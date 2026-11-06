@@ -11,9 +11,10 @@ How to read it:
 
 - **Measured** means checked on our own hardware. **Reported** means rclone's documentation or a public source says so and we
   haven't reproduced it. **To test** means nobody here has run it.
-- Providers appear by their plain names, as text, where the person has to pick one (the provider list, "Open website"). No
-  provider logos or trade dress; LordOS draws its own glyphs. Other operating systems' cloud features are never named, in the app
-  or here ([the brand rule](../tools/brand-check.mjs)).
+- Providers appear by the names rclone gives them, as plain text, only where the person has to pick one or sees which one an
+  account is (Add Account, an account's provider line, "Open website"): the one exception to [the brand rule](../tools/brand-check.mjs)
+  (17.2 item 2). No provider logos or trade dress; LordOS draws its own glyphs. Other operating systems' cloud features are
+  never named anywhere else.
 
 Mocks of every screen: https://claude.ai/artifact/FosCD4rEoU5Jr8ZM5K8oyq (private to the maintainer).
 
@@ -175,7 +176,9 @@ exists in the shipped version and records its answers.
 
 ### 6.1 Providers offered
 
-The add sheet shows a short list first, then **More…** with the rest rclone supports, searchable:
+As built (17.2 item 1): every backend the shipped rclone has, asked of rclone each time the sheet opens, under rclone's own
+names, minus the ones that aren't a storage of their own; the groups below are derived from each backend's options. The
+first design, kept for the groups:
 
 - **With sign-in in the browser** (OAuth): the large consumer and work drives (personal and business), a photo-and-file drive,
   Box, Dropbox, pCloud, Yandex Disk, Zoho WorkDrive, and others rclone marks as OAuth.
@@ -335,7 +338,8 @@ Camera and Photos; a cloud's shared-with-me folder where the provider exposes it
 
 ## 15. Phase 0 results
 
-Run on 2026-11-06 with rclone **v1.75.2** built from its tag's source with Go 1.26.10 (`CGO_ENABLED=0 go build -trimpath`), on
+Run on 2026-11-06 with rclone **v1.75.2** built from its tag's source with Go 1.26.10 (`CGO_ENABLED=0 go build -trimpath`; since
+17.2 item 7 the package carries rclone's official release binary instead, the same version), on
 VM 116 (Debian 13.7, amd64) and the Raspberry Pi 5 (arm64, LordOS 0.8.8.4). v1.76.0 came out the same day; 0.8.8.5 takes the newest
 patch release when it is built. Probe: `tools/cloud/phase0.sh` (a local `rclone serve webdav` stands in for the cloud). Same
 results on both architectures unless a number says otherwise.
@@ -633,3 +637,54 @@ confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"
    `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`, pinned in the script, key file in `packaging/keys/`), checks the hash, and puts
    the unmodified binary in `/usr/lib/lordos/rclone/rclone`. It is published in LordOS's own apt repository with each release
    (rclone has no apt repository of its own), so Store → Updates and `apt` keep it current. No Go on the build host.
+
+### 17.2 As built (branch `cloud-core`, 2026-11-06)
+
+1. **Providers.** `lord.cloud.providers()` answers `{ req }` and the list comes through `__lordCloudReply`; `cloud.providers()`
+   is a Promise. Each call runs `config/providers` (rclone is started if it isn't running). Left out: `alias`, `archive`,
+   `cache`, `chunker`, `combine`, `compress`, `hasher`, `http`, `local`, `memory`, `union`, `tardigrade`, every backend rclone
+   marks `Hide`, and every name another backend lists in its `Aliases`. `kind` is rclone's `Prefix` (`gcs`, `oos`), and
+   `config/create` gets its `Name`. `label` is rclone's `Description`, first line; `description` (and `hint`) is ours, from
+   the overlay, often empty. `group`: the overlay's when it has one (`cloud_pure.c`), else `cloud_derive_group`: `token` with
+   `client_id` and `client_secret` → `oauth` (a `token` alone, as Linkbox or Jottacloud have, is not a browser sign-in);
+   `access_key_id`, `secret_access_key`, `endpoint`, `sas_url`, `storage_url`, `bucket`, `bucket_name` or
+   `application_key` → `object`; `crypt` → `crypt`; else `server`. `verified`: the kind is under `verified` in
+   `assets/cloud/providers.json`. `website`: from the overlay. Fields as before, plus `help` (rclone's whole help). The
+   variants (Nextcloud, ownCloud on WebDAV) follow their backend in the list. rclone 1.75.2 gives 59 kinds this way (14 oauth, 33 server, 11 object, crypt), Nextcloud and ownCloud included.
+   Accounts keep their kind, rclone type, group and provider name in `accounts.json`, so an account of a backend with no
+   overlay comes back after a restart before the list is asked again.
+2. **Names.** rclone's, everywhere a provider is named (the list, `account.provider`, the keyring item's label). The overlay's
+   labels are only a fallback before rclone has answered, and the variants' own.
+3. **Questions.** `add` always answers through `{ req }` (a Promise in the SDK) when its arguments pass: `{ id }`, `{ question:
+   { state, name, help, type, examples: [{ value, help }], isPassword, required, exclusive, default } }` or `{ error, message
+   }`. `state` is `"<account id>:<rclone's state>"`; `answer(state, value)` runs `config/update` with `opt.continue`,
+   `state`, `result` (and `obscure`) and answers the same three ways. LordOS answers only `config_refresh_token` and
+   `config_is_local` itself; every other question goes to the person. While a new account waits for an answer it is in the
+   state with `configuring: true`; if its setup ends in an error it is removed (`config/delete`), and an existing one being
+   updated stays as it was with the error. Secret answers that rclone keeps as options go to the keyring with the rest
+   (`split_remote`). Sign-in in the browser still answers rclone's later questions with their defaults. **Measured:** Jottacloud
+   asks `config_type` (standard, traditional, legacy), then for a login token; a wrong token ends in `{ error }` and the
+   half-made account is gone (`cloud_integration.sh`, both architectures).
+4. **Empty Trash.** `emptyTrash(id)` → Promise `{ ok }` | `{ error: 'unsupported' }` | `{ error }`: `operations/cleanup` as an
+   `_async` rclone job, followed with `job/status` every second. `account.trashSupported` comes from `operations/fsinfo`'s
+   `CleanUp` feature; while it runs `account.emptyingTrash` is true, and `about` is asked again after it. WebDAV answers
+   `unsupported` (measured); a provider whose trash really empties is not tested yet.
+5. **Measure.** `measure(id)` → Promise `{ bytes, count }`: `operations/size` as an `_async` job; `cancelMeasure(id)` →
+   Promise `{ ok }` (`job/stop`), and the measure then answers `{ error: 'cloud.cancelled' }`. One rclone job per account at
+   a time (`cloud.busy`). The result is kept in `accounts.json` and shows as `about.used` when the provider gives none, with
+   `about.measuredAt` (ms), `measuredBytes` and `measuredCount`; `account.measuring` while it runs. **Measured** on WebDAV.
+6. **Delete.** `delete(paths)` → Promise `{ ok, deleted, failed: [{ path, error, errno }] }` or, at once, `{ error, path }`:
+   every path must be strictly inside a mounted account's folder (not the folder itself), with no `.`, `..` or `//`, and its
+   parent's real path must be its own text (no link on the way); one bad path refuses the whole request. A thread of its own
+   removes through the mount: a file or link with `unlink`, a folder with everything in it (`nftw` with `FTW_PHYS` and
+   `FTW_MOUNT`: links are not followed, and it never leaves the mount). **Measured:** a file and a folder with a subfolder
+   gone on the WebDAV server, no `.Trash` folder made, a path outside `~/Cloud`, the account's folder and a `..` path refused.
+7. **`lordos-rclone`** repackages `rclone-v1.75.2-linux-<arch>.zip` from downloads.rclone.org: `SHA256SUMS` must carry a good
+   signature by exactly `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA` (`packaging/keys/rclone-release-<fingerprint>.asc`, from
+   keys.openpgp.org, the same key as rclone.org/KEYS), the zip must have the hash it lists, the binary goes in unmodified
+   (`cmp` equal to the zip's), and on the build's own architecture it must say `rclone v1.75.2`. The copyright file is
+   rclone's MIT license plus every linked Go module's license, kept in `packaging/rclone/copyright-v1.75.2` (generated once
+   from a build of the tag). Both packages build in 39 s on VM 116 with no Go; the same release gives the same bytes; a
+   changed `SHA256SUMS` or zip is refused.
+
+The closed rc method table has 25 methods now: `operations/cleanup`, `operations/size`, `job/status` and `job/stop` were added.

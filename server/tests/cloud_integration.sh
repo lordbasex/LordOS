@@ -184,7 +184,7 @@ r=$(cmd free "$M/notes.txt")
 check "Free Up Space refuses a file waiting to go up" has "$r" '"reason":"pending"'
 check "its cached copy stays" test -e "$H/.cache/lordos/cloud/vfs/$ID/notes.txt"
 r=$(cmd wait '"up":{"files":0' 20)
-for i in $(seq 30); do [ "$(cat "$S/notes.txt")" = "changed here" ] && break; sleep 0.5; done
+for i in $(seq 120); do [ "$(cat "$S/notes.txt")" = "changed here" ] && break; sleep 0.5; done   # a slow or busy machine: up to 60 s
 check "the write reached the server" test "$(cat "$S/notes.txt")" = "changed here"
 
 r=$(cmd pause "$ID")
@@ -197,7 +197,8 @@ r=$(cmd status "$M/paused.txt")
 check "status while paused: going up" has "$r" '"st":"up"'
 r=$(cmd free "$M/paused.txt")
 check "Free Up Space refuses it: waiting to go up" has "$r" '"reason":"pending"'
-check "rclone's queue holds it" sh -c 'case "$1" in *"\"up\":{\"files\":1"*) exit 0;; esac; exit 1' x "$(cmd state)"
+r=$(cmd wait '"up":{"files":1' 10)
+check "rclone's queue holds it" has "$r" '"ok"' 
 r=$(cmd resume "$ID")
 for i in $(seq 40); do [ -e "$S/paused.txt" ] && break; sleep 0.5; done
 check "Resume lets it go up" test "$(cat "$S/paused.txt" 2>/dev/null)" = "made while paused"

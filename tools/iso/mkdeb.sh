@@ -320,7 +320,7 @@ if ! objdump -p "$L/bin/lord-sessiond" 2>/dev/null | grep -q "libsrtp2"; then ec
 # the signed tested-hardware snapshot, its own package (tools/iso/mkdeb-hwdata.sh): any version of format 1,
 # the first being the snapshot of 2026-10-27 (a format 2 is a Breaks in lordos-hwdata, not a change here)
 HWDATADEPS=", lordos-hwdata (>= 2026.10.27)"
-# rclone for Cloud and Connect to Server, our own build at /usr/lib/lordos/rclone (tools/iso/mkdeb-rclone.sh, docs/CLOUD.md 3.1);
+# rclone for Cloud and Connect to Server, rclone's signed release binary at /usr/lib/lordos/rclone (tools/iso/mkdeb-rclone.sh, docs/CLOUD.md 3.1);
 # Debian's rclone (1.60) is too old for Cloud, and nothing runs /usr/bin/rclone any more
 RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')

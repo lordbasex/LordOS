@@ -233,8 +233,9 @@ the catalog apps with only "code", then the packages.*
 **What `lordos` depends on since 0.8.7.** `lordos-hwdata`, the signed tested-hardware snapshot
 ([UPDATES.md](UPDATES.md), "The tested-hardware snapshot"); `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` for
 Remote Desk; `rclone`, `fuse3` and `openssh-client` for Connect to Server; `openssl`. An update brings them in.
-Since 0.8.8.5 `lordos-rclone` (upstream rclone v1.75.2 at `/usr/lib/lordos/rclone/rclone`, from `tools/iso/mkdeb-rclone.sh`, one
-package per architecture) replaces Debian's `rclone` as the dependency: Cloud needs a newer rclone than Debian 13's 1.60, and
+Since 0.8.8.5 `lordos-rclone` (rclone's official release binary v1.75.2, unmodified, at `/usr/lib/lordos/rclone/rclone`; `tools/iso/mkdeb-rclone.sh`
+checks the release's signed `SHA256SUMS` against rclone's pinned release key and the zip's hash, one package per architecture,
+published in LordOS's own apt repository with each release since rclone has none) replaces Debian's `rclone` as the dependency: Cloud needs a newer rclone than Debian 13's 1.60, and
 Connect to Server runs the same binary (Debian's only if ours is missing). Debian's `rclone` stays installed on an upgrade; nothing runs it.
 
 ## Suggested for your computer
