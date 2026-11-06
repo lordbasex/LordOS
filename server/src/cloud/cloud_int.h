@@ -52,6 +52,11 @@ typedef struct {
     int rcjob_req;
     int pending_req;                /* add()/answer() waiting for config/create's next step */
     int new_acc;                    /* added in this session and not finished: removed if its setup fails */
+    char trust_kind;                /* 'h' host keys, 'c' a certificate, shown and waiting for the person (cloud_trust.c) */
+    char *trust_data;
+    char *pend_sec;                 /* add's secrets while that question waits (wiped) */
+    int pend_upd;
+    time_t check_at;                /* the next listing that checks a mounted account still answers */
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */
     char *pending_secret;           /* not saved yet (keyring locked): retried */
     time_t about_at, tok_at, retry_at;
@@ -79,6 +84,13 @@ void  cl_save_keep(void);                   /* with cl_mu held */
 int   cl_rc_simple(int m, const char *body, int timeout);   /* an rc call whose answer doesn't matter: its status */
 void  cl_reply(int req, char *json);        /* an asynchronous answer for JS (takes json) */
 int   cl_next_req(void);
+
+/* cloud_trust.c */
+int   ct_needed(const Acc *a, const char *sec);
+int   ct_check(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);   /* 0 ok, 1 a question, -1 refused */
+int   ct_accept(Acc *a);
+void  ct_refuse(Acc *a);
+void  ct_forget(const Acc *a);
 
 /* cloud_files.c */
 void  cf_start(void);                                   /* the Keep on This Computer thread */

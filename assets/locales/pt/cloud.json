@@ -344,5 +344,15 @@
   "sftp.pickKey": "Escolha sua chave privada",
   "sftp.notKey": "Esse arquivo não é uma chave privada.",
   "sftp.chooseKey": "Escolha um arquivo de chave.",
-  "field.domain": "Domínio"
+  "field.domain": "Domínio",
+  "trust.hostTitle": "Este é o servidor certo?",
+  "trust.hostBody": "É a primeira conexão com {host}. Compare a impressão digital abaixo com a que o administrador do servidor lhe der, e confie só se forem iguais.",
+  "trust.certTitle": "O sistema não confia no certificado deste servidor",
+  "trust.certBody": "O LordOS não conseguiu confirmar quem é {host}. Confie neste certificado só se a impressão digital for igual à que o administrador do servidor lhe der.",
+  "trust.server": "Servidor",
+  "trust.fingerprint": "Impressão digital",
+  "trust.subject": "Emitido para",
+  "trust.issuer": "Emitido por",
+  "trust.trust": "Confiar",
+  "trust.trustCert": "Confiar neste certificado"
 }

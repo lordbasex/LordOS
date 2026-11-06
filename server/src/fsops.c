@@ -121,12 +121,19 @@ int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
         seterr(err, errlen, "fs.protected");
         return -1;
     }
-    if (renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) {
-        if (errno == EEXIST) seterr(err, errlen, "fs.exists");
-        else seterrno(err, errlen, errno);
-        return -1;
+    if (!renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) return 0;
+    if (errno == EINVAL || errno == ENOSYS) {
+        /* FUSE filesystems (rclone's cloud and Connect to Server mounts) don't take RENAME_NOREPLACE: check that nothing
+         * is at the target, then a plain rename. Between the check and the rename another program could create the
+         * target, which would then be replaced: a gap of microseconds, only on those filesystems. */
+        struct stat st;
+        if (!lstat(to, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
+        if (errno != ENOENT) { seterrno(err, errlen, errno); return -1; }
+        if (!renameat(AT_FDCWD, from, AT_FDCWD, to)) return 0;
     }
-    return 0;
+    if (errno == EEXIST) seterr(err, errlen, "fs.exists");
+    else seterrno(err, errlen, errno);
+    return -1;
 }
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */
@@ -419,8 +426,11 @@ static TrashDirs *trash_dirs(void) {
 }
 
 static double tree_size(const char *p, int depth) {
+    static __thread dev_t top;
     struct stat st;
     if (depth > 32 || lstat(p, &st)) return 0;
+    if (!depth) top = st.st_dev;
+    else if (st.st_dev != top) return 0;            /* a mount inside the trash is not the trash's size */
     if (!S_ISDIR(st.st_mode)) return (double)st.st_size;
     double sum = 0;
     DIR *d = opendir(p);
@@ -578,7 +588,7 @@ void fs_du(const char *real, double max_ms, FsDu *out) {
     memset(out, 0, sizeof *out);
     du_out = out;
     du_deadline = now_ms() + max_ms;
-    out->complete = nftw(real, du_cb, 32, FTW_PHYS) == 0;
+    out->complete = nftw(real, du_cb, 32, FTW_PHYS | FTW_MOUNT) == 0;   /* never into another filesystem (a cloud mount) */
 }
 
 static int has_ci(const char *hay, const char *needle) {
@@ -591,7 +601,34 @@ static int has_ci(const char *hay, const char *needle) {
     return 0;
 }
 
-typedef struct { const char *needle; int limit, depth, hits, visited; FsHitFn fn; void *ud; } Search;
+/* The walks for Recents and search stay on the filesystem they start on (docs/CLOUD.md 17.2, the Pi): a mount inside the
+ * home folder, above all a cloud or network one (~/Cloud/<account>, fuse.rclone, cifs, nfs, sshfs), is never entered.
+ * Its folder is skipped by its path, from /proc/self/mounts, before any lstat or readdir, so a server that doesn't answer
+ * can't block the interface's thread; st_dev catches the rest (a bind mount, one made during the walk). */
+#define WALK_SKIP_MAX 64
+typedef struct { char m[WALK_SKIP_MAX][PATH_MAX]; int n; dev_t dev; } WalkSkip;
+static void unescape_mount(char *s);
+static void walk_skip_init(WalkSkip *w, const char *root) {
+    w->n = 0;
+    struct stat st;
+    w->dev = !stat(root, &st) ? st.st_dev : 0;
+    FILE *f = fopen("/proc/self/mounts", "re");
+    if (!f) return;
+    char line[4096], dev[1024], mnt[2048];
+    size_t rl = strlen(root);
+    while (w->n < WALK_SKIP_MAX && fgets(line, sizeof line, f)) {
+        if (sscanf(line, "%1023s %2047s", dev, mnt) != 2) continue;
+        unescape_mount(mnt);
+        if (!strncmp(mnt, root, rl) && mnt[rl] == '/') pathf(w->m[w->n++], PATH_MAX, "%s", mnt);
+    }
+    fclose(f);
+}
+static int walk_skip(const WalkSkip *w, const char *path) {
+    for (int i = 0; i < w->n; i++) if (!strcmp(w->m[i], path)) return 1;
+    return 0;
+}
+
+typedef struct { const char *needle; int limit, depth, hits, visited; FsHitFn fn; void *ud; WalkSkip *skip; } Search;
 static void search_dir(const char *p, Search *s, int depth) {
     if (depth > s->depth || s->hits >= s->limit || s->visited > 100000) return;
     DIR *d = opendir(p);
@@ -601,8 +638,9 @@ static void search_dir(const char *p, Search *s, int depth) {
         s->visited++;
         char c[PATH_MAX];
         if ((size_t)snprintf(c, sizeof c, "%s/%s", p, e->d_name) >= sizeof c) continue;
+        if (walk_skip(s->skip, c)) continue;
         struct stat st;
-        if (lstat(c, &st)) continue;
+        if (lstat(c, &st) || (s->skip->dev && st.st_dev != s->skip->dev)) continue;
         if (has_ci(e->d_name, s->needle)) { s->hits++; s->fn(s->ud, c, S_ISDIR(st.st_mode), (double)st.st_size, (double)st.st_mtime * 1000); }
         if (S_ISDIR(st.st_mode)) search_dir(c, s, depth + 1);
     }
@@ -610,13 +648,17 @@ static void search_dir(const char *p, Search *s, int depth) {
 }
 
 int fs_search(const char *real, const char *needle, int limit, int depth, FsHitFn fn, void *ud) {
-    Search s = { needle, limit, depth, 0, 0, fn, ud };
+    WalkSkip *w = malloc(sizeof *w);
+    if (!w) return 0;
+    walk_skip_init(w, real);
+    Search s = { needle, limit, depth, 0, 0, fn, ud, w };
     if (needle[0]) search_dir(real, &s, 0);
+    free(w);
     return s.hits;
 }
 
 typedef struct { char path[PATH_MAX]; double mtime, size; } Recent;
-typedef struct { Recent *r; int n, cap, visited; time_t since; } RecentAcc;
+typedef struct { Recent *r; int n, cap, visited; time_t since; WalkSkip *skip; } RecentAcc;
 static void recent_dir(const char *p, RecentAcc *a, int depth) {
     if (depth > 5 || a->visited > 60000) return;
     DIR *d = opendir(p);
@@ -626,8 +668,9 @@ static void recent_dir(const char *p, RecentAcc *a, int depth) {
         a->visited++;
         char c[PATH_MAX];
         if ((size_t)snprintf(c, sizeof c, "%s/%s", p, e->d_name) >= sizeof c) continue;
+        if (walk_skip(a->skip, c)) continue;
         struct stat st;
-        if (lstat(c, &st)) continue;
+        if (lstat(c, &st) || (a->skip->dev && st.st_dev != a->skip->dev)) continue;
         if (S_ISDIR(st.st_mode)) { recent_dir(c, a, depth + 1); continue; }
         if (!S_ISREG(st.st_mode) || st.st_mtime < a->since) continue;
         double m = (double)st.st_mtime * 1000;
@@ -644,9 +687,12 @@ static void recent_dir(const char *p, RecentAcc *a, int depth) {
 int fs_recent(int limit, int days, FsHitFn fn, void *ud) {
     if (limit < 1) limit = 1;
     if (limit > 500) limit = 500;
-    RecentAcc a = { calloc((size_t)limit, sizeof(Recent)), 0, limit, 0, time(NULL) - (time_t)days * 86400 };
-    if (!a.r) return 0;
+    WalkSkip *w = malloc(sizeof *w);
+    RecentAcc a = { calloc((size_t)limit, sizeof(Recent)), 0, limit, 0, time(NULL) - (time_t)days * 86400, w };
+    if (!a.r || !w) { free(a.r); free(w); return 0; }
+    walk_skip_init(w, home);
     recent_dir(home, &a, 0);
+    free(w);
     for (int i = 0; i < a.n; i++) fn(ud, a.r[i].path, 0, a.r[i].size, a.r[i].mtime);
     free(a.r);
     return a.n;

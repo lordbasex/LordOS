@@ -391,7 +391,7 @@ export default function Files() {
       if (!g) return;
       const pr = cloudModel.deletePrompt(g.acc, g.paths.length);
       setConfirm({ text: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars), ok: tr('cloud.delete.ok'), destructive: true, run: () => {
-        cloud.delete(g.paths).then((r) => { setMsg(r && r.error ? errorText(r.error) : tr('cloud.delete.done', { count: g.paths.length, provider: g.acc.provider || g.acc.kind })); bump(); });
+        cloud.delete(g.paths).then((r) => { setMsg(r && r.error ? errorText(r.error) : tr('cloud.delete.done', { count: g.paths.length, provider: cloudModel.providerName(g.acc) })); bump(); });
         setTimeout(() => ask(i + 1), 0);
       } });
     };
