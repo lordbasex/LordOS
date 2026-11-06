@@ -388,7 +388,8 @@ const NOTES = { iclouddrive: ['cloud.notes.iclouddrive.adp', 'cloud.notes.icloud
 export const notesFor = (kind) => NOTES[String(kind || '')] || [];
 
 // Measure (17.2): a provider without a quota can be measured; the line once it was
-export const canMeasure = (about) => !about || !(about.total > 0);
+// only when the provider answered without a total (not when there was no answer: the account isn't connected)
+export const canMeasure = (about) => !!about && !(about.total > 0);
 export function measuredLine(about, fmt, fmtTime) {
   if (!about || !about.measuredAt) return null;
   return { key: 'cloud.measure.done', vars: { used: fmt(about.used || 0), when: fmtTime(new Date(toMs(about.measuredAt))) } };
@@ -412,3 +413,69 @@ export const deletePrompt = (acc, count) => ({
   title: { key: 'cloud.delete.title', vars: { provider: (acc && (acc.provider || acc.kind)) || '', count } },
   detail: { key: acc && acc.trashSupported ? 'cloud.delete.toTrash' : 'cloud.delete.final', vars: { provider: (acc && (acc.provider || acc.kind)) || '' } },
 });
+
+// ---- the credentials form (Pi test, 2026-11-06): the essential fields first, the rest under Advanced options ----
+
+// the fields each kind needs, in order; sftp's sign-in is a choice (password, or a key from a file)
+const ESSENTIAL = {
+  sftp: ['host', 'port', 'user'],
+  webdav: ['url', 'vendor', 'user', 'pass'],
+  nextcloud: ['url', 'user', 'pass'], owncloud: ['url', 'user', 'pass'],
+  s3: ['provider', 'endpoint', 'region', 'access_key_id', 'secret_access_key'],
+  ftp: ['host', 'port', 'user', 'pass'],
+  smb: ['host', 'port', 'user', 'pass', 'domain'],
+};
+const SFTP_AUTH = { password: 'pass', key: 'key_pem', passphrase: 'key_file_pass' };
+// "Raw PEM-encoded private key. If specified…" → "Raw PEM-encoded private key"
+export function shortLabel(help, name) {
+  const first = String(help || '').split('\n')[0].trim();
+  let s = first.split(/(?<=[a-z0-9)])[.;:](\s|$)/i)[0].replace(/\s*\(.*$/, '').replace(/[.:]+$/, '').trim();
+  if (s.length > 48) s = `${s.slice(0, 46).replace(/\s+\S*$/, '')}…`;
+  return s || String(name || '');
+}
+const BOOLS = ['true', 'false'];
+// how a field is asked: { input: 'password' | 'bool' | 'choice' | 'number' | 'text', options }
+export function fieldInput(f) {
+  const type = String((f && f.type) || '').toLowerCase();
+  const pw = f && (typeof f.isPassword === 'boolean' ? f.isPassword : (f.secret && /pass|secret|pem|token|private/i.test(f.name || '')));
+  if (pw) return { input: 'password', options: [] };
+  if (type === 'bool' || (!type && BOOLS.includes(String(f && f.default)))) return { input: 'bool', options: [] };
+  const ex = ((f && f.examples) || []).map(String).filter(Boolean);
+  if (ex.length >= 2) return { input: 'choice', options: ex };
+  if (/^(int|uint|float|sizesuffix)/.test(type)) return { input: 'number', options: [] };
+  return { input: 'text', options: [] };
+}
+// → { main: [field], auth: null | { password, key, passphrase } (field names), advanced: [field] }
+export function formLayout(p) {
+  const fields = (p && p.fields) || [];
+  const by = new Map(fields.map((f) => [f.name, f]));
+  const kind = p && p.kind;
+  const auth = kind === 'sftp' && by.has(SFTP_AUTH.password) ? { ...SFTP_AUTH } : null;
+  const authNames = auth ? Object.values(auth) : [];
+  let main;
+  if (ESSENTIAL[kind]) main = ESSENTIAL[kind].filter((n) => by.has(n) && !authNames.includes(n)).map((n) => by.get(n));
+  else main = fields.filter((f) => f.required || (f.default == null || f.default === '') && fieldInput(f).input !== 'bool');
+  const taken = new Set([...main.map((f) => f.name), ...authNames.filter((n) => by.has(n))]);
+  return { main, auth, advanced: fields.filter((f) => !taken.has(f.name)) };
+}
+// a private key file as rclone's key_pem takes it: one line, its line ends written as \n
+export const pemForRclone = (text) => String(text || '').replace(/\r/g, '').trim().split('\n').join('\\n');
+
+// ---- an account that isn't connected (keyring locked…) ----
+
+export const needsUnlock = (acc) => !!acc && (acc.error === 'cloud.keyringLocked' || acc.state === 'locked');
+// The text to show for an error code: "the service isn't running" only when it isn't; otherwise the account's own
+// reason, or that the account isn't connected yet.
+export function explainError(code, st, acc) {
+  if (!code) return null;
+  if ((code === 'cloud.notRunning' || code === 'cloud.unavailable') && st && st.service && st.service.running) return (acc && acc.error) || 'cloud.notConnected';
+  return code;
+}
+// What the space box shows: 'quota' (a total), 'noQuota' (the provider answered without a total: Measure), 'reason'
+// (no answer because the account isn't connected: its error), 'unknown' (no answer yet)
+export function spaceState(acc) {
+  const ab = acc && acc.about;
+  if (ab && ab.total > 0) return 'quota';
+  if (ab) return 'noQuota';
+  return acc && (acc.error || acc.state === 'locked') ? 'reason' : 'unknown';
+}

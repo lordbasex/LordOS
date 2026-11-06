@@ -814,6 +814,9 @@ static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, K
         jb_str(b, help ? help : "");
         jb_printf(b, ",\"secret\":%s,\"required\":%s,\"default\":", secret ? "true" : "false", json_bool(o, "Required", 0) ? "true" : "false");
         jb_str(b, secret ? "" : def ? def : "");
+        /* (interface, 2026-11-06) only a password is masked: Sensitive (a host, a user) stays plain text; the type for switches */
+        jb_printf(b, ",\"isPassword\":%s,\"type\":", json_bool(o, "IsPassword", 0) ? "true" : "false");
+        jb_str(b, json_str(o, "Type") ? json_str(o, "Type") : "string");
         jb_raw(b, ",\"examples\":[");
         const JVal *ex = json_get(o, "Examples");
         int ne = 0;

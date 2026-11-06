@@ -20,6 +20,7 @@
   "app.readFailed": "Não foi possível ler o arquivo",
   "app.writeFailed": "Não foi possível gravar o arquivo",
   "apps.restrictKernel": "As restrições deste app precisam de um kernel mais novo: ele não foi aberto",
+  "cloud.notConnected": "Esta conta ainda não está conectada",
   "cloud.unavailable": "A Nuvem não está disponível nesta sessão",
   "cloud.badId": "Essa conta na nuvem não existe",
   "cloud.badKind": "Esse tipo de conta não é oferecido",

@@ -20,6 +20,7 @@
   "app.readFailed": "Could not read the file",
   "app.writeFailed": "Could not write the file",
   "apps.restrictKernel": "This app's restrictions need a newer kernel: it was not started",
+  "cloud.notConnected": "This account isn't connected yet",
   "cloud.unavailable": "Cloud isn’t available in this session",
   "cloud.badId": "That cloud account doesn’t exist",
   "cloud.badKind": "That kind of account isn’t offered",
