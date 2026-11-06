@@ -244,6 +244,26 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   Tested: a new profile starts that way. Back to the LordOS frame: Settings → Appearance → «Use
   system title bar and borders» (or right click on the tab strip). With Chromium's «Classic» theme
   the buttons keep LordOS's order and side but are Chromium's own.
+- **Brave and other Chromium-based browsers** (0.8.8.4, #39). They don't read Debian
+  Chromium's `/etc/chromium/master_preferences`, where LordOS puts its defaults (a new Brave profile
+  has neither key; LordOS doesn't write into the vendor's `/opt/brave.com/brave`), so it starts with
+  Chromium's defaults for a desktop it doesn't know (`XDG_CURRENT_DESKTOP=LordOS`): its own bar
+  (`custom_chrome_frame` on) with the **Classic** theme, whose window buttons are Chromium's own
+  (minimize, maximize and close glyphs, on LordOS's side and in its order), not LordOS's traffic
+  lights; next to native windows they look like the Lord Classic theme's. Not a LordOS frame or
+  decoration bug: lord-server answers Brave's `xdg-decoration` request (it runs as a native Wayland
+  client, `--ozone-platform=wayland`) exactly as Chromium's, and with the GTK theme the same Brave
+  draws the traffic lights. The switch below now also writes Brave's profiles
+  (`~/.config/BraveSoftware/Brave-Browser`), and Store → Third-party apps installs it; in Brave
+  itself: ☰ → Settings → Appearance → Theme → **GTK** (traffic lights in its bar) or «Use system title
+  bar and borders» (the LordOS frame). Checked on VM 116 with Brave 1.99.55 in an isolated session: a
+  new profile with the Classic buttons, then Settings → Appearance → «Change them» and Brave reopened
+  with LordOS's traffic lights.
+
+  | | |
+  |---|---|
+  | ![brave classic](brave-classic-theme.png) | ![brave gtk](brave-gtk-theme.png) |
+  | A new Brave profile: its own bar with the Classic theme's buttons | After the switch («Change them»): the same profile with LordOS's traffic lights |
 - **Firefox ESR.** `/etc/firefox-esr/lordos.js` has `pref("browser.tabs.inTitlebar", 1)`: its own
   bar, with the window buttons in LordOS's order and side (it reads the same `button-layout`), drawn
   in Firefox's own style: Firefox draws those buttons itself, not with the GTK theme, so they aren't
@@ -308,7 +328,11 @@ own profiles, only when the switch is turned (never by itself at login):
   `sdk/browserframe.js`). No program is run and JS passes no path: only `on`/`off` and which
   browser. The folders are fixed (`$XDG_CONFIG_HOME` or `~/.config`, and `~`); every file is opened
   without following links, must be a regular file owned by the user and is size-capped.
-- **Chromium** (`~/.config/chromium/Default` and `Profile N`, `Preferences`):
+- **Chromium** (`~/.config/chromium/Default` and `Profile N`, `Preferences`), and since 0.8.8.4 **Brave**
+  the same way (`~/.config/BraveSoftware/Brave-Browser`, its own `SingletonLock` held by a process named
+  `brave`; one browser open doesn't stop the other from being written, and Settings says "Chromium or
+  Brave is open"). Settings' «Change them» counts the profiles the switch would change (a frame or a
+  theme unset or different, as in a new Brave profile), not only those with the opposite frame:
   `browser.custom_chrome_frame` = on/off, and with on `extensions.theme.system_theme` = 1 (the GTK
   theme, for the traffic lights) unless the profile uses a theme extension the user installed
   (kept). Chromium rewrites `Preferences` when it quits, so it is only written while Chromium is

@@ -6,22 +6,22 @@
   "admin.timezone": "Time zone",
   "admin.unavailable": "The admin helper is not running: lord-server must start with sudo and the user must be in the sudo group.",
   "browserTabs.applyAll": "Change them",
-  "browserTabs.chromiumOpen": "Chromium is open: its profiles change as soon as you quit it.",
+  "browserTabs.chromiumOpen": "Chromium or Brave is open: its profiles change as soon as you quit it.",
   "browserTabs.done": "Done. The browsers use it the next time they open.",
   "browserTabs.failed": {
     "one": "{count} browser profile could not be changed and was left as it was.",
     "other": "{count} browser profiles could not be changed and were left as they were."
   },
   "browserTabs.firefoxKept": "A Firefox profile sets this in its own user.js file, so it was left alone.",
-  "browserTabs.hint": "On: Chromium and Firefox draw a single bar with their tabs and LordOS's window buttons. Off: they use the LordOS frame. It changes your browser profiles and applies the next time each browser opens.",
+  "browserTabs.hint": "On: Chromium, Brave and Firefox draw a single bar with their tabs and LordOS's window buttons. Off: they use the LordOS frame. It changes your browser profiles and applies the next time each browser opens.",
   "browserTabs.label": "Browsers: tabs in the title bar",
   "browserTabs.othersOff": {
-    "one": "{count} Chromium profile still uses the LordOS frame",
-    "other": "{count} Chromium profiles still use the LordOS frame"
+    "one": "{count} Chromium or Brave profile doesn't show LordOS's window buttons yet",
+    "other": "{count} Chromium or Brave profiles don't show LordOS's window buttons yet"
   },
   "browserTabs.othersOn": {
-    "one": "{count} Chromium profile still draws its own bar",
-    "other": "{count} Chromium profiles still draw their own bar"
+    "one": "{count} Chromium or Brave profile still draws its own bar",
+    "other": "{count} Chromium or Brave profiles still draw their own bar"
   },
   "change": "Change…",
   "clipboard.add": "Add",

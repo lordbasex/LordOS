@@ -343,10 +343,21 @@ static int pid_is(long pid, const char *const *names) {
 }
 
 static const char *const CHROMIUM_NAMES[] = { "chromium", "chrome", NULL };
+static const char *const BRAVE_NAMES[] = { "brave", NULL };
 static const char *const FIREFOX_NAMES[] = { "firefox", "GeckoMain", NULL };
 
+/* The Chromium-based browsers whose profiles the switch writes (0.8.8.4, #39: Brave too): the data
+ * folder under ~/.config and the names of the process that holds its SingletonLock. They share
+ * Chromium's Preferences format and its two keys. */
+typedef struct { const char *dir; const char *const *procs; } ChromeKind;
+static const ChromeKind CHROME_KINDS[] = {
+    { "chromium", CHROMIUM_NAMES },
+    { "BraveSoftware/Brave-Browser", BRAVE_NAMES },
+};
+#define N_CHROME_KINDS (int)(sizeof CHROME_KINDS / sizeof CHROME_KINDS[0])
+
 /* Chromium's SingletonLock is a link to "<host>-<pid>". Anything unexpected counts as running. */
-static int chromium_locked(int dfd) {
+static int chromium_locked(int dfd, const char *const *procs) {
     char t[300], host[256];
     ssize_t k = readlinkat(dfd, "SingletonLock", t, sizeof t - 1);
     if (k < 0) return errno == ENOENT ? 0 : 1;
@@ -357,14 +368,17 @@ static int chromium_locked(int dfd) {
     if ((size_t)(dash - t) != strlen(host) || memcmp(t, host, (size_t)(dash - t))) return 1;   /* another computer */
     long pid = strtol(dash + 1, &e, 10);
     if (*e || pid <= 0) return 1;
-    return pid_is(pid, CHROMIUM_NAMES);          /* a dead or unrelated pid: a stale lock */
+    return pid_is(pid, procs);                   /* a dead or unrelated pid: a stale lock */
 }
 
 int brf_chromium_running(const char *cfg) {
-    int dfd = open_root(cfg, "chromium");
-    if (dfd < 0) return 0;
-    int r = chromium_locked(dfd);
-    close(dfd);
+    int r = 0;
+    for (int k = 0; k < N_CHROME_KINDS && !r; k++) {
+        int dfd = open_root(cfg, CHROME_KINDS[k].dir);
+        if (dfd < 0) continue;
+        r = chromium_locked(dfd, CHROME_KINDS[k].procs);
+        close(dfd);
+    }
     return r;
 }
 
@@ -411,17 +425,15 @@ static int chromium_profiles(int dfd, char **names) {
     return nn;
 }
 
-void brf_chromium_apply(const char *cfg, int on, BrfResult *r) {
-    memset(r, 0, sizeof *r);
-    int dfd = open_root(cfg, "chromium");
-    if (dfd < 0) return;
+/* One browser's profiles (its folder dfd): counts added to r. Nothing is written while it runs. */
+static void chrome_apply_one(int dfd, const char *const *procs, int on, BrfResult *r) {
     r->found = 1;
-    if (chromium_locked(dfd)) { r->running = 1; close(dfd); return; }
+    if (chromium_locked(dfd, procs)) { r->running = 1; return; }
     char *names[MAX_PROFILES];
-    int nn = chromium_profiles(dfd, names);
-    if (nn < 0) { r->failed++; close(dfd); return; }
+    int nn = chromium_profiles(dfd, names), running = 0;
+    if (nn < 0) { r->failed++; return; }
     for (int i = 0; i < nn; i++) {
-        int pfd = r->running ? -1 : openat(dfd, names[i], O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+        int pfd = running ? -1 : openat(dfd, names[i], O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
         free(names[i]);
         if (pfd < 0) continue;
         struct stat st;
@@ -437,7 +449,7 @@ void brf_chromium_apply(const char *cfg, int on, BrfResult *r) {
         int e = brf_chrome_edit(data, n, on, &out, &on_n);
         if (e == BRF_BAD) r->failed++;
         else if (e == BRF_SAME) r->unchanged++;
-        else if (chromium_locked(dfd)) r->running = 1;               /* it started meanwhile: later */
+        else if (chromium_locked(dfd, procs)) running = r->running = 1;   /* it started meanwhile: later */
         else if (write_at(pfd, "Preferences.lordos-backup", data, n, st.st_mode) ||
                  write_at(pfd, "Preferences", out, on_n, st.st_mode)) r->failed++;
         else r->changed++;
@@ -445,30 +457,45 @@ void brf_chromium_apply(const char *cfg, int on, BrfResult *r) {
         free(data);
         close(pfd);
     }
-    close(dfd);
 }
 
+void brf_chromium_apply(const char *cfg, int on, BrfResult *r) {
+    memset(r, 0, sizeof *r);
+    for (int k = 0; k < N_CHROME_KINDS; k++) {
+        int dfd = open_root(cfg, CHROME_KINDS[k].dir);
+        if (dfd < 0) continue;
+        chrome_apply_one(dfd, CHROME_KINDS[k].procs, on, r);
+        close(dfd);
+    }
+}
+
+/* Profiles that switching on would change (*off) and that switching off would change (*on): a
+ * profile with the frame or the theme unset or different counts, a malformed one doesn't. */
 void brf_chromium_state(const char *cfg, int *on, int *off) {
     *on = *off = 0;
-    int dfd = open_root(cfg, "chromium");
-    if (dfd < 0) return;
-    char *names[MAX_PROFILES];
-    int nn = chromium_profiles(dfd, names);
-    for (int i = 0; i < nn; i++) {
-        int pfd = openat(dfd, names[i], O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
-        free(names[i]);
-        if (pfd < 0) continue;
-        size_t n;
-        char *data = read_at(pfd, "Preferences", PREFS_MAX, &n, NULL);
-        close(pfd);
-        JDoc d;
-        if (!data || json_parse(data, n, &d, NULL, 0)) { free(data); continue; }
-        const JVal *b = json_get(d.root, "browser"), *f = b ? json_get(b, "custom_chrome_frame") : NULL;
-        if (f && f->type == J_BOOL) { if (f->num) (*on)++; else (*off)++; }
-        json_free(&d);
-        free(data);
+    for (int k = 0; k < N_CHROME_KINDS; k++) {
+        int dfd = open_root(cfg, CHROME_KINDS[k].dir);
+        if (dfd < 0) continue;
+        char *names[MAX_PROFILES];
+        int nn = chromium_profiles(dfd, names);
+        for (int i = 0; i < nn; i++) {
+            int pfd = openat(dfd, names[i], O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+            free(names[i]);
+            if (pfd < 0) continue;
+            size_t n;
+            char *data = read_at(pfd, "Preferences", PREFS_MAX, &n, NULL), *out = NULL;
+            close(pfd);
+            if (!data) continue;
+            size_t outn;
+            if (brf_chrome_edit(data, n, 1, &out, &outn) == BRF_CHANGED) (*off)++;
+            free(out);
+            out = NULL;
+            if (brf_chrome_edit(data, n, 0, &out, &outn) == BRF_CHANGED) (*on)++;
+            free(out);
+            free(data);
+        }
+        close(dfd);
     }
-    close(dfd);
 }
 
 /* ---- Firefox profiles ---- */

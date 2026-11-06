@@ -308,15 +308,16 @@ system by LordOS's packages.
 
 ## Mirrored apps (catalog)
 
-LordOS offers a curated list of third-party apps (today nine AI apps, and three free-of-charge
-proprietary apps in a "commercial" section: Google Chrome, Microsoft Edge and Spotify) through the
-Store with its normal package engine. The list is `apt/catalog.json` in the repository (schema,
+LordOS offers a curated list of third-party apps (today nine AI apps; three free-of-charge
+proprietary apps in a "commercial" section: Google Chrome, Microsoft Edge and Spotify; and three open
+source apps from other projects in Store → Third-party apps: ArtCraft, VSCodium and Brave Browser)
+through the Store with its normal package engine. The list is `apt/catalog.json` in the repository (schema,
 update steps and trust rules: `apt/README.md`); the vendors' signing keys are in `apt/keys/`,
 LordOS's build recipes in `apt/recipes/`. An app reaches a system in one of two ways:
 
 | Delivery | Apps | How |
 |---|---|---|
-| **direct** | Claude Code (`claude-code`), Claude Desktop (`claude-desktop`), Visual Studio Code (`code`), Cursor (`cursor`); commercial: Google Chrome (`google-chrome-stable`, amd64 and arm64), Microsoft Edge (`microsoft-edge-stable`, amd64), Spotify (`spotify-client`, amd64) | the vendor has a signed APT repository: the user's system adds it (a deb822 `.sources` with the key pinned in the catalog) and installs and updates from the vendor. Nothing is copied to lordos.org. |
+| **direct** | Claude Code (`claude-code`), Claude Desktop (`claude-desktop`), Visual Studio Code (`code`), Cursor (`cursor`); commercial: Google Chrome (`google-chrome-stable`, amd64 and arm64), Microsoft Edge (`microsoft-edge-stable`, amd64), Spotify (`spotify-client`, amd64); third-party apps (0.8.8.4): VSCodium (`codium`, amd64 and arm64), Brave Browser (`brave-browser`, amd64 and arm64) | the vendor has a signed APT repository: the user's system adds it (a deb822 `.sources` with the key pinned in the catalog) and installs and updates from the vendor. Nothing is copied to lordos.org. |
 | **mirror** | `llama.cpp`, `whisper.cpp`, `codex-cli` (built by LordOS); `goose`, `opencode` (the vendor's .deb) | no vendor repository: verified on the maintainer's Mac and published in `pool/catalog/` of lordos.org/apt, signed with the LordOS archive key with everything else. |
 
 The flow, on the maintainer's Mac only (like the rest of the repository):
@@ -371,6 +372,9 @@ cursor 3.27.14, claude-code 2.1.308, goose 1.56.0, opencode 1.19.4; of 2026-10-2
 | `google-chrome-stable` | always writes `/usr/share/keyrings/google-chrome.gpg` (Google's key EB4C 1BFD … D38B 4796 with its three current signing subkeys). On a new install (no `/etc/default/google-chrome`), or when `google-chrome.sources` already exists, it writes `/etc/apt/sources.list.d/google-chrome.sources` (`URIs: https://dl.google.com/linux/chrome-stable/deb/`, `Architectures:` the machine's, Signed-By that keyring) and `/etc/default/google-chrome` (`repo_add_once="false"`, `repo_reenable_on_distupgrade="true"`); it migrates and removes a legacy `google-chrome.list` and `/etc/apt/trusted.gpg.d/google-chrome.gpg`. The daily `/etc/cron.daily/google-chrome` rewrites the key and, while `google-chrome.sources` exists, the source; it doesn't recreate a removed one. An `/etc/default/google-chrome` with `repo_add_once="false"` and no `google-chrome.sources` stops it from adding one. Also `x-www-browser`/`gnome-www-browser` alternatives (priority 200), icons, `defaults.list`, and an AppArmor profile when `/etc/apparmor.d/abi/4.0` exists. postrm cleans the source, key and defaults file only on purge. |
 | `microsoft-edge-stable` | the same scripts as Chrome's: `/usr/share/keyrings/microsoft-edge.gpg` (Microsoft's key BC52 8686 … BE12 29CF, the same as VS Code's), `/etc/apt/sources.list.d/microsoft-edge.sources` (`URIs: https://packages.microsoft.com/repos/edge-stable`, the same index as `repos/edge`; the file carries `Architectures: amd64` twice, which apt accepts), `/etc/default/microsoft-edge`, `/etc/cron.daily/microsoft-edge`; purge-only cleanup. |
 | `spotify-client` | copies its key (`spotify-2025-11-21-5384CE82BA52C83A.gpg`, E109 6BCB … BA52 C83A) into `/etc/apt/trusted.gpg.d/` (trusted for every source without Signed-By), and writes `/etc/apt/sources.list.d/spotify.list` (`deb https://repository.spotify.com stable non-free`, no signed-by) unless a `.list` file already names that repository or `spotify.list` exists. It only looks at `.list` files, not `.sources`. Icons and the menu entry through `xdg-icon-resource`/`xdg-desktop-menu`; no postrm. The vendor-documented opt-out is an empty `spotify.list`. |
+| `codium` (1.143.17232, read on 2026-11-05) | links `/usr/bin/codium` and registers `/usr/bin/editor` (priority 0). It carries VS Code's script for adding Microsoft's repository, but behind a check that is always false for `codium`, so it adds no source and no key; the `/usr/bin/copilot` link code it also carries only acts for the `code` and `code-insiders` editions. Desktop and MIME databases refreshed. |
+| `brave-browser` (1.99.55, read on 2026-11-05) | depends on `brave-keyring`. Its postinst installs icons, `defaults.list` entries, the `x-www-browser`/`gnome-www-browser`/`brave-browser` alternatives (priority 201), an AppArmor profile when `/etc/apparmor.d/abi/4.0` exists, and the `chromemgmt` group only when `/etc/default/brave-browser` asks for it; its Chrome-style source and key writer is cut off by an `exit 0` before it runs (Brave's own comment: "Don't add the Chrome repo"), so it writes no source. |
+| `brave-keyring` (1.20) | ships `/usr/share/keyrings/brave-browser-archive-keyring.gpg` (Brave's three release keys: DBF1 A116 … 2003 8257, 47D3 2A74 … 6A73 CD96, B2A3 DCA3 … E4B0 DCA0) and `/etc/sysctl.d/30-brave.conf` (comments only). Its postinst links that keyring into `/etc/apt/trusted.gpg.d/` (trusted for every source) **unless** `/etc/apt/sources.list.d/brave-browser-release.sources` (or `.list`) already uses it as Signed-By, in which case it removes the link; postrm removes the link. |
 | `opencode` | `/usr/bin/ai.opencode.desktop` through update-alternatives; `chrome-sandbox` made setuid only when unprivileged user namespaces don't work; an AppArmor profile copied to `/etc/apparmor.d/ai.opencode.desktop` when AppArmor is enabled. It ships electron-updater's `app-update.yml` (GitHub releases). |
 
 So that the vendor scripts and LordOS's own source agree, a direct app's source should be written
@@ -399,6 +403,17 @@ their cron job):
   `lordos-<id>` names and the documented `linux/chrome/deb` URL the system would keep two sources for
   the same packages (different URLs, so apt doesn't refuse them; both appear in `apt-cache policy`).
 - **Microsoft Edge** is the same with `microsoft-edge` / `microsoft-edge.gpg` and `repos/edge-stable`.
+- **Brave Browser** (0.8.8.4) uses `"files": {"sources": "brave-browser-release", "keyring":
+  "brave-browser-archive-keyring.gpg"}`, the names of Brave's own instructions: the source is the one
+  `brave-keyring` looks for, so it doesn't link its keyring into `trusted.gpg.d`, and the keyring is the
+  path that package then installs (dpkg replaces the file LordOS wrote, which no package owns, with
+  Brave's three keys; the one LordOS pins, DBF1 A116 … 2003 8257, signs the repository today). Checked
+  on VM 116 on 2026-11-05 with the engine (`pkg-test run pkg-source-add`, `pkg-update`, `pkg-install
+  "codium brave-browser"`): both sources verified, `brave-browser` 1.99.55, `brave-keyring` 1.20 and
+  `codium` 1.143.17232 installed, no `trusted.gpg.d` link, nothing else in `sources.list.d`, and the
+  next engine update and `apt-get update` clean. **VSCodium** needs no `files`: its package writes no
+  source. If Brave starts signing with one of its other two keys, the catalog's key and fingerprint
+  change in a reviewed pull request, as for any key rotation.
 - **Spotify** has no `files`: its package writes a `.list` whatever `.sources` exist. With LordOS's
   `lordos-spotify.sources` and the package's `spotify.list` apt only warns ("Target Packages … is
   configured multiple times") and `apt-get update` succeeds; with an empty `spotify.list` created

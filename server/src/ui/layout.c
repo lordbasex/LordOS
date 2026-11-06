@@ -129,7 +129,13 @@ static void measure(Node *n, float aw, float ah, float *ow, float *oh) {
                 measure(c, isnan(iaw) ? NAN : iaw - mh, isnan(iah) ? NAN : iah - mv, &c_w, &c_h);
                 c_w += mh; c_h += mv;
                 if (wrap) {
-                    float cm = s->row ? c_w : c_h, cc = s->row ? c_h : c_w;
+                    /* the main size the lines are broken with, as layout breaks them: the flexBasis
+                     * or the width/height when set, else the measured size (a card with a long
+                     * summary measures wider than its basis; breaking with that made a grid of cards
+                     * measure more lines than it lays out, a blank band under it: 0.8.8.4, #37) */
+                    float b = res(c->s.basis, lim), e = res(s->row ? c->s.width : c->s.height, lim);
+                    float cm = !isnan(b) ? b + (s->row ? mh : mv) : !isnan(e) ? e + (s->row ? mh : mv) : s->row ? c_w : c_h;
+                    float cc = s->row ? c_h : c_w;
                     if (in_line && line_m + s->gap + cm > lim + 0.5f) {
                         if (line_m > tot_m) tot_m = line_m;
                         tot_c += line_c + s->gap;

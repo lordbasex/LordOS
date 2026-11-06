@@ -1,5 +1,5 @@
 // Settings → Appearance → "Browsers: tabs in the title bar" (docs/WAYLAND.md, "The switch in
-// Settings"). On: Chromium and Firefox draw one bar with their tabs and LordOS's window buttons;
+// Settings"). On: Chromium, Brave and Firefox draw one bar with their tabs and LordOS's window buttons;
 // off: they use LordOS's frame. The SDK (sdk/browserframe.js) writes that one preference in the
 // user's own browser profiles through lord.browserFrame.
 import { View, Button, Toggle, useLocale, useSettings, useStore, browserFrameResult, browserFrameState, browserTabsInTitlebar, setBrowserTabsInTitlebar } from '@lordos/sdk';
@@ -24,7 +24,7 @@ export function BrowserFrameSettings() {
   const [s] = useSettings();
   const on = browserTabsInTitlebar(s);
   const result = useStore(browserFrameResult);
-  // Chromium profiles that don't follow the switch (made before 0.8.4, or changed in Chromium)
+  // Chromium and Brave profiles that don't follow the switch (made before 0.8.4, a new Brave profile, or changed in the browser)
   const [state, setState] = useState(null);
   useEffect(() => { setState(browserFrameState()); }, [on, result]);
   const other = state ? (on ? state.off : state.on) : 0;

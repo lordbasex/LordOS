@@ -11,6 +11,7 @@ import catalog from '../../apt/catalog.json';
 import { debian } from './debian.js';
 import { Card, CardGrid, Featured, FeaturedSkeleton, Pill, Shelf, nameColor } from './ui.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
+import { catalogFields, search } from './search.js';
 
 const lang2 = () => (locale.get().lang || 'en').split('-')[0];
 // the kernel's machine name as Debian names the architecture
@@ -167,8 +168,7 @@ export function AiPage({ query, onOpen, onPage, section = 'ai' }) {
   const th = useTheme();
   useStore(locale);
   const here = useHere();
-  const q = (query || '').trim().toLowerCase();
-  const apps = catalogApps(section).filter((a) => !q || `${a.name} ${summary(a)} ${a.vendor || ''}`.toLowerCase().includes(q));
+  const apps = searchCatalog(catalogApps(section), query);
   const missing = apps.some((a) => !offered(a.package) && !(a.source && a.source.delivery === 'direct'));
   return h(View, { style: { gap: spacing.l } },
     h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, textAlign: 'start' } }, t(section === 'commercial' ? 'store.commercial.intro' : section === 'remote' ? 'store.remote.intro' : section === 'suites' ? 'store.suites.intro' : 'store.ai.intro')),
@@ -179,6 +179,21 @@ export function AiPage({ query, onOpen, onPage, section = 'ai' }) {
     section === 'commercial' ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.s } },
       h(Text, { style: { flex: 1, fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.4, textAlign: 'start' } }, t('store.commercial.drivers')),
       h(Button, { small: true, label: t('store.commercial.openDrivers'), onClick: () => onPage && onPage('suggested') })) : null);
+}
+
+// The catalog apps that match a search, best first (search.js: any word, joined or apart, case and
+// accents ignored; names, ids, package names and keywords count more than summaries).
+export const searchCatalog = (apps, query) => search(apps, query || '', (a) => catalogFields(a, lang2()));
+
+// Discover's search: the catalog apps that match, from every section, above the package results
+// (they aren't in the package lists until their maker's repository is added).
+export function CatalogResults({ query, onOpen }) {
+  useStore(locale);
+  const here = useHere();
+  const apps = searchCatalog(catalogApps(), query);
+  if (!apps.length) return null;
+  return h(Shelf, { title: t('store.search.catalog') },
+    h(CardGrid, null, ...apps.slice(0, 8).map((a) => h(AiCard, { key: a.id, a, here, onOpen }))));
 }
 
 // The banner LordOS publishes in its repository (apt/featured/featured.json and banner.png, signed with

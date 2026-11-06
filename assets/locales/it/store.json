@@ -38,7 +38,7 @@
   "commercial.intro": "App gratuite il cui codice sorgente non è pubblico: browser, musica, giochi e driver dei rispettivi autori. LordOS verifica che ognuna provenga dal suo autore, firmata con la chiave che LordOS fissa, ma non può esaminare né correggere ciò che fanno; hanno lo stesso firewall e gli stessi permessi di qualsiasi altra app Linux.",
   "commercial.openDrivers": "Apri Per questo computer",
   "remote.intro": "App per raggiungere questo computer da un altro, di autori esterni a LordOS. Non sono il Desktop remoto di LordOS sulla porta 5673: solo uno dei due può usare una sessione alla volta, e ogni persona che entra viene accettata dal computer. LordOS verifica che ognuna provenga dal suo autore, ma non può esaminare né correggere ciò che fanno.",
-  "suites.intro": "Suite open source di altri progetti che secondo noi vale la pena avere: ognuna si installa dal pacchetto del suo autore, che LordOS conserva con un checksum fissato. Il programma di avvio di una suite può poi scaricare le sue app dall’autore. LordOS non esamina né corregge ciò che fanno; hanno lo stesso firewall e gli stessi permessi di qualsiasi altra app Linux.",
+  "suites.intro": "App e suite open source di altri progetti che secondo noi vale la pena avere. Ognuna arriva dal suo autore: dal repository firmato dell'autore, con la chiave che LordOS fissa, o dal pacchetto dell'autore stesso, che LordOS conserva con un checksum fissato. Il launcher di una suite può poi scaricare le sue app dall'autore. LordOS non rivede né corregge ciò che fanno; hanno lo stesso firewall e gli stessi permessi di qualsiasi altra app Linux.",
   "debian.installedVersion": "Versione installata: {version}",
   "debian.lastUpdate": "Elenco dei pacchetti controllato il {date}",
   "debian.meta": "{name} · versione {version} · {size} installati · {suite}",
@@ -112,7 +112,7 @@
   "page.ai": "Intelligenza artificiale",
   "page.commercial": "Commerciali",
   "page.remote": "Accesso remoto",
-  "page.suites": "Suite di terze parti",
+  "page.suites": "App di terze parti",
   "page.discover": "Scopri",
   "page.installed": "Installate",
   "page.lordos": "App LordOS",
@@ -287,5 +287,6 @@
   "formats.hfs": "Legge volumi HFS+, in sola lettura.",
   "formats.apfs": "Legge volumi APFS, in sola lettura. Facoltativo.",
   "formats.allow": "Continua",
-  "formats.optional": "Aggiungi anche APFS. Compila un driver per il tuo kernel e aggiunge circa 500 MB di compilatori e header."
+  "formats.optional": "Aggiungi anche APFS. Compila un driver per il tuo kernel e aggiunge circa 500 MB di compilatori e header.",
+  "search.catalog": "Dal catalogo di LordOS"
 }

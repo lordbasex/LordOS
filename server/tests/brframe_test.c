@@ -233,7 +233,7 @@ static void test_chromium_disk(void) {
     char *before2 = strdup(get("h1/.config/chromium/Profile 2/Preferences"));
     int son0, soff0;
     brf_chromium_state(cfg, &son0, &soff0);
-    CHECK(son0 == 0 && soff0 == 1, "state before: %d on, %d off (unset and malformed not counted)", son0, soff0);
+    CHECK(son0 == 1 && soff0 == 2, "state before: %d on, %d off (an unset frame counts for both, a malformed profile for none)", son0, soff0);
 
     /* running: a live "chromium" process of ours holds the lock → nothing is written */
     gethostname(host, sizeof host);
@@ -290,6 +290,52 @@ static void test_chromium_disk(void) {
     brf_chromium_state(cfg, &son, &soff);
     CHECK(son == 0 && soff == 2, "state after off: %d on, %d off", son, soff);
     free(before2);
+}
+
+/* Brave (#39): its profiles under ~/.config/BraveSoftware/Brave-Browser, its own lock and process name */
+static void test_brave_disk(void) {
+    char cfg[512], host[256], t[512];
+    BrfResult r;
+    path(cfg, sizeof cfg, "h3/.config");
+    mkdirs(cfg);
+    /* a new Brave profile: no frame key, no theme key (Brave's own frame with the Classic theme) */
+    const char *fresh = "{\"brave\":{\"rewards\":{}},\"extensions\":{\"settings\":{}}}";
+    put("h3/.config/BraveSoftware/Brave-Browser/Default/Preferences", fresh);
+    put("h3/.config/BraveSoftware/Brave-Browser/Profile 2/Preferences", "{\"browser\":{\"custom_chrome_frame\":true},\"extensions\":{\"theme\":{\"system_theme\":1}}}");
+    put("h3/.config/chromium/Default/Preferences", "{}");
+    int son, soff;
+    brf_chromium_state(cfg, &son, &soff);
+    CHECK(soff == 2 && son == 3, "state with Brave: %d on, %d off", son, soff);
+
+    /* Brave open (a live "brave" holds its lock): Chromium is written, Brave waits */
+    gethostname(host, sizeof host);
+    pid_t b = child_named("brave");
+    snprintf(t, sizeof t, "%s-%d", host, (int)b);
+    lock_link("h3/.config/BraveSoftware/Brave-Browser/SingletonLock", t);
+    CHECK(brf_chromium_running(cfg), "Brave open counts as running");
+    brf_chromium_apply(cfg, 1, &r);
+    CHECK(r.found && r.running && r.changed == 1 && !strcmp(get("h3/.config/BraveSoftware/Brave-Browser/Default/Preferences"), fresh),
+          "Brave open: Chromium changed %d, Brave untouched", r.changed);
+    stop(b);
+    /* a "chromium" process holding Brave's lock isn't Brave: stale */
+    pid_t c = child_named("chromium");
+    snprintf(t, sizeof t, "%s-%d", host, (int)c);
+    lock_link("h3/.config/BraveSoftware/Brave-Browser/SingletonLock", t);
+    CHECK(!brf_chromium_running(cfg), "another browser's pid in Brave's lock is stale");
+    stop(c);
+    brf_chromium_apply(cfg, 1, &r);
+    CHECK(r.found && !r.running && r.changed == 1 && r.unchanged == 2, "Brave closed: changed %d unchanged %d", r.changed, r.unchanged);
+    int f, th;
+    chrome_values(get("h3/.config/BraveSoftware/Brave-Browser/Default/Preferences"), &f, &th);
+    CHECK(f == 1 && th == 1, "Brave Default: own bar and the GTK theme (%d %d)", f, th);
+    CHECK(strstr(get("h3/.config/BraveSoftware/Brave-Browser/Default/Preferences"), "\"rewards\":{}") != NULL, "Brave's own keys kept");
+    CHECK(!strcmp(get("h3/.config/BraveSoftware/Brave-Browser/Default/Preferences.lordos-backup"), fresh), "Brave backup");
+    brf_chromium_state(cfg, &son, &soff);
+    CHECK(soff == 0 && son == 3, "state after on: %d on, %d off", son, soff);
+    brf_chromium_apply(cfg, 0, &r);
+    CHECK(r.changed == 3, "off: changed %d", r.changed);
+    chrome_values(get("h3/.config/BraveSoftware/Brave-Browser/Profile 2/Preferences"), &f, &th);
+    CHECK(f == 0 && th == 1, "Brave Profile 2 off (%d %d)", f, th);
 }
 
 static void touch_later(const char *rel, int secs) {
@@ -430,6 +476,7 @@ int main(int argc, char **argv) {
     test_chrome_edit();
     test_userjs();
     test_chromium_disk();
+    test_brave_disk();
     test_firefox_disk();
     BrfResult a = { 1, 2, 1, 1, 0, 0, 0 }, b = { 0 };
     char *j = brf_result_json(&a, &b);

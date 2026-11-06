@@ -38,7 +38,7 @@
   "commercial.intro": "Des apps gratuites dont le code source n’est pas public : navigateurs, musique, jeux et pilotes de leurs éditeurs. LordOS vérifie que chacune provient bien de son éditeur, signée avec la clé épinglée par LordOS, mais ne peut ni examiner ni corriger ce qu’elle fait ; elles sont soumises au même pare-feu et aux mêmes autorisations que toute autre app Linux.",
   "commercial.openDrivers": "Ouvrir Pour cet ordinateur",
   "remote.intro": "Des apps pour joindre cet ordinateur depuis un autre, de créateurs extérieurs à LordOS. Ce n'est pas le Bureau à distance de LordOS sur le port 5673 : un seul des deux peut utiliser une session à la fois, et chaque personne qui entre est acceptée sur l'ordinateur. LordOS vérifie que chacune vient de son créateur, mais ne peut pas vérifier ni corriger ce qu'elles font.",
-  "suites.intro": "Des suites open source d'autres projets qui valent la peine selon nous : chacune s'installe depuis le paquet de son auteur, que LordOS conserve avec une somme de contrôle fixée. Le lanceur d'une suite peut ensuite télécharger ses apps depuis son auteur. LordOS ne vérifie ni ne corrige ce qu'elles font ; elles ont le même pare-feu et les mêmes permissions que toute autre app Linux.",
+  "suites.intro": "Des applications et suites open source d'autres projets qui valent la peine selon nous. Chacune vient de son éditeur : de son dépôt signé, avec la clé que LordOS épingle, ou de son propre paquet, que LordOS garde avec une somme de contrôle épinglée. Le lanceur d'une suite peut ensuite télécharger ses applications depuis son éditeur. LordOS ne vérifie ni ne corrige ce qu'elles font ; elles ont le même pare-feu et les mêmes permissions que toute autre application Linux.",
   "debian.installedVersion": "Version installée : {version}",
   "debian.lastUpdate": "Liste des paquets vérifiée le {date}",
   "debian.meta": "{name} · version {version} · {size} une fois installé · {suite}",
@@ -112,7 +112,7 @@
   "page.ai": "Intelligence artificielle",
   "page.commercial": "Commerciales",
   "page.remote": "Accès à distance",
-  "page.suites": "Suites tierces",
+  "page.suites": "Applications tierces",
   "page.discover": "Découvrir",
   "page.installed": "Installées",
   "page.lordos": "Apps LordOS",
@@ -287,5 +287,6 @@
   "formats.hfs": "Lit les volumes HFS+, en lecture seule.",
   "formats.apfs": "Lit les volumes APFS, en lecture seule. Facultatif.",
   "formats.allow": "Continuer",
-  "formats.optional": "Ajouter aussi APFS. Cela compile un pilote pour votre noyau et ajoute environ 500 Mo de compilateurs et d’en-têtes."
+  "formats.optional": "Ajouter aussi APFS. Cela compile un pilote pour votre noyau et ajoute environ 500 Mo de compilateurs et d’en-têtes.",
+  "search.catalog": "Du catalogue LordOS"
 }

@@ -1752,3 +1752,25 @@ build/mailnet-test build/lord-server`); nothing installed over `/usr/local/lib/l
    isolated headless session of the branch (`HOME` and `XDG_RUNTIME_DIR` of its own, `--headless 1280x800`)
    driven over its `remote.sock` as root (the socket accepts only root since the remote desktop hardening),
    asking for the video (`RP_VIDEO`, `RP_VMODE`) so the lossless stills arrive.
+## Step — 0.8.8.4 in development: Store search, VSCodium and Brave on VM 116 (2026-11-05)
+
+Issues #37, #38 and #39 (`PACKAGES.md`, "Search"; `UPDATES.md`, "Mirrored apps (catalog)"; `WAYLAND.md`, Brave).
+Built in `~/LordOS-i37`; that tree's package engine was pointed at its own index and cache
+(`/var/tmp/i37-pkg`, `/var/tmp/i37-cache`, a local edit of `idx.h` that is not committed) so the shared
+`/var/lib/lordos/pkg` of the installed LordOS was left alone. Two vendor sources were added the way the Store adds
+them (`build/pkg-test run pkg-source-add <id>`, from a root-owned copy of `apt/catalog.json` and `apt/keys/` under
+`/opt/i37`) and two apps installed with the engine:
+
+```sh
+sudo /opt/i37/bin/pkg-test run pkg-source-add vscodium        # /etc/apt/sources.list.d/lordos-vscodium.sources
+sudo /opt/i37/bin/pkg-test run pkg-source-add brave-browser   # /etc/apt/sources.list.d/brave-browser-release.sources
+sudo /opt/i37/bin/pkg-test run pkg-update
+sudo /opt/i37/bin/pkg-test run pkg-install "codium brave-browser"   # also brave-keyring and fonts-liberation
+```
+
+They stay on the VM for later Brave and VSCodium tests. To remove them: `pkg-remove "brave-browser codium"` (or
+`apt-get purge brave-browser brave-keyring codium`), then `pkg-source-remove vscodium` and
+`pkg-source-remove brave-browser`, and `sudo rm -rf /opt/i37 /var/tmp/i37-pkg /var/tmp/i37-cache`. The screenshots
+came from an isolated headless session of that tree (own `HOME` `~/i37-home`, `XDG_RUNTIME_DIR` `/tmp/i37-rt` and a
+`dbus-run-session` bus, driven over its `remote.sock`), with the LordOS GTK theme copied into that home's
+`.local/share/themes` because VM 116 doesn't have it in `/usr/share/themes`.
