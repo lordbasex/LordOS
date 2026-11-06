@@ -5,8 +5,8 @@
 // rclone.
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
-  formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, systemInfo, lordosVersion,
+  formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, systemInfo, lordosVersion,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -33,22 +33,23 @@ const toneColor = (t, tone) => (tone === 'warn' ? '#ffb340' : tone === 'busy' ? 
 const fmtSpace = (about, tr) => { const l = M.spaceLine(about, formatBytes); return tr(l.key, l.vars); };
 const limitLabel = (v, tr) => (v ? tr('cloud.limit.mbs', { count: v }) : tr('cloud.limit.none'));
 
-// A sheet over the Settings window (in the modal layer): a dim backdrop and a centered card. Escape closes it.
+// A sheet of the Settings window: drawn inside the window itself (CloudSheets, at the window's root), never in the
+// shell's modal layer, so a window above Settings (the browser during a sign-in) keeps all its input. A dim backdrop
+// over the window's content and a centered card; Escape closes it while Settings is the window in front.
 function Sheet({ width = 460, top, onClose, children, label }) {
   const t = useTheme();
   const win = useAppWindow();
-  const g = wm.frame(wm.get(win.id) || {});
-  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape' && onClose) onClose(); }), [onClose]);
+  const focused = useRef(win.focused);
+  focused.current = win.focused;
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape' && onClose && focused.current) onClose(); }), [onClose]);
   return (
-    <Layer name="modal">
-      <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 880, height: g.h || 600, backgroundColor: 'rgba(0,0,0,0.45)',
-        alignItems: 'center', justifyContent: top == null ? 'center' : 'flex-start', paddingTop: top || 0 }}>
-        <View aria-label={label} onMouseDown={(e) => e.stopPropagation?.()} style={{ width, maxHeight: (g.h || 600) - 40, borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg,
-          border: `1px solid ${t.separator}`, boxShadow: '0 30px 80px rgba(0,0,0,0.55)', overflow: 'hidden' }}>
-          {children}
-        </View>
+    <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center', justifyContent: top == null ? 'center' : 'flex-start', paddingTop: top || 0 }}>
+      <View aria-label={label} style={{ width, maxHeight: '96%', borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg,
+        border: `1px solid ${t.separator}`, boxShadow: '0 30px 80px rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+        {children}
       </View>
-    </Layer>
+    </View>
   );
 }
 
@@ -550,9 +551,24 @@ function Advanced({ a, st, p, verified }) {
   );
 }
 
+// Starts a sign-in in the browser, once: lord-server opens the page itself (nothing here opens it again), a second
+// start while one runs is ignored, a waiting sign-in for the same account is shown again instead of starting another,
+// and one for another account is cancelled first. The waiting card is inline in the Cloud pane, so the browser stays usable.
+let signinStarting = false;
+export function startSignIn(kind, name, own, provider) {
+  if (signinStarting) return;
+  const cur = cloudState.get().signin;
+  const same = cur && cur.phase === 'waiting' && cur.kind === kind && String(cur.name || '').toLowerCase() === String(name).toLowerCase() && M.toMs(cur.expiresAt) > Date.now();
+  if (same) { setView({ sheet: null, signin: { provider, name, kind } }); return; }
+  if (cur && cur.phase === 'waiting') cloud.cancelSignIn(cur.id);
+  signinStarting = true;
+  setView({ sheet: null, signin: { provider, name, kind, starting: true } });
+  let r;
+  try { r = cloud.beginSignIn(kind, name, own || {}); } finally { signinStarting = false; }
+  setView({ sheet: null, signin: { provider, name, kind, id: r && r.id, error: r && r.error } });
+}
 function beginAgain(a, p, own = {}) {
-  const r = cloud.beginSignIn(a.kind, a.name, own);
-  setView({ sheet: { kind: 'signin', provider: p || { kind: a.kind, label: a.provider }, name: a.name, error: r && r.error } });
+  startSignIn(a.kind, a.name, own, p || { kind: a.kind, label: a.provider });
 }
 // Sign In Again: the browser for an OAuth account (with the own-app choice first for a provider not verified yet, or
 // when the account already uses its own app), the credentials form for the others (the same name updates it).
@@ -596,7 +612,6 @@ function AccountPage({ a, st }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const accs = st.accounts || [];
-  const [picking, setPicking] = useState(false);
   const win = useAppWindow();
   const website = useMemo(() => cloud.websiteUrl(a.id), [a.id]);
   const last = (st.recent || []).find((r) => r.account === a.id || M.accountOf(r.path, [a]));
@@ -644,22 +659,11 @@ function AccountPage({ a, st }) {
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: 20, alignItems: 'flex-start' }}>
         <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
           <SpaceCard a={a} accounts={accs} />
-          <KeptList a={a} onAdd={() => setPicking(true)} />
+          <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
           <LinksList a={a} />
         </View>
         {wide ? side : <View style={{ alignSelf: 'stretch' }}>{side}</View>}
       </View>
-      {picking ? (() => {
-        const g = wm.frame(wm.get(win.id) || {});
-        return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 880, height: g.h || 600 }}>
-              <FilePicker mode="folder" start={a.mount} title={tr('cloud.addFolderTitle', { name: a.name })} onClose={() => setPicking(false)}
-                onPick={(p2) => { setPicking(false); const path = [].concat(p2)[0]; if (path && M.accountOf(path, [a])) cloud.keep([path]); }} />
-            </View>
-          </Layer>
-        );
-      })() : null}
     </Stack>
   );
 }
@@ -740,14 +744,12 @@ function AddSheet({ st }) {
   const close = () => setView({ sheet: null });
   const pick = (x) => { setSel(x.kind); setErr(''); setOwn({ own: false, id: '', secret: '' }); if (!named) setName(defaultName(st.accounts, x, tr)); };
   const go = () => {
-    if (!p) return;
+    if (!p || signinStarting) return;
     const bad = M.nameProblem(name, st.accounts);
     if (bad) { setErr(tr(`cloud.name.${bad}`)); return; }
     if (offerOwn && own.own && !own.id) { setErr(tr('cloud.ownApp.needId')); return; }
-    if (p.group === 'oauth') {
-      const r = cloud.beginSignIn(p.kind, name.trim(), offerOwn ? ownOpts(own) : {});
-      setView({ sheet: { kind: 'signin', provider: p, name: name.trim(), error: r && r.error } });
-    } else setView({ sheet: { kind: 'cred', provider: p, name: name.trim() } });
+    if (p.group === 'oauth') startSignIn(p.kind, name.trim(), offerOwn ? ownOpts(own) : {}, p);
+    else setView({ sheet: { kind: 'cred', provider: p, name: name.trim() } });
   };
   const none = providers.length && !parts.verified.length && !parts.unverified.length;
   if (loading || loadErr) {
@@ -982,7 +984,7 @@ function EmptyTrashSheet({ st, sheet }) {
 
 // ---- signing in with the browser (mock SignIn) ----
 
-function SignInSheet({ st, sheet }) {
+function SignInCard({ st, info }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [, tick] = useState(0);
@@ -990,60 +992,66 @@ function SignInSheet({ st, sheet }) {
   const [keepAll, setKeepAll] = useState(false);
   const [s, set] = useSettings();
   useEffect(() => { const id = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(id); }, []);
-  const si = st.signin && st.signin.name === sheet.name ? st.signin : null;
-  const p = sheet.provider || {};
+  const si = st.signin && (st.signin.id === info.id || String(st.signin.name || '').toLowerCase() === String(info.name || '').toLowerCase()) ? st.signin : null;
+  const p = info.provider || {};
   const expired = si && si.phase === 'waiting' && M.toMs(si.expiresAt) <= Date.now();
-  const failed = sheet.error || (si && si.phase === 'failed') || expired;
-  const cancel = () => { if (si && si.phase === 'waiting') cloud.cancelSignIn(si.id); setView({ sheet: null }); };
+  const failed = !info.starting && (info.error || (si && si.phase === 'failed') || expired || (!si && !info.id));
+  const close = () => setView({ signin: null });
+  const cancel = () => { if (si && si.phase === 'waiting') cloud.cancelSignIn(si.id); close(); };
+  const card = (children, accent) => (
+    <View aria-label={tr('cloud.signin.title', { provider: p.label || '' })} style={[box(t), { padding: 18, gap: 10, border: `1px solid ${accent || t.accent}` }]}>{children}</View>
+  );
   if (si && si.phase === 'done') {
-    const a = (st.accounts || []).find((x) => x.id === si.id || x.name === si.name);
+    const a = (st.accounts || []).find((x) => x.id === si.account || x.id === si.id || x.name === si.name);
     const finish = () => {
       if (a) {
         if (keepAll) cloud.keep([a.mount]);
         const hidden = s.cloudHidden || [];
         set({ cloudHidden: showInFiles ? hidden.filter((x) => x !== a.id) : [...new Set([...hidden, a.id])] });
       }
+      cloud.cancelSignIn(si.id);       // a finished sign-in: clears state.signin (17.1)
     };
-    return (
-      <Sheet width={360} onClose={() => { finish(); setView({ sheet: null }); }} label={tr('cloud.ready', { name: si.name })}>
-        <View style={{ padding: 26, gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#30d158', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>✓</Text>
-            </View>
-            <Text style={{ flex: 1, fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ready', { name: si.name })}</Text>
+    return card(
+      <>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#30d158', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>✓</Text>
           </View>
-          <Dim t={t} style={{ fontSize: typeScale.body }}>{`${a && a.about ? `${fmtSpace(a.about, tr)}. ` : ''}${tr('cloud.readyBody')}`}</Dim>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={showInFiles} onChange={setShowInFiles} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.showInFiles')}</Text></View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={keepAll} onChange={setKeepAll} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.keepEverything')}</Text></View>
-          <Button primary label={tr('cloud.openInFiles')} onClick={() => { finish(); setView({ page: a ? a.id : null, sheet: null }); if (a) wm.open('files', { new: true, args: { path: a.mount, nonce: Date.now() } }); }} />
+          <Text style={{ flex: 1, fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ready', { name: si.name })}</Text>
         </View>
-      </Sheet>
-    );
+        <Dim t={t} style={{ fontSize: typeScale.body }}>{`${a && a.about ? `${fmtSpace(a.about, tr)}. ` : ''}${tr('cloud.readyBody')}`}</Dim>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={showInFiles} onChange={setShowInFiles} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.showInFiles')}</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={keepAll} onChange={setKeepAll} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.keepEverything')}</Text></View>
+        <Actions>
+          <Button label={tr('cloud.done')} onClick={() => { finish(); setView({ signin: null, page: a ? a.id : null }); }} />
+          <Button primary label={tr('cloud.openInFiles')} onClick={() => { finish(); setView({ signin: null, page: a ? a.id : null }); if (a) wm.open('files', { new: true, args: { path: a.mount, nonce: Date.now() } }); }} />
+        </Actions>
+      </>, '#30d158');
   }
-  const left = si ? M.countdown(si.expiresAt) : '';
-  return (
-    <Sheet width={440} onClose={cancel} label={tr('cloud.signin.title', { provider: p.label || '' })}>
-      <View style={{ padding: 28, gap: 14, alignItems: 'center' }}>
-        <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ position: 'absolute', left: 0, top: 0 }}><UsageRing size={72} thickness={1.4} parts={failed ? [] : [{ frac: 0.25, color: t.accent }]} /></View>
-          <CloudGlyph kind="cloud" size={30} color={failed ? tint.warn : t.accent} />
+  const left = si && !failed ? M.countdown(si.expiresAt) : '';
+  return card(
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {failed ? null : <View style={{ position: 'absolute', left: 0, top: 0 }}><Spinner size={44} /></View>}
+          <CloudGlyph kind="cloud" size={20} color={failed ? tint.warn : t.accent} />
         </View>
-        <Text style={{ fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr(failed ? 'cloud.signin.failedTitle' : 'cloud.signin.title', { provider: p.label || '' })}</Text>
-        <Dim t={t} style={{ fontSize: typeScale.body, textAlign: 'center', lineHeight: 1.5 }}>
-          {failed ? (sheet.error ? errorText(sheet.error) : si && si.error ? errorText(si.error) : tr('cloud.signin.expired')) : tr('cloud.signin.body', { name: sheet.name })}</Dim>
-        {!failed && left ? <Dim t={t}>{tr('cloud.signin.left', { time: left })}</Dim> : null}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button label={tr('cloud.cancel')} onClick={cancel} />
-          {failed
-            ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => { const r = cloud.beginSignIn(p.kind, sheet.name, {}); setView({ sheet: { ...sheet, error: r && r.error } }); }} />
-            : <Button primary label={tr('cloud.signin.again')} disabled={!si} onClick={() => si && cloud.openSignInPage(si.id)} />}
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(failed ? 'cloud.signin.failedTitle' : 'cloud.signin.title', { provider: p.label || '' })}</Text>
+          <Dim t={t} style={{ fontSize: typeScale.body, lineHeight: 1.45 }}>
+            {failed ? (info.error ? errorText(info.error) : si && si.error ? errorText(si.error) : tr('cloud.signin.expired')) : tr('cloud.signin.body', { name: info.name })}</Dim>
         </View>
-        <Dim t={t} style={{ fontSize: typeScale.caption, textAlign: 'center', lineHeight: 1.5 }}>{tr('cloud.signin.rclone')}</Dim>
-        <Dim t={t} style={{ fontSize: typeScale.caption, textAlign: 'center', lineHeight: 1.5 }}>{tr('cloud.signin.local')}</Dim>
+        {left ? <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('cloud.signin.left', { time: left })}</Text> : null}
       </View>
-    </Sheet>
-  );
+      <Actions>
+        <Button label={tr(failed ? 'cloud.close' : 'cloud.cancel')} onClick={cancel} />
+        {failed
+          ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => startSignIn(info.kind || p.kind, info.name, {}, p)} />
+          : <Button primary label={tr('cloud.signin.again')} disabled={!si || info.starting} onClick={() => si && cloud.openSignInPage(si.id)} />}
+      </Actions>
+      <Dim t={t} style={{ fontSize: typeScale.caption, lineHeight: 1.5 }}>{tr('cloud.signin.rclone')}</Dim>
+      <Dim t={t} style={{ fontSize: typeScale.caption, lineHeight: 1.5 }}>{tr('cloud.signin.local')}</Dim>
+    </>, failed ? tint.warn : null);
 }
 
 // ---- Remove Account… ----
@@ -1100,17 +1108,34 @@ export function CloudSettings({ page }) {
     return <Stack><Note tone="warn">{tr('cloud.unavailable')}</Note></Stack>;
   }
   const a = v.page ? (st.accounts || []).find((x) => x.id === v.page) : null;
-  const sh = v.sheet;
   return (
-    <View>
+    <View style={{ gap: 16 }}>
+      {v.signin ? <SignInCard st={st} info={v.signin} /> : null}
       {a ? <AccountPage a={a} st={st} /> : <Overview st={st} />}
-      {sh && sh.kind === 'add' ? <AddSheet st={st} /> : null}
-      {sh && sh.kind === 'cred' ? <CredSheet st={st} sheet={sh} /> : null}
-      {sh && sh.kind === 'signin' ? <SignInSheet st={st} sheet={sh} /> : null}
-      {sh && sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
-      {sh && sh.kind === 'again' ? <AgainSheet st={st} sheet={sh} /> : null}
-      {sh && sh.kind === 'question' ? <QuestionSheet sheet={sh} /> : null}
-      {sh && sh.kind === 'emptyTrash' ? <EmptyTrashSheet st={st} sheet={sh} /> : null}
     </View>
+  );
+}
+
+// The Cloud pane's sheets, drawn by Settings at its window's root (index.jsx), over the window's content only.
+export function CloudSheets() {
+  const { t: tr } = useLocale();
+  const st = useCloud();
+  const v = useStore(cloudView);
+  const sh = v.sheet;
+  if (!sh || !st) return null;
+  const a = sh.id ? (st.accounts || []).find((x) => x.id === sh.id) : null;
+  return (
+    <>
+      {sh.kind === 'add' ? <AddSheet st={st} /> : null}
+      {sh.kind === 'cred' ? <CredSheet st={st} sheet={sh} /> : null}
+      {sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
+      {sh.kind === 'again' ? <AgainSheet st={st} sheet={sh} /> : null}
+      {sh.kind === 'question' ? <QuestionSheet sheet={sh} /> : null}
+      {sh.kind === 'emptyTrash' ? <EmptyTrashSheet st={st} sheet={sh} /> : null}
+      {sh.kind === 'pickFolder' && a ? (
+        <FilePicker mode="folder" start={a.mount} title={tr('cloud.addFolderTitle', { name: a.name })} onClose={() => setView({ sheet: null })}
+          onPick={(p2) => { setView({ sheet: null }); const path = [].concat(p2)[0]; if (path && M.accountOf(path, [a])) cloud.keep([path]); }} />
+      ) : null}
+    </>
   );
 }

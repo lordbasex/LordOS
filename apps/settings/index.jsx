@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
-import { CloudSettings, CloudHeaderAction } from './Cloud.jsx';
+import { CloudSettings, CloudHeaderAction, CloudSheets } from './Cloud.jsx';
 import { UsersSettings } from './Users.jsx';
 import { NetworkSettings } from './Network.jsx';
 import { General, Updates } from './General.jsx';
@@ -955,6 +955,8 @@ export default function Settings() {
           </View>
         </ScrollView>
       </View>
+      {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
+      {section === 'cloud' ? <CloudSheets /> : null}
     </View>
   );
 }

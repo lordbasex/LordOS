@@ -326,5 +326,6 @@
   "ownApp.rcloneLine": "Lo más rápido. La página de {provider} te va a pedir que permitas rclone, el motor de código abierto que usa Nube.",
   "ownApp.ownLine": "Tu propia app en el sitio para desarrolladores de {provider}: su cuota es solo tuya. Vas a necesitar su ID y su secreto de cliente.",
   "ownApp.redirect": "Dirección de redirección: {redirect}",
-  "ownApp.copied": "Dirección de redirección copiada"
+  "ownApp.copied": "Dirección de redirección copiada",
+  "close": "Cerrar"
 }

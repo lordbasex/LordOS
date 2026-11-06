@@ -326,5 +326,6 @@
   "ownApp.rcloneLine": "Quickest. {provider}'s page will ask you to allow rclone, the open source engine Cloud uses.",
   "ownApp.ownLine": "Your own app on {provider}'s developer site: its quota is yours alone. You'll need its client ID and secret.",
   "ownApp.redirect": "Redirect address: {redirect}",
-  "ownApp.copied": "Redirect address copied"
+  "ownApp.copied": "Redirect address copied",
+  "close": "Close"
 }

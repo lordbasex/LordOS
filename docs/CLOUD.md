@@ -665,3 +665,20 @@ confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"
 - The dev mock (`sdk/cloudmock.js`) answers all of it: providers after 0.9 s (`"cloudDevMock": "providersFail"` to see
   the failure), a 6-digit code asked when adding the phone maker's drive, Empty Trash, a 4 s Measure that can be
   stopped, delete.
+
+### 18.2 Sheets in the window, the sign-in inline (fixed 2026-11-06 after the Pi test)
+
+On the Pi the sign-in sheet was drawn in the shell's modal layer, so it floated over the browser and took its input, and
+the sign-in page opened more than once. Now:
+
+- Every Cloud sheet (Add Account, credentials, rclone's questions, Sign In Again, Remove, Empty Trash, the folder picker for
+  Keep) is drawn by `CloudSheets` at the Settings window's root, over that window's content only; none uses `Layer`.
+  A window above Settings keeps its input, and Escape closes a sheet only while Settings is in front. Files' cloud
+  dialogs were already inside its window.
+- The sign-in waits **inline** at the top of the Cloud pane (`SignInCard`): the time left, **Open Sign-in Page Again**,
+  **Cancel**, rclone's line; then "is ready" with Show in Files, Keep everything, **Done** and **Open in Files**. The Add
+  Account sheet closes when the sign-in starts, so Settings can go behind the browser.
+- One start: every sign-in goes through `startSignIn`, which ignores a second start while one runs, shows again a sign-in
+  already waiting for the same account instead of starting another, and cancels one for another account first. Nothing
+  in the interface opens the page on start (lord-server does); `cloud.openSignInPage` runs only from its button, and the
+  SDK's fallback opener only when lord-server couldn't open it.

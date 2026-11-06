@@ -427,6 +427,18 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('Files: Move to Trash and dragging to the Trash go through the cloud split', [/splitTrash\(paths, cf\.accounts\)/.test(src), /target === 'trash:'\) \{ trashRef\.current/.test(src)], [true, true]);
 }
 
+// ---- Cloud's sheets stay in the Settings window; a sign-in waits inline and opens the page once ----
+{
+  const src = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
+  const idx = fs.readFileSync(path.join(root, 'apps/settings/index.jsx'), 'utf8');
+  const files = fs.readFileSync(path.join(root, 'apps/files/cloud.jsx'), 'utf8');
+  eq('no Cloud sheet in the shell\'s modal layer (Settings, Files)', [/<Layer\b/.test(src), /<Layer\b/.test(files)], [false, false]);
+  eq('the sheets are drawn at the Settings window\'s root', /section === 'cloud' \? <CloudSheets \/> : null/.test(idx), true);
+  eq('the sign-in waits inline in the pane, not in a sheet', [/v\.signin \? <SignInCard/.test(src), /kind: 'signin'/.test(src)], [true, false]);
+  eq('every sign-in goes through one guarded start', [(src.match(/cloud\.beginSignIn\(/g) || []).length, /if \(signinStarting\) return;/.test(src)], [1, true]);
+  eq('the page isn\'t opened again on start (only by its button)', (src.match(/cloud\.openSignInPage\(/g) || []).length, 1);
+}
+
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----
 // No one-sided physical edge in Cloud's screens: text aligns to start/end, insets are insetInline*, and a
 // physical left/top is only for a cover of the whole box, a place on the screen (the window's frame) or a ring
