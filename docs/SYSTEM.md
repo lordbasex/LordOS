@@ -694,6 +694,15 @@ system apps can show something in the theme's bar, like the "menu extras" of pop
 (next to the privacy indicators) and `classic` (in the taskbar) draw it; a theme that does not draw
 it simply doesn't show them.
 
+An item with a panel (Cleaner, the network item, a third-party app's menu) places it with
+`statusPanelAt(button)` inside `<Overlay anchor={button}>`, and the privacy indicators do the same:
+the panel opens toward the middle of the button's display (`sdk/statusplace.js`), below a bar at the
+top (Lord Flow's menu bar, a Classic taskbar moved to the top) and above the Classic taskbar at the
+bottom, its default. Before 0.8.8.4 they always opened below, so on the bottom taskbar only their top
+edge showed under the bar ([#29](https://github.com/lordbasex/LordOS/issues/29)). `classic` draws
+the items 40 px tall, as tall as its buttons, so a panel clears the bar. Tested by
+`server/tests/statusplace_test.mjs`.
+
 ### Session notifications (`sdk/notify.js`)
 
 LordOS had no notifications (only the short clipboard toast). Now there is one shared by every app,

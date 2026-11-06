@@ -7,7 +7,7 @@ import { View, Text, Image, addListener } from '@lordos/runtime';
 import { useStore, createStore } from './store.js';
 import { useTheme } from './theme.js';
 import { Overlay } from './layers.js';
-import { registerStatusItem } from './statusitems.js';
+import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { packageList } from './packages.js';
 
 const specs = createStore({});            // app id → { icon, title, alert, menu }
@@ -42,7 +42,7 @@ function AppItem({ app, height }) {
   return h(View, { ref: btn, onClick: () => setOpen((o) => !o), style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },
     h(Image, { src: `${dir}/${spec.icon}`, style: { width: 16, height: 16, objectFit: 'contain' } }),
     spec.alert ? h(View, { style: { position: 'absolute', right: 3, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#ff453a' } }) : null,
-    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: { position: 'absolute', top: height + 4, right: 0 } }, h(Menu, { app, spec, th, close: () => setOpen(false) }))) : null);
+    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Menu, { app, spec, th, close: () => setOpen(false) }))) : null);
 }
 
 export function appStatusEvent(d) {

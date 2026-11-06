@@ -11,7 +11,7 @@ import { t } from './i18n.js';
 import { formatBytes, systemInfo } from './system.js';
 import { wm } from './windows.js';
 import { Overlay } from './layers.js';
-import { registerStatusItem } from './statusitems.js';
+import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { cleaner } from './cleaner.js';
 import { cleanerPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
@@ -100,7 +100,7 @@ function CleanerItem({ height }) {
   const p = cleanerPalette(all, th.mode);
   return h(View, { ref: btn, onClick: () => setOpen((o) => !o), style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },
     h(Image, { src: `asset:cleaner/status-${th.mode === 'light' ? 'dark' : 'light'}.png`, style: { width: 16, height: 16 } }),
-    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: { position: 'absolute', top: height + 4, right: 0 } }, h(Panel, { p, onClose: () => setOpen(false) }))) : null);
+    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Panel, { p, onClose: () => setOpen(false) }))) : null);
 }
 
 let started = false;

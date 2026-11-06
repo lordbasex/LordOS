@@ -13,6 +13,7 @@ import { appStatusEvent } from './appstatus.jsx';
 import { createElement as h, Fragment } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
+import { statusPanelAt } from './statusitems.js';
 import { t, locale, direction } from './i18n.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
@@ -168,10 +169,11 @@ export function PrivacyIndicators({ size = 8 }) {
   const list = useIndicators();
   const [open, setOpen] = useStoreLocal();
   if (!list.length) return null;
-  return h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6 }, onClick: () => setOpen(!open) },
+  // the list opens toward the middle of the display: below a bar at the top, above the Classic taskbar at the bottom
+  return h(View, { ref: (n) => { dotsAt.current = n; }, style: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6 }, onClick: () => setOpen(!open) },
     list.map((d) => h(View, { key: d.kind, style: { width: size, height: size, borderRadius: size / 2,
       backgroundColor: d.kind === 'camera' ? '#30d158' : '#ff9f0a' } })),
-    open ? h(View, { style: { position: 'absolute', top: 22, right: 0, minWidth: 180, borderRadius: 10, padding: 10, gap: 6,
+    open ? h(View, { style: { ...statusPanelAt(dotsAt, 14), minWidth: 180, borderRadius: 10, padding: 10, gap: 6,
       backgroundColor: '#2b2b30', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', zIndex: 99999 } },
       list.map((d) => h(View, { key: d.kind, style: { gap: 2 } },
         h(Text, { style: { fontSize: 11, fontWeight: 700, color: d.kind === 'camera' ? '#30d158' : '#ff9f0a' } },
@@ -182,6 +184,7 @@ export function PrivacyIndicators({ size = 8 }) {
 // local mini-state without React hooks (the theme's component may not have useState available
 // in its import); we use a module store.
 const openStore = createStore(false);
+const dotsAt = { current: null };
 function useStoreLocal() { return [useStore(openStore), openStore.set]; }
 
 // ---- Privacy page slots (e.g. the Monitor adds its own) ----

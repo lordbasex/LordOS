@@ -17,7 +17,7 @@ import { settings } from './settings.js';
 import { useTheme, popupBg } from './theme.js';
 import { t, formatNumber } from './i18n.js';
 import { formatBytes } from './system.js';
-import { registerStatusItem } from './statusitems.js';
+import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { Overlay } from './layers.js';
 import { Segmented } from './components.jsx';
 import { firewall, firewallState } from './monitor.js';
@@ -212,7 +212,7 @@ function NetStatusItem({ color, height }) {
       </View>
       {open && (
         <Overlay anchor={btn}>
-          <View ref={panel} style={{ position: 'absolute', top: height + 4, right: 0, borderRadius: th.menuRadius || 10, backgroundColor: popupBg(th),
+          <View ref={panel} style={{ ...statusPanelAt(btn), borderRadius: th.menuRadius || 10, backgroundColor: popupBg(th),
             border: `1px solid ${th.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
             <Panel onClose={() => setOpen(false)} />
           </View>
