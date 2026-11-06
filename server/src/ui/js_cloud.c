@@ -10,6 +10,7 @@
  *   add(kind, name, fields) → { id } | { error, field? }
  *   remove(id, { discardPending }) → { ok } | { error: 'pending', files }
  *   rename(id, name) → { ok } | { error }   refreshAbout(id)            websiteUrl(id) → string | null
+ *   retry(id|null)                          an account that isn't connected (keyring locked, offline) tries again
  *   status(paths) → { [path]: { st, pct?, error? } }
  *   keep(paths) / unkeep(paths)             free(paths) → { freed, skipped: [{ path, reason }] }
  *   link(path, expire) / unlink(path) → { req } (the answer comes in __lordCloudReply(req, result)) | { error }
@@ -101,8 +102,9 @@ static JSValue f_begin(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t;
     const char *k = arg(c, argc, argv, 0), *n = arg(c, argc, argv, 1);
     const char *id = argc > 2 ? prop(c, argv[2], "clientId") : NULL, *sec = argc > 2 ? prop(c, argv[2], "clientSecret") : NULL;
-    JSValue r = k && n ? parsed(c, cloud_begin_signin(k, n, id, sec)) : err(c, "cloud.badArgument");
-    fr(c, k); fr(c, n); fr(c, id); fr(c, sec);
+    const char *acc = argc > 2 ? prop(c, argv[2], "accountId") : NULL;
+    JSValue r = k && n ? parsed(c, cloud_begin_signin(k, n, id, sec, acc)) : err(c, "cloud.badArgument");
+    fr(c, k); fr(c, n); fr(c, id); fr(c, sec); fr(c, acc);
     return r;
 }
 
@@ -129,9 +131,10 @@ static JSValue f_add(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JSValue s = argc > 2 && JS_IsObject(argv[2]) ? JS_JSONStringify(c, argv[2], JS_UNDEFINED, JS_UNDEFINED) : JS_UNDEFINED;
     const char *f = JS_IsString(s) ? JS_ToCString(c, s) : NULL;
     JS_FreeValue(c, s);
+    const char *acc = argc > 3 ? prop(c, argv[3], "accountId") : NULL;
     int req = 0;
-    JSValue r = k && n && f ? req_or(c, cloud_add(k, n, f, &req), req) : err(c, "cloud.badArgument");
-    fr(c, k); fr(c, n); fr(c, f);
+    JSValue r = k && n && f ? req_or(c, cloud_add(k, n, f, acc, &req), req) : err(c, "cloud.badArgument");
+    fr(c, k); fr(c, n); fr(c, f); fr(c, acc);
     return r;
 }
 
@@ -157,6 +160,14 @@ static JSValue f_about(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t;
     const char *id = arg(c, argc, argv, 0);
     if (id) cloud_refresh_about(id);
+    fr(c, id);
+    return JS_UNDEFINED;
+}
+
+static JSValue f_retry(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    cloud_retry(id);                        /* null or no argument: every account not connected */
     fr(c, id);
     return JS_UNDEFINED;
 }
@@ -305,6 +316,7 @@ static const JSCFunctionListEntry fns[] = {
     JS_CFUNC_DEF("remove", 2, f_remove),
     JS_CFUNC_DEF("rename", 2, f_rename),
     JS_CFUNC_DEF("refreshAbout", 1, f_about),
+    JS_CFUNC_DEF("retry", 1, f_retry),
     JS_CFUNC_DEF("websiteUrl", 1, f_website),
     JS_CFUNC_DEF("status", 1, f_status),
     JS_CFUNC_DEF("keep", 1, f_keep),
@@ -329,7 +341,9 @@ void js_cloud_register(JSContext *c, JSValue lord) {
 
 int js_cloud_start(const char *home) {
     if (js_sys_assets() && js_sys_assets()[0]) cloud_set_assets(js_sys_assets());
-    return cloud_start(home, &cloud_keyring);
+    int r = cloud_start(home, &cloud_keyring);
+    if (!r) cloud_kr_watch();
+    return r;
 }
 
 void js_cloud_dispatch(void) { cloud_dispatch(js_cloud_event, js_cloud_reply, open_url); }

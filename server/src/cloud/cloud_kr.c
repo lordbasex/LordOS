@@ -63,3 +63,16 @@ static int kr_set(const char *id, const char *label, const char *secret) { retur
 static int kr_del(const char *id) { int r = ask("kr-del", id, NULL, NULL, NULL); return r == 1 ? 0 : r; }
 
 const CloudSecrets cloud_keyring = { kr_get, kr_set, kr_del };
+
+/* the session keyring opened (the person typed the login password in the keyring prompt or in Passwords, as after an
+ * automatic login): the accounts that waited for it connect now, without polling */
+static void on_vault_event(const char *json, size_t len) {
+    JDoc d;
+    if (json_parse(json, len, &d, NULL, 0)) return;
+    const char *ev = json_str(d.root, "ev"), *v = json_str(d.root, "v");
+    int unlocked = ev && v && !strcmp(ev, "unlocked") && !strcmp(v, "login");
+    json_free(&d);
+    if (unlocked) cloud_retry(NULL);
+}
+
+void cloud_kr_watch(void) { vc_set_event_hook(on_vault_event); }

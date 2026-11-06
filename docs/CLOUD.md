@@ -737,3 +737,33 @@ the sign-in page opened more than once. Now:
    changed `SHA256SUMS` or zip is refused.
 
 The closed rc method table has 25 methods now: `operations/cleanup`, `operations/size`, `job/status` and `job/stop` were added.
+
+**Later the same day (fixes from the Pi):**
+
+8. **A locked keyring, then unlocked.** After an automatic login the session keyring stays locked: it is wrapped by the login
+   password (Argon2id), which an automatic login never types, so nothing can open it without asking; Mail and Remote Desk
+   behave the same (Mail marks its accounts as needing the password, Remote Desk asks on connect). An account whose secrets
+   are behind it shows `state: 'locked'` and `error: 'cloud.keyringLocked'` (`cloud.noKeyring` when there is none) while
+   `service.running` stays true, and an action on it (measure, links, Empty Trash, delete) answers `cloud.keyringLocked`
+   instead of `cloud.notRunning`; an account that isn't connected for another reason answers `cloud.notConnected`.
+   `lord-server` hears lord-vault's own `{"ev":"unlocked","v":"login"}` event (`vc_set_event_hook`, `cloud_kr_watch`) and
+   connects the waiting accounts at once, with no polling; `cloud.retry(id|null)` does the same on demand (call it after
+   unlocking from the interface), and `refreshAbout(id)` of an account that isn't connected also retries it. The only timer
+   left is a fallback every 10 minutes. **Measured** (`cloud_integration.sh`, the keyring stand-in locked): the account says
+   locked with the service running, `measure` and `delete` answer `cloud.keyringLocked` and remove nothing, and after
+   unlocking, `retry` mounts it without a restart.
+9. **Busy and stale mounts.** Unmounting retries `mount/unmount` for 1.5 s, then detaches the folder lazily
+   (`fusermount3 -u -z`): a program that keeps a file open there no longer leaves the folder mounted (the
+   "Device or resource busy" in cloud.log). Before every mount a mount point that answers `ENOTCONN` ("Transport endpoint is
+   not connected", an rclone that died) or is still in `/proc/self/mounts` is detached first. **Measured:** Restart with a file
+   open in the mount, and `kill -9` of rclone with a file open, both end with exactly one mount at the folder.
+10. **Sign In Again and Add after a rename.** The account to update is found by kind name, not by pointer (the overlay's
+    entry and rclone's are the same kind; before, after the provider list had been asked, the same kind and name answered
+    `cloud.nameTaken`), with the name compared without case. `beginSignIn(kind, name, { accountId })` and `add(kind, name,
+    fields, { accountId })` update exactly that account whatever the name (an unknown id is `cloud.notFound`, another
+    kind `cloud.badKind`); the account page should pass its id. Accounts loaded from `accounts.json` share the session's one
+    entry per kind.
+11. **Rename** unmounts the old folder (lazily if busy), moves it, or makes the new one and removes the empty old one, then
+    mounts at the new name. **Measured:** renamed with a file open in it: mounted at the new name, the old folder unmounted
+    and gone; in a new session the account comes back mounted under its new name, `add` with the same kind and the name in
+    another case updates it, and `add` with its id updates it under any name.
