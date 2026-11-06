@@ -2,7 +2,9 @@
  * is one of a closed list, with checked arguments, and lord-server's cloud thread is rclone's only client.
  *
  *   available() → bool                      state() → State (also pushed: __lordCloud(state))
- *   providers() → [{ kind, label, group, hint, fields: [{ name, label, secret, required, default, examples }] }]
+ *   providers() → { req } → [{ kind, label, description, group, verified, website?, fields: [{ name, label, help, secret, required, default, examples }] }]
+ *   answer(state, value) → { req } → { id } | { question } | { error }     (add answers the same way)
+ *   emptyTrash(id) / measure(id) / cancelMeasure(id) / delete(paths) → { req } (answers through __lordCloudReply)
  *   beginSignIn(kind, name, { clientId, clientSecret }) → { id, url, expiresAt } | { error }
  *   openSignInPage(id) → bool               cancelSignIn(id)
  *   add(kind, name, fields) → { id } | { error, field? }
@@ -16,6 +18,7 @@
  *   restart()                               logName() → the Logs app's file name of rclone's log */
 #include "js_cloud.h"
 #include "js.h"
+#include "js_sys.h"
 #include "../apps.h"
 #include "../cloud/cloud.h"
 #include "../cloud/cloud_kr.h"
@@ -86,7 +89,13 @@ static void paths_free(JSContext *c, const char **p, int n) { for (int i = 0; p 
 
 static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return JS_NewBool(c, cloud_available()); }
 static JSValue f_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return parsed(c, cloud_state_json()); }
-static JSValue f_providers(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return parsed(c, cloud_providers_json()); }
+static JSValue req_or(JSContext *c, char *res, int req);
+static JSValue f_providers(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    int req = 0;
+    char *r = cloud_providers(&req);
+    return req_or(c, r, req);
+}
 
 static JSValue f_begin(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -120,7 +129,8 @@ static JSValue f_add(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JSValue s = argc > 2 && JS_IsObject(argv[2]) ? JS_JSONStringify(c, argv[2], JS_UNDEFINED, JS_UNDEFINED) : JS_UNDEFINED;
     const char *f = JS_IsString(s) ? JS_ToCString(c, s) : NULL;
     JS_FreeValue(c, s);
-    JSValue r = k && n && f ? parsed(c, cloud_add(k, n, f)) : err(c, "cloud.badArgument");
+    int req = 0;
+    JSValue r = k && n && f ? req_or(c, cloud_add(k, n, f, &req), req) : err(c, "cloud.badArgument");
     fr(c, k); fr(c, n); fr(c, f);
     return r;
 }
@@ -208,6 +218,37 @@ static JSValue f_link(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return r;
 }
 
+static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *st = arg(c, argc, argv, 0), *v = arg(c, argc, argv, 1);
+    int req = 0;
+    JSValue r = st && v ? req_or(c, cloud_answer(st, v, &req), req) : err(c, "cloud.badArgument");
+    fr(c, st); fr(c, v);      /* not wiped: it may be the JS string's own memory */
+    return r;
+}
+
+static JSValue acc_call(JSContext *c, int argc, JSValueConst *argv, char *(*fn)(const char *, int *)) {
+    const char *id = arg(c, argc, argv, 0);
+    int req = 0;
+    JSValue r = id ? req_or(c, fn(id, &req), req) : err(c, "cloud.badArgument");
+    fr(c, id);
+    return r;
+}
+static JSValue f_trash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return acc_call(c, argc, argv, cloud_empty_trash); }
+static JSValue f_measure(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return acc_call(c, argc, argv, cloud_measure); }
+static JSValue f_cancel_measure(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return acc_call(c, argc, argv, cloud_cancel_measure); }
+
+static JSValue f_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char **p;
+    int n = argc ? paths_of(c, argv[0], &p) : -1;
+    if (n < 0) return err(c, "cloud.badArgument");
+    int req = 0;
+    JSValue r = req_or(c, cloud_delete(p, n, &req), req);
+    paths_free(c, p, n);
+    return r;
+}
+
 static JSValue f_unlink(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *p = arg(c, argc, argv, 0);
@@ -256,6 +297,11 @@ static const JSCFunctionListEntry fns[] = {
     JS_CFUNC_DEF("openSignInPage", 1, f_open_signin),
     JS_CFUNC_DEF("cancelSignIn", 1, f_cancel_signin),
     JS_CFUNC_DEF("add", 3, f_add),
+    JS_CFUNC_DEF("answer", 2, f_answer),
+    JS_CFUNC_DEF("emptyTrash", 1, f_trash),
+    JS_CFUNC_DEF("measure", 1, f_measure),
+    JS_CFUNC_DEF("cancelMeasure", 1, f_cancel_measure),
+    JS_CFUNC_DEF("delete", 1, f_delete),
     JS_CFUNC_DEF("remove", 2, f_remove),
     JS_CFUNC_DEF("rename", 2, f_rename),
     JS_CFUNC_DEF("refreshAbout", 1, f_about),
@@ -278,8 +324,12 @@ void js_cloud_register(JSContext *c, JSValue lord) {
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, fns, sizeof fns / sizeof fns[0]);
     JS_SetPropertyStr(c, lord, "cloud", o);
+    if (js_sys_assets() && js_sys_assets()[0]) cloud_set_assets(js_sys_assets());
 }
 
-int js_cloud_start(const char *home) { return cloud_start(home, &cloud_keyring); }
+int js_cloud_start(const char *home) {
+    if (js_sys_assets() && js_sys_assets()[0]) cloud_set_assets(js_sys_assets());
+    return cloud_start(home, &cloud_keyring);
+}
 
 void js_cloud_dispatch(void) { cloud_dispatch(js_cloud_event, js_cloud_reply, open_url); }

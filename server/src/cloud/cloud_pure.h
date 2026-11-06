@@ -37,6 +37,10 @@ typedef enum {
     RCM_VFS_REFRESH,    /* vfs/refresh */
     RCM_VFS_FORGET,     /* vfs/forget */
     RCM_QUIT,           /* core/quit */
+    RCM_CLEANUP,        /* operations/cleanup: Empty Trash (17.2) */
+    RCM_SIZE,           /* operations/size, as an _async job: Measure (17.2) */
+    RCM_JOB_STATUS,     /* job/status of those two */
+    RCM_JOB_STOP,       /* job/stop: cancel a Measure */
     RCM_COUNT
 } RcMethod;
 
@@ -66,18 +70,25 @@ int  cloud_kept(const char *const *kept, int n, const char *rel);   /* rel is a 
 typedef struct {
     const char *kind;       /* ours: what JS names */
     const char *type;       /* rclone's backend */
-    const char *label;      /* shown as text in the provider list: plain names, no other operating system's names */
+    const char *label;      /* rclone's name for it (or ours for a variant), plain text in the provider list only */
     const char *group;      /* oauth | server | object | crypt */
     const char *hint;
     const char *preset;     /* fixed parameters, JSON object members ("\"vendor\":\"nextcloud\""), or NULL */
     const char *hidden;     /* fields the preset sets, comma separated, not shown */
     const char *website;    /* the provider's page, or NULL */
     const char *webfield;   /* or the account's own address in this field, only if https */
+    int variant;            /* ours: a preset on rclone's backend `type` (Nextcloud on WebDAV), not one of rclone's own */
 } CloudKind;
 int              cloud_kind_count(void);
 const CloudKind *cloud_kind_at(int i);
 const CloudKind *cloud_kind(const char *kind);
 int              cloud_field_hidden(const CloudKind *k, const char *field);
+int              cloud_excluded(const char *name);      /* a backend that isn't a storage of its own (alias, union…) */
+/* oauth (rclone's token, client_id and client_secret options), object (keys, endpoint, bucket), crypt, else server */
+const char      *cloud_derive_group(const char *name, const char *const *opts, int n);
+int              cloud_internal_question(const char *opt);   /* config/create's questions LordOS answers itself */
+/* a question's state as JS sees it, "<account id>:<rclone's state>": 0 and both parts */
+int              cloud_answer_state(const char *s, char *id, size_t n, const char **state);
 /* the page of an account: 1 and out, 0 none. field: the value of k->webfield (NULL if none). */
 int  cloud_site_url(const CloudKind *k, const char *field, char *out, size_t n);
 int  cloud_url_ok(const char *url);          /* https://, printable ASCII without quotes, spaces or backslashes, at most 300 */
@@ -88,7 +99,7 @@ int  cloud_auth_url(const char *line, char *url, size_t n);
 /* its stdout: 1 and the token (one JSON object) */
 int  cloud_auth_token(const char *out, char *tok, size_t n);
 /* config/create's next question asked non-interactively: what to answer (the default, except these) */
-const char *cloud_answer(const char *option, const char *def);
+const char *cloud_default_answer(const char *option, const char *def);
 
 /* ---- options ---- */
 #define CLOUD_BW_MAX (10L * 1024 * 1024)        /* KiB/s */

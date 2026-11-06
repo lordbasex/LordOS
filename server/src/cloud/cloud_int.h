@@ -45,6 +45,13 @@ typedef struct {
     int nt;
     int in_use;
     int links_supported;            /* -1 not known yet */
+    int trash_supported;            /* operations/cleanup (rclone's CleanUp feature); -1 not known yet */
+    long long measured_bytes, measured_count, measured_at;   /* Measure (17.2 item 5); at in ms, 0 never */
+    char rcjob_kind;                /* 'm' measure, 't' empty trash, 0 none: one async rclone job at a time */
+    long long rcjob_id;
+    int rcjob_req;
+    int pending_req;                /* add()/answer() waiting for config/create's next step */
+    int new_acc;                    /* added in this session and not finished: removed if its setup fails */
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */
     char *pending_secret;           /* not saved yet (keyring locked): retried */
     time_t about_at, tok_at, retry_at;
@@ -70,6 +77,8 @@ void  cl_changed(void);                     /* push the state soon */
 int   cl_paused(const Acc *a);              /* Pause, Pause All or on battery */
 void  cl_save_keep(void);                   /* with cl_mu held */
 int   cl_rc_simple(int m, const char *body, int timeout);   /* an rc call whose answer doesn't matter: its status */
+void  cl_reply(int req, char *json);        /* an asynchronous answer for JS (takes json) */
+int   cl_next_req(void);
 
 /* cloud_files.c */
 void  cf_start(void);                                   /* the Keep on This Computer thread */
@@ -79,5 +88,6 @@ char *cf_free(const char *const *paths, int n);
 void  cf_measure(void);                                 /* cache and kept bytes of every account (thread) */
 void  cf_auto_free(int below_gb);                       /* the automatic pass (thread) */
 long long cf_rm_tree(const char *path);                 /* removes a cache folder: bytes */
+char *cf_delete(const char *const *paths, int n, int *req);   /* Delete in the cloud (17.2 item 6), through the mount */
 
 #endif

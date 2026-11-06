@@ -32,6 +32,10 @@ static const char *const methods[RCM_COUNT] = {
     [RCM_VFS_REFRESH] = "vfs/refresh",
     [RCM_VFS_FORGET] = "vfs/forget",
     [RCM_QUIT] = "core/quit",
+    [RCM_CLEANUP] = "operations/cleanup",
+    [RCM_SIZE] = "operations/size",
+    [RCM_JOB_STATUS] = "job/status",
+    [RCM_JOB_STOP] = "job/stop",
 };
 
 const char *rc_method_path(int m) { return m >= 0 && m < RCM_COUNT ? methods[m] : NULL; }
@@ -194,38 +198,38 @@ int cloud_kept(const char *const *kept, int n, const char *rel) {
 
 /* ---- providers ---- */
 
+/* The overlay on rclone's own list (docs/CLOUD.md 17.2): what rclone can't say. Labels are rclone's names (its
+ * providers' Description) and are used only until rclone has listed them, except for the variants (a preset on a
+ * backend: Nextcloud and ownCloud on WebDAV), which are ours. group: only where rclone's options mislead the rule in
+ * cloud_derive_group. */
 static const CloudKind kinds[] = {
-    /* sign in with the browser */
-    { "drive", "drive", "Google Drive", "oauth", "Files and shared drives", NULL, NULL, "https://drive.google.com/", NULL },
-    { "onedrive", "onedrive", "Office Drive (personal and work)", "oauth", "The drive that comes with an office suite account", NULL, NULL, "https://onedrive.live.com/", NULL },
-    { "dropbox", "dropbox", "Dropbox", "oauth", NULL, NULL, NULL, "https://www.dropbox.com/home", NULL },
-    { "box", "box", "Box", "oauth", NULL, NULL, NULL, "https://app.box.com/", NULL },
-    { "pcloud", "pcloud", "pCloud", "oauth", NULL, NULL, NULL, "https://my.pcloud.com/", NULL },
-    { "yandex", "yandex", "Yandex Disk", "oauth", NULL, NULL, NULL, "https://disk.yandex.com/", NULL },
-    { "zoho", "zoho", "Zoho WorkDrive", "oauth", NULL, NULL, NULL, "https://workdrive.zoho.com/", NULL },
-    { "hidrive", "hidrive", "HiDrive", "oauth", NULL, NULL, NULL, "https://hidrive.ionos.com/", NULL },
-    { "putio", "putio", "put.io", "oauth", NULL, NULL, NULL, "https://app.put.io/", NULL },
-    { "sharefile", "sharefile", "ShareFile", "oauth", NULL, NULL, NULL, NULL, NULL },
-    { "gcs", "google cloud storage", "Google Cloud Storage", "oauth", "Buckets of a cloud project", NULL, NULL, "https://console.cloud.google.com/storage/browser", NULL },
-    /* a user and a password or a key */
-    { "webdav", "webdav", "WebDAV", "server", "Any WebDAV server", "\"vendor\":\"other\"", "vendor", NULL, "url" },
-    { "nextcloud", "webdav", "Nextcloud", "server", "Your Nextcloud's address, ending in /remote.php/dav/files/<user>", "\"vendor\":\"nextcloud\"", "vendor", NULL, "url" },
-    { "owncloud", "webdav", "ownCloud", "server", "Your ownCloud's address, ending in /remote.php/webdav", "\"vendor\":\"owncloud\"", "vendor", NULL, "url" },
-    { "sftp", "sftp", "SFTP", "server", "A computer or NAS over SSH", "\"shell_type\":\"none\"", "shell_type", NULL, NULL },
-    { "ftp", "ftp", "FTP", "server", NULL, NULL, NULL, NULL, NULL },
-    { "smb", "smb", "SMB", "server", "A shared folder on the network", NULL, NULL, NULL, NULL },
-    { "mega", "mega", "Mega", "server", NULL, NULL, NULL, "https://mega.nz/fm", NULL },
-    { "protondrive", "protondrive", "Proton Drive", "server", NULL, NULL, NULL, "https://drive.proton.me/", NULL },
-    { "koofr", "koofr", "Koofr", "server", NULL, "\"provider\":\"koofr\"", "provider", "https://app.koofr.net/", NULL },
-    { "storj", "storj", "Storj", "server", NULL, NULL, NULL, NULL, NULL },
-    { "seafile", "seafile", "Seafile", "server", NULL, NULL, NULL, NULL, "url" },
-    /* object storage */
-    { "s3", "s3", "S3 and compatible storage", "object", "Access key, secret, region and endpoint", NULL, NULL, NULL, "endpoint" },
-    { "b2", "b2", "Backblaze B2", "object", NULL, NULL, NULL, "https://secure.backblaze.com/b2_buckets.htm", NULL },
-    { "azureblob", "azureblob", "Azure Blob Storage", "object", NULL, NULL, NULL, "https://portal.azure.com/", NULL },
-    { "swift", "swift", "OpenStack Swift", "object", NULL, NULL, NULL, NULL, NULL },
-    /* an encrypted folder on top of another account (section 10) */
-    { "crypt", "crypt", "Encrypted folder", "crypt", "Names and contents encrypted before they leave this computer", NULL, NULL, NULL, NULL },
+    { "drive", "drive", "Google Drive", "oauth", NULL, NULL, NULL, "https://drive.google.com/", NULL, 0 },
+    { "onedrive", "onedrive", "Microsoft OneDrive", "oauth", NULL, NULL, NULL, "https://onedrive.live.com/", NULL, 0 },
+    { "dropbox", "dropbox", "Dropbox", "oauth", NULL, NULL, NULL, "https://www.dropbox.com/home", NULL, 0 },
+    { "box", "box", "Box", "oauth", NULL, NULL, NULL, "https://app.box.com/", NULL, 0 },
+    { "pcloud", "pcloud", "Pcloud", "oauth", NULL, NULL, NULL, "https://my.pcloud.com/", NULL, 0 },
+    { "yandex", "yandex", "Yandex Disk", "oauth", NULL, NULL, NULL, "https://disk.yandex.com/", NULL, 0 },
+    { "zoho", "zoho", "Zoho", "oauth", NULL, NULL, NULL, "https://workdrive.zoho.com/", NULL, 0 },
+    { "hidrive", "hidrive", "HiDrive", "oauth", NULL, NULL, NULL, "https://hidrive.ionos.com/", NULL, 0 },
+    { "putio", "putio", "Put.io", "oauth", NULL, NULL, NULL, "https://app.put.io/", NULL, 0 },
+    { "gcs", "google cloud storage", "Google Cloud Storage (this is not Google Drive)", "oauth", NULL, NULL, NULL, "https://console.cloud.google.com/storage/browser", NULL, 0 },
+    { "jottacloud", "jottacloud", "Jottacloud", "server", NULL, NULL, NULL, "https://www.jottacloud.com/web", NULL, 0 },
+    { "mailru", "mailru", "Mail.ru Cloud", "server", NULL, NULL, NULL, "https://cloud.mail.ru/", NULL, 0 },
+    { "webdav", "webdav", "WebDAV", "server", NULL, NULL, NULL, NULL, "url", 0 },
+    { "nextcloud", "webdav", "Nextcloud", "server", "Your Nextcloud's address, ending in /remote.php/dav/files/<user>", "\"vendor\":\"nextcloud\"", "vendor", NULL, "url", 1 },
+    { "owncloud", "webdav", "ownCloud", "server", "Your ownCloud's address, ending in /remote.php/webdav", "\"vendor\":\"owncloud\"", "vendor", NULL, "url", 1 },
+    { "sftp", "sftp", "SSH/SFTP", "server", NULL, "\"shell_type\":\"none\"", "shell_type", NULL, NULL, 0 },
+    { "mega", "mega", "Mega", "server", NULL, NULL, NULL, "https://mega.nz/fm", NULL, 0 },
+    { "protondrive", "protondrive", "Proton Drive", "server", NULL, NULL, NULL, "https://drive.proton.me/", NULL, 0 },
+    { "koofr", "koofr", "Koofr, Digi Storage and other Koofr-compatible storage providers", "server", NULL, NULL, NULL, NULL, NULL, 0 },
+    { "seafile", "seafile", "seafile", "server", NULL, NULL, NULL, NULL, "url", 0 },
+    { "s3", "s3", "Amazon S3 Compliant Storage Providers", "object", NULL, NULL, NULL, NULL, "endpoint", 0 },
+    { "b2", "b2", "Backblaze B2", "object", NULL, NULL, NULL, "https://secure.backblaze.com/b2_buckets.htm", NULL, 0 },
+    { "azureblob", "azureblob", "Microsoft Azure Blob Storage", "object", NULL, NULL, NULL, "https://portal.azure.com/", NULL, 0 },
+    { "azurefiles", "azurefiles", "Microsoft Azure Files", "object", NULL, NULL, NULL, "https://portal.azure.com/", NULL, 0 },
+    { "swift", "swift", "OpenStack Swift", "object", NULL, NULL, NULL, NULL, NULL, 0 },
+    { "oos", "oracleobjectstorage", "Oracle Cloud Infrastructure Object Storage", "object", NULL, NULL, NULL, NULL, NULL, 0 },
+    { "crypt", "crypt", "Encrypt/Decrypt a remote", "crypt", "Names and contents encrypted before they leave this computer", NULL, NULL, NULL, NULL, 0 },
 };
 
 int cloud_kind_count(void) { return (int)(sizeof kinds / sizeof kinds[0]); }
@@ -233,6 +237,44 @@ const CloudKind *cloud_kind_at(int i) { return i >= 0 && i < cloud_kind_count() 
 const CloudKind *cloud_kind(const char *kind) {
     for (int i = 0; kind && i < cloud_kind_count(); i++) if (!strcmp(kinds[i].kind, kind)) return &kinds[i];
     return NULL;
+}
+
+/* not a storage of its own (docs/CLOUD.md 17.2): wrappers, the local disk, memory, plain HTTP */
+int cloud_excluded(const char *name) {
+    static const char *const no[] = { "alias", "archive", "cache", "chunker", "combine", "compress", "hasher", "http", "local",
+                                      "memory", "union", "tardigrade", NULL };
+    for (int i = 0; name && no[i]; i++) if (!strcmp(no[i], name)) return 1;
+    return !name || !name[0];
+}
+
+const char *cloud_derive_group(const char *name, const char *const *opts, int n) {
+    int tok = 0, cid = 0, csec = 0, obj = 0;
+    if (name && !strcmp(name, "crypt")) return "crypt";
+    for (int i = 0; i < n; i++) {
+        const char *o = opts[i];
+        tok |= !strcmp(o, "token");
+        cid |= !strcmp(o, "client_id");
+        csec |= !strcmp(o, "client_secret");
+        obj |= !strcmp(o, "access_key_id") || !strcmp(o, "secret_access_key") || !strcmp(o, "endpoint") || !strcmp(o, "sas_url") ||
+               !strcmp(o, "storage_url") || !strcmp(o, "bucket") || !strcmp(o, "bucket_name") || !strcmp(o, "application_key");
+    }
+    if (tok && cid && csec) return "oauth";         /* a browser sign-in: rclone's OAuth options */
+    return obj ? "object" : "server";
+}
+
+int cloud_internal_question(const char *opt) {
+    return opt && (!strcmp(opt, "config_refresh_token") || !strcmp(opt, "config_is_local"));
+}
+
+int cloud_answer_state(const char *s, char *id, size_t n, const char **state) {
+    const char *c = s ? strchr(s, ':') : NULL;
+    if (!c || c == s || (size_t)(c - s) >= n || !c[1] || strlen(c + 1) > 512) return -1;
+    memcpy(id, s, (size_t)(c - s));
+    id[c - s] = 0;
+    if (!cloud_key_ok(id) || id[0] != 'c') return -1;
+    for (const char *p = c + 1; *p; p++) if ((unsigned char)*p < 0x20 || *p == 0x7f) return -1;
+    *state = c + 1;
+    return 0;
 }
 
 int cloud_field_hidden(const CloudKind *k, const char *f) {
@@ -309,7 +351,7 @@ int cloud_auth_token(const char *out, char *tok, size_t n) {
     return ok;
 }
 
-const char *cloud_answer(const char *opt, const char *def) {
+const char *cloud_default_answer(const char *opt, const char *def) {
     if (!opt) return def ? def : "";
     if (!strcmp(opt, "config_refresh_token")) return "false";          /* the token we just gave it */
     if (!strcmp(opt, "config_shared_client_id")) return "true";        /* 6.2: rclone's own IDs in 0.8.8.5 */

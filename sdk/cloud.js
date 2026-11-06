@@ -51,7 +51,8 @@ function openHere(url) {
 export const cloud = {
   available: () => has() && !!lord.cloud.available(),
   state: () => cloudState.get(),
-  providers: () => (has() ? lord.cloud.providers() || [] : []),
+  // rclone's backends, asked every time (docs/CLOUD.md 17.2 item 1)
+  providers: () => (has() ? later(lord.cloud.providers()) : Promise.resolve([])),
   beginSignIn: (kind, name, opts = {}) => (has() ? lord.cloud.beginSignIn(String(kind), String(name), {
     clientId: opts.clientId ? String(opts.clientId) : '', clientSecret: opts.clientSecret ? String(opts.clientSecret) : '',
   }) : { error: 'cloud.unavailable' }),
@@ -62,7 +63,14 @@ export const cloud = {
     return !!(s && s.id === id && s.url) && openHere(s.url);
   },
   cancelSignIn: (id) => has() && lord.cloud.cancelSignIn(String(id)),
-  add: (kind, name, fields = {}) => (has() ? lord.cloud.add(String(kind), String(name), fields) : { error: 'cloud.unavailable' }),
+  // { id } | { question: { state, name, help, type, examples, isPassword, required, default } } | { error } (17.2 item 3)
+  add: (kind, name, fields = {}) => (has() ? later(lord.cloud.add(String(kind), String(name), fields)) : Promise.resolve({ error: 'cloud.unavailable' })),
+  answer: (state, value) => (has() ? later(lord.cloud.answer(String(state), String(value ?? ''))) : Promise.resolve({ error: 'cloud.unavailable' })),
+  emptyTrash: (id) => (has() ? later(lord.cloud.emptyTrash(String(id))) : Promise.resolve({ error: 'cloud.unavailable' })),
+  measure: (id) => (has() ? later(lord.cloud.measure(String(id))) : Promise.resolve({ error: 'cloud.unavailable' })),
+  cancelMeasure: (id) => (has() ? later(lord.cloud.cancelMeasure(String(id))) : Promise.resolve({ error: 'cloud.unavailable' })),
+  // removes them in the cloud through the mount (the provider's own trash where it has one): paths strictly under ~/Cloud/<account>
+  delete: (p) => (has() ? later(lord.cloud.delete(paths(p))) : Promise.resolve({ error: 'cloud.unavailable' })),
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),
   refreshAbout: (id) => has() && lord.cloud.refreshAbout(String(id)),

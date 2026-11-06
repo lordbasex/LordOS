@@ -3,7 +3,7 @@
  * and the browser by a line on stdout. Built with CLOUD_TEST: LORDOS_CLOUD_RCLONE names the rclone binary.
  *
  * One command per line on stdin, one line of JSON per command on stdout:
- *   state | providers | add KIND NAME FIELDS-JSON | remove ID [discard] | rename ID NAME | status PATH | free PATH
+ *   state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
  *   keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
  *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit */
 #include "../src/cloud/cloud.h"
@@ -68,8 +68,18 @@ static const CloudSecrets ks = { k_get, k_set, k_del };
 
 static void out(char *s) { printf("%s\n", s ? s : "null"); fflush(stdout); free(s); }
 
+/* an answer now, or the one that comes through reply(req) */
+static void later(char *r, int req) {
+    if (r || !req) { out(r); return; }
+    got_req = 0;
+    long long end = ms() + 120000;
+    while (got_req != req && ms() < end) pump(100);
+    out(got_req == req ? strdup(got_reply) : strdup("{\"error\":\"timeout\"}"));
+}
+
 int main(void) {
     setvbuf(stdout, NULL, _IOLBF, 0);
+    if (getenv("LORDOS_ASSETS")) cloud_set_assets(getenv("LORDOS_ASSETS"));
     if (cloud_start(getenv("HOME"), &ks)) { printf("{\"error\":\"start\"}\n"); return 1; }
     char *line = NULL;
     size_t cap = 0;
@@ -80,10 +90,12 @@ int main(void) {
         char *a1 = strtok(NULL, " "), *rest = a1 ? a1 + strlen(a1) + 1 : NULL;
         pump(10);
         if (!strcmp(cmd, "state")) out(cloud_state_json());
-        else if (!strcmp(cmd, "providers")) out(cloud_providers_json());
+        else if (!strcmp(cmd, "providers")) { int req = 0; char *r = cloud_providers(&req); later(r, req); }
         else if (!strcmp(cmd, "add") && a1) {
             char *name = strtok(NULL, " "), *fields = name ? name + strlen(name) + 1 : NULL;
-            out(fields ? cloud_add(a1, name, fields) : strdup("{\"error\":\"usage\"}"));
+            int req = 0;
+            if (!fields) out(strdup("{\"error\":\"usage\"}"));
+            else { char *r = cloud_add(a1, name, fields, &req); later(r, req); }
         } else if (!strcmp(cmd, "remove") && a1) { char *d = strtok(NULL, " "); out(cloud_remove(a1, d && !strcmp(d, "discard"))); }
         else if (!strcmp(cmd, "rename") && a1 && rest) out(cloud_rename(a1, rest));
         else if (!strcmp(cmd, "status") && a1) { const char *p[] = { a1 }; out(cloud_status(p, 1)); }
@@ -99,6 +111,10 @@ int main(void) {
             while (got_req != req && ms() < end) pump(100);
             out(got_req == req ? strdup(got_reply) : strdup("{\"error\":\"timeout\"}"));
         } else if (!strcmp(cmd, "links") && a1) out(cloud_links(a1));
+        else if (!strcmp(cmd, "answer") && a1) { int req = 0; char *r = cloud_answer(a1, rest ? rest : "", &req); later(r, req); }
+        else if (!strcmp(cmd, "trash") && a1) { int req = 0; char *r = cloud_empty_trash(a1, &req); later(r, req); }
+        else if (!strcmp(cmd, "measure") && a1) { int req = 0; char *r = cloud_measure(a1, &req); later(r, req); }
+        else if (!strcmp(cmd, "delete") && a1) { int req = 0; const char *p[] = { a1 }; char *r = cloud_delete(p, 1, &req); later(r, req); }
         else if (!strcmp(cmd, "pause") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "resume") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 0); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "restart")) { cloud_restart(); out(strdup("{\"ok\":true}")); }

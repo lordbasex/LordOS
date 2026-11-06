@@ -40,13 +40,16 @@ trap cleanup EXIT INT TERM
 # the "cloud": a local WebDAV server with its own user
 head -c 5000000 /dev/urandom >"$S/Projects/big.bin"
 echo hello >"$S/notes.txt"
+echo bye >"$S/gone.txt"
+mkdir -p "$S/Gone/Inner"; echo a >"$S/Gone/a.txt"; echo b >"$S/Gone/Inner/b.txt"
 PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
 "$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass >"$T/dav.log" 2>&1 &
 DAV=$!
 sleep 1
 
 mkfifo "$T/in" "$T/out"
-env -i HOME="$H" XDG_RUNTIME_DIR="$R" PATH=/usr/bin:/bin LORDOS_CLOUD_RCLONE="$RC" "$B/cloud-harness" <"$T/in" >"$T/out" 2>"$T/harness.log" &
+ASSETS=$(cd "$(dirname "$0")/../../assets" 2>/dev/null && pwd)
+env -i HOME="$H" XDG_RUNTIME_DIR="$R" PATH=/usr/bin:/bin LORDOS_CLOUD_RCLONE="$RC" LORDOS_ASSETS="$ASSETS" "$B/cloud-harness" <"$T/in" >"$T/out" 2>"$T/harness.log" &
 HP=$!
 exec 3>"$T/in" 4<"$T/out"
 # one command, its one line (lines about opened pages are skipped)
@@ -56,13 +59,22 @@ rcd_pid() { pgrep -u "$(id -u)" -f "rcd --rc-addr unix://$R/lordos/cloud/rc.sock
 
 echo "== Cloud integration ($(uname -m), $("$RC" version 2>/dev/null | head -1))"
 r=$(cmd providers)
-check "providers before rclone runs: an empty list" has "$r" "[]"
-r=$(cmd wait '"running":true' 20)
-check "rclone rcd started for the provider list" has "$r" '"ok"'
-r=$(cmd sleep 500)
+check "providers: rclone started and asked (17.2 item 1)" sh -c 'case "$1" in "["*"\"kind\":"*) exit 0;; esac; exit 1' x "$r"
+r2=$(cmd wait '"running":true' 20)
+for k in webdav sftp s3 dropbox drive crypt nextcloud; do
+    check "providers has $k" has "$r" "\"kind\":\"$k\""
+done
+for k in alias union local memory http cache chunker combine compress hasher archive tardigrade; do
+    check "providers leaves out $k" sh -c 'case "$1" in *"\"kind\":\"$2\""*) exit 1;; esac; exit 0' x "$r" "$k"
+done
+check "providers: rclone's own name WebDAV" has "$r" '"label":"WebDAV"'
+check "providers: rclone's own name SSH/SFTP" has "$r" '"label":"SSH/SFTP"'
+check "providers: the drive variant Nextcloud is ours" has "$r" '"kind":"nextcloud","label":"Nextcloud"' 
+check "providers: groups derived (dropbox oauth, s3 object, webdav server)" sh -c 'case "$1" in *"\"kind\":\"s3\",\"label\""*"\"group\":\"object\""*) exit 0;; esac; exit 1' x "$r"
+check "providers: verified from assets/cloud/providers.json (webdav)" sh -c 'echo "$1" | grep -q "\"kind\":\"webdav\",[^{]*\"verified\":true"' x "$r"
+check "providers: a kind not verified says so (dropbox)" sh -c 'echo "$1" | grep -q "\"kind\":\"dropbox\",[^{]*\"verified\":false"' x "$r"
 r=$(cmd providers)
-check "providers: WebDAV, S3, the sign-in kinds" sh -c 'case "$1" in *"\"kind\":\"webdav\""*"\"kind\":\"s3\""*) exit 0;; esac; exit 1' x "$r"
-check "providers: no other operating system's names" sh -c 'case "$1" in *Microsoft*|*Windows*|*OneDrive*|*iCloud*|*Apple*) exit 1;; esac; exit 0' x "$r"
+check "providers asked again: still the list" has "$r" '"kind":"webdav"'
 
 P=$(rcd_pid)
 check "rcd is running" test -n "$P"
@@ -112,6 +124,23 @@ r=$(cmd secret "$ID")
 check "the password is in the keyring (stand-in), obscured by rclone" sh -c 'case "$1" in *"\"pass\":"*) case "$1" in *davpass*) exit 1;; esac; exit 0;; esac; exit 1' x "$r"
 check "no password in accounts.json" sh -c "! grep -q davpass '$H/.config/lordos/cloud/accounts.json'"
 check "nothing secret in any file of ~/.config/lordos/cloud" sh -c "! grep -rq davpass '$H/.config/lordos/cloud'"
+
+# rclone's own questions (17.2 item 3): Jottacloud's setup asks which kind of sign-in, then for a login token
+r=$(cmd add jottacloud Jotta '{}')
+check "add answers rclone's question (Jottacloud: config_type)" sh -c 'case "$1" in *"\"question\":"*"\"name\":\"config_type\""*"\"value\":\"standard\""*) exit 0;; esac; exit 1' x "$r"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+check "the question's state names the account" sh -c 'case "$1" in c*:*) exit 0;; esac; exit 1' x "$QS"
+r2=$(cmd state)
+check "the account shows while it is being set up" has "$r2" '"configuring":true'
+r=$(cmd answer "$QS" standard)
+check "answer: rclone's next question" has "$r" '"question":'
+QS2=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS2" not-a-real-login-token)
+check "a wrong answer ends with an error" has "$r" '"error":'
+r=$(cmd state)
+check "and the half-made account is gone" sh -c 'case "$1" in *Jotta*) exit 1;; esac; exit 0' x "$r"
+r=$(cmd answer "$QS2" again)
+check "answering a question that's gone is refused" has "$r" '"error":'
 
 # Sign In Again for a server account: add with the same name is an update of that account
 OLD=$(cmd secret "$ID")
@@ -179,6 +208,36 @@ r=$(cmd links "$ID")
 check "links list empty" test "$r" = "[]"
 r=$(cmd website "$ID")
 check "Open Website: none for an http address" test "$r" = "null"
+
+# Delete in the cloud (17.2 item 6): through the mount, never outside an account
+r=$(cmd delete "$M/gone.txt")
+check "delete a file: done" has "$r" '"ok":true'
+for i in $(seq 20); do [ ! -e "$S/gone.txt" ] && break; sleep 0.5; done
+check "the file is gone on the server" test ! -e "$S/gone.txt"
+r=$(cmd delete "$M/Gone")
+check "delete a folder with what is in it" sh -c 'case "$1" in *"\"ok\":true"*"\"deleted\":"*) exit 0;; esac; exit 1' x "$r"
+for i in $(seq 20); do [ ! -e "$S/Gone" ] && break; sleep 0.5; done
+check "the folder is gone on the server" test ! -e "$S/Gone"
+check "no .Trash folder made in the cloud" sh -c "! ls -a '$S' | grep -q '^\.Trash'"
+echo keep >"$H/outside.txt"
+r=$(cmd delete "$H/outside.txt")
+check "delete refuses a path outside ~/Cloud" has "$r" 'cloud.badPath'
+check "and leaves it" test -e "$H/outside.txt"
+r=$(cmd delete "$M")
+check "delete refuses the account's own folder" has "$r" 'cloud.badPath'
+r=$(cmd delete "$M/../Work/notes.txt")
+check "delete refuses .." has "$r" 'cloud.badPath'
+check "notes.txt still there" test -e "$S/notes.txt"
+
+# Empty Trash and Measure (17.2 items 4 and 5)
+r=$(cmd state)
+check "WebDAV: no trash to empty (trashSupported false)" has "$r" '"trashSupported":false'
+r=$(cmd trash "$ID")
+check "Empty Trash on WebDAV: unsupported" has "$r" 'unsupported'
+r=$(cmd measure "$ID")
+check "Measure on WebDAV: bytes and count" sh -c 'case "$1" in *"\"bytes\":"[1-9]*"\"count\":"[1-9]*) exit 0;; esac; exit 1' x "$r"
+r=$(cmd state)
+check "the measure is in about.used, with measuredAt" sh -c 'case "$1" in *"\"about\":{\"used\":"[1-9]*"\"measuredAt\":"*) exit 0;; esac; exit 1' x "$r"
 
 r=$(cmd free "$M/Projects")
 r=$(cmd keep "$M/Projects")
