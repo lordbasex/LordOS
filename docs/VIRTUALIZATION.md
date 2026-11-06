@@ -1648,15 +1648,18 @@ metal*.
 579 ms to the guest's next fetch, then 1,079 and 2,591 ms), leaks **10 passed** (147 s; 100 cycles in 146 s, 1,464 ms
 each, the slowest 5,242 ms); exit 0, nothing left in `/var/tmp`. These are nested numbers, not bare metal.
 
-*Not run on bare metal yet.* The maintainer offered the Proxmox host (the same Xeon Silver 4108, its own pve-qemu 11.1);
-reaching it from this session was refused by the session's permission rules, so nothing was run or changed there. For a
-host like that, which keeps QEMU, the firmware and passt elsewhere and where only root logs in, `make
-build/lord-vm-testpaths` gives a `lord-vm` that takes `LORDVM_TEST_QEMU_AMD64`, `LORDVM_TEST_QEMU_IMG`,
-`LORDVM_TEST_PASST`, `LORDVM_TEST_FW_CODE` and `LORDVM_TEST_FW_VARS` (never packaged); the gates still refuse root, so
-it also needs an unprivileged account with access to `/dev/kvm`. pve-qemu differs from Debian's QEMU 10.0.13 (version
-11.1, its own build options: whether its D-Bus display has `ScanoutDMABUF2` was not checked), so its numbers are for
-the engine and the disks, not for the display. A physical PC with LordOS installed on its own disk (the maintainer's i9)
-is the simpler place: the script as above.
+*Bare metal (Xeon Silver 4108, Proxmox host, pve-qemu 11.1)* — **Measured** 2026-11-06, run with the maintainer's
+authorization on the physical Proxmox host (Supermicro X11DDW-NT, 16 threads, 31 GB, kernel 7.0.14-23-pve), host left
+unchanged: nothing installed, no user or group created, no VM touched (`qm list` identical before and after). The kit:
+`lord-vm-testpaths` from `machines-089` pointed at pve-qemu 11.1.3, `/usr/share/pve-edk2-firmware/OVMF_CODE_4M.fd` and
+`OVMF_VARS_4M.fd`, and passt extracted from Debian 13's package; the gates ran as `nobody` with the `kvm` group through
+`setpriv` (they refuse root), `nice 19` and idle I/O, one at a time, their files in `/var/tmp/lordos-gates`, removed at
+the end with the kit (0 processes left). Results: integrity **47 passed** (216 s), recovery **41 passed** (229 s; passt
+killed: 390 ms to the guest's next fetch, then 1,102 and 2,583 ms), leaks **10 passed** (152 s; 100 cycles in 151 s,
+1,512 ms each, the slowest 5,286 ms); exit 0. pve-qemu 11.1 has `ScanoutDMABUF2` (Debian's 10.0.13 doesn't), but these
+gates run without a display, so the numbers are for the engine, the disks and the network, not for the picture. Logs
+kept outside the repository (`out/final/gates-proxmox/`). A physical PC with LordOS installed on its own disk (the
+maintainer's i9) is still to run the script as above, for Debian's QEMU and a real display.
 
 
 ## 13. Phase 0 results
