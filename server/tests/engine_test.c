@@ -1531,6 +1531,36 @@ static void test_grow_wrap_height(void) {
     CHECK(next->ay >= row->ay + words->h - 0.5f, "the next item (y %g) overlaps the wrapped text (ends at %g)", next->ay, row->ay + words->h);
 }
 
+/* A wrapping grid of cards with flexBasis (the Store's CardGrid): the lines are broken with the basis
+ * when measuring too, not with the content's width. A card whose text measured wider than its basis
+ * made the grid measure one card per line and leave a blank band under it (0.8.8.4, #37). */
+static void test_wrap_basis_height(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "width", 820);
+    Node *grid = view(root);
+    ss(grid, "flexDirection", "row"); ss(grid, "flexWrap", "wrap");
+    sn(grid, "gap", 12);
+    for (int i = 0; i < 6; i++) {
+        Node *card = view(grid);
+        sn(card, "flexGrow", 1); sn(card, "flexBasis", 250); sn(card, "minWidth", 220); sn(card, "minHeight", 148);
+        Node *wide = view(card);
+        sn(wide, "width", i % 2 ? 600 : 100); sn(wide, "height", 20);     /* content wider than the basis */
+    }
+    for (int i = 0; i < 4; i++) {                                          /* the grid's invisible fillers */
+        Node *f = view(grid);
+        sn(f, "flexGrow", 1); sn(f, "flexBasis", 250); sn(f, "minWidth", 220); sn(f, "height", 0);
+    }
+    Node *next = view(root);
+    sn(next, "height", 10);
+    layout_root(root, 820, 2000);
+    /* 3 cards per line (3 × 250 + 2 × 12 ≤ 820): 2 lines of cards, then 2 lines of fillers (0 high) */
+    float want = 148 * 2 + 12 * 3;
+    CHECK(fabsf(grid->h - want) < 0.5f, "card grid: %g high, want %g", grid->h, want);
+    CHECK(fabsf(next->ay - (grid->ay + grid->h)) < 0.5f, "the next item follows the grid (y %g, grid ends at %g)", next->ay, grid->ay + grid->h);
+}
+
 /* GPU path: a Linux window in a scaled node goes through the raster like the rest of the subtree, with
  * wl.c told the transform and asked to open the hole before the blend. It used to refuse the raster,
  * and the whole window was painted at full size: past the screen's edge in the Overview (Pi 5, 0.8.7). */
@@ -3073,6 +3103,7 @@ int main(int argc, char **argv) {
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_grow_wrap_height();
+    test_wrap_basis_height();
     test_overlay_scrollbar();
     test_transform_restyle();
     printf("engine-test: %d checks, %d failures\n", checks, fails);

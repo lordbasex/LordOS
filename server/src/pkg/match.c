@@ -111,8 +111,8 @@ int pkg_match_score(const PkgQuery *q, const char *name, const char *app_name, c
     if (q->n >= 2) {
         if (!strcmp(cn, q->joined) || (has_app && !strcmp(ca, q->joined))) { score += 1400; matched = q->n; }
         else if (strstr(cn, q->joined) || (has_app && strstr(ca, q->joined))) { score += 600; matched = q->n; }
-        /* the words together, in that order, in a summary ("based on VS Code") */
-        if (matched == q->n && summaries) {
+        /* else the words together, in that order, in a summary ("based on VS Code") */
+        else if (matched == q->n && summaries) {
             char ph[PKG_QUERY_WORDS * PKG_QUERY_WORD + PKG_QUERY_WORDS];
             size_t o = 0;
             for (int i = 0; i < q->n; i++) { memcpy(ph + o, q->w[i], q->len[i]); o += q->len[i]; ph[o++] = ' '; }

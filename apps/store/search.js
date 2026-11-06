@@ -70,11 +70,11 @@ export function score(item, q) {
     total += s;
   }
   if (words.length >= 2) {
+    const phrase = words.join(' ');
     if (item.names.some((n) => n.c === joined)) { total += 1400; matched = words.length; }
     else if (item.names.some((n) => n.c.includes(joined))) { total += 600; matched = words.length; }
-    // the words together, in that order, in a summary ("based on VS Code")
-    const phrase = words.join(' ');
-    if (matched === words.length && item.texts.some((t) => t.split(SEP).join(' ').includes(phrase))) total += 400;
+    // else the words together, in that order, in a summary ("based on VS Code")
+    else if (matched === words.length && item.texts.some((t) => t.split(SEP).join(' ').includes(phrase))) total += 400;
   }
   if (matched === words.length) return total + 10000;
   if (words.length < 2 || starts < 1) return 0;

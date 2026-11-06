@@ -220,6 +220,11 @@ categories, Installed and LordOS apps. Spotlight asks for `every: true`: only th
 word. On VM 116 (Debian 13, 75,016 packages) a search takes 24–33 ms, the same as before (24–31 ms with
 the old substring search, measured with the same queries).
 
+![search](store-search-vs-code.png)
+
+*"vs code": Visual Studio Code first, then VSCodium and Cursor (VS Code in their keywords or summary), then
+the catalog apps with only "code", then the packages.*
+
 **What `lordos` depends on since 0.8.7.** `lordos-hwdata`, the signed tested-hardware snapshot
 ([UPDATES.md](UPDATES.md), "The tested-hardware snapshot"); `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` for
 Remote Desk; `rclone`, `fuse3` and `openssh-client` for Connect to Server; `openssl`. An update brings them in.
