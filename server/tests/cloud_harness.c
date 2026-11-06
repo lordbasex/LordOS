@@ -3,7 +3,7 @@
  * and the browser by a line on stdout. Built with CLOUD_TEST: LORDOS_CLOUD_RCLONE names the rclone binary.
  *
  * One command per line on stdin, one line of JSON per command on stdout:
- *   state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
+ *   lock | unlock (the keyring stand-in) | retry ID|all | state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
  *   keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
  *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit */
 #include "../src/cloud/cloud.h"
@@ -40,7 +40,9 @@ static void pump(int wait_ms) {
 /* ---- the keyring stand-in ---- */
 static void kpath(char *out, size_t n, const char *id) { snprintf(out, n, "%s/.harness-keyring/%s", getenv("HOME"), id); }
 static int k_get(const char *id, char **s) {
-    char p[1024];
+    char p[1024], lk[1024];
+    snprintf(lk, sizeof lk, "%s/.harness-keyring/LOCKED", getenv("HOME"));
+    if (!access(lk, F_OK)) return -2;               /* "lock": the keyring stand-in is locked */
     kpath(p, sizeof p, id);
     FILE *f = fopen(p, "r");
     if (!f) return 1;
@@ -95,7 +97,12 @@ int main(void) {
             char *name = strtok(NULL, " "), *fields = name ? name + strlen(name) + 1 : NULL;
             int req = 0;
             if (!fields) out(strdup("{\"error\":\"usage\"}"));
-            else { char *r = cloud_add(a1, name, fields, &req); later(r, req); }
+            else { char *r = cloud_add(a1, name, fields, NULL, &req); later(r, req); }
+        } else if (!strcmp(cmd, "addid") && a1) {         /* addid ACCOUNT-ID KIND NAME FIELDS: new settings for that account */
+            char *kind = strtok(NULL, " "), *name = strtok(NULL, " "), *fields = name ? name + strlen(name) + 1 : NULL;
+            int req = 0;
+            if (!fields) out(strdup("{\"error\":\"usage\"}"));
+            else { char *r = cloud_add(kind, name, fields, a1, &req); later(r, req); }
         } else if (!strcmp(cmd, "remove") && a1) { char *d = strtok(NULL, " "); out(cloud_remove(a1, d && !strcmp(d, "discard"))); }
         else if (!strcmp(cmd, "rename") && a1 && rest) out(cloud_rename(a1, rest));
         else if (!strcmp(cmd, "status") && a1) { const char *p[] = { a1 }; out(cloud_status(p, 1)); }
@@ -118,6 +125,15 @@ int main(void) {
         else if (!strcmp(cmd, "pause") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "resume") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 0); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "restart")) { cloud_restart(); out(strdup("{\"ok\":true}")); }
+        else if (!strcmp(cmd, "retry") && a1) { cloud_retry(strcmp(a1, "all") ? a1 : NULL); out(strdup("{\"ok\":true}")); }
+        else if (!strcmp(cmd, "lock") || !strcmp(cmd, "unlock")) {
+            char d[1024], lk[1100];
+            snprintf(d, sizeof d, "%s/.harness-keyring", getenv("HOME"));
+            mkdir(d, 0700);
+            snprintf(lk, sizeof lk, "%s/LOCKED", d);
+            if (cmd[0] == 'l') { int fd = open(lk, O_CREAT | O_WRONLY, 0600); if (fd >= 0) close(fd); } else unlink(lk);
+            out(strdup("{\"ok\":true}"));
+        }
         else if (!strcmp(cmd, "about") && a1) { cloud_refresh_about(a1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "website") && a1) { char *w = cloud_website(a1); if (w) { printf("\"%s\"\n", w); fflush(stdout); free(w); } else out(NULL); }
         else if (!strcmp(cmd, "options") && a1) { char opts[4096]; snprintf(opts, sizeof opts, "%s%s%s", a1, rest ? " " : "", rest ? rest : ""); out(cloud_set_options(opts)); }

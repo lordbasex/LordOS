@@ -41,5 +41,7 @@ int   vc_private_pending(void);               /* private requests without a repl
 /* A private request from a lord-server thread that may wait (never the main loop): 0 and the reply in *rep
  * (malloc'd; the caller wipes and frees it), -1 not sent or no reply within timeout_ms. */
 int   vc_request_wait(const char *json, size_t len, char **rep, size_t *rlen, int timeout_ms);
+/* fn(event JSON) on lord-vault's reader thread for every event ({"ev":"unlocked","v":"login"}…), before JS gets it */
+void  vc_set_event_hook(void (*fn)(const char *json, size_t len));
 
 #endif

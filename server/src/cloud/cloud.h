@@ -32,10 +32,11 @@ char *cloud_state_json(void);
 /* the calls that take a *req: > 0, the answer comes through reply(req, …); otherwise the JSON returned is the answer */
 char *cloud_providers(int *req);                                /* rclone's backends, asked every time (17.2 item 1) */
 
-char *cloud_begin_signin(const char *kind, const char *name, const char *client_id, const char *client_secret);
+/* account_id: Sign In Again for that account, whatever name is given */
+char *cloud_begin_signin(const char *kind, const char *name, const char *client_id, const char *client_secret, const char *account_id);
 int   cloud_signin_url(const char *id, char *url, size_t n);    /* 0: the address of that sign-in */
 void  cloud_cancel_signin(const char *id);
-char *cloud_add(const char *kind, const char *name, const char *fields_json, int *req);   /* { id } | { question } | { error } */
+char *cloud_add(const char *kind, const char *name, const char *fields_json, const char *account_id, int *req);   /* { id } | { question } | { error } */
 char *cloud_answer(const char *state, const char *value, int *req);                       /* rclone's next question, or done */
 char *cloud_empty_trash(const char *id, int *req);
 char *cloud_measure(const char *id, int *req);                  /* { bytes, count } */
@@ -44,7 +45,8 @@ char *cloud_delete(const char *const *paths, int n, int *req);  /* only strictly
 void  cloud_set_assets(const char *dir);                        /* where cloud/providers.json is (the verified kinds) */
 char *cloud_remove(const char *id, int discard_pending);
 char *cloud_rename(const char *id, const char *name);
-void  cloud_refresh_about(const char *id);
+void  cloud_refresh_about(const char *id);                      /* also retries an account that isn't connected */
+void  cloud_retry(const char *id);                              /* accounts not connected try again; NULL: all */
 char *cloud_website(const char *id);                            /* the address, or NULL */
 char *cloud_status(const char *const *paths, int n);
 void  cloud_keep(const char *const *paths, int n, int keep);
