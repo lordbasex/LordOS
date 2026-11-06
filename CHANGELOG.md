@@ -10,6 +10,46 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- Machines (virtualization), alpha internals with no app yet: `lord-vm`, the sandboxed supervisor of one machine (QEMU over QMP, passt networking, cgroup limits, crash recovery), and `lord-vmdisplay`, its sandboxed picture and input helper over QEMU's D-Bus display, with a versioned `machine.json` and an isolation test that passes on the Raspberry Pi 5 and on amd64 (docs/VIRTUALIZATION.md 3.9).
+- Machines app (alpha): a library of the machines in `~/Machines` with their state, a New Machine sheet (architecture, vCPUs, memory, disk, import a `.qcow2` disk image or boot from an ISO), and a window per machine with its picture scaled to fit, keyboard and mouse, Pause/Resume, Restart, Ctrl+Alt+Delete, Full screen, Shut Down and Force Off. It installs what it needs (QEMU, firmware, the display module, passt) and lets the account use hardware virtualization with one click each, shows why a machine stopped with its log, and recovers a machine whose supervisor died. Closing a machine's window shuts it down; Delete moves it to the Trash.
+- Machines: over a machine's picture the pointer is the guest's own (an I-beam over a text field, its desktop's arrow), at the size the picture is shown; the host's arrow comes back over a text console and outside the picture.
+- Machines, redesigned to the approved mocks: a Control Center of cards (each machine's picture, system, state, power and disk-activity lights, CPU and memory bars, disk use, and summary bars for machines running, memory and free space), a right-click menu, a five-step New Machine assistant that recognizes the system in an ISO, a Configure window (CPU, memory, network, disk size and the CD/DVD of a machine that is off, notes), a Logs window, and in each machine's window a toolbar and menus with resolution, Devices, Logs, Screenshot, Pause, Power, Configure and Full Screen, a floating bar in full screen and a page that says why a machine didn't start.
+- Machines: **Eject ISO** in the library takes the installation ISO out of a machine that is off; the library marks a machine that still has one.
+- Machines: the New Machine sheet installs what an emulated machine of the other architecture needs, and a machine that wouldn't fit in memory beside the ones already running (counting QEMU's own share, larger when emulated) isn't started, with a message that says how much is needed and left.
+- Machines (beta): **Suspend** saves a machine's memory to its folder and the next start continues where it was (also when its window closes, if you choose); a saved session made by another engine, processor or machine type isn't loaded unless you ask, and can be discarded. **Keep Running** leaves a machine on without its window, **Start Without Window** starts one that way, and a running machine keeps the computer from sleeping (Configure → Startup and shutdown).
+- Machines: **snapshots** with names and pictures, of every disk at once and of the memory when the machine runs, on a timeline (Take Snapshot, Go Back to This with a snapshot of now first, Delete), and starting a machine that is off from a snapshot with memory.
+- Machines: **Clone** (a new machine beside the original, with its own identity) and **Duplicate** (the same identity, snapshots and saved session); on btrfs and XFS the copy shares the disk until either changes, on ext4 a Clone makes the original's disk a frozen shared base so both take only what changes, otherwise it's a full copy; Clone from Here makes a machine from one snapshot.
+- Machines: the **Storage** window: what machines, disc images, the Trash and other files take on the volume, each machine with its clones and what deleting it would really free, its split into disks, saved session, snapshots and the rest, Reclaim Space (with an estimate first) and shared disks nobody uses any more.
+- Machines: **profiles** (Productivity, Software Development, Testing, Design, Light desktop) sized for this computer in the assistant and in Configure; a resolution menu of the sizes that fit the display; **Record** the machine's own picture to a video in Screenshots.
+- Machines: the **Shell**, the machine's serial console in a terminal pane marked as the guest's; **Logs** with an Overview that brings together state, sandbox, limits, network, engine, storage, recoveries and problems (Copy Report), level filter, Clear View, and the guest's journal.
+- Machines: an opt-in **guest agent** (qemu-guest-agent in the guest, plus Machines' own private channel): its light on the card and the window's bar with what works now, a clean shutdown when the power button isn't heard, the guest's clock set after a pause or resume, the guest kept awake, its journal in Logs, and a **shared clipboard** (text, the directions you choose) through a small helper Machines installs in the guest.
+- Machines: the CD/DVD can be changed while a machine runs (Devices → Choose Disc Image, Eject Disc).
+- Machines: an interrupted suspend, resume, snapshot, compaction or linked clone is finished or undone the next time the machine opens, and the machine's log says which; disks a killed machine left with leaked space are repaired. Release gates for disk integrity, failure recovery and leaks (100 start/stop cycles) are scripts in `server/tests/`.
+- Machines: the network heals itself: when its helper (passt) ends, a new one is attached while the machine runs, the guest keeps its network card and address, and the window says it's back (measured: 4 to 7 ms to attach, the guest's next request 0.2 s after).
+- Machines: the shared clipboard carries pictures and rich text both ways, beside text; a machine's pictures are re-encoded on this side and its rich text cleaned of scripts, event handlers and links that aren't web or mail, before any app sees them.
+- Machines: **Record** has the machine's sound (its new sound card), in time with the picture.
+- Machines: a **Clone** gets its own name and machine-id inside the machine and new SSH keys at its first start, through the guest agent (the name is editable in the Clone sheet; **Keep identity (exact copy)** skips it).
+- Machines: shutting down, restarting or logging out saves running machines to disk (falling back to a clean shutdown, then off), and they resume where they were; a running machine keeps this computer from going to sleep when idle (visible to the system as an idle inhibitor), and the computer sleeps once none runs.
+
+### Fixed
+
+- Machines: the Snapshots window shows every snapshot, in rows that scroll, instead of one row cut off.
+- Machines: the install page says how the download goes in words, and when the network doesn't answer says so (about a minute) instead of "No package source could be verified".
+- Machines: finishing an interrupted revert at the next start no longer fails while the killed engine is still exiting.
+- Machines: Esc pressed while one of a machine window's menus is open closes the menu without reaching the guest; downloads of the packages Machines needs give up in about a minute when the network doesn't answer, and the page says so instead of waiting forever; when the machine's network helper ends, it's replaced and the window says so.
+
+- Machines on the Raspberry Pi 5: the machine's picture was see-through (the window below showed through the guest's black), because the GPU composition reads the picture's unused fourth byte as transparency. It is drawn opaque now.
+- Machines: hardware virtualization allowed with **Allow** was taken away again at the next login of any kind (an SSH login is enough), because the system rewrites `/dev/kvm`'s access list for the screen's session only. LordOS now keeps it.
+- Machines: a window of each running machine came back at the next login as one more empty Machines window. Only the library is restored now.
+- Machines: after an installation from an ISO, taking the ISO out moved the network card to another PCI slot and the installed system came up without network. Every device of a machine now has a fixed slot.
+- A picture shown scaled stayed black after it was replaced by one of another size: the scaled copy was freed but its old size kept, so it was never made again. It turned the Machines window black in full screen and could do the same to a Remote Desk session whose remote screen changed size.
+
+### Security
+
+- Machines: importing a disk image never reads another file: the image's format comes from LordOS's own check of its header (no backing file, no external data file), `qemu-img` runs sandboxed with the format named and backing turned off, and the system disk is checked again at every start.
+
 ## [0.8.8.4-beta] - 2026-11-06
 
 An update for 0.8.8 to 0.8.8.3 through Store → Updates and `apt`: the `lordos` package changes, with the 13 issues reported on GitHub since 0.8.8.3 (#28 to #40), a redesigned Remote Desk with sound, single sign-on for Fortinet VPNs and a Balance control for sound. Thanks to everyone who opened an issue. The installer's manual partitioning (#31) lives in the ISO and reaches people with the next one.

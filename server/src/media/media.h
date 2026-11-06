@@ -32,6 +32,17 @@ void media_shutdown(void);              /* close everything (theme change or exi
 /* drawing of a media node (paint.c) */
 void media_paint(Canvas *c, int handle, int node, float x, float y, float w, float h, float radius, float op);
 
+/* The pointer of a source that brings its own (a Machines guest): b, g, r, a bytes with straight alpha, w × h,
+ * hotspot; NULL: none (the host's arrow). media_src_cursor_visible: the source hid or showed it. */
+void media_src_cursor(int id, const uint8_t *bgra, int w, int h, int hx, int hy);
+void media_src_cursor_visible(int id, int on);
+/* Over a media node of source id (main.c, cursor_now): 0 the host's pointer (none sent, or the source turned its own
+ * off), 1 *px… (premultiplied, at the size the picture is shown, at most 64 × 64), 2 hidden (a fully transparent
+ * image). *gen changes when the image does. */
+int  media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen);
+/* changes with every change of a source's pointer (main.c marks the cursor to draw again) */
+unsigned media_cursor_serial(void);
+
 /* Opaque media node that contains the whole region (x0,y0)-(x1,y1), to paint only from it (paint.c). 0 if there is none. */
 int  media_cover_node(float x0, float y0, float x1, float y1);
 

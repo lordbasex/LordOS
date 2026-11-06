@@ -4,6 +4,7 @@
 #define LORD_MEDIA_INT_H
 
 #include "media.h"
+#include "mcursor.h"
 #include "proto.h"
 
 #include <stddef.h>
@@ -42,7 +43,9 @@ typedef struct {
     int ring_gen, ring_w, ring_h, ring_slots, cur_slot;
     uint32_t *px;               /* capture or image: premultiplied ARGB */
     int w, h, opaque;
+    int xrgb;                   /* the 4th byte means nothing (QEMU's x8r8g8b8): drawn with alpha 255 */
     unsigned frame_seq;         /* changes with each new frame */
+    unsigned painted_seq;       /* the frame_seq the last paint read (Machines acknowledges frames with it) */
     /* drawing */
     MediaView view;
     int node, box_w, box_h, sent_w, sent_h;
@@ -50,6 +53,13 @@ typedef struct {
     int cache_w, cache_h;
     unsigned cache_seq, cache_gen;
     float cache_box[4];
+    float shown_scale;          /* physical pixels per picture pixel at the last paint (the pointer follows it) */
+    /* the source's own pointer (a Machines guest's): drawn instead of the host's over its node */
+    McurImage cur;              /* as the source sent it, premultiplied and cut */
+    int cur_mode;               /* 0 none (the host's arrow), 1 the image, 2 hidden */
+    int cur_off;                /* the source said its pointer is hidden right now */
+    McurImage cur_shown;        /* cur at cur_shown_f */
+    float cur_shown_f;
     uint32_t *mip[8];           /* halvings (large photos) */
     int mip_w[8], mip_h[8], nmip;
     /* player state */
@@ -76,6 +86,7 @@ typedef struct {
 
 /* media.c */
 MediaSrc *media_src_new(int kind, const char *app);
+void media_cursor_touch(void);          /* a source's pointer changed (or the scale it's drawn at) */
 MediaSrc *media_src_get(int id);
 MediaSrc *media_src_at(int i);          /* iterate: 0..MEDIA_MAX_SRC-1 (NULL if free) */
 void media_src_close(MediaSrc *s);
@@ -126,6 +137,12 @@ MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
 MediaSrc *media_resize(MediaSrc *src, int w, int h);          /* new capture source, w × h */
 MediaSrc *media_rotate(MediaSrc *src, int turns);             /* new capture source, quarter turns clockwise */
 int  media_screenrec_start(MediaSrc *s, int fps);
+/* A recording of one picture instead of the screen (a Machines guest, 6.20): the same input ring and encoder, w × h
+ * fixed at start; the caller feeds it (a picture of another size is drawn into its top left, the rest black). It never
+ * becomes the screen recording, so the screen keeps its own. 0 ok. */
+int  media_framerec_start(MediaSrc *s, int w, int h, int fps);
+/* one frame, at most at the recording's rate (sooner ones are skipped); 1 sent, 0 skipped */
+int  media_framerec_feed(MediaSrc *s, const uint32_t *px, int w, int h);
 void media_capture_src_closed(MediaSrc *s);
 int  media_memfd_from_pixels(const uint32_t *px, int w, int h);
 

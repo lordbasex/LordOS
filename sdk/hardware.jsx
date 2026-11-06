@@ -262,8 +262,13 @@ export function applyIdle() {
 }
 
 const managed = () => typeof lord.session !== 'undefined' && lord.session.managed();
+const machinesAwake = () => { try { return typeof lord.vm !== 'undefined' ? lord.vm.awake() : 0; } catch (e) { return 0; } };
+// the sleep deadline came while a machine ran: looked at again every 30 s, and the computer sleeps once none runs
+// (unless someone came back first: the "wake" stage)
+let sleepHeld = null;
 function onIdle(data) {
   const stage = data?.stage;
+  if (stage === 'wake' && sleepHeld) { clearInterval(sleepHeld); sleepHeld = null; }
   if (stage === 'lock' && managed()) lord.session.lock();
   // the computer is going to sleep (the lid, the power button, a sleep timer) or woke up: the display was
   // off, so "Require password after the display turns off" applies (issue #36, sdk/idlemodel.js).
@@ -275,6 +280,20 @@ function onIdle(data) {
     return;
   }
   if (stage !== 'sleep') return;
+  // a machine that runs keeps this computer awake (Machines, "Keep this computer awake", on unless turned off there)
+  // (lord-vm also holds logind's idle inhibitor, which the login screen's sleep deadline obeys: lord-sessiond)
+  const n = machinesAwake();
+  if (n > 0) {
+    console.log(`idle: sleep held off: ${n} running machine(s) keep this computer awake`);
+    if (!sleepHeld) sleepHeld = setInterval(() => {
+      if (machinesAwake() > 0) return;
+      clearInterval(sleepHeld);
+      sleepHeld = null;
+      console.log('idle: no running machine holds sleep off any more: going to sleep');
+      onIdle({ stage: 'sleep' });
+    }, 30000);
+    return;
+  }
   // the login screen of a locked session has no admin helper: lord-sessiond suspends (docs/SESSIONS.md)
   if (typeof lord.greeter !== 'undefined') { lord.greeter.send(JSON.stringify({ t: 'power', a: 'suspend' })); return; }
   // sleep came before the lock deadline (a short sleep time): lock first, so waking up asks for the password

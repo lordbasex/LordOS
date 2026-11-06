@@ -743,5 +743,8 @@
   "vpn.editWhileOn": "Disattiva la VPN prima di modificarla.",
   "vpn.fortiSsoRefused": "Il server VPN non ha accettato l'accesso. Connetti di nuovo e accedi dalla pagina dell'organizzazione.",
   "vpn.clientCertPair": "Un certificato client richiede il certificato e la sua chiave privata.",
-  "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato."
+  "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato.",
+  "vm.noKvm": "Questo computer non offre virtualizzazione hardware",
+  "vm.noKvmGroup": "Questo sistema non ha il gruppo kvm per la virtualizzazione hardware",
+  "vm.groupFailed": "Impossibile aggiungere il tuo account al gruppo kvm"
 }

@@ -66,7 +66,7 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_STRING = 31, XA_WINDOW =
     X(NET_WM_WINDOW_TYPE_DND, "_NET_WM_WINDOW_TYPE_DND") X(NET_WM_MOVERESIZE, "_NET_WM_MOVERESIZE") X(NET_WM_PID, "_NET_WM_PID") \
     X(NET_CLIENT_LIST, "_NET_CLIENT_LIST") X(NET_FRAME_EXTENTS, "_NET_FRAME_EXTENTS") X(MOTIF_WM_HINTS, "_MOTIF_WM_HINTS") \
     X(WL_SURFACE_ID, "WL_SURFACE_ID") X(CLIPBOARD, "CLIPBOARD") X(TARGETS, "TARGETS") X(TIMESTAMP, "TIMESTAMP") X(INCR, "INCR") \
-    X(TEXT, "TEXT") X(MIME_UTF8, "text/plain;charset=utf-8") X(MIME_TEXT, "text/plain") X(MIME_PNG, "image/png") \
+    X(TEXT, "TEXT") X(MIME_UTF8, "text/plain;charset=utf-8") X(MIME_TEXT, "text/plain") X(MIME_PNG, "image/png") X(MIME_HTML, "text/html") \
     X(LORD_SEL_CLIPBOARD, "_LORD_SEL_CLIPBOARD") X(LORD_SEL_PRIMARY, "_LORD_SEL_PRIMARY")
 
 #define AE(id, name) A_##id,
@@ -600,17 +600,22 @@ static void sel_request(const uint8_t *p) {
     unsigned g;
     if (k == SEL_PRIM) text = wlx_primary(&tlen, &g);
     else if (!image) { text = term_clipboard(); tlen = strlen(text); }
+    size_t hlen = 0;
+    const char *html = k == SEL_CLIP && !image ? wl_clip_html(&hlen) : NULL;
     if (target == AT(TARGETS)) {
-        uint32_t list[10];
+        uint32_t list[12];
         uint32_t nl = 0;
         list[nl++] = AT(TARGETS);
         list[nl++] = AT(TIMESTAMP);
         if (image) list[nl++] = AT(MIME_PNG);
         else { list[nl++] = AT(UTF8_STRING); list[nl++] = AT(MIME_UTF8); list[nl++] = AT(MIME_TEXT); list[nl++] = XA_STRING; list[nl++] = AT(TEXT); }
+        if (html) list[nl++] = AT(MIME_HTML);
         change_prop(requestor, prop, XA_ATOM, 32, list, nl);
     } else if (target == AT(TIMESTAMP)) {
         uint32_t t = 0;
         change_prop(requestor, prop, XA_CARDINAL, 32, &t, 1);
+    } else if (html && target == AT(MIME_HTML)) {
+        write_data(requestor, prop, target, (const uint8_t *)html, hlen);
     } else if (image && target == AT(MIME_PNG)) {
         size_t n = 0;
         const unsigned char *png = wl_clip_png(&n);

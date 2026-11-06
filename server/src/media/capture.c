@@ -289,6 +289,47 @@ int media_screenrec_start(MediaSrc *s, int fps) {
     return 0;
 }
 
+int media_framerec_start(MediaSrc *s, int W, int H, int fps) {
+    W &= ~1; H &= ~1;
+    if (W < 16 || H < 16 || W > 8192 || H > 8192) return -1;
+    int slots = 3;
+    size_t n = (size_t)W * H * 4 * slots;
+    int fd = memfd_create("lordos-frames", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0 || ftruncate(fd, (off_t)n) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL)) { if (fd >= 0) close(fd); return -1; }
+    void *m = mmap(NULL, n, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { close(fd); return -1; }
+    s->in_map = m; s->in_len = n; s->in_fd = fd; s->in_w = W; s->in_h = H; s->in_slots = slots;
+    memset(s->in_busy, 0, sizeof s->in_busy);
+    s->rec_fps = fps > 0 && fps <= 60 ? fps : 30;
+    s->rec_start = now_ms();
+    s->rec_last = 0;
+    int64_t v[6] = { slots, W, H, 0, 0, 0 };
+    if (mp_send(s->sock, MM_INRING, 0, v, NULL, 0, &fd, 1)) { munmap(m, n); close(fd); s->in_map = NULL; s->in_fd = -1; return -1; }
+    return 0;
+}
+
+int media_framerec_feed(MediaSrc *s, const uint32_t *px, int w, int h) {
+    if (!s || !s->in_map || s->sock < 0 || !px || w < 1 || h < 1) return 0;
+    double t = now_ms();
+    if (t - s->rec_last < 1000.0 / (s->rec_fps > 0 ? s->rec_fps : 30) - 2) return 0;
+    int slot = -1;
+    for (int i = 0; i < s->in_slots; i++) if (!s->in_busy[i]) { slot = i; break; }
+    if (slot < 0) { s->rec_dropped++; return 0; }
+    uint32_t *dst = (uint32_t *)(s->in_map + (size_t)slot * s->in_w * s->in_h * 4);
+    int cw = w < s->in_w ? w : s->in_w, ch = h < s->in_h ? h : s->in_h;
+    if (cw != s->in_w || ch != s->in_h) memset(dst, 0, (size_t)s->in_w * s->in_h * 4);
+    for (int y = 0; y < ch; y++) {
+        uint32_t *d = dst + (size_t)y * s->in_w;
+        const uint32_t *q = px + (size_t)y * w;
+        for (int x = 0; x < cw; x++) d[x] = q[x] | 0xff000000u;      /* x8r8g8b8: the fourth byte isn't alpha */
+    }
+    if (mp_sendv(s->sock, MM_INFRAME, (uint32_t)slot, (int64_t)(t - s->rec_start), 0, 0, 0)) { s->rec_dropped++; return 0; }
+    s->in_busy[slot] = 1;
+    s->rec_last = t;
+    s->rec_frames++;
+    return 1;
+}
+
 void media_capture_src_closed(MediaSrc *s) {
     if (rec != s) return;
     rec = NULL;

@@ -43,6 +43,7 @@
 #   /usr/lib/modules-load.d/lordos-drivetemp.conf    SATA disk temperatures (drivetemp) at boot
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
+#   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 30 s for Machines to save running machines
 #   /usr/share/chromium/extensions/lordos-video/  LordOS's own browser extension for smooth video without
 #                                         hardware decoding (Debian's chromium loads every folder there;
 #                                         docs/VIDEO.md). Its settings are written at login by the
@@ -123,6 +124,18 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
+# Machines (0.8.9, alpha internals): lord-vm supervises one machine, lord-vmdisplay carries its picture and input
+# (docs/VIRTUALIZATION.md, "Phase 1 implementation"). QEMU and passt aren't dependencies: Machines asks for them.
+for b in lord-vm lord-vmdisplay; do
+    [ -x "server/build/$b" ] && install -m 755 "server/build/$b" "$L/bin/$b"
+    [ -x "$L/bin/$b" ] && { "$STRIP" --strip-unneeded "$L/bin/$b" 2>/dev/null || true; }
+done
+# lordos-guest (0.8.9 beta): the clipboard helper Machines copies into a guest of this architecture (Install Agent)
+if [ -x server/build/lordos-guest ]; then
+    install -d "$L/guest"
+    install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
+    "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
+fi
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }
@@ -196,6 +209,8 @@ install -D -m 644 tools/iso/rootfs/etc/modules-load.d/lordos-drivetemp.conf "$PK
 install -D -m 644 packaging/systemd/smartmontools-lordos.conf "$PKG/usr/lib/systemd/system/smartmontools.service.d/lordos.conf"
 # gnome-keyring, if an app pulls it in, without its Secret Service: LordOS keeps that name (docs/PASSWORDS.md)
 install -D -m 644 packaging/systemd/gnome-keyring-lordos.conf "$PKG/usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf"
+# Machines: a shutdown or restart waits up to 30 s for running machines to be saved (docs/VIRTUALIZATION.md 6.1)
+install -D -m 644 packaging/systemd/logind-lordos-machines.conf "$PKG/usr/lib/systemd/logind.conf.d/lordos-machines.conf"
 # remote login (SSH) defaults, read only once openssh-server is installed (docs/REMOTE.md)
 install -D -m 644 tools/iso/rootfs/etc/ssh/sshd_config.d/10-lordos.conf "$PKG/etc/ssh/sshd_config.d/10-lordos.conf"
 # a process may only trace its own descendants: a restricted Linux app must not take over an

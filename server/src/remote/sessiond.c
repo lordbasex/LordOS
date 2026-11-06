@@ -633,12 +633,50 @@ static void show_greeter(const char *mode, const char *user) {
     if (start_worker(W_GREETER, NULL, NULL)) { pending = W_GREETER; sd_log("login screen (%s) queued behind a running worker", greeter_mode); }
 }
 
+/* Is idle sleep held off? A machine running in some session holds logind's "idle" block inhibitor (Machines, "Keep
+ * this computer awake", docs/VIRTUALIZATION.md 6.14), which the login screen's sleep deadline, an idle sleep, obeys.
+ * Read from logind's BlockInhibited ("shutdown:idle") through busctl, two seconds at most. */
+static int idle_inhibited(void) {
+    int p[2];
+    if (pipe2(p, O_CLOEXEC)) return 0;
+    pid_t pid = fork();
+    if (pid == 0) {
+        int null = open("/dev/null", O_RDWR);
+        dup2(null, 0); dup2(p[1], 1); dup2(null, 2);
+        const char *const a[] = { "/usr/bin/busctl", "--system", "get-property", "org.freedesktop.login1", "/org/freedesktop/login1",
+                                  "org.freedesktop.login1.Manager", "BlockInhibited", NULL };
+        char *const env[] = { "PATH=/usr/sbin:/usr/bin:/sbin:/bin", NULL };
+        execve(a[0], (char *const *)a, env);
+        _exit(127);
+    }
+    close(p[1]);
+    char buf[512];
+    size_t n = 0;
+    while (pid > 0 && n + 1 < sizeof buf) {
+        struct pollfd pf = { p[0], POLLIN, 0 };
+        if (poll(&pf, 1, 2000) <= 0) break;
+        ssize_t r = read(p[0], buf + n, sizeof buf - 1 - n);
+        if (r <= 0) break;
+        n += (size_t)r;
+    }
+    close(p[0]);
+    buf[n] = 0;
+    if (pid > 0) { kill(pid, SIGKILL); while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {} }
+    /* s "shutdown:idle:handle-lid-switch" */
+    for (char *t = strchr(buf, '"'), *end; t && (end = strchr(++t, '"')); t = NULL) {
+        *end = 0;
+        for (char *w = strtok(t, ":"); w; w = strtok(NULL, ":")) if (!strcmp(w, "idle")) return 1;
+    }
+    return 0;
+}
+
 /* "suspend" only comes from the login screen: the sleep deadline of a session locked on the monitor, which
  * the login screen keeps while it has the monitor (a session's own sleep goes through its admin helper). */
 static void power(const char *what, const char *who) {
     const char *verb = !strcmp(what, "reboot") ? "reboot" : !strcmp(what, "poweroff") ? "poweroff"
                      : !strcmp(what, "suspend") ? "suspend" : NULL;
     if (!verb) return;
+    if (!strcmp(verb, "suspend") && idle_inhibited()) { sd_log("suspend requested %s: not now, idle sleep is held off (a running machine)", who); return; }
     sd_log("%s requested %s", verb, who);
     pid_t pid = fork();
     if (pid == 0) {
