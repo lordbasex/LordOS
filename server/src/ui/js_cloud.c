@@ -270,6 +270,16 @@ static JSValue f_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return r;
 }
 
+static JSValue f_search(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *p = arg(c, argc, argv, 0), *n = arg(c, argc, argv, 1);
+    int req = 0;
+    char *res_ = p && n ? cloud_search(p, n, &req) : NULL;
+    JSValue r = (p && n) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
+    fr(c, p); fr(c, n);
+    return r;
+}
+
 static JSValue f_unlink(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *p = arg(c, argc, argv, 0);
@@ -325,6 +335,7 @@ static const JSCFunctionListEntry fns[] = {
     JS_CFUNC_DEF("measure", 1, f_measure),
     JS_CFUNC_DEF("cancelMeasure", 1, f_cancel_measure),
     JS_CFUNC_DEF("delete", 1, f_delete),
+    JS_CFUNC_DEF("search", 2, f_search),
     JS_CFUNC_DEF("remove", 2, f_remove),
     JS_CFUNC_DEF("rename", 2, f_rename),
     JS_CFUNC_DEF("refreshAbout", 1, f_about),

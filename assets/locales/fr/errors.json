@@ -105,6 +105,8 @@
   "cloud.certChanged": "Le certificat de ce serveur a changé, la connexion a donc été refusée : c’est peut-être une attaque. C’était {old}, maintenant {new}.",
   "cloud.listFailed": "Impossible de lister les fichiers du compte",
   "cloud.notTrusted": "Le serveur n’a pas été approuvé : le compte n’a pas été ajouté",
+  "cloud.hostKeyOther": "Un autre compte connaît une clé différente pour ce serveur",
+  "cloud.tooManyAttempts": "Le serveur refuse pour un moment les nouvelles connexions de cet ordinateur : attendez une minute et réessayez",
   "bench.bootTestFailed": "Impossible d’enregistrer l’état du test de temps de démarrage",
   "bench.bootTestLive": "Le test de temps de démarrage ne peut pas s’exécuter en session live : rien de ce qu’il enregistre ne survit à un redémarrage",
   "camera.busy": "La caméra est occupée",

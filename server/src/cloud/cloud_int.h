@@ -52,9 +52,13 @@ typedef struct {
     int rcjob_req;
     int pending_req;                /* add()/answer() waiting for config/create's next step */
     int new_acc;                    /* added in this session and not finished: removed if its setup fails */
-    char trust_kind;                /* 'h' host keys, 'c' a certificate, shown and waiting for the person (cloud_trust.c) */
+    char trust_kind;                /* 'h' host keys, 'H' to replace the kept ones, 'c' a certificate, shown and waiting (cloud_trust.c) */
+    int trust_from_other;           /* this add took another account's known key for the same server (N1) */
+    char fp_old[256], fp_new[256];  /* a key or certificate that changed: both, for the state (U10) */
+    time_t pending_since;
     char *trust_data;
     char *pend_sec;                 /* add's secrets while that question waits (wiped) */
+    char *pend_tsec;                /* the same over the kept ones, for the checks (B15) */
     int pend_upd;
     time_t check_at;                /* the next listing that checks a mounted account still answers */
     char *checked[Q_MAX];           /* queued files the conflict rule already looked at (7.2) */
@@ -91,6 +95,8 @@ int   cl_next_req(void);
 int   ct_needed(const Acc *a, const char *sec);
 int   ct_check(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);   /* 0 ok, 1 a question, -1 refused */
 int   ct_accept(Acc *a);
+int   ct_key_mismatch(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);
+int   ct_probed_lately(const Acc *a);
 void  ct_refuse(Acc *a);
 void  ct_forget(const Acc *a);
 

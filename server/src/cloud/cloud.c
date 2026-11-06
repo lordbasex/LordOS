@@ -109,6 +109,8 @@ static Reply *rhead;
 
 void ct_params(const Acc *a, JBuf *b, int *first);     /* cloud_trust.c */
 static int presigned(const Acc *a);
+static void changed_failed(Acc *a, int req, const char *code, char *msg);
+static void wait_answer(Acc *a, int req, char *q, const char *sec, const char *tsec, int upd);
 static char *add_impl(const char *kind, const char *name, const char *fields, const char *account_id, int *req, int use_req);
 static const CloudKind *kind_get(const char *kind);
 static const CloudKind *kind_put(const char *kind, const char *type, const char *label, const char *group);
@@ -1339,7 +1341,8 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
     add_field = NULL;               /* only for the reply above */
     pthread_mutex_lock(&cl_mu);
     wipe_free(a->pend_sec);
-    a->pend_sec = NULL;
+    wipe_free(a->pend_tsec);
+    a->pend_sec = a->pend_tsec = NULL;
     pthread_mutex_unlock(&cl_mu);
     if (a->new_acc) {
         ct_forget(a);
@@ -1416,6 +1419,18 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
     char vmsg[256] = "";
     if (verify_remote(a, vmsg, sizeof vmsg)) {
         const char *c = cloud_failure_code(vmsg);
+        int sftp = !strcmp(a->k->type, "sftp");
+        if (sftp && c && !strcmp(c, "cloud.hostKeyChanged")) {
+            /* rclone's connection found another key than the kept one: B15 and N1 */
+            char code[64], msg2[2100], *q2 = NULL;
+            int t = ct_key_mismatch(a, a->pend_tsec ? a->pend_tsec : a->pend_sec, &q2, code, sizeof code, msg2, sizeof msg2);
+            if (t == 1) { wait_answer(a, req, q2, a->pend_sec, a->pend_tsec, a->pend_upd); return; }
+            changed_failed(a, req, code, msg2);
+            return;
+        }
+        /* B12: a reset right after a key probe is the server's penalty for the probe */
+        if (sftp && ct_probed_lately(a) && (strstr(vmsg, "connection reset") || strstr(vmsg, "handshake failed: EOF") || (c && !strcmp(c, "cloud.unreachable"))))
+            c = "cloud.tooManyAttempts";
         add_failed(a, req, c ? c : "cloud.addFailed", vmsg);
         return;
     }
@@ -1423,6 +1438,10 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
     a->pending_req = 0;
     a->new_acc = 0;
     a->err[0] = a->message[0] = 0;
+    a->fp_old[0] = a->fp_new[0] = 0;
+    wipe_free(a->pend_sec);
+    wipe_free(a->pend_tsec);
+    a->pend_sec = a->pend_tsec = NULL;
     pthread_mutex_unlock(&cl_mu);
     finish_new(a);
     if (req) {
@@ -1432,43 +1451,96 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
     }
 }
 
+/* a key or certificate that changed: { error, old, new } (msg is "old\tnew"), and both kept for the state (U10) */
+static void changed_failed(Acc *a, int req, const char *code, char *msg) {
+    char *tab = strchr(msg, '\t');
+    if (tab) *tab = 0;
+    pthread_mutex_lock(&cl_mu);
+    cpy(a->fp_old, sizeof a->fp_old, msg);
+    cpy(a->fp_new, sizeof a->fp_new, tab ? tab + 1 : "");
+    pthread_mutex_unlock(&cl_mu);
+    JBuf e;
+    jb_init(&e);
+    jb_raw(&e, "{\"error\":");
+    jb_str(&e, code);
+    jb_raw(&e, ",\"old\":");
+    jb_str(&e, msg);
+    jb_raw(&e, ",\"new\":");
+    jb_str(&e, tab ? tab + 1 : "");
+    jb_raw(&e, "}");
+    if (req) post_reply(req, e.oom ? (jb_free(&e), NULL) : e.p); else jb_free(&e);
+    add_failed(a, 0, code, "");
+}
+
+/* a question waits: what add was given stays (wiped after) to go on with once it is answered */
+static void wait_answer(Acc *a, int req, char *q, const char *sec, const char *tsec, int upd) {
+    pthread_mutex_lock(&cl_mu);
+    if (sec != a->pend_sec) { wipe_free(a->pend_sec); a->pend_sec = sec ? strdup(sec) : NULL; }
+    if (tsec != a->pend_tsec) { wipe_free(a->pend_tsec); a->pend_tsec = tsec ? strdup(tsec) : NULL; }
+    a->pend_upd = upd;
+    a->pending_req = 1;
+    a->pending_since = time(NULL);
+    pthread_mutex_unlock(&cl_mu);
+    if (req) post_reply(req, q); else free(q);
+    cl_changed();
+}
+
 /* who the server is (cloud_trust.c), then config/create: a question for the person, or on to add_step. sec: the
- * secrets given with add, kept (wiped after) while a trust question waits */
-static void add_continue(Acc *a, int req, const char *sec, int upd) {
+ * secrets given with add; tsec: those over the account's kept ones (an update may leave the host empty, B15), for
+ * the checks only */
+static void add_continue(Acc *a, int req, const char *sec, const char *tsec, int upd) {
     char msg[256] = "", code[64] = "", *q = NULL;
-    if (ct_needed(a, sec)) {
-        int t = ct_check(a, sec, &q, code, sizeof code, msg, sizeof msg);
-        if (t == 1) {
-            pthread_mutex_lock(&cl_mu);
-            if (a->pend_sec != sec) wipe_free(a->pend_sec);
-            a->pend_sec = sec && a->pend_sec != sec ? strdup(sec) : a->pend_sec;
-            a->pend_upd = upd;
-            a->pending_req = 1;
-            pthread_mutex_unlock(&cl_mu);
-            if (req) post_reply(req, q); else free(q);
-            cl_changed();
-            return;
-        }
+    if (!tsec) tsec = sec;
+    if (ct_needed(a, tsec)) {
+        int lately = !strcmp(a->k->type, "sftp") && ct_probed_lately(a);
+        int t = ct_check(a, tsec, &q, code, sizeof code, msg, sizeof msg);
+        if (t == 1) { wait_answer(a, req, q, sec, tsec, upd); return; }
         if (t < 0) {
-            if (!strcmp(code, "cloud.hostKeyChanged") || !strcmp(code, "cloud.certChanged")) {
-                /* both fingerprints, kept and now: msg is "old\tnew" (cloud_trust.c) */
-                char *tab = strchr(msg, '\t');
-                JBuf e;
-                jb_init(&e);
-                jb_raw(&e, "{\"error\":");
-                jb_str(&e, code);
-                if (tab) { *tab = 0; jb_raw(&e, ",\"old\":"); jb_str(&e, msg); jb_raw(&e, ",\"new\":"); jb_str(&e, tab + 1); }
-                jb_raw(&e, "}");
-                if (req) post_reply(req, e.oom ? (jb_free(&e), NULL) : e.p); else jb_free(&e);
-                add_failed(a, 0, code, tab ? tab + 1 : msg);
-                return;
-            }
+            if (!strcmp(code, "cloud.hostKeyChanged") || !strcmp(code, "cloud.certChanged")) { changed_failed(a, req, code, msg); return; }
+            /* B12: the server stopped answering right after an earlier try: it is refusing this computer for a while */
+            if (lately && !strcmp(code, "cloud.unreachable")) cpy(code, sizeof code, "cloud.tooManyAttempts");
             add_failed(a, req, code[0] ? code : "cloud.addFailed", msg);
             return;
         }
     }
+    /* kept while rclone sets it up: a key mismatch found by its listing is asked about with them (add_step) */
+    pthread_mutex_lock(&cl_mu);
+    if (sec != a->pend_sec) { wipe_free(a->pend_sec); a->pend_sec = sec ? strdup(sec) : NULL; }
+    if (tsec != a->pend_tsec) { wipe_free(a->pend_tsec); a->pend_tsec = tsec ? strdup(tsec) : NULL; }
+    a->pend_upd = upd;
+    pthread_mutex_unlock(&cl_mu);
     int r = create_remote_q(a, sec, upd ? 2 : 1, msg, sizeof msg, &q);
     add_step(a, req, r, q, msg);
+}
+
+/* B15: an update may give only the password: the checks need the host, port and user rclone keeps as secrets */
+static char *merged_secrets(Acc *a, const char *given) {
+    char *old = NULL;
+    if (!secrets || secrets->get(a->id, &old) || !old) return NULL;
+    JDoc o, g;
+    int ok_o = !json_parse(old, strlen(old), &o, NULL, 0), ok_g = given && !json_parse(given, strlen(given), &g, NULL, 0);
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{");
+    int first = 1;
+    for (const JVal *x = ok_o && o.root->type == J_OBJ ? o.root->kid : NULL; x; x = x->next) {
+        if (x->type != J_STR || (ok_g && json_get(g.root, x->key))) continue;
+        if (!first) jb_raw(&b, ",");
+        first = 0;
+        jb_str(&b, x->key); jb_raw(&b, ":"); jb_str(&b, x->str);
+    }
+    for (const JVal *x = ok_g && g.root->type == J_OBJ ? g.root->kid : NULL; x; x = x->next) {
+        if (x->type != J_STR) continue;
+        if (!first) jb_raw(&b, ",");
+        first = 0;
+        jb_str(&b, x->key); jb_raw(&b, ":"); jb_str(&b, x->str);
+    }
+    jb_raw(&b, "}");
+    if (ok_o) json_free(&o);
+    if (ok_g) json_free(&g);
+    wipe_free(old);
+    if (b.oom) { jb_free(&b); return NULL; }
+    return b.p;
 }
 
 static void job_add(Job *j) {
@@ -1487,7 +1559,9 @@ static void job_add(Job *j) {
         pthread_mutex_unlock(&cl_mu);
         if (!a->configured) bring_up_config(a);
     }
-    add_continue(a, j->req, j->a, upd);
+    char *tsec = upd ? merged_secrets(a, j->a) : NULL;
+    add_continue(a, j->req, j->a, tsec, upd);
+    wipe_free(tsec);
 }
 
 /* the answer to one of rclone's questions (17.2 item 3): config/update with continue, state and result */
@@ -1502,15 +1576,17 @@ static void job_answer(Job *j) {
         /* a host key or a certificate the person was shown (cloud_trust.c) */
         int yes = j->b && (!strcmp(j->b, "trust") || !strcmp(j->b, "accept") || !strcmp(j->b, "yes") || !strcmp(j->b, "true"));
         pthread_mutex_lock(&cl_mu);
-        char *sec = a->pend_sec;
+        char *sec = a->pend_sec, *tsec = a->pend_tsec;
         int upd = a->pend_upd;
-        a->pend_sec = NULL;
+        a->pend_sec = a->pend_tsec = NULL;
         a->pending_req = 0;
         pthread_mutex_unlock(&cl_mu);
-        if (!yes || !a->trust_kind) { ct_refuse(a); wipe_free(sec); add_failed(a, j->req, yes ? "cloud.noQuestion" : "cloud.notTrusted", ""); return; }
-        if (ct_accept(a)) { wipe_free(sec); add_failed(a, j->req, "cloud.addFailed", "could not keep the key or certificate"); return; }
-        add_continue(a, j->req, sec, upd);
+        if (!yes || !a->trust_kind) { ct_refuse(a); wipe_free(sec); wipe_free(tsec); add_failed(a, j->req, yes ? "cloud.noQuestion" : "cloud.notTrusted", ""); return; }
+        if (ct_accept(a)) { wipe_free(sec); wipe_free(tsec); add_failed(a, j->req, "cloud.addFailed", "could not keep the key or certificate"); return; }
+        if (upd && a->mounted) unmount_acc(a);
+        add_continue(a, j->req, sec, tsec, upd);
         wipe_free(sec);
+        wipe_free(tsec);
         return;
     }
     JBuf b;
@@ -1616,6 +1692,8 @@ static void job_link(Job *j, int unlink) {
     char arg[16] = "", msg[256];
     long long secs = 0;
     if (!unlink && cloud_expire(j->b, arg, sizeof arg, &secs)) { post_reply(j->req, err_json("cloud.badExpire")); return; }
+    /* B17: a presigned link lasts at most 7 days, whatever is asked: that is what is kept and answered */
+    if (!unlink && presigned(a) && (!secs || secs > 7 * 86400)) { secs = 7 * 86400; cpy(arg, sizeof arg, "7d"); }
     if (unlink && presigned(a)) {
         /* B8: an S3 link is a signed address: nothing on the server can take it back before it expires. It leaves the
          * list, and the answer says when it stops working. */
@@ -1683,6 +1761,8 @@ static void job_link(Job *j, int unlink) {
         jb_init(&r);
         jb_raw(&r, "{\"url\":");
         jb_str(&r, url);
+        if (secs) jb_printf(&r, ",\"expires\":%lld", now_ms() + secs * 1000);
+        else jb_raw(&r, ",\"expires\":null");
         jb_raw(&r, "}");
         res = r.oom ? (jb_free(&r), NULL) : r.p;
     }
@@ -2178,7 +2258,12 @@ static char *state_json(int light) {
         jb_printf(&b, ",\"mounted\":%s,\"state\":\"%s\"", a->mounted ? "true" : "false", st);
         if (a->locked) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked"); }
         else if (down) { jb_raw(&b, ",\"error\":"); jb_str(&b, dmn.error[0] ? dmn.error : "cloud.notRunning"); }
-        else if (a->err[0]) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->err); }
+        else if (a->err[0]) {
+            jb_raw(&b, ",\"error\":");
+            jb_str(&b, a->err);
+            /* U10: a key or certificate that changed: both fingerprints */
+            if (a->fp_old[0] || a->fp_new[0]) { jb_raw(&b, ",\"old\":"); jb_str(&b, a->fp_old); jb_raw(&b, ",\"new\":"); jb_str(&b, a->fp_new); }
+        }
         if (a->message[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, a->message); }
         if (a->have_about || a->measured_at) {
             static const char *const k[5] = { "total", "used", "free", "trashed", "other" };
@@ -2471,6 +2556,8 @@ static void *worker(void *arg) {
                     if (a->configured && t - a->tok_at >= 300) token_check(a);
                     if (a->mounted && t - a->about_at >= 1800) about_acc(a);
                     if (a->rcjob_kind) rcjob_poll(a);
+                    /* B14: a new account whose question nobody answered in 5 minutes goes away */
+                    if (a->new_acc && a->pending_req && a->pending_since && t - a->pending_since > 300) { add_failed(a, 0, "cloud.signinTimeout", ""); continue; }
                     /* B6: a mount can be up while the provider refuses every listing (a certificate, a password that
                      * changed): the top folder is listed after mounting and every 10 minutes (2 while it fails) */
                     if (a->mounted && t >= a->check_at && !a->pending_req) check_acc(a);

@@ -907,3 +907,26 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
     bound of the interface's thread, not Cloud's.
 
 The closed rc method table has 27 methods now (`operations/list`, `operations/stat`, `operations/copyfile` added).
+25. **SSH probes (B12, N1).** A key probe (`ssh-keyscan`) counts as a connection that never signed in under OpenSSH's
+    `PerSourcePenalties`, so: none when the account already keeps a key for that host and port (rclone checks it on its own
+    connection); none when another account keeps one (it is used as it is: if rclone's connection finds another key, the
+    new account is asked with `warning: 'cloud.hostKeyOther'`); otherwise exactly one per add or update. A refusal or a reset
+    within 2 minutes of a probe to that server answers `cloud.tooManyAttempts`.
+26. **A key that changed (B15, U10).** When the account's owner updates it (Sign In Again, `accountId`) and rclone's
+    connection finds another key, one probe gets it and the answer is `{ question: { state, kind: 'hostKeyChanged', host,
+    port, fingerprint, old, new } }`; `trust` replaces the kept key for that host. On a plain add it stays an error with
+    `old` and `new`. An update with only the password uses the host, port and user the keyring keeps for the checks. The
+    account's state carries `old` and `new` with `cloud.hostKeyChanged` / `cloud.certChanged`.
+27. **TLS details (B13, U11).** An IP address is checked with `openssl s_client -verify_ip` and no SNI; fingerprints are the
+    colon-separated hex only.
+28. **A failed new account (B14)** leaves the state at once; one whose question nobody answers goes after 5 minutes.
+29. **S3 links (B17)** last at most 7 days (rclone's limit for presigned links): `never` and `30d` are kept and answered as
+    7 days; `link()` answers `{ url, expires }` (ms, or null).
+30. **Auth phrases (U8):** FTP's `530 Login incorrect`, SMB's `NT_STATUS_LOGON_FAILURE`, S3's `InvalidAccessKeyId` /
+    `SignatureDoesNotMatch` / `AccessDenied`, WebDAV's 401/403 and SSH's "unable to authenticate" are `cloud.authFailed`;
+    network phrases are matched first, so a port number can't read as a status.
+31. **Search inside a cloud folder (N2).** `cloud.search(path, needle)` → Promise `{ hits: [{ path, dir, size, mtime }],
+    complete }`: a thread of its own walks the mount (through rclone's directory cache) with a budget of 15 s, 50 000
+    entries, 16 levels and 500 hits, names matched without case. Chosen over a recursive `operations/list` with a filter:
+    the walk sees exactly what Files shows and its cost is bounded here. `lord.fs.search` still answers nothing for a cloud
+    folder; Files calls `cloud.search` there.

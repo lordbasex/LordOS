@@ -41,7 +41,8 @@ char *cloud_answer(const char *state, const char *value, int *req);             
 char *cloud_empty_trash(const char *id, int *req);
 char *cloud_measure(const char *id, int *req);                  /* { bytes, count } */
 char *cloud_cancel_measure(const char *id, int *req);
-char *cloud_delete(const char *const *paths, int n, int *req);  /* only strictly under ~/Cloud/<account>, through the mount */
+char *cloud_delete(const char *const *paths, int n, int *req);
+char *cloud_search(const char *path, const char *needle, int *req);   /* { hits: [{ path, dir, size, mtime }], complete } */  /* only strictly under ~/Cloud/<account>, through the mount */
 void  cloud_set_assets(const char *dir);                        /* where cloud/providers.json is (the verified kinds) */
 char *cloud_remove(const char *id, int discard_pending);
 char *cloud_rename(const char *id, const char *name);

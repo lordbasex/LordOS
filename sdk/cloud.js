@@ -77,6 +77,8 @@ export const cloud = {
   measure: (id) => maybe('measure', String(id)),
   cancelMeasure: (id) => maybe('cancelMeasure', String(id)),
   // removes them in the cloud through the mount (the provider's own trash where it has one): paths strictly under ~/Cloud/<account>
+  // search inside a cloud folder, off the interface's thread (N2): { hits: [{ path, dir, size, mtime }], complete }
+  search: (path, needle) => (has() ? later(lord.cloud.search(String(path), String(needle))) : Promise.resolve({ error: 'cloud.unavailable' })),
   delete: (p) => maybe('delete', paths(p)),
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),

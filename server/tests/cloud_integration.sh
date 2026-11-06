@@ -433,6 +433,13 @@ r=$(cmd state)
 check "still one account, still named Office" sh -c 'case "$1" in *"\"id\":\"c"*"\"id\":\"c"*) exit 1;; *"\"name\":\"Office\""*) exit 0;; esac; exit 1' x "$r"
 check "files read in the new session" test "$(cat "$M/notes.txt")" = "changed here"
 
+# N2: search inside a cloud folder, off the interface's thread
+r=$(cmd search "$M" notes)
+check "search in a cloud folder finds notes.txt" has "$r" "\"path\":\"$M/notes.txt\""
+check "and says it was complete" has "$r" '"complete":true'
+r=$(cmd search "$H/outside" notes)
+check "search outside ~/Cloud is refused" has "$r" 'cloud.badPath'
+
 # B7: rename and move inside a cloud mount (FUSE takes no RENAME_NOREPLACE)
 r=$("$B/fs-walk" rename "$M/notes.txt" "$M/notes-moved.txt")
 check "rename in the mount: done" test "$r" = ok
@@ -464,16 +471,32 @@ r=$(cmd wait '"name":"Box"' 10)
 r=$(cmd wait '"mounted":true' 30)
 check "SFTP files read" test "$(cat "$H/Cloud/Box/s.txt" 2>/dev/null)" = s
 check "rclone checks the host key (no 'No host key validation' in its log)" sh -c "! grep -q 'No host key validation' '$H/.cache/lordos/cloud.log'"
-r=$(cmd add sftp Box2 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
-QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
-r=$(cmd answer "$QS" refuse)
-check "refusing the key: cloud.notTrusted, no account" sh -c 'case "$1" in *cloud.notTrusted*) case "$2" in *Box2*) exit 1;; esac; exit 0;; esac; exit 1' x "$r" "$(cmd state)"
+# N1: a second account on the same server takes the key the first one trusts, without asking
+r=$(cmd add sftp Box3 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+B3ID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+check "another account on the same server: no question, the known key used" test -n "$B3ID"
+r=$(cmd remove "$B3ID")
+# B15: Sign In Again with only the password: the kept host, port and user are used
+r=$(cmd addid "$SID" sftp Box '{"pass":"spass"}')
+check "update with only the password: done (no cloud.badAddress)" has "$r" "\"id\":\"$SID\""
+r=$(cmd wait '"name":"Box"' 10)
+r=$(cmd wait '"mounted":true' 30)
 kill "$SFTP"; sleep 0.5
 "$RC" serve sftp "$T/sftp" --addr "127.0.0.1:$SP" --user su --pass spass --key "$T/hk2" >"$T/sftp2.log" 2>&1 &
 SFTP=$!; EXTRA="$SFTP"; sleep 1.5
-r=$(cmd addid "$SID" sftp Box "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
 new=$(ssh-keygen -lf "$T/hk2.pub" | cut -d" " -f2)
-check "a changed host key is refused with both fingerprints" sh -c 'case "$1" in *"\"error\":\"cloud.hostKeyChanged\""*"\"old\":"*"$2"*"\"new\":"*"$3"*) exit 0;; esac; exit 1' x "$r" "$want" "$new"
+r=$(cmd add sftp Box4 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+check "a new account whose server's key differs from another account's: asked, with a warning" sh -c 'case "$1" in *"\"kind\":\"hostKey\""*"\"warning\":\"cloud.hostKeyOther\""*) exit 0;; esac; exit 1' x "$r"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" refuse)
+check "refusing the key: cloud.notTrusted, no account" sh -c 'case "$1" in *cloud.notTrusted*) case "$2" in *Box4*) exit 1;; esac; exit 0;; esac; exit 1' x "$r" "$(cmd state)"
+r=$(cmd addid "$SID" sftp Box '{"pass":"spass"}')
+check "the owner's update after the key changed: a hostKeyChanged question with both fingerprints" sh -c 'case "$1" in *"\"kind\":\"hostKeyChanged\""*"\"old\":"*"$2"*"\"new\":"*"$3"*) exit 0;; esac; exit 1' x "$r" "$want" "$new"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" trust)
+check "trusting the new key: the account works again" has "$r" "\"id\":\"$SID\""
+check "the kept key is the new one now" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$new' && ! ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$want'"
+r=$(cmd wait '"mounted":true' 30)
 r=$(cmd remove "$SID")
 kill "$SFTP"
 
