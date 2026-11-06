@@ -116,6 +116,29 @@ replies you sent, from Sent) — earlier messages collapsed, the selected one op
 New, Reply, Reply All, Forward, Archive, Delete, Flag and Category; search sits above the list.
 Keyboard: ❖N new, ❖R reply, ❖⇧R reply all, ❖J forward, ❖E archive, ⌦ delete, ↑/↓ next message.
 
+### Folders: roles and tree
+
+Each account has **at most one** Inbox, Drafts, Sent, Archive, Junk, Trash and All Mail
+(`server/src/mail/folderrole.c`, decided over the whole `LIST` at once). A folder the server flags
+with SPECIAL-USE (`\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive`, `\All`) always gets that role;
+only when no folder is flagged for a role does a name count: English ("Sent", "Sent Items",
+"Junk", "Spam"…) first, then the usual French, Spanish, Portuguese, Italian and German names
+("Envoyés", "Corbeille", "Papelera", "Lixeira", "Cestino", "Papierkorb"…), compared after decoding
+IMAP's modified UTF-7 ("Envoy&AOk-s") and without case, accented letters included. And then only for a top-level folder or a direct child of INBOX
+("Trash", "INBOX.Trash", "INBOX/Trash"), top level first, then the more usual name, then the
+server's order. A user folder deeper in the tree ("Clients/Sent") is never taken for a special one,
+and look-alikes that lose ("Sent Messages" next to a flagged "Sent") stay ordinary folders under
+their own names. The name match uses the folder's own hierarchy delimiter (`.` or `/`), never a
+guess.
+
+The sidebar builds the tree in the app (`apps/mail/foldertree.js`): special folders first, in
+the order above, wherever they live on the server; every other folder under its nearest listed
+parent, sorted by name, indented one step per level. When everything but INBOX lives under
+`INBOX.` (Dovecot or Courier with a personal-namespace prefix), the prefix is not shown as a
+level: "INBOX.Work.Clients" appears as Work → Clients. On servers without that prefix,
+"INBOX/Receipts" stays under Inbox. A `\Noselect` container shows (dimmed, not selectable) only
+when a visible folder hangs under it.
+
 ### Sync
 
 Per account, one worker thread: connect (implicit TLS on 993 or STARTTLS on 143; plaintext is
@@ -372,6 +395,11 @@ Local servers only, inside VM 123 (`docs/VM-SETUP.md`, step 24): Dovecot (IMAP, 
 Dovecot over LMTP, nothing relayed outside), Radicale (CalDAV/CardDAV with TLS), all behind a
 test CA added to the VM's CA store, and test data from scratch scripts. No real account was used.
 
+Folder roles and the folder tree (issue #28) were checked on VM 116 against two throwaway Dovecot
+2.4 instances, one with the `INBOX.` prefix and `.` separator plus SPECIAL-USE, one with `/` and no
+SPECIAL-USE (`docs/VM-SETUP.md`), with `example.test` test data only; unit tests in
+`server/tests/mail_test.c` (part "folder") and `server/tests/mail_foldertree_test.mjs`.
+
 ## Not done / not tested
 
 - The four built-in providers and Google CalDAV: settings
@@ -410,3 +438,5 @@ test CA added to the VM's CA store, and test data from scratch scripts. No real 
 | Calendar in light mode | Contacts in light mode |
 | ![reminders light](reminders-light.png) | ![account 1](mail-account-setup.png) |
 | Reminders in light mode | Add Account |
+| ![folder tree](mail-folder-tree.png) | |
+| Folders as a tree, one Sent and one Junk ("INBOX." prefix server, issue #28) | |

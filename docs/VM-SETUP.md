@@ -1708,3 +1708,27 @@ sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
 `sudo apt-get install -y --no-install-recommends qemu-system-x86`. The packages `build-arm64.sh` adds (debootstrap,
 squashfs-tools, xorriso, grub-common, grub-efi-arm64-bin, mtools, dosfstools) go into an overlay over the arm64 chroot,
 not on the VM and not into the chroot itself.
+
+## Step — 0.8.8.4 in development: Mail folder tree, issue #28 (VM 116, 2026-11-05)
+
+See `MAIL.md` ("Folders: roles and tree"). Tree in `~/LordOS-i28`, built there (`build/mail-test`,
+`build/mail-test-asan`, `build/lord-maild`, `build/maild-cli`, `build/lord-server`), nothing installed over
+`/usr/local/lib/lordos`.
+
+- **Installed for the test, then purged:** `dovecot-imapd` (with `dovecot-core`, `dovecot-sieve`,
+  `libexttextcat-2.0-0` and `libexttextcat-data`), installed
+  with a temporary `/usr/sbin/policy-rc.d` that refused service starts (removed right after) and
+  `systemctl disable dovecot`, so the system service never ran:
+  `sudo apt-get install -y --no-install-recommends dovecot-imapd`.
+- Two throwaway Dovecot 2.4 instances run by hand as `lord` from `~/i28-dc/A` and `~/i28-dc/B`
+  (`base_dir`, `state_dir`, log and Maildir there; `listen = 127.0.0.1`, implicit TLS on 11431 and 11432
+  with a self-signed certificate for `imap.example.test`, pinned in the test account; one passwd-file user
+  `tester@example.test` with a test-only password). A: namespace prefix `INBOX.` with separator `.`
+  and SPECIAL-USE on Sent, Drafts, Trash and Spam (Courier/Dovecot style, plus look-alikes "Sent Messages"
+  and "Junk"). B: no prefix, separator `/`, no SPECIAL-USE at all (roles by name, with "Sent Items" and
+  "Spam" as look-alikes, and "INBOX/Receipts").
+- Mail was checked in an isolated headless session (own `HOME` and `XDG_RUNTIME_DIR`, driven over its
+  `remote.sock`) with those two accounts, before and after the fix. That session's `lord-server` was a copy
+  of one built the same day from the same `next-0884` base in another tree (the fix doesn't touch
+  `lord-server`); this tree's own `build/lord-server` sent no frames headless and was not looked into.
+- **Undone at the end:** both instances stopped, those five packages purged (no `dovecot` users left), `~/i28-dc`, the test homes and the screenshots removed.

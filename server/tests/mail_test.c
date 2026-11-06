@@ -3,6 +3,7 @@
  * WebDAV XML reader. Every parser is also fed thousands of randomly mutated inputs (a small
  * deterministic fuzzer); run under -fsanitize=address,undefined in `make mail-asan`. */
 #include "mail/imapp.h"
+#include "mail/folderrole.h"
 #include "mail/mime.h"
 #include "mail/html.h"
 #include "mail/xml.h"
@@ -932,11 +933,145 @@ static void test_view(void) {
     }
 }
 
+/* ---- folder roles (issue #28: duplicated Sent/Junk, user folders taken for special ones) ---- */
+
+static void roles(const FolderRoleIn *in, int n, const char **out) { folder_roles_resolve(in, n, out); }
+
+static void test_folders(void) {
+    CHECKS(folder_flag_role("\\HasNoChildren \\Sent "), "sent");
+    CHECKS(folder_flag_role("\\SentItems "), "");
+    CHECKS(folder_flag_role("\\HasChildren "), "");
+    CHECKS(folder_name_role("INBOX", '.'), "inbox");
+    CHECKS(folder_name_role("inbox", '/'), "inbox");
+    CHECKS(folder_name_role("Trash", '/'), "trash");
+    CHECKS(folder_name_role("INBOX.Trash", '.'), "trash");
+    CHECKS(folder_name_role("INBOX/Junk", '/'), "junk");
+    /* a user folder deeper in the tree is never a special one */
+    CHECKS(folder_name_role("INBOX.Projects.Trash", '.'), "");
+    CHECKS(folder_name_role("Clients/Sent", '/'), "");
+    /* "." is not a delimiter on a "/" server */
+    CHECKS(folder_name_role("INBOX.Trash", '/'), "");
+    CHECKS(folder_name_role("Projects", '.'), "");
+
+    /* Dovecot/Courier style: everything under "INBOX.", SPECIAL-USE flags, plus look-alike names */
+    const FolderRoleIn a[] = {
+        { "INBOX", "\\HasChildren ", '.', 0 },
+        { "INBOX.Sent", "\\HasNoChildren \\Sent ", '.', 0 },
+        { "INBOX.Sent Messages", "\\HasNoChildren ", '.', 0 },
+        { "INBOX.Junk", "\\HasNoChildren ", '.', 0 },
+        { "INBOX.Spam", "\\HasNoChildren \\Junk ", '.', 0 },
+        { "INBOX.Drafts", "\\Drafts ", '.', 0 },
+        { "INBOX.Trash", "\\Trash \\HasChildren ", '.', 0 },
+        { "INBOX.Trash.Old", "\\HasNoChildren ", '.', 0 },
+        { "INBOX.Clients", "\\HasChildren ", '.', 0 },
+        { "INBOX.Clients.Sent", "\\HasNoChildren ", '.', 0 },
+    };
+    const char *o[10];
+    roles(a, 10, o);
+    CHECKS(o[0], "inbox"); CHECKS(o[1], "sent"); CHECKS(o[2], ""); CHECKS(o[3], ""); CHECKS(o[4], "junk");
+    CHECKS(o[5], "drafts"); CHECKS(o[6], "trash"); CHECKS(o[7], ""); CHECKS(o[8], ""); CHECKS(o[9], "");
+
+    /* no SPECIAL-USE, "/" delimiter, two candidates per role: one each, top level first, then the
+     * usual name ("Sent" over "Sent Items" listed before it, "Junk" over "Spam") */
+    const FolderRoleIn b[] = {
+        { "INBOX", "", '/', 0 },
+        { "INBOX/Sent", "", '/', 0 },
+        { "Sent Items", "", '/', 0 },
+        { "Sent", "", '/', 0 },
+        { "Spam", "", '/', 0 },
+        { "Junk", "", '/', 0 },
+        { "Trash", "", '/', 0 },
+        { "Bin", "", '/', 0 },
+        { "Work/Projects", "", '/', 0 },
+    };
+    const char *p[9];
+    roles(b, 9, p);
+    CHECKS(p[0], "inbox"); CHECKS(p[1], ""); CHECKS(p[2], ""); CHECKS(p[3], "sent");
+    CHECKS(p[4], ""); CHECKS(p[5], "junk"); CHECKS(p[6], "trash"); CHECKS(p[7], ""); CHECKS(p[8], "");
+    /* the same with Trash a \Noselect container: a container never gets a role */
+    FolderRoleIn c[9];
+    memcpy(c, b, sizeof c);
+    c[6].noselect = 1;
+    roles(c, 9, p);
+    CHECKS(p[6], ""); CHECKS(p[7], "trash");
+
+    /* Gmail: flags on nested folders, a \Noselect parent */
+    const FolderRoleIn g[] = {
+        { "INBOX", "\\HasNoChildren ", '/', 0 },
+        { "[Gmail]", "\\HasChildren \\Noselect ", '/', 1 },
+        { "[Gmail]/Sent Mail", "\\HasNoChildren \\Sent ", '/', 0 },
+        { "[Gmail]/All Mail", "\\All \\HasNoChildren ", '/', 0 },
+        { "[Gmail]/Trash", "\\HasNoChildren \\Trash ", '/', 0 },
+        { "Trash", "\\HasNoChildren ", '/', 0 },
+    };
+    const char *q[6];
+    roles(g, 6, q);
+    CHECKS(q[0], "inbox"); CHECKS(q[1], ""); CHECKS(q[2], "sent"); CHECKS(q[3], "all"); CHECKS(q[4], "trash"); CHECKS(q[5], "");
+    /* localized names, modified UTF-7 ("Envoy&AOk-s" = "Envoyés"), accents without case */
+    CHECKS(folder_name_role("Envoy&AOk-s", '/'), "sent");
+    CHECKS(folder_name_role("INBOX.&AMk-l&AOk-ments envoy&AOk-s", '.'), "sent");
+    CHECKS(folder_name_role("ÉLÉMENTS ENVOYÉS", '/'), "sent");
+    CHECKS(folder_name_role("Ind&AOk-sirables", '/'), "junk");
+    CHECKS(folder_name_role("Entw&APw-rfe", '/'), "drafts");
+    CHECKS(folder_name_role("Itens Exclu&AO0-dos", '/'), "trash");
+    CHECKS(folder_name_role("Lixo Eletr&APQ-nico", '/'), "junk");
+    CHECKS(folder_name_role("Posta inviata", '/'), "sent");
+    CHECKS(folder_name_role("Papierkorb", '/'), "trash");
+    CHECKS(folder_name_role("Elementos eliminados", '/'), "trash");
+    CHECKS(folder_name_role("Envoyes", '/'), "");                 /* no accent folding beyond case */
+    CHECKS(folder_name_role("Projets/Corbeille", '/'), "");       /* deeper: a user folder */
+
+    /* a French server with no SPECIAL-USE flags, "/" and no prefix */
+    const FolderRoleIn fr[] = {
+        { "INBOX", "\\HasNoChildren ", '/', 0 },
+        { "Brouillons", "", '/', 0 },
+        { "Envoy&AOk-s", "", '/', 0 },
+        { "Corbeille", "\\HasChildren ", '/', 0 },
+        { "Corbeille/Ancien", "", '/', 0 },
+        { "Ind&AOk-sirables", "", '/', 0 },
+        { "Spam", "", '/', 0 },
+        { "Archives", "", '/', 0 },
+        { "Clients", "", '/', 0 },
+        { "Clients/Envoy&AOk-s", "", '/', 0 },
+    };
+    const char *r[10];
+    roles(fr, 10, r);
+    CHECKS(r[0], "inbox"); CHECKS(r[1], "drafts"); CHECKS(r[2], "sent"); CHECKS(r[3], "trash"); CHECKS(r[4], "");
+    CHECKS(r[5], ""); CHECKS(r[6], "junk");                      /* the English name comes first */
+    CHECKS(r[7], "archive"); CHECKS(r[8], ""); CHECKS(r[9], "");
+    /* the same French server with the "INBOX." prefix and "." */
+    const FolderRoleIn frd[] = {
+        { "INBOX", "", '.', 0 },
+        { "INBOX.Brouillons", "", '.', 0 },
+        { "INBOX.Envoy&AOk-s", "", '.', 0 },
+        { "INBOX.Corbeille", "", '.', 0 },
+        { "INBOX.Corbeille.Ancien", "", '.', 0 },
+        { "INBOX.Ind&AOk-sirables", "", '.', 0 },
+        { "INBOX.Clients", "", '.', 0 },
+        { "INBOX.Clients.Corbeille", "", '.', 0 },
+    };
+    roles(frd, 8, r);
+    CHECKS(r[0], "inbox"); CHECKS(r[1], "drafts"); CHECKS(r[2], "sent"); CHECKS(r[3], "trash"); CHECKS(r[4], "");
+    CHECKS(r[5], "junk"); CHECKS(r[6], ""); CHECKS(r[7], "");
+    /* a flag still wins over any name */
+    const FolderRoleIn frf[] = {
+        { "INBOX", "", '/', 0 }, { "Corbeille", "", '/', 0 }, { "Deleted", "\\Trash ", '/', 0 },
+    };
+    roles(frf, 3, r);
+    CHECKS(r[1], ""); CHECKS(r[2], "trash");
+
+    /* no delimiter (NIL), empty input */
+    const FolderRoleIn f[] = { { "Drafts", NULL, 0, 0 } };
+    roles(f, 1, q);
+    CHECKS(q[0], "drafts");
+    roles(f, 0, q);
+}
+
 int main(void) {
     alarm(300);                 /* never hang a `make test`: SIGALRM kills a runaway parser */
     clock_t t0 = clock();
     static const struct { const char *name; void (*fn)(void); } parts[] = {
-        { "imap", test_imap }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard }, { "view", test_view },
+        { "imap", test_imap }, { "folder", test_folders }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard }, { "view", test_view },
     };
     for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
         int before = fails;

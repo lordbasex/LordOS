@@ -168,7 +168,6 @@ void store_clear(Account *a, Folder *f);
 void store_msg_text(Msg *m, const char *body_text);
 void store_reindex(Account *a, Folder *f, Msg *m);        /* after store_msg_text */  /* (re)builds m->text and the search index */
 char *store_body_path(Account *a, Folder *f, uint32_t uid, char *out, size_t cap);
-const char *special_of(const char *name, const char *flags);
 void store_drop_account(const char *id);
 
 /* JSON for the UI */

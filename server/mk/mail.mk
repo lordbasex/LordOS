@@ -1,6 +1,6 @@
 # Mail, Calendar, Contacts and Reminders (docs/MAIL.md). lord-maild is the sandboxed helper that
 # speaks IMAP, SMTP, CalDAV and CardDAV; with lord-sessiond it is the only binary linking OpenSSL.
-MAIL_PARSE := src/mail/xml.c src/mail/mime.c src/mail/html.c src/mail/imapp.c src/mail/ical.c src/mail/vcard.c
+MAIL_PARSE := src/mail/folderrole.c src/mail/xml.c src/mail/mime.c src/mail/html.c src/mail/imapp.c src/mail/ical.c src/mail/vcard.c
 MAIL_HDR := $(wildcard src/mail/*.h) src/doc/wire.h src/sec/json.h src/ui/tzif.h
 # parsers: IMAP, MIME, HTML sanitizer, iCalendar, vCard and XML, with a small fuzzer (tests/mail_test.c)
 test: build/mail-test
