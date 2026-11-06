@@ -16,6 +16,7 @@
 #include "../hw/hw_admin.h"
 #include "../hw/sleeplock.h"
 #include "js_sys.h"
+#include "../cloud/cloud.h"
 #include "js_err.h"
 #include "ui.h"
 #include "fonts.h"
@@ -196,6 +197,8 @@ static JSValue f_fs_read(JSContext *c, JSValueConst this_val, int argc, JSValueC
     int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
     if (bad) return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
+    /* B10: a cloud file not on this computer, of an account that can't be reached now, fails at once */
+    if (cloud_read_would_block(path)) return js_throw_code(c, "cloud.offline", NULL);
     struct stat st;
     if (stat(path, &st) || !S_ISREG(st.st_mode)) return js_throw_code(c, "fs.notFile", NULL);
     if (st.st_size > FS_READ_MAX) return js_throw_code(c, "fs.tooLarge", "max", "8 MB", NULL);
@@ -1294,9 +1297,13 @@ static JSValue f_fs_du(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
     if (bad) return fs_path_error(c, -1);
-    FsDu d;
-    fs_du(path, ms, &d);
+    FsDu d = { 0 };
+    int remote = fsops_remote_path(path);
+    /* a cloud or network folder isn't walked on this thread (a server that stopped answering would freeze the desktop):
+     * its size is the provider's (Cloud's about) or not known */
+    if (!remote) fs_du(path, ms, &d);
     JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "remote", JS_NewBool(c, remote));
     JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, d.size));
     JS_SetPropertyStr(c, o, "files", JS_NewFloat64(c, (double)d.files));
     JS_SetPropertyStr(c, o, "dirs", JS_NewFloat64(c, (double)d.dirs));
@@ -1350,7 +1357,7 @@ static JSValue f_fs_search(JSContext *c, JSValueConst this_val, int argc, JSValu
     char path[PATH_MAX];
     int bad = !p || !q || resolve_readable(p, path);
     Acc a = { c, JS_NewArray(c), 0 };
-    if (!bad) fs_search(path, q, opt_int(c, argc > 2 ? argv[2] : JS_UNDEFINED, "limit", 200, 1000),
+    if (!bad && !fsops_remote_path(path)) fs_search(path, q, opt_int(c, argc > 2 ? argv[2] : JS_UNDEFINED, "limit", 200, 1000),
                         opt_int(c, argc > 2 ? argv[2] : JS_UNDEFINED, "depth", 8, 16), hit_cb, &a);
     if (p) JS_FreeCString(c, p);
     if (q) JS_FreeCString(c, q);

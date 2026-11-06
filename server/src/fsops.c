@@ -647,6 +647,26 @@ static void search_dir(const char *p, Search *s, int depth) {
     if (d) closedir(d);
 }
 
+int fsops_remote_path(const char *real) {
+    FILE *f = fopen("/proc/self/mounts", "re");
+    if (!f) return 0;
+    char line[4096], dev[1024], mnt[2048], ty[64];
+    size_t best = 0;
+    int remote = 0;
+    while (fgets(line, sizeof line, f)) {
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, ty) != 3) continue;
+        unescape_mount(mnt);
+        size_t l = strlen(mnt);
+        int in = !strcmp(mnt, "/") || (!strncmp(real, mnt, l) && (real[l] == 0 || real[l] == '/'));
+        if (!in || l < best) continue;
+        best = l;
+        remote = !strncmp(ty, "fuse.", 5) || !strcmp(ty, "cifs") || !strcmp(ty, "smb3") || !strncmp(ty, "nfs", 3) ||
+                 !strcmp(ty, "9p") || !strcmp(ty, "ceph") || !strcmp(ty, "glusterfs") || !strcmp(ty, "davfs");
+    }
+    fclose(f);
+    return remote;
+}
+
 int fs_search(const char *real, const char *needle, int limit, int depth, FsHitFn fn, void *ud) {
     WalkSkip *w = malloc(sizeof *w);
     if (!w) return 0;

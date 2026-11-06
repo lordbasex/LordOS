@@ -138,59 +138,179 @@ static int prints(const char *lines, char *out, size_t n) {
     return rconnect_prints(fp, out, n);
 }
 
+/* the lines of a known_hosts text for one host tag (malloc, "" none) */
+static char *tag_lines(const char *file, const char *tag) {
+    size_t tl = strlen(tag), o = 0;
+    char *out = malloc(32768);
+    if (!out) return NULL;
+    out[0] = 0;
+    for (const char *p = file; p && *p;) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        if (l > tl && !strncmp(p, tag, tl) && p[tl] == ' ' && o + l + 2 < 32768) { memcpy(out + o, p, l); o += l; out[o++] = '\n'; out[o] = 0; }
+        p = e ? e + 1 : NULL;
+    }
+    return out;
+}
+
+/* B12: OpenSSH counts a key probe as a connection that never signed in (PerSourcePenalties): never more than one per add
+ * or update, none when the key is known, and a refusal right after one is said as such */
+#define PROBE_MAX 16
+static struct { char tag[300]; time_t at; } probes[PROBE_MAX];
+static void probed(const char *tag) {
+    int k = 0;
+    for (int i = 0; i < PROBE_MAX; i++) { if (!strcmp(probes[i].tag, tag)) { k = i; break; } if (probes[i].at < probes[k].at) k = i; }
+    cl_pf(probes[k].tag, sizeof probes[k].tag, "%s", tag);
+    probes[k].at = time(NULL);
+}
+int ct_probed_lately(const Acc *a) {
+    const char *host = param(a, "host"), *ps = param(a, "port");
+    char tag[300];
+    if (!host) return 0;
+    rconnect_host_tag(host, ps ? atoi(ps) : 22, tag, sizeof tag);
+    for (int i = 0; i < PROBE_MAX; i++) if (!strcmp(probes[i].tag, tag) && time(NULL) - probes[i].at < 120) return 1;
+    return 0;
+}
+
+/* one ssh-keyscan: the host's key lines for tag (malloc) and their fingerprints, 0; -1 nothing came */
+static int probe(const char *host, int port, const char *tag, char **good, char *fp, size_t fn) {
+    char pt[8];
+    cl_pf(pt, sizeof pt, "%d", port);
+    char *scan[] = { KEYSCAN, "-T", "5", "-p", pt, "-t", "ed25519,ecdsa,rsa", "--", (char *)host, NULL };
+    char *out = malloc(32768), *g = malloc(32768);
+    if (!out || !g) { free(out); free(g); return -1; }
+    probed(tag);
+    int n = run(scan, NULL, 1, out, 32768);
+    size_t gl = 0;
+    g[0] = 0;
+    for (char *line = n > 0 ? strtok(out, "\n") : NULL; line; line = strtok(NULL, "\n")) {
+        if (line[0] == '#' || !rconnect_keyline_ok(line, tag)) continue;
+        gl += (size_t)cl_pf(g + gl, 32768 - gl, "%s\n", line);
+        if (gl >= 32768) { gl = 32767; break; }
+    }
+    free(out);
+    if (!gl || prints(g, fp, fn)) { free(g); return -1; }
+    *good = g;
+    return 0;
+}
+
+static int write_lines(const char *path, const char *lines, int replace_tag, const char *tag) {
+    char dir[PATH_MAX];
+    cl_pf(dir, sizeof dir, "%s/known_hosts", cl_cfg);
+    mkdir(dir, 0700);
+    char *keep = NULL;
+    if (replace_tag) {
+        /* every line but the ones for this host: the person accepted its new key */
+        char *f = slurp(path);
+        keep = malloc(262144);
+        size_t o = 0, tl = strlen(tag);
+        if (keep) keep[0] = 0;
+        for (const char *p = f; keep && p && *p;) {
+            const char *e = strchr(p, '\n');
+            size_t l = e ? (size_t)(e - p) : strlen(p);
+            if (!(l > tl && !strncmp(p, tag, tl) && p[tl] == ' ') && o + l + 2 < 262144) { memcpy(keep + o, p, l); o += l; keep[o++] = '\n'; keep[o] = 0; }
+            p = e ? e + 1 : NULL;
+        }
+        free(f);
+    }
+    int fd = open(path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | (replace_tag ? O_TRUNC : O_APPEND), 0600);
+    int ok = fd >= 0 && (!keep || write(fd, keep, strlen(keep)) == (ssize_t)strlen(keep)) && write(fd, lines, strlen(lines)) == (ssize_t)strlen(lines);
+    if (fd >= 0) close(fd);
+    free(keep);
+    return ok ? 0 : -1;
+}
+
 static int check_ssh(Acc *a, char **q, char *code, size_t cn, char *msg, size_t mn) {
     const char *host = param(a, "host"), *ps = param(a, "port");
     int port = ps ? atoi(ps) : 22;
     if (!host || !rconnect_host_ok(host) || port <= 0 || port > 65535) { cl_pf(code, cn, "cloud.badAddress"); return -1; }
     if (access(KEYSCAN, X_OK) || access(KEYGEN, X_OK)) { cl_pf(code, cn, "cloud.addFailed"); cl_pf(msg, mn, "openssh-client is missing"); return -1; }
-    char tag[300], pt[8], kh[PATH_MAX];
+    char tag[300], kh[PATH_MAX];
     rconnect_host_tag(host, port, tag, sizeof tag);
-    cl_pf(pt, sizeof pt, "%d", port);
-    char *scan[] = { KEYSCAN, "-T", "5", "-p", pt, "-t", "ed25519,ecdsa,rsa", "--", (char *)host, NULL };
-    char *out = malloc(32768), *good = malloc(32768);
-    if (!out || !good) { free(out); free(good); cl_pf(code, cn, "cloud.addFailed"); return -1; }
-    int n = run(scan, NULL, 1, out, 32768);
     path_of(a, 1, kh, sizeof kh);
-    char *file = slurp(kh);
-    int have = 0, match = 0, changed = 0;
-    size_t gl = 0;
-    good[0] = 0;
-    for (char *line = n > 0 ? strtok(out, "\n") : NULL; line; line = strtok(NULL, "\n")) {
-        if (line[0] == '#' || !rconnect_keyline_ok(line, tag)) continue;
-        have = 1;
-        int k = file ? rconnect_known(file, tag, line) : -1;
-        match |= k == 1;
-        changed |= k == 0;
-        gl += (size_t)cl_pf(good + gl, 32768 - gl, "%s\n", line);
-        if (gl >= 32768) { gl = 32767; break; }
-    }
-    int r = 0;
-    char fp[1024] = "";
-    if (!have) { cl_pf(code, cn, "cloud.unreachable"); cl_pf(msg, mn, "no SSH host key from %s port %d", host, port); r = -1; }
-    else if (match) r = 0;
-    else if (changed) {
-        /* both fingerprints, the kept ones and the new */
-        char old[32768];
-        size_t ol = 0;
-        for (const char *p = file; p && *p;) {
-            const char *e = strchr(p, '\n');
-            size_t l = e ? (size_t)(e - p) : strlen(p);
-            if (l > strlen(tag) && !strncmp(p, tag, strlen(tag)) && p[strlen(tag)] == ' ' && ol + l + 2 < sizeof old) { memcpy(old + ol, p, l); ol += l; old[ol++] = '\n'; }
-            p = e ? e + 1 : NULL;
-        }
-        old[ol] = 0;
-        char ofp[1024] = "";
-        prints(old, ofp, sizeof ofp);
-        prints(good, fp, sizeof fp);
-        cl_pf(code, cn, "cloud.hostKeyChanged");
-        cl_pf(msg, mn, "%s\t%s", ofp, fp);
-        r = -1;
-    } else if (prints(good, fp, sizeof fp)) { cl_pf(code, cn, "cloud.addFailed"); cl_pf(msg, mn, "ssh-keygen could not read the keys"); r = -1; }
-    else { pend(a, 'h', good); *q = question(a, "hostKey", host, port, fp, NULL, NULL); r = *q ? 1 : -1; }
+    char *file = slurp(kh), *own = tag_lines(file, tag);
     free(file);
-    free(out);
+    int known = own && own[0];
+    free(own);
+    a->trust_from_other = 0;
+    if (known) return 0;                        /* rclone checks it on its own connection: no probe */
+    /* N1: another account already trusts a key for this server: used as it is, and rclone's connection says if it differs */
+    for (int i = 0; i < ACC_MAX; i++) {
+        Acc *b = &cl_acc[i];
+        if (!b->used || b == a || strcmp(b->k->type, "sftp")) continue;
+        char bp[PATH_MAX];
+        path_of(b, 1, bp, sizeof bp);
+        char *bf = slurp(bp), *bl = bf ? tag_lines(bf, tag) : NULL;
+        free(bf);
+        if (bl && bl[0] && !write_lines(kh, bl, 0, tag)) { free(bl); a->trust_from_other = 1; return 0; }
+        free(bl);
+    }
+    char *good = NULL, fp[1024] = "";
+    if (probe(host, port, tag, &good, fp, sizeof fp)) {
+        cl_pf(code, cn, "cloud.unreachable");
+        cl_pf(msg, mn, "no SSH host key from %s port %d", host, port);
+        return -1;
+    }
+    pend(a, 'h', good);
     free(good);
+    *q = question(a, "hostKey", host, port, fp, NULL, NULL);
+    return *q ? 1 : -1;
+}
+
+/* rclone's own connection said the key isn't the kept one (B15, N1): probed once; the owner updating the account is
+ * asked (hostKeyChanged, old and new), a new account whose key came from another account is asked with a warning,
+ * anything else is an error with both fingerprints. 1 a question, -1 an error */
+int ct_key_mismatch(Acc *a, const char *sec, char **q, char *code, size_t cn, char *msg, size_t mn) {
+    cur_sec = sec;
+    *q = NULL;
+    const char *host = param(a, "host"), *ps = param(a, "port");
+    int port = ps ? atoi(ps) : 22, r = -1;
+    char tag[300], kh[PATH_MAX], ofp[1024] = "", nfp[1024] = "", *good = NULL;
+    cl_pf(code, cn, "cloud.hostKeyChanged");
+    if (host) {
+        rconnect_host_tag(host, port, tag, sizeof tag);
+        path_of(a, 1, kh, sizeof kh);
+        char *file = slurp(kh), *own = file ? tag_lines(file, tag) : NULL;
+        free(file);
+        if (own && own[0]) prints(own, ofp, sizeof ofp);
+        free(own);
+        if (!probe(host, port, tag, &good, nfp, sizeof nfp)) {
+            pend(a, 'H', good);
+            if (!a->new_acc || a->trust_from_other) {
+                char st[64];
+                cl_pf(st, sizeof st, "%s:lordos-trust", a->id);
+                JBuf b;
+                jb_init(&b);
+                jb_raw(&b, "{\"question\":{\"kind\":");
+                jb_str(&b, a->new_acc ? "hostKey" : "hostKeyChanged");
+                jb_raw(&b, ",\"state\":");
+                jb_str(&b, st);
+                jb_raw(&b, ",\"host\":");
+                jb_str(&b, host);
+                jb_printf(&b, ",\"port\":%d,\"fingerprint\":", port);
+                jb_str(&b, nfp);
+                jb_raw(&b, ",\"old\":");
+                jb_str(&b, ofp);
+                jb_raw(&b, ",\"new\":");
+                jb_str(&b, nfp);
+                if (a->new_acc) jb_raw(&b, ",\"warning\":\"cloud.hostKeyOther\"");
+                jb_raw(&b, ",\"type\":\"bool\",\"examples\":[{\"value\":\"trust\",\"help\":\"\"},{\"value\":\"refuse\",\"help\":\"\"}],\"required\":true}}");
+                *q = b.oom ? (jb_free(&b), NULL) : b.p;
+                r = *q ? 1 : -1;
+            }
+        }
+        free(good);
+    }
+    cl_pf(msg, mn, "%s\t%s", ofp, nfp);
+    cur_sec = NULL;
+    explicit_bzero(sec_val, sizeof sec_val);
     return r;
+}
+
+/* U11: "sha256 Fingerprint=AB:CD:…" → "AB:CD:…" */
+static void hex_only(char *fp) {
+    char *e = strchr(fp, '=');
+    if (e) memmove(fp, e + 1, strlen(e + 1) + 1);
 }
 
 static int check_tls(Acc *a, char **q, char *code, size_t cn, char *msg, size_t mn) {
@@ -198,8 +318,14 @@ static int check_tls(Acc *a, char **q, char *code, size_t cn, char *msg, size_t 
     int port;
     if (tls_endpoint(a, host, sizeof host, &port)) return 0;
     if (access(OPENSSL, X_OK)) { cl_pf(code, cn, "cloud.addFailed"); cl_pf(msg, mn, "openssl is missing"); return -1; }
-    cl_pf(conn, sizeof conn, "%s:%d", host, port);
-    char *sc[] = { OPENSSL, "s_client", "-connect", conn, "-servername", host, "-verify_hostname", host, NULL };
+    struct in_addr ia4;
+    struct in6_addr ia6;
+    int ip = inet_pton(AF_INET, host, &ia4) == 1 || inet_pton(AF_INET6, host, &ia6) == 1;
+    if (strchr(host, ':')) cl_pf(conn, sizeof conn, "[%s]:%d", host, port); else cl_pf(conn, sizeof conn, "%s:%d", host, port);
+    /* B13: an address is checked as an address, and no name is sent for it */
+    char *sc_name[] = { OPENSSL, "s_client", "-connect", conn, "-servername", host, "-verify_hostname", host, NULL };
+    char *sc_ip[] = { OPENSSL, "s_client", "-connect", conn, "-verify_ip", host, NULL };
+    char **sc = ip ? sc_ip : sc_name;
     char *out = malloc(65536), pem[16384];
     if (!out) { cl_pf(code, cn, "cloud.addFailed"); return -1; }
     int n = run(sc, NULL, 1, out, 65536);
@@ -211,13 +337,14 @@ static int check_tls(Acc *a, char **q, char *code, size_t cn, char *msg, size_t 
     int how = rconnect_tls_decide(pin, pem, v);
     char fp[256] = "", who[1024] = "";
     char *x[] = { OPENSSL, "x509", "-noout", "-fingerprint", "-sha256", NULL };
-    if (how == RC_TLS_CHANGED || how == RC_TLS_ASK) { run(x, pem, 0, fp, sizeof fp); fp[strcspn(fp, "\n")] = 0; }
+    if (how == RC_TLS_CHANGED || how == RC_TLS_ASK) { run(x, pem, 0, fp, sizeof fp); fp[strcspn(fp, "\n")] = 0; hex_only(fp); }
     int r = 0;
     if (how == RC_TLS_PIN || how == RC_TLS_SYSTEM) r = 0;
     else if (how == RC_TLS_CHANGED) {
         char ofp[256] = "";
         run(x, pin, 0, ofp, sizeof ofp);
         ofp[strcspn(ofp, "\n")] = 0;
+        hex_only(ofp);
         cl_pf(code, cn, "cloud.certChanged");
         cl_pf(msg, mn, "%s\t%s", ofp, fp);
         r = -1;
@@ -269,10 +396,20 @@ int ct_accept(Acc *a) {
     pthread_mutex_unlock(&cl_mu);
     if (!kind || !data) { free(data); return -1; }
     char p[PATH_MAX], dir[PATH_MAX];
-    path_of(a, kind == 'h', p, sizeof p);
-    cl_pf(dir, sizeof dir, "%s/%s", cl_cfg, kind == 'h' ? "known_hosts" : "certs");
+    int ssh = kind == 'h' || kind == 'H';
+    path_of(a, ssh, p, sizeof p);
+    if (ssh) {
+        /* 'H': the accepted new key replaces the kept ones for that host */
+        char tag[300] = "";
+        size_t t = strcspn(data, " ");
+        if (t < sizeof tag) { memcpy(tag, data, t); tag[t] = 0; }
+        int r = write_lines(p, data, kind == 'H', tag);
+        free(data);
+        return r;
+    }
+    cl_pf(dir, sizeof dir, "%s/certs", cl_cfg);
     mkdir(dir, 0700);
-    int fd = open(p, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | (kind == 'h' ? O_APPEND : O_TRUNC), 0600);
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     size_t l = strlen(data);
     int ok = fd >= 0 && write(fd, data, l) == (ssize_t)l;
     if (fd >= 0) close(fd);

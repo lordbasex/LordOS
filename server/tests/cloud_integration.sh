@@ -4,6 +4,7 @@
 # throwaway home, never touches ~/Cloud.
 #
 #   sh tests/cloud_integration.sh <build dir> <rclone binary>
+# (the stand-in server lists with --dir-cache-time 1s: changes made on its side show at once, as on a real server)
 #
 # Checks: rclone rcd has no TCP listener, the rc folder is 0700 and the socket only the user's, no password on any
 # command line or in the environment, calls without the credentials are refused (config/dump, core/command), another
@@ -42,9 +43,10 @@ trap cleanup EXIT INT TERM
 head -c 5000000 /dev/urandom >"$S/Projects/big.bin"
 echo hello >"$S/notes.txt"
 echo bye >"$S/gone.txt"
+echo "the original" >"$S/conflict.txt"
 mkdir -p "$S/Gone/Inner"; echo a >"$S/Gone/a.txt"; echo b >"$S/Gone/Inner/b.txt"
 PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
-"$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass >"$T/dav.log" 2>&1 &
+"$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass --dir-cache-time 1s >"$T/dav.log" 2>&1 &
 DAV=$!
 sleep 1
 
@@ -269,6 +271,27 @@ r=$(cmd delete "$M/../Work/notes.txt")
 check "delete refuses .." has "$r" 'cloud.badPath'
 check "notes.txt still there" test -e "$S/notes.txt"
 
+# the conflict rule (7.2): changed in the cloud and here since it came down: ours is kept beside it
+cat "$M/conflict.txt" >/dev/null                # it comes down: rclone keeps what the cloud's object was
+sleep 1
+echo "changed on the server, longer" > "$S/conflict.txt"
+echo "mine" > "$M/conflict.txt"
+for i in $(seq 60); do [ "$(cat "$S/conflict.txt")" = mine ] && break; sleep 0.5; done
+check "conflict: the cloud's version kept as 'conflict (cloud copy).txt'" test "$(cat "$S/conflict (cloud copy).txt" 2>/dev/null)" = "changed on the server, longer"
+check "conflict: ours went up under the name" test "$(cat "$S/conflict.txt")" = mine
+r=$(cmd state)
+check "conflict: State.conflicts says so" sh -c 'case "$1" in *"\"conflicts\":[{\"path\":"*"conflict.txt\",\"kept\":"*"conflict (cloud copy).txt\""*) exit 0;; esac; exit 1' x "$r"
+echo "again mine" > "$M/notes.txt"
+for i in $(seq 40); do [ "$(cat "$S/notes.txt")" = "again mine" ] && break; sleep 0.5; done
+check "no conflict: a file changed only here goes up under its name" test "$(cat "$S/notes.txt")" = "again mine"
+echo "changed here" > "$M/notes.txt"
+for i in $(seq 40); do [ "$(cat "$S/notes.txt")" = "changed here" ] && break; sleep 0.5; done
+
+# U5: Get Info's message is text, never a server's HTML
+r=$(cmd addid "$ID" webdav Work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"nottheone2\"}")
+check "an error message carries no HTML" sh -c 'case "$1" in *"<"*) exit 1;; esac; exit 0' x "$r"
+r=$(cmd wait '"mounted":true' 30)
+
 # B4 for an existing account: wrong new credentials are reported and the account stays as it was
 r=$(cmd addid "$ID" webdav Work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"nottheone\"}")
 check "new credentials that don't work: cloud.authFailed" has "$r" 'cloud.authFailed'
@@ -288,6 +311,22 @@ echo "local recent" > "$H/local-recent.txt"
 OUT=$(HOME="$H" timeout 20 "$B/fs-walk" recent 2>&1)
 check "while a file in the home folder is still found" has "$OUT" "$H/local-recent.txt"
 kill -CONT "$DAV"
+
+# B10: the server down (refused): a cold read fails within seconds, and the account says offline
+kill "$DAV"; sleep 0.5
+r=$(cmd free "$M/Projects")
+t0=$(date +%s%N); timeout 60 head -c 10 "$M/Projects/big.bin" >/dev/null 2>&1; t1=$(date +%s%N)
+ms=$(( (t1 - t0) / 1000000 ))
+check "a file not on this computer, server down: fails in under 15 s ($ms ms)" test "$ms" -lt 15000
+r=$(cmd retry "$ID")
+r=$(cmd wait '"state":"offline"' 40)
+check "the account says offline" has "$r" '"ok"'
+r=$(cmd state)
+check "with cloud.unreachable" has "$r" '"error":"cloud.unreachable"'
+"$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass --dir-cache-time 1s >"$T/dav2.log" 2>&1 &
+DAV=$!; sleep 1
+r=$(cmd wait '"mounted":true,"state":"ok"' 60)
+check "and ok again once the server is back" has "$r" '"ok"'
 
 # Empty Trash and Measure (17.2 items 4 and 5)
 r=$(cmd state)
@@ -355,11 +394,27 @@ check "rename: the old folder unmounted and gone, even busy" sh -c "! grep -q ' 
 exec 6<&-
 M=$H/Cloud/Office
 
+# U7: rclone crashing again and again: every account says the service is down, and Restart brings it back
+for i in 1 2 3 4 5 6; do
+    p=$(rcd_pid); [ -n "$p" ] && kill -9 "$p"
+    for k in $(seq 40); do q=$(rcd_pid); [ -n "$q" ] && [ "$q" != "$p" ] && break; sleep 0.25; done
+done
+r=$(cmd wait '"running":false,' 30)
+r=$(cmd state)
+check "after crashes: the service is down with its error (cloud.crashed or startFailed)" sh -c 'case "$1" in *"\"running\":false"*"\"error\":\"cloud.crashed\""*|*"\"running\":false"*"\"error\":\"cloud.startFailed\""*) exit 0;; esac; exit 1' x "$r"
+check "and the account is in error with the service's error, not syncing" sh -c 'case "$1" in *"\"accounts\":[{"*"\"state\":\"error\",\"error\":\"cloud.crashed\""*|*"\"accounts\":[{"*"\"state\":\"error\",\"error\":\"cloud.startFailed\""*) exit 0;; esac; exit 1' x "$r"
+r=$(cmd restart)
+r=$(cmd wait '"mounted":true,"state":"ok"' 40)
+check "Restart after the crashes: mounted again" has "$r" '"ok"'
+
 # a new session: the account comes back from accounts.json; the same kind and name, in any case, is still that account
+exec 6<"$M/notes.txt"                       # B11: a file still open when the session ends
 r=$(cmd quit)
 exec 3>&- 4<&-
 wait "$HP" 2>/dev/null
 check "rclone ended with the first session" test -z "$(rcd_pid)"
+check "logout: no cloud mount left behind, even busy (B11)" sh -c "! grep -q ' $H/Cloud/' /proc/self/mounts"
+exec 6<&-
 start_harness
 r=$(cmd wait '"mounted":true' 30)
 check "next session: the renamed account mounted again" has "$r" '"ok"'
@@ -377,6 +432,13 @@ check "an unknown account id is refused" has "$r" 'cloud.notFound'
 r=$(cmd state)
 check "still one account, still named Office" sh -c 'case "$1" in *"\"id\":\"c"*"\"id\":\"c"*) exit 1;; *"\"name\":\"Office\""*) exit 0;; esac; exit 1' x "$r"
 check "files read in the new session" test "$(cat "$M/notes.txt")" = "changed here"
+
+# N2: search inside a cloud folder, off the interface's thread
+r=$(cmd search "$M" notes)
+check "search in a cloud folder finds notes.txt" has "$r" "\"path\":\"$M/notes.txt\""
+check "and says it was complete" has "$r" '"complete":true'
+r=$(cmd search "$H/outside" notes)
+check "search outside ~/Cloud is refused" has "$r" 'cloud.badPath'
 
 # B7: rename and move inside a cloud mount (FUSE takes no RENAME_NOREPLACE)
 r=$("$B/fs-walk" rename "$M/notes.txt" "$M/notes-moved.txt")
@@ -409,16 +471,32 @@ r=$(cmd wait '"name":"Box"' 10)
 r=$(cmd wait '"mounted":true' 30)
 check "SFTP files read" test "$(cat "$H/Cloud/Box/s.txt" 2>/dev/null)" = s
 check "rclone checks the host key (no 'No host key validation' in its log)" sh -c "! grep -q 'No host key validation' '$H/.cache/lordos/cloud.log'"
-r=$(cmd add sftp Box2 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
-QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
-r=$(cmd answer "$QS" refuse)
-check "refusing the key: cloud.notTrusted, no account" sh -c 'case "$1" in *cloud.notTrusted*) case "$2" in *Box2*) exit 1;; esac; exit 0;; esac; exit 1' x "$r" "$(cmd state)"
+# N1: a second account on the same server takes the key the first one trusts, without asking
+r=$(cmd add sftp Box3 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+B3ID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+check "another account on the same server: no question, the known key used" test -n "$B3ID"
+r=$(cmd remove "$B3ID")
+# B15: Sign In Again with only the password: the kept host, port and user are used
+r=$(cmd addid "$SID" sftp Box '{"pass":"spass"}')
+check "update with only the password: done (no cloud.badAddress)" has "$r" "\"id\":\"$SID\""
+r=$(cmd wait '"name":"Box"' 10)
+r=$(cmd wait '"mounted":true' 30)
 kill "$SFTP"; sleep 0.5
 "$RC" serve sftp "$T/sftp" --addr "127.0.0.1:$SP" --user su --pass spass --key "$T/hk2" >"$T/sftp2.log" 2>&1 &
 SFTP=$!; EXTRA="$SFTP"; sleep 1.5
-r=$(cmd addid "$SID" sftp Box "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
 new=$(ssh-keygen -lf "$T/hk2.pub" | cut -d" " -f2)
-check "a changed host key is refused with both fingerprints" sh -c 'case "$1" in *"\"error\":\"cloud.hostKeyChanged\""*"\"old\":"*"$2"*"\"new\":"*"$3"*) exit 0;; esac; exit 1' x "$r" "$want" "$new"
+r=$(cmd add sftp Box4 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+check "a new account whose server's key differs from another account's: asked, with a warning" sh -c 'case "$1" in *"\"kind\":\"hostKey\""*"\"warning\":\"cloud.hostKeyOther\""*) exit 0;; esac; exit 1' x "$r"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" refuse)
+check "refusing the key: cloud.notTrusted, no account" sh -c 'case "$1" in *cloud.notTrusted*) case "$2" in *Box4*) exit 1;; esac; exit 0;; esac; exit 1' x "$r" "$(cmd state)"
+r=$(cmd addid "$SID" sftp Box '{"pass":"spass"}')
+check "the owner's update after the key changed: a hostKeyChanged question with both fingerprints" sh -c 'case "$1" in *"\"kind\":\"hostKeyChanged\""*"\"old\":"*"$2"*"\"new\":"*"$3"*) exit 0;; esac; exit 1' x "$r" "$want" "$new"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" trust)
+check "trusting the new key: the account works again" has "$r" "\"id\":\"$SID\""
+check "the kept key is the new one now" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$new' && ! ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$want'"
+r=$(cmd wait '"mounted":true' 30)
 r=$(cmd remove "$SID")
 kill "$SFTP"
 

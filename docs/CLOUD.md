@@ -890,3 +890,56 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
   both fingerprints and **Trust the New Key**, answered `cloud.answer(state, 'trust')`.
 - `cloud.tooManyAttempts`: "The server is refusing new connections from this computer for a while. Wait a minute and try
   again."
+
+19. **Offline (B10).** rcd runs with `--contimeout 5s --timeout 30s --low-level-retries 1`: with the server refusing, a read of a
+    file not on this computer fails in about 8.6 s instead of more than 200 s (measured; uploads are retried by the VFS queue
+    anyway). A transfer that fails for the network lists the account at once; a listing that can't reach the server sets
+    `error: 'cloud.unreachable'` and `state: 'offline'`, retried every 30 s, and `ok` again when it answers. On the interface's
+    thread `lord.fs.read` of a cloud file not on this computer, of an account offline, locked, not mounted or with the
+    service down, fails at once with `cloud.offline` (`cloud_read_would_block`); what is here still opens. `lord.fs.du` on a
+    cloud, network or FUSE folder answers at once with `remote: true` and no size (the UI shows the provider's), and
+    `lord.fs.search` there finds nothing for now (N2 is to make it work off the interface's thread). `lord.fs.list` of a folder
+    rclone hasn't listed lately can still wait for rclone's timeouts (about 8 s) while offline: not changed.
+20. **Logout (B11).** `lord-server` stops Cloud after closing the apps: every account unmounted (a busy one lazily), rclone
+    asked to quit, up to 15 s, and anything still mounted detached. Measured: the session ended with a file open in the
+    mount leaves nothing in `/proc/self/mounts`.
+21. **Messages (U5)** shown under Get Info are rclone's words with HTML tags dropped, white space collapsed, at most 200 bytes.
+22. **Service down (U7):** while rclone isn't running (after `cloud.crashed`, a failed start…) every account says
+    `state: 'error'` with the service's error (`cloud.crashed`, `cloud.startFailed`, or `cloud.notRunning`).
+23. **Conflicts (7.2, as built).** Before a changed file goes up, it is held and the cloud's object is looked at
+    (`operations/stat`). If it changed since this copy came down (rclone's fingerprint in `vfsMeta`: size, plus modtime and
+    hash where the backend has them; a modtime within a second counts as the same), or it appeared in the cloud meanwhile, the
+    cloud's version is first copied in the cloud to **"name (cloud copy).ext"** (`operations/copyfile`, inside the account
+    only, added to the closed table), then ours goes up under the name. `State.conflicts: [{ path, kept, account, at }]`
+    (newest first, at most 20) names both: `path` is ours, `kept` the cloud's copy. **This differs from 7.2's naming**
+    ("name (this computer).ext" for ours): renaming our file in the mount moves the cloud's object with it in rclone's VFS, so
+    the cloud's version would have been overwritten (measured), and rclone has no way to drop a pending upload. If the copy
+    fails the file stays held and is tried again. Limits: a server change that keeps the size and gives no modtime or hash
+    (plain WebDAV) can't be seen; a change made in the second between the check and the upload is lost.
+24. **lord.fs.list** stops at 5000 entries per folder without saying so (`js_sys.c` `f_fs_list`): not changed here; it is a
+    bound of the interface's thread, not Cloud's.
+
+The closed rc method table has 27 methods now (`operations/list`, `operations/stat`, `operations/copyfile` added).
+25. **SSH probes (B12, N1).** A key probe (`ssh-keyscan`) counts as a connection that never signed in under OpenSSH's
+    `PerSourcePenalties`, so: none when the account already keeps a key for that host and port (rclone checks it on its own
+    connection); none when another account keeps one (it is used as it is: if rclone's connection finds another key, the
+    new account is asked with `warning: 'cloud.hostKeyOther'`); otherwise exactly one per add or update. A refusal or a reset
+    within 2 minutes of a probe to that server answers `cloud.tooManyAttempts`.
+26. **A key that changed (B15, U10).** When the account's owner updates it (Sign In Again, `accountId`) and rclone's
+    connection finds another key, one probe gets it and the answer is `{ question: { state, kind: 'hostKeyChanged', host,
+    port, fingerprint, old, new } }`; `trust` replaces the kept key for that host. On a plain add it stays an error with
+    `old` and `new`. An update with only the password uses the host, port and user the keyring keeps for the checks. The
+    account's state carries `old` and `new` with `cloud.hostKeyChanged` / `cloud.certChanged`.
+27. **TLS details (B13, U11).** An IP address is checked with `openssl s_client -verify_ip` and no SNI; fingerprints are the
+    colon-separated hex only.
+28. **A failed new account (B14)** leaves the state at once; one whose question nobody answers goes after 5 minutes.
+29. **S3 links (B17)** last at most 7 days (rclone's limit for presigned links): `never` and `30d` are kept and answered as
+    7 days; `link()` answers `{ url, expires }` (ms, or null).
+30. **Auth phrases (U8):** FTP's `530 Login incorrect`, SMB's `NT_STATUS_LOGON_FAILURE`, S3's `InvalidAccessKeyId` /
+    `SignatureDoesNotMatch` / `AccessDenied`, WebDAV's 401/403 and SSH's "unable to authenticate" are `cloud.authFailed`;
+    network phrases are matched first, so a port number can't read as a status.
+31. **Search inside a cloud folder (N2).** `cloud.search(path, needle)` → Promise `{ hits: [{ path, dir, size, mtime }],
+    complete }`: a thread of its own walks the mount (through rclone's directory cache) with a budget of 15 s, 50 000
+    entries, 16 levels and 500 hits, names matched without case. Chosen over a recursive `operations/list` with a filter:
+    the walk sees exactly what Files shows and its cost is bounded here. `lord.fs.search` still answers nothing for a cloud
+    folder; Files calls `cloud.search` there.

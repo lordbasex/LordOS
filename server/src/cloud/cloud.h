@@ -41,7 +41,8 @@ char *cloud_answer(const char *state, const char *value, int *req);             
 char *cloud_empty_trash(const char *id, int *req);
 char *cloud_measure(const char *id, int *req);                  /* { bytes, count } */
 char *cloud_cancel_measure(const char *id, int *req);
-char *cloud_delete(const char *const *paths, int n, int *req);  /* only strictly under ~/Cloud/<account>, through the mount */
+char *cloud_delete(const char *const *paths, int n, int *req);
+char *cloud_search(const char *path, const char *needle, int *req);   /* { hits: [{ path, dir, size, mtime }], complete } */  /* only strictly under ~/Cloud/<account>, through the mount */
 void  cloud_set_assets(const char *dir);                        /* where cloud/providers.json is (the verified kinds) */
 char *cloud_remove(const char *id, int discard_pending);
 char *cloud_rename(const char *id, const char *name);
@@ -49,6 +50,9 @@ void  cloud_refresh_about(const char *id);                      /* also retries 
 void  cloud_retry(const char *id);                              /* accounts not connected try again; NULL: all */
 char *cloud_website(const char *id);                            /* the address, or NULL */
 char *cloud_status(const char *const *paths, int n);
+/* B10: path is a cloud file not on this computer whose account can't be reached now (offline, locked, not running,
+ * not mounted): 1, and lord.fs.read fails at once instead of waiting for rclone */
+int   cloud_read_would_block(const char *path);
 void  cloud_keep(const char *const *paths, int n, int keep);
 char *cloud_free(const char *const *paths, int n);
 char *cloud_link(const char *path, const char *expire, int *req);

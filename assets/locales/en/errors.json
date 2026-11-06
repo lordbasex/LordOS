@@ -106,6 +106,8 @@
   "cloud.certChanged": "This server's certificate changed, so the connection was refused: it may be an attack.",
   "cloud.listFailed": "The account's files couldn't be listed",
   "cloud.notTrusted": "The server wasn't trusted, so the account wasn't added",
+  "cloud.hostKeyOther": "Another account knows a different key for this server",
+  "cloud.tooManyAttempts": "The server is refusing new connections from this computer for a while: wait a minute and try again",
   "bench.bootTestFailed": "Could not save the boot time test's state",
   "bench.bootTestLive": "The boot time test can't run in the live session: nothing it records survives a restart",
   "camera.busy": "The camera is busy",
