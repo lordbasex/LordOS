@@ -342,3 +342,47 @@ results on both architectures unless a number says otherwise.
 - **Security**: nothing listens on any TCP port while Cloud runs (`ss -ltnp`), the socket is 0600, `rclone.conf` holds no secret,
   a second local user can't connect, a JS caller can't reach `core/command` or `config/dump`.
 - **Load**: 100 000 files in one account listed in Files without stalling the desktop; a 4 GB upload with the desktop at 60 FPS.
+
+## 17. The `lord.cloud` contract (Phase 1)
+
+The interface and `lord-server` meet here; Settings, Files, the menu bar item and Backups use only this. Calls are synchronous
+and return at once (long work runs in `lord-server`'s cloud thread); every change is pushed as one state object through
+`__lordCloud(state)` (an eventfd in the main loop, at most twice a second, like `__lordBackup`), wrapped by `sdk/cloud.js` as
+`useCloud()` and `cloud.*`.
+
+```
+cloud.available()            → bool (lordos-rclone installed)
+cloud.state()                → State (the last one pushed)
+cloud.providers()            → [{ kind, label, group: 'oauth'|'server'|'object'|'crypt', hint,
+                                  fields: [{ name, label, secret, required, default, examples: [..] }] }]
+cloud.beginSignIn(kind, name, { clientId?, clientSecret? })   → { id, url, expiresAt } | { error }
+cloud.openSignInPage(id)     → opens url in the default browser again
+cloud.cancelSignIn(id)
+cloud.add(kind, name, fields)                                 → { id } | { error, field? }   (server, object, crypt kinds)
+cloud.remove(id, { discardPending })                          → { ok } | { error: 'pending', files }
+cloud.rename(id, name)       → { ok } | { error }
+cloud.refreshAbout(id)
+cloud.websiteUrl(id)         → string | null
+cloud.status(paths)          → { [path]: { st: 'cloud'|'down'|'here'|'kept'|'up'|'error', pct?, error? } }  (paths under ~/Cloud)
+cloud.keep(paths) / cloud.unkeep(paths)
+cloud.free(paths)            → { freed, skipped: [{ path, reason: 'open'|'pending'|'kept' }] }
+cloud.link(path, expire)     → { url } | { error: 'unsupported'|… }   (expire: '1d'|'7d'|'30d'|'never')
+cloud.unlink(path)           → { ok } | { error }
+cloud.links(id)              → [{ path, url, expires, made }]
+cloud.pause(id|null) / cloud.resume(id|null)
+cloud.setOptions({ bwUp, bwDown, pauseOnBattery, pauseOnMetered, autoFree, freeBelowGb })
+cloud.restart()
+cloud.showLog()              → opens Logs on the service
+
+State = {
+  service: { running, version, uptimeS, rssKb, restarts, error? },
+  options: { bwUp, bwDown, pauseOnBattery, pauseOnMetered, autoFree, freeBelowGb },
+  accounts: [{ id, name, kind, provider, mount, state: 'ok'|'syncing'|'paused'|'signin'|'offline'|'error'|'locked', message?,
+               about: { total?, used, free?, trashed?, other? } | null, cacheBytes, keptBytes,
+               up: { files, bytes, done, name? }, down: { files, bytes, done, name? }, kept: [path], linksSupported }],
+  signin: { id, kind, name, phase: 'waiting'|'done'|'failed', url, expiresAt, error? } | null,
+  recent: [{ path, account, dir: 'up'|'down', at }]   (newest first, at most 20)
+}
+```
+
+Errors are codes (`errors.json` keys `cloud.*`), never rclone's text, except `message` in an account, which is shown under Get Info.
