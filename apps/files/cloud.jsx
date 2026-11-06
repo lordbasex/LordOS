@@ -3,7 +3,7 @@
 // Share Link sheet, Get Info's cloud part, the header's transfers pill and the offline dialog. Built from the
 // approved mocks (Files, FilesMenu, ShareLink, GetInfo, States).
 import { View, Text, Button, Segmented, useTheme, useCloud, cloud, cloudModel as M, clipboard, toast, openUrl, formatBytes, formatDate, formatTime, spacing, typeScale, t as tr,
-  CloudGlyph, StatusGlyph, UsageRing, addListener, Toggle, errorText } from '@lordos/sdk';
+  CloudGlyph, StatusGlyph, UsageRing, addListener, Toggle, errorText, tOptional } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SideItem, SideTitle } from '../../sdk/fileparts.jsx';
 import { EntryIcon } from './glyphs.jsx';
@@ -110,12 +110,14 @@ export function cloudMenuItems(list, cf, { onShare, onMsg }) {
       } }); break;
       case 'shareLink': items.push({ label: tr('cloud.shareLink'), onClick: () => onShare(list[0]) }); break;
       case 'openWebsite': items.push({ label: tr('cloud.openOnWebsite'), onClick: () => openUrl(website) }); break;
-      case 'stopSharing': items.push({ label: tr('cloud.stopSharing'), danger: true, onClick: () => cloud.unlink(paths[0]) }); break;
+      case 'stopSharing': items.push({ label: tr('cloud.stopSharing'), danger: true, onClick: () => cloud.unlink(paths[0]).then((r) => { if (r && r.error) onMsg(errorMessage(r)); }) }); break;
       default: break;
     }
   }
   return items.length ? [...items, '-'] : [];
 }
+// an error answer with its details (a date, fingerprints) in the person's language
+export const errorMessage = (r) => { const e = M.errorVars(typeof r === 'string' ? { error: r } : r, (d) => formatDate(d, 'short')); return tOptional(`errors.${e.code}`, e.vars) || errorText(e.code); };
 const linkError = (r) => (r && r.error === 'unsupported' ? tr('cloud.link.unsupported') : tr('cloud.link.failed'));
 
 // ---- Share Link… (mock ShareLink) ----
@@ -167,7 +169,7 @@ export function ShareSheet({ e, cf, onClose }) {
           <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.5, textAlign: 'start' }}>{tr('cloud.share.provider')}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {link ? <Button plain destructive label={tr('cloud.stopSharing')} onClick={() => { cloud.unlink(e.path); onClose(); }} /> : null}
+          {link ? <Button plain destructive label={tr('cloud.stopSharing')} onClick={() => cloud.unlink(e.path).then((r) => { if (r && r.error) setErr(errorMessage(r)); else onClose(); })} /> : null}
           <View style={{ flex: 1 }} />
           {website ? <Button label={tr('cloud.openOnWebsite')} onClick={() => openUrl(website)} /> : null}
           <Button label={tr('cloud.done')} onClick={onClose} />
@@ -230,7 +232,7 @@ export function CloudInfo({ e, cf, onShare }) {
       ) : null}
       <View style={{ height: 1, backgroundColor: t.separator }} />
       <View>
-        {row(tr('cloud.info.account'), `${acc.name} (${acc.provider || acc.kind})`)}
+        {row(tr('cloud.info.account'), `${acc.name} (${M.providerName(acc)})`)}
         {row(tr('cloud.info.where'), M.whereLine(e.path, acc) || acc.name)}
         {!e.dir ? row(tr('cloud.info.inCloud'), formatBytes(size)) : null}
         {!e.dir && here != null ? row(tr('cloud.info.here'), s.st === 'down' ? tr('cloud.info.soFar', { size: formatBytes(here) }) : formatBytes(here)) : null}

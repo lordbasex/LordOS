@@ -410,8 +410,8 @@ export function splitTrash(paths, accounts) {
 }
 // the confirmation for one account's paths: { title, detail } keys and vars
 export const deletePrompt = (acc, count) => ({
-  title: { key: 'cloud.delete.title', vars: { provider: (acc && (acc.provider || acc.kind)) || '', count } },
-  detail: { key: acc && acc.trashSupported ? 'cloud.delete.toTrash' : 'cloud.delete.final', vars: { provider: (acc && (acc.provider || acc.kind)) || '' } },
+  title: { key: 'cloud.delete.title', vars: { provider: providerName(acc), count } },
+  detail: { key: acc && acc.trashSupported ? 'cloud.delete.toTrash' : 'cloud.delete.final', vars: { provider: providerName(acc) } },
 });
 
 // ---- the credentials form (Pi test, 2026-11-06): the essential fields first, the rest under Advanced options ----
@@ -476,6 +476,43 @@ export function explainError(code, st, acc) {
 export function spaceState(acc) {
   const ab = acc && acc.about;
   if (ab && ab.total > 0) return 'quota';
+  if (acc && (acc.error || acc.state === 'locked')) return 'reason';
   if (ab) return 'noQuota';
-  return acc && (acc.error || acc.state === 'locked') ? 'reason' : 'unknown';
+  // connected, and the provider told nothing (S3's about is null): Measure is how to know
+  return acc && acc.mounted ? 'noQuota' : 'unknown';
 }
+
+// ---- e2e findings (2026-11-06): provider names, trust prompts, errors with their details, where an error belongs ----
+
+// An account's provider line: rclone's short name (the provider list's label), never its long description
+export function providerName(acc, list) {
+  const p = (list || []).find((x) => x.kind === (acc && acc.kind));
+  if (p && p.label) return p.label;
+  const s = String((acc && (acc.providerLabel || acc.provider)) || (acc && acc.kind) || '');
+  // "Amazon S3 Compliant Storage Providers including AWS, …" → "Amazon S3 Compliant Storage Providers"
+  const cut = s.split(/\s+including\s+|,\s|\s\(|\s—\s/)[0].trim();
+  return cut.length > 40 ? `${cut.slice(0, 38).replace(/\s+\S*$/, '')}…` : cut;
+}
+// a trust question from add/answer: 'hostKey' | 'certificate' | null (an ordinary question of rclone's)
+export const trustKind = (q) => (q && (q.kind === 'hostKey' || q.kind === 'certificate') ? q.kind : null);
+// an error answer → { code, vars } for errors.<code>: its details (fingerprints, a date) come as fields of the answer
+export function errorVars(r, fmtDate) {
+  const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code) || '';
+  const src = { ...(r || {}), ...(r && typeof r.error === 'object' ? r.error : {}) };
+  const vars = {};
+  if (src.old || src.oldFingerprint) vars.old = src.old || src.oldFingerprint;
+  if (src.new || src.fingerprint) vars.new = src.new || src.fingerprint;
+  if (src.expires != null || src.until != null) vars.date = fmtDate(new Date(toMs(src.expires ?? src.until)));
+  if (src.host) vars.host = src.host;
+  return { code, vars };
+}
+// the field an add error belongs to: lord-server's own `field`, else by the code
+const ERROR_FIELD = { 'cloud.unreachable': ['host', 'url', 'endpoint'], 'cloud.badAddress': ['host', 'url', 'endpoint'],
+  'cloud.authFailed': ['pass', 'password', 'secret_access_key', 'key_pem'], 'cloud.badPassword': ['pass', 'password', 'secret_access_key', 'key_pem'] };
+export function errorField(r, p) {
+  if (r && r.field) return r.field;
+  const names = ((p && p.fields) || []).map((f) => f.name);
+  return (ERROR_FIELD[r && r.error] || []).find((n) => names.includes(n)) || null;
+}
+// an account that is connected (mounted, no error) and whose provider gives no total can be measured
+export const measurable = (acc) => !!acc && !acc.error && acc.state !== 'locked' && acc.mounted !== false && !(acc.about && acc.about.total > 0);

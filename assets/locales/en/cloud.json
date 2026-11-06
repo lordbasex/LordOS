@@ -344,5 +344,15 @@
   "sftp.pickKey": "Choose your private key",
   "sftp.notKey": "That file isn't a private key.",
   "sftp.chooseKey": "Choose a key file.",
-  "field.domain": "Domain"
+  "field.domain": "Domain",
+  "trust.hostTitle": "Is this the right server?",
+  "trust.hostBody": "This is the first connection to {host}. Compare the fingerprint below with the one the server's administrator gives you, and trust it only if they match.",
+  "trust.certTitle": "This server's certificate isn't trusted by the system",
+  "trust.certBody": "LordOS couldn't confirm who {host} is. Trust this certificate only if its fingerprint matches the one the server's administrator gives you.",
+  "trust.server": "Server",
+  "trust.fingerprint": "Fingerprint",
+  "trust.subject": "Issued to",
+  "trust.issuer": "Issued by",
+  "trust.trust": "Trust",
+  "trust.trustCert": "Trust This Certificate"
 }
