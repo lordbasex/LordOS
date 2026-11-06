@@ -295,5 +295,7 @@
   "fav.gone": "{name} non è più lì",
   "pin.add": "Fissa in Posizioni",
   "pin.remove": "Rimuovi da Posizioni",
-  "net.offLink": "Questo server è fuori dalla tua rete locale, quindi LordOS non elenca le sue cartelle. Digita il nome della cartella."
+  "net.offLink": "Questo server è fuori dalla tua rete locale, quindi LordOS non elenca le sue cartelle. Digita il nome della cartella.",
+  "markup": "Annota",
+  "markupHint": "Apri nell’editor di annotazioni"
 }

@@ -13,7 +13,7 @@
   "slideshow": "Slideshow",
   "brightness": "Brightness",
   "contrast": "Contrast",
-  "cropHint": "Drag over the photo to crop",
+  "cropHint": "Drag over the photo to crop; drag the corners or the inside to adjust it",
   "cropReady": "Only the marked area will be saved",
   "reset": "Reset",
   "saveCopy": "Save as copy",
@@ -43,5 +43,14 @@
   "rotateRight": "Rotate right",
   "fullscreen": "Full screen",
   "emptyTitle": "No photos",
-  "thumbSize": "Thumbnail size"
+  "thumbSize": "Thumbnail size",
+  "markup": "Markup",
+  "markupHint": "Open in the markup editor: arrows, text, redaction, crop and resize",
+  "crop": "Crop",
+  "crop.free": "Free",
+  "crop.original": "Original",
+  "crop.square": "Square",
+  "size": "Size",
+  "keepRatio": "Keep proportions",
+  "sizeInvalid": "Width and height must be whole numbers from 1 to {max}"
 }

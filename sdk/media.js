@@ -20,6 +20,8 @@ import { requestPermission, markDeviceUse } from './privacy.js';
 import { t } from './i18n.js';
 import { useTheme } from './theme.js';
 import * as fs from './fs.js';
+import { wm } from './windows.js';
+import { canMarkup } from './imageeditmodel.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.media) || null;
 const listeners = new Map();          // id → Set(fn(type, data))
@@ -79,6 +81,9 @@ export const media = {
     return call('screenshot', app, rect || {});
   },
   crop: (id, x, y, w, hh) => call('crop', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh)),
+  // the image editor (issue #30): each returns the id of a NEW picture, the source stays as it was
+  resize: (id, w, hh) => call('resize', id, Math.round(w), Math.round(hh)),
+  rotate: (id, quarterTurns) => call('rotate', id, Math.round(quarterTurns)),
   annotate: (base, ops, into) => call('annotate', base, ops, into || 0),
   saveImage: (id, path, opts = {}) => job(() => call('saveImage', id, path, opts)),
   copyImage: (id) => job(() => call('copyImage', id)),
@@ -123,6 +128,16 @@ export const media = {
   },
   protectedCount: () => call('protectedCount') || 0,
 };
+
+// The markup editor (Screenshots' editor: crop, resize, redact, arrows, text…) on a picture file, from
+// Photos and Files' Quick Preview. Only raster pictures lord-media decodes (imageeditmodel.js MARKUP_RE).
+export function openMarkup(path) {
+  if (!path || !canMarkup(path)) return null;
+  const sw = (typeof lord !== 'undefined' && lord.screen) || { width: 1280, height: 800 };
+  const w = Math.min(1100, sw.width - 80), h = Math.min(740, sw.height - 120);
+  return wm.open('screenshots', { instance: `edit${Date.now().toString(36)}`, args: { path },
+    frame: { x: Math.round((sw.width - w) / 2), y: 50, w, h } });
+}
 
 // Camera/microphone indicators while the source lives.
 const devices = new Map();            // id → { app, kind }

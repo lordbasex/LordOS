@@ -295,5 +295,7 @@
   "fav.gone": "{name} isn't there any more",
   "pin.add": "Pin to Locations",
   "pin.remove": "Remove from Locations",
-  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name."
+  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name.",
+  "markup": "Markup",
+  "markupHint": "Open in the markup editor"
 }

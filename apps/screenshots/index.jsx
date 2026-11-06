@@ -5,15 +5,18 @@
 //   ❖⇧3 / Print Screen  entire screen        ❖⇧4  area (or window, with Space)
 //   ❖⇧5                 the Screenshots panel (and stop a recording in progress)
 // Protected windows (wm.setProtected) come out black: the server does that, not this app.
-// After each capture a floating thumbnail shows up; a click opens the markup editor (arrow, box,
-// text, blur). They are saved in ~/Pictures/Screenshots or to the clipboard.
+// After each capture a floating thumbnail shows up; a click opens the markup editor (editor.jsx: arrow,
+// box, line, text, blur, pixelate and solid-fill redaction, crop, resize, turns). Photos and Files'
+// Quick Preview open the same editor on any picture (media.js openMarkup). Captures are saved in
+// ~/Pictures/Screenshots or to the clipboard.
 import {
-  View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, GroupBox, FormRow,
+  View, Text, MediaView, Toggle, Segmented, GroupBox, FormRow,
   useTheme, useAppWindow, useKeyboard, useStore, useWindows, wm, windows, typeScale,
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { captureRect } from './geometry.js';
+import { Editor } from './editor.jsx';
 
 const APP = 'screenshots';
 const recording = createStore(null);   // { id, path, start }
@@ -272,108 +275,12 @@ function RecBadge() {
   );
 }
 
-// ---- markup editor ----
+// ---- markup editor (editor.jsx) ----
 
-const COLORS = ['#ff3b30', '#ffcc00', '#34c759', '#0a84ff', '#ffffff', '#1c1c1e'];
-
-function Editor({ handle, path }) {
-  const th = useTheme();
-  const win = useAppWindow();
-  const [tool, setTool] = useState('arrow');
-  const [color, setColor] = useState(COLORS[0]);
-  const [ops, setOps] = useState([]);
-  const [draft, setDraft] = useState(null);
-  const [text, setText] = useState(null);        // { x, y, value } (image coordinates)
-  const [preview, setPreview] = useState(0);
-  const [msg, setMsg] = useState(null);
-  const box = useRef(null);
-  const drag = useRef(null);
-  const info = media.info(handle) || { width: 1, height: 1 };
-  useEffect(() => () => { media.close(handle); }, []);
-  useEffect(() => () => { if (preview) media.close(preview); }, [preview]);
-  useEffect(() => {
-    const all = draft ? [...ops, draft] : ops;
-    const id = media.annotate(handle, all, preview);
-    if (id && id !== preview) setPreview(id);
-    if (id) media.view(id, { fit: 'contain', background: 0 });
-  }, [ops, draft, handle]);
-  const map = (x, y) => {
-    const [lx, ly, bw, bh] = box.current ? lord.getLayout(box.current.id) : [0, 0, 1, 1];
-    const s = Math.min(bw / info.width, bh / info.height);
-    const ox = lx + (bw - info.width * s) / 2, oy = ly + (bh - info.height * s) / 2;
-    return { x: (x - ox) / s, y: (y - oy) / s, s };
-  };
-  useEffect(() => {
-    const offMove = addListener('pointermove', (e) => {
-      if (!drag.current) return;
-      const p = map(e.x, e.y);
-      setDraft((d) => d && { ...d, x2: p.x, y2: p.y });
-    });
-    const offUp = addListener('pointerup', () => {
-      if (!drag.current) return;
-      drag.current = null;
-      setDraft((d) => { if (d && Math.hypot(d.x2 - d.x1, d.y2 - d.y1) > 3) setOps((o) => [...o, d]); return null; });
-    });
-    return () => { offMove(); offUp(); };
-  });
-  const width = Math.max(3, Math.round(Math.min(info.width, info.height) / 220));
-  const down = (e) => {
-    const p = map(e.x, e.y);
-    if (tool === 'text') { setText({ x: p.x, y: p.y, value: '' }); return; }
-    drag.current = true;
-    setDraft({ type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color, width: tool === 'blur' ? 6 : width });
-  };
-  const addText = () => {
-    if (text && text.value.trim()) setOps((o) => [...o, { type: 'text', x1: text.x, y1: text.y, text: text.value, color, size: Math.max(18, width * 7) }]);
-    setText(null);
-  };
-  useKeyboard((e) => { if ((e.ctrl || e.meta) && String(e.base).toLowerCase() === 'z') setOps((o) => o.slice(0, -1)); });
-  const save = async () => {
-    const base = path ? path.split('/').pop().replace(/\.png$/i, '') : tr('screenshots.fileName', { date: stamp() });
-    const r = await media.saveImage(preview || handle, freeName(captureDir(), `${base} (${tr('screenshots.annotated')})`, 'png'));
-    setMsg(r.ok ? tr('screenshots.savedTo', { folder: tr('screenshots.folder') }) : tr('screenshots.saveError'));
-    setTimeout(() => setMsg(null), 2500);
-  };
-  const copy = async () => { const r = await media.copyImage(preview || handle); setMsg(r.ok ? tr('screenshots.copied') : tr('screenshots.saveError')); setTimeout(() => setMsg(null), 2500); };
-  const tools = [['arrow', '↗', 'screenshots.tool.arrow'], ['box', '▢', 'screenshots.tool.box'], ['text', 'T', 'screenshots.tool.text'],
-    ['blur', '▒', 'screenshots.tool.blur'], ['line', '╱', 'screenshots.tool.line']];
-  const tp = text ? (() => { const [lx, ly, bw, bh] = box.current ? lord.getLayout(box.current.id) : [0, 0, 1, 1]; const s = Math.min(bw / info.width, bh / info.height);
-    return { left: (bw - info.width * s) / 2 + text.x * s, top: (bh - info.height * s) / 2 + text.y * s }; })() : null;
-  return (
-    <View style={{ flex: 1 }}>
-      <Toolbar>
-        <ToolbarGroup>
-          {tools.map(([k, g, key]) => <ToolbarButton key={k} icon={g} title={tr(key)} active={tool === k} onClick={() => setTool(k)} />)}
-        </ToolbarGroup>
-        <ToolbarDivider />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {COLORS.map((c) => (
-            <View key={c} onClick={() => setColor(c)} style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-              border: `2px solid ${color === c ? th.accent : 'transparent'}` }}>
-              <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: c, border: `1px solid ${th.separator}` }} />
-            </View>
-          ))}
-        </View>
-        <ToolbarSpacer />
-        <ToolbarButton icon="⟲" title={tr('screenshots.undo')} onClick={() => setOps((o) => o.slice(0, -1))} />
-        <ToolbarButton icon="⧉" title={tr('screenshots.copy')} onClick={copy} />
-        <Button label={tr('screenshots.done')} onClick={() => wm.close(win.id)} />
-        <Button primary label={tr('screenshots.save')} onClick={save} />
-      </Toolbar>
-      <View ref={box} style={{ flex: 1, backgroundColor: th.mode === 'dark' ? '#111' : '#ddd', overflow: 'hidden', direction: 'ltr' }} onMouseDown={down}>
-        <MediaView media={preview || handle} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
-        {text && tp && (
-          <View style={{ position: 'absolute', left: tp.left, top: tp.top, width: 260 }}>
-            <TextInput value={text.value} autoFocus onChange={(v) => setText({ ...text, value: v })} onSubmit={addText} onCancel={() => setText(null)}
-              placeholder={tr('screenshots.textHint')} />
-          </View>
-        )}
-        {msg && <View style={{ position: 'absolute', left: 0, right: 0, bottom: 20, alignItems: 'center' }}>
-          <View style={{ paddingHorizontal: 14, height: 30, justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.75)' }}><Text style={{ fontSize: 12, color: '#fff' }}>{msg}</Text></View>
-        </View>}
-      </View>
-    </View>
-  );
+// a capture right after it was taken (handle, and its file if it was saved), or a picture file (path)
+function MarkupWindow({ handle, path }) {
+  return <Editor handle={handle} path={path} app={APP} newCapturePath={() => freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png')}
+    onSaved={(p) => { if (p.startsWith(`${captureDir()}/`)) recent.set((l) => [{ path: p, time: Date.now() }, ...l.filter((x) => x.path !== p)].slice(0, 20)); }} />;
 }
 
 // ---- the panel (main window) ----
@@ -445,6 +352,6 @@ export default function Screenshots() {
   if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} />;
   if (inst === 'count') return <Countdown secs={a.secs} start={a.start} />;
   if (inst === 'rec') return <RecBadge />;
-  if (inst.startsWith('edit') && a.handle) return <Editor handle={a.handle} path={a.path} />;
+  if (inst.startsWith('edit') && (a.handle || a.path)) return <MarkupWindow handle={a.handle} path={a.path} />;
   return <Panel />;
 }

@@ -2,11 +2,13 @@
 //
 // The library is the XDG pictures folder, ~/Pictures by default (and its folders), with thumbnails in ~/.cache/lordos/thumbs. The
 // viewer decodes with lord-media (PNG, JPEG, animated GIF, WebP, BMP; HEIC/AVIF if FFmpeg can)
-// and C draws it: zoom, panning, rotation, full screen and slideshow. Edits
-// (crop, rotation, brightness and contrast) are saved as a copy: the original is left untouched.
+// and C draws it: zoom, panning, rotation, full screen and slideshow. Edits (crop with aspect presets
+// and handles, a new size, rotation, brightness and contrast) are saved as a copy: the original is left
+// untouched. Markup opens the picture in the markup editor (arrows, text, redaction…; issue #30).
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
+  Segmented, TextInput, Toggle, openMarkup, imageEdit as M,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -81,7 +83,7 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
   const [center, setCenter] = useState({ cx: 0.5, cy: 0.5 });
   const [rot, setRot] = useState(0);            // user rotation (on top of EXIF)
   const [slide, setSlide] = useState(false);
-  const [edit, setEdit] = useState(null);        // { bright, contrast, crop: {x,y,w,h} in view px, dragging }
+  const [edit, setEdit] = useState(null);        // { bright, contrast, crop: {x,y,w,h} in view px, preset, size }
   const [toast, setToast] = useState(null);
   const box = useRef(null);
   const drag = useRef(null);
@@ -173,8 +175,9 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
       if (!d) return;
       if (d.crop) {
         const [lx, ly] = layout();
-        const x = e.x - lx, y = e.y - ly;
-        setEdit((ed) => ed && ({ ...ed, crop: { x: Math.min(d.x, x), y: Math.min(d.y, y), w: Math.abs(x - d.x), h: Math.abs(y - d.y) } }));
+        const x = e.x - lx, y = e.y - ly, b = imageRect(), ratio = cropRatio();
+        const c = d.crop === 'new' ? M.dragRect(d.x, d.y, x, y, ratio, b) : d.crop === 'move' ? M.moveRect(d.r, x - d.x, y - d.y, b) : M.resizeRect(d.r, d.crop, x, y, ratio, b);
+        setEdit((ed) => ed && ({ ...ed, crop: c }));
         return;
       }
       const { rw, rh, scale } = dims();
@@ -188,6 +191,32 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
     const { rw, rh, bw, bh, fit } = dims();
     return { x: (bw - rw * fit) / 2, y: (bh - rh * fit) / 2, w: rw * fit, h: rh * fit };
   };
+  const cropRatio = () => { const { rw, rh } = dims(); return M.presetRatio(edit?.preset || 'free', rw, rh); };
+  // the crop in the picture's pixels (after rotation), or all of it
+  const cropPixels = () => {
+    const { rw, rh } = dims(), r = imageRect(), k = rw / (r.w || 1);
+    const c = edit?.crop && edit.crop.w > 4 && edit.crop.h > 4 ? M.imageRect({ x: (edit.crop.x - r.x) * k, y: (edit.crop.y - r.y) * k, w: edit.crop.w * k, h: edit.crop.h * k }, rw, rh) : null;
+    return c || { x: 0, y: 0, w: rw, h: rh, all: true };
+  };
+  const startEdit = () => { setZoomAt(0); setEdit({ bright: 0, contrast: 0, crop: null, preset: 'free', size: null }); };
+  const setPreset = (p) => {
+    const { rw, rh } = dims();
+    setEdit((ed) => ({ ...ed, preset: p, crop: p === 'free' ? ed.crop : M.fitRatio(imageRect(), M.presetRatio(p, rw, rh)) }));
+  };
+  // the new size: follows the crop until a side is typed
+  const outSize = () => {
+    const c = cropPixels(), z = edit?.size;
+    if (!z) return { width: c.w, height: c.h, wText: String(c.w), hText: String(c.h), keep: true, touched: false };
+    if (z.keep) { const r = M.resizeSize(c.w, c.h, 'width', z.width, true); return { ...z, height: r.height, hText: String(r.height) }; }
+    return z;
+  };
+  const typeSide = (side, txt) => {
+    const c = cropPixels(), cur = outSize(), v = M.parseSide(txt);
+    const key = side === 'width' ? 'wText' : 'hText';
+    if (v == null) { setEdit((ed) => ({ ...ed, size: { ...cur, [key]: txt, touched: true } })); return; }
+    const r = M.resizeSize(c.w, c.h, side, v, cur.keep);
+    setEdit((ed) => ({ ...ed, size: { ...cur, ...(cur.keep ? r : { [side]: v }), [key]: txt, ...(cur.keep ? { [side === 'width' ? 'hText' : 'wText']: String(side === 'width' ? r.height : r.width) } : {}), touched: true } }));
+  };
 
   const saveCopy = async () => {
     const ext = /\.jpe?g$/i.test(path) ? 'jpeg' : 'png';
@@ -198,11 +227,12 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
       out = `${dirOf(path)}/${name}`;
       try { fs.stat(out); } catch (e) { break; }
     }
-    const r = imageRect();
-    const c = edit.crop && edit.crop.w > 4 && edit.crop.h > 4 ? {
-      cx: Math.round(Math.max(0, edit.crop.x - r.x)), cy: Math.round(Math.max(0, edit.crop.y - r.y)),
-      cw: Math.round(Math.min(edit.crop.w, r.w)), ch: Math.round(Math.min(edit.crop.h, r.h)), refw: Math.round(r.w) } : {};
-    const res = await media.edit(APP, path, out, { rotate: rot, brightness: edit.bright, contrast: edit.contrast, format: ext, ...c });
+    const p = cropPixels(), z = outSize();
+    const c = p.all ? {} : { cx: p.x, cy: p.y, cw: p.w, ch: p.h, refw: dims().rw };
+    const w = M.parseSide(z.wText), h = M.parseSide(z.hText);
+    if (z.touched && (!w || !h)) { setToast(tr('photos.sizeInvalid', { max: M.MAX_SIDE })); setTimeout(() => setToast(null), 3000); return; }
+    const sz = z.touched && (w !== p.w || h !== p.h) ? { width: w, height: h } : {};
+    const res = await media.edit(APP, path, out, { rotate: rot, brightness: edit.bright, contrast: edit.contrast, format: ext, ...c, ...sz });
     setToast(res.ok ? tr('photos.saved', { name: baseName(res.path) }) : tr('photos.saveError'));
     setTimeout(() => setToast(null), 3000);
     if (res.ok) setEdit(null);
@@ -231,7 +261,8 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
           <ToolbarButton icon="⟳" title={tr('photos.rotateRight')} onClick={() => setRot((r) => r + 90)} />
           <ToolbarButton icon="▶" iconSize={13} title={tr('photos.slideshow')} onClick={() => setSlide(true)} />
           <ToolbarButton icon="⛶" title={tr('photos.fullscreen')} onClick={() => wm.setFullscreen(winId, true)} />
-          <ToolbarButton icon="✎" label={tr('photos.edit')} active={!!edit} onClick={() => setEdit(edit ? null : { bright: 0, contrast: 0, crop: null })} />
+          {M.canMarkup(path) && !info?.animated && !error ? <ToolbarButton icon="✐" label={tr('photos.markup')} title={tr('photos.markupHint')} onClick={() => openMarkup(path)} /> : null}
+          <ToolbarButton icon="✎" label={tr('photos.edit')} active={!!edit} onClick={() => (edit ? setEdit(null) : startEdit())} />
         </View>
       )}
       <View ref={box} style={{ flex: 1, overflow: 'hidden' }}
@@ -239,7 +270,12 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
         onPinch={(e) => { if (e.phase === 'begin') pinchK.current = 1; else { zoomBy(e.scale / pinchK.current); pinchK.current = e.scale; } }}
         onDoubleClick={() => setZoomAt(zoom ? 0 : 1)}
         onMouseDown={(e) => {
-          if (edit) { const [lx, ly] = layout(); drag.current = { crop: true, x: e.x - lx, y: e.y - ly }; return; }
+          if (edit) {
+            const [lx, ly] = layout(), x = e.x - lx, y = e.y - ly;
+            const h = edit.crop && edit.crop.w > 4 ? M.handleAt(edit.crop, x, y, 10, cropRatio()) : null;
+            drag.current = !h ? { crop: 'new', x, y } : h === 'move' ? { crop: 'move', x, y, r: edit.crop } : { crop: h, r: edit.crop };
+            return;
+          }
           if (zoom) drag.current = { x: e.x, y: e.y, cx: center.cx, cy: center.cy };
         }}>
         <MediaView media={id} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
@@ -256,6 +292,9 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
               <View style={{ position: 'absolute', left: 0, top: c.y, width: c.x, height: c.h, backgroundColor: dim }} />
               <View style={{ position: 'absolute', left: c.x + c.w, top: c.y, right: 0, height: c.h, backgroundColor: dim }} />
               <View style={{ position: 'absolute', left: c.x, top: c.y, width: c.w, height: c.h, border: '2px solid #fff' }} />
+              {[[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]].map(([x, y], i) => (
+                <View key={i} style={{ position: 'absolute', left: x - 6, top: y - 6, width: 12, height: 12, borderRadius: 3, backgroundColor: '#fff', border: '1px solid rgba(0,0,0,0.5)' }} />
+              ))}
             </View>
           );
         })()}
@@ -279,17 +318,35 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
           </View>
         </View>}
       </View>
-      {edit && !full && (
-        <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, backgroundColor: '#1d1d20' }}>
-          <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.brightness')}</Text>
-          <Slider value={edit.bright} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, bright: Math.round(v) })} />
-          <Text style={{ fontSize: 12, color: '#ccc', marginLeft: 8 }}>{tr('photos.contrast')}</Text>
-          <Slider value={edit.contrast} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, contrast: Math.round(v) })} />
-          <Text style={{ fontSize: 11, color: '#999', flex: 1 }}>{edit.crop ? tr('photos.cropReady') : tr('photos.cropHint')}</Text>
-          <Button label={tr('photos.reset')} onClick={() => { setEdit({ bright: 0, contrast: 0, crop: null }); setRot(0); }} />
-          <Button primary label={tr('photos.saveCopy')} onClick={saveCopy} />
-        </View>
-      )}
+      {edit && !full && (() => {
+        const cp = cropPixels(), z = outSize();
+        return (
+          <View style={{ paddingVertical: 8, paddingHorizontal: 16, gap: 8, backgroundColor: '#1d1d20' }}>
+            <View style={{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.crop')}</Text>
+              <Segmented small value={edit.preset} onChange={setPreset}
+                options={M.CROP_PRESETS.map((p) => [p, p === 'free' || p === 'original' || p === 'square' ? tr(`photos.crop.${p}`) : p])} />
+              <Text style={{ fontSize: 11, color: '#999', direction: 'ltr' }}>{`${cp.w} × ${cp.h}`}</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.size')}</Text>
+              <View style={{ width: 70 }}><TextInput value={z.wText} onChange={(t) => typeSide('width', t)} selectAll /></View>
+              <Text style={{ fontSize: 12, color: '#999' }}>×</Text>
+              <View style={{ width: 70 }}><TextInput value={z.hText} onChange={(t) => typeSide('height', t)} selectAll /></View>
+              <Toggle small on={z.keep} onChange={(k) => setEdit((ed) => ({ ...ed, size: { ...outSize(), keep: k, touched: true } }))} />
+              <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.keepRatio')}</Text>
+            </View>
+            <View style={{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.brightness')}</Text>
+              <Slider value={edit.bright} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, bright: Math.round(v) })} />
+              <Text style={{ fontSize: 12, color: '#ccc', marginLeft: 8 }}>{tr('photos.contrast')}</Text>
+              <Slider value={edit.contrast} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, contrast: Math.round(v) })} />
+              <Text style={{ fontSize: 11, color: '#999', flex: 1 }}>{edit.crop ? tr('photos.cropReady') : tr('photos.cropHint')}</Text>
+              <Button label={tr('photos.reset')} onClick={() => { setEdit({ bright: 0, contrast: 0, crop: null, preset: 'free', size: null }); setRot(0); }} />
+              <Button primary label={tr('photos.saveCopy')} onClick={saveCopy} />
+            </View>
+          </View>
+        );
+      })()}
     </View>
     </ThemeProvider>
   );

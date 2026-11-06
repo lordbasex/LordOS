@@ -1,6 +1,6 @@
 // panels.jsx — context menu (with submenus), Quick Preview, Get Info and confirm.
 // All are drawn inside the window, with coordinates relative to it.
-import { View, Text, TextInput, Button, ToolbarButton, Hairline, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ToolbarButton, Hairline, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr, openMarkup, imageEdit } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
 import { EntryIcon, TagDots } from './glyphs.jsx';
@@ -68,10 +68,12 @@ export function ContextMenu({ x, y, items, onClose, bounds }) {
   );
 }
 
-// Quick Preview (Space): the image, the text or the file's card, large, in a rounded panel.
+// Quick Preview (Space): the image, the text or the file's card, large, in a rounded panel. A picture
+// (PNG, JPEG, WebP…) has Markup: the markup editor (crop, resize, redact, arrows, text; issue #30).
 export function QuickLook({ e, onClose, index, count }) {
   const t = useTheme();
   if (!e) return null;
+  const markup = !e.dir && !e.arc && imageEdit.canMarkup(e.name);
   return (
     <View onMouseDown={onClose} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
       <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: '84%', height: '88%', borderRadius: 12, backgroundColor: t.windowBg,
@@ -83,6 +85,7 @@ export function QuickLook({ e, onClose, index, count }) {
             <Text style={{ textAlign: 'center', fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{e.name}</Text>
           </View>
           <Text style={{ minWidth: 22, fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{count > 1 ? `${index + 1} / ${count}` : ''}</Text>
+          {markup ? <ToolbarButton icon="✐" small label={tr('files.markup')} title={tr('files.markupHint')} onClick={() => { openMarkup(e.path); onClose(); }} /> : null}
         </View>
         <View style={{ flex: 1, padding: 8 }}>
           <QuickContent e={e} />
