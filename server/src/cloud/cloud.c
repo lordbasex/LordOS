@@ -93,16 +93,19 @@ static long long seen_done;          /* newest completed_at already in recent */
 typedef struct Link { struct Link *next; char id[16]; char *rel, *url; long long expires, made; } Link;
 static Link *links;
 
-enum { J_RETRY = 100 };
+enum { J_RETRY = 100, J_ADDLATE };
 enum { J_PROVIDERS = 1, J_ADD, J_REMOVE, J_RENAME, J_ABOUT, J_LINK, J_UNLINK, J_RESTART, J_OPTIONS, J_PAUSE, J_SIGNIN, J_STOP,
        J_ANSWER, J_TRASH, J_MEASURE, J_CANCEL_MEASURE };
-typedef struct Job { struct Job *next; int type, req, flag; char id[16]; char *a, *b; } Job;
+typedef struct Job { struct Job *next; int type, req, flag; char id[16]; char *a, *b, *c, *d; } Job;
 static Job *jhead, *jtail;
 
 static void (*reply_fn)(int, const char *);
 typedef struct Reply { struct Reply *next; int req; char *json; } Reply;
 static Reply *rhead;
 
+void ct_params(const Acc *a, JBuf *b, int *first);     /* cloud_trust.c */
+static int presigned(const Acc *a);
+static char *add_impl(const char *kind, const char *name, const char *fields, const char *account_id, int *req, int use_req);
 static const CloudKind *kind_get(const char *kind);
 static const CloudKind *kind_put(const char *kind, const char *type, const char *label, const char *group);
 
@@ -840,6 +843,8 @@ static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, K
         int secret = json_bool(o, "IsPassword", 0) || json_bool(o, "Sensitive", 0);
         if (secret) { if (sa.n) jb_raw(&sa, ","); jb_raw(&sa, nm); }
         if (json_bool(o, "Advanced", 0) || json_num(o, "Hide", 0) != 0 || cloud_field_hidden(k, nm) || (oauth && is_oauth_field(nm))) continue;
+        /* 4.2: an option that runs a program or reads a local file is neither offered nor accepted (sftp's ssh, key_file…) */
+        if (cloud_option_refused(nm, json_str(o, "Type"))) continue;
         if (oauth) continue;                            /* signing in asks rclone's own questions */
         if (ki->n >= 64) continue;
         cpy(ki->name[ki->n], sizeof ki->name[0], nm);
@@ -1017,6 +1022,9 @@ static int answer_states(const char *id, JDoc *d, char *msg, size_t mn, char **q
     return -1;
 }
 
+/* options rclone itself keeps that the refusal rule would catch by name: OAuth's client id and secret, the token */
+static int keep_internal(const char *k) { return !strcmp(k, "token") || !strcmp(k, "client_id") || !strcmp(k, "client_secret"); }
+
 /* config/create with the non-secret options, the preset and the secrets (a JSON object's text, or NULL).
  * fresh 1: a new account, secrets plain, the state machine answered; 2: the same for an existing account (Sign In
  * Again, new credentials: config/update, so what isn't given stays); 0: what config/get gave (obscured), at start. */
@@ -1031,6 +1039,7 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
     if (a->k->preset) { jb_raw(&b, a->k->preset); first = 0; }
     for (int i = 0; i < a->p.n; i++) {
         if (cloud_field_hidden(a->k, a->p.kv[i].key)) continue;
+        if (cloud_option_refused(a->p.kv[i].key, "string") && !keep_internal(a->p.kv[i].key)) continue;   /* even from a file */
         if (!first) jb_raw(&b, ",");
         first = 0;
         jb_str(&b, a->p.kv[i].key);
@@ -1041,6 +1050,7 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
     if (secret_json && !json_parse(secret_json, strlen(secret_json), &sd, NULL, 0)) {
         for (const JVal *x = sd.root->type == J_OBJ ? sd.root->kid : NULL; x; x = x->next) {
             if (x->type != J_STR || !cloud_key_ok(x->key)) continue;
+            if (cloud_option_refused(x->key, "string") && !keep_internal(x->key)) continue;
             if (!first) jb_raw(&b, ",");
             first = 0;
             jb_str(&b, x->key);
@@ -1049,6 +1059,7 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
         }
         json_free(&sd);
     }
+    ct_params(a, &b, &first);                   /* its own known_hosts and accepted certificate, never from JS */
     jb_printf(&b, "},\"opt\":{\"nonInteractive\":true,%s}}", fresh ? "\"obscure\":true" : "\"noObscure\":true");
     JDoc d;
     int st = b.oom ? -1 : rcj(fresh == 2 ? RCM_UPDATE : RCM_CREATE, b.p, &d, msg, mn, RC_LONG);
@@ -1113,7 +1124,8 @@ static void check_links(Acc *a) {
     if (rcj(RCM_FSINFO, body, &d, NULL, 0, RC_SHORT) == 200 && d.root) {
         const JVal *f = json_get(d.root, "Features");
         a->links_supported = json_bool(f, "PublicLink", 0);
-        a->trash_supported = json_bool(f, "CleanUp", 0);
+        /* S3's CleanUp removes unfinished multipart uploads: not a trash to empty */
+        a->trash_supported = json_bool(f, "CleanUp", 0) && !presigned(a);
     }
     if (d.root) json_free(&d);
 }
@@ -1158,8 +1170,13 @@ static int mount_acc(Acc *a) {
     int st = b.oom ? -1 : rcs(RCM_MOUNT, b.p, msg, sizeof msg, RC_SHORT);
     jb_free(&b);
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->err[0] = 0; a->message[0] = 0; }
-    else { a->mounted = 0; cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : "cloud.mountFailed"); cpy(a->message, sizeof a->message, msg); }
+    if (st == 200) { a->mounted = 1; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; }
+    else {
+        a->mounted = 0;
+        const char *fc = cloud_failure_code(msg);
+        cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
+        cpy(a->message, sizeof a->message, msg);
+    }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
     cl_changed();
@@ -1288,11 +1305,13 @@ static void finish_new(Acc *a) {
     mount_acc(a);
 }
 
+static const char *add_field;       /* the field an add error is about, for the next err_msg_json (the thread only) */
 static char *err_msg_json(const char *code, const char *msg) {
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"error\":");
     jb_str(&b, code);
+    if (add_field) { jb_raw(&b, ",\"field\":"); jb_str(&b, add_field); add_field = NULL; }
     if (msg && msg[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, msg); }
     jb_raw(&b, "}");
     return b.oom ? (jb_free(&b), NULL) : b.p;
@@ -1300,8 +1319,19 @@ static char *err_msg_json(const char *code, const char *msg) {
 
 /* the setup of an account didn't take: a new one goes away, an existing one stays as it was with the error */
 static void add_failed(Acc *a, int req, const char *code, const char *msg) {
+    /* which field the person should look at */
+    if (!strcmp(code, "cloud.badAddress") || !strcmp(code, "cloud.unreachable") || !strcmp(code, "cloud.certUntrusted"))
+        add_field = kv_get(&a->p, "url") ? "url" : kv_get(&a->p, "endpoint") ? "endpoint" : kv_get(&a->p, "host") ? "host" : NULL;
+    else if (!strcmp(code, "cloud.authFailed"))
+        add_field = kv_get(&a->p, "key_pem") ? "key_pem" : kv_get(&a->p, "user") ? "pass" : NULL;
     if (req) post_reply(req, err_msg_json(code, msg));
+    add_field = NULL;               /* only for the reply above */
+    pthread_mutex_lock(&cl_mu);
+    wipe_free(a->pend_sec);
+    a->pend_sec = NULL;
+    pthread_mutex_unlock(&cl_mu);
     if (a->new_acc) {
+        ct_forget(a);
         char body[64];
         cl_pf(body, sizeof body, "{\"name\":\"%s\"}", a->id);
         if (cl_running) rcs(RCM_DELETE, body, NULL, 0, RC_SHORT);
@@ -1309,13 +1339,48 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
         acc_free(a);
         pthread_mutex_unlock(&cl_mu);
     } else {
-        if (!a->mounted && cl_running) mount_acc(a);  /* as it was; the error says the new settings didn't take */
+        /* as it was: the credentials in the keyring (the new ones are only saved once they work), mounted again; the
+         * error says the new settings didn't take */
+        if (cl_running) bring_up_config(a);
+        if (!a->mounted && cl_running) mount_acc(a);
         pthread_mutex_lock(&cl_mu);
         cpy(a->err, sizeof a->err, code);
         cpy(a->message, sizeof a->message, msg);
         a->pending_req = 0;
         pthread_mutex_unlock(&cl_mu);
     }
+    cl_changed();
+}
+
+/* lists the account's top folder (folders only, no times): 0 it answered, -1 and rclone's words */
+static int verify_remote(Acc *a, char *msg, size_t mn) {
+    char body[160];
+    cl_pf(body, sizeof body, "{\"fs\":\"%s:\",\"remote\":\"\",\"opt\":{\"dirsOnly\":true,\"noModTime\":true,\"noMimeType\":true}}", a->id);
+    int st = rcs(RCM_LIST, body, msg, mn, 20000);
+    if (st == 200) return 0;
+    if (st < 0) cpy(msg, mn, "i/o timeout: no answer within 20 s");
+    return -1;
+}
+
+static int listing_code(const char *e) {
+    static const char *const c[] = { "cloud.authFailed", "cloud.unreachable", "cloud.badAddress", "cloud.certUntrusted", "cloud.hostKeyChanged",
+                                     "cloud.offline", "cloud.signInAgain", "cloud.listFailed", NULL };
+    for (int i = 0; c[i]; i++) if (!strcmp(e, c[i])) return 1;
+    return 0;
+}
+
+static void check_acc(Acc *a) {
+    char msg[256] = "";
+    int bad = verify_remote(a, msg, sizeof msg);
+    const char *c = bad ? cloud_failure_code(msg) : NULL;
+    pthread_mutex_lock(&cl_mu);
+    a->check_at = time(NULL) + (bad ? 120 : 600);
+    if (bad) {
+        cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
+        if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
+        cpy(a->message, sizeof a->message, msg);
+    } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; }
+    pthread_mutex_unlock(&cl_mu);
     cl_changed();
 }
 
@@ -1335,6 +1400,13 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
         add_failed(a, req, !strcmp(c, "cloud.failed") ? "cloud.addFailed" : c, msg);
         return;
     }
+    /* B4: before it counts, the account must answer: its top folder listed (rclone connects and signs in there) */
+    char vmsg[256] = "";
+    if (verify_remote(a, vmsg, sizeof vmsg)) {
+        const char *c = cloud_failure_code(vmsg);
+        add_failed(a, req, c ? c : "cloud.addFailed", vmsg);
+        return;
+    }
     pthread_mutex_lock(&cl_mu);
     a->pending_req = 0;
     a->new_acc = 0;
@@ -1348,13 +1420,51 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
     }
 }
 
+/* who the server is (cloud_trust.c), then config/create: a question for the person, or on to add_step. sec: the
+ * secrets given with add, kept (wiped after) while a trust question waits */
+static void add_continue(Acc *a, int req, const char *sec, int upd) {
+    char msg[256] = "", code[64] = "", *q = NULL;
+    if (ct_needed(a, sec)) {
+        int t = ct_check(a, sec, &q, code, sizeof code, msg, sizeof msg);
+        if (t == 1) {
+            pthread_mutex_lock(&cl_mu);
+            if (a->pend_sec != sec) wipe_free(a->pend_sec);
+            a->pend_sec = sec && a->pend_sec != sec ? strdup(sec) : a->pend_sec;
+            a->pend_upd = upd;
+            a->pending_req = 1;
+            pthread_mutex_unlock(&cl_mu);
+            if (req) post_reply(req, q); else free(q);
+            cl_changed();
+            return;
+        }
+        if (t < 0) {
+            if (!strcmp(code, "cloud.hostKeyChanged") || !strcmp(code, "cloud.certChanged")) {
+                /* both fingerprints, kept and now: msg is "old\tnew" (cloud_trust.c) */
+                char *tab = strchr(msg, '\t');
+                JBuf e;
+                jb_init(&e);
+                jb_raw(&e, "{\"error\":");
+                jb_str(&e, code);
+                if (tab) { *tab = 0; jb_raw(&e, ",\"old\":"); jb_str(&e, msg); jb_raw(&e, ",\"new\":"); jb_str(&e, tab + 1); }
+                jb_raw(&e, "}");
+                if (req) post_reply(req, e.oom ? (jb_free(&e), NULL) : e.p); else jb_free(&e);
+                add_failed(a, 0, code, tab ? tab + 1 : msg);
+                return;
+            }
+            add_failed(a, req, code[0] ? code : "cloud.addFailed", msg);
+            return;
+        }
+    }
+    int r = create_remote_q(a, sec, upd ? 2 : 1, msg, sizeof msg, &q);
+    add_step(a, req, r, q, msg);
+}
+
 static void job_add(Job *j) {
     Acc *a;
     pthread_mutex_lock(&cl_mu);
     a = cl_find(j->id);
     pthread_mutex_unlock(&cl_mu);
     if (!a) { if (j->req) post_reply(j->req, err_json("cloud.notFound")); return; }
-    char msg[256] = "", *q = NULL;
     int upd = j->flag;
     if (ensure_daemon()) { add_failed(a, j->req, "cloud.notRunning", ""); return; }
     if (upd) {
@@ -1365,8 +1475,7 @@ static void job_add(Job *j) {
         pthread_mutex_unlock(&cl_mu);
         if (!a->configured) bring_up_config(a);
     }
-    int r = create_remote_q(a, j->a, upd ? 2 : 1, msg, sizeof msg, &q);
-    add_step(a, j->req, r, q, msg);
+    add_continue(a, j->req, j->a, upd);
 }
 
 /* the answer to one of rclone's questions (17.2 item 3): config/update with continue, state and result */
@@ -1377,6 +1486,21 @@ static void job_answer(Job *j) {
     int waiting = a && a->pending_req;
     pthread_mutex_unlock(&cl_mu);
     if (!a || !waiting || !cl_running) { post_reply(j->req, err_json(!a ? "cloud.notFound" : !cl_running ? "cloud.notRunning" : "cloud.noQuestion")); return; }
+    if (!strcmp(j->a, "lordos-trust")) {
+        /* a host key or a certificate the person was shown (cloud_trust.c) */
+        int yes = j->b && (!strcmp(j->b, "trust") || !strcmp(j->b, "accept") || !strcmp(j->b, "yes") || !strcmp(j->b, "true"));
+        pthread_mutex_lock(&cl_mu);
+        char *sec = a->pend_sec;
+        int upd = a->pend_upd;
+        a->pend_sec = NULL;
+        a->pending_req = 0;
+        pthread_mutex_unlock(&cl_mu);
+        if (!yes || !a->trust_kind) { ct_refuse(a); wipe_free(sec); add_failed(a, j->req, yes ? "cloud.noQuestion" : "cloud.notTrusted", ""); return; }
+        if (ct_accept(a)) { wipe_free(sec); add_failed(a, j->req, "cloud.addFailed", "could not keep the key or certificate"); return; }
+        add_continue(a, j->req, sec, upd);
+        wipe_free(sec);
+        return;
+    }
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"name\":");
@@ -1420,6 +1544,7 @@ static void job_remove(Job *j) {
         if (a->configured) rcs(RCM_DELETE, body, NULL, 0, RC_SHORT);
     }
     remove_acc_files(a);
+    ct_forget(a);
     if (secrets) secrets->del(a->id);
     pthread_mutex_lock(&cl_mu);
     for (Link **l = &links; *l; ) {
@@ -1463,6 +1588,13 @@ static void job_rename(Job *j) {
     cl_changed();
 }
 
+/* backends whose links are presigned addresses, which can't be revoked, and whose CleanUp isn't a trash */
+static int presigned(const Acc *a) {
+    static const char *const t[] = { "s3", "oracleobjectstorage", "qingstor", NULL };
+    for (int i = 0; t[i]; i++) if (!strcmp(a->k->type, t[i])) return 1;
+    return 0;
+}
+
 static void job_link(Job *j, int unlink) {
     Acc *a;
     pthread_mutex_lock(&cl_mu);
@@ -1472,6 +1604,24 @@ static void job_link(Job *j, int unlink) {
     char arg[16] = "", msg[256];
     long long secs = 0;
     if (!unlink && cloud_expire(j->b, arg, sizeof arg, &secs)) { post_reply(j->req, err_json("cloud.badExpire")); return; }
+    if (unlink && presigned(a)) {
+        /* B8: an S3 link is a signed address: nothing on the server can take it back before it expires. It leaves the
+         * list, and the answer says when it stops working. */
+        long long exp = -1;
+        pthread_mutex_lock(&cl_mu);
+        for (Link **l = &links; *l; ) {
+            if (!strcmp((*l)->id, a->id) && !strcmp((*l)->rel, j->a)) { Link *x = *l; exp = x->expires; *l = x->next; free(x->rel); free(x->url); free(x); }
+            else l = &(*l)->next;
+        }
+        save_links();
+        pthread_mutex_unlock(&cl_mu);
+        char b[128];
+        if (exp > 0) cl_pf(b, sizeof b, "{\"error\":\"cloud.cantRevoke\",\"expires\":%lld}", exp);
+        else cl_pf(b, sizeof b, "{\"error\":\"cloud.cantRevoke\",\"expires\":null}");
+        post_reply(j->req, strdup(b));
+        cl_changed();
+        return;
+    }
     JBuf b;
     jb_init(&b);
     jb_printf(&b, "{\"fs\":\"%s:\",\"remote\":", a->id);
@@ -2048,11 +2198,19 @@ static void do_job(Job *j) {
     }
     case J_ADD: if (!ensure_daemon() && !nkinfo) free(load_providers()); job_add(j); break;
     case J_ANSWER: job_answer(j); break;
+    case J_ADDLATE: {
+        if (!ensure_daemon()) free(load_providers());
+        int r2 = 0;
+        char *res = nkinfo ? add_impl(j->d, j->a, j->c, j->b, &r2, j->req) : err_json(cl_running ? "cloud.notReady" : "cloud.notRunning");
+        if (res) post_reply(j->req, res);
+        break;
+    }
     case J_RETRY:
         if (!naccounts() || ensure_daemon()) break;
         for (int i = 0; i < ACC_MAX; i++) {
             Acc *a = &cl_acc[i];
-            if (!a->used || (j->id[0] && strcmp(a->id, j->id)) || (a->configured && a->mounted)) continue;
+            if (!a->used || (j->id[0] && strcmp(a->id, j->id))) continue;
+            if (a->configured && a->mounted) { a->check_at = 0; continue; }     /* listed again on the next tick */
             if (!strcmp(a->err, "cloud.addFailed") || a->pending_req || a->new_acc) continue;
             pthread_mutex_lock(&cl_mu);
             a->err[0] = a->message[0] = 0;
@@ -2139,6 +2297,8 @@ static void *worker(void *arg) {
             if (j->a) { explicit_bzero(j->a, strlen(j->a)); free(j->a); }
             if (j->b) explicit_bzero(j->b, strlen(j->b));   /* an answer may be a code or a password */
             free(j->b);
+            if (j->c) { explicit_bzero(j->c, strlen(j->c)); free(j->c); }   /* a deferred add's fields */
+            free(j->d);
             free(j);
             dmn.idle_since = time(NULL);
         }
@@ -2164,6 +2324,9 @@ static void *worker(void *arg) {
                     if (a->configured && t - a->tok_at >= 300) token_check(a);
                     if (a->mounted && t - a->about_at >= 1800) about_acc(a);
                     if (a->rcjob_kind) rcjob_poll(a);
+                    /* B6: a mount can be up while the provider refuses every listing (a certificate, a password that
+                     * changed): the top folder is listed after mounting and every 10 minutes (2 while it fails) */
+                    if (a->mounted && t >= a->check_at && !a->pending_req) check_acc(a);
                 }
             }
             if (now >= next_slow) {                 /* every minute */
@@ -2417,7 +2580,25 @@ void cloud_cancel_signin(const char *id) {
 }
 
 char *cloud_add(const char *kind, const char *name, const char *fields, const char *account_id, int *req) {
+    return add_impl(kind, name, fields, account_id, req, 0);
+}
+
+/* use_req > 0: called by the thread for an add that came before rclone's list of providers; the answer goes there */
+static char *add_impl(const char *kind, const char *name, const char *fields, const char *account_id, int *req, int use_req) {
     *req = 0;
+    pthread_mutex_lock(&cl_mu);
+    int known = nkinfo > 0;
+    pthread_mutex_unlock(&cl_mu);
+    if (!known && !use_req && cloud_available() && kind && name && fields) {
+        /* add before providers(): the thread asks rclone for the list first, then does it (no cloud.notReady) */
+        Job *j = new_job(J_ADDLATE, "", name, account_id);
+        if (!j) return err_json("cloud.failed");
+        j->c = strdup(fields);
+        j->d = strdup(kind);
+        j->req = *req = next_req();
+        push_job(j);
+        return NULL;
+    }
     pthread_mutex_lock(&cl_mu);
     const CloudKind *k = kind_get(kind);
     pthread_mutex_unlock(&cl_mu);
@@ -2515,7 +2696,7 @@ out:
     if (a && !res && !sec.oom) {
         /* the answer, { id } or one of rclone's questions, comes through reply(req) */
         Job *j = new_job(J_ADD, a->id, sec.p, NULL);
-        if (j) { j->flag = upd != NULL; j->req = *req = next_req(); push_job(j); }
+        if (j) { j->flag = upd != NULL; j->req = *req = use_req ? use_req : next_req(); push_job(j); }
         else res = err_json("cloud.failed");
     }
     if (!sec.oom) explicit_bzero(sec.p, sec.n);

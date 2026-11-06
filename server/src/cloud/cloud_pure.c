@@ -36,6 +36,7 @@ static const char *const methods[RCM_COUNT] = {
     [RCM_SIZE] = "operations/size",
     [RCM_JOB_STATUS] = "job/status",
     [RCM_JOB_STOP] = "job/stop",
+    [RCM_LIST] = "operations/list",
 };
 
 const char *rc_method_path(int m) { return m >= 0 && m < RCM_COUNT ? methods[m] : NULL; }
@@ -266,6 +267,43 @@ int cloud_internal_question(const char *opt) {
     return opt && (!strcmp(opt, "config_refresh_token") || !strcmp(opt, "config_is_local"));
 }
 
+static int ends(const char *s, const char *suf) { size_t a = strlen(s), b = strlen(suf); return a >= b && !strcmp(s + a - b, suf); }
+
+int cloud_option_refused(const char *n, const char *type) {
+    static const char *const no[] = {
+        "ssh", "server_command", "key_use_agent", "ssh_agent", "unix_socket", "known_hosts_file", "socks_proxy", "http_proxy",
+        "env_auth", "use_msi", "use_emulator", "use_az", "use_cli", "msi_object_id", "msi_client_id", "msi_mi_res_id",
+        "client_credentials", "auth_url", "token_url", "service_account_credentials", NULL };
+    static const char *const suffix[] = { "_command", "_file", "_path", "_socket", "_dir", "_cmd", "_exec", "_agent", NULL };
+    static const char *const types[] = { "string", "int", "bool", "SizeSuffix", "Duration", "Tristate", "float64", "CommaSepList",
+                                         "Encoding", "Bits", "Time", NULL };
+    if (!n || !cloud_key_ok(n) || !strncmp(n, "config_", 7)) return 1;
+    for (int i = 0; no[i]; i++) if (!strcmp(n, no[i])) return 1;
+    for (int i = 0; suffix[i]; i++) if (ends(n, suffix[i])) return 1;
+    if (!type) return 1;
+    for (int i = 0; types[i]; i++) if (!strcmp(type, types[i])) return 0;
+    return 1;                                       /* SpaceSepList (sftp's ssh), stringArray, anything new */
+}
+
+const char *cloud_failure_code(const char *m) {
+    static const char *const auth[] = { "unable to authenticate", "decryption password incorrect", "incorrect password",
+        "passphrase", "bad decrypt", "401", "403", "Unauthorized", "Forbidden", "authentication", "permission denied",
+        "invalid credentials", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "login failed", "wrong password",
+        "no supported methods remain", "couldn't decrypt", "failed to parse private key", "cannot decode encrypted private keys", NULL };
+    static const char *const net[] = { "connection refused", "i/o timeout", "no route to host", "no such host", "network is unreachable",
+        "connection reset", "deadline exceeded", "timeout", "host is down", "EOF", NULL };
+    static const char *const addr[] = { "unsupported protocol scheme", "invalid URL", "missing port", "too many colons", "invalid port",
+        "first path segment in URL", "missing protocol scheme", "invalid character", "parse \"", NULL };
+    if (!m || !m[0]) return NULL;
+    if (strstr(m, "knownhosts: key mismatch") || strstr(m, "host key mismatch") || strstr(m, "REMOTE HOST IDENTIFICATION HAS CHANGED")) return "cloud.hostKeyChanged";
+    if (strstr(m, "decryption password incorrect") || strstr(m, "passphrase")) return "cloud.authFailed";   /* a key's, not TLS */
+    if (strstr(m, "x509:") || strstr(m, "failed to verify certificate") || strstr(m, "certificate signed by unknown authority")) return "cloud.certUntrusted";
+    for (int i = 0; addr[i]; i++) if (strstr(m, addr[i])) return "cloud.badAddress";
+    for (int i = 0; auth[i]; i++) if (strstr(m, auth[i])) return "cloud.authFailed";
+    for (int i = 0; net[i]; i++) if (strstr(m, net[i])) return "cloud.unreachable";
+    return NULL;
+}
+
 int cloud_answer_state(const char *s, char *id, size_t n, const char **state) {
     const char *c = s ? strchr(s, ':') : NULL;
     if (!c || c == s || (size_t)(c - s) >= n || !c[1] || strlen(c + 1) > 512) return -1;
@@ -291,7 +329,7 @@ int cloud_field_hidden(const CloudKind *k, const char *f) {
 
 int cloud_url_ok(const char *u) {
     size_t n = u ? strlen(u) : 0;
-    if (n < 9 || n > 300 || strncmp(u, "https://", 8) || u[8] == '/' || u[8] == '-') return 0;
+    if (n < 9 || n > 4096 || strncmp(u, "https://", 8) || u[8] == '/' || u[8] == '-') return 0;
     for (; *u; u++) if (*u <= ' ' || *u >= 0x7f || *u == '"' || *u == '\'' || *u == '\\' || *u == '<' || *u == '>' || *u == '`') return 0;
     return 1;
 }

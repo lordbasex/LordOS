@@ -40,6 +40,7 @@ typedef struct {
     int timeout_ms;         /* then SIGKILL, and -1 */
     int offline;            /* no TCP at all */
     int any_status;         /* its exit status doesn't count */
+    const char *scope;      /* NULL: RCONNECT_SCOPE; Cloud's checks run in CLOUD_SCOPE */
 } RconnectRun;
 int   rconnect_run(const RconnectRun *job);                    /* bytes of output, -1 failed or out of time */
 

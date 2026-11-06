@@ -806,3 +806,44 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
 - **Provider names**: an account's line uses the provider list's short label (asked once in the background when the pane
   opens), else rclone's description cut before "including"; it is cut with an ellipsis where it doesn't fit.
 - **Measure** shows for a connected account whose provider gives no total, `about` null included (S3).
+
+**From the end-to-end tests (2026-11-06, B3–B9):**
+
+12. **Options JS may set (B5, 4.2).** Only an allow-list per kind: rclone's non-advanced, non-hidden options of that
+    backend, minus every option `cloud_option_refused` catches, which is applied again to whatever goes to `config/create`:
+    names ending `_command`, `_file`, `_path`, `_socket`, `_dir`, `_cmd`, `_exec` or `_agent`; `ssh` (sftp's external ssh
+    command), `server_command`, `key_use_agent`, `ssh_agent`, `unix_socket`, `known_hosts_file` (LordOS sets it, item 14),
+    `env_auth`, `use_msi`, `use_az`, `use_cli`, the proxies, `auth_url`, `token_url`, `client_credentials`, every `config_*`;
+    and every option whose type isn't plain data (string, int, bool, size, duration, tristate, float, comma list, encoding,
+    bits, time): sftp's `ssh` is a `SpaceSepList`. Keys go as content (`key_pem`). `cloud.add('sftp', …, { ssh: 'sh -c …' })`
+    answers `{ error: 'cloud.badField', field: 'ssh' }` and runs nothing; of rclone 1.75.2's 59 kinds and 187 offered
+    fields none matches those patterns (`cloud_integration.sh`).
+13. **A new account must answer (B4).** Before `{ id }`, its top folder is listed (`operations/list`, folders only, 20 s). On
+    failure the account is removed whole (rclone's remote, the trust files; nothing was saved yet) and the answer is
+    `cloud.authFailed`, `cloud.unreachable`, `cloud.badAddress`, `cloud.certUntrusted`, `cloud.hostKeyChanged` or
+    `cloud.addFailed` with rclone's `message`, and `field` where one is to blame (`url`, `endpoint`, `host`, `pass`,
+    `key_pem`). An update keeps the account and its old credentials (from the keyring) and reports the same. A mounted account
+    is listed again after mounting, every 10 minutes (2 while it fails) and on `retry(id)`, and its `state`/`error` follow
+    (B6: a password changed on the server shows `cloud.authFailed` without a restart).
+14. **Who the server is (B9, B6; `cloud_trust.c`).** As Connect to Server: SFTP keys read with `ssh-keyscan`, a new one
+    answered as `{ question: { state, kind: 'hostKey', host, port, fingerprint } }`; `answer(state, 'trust')` keeps it in
+    `~/.config/lordos/cloud/known_hosts/<id>` (0600) and rclone always gets `known_hosts_file` pointing there (no more "No host
+    key validation"); a changed key answers `{ error: 'cloud.hostKeyChanged', old, new }`. An https address (WebDAV, S3's
+    endpoint…) whose certificate the system doesn't trust answers `{ question: { state, kind: 'certificate', host, port,
+    fingerprint, subject, issuer } }`; trusted, it is kept in `~/.config/lordos/cloud/certs/<id>.pem` (0600) and given to that
+    account alone as rclone's `override.ca_cert` (measured: another account on the same server is asked again;
+    `no_check_certificate` is never used); a changed one answers `{ error: 'cloud.certChanged', old, new }`; one that doesn't
+    name the host is `cloud.certUntrusted`. Any other answer than `trust` is `cloud.notTrusted`. `ssh-keyscan`, `ssh-keygen`
+    and `openssl` run through `rconnect_run` in Cloud's scope (read-only, 15 s, no TCP for the offline ones).
+15. **Rename in a mount (B7).** FUSE (rclone's mounts, also Connect to Server's) refuses `RENAME_NOREPLACE` with `EINVAL`:
+    `fsops_rename` then checks that nothing is at the target and does a plain `rename`; another program creating the
+    target in those microseconds would be replaced, only on those filesystems.
+16. **Links (B8).** Addresses up to 4096 characters (presigned links). Stop Sharing on S3-style backends (`s3`,
+    `oracleobjectstorage`, `qingstor`) answers `{ error: 'cloud.cantRevoke', expires }` (ms, or null) and drops the link from
+    `links.json`: a presigned address can't be withdrawn before it expires. Their `trashSupported` is false (CleanUp there
+    removes unfinished uploads, not a trash).
+17. **`add` before `providers()`** asks rclone for the list itself instead of answering `cloud.notReady`.
+18. **Recents and search (B3).** `fs_recent` and `fs_search` skip every mount point under the home folder by path (from
+    `/proc/self/mounts`, before any `lstat`) and stay on the home's filesystem; `fs_du` and the Trash's size stay on theirs.
+    Measured: with the WebDAV server of a mounted account stopped (`SIGSTOP`), Recents and search answer at once and list
+    nothing from `~/Cloud`.
