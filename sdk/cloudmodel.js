@@ -170,11 +170,12 @@ export function groupProviders(list, query = '', expanded = []) {
 
 // the provider tile's letter: its label's first letters ("S3", "B2" keep their digits)
 export function providerMark(label) {
-  const s = String(label || '').trim();
-  const m = /^([A-Za-z])[A-Za-z]*\s*([0-9])/.exec(s);
-  if (m) return `${m[1].toUpperCase()}${m[2]}`;
-  const ch = [...s][0] || '?';
-  return ch;
+  const words = String(label || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  const last = words[words.length - 1];
+  if (/^[A-Za-z][0-9]$/.test(last)) return last.toUpperCase();          // "Backblaze B2" → B2
+  if (/^[A-Za-z][0-9]/.test(words[0])) return words[0].slice(0, 2).toUpperCase();   // "S3" → S3
+  return [...words[0]][0];
 }
 const MARK_COLORS = ['#0a84ff', '#2f6fd6', '#17a2b8', '#e5484d', '#d9822b', '#30d158', '#5e5ce6', '#8e8e93', '#ff9f0a', '#e0413a', '#bf5af2'];
 export const providerColor = (p) => {
