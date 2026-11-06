@@ -48,35 +48,38 @@ static UINT queued_ms(void) {
     return (UINT)(n / (AR_RATE * 4 / 1000));
 }
 
-/* How much sound may wait in the ring. Servers send a little faster than the output plays, and a burst at the start:
- * with no limit the ring filled up (1.3 s behind the picture) and every packet after that lost its tail to a full
- * ring, a click each time. Over RD_HIGH_MS whole packets are skipped until the ring is down to RD_LOW_MS: one clean
- * jump, then quiet. */
-#define RD_HIGH_MS 300
-#define RD_LOW_MS  120
+/* How much sound may wait in the ring. The remote computer's clock and the output's never agree exactly (measured on
+ * the Pi with a USB adapter: 48010 Hz in, 47897 Hz out, 0.24 %), and servers send a burst at the start. With no limit
+ * the ring filled up (1.3 s behind the picture) and every packet lost its tail to a full ring: clicks. So the
+ * resampler runs a little faster or slower to keep the ring between RD_LOW_MS and RD_HIGH_MS (RD_TRIM, 0.4 %, about
+ * 7 cents: not heard), and only past RD_DROP_MS (the start's burst, a stall) are whole packets skipped, down to
+ * RD_HIGH_MS. */
+#define RD_LOW_MS  100
+#define RD_HIGH_MS 200
+#define RD_DROP_MS 500
+#define RD_TRIM    0.004
 static int skipping;
 
 static UINT play(rdpsndDevicePlugin *d, const BYTE *data, size_t size) {
     LordSnd *s = (LordSnd *)d;
     if (!rd_audio_ring || !data) return 0;
     UINT q = queued_ms();
-    if (q > RD_HIGH_MS) skipping = 1;
-    else if (q < RD_LOW_MS) skipping = 0;
+    if (q > RD_DROP_MS) skipping = 1;
+    else if (q < RD_HIGH_MS) skipping = 0;
     if (skipping) return q;
     int ch = s->fmt.nChannels;
     size_t frames = size / (2u * (size_t)ch);
     const int16_t *in = (const int16_t *)data;
     int16_t out[2048 * 2];
     size_t o = 0;
-    if (s->fmt.nSamplesPerSec == 48000) {
-        for (size_t i = 0; i < frames; i++) {
-            out[o++] = in[i * ch];
-            out[o++] = in[i * ch + (ch - 1)];
-            if (o == sizeof out / sizeof out[0]) { ar_write(rd_audio_ring, out, o * 2); o = 0; }
-        }
-    } else {
-        /* 44.1 → 48 kHz: each output sample lies between input frames k-1 and k (k = 0: the last of the previous packet) */
-        const double step = 44100.0 / 48000.0;
+    {
+        /* to 48 kHz: each output sample lies between input frames k-1 and k (k = 0: the last of the previous packet);
+         * a longer step uses up the input sooner, so fewer samples go into the ring */
+        static double avg = -1;         /* packets come in bursts: steer by the average, not by each one */
+        avg = avg < 0 ? q : avg + ((double)q - avg) * 0.05;
+        double step = (double)s->fmt.nSamplesPerSec / 48000.0;
+        if (avg > RD_HIGH_MS) step *= 1.0 + RD_TRIM;
+        else if (avg < RD_LOW_MS) step *= 1.0 - RD_TRIM;
         double p = s->phase;
         while (p < (double)frames) {
             size_t k = (size_t)p;
