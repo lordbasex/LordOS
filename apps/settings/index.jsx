@@ -949,7 +949,8 @@ export default function Settings() {
         </View>
         <ScrollView resetKey={section} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: spacing.xxl, paddingTop: spacing.xl, alignItems: 'center' }}>
-            <View style={{ width: '100%', maxWidth: 680 }}>
+            {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
+            <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
             </View>
           </View>

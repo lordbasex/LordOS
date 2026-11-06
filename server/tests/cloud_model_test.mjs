@@ -415,7 +415,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('notes before a provider', [M.notesFor('iclouddrive').length, M.notesFor('webdav')], [3, []]);
   const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
   eq('the notes are in the catalog', M.notesFor('iclouddrive').every((k) => k.slice(6) in cat), true);
-  eq('measure', [M.canMeasure({ used: 5 }), M.canMeasure({ used: 5, total: 9 }), M.canMeasure(null)], [true, false, true]);
+  eq('measure: only an answer without a total', [M.canMeasure({ used: 5 }), M.canMeasure({ used: 5, total: 9 }), M.canMeasure(null)], [true, false, false]);
   eq('measured line', [M.measuredLine({ used: 7 }, String, () => 'x'), M.measuredLine({ used: 7e9, measuredAt: 1.7e12 }, (n) => `${n / 1e9} GB`, () => 'today')],
     [null, { key: 'cloud.measure.done', vars: { used: '7 GB', when: 'today' } }]);
   const accs = [acc('1', 'Work', { provider: 'pCloud', trashSupported: true }), acc('2', 'NAS', { provider: 'WebDAV' })];
@@ -437,6 +437,43 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('the sign-in waits inline in the pane, not in a sheet', [/v\.signin \? <SignInCard/.test(src), /kind: 'signin'/.test(src)], [true, false]);
   eq('every sign-in goes through one guarded start', [(src.match(/cloud\.beginSignIn\(/g) || []).length, /if \(signinStarting\) return;/.test(src)], [1, true]);
   eq('the page isn\'t opened again on start (only by its button)', (src.match(/cloud\.openSignInPage\(/g) || []).length, 1);
+}
+
+
+// ---- the credentials form, an account that isn't connected (the Pi test) ----
+{
+  const F = (name, o = {}) => ({ name, label: '', help: '', secret: false, required: false, default: '', examples: [], ...o });
+  eq('short labels from rclone\'s help', [M.shortLabel('Raw PEM-encoded private key.\n\nIf specified, will override key_file.', 'key_pem'),
+    M.shortLabel('When set forces the usage of the ssh-agent.', 'key_use_agent'), M.shortLabel('SSH host to connect to.\n\nE.g. "example.com".', 'host'),
+    M.shortLabel('', 'odd'), M.shortLabel('Path to PEM-encoded private key file (leave blank or set key-use-agent to use ssh-agent).', 'key_file')],
+    ['Raw PEM-encoded private key', 'When set forces the usage of the ssh-agent', 'SSH host to connect to', 'odd', 'Path to PEM-encoded private key file']);
+  eq('only a password is masked (Sensitive host and user stay plain)', [M.fieldInput(F('host', { secret: true, isPassword: false })).input, M.fieldInput(F('user', { secret: true, isPassword: false })).input,
+    M.fieldInput(F('pass', { secret: true, isPassword: true })).input, M.fieldInput(F('pass', { secret: true })).input, M.fieldInput(F('host', { secret: true })).input], ['text', 'text', 'password', 'password', 'text']);
+  eq('switches, menus, numbers', [M.fieldInput(F('a', { type: 'bool' })).input, M.fieldInput(F('a', { default: 'false' })).input, M.fieldInput(F('a', { examples: ['x', 'y', 'z'] })),
+    M.fieldInput(F('a', { type: 'int' })).input], ['bool', 'bool', { input: 'choice', options: ['x', 'y', 'z'] }, 'number']);
+  const sftp = { kind: 'sftp', fields: ['host', 'user', 'port', 'pass', 'key_pem', 'key_file', 'key_file_pass', 'pubkey', 'key_use_agent', 'use_insecure_cipher', 'disable_hashcheck', 'ssh'].map((n) => F(n, { required: n === 'host' })) };
+  const L = M.formLayout(sftp);
+  eq('SFTP: Server, Port, User, then the sign-in choice; the rest is advanced', [L.main.map((f) => f.name), L.auth, L.advanced.map((f) => f.name)],
+    [['host', 'port', 'user'], { password: 'pass', key: 'key_pem', passphrase: 'key_file_pass' }, ['key_file', 'pubkey', 'key_use_agent', 'use_insecure_cipher', 'disable_hashcheck', 'ssh']]);
+  const s3 = { kind: 's3', fields: ['provider', 'env_auth', 'access_key_id', 'secret_access_key', 'region', 'endpoint', 'acl'].map((n) => F(n)) };
+  eq('S3: provider, endpoint, region, the keys', M.formLayout(s3).main.map((f) => f.name), ['provider', 'endpoint', 'region', 'access_key_id', 'secret_access_key']);
+  eq('WebDAV', M.formLayout({ kind: 'webdav', fields: ['url', 'vendor', 'user', 'pass', 'bearer_token'].map((n) => F(n)) }).main.map((f) => f.name), ['url', 'vendor', 'user', 'pass']);
+  const other = { kind: 'koofr', fields: [F('mountid', { default: 'x' }), F('user', { required: true }), F('password', { required: true, secret: true }), F('setmtime', { default: 'true' }), F('endpoint')] };
+  eq('another kind: required ones and those without a default (no switches)', [M.formLayout(other).main.map((f) => f.name), M.formLayout(other).advanced.map((f) => f.name)], [['user', 'password', 'endpoint'], ['mountid', 'setmtime']]);
+  eq('a key for rclone: one line', M.pemForRclone('-----BEGIN OPENSSH PRIVATE KEY-----\r\nabc\ndef\n-----END OPENSSH PRIVATE KEY-----\n'), '-----BEGIN OPENSSH PRIVATE KEY-----\\nabc\\ndef\\n-----END OPENSSH PRIVATE KEY-----');
+  const running = { service: { running: true } }, stopped = { service: { running: false } };
+  const locked = { error: 'cloud.keyringLocked', state: 'locked', about: null };
+  eq('"the service isn\'t running" only when it isn\'t', [M.explainError('cloud.notRunning', running, locked), M.explainError('cloud.notRunning', running, {}), M.explainError('cloud.notRunning', stopped, locked),
+    M.explainError('cloud.measureFailed', running, locked), M.explainError(null, running, locked)], ['cloud.keyringLocked', 'cloud.notConnected', 'cloud.notRunning', 'cloud.measureFailed', null]);
+  eq('space: a quota, no quota (Measure), not connected (its reason), not known yet', [M.spaceState({ about: { total: 9, used: 1 } }), M.spaceState({ about: { used: 1 } }), M.spaceState(locked), M.spaceState({ about: null })],
+    ['quota', 'noQuota', 'reason', 'unknown']);
+  eq('no Measure without an answer', [M.canMeasure(locked.about), M.canMeasure({ used: 1 })], [false, true]);
+  eq('unlock', [M.needsUnlock(locked), M.needsUnlock({ state: 'ok' }), M.needsUnlock({ state: 'locked' })], [true, false, true]);
+  const src = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
+  eq('Unlock Keyring… uses the system prompt; the menu bar panel too', [/askKeyringUnlock\(\)/.test(src), /askKeyringUnlock\(\)/.test(fs.readFileSync(path.join(root, 'sdk/cloudstatus.jsx'), 'utf8'))], [true, true]);
+  eq('after unlocking: cloud.retry, no restart', [/askKeyringUnlock\(\)\.then\(\(ok\) => \{ if \(ok\) cloud\.retry\(null\)/.test(src), /cloud\.restart\(\);\n/.test(src.split('function unlockKeyring')[1].split('}')[0])], [true, false]);
+  eq('Sign In Again names the account by its id (17.2 item 10)', [/accountId: a\.id \}, p \|\|/.test(src), /again: true, accountId: a\.id/.test(src), /sheet\.accountId \? \{ accountId: sheet\.accountId \}/.test(src)], [true, true, true]);
+  eq('the form\'s body scrolls between its fixed title and buttons', /<ScrollView style=\{\{ maxHeight: Math\.max\(180, frameH - 220\) \}\}>/.test(src), true);
 }
 
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----

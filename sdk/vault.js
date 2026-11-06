@@ -134,7 +134,13 @@ export async function autofillReveal(id) {
 
 // ---- system prompt: unlock the keyring (Secret Service asked for it) ----
 
-const prompts = createStore([]);          // [{ prompt }]
+const prompts = createStore([]);          // [{ prompt }] from the Secret Service, or [{ local: resolve }] (askKeyringUnlock)
+
+// An app asks the person to unlock the keyring (Cloud's accounts when the session logged in without a password): the
+// same prompt as the Secret Service's. → Promise<boolean>, true once it is unlocked.
+export function askKeyringUnlock() {
+  return new Promise((resolve) => prompts.set((q) => [...q, { local: resolve }]));
+}
 if (has()) {
   onVaultEvent((ev) => {
     if (ev.ev === 'ss-prompt') prompts.set((q) => [...q, { prompt: ev.prompt }]);
@@ -150,13 +156,16 @@ export function KeyringPrompt() {
   const cur = q[0];
   // a new prompt clears the field; more of them queuing up behind it doesn't (they used to wipe what
   // was being typed)
-  useEffect(() => { setPw(''); setErr(''); }, [cur?.prompt]);
+  useEffect(() => { setPw(''); setErr(''); }, [cur?.prompt, cur?.local]);
   if (!q.length) return null;
   // every queued prompt asks for the same keyring: one answer goes to all of them, so Cancel doesn't
   // bring the same box back once per request an app made
   const done = (ok) => {
     const all = prompts.get();
-    for (const p of all) { try { lord.vault.promptDone(p.prompt, ok); } catch (e) { /* */ } }
+    for (const p of all) {
+      if (p.local) { p.local(!!ok); continue; }
+      try { lord.vault.promptDone(p.prompt, ok); } catch (e) { /* */ }
+    }
     prompts.set((l) => l.filter((p) => !all.includes(p)));
   };
   const submit = async () => {

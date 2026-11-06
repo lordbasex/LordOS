@@ -133,7 +133,9 @@ static JSValue f_add(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, s);
     const char *acc = argc > 3 ? prop(c, argv[3], "accountId") : NULL;
     int req = 0;
-    JSValue r = k && n && f ? req_or(c, cloud_add(k, n, f, acc, &req), req) : err(c, "cloud.badArgument");
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = (k && n && f) ? cloud_add(k, n, f, acc, &req) : NULL;
+    JSValue r = (k && n && f) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, k); fr(c, n); fr(c, f); fr(c, acc);
     return r;
 }
@@ -224,7 +226,9 @@ static JSValue f_link(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     (void)t;
     const char *p = arg(c, argc, argv, 0), *e = arg(c, argc, argv, 1);
     int req = 0;
-    JSValue r = p ? req_or(c, cloud_link(p, e ? e : "never", &req), req) : err(c, "cloud.badArgument");
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = (p) ? cloud_link(p, e ? e : "never", &req) : NULL;
+    JSValue r = (p) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, p); fr(c, e);
     return r;
 }
@@ -233,7 +237,9 @@ static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     (void)t;
     const char *st = arg(c, argc, argv, 0), *v = arg(c, argc, argv, 1);
     int req = 0;
-    JSValue r = st && v ? req_or(c, cloud_answer(st, v, &req), req) : err(c, "cloud.badArgument");
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = (st && v) ? cloud_answer(st, v, &req) : NULL;
+    JSValue r = (st && v) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, st); fr(c, v);      /* not wiped: it may be the JS string's own memory */
     return r;
 }
@@ -241,7 +247,9 @@ static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 static JSValue acc_call(JSContext *c, int argc, JSValueConst *argv, char *(*fn)(const char *, int *)) {
     const char *id = arg(c, argc, argv, 0);
     int req = 0;
-    JSValue r = id ? req_or(c, fn(id, &req), req) : err(c, "cloud.badArgument");
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = (id) ? fn(id, &req) : NULL;
+    JSValue r = (id) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, id);
     return r;
 }
@@ -255,7 +263,9 @@ static JSValue f_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     int n = argc ? paths_of(c, argv[0], &p) : -1;
     if (n < 0) return err(c, "cloud.badArgument");
     int req = 0;
-    JSValue r = req_or(c, cloud_delete(p, n, &req), req);
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = cloud_delete(p, n, &req);
+    JSValue r = req_or(c, res_, req);
     paths_free(c, p, n);
     return r;
 }
@@ -264,7 +274,9 @@ static JSValue f_unlink(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     (void)t;
     const char *p = arg(c, argc, argv, 0);
     int req = 0;
-    JSValue r = p ? req_or(c, cloud_unlink(p, &req), req) : err(c, "cloud.badArgument");
+    /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
+    char *res_ = (p) ? cloud_unlink(p, &req) : NULL;
+    JSValue r = (p) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, p);
     return r;
 }

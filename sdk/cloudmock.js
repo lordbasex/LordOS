@@ -25,7 +25,16 @@ const FIELDS = {
   webdav: [F('url', 'Server', { required: true, examples: ['https://cloud.example.test/remote.php/dav/files/ana'] }),
     F('vendor', 'Preset', { default: 'nextcloud', examples: ['nextcloud', 'owncloud', 'other'] }), F('user', 'User', { required: true }),
     F('pass', 'App password', { secret: true, required: true })],
-  sftp: [F('host', 'Server', { required: true }), F('user', 'User'), F('port', 'Port', { default: '22' }), F('pass', 'Password', { secret: true })],
+  // as lord-server lists them (17.2): rclone's help, Sensitive host and user (secret) but only the passwords isPassword
+  sftp: [F('host', 'SSH host to connect to.', { required: true, secret: true, isPassword: false, help: 'SSH host to connect to.\n\nE.g. "example.com".' }),
+    F('user', 'SSH username.', { secret: true, isPassword: false, help: 'SSH username.' }), F('port', 'SSH port number.', { default: '22', type: 'int', help: 'SSH port number.' }),
+    F('pass', 'SSH password, leave blank to use ssh-agent.', { secret: true, isPassword: true }), F('key_pem', 'Raw PEM-encoded private key.', { secret: true, isPassword: false }),
+    F('key_file', 'Path to PEM-encoded private key file.', { help: 'Path to PEM-encoded private key file.\n\nLeave blank or set key-use-agent to use ssh-agent.' }),
+    F('key_file_pass', 'The passphrase to decrypt the PEM-encoded private key file.', { secret: true, isPassword: true }),
+    F('key_use_agent', 'When set forces the usage of the ssh-agent.', { default: 'false', type: 'bool', help: 'When set forces the usage of the ssh-agent.\n\nWhen key-file is also set, the ".pub" file of the specified key-file is read and only the associated key is requested from the ssh-agent.' }),
+    F('use_insecure_cipher', 'Enable the use of insecure ciphers and key exchange methods.', { default: 'false', type: 'bool' }),
+    F('disable_hashcheck', 'Disable the execution of SSH commands to determine if remote file hashing is available.', { default: 'false', type: 'bool' }),
+    F('shell_type', 'The type of SSH shell on remote server, if any.', { examples: ['none', 'unix', 'powershell', 'cmd'] })],
   smb: [F('host', 'Server', { required: true }), F('user', 'User'), F('pass', 'Password', { secret: true })],
   ftp: [F('host', 'Server', { required: true }), F('user', 'User'), F('pass', 'Password', { secret: true })],
   mega: [F('user', 'Email', { required: true }), F('pass', 'Password', { secret: true, required: true })],
@@ -118,6 +127,10 @@ export function installCloudMock(home, scenario = '') {
     push();
   }, 1000);
 
+  // scenario 'locked' (settings "cloudDevMock": "locked"): the session logged in without a password, the keyring is locked
+  if (scenario === 'locked') {
+    for (const a of st.accounts.slice(0, 2)) { a.state = 'locked'; a.error = 'cloud.keyringLocked'; a.about = null; a.up = { files: 0, bytes: 0, done: 0 }; a.down = { files: 0, bytes: 0, done: 0 }; }
+  }
   if (scenario === 'states') {
     st.accounts[3].state = 'ok';
     setTimeout(() => {
@@ -256,6 +269,7 @@ export function installCloudMock(home, scenario = '') {
     resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; push(); },
     setOptions(o) { Object.assign(st.options, o); push(); },
     setAccountOptions(id, o) { const a = find(id); if (a) { a.options = { ...(a.options || {}), ...o }; push(); } },
+    retry(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'locked') { a.state = 'ok'; delete a.error; a.about = { used: 1 }; } push(); },
     restart() { st.service.uptimeS = 0; st.service.restarts++; push(); },
     showLog: () => {},
   };

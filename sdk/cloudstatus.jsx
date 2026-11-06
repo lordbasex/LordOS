@@ -21,6 +21,7 @@ import { cloud, cloudState } from './cloud.js';
 import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, transitions as transitionsOf } from './cloudmodel.js';
 import { CloudGlyph, AccountBadge } from './cloudui.jsx';
 import { installCloudMock } from './cloudmock.js';
+import { askKeyringUnlock } from './vault.js';
 
 const openSettings = (page) => wm.open('settings', { args: { section: 'cloud', page, nonce: Date.now() } });
 const openFiles = (path, select) => wm.open('files', { new: true, args: { path, ...(select ? { select } : {}), nonce: Date.now() } });
@@ -57,7 +58,11 @@ function Panel({ st, onClose }) {
         h(AccountBadge, { color: accountColor(accs, a.id), size: 30 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 1 } },
           h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
-          h(Text, { style: { fontSize: 12, color: ToneColor(th, line.tone), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, text)));
+          h(Text, { style: { fontSize: 12, color: ToneColor(th, line.tone), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, text)),
+        // a locked keyring: unlock it from here (the system's keyring prompt)
+        a.error === 'cloud.keyringLocked' || a.state === 'locked' ? h(View, { onClick: (e) => { e.stopPropagation?.(); onClose(); askKeyringUnlock().then((ok) => { if (ok) cloud.retry(null); }); },
+          style: { height: 24, paddingHorizontal: 10, borderRadius: th.controlRadiusSmall, justifyContent: 'center', backgroundColor: th.accent } },
+        h(Text, { style: { fontSize: 12, fontWeight: 600, color: '#fff' } }, t('cloud.unlock'))) : null);
       })),
     rows.length ? h(View, { style: { borderTopWidth: 1, borderTopColor: th.separator, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 } },
       h(Text, { style: { fontSize: 11, fontWeight: 600, color: th.textDim, textAlign: 'start' } }, t('cloud.recent'))) : null,
@@ -130,7 +135,7 @@ export function startCloud() {
   // development only: the stand-in for lord.cloud (cloudmock.js)
   try {
     const dev = settings.get().cloudDevMock;
-    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || dev === 'states' || dev === 'providersFail')) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
+    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || ['states', 'providersFail', 'locked'].includes(dev))) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
   } catch (e) { console.log(`cloud mock: ${e}`); }
   let prev = cloudState.get();
   cloudState.subscribe(() => {

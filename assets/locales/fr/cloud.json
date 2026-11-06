@@ -327,5 +327,22 @@
   "ownApp.ownLine": "Votre propre application sur le site développeurs de {provider} : son quota n’est qu’à vous. Il vous faudra son ID client et son secret.",
   "ownApp.redirect": "Adresse de redirection : {redirect}",
   "ownApp.copied": "Adresse de redirection copiée",
-  "close": "Fermer"
+  "close": "Fermer",
+  "unlock": "Déverrouiller le trousseau…",
+  "unlockWhy": "Vos connexions sont gardées dans le trousseau, qui reste verrouillé quand vous ouvrez la session sans mot de passe.",
+  "space.notConnected": "L’espace s’affiche une fois le compte connecté.",
+  "advancedOptions": "Options avancées",
+  "save": "Enregistrer",
+  "rename": "Renommer",
+  "sftp.signInWith": "Se connecter avec",
+  "sftp.key": "Clé SSH",
+  "sftp.keyFile": "Fichier de clé",
+  "sftp.noKey": "Aucune clé choisie",
+  "sftp.chooseFile": "Choisir…",
+  "sftp.keyHint": "Un fichier de clé privée, en général dans ~/.ssh. Son contenu va dans le trousseau ; le fichier n’est plus nécessaire ensuite.",
+  "sftp.passphrase": "Phrase secrète de la clé",
+  "sftp.pickKey": "Choisissez votre clé privée",
+  "sftp.notKey": "Ce fichier n’est pas une clé privée.",
+  "sftp.chooseKey": "Choisissez un fichier de clé.",
+  "field.domain": "Domaine"
 }

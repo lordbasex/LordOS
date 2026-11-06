@@ -6,7 +6,7 @@
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, systemInfo, lordosVersion,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -83,7 +83,12 @@ const measureRev = createStore(0);
 const startMeasure = (id) => {
   measuring.set(id, {});
   measureRev.set((x) => x + 1);
-  cloud.measure(id).then((r) => { if (measuring.has(id)) { if (r && r.error) measuring.set(id, { error: r.error, done: true }); else measuring.delete(id); measureRev.set((x) => x + 1); } });
+  cloud.measure(id).then((r) => {
+    if (!measuring.has(id)) return;
+    const st = cloudState.get(), acc = (st.accounts || []).find((x) => x.id === id);
+    if (r && r.error) measuring.set(id, { error: M.explainError(r.error, st, acc), done: true }); else measuring.delete(id);
+    measureRev.set((x) => x + 1);
+  });
 };
 const stopMeasure = (id) => { cloud.cancelMeasure(id); measuring.delete(id); measureRev.set((x) => x + 1); };
 function MeasureRow({ a }) {
@@ -108,6 +113,26 @@ function MeasureRow({ a }) {
         </View>
       )}
       {m && m.error ? <Text style={{ fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{errorText(m.error)}</Text> : null}
+    </View>
+  );
+}
+
+// Unlock Keyring… (an account's error cloud.keyringLocked): the system's keyring prompt; once it is unlocked lord-server
+// connects the waiting accounts at once (lord-server hears the vault's unlock too; cloud.retry asks it now, 17.2 item 8)
+export function unlockKeyring() {
+  return askKeyringUnlock().then((ok) => { if (ok) cloud.retry(null); return ok; });
+}
+function UnlockRow({ a, small }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  if (!M.needsUnlock(a)) return null;
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: tint.warn, textAlign: 'start' }}>{tr('cloud.state.locked')}</Text>
+        <Button small primary label={tr('cloud.unlock')} onClick={unlockKeyring} />
+      </View>
+      {small ? null : <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.unlockWhy')}</Dim>}
     </View>
   );
 }
@@ -154,6 +179,7 @@ function AccountRow({ a, accounts, last }) {
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: toneColor(t, line.tone === 'warn' ? 'warn' : 'dim'), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr(line.key, line.vars)}</Text>
         </View>
       </View>
+      {M.needsUnlock(a) ? <View onClick={(e) => e.stopPropagation?.()}><Button small label={tr('cloud.unlock')} onClick={unlockKeyring} /></View> : null}
       <View style={{ width: 190, gap: 5 }}>
         <SpaceBar parts={u ? [{ frac: u.pct != null ? u.pct : 0.02, color }] : []} />
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{(() => {
@@ -246,7 +272,16 @@ function SpaceCard({ a, accounts }) {
   const u = M.usage(a.about);
   const color = M.accountColor(accounts, a.id);
   const parts = M.ringParts(a.about, color);
-  if (!u) return <View style={[box(t), { padding: 18, gap: 8 }]}><Dim t={t}>{tr('cloud.space.unknown')}</Dim><MeasureRow a={a} /></View>;
+  if (!u) {
+    const why = M.spaceState(a) === 'reason';
+    return (
+      <View style={[box(t), { padding: 18, gap: 8 }]}>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.space.title')}</Text>
+        <Dim t={t}>{tr(why ? 'cloud.space.notConnected' : 'cloud.space.unknown')}</Dim>
+        {/* the reason itself (and Unlock Keyring…) is said once, in the account's status box */}
+      </View>
+    );
+  }
   return (
     <View aria-label={tr('cloud.space.title')} style={[box(t), { padding: 18, flexDirection: 'row', gap: 22, alignItems: 'center' }]}>
       {parts ? (
@@ -338,31 +373,53 @@ function LinksList({ a }) {
   );
 }
 
+// The account's name (its folder in ~/Cloud): a click makes it a field; Enter, Save or a click elsewhere saves it
+// (cloud.rename), Escape leaves it; a problem shows under the field.
 function NameField({ a, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [edit, setEdit] = useState(null);
   const [err, setErr] = useState('');
+  const box = useRef(null);
+  const editRef = useRef(null);
+  editRef.current = edit;
   const save = () => {
-    const n = (edit || '').trim();
-    if (n === a.name) { setEdit(null); return; }
+    const n = (editRef.current || '').trim();
+    if (editRef.current == null) return;
+    if (n === a.name) { setEdit(null); setErr(''); return; }
     const bad = M.nameProblem(n, accounts, a.id);
     if (bad) { setErr(tr(`cloud.name.${bad}`)); return; }
     const r = cloud.rename(a.id, n);
     if (r && r.error) { setErr(errorText(r.error)); return; }
     setEdit(null); setErr('');
   };
+  // a click outside the field saves it, as leaving a field does
+  useEffect(() => {
+    if (edit == null) return undefined;
+    return addListener('pointerdown', (e) => {
+      const n = box.current;
+      if (!n) return;
+      const [x, y, w, h] = lord.getLayout(n.id);
+      if (e.x < x || e.x > x + w || e.y < y || e.y > y + h) save();
+    });
+  }, [edit == null]);
   if (edit != null) {
     return (
-      <View style={{ width: 150, gap: 2 }}>
-        <TextInput autoFocus selectAll value={edit} onChange={(v) => { setEdit(v.slice(0, M.NAME_MAX)); setErr(''); }} onSubmit={save} onCancel={() => { setEdit(null); setErr(''); }} />
+      <View ref={box} style={{ width: 210, gap: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <TextInput autoFocus selectAll value={edit} onChange={(v) => { setEdit(v.slice(0, M.NAME_MAX)); setErr(''); }} onSubmit={save} onCancel={() => { setEdit(null); setErr(''); }} />
+          </View>
+          <Button small primary label={tr('cloud.save')} onClick={save} />
+        </View>
         {err ? <Text style={{ fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
       </View>
     );
   }
   return (
-    <View onClick={() => setEdit(a.name)} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: t.control }}>
+    <View onClick={() => setEdit(a.name)} title={tr('cloud.rename')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: t.control }}>
       <Text style={{ fontSize: typeScale.callout, color: t.text }}>{a.name}</Text>
+      <Text style={{ fontSize: 11, color: t.textDim }}>✎</Text>
     </View>
   );
 }
@@ -397,7 +454,7 @@ function Options({ a, accounts }) {
 
 // The choice for a browser sign-in (docs/CLOUD.md 19): rclone's app (the default) or the person's own app, its client ID
 // and secret (to beginSignIn's { clientId, clientSecret }, kept in the keyring), why, and rclone's page on making one.
-function OwnAppChoice({ p, value, onChange }) {
+function OwnAppChoice({ p, value, onChange, row }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const v = value || { own: false, id: '', secret: '' };
@@ -414,7 +471,7 @@ function OwnAppChoice({ p, value, onChange }) {
     const on = !!v.own === own;
     return (
       <View role="radio" aria-checked={on ? 'true' : 'false'} onClick={() => { if (!on) set({ own }); }}
-        style={{ padding: 12, gap: 10, borderRadius: 10, border: `1px solid ${on ? t.accent : t.separator}`,
+        style={{ flex: row ? 1 : undefined, minWidth: 0, padding: 12, gap: 10, borderRadius: 10, border: `1px solid ${on ? t.accent : t.separator}`,
           backgroundColor: on ? (t.mode === 'dark' ? '#16335a' : '#dcebff') : t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
           <View style={{ width: 16, height: 16, marginTop: 1, borderRadius: 8, border: `1.5px solid ${on ? t.accent : t.textDim}`, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -437,7 +494,7 @@ function OwnAppChoice({ p, value, onChange }) {
     );
   };
   return (
-    <View role="radiogroup" aria-label={tr('cloud.ownApp.title')} style={{ gap: 8 }}>
+    <View role="radiogroup" aria-label={tr('cloud.ownApp.title')} style={{ gap: 8, flexDirection: row ? 'row' : 'column', alignItems: row ? 'flex-start' : 'stretch' }}>
       {card(false, tr('cloud.ownApp.rclone'), tr('cloud.ownApp.rcloneLine', { provider: label }), tr('cloud.ownApp.recommended'))}
       {card(true, tr('cloud.ownApp.own'), tr('cloud.ownApp.ownLine', { provider: label }), null, (
         <>
@@ -519,7 +576,7 @@ function CheckAccount({ a, st, p, verified }) {
 }
 
 // Advanced: Check This Account (for a verified provider: to report a problem) and, for a browser sign-in, the person's own app.
-function Advanced({ a, st, p, verified }) {
+function Advanced({ a, st, p, verified, wide }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [open, setOpen] = useState(false);
@@ -541,7 +598,7 @@ function Advanced({ a, st, p, verified }) {
         <View style={{ gap: 6 }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownApp.title')}</Text>
           {a.ownClient ? <Dim t={t}>{tr('cloud.ownApp.inUse')}</Dim> : null}
-          <OwnAppChoice p={p || { kind: a.kind }} value={own} onChange={setOwn} />
+          <OwnAppChoice p={p || { kind: a.kind }} value={own} onChange={setOwn} row={wide} />
           <Actions>
             <Button small label={tr('cloud.signInAgain')} disabled={own.own && !own.id} onClick={() => beginAgain(a, p, ownOpts(own))} />
           </Actions>
@@ -559,16 +616,17 @@ export function startSignIn(kind, name, own, provider) {
   if (signinStarting) return;
   const cur = cloudState.get().signin;
   const same = cur && cur.phase === 'waiting' && cur.kind === kind && String(cur.name || '').toLowerCase() === String(name).toLowerCase() && M.toMs(cur.expiresAt) > Date.now();
-  if (same) { setView({ sheet: null, signin: { provider, name, kind } }); return; }
+  if (same) { setView({ sheet: null, signin: { provider, name, kind, own } }); return; }
   if (cur && cur.phase === 'waiting') cloud.cancelSignIn(cur.id);
   signinStarting = true;
-  setView({ sheet: null, signin: { provider, name, kind, starting: true } });
+  setView({ sheet: null, signin: { provider, name, kind, own, starting: true } });
   let r;
   try { r = cloud.beginSignIn(kind, name, own || {}); } finally { signinStarting = false; }
-  setView({ sheet: null, signin: { provider, name, kind, id: r && r.id, error: r && r.error } });
+  setView({ sheet: null, signin: { provider, name, kind, own, id: r && r.id, error: r && r.error } });
 }
 function beginAgain(a, p, own = {}) {
-  startSignIn(a.kind, a.name, own, p || { kind: a.kind, label: a.provider });
+  // { accountId }: exactly this account, whatever its name now (17.2 item 10)
+  startSignIn(a.kind, a.name, { ...own, accountId: a.id }, p || { kind: a.kind, label: a.provider });
 }
 // Sign In Again: the browser for an OAuth account (with the own-app choice first for a provider not verified yet, or
 // when the account already uses its own app), the credentials form for the others (the same name updates it).
@@ -581,7 +639,7 @@ function signInAgain(a) {
     return;
   }
   // the form needs the provider's fields: from rclone's list (asked now if this session hasn't yet)
-  const open = (q) => { if (q && (q.fields || []).length) setView({ sheet: { kind: 'cred', provider: q, name: a.name, again: true } }); };
+  const open = (q) => { if (q && (q.fields || []).length) setView({ sheet: { kind: 'cred', provider: q, name: a.name, again: true, accountId: a.id } }); };
   if (p && (p.fields || []).length) open(p);
   else loadProviders().then(() => open(providerOf(a.kind)), () => {});
 }
@@ -620,30 +678,41 @@ function AccountPage({ a, st }) {
   const verified = typeof (providerCache.get().find((x) => x.kind === a.kind) || {}).verified === 'boolean'
     ? providerCache.get().find((x) => x.kind === a.kind).verified : M.isVerified(a.kind, CLOUD_PROVIDERS);
   const line = M.stateLine(a);
-  const wide = (wm.frame(wm.get(win.id) || {}).w || 880) >= 860;
-  const side = (
-    <View aria-label={tr('cloud.options')} style={{ width: wide ? 280 : undefined, gap: 12 }}>
+  const stateText = tr(line.key, line.vars);
+  const errText = a.error && !M.needsUnlock(a) ? errorText(M.explainError(a.error, st, a)) : '';
+  // two balanced columns once the window is wide enough, one column otherwise
+  const wide = (wm.frame(wm.get(win.id) || {}).w || 880) >= 900;
+  const left = (
+    <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
+      <SpaceCard a={a} accounts={accs} />
+      <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
+      <LinksList a={a} />
       {verified ? null : (
         <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 6, border: `1px solid ${t.accent}` }]}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.check.title')}</Text>
           <CheckAccount a={a} st={st} p={p} verified={false} />
         </View>
       )}
+    </View>
+  );
+  const right = (
+    <View aria-label={tr('cloud.options')} style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 12 }}>
       <Options a={a} accounts={accs} />
       <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 4 }]}>
-        <Dim t={t}>{a.provider || a.kind}</Dim>
-        <Dim t={t} style={{ color: toneColor(t, line.tone) }}>{tr(line.key, line.vars)}</Dim>
-        <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
+        <Dim t={t}>{`${a.provider || a.kind} · ${verified ? tr('cloud.verified.yes') : tr('cloud.verified.no')}`}</Dim>
+        {/* the state once (Unlock Keyring… says it for a locked keyring), the account's own error only when it says more */}
+        {M.needsUnlock(a) ? <UnlockRow a={a} /> : <Dim t={t} style={{ color: toneColor(t, line.tone) }}>{stateText}</Dim>}
+        {errText && errText !== stateText ? <Dim t={t} style={{ color: tint.warn }}>{errText}</Dim> : null}
         <Dim t={t}>{last ? tr('cloud.lastSynced', { when: (() => { const g = M.ago(last.at); return tr(g.key, g.vars); })() }) : tr('cloud.notSyncedYet')}</Dim>
-        {a.error ? <Dim t={t} style={{ color: tint.warn }}>{errorText(a.error)}</Dim> : null}
-        <Dim t={t}>{verified ? tr('cloud.verified.yes') : tr('cloud.verified.no')}</Dim>
+        <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
       </View>
-      <Button label={tr('cloud.signInAgain')} onClick={() => signInAgain(a)} />
-      <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ height: 30, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>
-        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#fff' }}>{tr('cloud.remove')}</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button label={tr('cloud.signInAgain')} style={{ flex: 1 }} onClick={() => signInAgain(a)} />
+        <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ flex: 1, height: 28, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#fff' }}>{tr('cloud.remove')}</Text>
+        </View>
       </View>
       <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.removeHint')}</Dim>
-      <Advanced a={a} st={st} p={p} verified={verified} />
     </View>
   );
   return (
@@ -657,13 +726,10 @@ function AccountPage({ a, st }) {
         <Button label={tr('cloud.showInFiles')} onClick={() => wm.open('files', { new: true, args: { path: a.mount, nonce: Date.now() } })} />
       </View>
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: 20, alignItems: 'flex-start' }}>
-        <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
-          <SpaceCard a={a} accounts={accs} />
-          <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
-          <LinksList a={a} />
-        </View>
-        {wide ? side : <View style={{ alignSelf: 'stretch' }}>{side}</View>}
+        {left}
+        {right}
       </View>
+      <Advanced a={a} st={st} p={p} verified={verified} wide={wide} />
     </Stack>
   );
 }
@@ -828,75 +894,169 @@ function AddSheet({ st }) {
 
 // ---- a server's or a bucket's credentials (mock Credentials) ----
 
-// a field's label: ours for the usual rclone option names, else the provider list's own
-const fieldLabel = (f) => tOptional(`cloud.field.${f.name}`) || f.label || f.name;
+// a field's label: ours for the usual rclone option names, else the first clause of rclone's help (never the raw sentence)
+const fieldLabel = (f) => tOptional(`cloud.field.${f.name}`) || M.shortLabel(f.help || f.label, f.name);
 
+// One field of a provider's form, by its kind (M.fieldInput): a masked field only for a password, a switch for a
+// yes/no, a menu for rclone's choices, else text
+function FieldControl({ f, value, onChange, onSubmit }) {
+  const how = M.fieldInput(f);
+  if (how.input === 'bool') {
+    const on = String(value || f.default || 'false') === 'true';
+    return <Toggle small on={on} onChange={(v) => onChange(v ? 'true' : 'false')} />;
+  }
+  if (how.input === 'choice') {
+    const opts = [...new Set([...how.options, ...(value ? [value] : [])])].map((x) => [x, x]);
+    return how.options.length <= 4
+      ? <Segmented small fill value={value || how.options[0]} onChange={onChange} options={opts.map(([v]) => [v, v.charAt(0).toUpperCase() + v.slice(1)])} />
+      : <PopUp width={250} value={value || how.options[0]} onChange={onChange} options={opts} />;
+  }
+  return <TextInput secure={how.input === 'password'} value={value || ''} placeholder={f.examples && f.examples[0] && how.input !== 'password' ? String(f.examples[0]) : ''}
+    style={{ direction: 'ltr' }} onChange={onChange} onSubmit={onSubmit} />;
+}
+
+// A server's or a bucket's form: the essential fields (M.formLayout), SFTP's sign-in (a password, or a key read from a
+// file and sent as key_pem, so rclone never needs the file), and the rest under Advanced options. Its body scrolls
+// inside the Settings window; the title and Back / Connect stay.
 function CredSheet({ st, sheet }) {
   const t = useTheme();
   const { t: tr } = useLocale();
+  const win = useAppWindow();
+  const frameH = (wm.frame(wm.get(win.id) || {}).h) || 600;
   const p = sheet.provider;
+  const layout = M.formLayout(p);
   const [vals, setVals] = useState(() => M.formValues(p));
   const [name, setName] = useState(sheet.name || '');
   const [err, setErr] = useState(null);       // { text, field }
   const [busy, setBusy] = useState(false);
+  const [adv, setAdv] = useState(false);
+  const [auth, setAuth] = useState('password');
+  const [keyFile, setKeyFile] = useState('');
+  const [picking, setPicking] = useState(false);
+  const set = (k, v) => { setVals((o) => ({ ...o, [k]: v })); setErr(null); };
   const back = () => setView({ sheet: sheet.again ? null : { kind: 'add' } });
+  const pickKey = (path) => {
+    setPicking(false);
+    if (!path) return;
+    try {
+      const text = lord.fs.read(path, 'text');
+      if (!/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) { setErr({ text: tr('cloud.sftp.notKey'), field: '__key' }); return; }
+      setKeyFile(path); set(layout.auth.key, M.pemForRclone(text));
+    } catch (e) { setErr({ text: errorText(e), field: '__key' }); }
+  };
   const connect = () => {
-    const miss = M.missingField(p, vals);
-    if (miss) { setErr({ text: tr('cloud.field.required'), field: miss }); return; }
+    const v = { ...vals };
+    if (layout.auth) {
+      if (auth === 'password') { delete v[layout.auth.key]; delete v[layout.auth.passphrase]; }
+      else { delete v[layout.auth.password]; if (!v[layout.auth.key]) { setErr({ text: tr('cloud.sftp.chooseKey'), field: '__key' }); return; } }
+    }
+    const miss = M.missingField(p, v);
+    if (miss && !(layout.auth && Object.values(layout.auth).includes(miss))) { setErr({ text: tr('cloud.field.required'), field: miss }); if (layout.advanced.some((f) => f.name === miss)) setAdv(true); return; }
     const bad = sheet.again ? null : M.nameProblem(name, st.accounts);
     if (bad) { setErr({ text: tr(`cloud.name.${bad}`), field: '__name' }); return; }
     setBusy(true);
-    Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, vals))).then((r) => {
+    Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v), sheet.accountId ? { accountId: sheet.accountId } : {})).then((r) => {
       setBusy(false);
-      if (r && r.error) { setErr({ text: errorText(r.error), field: r.field || null }); return; }
+      if (r && r.error) { setErr({ text: errorText(r.error), field: r.field || null }); if (r.field && layout.advanced.some((f) => f.name === r.field)) setAdv(true); return; }
       afterAdd(r, p, name.trim());
     });
   };
   const notes = M.notesFor(p.kind);
   const note = p.group === 'object' ? tr('cloud.cred.noteObject') : p.group === 'crypt' ? tr('cloud.cred.noteCrypt') : tr('cloud.cred.noteServer');
-  const field = (key, label, input) => (
-    <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <Text style={{ width: 120, fontSize: typeScale.body, color: t.textDim, textAlign: 'end' }}>{label}</Text>
-      <View style={{ flex: 1, minWidth: 0, borderRadius: 8, border: err && err.field === key ? `1px solid ${tint.error}` : '1px solid transparent' }}>{input}</View>
+  const row = (key, label, input, help) => (
+    <View key={key} style={{ gap: 3 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Text style={{ width: 130, fontSize: typeScale.body, color: t.textDim, textAlign: 'end' }}>{label}</Text>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', borderRadius: 8, border: err && err.field === key ? `1px solid ${tint.error}` : '1px solid transparent' }}>{input}</View>
+      </View>
+      {help ? <Text style={{ marginInlineStart: 140, fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{help}</Text> : null}
     </View>
   );
+  const control = (f) => <FieldControl f={f} value={vals[f.name]} onChange={(x) => set(f.name, x)} onSubmit={connect} />;
+  const fieldRow = (f) => row(f.name, fieldLabel(f), <View style={{ flex: 1, minWidth: 0 }}>{control(f)}</View>);
+  // an advanced option: its short label (a switch beside it), the control under it, rclone's whole help dimmed below
+  const advRow = (f) => {
+    const bool = M.fieldInput(f).input === 'bool';
+    const help = String(f.help || '').trim();
+    return (
+      <View key={f.name} style={{ gap: 4, paddingVertical: 4, borderRadius: 8, border: err && err.field === f.name ? `1px solid ${tint.error}` : '1px solid transparent' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{fieldLabel(f)}</Text>
+          {bool ? control(f) : null}
+        </View>
+        {bool ? null : control(f)}
+        {help ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{help}</Text> : null}
+        <Text style={{ fontSize: 10, color: t.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' }}>{f.name}</Text>
+      </View>
+    );
+  };
+  const byName = (n) => (p.fields || []).find((f) => f.name === n);
   return (
-    <Sheet width={460} top={40} onClose={back} label={p.label}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 8 }}>
-        <View style={{ width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: M.providerColor(p) }}>
-          <Text style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{p.group === 'crypt' ? '◆' : M.providerMark(p.label)}</Text>
+    <>
+      <Sheet width={500} top={24} onClose={back} label={p.label}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: t.separator }}>
+          <View style={{ width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: M.providerColor(p) }}>
+            <Text style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{p.group === 'crypt' ? '◆' : M.providerMark(p.label)}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{p.label}</Text>
+            {p.description || p.hint ? <Dim t={t}>{p.description || p.hint}</Dim> : null}
+          </View>
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{p.label}</Text>
-          {p.description || p.hint ? <Dim t={t}>{p.description || p.hint}</Dim> : null}
+        <ScrollView style={{ maxHeight: Math.max(180, frameH - 220) }}>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 12, gap: 10 }}>
+            {notes.length ? (
+              <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 4, borderRadius: 8, border: `1px solid ${tint.warn}` }}>
+                <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.notes.before', { provider: p.label })}</Text>
+                {notes.map((k) => <Dim key={k} t={t}>{`• ${tr(k)}`}</Dim>)}
+              </View>
+            ) : null}
+            {layout.main.map((f) => fieldRow(f))}
+            {layout.auth ? (
+              <>
+                {row('__auth', tr('cloud.sftp.signInWith'), <Segmented small fill value={auth} onChange={(x) => { setAuth(x); setErr(null); }}
+                  options={[['password', tr('cloud.field.password')], ['key', tr('cloud.sftp.key')]]} />)}
+                {auth === 'password'
+                  ? (byName(layout.auth.password) ? fieldRow(byName(layout.auth.password)) : null)
+                  : (
+                    <>
+                      {row('__key', tr('cloud.sftp.keyFile'), (
+                        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: keyFile ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', direction: 'ltr', textAlign: 'start' }}>
+                            {keyFile ? keyFile.split('/').pop() : tr('cloud.sftp.noKey')}</Text>
+                          <Button small label={tr('cloud.sftp.chooseFile')} onClick={() => setPicking(true)} />
+                        </View>
+                      ), tr('cloud.sftp.keyHint'))}
+                      {byName(layout.auth.passphrase) ? row(layout.auth.passphrase, tr('cloud.sftp.passphrase'),
+                        <View style={{ flex: 1, minWidth: 0 }}><TextInput secure value={vals[layout.auth.passphrase] || ''} onChange={(x) => set(layout.auth.passphrase, x)} onSubmit={connect} /></View>) : null}
+                    </>
+                  )}
+              </>
+            ) : null}
+            {sheet.again ? null : row('__name', tr('cloud.accountName'), <View style={{ flex: 1, minWidth: 0 }}><TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setErr(null); }} onSubmit={connect} /></View>)}
+            {layout.advanced.length ? (
+              <View style={{ gap: 10, marginTop: 4 }}>
+                <View onClick={() => setAdv(!adv)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 10, color: t.textDim }}>{adv ? '▼' : direction() === 'rtl' ? '◀' : '▶'}</Text>
+                  <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.advancedOptions')}</Text>
+                  <Dim t={t}>{String(layout.advanced.length)}</Dim>
+                </View>
+                {adv ? layout.advanced.map(advRow) : null}
+              </View>
+            ) : null}
+            <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
+              <Dim t={t}>{note}</Dim>
+            </View>
+          </View>
+        </ScrollView>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: t.separator }}>
+          <Text style={{ flex: 1, fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err ? err.text : ''}</Text>
+          <Button label={tr('cloud.back')} onClick={back} />
+          <Button primary label={tr(busy ? 'cloud.connecting' : 'cloud.connect')} disabled={busy} onClick={connect} />
         </View>
-      </View>
-      {notes.length ? (
-        <View style={{ marginHorizontal: 20, marginTop: 4, paddingHorizontal: 12, paddingVertical: 10, gap: 4, borderRadius: 8, border: `1px solid ${tint.warn}` }}>
-          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.notes.before', { provider: p.label })}</Text>
-          {notes.map((k) => <Dim key={k} t={t}>{`• ${tr(k)}`}</Dim>)}
-        </View>
-      ) : null}
-      <View style={{ paddingHorizontal: 20, paddingVertical: 8, gap: 10 }}>
-        {(p.fields || []).map((f) => field(f.name, fieldLabel(f),
-          // a choice among a few of the provider's examples (a preset, a service), else a text field; secrets masked
-          // (a segmented control: a pop-up's list would open under the sheet's layer)
-          !f.secret && (f.examples || []).length > 1 && f.examples.length <= 4
-            ? <Segmented small fill value={vals[f.name] || String(f.examples[0])} onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }}
-              options={f.examples.map(String).map((x) => [x, x.charAt(0).toUpperCase() + x.slice(1)])} />
-            : <TextInput secure={!!f.secret} value={vals[f.name] || ''} placeholder={f.examples && f.examples[0] ? String(f.examples[0]) : ''} style={{ direction: 'ltr' }}
-              onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }} onSubmit={connect} />))}
-        {sheet.again ? null : field('__name', tr('cloud.accountName'), <TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setErr(null); }} onSubmit={connect} />)}
-      </View>
-      <View style={{ marginHorizontal: 20, marginTop: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
-        <Dim t={t}>{note}</Dim>
-      </View>
-      {err ? <Text style={{ marginHorizontal: 20, marginTop: 8, fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err.text}</Text> : null}
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18 }}>
-        <Button label={tr('cloud.back')} onClick={back} />
-        <Button primary label={tr(busy ? 'cloud.connecting' : 'cloud.connect')} disabled={busy} onClick={connect} />
-      </View>
-    </Sheet>
+      </Sheet>
+      {picking ? <FilePicker title={tr('cloud.sftp.pickKey')} start=".ssh" onClose={() => setPicking(false)} onPick={(x) => pickKey([].concat(x)[0])} /> : null}
+    </>
   );
 }
 
@@ -960,7 +1120,7 @@ function EmptyTrashSheet({ st, sheet }) {
   if (!a) return null;
   const go = () => {
     setBusy(true);
-    cloud.emptyTrash(a.id).then((r) => { setBusy(false); setMsg(r && r.error ? { ok: false, text: errorText(r.error) } : { ok: true, text: tr('cloud.trash.done', { provider: a.provider || a.kind }) }); });
+    cloud.emptyTrash(a.id).then((r) => { setBusy(false); setMsg(r && r.error ? { ok: false, text: errorText(M.explainError(r.error, cloudState.get(), a)) } : { ok: true, text: tr('cloud.trash.done', { provider: a.provider || a.kind }) }); });
   };
   return (
     <Sheet width={400} onClose={close} label={tr('cloud.trash.empty')}>
@@ -1046,7 +1206,7 @@ function SignInCard({ st, info }) {
       <Actions>
         <Button label={tr(failed ? 'cloud.close' : 'cloud.cancel')} onClick={cancel} />
         {failed
-          ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => startSignIn(info.kind || p.kind, info.name, {}, p)} />
+          ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => startSignIn(info.kind || p.kind, info.name, info.own || {}, p)} />
           : <Button primary label={tr('cloud.signin.again')} disabled={!si || info.starting} onClick={() => si && cloud.openSignInPage(si.id)} />}
       </Actions>
       <Dim t={t} style={{ fontSize: typeScale.caption, lineHeight: 1.5 }}>{tr('cloud.signin.rclone')}</Dim>

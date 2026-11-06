@@ -327,5 +327,22 @@
   "ownApp.ownLine": "La tua app sul sito per sviluppatori di {provider}: la sua quota è solo tua. Ti serviranno il suo ID client e il segreto.",
   "ownApp.redirect": "Indirizzo di reindirizzamento: {redirect}",
   "ownApp.copied": "Indirizzo di reindirizzamento copiato",
-  "close": "Chiudi"
+  "close": "Chiudi",
+  "unlock": "Sblocca portachiavi…",
+  "unlockWhy": "I tuoi accessi sono nel portachiavi, che resta bloccato quando entri senza password.",
+  "space.notConnected": "Lo spazio compare quando l’account è connesso.",
+  "advancedOptions": "Opzioni avanzate",
+  "save": "Salva",
+  "rename": "Rinomina",
+  "sftp.signInWith": "Accedi con",
+  "sftp.key": "Chiave SSH",
+  "sftp.keyFile": "File della chiave",
+  "sftp.noKey": "Nessuna chiave scelta",
+  "sftp.chooseFile": "Scegli…",
+  "sftp.keyHint": "Un file di chiave privata, di solito in ~/.ssh. Il contenuto va nel portachiavi; il file poi non serve più.",
+  "sftp.passphrase": "Passphrase della chiave",
+  "sftp.pickKey": "Scegli la tua chiave privata",
+  "sftp.notKey": "Quel file non è una chiave privata.",
+  "sftp.chooseKey": "Scegli un file di chiave.",
+  "field.domain": "Dominio"
 }

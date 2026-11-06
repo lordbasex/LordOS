@@ -327,5 +327,22 @@
   "ownApp.ownLine": "Your own app on {provider}'s developer site: its quota is yours alone. You'll need its client ID and secret.",
   "ownApp.redirect": "Redirect address: {redirect}",
   "ownApp.copied": "Redirect address copied",
-  "close": "Close"
+  "close": "Close",
+  "unlock": "Unlock Keyring…",
+  "unlockWhy": "Your sign-ins are kept in the keyring, which locks when you log in without a password.",
+  "space.notConnected": "The space shows once the account is connected.",
+  "advancedOptions": "Advanced options",
+  "save": "Save",
+  "rename": "Rename",
+  "sftp.signInWith": "Sign in with",
+  "sftp.key": "SSH key",
+  "sftp.keyFile": "Key file",
+  "sftp.noKey": "No key chosen",
+  "sftp.chooseFile": "Choose…",
+  "sftp.keyHint": "A private key file, usually in ~/.ssh. What it holds goes to the keyring; the file itself isn't needed afterwards.",
+  "sftp.passphrase": "Key passphrase",
+  "sftp.pickKey": "Choose your private key",
+  "sftp.notKey": "That file isn't a private key.",
+  "sftp.chooseKey": "Choose a key file.",
+  "field.domain": "Domain"
 }
