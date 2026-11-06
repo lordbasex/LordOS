@@ -3,7 +3,8 @@
  *
  *   - Messages (D-Bus specification 0.41): fixed header + a(yv) fields + body, per-type
  *     alignment, little endian when writing and both orders when reading. Types: y b n q i u x t d s
- *     o g a ( ) { } v (no h: fds are not passed).
+ *     o g a ( ) { } v, and h (a file descriptor's index) only on a connection opened with
+ *     dbus_open_fds: every other connection refuses a message that carries fds.
  *   - Strict reading: dbus_msg_parse validates EVERYTHING before delivering the message (lengths, signatures,
  *     depth, NUL-terminated strings with no embedded NUL, booleans 0/1, object paths,
  *     zero alignment and padding, 128 MiB cap). After that the typed reader (DRd) only reads
@@ -21,6 +22,7 @@
 
 #define DBUS_MAX_MSG    (128u * 1024 * 1024)
 #define DBUS_MAX_DEPTH  32               /* nested containers (the specification allows 64) */
+#define DBUS_MAX_FDS    4                /* fds one message may carry (dbus_open_fds connections only) */
 
 enum { DBUS_CALL = 1, DBUS_RETURN = 2, DBUS_ERROR = 3, DBUS_SIGNAL = 4 };
 enum { DBUS_NO_REPLY = 1, DBUS_NO_AUTOSTART = 2 };
@@ -34,14 +36,23 @@ typedef struct {
     uint32_t body_len;
     uint8_t *raw;                        /* malloc; dbus_msg_free wipes it */
     size_t raw_len;
+    /* the fds that came with it (dbus_open_fds connections only): fds[i] for i < n_fds, closed by
+     * dbus_msg_free; a handler that keeps one dups it */
+    int fds[DBUS_MAX_FDS];
+    int n_fds;
 } DMsg;
 
 /* Total length of the message starting at buf (at least 16 bytes), 0 if more bytes are needed to know
  * or -1 if the header is invalid or exceeds the cap. */
 long dbus_msg_size(const uint8_t *buf, size_t len);
-/* Validates and builds m from a COPY of buf[0..len) (len = dbus_msg_size). 0 ok. */
+/* Validates and builds m from a COPY of buf[0..len) (len = dbus_msg_size). 0 ok. A message that says it
+ * carries fds is refused. */
 int  dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m);
-void dbus_msg_free(DMsg *m);
+/* The same, allowing up to max_fds fds (*declared: how many it says it carries; the caller attaches
+ * them). */
+int  dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int *declared);
+void dbus_msg_free(DMsg *m);                     /* also closes its fds */
+void dbus_msg_drop_fds(DMsg *m);                 /* closes its fds now (a message that should carry none) */
 
 /* Standalone validations */
 int  dbus_sig_valid(const char *sig);            /* complete signature (several types), ≤ 255 */
@@ -112,6 +123,8 @@ typedef struct {
     uint8_t *in; size_t in_n, in_cap;
     uint8_t *out; size_t out_n, out_off, out_cap;
     int dead;
+    int unix_fds;                        /* the bus agreed to pass fds (dbus_open_fds) */
+    int fdq[DBUS_MAX_FDS], fdq_n;        /* fds received and not yet given to a message */
 } DConn;
 
 /* Connects (without authenticating) to the session bus: DBUS_SESSION_BUS_ADDRESS (unix:path= or
@@ -122,7 +135,10 @@ int  dbus_connect_system(void);
 /* SASL EXTERNAL + Hello over a connected socket (waits up to timeout_ms). Leaves the fd
  * non-blocking. 0 ok. */
 int  dbus_open(DConn *c, int fd, int timeout_ms);
-void dbus_close(DConn *c);                        /* closes the fd and wipes the buffers */
+/* The same, also asking the bus to pass fds (NEGOTIATE_UNIX_FD): replies may then carry them (logind's
+ * Inhibit, hw/sleeplock.c). Without the bus's agreement it works as dbus_open. */
+int  dbus_open_fds(DConn *c, int fd, int timeout_ms);
+void dbus_close(DConn *c);                        /* closes the fd (and fds received) and wipes the buffers */
 /* Queues a message (h->serial is filled in if 0) and tries to send it. Returns the serial or 0. */
 uint32_t dbus_send(DConn *c, DHdr *h, const DBuf *body);
 int  dbus_flush(DConn *c);                        /* sends what it can; -1 if disconnected */

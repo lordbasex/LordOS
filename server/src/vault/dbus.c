@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
@@ -18,12 +19,12 @@ static int align_of(char c) {
     switch (c) {
     case 'y': case 'g': case 'v': return 1;
     case 'n': case 'q': return 2;
-    case 'b': case 'i': case 'u': case 's': case 'o': case 'a': return 4;
+    case 'b': case 'i': case 'u': case 'h': case 's': case 'o': case 'a': return 4;
     case 'x': case 't': case 'd': case '(': case '{': return 8;
     default: return 0;
     }
 }
-static int is_basic(char c) { return c && strchr("ybnqiuxtdsog", c) != NULL; }
+static int is_basic(char c) { return c && strchr("ybnqiuxtdsogh", c) != NULL; }
 
 static int sig_one(const char *s, size_t *n, int depth, int in_array) {
     if (depth > DBUS_MAX_DEPTH) return -1;
@@ -150,7 +151,7 @@ static int v_type(V *v, const char *sig, size_t *used, int depth) {
         v->pos += 4;
         return 0;
     }
-    case 'i': case 'u': if (v_align(v, 4) || v->pos + 4 > v->len) return -1; v->pos += 4; return 0;
+    case 'i': case 'u': case 'h': if (v_align(v, 4) || v->pos + 4 > v->len) return -1; v->pos += 4; return 0;
     case 'x': case 't': case 'd': if (v_align(v, 8) || v->pos + 8 > v->len) return -1; v->pos += 8; return 0;
     case 's': return v_str(v, 0);
     case 'o': return v_str(v, 1);
@@ -227,7 +228,13 @@ long dbus_msg_size(const uint8_t *buf, size_t len) {
 static const char *const field_sig[10] = { NULL, "o", "s", "s", "s", "u", "s", "s", "g", "u" };
 
 int dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m) {
+    int declared;
+    return dbus_msg_parse_fds(buf, len, m, 0, &declared);
+}
+
+int dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int *declared) {
     memset(m, 0, sizeof *m);
+    *declared = 0;
     long total = dbus_msg_size(buf, len);
     if (total <= 0 || (size_t)total != len) return -1;
     int be = buf[0] == 'B';
@@ -295,7 +302,8 @@ int dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m) {
             p = w.pos;
         }
     }
-    if (got_fds) goto bad;                               /* we do not accept fds */
+    /* fds only where the connection asked for them (dbus_open_fds), and at most max_fds */
+    if (got_fds > (uint32_t)(max_fds > 0 ? max_fds : 0)) goto bad;
     switch (type) {
     case DBUS_CALL: if (!m->path || !m->member) goto bad; break;
     case DBUS_RETURN: if (!m->reply_serial) goto bad; break;
@@ -315,13 +323,21 @@ int dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m) {
     m->body_len = (uint32_t)(len - bstart);
     if (!m->sig) { if (m->body_len) goto bad; m->sig = ""; }
     else if (!dbus_body_valid(m->sig, m->body, m->body_len, be)) goto bad;
+    if (!got_fds && strchr(m->sig, 'h')) goto bad;      /* an fd's index with no fds */
+    *declared = (int)got_fds;
     return 0;
 bad:
     dbus_msg_free(m);
     return -1;
 }
 
+void dbus_msg_drop_fds(DMsg *m) {
+    for (int i = 0; i < m->n_fds && i < DBUS_MAX_FDS; i++) if (m->fds[i] >= 0) close(m->fds[i]);
+    m->n_fds = 0;
+}
+
 void dbus_msg_free(DMsg *m) {
+    dbus_msg_drop_fds(m);
     if (m->raw) { explicit_bzero(m->raw, m->raw_len); free(m->raw); }
     memset(m, 0, sizeof *m);
 }
@@ -619,7 +635,7 @@ static int read_line(int fd, char *out, size_t cap, double deadline) {
     }
 }
 
-int dbus_open(DConn *c, int fd, int timeout_ms) {
+static int open_conn(DConn *c, int fd, int timeout_ms, int want_fds) {
     memset(c, 0, sizeof *c);
     c->fd = fd;
     if (fd < 0) return -1;
@@ -634,6 +650,10 @@ int dbus_open(DConn *c, int fd, int timeout_ms) {
     int ml = snprintf(msg, sizeof msg, "AUTH EXTERNAL %s\r\n", hex);
     if (write_all(fd, "", 1, deadline) || write_all(fd, msg, (size_t)ml, deadline)) return -1;
     if (read_line(fd, line, sizeof line, deadline) || strncmp(line, "OK ", 3)) return -1;
+    if (want_fds) {                     /* "ERROR" (the bus can't) leaves a plain connection */
+        if (write_all(fd, "NEGOTIATE_UNIX_FD\r\n", 19, deadline) || read_line(fd, line, sizeof line, deadline)) return -1;
+        c->unix_fds = !strcmp(line, "AGREE_UNIX_FD");
+    }
     if (write_all(fd, "BEGIN\r\n", 7, deadline)) return -1;
     DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus", .member = "Hello", .dest = "org.freedesktop.DBus" };
     uint32_t s = dbus_send(c, &h, NULL);
@@ -649,7 +669,12 @@ int dbus_open(DConn *c, int fd, int timeout_ms) {
     return 0;
 }
 
+int dbus_open(DConn *c, int fd, int timeout_ms) { return open_conn(c, fd, timeout_ms, 0); }
+int dbus_open_fds(DConn *c, int fd, int timeout_ms) { return open_conn(c, fd, timeout_ms, 1); }
+
 void dbus_close(DConn *c) {
+    for (int i = 0; i < c->fdq_n && i < DBUS_MAX_FDS; i++) close(c->fdq[i]);
+    c->fdq_n = 0;
     if (c->fd >= 0) close(c->fd);
     if (c->in) { explicit_bzero(c->in, c->in_cap); free(c->in); }
     if (c->out) { explicit_bzero(c->out, c->out_cap); free(c->out); }
@@ -708,13 +733,42 @@ static int take(DConn *c, DMsg *m) {
     long sz = dbus_msg_size(c->in, c->in_n);
     if (sz < 0) { c->dead = 1; return -1; }
     if (sz == 0 || (size_t)sz > c->in_n) return 0;
-    int r = dbus_msg_parse(c->in, (size_t)sz, m);
+    int declared = 0;
+    int r = dbus_msg_parse_fds(c->in, (size_t)sz, m, c->unix_fds ? DBUS_MAX_FDS : 0, &declared);
     size_t rest = c->in_n - (size_t)sz;
     memmove(c->in, c->in + sz, rest);
     explicit_bzero(c->in + rest, (size_t)sz);
     c->in_n = rest;
     if (r) { c->dead = 1; return -1; }       /* the bus already validates: something invalid is a serious error */
+    /* the fds came with the message's first bytes, in order: they are the oldest ones queued */
+    if (declared > c->fdq_n) { dbus_msg_free(m); c->dead = 1; return -1; }
+    for (int i = 0; i < declared; i++) m->fds[i] = c->fdq[i];
+    m->n_fds = declared;
+    c->fdq_n -= declared;
+    memmove(c->fdq, c->fdq + declared, (size_t)c->fdq_n * sizeof c->fdq[0]);
     return 1;
+}
+
+/* recv, and on a connection that passes fds, recvmsg keeping the fds that came (more than the queue
+ * holds are closed: the message that needs them is then refused in take). */
+static ssize_t recv_in(DConn *c, void *buf, size_t n) {
+    if (!c->unix_fds) return recv(c->fd, buf, n, MSG_DONTWAIT);
+    struct iovec io = { buf, n };
+    union { struct cmsghdr h; char b[CMSG_SPACE(16 * sizeof(int))]; } cb;
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cb.b, .msg_controllen = sizeof cb.b };
+    ssize_t k = recvmsg(c->fd, &mh, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+    if (k < 0) return k;
+    for (struct cmsghdr *h = CMSG_FIRSTHDR(&mh); h; h = CMSG_NXTHDR(&mh, h)) {
+        if (h->cmsg_level != SOL_SOCKET || h->cmsg_type != SCM_RIGHTS) continue;
+        int nf = (int)((h->cmsg_len - CMSG_LEN(0)) / sizeof(int));
+        for (int i = 0; i < nf; i++) {
+            int f;
+            memcpy(&f, CMSG_DATA(h) + i * sizeof(int), sizeof f);
+            if (c->fdq_n < DBUS_MAX_FDS) c->fdq[c->fdq_n++] = f;
+            else close(f);
+        }
+    }
+    return k;
 }
 
 int dbus_next(DConn *c, DMsg *m) {
@@ -732,7 +786,7 @@ int dbus_next(DConn *c, DMsg *m) {
             c->in = p;
             c->in_cap = nc;
         }
-        ssize_t k = recv(c->fd, c->in + c->in_n, c->in_cap - c->in_n, MSG_DONTWAIT);
+        ssize_t k = recv_in(c, c->in + c->in_n, c->in_cap - c->in_n);
         if (k < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;

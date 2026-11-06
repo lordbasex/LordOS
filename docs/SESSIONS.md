@@ -248,7 +248,10 @@ sign-in screen measured 141 ms on a VMware Fusion VM.
 The log says both: `monitor: taken from <user> in N ms` and `monitor: the login screen (lock), N ms
 after the screen went dark`.
 
-- **Lock screen:** ❖L, ❖Ctrl+Q, or the logo menu → «Lock Screen».
+- **Lock screen:** ❖L, ❖Ctrl+Q, or the logo menu → «Lock Screen»; also "require password" after the
+  display turns off, and (0.8.8.4, issue #36) before the computer sleeps: the session on the monitor
+  holds a logind delay inhibitor and lets it go only once `RP_UNDISPLAY` arrives (`hw/sleeplock.c`,
+  SETTINGS.md "Display off, lock, sleep"), so the computer never sleeps with the desktop on the screen.
   1. The session sends `RP_SESSION {"a":"lock"}` to all its viewers.
   2. The monitor shows the login screen with that user.
   3. Browsers connected to that session are also cut off and go back to the login

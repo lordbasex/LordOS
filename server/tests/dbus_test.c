@@ -7,7 +7,9 @@
  *   - the 1024-bit arithmetic against Python's pow() and RFC 2409 group 2;
  *   - the Secret Service end to end with a fake bus (socketpair + fork): plain and DH sessions
  *     (our own client: modexp + HKDF + AES-128-CBC), create, search, read, change, delete,
- *     properties, introspection, lock and unlock with a prompt (Prompt + Completed). */
+ *     properties, introspection, lock and unlock with a prompt (Prompt + Completed);
+ *   - fds (issue #36, logind's Inhibit): a reply carrying one is delivered with it only on a connection
+ *     that negotiated fds, refused everywhere else; an 'h' with no fds is refused. */
 #include "vault/dbus.h"
 #include "vault/secretsvc.h"
 #include "vault/smem.h"
@@ -15,6 +17,7 @@
 #include "ss_memback.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -45,6 +48,86 @@ static void t_sigs(void) {
     check(dbus_path_valid("/") && dbus_path_valid("/org/freedesktop/secrets") && dbus_path_valid("/a_b/C9"), "valid paths");
     check(!dbus_path_valid("") && !dbus_path_valid("org") && !dbus_path_valid("/a/") && !dbus_path_valid("//a") && !dbus_path_valid("/a-b"), "invalid paths");
     check(dbus_name_valid("org.freedesktop.Secret.Service") && !dbus_name_valid("org") && !dbus_name_valid(".a.b") && !dbus_name_valid("a..b") && !dbus_name_valid("1a.b"), "names");
+}
+
+/* ---------- fds (logind's Inhibit reply, hw/sleeplock.c) ---------- */
+
+/* A method return to serial 1 whose body is one 'h' (index 0); unix_fds 1, or 0 to leave the field out. */
+static void fd_reply(DBuf *w, int unix_fds) {
+    dw_init(w);
+    dw_u8(w, 'l'); dw_u8(w, DBUS_RETURN); dw_u8(w, 0); dw_u8(w, 1);
+    dw_u32(w, 4);                       /* body length */
+    dw_u32(w, 7);                       /* serial */
+    size_t mark = dw_arr_begin(w, 8);
+    dw_struct(w); dw_u8(w, 5); dw_variant(w, "u"); dw_u32(w, 1);
+    dw_struct(w); dw_u8(w, 8); dw_variant(w, "g"); dw_sig(w, "h");
+    if (unix_fds) { dw_struct(w); dw_u8(w, 9); dw_variant(w, "u"); dw_u32(w, (uint32_t)unix_fds); }
+    dw_arr_end(w, mark);
+    dw_align(w, 8);
+    dw_u32(w, 0);                       /* the fd's index */
+}
+
+static int send_with_fd(int sock, const DBuf *w, int fd) {
+    struct iovec io = { w->p, w->n };
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cb;
+    memset(&cb, 0, sizeof cb);
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
+    if (fd >= 0) {
+        mh.msg_control = cb.b;
+        mh.msg_controllen = sizeof cb.b;
+        struct cmsghdr *h = CMSG_FIRSTHDR(&mh);
+        h->cmsg_level = SOL_SOCKET;
+        h->cmsg_type = SCM_RIGHTS;
+        h->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(h), &fd, sizeof fd);
+    }
+    return sendmsg(sock, &mh, 0) == (ssize_t)w->n ? 0 : -1;
+}
+
+static void t_fds(void) {
+    check(dbus_sig_valid("h") && dbus_sig_valid("a{sh}"), "'h' is a valid signature");
+    DBuf w;
+    fd_reply(&w, 1);
+    DMsg m;
+    int declared = -1;
+    check(dbus_msg_parse(w.p, w.n, &m) != 0, "a message with fds refused by dbus_msg_parse");
+    check(dbus_msg_parse_fds(w.p, w.n, &m, 4, &declared) == 0 && declared == 1 && !strcmp(m.sig, "h") && m.n_fds == 0,
+          "dbus_msg_parse_fds takes it (the fds are attached by the connection)");
+    dbus_msg_free(&m);
+    DBuf w0;
+    fd_reply(&w0, 0);
+    check(dbus_msg_parse_fds(w0.p, w0.n, &m, 4, &declared) != 0, "an 'h' with no fds is refused");
+    dw_free(&w0);
+
+    for (int negotiated = 0; negotiated < 2; negotiated++) {
+        int sv[2], pp[2];
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) || pipe(pp)) { check(0, "socketpair/pipe"); continue; }
+        DConn c;
+        memset(&c, 0, sizeof c);
+        c.fd = sv[0];
+        c.unix_fds = negotiated;
+        check(send_with_fd(sv[1], &w, pp[1]) == 0, "sendmsg with an fd");
+        close(pp[1]);
+        int r = dbus_next(&c, &m);
+        if (negotiated) {
+            check(r == 1 && m.n_fds == 1 && m.fds[0] >= 0 && m.type == DBUS_RETURN && m.reply_serial == 1,
+                  "fds negotiated: the reply comes with its fd");
+            int fd = m.n_fds == 1 ? m.fds[0] : -1;
+            check(fd >= 0 && (fcntl(fd, F_GETFD) & FD_CLOEXEC), "the fd received is close-on-exec");
+            if (fd >= 0) check(write(fd, "x", 1) == 1, "the fd is the pipe's write end");
+            dbus_msg_free(&m);
+            check(fd < 0 || fcntl(fd, F_GETFD) < 0, "dbus_msg_free closes it");
+            char ch;
+            check(read(pp[0], &ch, 1) == 1 && read(pp[0], &ch, 1) == 0, "no copy left open");
+        } else {
+            check(r == -1, "fds not negotiated: the message is refused");
+            if (r == 1) dbus_msg_free(&m);
+        }
+        close(pp[0]);
+        close(sv[1]);
+        dbus_close(&c);
+    }
+    dw_free(&w);
 }
 
 /* ---------- round trip ---------- */
@@ -773,6 +856,7 @@ int main(int argc, char **argv) {
     t_roundtrip();
     t_reject();
     t_modexp();
+    t_fds();
     /* fuzz over our own and captured messages */
     size_t len;
     uint8_t *v = valid_msg(&len);

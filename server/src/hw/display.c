@@ -46,6 +46,7 @@ static struct {
     int done_off, done_lock, done_sleep, off;
     int blank_pending;                  /* display_blank: turn off as soon as there is a card */
     int sleep_first_s;                  /* the first sleep deadline when it differs (until the next input) */
+    double off_at;                      /* when the screen went off after idle (CLOCK_MONOTONIC ms) */
 } D = { .kelvin = NIGHT_K_MAX };
 
 static void apply_tint_all(void);
@@ -58,6 +59,18 @@ static double now_ms(void) {
 }
 
 static Kms *kms(void) { return D.host && D.host->kms ? D.host->kms() : NULL; }
+
+/* Development only (tests/lock_e2e.sh, a VM whose one card the running desktop holds): with
+ * LORD_IDLE_HEADLESS=1 a session without a monitor keeps the idle deadlines as if its frame in memory
+ * were the screen ("off" only stops counting it as lit), until lord-sessiond's RP_UNDISPLAY
+ * (display_left). lord-sessiond never sets it. */
+static int idle_headless = -1, idle_left;
+static int screen(void) {
+    if (kms()) return 1;
+    if (idle_headless < 0) idle_headless = getenv("LORD_IDLE_HEADLESS") != NULL;
+    return idle_headless && !idle_left;
+}
+void display_left(void) { idle_left = 1; D.off = 0; }
 static void event(const char *kind, const char *json) { if (D.host && D.host->event) D.host->event(kind, json); }
 static int heads(Kms **out, int max) {
     if (D.host && D.host->heads) return D.host->heads(out, max);
@@ -737,7 +750,7 @@ void display_idle_state(int *dark, int *off_s, int *sleep_s, int *sleep_left_s) 
 }
 
 double display_timeout(double now) {
-    if (!kms()) return -1;
+    if (!screen()) return -1;
     if (D.blank_pending) return 0;
     double best = -1, ds[3] = { deadline(D.off_s, D.done_off), deadline(D.lock_s, D.done_lock), sleep_deadline() };
     for (int i = 0; i < 3; i++) {
@@ -750,19 +763,18 @@ double display_timeout(double now) {
 }
 
 void display_tick(double now) {
-    Kms *k = kms();
-    if (!k) return;
+    if (!screen()) return;
     double off = deadline(D.off_s, D.done_off), lock = deadline(D.lock_s, D.done_lock), slp = sleep_deadline();
     if (D.blank_pending) {              /* the login screen of an idle lock: it stays dark (display_blank) */
         D.blank_pending = 0;
         D.done_off = 1;
-        if (!D.off && dpms_all(0)) D.off = 1;
+        if (!D.off && (dpms_all(0) || !kms())) { D.off = 1; D.off_at = now; }
         event("idle", "{\"stage\":\"off\"}");
         off = -1;
     }
     if (off >= 0 && now >= off) {
         D.done_off = 1;
-        if (dpms_all(0)) D.off = 1;
+        if (!D.off && (dpms_all(0) || !kms())) { D.off = 1; D.off_at = now; }
         event("idle", "{\"stage\":\"off\"}");
     }
     if (lock >= 0 && now >= lock) { D.done_lock = 1; event("idle", "{\"stage\":\"lock\"}"); }
@@ -770,6 +782,19 @@ void display_tick(double now) {
 }
 
 int display_is_off(void) { return D.off; }
+
+int display_on_monitor(void) { return screen(); }
+
+double display_dark_ms(double now) { return D.off && screen() && now >= D.off_at ? now - D.off_at : 0; }
+
+/* Input from the keyboard, mouse or trackpad. A lock whose time has already come is sent before the
+ * input counts as activity: the key or touch that wakes the screen never cancels a lock that was due
+ * (issue #36). Not for the other kinds of activity (a video that keeps the screen on, remote input). */
+void display_input(double now) {
+    double lock = deadline(D.lock_s, D.done_lock);
+    if (screen() && lock >= 0 && now >= lock) { D.done_lock = 1; event("idle", "{\"stage\":\"lock\"}"); }
+    display_activity(now);
+}
 
 /* ---- software rotation ---- */
 

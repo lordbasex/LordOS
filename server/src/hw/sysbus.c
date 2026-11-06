@@ -6,8 +6,8 @@
 #include <string.h>
 
 #define MAX_PENDING 64
-#define MAX_HANDLERS 4
-#define MAX_WATCH 4
+#define MAX_HANDLERS 8                  /* bt, ppd, timedate and sleeplock today */
+#define MAX_WATCH 8                     /* BlueZ, two power-profiles names, polkit and logind today */
 
 typedef struct { uint32_t serial; SbReply cb; void *ctx; } Pending;
 typedef struct { char name[64]; SbOwner fn; } Watch;
@@ -57,8 +57,14 @@ void sysbus_add_match(const char *rule) {
     dw_free(&b);
 }
 
-void sysbus_on_signal(SbSignal fn) { if (nsig < MAX_HANDLERS) signals[nsig++] = fn; }
-void sysbus_on_call(SbCall fn) { if (ncall < MAX_HANDLERS) calls[ncall++] = fn; }
+void sysbus_on_signal(SbSignal fn) {
+    if (nsig < MAX_HANDLERS) signals[nsig++] = fn;
+    else fprintf(stderr, "sysbus: too many signal handlers (MAX_HANDLERS)\n");
+}
+void sysbus_on_call(SbCall fn) {
+    if (ncall < MAX_HANDLERS) calls[ncall++] = fn;
+    else fprintf(stderr, "sysbus: too many call handlers (MAX_HANDLERS)\n");
+}
 
 static void got_owner(const DMsg *m, void *ctx) {
     Watch *w = ctx;
@@ -81,7 +87,10 @@ static void ask_owner(Watch *w) {
 }
 
 void sysbus_watch_name(const char *name, SbOwner fn) {
-    if (nwatch >= MAX_WATCH || strlen(name) >= sizeof watches[0].name) return;
+    if (nwatch >= MAX_WATCH || strlen(name) >= sizeof watches[0].name) {
+        fprintf(stderr, "sysbus: cannot watch %s (MAX_WATCH)\n", name);
+        return;
+    }
     Watch *w = &watches[nwatch++];
     snprintf(w->name, sizeof w->name, "%s", name);
     w->fn = fn;
@@ -94,7 +103,8 @@ void sysbus_watch_name(const char *name, SbOwner fn) {
 int sysbus_start(void) {
     if (up) return 0;
     int fd = dbus_connect_system();
-    if (fd < 0 || dbus_open(&conn, fd, 2000)) {
+    /* fds: logind's Inhibit answers with one (hw/sleeplock.c); only replies may bring them (handle) */
+    if (fd < 0 || dbus_open_fds(&conn, fd, 2000)) {
         if (fd >= 0) dbus_close(&conn);
         fprintf(stderr, "sysbus: no system bus (Bluetooth and power profiles unavailable)\n");
         return -1;
@@ -113,6 +123,7 @@ static void lost(void) {
 }
 
 static void handle(DMsg *m) {
+    if (m->type != DBUS_RETURN) dbus_msg_drop_fds(m);  /* only a reply to our own call may bring fds */
     if (m->type == DBUS_RETURN || m->type == DBUS_ERROR) {
         for (int i = 0; i < MAX_PENDING; i++)
             if (pending[i].serial && pending[i].serial == m->reply_serial) {

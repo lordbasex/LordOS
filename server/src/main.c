@@ -58,6 +58,7 @@
 #include "ui/js_logs.h"
 #include "hw/hw.h"
 #include "hw/pkagent.h"
+#include "hw/sleeplock.h"
 #include "hw/modes.h"
 #include "ui/js_hw.h"
 #include "outputs.h"
@@ -1013,6 +1014,8 @@ static void display_detach(void) {
     Server *s = remote_server;
     parked_drop();
     splash_wait = 0;
+    sleeplock_monitor_taken();          /* a lock before sleep: the computer may sleep now (hw/sleeplock.c) */
+    display_left();
     if (s->headless) return;
     prep_undo_all(s);                           /* a prepared frame is dropped with its display */
     gpu_tex_free(s->cursor_tex);
@@ -1041,7 +1044,7 @@ static void display_detach(void) {
 
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
-    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_activity(now_ms());
+    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_input(now_ms());
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);
     if (d->tp) {                        /* touchpad o pantalla táctil: driver propio (tp/tp.c) */
