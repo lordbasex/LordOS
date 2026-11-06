@@ -242,6 +242,20 @@ char *cf_status(const char *const *paths, int n) {
     return b.oom ? (jb_free(&b), NULL) : b.p;
 }
 
+int cloud_read_would_block(const char *path) {
+    char name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1];
+    if (!cl_root[0] || !path || cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel) || !rel[0]) return 0;
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find_name(name);
+    int down = a && (!cl_running || !a->mounted || a->locked || !strcmp(a->err, "cloud.unreachable") || !strcmp(a->err, "cloud.offline"));
+    char id[16] = "";
+    if (a) cl_pf(id, sizeof id, "%s", a->id);
+    pthread_mutex_unlock(&cl_mu);
+    if (!down) return 0;
+    CloudMeta m;
+    return read_meta(id, rel, &m) || m.cached < m.size;     /* what is here still opens */
+}
+
 /* ---- Free Up Space ---- */
 
 typedef struct { const Snap *s; const OpenSet *o; long long freed; JBuf *skip; int nskip; } FreeCtx;

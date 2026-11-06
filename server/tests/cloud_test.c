@@ -22,11 +22,11 @@ static void t_methods(void) {
     static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
         "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
         "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
-        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", NULL };
+        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", "operations/stat", "operations/copyfile", NULL };
     static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
         "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/delete",
         "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
-        "operations/copyfile", "operations/rmdirs", "operations/mkdir", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
+        "operations/rmdirs", "operations/mkdir", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
         "sync/move", "pluginsctl/addPlugin", "debug/set-gc-percent", "core/obscure", "mount/unmountall", "job/list", "job/stopgroup", "operations/check", NULL };
     int n = 0;
     for (int m = 0; m < RCM_COUNT; m++) {
@@ -209,6 +209,33 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("Get \"ftp://x\": unsupported protocol scheme \"ftp\""), "cloud.badAddress"));
     CHECK(!strcmp(cloud_failure_code("Propfind \"https://127.0.0.1:18443/\": tls: failed to verify certificate: x509: certificate signed by unknown authority"), "cloud.certUntrusted"));
     CHECK(!strcmp(cloud_failure_code("ssh: handshake failed: knownhosts: key mismatch"), "cloud.hostKeyChanged"));
+    /* U5: what Get Info shows */
+    char cl[201];
+    cloud_clean_text("401 Unauthorized: <!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n<html><head>\n<title>401 Unauthorized</title>\n</head><body>\n<h1>Unauthorized</h1>", cl, sizeof cl);
+    CHECK(!strchr(cl, '<') && !strchr(cl, '\n') && !strstr(cl, "  ") && strstr(cl, "401 Unauthorized") && strstr(cl, "Unauthorized"));
+    char big[1000];
+    memset(big, 'x', sizeof big - 1);
+    big[sizeof big - 1] = 0;
+    cloud_clean_text(big, cl, sizeof cl);
+    CHECK(strlen(cl) == 200);
+    cloud_clean_text("ñ\xe2\x82", cl, 3);                          /* never half a character */
+    CHECK(!strcmp(cl, "ñ"));
+    cloud_clean_text(NULL, cl, sizeof cl);
+    CHECK(!cl[0]);
+    /* the conflict rule: did the cloud's object change since it came down? */
+    const char *h1[] = { "d41d8cd98f00b204e9800998ecf8427e" };
+    CHECK(cloud_remote_changed("6", 6, -1, NULL, 0) == 0 && cloud_remote_changed("6", 21, -1, NULL, 0) == 1);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08.123456789 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), NULL, 0) == 0);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:30:00Z"), NULL, 0) == 1);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,d41d8cd98f00b204e9800998ecf8427e", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), h1, 1) == 0);
+    CHECK(cloud_remote_changed("6,ffffffffffffffffffffffffffffffff", 6, -1, h1, 1) == 1);
+    CHECK(cloud_remote_changed("", 6, -1, NULL, 0) == -1 && cloud_remote_changed("abc", 6, -1, NULL, 0) == -1 && cloud_remote_changed(NULL, 6, -1, NULL, 0) == -1);
+    char cn[CLOUD_REL_MAX + 1];
+    CHECK(!cloud_conflict_name("notes.txt", 1, cn, sizeof cn) && !strcmp(cn, "notes (cloud copy).txt"));
+    CHECK(!cloud_conflict_name("Docs/report.final.pdf", 2, cn, sizeof cn) && !strcmp(cn, "Docs/report.final (cloud copy 2).pdf"));
+    CHECK(!cloud_conflict_name("Makefile", 1, cn, sizeof cn) && !strcmp(cn, "Makefile (cloud copy)"));
+    CHECK(!cloud_conflict_name("a/.hidden", 1, cn, sizeof cn) && !strcmp(cn, "a/.hidden (cloud copy)"));
+    CHECK(cloud_conflict_name("x.txt", 1, cn, 8) == -1);
     /* B8: a presigned link is long */
     {
         char u[4200] = "https://bucket.s3.example.test/file?X-Amz-Signature=";
@@ -220,6 +247,9 @@ static void t_refused(void) {
         u[l] = 0;
         CHECK(!cloud_url_ok(u));
     }
+    CHECK(!strcmp(cloud_failure_code("Propfind \"http://127.0.0.1:40151/\": dial tcp 127.0.0.1:40151: connect: connection refused"), "cloud.unreachable"));
+    CHECK(!strcmp(cloud_failure_code("530 Login incorrect."), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("couldn't connect: smb: NT_STATUS_LOGON_FAILURE"), "cloud.authFailed"));
     CHECK(cloud_failure_code("directory not found") == NULL && cloud_failure_code("") == NULL && cloud_failure_code(NULL) == NULL);
 }
 
@@ -279,7 +309,7 @@ static void t_meta(void) {
 }
 
 static void t_status(void) {
-    CloudMeta whole = { 100, 100, 0, 0 }, part = { 100, 40, 0, 0 }, dirty = { 100, 100, 0, 1 };
+    CloudMeta whole = { .size = 100, .cached = 100 }, part = { .size = 100, .cached = 40 }, dirty = { .size = 100, .cached = 100, .dirty = 1 };
     CloudLive l = { 0 };
     double pct;
     CHECK(!strcmp(cloud_file_status(NULL, &l, &pct), "cloud") && pct < 0);
@@ -299,7 +329,7 @@ static void t_status(void) {
     CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "up") && pct == 91);
     l.error = 1;
     CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "error"));
-    CloudMeta empty = { 0, 0, 0, 0 };
+    CloudMeta empty = { .size = 0 };
     l = (CloudLive){ 0 };
     CHECK(!strcmp(cloud_file_status(&empty, &l, &pct), "here"));
 }

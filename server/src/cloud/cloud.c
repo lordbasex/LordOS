@@ -57,6 +57,7 @@ int cl_running;
 
 static const CloudSecrets *secrets;
 static int started, efd_push = -1, efd_job = -1;
+static volatile int worker_done;
 static char rt_dir[PATH_MAX], log_path[PATH_MAX];
 static long long last_emit_ms;
 static char *last_state;
@@ -87,6 +88,9 @@ static struct {
 } si;
 
 static struct { char path[PATH_MAX]; char account[16]; int up; long long at; } recent[RECENT_MAX];
+#define CONFLICTS_MAX 20
+static struct { char path[PATH_MAX], kept[PATH_MAX]; char account[16]; long long at; } conflicts[CONFLICTS_MAX];
+static int nconflicts;
 static int nrecent;
 static long long seen_done;          /* newest completed_at already in recent */
 
@@ -172,6 +176,8 @@ static unsigned long long fnv(const char *s) {
 }
 
 static void cpy(char *d, size_t n, const char *s) { cl_pf(d, n, "%s", s ? s : ""); }
+/* U5: rclone's words for Get Info, never a server's HTML page (tags out, spaces collapsed, at most 200 bytes) */
+#define set_message(a, m) cloud_clean_text((m), (a)->message, 201)
 
 static void kv_clear(Params *p) { for (int i = 0; i < p->n; i++) wipe_free(p->kv[i].val); p->n = 0; }
 static const char *kv_get(const Params *p, const char *k) { for (int i = 0; i < p->n; i++) if (!strcmp(p->kv[i].key, k)) return p->kv[i].val; return NULL; }
@@ -206,6 +212,8 @@ static void acc_free_live(Acc *a) {
 }
 static void acc_free(Acc *a) {
     acc_free_live(a);
+    for (int i = 0; i < a->nchecked; i++) free(a->checked[i]);
+    a->nchecked = 0;
     kv_clear(&a->p);
     wipe_free(a->pending_secret);
     for (int i = 0; i < a->nkeep; i++) free(a->keep[i]);
@@ -641,6 +649,9 @@ static int daemon_start(void) {
     }
     char *argv[] = { "rclone", "rcd", "--rc-addr", addr, "--rc-htpasswd", "/proc/self/fd/3", "--config", "", "--cache-dir", cache,
                      "--log-file", log_path, "--log-level", "NOTICE", "--use-mmap", "--buffer-size", "16M", "--transfers", "4",
+                     /* B10: a server that doesn't answer fails a cold read in about 8 s, not minutes (measured: 8.6 s
+                      * refused, >200 s with rclone's defaults); uploads are retried by the VFS queue anyway */
+                     "--contimeout", "5s", "--timeout", "30s", "--low-level-retries", "1",
                      "--checkers", "8", NULL };
     char *env[10], envbuf[4096];
     child_env(env, envbuf, sizeof envbuf, NULL, NULL);
@@ -1147,7 +1158,7 @@ static void about_acc(Acc *a) {
     } else if (st != 200) {
         cpy(a->err, sizeof a->err, code_of(msg, !strcmp(a->k->group, "oauth")));
         if (!strcmp(a->err, "cloud.failed")) a->err[0] = 0;   /* about isn't worth an error state */
-        else cpy(a->message, sizeof a->message, msg);
+        else set_message(a, msg);
     }
     pthread_mutex_unlock(&cl_mu);
     if (d.root) json_free(&d);
@@ -1175,7 +1186,7 @@ static int mount_acc(Acc *a) {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
         cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
-        cpy(a->message, sizeof a->message, msg);
+        set_message(a, msg);
     }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
@@ -1216,7 +1227,7 @@ static void bring_up(Acc *a) {
     int ok = !create_remote(a, r == 0 ? sec : NULL, 0, msg, sizeof msg);
     pthread_mutex_lock(&cl_mu);
     if (ok) { a->configured = 1; if (sec) a->tok_hash = fnv(sec); }
-    else { cpy(a->err, sizeof a->err, "cloud.failed"); cpy(a->message, sizeof a->message, msg); }
+    else { cpy(a->err, sizeof a->err, "cloud.failed"); set_message(a, msg); }
     pthread_mutex_unlock(&cl_mu);
     wipe_free(sec);
     if (ok) mount_acc(a);
@@ -1312,7 +1323,7 @@ static char *err_msg_json(const char *code, const char *msg) {
     jb_raw(&b, "{\"error\":");
     jb_str(&b, code);
     if (add_field) { jb_raw(&b, ",\"field\":"); jb_str(&b, add_field); add_field = NULL; }
-    if (msg && msg[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, msg); }
+    if (msg && msg[0]) { char clean[201]; cloud_clean_text(msg, clean, sizeof clean); jb_raw(&b, ",\"message\":"); jb_str(&b, clean); }
     jb_raw(&b, "}");
     return b.oom ? (jb_free(&b), NULL) : b.p;
 }
@@ -1345,7 +1356,7 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
         if (!a->mounted && cl_running) mount_acc(a);
         pthread_mutex_lock(&cl_mu);
         cpy(a->err, sizeof a->err, code);
-        cpy(a->message, sizeof a->message, msg);
+        set_message(a, msg);
         a->pending_req = 0;
         pthread_mutex_unlock(&cl_mu);
     }
@@ -1374,11 +1385,12 @@ static void check_acc(Acc *a) {
     int bad = verify_remote(a, msg, sizeof msg);
     const char *c = bad ? cloud_failure_code(msg) : NULL;
     pthread_mutex_lock(&cl_mu);
-    a->check_at = time(NULL) + (bad ? 120 : 600);
+    /* offline: listed every 30 s, so it comes back as soon as the server does */
+    a->check_at = time(NULL) + (!bad ? 600 : c && !strcmp(c, "cloud.unreachable") ? 30 : 120);
     if (bad) {
         cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
         if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
-        cpy(a->message, sizeof a->message, msg);
+        set_message(a, msg);
     } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; }
     pthread_mutex_unlock(&cl_mu);
     cl_changed();
@@ -1905,6 +1917,8 @@ static void record_done(void) {
         /* the last error of each file */
         int k;
         for (k = 0; k < a->nerrn && strcmp(a->errn[k], nm); k++) {}
+        /* B10: a transfer that failed for the network: list the account now, which marks it offline */
+        if (er && er[0] && t > seen_done) { const char *fc = cloud_failure_code(er); if (fc && !strcmp(fc, "cloud.unreachable")) a->check_at = 0; }
         if (er && er[0] && k == a->nerrn) {
             if (a->nerrn == ERRN_MAX) { free(a->errn[0]); memmove(a->errn, a->errn + 1, sizeof a->errn[0] * (ERRN_MAX - 1)); a->nerrn--; }
             a->errn[a->nerrn++] = strdup(nm);
@@ -1922,6 +1936,105 @@ static void record_done(void) {
     seen_done = newest;
     pthread_mutex_unlock(&cl_mu);
     json_free(&d);
+}
+
+static void set_expiry(Acc *a, int qid, double e) {
+    char b[160];
+    cl_pf(b, sizeof b, "{\"fs\":\"%s:\",\"id\":%d,\"expiry\":%.0f,\"relative\":false}", a->id, qid, e);
+    rcs(RCM_VFS_EXPIRY, b, NULL, 0, RC_SHORT);
+}
+
+static int was_checked(Acc *a, const char *name) {
+    pthread_mutex_lock(&cl_mu);
+    int y = 0;
+    for (int i = 0; i < a->nchecked && !y; i++) y = !strcmp(a->checked[i], name);
+    pthread_mutex_unlock(&cl_mu);
+    return y;
+}
+static void mark_checked(Acc *a, const char *name) {
+    pthread_mutex_lock(&cl_mu);
+    if (a->nchecked < Q_MAX) { char *d = strdup(name); if (d) a->checked[a->nchecked++] = d; }
+    pthread_mutex_unlock(&cl_mu);
+}
+
+/* the conflict rule (7.2), as built: the file was changed here; if the cloud's object changed too since this copy came
+ * down (or appeared meanwhile), the cloud's version is first copied, in the cloud, to "name (cloud copy).ext" next to it,
+ * and then ours goes up under the name. Renaming ours in the mount instead (the design's "name (this computer)") moves
+ * the cloud's object along with it in rclone's VFS, so the cloud's version would be lost: measured, not used.
+ * 0 it goes up (kept: the copy, or "" when there was no conflict), 2 not yet (the copy failed: held, tried again) */
+static int conflict_check(Acc *a, const char *rel, char *kept, size_t kn) {
+    char mp[PATH_MAX * 2], body[CLOUD_REL_MAX * 2 + 128];
+    cl_pf(mp, sizeof mp, "%s/vfsMeta/%s/%s", cl_cache, a->id, rel);
+    char *mt = read_file(mp, 65536, NULL);
+    CloudMeta m;
+    int have = mt && !cloud_meta_parse(mt, strlen(mt), &m) && m.fingerprint[0];
+    free(mt);
+    /* made here (no copy came down): it is a conflict too if the cloud has an object with that name it hadn't shown yet */
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"fs\":\"%s:\",\"remote\":", a->id);
+    jb_str(&b, rel);
+    jb_raw(&b, ",\"opt\":{\"showHash\":true}}");
+    cl_pf(body, sizeof body, "%s", b.oom ? "" : b.p);
+    jb_free(&b);
+    JDoc d;
+    int st = rcj(RCM_STAT, body, &d, NULL, 0, 15000);
+    const JVal *item = st == 200 && d.root ? json_get(d.root, "item") : NULL;
+    int changed = 0;
+    if (item && item->type == J_OBJ) {
+        const char *hs[8];
+        int nh = 0;
+        const JVal *h = json_get(item, "Hashes");
+        for (const JVal *x = h && h->type == J_OBJ ? h->kid : NULL; x && nh < 8; x = x->next) if (x->type == J_STR) hs[nh++] = x->str;
+        const char *mtm = json_str(item, "ModTime");
+        changed = !have || cloud_remote_changed(m.fingerprint, (long long)json_num(item, "Size", -1), mtm ? (double)cloud_rfc3339(mtm) : -1, hs, nh) == 1;
+    }
+    if (d.root) json_free(&d);
+    kept[0] = 0;
+    if (!changed) return 0;
+    char from[PATH_MAX * 2], to[PATH_MAX * 2];
+    cl_pf(from, sizeof from, "%s/%s/%s", cl_root, a->name, rel);
+    for (int n = 1; n < 20; n++) {
+        if (cloud_conflict_name(rel, n, kept, kn)) return 0;
+        cl_pf(to, sizeof to, "%s/%s/%s", cl_root, a->name, kept);
+        struct stat s2;
+        if (!lstat(to, &s2)) continue;
+        JBuf c;
+        jb_init(&c);
+        jb_printf(&c, "{\"srcFs\":\"%s:\",\"srcRemote\":", a->id);
+        jb_str(&c, rel);
+        jb_printf(&c, ",\"dstFs\":\"%s:\",\"dstRemote\":", a->id);
+        jb_str(&c, kept);
+        jb_raw(&c, "}");
+        char msg[256] = "";
+        int st2 = c.oom ? -1 : rcs(RCM_COPYFILE, c.p, msg, sizeof msg, 300000);
+        jb_free(&c);
+        if (st2 != 200) { fprintf(stderr, "cloud: conflict on %s, the cloud's version couldn't be copied (%s): held\n", rel, msg); kept[0] = 0; return 2; }
+        char dir[CLOUD_REL_MAX + 1];
+        cl_pf(dir, sizeof dir, "%s", rel);
+        char *sl = strrchr(dir, '/');
+        if (sl) *sl = 0; else dir[0] = 0;
+        JBuf r;
+        jb_init(&r);
+        jb_printf(&r, "{\"fs\":\"%s:\"", a->id);
+        if (dir[0]) { jb_raw(&r, ",\"dir\":"); jb_str(&r, dir); }
+        jb_raw(&r, "}");
+        if (!r.oom) rcs(RCM_VFS_REFRESH, r.p, NULL, 0, RC_SHORT);      /* the copy shows in Files */
+        jb_free(&r);
+        pthread_mutex_lock(&cl_mu);
+        if (nconflicts == CONFLICTS_MAX) nconflicts--;
+        memmove(conflicts + 1, conflicts, sizeof conflicts[0] * (size_t)nconflicts);
+        cl_pf(conflicts[0].path, sizeof conflicts[0].path, "%s", from);
+        cl_pf(conflicts[0].kept, sizeof conflicts[0].kept, "%s", to);
+        cl_pf(conflicts[0].account, sizeof conflicts[0].account, "%s", a->id);
+        conflicts[0].at = now_ms();
+        nconflicts++;
+        pthread_mutex_unlock(&cl_mu);
+        fprintf(stderr, "cloud: %s changed in the cloud and here: the cloud's version kept as %s\n", rel, kept);
+        cl_changed();
+        return 0;
+    }
+    return 0;
 }
 
 static void poll_acc(Acc *a) {
@@ -1953,21 +2066,41 @@ static void poll_acc(Acc *a) {
         pthread_mutex_unlock(&cl_mu);
     }
     if (d.root) json_free(&d);
-    /* Pause: what waits to go up waits longer; Resume lets it go */
+    /* Pause holds what waits to go up; otherwise each changed file is looked at once before it goes (the conflict rule):
+     * held, compared with the cloud's object (the cloud's version copied aside on a conflict), then let go */
     int hold = cl_paused(a);
-    struct { int id; double e; } set[Q_MAX];
-    int ns = 0;
+    struct { int id; double e; int up; char name[CLOUD_REL_MAX + 1]; } it[64];
+    int ni = 0;
     pthread_mutex_lock(&cl_mu);
-    for (int k = 0; k < a->nq; k++) {
-        if (hold && !a->q[k].uploading && a->q[k].expiry < 1e8) { set[ns].id = a->q[k].qid; set[ns++].e = 1e9; }
-        else if (!hold && a->held && a->q[k].expiry > 1e8) { set[ns].id = a->q[k].qid; set[ns++].e = 0; }
+    for (int k = 0; k < a->nq && ni < 64; k++) {
+        it[ni].id = a->q[k].qid;
+        it[ni].e = a->q[k].expiry;
+        it[ni].up = a->q[k].uploading;
+        cl_pf(it[ni].name, sizeof it[ni].name, "%s", a->q[k].name);
+        ni++;
+    }
+    /* forget the ones that went up */
+    for (int c = 0; c < a->nchecked; ) {
+        int in = 0;
+        for (int k = 0; k < a->nq; k++) if (!strcmp(a->q[k].name, a->checked[c])) in = 1;
+        if (in) { c++; continue; }
+        free(a->checked[c]);
+        a->checked[c] = a->checked[--a->nchecked];
     }
     a->held = hold;
     pthread_mutex_unlock(&cl_mu);
-    for (int k = 0; k < ns; k++) {
-        char b[160];
-        cl_pf(b, sizeof b, "{\"fs\":\"%s:\",\"id\":%d,\"expiry\":%.0f,\"relative\":false}", a->id, set[k].id, set[k].e);
-        rcs(RCM_VFS_EXPIRY, b, NULL, 0, RC_SHORT);
+    for (int k = 0; k < ni; k++) {
+        if (it[k].up) continue;
+        if (hold) { if (it[k].e < 1e8) set_expiry(a, it[k].id, 1e9); continue; }
+        if (!was_checked(a, it[k].name)) {
+            set_expiry(a, it[k].id, 1e9);               /* held while it is looked at */
+            char kept[CLOUD_REL_MAX + 1];
+            if (conflict_check(a, it[k].name, kept, sizeof kept) == 2) continue;      /* held: tried again */
+            mark_checked(a, it[k].name);
+            set_expiry(a, it[k].id, 0);
+            continue;
+        }
+        if (it[k].e > 1e8) set_expiry(a, it[k].id, 0);   /* looked at (or held by Pause): it goes */
     }
 }
 
@@ -2024,9 +2157,11 @@ static char *state_json(int light) {
             if (a->t[k].up) { ud += a->t[k].bytes; if (!un) un = a->t[k].name; }
             else { nd++; db += a->t[k].size; dd += a->t[k].bytes; if (!dn) dn = a->t[k].name; }
         }
-        const char *st = a->locked ? "locked" : !strcmp(a->err, "cloud.signInAgain") ? "signin" : !strcmp(a->err, "cloud.offline") ? "offline"
-                       : a->err[0] ? "error" : cl_paused(a) ? "paused" : (a->nq || nd) ? "syncing" : (!a->mounted && !cl_running && !dmn.error[0]) ? "ok"
-                       : !a->mounted ? "syncing" : "ok";
+        /* U7: with the service down every account says so (error cloud.notRunning or the service's own error) */
+        int down = !cl_running && (dmn.error[0] || dmn.started);
+        const char *st = a->locked ? "locked" : down ? "error" : !strcmp(a->err, "cloud.signInAgain") ? "signin"
+                       : !strcmp(a->err, "cloud.offline") || !strcmp(a->err, "cloud.unreachable") ? "offline"
+                       : a->err[0] ? "error" : cl_paused(a) ? "paused" : (a->nq || nd) ? "syncing" : !a->mounted ? "syncing" : "ok";
         jb_raw(&b, first ? "{\"id\":" : ",{\"id\":");
         first = 0;
         jb_str(&b, a->id);
@@ -2042,6 +2177,7 @@ static char *state_json(int light) {
         jb_str(&b, dir);
         jb_printf(&b, ",\"mounted\":%s,\"state\":\"%s\"", a->mounted ? "true" : "false", st);
         if (a->locked) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked"); }
+        else if (down) { jb_raw(&b, ",\"error\":"); jb_str(&b, dmn.error[0] ? dmn.error : "cloud.notRunning"); }
         else if (a->err[0]) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->err); }
         if (a->message[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, a->message); }
         if (a->have_about || a->measured_at) {
@@ -2092,6 +2228,17 @@ static char *state_json(int light) {
         if (si.account[0]) { jb_raw(&b, ",\"account\":"); jb_str(&b, si.account); }
         jb_raw(&b, "}");
     } else jb_raw(&b, "null");
+    jb_raw(&b, ",\"conflicts\":[");
+    for (int i = 0; i < nconflicts; i++) {
+        jb_raw(&b, i ? ",{\"path\":" : "{\"path\":");
+        jb_str(&b, conflicts[i].path);
+        jb_raw(&b, ",\"kept\":");
+        jb_str(&b, conflicts[i].kept);
+        jb_raw(&b, ",\"account\":");
+        jb_str(&b, conflicts[i].account);
+        jb_printf(&b, ",\"at\":%lld}", conflicts[i].at);
+    }
+    jb_raw(&b, "]");
     jb_raw(&b, ",\"recent\":[");
     for (int i = 0; i < nrecent; i++) {
         jb_raw(&b, i ? ",{\"path\":" : "{\"path\":");
@@ -2292,7 +2439,7 @@ static void *worker(void *arg) {
             if (j) { jhead = j->next; if (!jhead) jtail = NULL; }
             pthread_mutex_unlock(&cl_mu);
             if (!j) break;
-            if (j->type == J_STOP) { free(j); daemon_stop(); return NULL; }
+            if (j->type == J_STOP) { free(j); daemon_stop(); worker_done = 1; return NULL; }
             do_job(j);
             if (j->a) { explicit_bzero(j->a, strlen(j->a)); free(j->a); }
             if (j->b) explicit_bzero(j->b, strlen(j->b));   /* an answer may be a code or a password */
@@ -2381,10 +2528,13 @@ int cloud_start(const char *home_dir, const CloudSecrets *sec) {
 }
 
 void cloud_stop(void) {
-    if (!started) return;
+    if (!started || worker_done) return;
     Job *j = new_job(J_STOP, "", NULL, NULL);
     if (j) push_job(j);
-    for (int i = 0; i < 60 && cl_running; i++) { struct timespec ts = { 0, 50 * 1000 * 1000 }; nanosleep(&ts, NULL); }
+    /* the thread unmounts every account (each busy one lazily after 1.5 s) and waits for rclone: up to 15 s */
+    for (int i = 0; i < 300 && !worker_done; i++) { struct timespec ts = { 0, 50 * 1000 * 1000 }; nanosleep(&ts, NULL); }
+    /* whatever is still there (the thread was stuck in a call): detached here */
+    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) { char d[PATH_MAX]; mount_dir(&cl_acc[i], d, sizeof d); if (is_mounted(d)) fusermount_u(d); }
 }
 
 int cloud_fd(void) { return efd_push; }

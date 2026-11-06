@@ -57,6 +57,8 @@ typedef struct {
     char *pend_sec;                 /* add's secrets while that question waits (wiped) */
     int pend_upd;
     time_t check_at;                /* the next listing that checks a mounted account still answers */
+    char *checked[Q_MAX];           /* queued files the conflict rule already looked at (7.2) */
+    int nchecked;
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */
     char *pending_secret;           /* not saved yet (keyring locked): retried */
     time_t about_at, tok_at, retry_at;

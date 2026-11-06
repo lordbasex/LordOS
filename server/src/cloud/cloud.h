@@ -49,6 +49,9 @@ void  cloud_refresh_about(const char *id);                      /* also retries 
 void  cloud_retry(const char *id);                              /* accounts not connected try again; NULL: all */
 char *cloud_website(const char *id);                            /* the address, or NULL */
 char *cloud_status(const char *const *paths, int n);
+/* B10: path is a cloud file not on this computer whose account can't be reached now (offline, locked, not running,
+ * not mounted): 1, and lord.fs.read fails at once instead of waiting for rclone */
+int   cloud_read_would_block(const char *path);
 void  cloud_keep(const char *const *paths, int n, int keep);
 char *cloud_free(const char *const *paths, int n);
 char *cloud_link(const char *path, const char *expire, int *req);

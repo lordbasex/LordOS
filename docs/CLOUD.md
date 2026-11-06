@@ -878,3 +878,32 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
 - **U7**: while `service.running` is false every account says "Not connected: the cloud service isn't running" (dim with
   "!" in Files' sidebar), and the overview starts with the service's own message, **Restart** and **Show Log**.
 - The server form no longer promises a fingerprint prompt; the trust step (18.4) shows only when lord-server asks.
+19. **Offline (B10).** rcd runs with `--contimeout 5s --timeout 30s --low-level-retries 1`: with the server refusing, a read of a
+    file not on this computer fails in about 8.6 s instead of more than 200 s (measured; uploads are retried by the VFS queue
+    anyway). A transfer that fails for the network lists the account at once; a listing that can't reach the server sets
+    `error: 'cloud.unreachable'` and `state: 'offline'`, retried every 30 s, and `ok` again when it answers. On the interface's
+    thread `lord.fs.read` of a cloud file not on this computer, of an account offline, locked, not mounted or with the
+    service down, fails at once with `cloud.offline` (`cloud_read_would_block`); what is here still opens. `lord.fs.du` on a
+    cloud, network or FUSE folder answers at once with `remote: true` and no size (the UI shows the provider's), and
+    `lord.fs.search` there finds nothing for now (N2 is to make it work off the interface's thread). `lord.fs.list` of a folder
+    rclone hasn't listed lately can still wait for rclone's timeouts (about 8 s) while offline: not changed.
+20. **Logout (B11).** `lord-server` stops Cloud after closing the apps: every account unmounted (a busy one lazily), rclone
+    asked to quit, up to 15 s, and anything still mounted detached. Measured: the session ended with a file open in the
+    mount leaves nothing in `/proc/self/mounts`.
+21. **Messages (U5)** shown under Get Info are rclone's words with HTML tags dropped, white space collapsed, at most 200 bytes.
+22. **Service down (U7):** while rclone isn't running (after `cloud.crashed`, a failed start…) every account says
+    `state: 'error'` with the service's error (`cloud.crashed`, `cloud.startFailed`, or `cloud.notRunning`).
+23. **Conflicts (7.2, as built).** Before a changed file goes up, it is held and the cloud's object is looked at
+    (`operations/stat`). If it changed since this copy came down (rclone's fingerprint in `vfsMeta`: size, plus modtime and
+    hash where the backend has them; a modtime within a second counts as the same), or it appeared in the cloud meanwhile, the
+    cloud's version is first copied in the cloud to **"name (cloud copy).ext"** (`operations/copyfile`, inside the account
+    only, added to the closed table), then ours goes up under the name. `State.conflicts: [{ path, kept, account, at }]`
+    (newest first, at most 20) names both: `path` is ours, `kept` the cloud's copy. **This differs from 7.2's naming**
+    ("name (this computer).ext" for ours): renaming our file in the mount moves the cloud's object with it in rclone's VFS, so
+    the cloud's version would have been overwritten (measured), and rclone has no way to drop a pending upload. If the copy
+    fails the file stays held and is tried again. Limits: a server change that keeps the size and gives no modtime or hash
+    (plain WebDAV) can't be seen; a change made in the second between the check and the upload is lost.
+24. **lord.fs.list** stops at 5000 entries per folder without saying so (`js_sys.c` `f_fs_list`): not changed here; it is a
+    bound of the interface's thread, not Cloud's.
+
+The closed rc method table has 27 methods now (`operations/list`, `operations/stat`, `operations/copyfile` added).

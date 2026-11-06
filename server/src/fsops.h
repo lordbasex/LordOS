@@ -51,6 +51,9 @@ typedef struct { double size; long files, dirs; int complete; } FsDu;
 void fs_du(const char *real, double max_ms, FsDu *out);
 typedef void (*FsHitFn)(void *ud, const char *path, int dir, double size, double mtime);
 int  fs_search(const char *real, const char *needle, int limit, int depth, FsHitFn fn, void *ud);
+/* real is on a cloud, network or other FUSE mount (fuse.*, cifs, smb3, nfs*, 9p…), from the mount table: the interface's
+ * thread mustn't walk it (lord.fs.du and search answer at once there) */
+int  fsops_remote_path(const char *real);
 int  fs_recent(int limit, int days, FsHitFn fn, void *ud);
 typedef void (*FsVolFn)(void *ud, const char *path, const char *fstype, double total, double avail);
 void fs_volumes(FsVolFn fn, void *ud);

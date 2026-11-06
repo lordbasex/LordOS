@@ -2730,6 +2730,7 @@ int main(int argc, char **argv) {
 
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
+    cloud_stop();                         /* B11: every cloud folder unmounted (lazily if busy), then rclone quits */
     if (s.renders)
         fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);

@@ -37,6 +37,8 @@ static const char *const methods[RCM_COUNT] = {
     [RCM_JOB_STATUS] = "job/status",
     [RCM_JOB_STOP] = "job/stop",
     [RCM_LIST] = "operations/list",
+    [RCM_STAT] = "operations/stat",
+    [RCM_COPYFILE] = "operations/copyfile",
 };
 
 const char *rc_method_path(int m) { return m >= 0 && m < RCM_COUNT ? methods[m] : NULL; }
@@ -287,11 +289,14 @@ int cloud_option_refused(const char *n, const char *type) {
 
 const char *cloud_failure_code(const char *m) {
     static const char *const auth[] = { "unable to authenticate", "decryption password incorrect", "incorrect password",
-        "passphrase", "bad decrypt", "401", "403", "Unauthorized", "Forbidden", "authentication", "permission denied",
-        "invalid credentials", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "login failed", "wrong password",
-        "no supported methods remain", "couldn't decrypt", "failed to parse private key", "cannot decode encrypted private keys", NULL };
-    static const char *const net[] = { "connection refused", "i/o timeout", "no route to host", "no such host", "network is unreachable",
-        "connection reset", "deadline exceeded", "timeout", "host is down", "EOF", NULL };
+        "passphrase", "bad decrypt", "401 Unauthorized", "403 Forbidden", "StatusCode: 401", "StatusCode: 403", "status code: 401",
+        "status code: 403", "status code 401", "status code 403", ": 401", ": 403", "Unauthorized", "Forbidden", "authentication failed",
+        "permission denied", "invalid credentials", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "login failed",
+        "Login incorrect", "530 ", "wrong password", "no supported methods remain", "couldn't decrypt", "failed to parse private key",
+        "cannot decode encrypted private keys", "invalid_grant", "STATUS_LOGON_FAILURE", "NT_STATUS_LOGON_FAILURE", NULL };
+    static const char *const net[] = { "connection refused", "no route to host", "no such host", "network is unreachable",
+        "i/o timeout", "host is down", NULL };
+    static const char *const weak[] = { "connection reset", "deadline exceeded", "timeout", "EOF", NULL };
     static const char *const addr[] = { "unsupported protocol scheme", "invalid URL", "missing port", "too many colons", "invalid port",
         "first path segment in URL", "missing protocol scheme", "invalid character", "parse \"", NULL };
     if (!m || !m[0]) return NULL;
@@ -299,9 +304,84 @@ const char *cloud_failure_code(const char *m) {
     if (strstr(m, "decryption password incorrect") || strstr(m, "passphrase")) return "cloud.authFailed";   /* a key's, not TLS */
     if (strstr(m, "x509:") || strstr(m, "failed to verify certificate") || strstr(m, "certificate signed by unknown authority")) return "cloud.certUntrusted";
     for (int i = 0; addr[i]; i++) if (strstr(m, addr[i])) return "cloud.badAddress";
+    for (int i = 0; net[i]; i++) if (strstr(m, net[i])) return "cloud.unreachable";   /* before auth: a port can read "401" */
     for (int i = 0; auth[i]; i++) if (strstr(m, auth[i])) return "cloud.authFailed";
-    for (int i = 0; net[i]; i++) if (strstr(m, net[i])) return "cloud.unreachable";
+    for (int i = 0; weak[i]; i++) if (strstr(m, weak[i])) return "cloud.unreachable";
     return NULL;
+}
+
+void cloud_clean_text(const char *in, char *out, size_t n) {
+    size_t o = 0;
+    int tag = 0, sp = 0;
+    if (!n) return;
+    for (const unsigned char *p = (const unsigned char *)(in ? in : ""); *p && o + 1 < n; p++) {
+        if (*p == '<') { tag = 1; sp = 1; continue; }
+        if (tag) { if (*p == '>') tag = 0; continue; }
+        if (*p < 0x20 || *p == ' ' || *p == 0x7f) { sp = 1; continue; }
+        if (sp && o) { if (o + 2 >= n) break; out[o++] = ' '; }
+        sp = 0;
+        /* a whole UTF-8 sequence or nothing */
+        int k = *p < 0x80 ? 1 : (*p & 0xe0) == 0xc0 ? 2 : (*p & 0xf0) == 0xe0 ? 3 : (*p & 0xf8) == 0xf0 ? 4 : 0;
+        if (!k) continue;
+        if (o + (size_t)k >= n) break;
+        int ok = 1;
+        for (int i = 1; i < k; i++) if ((p[i] & 0xc0) != 0x80) ok = 0;
+        if (!ok) continue;
+        memcpy(out + o, p, (size_t)k);
+        o += (size_t)k;
+        p += k - 1;
+    }
+    out[o] = 0;
+}
+
+/* Go's time.Time printed with %v in UTC: "2026-11-06 22:20:08.123456789 +0000 UTC" → seconds, -1 */
+static double go_time(const char *s) {
+    int Y, M, D, h, m, sec, n = 0;
+    if (sscanf(s, "%4d-%2d-%2d %2d:%2d:%2d%n", &Y, &M, &D, &h, &m, &sec, &n) != 6) return -1;
+    char iso[40];
+    snprintf(iso, sizeof iso, "%04d-%02d-%02dT%02d:%02d:%02dZ", Y, M, D, h, m, sec);
+    double t = (double)cloud_rfc3339(iso), frac = 0, f = 0.1;
+    if (t < 0) return -1;
+    if (s[n] == '.') for (const char *p = s + n + 1; *p >= '0' && *p <= '9'; p++, f /= 10) frac += (*p - '0') * f;
+    return t + frac;
+}
+
+int cloud_remote_changed(const char *fp, long long size, double mtime, const char *const *hashes, int nh) {
+    if (!fp || !fp[0]) return -1;
+    char *end;
+    long long s = strtoll(fp, &end, 10);
+    if (end == fp) return -1;
+    if (s != size) return 1;
+    int told = 1;                                           /* the size alone tells something */
+    for (const char *p = *end == ',' ? end + 1 : NULL; p && *p; ) {
+        const char *e = strchr(p, ',');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        char part[128];
+        if (l >= sizeof part) return -1;
+        memcpy(part, p, l);
+        part[l] = 0;
+        double t = go_time(part);
+        if (t >= 0) {
+            if (mtime >= 0 && (t - mtime > 1 || mtime - t > 1)) return 1;        /* a second: providers round */
+        } else if (nh > 0) {
+            int same = 0;
+            for (int i = 0; i < nh; i++) if (hashes[i] && !strcasecmp(hashes[i], part)) same = 1;
+            if (!same) return 1;
+        }
+        p = e ? e + 1 : NULL;
+    }
+    return told ? 0 : -1;
+}
+
+int cloud_conflict_name(const char *rel, int n, char *out, size_t cap) {
+    const char *base = strrchr(rel, '/');
+    base = base ? base + 1 : rel;
+    const char *dot = strrchr(base, '.');
+    if (!dot || dot == base) dot = base + strlen(base);
+    char num[16] = "";
+    if (n > 1) snprintf(num, sizeof num, " %d", n);
+    int r = snprintf(out, cap, "%.*s (cloud copy%s)%s", (int)(dot - rel), rel, num, dot);   /* i18n-ok: a file name */
+    return r < 0 || (size_t)r >= cap || r > CLOUD_REL_MAX ? -1 : 0;
 }
 
 int cloud_answer_state(const char *s, char *id, size_t n, const char **state) {
@@ -457,6 +537,8 @@ int cloud_meta_parse(const char *json, size_t len, CloudMeta *m) {
         m->dirty = json_bool(o, "Dirty", 0);
         const char *at = json_str(o, "ATime");
         m->atime = at ? cloud_rfc3339(at) : -1;
+        const char *fp = json_str(o, "Fingerprint");
+        if (fp && strlen(fp) < sizeof m->fingerprint) memcpy(m->fingerprint, fp, strlen(fp) + 1);
         const JVal *rs = json_get(o, "Rs");
         r = 0;
         if (rs && rs->type == J_ARR)

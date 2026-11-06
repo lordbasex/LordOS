@@ -42,6 +42,8 @@ typedef enum {
     RCM_JOB_STATUS,     /* job/status of those two */
     RCM_JOB_STOP,       /* job/stop: cancel a Measure */
     RCM_LIST,           /* operations/list of an account's top folder only: a new account is checked before it counts */
+    RCM_STAT,           /* operations/stat of one file about to go up: the conflict rule (7.2) */
+    RCM_COPYFILE,       /* operations/copyfile, inside one account only: the cloud's version kept before ours replaces it */
     RCM_COUNT
 } RcMethod;
 
@@ -93,7 +95,14 @@ int              cloud_internal_question(const char *opt);
  * data (a list given to a shell, …) is refused unless known. type: rclone's Type ("string", "bool", …), NULL unknown. */
 int              cloud_option_refused(const char *name, const char *type);
 /* rclone's words when an account didn't work → cloud.authFailed | cloud.unreachable | cloud.badAddress | NULL (other) */
-const char      *cloud_failure_code(const char *msg);   /* config/create's questions LordOS answers itself */
+const char      *cloud_failure_code(const char *msg);
+/* a message fit for Get Info: HTML tags dropped, white space collapsed, cut at a character boundary to fit n (≤ n-1 bytes) */
+void             cloud_clean_text(const char *in, char *out, size_t n);
+/* the conflict rule (7.2): did the object in the cloud change since this copy came down? fingerprint as kept in vfsMeta,
+ * the object now (size, modtime in seconds or < 0 unknown, its hashes). 1 changed, 0 the same, -1 can't tell */
+int              cloud_remote_changed(const char *fingerprint, long long size, double mtime, const char *const *hashes, int nh);
+/* "dir/name (cloud copy).ext", n > 1 adds " n" before the extension: 0, -1 too long */
+int              cloud_conflict_name(const char *rel, int n, char *out, size_t cap);   /* config/create's questions LordOS answers itself */
 /* a question's state as JS sees it, "<account id>:<rclone's state>": 0 and both parts */
 int              cloud_answer_state(const char *s, char *id, size_t n, const char **state);
 /* the page of an account: 1 and out, 0 none. field: the value of k->webfield (NULL if none). */
@@ -120,6 +129,7 @@ typedef struct {
     long long cached;       /* bytes present in the cache (the ranges) */
     long long atime;        /* last use, seconds */
     int dirty;              /* changed here, not uploaded */
+    char fingerprint[256];  /* rclone's of the object as it was when it came down: "size[,modtime][,hash]" */
 } CloudMeta;
 long long cloud_rfc3339(const char *s);       /* seconds since the epoch, -1 */
 int  cloud_meta_parse(const char *json, size_t len, CloudMeta *m);   /* a vfsMeta file: 0 */
