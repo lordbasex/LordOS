@@ -1708,3 +1708,24 @@ sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
 `sudo apt-get install -y --no-install-recommends qemu-system-x86`. The packages `build-arm64.sh` adds (debootstrap,
 squashfs-tools, xorriso, grub-common, grub-efi-arm64-bin, mtools, dosfstools) go into an overlay over the arm64 chroot,
 not on the VM and not into the chroot itself.
+
+## Step — 0.8.8.4 in development: CalDAV/CardDAV for #32 on VM 116 (2026-11-05)
+
+See `MAIL.md` ("Calendars and contacts accounts", "Measured against Radicale"). Built in `~/LordOS-i32`
+(`make -j2 build/lord-maild build/maild-cli build/mail-test build/mail-test-asan build/mailc-test
+build/mailnet-test build/lord-server`); nothing installed over `/usr/local/lib/lordos`.
+
+1. **Package:** `sudo apt-get install -y --no-install-recommends radicale` (3.5.3; pulls `python3-radicale`).
+   Its system service stays disabled and stopped: the tests run a private instance as `lord`.
+2. **Names:** `127.0.0.1 dav.example.test contacts.example.test` appended to `/etc/hosts` (two names for the
+   same server, so the contacts URL is a different host from the calendars URL, as with the large provider).
+3. **Private Radicale** (`~/LordOS-i32/dav-setup.sh`, kept out of the repo): `127.0.0.1:5233`, TLS with a
+   self-signed certificate for both names (the certificate warning and *Trust This Certificate* are part
+   of the test), `htpasswd` with plain passwords (test only), `owner_only`, storage under
+   `~/LordOS-i32/dav-test`. Users `ana@example.test` and `beto@example.test`, test-only passwords; their
+   calendars, a weekly event with a moved occurrence, an all-day event, a to-do and six contacts are created
+   with `curl` (`MKCOL` / `PUT`). No real account and no outside server were used.
+4. **Runs:** `build/maild-cli` with `HOME=~/LordOS-i32/dav-test/home` (its own accounts file and cache), and an
+   isolated headless session of the branch (`HOME` and `XDG_RUNTIME_DIR` of its own, `--headless 1280x800`)
+   driven over its `remote.sock` as root (the socket accepts only root since the remote desktop hardening),
+   asking for the video (`RP_VIDEO`, `RP_VMODE`) so the lossless stills arrive.

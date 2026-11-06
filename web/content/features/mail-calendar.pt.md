@@ -15,6 +15,7 @@ O e-mail é o caminho mais comum para atacar um computador. Uma mensagem é um d
 - **Convites** que chegam por e-mail: Aceitar, Talvez ou Recusar. O evento entra no Calendário e a resposta vai para o organizador.
 - **Lembretes:** listas, prazos, prioridades, sinalizadores e as visões Hoje / Agendados / Todos / Sinalizados / Concluídos, sincronizados por CalDAV.
 - **Contatos:** locais ou sincronizados por CardDAV, com grupos e fotos. O E-mail completa os endereços a partir deles.
+- **Contas de calendários e contatos pelos próprios apps** (0.8.8.4, em desenvolvimento; a última versão publicada é a 0.8.8.3): *Adicionar conta…* no Calendário e nos Contatos adiciona qualquer servidor CalDAV/CardDAV (os contatos podem ter endereço próprio), ou usa um ajuste embutido para um grande provedor cujos calendários e contatos pedem uma senha específica de app. Se o mesmo evento ou contato também mudou em outro dispositivo, a versão do servidor vence e a sua fica guardada neste computador, com uma notificação dizendo onde.
 - **Os alarmes tocam com os apps fechados,** porque o ajudante continua rodando durante a sessão.
 - **Qualquer conta IMAP e SMTP** funciona. Para alguns provedores muito usados, as configurações do servidor são preenchidas a partir de uma tabela embutida, sem consultar nada online.
 
@@ -42,13 +43,13 @@ O e-mail é o caminho mais comum para atacar um computador. Uma mensagem é um d
 
 ## As perguntas do leitor cético
 
-**E se uma mensagem explorar um bug no leitor?** É exatamente o que o projeto supõe que um dia vai acontecer. O leitor roda no `lord-maild`, que não consegue criar sockets, não consegue executar programas e só pode escrever no próprio cache. Os leitores são testados a fundo: 30.953 verificações no `mail-test`, incluindo fuzzing por mutação de MIME, conjuntos de caracteres, o sanitizador de HTML, iCalendar, vCard e XML, além de suítes separadas para a camada de rede e para o conector.
+**E se uma mensagem explorar um bug no leitor?** É exatamente o que o projeto supõe que um dia vai acontecer. O leitor roda no `lord-maild`, que não consegue criar sockets, não consegue executar programas e só pode escrever no próprio cache. Os leitores são testados a fundo: 47.395 verificações no `mail-test`, incluindo fuzzing por mutação de MIME, conjuntos de caracteres, o sanitizador de HTML, iCalendar, vCard, XML e as rotinas de sincronização de calendários, além de suítes separadas para a camada de rede e para o conector.
 
 **Um ajudante sequestrado poderia falar com a minha rede local?** Só com os servidores do seu arquivo de contas. As liberações de imagens se limitam a endereços públicos, e a verificação é feita no endereço realmente conectado, então um truque de DNS não consegue redirecioná-lo para o seu roteador.
 
 **O desktop trava enquanto o e-mail sincroniza?** Não. Os pedidos são assíncronos; dentro do ajudante, o trabalho de rede roda numa thread por conta. Medido numa VM de teste: uma pasta com 10.000 mensagens sincroniza em cerca de 2 s e abre a partir do cache local em cerca de 20 ms.
 
-**O login por OAuth é suportado?** Está preparado, mas desativado. Os grandes provedores só emitem tokens de login para aplicativos registrados com eles, então é preciso um client ID registrado. Até lá, essas contas usam senhas de app.
+**O login por OAuth é suportado?** Está preparado, mas desativado. Os grandes provedores só emitem tokens de login para aplicativos registrados com eles, então é preciso um client ID registrado. Até lá, essas contas usam senhas de app. Um grande provedor só permite seus calendários e contatos com OAuth: Adicionar conta mostra esse caso como "ainda não disponível" em vez de pedir uma senha.
 
 [[shot:3]]
 
@@ -56,7 +57,7 @@ O e-mail é o caminho mais comum para atacar um computador. Uma mensagem é um d
 
 ## Limites honestos
 
-- **Nenhuma conta de provedor real foi testada.** A VM de teste usou servidores IMAP, SMTP e CalDAV/CardDAV locais, com uma autoridade certificadora de teste. As configurações de provedores embutidas vêm dos valores publicados pelos próprios provedores.
+- **Nenhuma conta de provedor real foi testada.** A VM de teste usou servidores IMAP, SMTP e CalDAV/CardDAV locais, com uma autoridade certificadora de teste. As configurações de provedores embutidas vêm dos valores publicados pelos próprios provedores; o ajuste de calendários e contatos foi testado com um servidor Radicale local e com respostas de teste no formato das do provedor.
 - **Ainda não:** editar uma única ocorrência de um evento que se repete, criar calendários ou catálogos de endereços no servidor, conjuntos de caracteres CJK multibyte, e-mail criptografado ou assinado (S/MIME e OpenPGP) e IMAP QRESYNC.
 - **O login por OAuth** fica desativado até um client ID ser registrado.
 
