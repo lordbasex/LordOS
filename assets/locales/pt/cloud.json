@@ -358,5 +358,11 @@
   "space.notMeasured": "Espaço não medido",
   "state.serviceDown": "Sem conexão: o serviço da Nuvem não está funcionando",
   "serviceDown.title": "O serviço da Nuvem não está funcionando",
-  "serviceDown.body": "Suas contas não se conectam até ele voltar a funcionar."
+  "serviceDown.body": "Suas contas não se conectam até ele voltar a funcionar.",
+  "trust.changedTitle": "A identidade do servidor mudou",
+  "trust.changedBody": "{host} agora mostra uma chave diferente da que esta conta aceitou. Isso acontece quando o servidor é reinstalado, mas também pode ser outro computador se passando por ele. Confie na chave nova só se o administrador do servidor confirmar a impressão digital.",
+  "trust.old": "Antes",
+  "trust.new": "Agora",
+  "trust.trustNew": "Confiar na chave nova",
+  "cred.noteSftp": "Na primeira vez, o LordOS mostra a impressão digital da chave do servidor para você comparar com a do administrador. Senhas e chaves vão para o chaveiro."
 }

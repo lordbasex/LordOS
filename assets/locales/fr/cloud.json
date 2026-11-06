@@ -358,5 +358,11 @@
   "space.notMeasured": "Espace non mesuré",
   "state.serviceDown": "Non connecté : le service Cloud ne fonctionne pas",
   "serviceDown.title": "Le service Cloud ne fonctionne pas",
-  "serviceDown.body": "Vos comptes ne sont pas connectés tant qu’il ne fonctionne pas de nouveau."
+  "serviceDown.body": "Vos comptes ne sont pas connectés tant qu’il ne fonctionne pas de nouveau.",
+  "trust.changedTitle": "L’identité du serveur a changé",
+  "trust.changedBody": "{host} présente maintenant une clé différente de celle que ce compte avait acceptée. Cela arrive quand le serveur est réinstallé, mais cela peut aussi vouloir dire qu’un autre ordinateur se fait passer pour lui. Ne faites confiance à la nouvelle clé que si l’administrateur du serveur confirme son empreinte.",
+  "trust.old": "Avant",
+  "trust.new": "Maintenant",
+  "trust.trustNew": "Faire confiance à la nouvelle clé",
+  "cred.noteSftp": "La première fois, LordOS affiche l’empreinte de la clé du serveur pour que vous la compariez avec celle de son administrateur. Mots de passe et clés vont dans le trousseau."
 }

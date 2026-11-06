@@ -878,3 +878,15 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
 - **U7**: while `service.running` is false every account says "Not connected: the cloud service isn't running" (dim with
   "!" in Files' sidebar), and the overview starts with the service's own message, **Restart** and **Show Log**.
 - The server form no longer promises a fingerprint prompt; the trust step (18.4) shows only when lord-server asks.
+
+### 18.6 The e2e re-run (U9, U10)
+
+- **U9**: the SFTP form's note is about the server's key ("The first time, LordOS shows the server's key fingerprint…"),
+  not a certificate.
+- **U10**: `cloud.hostKeyChanged` and `cloud.certChanged` no longer carry `{old}`/`{new}` in their text; the fingerprints
+  show apart, in monospace, as **Before** and **Now** (`changedPrints`: the answer's `old`/`new`, else the new one from the
+  account's `message`), under the credentials form's error and in the account's status box.
+- A question `{ kind: 'hostKeyChanged', old, new }` (Sign In Again by the owner) asks "The server's identity changed" with
+  both fingerprints and **Trust the New Key**, answered `cloud.answer(state, 'trust')`.
+- `cloud.tooManyAttempts`: "The server is refusing new connections from this computer for a while. Wait a minute and try
+  again."

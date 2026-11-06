@@ -495,7 +495,14 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     ['noQuota', true, false, false]);
   const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/errors.json'), 'utf8'));
   eq('each new error has its own text', ['cloud.hostKeyChanged', 'cloud.certUntrusted', 'cloud.unreachable', 'cloud.badAddress', 'cloud.cantRevoke', 'cloud.notConnected', 'cloud.keyringLocked', 'cloud.noKeyring', 'cloud.notRunning', 'cloud.notFound', 'cloud.badKind'].filter((k) => !cat[k]), []);
-  eq('fingerprints and the date in their texts', [/\{old\}.*\{new\}/.test(cat['cloud.hostKeyChanged']), /\{date\}/.test(cat['cloud.cantRevoke'])], [true, true]);
+  eq('fingerprints shown apart, never as {old}/{new} in the text (U10); the date in its text', [/\{(old|new)\}/.test(cat['cloud.hostKeyChanged'] + cat['cloud.certChanged']), /\{date\}/.test(cat['cloud.cantRevoke'])], [false, true]);
+  eq('the fingerprints of a change: the answer\'s, else the account\'s message', [M.changedPrints({ error: 'cloud.hostKeyChanged', old: 'SHA256:a', new: 'SHA256:b' }),
+    M.changedPrints(null, { error: 'cloud.hostKeyChanged', message: 'host key is now SHA256:Xy9+/z=' }), M.changedPrints({ error: 'cloud.unreachable' }), M.changedPrints(null, { error: 'cloud.keyringLocked' })],
+    [{ old: 'SHA256:a', new: 'SHA256:b' }, { old: null, new: 'SHA256:Xy9+/z=' }, null, null]);
+  eq('the owner trusts a changed key (question kind)', M.trustKind({ kind: 'hostKeyChanged', old: 'a', new: 'b' }), 'hostKeyChanged');
+  eq('too many attempts has its own text', !!cat['cloud.tooManyAttempts'], true);
+  const cl = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
+  eq('SFTP\'s note is about the server\'s key (U9)', [/key/i.test(cl['cred.noteSftp']), /certificate/i.test(cl['cred.noteSftp'])], [true, false]);
 }
 
 // ---- the e2e first pass: U3, U4, U6, U7 ----

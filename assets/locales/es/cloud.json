@@ -358,5 +358,11 @@
   "space.notMeasured": "Espacio sin medir",
   "state.serviceDown": "Sin conexión: el servicio de nube no está funcionando",
   "serviceDown.title": "El servicio de nube no está funcionando",
-  "serviceDown.body": "Tus cuentas no se conectan hasta que vuelva a funcionar."
+  "serviceDown.body": "Tus cuentas no se conectan hasta que vuelva a funcionar.",
+  "trust.changedTitle": "La identidad del servidor cambió",
+  "trust.changedBody": "{host} ahora muestra una clave distinta de la que esta cuenta aceptó. Pasa cuando se reinstala el servidor, pero también puede ser otra computadora haciéndose pasar por él. Confiá en la clave nueva solo si el administrador del servidor confirma su huella.",
+  "trust.old": "Antes",
+  "trust.new": "Ahora",
+  "trust.trustNew": "Confiar en la clave nueva",
+  "cred.noteSftp": "La primera vez, LordOS muestra la huella de la clave del servidor para que la compares con la del administrador. Las contraseñas y las claves van al llavero."
 }

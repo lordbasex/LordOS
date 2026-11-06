@@ -503,7 +503,17 @@ export function providerName(acc, list) {
   return cut.length > 40 ? `${cut.slice(0, 38).replace(/\s+\S*$/, '')}…` : cut;
 }
 // a trust question from add/answer: 'hostKey' | 'certificate' | null (an ordinary question of rclone's)
-export const trustKind = (q) => (q && (q.kind === 'hostKey' || q.kind === 'certificate') ? q.kind : null);
+export const trustKind = (q) => (q && ['hostKey', 'certificate', 'hostKeyChanged'].includes(q.kind) ? q.kind : null);
+// The fingerprints behind a changed key or certificate: the answer's old and new, else the account's message (the new one)
+export function changedPrints(r, acc) {
+  const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code);
+  const src = { ...(r || {}), ...(r && typeof r.error === 'object' ? r.error : {}) };
+  if (!['cloud.hostKeyChanged', 'cloud.certChanged'].includes(code || (acc && acc.error))) return null;
+  const old = src.old || src.oldFingerprint || null;
+  let nw = src.new || src.fingerprint || null;
+  if (!nw && acc && /SHA256:|([0-9A-F]{2}:){8}/i.test(String(acc.message || ''))) nw = String(acc.message).match(/SHA256:[A-Za-z0-9+/=]+|([0-9A-F]{2}:){15,}[0-9A-F]{2}/i)[0];
+  return old || nw ? { old, new: nw } : null;
+}
 // an error answer → { code, vars } for errors.<code>: its details (fingerprints, a date) come as fields of the answer
 export function errorVars(r, fmtDate) {
   const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code) || '';

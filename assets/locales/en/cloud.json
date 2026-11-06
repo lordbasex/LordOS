@@ -358,5 +358,11 @@
   "space.notMeasured": "Space not measured",
   "state.serviceDown": "Not connected: the cloud service isn't running",
   "serviceDown.title": "The cloud service isn't running",
-  "serviceDown.body": "Your accounts aren't connected until it runs again."
+  "serviceDown.body": "Your accounts aren't connected until it runs again.",
+  "trust.changedTitle": "The server's identity changed",
+  "trust.changedBody": "{host} now shows a different key from the one this account trusted. That happens when the server is reinstalled, but it can also mean another computer is posing as it. Trust the new key only if the server's administrator confirms its fingerprint.",
+  "trust.old": "Before",
+  "trust.new": "Now",
+  "trust.trustNew": "Trust the New Key",
+  "cred.noteSftp": "The first time, LordOS shows the server's key fingerprint to compare with its administrator's. Passwords and keys go to the keyring."
 }
