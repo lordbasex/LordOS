@@ -2,8 +2,8 @@
 
 The design of **Machines** (working name), LordOS's desktop virtualization app: run other operating systems in windows of the
 LordOS desktop, on the machine you have, at native speed where the hardware allows it, for free and with open source parts.
-This is the design, and it follows the Virtual machines item in [ROADMAP.md](ROADMAP.md). Phase 0 (section 13) and the internals
-of Phase 1 (3.9) are built; the app isn't.
+This is the design, and it follows the Virtual machines item in [ROADMAP.md](ROADMAP.md). Phases 0 to 2 and the import of Phase 3
+are built (see "Status and how to continue" below).
 
 How to read it:
 
@@ -17,6 +17,119 @@ How to read it:
 
 
 Mocks of every screen: https://claude.ai/artifact/WNiELGEazSqnr68SFWuyPz (private to the maintainer).
+
+## Status and how to continue (read this first)
+
+Updated 2026-11-07. This is the resume point: what is built, what was validated where, and what each phase still needs. When
+work continues, start here, pick the next open item, and tick it here (with the date and where it was checked) in the same
+commit that does it. The details of each item are in the section named after it.
+
+**Where the code is.** Machines ships in **0.8.8.5-beta** (it was planned as 0.8.9; the maintainer moved it forward on
+2026-11-07), merged with Cloud on branch `rel-0885` and from there into `main`. Its history is on `machines-089` (from
+`machines-beta` and `machines-import`). Parts: `server/src/vm/` (`lord-vm`, `lord-vmdisplay`, the protocol `vmproto.h`, import,
+catalog, unattended answer files `vmunattend.c`), `server/src/ui/js_vm*.c` (`lord.vm`), `apps/machines/` (the app, from the
+mocks), `assets/machines/systems.json` and `packaging/keys/machines/` (download cards and the makers' pinned keys).
+
+**How to test.**
+- Unit and integration: `make -C server test` (vm-test, vmimport, vm-import, vmcatalog, http-resume, vmunattend and the suites);
+  on the Mac `node server/tests/vm_catalog_test.mjs` and `node server/tests/vm_model_test.mjs`, `node tools/i18n-check.mjs`,
+  `node tools/brand-check.mjs`.
+- Release gates (12): `server/tests/vm_isolation.sh`, `vm_integrity.sh`, `vm_recovery.sh`, `vm_leak.sh` (helpers in
+  `vm_gate_lib.sh`); on a physical PC `tools/vm/bare-metal-gates.sh` runs them and writes one results file.
+- On screen in a real session: the bench in `tools/vm/e2e/` (README there): a headless LordOS session, a driver bundle, clicks and
+  screenshots over `remote.sock`.
+- Never on the maintainer's daily desktop without asking; the build VM (VM 116) and the Pi 5 may be used.
+
+### Phase 0, technical proof: done (2026-11-04)
+
+- [x] KVM, QEMU, QMP and D-Bus display, Debian 13 guest with picture and input on amd64 (nested) and the Pi 5 (section 13).
+- [x] 4K guest on the 16K Pi kernel, GICv2, `device=/dev/fdset`, `ui-dbus` on arm64, TCG numbers, passt chosen over user networking,
+  virtiofs on both, the Pi desktop under a 3-vCPU load.
+- Left open from 13.8 (carried to later phases, below): bare-metal amd64 figures, the arm64 3D abort, dmabuf import, GICV trapping,
+  passt's speed spread on the Pi, boot time.
+
+### Phase 1, alpha: done (2026-11-05)
+
+- [x] `lord-vm` (sandbox, QMP, cgroup limits, crash recovery), `lord-vmdisplay`, `machine.json` schema, qcow2 NVRAM (3.9).
+- [x] Isolation test passes on the Pi 5 and amd64.
+- [x] Phase 1's open items: Esc in a menu, CD/DVD while running, install timeout, passt crash healing.
+
+### Phase 2, beta: built, one validation left
+
+Built and validated:
+- [x] Control Center of cards, right-click menu, five-step New Machine assistant, Configure, Logs, machine window with toolbar and
+  menus, full-screen bar, BootFailed page (mocks).
+- [x] Suspend and resume, Keep Running, Start Without Window, keep awake (6.1); snapshots with memory and a timeline (6.2);
+  Clone, Duplicate, linked clones, Clone from Here (6.3); Storage window and Reclaim Space (6.16).
+- [x] Profiles, resolution menu, Record with sound, Shell (serial console), Logs with Overview (6.18, 6.19).
+- [x] Guest agent with its popover, shared clipboard (text, images, rich text, sanitized), clock after resume, Clone identity
+  reset.
+- [x] Self-healing network (passt restarted while running), host shutdown or logout saves running machines.
+- [x] Download cards Debian, Ubuntu, Fedora, Kali per architecture: makers' OpenPGP signatures checked, SHA-256, resumed downloads,
+  downloaded systems in Storage with removal.
+- [x] Install without questions (Debian preseed, Ubuntu autoinstall, Fedora kickstart; password only as a SHA-512 hash).
+- [x] Shut Down through the guest agent first, then the ACPI button; root cause of a guest ignoring the button (no dbus, so no
+  logind; unattended installs now always bring the standard task, `qemu-guest-agent`, and `acpid` on a console Debian).
+- [x] Release gates pass: Pi 5 (45/41/10), nested amd64, bare-metal Xeon Silver 4108 (47/41/10, 2026-11-06).
+- [x] Debian 13.7 desktop end to end with nothing typed: card, download (stopped and continued), install, reboot, login to GNOME
+  (about 28 min on 2 vCPU, 3 GB; 2026-11-07, VM 116, screenshots `u-01`…`u-08`).
+- [x] Kernel paths in the real ISOs match the catalog (Ubuntu `casper/`, Fedora `images/pxeboot/`).
+
+Still open in Phase 2:
+- [ ] **Ubuntu 26.04 unattended desktop install through its reboot and login** (it ran the whole autoinstall into
+  `ubuntu-desktop-minimal`; the first try stopped when the build VM's disk filled). Needs about 12 GB free.
+- [ ] **Fedora 45 kickstart install through its reboot and login** (seen partitioning and downloading packages, stopped on
+  purpose).
+- [ ] Ubuntu console (no desktop) install through login.
+- [ ] Kali card end to end (only its catalog entry and signature check were exercised).
+- [ ] arm64 cards end to end on the Pi 5 (the unattended path was checked on amd64 only).
+- [ ] Seen, not fixed: on a first start the window can stay on "Display output is not active" until it is given a size.
+- [ ] Whether the session's idle sleep was really held off by a running machine wasn't watched on screen (6.1).
+- [ ] Shared extents (reflink) in Storage weren't seen: the test machines are ext4; check on btrfs or XFS.
+- [ ] Bare-metal amd64 on the maintainer's i9 PC (AMD GPU): run `tools/vm/bare-metal-gates.sh`, then the Debian card on screen,
+  and record the numbers in section 13 (13.8 item 1, with Mesa: 3D and dmabuf formats).
+
+### Phase 3, advanced: import built, the rest open
+
+- [x] Migrate from another app (`.vmx`/`.vmwarevm`, `.vbox`, `.pvm`, `.ova`/`.ovf`, single VMDK/VDI/VHDX/VHD), identity kept,
+  hostile-input rules, sandboxed conversion (6.22).
+- [ ] Shared folders (virtiofs, 6.x; measured in Phase 0, not built in the app). Recommended first.
+- [ ] USB passthrough of a device to a machine.
+- [ ] Bridged and Host-only networks (`vhost-net` for Bridged).
+- [ ] File copy panel with flow control and resume, Send to LordOS, drag in and out (7, target 300 MB/s).
+- [ ] UEFI secure boot and TPM (swtpm, its state in snapshots: To test).
+- [ ] virtio-win guests on both architectures with automatic driver setup (4.3; pinned virtio-win version, answer-file edition
+  selection, the generic key only as fallback).
+- [ ] 3D: virgl and venus on amd64; the arm64 3D abort (13.8 item 2, open decision 5).
+- [ ] dmabuf import in the compositor (13.8 item 3) and latency to the screen (13.8 item 4).
+- [ ] Picture in Picture, multi-head.
+- [ ] Export, backups of machines, Monitor integration.
+- [ ] `lordvm` command line: shell, exec, logs, cp.
+- [ ] Done when: a real compatibility and security matrix per architecture (16).
+
+### Phase 4, integration: not started
+
+- [ ] Linux Apps mode (guest apps as windows, in the Dock).
+- [ ] Reproducible machines (`lordvm apply dev.toml`, rebuild).
+- [ ] Local MCP server (`lordvm mcp`, off by default; open question 11).
+- [ ] Migrate from another computer (6.11).
+- [ ] Android card, if the image exists (open question 6).
+
+### Phase 5, later: decided then
+
+- [ ] Own agent for other guests' windows; a lightweight engine for Linux guests; GPU passthrough on PCs; reaching a machine from
+  another computer over LordOS's remote desktop.
+
+### Measurements and checks still open (any phase)
+
+- [ ] 13.8 item 5: repeat the Pi's 4-vCPU drag on an untouched board, a memory-heavy guest at 3 vCPUs, the 1000 ms stalls with all
+  cores busy (a desktop issue, also with no VM).
+- [ ] 13.8 item 6: GICV trapping cost on the 16K kernel, and a 4K kernel (open decision 4).
+- [ ] 13.8 item 7: render node by descriptor, one slice for all machines under `lord-sessiond` (3.7).
+- [ ] 13.8 item 8: passt's 96–379 MB/s spread on the Pi.
+- [ ] 13.8 item 9: boot time (UEFI is 12.3 s of the Pi's 18.6 s); direct kernel boot for Linux guests.
+- [ ] Our own seccomp filter on top of QEMU's (3.x, To test).
+- [ ] Open questions in 18 (1, 2, 3, 5, 6, 8, 9, 10, 11) wait for the maintainer.
 
 ## 1. Goals
 
