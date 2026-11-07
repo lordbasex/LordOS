@@ -927,6 +927,15 @@ static void outputs_apply(Server *s) {
                 out_scale(o), o->v.w, o->v.h, o->v.x, o->v.y, j == p.main ? ", main" : "", p.mirror ? ", mirror" : "");
     }
     display_resync_done(ok, &p);
+    /* the login screen opens its clock and users on this session's main display (lord-sessiond keeps
+     * the connector for it, docs/DISPLAYS.md): only a change is sent */
+    static char told_main[32];
+    if (ok && !s->greeter && p.n > 1 && strcmp(told_main, p.o[p.main].connector)) {
+        char j[96];
+        snprintf(told_main, sizeof told_main, "%s", p.o[p.main].connector);
+        snprintf(j, sizeof j, "{\"a\":\"display\",\"main\":\"%s\"}", told_main);
+        mirror_session(j);
+    }
     set_size(s, p.bw > 0 ? p.bw : (int)k0->width, p.bh > 0 ? p.bh : (int)k0->height);
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;     /* the GPU stopped above */
     if (gpu_allowed(s) && !s->gpu_paused) gpu_start(s);

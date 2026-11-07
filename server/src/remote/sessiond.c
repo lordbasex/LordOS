@@ -464,6 +464,47 @@ static void save_last_user(const char *user) {
     if (!ok || rename(SD_LAST_USER ".new", SD_LAST_USER)) unlink(SD_LAST_USER ".new");
 }
 
+/* The main display last chosen in the session shown on the monitor, by connector ("HDMI-A-1", "DP-2"):
+ * the login screen opens there (sd_main_display), so a dark first connector doesn't leave it blind.
+ * Kept in SD_MAIN_DISPLAY (root's, 0644); only [A-Za-z0-9-], up to 31 characters, is accepted or read back. */
+#define SD_MAIN_DISPLAY "/var/lib/lordos/main-display"
+
+static int valid_connector(const char *c) {
+    size_t n = strlen(c);
+    if (!n || n > 31) return 0;
+    for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)c[i]) && c[i] != '-') return 0;
+    return 1;
+}
+
+static void load_main_display(void) {
+    sd_main_display[0] = 0;
+    int fd = open(SD_MAIN_DISPLAY, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return;
+    char buf[40];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    buf[strcspn(buf, "\n")] = 0;
+    if (valid_connector(buf)) snprintf(sd_main_display, sizeof sd_main_display, "LORD_MAIN_DISPLAY=%s", buf);
+}
+
+static void save_main_display(const char *conn) {
+    char env[sizeof sd_main_display];
+    if (!valid_connector(conn)) return;
+    snprintf(env, sizeof env, "LORD_MAIN_DISPLAY=%s", conn);
+    if (!strcmp(env, sd_main_display)) return;
+    memcpy(sd_main_display, env, sizeof env);
+    mkdir("/var/lib/lordos", 0755);
+    unlink(SD_MAIN_DISPLAY ".new");
+    int fd = open(SD_MAIN_DISPLAY ".new", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd < 0) return;
+    size_t n = strlen(conn);
+    int ok = write(fd, conn, n) == (ssize_t)n && write(fd, "\n", 1) == 1;
+    close(fd);
+    if (!ok || rename(SD_MAIN_DISPLAY ".new", SD_MAIN_DISPLAY)) unlink(SD_MAIN_DISPLAY ".new");
+}
+
 /* LordBench's boot time test (bench/boottest.h): after a test boot's first frame, when to restart (rd_now()
  * seconds, 0 = not pending) and which boot of how many this one was */
 static double bt_reboot_at;
@@ -954,6 +995,12 @@ static void from_shown(int type, const char *j) {
         char a[16] = "";
         jstr(j, "a", a, sizeof a);
         if (!strcmp(a, "power")) { session_power(j); return; }
+        if (!strcmp(a, "display")) {
+            char m[40] = "";
+            jstr(j, "main", m, sizeof m);
+            save_main_display(m);
+            return;
+        }
         if (strstr(j, "\"lock\"")) {
             sd_log("%s locked the screen", shown_user);
             struct passwd *lp = sd_valid_username(shown_user) ? getpwnam(shown_user) : NULL;
@@ -1376,6 +1423,7 @@ int main(int argc, char **argv) {
     find_paths();
     load_config();
     load_last_user();
+    load_main_display();
     stop_greeters("left over from before this start");
     mkdir("/run/lordos", 0755);
     /* delegated cgroup (Delegate=yes): sessiond moves into the "supervisor" leaf and each session gets

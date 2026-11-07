@@ -235,6 +235,14 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         unique_identity(o, i, ids[i], ID_MAX, names[i], sizeof names[i]);
         if (main_i < 0 && c->main_id[0] && !strcmp(ids[i], c->main_id)) main_i = i;
     }
+    /* the login screen has no displays.json: lord-sessiond gives it the main display last chosen in a
+     * session (LORD_MAIN_DISPLAY, a connector), else the first connected one */
+    const char *want = c->main_id[0] ? NULL : getenv("LORD_MAIN_DISPLAY");
+    for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && main_i < 0 && want && want[0]; i++) {
+        char conn[32];
+        snprintf(conn, sizeof conn, "%s-%u", kms_connector_type_name(o[i].type), o[i].type_id);
+        if (o[i].connected && o[i].nmodes && !strcmp(conn, want)) main_i = i;
+    }
     for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && main_i < 0; i++) if (o[i].connected && o[i].nmodes) main_i = i;
     if (main_i < 0) return 0;
     idx[m++] = main_i;                                      /* the main display first */

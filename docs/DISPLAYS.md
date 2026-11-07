@@ -275,3 +275,9 @@ not its name, because two monitors of the same model share a name; a value saved
 works while it names a single display (`sdk/dock.js`, `assignedDisplay`). The sign-in and lock screen
 shows its clock, users and buttons on the main display and its wallpaper on every display
 (`themes/greeter`).
+
+Its main display is the one last chosen in the session shown on the monitor: that session sends the
+connector to `lord-sessiond` (`{"a":"display","main":"DP-2"}`) when it changes, `lord-sessiond` keeps
+it in `/var/lib/lordos/main-display` and starts the login screen with `LORD_MAIN_DISPLAY=<connector>`.
+If that connector isn't connected, the first connected one is the main display, as before. It goes by
+connector because identical monitors can report the same EDID serial.

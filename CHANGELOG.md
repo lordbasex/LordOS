@@ -14,6 +14,7 @@ In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
 
 ### Fixed
 
+- **The login screen opens on the main display you chose.** It runs as its own system user and has no `displays.json`, so it always took the first connected connector: with three monitors on a Radeon RX 580 and the first DisplayPort output dark, the password had to be typed blind. The session shown on the monitor now tells `lord-sessiond` its main display's connector when it changes (`{"a":"display","main":"HDMI-A-1"}`, only `[A-Za-z0-9-]`, up to 31 characters); `lord-sessiond` keeps it in `/var/lib/lordos/main-display` (root's, 0644) and starts the login screen with `LORD_MAIN_DISPLAY`, which its display plan uses when that connector is connected (else the first connected one, as before). The connector, not the monitor's identity, because identical monitors can report the same EDID serial (three Samsung S27F350 here).
 - **The hardware cursor on amdgpu** (Radeon RX 580): the cursor plane is created at the driver's `DRM_CAP_CURSOR_WIDTH/HEIGHT` (128 there) instead of 64×64. The driver scanned a 64×64 buffer as 128×128, squashing the arrow and showing colored stripes read from past the buffer.
 - **"atomic remove_fb failed" kernel warnings** when the GPU path stops (rearranging displays, screen recording, a failed GPU frame): the dumb buffers now go on screen before the GPU's framebuffers are removed. Removing a framebuffer still scanned out makes the kernel try to turn its CRTC off, which amdgpu refuses with a WARNING and a tainted kernel.
 
