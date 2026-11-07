@@ -30,6 +30,11 @@ const CursorImage *cursor_image_pct(int shape, int pct);
  * display. The result is capped at 200 % (64 px, the cursor plane). Returns 1 if it changed. */
 int cursor_set_size(int pct);
 int cursor_size(void);
+/* Shake to find it (shake.h): level 0..1 grows the cursor toward 200 % (in eighths); 1 if it changed.
+ * cursor_set_shake turns the gesture on or off (Settings → Mouse & Trackpad, on by default). */
+int cursor_set_boost(double level);
+void cursor_set_shake(int on);
+int cursor_shake(void);
 /* Changes each time the size changes (to redraw the cursor). */
 unsigned cursor_size_serial(void);
 /* The scale (percent, a multiple of 25 in 75–200) a display at pct gets with the size setting. */

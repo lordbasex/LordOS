@@ -2,6 +2,8 @@
   "pointer.title": "Pointer",
   "pointer.size": "Pointer size",
   "pointer.sizeHint": "For the mouse and the trackpad, on top of the display's scale. Linux apps opened from now on use it too.",
+  "pointer.shake": "Shake pointer to locate",
+  "pointer.shakeHint": "Move the mouse or your finger quickly left and right and the pointer grows for a moment, so you can find it.",
   "pointer.small": "Small",
   "pointer.default": "Default",
   "pointer.large": "Large",

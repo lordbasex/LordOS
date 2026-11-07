@@ -54,6 +54,7 @@
 #include "app/apphost_bc.h"
 #include "sec/broker.h"
 #include "cursor.h"
+#include "shake.h"
 #include "ui/grab.h"
 #include "ui/js_wm.h"
 #include "ui/portal.h"
@@ -451,8 +452,15 @@ static int node_cursor(const Node *n) {
 
 static int out_scale(const Out *o);
 static int out_at_pointer(const Server *s);
+/* shake the pointer to find it (shake.h): every motion, from any device, feeds it */
+static Shake pointer_shake;
 static void dispatch_pointer(Server *s) {
     s->motion_pending = 0;
+    {
+        static int px, py, seen;
+        if (s->moved && cursor_shake() && seen) shake_motion(&pointer_shake, now_ms(), s->cx - px, s->cy - py);
+        px = s->cx; py = s->cy; seen = 1;
+    }
     {   /* app cursors by name (cursor-shape-v1) at the scale of the display under the pointer */
         int oi = out_at_pointer(s);
         wl_set_pointer_scale(oi >= 0 ? out_scale(&s->out[oi]) : 100);
@@ -2543,6 +2551,10 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        /* shake to find it: the cursor grows and shrinks back (a new size serial redraws it below) */
+        cursor_set_boost(cursor_shake() ? shake_level(&pointer_shake, now) : 0);
+        double shd0 = cursor_shake() ? shake_timeout(&pointer_shake, now) : -1;
+        if (shd0 >= 0 && (delay < 0 || shd0 < delay)) delay = shd0;
         static unsigned cursor_size_seen;   /* Settings → Mouse & Trackpad: pointer size */
         if (cursor_size_serial() != cursor_size_seen) {
             cursor_size_seen = cursor_size_serial();

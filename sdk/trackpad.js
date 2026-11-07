@@ -18,6 +18,7 @@ export const TRACKPAD_DEFAULTS = {
   mouseNatural: false,      // a mouse's wheel the other way
   mouseLeftHanded: false,   // a mouse's primary button is the right one
   pointerSize: 1,           // pointer size, times the display's (0.75..2)
+  shakeToLocate: true,      // shake the pointer to find it: it grows for a moment
   scrollSpeed: 0.5,         // two-finger scroll speed (0..1)
   sensitivity: 'medium',    // touch sensitivity: 'low' | 'medium' | 'high'
   tap: true,                // tap to click

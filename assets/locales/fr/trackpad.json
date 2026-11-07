@@ -2,6 +2,8 @@
   "pointer.title": "Pointeur",
   "pointer.size": "Taille du pointeur",
   "pointer.sizeHint": "Pour la souris et le trackpad, en plus de l'échelle de l'écran. Les apps Linux ouvertes désormais l'utilisent aussi.",
+  "pointer.shake": "Secouer le pointeur pour le localiser",
+  "pointer.shakeHint": "Déplacez vite la souris ou le doigt de gauche à droite et le pointeur grossit un instant pour que vous le trouviez.",
   "pointer.small": "Petit",
   "pointer.default": "Normal",
   "pointer.large": "Grand",

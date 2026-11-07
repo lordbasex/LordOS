@@ -93,6 +93,7 @@ export function TrackpadSettings() {
             options={[[0.75, tr('trackpad.pointer.small')], [1, tr('trackpad.pointer.default')], [1.25, tr('trackpad.pointer.large')],
               [1.5, tr('trackpad.pointer.larger')], [2, tr('trackpad.pointer.largest')]]} />
         </SettingRow>
+        <SettingRow label={tr('trackpad.pointer.shake')} hint={tr('trackpad.pointer.shakeHint')}>{toggle('shakeToLocate')}</SettingRow>
       </Section>
       <Section title={tr('trackpad.mouse.title')}>
         <SettingRow label={tr('trackpad.mouse.speed')} stack={false}>{slider('mouseSpeed')}</SettingRow>

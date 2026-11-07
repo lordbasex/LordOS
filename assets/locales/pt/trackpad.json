@@ -2,6 +2,8 @@
   "pointer.title": "Ponteiro",
   "pointer.size": "Tamanho do ponteiro",
   "pointer.sizeHint": "Para o mouse e o trackpad, além da escala da tela. Os apps Linux que você abrir a partir de agora também o usam.",
+  "pointer.shake": "Agitar o ponteiro para localizá-lo",
+  "pointer.shakeHint": "Mova o mouse ou o dedo rapidamente de um lado para o outro e o ponteiro aumenta por um momento para você encontrá-lo.",
   "pointer.small": "Pequeno",
   "pointer.default": "Padrão",
   "pointer.large": "Grande",

@@ -184,6 +184,8 @@ static void build(int shape, Shape *s) {
 static CursorImage cache[6][CUR_COUNT];       /* 75, 100, 125, 150, 175 and 200 % */
 static int size_pct = 100;
 static unsigned size_serial;
+static int boost_8ths;                          /* shake to find it (shake.c): 0..8, toward 200 % */
+static int shake_on = 1;
 
 int cursor_set_size(int pct) {
     if (pct < 75) pct = 75;
@@ -194,6 +196,18 @@ int cursor_set_size(int pct) {
     return 1;
 }
 int cursor_size(void) { return size_pct; }
+
+int cursor_set_boost(double level) {
+    int b = (int)(level * 8 + 0.5);
+    if (b < 0) b = 0;
+    if (b > 8) b = 8;
+    if (b == boost_8ths) return 0;
+    boost_8ths = b;
+    size_serial++;
+    return 1;
+}
+void cursor_set_shake(int on) { shake_on = on != 0; if (!shake_on) cursor_set_boost(0); }
+int cursor_shake(void) { return shake_on; }
 unsigned cursor_size_serial(void) { return size_serial; }
 
 int cursor_effective_pct(int pct) {
@@ -202,6 +216,7 @@ int cursor_effective_pct(int pct) {
     pct = pct * size_pct / 100;
     if (pct < 75) pct = 75;
     if (pct > 200) pct = 200;
+    pct += (200 - pct) * boost_8ths / 8;        /* while shaken: up to the largest the plane takes */
     return (pct + 12) / 25 * 25;
 }
 

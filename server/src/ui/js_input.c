@@ -106,6 +106,11 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     str_field(c, argv[0], "secondary", secondary, 3, &k.secondary);
     str_field(c, argv[0], "sensitivity", sensitivity, 3, &k.sensitivity);
     tp_set_config(&k);
+    {   /* shake the pointer to find it (shake.h) */
+        JSValue v = JS_GetPropertyStr(c, argv[0], "shakeToLocate");
+        if (JS_IsBool(v)) cursor_set_shake(JS_ToBool(c, v));
+        JS_FreeValue(c, v);
+    }
     /* pointer size (×0.75..×2 of the display's), also for Linux apps started from now on */
     if (num_field(c, argv[0], "pointerSize", 0.5, 2, &d) && cursor_set_size((int)(d * 100 + 0.5))) {
         char v[16];
