@@ -984,7 +984,14 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     `autoinstall ---`, and subiquity ran the whole autoinstall with no question (`u-13`: network, storage, curtin,
     `qemu-guest-agent`) up to *installing ubuntu-desktop-minimal*, where the build VM's disk filled (QEMU paused the
     guest on `BLOCK_IO_ERROR`, `u-14`; 43 GB of other work in `/var/tmp`, not this work's to delete). Then again
-    without the desktop (`desktop: false`, the console system): below.
+    without the desktop (`desktop: false`, 2 vCPU, 3 GB, 20 GB): the same autoinstall with no question through curtin,
+    GRUB, *configuring cloud-init* and into *run_unattended_upgrades* (security updates from the archive), its disk at
+    6.3 GB, when the build VM had under 500 MB left: the guest was paused and removed so the shared host wouldn't fill.
+    So Ubuntu's restart into the installed system and its login are **not seen yet**; they need about 8 GB free on
+    the build VM (the 3.2 GB image and a 6 to 7 GB disk; with the desktop about 12 GB).
+  - **Not changed, noted:** the first start's picture can stay on *Display output is not active* while the installer
+    runs at the firmware's resolution, until the window asks for a size (seen once with Debian; a start with the
+    window already sized showed the installer at once).
   - **Fedora 45:** the card resolved the netinst image (`Fedora-Everything-netinst-x86_64-45-1.4.iso`, 1.0 GB,
     clear-signed list), the OEMDRV seed disk and `inst.stage2=hd:LABEL=Fedora-E-dvd-x86_64-45
     inst.ks=hd:LABEL=OEMDRV:/ks.cfg`; anaconda read the kickstart and went straight to *Installation* with every spoke
