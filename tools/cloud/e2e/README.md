@@ -18,6 +18,7 @@ Test only: nothing here ships, and every credential below is a throwaway one for
 | `cases/files.sh`, `cases/files.js` | Files' operations on one account through `lord.fs` (write, status up → here, rename, mkdir, move, copy in, copy out, list), the server's side checked, then `cloud.delete` and no `.Trash` left |
 | `cases/adds.js`, `cases/errors.js` | every good account (trust questions answered) and every add that must fail (wrong password, key, passphrase, port, host, address, S3 secret, options that run programs or name files), with what's left behind |
 | `cases/conflict.sh` | a file changed on both sides while ours is held (account paused), then Resume; prints both sides' copies on the server |
+| `cases/conflict-offline.sh` | the real offline conflict per backend (server process stopped and its sessions killed), modes `diff`, `same`, `none` |
 | `cases/check.js` | Check This Account with Settings' own env, and its report |
 | `push.sh` | from the Mac: rebuild the bundle and copy the bench (`full`: the tree, `make`, install) |
 
