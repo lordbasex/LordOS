@@ -203,6 +203,7 @@ int main(void) {
     T("autoinstall: name and form", a && !strcmp(nm, "user-data") && !strncmp(a, "#cloud-config\n", 14) && strstr(a, "autoinstall:\n  version: 1\n"));
     T("autoinstall: identity with the hash", a && strstr(a, "    username: \"ana\"\n") && strstr(a, "    password: \"" HASH "\"\n") && strstr(a, "hostname: \"debian-13\""));
     T("autoinstall: desktop, agent, reboot", a && strstr(a, "ubuntu-desktop-minimal") && strstr(a, "qemu-guest-agent") && strstr(a, "shutdown: reboot"));
+    T("autoinstall: the desktop without the snap-only firefox package", a && strstr(a, "      - package: \"firefox\"\n        pin: \"release o=Ubuntu\"\n        pin-priority: -1\n"));
     free(a);
     char *md = vmu_meta_data(&u, "f0add705-5b88-4a90-8745-7fcc7713d19d");
     T("meta-data", md && strstr(md, "instance-id: f0add705-5b88-4a90-8745-7fcc7713d19d\n") && strstr(md, "local-hostname: debian-13\n"));
