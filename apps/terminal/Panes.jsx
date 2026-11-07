@@ -5,6 +5,7 @@ import { meta, setRatio, focusPane, toast } from './state.js';
 import { tmuxFocus } from './tmux.js';
 import { getProfile } from './profiles.js';
 import { SecretBar } from './SecretBar.jsx';
+import { pathsText } from './paths.js';
 
 export const paneNodes = new Map();     // sid → instancia del nodo (para navegar entre paneles)
 
@@ -91,7 +92,8 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
   const badge = m.badge;
   const transparent = (p.transparency || 0) > 0;
   return (
-    <View style={{ flex: 1, overflow: 'hidden', backdropFilter: transparent && p.blur ? 'blur(14px)' : undefined }}>
+    <View onFilesDrop={(paths) => { focusPane(wid, sid); term.paste(sid, pathsText(paths)); }}
+      style={{ flex: 1, overflow: 'hidden', backdropFilter: transparent && p.blur ? 'blur(14px)' : undefined }}>
       <Terminal ref={(inst) => { ref.current = inst; if (inst) paneNodes.set(sid, inst); else paneNodes.delete(sid); }}
         session={sid} onMouseDown={onMouseDown}
         onMouseMove={(e) => { if (!dragging.current) { const l = e.local(ref.current); term.mouse(sid, 'move', l.x, l.y, 0, e.mods); } }}

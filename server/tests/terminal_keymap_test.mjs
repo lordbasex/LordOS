@@ -76,8 +76,17 @@ const after = migrateSettings(before);
 eq('migration 2: the profile keeps only its real mappings', after.terminal.profiles[0].keyMap.map((m) => m.combo), ['Ctrl+2']);
 eq('migration 2: a profile without mappings is untouched', after.terminal.profiles[1], { id: 'b' });
 eq('migration 2: the global mappings too', after.terminal.keyMap.map((m) => m.combo), ['Shift+Enter']);
-eq('migration 2: the schema', after.schema, 2);
-eq('migration 2: settings without a terminal', migrateSettings({ schema: 1, x: 1 }), { schema: 2, x: 1 });
+eq('migrations: the schema', after.schema, 3);
+eq('migrations: settings without a terminal', migrateSettings({ schema: 1, x: 1 }), { schema: 3, x: 1 });
+
+// migration 3: a default profile that types a command on open
+const ssh = { id: 'p1', name: 'TURN NAT', initialText: 'ssh ec2-user@203.0.113.7' };
+let m3 = migrateSettings({ schema: 2, terminal: { profiles: [ssh], defaultProfile: 'p1' } }).terminal;
+eq('migration 3: a plain Default profile is added and made the default', [m3.defaultProfile, m3.profiles.map((p) => p.id)], ['default', ['default', 'p1']]);
+m3 = migrateSettings({ schema: 2, terminal: { profiles: [ssh, { id: 'work', name: 'Work' }], defaultProfile: 'p1' } }).terminal;
+eq('migration 3: or an existing plain profile becomes the default', [m3.defaultProfile, m3.profiles.length], ['work', 2]);
+m3 = migrateSettings({ schema: 2, terminal: { profiles: [{ id: 'default' }, ssh], defaultProfile: 'default' } }).terminal;
+eq('migration 3: a plain default is left alone', m3.defaultProfile, 'default');
 
 // zoom by the character (evdev codes: 12 is US "-", 53 US "/", 27 US "]", 13 US "=")
 eq('❖ and the Latin American "-" key (US "/")', actionOf({ meta: true, key: '-', code: 53 }), 'zoomOut');

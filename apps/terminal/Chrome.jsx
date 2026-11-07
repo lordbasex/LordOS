@@ -10,24 +10,36 @@ import {
   focusPane, wins, moveTab, commandHistory, captured,
 } from './state.js';
 import { terminalSettings, getProfile, profileName } from './profiles.js';
+import { programLabel, isClaude } from './paths.js';
 
 const small = (t, extra) => ({ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap', ...extra });
 
 // ---- tabs ----
 
-function Tab({ t, wid, tab, active, index, maxChars }) {
+// "#rrggbb" with an alpha (the tab's tint)
+const tint = (hex, a) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+};
+export const TAB_COLORS = ['#ff453a', '#ff9f0a', '#ffd60a', '#32d74b', '#0a84ff', '#bf5af2', '#8e8e93'];
+
+function Tab({ t, wid, tab, active, index, maxChars, onMenu }) {
   const [hover, setHover] = useState(false);
   const m = useStore(meta, (x) => x[tab.focus]) || {};
   const anyBell = useStore(meta, (x) => leaves(tab.root).some((s) => x[s]?.bell));
   const anyActivity = useStore(meta, (x) => leaves(tab.root).some((s) => x[s]?.activity));
   const title = tabTitle(tab);
-  const color = getProfile(m.profile).tabColor;
+  const color = tab.color || getProfile(m.profile).tabColor;     // the tab's own (its menu), else the profile's
   return (
     <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onMouseDown={() => selectTab(wid, tab.id)}
       onMouseUp={(e) => { if (e.button === 1) closeTab(wid, tab.id); }}
+      onContextMenu={(e) => onMenu?.(e, tab)}
       style={{ flex: 1, maxWidth: 260, minWidth: 90, height: 26, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 6,
-        borderRadius: 6, backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : '#ffffff') : hover ? t.hover : 'transparent',
+        borderRadius: 6, backgroundColor: color ? tint(color, active ? 0.55 : hover ? 0.38 : 0.26)
+          : active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : '#ffffff') : hover ? t.hover : 'transparent',
         boxShadow: active && t.mode !== 'dark' ? '0 1px 2px rgba(0,0,0,0.12)' : 'none' }}>
       <View onClick={(e) => { e.stopPropagation(); closeTab(wid, tab.id); }} style={{ width: 16, height: 16, borderRadius: 4,
         alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? t.hover : 'transparent' }}>
@@ -46,7 +58,7 @@ function Tab({ t, wid, tab, active, index, maxChars }) {
   );
 }
 
-export function TabBar({ t, wid, w }) {
+export function TabBar({ t, wid, w, onTabMenu }) {
   const ref = useRef(null);
   const [width, setWidth] = useState(600);
   useEffect(() => { if (ref.current) { const lw = lord.getLayout(ref.current.id)[2]; if (lw && Math.abs(lw - width) > 4) setWidth(lw); } });
@@ -55,7 +67,7 @@ export function TabBar({ t, wid, w }) {
   return (
     <View ref={ref} style={{ height: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4, backgroundColor: t.sidebarBg }}>
       <Hairline edge="bottom" />
-      {w.tabs.map((tab, i) => <Tab key={tab.id} t={t} wid={wid} tab={tab} index={i} active={tab.id === w.active} maxChars={maxChars} />)}
+      {w.tabs.map((tab, i) => <Tab key={tab.id} t={t} wid={wid} tab={tab} index={i} active={tab.id === w.active} maxChars={maxChars} onMenu={onTabMenu} />)}
       <ToolbarButton icon="+" iconSize={17} small title={tr('terminal.action.newTab')} color={t.textDim} onClick={() => addTab(wid)} style={{ width: 26 }} />
       {w.broadcast && (
         <View style={{ paddingHorizontal: 8, height: 22, borderRadius: 5, justifyContent: 'center', backgroundColor: '#ff453a' }}>
@@ -85,7 +97,7 @@ export function StatusBar({ t, sid }) {
     <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 16, backgroundColor: t.sidebarBg }}>
       <Hairline edge="top" />
       <Item label={cwd || '~'} />
-      <Item label={info.busy ? `▶ ${info.process}` : `${info.shell || 'shell'}`} color={info.busy ? t.accent : undefined} />
+      <Item label={info.busy ? `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}` : `${info.shell || 'shell'}`} color={info.busy ? (isClaude(info.process) ? '#d97757' : t.accent) : undefined} />
       {m.lastExit > 0 && <Item label={tr('terminal.status.lastExit', { code: m.lastExit })} color="#ff453a" />}
       <View style={{ flex: 1 }} />
       {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
@@ -413,7 +425,7 @@ export function ReplayBar({ t, wid, replay }) {
 
 export function ContextMenu({ t, x, y, items, onClose }) {
   // width from the longest text (it changes with the language)
-  const width = Math.ceil(Math.max(230, ...items.filter((it) => it !== '-').map((it) =>
+  const width = Math.ceil(Math.max(230, ...items.filter((it) => it !== '-' && it.label).map((it) =>
     40 + lord.measureText(it.label, 13, 400) + (it.hint ? 16 + lord.measureText(it.hint, 11, 400) : 0))));
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} onMouseDown={onClose}>
@@ -421,8 +433,23 @@ export function ContextMenu({ t, x, y, items, onClose }) {
         borderRadius: 9, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.45)' }}>
         {items.map((it, i) => (it === '-'
           ? <View key={i} style={{ height: 1, marginVertical: 4, marginHorizontal: 8, backgroundColor: t.separator }} />
+          : it.swatches ? <Swatches key={i} t={t} item={it} onClose={onClose} />
           : <MenuRow key={i} t={t} item={it} onClose={onClose} />))}
       </View>
+    </View>
+  );
+}
+
+// A row of colors (a tab's color): { swatches: [{ hex | null, on, onClick }] }; null is "none".
+function Swatches({ t, item, onClose }) {
+  return (
+    <View style={{ height: 28, marginHorizontal: 5, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {item.swatches.map((sw, i) => (
+        <View key={i} onClick={() => { onClose(); sw.onClick(); }} style={{ width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: sw.hex || 'transparent', border: sw.hex ? 'none' : `1.5px solid ${t.textDim}` }}>
+          {sw.on ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sw.hex ? '#fff' : t.textDim }} /> : null}
+        </View>
+      ))}
     </View>
   );
 }

@@ -228,7 +228,8 @@ function ImportPanel({ t, onClose, onDone }) {
       const i = np.itermGuid ? profiles.findIndex((x) => x.itermGuid === np.itermGuid) : -1;
       const prof = i >= 0 ? { ...np, id: profiles[i].id } : np;
       if (i >= 0) profiles[i] = prof; else profiles.push(prof);
-      if (makeDefault && np.itermGuid && np.itermGuid === result.defaultGuid) defaultProfile = prof.id;
+      // a profile that types a command when it opens never becomes the default: every new tab would run it
+      if (makeDefault && np.itermGuid && np.itermGuid === result.defaultGuid && !String(np.initialText || '').trim()) defaultProfile = prof.id;
       added++;
     }
     const schemes = { ...(cfg.schemes || {}) };

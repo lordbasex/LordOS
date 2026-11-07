@@ -12,11 +12,12 @@ import {
 } from './state.js';
 import { PaneTree, paneNodes } from './Panes.jsx';
 import {
-  TabBar, StatusBar, FindBar, Toolbelt, Overlays, ContextMenu, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
+  TabBar, TAB_COLORS, StatusBar, FindBar, Toolbelt, Overlays, ContextMenu, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
 } from './Chrome.jsx';
 import { Preferences } from './Preferences.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
+import { clipboardImage, pathsText, isClaude } from './paths.js';
 import { getProfile, schemeOf, terminalSettings, profileName } from './profiles.js';
 
 // Menú del Dock (clic derecho): nueva ventana, nueva pestaña y pestaña con un perfil.
@@ -126,7 +127,14 @@ function run(wid, action) {
     case 'findNext': term.searchMove(sid, -1); break;
     case 'findPrev': term.searchMove(sid, 1); break;
     case 'copy': { const txt = term.copy(sid); if (txt) clipboard.remember(txt); break; }
-    case 'paste': { const txt = clipboard.get(); if (txt) sendTo(w, (s) => term.paste(s, txt)); break; }
+    case 'paste': {
+      // an image on the clipboard goes in as its file's path (paths.js): Claude Code attaches it
+      const img = clipboardImage(lord.clipboard.state());
+      if (img) { sendTo(w, (s) => term.paste(s, pathsText([img]))); break; }
+      const txt = clipboard.get();
+      if (txt) sendTo(w, (s) => term.paste(s, txt));
+      break;
+    }
     case 'pasteHistory': openPasteHistory(wid); break;
     case 'selectAll': term.select(sid, 'all'); break;
     case 'selectOutput':
@@ -322,6 +330,12 @@ export default function TerminalApp() {
     const action = actionOf(e);
     if (action) { run(wid, action); return; }
     if (MODIFIER_CODES.has(e.code) || e.meta || s == null) return;
+    // Ctrl+V in Claude Code with an image on the clipboard: its path goes in. Claude Code looks for the image
+    // with xclip or wl-paste, which don't reach LordOS's clipboard; it attaches a pasted image path the same way.
+    if (e.ctrl && !e.alt && !e.shift && e.code === 47 && isClaude(term.info(s)?.process)) {
+      const img = clipboardImage(lord.clipboard.state());
+      if (img) { sendTo(cur, (x) => term.paste(x, pathsText([img]))); return; }
+    }
     const key = e.key && e.key.length > 1 ? e.key : '';
     const base = e.ctrl || e.alt ? e.base || '' : '';
     if (!key && !e.char && !base) return;
@@ -331,6 +345,19 @@ export default function TerminalApp() {
   if (!w || !tab) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   const scheme = schemeOf(profile);
   const paneBg = scheme.bg;
+
+  // a tab's menu: its color (over its profile's, as in other terminals), title and closing
+  const onTabMenu = (e, tb) => {
+    const [rx, ry] = lord.getLayout(root.current.id);
+    const setColor = (hex) => patchWin(wid, (x) => ({ tabs: x.tabs.map((o) => (o.id === tb.id ? { ...o, color: hex } : o)) }));
+    setCtx({ x: e.x - rx, y: e.y - ry, items: [
+      { label: tr('terminal.prefs.tabColor'), disabled: true, onClick: () => {} },
+      { swatches: [null, ...TAB_COLORS].map((hex) => ({ hex, on: (tb.color || null) === hex, onClick: () => setColor(hex) })) },
+      '-',
+      { label: actionLabel('editTitle'), onClick: () => { selectTab(wid, tb.id); run(wid, 'editTitle'); } },
+      { label: actionLabel('closeTab'), onClick: () => closeTab(wid, tb.id) },
+    ] });
+  };
 
   const onContextMenu = (e, s) => {
     const [rx, ry] = lord.getLayout(root.current.id);
@@ -353,7 +380,7 @@ export default function TerminalApp() {
 
   return (
     <View ref={root} style={{ flex: 1 }}>
-      <TabBar t={t} wid={wid} w={w} />
+      <TabBar t={t} wid={wid} w={w} onTabMenu={onTabMenu} />
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <PaneTree wid={wid} tab={tab} windowFocused={focused} divider={t.separator} bg={paneBg} onContextMenu={onContextMenu} />

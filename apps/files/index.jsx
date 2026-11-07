@@ -521,6 +521,8 @@ export default function Files() {
   };
   // ---- drag and drop (⌥ copies; otherwise it moves) ----
   const dropOf = (inst) => { for (let n = inst; n; n = n.parent) { if (n.props?.dropPath) return n.props.dropPath; if (n.props?.dropTrash) return 'trash:'; } return null; };
+  // another app's window under the pointer that takes files (an onFilesDrop prop, e.g. the Terminal: their paths)
+  const filesDropOf = (inst) => { for (let n = inst; n; n = n.parent) if (typeof n.props?.onFilesDrop === 'function') return n.props.onFilesDrop; return null; };
   useEffect(() => {
     const mv = addListener('pointermove', (e) => {
       const p = press.current;
@@ -537,6 +539,8 @@ export default function Files() {
       if (!p || !p.moved) return;
       const target = dropOf(e.target);
       setDrag(null); setDropTarget(null);
+      const other = !target && !p.favOnly ? filesDropOf(e.target) : null;
+      if (other) { try { other(p.paths); } catch (err) { console.warn('files drop:', err); } return; }
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
       if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { trashRef.current(p.paths); return; }       // (cloud paths are asked about and deleted there)

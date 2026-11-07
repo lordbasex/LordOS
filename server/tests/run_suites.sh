@@ -223,6 +223,9 @@ EOF
     # (0.8.8.6) Passwords in the Terminal: the prompt's host and the entries offered (apps/terminal/secret.js)
     if have node; then run "terminal-secret-test (apps/terminal/secret.js)" node tests/terminal_secret_test.mjs
     else skip "terminal-secret-test" "node"; fi
+    # (0.8.8.6) files into the Terminal as quoted paths: drops from Files and the clipboard's image (apps/terminal/paths.js)
+    if have node; then run "terminal-paths-test (apps/terminal/paths.js)" node tests/terminal_paths_test.mjs
+    else skip "terminal-paths-test" "node"; fi
     # (0.8.8.6) Monitor → Memory: the processes grouped by app (apps/monitor/memtop.js)
     if have node; then run "monitor-memtop-test (apps/monitor/memtop.js)" node tests/monitor_memtop_test.mjs
     else skip "monitor-memtop-test" "node"; fi

@@ -38,7 +38,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 2;
+export const SETTINGS_SCHEMA = 3;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -56,6 +56,18 @@ const MIGRATIONS = [
     if (!t || typeof t !== 'object') return s;
     const profiles = Array.isArray(t.profiles) ? t.profiles.map((p) => (p && p.keyMap ? { ...p, keyMap: dropUsNoops(p.keyMap) } : p)) : t.profiles;
     return { ...s, terminal: { ...t, profiles, keyMap: dropUsNoops(t.keyMap) } };
+  }],
+  [3, (s) => {            // 0.8.8.6: a Terminal default profile that types a command when it opens (an imported
+    // profile's initial text, made the default): every new tab ran it. A plain profile becomes the default, a new
+    // one if there is none; the imported profile stays, a menu away (New Tab with Profile).
+    const t = s.terminal;
+    if (!t || typeof t !== 'object' || !Array.isArray(t.profiles) || !t.profiles.length) return s;
+    const def = t.profiles.find((p) => p && p.id === t.defaultProfile) || t.profiles[0];
+    if (!def || !String(def.initialText || '').trim()) return s;
+    const plain = t.profiles.find((p) => p && !String(p.initialText || '').trim());
+    if (plain) return { ...s, terminal: { ...t, defaultProfile: plain.id } };
+    const id = t.profiles.some((p) => p && p.id === 'default') ? `default-${t.profiles.length}` : 'default';
+    return { ...s, terminal: { ...t, profiles: [{ id, name: '' }, ...t.profiles], defaultProfile: id } };
   }],
 ];
 export function migrateSettings(s) {
