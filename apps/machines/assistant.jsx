@@ -53,6 +53,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [shareClip, setShareClip] = useState(false);
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState(null);
+  const [stopped, setStopped] = useState(false);  // Stop Download: the part is kept, Continue Download picks it up
   // a download card: { id, name, phase: 'list' | 'ready' | 'error', image: { name, sha, size }, err }
   const [dl, setDl] = useState(null);
   const [got, setGot] = useState(null);          // the download's progress, { done, total }, in step 5
@@ -125,7 +126,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     return () => clearInterval(timer);
   }, [job]);
   const create = async () => {
-    setFail(null);
+    setFail(null); setStopped(false);
     let iso = null;
     if (downloading) {
       setStep(4); setGot({ done: 0, total: dl.image.size || 0 }); cancelled.current = false;
@@ -135,11 +136,12 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
           const g = progressOf(l);
           if (g) setGot((o) => ({ ...g, resumed: o?.resumed || 0 }));
           const r = resumedOf(l);
-          if (r) setGot((o) => ({ ...(o || { done: r, total: 0 }), resumed: r }));
+          if (r) setGot((o) => ({ total: 0, ...o, done: Math.max(o?.done || 0, r), resumed: r }));
         }, { quiet: true }));
       } catch (e) {
         setGot(null);
-        setFail(cancelled.current ? tr('machines.dl.cancelled') : e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed'));
+        if (cancelled.current) { setStopped(true); return; }
+        setFail(e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed'));
         return;
       }
       setGot(null);
@@ -282,6 +284,14 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       ) : null}
       {Object.keys(v.errors).length ? <Text style={{ fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{Object.values(v.errors).map((e) => tr(`machines.new.err.${e}`, { max: host.memMaxMb })).join(' ')}</Text> : null}
     </>;
+  } else if (stopped) {
+    body = (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <OsMark id={sys.id} size={72} />
+        <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{tr('machines.dl.stoppedTitle')}</Text>
+        <Text style={{ maxWidth: 560, fontSize: 13, color: p.dim, textAlign: 'center' }}>{tr('machines.dl.cancelled')}</Text>
+      </View>
+    );
   } else if (got && !fail) {
     // the download, with its progress; the helper checks the SHA-256 at the end
     const mb = (x) => gb(Math.round(x / 1048576));
@@ -317,7 +327,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         {step === 0 ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
           onClick={() => setArch(arch === host.arch ? other : host.arch)} /> : null}
         <View style={{ flex: 1 }} />
-        {step === 4 && !fail ? null : <Btn label={step === 0 || fail ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail ? onClose() : setStep(step - 1))} />}
+        {stopped ? <Btn label={tr('machines.back')} onClick={() => { setStopped(false); setStep(3); }} /> : null}
+        {step === 4 && !fail && !stopped ? null : <Btn label={step === 0 || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail || stopped ? onClose() : setStep(step - 1))} />}
+        {stopped ? <Btn primary label={tr('machines.dl.continue')} onClick={create} /> : null}
         {step < 3 ? <Btn primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
         {step === 3 ? <Btn primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
       </View>

@@ -25,3 +25,5 @@ desktop/imager/dist/
 desktop/imager/node_modules/
 desktop/imager/src-tauri/gen/
 HANDOFF.md
+themes/*/theme.vm-e2e.bundle.js
+themes/*/code-manifest.vm-e2e.json
