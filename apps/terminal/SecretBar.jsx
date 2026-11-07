@@ -12,7 +12,12 @@ import { secretHost, rankEntries } from './secret.js';
 export function SecretBar({ sid, wid, prompt }) {
   const th = useTheme();
   const [list, setList] = useState(null);     // null: closed; 'locked' | 'none' | [entries]
-  const host = secretHost(prompt, meta.get()[sid]?.host);
+  // who asks, from its own executable and arguments (lord-server reads /proc), not from the text it printed: a
+  // script that prints "ana@bank's password:" shows as itself, and its host is not taken from that text
+  const [who, setWho] = useState(null);
+  useEffect(() => { try { setWho(lord.term.asking(sid)); } catch (e) { setWho(null); } }, [sid, prompt]);
+  const program = who?.program || '';
+  const host = who?.host || (program === 'git' ? secretHost(prompt, '') : '') || (program ? '' : secretHost(prompt, meta.get()[sid]?.host));
 
   const load = async () => {
     try {
@@ -42,7 +47,8 @@ export function SecretBar({ sid, wid, prompt }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text style={{ fontSize: 14 }}>🔑</Text>
         <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {host ? T('terminal.secret.askedHost', { host }) : T('terminal.secret.asked')}
+          {program ? T(host ? 'terminal.secret.askedBy' : 'terminal.secret.askedByNoHost', { program, host })
+            : host ? T('terminal.secret.askedHost', { host }) : T('terminal.secret.asked')}
         </Text>
         {btn(T('terminal.secret.usePasswords'), () => (list == null ? load() : setList(null)), true)}
         {btn(T('terminal.secret.typeIt'), () => patchMeta(sid, { secretDismissed: prompt }))}

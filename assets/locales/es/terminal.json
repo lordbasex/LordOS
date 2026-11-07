@@ -324,5 +324,13 @@
   "secret.none": "No hay inicios de sesión en Contraseñas.",
   "secret.failed": "No se pudo completar la contraseña.",
   "secret.notAsking": "El programa dejó de pedir la contraseña, así que no se envió.",
-  "secret.multiline": "Esa contraseña tiene más de una línea y no se envió."
+  "secret.multiline": "Esa contraseña tiene más de una línea y no se envió.",
+  "secret.askedBy": "{program} pide la contraseña de {host}",
+  "secret.askedByNoHost": "{program} pide una contraseña",
+  "save.ask": "¿Guardar la contraseña de {title} en Contraseñas?",
+  "save.save": "Guardar",
+  "save.notNow": "Ahora no",
+  "save.locked": "Contraseñas está bloqueada. Desbloqueala y tocá Guardar.",
+  "save.saved": "Guardada en Contraseñas",
+  "save.failed": "No se pudo guardar la contraseña."
 }

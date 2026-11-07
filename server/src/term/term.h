@@ -100,7 +100,7 @@ enum {
     EV_NOTIFY = 1 << 5, EV_OUTPUT = 1 << 6, EV_PROFILE = 1 << 7, EV_ATTENTION = 1 << 8,
     EV_COPY = 1 << 9, EV_COMMAND = 1 << 10, EV_RUN = 1 << 11, EV_HOST = 1 << 12,
     EV_TMUX = 1 << 13, EV_TMUX_START = 1 << 14, EV_TMUX_END = 1 << 15, EV_RESIZE = 1 << 16,
-    EV_SECRET = 1 << 17, EV_FILL = 1 << 18,
+    EV_SECRET = 1 << 17, EV_FILL = 1 << 18, EV_SAVE = 1 << 19, EV_SAVED = 1 << 20,
 };
 
 typedef struct {
@@ -289,6 +289,9 @@ typedef struct {
     char secret_prompt[200];
     double secret_checked;
     char fill_result[24];       /* how the last fill from Passwords ended (termfill.c), for JS */
+    int typing;                 /* inside term_key/term_paste: the user's own input (tcapture.c captures only that) */
+    char save_offer[512];       /* "Save to Passwords?" (tcapture.c): the target as JSON, never the value */
+    char save_result[24];       /* how saving it ended (termfill.c) */
 } Session;
 
 void     term_init(const char *fonts_dir, const char *shell_dir);
@@ -305,8 +308,14 @@ void     term_input(Session *s, const char *data, size_t n);
  * prompt goes to prompt (may be NULL). Sessions without a pty (a serial console) never ask. */
 int      term_asks_secret(Session *s, char *prompt, size_t n);
 int      term_prompt_names_secret(const char *line);      /* the prompt names a password (tsecret.c) */
+struct TcapTarget;
+/* The program asking for a password on the session (its executable and arguments, from /proc) (tsecret.c). */
+int      term_secret_target(Session *s, const char *prompt, struct TcapTarget *t, char *exe, size_t exen);
+int      term_traced(void);                                /* this process is being traced: no secrets */
 /* A fill from Passwords ended (termfill.c): "ok" or an error code, sent to JS as the "fill" event. */
 void     term_fill_done(Session *s, const char *result);
+/* Saving a typed password ended (termfill.c): "ok" or an error code, the "saved" event. */
+void     term_save_done(Session *s, const char *result);
 void     term_key(Session *s, const char *key, const char *chr, const char *base, int mods);
 void     term_paste(Session *s, const char *text);
 void     term_focus(Session *s, int on);

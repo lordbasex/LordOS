@@ -5,6 +5,7 @@ import { meta, setRatio, focusPane, toast } from './state.js';
 import { tmuxFocus } from './tmux.js';
 import { getProfile } from './profiles.js';
 import { SecretBar } from './SecretBar.jsx';
+import { SaveBar } from './SaveBar.jsx';
 import { pathsText } from './paths.js';
 
 export const paneNodes = new Map();     // sid → instancia del nodo (para navegar entre paneles)
@@ -116,6 +117,7 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
       )}
       {flash && <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.14)', pointerEvents: 'none' }} />}
       {m.secret && m.secretDismissed !== m.secret ? <SecretBar sid={sid} wid={wid} prompt={m.secret} /> : null}
+      {m.saveOffer && !m.secret ? <SaveBar sid={sid} wid={wid} offer={m.saveOffer} /> : null}
     </View>
   );
 }

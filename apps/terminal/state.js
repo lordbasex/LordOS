@@ -463,6 +463,17 @@ term.onAny((sid, type, data) => {
       if (data === 'ok') patchMeta(sid, { secretDismissed: meta.get()[sid]?.secret || '' });
       else toast(wid, T(data === 'not-asking' ? 'terminal.secret.notAsking' : data === 'multiline' ? 'terminal.secret.multiline' : 'terminal.secret.failed'));
       break;
+    // Save to Passwords (SaveBar.jsx): a typed password was accepted; only its program, host and user come here
+    case 'save': {
+      let o = null;
+      try { o = JSON.parse(data); } catch (e) { /* not JSON: nothing to offer */ }
+      if (o && Number(o.token) > 0) patchMeta(sid, { saveOffer: { ...o, token: Number(o.token) } });
+      break;
+    }
+    case 'saved':
+      patchMeta(sid, { saveOffer: null });
+      toast(wid, T(data === 'ok' ? 'terminal.save.saved' : data === 'locked' ? 'terminal.save.locked' : 'terminal.save.failed'));
+      break;
     case 'exit': triggerSeen.delete(sid); removeSession(sid); break;
     default: break;
   }

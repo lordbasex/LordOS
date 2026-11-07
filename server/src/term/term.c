@@ -1,6 +1,7 @@
 /* term.c — terminal sessions: PTY ↔ emulator, keyboard, mouse, clipboard, events
  * for the app (title, directory, bell, process exit) and cursor blinking. */
 #include "term.h"
+#include "tcapture.h"
 #include "../ui/ui.h"
 #include "../ui/fonts.h"
 
@@ -282,6 +283,7 @@ static void child_exited(Session *s) {
 
 void term_close(Session *s) {
     if (!s || !s->used) return;
+    tcap_drop(s->id);                       /* a typed password waiting to be saved goes with the session */
     if (s->ctrl >= 0) {         /* the holder releases the PTY and leaves */
         if (write(s->ctrl, "q", 1) < 0) {}
         close(s->ctrl);
@@ -438,6 +440,7 @@ static void tmux_keys(Session *v, const char *data, size_t n);
 
 void term_input(Session *s, const char *data, size_t n) {
     if (!s || !s->alive || !n) return;
+    if (s->typing && tcap_pending()) tcap_keys(s->id, data, n, now_ms());     /* Save to Passwords (tcapture.c) */
     if (s->gateway) { tmux_keys(s, data, n); return; }
     if (!s->out_len) {
         ssize_t w = write(s->fd, data, n);
@@ -479,6 +482,7 @@ void term_dispatch(int id, short revents) {
         ssize_t r = read(s->fd, buf, sizeof buf);
         if (r > 0) {
             vt_write(&s->t, buf, (size_t)r);
+            if (tcap_pending()) tcap_output(s->id, buf, (size_t)r);      /* a password rejected after Enter */
             if (s->log) fwrite(buf, 1, (size_t)r, s->log);
             total += (size_t)r;
             continue;
@@ -508,9 +512,55 @@ static void check_secret(Session *s) {
     int on = term_asks_secret(s, prompt, sizeof prompt);
     s->secret_checked = now_ms();
     if (on == s->secret && (!on || !strcmp(prompt, s->secret_prompt))) return;
+    if (on != s->secret) {                  /* Save to Passwords: what the program asks for, from its arguments */
+        TcapTarget tg;
+        if (!on) tcap_prompt(s->id, 0, NULL, s->secret_checked);
+        else if (!term_traced() && !term_secret_target(s, prompt, &tg, NULL, 0)) tcap_prompt(s->id, 1, &tg, s->secret_checked);
+    }
     s->secret = on;
     snprintf(s->secret_prompt, sizeof s->secret_prompt, "%s", on ? prompt : "");
     s->t.events |= EV_SECRET;
+}
+
+/* "Save to Passwords?" for JS: the target and a token, never the value (it stays in tcapture.c) */
+static void json_put(char *o, size_t n, size_t *k, const char *key, const char *v) {
+    if (*k + 32 >= n) return;               /* no room: the caller sees the object unfinished and drops it */
+    int w = snprintf(o + *k, n - *k, "%s\"%s\":\"", *k > 1 ? "," : "", key);
+    if (w < 0 || (size_t)w >= n - *k) { *k = n; return; }
+    *k += (size_t)w;
+    for (; *v && *k + 8 < n; v++) {
+        unsigned char c = (unsigned char)*v;
+        if (c == '"' || c == '\\') { o[(*k)++] = '\\'; o[(*k)++] = (char)c; }
+        else if (c >= 0x20) o[(*k)++] = (char)c;
+    }
+    if (*v || *k + 1 >= n) { *k = n; return; }    /* cut short: never a truncated value */
+    o[(*k)++] = '"';
+    o[*k] = 0;
+}
+
+static void save_offer(int sid, unsigned token, const TcapTarget *t) {
+    Session *s = term_get(sid);
+    if (!s) { tcap_drop(sid); return; }
+    static const char *const kinds[] = { "", "ssh", "database", "git", "other" };
+    char *o = s->save_offer, tok[16];
+    size_t n = sizeof s->save_offer, k = 1;
+    o[0] = '{';
+    snprintf(tok, sizeof tok, "%u", token);
+    json_put(o, n, &k, "token", tok);
+    json_put(o, n, &k, "kind", kinds[t->kind >= 0 && t->kind <= TK_OTHER ? t->kind : 0]);
+    json_put(o, n, &k, "program", t->program);
+    json_put(o, n, &k, "engine", t->engine);
+    json_put(o, n, &k, "host", t->host);
+    json_put(o, n, &k, "user", t->user);
+    json_put(o, n, &k, "port", t->port);
+    if (k + 2 < n) { o[k++] = '}'; o[k] = 0; } else { tcap_drop(sid); return; }
+    s->t.events |= EV_SAVE;
+}
+
+void term_save_done(Session *s, const char *result) {
+    if (!s) return;
+    snprintf(s->save_result, sizeof s->save_result, "%s", result);
+    s->t.events |= EV_SAVED;
 }
 
 void term_fill_done(Session *s, const char *result) {
@@ -803,7 +853,7 @@ int term_damage(void) {
 }
 
 double term_timeout(double now) {
-    double best = -1;
+    double best = tcap_pending() ? 250 : -1;      /* a typed password's verdict, its offer's expiry */
     for (int i = 0; i < TERM_MAX; i++) {
         Session *s = &sessions[i];
         if (!s->used) continue;
@@ -829,6 +879,7 @@ double term_timeout(double now) {
 
 void term_tick(double now) {
     if (norphans) reap();
+    if (tcap_pending()) tcap_tick(now, save_offer);         /* Save to Passwords: verdicts and expiry */
     for (int i = 0; i < TERM_MAX; i++) {
         Session *s = &sessions[i];
         if (!s->used) continue;
@@ -883,6 +934,8 @@ void term_events(TermEventFn fn) {
         if (e & EV_OUTPUT) fn(id, "output", "");
         if (e & EV_SECRET) fn(id, "secret", s->secret ? s->secret_prompt : "");
         if (e & EV_FILL) fn(id, "fill", s->fill_result);
+        if (e & EV_SAVE) fn(id, "save", s->save_offer);
+        if (e & EV_SAVED) fn(id, "saved", s->save_result);
         if (e & EV_EXIT) { snprintf(code, sizeof code, "%d", s->exit_code); fn(id, "exit", code); }
         if (!term_get(id)) continue;    /* JS may have closed the session in a callback */
     }
@@ -915,7 +968,14 @@ static int ctrl_code(int c) {
     }
 }
 
+static void key_input(Session *s, const char *key, const char *chr, const char *base, int mods);
 void term_key(Session *s, const char *key, const char *chr, const char *base, int mods) {
+    s->typing = 1;                          /* what goes out from here is the user's (tcapture.c) */
+    key_input(s, key, chr, base, mods);
+    s->typing = 0;
+}
+
+static void key_input(Session *s, const char *key, const char *chr, const char *base, int mods) {
     Term *t = &s->t;
     if (t->view) { t->view = 0; t->all_dirty = 1; }
     s->last_input = now_ms();       /* the cursor stops blinking while typing */
@@ -983,8 +1043,11 @@ void term_paste(Session *s, const char *text) {
         buf[o++] = text[i] == '\n' ? '\r' : text[i];
     }
     if (s->t.modes & M_BRACKETED) send(s, "\033[200~");
+    s->typing = 1;                          /* a pasted password is the user's too (tcapture.c) */
     term_input(s, buf, o);
+    s->typing = 0;
     if (s->t.modes & M_BRACKETED) send(s, "\033[201~");
+    explicit_bzero(buf, o);                 /* it may have been a password */
     free(buf);
     if (s->t.view) { s->t.view = 0; s->t.all_dirty = 1; }
 }

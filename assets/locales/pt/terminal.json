@@ -324,5 +324,13 @@
   "secret.none": "Não há logins em Senhas.",
   "secret.failed": "Não foi possível preencher a senha.",
   "secret.notAsking": "O programa parou de pedir a senha, então ela não foi enviada.",
-  "secret.multiline": "Essa senha tem mais de uma linha e não foi enviada."
+  "secret.multiline": "Essa senha tem mais de uma linha e não foi enviada.",
+  "secret.askedBy": "{program} está pedindo a senha de {host}",
+  "secret.askedByNoHost": "{program} está pedindo uma senha",
+  "save.ask": "Salvar a senha de {title} em Senhas?",
+  "save.save": "Salvar",
+  "save.notNow": "Agora não",
+  "save.locked": "Senhas está bloqueado. Desbloqueie e toque em Salvar.",
+  "save.saved": "Salva em Senhas",
+  "save.failed": "Não foi possível salvar a senha."
 }

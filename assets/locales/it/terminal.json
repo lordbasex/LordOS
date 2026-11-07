@@ -324,5 +324,13 @@
   "secret.none": "Non ci sono login in Password.",
   "secret.failed": "Non è stato possibile inserire la password.",
   "secret.notAsking": "Il programma ha smesso di chiedere la password, quindi non è stata inviata.",
-  "secret.multiline": "Quella password ha più di una riga e non è stata inviata."
+  "secret.multiline": "Quella password ha più di una riga e non è stata inviata.",
+  "secret.askedBy": "{program} chiede la password di {host}",
+  "secret.askedByNoHost": "{program} chiede una password",
+  "save.ask": "Salvare la password di {title} in Password?",
+  "save.save": "Salva",
+  "save.notNow": "Non ora",
+  "save.locked": "Password è bloccata. Sbloccala, poi Salva.",
+  "save.saved": "Salvata in Password",
+  "save.failed": "Non è stato possibile salvare la password."
 }

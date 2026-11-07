@@ -16,6 +16,10 @@ int termfill_start(int sid, const char *vault, const char *entry, const char *fi
 /* A private reply from lord-vault (brokerkr_tick passes on the ones that aren't its own): 1 if it was a
  * fill's. The reply is the caller's to wipe and free. */
 int termfill_reply(uint32_t id, const char *rep, size_t len);
-int termfill_pending(void);             /* fills waiting for lord-vault */
+/* Saves the typed password a "Save to Passwords?" offer is about (its token, tcapture.c) in lord-vault, on the
+ * private channel; the value is wiped here either way. -1 if there is no such offer any more. The "saved"
+ * event says how it ended. */
+int termfill_save(int sid, unsigned token);
+int termfill_pending(void);             /* fills (and saves) waiting for lord-vault */
 
 #endif

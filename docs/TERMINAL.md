@@ -157,7 +157,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 
 | Feature of other terminal emulators | Status |
 |---|---|
-| Passwords when a program asks for one (ssh, sudo, git, gpg) | ✅ since 0.8.8.6: a bar offers the Passwords logins (the host's first); the picked one goes from lord-vault to the pty in C, never through JS (`src/term/termfill.c`, docs/PASSWORDS.md) |
+| Passwords when a program asks for one (ssh, sudo, git, gpg), and saving one typed by hand | ✅ since 0.8.8.6: a bar offers the Passwords logins (the host's first; it names the asking program, read from /proc); a typed password the program accepted is offered for saving. The value goes between lord-vault and the pty in C, never through JS (`src/term/termfill.c`, `tcapture.c`, docs/PASSWORDS.md) |
 | Python API, AI assistant | — no scripting is exposed to the theme |
 | Triggers that run scripts or coprocesses, custom per-profile commands | — LordOS only opens the user's shell; an imported "command" is typed into the shell on open |
 | Background image, horizontal spacing | ⏳ |

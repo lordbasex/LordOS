@@ -344,6 +344,34 @@ asked for <host>", **Use Passwords** and **Type It**.
   wiped. It is written only if the program is still asking when the reply arrives ("not-asking" otherwise),
   never if it has more than one line. JS gets only the outcome (`ok`, `not-asking`, `multiline`, an error).
 - Passwords locked: the bar says so, with **Open Passwords** and **Try Again**.
+- **Who asks** is read from the asking process itself (`/proc/<pgrp>/cmdline` and `exe`, `term_secret_target`):
+  the bar says "ssh is asking for the password for 203.0.113.7", and the entries for that host come first. A
+  script that prints "ana@bank's password:" shows as itself, and its host is not taken from what it printed.
+
+### Saving a password typed in the Terminal (0.8.8.6)
+
+When you type a password yourself and the program accepts it, the Terminal asks **"Save the password for
+ssh ec2-user@203.0.113.7 in Passwords?"** (**Save**, **Not Now**).
+
+- **What is kept, and where** (`server/src/term/tcapture.c`, `build/term-capture-test`): only what you type or
+  paste while the program asks (a fill from Passwords is not captured), in one locked page of `lord-server`'s
+  memory (`mlock`, `MADV_DONTDUMP`; the process is not dumpable). Backspace and Ctrl+U edit it.
+- **When it is wiped**: Ctrl+C or Escape; the program stops asking without an Enter; it asks again (the
+  password was wrong) or prints its own rejection ("Permission denied", "Sorry, try again", "password
+  authentication failed"…, not a welcome message's "Last failed login"); still asking 20 s after Enter; longer
+  than 256 bytes; Not Now; saved; the session closed; 60 s after the offer.
+- **Never captured**: the user's own login password (`sudo`, `su`, `passwd`, `pkexec`, `login`…), or anything
+  while `lord-server` is being traced.
+- **What JS sees**: `{ token, kind, program, engine, host, user, port }` and nothing else; the token is random.
+  Not offered when Passwords already has that host and user (`alreadySaved`, `apps/terminal/secret.js`).
+- **Saving**: `termfill.c` builds a `save` request on the private channel with the entry in its category's own
+  fields: **SSH** (ssh, sftp, scp, rsync: host, port, username, password), **Database** (mysql, mariadb, psql,
+  redis-cli, mongosh: engine, host, port, username, password), **Internet** (git over HTTPS: URL, username,
+  password) or **Network** (anything else), tagged **Terminal** and the program, titled "ssh ec2-user@host".
+  The request buffer and the captured value are wiped as soon as it is sent.
+- **Why no extra cipher between `lord-server` and `lord-vault`**: they talk over an inherited `socketpair`
+  (no path, no port), and neither process can be read by another (not dumpable; Yama). To read the password in
+  transit one would have to read one of the two processes' memory, where a cipher's key would be too.
 
 ### Secret Service (`org.freedesktop.secrets`)
 

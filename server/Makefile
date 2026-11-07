@@ -60,7 +60,7 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
-       src/term/vt.c src/term/pty.c src/term/term.c src/term/termfill.c src/term/tsecret.c src/term/term_paint.c src/term/hold.c \
+       src/term/vt.c src/term/pty.c src/term/term.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
        src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/forti.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/net/ifwatch.c src/net/wake.c \
        src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
        $(SEC_SRC) $(APP_SRC) $(MON_SRC) $(MEDIA_SRC)
@@ -272,7 +272,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc,$(ALL))
 	@sh tests/run_suites.sh full
@@ -648,8 +648,12 @@ build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/medi
 build/vt-dump: tests/vt_dump.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $^ $(LDLIBS)
 
-build/term-secret-test: tests/term_secret_test.c src/term/tsecret.c build/obj/term/vt.o build/obj/ui/stb.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_secret_test.c src/term/tsecret.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)
+build/term-secret-test: tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)
+	./$@ || { rm -f $@; exit 1; }
+
+build/term-capture-test: tests/term_capture_test.c src/term/tcapture.c src/term/tcapture.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_capture_test.c src/term/tcapture.c
 	./$@ || { rm -f $@; exit 1; }
 
 build/shake-test: tests/shake_test.c src/shake.c src/shake.h

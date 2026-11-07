@@ -7,6 +7,7 @@
 #include "ui.h"
 #include "../term/term.h"
 #include "../term/termfill.h"
+#include "../term/tcapture.h"
 #include "js_sys.h"
 #include "js_err.h"
 
@@ -648,12 +649,53 @@ static JSValue f_clip_set(JSContext *c, JSValueConst this_val, int argc, JSValue
     return JS_UNDEFINED;
 }
 
-/* Passwords in the Terminal (term/termfill.c): the program's password prompt now, or null */
+/* Passwords in the Terminal (term/termfill.c): what asks for a password now, or null:
+ * { prompt, program, exe, host, user, port }. The program and the account come from the asking process's own
+ * executable and arguments (/proc), not from the text it printed, so a script can't pass for ssh. */
 static JSValue f_asking(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
-    char prompt[200];
-    return s && term_asks_secret(s, prompt, sizeof prompt) ? JS_NewString(c, prompt) : JS_NULL;
+    char prompt[200], exe[512];
+    TcapTarget t;
+    if (!s || !term_asks_secret(s, prompt, sizeof prompt)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "prompt", JS_NewString(c, prompt));
+    if (!term_secret_target(s, prompt, &t, exe, sizeof exe)) {
+        JS_SetPropertyStr(c, o, "program", JS_NewString(c, t.program));
+        JS_SetPropertyStr(c, o, "exe", JS_NewString(c, exe));
+        JS_SetPropertyStr(c, o, "host", JS_NewString(c, t.host));
+        JS_SetPropertyStr(c, o, "user", JS_NewString(c, t.user));
+        JS_SetPropertyStr(c, o, "port", JS_NewString(c, t.port));
+    }
+    return o;
+}
+
+static int arg_token(JSContext *c, JSValueConst v, unsigned *token) {
+    double d = 0;
+    if (JS_ToFloat64(c, &d, v) || !(d >= 1 && d <= 4294967295.0) || d != (double)(unsigned)d) return -1;
+    *token = (unsigned)d;
+    return 0;
+}
+
+/* saveSecret(sid, token): the typed password the "save" event offered goes to Passwords (termfill_save); JS never
+ * has it. false if the offer is gone (declined, expired, another prompt). The "saved" event says how it ended. */
+static JSValue f_save_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t sid = 0;
+    unsigned token = 0;
+    if (argc < 2 || JS_ToInt32(c, &sid, argv[0]) || arg_token(c, argv[1], &token)) return JS_FALSE;
+    return JS_NewBool(c, termfill_save(sid, token) == 0);
+}
+
+/* dropSecret(sid, token): "Not Now": the typed password is wiped */
+static JSValue f_drop_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t sid = 0;
+    unsigned token = 0;
+    if (argc < 2 || JS_ToInt32(c, &sid, argv[0]) || arg_token(c, argv[1], &token)) return JS_FALSE;
+    if (!tcap_value(sid, token, NULL, NULL)) return JS_FALSE;
+    tcap_drop(sid);
+    return JS_TRUE;
 }
 
 /* fill(sid, vault, entry, field, index): the entry's field goes from lord-vault to the pty without passing
@@ -674,6 +716,8 @@ static JSValue f_fill(JSContext *c, JSValueConst this_val, int argc, JSValueCons
 
 static const JSCFunctionListEntry term_funcs[] = {
     JS_CFUNC_DEF("asking", 1, f_asking),
+    JS_CFUNC_DEF("saveSecret", 2, f_save_secret),
+    JS_CFUNC_DEF("dropSecret", 2, f_drop_secret),
     JS_CFUNC_DEF("fill", 5, f_fill),
     JS_CFUNC_DEF("create", 1, f_create),
     JS_CFUNC_DEF("list", 0, f_list),

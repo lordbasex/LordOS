@@ -324,5 +324,13 @@
   "secret.none": "There are no logins in Passwords.",
   "secret.failed": "The password couldn't be filled in.",
   "secret.notAsking": "The program stopped asking for the password, so it wasn't sent.",
-  "secret.multiline": "That password has more than one line and wasn't sent."
+  "secret.multiline": "That password has more than one line and wasn't sent.",
+  "secret.askedBy": "{program} is asking for the password for {host}",
+  "secret.askedByNoHost": "{program} is asking for a password",
+  "save.ask": "Save the password for {title} in Passwords?",
+  "save.save": "Save",
+  "save.notNow": "Not Now",
+  "save.locked": "Passwords is locked. Unlock it, then Save.",
+  "save.saved": "Saved in Passwords",
+  "save.failed": "The password couldn't be saved."
 }

@@ -324,5 +324,13 @@
   "secret.none": "Il n'y a aucun identifiant dans Mots de passe.",
   "secret.failed": "Le mot de passe n'a pas pu être rempli.",
   "secret.notAsking": "Le programme ne demande plus le mot de passe, il n'a donc pas été envoyé.",
-  "secret.multiline": "Ce mot de passe a plus d'une ligne et n'a pas été envoyé."
+  "secret.multiline": "Ce mot de passe a plus d'une ligne et n'a pas été envoyé.",
+  "secret.askedBy": "{program} demande le mot de passe de {host}",
+  "secret.askedByNoHost": "{program} demande un mot de passe",
+  "save.ask": "Enregistrer le mot de passe de {title} dans Mots de passe ?",
+  "save.save": "Enregistrer",
+  "save.notNow": "Pas maintenant",
+  "save.locked": "Mots de passe est verrouillé. Déverrouillez-le, puis Enregistrer.",
+  "save.saved": "Enregistré dans Mots de passe",
+  "save.failed": "Le mot de passe n'a pas pu être enregistré."
 }
