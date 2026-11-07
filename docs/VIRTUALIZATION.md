@@ -955,6 +955,30 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     `machine.json`, and stops with the new reason `installed` (`VR_INSTALLED`, added at the end of `vmproto.h`). The
     machine's window starts it again at once: the installed system. QEMU gives a `-kernel` boot index 0, so during
     that first start the system disk is 1 and the CD 2.
+- *Install without questions, tested so far (2026-11-06).* `tests/vmunattend_test.c` **80** (the spec and twenty
+  refused ones, the three answer files with the hash and never a plain password, the command line and `{label}`, the
+  FAT seed disk read back by long name and passed by `fsck.fat -n`, the cpio, ISO 9660 images made in the test with
+  Rock Ridge, plain and Joliet names, broken records, an oversized directory, a file past the end, and `vmu_prepare`
+  end to end), `vmcatalog-test` 226 (the hidden entries, signed like the cards), `vm_catalog_test.mjs` 61,
+  `vm_model_test.mjs` 153. On VM 116 in a real session (`out/final/machines-e2e/u-*.png`): the Debian card's *Set
+  up* step (`u-02`), the Review (`u-03`), the download (`u-04`, sizes now in Storage's units); the machine's folder had
+  `disks/unattended/{vmlinuz,initrd,cmdline}`, the spec file was gone from the runtime folder, and the initrd's
+  appended preseed had `passwd/user-password-crypted` with a `$6$` hash and no password. The first start failed once
+  (QEMU: *bootindex 0 has already been used*: `-kernel` takes it), fixed by moving the disks' boot indexes during that
+  start; then the installer ran with nothing typed, past language, keyboard, network and partitioning, into *Installing
+  the base system* (`u-05`, `u-06`). While it installed GNOME, VM 116 (3.9 GB, no swap, the Cloud bench's sessions and
+  servers beside it) stopped answering ssh for over 50 minutes (TCP and ping up: memory exhaustion), so the end of the
+  install, the restart into the installed system, the Ubuntu and Fedora runs and the power-button checks below wait
+  for the build VM to come back (a reset needs the Proxmox host, which this work doesn't touch).
+- *The power button (6.1).* What was seen: a console-only Debian (the earlier preseed: no task, only
+  qemu-guest-agent) ignored `system_powerdown` for 60 s (*power button pressed*, then *didn't shut down in time*); the
+  agent was off, so nothing else was tried. The likely cause, not yet confirmed in that guest: such an install has no
+  D-Bus, so systemd-logind, which turns the ACPI *Power Button* input event into a shutdown (`HandlePowerKey`), isn't
+  running, and there is no acpid either; a desktop install has both. What changed: Shut Down asks qemu-guest-agent
+  first when it answers (it shuts down whatever the guest does with its button) and presses the button 10 s later if
+  the guest still runs; without the agent, the button first, then the agent if it shows up. The unattended installs
+  bring qemu-guest-agent and turn the machine's agent on, and a console-only Debian gets `acpid` and
+  `acpi-support-base`.
 - *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
   releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
   and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
@@ -2004,7 +2028,7 @@ Machines (React + LordOS SDK)
 |---|---|---|
 | **0, Technical proof** | No app. KVM, QEMU, QMP and D-Bus display: a Debian 13 guest with picture and input on amd64 and Pi 5, over direct QMP. Answers 2.2's open items: 4K guest on 16K host, Pi GICv2, GICV trapping by kernel, TCG numbers, `ui-dbus` on arm64, nested checks, `device=/dev/fdset`, formats and modifiers per GPU, desktop under load. No agent, no 3D, no USB, no snapshots | Done 2026-11-04: numbers in section 13, open items in 13.8 |
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
-| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"), with the makers' signatures checked, resumed downloads and removal in Storage, and driven on screen in a LordOS session through a whole Debian install (2026-11-06); the gates pass on bare-metal amd64 too. Still open: the cards' unattended install and the console guest's ACPI shutdown (3.9) |
+| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"), with the makers' signatures checked, resumed downloads and removal in Storage, and driven on screen in a LordOS session through a whole Debian install (2026-11-06); the gates pass on bare-metal amd64 too. Unattended install built (3.9, "Install without questions") and seen into Debian's base system install on VM 116; still open: its end to end (Debian to login, Ubuntu, Fedora) and the power-button check, waiting for the build VM |
 | **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import (import of other apps' machines built, 6.22), backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
 | **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
