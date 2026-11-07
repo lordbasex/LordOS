@@ -374,7 +374,8 @@ export function storageBar(st, images = []) {
   const inUse = images.reduce((a, x) => a + (x.users?.length ? x.size || 0 : 0), 0);
   const parts = [['machines', machines], ['isos', Math.max(0, (st.isos || 0) - inUse)], ...(images.length ? [['downloads', dl]] : []), ['trash', st.trash || 0]];
   const other = Math.max(0, used - parts.reduce((a, x) => a + x[1], 0));
-  return [...parts, ['other', other]].map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
+  // an empty slice isn't shown (no "Disc images 0 MB")
+  return [...parts, ['other', other]].filter(([, bytes]) => bytes > 0).map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
 }
 
 // ---- the resolution menu (5.3) ----

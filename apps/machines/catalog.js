@@ -8,7 +8,7 @@ export function systemsFor(cat, arch) {
   const out = [];
   for (const s of Array.isArray(cat?.systems) ? cat.systems : []) {
     const a = s?.arch?.[arch];
-    if (!a || typeof s.id !== 'string' || typeof a.file !== 'string') continue;
+    if (!a || s.hidden || typeof s.id !== 'string' || typeof a.file !== 'string') continue;
     out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', listed: !a.sums });
   }
   return out;
@@ -127,4 +127,42 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
       file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : '', users, dirs, running });
   }
   return [...out.values()].sort((a, b) => b.size - a.size || a.sha.localeCompare(b.sha));
+}
+
+// ---- unattended installs (vmunattend.h) ----
+// how a card installs without questions on this architecture: { kind, image (the entry whose image it boots: the card's
+// own, or a hidden one), kernel, initrd, append } or null
+export function unattendedOf(cat, id, arch) {
+  const s = (cat?.systems || []).find((x) => x?.id === id);
+  const u = s?.unattended;
+  const a = u?.arch?.[arch];
+  if (!u || !a || !['preseed', 'autoinstall', 'kickstart'].includes(u.kind) || typeof a.kernel !== 'string' || typeof a.initrd !== 'string') return null;
+  const image = typeof u.image === 'string' ? u.image : id;
+  if (!entryOf(cat, image, arch)) return null;
+  return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(u.append || ''), release: String(s.release || '') };
+}
+
+// what the person types for an unattended install, checked as lord-vm checks it: { ok, errors: { user, password, hostname } }
+const RESERVED = ['root', 'daemon', 'bin', 'sys', 'sync', 'games', 'man', 'lp', 'mail', 'news', 'uucp', 'proxy', 'www-data', 'backup', 'list',
+  'irc', 'nobody', 'systemd-network', 'messagebus', 'admin', 'sudo', 'wheel', 'adm'];
+export function checkSetup({ user, password, hostname }) {
+  const errors = {};
+  if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(user || '')) errors.user = user ? 'user' : 'userEmpty';
+  else if (RESERVED.includes(user)) errors.user = 'userReserved';
+  if (!password) errors.password = 'passwordEmpty';
+  else if (password.length > 255) errors.password = 'passwordLong';
+  if (!/^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(hostname || '')) errors.hostname = 'hostname';
+  return { ok: !Object.keys(errors).length, errors };
+}
+
+// a machine's name as a computer name: "Debian 13.7" → "debian-13-7"
+export function hostnameFor(name) {
+  const h = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/, '');
+  return h || 'machine';
+}
+
+// an account name from the person's own: "Federico Pereira" or "lordbasex" → "lordbasex"
+export function userFor(home) {
+  const u = String(home || '').split('/').filter(Boolean).pop() || '';
+  return /^[a-z_][a-z0-9_-]{0,31}$/.test(u) && !RESERVED.includes(u) ? u : 'user';
 }

@@ -175,7 +175,8 @@ const st = { total: 1000, free: 400, isos: 50, trash: 20, machines: [
 ], bases: [{ path: '/l/.shared/b.qcow2', bytes: 300, users: 2, trash: 0 }] };
 eq('storage rows order', storageRows(st).map((r) => [r.name || 'base', r.level]), [['Alpha', 0], ['Debian Dev', 0], ['Debian Dev clone', 1], ['base', 0]]);
 eq('storage row base users', storageRows(st)[1].baseUsers, 2);
-eq('storage bar', storageBar(st).map((b) => [b.key, b.bytes]), [['machines', 630], ['isos', 50], ['trash', 20], ['other', 0]]);
+eq('storage bar', storageBar(st).map((b) => [b.key, b.bytes]), [['machines', 630], ['isos', 50], ['trash', 20]]);
+eq('storage bar: empty slices hidden', storageBar({ total: 1000, free: 400, machines: [{ total: 600 }], bases: [], isos: 0, trash: 0 }).map((b) => b.key), ['machines']);
 eq('storage bar no total', storageBar({}), []);
 
 // ---- the guest agent ----

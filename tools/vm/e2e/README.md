@@ -26,7 +26,10 @@ ssh VM 'sudo python3 -I ~/LordOS-089/tools/vm/e2e/lc.py m89a "launchApp(\"machin
 ssh VM 'sudo python3 -I ~/LordOS-089/tools/vm/e2e/ui.py /run/vm-e2e-rt/m89a/lordos/remote.sock grab:/tmp/a.png'
 ```
 
-The Debian install: serve `preseed-debian.cfg` from another computer on the build VM's network
+Since the assistant's *Install without questions* (docs/VIRTUALIZATION.md 3.9) a card installs with nothing typed in the
+guest: the bench only fills the *Set up* step (account, password) and waits for the machine to restart into the installed
+system. Typing in the session goes through its keyboard layout (LA on VM 116): keep test passwords to letters and digits.
+The first run, before that existed: serve `preseed-debian.cfg` from another computer on the build VM's network
 (`python3 -m http.server 8089 --bind <its address>` in a folder with only that file), and at the installer's boot menu
 press Down (Install), `e`, Down three times to the `linux` line, End, type ` auto=true priority=critical
 url=http://<its address>:8089/preseed-debian.cfg`, then Ctrl+X. Not from the build VM itself: with passt the guest has

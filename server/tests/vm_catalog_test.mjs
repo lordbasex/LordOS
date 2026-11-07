@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const C = await import(path.join(here, '../../apps/machines/catalog.js'));
 const CAT = JSON.parse(fs.readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
-const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR } = C;
+const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR, unattendedOf, checkSetup, hostnameFor, userFor } = C;
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 
 let n = 0, bad = 0;
@@ -94,6 +94,22 @@ eq('images: a bad info file', downloadedImages(CAT, [{ name: `${A}.iso`, size: 9
 const st = { total: 1000, free: 100, machines: [{ total: 300 }], bases: [], isos: 250, trash: 10 };
 eq('bar with downloads', M.storageBar(st, [{ size: 200, users: ['Deb'] }, { size: 50, users: [] }]).map((b) => [b.key, b.bytes]), [['machines', 300], ['isos', 50], ['downloads', 250], ['trash', 10], ['other', 290]]);
 eq('bar without downloads', M.storageBar(st).map((b) => b.key), ['machines', 'isos', 'trash', 'other']);
+
+// ---- unattended installs ----
+eq('hidden entries have no card', systemsFor(CAT, 'amd64').some((s) => s.id.includes('-')), false);
+eq('unattended: debian', unattendedOf(CAT, 'debian', 'amd64'), { kind: 'preseed', image: 'debian', kernel: 'install.amd/vmlinuz', initrd: 'install.amd/initrd.gz', append: 'auto=true priority=critical --- quiet', release: '13' });
+eq('unattended: debian arm64', unattendedOf(CAT, 'debian', 'arm64')?.kernel, 'install.a64/vmlinuz');
+eq('unattended: ubuntu from the server image', [unattendedOf(CAT, 'ubuntu', 'amd64')?.kind, unattendedOf(CAT, 'ubuntu', 'amd64')?.image], ['autoinstall', 'ubuntu-server']);
+eq('unattended: fedora from the network installer', [unattendedOf(CAT, 'fedora', 'arm64')?.kind, unattendedOf(CAT, 'fedora', 'arm64')?.image, unattendedOf(CAT, 'fedora', 'amd64')?.append.includes('{label}')], ['kickstart', 'fedora-netinst', true]);
+eq('unattended: none for kali', unattendedOf(CAT, 'kali', 'amd64'), null);
+eq('ubuntu server image in the signed list', pickImage(entryOf(CAT, 'ubuntu-server', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-amd64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-amd64.iso');
+eq('ubuntu arm64 server image, not largemem', pickImage(entryOf(CAT, 'ubuntu-server', 'arm64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-arm64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-arm64.iso');
+eq('fedora netinst pattern', [new RegExp(entryOf(CAT, 'fedora-netinst', 'amd64').file).test('Fedora-Everything-netinst-x86_64-45-1.4.iso'), new RegExp(entryOf(CAT, 'fedora-netinst', 'amd64').sumsPattern).test('Fedora-Everything-45-1.4-x86_64-CHECKSUM')], [true, true]);
+eq('setup ok', checkSetup({ user: 'ana', password: 'x', hostname: 'debian-13' }), { ok: true, errors: {} });
+eq('setup errors', checkSetup({ user: 'Root', password: '', hostname: '-x' }).errors, { user: 'user', password: 'passwordEmpty', hostname: 'hostname' });
+eq('setup reserved', checkSetup({ user: 'root', password: 'x', hostname: 'h' }).errors, { user: 'userReserved' });
+eq('hostname from a name', [hostnameFor('Debian 13.7'), hostnameFor('Ubuntu Señal 26.04!'), hostnameFor('***')], ['debian-13-7', 'ubuntu-senal-26-04', 'machine']);
+eq('user from home', [userFor('/home/federico'), userFor('/home/Root'), userFor('/root')], ['federico', 'user', 'user']);
 
 console.log(`== vm-catalog-test: ${n - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

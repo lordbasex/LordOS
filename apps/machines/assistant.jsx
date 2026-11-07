@@ -5,12 +5,16 @@
 // one reads its maker's SHA-256 list (vm-image-list), the newest image of the release is named with its hash, and step 5
 // downloads it (vm-image-get, which keeps it only with that hash) before the machine is made from it.
 // Migrate from another app opens the import plan (migrate.jsx).
+// Install without questions (the mock "Unattended", step 3 "Set up"): for a card whose catalog entry says how, the
+// account, password, computer name, time zone and keyboard become the installer's answer file (lord-vm --unattended,
+// vmunattend.h); the password goes to lord-server, which keeps only its hash. A card may install from another image
+// of its maker's (Ubuntu's server image, Fedora's network installer), resolved like the card's own.
 import { View, Text, TextInput, FilePicker, Toggle, admin, fs, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, sizeMb } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize } from './model.js';
-import { usePal, OsMark, Btn, Bar, gb } from './ui.jsx';
+import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
 import { writeMeta } from './meta.js';
 import { Migrate } from './migrate.jsx';
 
@@ -58,6 +62,12 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [dl, setDl] = useState(null);
   const [got, setGot] = useState(null);          // the download's progress, { done, total }, in step 5
   const pickSeq = useRef(0);
+  // Install without questions: { on, user, password, hostname, timezone, keymap }; alt: the image it boots when that
+  // isn't the card's own ({ id, phase, image, err })
+  const hd = (typeof lord !== 'undefined' && lord.vm?.hostDefaults?.()) || { timezone: 'UTC', keymap: 'us', locale: 'en_US.UTF-8' };
+  const [un, setUn] = useState({ on: true, user: userFor(typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : ''), password: '', hostname: '', timezone: hd.timezone, keymap: hd.keymap });
+  const [alt, setAlt] = useState(null);
+  const altSeq = useRef(0);
   const cancelled = useRef(false);
   const other = host.arch === 'amd64' ? 'arm64' : 'amd64';
   const size = profileSize(profile, host);
@@ -80,25 +90,31 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     if (a) setArch(a);
     setName(suggestName(s, vv, names));
   };
-  // a card: its maker's list (and, when the list's name changes per build, the folder's listing first), the newest image
+  // an entry's maker's list (and, when the list's name changes per build, the folder's listing first), checked by the
+  // helper, and the newest image in it
+  const resolve = async (id, a) => {
+    const e = entryOf(CATALOG, id, a);
+    if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
+    let p = await admin.run('vm-image-list', `${id} ${a}`, null, { quiet: true });
+    if (!e.sums) {
+      const list = newest(listingNames(fs.read(String(p)), e.sumsPattern), e.sumsPattern);
+      if (!list) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
+      p = await admin.run('vm-image-list', `${id} ${a} ${list}`, null, { quiet: true });
+    }
+    const img = pickImage(e, fs.read(String(p)));
+    if (!img) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
+    return img;
+  };
+  // a card: its list, the newest image
   const pickDownload = async (s, a = arch) => {
     const seq = ++pickSeq.current;
-    setSource('download'); setPath(''); setPicking(false);
+    setSource('download'); setPath(''); setPicking(false); setAlt(null);
     setSys({ id: s.id, name: s.name }); setVer(s.release); setName(suggestName({ name: s.name }, s.release, names));
     setDl({ id: s.id, name: s.name, phase: 'list' });
-    const e = entryOf(CATALOG, s.id, a);
     try {
-      if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-      let p = await admin.run('vm-image-list', `${s.id} ${a}`, null, { quiet: true });
-      if (!e.sums) {
-        const list = newest(listingNames(fs.read(String(p)), e.sumsPattern), e.sumsPattern);
-        if (!list) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-        p = await admin.run('vm-image-list', `${s.id} ${a} ${list}`, null, { quiet: true });
-      }
-      const img = pickImage(e, fs.read(String(p)));
-      if (!img) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
+      const img = await resolve(s.id, a);
       if (seq !== pickSeq.current) return;
-      const vv = versionIn(img.name, e.release);
+      const vv = versionIn(img.name, s.release);
       setVer(vv); setName(suggestName({ name: s.name }, vv, names));
       setDl({ id: s.id, name: s.name, phase: 'ready', image: img });
     } catch (err) {
@@ -111,6 +127,21 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id);
     if (s) pickDownload(s, arch); else { setSource(null); setDl(null); }
   }, [arch]);
+  // the image an unattended install boots, when it isn't the card's own: read once the switch is on
+  const uo = downloading && dl ? unattendedOf(CATALOG, dl.id, arch) : null;
+  const unOn = !!uo && un.on;
+  const needAlt = unOn && uo.image !== dl?.id;
+  useEffect(() => {
+    if (!needAlt || (alt && alt.id === uo.image && alt.arch === arch && alt.phase !== 'error')) return;
+    const seq = ++altSeq.current;
+    setAlt({ id: uo.image, arch, phase: 'list' });
+    resolve(uo.image, arch).then((img) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'ready', image: img }); })
+      .catch((err) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'error', err: err.message || String(err) }); });
+  }, [needAlt, uo?.image, arch]);
+  useEffect(() => { if (name && !un.hostname) setUn((u) => ({ ...u, hostname: hostnameFor(name) })); }, [name]);
+  const setup = checkSetup(un);
+  // what is downloaded and installed: the card's image, or the unattended install's own
+  const inst = needAlt ? (alt?.phase === 'ready' ? { id: alt.id, image: alt.image } : null) : downloading && dl?.image ? { id: dl.id, image: dl.image } : null;
   useEffect(() => {
     if (!job) return undefined;
     const timer = setInterval(() => {
@@ -129,10 +160,10 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     setFail(null); setStopped(false);
     let iso = null;
     if (downloading) {
-      setStep(4); setGot({ done: 0, total: dl.image.size || 0 }); cancelled.current = false;
+      setStep(4); setGot({ done: 0, total: inst.image.size || 0 }); cancelled.current = false;
       try {
         // a download stopped before is continued: the helper says from where first ("vm.downloadResumed")
-        iso = String(await admin.run('vm-image-get', `${dl.id} ${arch} ${dl.image.name} ${dl.image.sha}`, (l) => {
+        iso = String(await admin.run('vm-image-get', `${inst.id} ${arch} ${inst.image.name} ${inst.image.sha}`, (l) => {
           const g = progressOf(l);
           if (g) setGot((o) => ({ ...g, resumed: o?.resumed || 0 }));
           const r = resumedOf(l);
@@ -146,7 +177,13 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       }
       setGot(null);
     }
-    const id = lord.vm.create(createRequest(iso ? { ...d, path: iso } : d));
+    const req = createRequest(iso ? { ...d, path: iso } : d);
+    if (iso && unOn) {
+      req.unattended = { kind: uo.kind, user: un.user, password: un.password, fullname: '', hostname: un.hostname, timezone: un.timezone,
+        keymap: un.keymap, variant: '', locale: hd.locale || 'en_US.UTF-8', release: uo.release, kernel: uo.kernel, initrd: uo.initrd, append: uo.append, desktop: true };
+    }
+    const id = lord.vm.create(req);
+    if (req.unattended) { req.unattended.password = ''; setUn((u) => ({ ...u, password: '' })); }
     if (!id) { setFail(tr('machines.new.refused')); setStep(4); return; }
     setJob(id);
     setStep(4);
@@ -154,8 +191,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const stopDownload = () => { cancelled.current = true; admin.run('vm-image-cancel', '', null, { quiet: true }).catch(() => {}); };
 
   if (source === 'migrate' && path && !picking) return <Migrate host={host} path={path} names={names} onClose={onClose} onDone={() => onClose()} onStart={(m) => onCreated(m)} />;
-  const can = [downloading ? dl?.phase === 'ready' : !!source && !!path && !v.errors.path, true, !v.errors.name, v.ok && !missing.length, false][step];
-  const title = tr(`machines.as.title.${STEPS[step]}`);
+  const can = [downloading ? dl?.phase === 'ready' : !!source && !!path && !v.errors.path, true, !v.errors.name && (!unOn || (setup.ok && !!inst)),
+    v.ok && !missing.length && (!downloading || !!inst), false][step];
+  const title = step === 2 && uo ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
   let body = null;
   if (step === 0) body = <>
@@ -167,7 +205,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
           const mine = downloading && dl?.id === s.id;
           const exact = mine && dl.image?.size > 0;
           const title = [s.name, mine && dl.phase === 'ready' ? ver : s.release].filter(Boolean).join(' ');
-          const sz = gb(sizeMb(s.approxMb, exact ? dl.image.size : 0));
+          const sz = bytes(exact ? dl.image.size : s.approxMb * 1048576);
           return <Tile key={s.id} height={118} selected={mine} mark={<OsMark id={s.id} size={40} />} title={title}
             hint={tr(exact ? 'machines.dl.size' : 'machines.dl.sizeAbout', { arch, size: sz })} onClick={() => pickDownload(s)} />;
         })}
@@ -244,12 +282,48 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       <Toggle on={customize} onChange={setCustomize} />
       <Text style={{ fontSize: 13, color: p.text }}>{tr('machines.as.customize')}</Text>
     </View>
+    {uo ? <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: p.dark ? '#1d3049' : '#e6f1ff', border: `1px solid ${p.dark ? '#2f5580' : '#9cc6f5'}` }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.un.title')}</Text>
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.un.hint')}</Text>
+        </View>
+        <Toggle on={un.on} onChange={(on) => setUn((u) => ({ ...u, on }))} />
+      </View>
+      {un.on ? <>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.un.user')}</Text>
+            <TextInput value={un.user} onChange={(user) => setUn((u) => ({ ...u, user }))} />
+            {setup.errors.user ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.un.err.${setup.errors.user}`)}</Text> : null}
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.un.password')}</Text>
+            <TextInput secure value={un.password} onChange={(password) => setUn((u) => ({ ...u, password }))} />
+            {setup.errors.password && un.password ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.un.err.${setup.errors.password}`)}</Text> : null}
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {[['hostname', 'computer'], ['timezone', 'timezone'], ['keymap', 'keyboard']].map(([k, l]) => (
+            <View key={k} style={{ flex: 1, gap: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr(`machines.un.${l}`)}</Text>
+              <TextInput value={un[k]} onChange={(val) => setUn((u) => ({ ...u, [k]: val }))} />
+              {k === 'hostname' && setup.errors.hostname ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr('machines.un.err.hostname')}</Text> : null}
+            </View>
+          ))}
+        </View>
+        <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr(`machines.un.how.${uo.kind}`)}</Text>
+        {needAlt ? <Text style={{ fontSize: 12, color: alt?.phase === 'error' ? '#ff453a' : p.dim, textAlign: 'start' }}>
+          {alt?.phase === 'ready' ? tr('machines.un.image', { file: alt.image.name }) : alt?.phase === 'error' ? alt.err : tr('machines.dl.reading', { name: dl.name })}</Text> : null}
+      </> : null}
+    </> : null}
   </>;
   else if (step === 3) {
     const rows = [
       [tr('machines.as.r.system'), [sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')],
-      [tr('machines.as.r.from'), downloading ? dl.image.name : path.split('/').pop()],
-      ...(downloading ? [[tr('machines.as.r.download'), dl.image.size ? tr('machines.dl.checked', { size: gb(Math.round(dl.image.size / 1048576)) }) : tr('machines.dl.checkedNoSize')]] : []),
+      [tr('machines.as.r.from'), downloading ? inst?.image.name || '' : path.split('/').pop()],
+      ...(downloading ? [[tr('machines.as.r.download'), inst?.image.size ? tr('machines.dl.checked', { size: bytes(inst.image.size) }) : tr('machines.dl.checkedNoSize')]] : []),
+      ...(uo ? [[tr('machines.as.r.install'), unOn ? tr('machines.un.review', { user: un.user, host: un.hostname }) : tr('machines.un.reviewOff')]] : []),
       [tr('machines.as.r.arch'), emulated ? `${arch}, ${tr('machines.emulatedLower')}` : arch],
       [tr('machines.as.r.cpu'), tr('machines.vcpus', { n: size.vcpus })],
       [tr('machines.as.r.memory'), gb(size.memoryMb)],
@@ -261,7 +335,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     body = <>
       <View style={{ borderRadius: 12, backgroundColor: p.card }}>
         {rows.map(([k, val], i) => (
-          <View key={k} style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: i < rows.length - 1 ? 1 : 0, borderColor: p.line }}>
+          <View key={k} style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: rows.length > 10 ? 7 : 10, borderBottomWidth: i < rows.length - 1 ? 1 : 0, borderColor: p.line }}>
             <Text style={{ flex: 1, fontSize: 13, color: p.dim, textAlign: 'start' }}>{k}</Text>
             <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, direction: 'ltr' }}>{val}</Text>
           </View>
@@ -294,7 +368,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     );
   } else if (got && !fail) {
     // the download, with its progress; the helper checks the SHA-256 at the end
-    const mb = (x) => gb(Math.round(x / 1048576));
+    const mb = bytes;
     const checking = got.total > 0 && got.done >= got.total;
     body = (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -318,7 +392,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   return (
     <View style={{ flex: 1, paddingHorizontal: 28, paddingVertical: 24, gap: 16, borderRadius: 12, backgroundColor: p.raised, border: `1px solid ${p.line}` }}>
       <View style={{ flexDirection: 'row', gap: 20 }}>
-        {STEPS.map((s, i) => <Text key={s} style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, color: i === step ? p.text : p.dim }}>{`${i + 1} ${tr(`machines.as.step.${s}`)}`}</Text>)}
+        {STEPS.map((s, i) => <Text key={s} style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, color: i === step ? p.text : p.dim }}>{`${i + 1} ${tr(`machines.as.step.${s === 'name' && uo ? 'setup' : s}`)}`}</Text>)}
       </View>
       <Text style={{ fontSize: 22, fontWeight: 600, color: p.text, textAlign: 'start' }}>{title}</Text>
       {body}

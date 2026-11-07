@@ -284,7 +284,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         lord.vm.close(sid);
         setSid(0);
         if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
-        if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
+        // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
+        // so starting again is the installed system (3.9, "Unattended install")
+        if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return; }
+        if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
       }
     }, 16);
     return () => clearInterval(timer);
