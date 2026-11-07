@@ -955,30 +955,54 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     `machine.json`, and stops with the new reason `installed` (`VR_INSTALLED`, added at the end of `vmproto.h`). The
     machine's window starts it again at once: the installed system. QEMU gives a `-kernel` boot index 0, so during
     that first start the system disk is 1 and the CD 2.
-- *Install without questions, tested so far (2026-11-06).* `tests/vmunattend_test.c` **80** (the spec and twenty
-  refused ones, the three answer files with the hash and never a plain password, the command line and `{label}`, the
-  FAT seed disk read back by long name and passed by `fsck.fat -n`, the cpio, ISO 9660 images made in the test with
-  Rock Ridge, plain and Joliet names, broken records, an oversized directory, a file past the end, and `vmu_prepare`
-  end to end), `vmcatalog-test` 226 (the hidden entries, signed like the cards), `vm_catalog_test.mjs` 61,
-  `vm_model_test.mjs` 153. On VM 116 in a real session (`out/final/machines-e2e/u-*.png`): the Debian card's *Set
-  up* step (`u-02`), the Review (`u-03`), the download (`u-04`, sizes now in Storage's units); the machine's folder had
-  `disks/unattended/{vmlinuz,initrd,cmdline}`, the spec file was gone from the runtime folder, and the initrd's
-  appended preseed had `passwd/user-password-crypted` with a `$6$` hash and no password. The first start failed once
-  (QEMU: *bootindex 0 has already been used*: `-kernel` takes it), fixed by moving the disks' boot indexes during that
-  start; then the installer ran with nothing typed, past language, keyboard, network and partitioning, into *Installing
-  the base system* (`u-05`, `u-06`). While it installed GNOME, VM 116 (3.9 GB, no swap, the Cloud bench's sessions and
-  servers beside it) stopped answering ssh for over 50 minutes (TCP and ping up: memory exhaustion), so the end of the
-  install, the restart into the installed system, the Ubuntu and Fedora runs and the power-button checks below wait
-  for the build VM to come back (a reset needs the Proxmox host, which this work doesn't touch).
-- *The power button (6.1).* What was seen: a console-only Debian (the earlier preseed: no task, only
-  qemu-guest-agent) ignored `system_powerdown` for 60 s (*power button pressed*, then *didn't shut down in time*); the
-  agent was off, so nothing else was tried. The likely cause, not yet confirmed in that guest: such an install has no
-  D-Bus, so systemd-logind, which turns the ACPI *Power Button* input event into a shutdown (`HandlePowerKey`), isn't
-  running, and there is no acpid either; a desktop install has both. What changed: Shut Down asks qemu-guest-agent
-  first when it answers (it shuts down whatever the guest does with its button) and presses the button 10 s later if
-  the guest still runs; without the agent, the button first, then the agent if it shows up. The unattended installs
-  bring qemu-guest-agent and turn the machine's agent on, and a console-only Debian gets `acpid` and
-  `acpi-support-base`.
+- *Install without questions, tested (2026-11-06 and 07).* `tests/vmunattend_test.c` **82** (the spec and the ones it
+  refuses, the three answer files with the hash and never a plain password, the keyboard's codes and description, the
+  command line and `{label}`, the FAT seed disk read back by long name and passed by `fsck.fat -n`, the cpio, ISO 9660
+  images made in the test with Rock Ridge, plain and Joliet names, broken records, an oversized directory, a file past
+  the end, and `vmu_prepare` end to end), `vmcatalog-test` 226, `vm_catalog_test.mjs` 61, `vm_model_test.mjs` 153.
+  The kernel paths were checked in the real images: Debian `install.amd/vmlinuz`, `initrd.gz`; Ubuntu 26.04.1 server
+  `casper/vmlinuz`, `casper/initrd` (its GRUB entry: `linux /casper/vmlinuz ---`); Fedora 45 netinst
+  `images/pxeboot/vmlinuz`, `initrd.img`, volume label `Fedora-E-dvd-x86_64-45` (its GRUB entry has the same
+  `inst.stage2=hd:LABEL=…`). On VM 116 (now 12 GB and a 2 GB swap file), in a real session, screenshots
+  `out/final/machines-e2e/u-*.png`, one guest at a time:
+  - **Debian 13.7 desktop, nothing typed:** the card, *Set up* (`u-02`), Review (`u-03`), the download, stopped and
+    continued (`08`, `09`), then the installer from language to GNOME with no question (`u-05`), the installer's
+    restart ended QEMU (*the install is done*), lord-vm emptied `disks/unattended` and took the ISO out, the window
+    started the machine again: GRUB from the disk and GDM with the account `tester` (`u-07`), and the login with
+    the password typed in the assistant (`u-08`, GNOME's welcome). Install 28 minutes with GNOME (2 vCPU, 3 GB).
+    Two fixes on the way: (1) the first run stopped once on *keyboard-configuration* (the installed system's package
+    asks for the layout again when only `xkb-keymap` is preseeded): the preseed now also carries `layoutcode`,
+    `variantcode`, `modelcode` and the layout's xkb description from this computer's rules
+    (`/usr/share/X11/xkb/rules/base.lst`: *English (US)*), and the next run had no question; (2) lord-vm's own
+    Landlock lets it remove files in the machine's folder, not folders: the empty `unattended` folder stays (a
+    start only looks for `unattended/cmdline`). Also seen: the first start's picture said *Display output is not
+    active* while the installer ran, until the window was given a size (1280 × 800); a start after that showed it
+    at once. Not changed here (the display follows the window's size on the second start), noted below.
+  - **Shut Down of the installed Debian desktop:** through qemu-guest-agent (*asking qemu-guest-agent to shut the guest
+    down*), stopped in 3.0 and 3.5 s (two runs), reason `host-shutdown`.
+  - **Ubuntu 26.04.1:** the card resolved its server image from the same signed list, made the CIDATA seed disk and
+    `autoinstall ---`, and subiquity ran the whole autoinstall with no question (`u-13`: network, storage, curtin,
+    `qemu-guest-agent`) up to *installing ubuntu-desktop-minimal*, where the build VM's disk filled (QEMU paused the
+    guest on `BLOCK_IO_ERROR`, `u-14`; 43 GB of other work in `/var/tmp`, not this work's to delete). Then again
+    without the desktop (`desktop: false`, the console system): below.
+  - **Fedora 45:** the card resolved the netinst image (`Fedora-Everything-netinst-x86_64-45-1.4.iso`, 1.0 GB,
+    clear-signed list), the OEMDRV seed disk and `inst.stage2=hd:LABEL=Fedora-E-dvd-x86_64-45
+    inst.ks=hd:LABEL=OEMDRV:/ks.cfg`; anaconda read the kickstart and went straight to *Installation* with every spoke
+    set (language, time zone *America/Argentina/Buenos_Aires*, the metalink source, *Fedora Workstation*, automatic
+    partitioning, network) and installed: disk label, ext4 `/boot`, btrfs, EFI, *Installing the software, Downloading
+    packages* (`u-16`). Stopped there, as asked (the disk).
+- *The power button (6.1), confirmed (2026-11-07).* In a console-only Debian installed by the card's preseed
+  (`desktop: false`: the *standard* task, `qemu-guest-agent`, `acpid`): the guest has the ACPI *Power Button* input
+  device (`/proc/bus/input/devices`: *Power Button*, `kbd event3`), `dbus` installed, and `systemd-logind`, `acpid` and
+  `qemu-guest-agent` active (`u-09`). With acpid and the agent stopped and disabled (`u-10`), Shut Down pressed only
+  the button and the guest was off in **0.8 s**; again from its login prompt, through the agent, in 1.2 s. So the
+  button reaches the guest through q35's ACPI, and systemd-logind turns it into a shutdown (`HandlePowerKey=poweroff`,
+  its default) whenever it runs. The guest that ignored it for 60 s was installed with no task at all: `dbus` is
+  *Priority: standard* in Debian 13, and nothing in such an install pulls it, so there is no system bus,
+  systemd-logind doesn't run, and no acpid either; nobody hears the button. What changed: Shut Down asks
+  qemu-guest-agent first when it answers and presses the button 10 s later if the guest still runs (without the
+  agent, the button first); the card's installs bring the standard task or a desktop (`dbus`, logind),
+  `qemu-guest-agent` with the machine's agent on, and, on a console Debian, `acpid` and `acpi-support-base`.
 - *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
   releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
   and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
