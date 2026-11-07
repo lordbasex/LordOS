@@ -66,6 +66,8 @@ typedef struct {
 #define SYNCED_MAX 64
     struct { char rel[CLOUD_REL_MAX + 1]; char fp[256]; } synced[SYNCED_MAX];   /* our last uploads, as the cloud has them (N5) */
     int nsynced;
+    char srv_host[256];             /* the server it talks to, for the state: N4's "other accounts on this server" */
+    int srv_port;
     int precision_s;                /* the backend's modtime precision, seconds (fsinfo) */
     int nchecked;
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */

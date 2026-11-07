@@ -507,6 +507,7 @@ QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
 r=$(cmd answer "$QS" trust)
 check "trusting the new key: the account works again" has "$r" "\"id\":\"$SID\""
 check "the kept key is the new one now" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$new' && ! ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$want'"
+check "State: an SFTP account carries its server (host, port)" sh -c 'case "$1" in *"\"name\":\"Box\""*"\"host\":\"127.0.0.1\",\"port\":$2,"*) exit 0;; esac; exit 1' x "$(cmd state)" "$SP"
 check "N4: the other account on that server got the new key too" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$B3ID' | grep -q '$new'"
 r=$(cmd wait '"name":"Box3","kind":"sftp"' 10)
 for i in $(seq 40); do st=$(cmd state); case "$st" in *'"name":"Box3"'*'"mounted":true'*) break;; esac; sleep 0.5; done
@@ -603,6 +604,8 @@ r=$(cmd wait '"name":"Bucket"' 10)
 r=$(cmd wait '"mounted":true' 30)
 r=$(cmd state)
 check "S3: trashSupported is false" sh -c 'echo "$1" | grep -q "\"name\":\"Bucket\".*\"trashSupported\":false"' x "$r"
+check "State: an S3 account carries its endpoint's host and port" sh -c 'echo "$1" | grep -q "\"host\":\"127.0.0.1\",\"port\":$2,"' x "$r" "$OP"
+check "State: a WebDAV account carries its URL's host and port" sh -c 'echo "$1" | grep -q "\"host\":\"127.0.0.1\",\"port\":$2,"' x "$r" "$PORT"
 r=$(cmd unlink "$H/Cloud/Bucket/bucket1/o.txt")
 check "Stop Sharing on S3: cloud.cantRevoke" has "$r" '"error":"cloud.cantRevoke"'
 r=$(cmd remove "$OID")

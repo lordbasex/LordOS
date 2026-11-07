@@ -3,6 +3,7 @@
 #include "../sec/json.h"
 
 #include <ctype.h>
+#include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -591,4 +592,59 @@ int cloud_evict_lru(const CloudCand *c, int n, long long need, int *pick) {
     int used = 0;
     while (used < k && got < need) got += c[pick[used++]].bytes;
     return used;
+}
+
+/* "scheme://[user@]host[:port]/..." or "host[:port]" (S3 endpoints may come without a scheme) */
+static int url_server(const char *u, char *h, size_t hn) {
+    const char *p = strstr(u, "://");
+    int https = 1;
+    if (p) { https = !strncasecmp(u, "https", 5); p += 3; } else p = u;
+    const char *end = p + strcspn(p, "/?#");
+    const char *at = memchr(p, '@', (size_t)(end - p));
+    if (at) p = at + 1;
+    const char *hs = p, *he, *colon;
+    if (*p == '[') {
+        he = memchr(p, ']', (size_t)(end - p));
+        if (!he) return 0;
+        hs = p + 1;
+        colon = he + 1 < end && he[1] == ':' ? he + 1 : NULL;
+    } else { colon = memchr(p, ':', (size_t)(end - p)); he = colon ? colon : end; }
+    size_t n = (size_t)(he - hs);
+    if (!n || n >= hn) return 0;
+    memcpy(h, hs, n);
+    h[n] = 0;
+    for (size_t i = 0; i < n; i++) h[i] = (char)tolower((unsigned char)h[i]);
+    int port = https ? 443 : 80;
+    if (colon) {
+        char *e;
+        long v = strtol(colon + 1, &e, 10);
+        if (e == colon + 1 || e != end || v < 1 || v > 65535) { h[0] = 0; return 0; }
+        port = (int)v;
+    }
+    return port;
+}
+
+int cloud_server_of(const char *type, const char *host, const char *port, const char *url, const char *endpoint,
+                    const char *tls, char *h, size_t hn) {
+    if (!h || !hn) return 0;
+    h[0] = 0;
+    if (!type) return 0;
+    if (!strcmp(type, "webdav")) return url && url[0] ? url_server(url, h, hn) : 0;
+    if (!strcmp(type, "s3")) return endpoint && endpoint[0] ? url_server(endpoint, h, hn) : 0;
+    int def = !strcmp(type, "sftp") ? 22 : !strcmp(type, "smb") ? 445 : !strcmp(type, "ftp") ? (tls && !strcmp(tls, "true") ? 990 : 21) : 0;
+    if (!def || !host || !host[0] || strlen(host) >= hn) return 0;
+    for (const char *c = host; *c; c++) if ((unsigned char)*c <= ' ' || *c == '/' || *c == '@') return 0;
+    const char *hs = host;
+    size_t n = strlen(host);
+    if (n > 2 && host[0] == '[' && host[n - 1] == ']') { hs++; n -= 2; }
+    memcpy(h, hs, n);
+    h[n] = 0;
+    for (size_t i = 0; i < n; i++) h[i] = (char)tolower((unsigned char)h[i]);
+    if (port && port[0]) {
+        char *e;
+        long v = strtol(port, &e, 10);
+        if (*e || v < 1 || v > 65535) { h[0] = 0; return 0; }
+        return (int)v;
+    }
+    return def;
 }

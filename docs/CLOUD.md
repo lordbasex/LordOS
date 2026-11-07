@@ -981,11 +981,17 @@ The closed rc method table has 27 methods now (`operations/list`, `operations/st
 36. **Other accounts on the server (N4).** `answer(state, 'trust', { applyToOthers })` (default true): when the owner trusts
     a host's new key, the other accounts that kept the same old key for that host and port get it too, and are made again
     in rclone (rclone reads known_hosts when it makes a remote) and listed.
+37. **Each account's server in the state.** `host` (lower case, without brackets) and `port` for the server kinds: SFTP,
+    FTP and SMB from their fields (default 22, 21 or 990 with implicit TLS, 445), WebDAV from its URL and S3 from its
+    endpoint (443 or 80 by scheme); `null` for the others and for S3 on the provider's own endpoint. Known once the
+    account has been set up in this session's rclone (its host may live in the keyring). The interface can count "other
+    accounts on this server" exactly.
 
 ### 18.8 N4 in the interface
 
 The "The server's identity changed" step has a check box, on by default, "Also use the new key for my other accounts on
 this server (N)", shown only when other accounts kept the same old key; its value goes to
-`cloud.answer(state, 'trust', { applyToOthers })`. State has no host or port per account, so those accounts are found by
-their `old` fingerprint (`othersWithKey`), the account being updated left out. An account with `cloud.hostKeyChanged` shows
+`cloud.answer(state, 'trust', { applyToOthers })`. Those accounts are found by their `old` fingerprint (`othersWithKey`),
+the account being updated left out; State now also carries each account's `host` and `port` (17.2 item 37), so the
+count can be made exact. An account with `cloud.hostKeyChanged` shows
 its own `old` and `new` in its status box.

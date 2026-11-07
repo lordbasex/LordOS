@@ -238,6 +238,28 @@ static void t_refused(void) {
     CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,aaaa", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), h1, 1, 1) == 1);
     CHECK(!strcmp(cloud_failure_code("The attempted logon is invalid. This is either due to a bad username or authentication information."), "cloud.authFailed"));
     char cn[CLOUD_REL_MAX + 1];
+    {   /* the server in the state (N4's count) */
+        char sh[256];
+        CHECK(cloud_server_of("sftp", "Files.Example.test", NULL, NULL, NULL, NULL, sh, sizeof sh) == 22 && !strcmp(sh, "files.example.test"));
+        CHECK(cloud_server_of("sftp", "files.example.test", "2222", NULL, NULL, NULL, sh, sizeof sh) == 2222);
+        CHECK(cloud_server_of("sftp", "files.example.test", "99999", NULL, NULL, NULL, sh, sizeof sh) == 0 && !sh[0]);
+        CHECK(cloud_server_of("sftp", "files.example.test", "22x", NULL, NULL, NULL, sh, sizeof sh) == 0);
+        CHECK(cloud_server_of("sftp", "a b", NULL, NULL, NULL, NULL, sh, sizeof sh) == 0);
+        CHECK(cloud_server_of("sftp", "[::1]", NULL, NULL, NULL, NULL, sh, sizeof sh) == 22 && !strcmp(sh, "::1"));
+        CHECK(cloud_server_of("ftp", "ftp.example.test", NULL, NULL, NULL, NULL, sh, sizeof sh) == 21);
+        CHECK(cloud_server_of("ftp", "ftp.example.test", NULL, NULL, NULL, "true", sh, sizeof sh) == 990);
+        CHECK(cloud_server_of("smb", "nas.example.test", NULL, NULL, NULL, NULL, sh, sizeof sh) == 445);
+        CHECK(cloud_server_of("webdav", NULL, NULL, "https://dav.example.test/remote.php/dav", NULL, NULL, sh, sizeof sh) == 443 && !strcmp(sh, "dav.example.test"));
+        CHECK(cloud_server_of("webdav", NULL, NULL, "http://user@127.0.0.1:8080/x", NULL, NULL, sh, sizeof sh) == 8080 && !strcmp(sh, "127.0.0.1"));
+        CHECK(cloud_server_of("webdav", NULL, NULL, "http://[::1]:81", NULL, NULL, sh, sizeof sh) == 81 && !strcmp(sh, "::1"));
+        CHECK(cloud_server_of("webdav", NULL, NULL, "http://h.example.test:x/", NULL, NULL, sh, sizeof sh) == 0 && !sh[0]);
+        CHECK(cloud_server_of("webdav", NULL, NULL, "", NULL, NULL, sh, sizeof sh) == 0);
+        CHECK(cloud_server_of("s3", NULL, NULL, NULL, "http://127.0.0.1:9000", NULL, sh, sizeof sh) == 9000);
+        CHECK(cloud_server_of("s3", NULL, NULL, NULL, "s3.example.test", NULL, sh, sizeof sh) == 443 && !strcmp(sh, "s3.example.test"));
+        CHECK(cloud_server_of("s3", NULL, NULL, NULL, NULL, NULL, sh, sizeof sh) == 0);
+        CHECK(cloud_server_of("drive", "x", NULL, NULL, NULL, NULL, sh, sizeof sh) == 0 && !sh[0]);
+        CHECK(cloud_server_of(NULL, "x", NULL, NULL, NULL, NULL, sh, sizeof sh) == 0);
+    }
     CHECK(!cloud_conflict_name("notes.txt", 1, cn, sizeof cn) && !strcmp(cn, "notes (cloud copy).txt"));
     CHECK(!cloud_conflict_name("Docs/report.final.pdf", 2, cn, sizeof cn) && !strcmp(cn, "Docs/report.final (cloud copy 2).pdf"));
     CHECK(!cloud_conflict_name("Makefile", 1, cn, sizeof cn) && !strcmp(cn, "Makefile (cloud copy)"));

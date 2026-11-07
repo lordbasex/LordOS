@@ -1042,7 +1042,31 @@ static int keep_internal(const char *k) { return !strcmp(k, "token") || !strcmp(
 /* config/create with the non-secret options, the preset and the secrets (a JSON object's text, or NULL).
  * fresh 1: a new account, secrets plain, the state machine answered; 2: the same for an existing account (Sign In
  * Again, new credentials: config/update, so what isn't given stays); 0: what config/get gave (obscured), at start. */
+/* the server this account talks to, from its fields wherever they live (some are secret-flagged), kept for the state */
+static void note_server(Acc *a, const char *secret_json) {
+    static const char *const ks[] = { "host", "port", "url", "endpoint", "explicit_tls", "tls" };
+    char v[6][512];
+    JDoc d;
+    int have = secret_json && secret_json[0] && !json_parse(secret_json, strlen(secret_json), &d, NULL, 0);
+    for (int k = 0; k < 6; k++) {
+        v[k][0] = 0;
+        for (int i = 0; i < a->p.n; i++) if (!strcmp(a->p.kv[i].key, ks[k])) { cpy(v[k], sizeof v[k], a->p.kv[i].val); break; }
+        const char *x = !v[k][0] && have ? json_str(d.root, ks[k]) : NULL;
+        if (x) cpy(v[k], sizeof v[k], x);
+    }
+    if (have) json_free(&d);
+    char h[256];
+    int port = cloud_server_of(a->k->type, v[0], v[1], v[2], v[3], v[5][0] ? v[5] : NULL, h, sizeof h);
+    explicit_bzero(v, sizeof v);
+    if (port <= 0) return;                  /* not a server kind, or not in what was given: the kept one stays */
+    pthread_mutex_lock(&cl_mu);
+    cpy(a->srv_host, sizeof a->srv_host, h);
+    a->srv_port = port;
+    pthread_mutex_unlock(&cl_mu);
+}
+
 static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn, char **question) {
+    note_server(a, secret_json);
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"name\":");
@@ -2405,7 +2429,9 @@ static char *state_json(int light) {
             if (k) jb_raw(&b, ",");
             jb_str(&b, kp);
         }
-        jb_printf(&b, "],\"linksSupported\":%s,\"trashSupported\":%s,\"measuring\":%s,\"emptyingTrash\":%s,\"configuring\":%s,\"paused\":%s,\"ownClient\":%s}",
+        if (a->srv_port > 0) { jb_raw(&b, "],\"host\":"); jb_str(&b, a->srv_host); jb_printf(&b, ",\"port\":%d", a->srv_port); }
+        else jb_raw(&b, "],\"host\":null,\"port\":null");
+        jb_printf(&b, ",\"linksSupported\":%s,\"trashSupported\":%s,\"measuring\":%s,\"emptyingTrash\":%s,\"configuring\":%s,\"paused\":%s,\"ownClient\":%s}",
                   a->links_supported > 0 ? "true" : "false", a->trash_supported > 0 ? "true" : "false", a->rcjob_kind == 'm' ? "true" : "false",
                   a->rcjob_kind == 't' ? "true" : "false", a->pending_req || a->new_acc ? "true" : "false", a->paused ? "true" : "false", a->own_client ? "true" : "false");
     }

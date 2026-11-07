@@ -103,6 +103,10 @@ void             cloud_clean_text(const char *in, char *out, size_t n);
  * the object now (size, modtime in seconds or < 0 unknown, its hashes). 1 changed, 0 the same, -1 can't tell */
 int              cloud_remote_changed(const char *fingerprint, long long size, double mtime, const char *const *hashes, int nh, int precision_s);
 /* "dir/name (cloud copy).ext", n > 1 adds " n" before the extension: 0, -1 too long */
+/* the server an account talks to, for the state (not a secret there): host into h, the port returned, 0 when none
+ * (an OAuth provider, or S3 on the provider's own endpoint). host/port/url/endpoint/tls as the account's fields */
+int              cloud_server_of(const char *type, const char *host, const char *port, const char *url, const char *endpoint,
+                                 const char *tls, char *h, size_t hn);
 int              cloud_conflict_name(const char *rel, int n, char *out, size_t cap);   /* config/create's questions LordOS answers itself */
 /* a question's state as JS sees it, "<account id>:<rclone's state>": 0 and both parts */
 int              cloud_answer_state(const char *s, char *id, size_t n, const char **state);
