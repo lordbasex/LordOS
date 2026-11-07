@@ -917,6 +917,9 @@ void term_key(Session *s, const char *key, const char *chr, const char *base, in
             }
             return;
         }
+        char seq[32];
+        int sn = vt_key_encode(t, key, 0, m, seq, sizeof seq);   /* the protocol the program asked for */
+        if (sn) { term_input(s, seq, (size_t)sn); return; }
         if (!strcmp(key, "Enter")) { send(s, mods & MOD_ALT ? "\033\r" : (t->modes & M_LNM) ? "\r\n" : "\r"); return; }
         if (!strcmp(key, "Tab")) { send(s, mods & MOD_SHIFT ? "\033[Z" : mods & MOD_ALT ? "\033\t" : "\t"); return; }
         if (!strcmp(key, "Backspace")) { send(s, mods & MOD_CTRL ? "\b" : mods & MOD_ALT ? "\033\177" : "\177"); return; }
@@ -924,6 +927,11 @@ void term_key(Session *s, const char *key, const char *chr, const char *base, in
     }
     const char *text = chr && chr[0] ? chr : base;
     if (!text || !text[0]) return;
+    if (mods & (MOD_CTRL | MOD_ALT) && base && base[0] && !base[1]) {
+        char seq[32];
+        int sn = vt_key_encode(t, NULL, (unsigned char)base[0], m, seq, sizeof seq);
+        if (sn) { term_input(s, seq, (size_t)sn); return; }
+    }
     if (mods & MOD_CTRL) {
         int c = ctrl_code((unsigned char)text[0]);
         if (c >= 0) {

@@ -272,7 +272,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/vt-dump build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/vt-dump build/vt-keys-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc,$(ALL))
 	@sh tests/run_suites.sh full
@@ -647,6 +647,10 @@ build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/medi
 
 build/vt-dump: tests/vt_dump.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $^ $(LDLIBS)
+
+build/vt-keys-test: tests/vt_keys_test.c build/obj/term/vt.o build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $^ $(LDLIBS)
+	./$@ || { rm -f $@; exit 1; }
 
 build/gen/%-protocol.h: $(WLPROTO)/stable/xdg-shell/%.xml
 	@mkdir -p build/gen

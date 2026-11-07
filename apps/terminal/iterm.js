@@ -171,6 +171,10 @@ export function itermCombo(spec) {
   const code = parseInt(parts[0], 16), mods = parseInt(parts[1] || '0', 16);
   if (Number.isNaN(code)) return null;
   let key = NS_KEYS[code];
+  // the numeric keypad (NSNumericPadKeyMask): macOS also sets it on the arrows, which stay; a keypad
+  // character or Enter has no combination here and would take the main key of the same character
+  // (on a Latin American keyboard, the key that types "-" sent "/")
+  if ((mods & 0x200000) && (!key || code === 0x03)) return null;
   let shift = !!(mods & 0x20000);
   if (code === 0x19) shift = true;
   if (!key) {

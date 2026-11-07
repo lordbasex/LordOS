@@ -250,6 +250,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "scrollview-reset-test (sdk/components.jsx)" node tests/scrollview_reset_test.mjs
     else skip "scrollview-reset-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
+    if have node && [ -d ../node_modules/esbuild ]; then
+        run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs
+    else skip "terminal-keymap-test" "node and the repository's node_modules (npm install)"; fi
 }
 
 full() {

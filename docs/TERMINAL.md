@@ -79,6 +79,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Emoji graphemes (👍🏽, flags, 👨‍👩‍👧) | ✅ | with mode 2027 (like contour/wezterm/foot); without it `wcwidth` is respected so the shell doesn't get misaligned |
 | Text reflow on resize | ✅ | also with wide characters |
 | Mouse modes (1000/1002/1003/1006), focus (1004), bracketed paste (2004), synchronized output (2026) | ✅ | |
+| Keys with modifiers: kitty keyboard protocol flag 1 (disambiguate; `CSI > u`, `< u`, `= u`, `? u`, a stack per screen) and xterm modifyOtherKeys 2 | ✅ | Shift+Enter is `CSI 13;2u` when a program asks (Claude Code: a new line); the other kitty flags (release events, all keys as escapes) aren't supported and the query says so |
 | DA, DSR/CPR, DECRQM, XTVERSION, window size replies | ✅ | |
 | OSC 8 hyperlinks, OSC 0/2 title, OSC 7 directory, OSC 52 clipboard (write only) | ✅ | reading the clipboard from the shell isn't allowed |
 | OSC 9 notifications | ✅ | notice inside the window |

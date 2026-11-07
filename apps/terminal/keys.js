@@ -112,7 +112,18 @@ function table() {
   return lookup;
 }
 
-export const actionOf = (e) => table().get(comboOf(e)) || null;
+// Zoom goes by the character the key types, as in iTerm2, not by its US position: on a Latin American
+// keyboard "+" and "-" sit where a US one has "]" and "/" (❖] is the next pane, ❖/ nothing). Unless the
+// user set their own zoom shortcuts.
+const ZOOM_CHARS = { '+': 'zoomIn', '=': 'zoomIn', '-': 'zoomOut' };
+function zoomByChar(e) {
+  const own = terminalSettings().shortcuts || {};
+  if (own.zoomIn || own.zoomOut) return null;
+  const mods = (e.meta && !e.ctrl && !e.alt) || (e.ctrl && e.shift && !e.meta && !e.alt);
+  return mods ? ZOOM_CHARS[e.key] || null : null;
+}
+
+export const actionOf = (e) => zoomByChar(e) || table().get(comboOf(e)) || null;
 
 // Asignación de tecla del perfil o global para este evento (o null).
 export function keyMappingOf(e, profile) {
@@ -127,7 +138,7 @@ export function mappingBytes(m) {
     return String(m.param || '').replace(/\\(x[0-9a-fA-F]{2}|u\{[0-9a-fA-F]+\}|.)/g, (_, c) => {
       if (c[0] === 'x') return String.fromCharCode(parseInt(c.slice(1), 16));
       if (c[0] === 'u') return String.fromCodePoint(parseInt(c.slice(2, -1), 16));
-      return { n: '\r', r: '\r', t: '\t', e: '\x1b', a: '\x07', b: '\x08', '\\': '\\' }[c] ?? c;
+      return { n: '\n', r: '\r', t: '\t', e: '\x1b', a: '\x07', b: '\x08', '\\': '\\' }[c] ?? c;
     });
   }
   if (m.action === 'escape') return `\x1b${m.param || ''}`;

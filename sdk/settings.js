@@ -38,9 +38,25 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 1;
+export const SETTINGS_SCHEMA = 2;
+// A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
+// US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
+// importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
+const US_SHIFTED = { 8: '*', '=': '+' };
+export function usNoopMapping(m) {
+  if (!m || m.action !== 'text' || typeof m.combo !== 'string') return false;
+  const k = m.combo.startsWith('Shift+') ? US_SHIFTED[m.combo.slice(6)] : /^[0-9./*+=-]$/.test(m.combo) ? m.combo : null;
+  return k != null && m.param === k;
+}
+function dropUsNoops(list) { return Array.isArray(list) ? list.filter((m) => !usNoopMapping(m)) : list; }
 const MIGRATIONS = [
   [1, (s) => s],          // 0.8.1: the schema number starts being recorded; nothing changes
+  [2, (s) => {            // 0.8.8.6: Terminal mappings imported from iTerm2's keypad (usNoopMapping)
+    const t = s.terminal;
+    if (!t || typeof t !== 'object') return s;
+    const profiles = Array.isArray(t.profiles) ? t.profiles.map((p) => (p && p.keyMap ? { ...p, keyMap: dropUsNoops(p.keyMap) } : p)) : t.profiles;
+    return { ...s, terminal: { ...t, profiles, keyMap: dropUsNoops(t.keyMap) } };
+  }],
 ];
 export function migrateSettings(s) {
   let out = s;

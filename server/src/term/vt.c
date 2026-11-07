@@ -457,6 +457,7 @@ static void use_alt(Term *t, int on, int clear) {
     if (on) {
         save_cursor(t, &t->saved_alt);
         t->buf = &t->alt;
+        t->nkitty[1] = 0;                   /* the alternate screen starts with its own empty stack */
         if (clear) for (int r = 0; r < t->rows; r++) line_reset(L(t, r));
     } else {
         t->buf = &t->main;
@@ -658,6 +659,9 @@ static void csi(Term *t, int f) {
         } else if (f == 'p' && t->ninter == 1 && t->inter[0] == '$') {
             int m = prm0(t, 0, 0);
             reply(t, "\033[?%d;%d$y", m, dec_mode_state(t, m));
+        } else if (f == 'u') {                              /* kitty keyboard protocol: the flags in use */
+            int a = t->buf == &t->alt;
+            reply(t, "\033[?%du", t->nkitty[a] ? t->kitty[a][t->nkitty[a] - 1] : 0);
         } else if (f == 'n' && prm0(t, 0, 0) == 6) {
             reply(t, "\033[?%d;%dR", t->cy + 1 - (t->modes & M_ORIGIN ? t->top : 0), t->cx + 1);
         } else if (f == 'J') erase_display(t, prm0(t, 0, 0));
@@ -673,7 +677,25 @@ static void csi(Term *t, int f) {
         }
         return;
     }
-    if (t->priv == '>') {
+    if (t->priv == '>' || t->priv == '<' || t->priv == '=') {
+        int a = t->buf == &t->alt;
+        uint8_t *st = t->kitty[a];
+        int *ns = &t->nkitty[a];
+        if (f == 'u' && t->priv == '>') {               /* push (only flag 1, the one supported) */
+            if (*ns == 8) { memmove(st, st + 1, 7); (*ns)--; }
+            st[(*ns)++] = (uint8_t)(prm0(t, 0, 0) & 1);
+        } else if (f == 'u' && t->priv == '<') {        /* pop n */
+            int k = prm(t, 0, 1);
+            *ns = k >= *ns ? 0 : *ns - k;
+        } else if (f == 'u' && t->priv == '=') {        /* set (1), or (2), and not (3) the current flags */
+            int v = prm0(t, 0, 0) & 1, mode = prm(t, 1, 1);
+            if (!*ns) st[(*ns)++] = 0;
+            uint8_t *cur = &st[*ns - 1];
+            *cur = (uint8_t)(mode == 2 ? (*cur | v) : mode == 3 ? (*cur & ~v) : v);
+        } else if (f == 'm' && t->priv == '>' && prm0(t, 0, 0) == 4) {
+            t->other_keys = t->nparams > 1 ? prm0(t, 1, 0) : 0;     /* modifyOtherKeys: 0, 1 or 2 */
+        }
+        if (t->priv != '>') return;
         if (f == 'c') reply(t, "\033[>0;276;0c");
         else if (f == 'q') reply(t, "\033P>|LordOS Terminal 0.4\033\\");
         return;
@@ -1488,6 +1510,7 @@ void vt_reset(Term *t) {
     t->cx = t->cy = t->wrap_pending = 0;
     t->g[0] = t->g[1] = t->gl = 0;
     t->cursor_shape = 0;
+    t->nkitty[0] = t->nkitty[1] = t->other_keys = 0;
     t->fg_set = t->bg_set = t->cursor_set = 0;
     t->state = S_GROUND;
     t->utf8_left = 0;
@@ -2309,4 +2332,31 @@ int vt_copy_key(Term *t, const char *k, int ctrl, char **yank) {
         return 2;
     }
     return 0;
+}
+
+/* ---- keys with modifiers (kitty keyboard protocol, flag 1; xterm's modifyOtherKeys) ---- */
+
+int vt_key_encode(const Term *t, const char *key, uint32_t cp, int m, char *out, size_t size) {
+    int a = t->buf == &t->alt;
+    int kitty = t->nkitty[a] && (t->kitty[a][t->nkitty[a] - 1] & 1);
+    int code = 0;
+    if (key) {
+        if (!strcmp(key, "Enter")) code = 13;
+        else if (!strcmp(key, "Tab")) code = 9;
+        else if (!strcmp(key, "Backspace")) code = 127;
+        else if (!strcmp(key, "Escape")) code = 27;
+        else return 0;
+    } else {
+        /* only Ctrl or Alt change a character; the key's own (lowercase) character is reported */
+        if (!((m - 1) & 6) || cp < 0x20 || cp > 0x7e) return 0;
+        code = cp >= 'A' && cp <= 'Z' ? (int)cp + 32 : (int)cp;
+    }
+    int n = 0;
+    if (kitty) {
+        if (code == 27 && m == 1) n = snprintf(out, size, "\033[27u");     /* Escape alone, told apart from a sequence */
+        else if (m > 1) n = snprintf(out, size, "\033[%d;%du", code, m);
+    } else if (t->other_keys == 2 && m > 1 && !(code == 9 && m == 2)) {      /* Shift+Tab keeps CSI Z */
+        n = snprintf(out, size, "\033[27;%d;%d~", m, code);
+    }
+    return n > 0 && (size_t)n < size ? n : 0;
 }

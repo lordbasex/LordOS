@@ -117,6 +117,12 @@ typedef struct Term {
     uint8_t *tabs;
     int g[2], gl;               /* character sets: 0 ASCII, 1 DEC graphics */
     int cursor_shape;           /* DECSCUSR: 0 = the profile's */
+    /* keys with modifiers that legacy encoding can't tell apart (Shift+Enter is a plain CR there), as the
+     * program asks: the kitty keyboard protocol's flag 1, "disambiguate", a stack per screen (CSI > u
+     * pushes, CSI < u pops, CSI = u sets, CSI ? u asks), and xterm's modifyOtherKeys (CSI > 4 ; n m) */
+    uint8_t kitty[2][8];
+    int nkitty[2];
+    int other_keys;
     SavedCursor saved, saved_alt;
     uint32_t last_cp;
 
@@ -185,6 +191,10 @@ void  vt_free(Term *t);
 void  vt_write(Term *t, const uint8_t *data, size_t n);
 void  vt_resize(Term *t, int cols, int rows);
 void  vt_reset(Term *t);
+/* A key with modifiers (m: 1 + Shift 1 + Alt 2 + Ctrl 4, as in CSI sequences) in the keyboard protocol
+ * the program asked for: "Enter", "Tab", "Backspace" or "Escape", or else the character cp (key NULL).
+ * Writes the sequence to out and returns its length, or 0 when the legacy encoding applies. */
+int   vt_key_encode(const Term *t, const char *key, uint32_t cp, int m, char *out, size_t size);
 void  vt_apply_palette(Term *t);
 Line *vt_view_line(Term *t, int row, long long *abs);
 long long vt_first_abs(const Term *t);
