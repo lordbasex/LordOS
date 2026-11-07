@@ -76,8 +76,9 @@ Built and validated:
 - [x] Kernel paths in the real ISOs match the catalog (Ubuntu `casper/`, Fedora `images/pxeboot/`).
 
 Still open in Phase 2:
-- [ ] **Ubuntu 26.04 unattended desktop install through its reboot and login** (it ran the whole autoinstall into
-  `ubuntu-desktop-minimal`; the first try stopped when the build VM's disk filled). Needs about 12 GB free.
+- [x] **Ubuntu 26.04.1 unattended desktop install through its reboot and login** (2026-11-07, VM 116: 23 min on 2 vCPU,
+  3 GB, 24 GB disk; login with the assistant's password, `u-14`, `u-15`; Shut Down through the agent 5.5 s). Needed the fix that
+  keeps Ubuntu's browser package out (it only installs the snap, which fails inside the installer).
 - [ ] **Fedora 45 kickstart install through its reboot and login** (seen partitioning and downloading packages, stopped on
   purpose).
 - [ ] Ubuntu console (no desktop) install through login.
