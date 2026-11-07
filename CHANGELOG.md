@@ -12,8 +12,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
 
+### Added
+
+- **Monitor → Memory says what is using it**: the memory in use is split into **Apps** (what programs hold: `AnonPages + Shmem`) and **System and drivers** (the rest: the kernel's tables and buffers, the graphics driver's), and a new **Using the most memory** card lists the 8 apps holding the most, each app's processes added up (a browser's tabs, LordOS's helpers) with their count (`apps/monitor/memtop.js`, `server/tests/monitor_memtop_test.mjs`).
+
 ### Fixed
 
+- **Memory in use** in Monitor, About, Settings → General and `lordos-sysreport` no longer counts the kernel's reserve of free pages. It was `MemTotal − MemAvailable`, and MemAvailable also leaves out the zone watermarks, which grow with the RAM and hold nothing: a 128 GB computer showed 2.3 GB in use for 1.2 GB really held (on a 4 GB Raspberry Pi the difference is a few tens of MB). It is now `MemTotal − MemFree − (Buffers + Cached + SReclaimable − Shmem)`, the way htop counts it, from one shared formula (`server/src/meminfo.h`, checked in `sysreport-test`); `lord.sys.info()` gives it as `memUsedKB`. Monitor's used, cache and free now add up to the total.
 - **The login screen opens on the main display you chose.** It runs as its own system user and has no `displays.json`, so it always took the first connected connector: with three monitors on a Radeon RX 580 and the first DisplayPort output dark, the password had to be typed blind. The session shown on the monitor now tells `lord-sessiond` its main display's connector when it changes (`{"a":"display","main":"HDMI-A-1"}`, only `[A-Za-z0-9-]`, up to 31 characters); `lord-sessiond` keeps it in `/var/lib/lordos/main-display` (root's, 0644) and starts the login screen with `LORD_MAIN_DISPLAY`, which its display plan uses when that connector is connected (else the first connected one, as before). The connector, not the monitor's identity, because identical monitors can report the same EDID serial (three Samsung S27F350 here).
 - **The hardware cursor on amdgpu** (Radeon RX 580): the cursor plane is created at the driver's `DRM_CAP_CURSOR_WIDTH/HEIGHT` (128 there) instead of 64×64. The driver scanned a 64×64 buffer as 128×128, squashing the arrow and showing colored stripes read from past the buffer.
 - **"atomic remove_fb failed" kernel warnings** when the GPU path stops (rearranging displays, screen recording, a failed GPU frame): the dumb buffers now go on screen before the GPU's framebuffers are removed. Removing a framebuffer still scanned out makes the kernel try to turn its CRTC off, which amdgpu refuses with a WARNING and a tainted kernel.

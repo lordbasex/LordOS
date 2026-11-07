@@ -50,6 +50,15 @@
   "memUsed": "Utilisée par les apps et services",
   "memCache": "Cache de fichiers",
   "memFree": "Libre",
+  "memApps": "Apps",
+  "memSystem": "Système et pilotes",
+  "memSplitHint": "Apps, c'est ce qu'occupent les programmes (LordOS compris). Système et pilotes, c'est ce que le noyau et les pilotes gardent pour eux, dont les tampons de la carte graphique.",
+  "memTop": "Ce qui utilise le plus de mémoire",
+  "memTopCount": {
+    "one": "{count} processus",
+    "other": "{count} processus"
+  },
+  "memTopHint": "Les processus de chaque app, additionnés. La mémoire partagée entre processus compte dans chacun, donc le total peut dépasser Apps.",
   "swap": "Swap",
   "swapValue": "{used} sur {total}",
   "last60": "60 dernières secondes",

@@ -50,6 +50,15 @@
   "memUsed": "Usata da app e servizi",
   "memCache": "Cache dei file",
   "memFree": "Libera",
+  "memApps": "App",
+  "memSystem": "Sistema e driver",
+  "memSplitHint": "App è ciò che occupano i programmi (LordOS compreso). Sistema e driver è ciò che il kernel e i driver tengono per sé, tra cui i buffer della scheda video.",
+  "memTop": "Ciò che usa più memoria",
+  "memTopCount": {
+    "one": "{count} processo",
+    "other": "{count} processi"
+  },
+  "memTopHint": "I processi di ogni app, sommati. La memoria condivisa tra processi conta in ciascuno, quindi la somma può superare App.",
   "swap": "Swap",
   "swapValue": "{used} di {total}",
   "last60": "Ultimi 60 secondi",

@@ -220,6 +220,9 @@ EOF
     # (0.8.5) System Information's model (apps/sysinfo/model.js): GPU layers, CPU reasons, Compatibility
     if have node; then run "sysinfo-model-test (apps/sysinfo/model.js)" node tests/sysinfo_model_test.mjs
     else skip "sysinfo-model-test" "node"; fi
+    # (0.8.8.6) Monitor → Memory: the processes grouped by app (apps/monitor/memtop.js)
+    if have node; then run "monitor-memtop-test (apps/monitor/memtop.js)" node tests/monitor_memtop_test.mjs
+    else skip "monitor-memtop-test" "node"; fi
     # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
     if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
     else skip "sysinfo-perf-test" "node"; fi

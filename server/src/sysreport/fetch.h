@@ -12,7 +12,7 @@ typedef enum { FETCH_PLAIN, FETCH_256, FETCH_TRUECOLOR } FetchColor;
 typedef struct {
     char user[64], host[64];            /* empty with --share */
     long uptime_s;                      /* -1 unknown */
-    unsigned long long mem_used_kb;     /* MemTotal − MemAvailable */
+    unsigned long long mem_used_kb;     /* in use, without cache or the kernel's reserve (meminfo.h) */
     unsigned long long disk_used, disk_total;   /* the root file system, bytes */
     int packages;                       /* Debian packages installed, -1 unknown */
     char shell[32];                     /* the login shell's name */

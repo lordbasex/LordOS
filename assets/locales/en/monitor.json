@@ -50,6 +50,15 @@
   "memUsed": "Used by apps and services",
   "memCache": "File cache",
   "memFree": "Free",
+  "memApps": "Apps",
+  "memSystem": "System and drivers",
+  "memSplitHint": "Apps is what programs hold (LordOS's own included). System and drivers is what the kernel and the drivers keep for themselves, the graphics card's buffers among them.",
+  "memTop": "Using the most memory",
+  "memTopCount": {
+    "one": "{count} process",
+    "other": "{count} processes"
+  },
+  "memTopHint": "Each app's processes added up. Memory that processes share counts in each of them, so these can add up to more than Apps.",
   "swap": "Swap",
   "swapValue": "{used} of {total}",
   "last60": "Last 60 seconds",

@@ -23,7 +23,7 @@ blocklists arrived ("Network, second generation").
 |---|---|
 | Overview | CPU, Memory, Network and Disk with a 60 s chart; below, CPU temperature, fan, 1 min load, 5/15 min load and cached memory |
 | CPU | total usage (big chart), one chart per core, 1/5/15 load, temperature and tasks |
-| Memory | stacked bar (used, file cache, free), swap and a 60 s chart |
+| Memory | stacked bar (apps, system and drivers, file cache, free), swap, "Using the most memory" (each app's processes added up, the 8 largest) and a 60 s chart |
 | Network | apps with connections, map, summary or detail of the chosen app (see below) |
 | Disks | total read and write; one row per disk (model, `/dev`, size, temperature, health, rates); the chosen disk's temperature over the last 30 minutes and its health, with "Open in Disks" (see "Disk temperature and health") |
 | Processes | sortable table (CPU, memory, threads, PID, user), search, "Mine" / "All"; Stop and Get Info for the selected process (see "Process actions") |

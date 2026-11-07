@@ -22,6 +22,7 @@
 #include "sysreport/fetch.h"
 #include "sysreport/smbios.h"
 #include "sysreport/facts.h"
+#include "meminfo.h"
 #include "sec/json.h"
 
 #include <errno.h>
@@ -1064,6 +1065,11 @@ int main(int argc, char **argv) {
     setenv("TERM", "xterm-256color", 1);
     setenv("COLORTERM", "truecolor", 1);
     CHECK(fetch_color_mode("auto", 1) == FETCH_TRUECOLOR && fetch_color_mode("auto", 0) == FETCH_PLAIN && fetch_color_mode("never", 1) == FETCH_PLAIN, "color modes");
+    /* the memory in use (meminfo.h), from a 128 GB amd64 with three displays (kB): MemTotal − MemAvailable said
+     * 2.3 GB, ~0.85 GB of it the kernel's reserve of free pages; and a Shmem larger than the caches */
+    CHECK(meminfo_used(131775264, 123896468, 343352, 6104788, 194844, 7292) == 1243104, "memory in use without the kernel's reserve");
+    CHECK(meminfo_cache(343352, 6104788, 194844, 7292) == 6635692 && meminfo_cache(1, 2, 3, 10) == 0, "memory cache");
+    CHECK(meminfo_used(100, 90, 0, 50, 0, 0) == 0, "never below 0");
     test_pi_firmware();
     test_periph();
     test_empty();

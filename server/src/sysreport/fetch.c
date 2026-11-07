@@ -6,6 +6,7 @@
 #endif
 #include "fetch.h"
 #include "../hw/jbuf.h"
+#include "../meminfo.h"
 
 #include <fcntl.h>
 #include <pwd.h>
@@ -140,8 +141,8 @@ void fetch_live(FetchLive *l, const char *root, int share) {
     free(t);
     snprintf(p, sizeof p, "%s/proc/meminfo", root);
     t = slurp(p, 16384);
-    unsigned long long total = meminfo_kb(t, "MemTotal:"), avail = meminfo_kb(t, "MemAvailable:");
-    l->mem_used_kb = total > avail ? total - avail : 0;
+    l->mem_used_kb = meminfo_used(meminfo_kb(t, "MemTotal:"), meminfo_kb(t, "MemFree:"), meminfo_kb(t, "Buffers:"),
+                                  meminfo_kb(t, "Cached:"), meminfo_kb(t, "SReclaimable:"), meminfo_kb(t, "Shmem:"));
     free(t);
     struct statvfs vs;
     snprintf(p, sizeof p, "%s/", root);

@@ -14,6 +14,7 @@
 #include "procctl.h"
 #include "disktemp.h"
 #include "voltage.h"
+#include "../meminfo.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -213,7 +214,7 @@ static void cpu_sample(Buf *b, double dt) {
 
 static void mem_sample(Buf *b) {
     char txt[8192];
-    unsigned long long total = 0, avail = 0, buffers = 0, cached = 0, srec = 0, shmem = 0, swt = 0, swf = 0;
+    unsigned long long total = 0, freep = 0, avail = 0, buffers = 0, cached = 0, srec = 0, shmem = 0, anon = 0, swt = 0, swf = 0;
     if (mon_read_small("/proc/meminfo", txt, sizeof txt) > 0) {
         for (char *l = txt; l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
             char *c = strchr(l, ':');
@@ -222,22 +223,28 @@ static void mem_sample(Buf *b) {
             size_t k = (size_t)(c - l);
 #define IS(name) (k == sizeof(name) - 1 && !strncmp(l, name, k))
             if (IS("MemTotal")) total = v;
+            else if (IS("MemFree")) freep = v;
             else if (IS("MemAvailable")) avail = v;
             else if (IS("Buffers")) buffers = v;
             else if (IS("Cached")) cached = v;
             else if (IS("SReclaimable")) srec = v;
             else if (IS("Shmem")) shmem = v;
+            else if (IS("AnonPages")) anon = v;
             else if (IS("SwapTotal")) swt = v;
             else if (IS("SwapFree")) swf = v;
 #undef IS
         }
     }
-    unsigned long long used = total > avail ? total - avail : 0;
-    unsigned long long cache = buffers + cached + srec;
-    cache = cache > shmem ? cache - shmem : 0;
+    /* used + cache + free = total; not total − MemAvailable, which counts the kernel's reserve (meminfo.h) */
+    unsigned long long used = meminfo_used(total, freep, buffers, cached, srec, shmem);
+    unsigned long long cache = meminfo_cache(buffers, cached, srec, shmem);
     if (cache > total - used) cache = total - used;
-    mon_buf_printf(b, ",\"mem\":{\"total\":%llu,\"used\":%llu,\"cache\":%llu,\"avail\":%llu,\"swapTotal\":%llu,\"swapUsed\":%llu}",
-               total, used, cache, avail, swt, swt > swf ? swt - swf : 0);
+    /* in use, split: what programs hold (their private memory and shared memory, tmpfs included), and the
+     * rest, the kernel's and the drivers' own (its tables and buffers, the graphics card's) */
+    unsigned long long apps = anon + shmem;
+    if (apps > used) apps = used;
+    mon_buf_printf(b, ",\"mem\":{\"total\":%llu,\"used\":%llu,\"apps\":%llu,\"system\":%llu,\"cache\":%llu,\"avail\":%llu,\"swapTotal\":%llu,\"swapUsed\":%llu}",
+               total, used, apps, used - apps, cache, avail, swt, swt > swf ? swt - swf : 0);
 }
 
 static void load_sample(Buf *b) {

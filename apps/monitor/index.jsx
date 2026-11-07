@@ -5,12 +5,13 @@
 // four times per second.
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
-  useMonitor, monitor, monitorSamples, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp,
+  useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { Chart } from './Chart.jsx';
+import { memTop } from './memtop.js';
 import { Glyph, MonitorIcon } from './icons.jsx';
 import { NetworkTab } from './Network.jsx';
 import { RemoteGlyph } from './RemoteDesktop.jsx';
@@ -26,7 +27,7 @@ import { VoltageTab } from './Voltage.jsx';
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
 // Series colors (TangoOS's)
-export const C = { mem: '#8b5cf6', cache: '#c4b5fd', rx: '#22c55e', tx: '#f97316', read: '#2f7cf6', write: '#ec4899' };
+export const C = { mem: '#8b5cf6', system: '#5b4bc4', cache: '#c4b5fd', rx: '#22c55e', tx: '#f97316', read: '#2f7cf6', write: '#ec4899' };
 
 // Settings → Privacy → Monitor (the page belongs to another module: registered if it exists).
 if (typeof sdk.registerPrivacySection === 'function') sdk.registerPrivacySection({ id: 'monitor', order: 10, Component: MonitorPrivacy });
@@ -256,8 +257,12 @@ function MemTab({ s, last }) {
   const card = useCardStyle();
   const m = last.mem;
   const free = Math.max(0, m.total - m.used - m.cache);
+  // in use, split into what apps hold and what the system keeps (a sample without the split: all in use)
+  const split = m.apps != null && m.system != null;
   const parts = [
-    { key: 'used', label: tr('monitor.memUsed'), v: m.used, color: C.mem },
+    ...(split
+      ? [{ key: 'apps', label: tr('monitor.memApps'), v: m.apps, color: C.mem }, { key: 'system', label: tr('monitor.memSystem'), v: m.system, color: C.system }]
+      : [{ key: 'used', label: tr('monitor.memUsed'), v: m.used, color: C.mem }]),
     { key: 'cache', label: tr('monitor.memCache'), v: m.cache, color: C.cache },
     { key: 'free', label: tr('monitor.memFree'), v: free, color: null },
   ];
@@ -283,12 +288,45 @@ function MemTab({ s, last }) {
           )}
         </View>
       </Card>
+      {split && <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5, maxWidth: 620 }}>{tr('monitor.memSplitHint')}</Text>}
+      <MemTop />
       <Card icon="activity" title={tr('monitor.last60')}>
         <Chart series={[{ label: tr('monitor.usedCache'), values: s.cache, color: C.cache }, { label: tr('monitor.used'), values: s.mem, color: C.mem }]}
           max={m.total} format={fmt.mem} times={s.times} height={170} bg={card.bg} />
       </Card>
       <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5, maxWidth: 620 }}>{tr('monitor.cacheHint')}</Text>
     </>
+  );
+}
+
+// The apps using the most memory: their processes added up (memtop.js), from the process list the
+// Memory tab asks for once per second.
+function MemTop() {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const procs = useStore(monitorProcesses);
+  const top = useMemo(() => memTop(procs?.list, 8), [procs]);
+  if (!top.length) return null;
+  const label = (p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : p.appName || p.name);
+  return (
+    <Card icon="memory" title={tr('monitor.memTop')}>
+      {top.map((g) => (
+        <View key={g.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <AppGlyph item={g.item} size={18} />
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: t.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label(g.item)}</Text>
+              {g.count > 1 && <Text style={{ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('monitor.memTopCount', { count: g.count })}</Text>}
+              <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{fmt.mem(g.rss)}</Text>
+            </View>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: t.control }}>
+              <View style={{ width: `${(g.rss / top[0].rss) * 100}%`, height: 6, borderRadius: 3, backgroundColor: C.mem }} />
+            </View>
+          </View>
+        </View>
+      ))}
+      <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5 }}>{tr('monitor.memTopHint')}</Text>
+    </Card>
   );
 }
 
@@ -412,7 +450,7 @@ export default function Monitor() {
   useEffect(() => { if (args?.tab) setTab(args.tab); }, [args?.tab, args?.nonce]);
   const showConns = tab === 'network' && prefs.connections !== false;
   // which lists lord-server builds (without redrawing this window on every sample)
-  useMonitor({ procs: tab === 'processes', conns: showConns, geo: showConns && prefs.geo !== false, everyMs: 0 });
+  useMonitor({ procs: tab === 'processes' || tab === 'memory', conns: showConns, geo: showConns && prefs.geo !== false, everyMs: 0 });
   const ready = useStore(monitorSamples, (l) => l.length > 0);
   // Voltage only exists where the machine reports something (not in a virtual machine, for one)
   const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);

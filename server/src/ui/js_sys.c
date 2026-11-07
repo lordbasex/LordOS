@@ -29,6 +29,7 @@
 #include "../sec/perms.h"
 #include "../app/app.h"
 #include "../ime.h"
+#include "../meminfo.h"
 #include "../wl/wl.h"
 #include "../wl/keygrab.h"
 #include "../wl/xwayland.h"
@@ -297,10 +298,16 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     for (const char *p = txt; p && (p = strstr(p, "processor")); p += 9) cores++;
     free(txt);
 
-    double mem_total = 0, mem_avail = 0, uptime = 0;
+    double mem_total = 0, mem_avail = 0, mem_used = 0, uptime = 0;
     txt = read_small("/proc/meminfo", 8192, NULL);
-    if (txt && !field(txt, "MemTotal", buf, sizeof buf)) mem_total = atof(buf);
-    if (txt && !field(txt, "MemAvailable", buf, sizeof buf)) mem_avail = atof(buf);
+    if (txt) {
+        static const char *const keys[] = { "MemTotal", "MemFree", "Buffers", "Cached", "SReclaimable", "Shmem" };
+        unsigned long long v[6] = { 0 };
+        for (int i = 0; i < 6; i++) if (!field(txt, keys[i], buf, sizeof buf)) v[i] = strtoull(buf, NULL, 10);
+        mem_total = (double)v[0];
+        mem_used = (double)meminfo_used(v[0], v[1], v[2], v[3], v[4], v[5]);
+        if (!field(txt, "MemAvailable", buf, sizeof buf)) mem_avail = atof(buf);
+    }
     free(txt);
     txt = read_small("/proc/uptime", 128, NULL);
     if (txt) uptime = atof(txt);
@@ -315,6 +322,7 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(c, o, "cores", JS_NewInt32(c, cores));
     JS_SetPropertyStr(c, o, "memTotalKB", JS_NewFloat64(c, mem_total));
     JS_SetPropertyStr(c, o, "memAvailableKB", JS_NewFloat64(c, mem_avail));
+    JS_SetPropertyStr(c, o, "memUsedKB", JS_NewFloat64(c, mem_used));   /* without cache or the kernel's reserve */
     JS_SetPropertyStr(c, o, "uptime", JS_NewFloat64(c, uptime));
     /* this boot: seconds from the kernel's start to the first frame on the monitor, and what it showed */
     boot_time_load();
