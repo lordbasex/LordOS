@@ -1,6 +1,6 @@
 /* pgp.h — what's needed from OpenPGP (RFC 4880) to verify a repository's InRelease:
  * binary or armored keyrings (.gpg/.pgp/.asc), v4 RSA or EdDSA (Ed25519) signatures with SHA-256 or
- * SHA-512, and cleartext-signed messages. Our own code (no gpgv or sqv). */
+ * SHA-512, cleartext-signed messages and detached signatures (the makers' checksum lists Machines downloads). Our own code (no gpgv or sqv). */
 #ifndef LORD_PKG_PGP_H
 #define LORD_PKG_PGP_H
 
@@ -36,6 +36,15 @@ void pgp_keyring_free(PgpKeyring *kr);
  * a known key makes everything fail. *body receives the signed text (with \n, malloc). */
 int  pgp_verify_clearsigned(const PgpKeyring *kr, const char *msg, size_t len, int64_t now,
                             char **body, size_t *body_len, char *err, size_t errlen);
+
+/* Verifies a detached signature (armored or binary packets) over data: v4, binary (0x00) or text (0x01), the same
+ * algorithms and checks as above. Returns the same way (> 0 = ok). */
+int  pgp_verify_detached(const PgpKeyring *kr, const char *data, size_t len, const char *sig, size_t siglen, int64_t now,
+                         char *err, size_t errlen);
+
+/* Keeps only the primary keys whose fingerprint (40 hex digits, any case) is one of fprs, with their subkeys; returns
+ * how many primary keys are left. The other keys can't verify anything afterwards. */
+int  pgp_keyring_pin(PgpKeyring *kr, const char *const *fprs, int nfprs);
 
 /* An armored block ("-----BEGIN …") as binary packets in *out (malloc); returns its length or -1. */
 long pgp_dearmor(const char *in, size_t len, uint8_t **out);

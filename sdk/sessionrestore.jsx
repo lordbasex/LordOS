@@ -56,6 +56,9 @@ function entryOf(open) {
   const app = isLinux ? (w.args?.pkg ? getApp(w.args.appId) : null) : getApp(w.id);
   if (!isLinux && (!app || app.builtin)) return null;
   if (app && (app.hidden || app.live)) return null;
+  // a single-window app (manifest "singleWindow") comes back as its main window only: its other windows show
+  // something that isn't restored (a Machines window would come back as a second library, without its machine)
+  if (app && app.singleWindow && String(w.id).includes('#')) return null;
   const id = dockIdOfWindow(w);
   const p = parseDockId(id);                      // "linux:…": a window with no .desktop can't be launched
   if (!p || p.kind === 'shell' || NEVER.includes(p.key)) return null;
@@ -197,6 +200,7 @@ function restore(list, active = 0) {
       if (a && !a.isolated && !a.package) {
         if (!a.builtin && !a.hidden && !a.live) {
           const first = !windows.get().some((w) => w.app === p.key);
+          if (!first && a.singleWindow) { if (i < steps.length) setTimeout(step, STAGGER_MS); else setTimeout(finish, SETTLE_MS); return; }
           const id = wm.open(p.key, { ...(first ? null : { new: true }), ...(e.args ? { args: e.args } : null), frame: fit(e.f), desktop: desktopAt(e.desk || 0) });
           if (id) afterOpen(id, e);
         }

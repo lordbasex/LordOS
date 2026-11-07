@@ -151,5 +151,11 @@
   "install.manual.tableKept": "L’installazione si è fermata dopo aver eliminato delle partizioni: resta la nuova tabella, perché il loro spazio potrebbe essere già stato scritto. Le altre partizioni non sono state toccate",
   "install.creatingAccount": "Creazione dell’account {user}",
   "install.accountDone": "L’account è pronto",
-  "vpn.trusted": "Certificato accettato"
+  "vpn.trusted": "Certificato accettato",
+  "vm.alreadyInstalled": "Già installato",
+  "vm.downloadCancelled": "Download interrotto",
+  "vm.imageRemoved": "Immagine eliminata",
+  "vm.downloadResumed": "Ripresa di un download interrotto ({from} byte tenuti)",
+  "vm.kvmReady": "Fatto: le macchine possono già usare la virtualizzazione hardware",
+  "vm.kvmNextLogin": "Possibile dal tuo prossimo accesso"
 }

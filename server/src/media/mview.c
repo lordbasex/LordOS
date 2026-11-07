@@ -68,6 +68,18 @@ static void build_mips(MediaSrc *s, const uint32_t *px, int w, int h) {
     }
 }
 
+/* An x8r8g8b8 picture (a Machines guest's) has 0 where alpha would be. The CPU composition never looks at it, but
+ * the GPU's takes the UI's alpha 0 for a hole where an app window shows through (gpu.c): the picture was see-through
+ * on the Raspberry Pi 5 (2026-11-05). What was copied as is gets alpha 255 here, inside the clip. */
+static void force_alpha(Canvas *c, int x, int y, int w, int h) {
+    int x0 = x > c->clip.x0 ? x : c->clip.x0, y0 = y > c->clip.y0 ? y : c->clip.y0;
+    int x1 = x + w < c->clip.x1 ? x + w : c->clip.x1, y1 = y + h < c->clip.y1 ? y + h : c->clip.y1;
+    for (int j = y0; j < y1; j++) {
+        uint32_t *row = c->px + (size_t)j * c->stride;
+        for (int i = x0; i < x1; i++) row[i] |= 0xff000000u;
+    }
+}
+
 static inline uint32_t bilinear(const uint32_t *px, int w, int h, float u, float v) {
     if (u < 0) u = 0;
     if (v < 0) v = 0;
@@ -102,6 +114,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     Rect old = canvas_push_clip(c, x, y, w, h);
     int sw, sh;
     const uint32_t *px = pixels_of(s, &sw, &sh);
+    if (px) s->painted_seq = s->frame_seq;
     if (!px) {
         if (s->view.bg >> 24) canvas_rrect(c, x, y, w, h, radius, with_opacity(s->view.bg, op));
         canvas_set_clip(c, old);
@@ -116,6 +129,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     /* video: the frame already comes at the right size; if it differs by one pixel from rounding, it's copied anyway */
     int ring = s->map && s->ring_slots;
     if (ring && !rot && s->view.zoom <= 0 && !s->view.fit && (abs(sw - bw) <= 2 || abs(sh - bh) <= 2) && sw <= bw + 2 && sh <= bh + 2) sc = 1;
+    if (s->shown_scale != sc) { s->shown_scale = sc; if (s->cur_mode == 1) media_cursor_touch(); }
     float dw = rw * sc, dh = rh * sc, dx, dy;
     if (s->view.zoom > 0) { dx = x + w / 2 - s->view.cx * dw; dy = y + h / 2 - s->view.cy * dh; }
     else { dx = x + (w - dw) / 2; dy = y + (h - dh) / 2; }
@@ -138,6 +152,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     }
     if (!rot && !s->view.mirror && fabsf(sc - 1) < 0.001f && !s->view.bright && !s->view.contrast) {
         canvas_blit(c, px, sw, sh, (int)lroundf(dx), (int)lroundf(dy), 0, op, opaque);
+        if (s->xrgb) force_alpha(c, (int)lroundf(dx), (int)lroundf(dy), sw, sh);
         canvas_set_clip(c, old);
         return;
     }
@@ -149,7 +164,10 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     float key[4] = { dx - vx0, dy - vy0, sc, (float)(vw * 65536 + vh) };
     if (!s->cache || s->cache_w != vw || s->cache_h != vh || s->cache_seq != s->frame_seq || s->cache_gen != s->view.gen ||
         memcmp(key, s->cache_box, sizeof key)) {
-        if (s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
+        /* whoever drops the cache (a new picture, unmap_pixels) leaves cache_w × cache_h as they were: a
+         * size that fits isn't proof that there's a buffer. Before 2026-11-05 a Machines or Remote Desk
+         * picture replaced while scaled (full screen) left the cache NULL and the box black for good */
+        if (!s->cache || s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
         if (!s->cache) { canvas_set_clip(c, old); return; }
         s->cache_w = vw;
         s->cache_h = vh;
@@ -178,7 +196,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
                 case 270: u = sw - vp; v = up; break;
                 default: u = up; v = vp;
                 }
-                o[i] = bilinear(lp, lw, lh, u / lf - 0.5f, v / lf - 0.5f);
+                o[i] = bilinear(lp, lw, lh, u / lf - 0.5f, v / lf - 0.5f) | (s->xrgb ? 0xff000000u : 0);
             }
         }
         if (s->view.bright || s->view.contrast) {

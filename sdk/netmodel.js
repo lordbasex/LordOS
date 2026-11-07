@@ -27,6 +27,7 @@ export const COMPONENTS = {
   'lordos:terminal': { label: 'monitor.comp.terminal', icon: 'terminal', hint: 'monitor.comp.terminalHint' },
   'lordos:lan': { label: 'monitor.comp.lan', glyph: 'network', hint: 'monitor.comp.lanHint' },
   'lordos:lists': { label: 'monitor.comp.lists', glyph: 'shield', hint: 'monitor.comp.listsHint' },
+  'lordos:machines': { label: 'monitor.comp.machines', icon: 'machines', hint: 'monitor.comp.machinesHint' },
   'lordos:vpn': { label: 'monitor.comp.vpn', glyph: 'tunnel', hint: 'monitor.comp.vpnHint', system: true },
   'system:dns': { label: 'monitor.comp.dns', glyph: 'dns', hint: 'monitor.comp.dnsHint', system: true },
   'system:time': { label: 'monitor.comp.time', glyph: 'clock', hint: 'monitor.comp.timeHint', system: true },

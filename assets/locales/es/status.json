@@ -151,5 +151,11 @@
   "install.manual.tableKept": "La instalación se detuvo después de borrar particiones: queda la tabla nueva, porque su espacio ya puede estar escrito. Las demás particiones no se tocaron",
   "install.creatingAccount": "Creando la cuenta {user}",
   "install.accountDone": "La cuenta está lista",
-  "vpn.trusted": "Certificado aceptado"
+  "vpn.trusted": "Certificado aceptado",
+  "vm.alreadyInstalled": "Ya estaba instalado",
+  "vm.downloadCancelled": "Descarga detenida",
+  "vm.imageRemoved": "Imagen borrada",
+  "vm.downloadResumed": "Continuando una descarga detenida ({from} bytes guardados)",
+  "vm.kvmReady": "Listo: las máquinas ya pueden usar la virtualización por hardware",
+  "vm.kvmNextLogin": "Listo a partir de tu próximo inicio de sesión"
 }

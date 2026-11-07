@@ -797,5 +797,18 @@
   "vpn.editWhileOn": "Disattiva la VPN prima di modificarla.",
   "vpn.fortiSsoRefused": "Il server VPN non ha accettato l'accesso. Connetti di nuovo e accedi dalla pagina dell'organizzazione.",
   "vpn.clientCertPair": "Un certificato client richiede il certificato e la sua chiave privata.",
-  "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato."
+  "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato.",
+  "vm.noKvm": "Questo computer non offre virtualizzazione hardware",
+  "vm.noKvmGroup": "Questo sistema non ha il gruppo kvm per la virtualizzazione hardware",
+  "vm.groupFailed": "Impossibile aggiungere il tuo account al gruppo kvm",
+  "vm.listFailed": "Non è stato possibile scaricare l’elenco delle immagini: {reason}",
+  "vm.notListed": "Quell’immagine non è nell’elenco di chi la produce",
+  "vm.imageBusy": "Quell’immagine è già in download",
+  "vm.hashMismatch": "Lo SHA-256 del download non è quello dell’elenco di chi la produce: è stato scartato",
+  "vm.downloadFailed": "Non è stato possibile scaricare l’immagine: {reason}",
+  "vm.nothingRunning": "Nessun download in corso",
+  "vm.removeFailed": "Non è stato possibile eliminare l’immagine",
+  "vm.listUnsigned": "{name} non è firmato da chi lo produce, quindi i suoi hash non sono affidabili: rifiutato",
+  "vm.listBadSignature": "La firma di {name} non si verifica con la chiave fissata di chi lo produce ({reason}): rifiutato",
+  "vm.imageInUse": "Una macchina accesa ha quell’immagine nel lettore CD: spegnila prima"
 }

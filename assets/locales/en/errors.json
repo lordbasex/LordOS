@@ -797,5 +797,18 @@
   "vpn.editWhileOn": "Turn the VPN off before editing it.",
   "vpn.fortiSsoRefused": "The VPN server didn't accept the sign-in. Connect again and sign in on the organization's page.",
   "vpn.clientCertPair": "A client certificate needs both the certificate and its private key.",
-  "vpn.fortiClientCert": "The client certificate or its key couldn't be used. Check the key password, and that the key belongs to the certificate."
+  "vpn.fortiClientCert": "The client certificate or its key couldn't be used. Check the key password, and that the key belongs to the certificate.",
+  "vm.noKvm": "This computer offers no hardware virtualization",
+  "vm.noKvmGroup": "This system has no kvm group for hardware virtualization",
+  "vm.groupFailed": "Your account could not be added to the kvm group",
+  "vm.listFailed": "The list of images couldn't be downloaded: {reason}",
+  "vm.notListed": "That image isn't in its maker's list",
+  "vm.imageBusy": "That image is already being downloaded",
+  "vm.hashMismatch": "The download's SHA-256 isn't the one its maker lists: it was thrown away",
+  "vm.downloadFailed": "The image couldn't be downloaded: {reason}",
+  "vm.nothingRunning": "No download is running",
+  "vm.removeFailed": "The image couldn't be deleted",
+  "vm.listUnsigned": "{name} isn't signed by its maker, so its hashes can't be trusted: refused",
+  "vm.listBadSignature": "The signature on {name} doesn't verify with its maker's pinned key ({reason}): refused",
+  "vm.imageInUse": "A running machine has that image in its CD drive: shut it down first"
 }

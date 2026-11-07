@@ -1158,6 +1158,16 @@ same fixed-size requests, no new request type, used by `lan.c` only for one unco
 `NAMES`, `FW_COMPONENTS` and `netconn_test`, a row in `sdk/netmodel.js` with its text in three languages, and
 `lan_socket` calling `netconn_socket`.
 
+### Machines' downloads (0.8.9)
+
+The New Machine assistant downloads systems (`VIRTUALIZATION.md`, 3.9, "The Linux download cards"). They are a
+component of their own, `machines` (firewall app `lordos:machines`, scope `lordos-net-machines.scope`), so they show as
+"Machines downloads" in the Monitor and follow their own rules instead of the Store's. No connector is involved: the
+downloads go through the Store's downloader (`pkg/http.c`), whose child enters a component's scope before dropping to
+`nobody`; `fetch_batch_in` takes the scope (the Store keeps `lordos-net-store.scope`), and the closed actions
+`vm-image-list` and `vm-image-get` pass `lordos-net-machines.scope`. The change is the name in `FW_COMPONENTS`, a row in
+`sdk/netmodel.js` with its text in five languages, and that parameter.
+
 ### The essential system services (0.8.5)
 
 Name resolution, time and the network service are shown but can never be blocked: they are not in

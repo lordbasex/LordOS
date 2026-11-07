@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Parallels_disk_image Version="1.0">
+    <Disk_Parameters>
+        <Disk_size>2097152</Disk_size>
+        <Cylinders>2080</Cylinders>
+        <PhysicalSectorSize>4096</PhysicalSectorSize>
+        <Heads>16</Heads>
+        <Sectors>63</Sectors>
+        <Padding>0</Padding>
+        <Encryption><Engine>{00000000-0000-0000-0000-000000000000}</Engine><Data></Data></Encryption>
+        <UID>{11111111-0000-0000-0000-000000000000}</UID>
+        <Name>harddisk</Name>
+        <Miscellaneous><CompatLevel>level2</CompatLevel><Bootable>1</Bootable></Miscellaneous>
+    </Disk_Parameters>
+    <StorageData>
+        <Storage>
+            <Start>0</Start>
+            <End>2097152</End>
+            <Blocksize>2048</Blocksize>
+            <Image><GUID>{5fbaabe3-6958-40ff-92a7-860e329aab41}</GUID><Type>Compressed</Type><File>harddisk.hdd.0.{5fbaabe3-6958-40ff-92a7-860e329aab41}.hds</File></Image>
+            <Image><GUID>{6abcdef0-1111-2222-3333-444455556666}</GUID><Type>Compressed</Type><File>harddisk.hdd.0.{6abcdef0-1111-2222-3333-444455556666}.hds</File></Image>
+        </Storage>
+    </StorageData>
+    <Snapshots>
+        <Shot><GUID>{5fbaabe3-6958-40ff-92a7-860e329aab41}</GUID><ParentGUID>{00000000-0000-0000-0000-000000000000}</ParentGUID></Shot>
+        <Shot><GUID>{6abcdef0-1111-2222-3333-444455556666}</GUID><ParentGUID>{5fbaabe3-6958-40ff-92a7-860e329aab41}</ParentGUID></Shot>
+    </Snapshots>
+</Parallels_disk_image>

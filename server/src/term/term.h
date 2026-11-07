@@ -277,6 +277,10 @@ typedef struct {
 
 void     term_init(const char *fonts_dir, const char *shell_dir);
 Session *term_create(const char *cwd, int scrollback);
+/* A session on a stream someone else holds the other end of (a Machines guest's serial console): what arrives is
+ * drawn, what's typed is written to it. No process, no PTY, no holder; the descriptor is the session's (closed with
+ * it). NULL when there's no room. */
+Session *term_create_fd(int fd, int scrollback);
 Session *term_get(int id);
 void     term_close(Session *s);
 void     term_input(Session *s, const char *data, size_t n);

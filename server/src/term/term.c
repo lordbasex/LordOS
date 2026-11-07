@@ -5,6 +5,7 @@
 #include "../ui/fonts.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <locale.h>
 #include <math.h>
 #include <signal.h>
@@ -234,6 +235,29 @@ Session *term_create(const char *cwd, int scrollback) {
     return s;
 }
 
+Session *term_create_fd(int fd, int scrollback) {
+    Session *s = NULL;
+    for (int i = 0; i < TERM_MAX && !s; i++) if (!sessions[i].used) s = &sessions[i];
+    if (!s || fd < 0) return NULL;
+    memset(s, 0, sizeof *s);
+    term_profile_defaults(&s->prof);
+    if (scrollback > 0) s->prof.scrollback = scrollback > 1000000 ? 1000000 : scrollback;
+    s->id = next_id++;
+    if (vt_init(&s->t, 80, 24, s->prof.scrollback, &s->prof)) { vt_free(&s->t); return NULL; }
+    s->t.respond = respond;
+    s->t.tmux = tmux_cb;
+    s->t.user = s;
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    s->fd = fd;
+    s->pid = 0;                 /* no process: never signalled, never waited for */
+    s->ctrl = -1;
+    s->used = 1;
+    s->alive = 1;
+    s->blink_on = 1;
+    s->replay = -1;
+    return s;
+}
+
 static void reap(void) {
     int k = 0;
     for (int i = 0; i < norphans; i++)
@@ -244,9 +268,9 @@ static void reap(void) {
 static void child_exited(Session *s) {
     if (!s->alive) return;
     int st = 0;
-    pid_t r = waitpid(s->pid, &st, WNOHANG);
-    if (r == s->pid) s->exit_code = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
-    else if (norphans < (int)(sizeof orphans / sizeof *orphans)) orphans[norphans++] = s->pid;
+    pid_t r = s->pid > 0 ? waitpid(s->pid, &st, WNOHANG) : 0;
+    if (s->pid > 0 && r == s->pid) s->exit_code = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+    else if (s->pid > 0 && norphans < (int)(sizeof orphans / sizeof *orphans)) orphans[norphans++] = s->pid;
     close(s->fd);
     s->fd = -1;
     s->alive = 0;
@@ -262,7 +286,8 @@ void term_close(Session *s) {
         s->ctrl = -1;
     }
     if (s->key[0]) { char st[300]; hold_state_path(s->key, st, sizeof st); unlink(st); }
-    if (s->alive && !s->gateway) {
+    if (s->alive && !s->gateway && s->pid <= 0) close(s->fd);          /* a stream session: only its descriptor */
+    else if (s->alive && !s->gateway) {
         kill(-s->pid, SIGHUP);
         kill(s->pid, SIGHUP);
         close(s->fd);

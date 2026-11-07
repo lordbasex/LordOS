@@ -35,6 +35,11 @@
 #include <unistd.h>
 
 #define TIMEOUT_MS 30000
+/* Connecting to one host tries each of its addresses, but all of them together for at most this long; and a host that
+ * didn't answer (no connection, or no reply in TIMEOUT_MS) isn't tried again in the same batch, so a batch of 60
+ * packages on a network that drops packets fails in about a minute instead of 60 × (addresses × 15 s + 30 s). */
+#define CONNECT_TOTAL_MS 20000
+#define DEAD_MAX 8
 
 /* ---- dates ---- */
 
@@ -73,7 +78,26 @@ typedef struct {
     char buf[16384];
     size_t pos, len;
     int out;                            /* pipe to the parent */
+    char dead[DEAD_MAX][264];           /* "host:port" that didn't answer in this batch */
+    int ndead;
 } Conn;
+
+static long long mono_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static int host_dead(const Conn *c, const char *host, const char *port) {
+    char k[264];
+    snprintf(k, sizeof k, "%s:%s", host, port);
+    for (int i = 0; i < c->ndead; i++) if (!strcmp(c->dead[i], k)) return 1;
+    return 0;
+}
+static void mark_dead(Conn *c, const char *host, const char *port) {
+    if (host_dead(c, host, port) || c->ndead >= DEAD_MAX) return;
+    snprintf(c->dead[c->ndead++], sizeof c->dead[0], "%s:%s", host, port);
+}
 
 static int send_msg(int out, char type, uint32_t item, const void *data, uint32_t len) {
     uint8_t h[9] = { (uint8_t)type, (uint8_t)item, (uint8_t)(item >> 8), (uint8_t)(item >> 16), (uint8_t)(item >> 24),
@@ -152,24 +176,28 @@ static int tls_start(Conn *c, int tcp, const char *host, char *err, size_t errle
 static int conn_open(Conn *c, const char *host, const char *port, int tls, char *err, size_t errlen) {
     if (c->fd >= 0 && c->tls == tls && !strcmp(c->host, host) && !strcmp(c->port, port)) return 0;
     conn_close(c);
+    if (host_dead(c, host, port)) { lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
     int r = getaddrinfo(host, port, &hints, &res);
-    if (r) { lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
+    if (r) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
+    long long end = mono_ms() + CONNECT_TOTAL_MS;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
+        long long left = end - mono_ms();
+        if (left <= 0) break;
         int fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, a->ai_protocol);
         if (fd < 0) continue;
         if (connect(fd, a->ai_addr, a->ai_addrlen) && errno != EINPROGRESS) { close(fd); continue; }
         struct pollfd p = { fd, POLLOUT, 0 };
         int e = 0;
         socklen_t el = sizeof e;
-        if (poll(&p, 1, 15000) != 1 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &e, &el) || e) { close(fd); continue; }
+        if (poll(&p, 1, left < 15000 ? (int)left : 15000) != 1 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &e, &el) || e) { close(fd); continue; }
         c->fd = fd;
         break;
     }
     freeaddrinfo(res);
-    if (c->fd < 0) { lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
+    if (c->fd < 0) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     c->tls = tls;
     if (tls && (c->fd = tls_start(c, c->fd, host, err, errlen)) < 0) return -1;
     snprintf(c->host, sizeof c->host, "%s", host);
@@ -284,7 +312,7 @@ static void get_file(Conn *c, const FetchItem *it, uint32_t idx) {
 }
 
 /* Downloads one item: sends H, D… and E. */
-static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
+static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
     if (!strncmp(it->url, "file:", 5)) { get_file(c, it, idx); return; }
     char url[1100], err[200] = "", line[4096];
     snprintf(url, sizeof url, "%s", it->url);
@@ -309,18 +337,21 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
             else epath[en++] = *q;
         }
         epath[en] = 0;
-        char req[3600], ims[80] = "";
+        char req[3600], ims[80] = "", range[48] = "";
         if (it->ims > 0) {
             char d[48];
             http_format_date(it->ims, d, sizeof d);
             snprintf(ims, sizeof ims, "If-Modified-Since: %s\r\n", d);
         }
+        /* a resumed download asks for the rest (resume): 206 from there, or the whole file again (200) */
+        if (from) snprintf(range, sizeof range, "Range: bytes=%llu-\r\n", (unsigned long long)from);
         int rl = snprintf(req, sizeof req, "GET %s HTTP/1.1\r\nHost: %s%s%s\r\nUser-Agent: LordOS-pkg/0.7\r\n"
-                          "Accept-Encoding: identity\r\nConnection: keep-alive\r\n%s\r\n",
-                          epath, host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", ims);
+                          "Accept-Encoding: identity\r\nConnection: keep-alive\r\n%s%s\r\n",
+                          epath, host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", ims, range);
         if (rl >= (int)sizeof req || conn_write(c, req, (size_t)rl) || conn_line(c, line, sizeof line)) {
             conn_close(c);
             if (retry) { retry = 0; goto again; }
+            mark_dead(c, host, port);
             lerr_set(err, sizeof err, "pkg.http.noResponse", "host", host, NULL);
             break;
         }
@@ -329,6 +360,8 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
         int64_t clen = -1, lastmod = 0;
         int chunked = 0, close_after = minor == 0;
         char location[1024] = "";
+        unsigned long long cr_from = 0, cr_to = 0;
+        int has_cr = 0;
         for (;;) {
             if (conn_line(c, line, sizeof line)) { conn_close(c); lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); goto out; }
             if (!line[0]) break;
@@ -341,13 +374,22 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
             else if (!strcasecmp(line, "Connection") && strcasestr(v, "close")) close_after = 1;
             else if (!strcasecmp(line, "Location")) snprintf(location, sizeof location, "%s", v);
             else if (!strcasecmp(line, "Last-Modified")) lastmod = http_parse_date(v);
+            else if (!strcasecmp(line, "Content-Range")) has_cr = sscanf(v, "bytes %llu-%llu/", &cr_from, &cr_to) == 2;
+        }
+        if (status == 206 && (!from || !has_cr || cr_from != from || cr_to < cr_from || chunked ||
+                              (clen >= 0 && (unsigned long long)clen != cr_to - cr_from + 1))) {
+            /* not the rest we asked for: from the start again, on a new connection (the body isn't read) */
+            conn_close(c);
+            if (!from) { lerr_set(err, sizeof err, "pkg.http.badResponse", NULL); break; }
+            from = 0;
+            continue;
         }
         int has_body = status != 304 && status != 204 && !(status >= 100 && status < 200);
         int redirect = (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) && location[0];
-        int deliver = status == 200;
+        int deliver = status == 200 || status == 206;
         if (deliver) {
             char h[96];
-            snprintf(h, sizeof h, "%d %lld %lld", status, (long long)lastmod, (long long)clen);
+            snprintf(h, sizeof h, "%d %lld %lld %llu", status, (long long)lastmod, (long long)clen, status == 206 ? (unsigned long long)from : 0ull);
             if (send_msg(c->out, 'H', idx, h, (uint32_t)strlen(h))) _exit(1);
         }
         uint64_t got = 0;
@@ -384,6 +426,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
             if (!chunked && clen < 0) close_after = 1;
         }
         if (close_after) conn_close(c);
+        if (status == 416 && from) { from = 0; continue; }          /* the part is no use (the file changed): again */
         if (redirect && redirects < 5) {
             if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
             else snprintf(url, sizeof url, "%s", location);
@@ -406,6 +449,9 @@ out:
 
 /* Switches to nobody: no groups, unable to go back to root. */
 static int drop_to_nobody(void) {
+#ifdef LORD_HTTP_TEST                   /* tests/http_resume_test.c, as an ordinary user: nothing to drop */
+    if (geteuid() != 0) return chdir("/");
+#endif
     struct passwd *pw = getpwnam("nobody");
     uid_t uid = pw ? pw->pw_uid : 65534;
     gid_t gid = pw ? pw->pw_gid : 65534;
@@ -430,7 +476,9 @@ static int read_full(int fd, void *buf, size_t n) {
     return 0;
 }
 
-int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
+int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) { return fetch_batch_in(items, n, cb, ud, "lordos-net-store.scope"); }
+
+int fetch_batch_in(FetchItem *items, int n, FetchProgress cb, void *ud, const char *scope) {
     if (n <= 0) return 0;
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return 0;
@@ -440,7 +488,14 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
         items[i].status = 0;
         items[i].size = 0;
         items[i].last_modified = 0;
+        items[i].resumed = 0;
         lerr_set(items[i].err, sizeof items[i].err, "pkg.http.notDownloaded", NULL);
+        /* a part kept from a cut download: ours, a plain file, smaller than the most the item may be */
+        struct stat ps;
+        char pp[600];
+        snprintf(pp, sizeof pp, "%s.part", items[i].dest);
+        if (items[i].resume && !lstat(pp, &ps) && S_ISREG(ps.st_mode) && ps.st_uid == geteuid() && ps.st_nlink == 1 &&
+            ps.st_size > 0 && (uint64_t)ps.st_size < items[i].max) items[i].resumed = (uint64_t)ps.st_size;
     }
     pid_t pid = fork();
     if (pid < 0) { close(p[0]); close(p[1]); return 0; }
@@ -454,11 +509,13 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
         signal(SIGPIPE, SIG_IGN);
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         /* (0.8.5) in lordos-net-store.scope, so the Store and the updates are their own app for the
-         * firewall and Monitor → Network (lordos:store); outside a LordOS session, where it is */
-        if (getenv("LORDOS_SESSIOND")) cgroup_enter_root("lordos-net-store.scope");
+         * firewall and Monitor → Network (lordos:store); Machines' downloads in lordos-net-machines.scope
+         * (0.8.9, lordos:machines); outside a LordOS session, where it is */
+        if (getenv("LORDOS_SESSIOND")) cgroup_enter_root(scope);
         if (drop_to_nobody()) _exit(2);
-        Conn c = { .fd = -1, .out = 3, .tls = 0, .helper = 0 };
-        for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i);
+        static Conn c;
+        c.fd = -1; c.out = 3; c.tls = 0; c.helper = 0; c.ndead = 0;
+        for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i, items[i].resumed);
         conn_close(&c);
         _exit(0);
     }
@@ -481,9 +538,42 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
             char t[96];
             snprintf(t, sizeof t, "%.*s", (int)(len < 95 ? len : 95), buf);
             long long lm = 0, cl = 0;
-            sscanf(t, "%d %lld %lld", &it->status, &lm, &cl);
+            unsigned long long from = 0;
+            sscanf(t, "%d %lld %lld %llu", &it->status, &lm, &cl, &from);
             it->last_modified = lm;
-            if (it->status == 200) {
+            if (it->status == 206) {
+                /* the rest of the part kept from before: appended, and the hash seeded with what is already there */
+                if (fd >= 0) close(fd);
+                snprintf(tmp, sizeof tmp, "%s.part", it->dest);
+                cur = (int)item;
+                sha256_init(&sh);
+                it->status = 200;
+                fd = open(tmp, O_RDWR | O_APPEND | O_CLOEXEC | O_NOFOLLOW);
+                struct stat ps;
+                int okp = fd >= 0 && !fstat(fd, &ps) && S_ISREG(ps.st_mode) && ps.st_uid == geteuid() && from == it->resumed &&
+                          (uint64_t)ps.st_size == from;
+                for (uint64_t o = 0; okp && o < from;) {
+                    ssize_t r = pread(fd, buf, (size_t)(from - o < (1u << 16) ? from - o : (1u << 16)), (off_t)o);
+                    if (r < 0 && errno == EINTR) continue;
+                    if (r <= 0) { okp = 0; break; }
+                    sha256_update(&sh, buf, (size_t)r);
+                    o += (uint64_t)r;
+                }
+                if (!okp) {
+                    if (fd >= 0) close(fd);
+                    fd = -1;
+                    unlink(tmp);
+                    it->status = 0;
+                    it->resumed = 0;
+                    lerr_set(it->err, sizeof it->err, "pkg.http.createFailed", "path", tmp, NULL);
+                } else {
+                    it->size = from;
+                    done += from;
+                    if (!it->expect && cl > 0) total += (uint64_t)cl + from;
+                }
+            } else if (it->status == 200) {
+                it->resumed = 0;                /* the whole file (a server that ignores ranges): from the start */
+                if (!it->expect && cl > 0) total += (uint64_t)cl;   /* an unknown size: the server's, for progress */
                 if (fd >= 0) close(fd);
                 snprintf(tmp, sizeof tmp, "%s.part", it->dest);
                 unlink(tmp);
@@ -511,23 +601,28 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
                 cb(done, total, ud);
             }
         } else if (h[0] == 'E') {
+            int cut = 0;
             if (len) {
                 snprintf(it->err, sizeof it->err, "%.*s", (int)(len < 199 ? len : 199), buf);
-                if (it->status == 200) it->status = 0;
+                if (it->status == 200) { it->status = 0; cut = 1; }
             } else it->err[0] = 0;
             if ((int)item == cur && fd >= 0) {
                 int good = it->status == 200 && fsync(fd) == 0;
+                if (cut && it->resume && !lerr_has(it->err, "pkg.http.tooLarge")) fsync(fd);   /* kept for the next try */
                 close(fd);
                 fd = -1;
                 if (good) {
                     sha256_final(&sh, it->sha256);
                     if (rename(tmp, it->dest)) { unlink(tmp); it->status = 0; lerr_set(it->err, sizeof it->err, "pkg.http.saveFailed", "path", it->dest, NULL); }
-                } else unlink(tmp);
+                } else if (!(cut && it->resume && !lerr_has(it->err, "pkg.http.tooLarge"))) unlink(tmp);
             }
             if (it->status == 200 || it->status == 304) ok++;
         }
     }
-    if (fd >= 0) { close(fd); unlink(tmp); }
+    if (fd >= 0) {                      /* the child went away mid-file */
+        if (cur >= 0 && items[cur].resume) fsync(fd); else unlink(tmp);
+        close(fd);
+    }
     free(buf);
     close(p[0]);
     int st;

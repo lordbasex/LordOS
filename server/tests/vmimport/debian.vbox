@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- an invented machine for the importer's tests -->
+<VirtualBox xmlns="http://www.virtualbox.org/" version="1.19-linux">
+  <Machine uuid="{11111111-2222-3333-4444-555566667777}" name="Debian &amp; tests" OSType="Debian_64" snapshotFolder="Snapshots" currentSnapshot="{99999999-0000-0000-0000-000000000001}">
+    <MediaRegistry>
+      <HardDisks>
+        <HardDisk uuid="{aaaaaaaa-bbbb-cccc-dddd-eeeeffff0011}" location="debian.vdi" format="VDI" type="Normal">
+          <HardDisk uuid="{bbbbbbbb-0000-0000-0000-000000000002}" location="Snapshots/{bbbbbbbb-0000-0000-0000-000000000002}.vdi" format="VDI"/>
+        </HardDisk>
+      </HardDisks>
+      <DVDImages>
+        <Image uuid="{cccccccc-0000-0000-0000-000000000003}" location="/isos/debian.iso"/>
+      </DVDImages>
+    </MediaRegistry>
+    <ExtraData>
+      <ExtraDataItem name="VBoxInternal/Devices/pcbios/0/Config/DmiSystemVendor" value="Example Systems"/>
+      <ExtraDataItem name="VBoxInternal/Devices/pcbios/0/Config/DmiSystemSKU" value="SKU-42"/>
+    </ExtraData>
+    <Snapshot uuid="{99999999-0000-0000-0000-000000000001}" name="Before upgrade" timeStamp="2026-10-01T10:00:00Z">
+      <Hardware><CPU count="1"/><Memory RAMSize="512"/></Hardware>
+    </Snapshot>
+    <Hardware>
+      <CPU count="2"><PAE enabled="true"/></CPU>
+      <Memory RAMSize="1024"/>
+      <Boot><Order position="1" device="HardDisk"/></Boot>
+      <RTC localOrUTC="UTC"/>
+      <Network>
+        <Adapter slot="0" enabled="true" MACAddress="080027A1B2C3" type="82540EM"><NAT/></Adapter>
+        <Adapter slot="1" enabled="true" MACAddress="080027D4E5F6" type="virtio"><InternalNetwork name="intnet"/></Adapter>
+        <Adapter slot="2" enabled="false" MACAddress="080027000000"/>
+      </Network>
+      <StorageControllers>
+        <StorageController name="IDE" type="PIIX4" PortCount="2" useHostIOCache="true" Bootable="true">
+          <AttachedDevice passthrough="false" type="DVD" hotpluggable="false" port="1" device="0"><Image uuid="{cccccccc-0000-0000-0000-000000000003}"/></AttachedDevice>
+        </StorageController>
+        <StorageController name="SATA" type="AHCI" PortCount="1" useHostIOCache="false" Bootable="true">
+          <AttachedDevice type="HardDisk" hotpluggable="false" port="0" device="0"><Image uuid="{bbbbbbbb-0000-0000-0000-000000000002}"/></AttachedDevice>
+        </StorageController>
+      </StorageControllers>
+    </Hardware>
+  </Machine>
+</VirtualBox>

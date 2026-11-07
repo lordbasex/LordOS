@@ -797,5 +797,18 @@
   "vpn.editWhileOn": "Apagá la VPN antes de editarla.",
   "vpn.fortiSsoRefused": "El servidor VPN no aceptó el inicio de sesión. Volvé a conectar e iniciá sesión en la página de la organización.",
   "vpn.clientCertPair": "Un certificado de cliente necesita el certificado y su clave privada.",
-  "vpn.fortiClientCert": "No se pudo usar el certificado de cliente o su clave. Revisá la contraseña de la clave y que la clave sea de ese certificado."
+  "vpn.fortiClientCert": "No se pudo usar el certificado de cliente o su clave. Revisá la contraseña de la clave y que la clave sea de ese certificado.",
+  "vm.noKvm": "Esta computadora no ofrece virtualización por hardware",
+  "vm.noKvmGroup": "Este sistema no tiene el grupo kvm para la virtualización por hardware",
+  "vm.groupFailed": "No se pudo agregar tu cuenta al grupo kvm",
+  "vm.listFailed": "No se pudo descargar la lista de imágenes: {reason}",
+  "vm.notListed": "Esa imagen no está en la lista de quien la hace",
+  "vm.imageBusy": "Esa imagen ya se está descargando",
+  "vm.hashMismatch": "El SHA-256 de la descarga no es el que da la lista de quien la hace: se descartó",
+  "vm.downloadFailed": "No se pudo descargar la imagen: {reason}",
+  "vm.nothingRunning": "No hay ninguna descarga en curso",
+  "vm.removeFailed": "No se pudo borrar la imagen",
+  "vm.listUnsigned": "{name} no está firmada por quien la hace, así que sus hashes no son confiables: rechazada",
+  "vm.listBadSignature": "La firma de {name} no se verifica con la clave fijada de quien la hace ({reason}): rechazada",
+  "vm.imageInUse": "Una máquina encendida tiene esa imagen en su lectora de CD: apagala primero"
 }

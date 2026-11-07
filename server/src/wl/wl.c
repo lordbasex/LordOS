@@ -1157,6 +1157,15 @@ static int clip_is_image;           /* the last thing copied was that image (and
 static char clip_png_path[160];
 static char clip_img_origin[128] = "linux";
 static int clip_img_sensitive;
+/* Rich text: an HTML version of the clipboard's text, valid while the text is the one it came with (its generation).
+ * Read from an app that offers text/html beside its text, or set by Machines (a guest's rich text, sanitized by
+ * lord-vm); offered again as text/html to Wayland and X11 apps. Never for a secret. */
+static char *clip_html;
+static size_t clip_html_len;
+static unsigned clip_html_gen;          /* term_clipboard_gen() it belongs to (0: none) */
+static char *clip_html_pend;            /* read from an app before its text arrived */
+static size_t clip_html_pend_len;
+static unsigned clip_html_pend_offer, clip_text_offer;
 
 static int text_mime(const char *m) {
     return !strcmp(m, "text/plain;charset=utf-8") || !strcmp(m, "text/plain") || !strcmp(m, "UTF8_STRING") ||
@@ -1209,8 +1218,15 @@ static void store_png(const unsigned char *png, size_t n) {
     if (fd < 0 || close(fd) || off != n) clip_png_path[0] = 0;
 }
 
+static void html_adopt(char *h, size_t n) {
+    free(clip_html);
+    clip_html = h;
+    clip_html_len = n;
+    clip_html_gen = h ? term_clipboard_gen() : 0;
+}
+
 /* reading an app's selection into LordOS */
-typedef struct { int fd, image, sensitive, primary; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
+typedef struct { int fd, image, sensitive, primary, html, html_only; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
 static void prim_store(const char *t, size_t n);
 
 static int reader_ready(int fd, uint32_t mask, void *data) {
@@ -1232,6 +1248,36 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
     }
     if (rd->primary) {
         if (rd->len) prim_store(rd->buf, rd->len);
+    } else if (rd->html) {
+        /* the text/html beside an app's text: kept with that text (whichever of the two arrives last) */
+        char *h = rd->len && rd->offer == clip_offer_gen ? malloc(rd->len) : NULL;
+        if (h) memcpy(h, rd->buf, rd->len);
+        if (h && rd->html_only) {
+            /* an app that offers rich text only: its text is the HTML without tags (a few entities back) */
+            char *t = malloc(rd->len + 1);
+            size_t k = 0;
+            int tag = 0;
+            for (size_t i = 0; t && i < rd->len; i++) {
+                char c = rd->buf[i];
+                if (tag) { if (c == '>') tag = 0; continue; }
+                if (c == '<') { tag = 1; continue; }
+                if (c == '&' && i + 3 < rd->len && !strncmp(rd->buf + i, "&lt;", 4)) { t[k++] = '<'; i += 3; continue; }
+                if (c == '&' && i + 3 < rd->len && !strncmp(rd->buf + i, "&gt;", 4)) { t[k++] = '>'; i += 3; continue; }
+                if (c == '&' && i + 4 < rd->len && !strncmp(rd->buf + i, "&amp;", 5)) { t[k++] = '&'; i += 4; continue; }
+                t[k++] = c;
+            }
+            if (t && k) {
+                term_set_clipboard(t, k);
+                term_clipboard_mark(rd->origin, rd->sensitive);
+                clip_seen = term_clipboard_gen();
+                clip_is_image = 0;
+                clip_text_offer = rd->offer;
+                if (!rd->sensitive) { html_adopt(h, rd->len); h = NULL; }
+            }
+            free(t);
+            free(h);
+        } else if (h && clip_text_offer == rd->offer) html_adopt(h, rd->len);
+        else if (h) { free(clip_html_pend); clip_html_pend = h; clip_html_pend_len = rd->len; clip_html_pend_offer = rd->offer; }
     } else if (rd->len && rd->image) {
         if (rd->len > 8 && !memcmp(rd->buf, "\x89PNG\r\n\x1a\n", 8)) {
             store_png((unsigned char *)rd->buf, rd->len);
@@ -1243,6 +1289,9 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         term_clipboard_mark(rd->origin, rd->sensitive);
         clip_seen = term_clipboard_gen();       /* not a change from LordOS */
         clip_is_image = 0;
+        clip_text_offer = rd->offer;
+        if (clip_html_pend && clip_html_pend_offer == rd->offer && !rd->sensitive) { html_adopt(clip_html_pend, clip_html_pend_len); clip_html_pend = NULL; }
+        else html_adopt(NULL, 0);
     }
     wl_event_source_remove(rd->ev);
     close(rd->fd);
@@ -1258,6 +1307,8 @@ static void read_selection(Source *s) {
     for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "text/plain;charset=utf-8")) mime = s->mimes[i];
     for (int i = 0; i < s->nmimes && !mime; i++) if (text_mime(s->mimes[i])) mime = s->mimes[i];
     for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "image/png")) { mime = s->mimes[i]; image = 1; }
+    int html_only = 0;
+    for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "text/html")) { mime = s->mimes[i]; html_only = 1; }
     if (!mime) return;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
@@ -1267,6 +1318,7 @@ static void read_selection(Source *s) {
     if (!rd) { close(p[0]); return; }
     rd->fd = p[0];
     rd->image = image;
+    rd->html = rd->html_only = html_only;
     /* origin: the app_id of a window of that app; sensitive if it is a password manager
      * (KDE/GNOME convention: offers x-kde-passwordManagerHint = secret) */
     struct wl_client *cl = wl_resource_get_client(s->res);
@@ -1274,8 +1326,23 @@ static void read_selection(Source *s) {
         if (surfs[i] && surfs[i]->client == cl && surfs[i]->app_id[0]) snprintf(rd->origin, sizeof rd->origin, "%s", surfs[i]->app_id);
     if (!rd->origin[0]) snprintf(rd->origin, sizeof rd->origin, "linux");
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "x-kde-passwordManagerHint")) rd->sensitive = 1;
+    rd->offer = clip_offer_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
-    if (!rd->ev) { close(p[0]); free(rd); }
+    if (!rd->ev) { close(p[0]); free(rd); return; }
+    /* rich text: its text/html too, beside the text (not for an image, nor a secret) */
+    if (image || html_only || rd->sensitive) return;
+    int has_html = 0;
+    for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "text/html")) has_html = 1;
+    if (!has_html || pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
+    wl_data_source_send_send(s->res, "text/html", p[1]);
+    close(p[1]);
+    Reader *hr = calloc(1, sizeof *hr);
+    if (!hr) { close(p[0]); return; }
+    hr->fd = p[0];
+    hr->html = 1;
+    hr->offer = clip_offer_gen;
+    hr->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, hr);
+    if (!hr->ev) { close(p[0]); free(hr); }
 }
 
 /* writing to an app, without blocking the server if the app reads slowly */
@@ -1321,6 +1388,9 @@ static void ofr_receive(struct wl_client *c, struct wl_resource *r, const char *
     if (src && src == selection) { wl_data_source_send_send(src->res, mime, fd); close(fd); return; }
     if (!src && clip_is_image && clip_png && !strcmp(mime, "image/png")) { send_bytes(fd, clip_png, clip_png_len); return; }
     if (!src && !clip_is_image && text_mime(mime)) { const char *t = term_clipboard(); send_bytes(fd, t, strlen(t)); return; }
+    size_t hn = 0;
+    const char *html = !src ? wl_clip_html(&hn) : NULL;
+    if (html && !strcmp(mime, "text/html")) { send_bytes(fd, html, hn); return; }
     /* KDE/GNOME convention: clipboard managers skip an offer carrying this hint */
     if (!src && !clip_is_image && !strcmp(mime, "x-kde-passwordManagerHint") && term_clipboard_sensitive()) { send_bytes(fd, "secret", 6); return; }
     close(fd);
@@ -1355,6 +1425,8 @@ static void offer_selection(struct wl_resource *dev) {
         wl_data_offer_send_offer(o, "text/plain;charset=utf-8");
         wl_data_offer_send_offer(o, "text/plain");
         wl_data_offer_send_offer(o, "UTF8_STRING");
+        size_t hn = 0;
+        if (wl_clip_html(&hn)) wl_data_offer_send_offer(o, "text/html");
         /* a secret copied in LordOS (Passwords, password fields): Linux clipboard managers must not keep it */
         if (term_clipboard_sensitive()) wl_data_offer_send_offer(o, "x-kde-passwordManagerHint");
     }
@@ -1370,6 +1442,17 @@ const unsigned char *wl_clip_png(size_t *len) {
     return *len ? clip_png : NULL;
 }
 const char *wl_clip_image_origin(void) { return clip_img_origin; }
+const char *wl_clip_html(size_t *len) {
+    int ok = clip_html && !clip_is_image && clip_html_gen == term_clipboard_gen() && !term_clipboard_sensitive();
+    *len = ok ? clip_html_len : 0;
+    return ok ? clip_html : NULL;
+}
+void wl_clip_set_html(const char *html, size_t n) {
+    char *h = html && n ? malloc(n) : NULL;
+    if (h) memcpy(h, html, n);
+    html_adopt(h, h ? n : 0);
+    if (dpy) offer_to_focus();
+}
 int wl_clip_image_sensitive(void) { return clip_img_sensitive; }
 
 /* Only two places: the compositor's previews ($XDG_RUNTIME_DIR/lordos/clip-N.png) and the

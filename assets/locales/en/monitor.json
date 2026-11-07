@@ -457,5 +457,7 @@
   "volt.rail.BATT": "Clock battery",
   "comp.lan": "Network search in Files",
   "comp.lanHint": "Files → Network: computers and shares on the local network.",
+  "comp.machines": "Machines downloads",
+  "comp.machinesHint": "Machines: the systems you download in the New Machine assistant, and their checksum lists.",
   "net.shareHolder": "{app} is sharing this session’s screen."
 }

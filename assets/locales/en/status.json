@@ -151,5 +151,11 @@
   "install.manual.tableKept": "The installation stopped after partitions were deleted: the new table stays, since their space may already have been written. The other partitions are untouched",
   "install.creatingAccount": "Creating the account {user}",
   "install.accountDone": "The account is ready",
-  "vpn.trusted": "Certificate trusted"
+  "vpn.trusted": "Certificate trusted",
+  "vm.alreadyInstalled": "Already installed",
+  "vm.downloadCancelled": "Download stopped",
+  "vm.imageRemoved": "Image deleted",
+  "vm.downloadResumed": "Continuing a stopped download ({from} bytes kept)",
+  "vm.kvmReady": "Allowed: machines can use hardware virtualization now",
+  "vm.kvmNextLogin": "Allowed from your next login"
 }

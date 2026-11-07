@@ -151,5 +151,11 @@
   "install.manual.tableKept": "L’installation s’est arrêtée après la suppression de partitions : la nouvelle table reste, car leur espace a déjà pu être écrit. Les autres partitions n’ont pas été touchées",
   "install.creatingAccount": "Création du compte {user}",
   "install.accountDone": "Le compte est prêt",
-  "vpn.trusted": "Certificat approuvé"
+  "vpn.trusted": "Certificat approuvé",
+  "vm.alreadyInstalled": "Déjà installé",
+  "vm.downloadCancelled": "Téléchargement arrêté",
+  "vm.imageRemoved": "Image supprimée",
+  "vm.downloadResumed": "Reprise d’un téléchargement arrêté ({from} octets gardés)",
+  "vm.kvmReady": "C’est fait : les machines peuvent utiliser la virtualisation matérielle",
+  "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion"
 }

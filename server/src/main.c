@@ -226,6 +226,7 @@ typedef struct {
     /* pointer motion gathered until the next frame; buttons held (mask); cursor shape from the
      * node under the pointer (`cursor` style, docs/WINDOWS.md) */
     int motion_pending, held, shape, over_app;
+    int over_media;             /* source of the media node under the pointer (its own pointer, Machines) */
 } Server;
 
 #define K0(s) (&(s)->out[0].kms)
@@ -354,6 +355,12 @@ static void cursor_now(const Server *s, Cur *c, int pct) {
     c->mode = wl_cursor(&c->px, &c->w, &c->h, &c->hx, &c->hy, &c->gen);
     int grabbing = grab_active();
     if (c->mode && !grabbing && (s->over_app || wl_pointer_locked())) return;   /* the app chose its own (or hid it) */
+    /* over a machine's picture: the guest's pointer, at the size the picture is shown (media_node_cursor) */
+    if (!grabbing && !s->over_app && s->over_media && s->shape <= CUR_DEFAULT) {
+        Cur m = { 0 };
+        m.mode = media_node_cursor(s->over_media, &m.px, &m.w, &m.h, &m.hx, &m.hy, &m.gen);
+        if (m.mode) { *c = m; return; }
+    }
     int shape = grabbing ? grab_cursor() : s->shape;
     if (shape <= CUR_DEFAULT) { c->mode = 0; return; }
     const CursorImage *ci = cursor_image_pct(shape, pct);
@@ -476,6 +483,8 @@ static void dispatch_pointer(Server *s) {
     int shape = over == 2 ? CUR_DEFAULT : node_cursor(target);
     if (shape != s->shape || grabbing != grab_active() || (over != 0) != s->over_app) { s->shape = shape; s->cursor_dirty = 1; }
     s->over_app = over != 0;                /* el cursor de la app solo vale sobre sus superficies */
+    int om = over == 0 && target && target->type == NODE_MEDIA ? target->term : 0;
+    if (om != s->over_media) { s->over_media = om; s->cursor_dirty = 1; }
     if (s->moved && !grabbing) js_pointer("move", id, x, y, 0);
     for (int i = 0; i < s->nbuttons; i++)          /* sobre un menú, solo los "up" (terminan arrastres) */
         if (over != 2 || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
@@ -2570,6 +2579,10 @@ int main(int argc, char **argv) {
         js_input_flush();                   /* the on-screen keyboard's taps (js_input.c), as physical keys */
         /* the frame pipeline (fpipe.h): a prepared frame whose flip is done is submitted, and the next one may
          * be painted while every display waits for its flip */
+        {   /* a machine's guest changed its pointer (or the scale it's drawn at) while the host's is over it */
+            static unsigned mcur;
+            if (media_cursor_serial() != mcur) { mcur = media_cursor_serial(); if (s.over_media) s.cursor_dirty = 1; }
+        }
         int ahead = !unseen && can_prepare(&s);
         int wants = !unseen && (ui.dirty || s.cursor_dirty || js_wants_frame() || wl_wants_frame() || media_wants_frame() ||
                                 outs_have_work(&s) || prep_ready(&s) || ahead);

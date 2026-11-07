@@ -104,6 +104,9 @@ const unsigned char *wl_clip_png(size_t *len);   /* the copied PNG, or NULL */
 const char *wl_clip_image_origin(void);
 int         wl_clip_image_sensitive(void);
 int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lordos/clip-N.png */
+/* rich text: the HTML that goes with the clipboard's current text (NULL if none); set it right after the text */
+const char *wl_clip_html(size_t *len);
+void        wl_clip_set_html(const char *html, size_t n);
 
 /* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize,
  * minimize, fullscreen, unfullscreen. data is JSON. */

@@ -1,0 +1,19 @@
+# Disk DescriptorFile
+version=1
+encoding="UTF-8"
+CID=12345678
+parentCID=87654321
+createType="twoGbMaxExtentSparse"
+parentFileNameHint="base.vmdk"
+
+# Extent description
+RW 4192256 SPARSE "split-s001.vmdk"
+RW 4192256 SPARSE "split-s002.vmdk"
+RW 0 ZERO
+
+# The Disk Data Base
+#DDB
+
+ddb.adapterType = "lsilogic"
+ddb.uuid = "60 00 C2 9a bc de f0 12-34 56 78 9a bc de f0 12"
+ddb.virtualHWVersion = "19"

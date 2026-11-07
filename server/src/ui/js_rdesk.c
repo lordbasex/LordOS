@@ -198,7 +198,7 @@ static void set_size(Sess *s, int w, int h) {
     MediaSrc *m = s->media ? media_src_get(s->media) : media_src_new(SK_IMAGE, "rdesk");
     if (!m) { munmap(map, len); close(fd); s->state = RS_FAILED; return; }
     if (m->map) munmap(m->map, m->map_len);
-    free(m->cache); m->cache = NULL;
+    free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
     s->media = m->id; s->w = w; s->h = h;
     /* the media node keeps the sound from now on: lord-server's loop serves its stream, and closing the node ends it */

@@ -40,6 +40,7 @@
 #include "logs/logs_admin.h"
 #include "hw/hw_admin.h"
 #include "clean/clean_admin.h"
+#include "vm/vm_admin.h"
 #include "lan/share_admin.h"
 #include "remote/sgrant_admin.h"
 #include "monitor/proc_admin.h"
@@ -410,6 +411,7 @@ static const struct { const char *name; ActionFn fn; int flags; } actions[] = {
     LOGS_ADMIN_ACTIONS
     HW_ADMIN_ACTIONS
     CLEAN_ADMIN_ACTIONS
+    VM_ADMIN_ACTIONS
     PROC_ADMIN_ACTIONS
     SHARE_ADMIN_ACTIONS
     SGRANT_ADMIN_ACTIONS
