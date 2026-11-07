@@ -1,5 +1,5 @@
 {
-  "note": "The systems the New Machine assistant offers to download (docs/VIRTUALIZATION.md 4.1 and 3.9, \"The Linux download cards\"). Read by the app (apps/machines/catalog.js, bundled) and by the admin helper as root (server/src/vm/vmcatalog.c, from /usr/lib/lordos/assets/machines/systems.json): JS names an entry and an architecture, never a URL. An entry names a release, not a file: 'dir' is the maker's folder for it, 'sums' the maker's own SHA-256 list in that folder (or 'sumsPattern', the list's name to look for in the folder's listing when the name changes per build), and 'file' the image's name as an extended regular expression; the newest matching name in the list is taken, and the download must have the SHA-256 the list gives for it, or it is thrown away. 'fileDir' is where the image itself is fetched when it isn't 'dir' (a mirror redirector). 'approxMb' is only what the card says before the list is read; 'maxMb' is the most a download may be. Before any hash in a list is trusted, the list's OpenPGP signature is checked (vmcatalog.c, pkg/pgp.c): 'signature' is how the maker signs it ('detached', a file named 'name' in the same folder, or 'clearsigned', the list itself), 'keys' the maker's key file, pinned in the package (packaging/keys/machines, installed in /usr/lib/lordos/assets/machines/keys), and 'fingerprints' the primary keys of that file that may sign; a list that isn't signed, or whose signature doesn't verify with them, is refused. 'keySource' says where the key was fetched, 'fingerprintChecked' where its fingerprint was compared, over https, with the one the maker publishes. 'hashSource' says where each hash comes from; 'checked' is when the entry was last tried. Order is the cards' order.",
+  "note": "The systems the New Machine assistant offers to download (docs/VIRTUALIZATION.md 4.1 and 3.9, \"The Linux download cards\"). Read by the app (apps/machines/catalog.js, bundled) and by the admin helper as root (server/src/vm/vmcatalog.c, from /usr/lib/lordos/assets/machines/systems.json): JS names an entry and an architecture, never a URL. An entry names a release, not a file: 'dir' is the maker's folder for it, 'sums' the maker's own SHA-256 list in that folder (or 'sumsPattern', the list's name to look for in the folder's listing when the name changes per build), and 'file' the image's name as an extended regular expression; the newest matching name in the list is taken, and the download must have the SHA-256 the list gives for it, or it is thrown away. 'fileDir' is where the image itself is fetched when it isn't 'dir' (a mirror redirector). 'approxMb' is only what the card says before the list is read; 'maxMb' is the most a download may be. Before any hash in a list is trusted, the list's OpenPGP signature is checked (vmcatalog.c, pkg/pgp.c): 'signature' is how the maker signs it ('detached', a file named 'name' in the same folder, or 'clearsigned', the list itself), 'keys' the maker's key file, pinned in the package (packaging/keys/machines, installed in /usr/lib/lordos/assets/machines/keys), and 'fingerprints' the primary keys of that file that may sign; a list that isn't signed, or whose signature doesn't verify with them, is refused. 'keySource' says where the key was fetched, 'fingerprintChecked' where its fingerprint was compared, over https, with the one the maker publishes. 'hashSource' says where each hash comes from; 'checked' is when the entry was last tried. 'unattended' says how the card installs without questions (vmunattend.h): the answer file's kind, the installer's kernel and initrd in the ISO for each architecture, the kernel command line ({label}: the ISO's volume label), and 'image', another entry whose image that install boots instead (a server or network installer), marked 'hidden' so it has no card. Order is the cards' order.",
   "systems": [
     {
       "id": "debian", "name": "Debian", "release": "13", "kind": "iso",
@@ -10,6 +10,9 @@
       "keySource": "keyring.debian.org (HKPS lookup of the fingerprint), fetched 2026-11-06",
       "fingerprintChecked": "https://www.debian.org/CD/verify, 2026-11-06 (Debian CD signing key, the one its current lists are signed with)",
       "checked": "2026-11-06",
+      "unattended": { "kind": "preseed", "append": "auto=true priority=critical --- quiet",
+                      "arch": { "amd64": { "kernel": "install.amd/vmlinuz", "initrd": "install.amd/initrd.gz" },
+                                "arm64": { "kernel": "install.a64/vmlinuz", "initrd": "install.a64/initrd.gz" } } },
       "arch": {
         "amd64": { "dir": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/", "sums": "SHA256SUMS",
                    "file": "^debian-13\\.[0-9]+\\.[0-9]+-amd64-netinst\\.iso$", "approxMb": 760, "maxMb": 2048 },
@@ -26,6 +29,9 @@
       "keySource": "keyserver.ubuntu.com (HKPS lookup of the fingerprint), fetched 2026-11-06",
       "fingerprintChecked": "https://ubuntu.com/tutorials/how-to-verify-ubuntu, 2026-11-06 (Ubuntu CD Image Automatic Signing Key (2012))",
       "checked": "2026-11-06",
+      "unattended": { "kind": "autoinstall", "image": "ubuntu-server", "append": "autoinstall ---",
+                      "arch": { "amd64": { "kernel": "casper/vmlinuz", "initrd": "casper/initrd" },
+                                "arm64": { "kernel": "casper/vmlinuz", "initrd": "casper/initrd" } } },
       "arch": {
         "amd64": { "dir": "https://releases.ubuntu.com/26.04/", "sums": "SHA256SUMS",
                    "file": "^ubuntu-26\\.04(\\.[0-9]+)?-desktop-amd64\\.iso$", "approxMb": 6180, "maxMb": 10240 },
@@ -42,6 +48,10 @@
       "keySource": "https://fedoraproject.org/fedora.gpg (the Fedora 45 key of that file), fetched 2026-11-06",
       "fingerprintChecked": "https://fedoraproject.org/security/, 2026-11-06 (Fedora 45)",
       "checked": "2026-11-06",
+      "unattended": { "kind": "kickstart", "image": "fedora-netinst",
+                      "append": "inst.stage2=hd:LABEL={label} inst.ks=hd:LABEL=OEMDRV:/ks.cfg quiet",
+                      "arch": { "amd64": { "kernel": "images/pxeboot/vmlinuz", "initrd": "images/pxeboot/initrd.img" },
+                                "arm64": { "kernel": "images/pxeboot/vmlinuz", "initrd": "images/pxeboot/initrd.img" } } },
       "arch": {
         "amd64": { "dir": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/",
                    "fileDir": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/",
@@ -67,6 +77,79 @@
                    "file": "^kali-linux-2026\\.[0-9]+[a-z]?-installer-amd64\\.iso$", "approxMb": 4810, "maxMb": 10240 },
         "arm64": { "dir": "https://cdimage.kali.org/current/", "sums": "SHA256SUMS",
                    "file": "^kali-linux-2026\\.[0-9]+[a-z]?-installer-arm64\\.iso$", "approxMb": 3860, "maxMb": 10240 }
+      }
+    },
+    {
+      "id": "ubuntu-server",
+      "name": "Ubuntu",
+      "release": "26.04",
+      "kind": "iso",
+      "hidden": true,
+      "homepage": "https://ubuntu.com/download/desktop",
+      "hashSource": "the same signed SHA256SUMS as the Ubuntu card (releases.ubuntu.com, cdimage.ubuntu.com): the server image, which the Ubuntu card's unattended install uses (autoinstall, then the desktop's packages)",
+      "signature": {
+        "type": "detached",
+        "name": "SHA256SUMS.gpg"
+      },
+      "keys": "ubuntu-cdimage.asc",
+      "fingerprints": [
+        "843938DF228D22F7B3742BC0D94AA3F0EFE21092"
+      ],
+      "keySource": "keyserver.ubuntu.com (HKPS lookup of the fingerprint), fetched 2026-11-06",
+      "fingerprintChecked": "https://ubuntu.com/tutorials/how-to-verify-ubuntu, 2026-11-06 (Ubuntu CD Image Automatic Signing Key (2012))",
+      "checked": "2026-11-06",
+      "arch": {
+        "amd64": {
+          "dir": "https://releases.ubuntu.com/26.04/",
+          "sums": "SHA256SUMS",
+          "file": "^ubuntu-26\\.04(\\.[0-9]+)?-live-server-amd64\\.iso$",
+          "approxMb": 3200,
+          "maxMb": 8192
+        },
+        "arm64": {
+          "dir": "https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/",
+          "sums": "SHA256SUMS",
+          "file": "^ubuntu-26\\.04(\\.[0-9]+)?-live-server-arm64\\.iso$",
+          "approxMb": 3000,
+          "maxMb": 8192
+        }
+      }
+    },
+    {
+      "id": "fedora-netinst",
+      "name": "Fedora",
+      "release": "45",
+      "kind": "iso",
+      "hidden": true,
+      "homepage": "https://fedoraproject.org/workstation/download",
+      "hashSource": "the clear-signed CHECKSUM of Fedora's Everything folder (dl.fedoraproject.org): the network installer, which the Fedora card's unattended install uses (kickstart, Workstation from the mirrors)",
+      "signature": {
+        "type": "clearsigned"
+      },
+      "keys": "fedora-45.asc",
+      "fingerprints": [
+        "4F50A6114CD5C6976A7F1179655A4B02F577861E"
+      ],
+      "keySource": "https://fedoraproject.org/fedora.gpg (the Fedora 45 key of that file), fetched 2026-11-06",
+      "fingerprintChecked": "https://fedoraproject.org/security/, 2026-11-06 (Fedora 45)",
+      "checked": "2026-11-06",
+      "arch": {
+        "amd64": {
+          "dir": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Everything/x86_64/iso/",
+          "fileDir": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Everything/x86_64/iso/",
+          "sumsPattern": "^Fedora-Everything-45-[0-9]+\\.[0-9]+-x86_64-CHECKSUM$",
+          "file": "^Fedora-Everything-netinst-x86_64-45-[0-9]+\\.[0-9]+\\.iso$",
+          "approxMb": 950,
+          "maxMb": 4096
+        },
+        "arm64": {
+          "dir": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Everything/aarch64/iso/",
+          "fileDir": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Everything/aarch64/iso/",
+          "sumsPattern": "^Fedora-Everything-45-[0-9]+\\.[0-9]+-aarch64-CHECKSUM$",
+          "file": "^Fedora-Everything-netinst-aarch64-45-[0-9]+\\.[0-9]+\\.iso$",
+          "approxMb": 900,
+          "maxMb": 4096
+        }
       }
     }
   ]

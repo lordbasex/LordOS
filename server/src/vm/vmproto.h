@@ -167,6 +167,7 @@ enum {
     VR_USER,                /* VM_PAUSE / VM_RESUME */
     VR_SUSPENDED,           /* VM_SUSPEND: the memory is in suspend.state, the next start resumes from it */
     VR_RESUME_FAILED,       /* the saved state couldn't be loaded (text says why); it's kept: try again or discard */
+    VR_INSTALLED,           /* an unattended install's first start ended with the installer's restart (vmunattend.h) */
     VR_COUNT
 };
 /* VM_REPLY codes */

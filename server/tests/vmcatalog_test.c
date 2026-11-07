@@ -193,6 +193,14 @@ int main(int argc, char **argv) {
             T(lab, e.max_bytes >= (1ull << 30) && e.max_bytes <= (64ull << 30));
         }
     VmCatEntry e;
+    /* the images the unattended installs boot instead (hidden entries): found, signed like the cards, the right names */
+    T("ubuntu-server: found, signed", !vmcat_find(cat, n, "ubuntu-server", "amd64", &e) && e.sig_type == VMCAT_SIG_DETACHED && !strcmp(e.sums, "SHA256SUMS") &&
+      vmcat_match(e.file_re, "ubuntu-26.04.1-live-server-amd64.iso") && !vmcat_match(e.file_re, "ubuntu-26.04.1-desktop-amd64.iso"));
+    T("ubuntu-server arm64: not largemem", !vmcat_find(cat, n, "ubuntu-server", "arm64", &e) && vmcat_match(e.file_re, "ubuntu-26.04-live-server-arm64.iso") &&
+      !vmcat_match(e.file_re, "ubuntu-26.04-live-server-arm64+largemem.iso"));
+    T("fedora-netinst: found, clear-signed", !vmcat_find(cat, n, "fedora-netinst", "amd64", &e) && e.sig_type == VMCAT_SIG_CLEAR &&
+      vmcat_match(e.sums_re, "Fedora-Everything-45-1.4-x86_64-CHECKSUM") && vmcat_match(e.file_re, "Fedora-Everything-netinst-x86_64-45-1.4.iso") &&
+      !vmcat_match(e.file_re, "Fedora-Workstation-Live-45-1.4.x86_64.iso"));
     T("unknown id", vmcat_find(cat, n, "nothing", "amd64", &e));
     T("unknown arch", vmcat_find(cat, n, "debian", "riscv64", &e));
     T("fedora: its list's name", !vmcat_find(cat, n, "fedora", "amd64", &e) && vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-x86_64-CHECKSUM") &&

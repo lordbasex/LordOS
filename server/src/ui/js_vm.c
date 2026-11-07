@@ -63,7 +63,7 @@ extern char **environ;
 static const char *const STATES[VS_COUNT] = { "stopped", "starting", "running", "paused", "stopping", "crashed" };
 static const char *const REASONS[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
-    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed",
+    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
 };
 
 static void reap_orphans(void);
@@ -342,6 +342,59 @@ static int user_file(JSContext *c, JSValueConst v, char *out, size_t n) {
 
 static int prop_int(JSContext *c, JSValueConst o, const char *k) { JSValue v = JS_GetPropertyStr(c, o, k); int i = 0; JS_ToInt32(c, &i, v); JS_FreeValue(c, v); return i; }
 
+static void host_defaults(char *lang, size_t ln, char *tz, size_t tn, char *km, size_t kn);
+
+/* an unattended install's spec for lord-vm --unattended (vm/vmunattend.h): the object's words as JSON, the password
+ * replaced by its SHA-512 crypt hash, in a 0600 file of the runtime folder that lord-vm reads and removes. 0, or -1 */
+static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
+    static const char *const keys[] = { "kind", "user", "fullname", "hostname", "timezone", "keymap", "variant", "locale", "release",
+                                        "kernel", "initrd", "append", NULL };
+    char buf[8192];
+    size_t n = (size_t)snprintf(buf, sizeof buf, "{\"arch\":\"%s\"", arch);
+    int ok = 1;
+    for (int i = 0; keys[i] && ok; i++) {
+        JSValue v = JS_GetPropertyStr(c, o, keys[i]);
+        if (JS_IsString(v)) {
+            const char *sv = JS_ToCString(c, v);
+            char q[1200];
+            if (!sv || strlen(sv) > 512 || !json_quote(q, sizeof q, sv)) ok = 0;
+            else n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"%s\":%s", keys[i], q);
+            if (sv) JS_FreeCString(c, sv);
+        }
+        JS_FreeValue(c, v);
+    }
+    JSValue vd = JS_GetPropertyStr(c, o, "desktop");
+    if (JS_IsBool(vd)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"desktop\":%s", JS_ToBool(c, vd) ? "true" : "false");
+    JS_FreeValue(c, vd);
+    /* the password: only its hash leaves here */
+    JSValue vp = JS_GetPropertyStr(c, o, "password");
+    const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+    char hash[160] = "";
+    if (pw && pw[0] && strlen(pw) < 256) {
+        char salt[64];
+        struct crypt_data cd;
+        memset(&cd, 0, sizeof cd);
+        const char *h = crypt_gensalt_rn("$6$", 0, NULL, 0, salt, sizeof salt) ? crypt_r(pw, salt, &cd) : NULL;
+        if (h && h[0] == '$' && strlen(h) < sizeof hash) snprintf(hash, sizeof hash, "%s", h);
+        explicit_bzero(&cd, sizeof cd);
+    }
+    if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+    JS_FreeValue(c, vp);
+    if (!hash[0]) ok = 0;
+    n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
+    if (!ok || n >= sizeof buf) return -1;
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    static unsigned k;
+    if (rt && rt[0] == '/' && strlen(rt) < 200) snprintf(path, pn, "%s/.lordos-vm-unattended-%d-%u", rt, (int)getpid(), ++k);
+    else snprintf(path, pn, "/run/user/%u/.lordos-vm-unattended-%d-%u", (unsigned)getuid(), (int)getpid(), ++k);
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int good = fd >= 0 && write(fd, buf, n) == (ssize_t)n;
+    if (fd >= 0) close(fd);
+    explicit_bzero(buf, sizeof buf);
+    if (!good) { if (fd >= 0) unlink(path); path[0] = 0; return -1; }
+    return 0;
+}
+
 static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsObject(argv[0])) return JS_NewInt32(c, 0);
@@ -389,6 +442,11 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
     }
     JS_FreeValue(c, vp);
+    /* an unattended install (only from an ISO) */
+    char spec[PATH_MAX] = "";
+    JSValue vu = JS_GetPropertyStr(c, argv[0], "unattended");
+    if (ok && JS_IsObject(vu)) { if (!has_iso || unattended_spec(c, vu, arch, spec, sizeof spec)) ok = 0; }
+    JS_FreeValue(c, vu);
     int id = 0;
     if (ok) {
         char folder[64], dir[PATH_MAX + 80];
@@ -398,9 +456,13 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
-        char *args[] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
-                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso,
-                         share ? "--agent" : NULL, "on", "--clipboard", "both", NULL };
+        char *args[32] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
+                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
+        int na = 0;
+        while (args[na]) na++;
+        if (spec[0]) { args[na++] = "--unattended"; args[na++] = spec; }
+        if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
+        args[na] = NULL;
         int p[2];
         if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
         else {
@@ -428,6 +490,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             }
         }
     }
+    if (!id && spec[0]) unlink(spec);
     if (name) JS_FreeCString(c, name);
     if (arch) JS_FreeCString(c, arch);
     JS_FreeValue(c, vn); JS_FreeValue(c, va); JS_FreeValue(c, vi); JS_FreeValue(c, vs);
@@ -785,6 +848,29 @@ static void host_keymap(char *out, size_t n) {
     }
     fclose(f);
 }
+static void host_defaults(char *lang, size_t ln, char *tz, size_t tn, char *km, size_t kn) {
+    char lt[256];
+    snprintf(lang, ln, "C.UTF-8");
+    snprintf(tz, tn, "UTC");
+    const char *l = getenv("LANG");
+    if (l && safe_word(l, "._@-")) snprintf(lang, ln, "%s", l);
+    ssize_t r = readlink("/etc/localtime", lt, sizeof lt - 1);
+    if (r > 0) { lt[r] = 0; char *z = strstr(lt, "zoneinfo/"); if (z && safe_word(z + 9, "/_-+")) snprintf(tz, tn, "%s", z + 9); }
+    host_keymap(km, kn);
+}
+
+/* lord.vm.hostDefaults() → { locale, timezone, keymap }: this computer's, what an unattended install starts from */
+static JSValue f_host_defaults(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char lang[80], tz[96], km[64];
+    host_defaults(lang, sizeof lang, tz, sizeof tz, km, sizeof km);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "locale", JS_NewString(c, lang));
+    JS_SetPropertyStr(c, o, "timezone", JS_NewString(c, tz));
+    JS_SetPropertyStr(c, o, "keymap", JS_NewString(c, km));
+    return o;
+}
+
 static int write_creds(char *path, size_t n, const char *dir) {
     const char *rt = getenv("XDG_RUNTIME_DIR");
     char base[256];
@@ -2293,7 +2379,7 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static const JSCFunctionListEntry funcs[] = {
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),

@@ -25,6 +25,7 @@
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
+#include "vmunattend.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -99,7 +100,7 @@ static const char *const FW_AMD64[][2] = {
 static const char *const STATE_NAME[VS_COUNT] = { "stopped", "starting", "running", "paused", "stopping", "crashed" };
 static const char *const REASON_NAME[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
-    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed",
+    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
 };
 
 /* ---- log ---- */
@@ -586,7 +587,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     VmHost h;
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
-    const char *name = NULL, *import = NULL, *iso = NULL;
+    const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
     int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
@@ -603,13 +604,32 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
         else if (!strcmp(a, "--import")) import = v;
         else if (!strcmp(a, "--iso")) iso = v;
+        else if (!strcmp(a, "--unattended")) unatt = v;
         else if (!strcmp(a, "--agent")) { agent = parse_enum(v, "off", "on"); if (agent < 0) { fprintf(stderr, "lord-vm: --agent on|off\n"); return 2; } }
         else if (!strcmp(a, "--clipboard")) { clip = parse_clip(v); if (clip < 0) { fprintf(stderr, "lord-vm: --clipboard off|to-guest|from-guest|both\n"); return 2; } }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
+    /* an unattended install (vmunattend.h): the spec lord-server wrote (0600, the password only as a hash), read and
+     * removed at once; it needs the ISO it boots from */
+    VmUnattend un;
+    if (unatt) {
+        char sp[65536], why[200];
+        int sfd = open(unatt, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t sn = sfd >= 0 ? read(sfd, sp, sizeof sp - 1) : -1;
+        if (sfd >= 0) close(sfd);
+        unlink(unatt);
+        if (sn <= 0) { fprintf(stderr, "lord-vm: can't read %s\n", unatt); return 2; }
+        sp[sn] = 0;
+        int bad = vmu_parse(sp, (size_t)sn, &un, why, sizeof why);
+        explicit_bzero(sp, sizeof sp);
+        if (bad) { fprintf(stderr, "lord-vm: %s\n", why); return 2; }
+        if (!iso) { fprintf(stderr, "lord-vm: --unattended needs --iso\n"); return 2; }
+        if (strcmp(un.arch, vm_arch_name(arch))) { fprintf(stderr, "lord-vm: the unattended spec is for %s\n", un.arch); return 2; }
+    }
     VmMachine m;
     vm_machine_defaults(&m, &h, arch);
     if (agent >= 0) m.agent = agent;
+    if (unatt) m.agent = 1;              /* the installs bring qemu-guest-agent: Shut Down asks it first (6.1) */
     if (clip >= 0) m.clipboard = clip;
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (accel >= 0) m.accel = accel;
@@ -679,6 +699,17 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "raw", "-O", "qcow2", (char *)vars, nv, NULL };
         if (run_tool(cv, err, sizeof err)) { fprintf(stderr, "lord-vm: making the UEFI variables failed: %s\n", err); unlink(sys); return 1; }
     }
+    if (unatt) {
+        char dd[PATH_MAX + 64], why[300];
+        snprintf(dd, sizeof dd, "%s/disks", real);
+        if (vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
+            fprintf(stderr, "lord-vm: the unattended install can't be prepared: %s\n", why);
+            unlink(sys);
+            snprintf(dd, sizeof dd, "%s/disks/nvram.qcow2", real); unlink(dd);
+            return 1;
+        }
+        explicit_bzero(&un, sizeof un);
+    }
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); return 1; }
     printf("{\"created\":true,\"dir\":\""); for (const char *c = real; *c; c++) { if (*c == '"' || *c == '\\') putchar('\\'); putchar(*c); }
     printf("\",\"id\":\"%s\",\"arch\":\"%s\",\"accel\":\"%s\",\"firmware\":\"%s\",\"machine_type\":\"%s\",\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d}\n",
@@ -713,6 +744,8 @@ static struct {
     int memev_fd;
     long oom0;
     int host_shutdown, poweroff, forced, guest_shutdown, panic, killed;
+    int unattended, install_done;        /* the first start of an unattended install (disks/unattended), and its end */
+    char un_cmd[640];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
     int pq_head, pq_n;
@@ -746,7 +779,7 @@ static struct {
     int qga_fd, lag_fd, ag_state, ag_caps, qga_up, qga_open;
     Qmp qga;
     int agq[32], agq_head, agq_n;           /* what each qemu-guest-agent reply answers (AQ_*) */
-    long long ag_next, sync_at, ping_at, journal_at, shutdown_at;
+    long long ag_next, sync_at, ping_at, journal_at, shutdown_at, acpi_at;
     long sync_id;
     char ag_version[48], ag_os[96], jcursor[256];
     long jpid;                              /* a journalctl running in the guest (guest-exec), 0 none */
@@ -1143,23 +1176,25 @@ static void build_qemu_args(void) {
      * network cards at 0x18 (q35 keeps 0x1f for its own controllers). Serials are letters, digits and "-_." only. */
     char ser[VM_SERIAL_MAX + 16];
     snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
+    /* an unattended install's first start: QEMU gives the installer's kernel (-kernel) boot index 0 */
+    const char *bi_sys = S.unattended ? "1" : "0", *bi_cd = S.unattended ? "2" : "1";
     if (m->devices == VM_DEV_COMPAT) {
         /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
          * to ide.5), arm64's virt gets one in the system disk's slot */
         const char *bus = arm ? "ahci" : "ide";
         if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
-        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0,bootindex=0%s", bus, ser);
+        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0,bootindex=%s%s", bus, bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=1", bus);
+            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=%s", bus, bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=1", bus); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=%s", bus, bi_cd); S.cd_node[0] = 0; }
     } else {
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0,addr=0x1%s", ser);
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
@@ -1169,9 +1204,24 @@ static void build_qemu_args(void) {
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=1");
+            arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,bootindex=1"); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+    }
+    if (S.unattended) {
+        /* an unattended install's first start (vmunattend.h): the installer's own kernel and initrd with the answers'
+         * command line, the seed disk (slot 0xa), and the installer's last restart ends QEMU instead, so lord-vm can take
+         * them away before the installed system starts */
+        snprintf(p, sizeof p, "%s/unattended/vmlinuz", S.disks); arg("-kernel"); arg(p);
+        snprintf(p, sizeof p, "%s/unattended/initrd", S.disks); arg("-initrd"); arg(p);
+        arg("-append"); arg(S.un_cmd);
+        snprintf(p, sizeof p, "%s/unattended/seed.img", S.disks);
+        if (file_exists(p)) {
+            arg("-blockdev"); argj(blockdev_file("seed-file", p, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "seed", "seed-file", 1));
+            arg("-device"); arg("virtio-blk-pci,id=seed0,drive=seed,addr=0xa");
+        }
+        arg("-action"); arg("reboot=shutdown");
     }
     static const char *const NICDEV[VM_NIC_COUNT] = { "virtio-net-pci", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet" };
     if (m->network == VM_NET_SHARED) {
@@ -1275,6 +1325,26 @@ static int start_machine(void) {
         if (disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
     }
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
+    S.unattended = 0;
+    S.install_done = 0;
+    {
+        char cp[PATH_MAX + 64];
+        snprintf(cp, sizeof cp, "%s/unattended/cmdline", S.disks);
+        int cfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t cn = cfd >= 0 ? read(cfd, S.un_cmd, sizeof S.un_cmd - 1) : -1;
+        if (cfd >= 0) close(cfd);
+        if (cn > 0) {
+            S.un_cmd[cn] = 0;
+            int ok = S.m.iso[0] != 0;
+            for (ssize_t i = 0; i < cn; i++) if ((unsigned char)S.un_cmd[i] < 0x20 || (unsigned char)S.un_cmd[i] > 0x7e) ok = 0;
+            snprintf(cp, sizeof cp, "%s/unattended/vmlinuz", S.disks);
+            if (!file_exists(cp)) ok = 0;
+            snprintf(cp, sizeof cp, "%s/unattended/initrd", S.disks);
+            if (!file_exists(cp)) ok = 0;
+            if (ok) { S.unattended = 1; vlog("unattended: this start installs the system (the installer's kernel and the answers)"); }
+            else vlog("unattended: disks/unattended is incomplete or the ISO is gone: started as usual");
+        }
+    }
     if (!file_exists(QEMU_BIN_OF(S.m.arch))) { fail_start("%s isn't installed", QEMU_BIN_OF(S.m.arch)); return -1; }
     if (S.m.network == VM_NET_SHARED && !file_exists(PASST)) { fail_start("passt isn't installed (Shared network)"); return -1; }
     {
@@ -1405,12 +1475,21 @@ static int start_machine(void) {
 
 /* ---- requests ---- */
 
+static int qga_do(const char *cmd, const char *args, int kind);
 static void begin_shutdown(int secs) {
     if (S.state == VS_PAUSED) qmp_do("cont", NULL, P_IGNORE, -1, 0, -1, -1);
-    qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1);
     S.host_shutdown = 1;
     S.shut_deadline = now_ms() + (long long)(secs ? secs : 60) * 1000;
-    if (S.qga_up) S.shutdown_at = now_ms() + 15000;     /* ACPI first, then the agent (6.1) */
+    if (S.qga_up && (S.ag_caps & VAC_SHUTDOWN)) {
+        /* the guest agent first (6.1): it shuts down whatever the guest does with its power button (a console system
+         * without logind or acpid ignores it); the button too if the guest is still there 10 s later */
+        vlog("agent: asking qemu-guest-agent to shut the guest down");
+        qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1);
+        S.acpi_at = now_ms() + 10000;
+    } else {
+        qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1);
+        if (S.qga_up) S.shutdown_at = now_ms() + 15000;     /* the agent, if it answers later */
+    }
     set_state(VS_STOPPING, VR_HOST_SHUTDOWN, 0, "asked the guest to shut down");
 }
 
@@ -2394,6 +2473,10 @@ static void drain_lag(void) {
 /* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
 static void ag_tick(long long now) {
     S.ag_next = now + 1000;
+    if (S.acpi_at && now >= S.acpi_at) {
+        S.acpi_at = 0;
+        if (S.state == VS_STOPPING) { vlog("agent: the guest is still running: pressing the power button too"); qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1); }
+    }
     if (S.qga_fd < 0) return;
     if (!S.qga_up) { if (now - S.sync_at > (S.qga_open ? 3000 : 10000)) qga_sync(); return; }
     if (now - S.ping_at > 25000) { ag_lost("qemu-guest-agent stopped answering"); return; }
@@ -2591,6 +2674,7 @@ static void on_qmp_event(const JVal *root) {
         const char *why = data ? json_str(data, "reason") : NULL;
         vlog("qemu: SHUTDOWN guest=%d reason=%s", guest, why ? why : "?");
         if (guest) S.guest_shutdown = 1;
+        if (S.unattended && why && !strcmp(why, "guest-reset")) { S.install_done = 1; vlog("unattended: the installer restarted the machine: the install is done"); }
         if (S.state != VS_STOPPING) set_state(VS_STOPPING, guest ? VR_GUEST_SHUTDOWN : VR_POWEROFF, 0, why ? why : "");
     } else if (!strcmp(ev, "RESET")) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
@@ -2710,6 +2794,7 @@ static void drain_qmp(void) {
 
 /* ---- QEMU's end ---- */
 
+static void unattended_done(void);
 static void qemu_exited(int status) {
     S.qemu_done = 1;
     S.qemu_status = status;
@@ -2730,6 +2815,7 @@ static void qemu_exited(int status) {
         else if (S.panic) { st = VS_CRASHED; why = VR_GUEST_PANIC; }
         else if (S.forced) why = VR_FORCED;
         else if (S.poweroff) why = VR_POWEROFF;
+        else if (S.install_done) why = VR_INSTALLED;
         else if (S.host_shutdown && S.guest_shutdown) why = VR_HOST_SHUTDOWN;
         else if (S.guest_shutdown) why = VR_GUEST_SHUTDOWN;
     } else if (WIFSIGNALED(status)) {
@@ -2741,7 +2827,31 @@ static void qemu_exited(int status) {
     if (S.suspending) { if (S.susp_fd >= 0) close(S.susp_fd); S.susp_fd = -1; suspend_cleanup_tmp(); vm_op_end(S.dir); S.suspending = 0; reply(S.susp_client, S.susp_seq, VME_QMP, "QEMU stopped while saving"); }
     if (S.passt > 0) kill(S.passt, SIGTERM);
     if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGTERM, NULL, 0);
+    if (why == VR_INSTALLED) unattended_done();
     set_state(st, why, code, d);
+}
+
+/* the install is done: the installer's kernel, the answers and the seed disk go, and the ISO comes out of the drive
+ * (machine.json without it), so the next start is the installed system's own */
+static void unattended_done(void) {
+    static const char *const names[] = { "vmlinuz", "initrd", "cmdline", "seed.img", NULL };
+    char p[PATH_MAX + 64];
+    for (int i = 0; names[i]; i++) {
+        snprintf(p, sizeof p, "%s/unattended/%s", S.disks, names[i]);
+        int fd = open(p, O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (fd >= 0) { struct stat st; if (!fstat(fd, &st) && st.st_size > 0 && !strcmp(names[i], "seed.img")) { static const char z[4096]; for (off_t o = 0; o < st.st_size; o += (off_t)sizeof z) if (write(fd, z, sizeof z) < 0) break; } close(fd); }
+        unlink(p);
+    }
+    snprintf(p, sizeof p, "%s/unattended", S.disks);
+    rmdir(p);
+    VmMachine m;
+    char err[256];
+    if (!vm_machine_load(S.dir, &m, err, sizeof err)) {
+        m.iso[0] = 0;
+        if (!vm_machine_save(S.dir, &m)) S.m.iso[0] = 0;
+    }
+    S.unattended = 0;
+    vlog("unattended: the installer's files and the seed disk are removed, the ISO is out of the drive: the next start is the installed system");
 }
 
 static void reap(void) {
