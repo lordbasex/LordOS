@@ -37,7 +37,7 @@ char *cloud_begin_signin(const char *kind, const char *name, const char *client_
 int   cloud_signin_url(const char *id, char *url, size_t n);    /* 0: the address of that sign-in */
 void  cloud_cancel_signin(const char *id);
 char *cloud_add(const char *kind, const char *name, const char *fields_json, const char *account_id, int *req);   /* { id } | { question } | { error } */
-char *cloud_answer(const char *state, const char *value, int *req);                       /* rclone's next question, or done */
+char *cloud_answer(const char *state, const char *value, int apply_others, int *req);   /* apply_others: N4 */                       /* rclone's next question, or done */
 char *cloud_empty_trash(const char *id, int *req);
 char *cloud_measure(const char *id, int *req);                  /* { bytes, count } */
 char *cloud_cancel_measure(const char *id, int *req);

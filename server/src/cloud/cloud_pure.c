@@ -39,6 +39,7 @@ static const char *const methods[RCM_COUNT] = {
     [RCM_LIST] = "operations/list",
     [RCM_STAT] = "operations/stat",
     [RCM_COPYFILE] = "operations/copyfile",
+    [RCM_FSCACHE_CLEAR] = "fscache/clear",
 };
 
 const char *rc_method_path(int m) { return m >= 0 && m < RCM_COUNT ? methods[m] : NULL; }
@@ -293,10 +294,11 @@ const char *cloud_failure_code(const char *m) {
         "status code: 403", "status code 401", "status code 403", ": 401", ": 403", "Unauthorized", "Forbidden", "authentication failed",
         "permission denied", "invalid credentials", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "login failed",
         "Login incorrect", "530 ", "wrong password", "no supported methods remain", "couldn't decrypt", "failed to parse private key",
-        "cannot decode encrypted private keys", "invalid_grant", "STATUS_LOGON_FAILURE", "NT_STATUS_LOGON_FAILURE", NULL };
+        "cannot decode encrypted private keys", "invalid_grant", "STATUS_LOGON_FAILURE", "NT_STATUS_LOGON_FAILURE",
+        "attempted logon is invalid", "bad username or authentication", NULL };
     static const char *const net[] = { "connection refused", "no route to host", "no such host", "network is unreachable",
         "i/o timeout", "host is down", NULL };
-    static const char *const weak[] = { "connection reset", "deadline exceeded", "timeout", "EOF", NULL };
+    static const char *const weak[] = { "connection reset", "broken pipe", "deadline exceeded", "timeout", "EOF", NULL };
     static const char *const addr[] = { "unsupported protocol scheme", "invalid URL", "missing port", "too many colons", "invalid port",
         "first path segment in URL", "missing protocol scheme", "invalid character", "parse \"", NULL };
     if (!m || !m[0]) return NULL;
@@ -346,13 +348,15 @@ static double go_time(const char *s) {
     return t + frac;
 }
 
-int cloud_remote_changed(const char *fp, long long size, double mtime, const char *const *hashes, int nh) {
+int cloud_remote_changed(const char *fp, long long size, double mtime, const char *const *hashes, int nh, int precision_s) {
     if (!fp || !fp[0]) return -1;
     char *end;
     long long s = strtoll(fp, &end, 10);
     if (end == fp) return -1;
     if (s != size) return 1;
-    int told = 1;                                           /* the size alone tells something */
+    /* N5: a hash says it all when both sides have one; a modtime counts only beyond the backend's precision */
+    int hash_seen = 0, hash_same = 0, time_changed = 0;
+    double slack = precision_s > 1 ? precision_s : 1;
     for (const char *p = *end == ',' ? end + 1 : NULL; p && *p; ) {
         const char *e = strchr(p, ',');
         size_t l = e ? (size_t)(e - p) : strlen(p);
@@ -361,16 +365,15 @@ int cloud_remote_changed(const char *fp, long long size, double mtime, const cha
         memcpy(part, p, l);
         part[l] = 0;
         double t = go_time(part);
-        if (t >= 0) {
-            if (mtime >= 0 && (t - mtime > 1 || mtime - t > 1)) return 1;        /* a second: providers round */
-        } else if (nh > 0) {
-            int same = 0;
-            for (int i = 0; i < nh; i++) if (hashes[i] && !strcasecmp(hashes[i], part)) same = 1;
-            if (!same) return 1;
+        if (t >= 0) { if (mtime >= 0 && (t - mtime > slack || mtime - t > slack)) time_changed = 1; }
+        else if (nh > 0) {
+            hash_seen = 1;
+            for (int i = 0; i < nh; i++) if (hashes[i] && !strcasecmp(hashes[i], part)) hash_same = 1;
         }
         p = e ? e + 1 : NULL;
     }
-    return told ? 0 : -1;
+    if (hash_seen) return hash_same ? 0 : 1;
+    return time_changed;
 }
 
 int cloud_conflict_name(const char *rel, int n, char *out, size_t cap) {

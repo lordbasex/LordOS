@@ -44,6 +44,7 @@ head -c 5000000 /dev/urandom >"$S/Projects/big.bin"
 echo hello >"$S/notes.txt"
 echo bye >"$S/gone.txt"
 echo "the original" >"$S/conflict.txt"
+echo "offline original" >"$S/offc.txt"
 mkdir -p "$S/Gone/Inner"; echo a >"$S/Gone/a.txt"; echo b >"$S/Gone/Inner/b.txt"
 PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
 "$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass --dir-cache-time 1s >"$T/dav.log" 2>&1 &
@@ -284,6 +285,7 @@ check "conflict: State.conflicts says so" sh -c 'case "$1" in *"\"conflicts\":[{
 echo "again mine" > "$M/notes.txt"
 for i in $(seq 40); do [ "$(cat "$S/notes.txt")" = "again mine" ] && break; sleep 0.5; done
 check "no conflict: a file changed only here goes up under its name" test "$(cat "$S/notes.txt")" = "again mine"
+check "N5: and no spurious cloud copy of a file we uploaded before" test ! -e "$S/notes (cloud copy).txt"
 echo "changed here" > "$M/notes.txt"
 for i in $(seq 40); do [ "$(cat "$S/notes.txt")" = "changed here" ] && break; sleep 0.5; done
 
@@ -313,7 +315,10 @@ check "while a file in the home folder is still found" has "$OUT" "$H/local-rece
 kill -CONT "$DAV"
 
 # B10: the server down (refused): a cold read fails within seconds, and the account says offline
+cat "$M/offc.txt" >/dev/null                    # B18: it came down before the server went away
+sleep 1
 kill "$DAV"; sleep 0.5
+echo "mine, offline" > "$M/offc.txt"            # changed here while the server is down: rclone's tries fail
 r=$(cmd free "$M/Projects")
 t0=$(date +%s%N); timeout 60 head -c 10 "$M/Projects/big.bin" >/dev/null 2>&1; t1=$(date +%s%N)
 ms=$(( (t1 - t0) / 1000000 ))
@@ -323,10 +328,17 @@ r=$(cmd wait '"state":"offline"' 40)
 check "the account says offline" has "$r" '"ok"'
 r=$(cmd state)
 check "with cloud.unreachable" has "$r" '"error":"cloud.unreachable"'
+sleep 12                                        # past rclone's own retry (10 s): it must not have gone up anyway
+echo "the server's own edit, while we were offline" > "$S/offc.txt"
 "$RC" serve webdav "$S" --addr "127.0.0.1:$PORT" --user dav --pass davpass --dir-cache-time 1s >"$T/dav2.log" 2>&1 &
 DAV=$!; sleep 1
 r=$(cmd wait '"mounted":true,"state":"ok"' 60)
 check "and ok again once the server is back" has "$r" '"ok"'
+for i in $(seq 60); do [ "$(cat "$S/offc.txt")" = "mine, offline" ] && break; sleep 0.5; done
+check "B18: the server's edit made while we were offline is kept as 'offc (cloud copy).txt'" test "$(cat "$S/offc (cloud copy).txt" 2>/dev/null)" = "the server's own edit, while we were offline"
+check "B18: ours went up under the name once the server answered" test "$(cat "$S/offc.txt")" = "mine, offline"
+r=$(cmd state)
+check "B18: State.conflicts names it" has "$r" 'offc (cloud copy).txt'
 
 # Empty Trash and Measure (17.2 items 4 and 5)
 r=$(cmd state)
@@ -475,7 +487,6 @@ check "rclone checks the host key (no 'No host key validation' in its log)" sh -
 r=$(cmd add sftp Box3 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
 B3ID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
 check "another account on the same server: no question, the known key used" test -n "$B3ID"
-r=$(cmd remove "$B3ID")
 # B15: Sign In Again with only the password: the kept host, port and user are used
 r=$(cmd addid "$SID" sftp Box '{"pass":"spass"}')
 check "update with only the password: done (no cloud.badAddress)" has "$r" "\"id\":\"$SID\""
@@ -496,9 +507,50 @@ QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
 r=$(cmd answer "$QS" trust)
 check "trusting the new key: the account works again" has "$r" "\"id\":\"$SID\""
 check "the kept key is the new one now" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$new' && ! ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$SID' | grep -q '$want'"
+check "N4: the other account on that server got the new key too" sh -c "ssh-keygen -lf '$H/.config/lordos/cloud/known_hosts/$B3ID' | grep -q '$new'"
+r=$(cmd wait '"name":"Box3","kind":"sftp"' 10)
+for i in $(seq 40); do st=$(cmd state); case "$st" in *'"name":"Box3"'*'"mounted":true'*) break;; esac; sleep 0.5; done
+check "N4: and works again without being asked" test -e "$H/Cloud/Box3/s.txt"
+r=$(cmd remove "$B3ID")
 r=$(cmd wait '"mounted":true' 30)
 r=$(cmd remove "$SID")
 kill "$SFTP"
+
+# B18 on other kinds: the server really stopped (its sessions too), an edit on each side, the server back
+newport() { python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])'; }
+offc_case() {   # KIND NAME DIR FILE(rel) START-COMMAND FIELDS
+    ock=$1 ocn=$2 ocd=$3 ocf=$4 ocstart=$5 ocfields=$6   # (check() uses n)
+    sh -c "$ocstart" & OP_PID=$!; EXTRA="$OP_PID"; sleep 1.5
+    r=$(cmd add "$ock" "$ocn" "$ocfields")
+    case "$r" in *'"question"'*) QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p'); r=$(cmd answer "$QS" trust) ;; esac
+    ocid=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+    check "B18 $ock: added" test -n "$ocid"
+    r=$(cmd wait "\"name\":\"$ocn\"" 10)
+    for i in $(seq 60); do [ -e "$H/Cloud/$ocn/$ocf" ] && break; sleep 0.5; done
+    cat "$H/Cloud/$ocn/$ocf" >/dev/null 2>&1; sleep 1
+    pkill -P "$OP_PID" 2>/dev/null; kill "$OP_PID" 2>/dev/null; sleep 0.5
+    echo "mine, offline" > "$H/Cloud/$ocn/$ocf"
+    sleep 12
+    echo "the server's own edit, while we were offline" > "$ocd/$ocf"
+    sh -c "$ocstart" & OP_PID=$!; EXTRA="$OP_PID"; sleep 1.5
+    r=$(cmd retry "$ocid")
+    for i in $(seq 120); do [ "$(cat "$ocd/$ocf")" = "mine, offline" ] && break; sleep 0.5; done
+    base=${ocf%.*}; ext=${ocf##*.}
+    check "B18 $ock: the server's offline edit kept as a cloud copy" test "$(cat "$ocd/$base (cloud copy).$ext" 2>/dev/null)" = "the server's own edit, while we were offline"
+    check "B18 $ock: ours went up under the name" test "$(cat "$ocd/$ocf")" = "mine, offline"
+    for i in $(seq 60); do case "$(cmd state)" in *"\"name\":\"$ocn\""*'"up":{"files":0'*) break;; esac; sleep 0.5; done
+    check "B18 $ock: nothing left waiting to go up" sh -c 'case "$1" in *"\"name\":\"$2\""*"\"up\":{\"files\":0"*) exit 0;; esac; exit 1' x "$(cmd state)" "$ocn"
+    r=$(cmd remove "$ocid")
+    pkill -P "$OP_PID" 2>/dev/null; kill "$OP_PID" 2>/dev/null; EXTRA=""
+    for i in $(seq 60); do case "$(cmd state)" in *"\"name\":\"$ocn\""*) sleep 0.5;; *) break;; esac; done
+    check "B18 $ock: removed afterwards ($ocid)" sh -c 'case "$1" in *"\"name\":\"$2\""*) exit 1;; esac; exit 0' x "$(cmd state)" "$ocn"
+}
+mkdir -p "$T/o-sftp" "$T/o-ftp" "$T/o-s3/bucket1"
+echo "offline original" > "$T/o-sftp/offc.txt"; echo "offline original" > "$T/o-ftp/offc.txt"; echo "offline original" > "$T/o-s3/bucket1/offc.txt"
+P1=$(newport); P2=$(newport); P3=$(newport)
+offc_case sftp OffSftp "$T/o-sftp" offc.txt "exec '$RC' serve sftp '$T/o-sftp' --addr 127.0.0.1:$P1 --user ou --pass opass --key '$T/hk1' --dir-cache-time 1s >>'$T/o.log' 2>&1" "{\"host\":\"127.0.0.1\",\"port\":\"$P1\",\"user\":\"ou\",\"pass\":\"opass\"}"
+offc_case ftp OffFtp "$T/o-ftp" offc.txt "exec '$RC' serve ftp '$T/o-ftp' --addr 127.0.0.1:$P2 --user ou --pass opass --dir-cache-time 1s >>'$T/o.log' 2>&1" "{\"host\":\"127.0.0.1\",\"port\":\"$P2\",\"user\":\"ou\",\"pass\":\"opass\"}"
+offc_case s3 OffS3 "$T/o-s3" bucket1/offc.txt "exec '$RC' serve s3 '$T/o-s3' --addr 127.0.0.1:$P3 --auth-key checkkey,checksecret --dir-cache-time 1s >>'$T/o.log' 2>&1" "{\"provider\":\"Rclone\",\"endpoint\":\"http://127.0.0.1:$P3\",\"access_key_id\":\"checkkey\",\"secret_access_key\":\"checksecret\"}"
 
 # B6: a certificate the system doesn't trust is shown, and trusted for that account alone
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$T/k1.pem" -out "$T/c1.pem" -days 2 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 2>/dev/null

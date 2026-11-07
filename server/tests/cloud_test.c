@@ -22,7 +22,7 @@ static void t_methods(void) {
     static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
         "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
         "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
-        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", "operations/stat", "operations/copyfile", NULL };
+        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", "operations/stat", "operations/copyfile", "fscache/clear", NULL };
     static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
         "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/delete",
         "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
@@ -203,6 +203,7 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("failed to read private key: x509: decryption password incorrect"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("AccessDenied: Access Denied status code: 403"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("dial tcp 127.0.0.1:1: connect: connection refused"), "cloud.unreachable"));
+    CHECK(!strcmp(cloud_failure_code("error in ListJSON: write tcp 127.0.0.1:38242->127.0.0.1:18991: write: broken pipe"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("dial tcp: lookup nowhere.example.test: no such host"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("dial tcp 10.255.255.1:22: i/o timeout"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("parse \"http://127.0.0.1:99999\": invalid port \":99999\" after host"), "cloud.badAddress"));
@@ -224,12 +225,18 @@ static void t_refused(void) {
     CHECK(!cl[0]);
     /* the conflict rule: did the cloud's object change since it came down? */
     const char *h1[] = { "d41d8cd98f00b204e9800998ecf8427e" };
-    CHECK(cloud_remote_changed("6", 6, -1, NULL, 0) == 0 && cloud_remote_changed("6", 21, -1, NULL, 0) == 1);
-    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08.123456789 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), NULL, 0) == 0);
-    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:30:00Z"), NULL, 0) == 1);
-    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,d41d8cd98f00b204e9800998ecf8427e", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), h1, 1) == 0);
-    CHECK(cloud_remote_changed("6,ffffffffffffffffffffffffffffffff", 6, -1, h1, 1) == 1);
-    CHECK(cloud_remote_changed("", 6, -1, NULL, 0) == -1 && cloud_remote_changed("abc", 6, -1, NULL, 0) == -1 && cloud_remote_changed(NULL, 6, -1, NULL, 0) == -1);
+    CHECK(cloud_remote_changed("6", 6, -1, NULL, 0, 1) == 0 && cloud_remote_changed("6", 21, -1, NULL, 0, 1) == 1);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08.123456789 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), NULL, 0, 1) == 0);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:30:00Z"), NULL, 0, 1) == 1);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,d41d8cd98f00b204e9800998ecf8427e", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), h1, 1, 1) == 0);
+    CHECK(cloud_remote_changed("6,ffffffffffffffffffffffffffffffff", 6, -1, h1, 1, 1) == 1);
+    CHECK(cloud_remote_changed("", 6, -1, NULL, 0, 1) == -1 && cloud_remote_changed("abc", 6, -1, NULL, 0, 1) == -1 && cloud_remote_changed(NULL, 6, -1, NULL, 0, 1) == -1);
+    /* N5: within the backend's precision a modtime is the same; a hash decides when both sides have one */
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:20:40Z"), NULL, 0, 60) == 0);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC", 6, (double)cloud_rfc3339("2026-11-06T22:20:09Z"), NULL, 0, 1) == 0);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,d41d8cd98f00b204e9800998ecf8427e", 6, (double)cloud_rfc3339("2026-11-07T10:00:00Z"), h1, 1, 1) == 0);
+    CHECK(cloud_remote_changed("6,2026-11-06 22:20:08 +0000 UTC,aaaa", 6, (double)cloud_rfc3339("2026-11-06T22:20:08Z"), h1, 1, 1) == 1);
+    CHECK(!strcmp(cloud_failure_code("The attempted logon is invalid. This is either due to a bad username or authentication information."), "cloud.authFailed"));
     char cn[CLOUD_REL_MAX + 1];
     CHECK(!cloud_conflict_name("notes.txt", 1, cn, sizeof cn) && !strcmp(cn, "notes (cloud copy).txt"));
     CHECK(!cloud_conflict_name("Docs/report.final.pdf", 2, cn, sizeof cn) && !strcmp(cn, "Docs/report.final (cloud copy 2).pdf"));
@@ -502,13 +509,13 @@ static void t_state(void) {
         s = cloud_delete(dp4, 0, &dreq);
         CHECK(s && strstr(s, "cloud.badArgument"));
         free(s);
-        s = cloud_answer("c0a1b2c3d:x", "v", &dreq);
+        s = cloud_answer("c0a1b2c3d:x", "v", 1, &dreq);
         CHECK(s && strstr(s, "cloud.notFound") && !dreq);
         free(s);
-        s = cloud_answer("cab12cd34:x", "v", &dreq);
+        s = cloud_answer("cab12cd34:x", "v", 1, &dreq);
         CHECK(s && strstr(s, "cloud.noQuestion") && !dreq);
         free(s);
-        s = cloud_answer("garbage", "v", &dreq);
+        s = cloud_answer("garbage", "v", 1, &dreq);
         CHECK(s && strstr(s, "cloud.badArgument"));
         free(s);
         s = cloud_measure("nobody", &dreq);

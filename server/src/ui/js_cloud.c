@@ -236,9 +236,10 @@ static JSValue f_link(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *st = arg(c, argc, argv, 0), *v = arg(c, argc, argv, 1);
-    int req = 0;
+    int req = 0, apply = 1;      /* { applyToOthers } (N4), true unless said */
+    if (argc > 2 && JS_IsObject(argv[2])) { JSValue x = JS_GetPropertyStr(c, argv[2], "applyToOthers"); if (JS_IsBool(x)) apply = JS_ToBool(c, x) > 0; JS_FreeValue(c, x); }
     /* the call first: it sets req (C leaves the order of a call's arguments unspecified) */
-    char *res_ = (st && v) ? cloud_answer(st, v, &req) : NULL;
+    char *res_ = (st && v) ? cloud_answer(st, v, apply, &req) : NULL;
     JSValue r = (st && v) ? req_or(c, res_, req) : err(c, "cloud.badArgument");
     fr(c, st); fr(c, v);      /* not wiped: it may be the JS string's own memory */
     return r;

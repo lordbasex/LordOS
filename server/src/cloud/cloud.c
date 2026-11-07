@@ -110,6 +110,7 @@ static Reply *rhead;
 void ct_params(const Acc *a, JBuf *b, int *first);     /* cloud_trust.c */
 static int presigned(const Acc *a);
 static void changed_failed(Acc *a, int req, const char *code, char *msg);
+static void note_synced(Acc *a, const char *rel);
 static void wait_answer(Acc *a, int req, char *q, const char *sec, const char *tsec, int upd);
 static char *add_impl(const char *kind, const char *name, const char *fields, const char *account_id, int *req, int use_req);
 static const CloudKind *kind_get(const char *kind);
@@ -1139,6 +1140,9 @@ static void check_links(Acc *a) {
         a->links_supported = json_bool(f, "PublicLink", 0);
         /* S3's CleanUp removes unfinished multipart uploads: not a trash to empty */
         a->trash_supported = json_bool(f, "CleanUp", 0) && !presigned(a);
+        /* nanoseconds; rclone's "not supported" is a huge number: modtimes then don't count */
+        double pr = json_num(d.root, "Precision", 1e9);
+        a->precision_s = pr >= 1e17 ? 0 : pr <= 1e9 ? 1 : (int)(pr / 1e9 + 0.5);
     }
     if (d.root) json_free(&d);
 }
@@ -1367,10 +1371,21 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
 }
 
 /* lists the account's top folder (folders only, no times): 0 it answered, -1 and rclone's words */
+/* B18: rclone's FTP and SMB backends keep a pooled connection the server closed when it stopped, and fail with it
+ * ("broken pipe") long after the server is back; its cached remote is dropped so the next call connects anew */
+static int stale_pool(Acc *a, const char *msg) {
+    if (strcmp(a->k->type, "ftp") && strcmp(a->k->type, "smb")) return 0;
+    const char *fc = cloud_failure_code(msg);
+    if (!fc || strcmp(fc, "cloud.unreachable")) return 0;
+    char m2[64];
+    return rcs(RCM_FSCACHE_CLEAR, "{}", m2, sizeof m2, 5000) == 200;
+}
+
 static int verify_remote(Acc *a, char *msg, size_t mn) {
     char body[160];
     cl_pf(body, sizeof body, "{\"fs\":\"%s:\",\"remote\":\"\",\"opt\":{\"dirsOnly\":true,\"noModTime\":true,\"noMimeType\":true}}", a->id);
     int st = rcs(RCM_LIST, body, msg, mn, 20000);
+    if (st != 200 && st > 0 && stale_pool(a, msg)) st = rcs(RCM_LIST, body, msg, mn, 20000);
     if (st == 200) return 0;
     if (st < 0) cpy(msg, mn, "i/o timeout: no answer within 20 s");
     return -1;
@@ -1394,8 +1409,20 @@ static void check_acc(Acc *a) {
         cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
         if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
         set_message(a, msg);
-    } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; }
+    } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; a->fp_old[0] = a->fp_new[0] = 0; }
+    int key = bad && c && !strcmp(c, "cloud.hostKeyChanged") && !a->fp_new[0];
     pthread_mutex_unlock(&cl_mu);
+    /* U12: a key that changed, seen by rclone: the kept fingerprint and, once, the server's new one */
+    if (key) {
+        char o[256] = "", n[256] = "", *ks = NULL;
+        if (secrets && secrets->get(a->id, &ks)) ks = NULL;        /* its host and port live with its secrets */
+        ct_fingerprints(a, ks, o, sizeof o, n, sizeof n);
+        wipe_free(ks);
+        pthread_mutex_lock(&cl_mu);
+        cpy(a->fp_old, sizeof a->fp_old, o);
+        cpy(a->fp_new, sizeof a->fp_new, n[0] ? n : "?");
+        pthread_mutex_unlock(&cl_mu);
+    }
     cl_changed();
 }
 
@@ -1582,7 +1609,7 @@ static void job_answer(Job *j) {
         a->pending_req = 0;
         pthread_mutex_unlock(&cl_mu);
         if (!yes || !a->trust_kind) { ct_refuse(a); wipe_free(sec); wipe_free(tsec); add_failed(a, j->req, yes ? "cloud.noQuestion" : "cloud.notTrusted", ""); return; }
-        if (ct_accept(a)) { wipe_free(sec); wipe_free(tsec); add_failed(a, j->req, "cloud.addFailed", "could not keep the key or certificate"); return; }
+        if (ct_accept(a, j->flag != 2)) { wipe_free(sec); wipe_free(tsec); add_failed(a, j->req, "cloud.addFailed", "could not keep the key or certificate"); return; }
         if (upd && a->mounted) unmount_acc(a);
         add_continue(a, j->req, sec, tsec, upd);
         wipe_free(sec);
@@ -1981,6 +2008,8 @@ static void record_done(void) {
     if (rcj(RCM_TRANSFERRED, "{}", &d, NULL, 0, RC_SHORT) != 200 || !d.root) { if (d.root) json_free(&d); return; }
     const JVal *tr = json_get(d.root, "transferred");
     long long newest = seen_done;
+    struct { char id[16], rel[CLOUD_REL_MAX + 1]; } ups[16];
+    int nup = 0;
     pthread_mutex_lock(&cl_mu);
     for (const JVal *x = tr && tr->type == J_ARR ? tr->kid : NULL; x; x = x->next) {
         const char *src = json_str(x, "srcFs"), *dst = json_str(x, "dstFs"), *nm = json_str(x, "name"), *at = json_str(x, "completed_at"), *er = json_str(x, "error");
@@ -2003,6 +2032,7 @@ static void record_done(void) {
             if (a->nerrn == ERRN_MAX) { free(a->errn[0]); memmove(a->errn, a->errn + 1, sizeof a->errn[0] * (ERRN_MAX - 1)); a->nerrn--; }
             a->errn[a->nerrn++] = strdup(nm);
         } else if ((!er || !er[0]) && k < a->nerrn) { free(a->errn[k]); a->errn[k] = a->errn[--a->nerrn]; }
+        if (dst && t > seen_done && (!er || !er[0]) && nup < 16) { cl_pf(ups[nup].id, sizeof ups[nup].id, "%s", a->id); cl_pf(ups[nup].rel, sizeof ups[nup].rel, "%s", nm); nup++; }
         if (t <= seen_done || (er && er[0])) continue;
         if (t > newest) newest = t;
         if (nrecent == RECENT_MAX) nrecent--;
@@ -2016,6 +2046,12 @@ static void record_done(void) {
     seen_done = newest;
     pthread_mutex_unlock(&cl_mu);
     json_free(&d);
+    for (int i = 0; i < nup; i++) {                     /* N5: what the cloud has after our upload */
+        pthread_mutex_lock(&cl_mu);
+        Acc *a = cl_find(ups[i].id);
+        pthread_mutex_unlock(&cl_mu);
+        if (a) note_synced(a, ups[i].rel);
+    }
 }
 
 static void set_expiry(Acc *a, int qid, double e) {
@@ -2030,6 +2066,51 @@ static int was_checked(Acc *a, const char *name) {
     for (int i = 0; i < a->nchecked && !y; i++) y = !strcmp(a->checked[i], name);
     pthread_mutex_unlock(&cl_mu);
     return y;
+}
+/* N5: after our upload of a file, the cloud's object is ours: its fingerprint is kept (the VFS keeps the one from when it
+ * came down) */
+static const char *synced_fp(Acc *a, const char *rel) {
+    for (int i = 0; i < a->nsynced; i++) if (!strcmp(a->synced[i].rel, rel)) return a->synced[i].fp;
+    return NULL;
+}
+static void note_synced(Acc *a, const char *rel) {
+    char body[CLOUD_REL_MAX * 2 + 128];
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"fs\":\"%s:\",\"remote\":", a->id);
+    jb_str(&b, rel);
+    jb_raw(&b, ",\"opt\":{\"showHash\":true}}");
+    cl_pf(body, sizeof body, "%s", b.oom ? "" : b.p);
+    jb_free(&b);
+    JDoc d;
+    if (rcj(RCM_STAT, body, &d, NULL, 0, 15000) != 200 || !d.root) { if (d.root) json_free(&d); return; }
+    const JVal *it = json_get(d.root, "item");
+    if (it && it->type == J_OBJ) {
+        char fp[256];
+        const char *mt = json_str(it, "ModTime"), *h = NULL;
+        const JVal *hs = json_get(it, "Hashes");
+        if (hs && hs->type == J_OBJ && hs->kid && hs->kid->type == J_STR) h = hs->kid->str;
+        /* the VFS fingerprint's own shape: size, modtime as Go prints it in UTC, hash */
+        long long t = mt ? cloud_rfc3339(mt) : -1;
+        char when[64] = "";
+        if (t >= 0) { time_t tt = (time_t)t; struct tm g; gmtime_r(&tt, &g); strftime(when, sizeof when, ",%Y-%m-%d %H:%M:%S +0000 UTC", &g); }
+        cl_pf(fp, sizeof fp, "%lld%s%s%s", (long long)json_num(it, "Size", 0), when, h ? "," : "", h ? h : "");
+        pthread_mutex_lock(&cl_mu);
+        int k = -1;
+        for (int i = 0; i < a->nsynced; i++) if (!strcmp(a->synced[i].rel, rel)) k = i;
+        if (k < 0 && a->nsynced < SYNCED_MAX) k = a->nsynced++;
+        if (k < 0) k = (int)(time(NULL) % SYNCED_MAX);
+        cl_pf(a->synced[k].rel, sizeof a->synced[k].rel, "%s", rel);
+        cl_pf(a->synced[k].fp, sizeof a->synced[k].fp, "%s", fp);
+        pthread_mutex_unlock(&cl_mu);
+    }
+    json_free(&d);
+}
+
+static void unmark_checked(Acc *a, const char *name) {
+    pthread_mutex_lock(&cl_mu);
+    for (int i = 0; i < a->nchecked; i++) if (!strcmp(a->checked[i], name)) { free(a->checked[i]); a->checked[i] = a->checked[--a->nchecked]; break; }
+    pthread_mutex_unlock(&cl_mu);
 }
 static void mark_checked(Acc *a, const char *name) {
     pthread_mutex_lock(&cl_mu);
@@ -2058,8 +2139,24 @@ static int conflict_check(Acc *a, const char *rel, char *kept, size_t kn) {
     cl_pf(body, sizeof body, "%s", b.oom ? "" : b.p);
     jb_free(&b);
     JDoc d;
-    int st = rcj(RCM_STAT, body, &d, NULL, 0, 15000);
-    const JVal *item = st == 200 && d.root ? json_get(d.root, "item") : NULL;
+    char smsg[256] = "";
+    int st = rcj(RCM_STAT, body, &d, smsg, sizeof smsg, 15000);
+    if (st != 200 && st > 0 && stale_pool(a, smsg)) {
+        if (d.root) json_free(&d);
+        smsg[0] = 0;
+        st = rcj(RCM_STAT, body, &d, smsg, sizeof smsg, 15000);
+    }
+    if (st != 200) {
+        /* B18: the cloud can't say what it has: held until it can (never "no conflict" by default) */
+        if (d.root) json_free(&d);
+        const char *fc = cloud_failure_code(smsg);
+        pthread_mutex_lock(&cl_mu);
+        if (fc && !strcmp(fc, "cloud.unreachable")) { cpy(a->err, sizeof a->err, "cloud.unreachable"); a->check_at = time(NULL) + 30; }
+        pthread_mutex_unlock(&cl_mu);
+        kept[0] = 0;
+        return 2;
+    }
+    const JVal *item = d.root ? json_get(d.root, "item") : NULL;
     int changed = 0;
     if (item && item->type == J_OBJ) {
         const char *hs[8];
@@ -2067,7 +2164,9 @@ static int conflict_check(Acc *a, const char *rel, char *kept, size_t kn) {
         const JVal *h = json_get(item, "Hashes");
         for (const JVal *x = h && h->type == J_OBJ ? h->kid : NULL; x && nh < 8; x = x->next) if (x->type == J_STR) hs[nh++] = x->str;
         const char *mtm = json_str(item, "ModTime");
-        changed = !have || cloud_remote_changed(m.fingerprint, (long long)json_num(item, "Size", -1), mtm ? (double)cloud_rfc3339(mtm) : -1, hs, nh) == 1;
+        /* N5: what this computer last knew of the cloud's object: its own last upload of it, else what came down */
+        const char *fp = synced_fp(a, rel);
+        changed = !have && !fp ? 1 : cloud_remote_changed(fp ? fp : m.fingerprint, (long long)json_num(item, "Size", -1), mtm ? (double)cloud_rfc3339(mtm) : -1, hs, nh, a->precision_s) == 1;
     }
     if (d.root) json_free(&d);
     kept[0] = 0;
@@ -2149,13 +2248,14 @@ static void poll_acc(Acc *a) {
     /* Pause holds what waits to go up; otherwise each changed file is looked at once before it goes (the conflict rule):
      * held, compared with the cloud's object (the cloud's version copied aside on a conflict), then let go */
     int hold = cl_paused(a);
-    struct { int id; double e; int up; char name[CLOUD_REL_MAX + 1]; } it[64];
+    struct { int id; double e; int up, tries; char name[CLOUD_REL_MAX + 1]; } it[64];
     int ni = 0;
     pthread_mutex_lock(&cl_mu);
     for (int k = 0; k < a->nq && ni < 64; k++) {
         it[ni].id = a->q[k].qid;
         it[ni].e = a->q[k].expiry;
         it[ni].up = a->q[k].uploading;
+        it[ni].tries = a->q[k].tries;
         cl_pf(it[ni].name, sizeof it[ni].name, "%s", a->q[k].name);
         ni++;
     }
@@ -2169,9 +2269,22 @@ static void poll_acc(Acc *a) {
     }
     a->held = hold;
     pthread_mutex_unlock(&cl_mu);
+    /* B18: the server not answering, every waiting file is held: rclone mustn't retry an upload by itself, since the
+     * cloud's copy may change meanwhile; each goes again through the check once the account answers */
+    pthread_mutex_lock(&cl_mu);
+    int offline = !strcmp(a->err, "cloud.unreachable") || !strcmp(a->err, "cloud.offline");
+    pthread_mutex_unlock(&cl_mu);
     for (int k = 0; k < ni; k++) {
         if (it[k].up) continue;
-        if (hold) { if (it[k].e < 1e8) set_expiry(a, it[k].id, 1e9); continue; }
+        if (it[k].tries > 0 && was_checked(a, it[k].name)) {
+            unmark_checked(a, it[k].name);              /* an attempt failed: looked at again before the next one */
+            set_expiry(a, it[k].id, 1e9);
+            pthread_mutex_lock(&cl_mu);
+            a->check_at = 0;                            /* and the account listed now: offline? */
+            pthread_mutex_unlock(&cl_mu);
+            continue;
+        }
+        if (hold || offline) { if (it[k].e < 1e8) set_expiry(a, it[k].id, 1e9); continue; }
         if (!was_checked(a, it[k].name)) {
             set_expiry(a, it[k].id, 1e9);               /* held while it is looked at */
             char kept[CLOUD_REL_MAX + 1];
@@ -2442,6 +2555,17 @@ static void do_job(Job *j) {
         for (int i = 0; i < ACC_MAX; i++) {
             Acc *a = &cl_acc[i];
             if (!a->used || (j->id[0] && strcmp(a->id, j->id))) continue;
+            if (a->reconnect) {
+                /* made again from its options and secrets, then mounted: rclone takes the new known_hosts */
+                a->reconnect = 0;
+                if (a->mounted) unmount_acc(a);
+                pthread_mutex_lock(&cl_mu);
+                a->configured = 0;
+                a->err[0] = a->message[0] = 0;
+                pthread_mutex_unlock(&cl_mu);
+                bring_up(a);
+                continue;
+            }
             if (a->configured && a->mounted) { a->check_at = 0; continue; }     /* listed again on the next tick */
             if (!strcmp(a->err, "cloud.addFailed") || a->pending_req || a->new_acc) continue;
             pthread_mutex_lock(&cl_mu);
@@ -2673,7 +2797,7 @@ char *cloud_providers(int *req) {
     return async_job(J_PROVIDERS, "", NULL, NULL, req);
 }
 
-char *cloud_answer(const char *state, const char *value, int *req) {
+char *cloud_answer(const char *state, const char *value, int apply_others, int *req) {
     char id[16];
     const char *st;
     *req = 0;
@@ -2684,7 +2808,14 @@ char *cloud_answer(const char *state, const char *value, int *req) {
     int ok = a && a->pending_req;
     pthread_mutex_unlock(&cl_mu);
     if (!ok) return err_json(a ? "cloud.noQuestion" : "cloud.notFound");
-    return async_job(J_ANSWER, id, st, value, req);
+    char *r = async_job(J_ANSWER, id, st, value, req);
+    if (!r && !apply_others) {
+        /* the job is queued: mark it (the queue's tail is ours) */
+        pthread_mutex_lock(&cl_mu);
+        if (jtail && jtail->req == *req) jtail->flag = 2;
+        pthread_mutex_unlock(&cl_mu);
+    }
+    return r;
 }
 
 static char *acc_job(int type, const char *id, int *req) {

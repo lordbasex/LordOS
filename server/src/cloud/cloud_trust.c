@@ -388,7 +388,7 @@ int ct_check(Acc *a, const char *sec, char **q, char *code, size_t cn, char *msg
 }
 
 /* the person accepted what was shown: kept, 0600 in a 0700 folder */
-int ct_accept(Acc *a) {
+int ct_accept(Acc *a, int apply_others) {
     pthread_mutex_lock(&cl_mu);
     char kind = a->trust_kind, *data = a->trust_data;
     a->trust_kind = 0;
@@ -403,7 +403,22 @@ int ct_accept(Acc *a) {
         char tag[300] = "";
         size_t t = strcspn(data, " ");
         if (t < sizeof tag) { memcpy(tag, data, t); tag[t] = 0; }
+        /* N4: the other accounts on this server that kept the same old key take the new one too */
+        char *old = NULL;
+        if (kind == 'H' && apply_others) { char *f = slurp(p); old = f ? tag_lines(f, tag) : NULL; free(f); }
         int r = write_lines(p, data, kind == 'H', tag);
+        for (int i = 0; old && old[0] && !r && i < ACC_MAX; i++) {
+            Acc *b = &cl_acc[i];
+            if (!b->used || b == a || strcmp(b->k->type, "sftp")) continue;
+            char bp[PATH_MAX];
+            path_of(b, 1, bp, sizeof bp);
+            char *bf = slurp(bp), *bl = bf ? tag_lines(bf, tag) : NULL;
+            free(bf);
+            /* rclone reads known_hosts when it makes the remote: that account is made again (reconnect) */
+            if (bl && !strcmp(bl, old) && !write_lines(bp, data, 1, tag)) { b->fp_old[0] = b->fp_new[0] = 0; b->reconnect = 1; cloud_retry(b->id); }
+            free(bl);
+        }
+        free(old);
         free(data);
         return r;
     }
@@ -444,4 +459,22 @@ void ct_forget(const Acc *a) {
     unlink(p);
     path_of(a, 0, p, sizeof p);
     unlink(p);
+}
+
+void ct_fingerprints(Acc *a, const char *sec, char *old, size_t on, char *now, size_t nn) {
+    cur_sec = sec;
+    const char *host = param(a, "host"), *ps = param(a, "port");
+    old[0] = now[0] = 0;
+    if (!host) { cur_sec = NULL; return; }
+    int port = ps ? atoi(ps) : 22;
+    char tag[300], kh[PATH_MAX], *good = NULL;
+    rconnect_host_tag(host, port, tag, sizeof tag);
+    path_of(a, 1, kh, sizeof kh);
+    char *f = slurp(kh), *own = f ? tag_lines(f, tag) : NULL;
+    free(f);
+    if (own && own[0]) prints(own, old, on);
+    free(own);
+    if (!probe(host, port, tag, &good, now, nn)) free(good);
+    cur_sec = NULL;
+    explicit_bzero(sec_val, sizeof sec_val);
 }
