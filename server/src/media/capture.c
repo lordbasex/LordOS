@@ -164,10 +164,15 @@ void media_capture_size(int *w, int *h) {
     *h = (m ? m->v.ph : (int)ui.height) & ~1;
 }
 
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h) {
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display) {
     int W = (int)ui.width, H = (int)ui.height;
     if (W <= 0 || H <= 0 || !ui.root) return NULL;
-    const DisplayOut *m = w <= 0 || h <= 0 ? capture_main() : NULL;
+    /* one display asked for (Screenshots: a file per display, an area on any of them) */
+    const DisplayPlan *plan = display_current();
+    const DisplayOut *m = NULL;
+    for (int i = 0; display && i < plan->n; i++) if (plan->o[i].conn == display) m = &plan->o[i];
+    if (display && !m) return NULL;
+    if (!display && (w <= 0 || h <= 0)) m = capture_main();
     if (m) { W = m->v.pw; H = m->v.ph; }
     uint32_t *full = malloc((size_t)W * H * 4);
     if (!full) return NULL;

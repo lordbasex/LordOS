@@ -131,7 +131,9 @@ int  maudio_failed(const MAudio *a);
 void media_view_reset(MediaSrc *s);
 
 /* capture.c */
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h);
+/* display: a display's connector id (lord.screen.displays[].id): that display at its physical resolution; 0 for
+ * Settings' choice ("Screenshots and sharing": the main display, or every display at 100 %). */
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display);
 void media_capture_size(int *w, int *h);     /* recording / remote desktop frame size (docs/DISPLAYS.md) */
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
 MediaSrc *media_resize(MediaSrc *src, int w, int h);          /* new capture source, w × h */

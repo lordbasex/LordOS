@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { captureView, captureRect } = await import(path.join(here, '../../apps/screenshots/geometry.js'));
+const { captureView, captureRect, displaysToCapture, displayAt, dragRect } = await import(path.join(here, '../../apps/screenshots/geometry.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -51,6 +51,22 @@ eq('all displays: 1:1 in the global space', captureRect({ x: 1380, y: 28, w: 500
 
 // ---- no display list (headless, older server) ----
 eq('no displays: from the screen width', captureRect({ x: 10, y: 10, w: 100, h: 100 }, 1600, 1000, { width: 800, height: 500 }), { x: 20, y: 20, w: 200, h: 200 });
+
+// ---- several displays (0.8.8.6: captures were of the main display only) ----
+const three = { width: 5760, height: 1080, mirror: false, displays: [
+  { id: 94, x: 1920, y: 0, w: 1920, h: 1080, pw: 1920, ph: 1080, scale: 100, main: true },
+  { id: 83, x: 0, y: 0, w: 1920, h: 1080, pw: 1920, ph: 1080, scale: 100 },
+  { id: 88, x: 3840, y: 0, w: 1920, h: 1080, pw: 3840, ph: 2160, scale: 200 }] };
+eq('three displays: each captured', displaysToCapture(three).map((d) => d.id), [94, 83, 88]);
+eq('mirrored: Settings\' choice', displaysToCapture({ ...three, mirror: true }), [null]);
+eq('one display: Settings\' choice', displaysToCapture(one(100, 1920, 1080, 1920, 1080)), [null]);
+eq('the point on the left display', displayAt(three.displays, 100, 100).id, 83);
+eq('the point on the right display', displayAt(three.displays, 4000, 10).id, 88);
+eq('outside every display', displayAt(three.displays, 9000, 10), null);
+eq('a selection on the left display lands in its capture', captureRect({ x: 100, y: 50, w: 200, h: 100 }, 1920, 1080, three, three.displays[1]), { x: 100, y: 50, w: 200, h: 100 });
+eq('a selection on the 200 % right display, at its resolution', captureRect({ x: 3940, y: 50, w: 200, h: 100 }, 3840, 2160, three, three.displays[2]), { x: 200, y: 100, w: 400, h: 200 });
+eq('a drag stays inside the display it began on', dragRect({ x: 1800, y: 100 }, 2500, 300, three.displays[1]), { x: 1800, y: 100, w: 120, h: 200 });
+eq('a drag up and left', dragRect({ x: 500, y: 500 }, 100, 50, three.displays[1]), { x: 100, y: 50, w: 400, h: 450 });
 
 console.log(`${n - bad}/${n} screenshots geometry checks passed`);
 process.exit(bad ? 1 : 0);

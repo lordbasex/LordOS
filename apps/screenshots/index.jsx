@@ -15,7 +15,7 @@ import {
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { captureRect } from './geometry.js';
+import { captureRect, displaysToCapture, displayAt, dragRect } from './geometry.js';
 import { Editor } from './editor.jsx';
 
 const APP = 'screenshots';
@@ -111,15 +111,53 @@ async function allowed(ask) {
     return got;
   } catch (e) { refused(e); return null; }
 }
-const grab = () => allowed(() => media.screenshot(APP));
+// d: a display of lord.screen.displays (captured at its own resolution), or null for Settings' choice
+const grab = (d) => allowed(() => media.screenshot(APP, d ? { display: d.id } : undefined));
+
+// ❖⇧4 on every display at once: a capture and a full-screen overlay per display (geometry.js), sharing one
+// selection; it stays inside the display it began on.
+const area = createStore(null);   // { shots: [{ handle, display }], mode, start, rect, hover, pointer }
+function endArea(keep) {
+  const a = area.get();
+  if (!a) return;
+  area.set(null);
+  for (const w of windows.get()) if (w.app === APP && String(w.instance || w.id).includes('overlay')) wm.close(w.id, true);
+  for (const sh of a.shots) if (sh.handle !== keep) media.close(sh.handle);
+}
+async function areaDone(r, at) {
+  const a = area.get();
+  if (!a) return;
+  const shot = a.shots.find((sh) => !sh.display || (at && sh.display.id === at.id)) || a.shots[0];
+  endArea(shot.handle);
+  if (!r || r.w < 3 || r.h < 3) { media.close(shot.handle); return; }
+  // r is in logical pixels; the capture is at its display's physical resolution (2× at 200 %)
+  const info = media.info(shot.handle);
+  const p = info && captureRect(r, info.width, info.height, lord.screen, shot.display);
+  if (!p) { media.close(shot.handle); return; }
+  const c = media.crop(shot.handle, p.x, p.y, p.w, p.h);
+  media.close(shot.handle);
+  await finish(c);
+}
 
 export const capture = {
-  full: () => afterHide(() => withTimer(async () => finish(await grab()))),
+  // ❖⇧3: a file per display, as other systems do
+  full: () => afterHide(() => withTimer(async () => {
+    for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h); }
+  })),
   area: (mode = 'area') => afterHide(() => withTimer(async () => {
-    const h = await grab();
-    if (!h) return;
-    const id = wm.open(APP, { instance: 'overlay', args: { handle: h, mode } });
-    wm.setFullscreen(id, true);
+    endArea();
+    const shots = [];
+    for (const d of displaysToCapture(lord.screen)) {
+      const h = await grab(d);
+      if (!h) { shots.forEach((sh) => media.close(sh.handle)); return; }
+      shots.push({ handle: h, display: d });
+    }
+    area.set({ shots, mode, start: null, rect: null, hover: null, pointer: null });
+    shots.forEach((sh, i) => {
+      const d = sh.display;
+      const id = wm.open(APP, { instance: `overlay${i}`, args: { index: i }, ...(d ? { frame: { x: d.x, y: d.y, w: d.w, h: d.h } } : {}) });
+      wm.setFullscreen(id, true);
+    });
   })),
   async record() {
     const cur = recording.get();
@@ -157,69 +195,84 @@ addShortcuts([
 
 // ---- the app's windows ----
 
-function Overlay({ handle, mode: initial }) {
-  const win = useAppWindow();
+function Overlay({ index }) {
+  const a = useStore(area);
   const { windows: list } = useWindows();
-  const [mode, setMode] = useState(initial);
-  const [rect, setRect] = useState(null);
-  const [hover, setHover] = useState(null);
-  const drag = useRef(null);
-  useEffect(() => { media.view(handle, { zoom: 1, cx: 0.5, cy: 0.5, background: 0xff000000 }); }, [handle]);
-  const done = async (r) => {
-    wm.close(win.id, true);
-    if (!r || r.w < 3 || r.h < 3) { media.close(handle); return; }
-    // r is in logical pixels; the capture is at the display's physical resolution (2× at 200 %)
-    const info = media.info(handle);
-    const p = info && captureRect(r, info.width, info.height, lord.screen);
-    if (!p) { media.close(handle); return; }
-    const c = media.crop(handle, p.x, p.y, p.w, p.h);
-    media.close(handle);
-    await finish(c);
-  };
+  const shot = a?.shots[index];
+  const d = shot?.display || null;              // this overlay's display (null: the main one, Settings' choice)
+  const ox = d ? d.x : 0, oy = d ? d.y : 0;     // global → this overlay's pixels
+  useEffect(() => { if (shot) media.view(shot.handle, { zoom: 1, cx: 0.5, cy: 0.5, background: 0xff000000 }); }, [shot?.handle]);
   useKeyboard((e) => {
-    if (e.key === 'Escape') { wm.close(win.id, true); media.close(handle); }
-    if (e.key === ' ') setMode((m) => (m === 'area' ? 'window' : 'area'));
+    if (index !== 0) return;                    // one overlay answers the keys for all of them
+    if (e.key === 'Escape') endArea();
+    if (e.key === ' ') area.set((x) => (x ? { ...x, mode: x.mode === 'area' ? 'window' : 'area', start: null, rect: null } : x));
   });
   useEffect(() => {
+    if (index !== 0) return undefined;          // the pointer, once for every overlay
+    const displays = () => (area.get()?.shots || []).map((sh) => sh.display).filter(Boolean);
     const offMove = addListener('pointermove', (e) => {
-      if (drag.current) { const d = drag.current; setRect({ x: Math.min(d.x, e.x), y: Math.min(d.y, e.y), w: Math.abs(e.x - d.x), h: Math.abs(e.y - d.y) }); return; }
-      // window under the pointer (the topmost one)
+      const cur = area.get();
+      if (!cur) return;
+      if (cur.start) { area.set({ ...cur, pointer: { x: e.x, y: e.y }, rect: dragRect(cur.start, e.x, e.y, cur.start.display) }); return; }
+      // the window under the pointer (the topmost one), for the window mode
       const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
       let found = null;
-      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, title: windowTitle(w) }; }
-      setHover(found);
+      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
+      area.set({ ...cur, pointer: { x: e.x, y: e.y }, hover: found });
     });
     const offUp = addListener('pointerup', (e) => {
-      if (!drag.current) return;
-      const d = drag.current;
-      drag.current = null;
-      done({ x: Math.min(d.x, e.x), y: Math.min(d.y, e.y), w: Math.abs(e.x - d.x), h: Math.abs(e.y - d.y) });
+      const cur = area.get();
+      if (!cur?.start) return;
+      areaDone(dragRect(cur.start, e.x, e.y, cur.start.display), cur.start.display);
     });
     return () => { offMove(); offUp(); };
-  }, [list, mode]);
+  }, [list, index]);
+  if (!a || !shot) return null;
+  const down = (e) => {
+    if (a.mode === 'area') area.set({ ...a, start: { x: e.x, y: e.y, display: displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), e.x, e.y) } });
+    else if (a.hover) areaDone(a.hover, a.hover.display);
+  };
   const dim = 'rgba(0,0,0,0.35)';
-  const r = mode === 'window' ? hover : rect;
+  const g = a.mode === 'window' ? a.hover : a.rect;
+  const r = g ? { x: g.x - ox, y: g.y - oy, w: g.w, h: g.h, title: g.title } : null;
+  const p = a.pointer ? { x: a.pointer.x - ox, y: a.pointer.y - oy } : null;
+  const here = p && (!d || (p.x >= 0 && p.y >= 0 && p.x < d.w && p.y < d.h));
+  const guide = 'rgba(255,255,255,0.55)';
   return (
-    <View style={{ flex: 1, direction: 'ltr' }} onMouseDown={(e) => { if (mode === 'area') drag.current = { x: e.x, y: e.y }; else done(hover); }}>
-      <MediaView media={handle} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
+    <View style={{ flex: 1, direction: 'ltr', cursor: 'crosshair' }} onMouseDown={down}>
+      <MediaView media={shot.handle} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
       {r ? (
         <>
-          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, height: r.y, backgroundColor: dim }} />
+          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, height: Math.max(0, r.y), backgroundColor: dim }} />
           <View style={{ position: 'absolute', left: 0, top: r.y + r.h, right: 0, bottom: 0, backgroundColor: dim }} />
-          <View style={{ position: 'absolute', left: 0, top: r.y, width: r.x, height: r.h, backgroundColor: dim }} />
+          <View style={{ position: 'absolute', left: 0, top: r.y, width: Math.max(0, r.x), height: r.h, backgroundColor: dim }} />
           <View style={{ position: 'absolute', left: r.x + r.w, top: r.y, right: 0, height: r.h, backgroundColor: dim }} />
-          <View style={{ position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, border: `1px solid ${mode === 'window' ? '#4c8dff' : '#fff'}`,
-            backgroundColor: mode === 'window' ? 'rgba(76,141,255,0.15)' : 'transparent' }} />
+          <View style={{ position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, border: `1px solid ${a.mode === 'window' ? '#4c8dff' : '#fff'}`,
+            backgroundColor: a.mode === 'window' ? 'rgba(76,141,255,0.15)' : 'transparent' }} />
           <View style={{ position: 'absolute', left: r.x + r.w + 6, top: r.y + r.h + 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.7)' }}>
-            <Text style={{ fontSize: 11, color: '#fff' }}>{mode === 'window' ? r.title : `${Math.round(r.w)} × ${Math.round(r.h)}`}</Text>
+            <Text style={{ fontSize: 11, color: '#fff' }}>{a.mode === 'window' ? r.title : `${Math.round(r.w)} × ${Math.round(r.h)}`}</Text>
           </View>
         </>
       ) : <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: dim }} />}
-      <View style={{ position: 'absolute', left: 0, right: 0, top: 18, alignItems: 'center', pointerEvents: 'none' }}>
-        <View style={{ paddingHorizontal: 14, height: 30, justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.7)' }}>
-          <Text style={{ fontSize: 12, color: '#fff' }}>{tr(mode === 'window' ? 'screenshots.hintWindow' : 'screenshots.hintArea')}</Text>
+      {/* the crosshair: guides through the pointer across this display and its coordinates on the display */}
+      {a.mode === 'area' && here ? (
+        <>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: Math.round(p.y), height: 1, backgroundColor: guide, pointerEvents: 'none' }} />
+          <View style={{ position: 'absolute', top: 0, bottom: 0, left: Math.round(p.x), width: 1, backgroundColor: guide, pointerEvents: 'none' }} />
+          {!a.start && (
+            <View style={{ position: 'absolute', left: p.x + 12, top: p.y + 12, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.7)', pointerEvents: 'none' }}>
+              <Text style={{ fontSize: 11, color: '#fff', fontFamily: 'monospace' }}>{`${Math.round(p.x)}, ${Math.round(p.y)}`}</Text>
+            </View>
+          )}
+        </>
+      ) : null}
+      {(index === 0 || (here && !a.start)) && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 18, alignItems: 'center', pointerEvents: 'none' }}>
+          <View style={{ paddingHorizontal: 14, height: 30, justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <Text style={{ fontSize: 12, color: '#fff' }}>{tr(a.mode === 'window' ? 'screenshots.hintWindow' : 'screenshots.hintArea')}</Text>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -348,7 +401,7 @@ export default function Screenshots() {
   const win = useAppWindow();
   const inst = String(win.id).split('#')[1] || '';
   const a = win.args || {};
-  if (inst === 'overlay' && a.handle) return <Overlay handle={a.handle} mode={a.mode} />;
+  if (String(inst).startsWith('overlay') && a.index != null) return <Overlay index={a.index} />;
   if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} />;
   if (inst === 'count') return <Countdown secs={a.secs} start={a.start} />;
   if (inst === 'rec') return <RecBadge />;

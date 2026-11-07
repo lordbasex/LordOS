@@ -199,6 +199,7 @@ Settings → Displays → "Screenshots and sharing": **main display** (default) 
   coordinates are mapped back through its view.
 - All displays: a capture view of the whole logical space at 100 % is painted only while someone
   watches or records (`Out cap` in `main.c`).
+- Screenshots captures each display on its own whatever this setting says (0.8.8.6): ❖⇧3 saves a file per display and ❖⇧4 selects on any of them, each capture at its display's physical resolution (`media.screenshot(app, { display: id })`, the display's `lord.screen.displays[].id`).
 - A window or area picked in Screenshots is in logical pixels; `apps/screenshots/geometry.js`
   turns it into the capture's pixels (× the main display's scale, from its origin), so at 200 % a
   window comes out whole (tests: `server/tests/screenshots_model_test.mjs`).

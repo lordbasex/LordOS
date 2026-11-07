@@ -373,7 +373,8 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     else {
         JSValueConst o = argc > 1 ? argv[1] : JS_UNDEFINED;
         MediaSrc *s = media_screenshot(app, opt_int(c, o, "x", 0, -65536, 65536), opt_int(c, o, "y", 0, -65536, 65536),
-                                       opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536));
+                                       opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536),
+                                       (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30));
         ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, "media.captureFailed", NULL);
     }
     JS_FreeCString(c, app);
