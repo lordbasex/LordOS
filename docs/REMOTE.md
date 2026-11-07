@@ -660,8 +660,9 @@ standard OpenSSH server (`openssh-server`), not something of our own.
 ![Settings → Sharing: remote login on](settings-sharing-ssh-light.png)
 
 - **It's off by default on every install:** the live ISO, a disk installed from it, the Raspberry
-  Pi image and the Debian installer. The ISO and the installed system don't even ship
-  `openssh-server`; the Pi image ships it disabled. The switch shows the real state: whether
+  Pi image and the Debian installer. Since 0.8.8.6 the ISO (and a disk installed from it) ships
+  `openssh-server` disabled and without host keys, like the Pi image; an install from an older ISO
+  or the Debian installer may not have it. The switch shows the real state: whether
   `ssh.service` (or `ssh.socket`) is enabled to start at boot, and whether `sshd` is running.
 - **Turning it on:**
   1. If `openssh-server` isn't installed, Settings installs it with the package engine's own

@@ -69,6 +69,8 @@ esac
 PKGS_BASE="initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
  iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps e2fsprogs fdisk dosfstools util-linux
  systemd-timesyncd"
+# command-line tools, the same in the ISO and the Raspberry Pi image (also Recommends of the lordos package)
+. "$ROOT/tools/iso/packages-tools.sh"
 PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit polkitd pkexec
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
@@ -274,7 +276,7 @@ mount_ch "$CH"
 echo "== paquetes"
 in_root "$CH" apt-get update -q > "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # shellcheck disable=SC2086
-in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_LORDOS $PKGS_RPI $PKGS_BT $ARCHIVE_K $PKGS_GPU $PKGS_APPS $PKGS_SSH $PKGS_SPLASH \
+in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_RPI $PKGS_BT $ARCHIVE_K $PKGS_GPU $PKGS_APPS $PKGS_SSH $PKGS_SPLASH \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # the LordOS kernels (same hooks as Raspberry Pi's: initramfs, raspi-firmware copies kernel_2712.img,
 # device trees and overlays), and an apt pin so the archive kernel of that flavour never replaces them

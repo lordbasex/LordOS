@@ -335,6 +335,10 @@ MEDIADEPS=""
 if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, libavutil59, libswscale8, libswresample5, libva2, libva-drm2"; fi
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
 RTCDEPS=", libsrtp2-1, libusrsctp2"
+# the CPU's microcode updates on amd64 (non-free-firmware, in every LordOS install's sources): a Depends, so the
+# update to 0.8.8.6 brings them to installs that never had them (they load on the next boot)
+MICROCODEDEPS=""
+[ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && MICROCODEDEPS=", intel-microcode, amd64-microcode"
 if ! objdump -p "$L/bin/lord-sessiond" 2>/dev/null | grep -q "libsrtp2"; then echo "lord-sessiond is not linked with libsrtp2: rebuild it (make -C server)" >&2; exit 1; fi
 # the signed tested-hardware snapshot, its own package (tools/iso/mkdeb-hwdata.sh): any version of format 1,
 # the first being the snapshot of 2026-10-27 (a format 2 is a Breaks in lordos-hwdata, not a change here)
@@ -349,8 +353,8 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
-Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
+Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill
 Section: x11
 Priority: optional
 Protected: yes

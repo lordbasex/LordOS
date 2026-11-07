@@ -24,9 +24,12 @@ IMG="$WORK/image"
 OUT="$WORK/out"
 ARCH=$(dpkg --print-architecture)
 case "$ARCH" in
-    amd64) PKG_KERNEL=linux-image-amd64; PKGS_GRUB="grub-efi-amd64-bin grub-pc-bin"; GRUB_DIR=x86_64-efi; SQUASHFS_BCJ="-Xbcj x86" ;;
+    # the CPU's microcode updates (Intel and AMD, non-free-firmware): without them the kernel keeps the BIOS's,
+    # often years old, and reports CPU flaws it can't mitigate (MMIO Stale Data, SRBDS, GDS on an i9-10900)
+    amd64) PKG_KERNEL=linux-image-amd64; PKGS_GRUB="grub-efi-amd64-bin grub-pc-bin"; GRUB_DIR=x86_64-efi; SQUASHFS_BCJ="-Xbcj x86"
+           PKGS_MICROCODE="intel-microcode amd64-microcode" ;;
     # UEFI only. mksquashfs has no BCJ filter for 64-bit ARM ("arm" is the 32-bit instruction set)
-    arm64) PKG_KERNEL=linux-image-arm64; PKGS_GRUB="grub-efi-arm64-bin"; GRUB_DIR=arm64-efi; SQUASHFS_BCJ="" ;;
+    arm64) PKG_KERNEL=linux-image-arm64; PKGS_GRUB="grub-efi-arm64-bin"; GRUB_DIR=arm64-efi; SQUASHFS_BCJ=""; PKGS_MICROCODE="" ;;
     *) echo "build.sh: LordOS builds a live ISO for amd64 and arm64, not $ARCH" >&2; exit 1 ;;
 esac
 ISO="$OUT/lordos-live-$VERSION-$ARCH.iso"
@@ -41,6 +44,8 @@ done
 # Live system packages. LordOS does not use GNOME or KDE: only what is below (xwayland only for X11 apps).
 PKGS_BASE="$PKG_KERNEL initramfs-tools live-boot live-boot-initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
  iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps"
+# command-line tools, the same in the ISO and the Raspberry Pi image (also Recommends of the lordos package)
+. "$ROOT/tools/iso/packages-tools.sh"
 # gsettings-desktop-schemas: without it GTK 3 apps can't read gtk-theme from the keyfile backend
 # lord-server writes, and they draw light Adwaita instead of LordOS / LordOS-dark (docs/WAYLAND.md)
 PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit polkitd pkexec
@@ -51,7 +56,7 @@ PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewi
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland pciutils usbutils"
 PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firmware-realtek firmware-atheros
- firmware-brcm80211 firmware-sof-signed wireless-regdb"
+ firmware-brcm80211 firmware-sof-signed wireless-regdb bluez-firmware"
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
@@ -65,6 +70,10 @@ PKGS_SPLASH="plymouth plymouth-label"
 # report). The base package only: open-vm-tools-desktop targets X11 (no clipboard sharing or automatic
 # resize yet). Its units carry ConditionVirtualization=vmware, so they don't run anywhere else.
 PKGS_VM="open-vm-tools"
+# the SSH server, installed but off, as in the Raspberry Pi image: Settings → Sharing → "Remote login (SSH)"
+# makes this computer's host keys and turns it on for good (ssh-set on, server/src/remote/ssh_admin.c).
+# openssh-sftp-server too: scp and sftp need it
+PKGS_SSH="openssh-server openssh-sftp-server"
 
 echo "== LordOS $VERSION: live ISO in $WORK"
 umount_all() {
@@ -112,7 +121,7 @@ in_ch() { chroot "$CH" env DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 PATH=/usr
 echo "== paquetes"
 in_ch apt-get update -q > "$WORK/apt.log" 2>&1
 # shellcheck disable=SC2086
-in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_GPU $PKGS_APPS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM \
+in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_TOOLS $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_MICROCODE $PKGS_GPU $PKGS_APPS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM $PKGS_SSH \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 cp "$DEB" "$CH/tmp/lordos.deb"
 cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
@@ -124,6 +133,10 @@ install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-blu
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$CH/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
 rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb" "$CH/tmp/lordos-rclone.deb"
+# SSH off, and no host keys in the image: every computer installed from this ISO would share them
+# (Remote login makes its own with ssh-keygen -A when turned on)
+rm -f "$CH/etc/ssh/ssh_host_"*
+in_ch systemctl disable ssh.service ssh.socket > /dev/null 2>&1 || true
 
 # 3. configuration
 echo "== configuration"
