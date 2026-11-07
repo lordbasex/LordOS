@@ -35,6 +35,18 @@ static int user_ok(const char *s) {
     return 1;
 }
 
+/* an xkb description: letters (UTF-8 too), digits, space and ( ) , . ' - / */
+static int keydesc_ok(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n >= 96) return 0;
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c >= 0x80) continue;
+        if (!(isalnum(c) || strchr(" (),.'-/", c))) return 0;
+    }
+    return 1;
+}
+
 /* letters (any UTF-8 letter byte), digits, space and . ' - ; no quotes, backslashes, control characters */
 static int fullname_ok(const char *s) {
     size_t n = s ? strlen(s) : 0;
@@ -94,12 +106,12 @@ int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errle
     const char *bad = NULL;
     u->kind = !k ? 0 : !strcmp(k, "preseed") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL : !strcmp(k, "kickstart") ? VMU_KICKSTART : 0;
     /* the strings must fit their fields: a longer one is refused, not cut */
-    static const char *const keys[] = { "user", "fullname", "hash", "hostname", "timezone", "keymap", "variant", "locale", "release", "arch", "kernel", "initrd", "append" };
-    static const size_t caps[] = { 33, 65, 128, 64, 64, 32, 32, 32, 16, 8, 128, 128, 512 };
+    static const char *const keys[] = { "user", "fullname", "hash", "hostname", "timezone", "keymap", "variant", "locale", "release", "arch", "kernel", "initrd", "append", "keydesc" };
+    static const size_t caps[] = { 33, 65, 128, 64, 64, 32, 32, 32, 16, 8, 128, 128, 512, 96 };
     for (size_t i = 0; i < sizeof keys / sizeof keys[0] && !bad; i++) { const char *v = json_str(r, keys[i]); if (v && strlen(v) >= caps[i]) bad = keys[i]; }
     CP(user, "user"); CP(fullname, "fullname"); CP(hash, "hash"); CP(hostname, "hostname"); CP(timezone, "timezone");
     CP(keymap, "keymap"); CP(variant, "variant"); CP(locale, "locale"); CP(release, "release"); CP(arch, "arch");
-    CP(kernel, "kernel"); CP(initrd, "initrd"); CP(append, "append");
+    CP(kernel, "kernel"); CP(initrd, "initrd"); CP(append, "append"); CP(keydesc, "keydesc");
     u->desktop = json_bool(r, "desktop", 1);
     json_free(&d);
     if (bad) {}
@@ -111,6 +123,7 @@ int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errle
     else if (!word_of(u->timezone, sizeof u->timezone, "/_+-", 0)) bad = "timezone";
     else if (!word_of(u->keymap, sizeof u->keymap, "_-", 0)) bad = "keymap";
     else if (u->variant[0] && !word_of(u->variant, sizeof u->variant, "_-", 0)) bad = "variant";
+    else if (!keydesc_ok(u->keydesc)) bad = "keydesc";
     else if (!word_of(u->locale, sizeof u->locale, "._@-", 0)) bad = "locale";
     else if (strcmp(u->arch, "amd64") && strcmp(u->arch, "arm64")) bad = "arch";
     else if (u->kind == VMU_KICKSTART && !word_of(u->release, sizeof u->release, ".", 0)) bad = "release";
@@ -150,7 +163,16 @@ static char *preseed(const VmUnattend *u) {
     bput(&b, "#_preseed_V1\n# Made by Machines (LordOS) for an unattended install: the account's password is only a hash here.\n");
     bput(&b, "d-i debian-installer/locale string %s\n", u->locale);
     bput(&b, "d-i keyboard-configuration/xkb-keymap select %s\n", u->keymap);
-    if (u->variant[0]) bput(&b, "d-i keyboard-configuration/variantcode string %s\n", u->variant);
+    /* the installed system's keyboard-configuration asks for a layout again when only the keymap is given (seen with
+     * the desktop task): its codes too */
+    bput(&b, "d-i keyboard-configuration/layoutcode string %s\nd-i keyboard-configuration/variantcode string %s\n"
+             "d-i keyboard-configuration/modelcode string pc105\n", u->keymap, u->variant);
+    /* and with the desktop task the installed system's keyboard-configuration still asks for the layout and its
+     * variant, which take xkb's description: the host's, for the same layout */
+    if (u->keydesc[0]) {
+        bput(&b, "keyboard-configuration keyboard-configuration/layout select %s\n", u->keydesc);
+        if (!u->variant[0]) bput(&b, "keyboard-configuration keyboard-configuration/variant select %s\n", u->keydesc);
+    }
     bput(&b, "d-i netcfg/choose_interface select auto\n");
     bput(&b, "d-i netcfg/get_hostname string %s\nd-i netcfg/hostname string %s\nd-i netcfg/get_domain string\n", u->hostname, u->hostname);
     bput(&b, "d-i mirror/country string manual\nd-i mirror/http/hostname string deb.debian.org\nd-i mirror/http/directory string /debian\n"

@@ -2842,8 +2842,8 @@ static void unattended_done(void) {
         if (fd >= 0) { struct stat st; if (!fstat(fd, &st) && st.st_size > 0 && !strcmp(names[i], "seed.img")) { static const char z[4096]; for (off_t o = 0; o < st.st_size; o += (off_t)sizeof z) if (write(fd, z, sizeof z) < 0) break; } close(fd); }
         unlink(p);
     }
-    snprintf(p, sizeof p, "%s/unattended", S.disks);
-    rmdir(p);
+    /* the empty folder stays: lord-vm's own Landlock lets it remove files in the machine's folder, not folders; a start
+     * only looks for unattended/cmdline */
     VmMachine m;
     char err[256];
     if (!vm_machine_load(S.dir, &m, err, sizeof err)) {

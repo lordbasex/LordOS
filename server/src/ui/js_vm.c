@@ -344,6 +344,30 @@ static int prop_int(JSContext *c, JSValueConst o, const char *k) { JSValue v = J
 
 static void host_defaults(char *lang, size_t ln, char *tz, size_t tn, char *km, size_t kn);
 
+/* an xkb layout's description ("English (US)") from the system's rules, for an unattended Debian install: "" if not
+ * found. Only the "! layout" section, a line "  <code>  <description>" */
+static void xkb_desc(const char *code, char *out, size_t n) {
+    out[0] = 0;
+    FILE *f = fopen("/usr/share/X11/xkb/rules/base.lst", "re");
+    if (!f) return;
+    char line[256];
+    int in = 0;
+    size_t cl = strlen(code);
+    while (fgets(line, sizeof line, f)) {
+        if (line[0] == '!') { in = !strncmp(line, "! layout", 8); continue; }
+        if (!in) continue;
+        const char *p = line;
+        while (*p == ' ') p++;
+        if (strncmp(p, code, cl) || p[cl] != ' ') continue;
+        p += cl;
+        while (*p == ' ') p++;
+        size_t l = strcspn(p, "\n");
+        if (l < n) { memcpy(out, p, l); out[l] = 0; }
+        break;
+    }
+    fclose(f);
+}
+
 /* an unattended install's spec for lord-vm --unattended (vm/vmunattend.h): the object's words as JSON, the password
  * replaced by its SHA-512 crypt hash, in a 0600 file of the runtime folder that lord-vm reads and removes. 0, or -1 */
 static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
@@ -362,6 +386,15 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
             if (sv) JS_FreeCString(c, sv);
         }
         JS_FreeValue(c, v);
+    }
+    {
+        /* the keyboard layout's description, for installers that ask for it by name (Debian's desktop) */
+        JSValue vk = JS_GetPropertyStr(c, o, "keymap");
+        const char *km = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL;
+        char desc[96], q[200];
+        if (km && strlen(km) < 32) { xkb_desc(km, desc, sizeof desc); if (desc[0] && json_quote(q, sizeof q, desc)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"keydesc\":%s", q); }
+        if (km) JS_FreeCString(c, km);
+        JS_FreeValue(c, vk);
     }
     JSValue vd = JS_GetPropertyStr(c, o, "desktop");
     if (JS_IsBool(vd)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"desktop\":%s", JS_ToBool(c, vd) ? "true" : "false");

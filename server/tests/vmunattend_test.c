@@ -26,7 +26,7 @@ static const char *spec(const char *kind, const char *over) {
         { "kind", NULL }, { "user", "\"ana\"" }, { "fullname", "\"Ana Pérez\"" }, { "hash", "\"" HASH "\"" }, { "hostname", "\"debian-13\"" },
         { "timezone", "\"America/Argentina/Buenos_Aires\"" }, { "keymap", "\"latam\"" }, { "variant", "\"\"" }, { "locale", "\"C.UTF-8\"" },
         { "release", "\"45\"" }, { "arch", "\"amd64\"" }, { "kernel", "\"install.amd/vmlinuz\"" }, { "initrd", "\"install.amd/initrd.gz\"" },
-        { "append", "\"auto=true priority=critical inst.stage2=hd:LABEL={label} --- quiet\"" },
+        { "append", "\"auto=true priority=critical inst.stage2=hd:LABEL={label} --- quiet\"" }, { "keydesc", "\"Spanish (Latin American)\"" },
     };
     char kq[64];
     snprintf(kq, sizeof kq, "\"%s\"", kind);
@@ -165,7 +165,7 @@ int main(void) {
         { "kernel", "\"kernel\":\"/install.amd/vmlinuz\"" }, { "kernel", "\"kernel\":\"../x\"" }, { "initrd", "\"initrd\":\"a//b\"" },
         { "append", "\"append\":\"a; rm -rf /\"" }, { "append", "\"append\":\"a\\nb\"" }, { "append", "\"append\":\"$(x)\"" },
         { "arch", "\"arch\":\"riscv64\"" }, { "kind", "\"kind\":\"windows\"" },
-        { "user", "\"user\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"" }, { "keymap", "\"keymap\":\"la tam\"" },
+        { "user", "\"user\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"" }, { "keymap", "\"keymap\":\"la tam\"" }, { "keydesc", "\"keydesc\":\"Spanish\\nx\"" }, { "keydesc", "\"keydesc\":\"a \\\"b\\\"\"" },
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         char b[2400], lab[96];
@@ -187,7 +187,10 @@ int main(void) {
     T("preseed: account and hash", a && strstr(a, "d-i passwd/username string ana\n") && strstr(a, "d-i passwd/user-password-crypted password " HASH "\n"));
     T("preseed: no plain password question", a && !strstr(a, "passwd/user-password password") && !strstr(a, "user-password-again"));
     T("preseed: desktop, agent, zone, keyboard", a && strstr(a, "gnome-desktop") && strstr(a, "qemu-guest-agent") &&
-      strstr(a, "time/zone string America/Argentina/Buenos_Aires") && strstr(a, "xkb-keymap select latam") && strstr(a, "Ana Pérez"));
+      strstr(a, "time/zone string America/Argentina/Buenos_Aires") && strstr(a, "xkb-keymap select latam") && strstr(a, "Ana Pérez") &&
+      strstr(a, "keyboard-configuration/layoutcode string latam\n") && strstr(a, "keyboard-configuration/variantcode string \n") &&
+      strstr(a, "keyboard-configuration keyboard-configuration/layout select Spanish (Latin American)\n") &&
+      strstr(a, "keyboard-configuration keyboard-configuration/variant select Spanish (Latin American)\n"));
     free(a);
     s = spec("preseed", "\"desktop\":false");
     vmu_parse(s, strlen(s), &u, err, sizeof err);

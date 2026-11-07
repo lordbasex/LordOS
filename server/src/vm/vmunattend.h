@@ -31,6 +31,7 @@ typedef struct {
     char timezone[64];      /* Area/City */
     char keymap[32];        /* xkb layout */
     char variant[32];       /* xkb variant, may be "" */
+    char keydesc[96];       /* the layout's xkb description ("English (US)"), may be "": Debian's desktop asks for it */
     char locale[32];        /* ll_CC.UTF-8 */
     char release[16];       /* the system's release (Fedora's mirror list: "45") */
     char arch[8];           /* amd64 | arm64 */
