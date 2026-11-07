@@ -144,7 +144,8 @@ export function installCloudMock(home, scenario = '') {
       p.up = { files: 14, bytes: 140 * MB, done: 0, name: 'IMG_4101.jpg' };
       st.accounts[2].state = 'offline';
       const w = st.accounts[1];
-      st.conflicts = [{ path: `${w.mount}/Projects/Proposal v3.odt`, kept: `${w.mount}/Projects/Proposal v3 (this computer).odt`, account: w.id, at: Date.now() }];
+      // ours keeps the name; the cloud's version is saved next to it (17.2 item 23)
+      st.conflicts = [{ path: `${w.mount}/Projects/Proposal v3.odt`, kept: `${w.mount}/Projects/Proposal v3 (cloud copy).odt`, account: w.id, at: Date.now() }];
       push();
     }, 4000);
   }
@@ -284,13 +285,30 @@ export function installCloudMock(home, scenario = '') {
       let l = list.find((x) => x.path === path);
       if (!l) { l = { path, url: `https://share.example.test/s/${Math.random().toString(36).slice(2, 12)}`, made: Date.now() / 1000 }; list.push(l); }
       l.expires = days ? (Date.now() + days * 864e5) / 1000 : 0;
+      if (a.kind === 's3' && (!days || days > 7)) l.expires = (Date.now() + 7 * 864e5) / 1000;   // 7 days at most (17.2 item 29)
       push();
-      return { url: l.url };
+      return { url: l.url, expires: l.expires ? l.expires * 1000 : null };
     },
     unlink(path) {
       const a = ofPath(path);
       if (a && a.kind === 's3') return Promise.resolve({ error: 'cloud.cantRevoke', expires: Date.now() + 5 * 864e5 });
       if (a && links[a.id]) links[a.id] = links[a.id].filter((x) => x.path !== path); push(); return { ok: true }; },
+    // a walk of the account's folder (17.2 item 31), names matched without case, a little later
+    search(path, needle) {
+      const out = [];
+      const q = String(needle).toLowerCase();
+      const walk = (d, depth) => {
+        let list = [];
+        try { list = lord.fs.list(d); } catch (e) { return; }
+        for (const e of list) {
+          const p = `${d}/${e.name}`;
+          if (e.name.toLowerCase().includes(q)) out.push({ path: p, dir: !!e.dir, size: e.size || 0, mtime: e.mtime || 0 });
+          if (e.dir && depth < 16) walk(p, depth + 1);
+        }
+      };
+      walk(path, 0);
+      return new Promise((r) => setTimeout(() => r({ hits: out.slice(0, 500), complete: out.length <= 500 }), 700));
+    },
     links: (id) => JSON.parse(JSON.stringify(links[id] || [])),
     pause(id) { for (const a of st.accounts) if (!id || a.id === id) { a.prev = a.state === 'paused' ? a.prev : a.state; a.state = 'paused'; } push(); },
     resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; push(); },

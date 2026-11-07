@@ -54,6 +54,7 @@ typedef struct {
     int new_acc;                    /* added in this session and not finished: removed if its setup fails */
     char trust_kind;                /* 'h' host keys, 'H' to replace the kept ones, 'c' a certificate, shown and waiting (cloud_trust.c) */
     int trust_from_other;           /* this add took another account's known key for the same server (N1) */
+    int reconnect;                  /* its remote is made again (a new key kept for it, N4) */
     char fp_old[256], fp_new[256];  /* a key or certificate that changed: both, for the state (U10) */
     time_t pending_since;
     char *trust_data;
@@ -62,6 +63,10 @@ typedef struct {
     int pend_upd;
     time_t check_at;                /* the next listing that checks a mounted account still answers */
     char *checked[Q_MAX];           /* queued files the conflict rule already looked at (7.2) */
+#define SYNCED_MAX 64
+    struct { char rel[CLOUD_REL_MAX + 1]; char fp[256]; } synced[SYNCED_MAX];   /* our last uploads, as the cloud has them (N5) */
+    int nsynced;
+    int precision_s;                /* the backend's modtime precision, seconds (fsinfo) */
     int nchecked;
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */
     char *pending_secret;           /* not saved yet (keyring locked): retried */
@@ -94,7 +99,8 @@ int   cl_next_req(void);
 /* cloud_trust.c */
 int   ct_needed(const Acc *a, const char *sec);
 int   ct_check(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);   /* 0 ok, 1 a question, -1 refused */
-int   ct_accept(Acc *a);
+int   ct_accept(Acc *a, int apply_others);     /* apply_others: a new key also for the accounts that kept the same old one (N4) */
+void  ct_fingerprints(Acc *a, const char *sec, char *old, size_t on, char *now, size_t nn);   /* the kept and (one probe) the server's */
 int   ct_key_mismatch(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);
 int   ct_probed_lately(const Acc *a);
 void  ct_refuse(Acc *a);

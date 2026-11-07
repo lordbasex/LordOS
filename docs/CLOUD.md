@@ -943,3 +943,41 @@ The closed rc method table has 27 methods now (`operations/list`, `operations/st
     entries, 16 levels and 500 hits, names matched without case. Chosen over a recursive `operations/list` with a filter:
     the walk sees exactly what Files shows and its cost is bounded here. `lord.fs.search` still answers nothing for a cloud
     folder; Files calls `cloud.search` there.
+
+### 18.7 The interface of 17.2 items 19 to 31
+
+- **Search in a cloud folder** goes to `cloud.search(path, needle)` (local search unchanged): "Searching <account>…" in the
+  search bar while it runs, the hits when they come, and "Search stopped early: showing the first N" when `complete` is
+  false. Only the latest search's answer is shown.
+- **Conflicts** follow 17.2 item 23: the notification says "<name> also changed in <account>. Your version kept its name;
+  the other one is next to it as “<kept name>”." (`kept` is the cloud's copy, "name (cloud copy).ext"), with Show Both in
+  Files.
+- **Opening a file only in the cloud** while its account is offline, locked or not mounted shows the offline message
+  (`cantOpen`). A host-key question with `warning: 'cloud.hostKeyOther'` shows that warning above the fingerprint.
+- **Get Info** of a folder on a cloud or network mount: `lord.fs.du` answers `{ remote: true }`, so the size is the
+  listing's when known, else "—"; it never stays on "Calculating…".
+- **Links** show the expiry the provider answered (`{ url, expires }`); S3 offers only 1 day and 7 days.
+- **5000 entries**: a cloud folder whose listing came back with exactly 5000 says "Showing the first 5,000 items" in the
+  status bar (`lord.fs.list`'s bound, item 24).
+32. **Every upload attempt goes through the conflict rule (B18).** rclone's VFS retries a failed upload by itself (every
+    10 s); now an item whose attempt failed (`tries > 0`) is held again (expiry pushed far out), its "looked at" mark dropped,
+    and the account listed at once. While the account is offline every waiting file is held, and the check itself holds
+    the file when the cloud can't answer (`operations/stat` failing is never "no conflict"). Once the account answers, each
+    file is checked again and either goes up or, if the cloud's copy changed meanwhile, the cloud's version is copied to
+    "name (cloud copy).ext" first. **Measured** with the server really stopped (its process and sessions killed), an edit
+    on each side and the server back: WebDAV, SFTP, FTP and S3 (rclone's own servers as stand-ins) all keep the cloud's edit
+    as the cloud copy and send ours under the name. SMB and a real MinIO were not run here. rclone's FTP (and SMB) backend
+    keeps the pooled connection the stopped server closed and fails with it ("broken pipe") for as long as it runs, so
+    a "broken pipe" is `cloud.unreachable` and, for an FTP or SMB account, a listing or check that fails that way drops
+    rclone's cached remotes (`fscache/clear`, added to the table) and tries once more: the mount's own uploads recover
+    with it (measured on FTP).
+33. **What this computer last knew (N5).** After each of our uploads the cloud's object is looked at once and its fingerprint
+    kept per file (rclone's VFS keeps the one from when the file came down), so a file we uploaded before isn't a conflict
+    with itself. A hash decides when both sides have one; a modtime counts only beyond the backend's precision
+    (`operations/fsinfo` `Precision`: 1 s for SFTP, more for FTP; none when the backend has no modtimes).
+34. **SMB's "The attempted logon is invalid…"** is `cloud.authFailed`.
+35. **A changed key in the state (U12):** an account whose listing fails with `cloud.hostKeyChanged` carries `old` (from its
+    known_hosts) and `new` (one probe, once).
+36. **Other accounts on the server (N4).** `answer(state, 'trust', { applyToOthers })` (default true): when the owner trusts
+    a host's new key, the other accounts that kept the same old key for that host and port get it too, and are made again
+    in rclone (rclone reads known_hosts when it makes a remote) and listed.

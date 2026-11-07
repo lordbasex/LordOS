@@ -105,7 +105,7 @@
   "cloud.certChanged": "El certificado de este servidor cambió, así que se rechazó la conexión: puede ser un ataque.",
   "cloud.listFailed": "No se pudieron listar los archivos de la cuenta",
   "cloud.notTrusted": "No se confió en el servidor, así que no se agregó la cuenta",
-  "cloud.hostKeyOther": "Otra cuenta conoce una clave distinta para este servidor",
+  "cloud.hostKeyOther": "Otra cuenta conoce una clave distinta para este servidor. Consultá con su administrador antes de confiar en esta.",
   "cloud.tooManyAttempts": "El servidor está rechazando nuevas conexiones de esta computadora por un rato: esperá un minuto y probá de nuevo",
   "bench.bootTestFailed": "No se pudo guardar el estado de la prueba de arranque",
   "bench.bootTestLive": "La prueba de arranque no funciona en la sesión en vivo: nada de lo que registra sobrevive a un reinicio",

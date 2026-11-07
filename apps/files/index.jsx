@@ -6,13 +6,13 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel, cloud, errorText,
+  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
 import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
-import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs } from './locations.js';
+import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
 import {
   fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
   openersFor, openEntry,
@@ -235,10 +235,26 @@ export default function Files() {
   const baseLoc = tab.loc;
   const loc = debounced ? { type: 'search', root: scope === 'home' || baseLoc.type !== 'dir' ? fs.home() : baseLoc.path, query: debounced } : baseLoc;
   const [netState, searchLan] = useLan(baseLoc.type === 'network', (m) => setMsg(m));
+  // a search inside a cloud account goes to cloud.search, off the interface's thread (docs/CLOUD.md 17.2 item 31)
+  const cloudSt = useCloud();
+  const searchAcc = loc.type === 'search' ? cloudModel.accountOf(loc.root, cloudSt && cloudSt.accounts) : null;
+  const [cs, setCs] = useState(null);            // { key, busy, hits, complete, error }
+  const csKey = useRef('');
+  const searchKey = searchAcc && loc.query ? `${loc.root}|${loc.query}` : '';
+  useEffect(() => {
+    if (!searchKey) { csKey.current = ''; setCs(null); return; }
+    if (csKey.current === searchKey) return;          // this search already ran or runs: only its own answer counts
+    csKey.current = searchKey;
+    setCs({ key: searchKey, busy: true, hits: [] });
+    cloud.search(loc.root, loc.query).then((r) => {
+      if (csKey.current === searchKey) setCs({ key: searchKey, busy: false, hits: (r && r.hits) || [], complete: !r || r.complete !== false, error: r && r.error });
+    });
+  }, [searchKey]);
   const [entries, error] = useMemo(() => {
     if (loc.type === 'network') return [hostEntries(netState, volumes), null];
+    if (searchAcc) return [cloudModel.searchEntries(cs && cs.hits), cs && cs.error ? errorText(cs.error) : null];
     try { return [loadEntries(loc, { hidden, launcherApps }), null]; } catch (e) { return [[], e.message]; }
-  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer]);
+  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
   // what the list's extra columns need, asked once per file until something changes
@@ -440,7 +456,7 @@ export default function Files() {
     if (e.netWay) { openWay(e.netWay, e.netParent); return; }
     if (e.netHost) { if (e.ways[0]) openWay(e.ways[0], e.netHost); else setMsg(tr('files.net.nothing')); return; }
     if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; }
-    if (!e.dir && cf.status[e.path]?.st === 'cloud' && cf.accountOf(e.path)?.state === 'offline') { setOfflineAsk(e); return; }
+    if (!e.dir && cloudModel.cantOpen(cf.accountOf(e.path), cf.status[e.path])) { setOfflineAsk(e); return; }
     if (prefs.foldersInTabs && e.dir && !e.arc && !e.app) { newTabAt({ type: 'dir', path: e.path }); return; }
     openEntry(e, ctx);
   };
@@ -892,6 +908,10 @@ export default function Files() {
               <ScopeChip key={sc} t={t} on={scope === sc || baseLoc.type !== 'dir'} onClick={() => { setScope(sc); setPrefs({ lastScope: sc }); }}
                 label={sc === 'here' ? `“${locTitle(baseLoc, dirs)}”` : tr('files.place.home')} />
             ))}
+            {searchAcc && cs && (cs.busy || !cs.complete) ? (
+              <Text key={cs.busy ? 'busy' : 'partial'} style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {cs.busy ? tr('cloud.search.running', { name: searchAcc.name }) : tr('cloud.search.partial', { count: cs.hits.length })}</Text>
+            ) : null}
           </View>
         )}
         {/* tabs */}
@@ -946,6 +966,7 @@ export default function Files() {
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {msg || (loc.type === 'network' ? lanStatus(netState, flat.length) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+                curAcc && entries.capped ? tr('cloud.listCapped', { count: formatNumber(LIST_CAP) }) : '',
                 curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '))}
             </Text>
           )}

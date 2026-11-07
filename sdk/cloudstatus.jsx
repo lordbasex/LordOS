@@ -122,7 +122,7 @@ function announce(ev, st) {
       ] });
   } else if (ev.type === 'conflict') {
     const name = String(ev.path).split('/').pop();
-    const kept = ev.kept ? String(ev.kept).split('/').pop() : conflictName(name, t('cloud.thisComputer'));
+    const kept = ev.kept ? String(ev.kept).split('/').pop() : conflictName(name, t('cloud.cloudCopy'));   // the cloud's version, next to ours (17.2 item 23)
     notify({ app: 'files', label, icon, title: t('cloud.notify.conflictTitle'), body: t('cloud.notify.conflictBody', { file: name, account: ev.name, kept }),
       actions: [{ id: 'show', label: t('cloud.notify.showBoth'), primary: true, run: () => openFiles(String(ev.path).split('/').slice(0, -1).join('/'), name) }] });
   }

@@ -120,11 +120,13 @@ export function InfoPanel({ e, onClose, openers, extra }) {
     if (!e || e.app) return undefined;
     try { setSt(lord.fs.stat(e.path)); } catch (err) { setSt({ error: err.message }); }
     if (!e.dir) return undefined;
-    const id = setTimeout(() => { try { setDu(lord.fs.du(e.path, 900)); } catch (err) { /* no permission */ } }, 30);
+    // a cloud or network mount answers { remote: true } without walking it: the listing's size, or nothing
+    const id = setTimeout(() => { try { setDu(lord.fs.du(e.path, 900) || { remote: true }); } catch (err) { setDu({ failed: true }); } }, 30);
     return () => clearTimeout(id);
   }, [e?.path]);
   if (!e) return null;
-  const size = e.dir ? (du ? `${formatBytes(du.size)}${du.complete ? '' : '+'} · ${tr('files.info.items', { count: du.files + du.dirs })}` : tr('files.info.calculating')) : formatBytes(st?.size ?? e.size);
+  const size = e.dir ? (!du ? tr('files.info.calculating') : du.remote || du.failed || du.size == null ? (e.size > 0 ? formatBytes(e.size) : '—')
+    : `${formatBytes(du.size)}${du.complete ? '' : '+'} · ${tr('files.info.items', { count: du.files + du.dirs })}`) : formatBytes(st?.size ?? e.size);
   return (
     // a cloud item's card is taller (status, account, sizes, Keep): it takes the window's height and its body scrolls
     <View style={{ position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: 16, top: 56, ...(extra ? { bottom: 16 } : null), width: 360, borderRadius: 12,

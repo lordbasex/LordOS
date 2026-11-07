@@ -118,7 +118,7 @@ int main(void) {
             while (got_req != req && ms() < end) pump(100);
             out(got_req == req ? strdup(got_reply) : strdup("{\"error\":\"timeout\"}"));
         } else if (!strcmp(cmd, "links") && a1) out(cloud_links(a1));
-        else if (!strcmp(cmd, "answer") && a1) { int req = 0; char *r = cloud_answer(a1, rest ? rest : "", &req); later(r, req); }
+        else if (!strcmp(cmd, "answer") && a1) { int req = 0; char *r = cloud_answer(a1, rest ? rest : "", 1, &req); later(r, req); }
         else if (!strcmp(cmd, "trash") && a1) { int req = 0; char *r = cloud_empty_trash(a1, &req); later(r, req); }
         else if (!strcmp(cmd, "measure") && a1) { int req = 0; char *r = cloud_measure(a1, &req); later(r, req); }
         else if (!strcmp(cmd, "search") && a1 && rest) { int req = 0; char *r = cloud_search(a1, rest, &req); later(r, req); }

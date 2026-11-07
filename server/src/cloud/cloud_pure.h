@@ -44,6 +44,7 @@ typedef enum {
     RCM_LIST,           /* operations/list of an account's top folder only: a new account is checked before it counts */
     RCM_STAT,           /* operations/stat of one file about to go up: the conflict rule (7.2) */
     RCM_COPYFILE,       /* operations/copyfile, inside one account only: the cloud's version kept before ours replaces it */
+    RCM_FSCACHE_CLEAR,  /* fscache/clear: FTP and SMB keep a dead connection after the server restarts (B18) */
     RCM_COUNT
 } RcMethod;
 
@@ -100,7 +101,7 @@ const char      *cloud_failure_code(const char *msg);
 void             cloud_clean_text(const char *in, char *out, size_t n);
 /* the conflict rule (7.2): did the object in the cloud change since this copy came down? fingerprint as kept in vfsMeta,
  * the object now (size, modtime in seconds or < 0 unknown, its hashes). 1 changed, 0 the same, -1 can't tell */
-int              cloud_remote_changed(const char *fingerprint, long long size, double mtime, const char *const *hashes, int nh);
+int              cloud_remote_changed(const char *fingerprint, long long size, double mtime, const char *const *hashes, int nh, int precision_s);
 /* "dir/name (cloud copy).ext", n > 1 adds " n" before the extension: 0, -1 too long */
 int              cloud_conflict_name(const char *rel, int n, char *out, size_t cap);   /* config/create's questions LordOS answers itself */
 /* a question's state as JS sees it, "<account id>:<rclone's state>": 0 and both parts */

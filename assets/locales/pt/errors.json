@@ -105,7 +105,7 @@
   "cloud.certChanged": "O certificado deste servidor mudou, por isso a conexão foi recusada: pode ser um ataque.",
   "cloud.listFailed": "Não foi possível listar os arquivos da conta",
   "cloud.notTrusted": "O servidor não foi considerado confiável, então a conta não foi adicionada",
-  "cloud.hostKeyOther": "Outra conta conhece uma chave diferente para este servidor",
+  "cloud.hostKeyOther": "Outra conta conhece uma chave diferente para este servidor. Confirme com o administrador antes de confiar nesta.",
   "cloud.tooManyAttempts": "O servidor está recusando novas conexões deste computador por um tempo: espere um minuto e tente de novo",
   "bench.bootTestFailed": "Não foi possível salvar o estado do teste de inicialização",
   "bench.bootTestLive": "O teste de inicialização não funciona na sessão ao vivo: nada do que ele registra sobrevive a uma reinicialização",

@@ -117,7 +117,6 @@
   "pauseAll": "Pause All",
   "resumeAll": "Resume All",
   "recent": "Recent",
-  "thisComputer": "this computer",
   "ago.now": "now",
   "ago.min": {
     "one": "{count} min",
@@ -165,7 +164,7 @@
   "notify.signinTitle": "“{name}” needs you to sign in again",
   "notify.signinBody": "The provider stopped accepting the saved sign-in. Changes made here wait on this computer until you sign in. Files you kept still open.",
   "notify.conflictTitle": "Changed on another device too",
-  "notify.conflictBody": "{file} changed in {account} while this computer was offline. The cloud's version keeps the name; yours is next to it as “{kept}”.",
+  "notify.conflictBody": "{file} also changed in {account}. Your version kept its name; the other one is next to it as “{kept}”.",
   "notify.showBoth": "Show Both in Files",
   "notify.fullTitle": "“{name}” is full",
   "notify.fullBody": {
@@ -364,5 +363,12 @@
   "trust.old": "Before",
   "trust.new": "Now",
   "trust.trustNew": "Trust the New Key",
-  "cred.noteSftp": "The first time, LordOS shows the server's key fingerprint to compare with its administrator's. Passwords and keys go to the keyring."
+  "cred.noteSftp": "The first time, LordOS shows the server's key fingerprint to compare with its administrator's. Passwords and keys go to the keyring.",
+  "cloudCopy": "cloud copy",
+  "search.running": "Searching {name}…",
+  "search.partial": {
+    "one": "Search stopped early: showing the first {count}",
+    "other": "Search stopped early: showing the first {count}"
+  },
+  "listCapped": "Showing the first {count} items"
 }

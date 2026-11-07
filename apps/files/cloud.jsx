@@ -130,11 +130,12 @@ export function ShareSheet({ e, cf, onClose }) {
   const existing = useMemo(() => M.linkOf(cloud.links(acc.id), e.path), [e.path]);
   const [expire, setExpire] = useState(existing ? null : M.DEFAULT_EXPIRY);
   const [link, setLink] = useState(existing ? existing.url : null);
+  const [until, setUntil] = useState(existing ? existing.expires : null);     // what the provider answered (S3: 7 days at most)
   const [err, setErr] = useState('');
   const website = useMemo(() => cloud.websiteUrl(acc.id), [acc.id]);
   useEffect(() => addListener('keydown', (ev) => { if (ev.key === 'Escape') onClose(); }), []);
   const make = (x) => {
-    Promise.resolve(cloud.link(e.path, x)).then((r) => { if (r && r.url) { setLink(r.url); setErr(''); } else setErr(linkError(r)); });
+    Promise.resolve(cloud.link(e.path, x)).then((r) => { if (r && r.url) { setLink(r.url); setUntil(r.expires || null); setErr(''); } else setErr(linkError(r)); });
   };
   useEffect(() => { if (!existing && acc.linksSupported) make(M.DEFAULT_EXPIRY); }, []);
   const copy = () => { if (link) { clipboard.set(link); toast.set(tr('cloud.linkCopied')); } };
@@ -162,7 +163,8 @@ export function ShareSheet({ e, cf, onClose }) {
             </View>
             <View style={{ gap: 6 }}>
               <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('cloud.share.expires')}</Text>
-              <Segmented fill value={expire} onChange={(x) => { setExpire(x); make(x); }} options={M.EXPIRY.map((x) => [x, tr(`cloud.expiry.${x}`)])} appearance="neutral" />
+              <Segmented fill value={expire} onChange={(x) => { setExpire(x); make(x); }} options={M.expiryChoices(acc).map((x) => [x, tr(`cloud.expiry.${x}`)])} appearance="neutral" />
+              {link ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{until ? tr('cloud.link.expires', { date: formatDate(new Date(M.toMs(until)), 'short') }) : tr('cloud.link.never')}</Text> : null}
             </View>
           </>
         ) : <Text style={{ fontSize: typeScale.body, color: t.textDim, textAlign: 'start' }}>{tr('cloud.link.unsupported')}</Text>}

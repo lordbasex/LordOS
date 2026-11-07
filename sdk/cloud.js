@@ -72,7 +72,8 @@ export const cloud = {
   // { id } | { question: { state, name, help, type, examples, isPassword, required, default } } | { error } (17.2 item 3)
   add: (kind, name, fields = {}, opts = {}) => (has() ? later(lord.cloud.add(String(kind), String(name), fields,
     { accountId: opts.accountId ? String(opts.accountId) : '' })) : Promise.resolve({ error: 'cloud.unavailable' })),
-  answer: (state, value) => maybe('answer', String(state), String(value ?? '')),
+  // opts.applyToOthers (default true): a host's new key also for the other accounts that kept its old one (N4)
+  answer: (state, value, opts = {}) => maybe('answer', String(state), String(value ?? ''), { applyToOthers: opts.applyToOthers !== false }),
   emptyTrash: (id) => maybe('emptyTrash', String(id)),
   measure: (id) => maybe('measure', String(id)),
   cancelMeasure: (id) => maybe('cancelMeasure', String(id)),
