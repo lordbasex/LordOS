@@ -991,7 +991,7 @@ The closed rc method table has 27 methods now (`operations/list`, `operations/st
 
 The "The server's identity changed" step has a check box, on by default, "Also use the new key for my other accounts on
 this server (N)", shown only when other accounts kept the same old key; its value goes to
-`cloud.answer(state, 'trust', { applyToOthers })`. Those accounts are found by their `old` fingerprint (`othersWithKey`),
-the account being updated left out; State now also carries each account's `host` and `port` (17.2 item 37), so the
-count can be made exact. An account with `cloud.hostKeyChanged` shows
+`cloud.answer(state, 'trust', { applyToOthers })`. The accounts counted (`othersWithKey`) are those with the same host and
+port (State's `host`/`port`, 17.2 item 37; 22 when no port), or, when an account's host is hidden by a locked keyring or
+absent, the same `old` fingerprint; the account being updated is left out. An account with `cloud.hostKeyChanged` shows
 its own `old` and `new` in its status box.
