@@ -993,7 +993,11 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     firefox package preinst maintainer script subprocess failed with exit status 1*): Ubuntu's firefox deb only
     installs the snap, which can't happen in the installer's target where snapd isn't running, and subiquity then
     waits on its error screen. The autoinstall now pins firefox out (`apt.preferences`, priority -1) when it adds the
-    desktop (a browser can come from the Store afterwards); `vmunattend-test` 83.
+    desktop (a browser can come from the Store afterwards); `vmunattend-test` 83. With that, the card's run (2 vCPU, 3 GB, 24 GB; the image
+    already stored) installed with nothing typed in **23 minutes** (08:02:39 to 08:25:58), the installer's restart
+    ended the first start, lord-vm removed the seed disk and the ISO, and the machine started again into the installed
+    system: GDM with the account `tester` (`u-14`), and the password typed in the assistant logged in to the Ubuntu
+    desktop (`u-15`). Shut Down through the guest agent: off in 5.5 s. Its disk took 8.9 GB.
   - **Not changed, noted:** the first start's picture can stay on *Display output is not active* while the installer
     runs at the firmware's resolution, until the window asks for a size (seen once with Debian; a start with the
     window already sized showed the installer at once).
