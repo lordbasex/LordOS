@@ -6,6 +6,7 @@
 #include "../wl/wl.h"
 #include "ui.h"
 #include "../term/term.h"
+#include "../term/termfill.h"
 #include "js_sys.h"
 #include "js_err.h"
 
@@ -647,7 +648,33 @@ static JSValue f_clip_set(JSContext *c, JSValueConst this_val, int argc, JSValue
     return JS_UNDEFINED;
 }
 
+/* Passwords in the Terminal (term/termfill.c): the program's password prompt now, or null */
+static JSValue f_asking(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    Session *s = arg_session(c, argv[0]);
+    char prompt[200];
+    return s && term_asks_secret(s, prompt, sizeof prompt) ? JS_NewString(c, prompt) : JS_NULL;
+}
+
+/* fill(sid, vault, entry, field, index): the entry's field goes from lord-vault to the pty without passing
+ * through here; the "fill" event says how it ended. false when it couldn't be asked for. */
+static JSValue f_fill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 5) return JS_FALSE;
+    int32_t sid = 0, idx = 0;
+    JS_ToInt32(c, &sid, argv[0]);
+    JS_ToInt32(c, &idx, argv[4]);
+    const char *v = JS_ToCString(c, argv[1]), *e = JS_ToCString(c, argv[2]), *f = JS_ToCString(c, argv[3]);
+    int ok = v && e && f && termfill_start(sid, v, e, f, idx) == 0;
+    if (v) JS_FreeCString(c, v);
+    if (e) JS_FreeCString(c, e);
+    if (f) JS_FreeCString(c, f);
+    return JS_NewBool(c, ok);
+}
+
 static const JSCFunctionListEntry term_funcs[] = {
+    JS_CFUNC_DEF("asking", 1, f_asking),
+    JS_CFUNC_DEF("fill", 5, f_fill),
     JS_CFUNC_DEF("create", 1, f_create),
     JS_CFUNC_DEF("list", 0, f_list),
     JS_CFUNC_DEF("close", 1, f_close),

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -36,6 +37,7 @@ static double now_ms(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
 }
+static void check_secret(Session *s);
 
 /* ---- default profile: the "Classic" colors ---- */
 
@@ -428,6 +430,7 @@ static void flush_out(Session *s) {
         if (w <= 0) break;
         memmove(s->out, s->out + w, s->out_len - (size_t)w);
         s->out_len -= (size_t)w;
+        explicit_bzero(s->out + s->out_len, (size_t)w);    /* what was typed (a password from Passwords) isn't left behind */
     }
 }
 
@@ -485,6 +488,7 @@ void term_dispatch(int id, short revents) {
         break;
     }
     if (total) {
+        check_secret(s);
         if (s->log) fflush(s->log);
         s->screen_changed = 1;
         double now = now_ms();
@@ -492,6 +496,27 @@ void term_dispatch(int id, short revents) {
         s->blink_on = 1;
         if (now - s->last_event >= 1000) { s->t.events |= EV_OUTPUT; s->last_event = now; }
     }
+}
+
+/* ---- a program asking for a password (Passwords in the Terminal, docs/TERMINAL.md) ----
+ * Read from the pty itself, not guessed from the text: getpass(3) and its kin turn echo off and keep line
+ * input. The prompt must also name a password, so a program that hides input for another reason (a raw
+ * editor keeps ICANON off anyway) isn't offered one. */
+
+static void check_secret(Session *s) {
+    char prompt[sizeof s->secret_prompt];
+    int on = term_asks_secret(s, prompt, sizeof prompt);
+    s->secret_checked = now_ms();
+    if (on == s->secret && (!on || !strcmp(prompt, s->secret_prompt))) return;
+    s->secret = on;
+    snprintf(s->secret_prompt, sizeof s->secret_prompt, "%s", on ? prompt : "");
+    s->t.events |= EV_SECRET;
+}
+
+void term_fill_done(Session *s, const char *result) {
+    if (!s) return;
+    snprintf(s->fill_result, sizeof s->fill_result, "%s", result);
+    s->t.events |= EV_FILL;
 }
 
 /* ---- tmux -CC (control mode) ----
@@ -813,6 +838,7 @@ void term_tick(double now) {
         }
         /* Last activity notice of a burst (notices go out at most once per second). */
         if (s->last_output > s->last_event && now - s->last_event >= 1000) { s->t.events |= EV_OUTPUT; s->last_event = now; }
+        if (s->secret && now - s->secret_checked >= 300) check_secret(s);   /* echo back on without output */
         if (!(cursor_blinks(s) || s->prof.blink_text)) { s->blink_on = 1; continue; }
         /* While output arrives the cursor stays on; afterwards it blinks. */
         int on = ((long)((now - fmax(s->last_output, s->last_input)) / BLINK_MS) % 2) == 0;
@@ -855,6 +881,8 @@ void term_events(TermEventFn fn) {
         if (e & EV_RESIZE) { snprintf(code, sizeof code, "%d %d", s->t.cols, s->t.rows); fn(id, "resize", code); }
         if (e & EV_TMUX_END) fn(id, "tmux-end", "");
         if (e & EV_OUTPUT) fn(id, "output", "");
+        if (e & EV_SECRET) fn(id, "secret", s->secret ? s->secret_prompt : "");
+        if (e & EV_FILL) fn(id, "fill", s->fill_result);
         if (e & EV_EXIT) { snprintf(code, sizeof code, "%d", s->exit_code); fn(id, "exit", code); }
         if (!term_get(id)) continue;    /* JS may have closed the session in a callback */
     }

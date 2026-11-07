@@ -313,5 +313,16 @@
   "prefs.monoCount": {
     "one": "{count} monoespaciada instalada",
     "other": "{count} monoespaciadas instaladas"
-  }
+  },
+  "secret.asked": "Se está pidiendo una contraseña",
+  "secret.askedHost": "Se está pidiendo la contraseña de {host}",
+  "secret.usePasswords": "Usar Contraseñas",
+  "secret.typeIt": "Escribirla",
+  "secret.locked": "Contraseñas está bloqueada. Desbloqueala y probá de nuevo.",
+  "secret.open": "Abrir Contraseñas",
+  "secret.retry": "Reintentar",
+  "secret.none": "No hay inicios de sesión en Contraseñas.",
+  "secret.failed": "No se pudo completar la contraseña.",
+  "secret.notAsking": "El programa dejó de pedir la contraseña, así que no se envió.",
+  "secret.multiline": "Esa contraseña tiene más de una línea y no se envió."
 }

@@ -16,6 +16,7 @@
 #include "broker_int.h"
 #include "json.h"
 #include "../vault/vclient.h"
+#include "../term/termfill.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,8 +214,10 @@ void brokerkr_tick(void) {
     size_t len;
     char *rep;
     while ((rep = vc_take_private(&id, &len))) {
+        int mine = 0;
         for (int i = 0; i < KR_MAX; i++)
-            if ((rq[i].st == ST_REQ || rq[i].st == ST_SHARE || rq[i].st == ST_RETRY) && rq[i].vid == (int)id) { on_reply(&rq[i], rep, len); break; }
+            if ((rq[i].st == ST_REQ || rq[i].st == ST_SHARE || rq[i].st == ST_RETRY) && rq[i].vid == (int)id) { on_reply(&rq[i], rep, len); mine = 1; break; }
+        if (!mine) termfill_reply(id, rep, len);           /* Passwords in the Terminal (term/termfill.c) */
         explicit_bzero(rep, len);
         free(rep);
     }
@@ -244,5 +247,5 @@ void brokerkr_conn_closed(int conn) {
 
 int brokerkr_pollfd(void) {
     for (int i = 0; i < KR_MAX; i++) if (rq[i].st == ST_REQ || rq[i].st == ST_SHARE || rq[i].st == ST_RETRY) return vc_private_fd();
-    return -1;
+    return termfill_pending() ? vc_private_fd() : -1;
 }

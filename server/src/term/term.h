@@ -100,6 +100,7 @@ enum {
     EV_NOTIFY = 1 << 5, EV_OUTPUT = 1 << 6, EV_PROFILE = 1 << 7, EV_ATTENTION = 1 << 8,
     EV_COPY = 1 << 9, EV_COMMAND = 1 << 10, EV_RUN = 1 << 11, EV_HOST = 1 << 12,
     EV_TMUX = 1 << 13, EV_TMUX_START = 1 << 14, EV_TMUX_END = 1 << 15, EV_RESIZE = 1 << 16,
+    EV_SECRET = 1 << 17, EV_FILL = 1 << 18,
 };
 
 typedef struct {
@@ -283,6 +284,11 @@ typedef struct {
     int paused;                 /* virtual: output waits until JS loads the content */
     char *pend;
     size_t pend_n, pend_cap;
+    /* a program asking for a password (term_asks_secret): the Terminal offers Passwords */
+    int secret;
+    char secret_prompt[200];
+    double secret_checked;
+    char fill_result[24];       /* how the last fill from Passwords ended (termfill.c), for JS */
 } Session;
 
 void     term_init(const char *fonts_dir, const char *shell_dir);
@@ -294,6 +300,13 @@ Session *term_create_fd(int fd, int scrollback);
 Session *term_get(int id);
 void     term_close(Session *s);
 void     term_input(Session *s, const char *data, size_t n);
+/* 1 if the program on the session's pty is asking for a password now: echo off with line input (what
+ * getpass and its kin set: sudo, ssh, git, gpg) and a prompt on the cursor's line that names one. The
+ * prompt goes to prompt (may be NULL). Sessions without a pty (a serial console) never ask. */
+int      term_asks_secret(Session *s, char *prompt, size_t n);
+int      term_prompt_names_secret(const char *line);      /* the prompt names a password (tsecret.c) */
+/* A fill from Passwords ended (termfill.c): "ok" or an error code, sent to JS as the "fill" event. */
+void     term_fill_done(Session *s, const char *result);
 void     term_key(Session *s, const char *key, const char *chr, const char *base, int mods);
 void     term_paste(Session *s, const char *text);
 void     term_focus(Session *s, int on);

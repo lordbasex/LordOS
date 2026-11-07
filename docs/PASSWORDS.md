@@ -328,6 +328,23 @@ lists what the app saved in the keyring for that service plus matching Passwords
 or by SSID for Wi-Fi) while the vault is unlocked; the secret leaves `lord-vault` only when the
 user picks one. Used in Settings → Network (Wi-Fi password, VPN credentials).
 
+### In the Terminal (0.8.8.6)
+
+When the program in a Terminal session asks for a password, the Terminal shows a bar: "A password is being
+asked for <host>", **Use Passwords** and **Type It**.
+
+- **Detection** (`server/src/term/tsecret.c`, `build/term-secret-test`): from the pty itself, as `getpass(3)`
+  leaves it (echo off, line input), and the prompt on the cursor's line must name a password ("password",
+  "passphrase", "contraseña", "senha"…). A full-screen program keeps line input off, so it is never offered one.
+- **What JS sees** (`apps/terminal/SecretBar.jsx`, `secret.js`): the prompt, and the Passwords logins
+  (category `internet`) as `{ id, title, sub }`, those whose address or title names the prompt's host first
+  (`user@host's password`, `https://user@host`, or the session's host).
+- **The password** goes from `lord-vault` to `lord-server`'s C code on the private channel (`reveal` with
+  `vc_request_private`, `server/src/term/termfill.c`), is written to that session's pty followed by Enter and
+  wiped. It is written only if the program is still asking when the reply arrives ("not-asking" otherwise),
+  never if it has more than one line. JS gets only the outcome (`ok`, `not-asking`, `multiline`, an error).
+- Passwords locked: the bar says so, with **Open Passwords** and **Try Again**.
+
 ### Secret Service (`org.freedesktop.secrets`)
 
 Our own minimal D-Bus code (`src/vault/dbus.c`, `secretsvc.c`). Before writing it we checked: no

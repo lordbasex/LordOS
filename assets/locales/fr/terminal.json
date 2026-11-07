@@ -313,5 +313,16 @@
   "prefs.monoCount": {
     "one": "{count} police à chasse fixe installée",
     "other": "{count} polices à chasse fixe installées"
-  }
+  },
+  "secret.asked": "Un mot de passe est demandé",
+  "secret.askedHost": "Le mot de passe de {host} est demandé",
+  "secret.usePasswords": "Utiliser Mots de passe",
+  "secret.typeIt": "Le saisir",
+  "secret.locked": "Mots de passe est verrouillé. Déverrouillez-le et réessayez.",
+  "secret.open": "Ouvrir Mots de passe",
+  "secret.retry": "Réessayer",
+  "secret.none": "Il n'y a aucun identifiant dans Mots de passe.",
+  "secret.failed": "Le mot de passe n'a pas pu être rempli.",
+  "secret.notAsking": "Le programme ne demande plus le mot de passe, il n'a donc pas été envoyé.",
+  "secret.multiline": "Ce mot de passe a plus d'une ligne et n'a pas été envoyé."
 }

@@ -313,5 +313,16 @@
   "prefs.monoCount": {
     "one": "{count} monoespaçada instalada",
     "other": "{count} monoespaçadas instaladas"
-  }
+  },
+  "secret.asked": "Uma senha está sendo pedida",
+  "secret.askedHost": "A senha de {host} está sendo pedida",
+  "secret.usePasswords": "Usar Senhas",
+  "secret.typeIt": "Digitá-la",
+  "secret.locked": "Senhas está bloqueado. Desbloqueie e tente de novo.",
+  "secret.open": "Abrir Senhas",
+  "secret.retry": "Tentar de novo",
+  "secret.none": "Não há logins em Senhas.",
+  "secret.failed": "Não foi possível preencher a senha.",
+  "secret.notAsking": "O programa parou de pedir a senha, então ela não foi enviada.",
+  "secret.multiline": "Essa senha tem mais de uma linha e não foi enviada."
 }

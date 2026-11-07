@@ -457,6 +457,12 @@ term.onAny((sid, type, data) => {
       patchMeta(sid, { host: data });
       autoProfile(sid, meta.get()[sid]?.cwd, wid);
       break;
+    // Passwords in the Terminal (SecretBar.jsx): the program's password prompt, "" when it stops asking
+    case 'secret': patchMeta(sid, { secret: data || '' }); break;
+    case 'fill':
+      if (data === 'ok') patchMeta(sid, { secretDismissed: meta.get()[sid]?.secret || '' });
+      else toast(wid, T(data === 'not-asking' ? 'terminal.secret.notAsking' : data === 'multiline' ? 'terminal.secret.multiline' : 'terminal.secret.failed'));
+      break;
     case 'exit': triggerSeen.delete(sid); removeSession(sid); break;
     default: break;
   }

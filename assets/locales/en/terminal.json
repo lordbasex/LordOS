@@ -313,5 +313,16 @@
   "prefs.monoCount": {
     "one": "{count} monospaced font installed",
     "other": "{count} monospaced fonts installed"
-  }
+  },
+  "secret.asked": "A password is being asked for",
+  "secret.askedHost": "A password is being asked for {host}",
+  "secret.usePasswords": "Use Passwords",
+  "secret.typeIt": "Type It",
+  "secret.locked": "Passwords is locked. Unlock it and try again.",
+  "secret.open": "Open Passwords",
+  "secret.retry": "Try Again",
+  "secret.none": "There are no logins in Passwords.",
+  "secret.failed": "The password couldn't be filled in.",
+  "secret.notAsking": "The program stopped asking for the password, so it wasn't sent.",
+  "secret.multiline": "That password has more than one line and wasn't sent."
 }

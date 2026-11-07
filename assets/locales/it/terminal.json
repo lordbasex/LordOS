@@ -313,5 +313,16 @@
   "prefs.monoCount": {
     "one": "{count} carattere a spaziatura fissa installato",
     "other": "{count} caratteri a spaziatura fissa installati"
-  }
+  },
+  "secret.asked": "È richiesta una password",
+  "secret.askedHost": "È richiesta la password di {host}",
+  "secret.usePasswords": "Usa Password",
+  "secret.typeIt": "Digitala",
+  "secret.locked": "Password è bloccata. Sbloccala e riprova.",
+  "secret.open": "Apri Password",
+  "secret.retry": "Riprova",
+  "secret.none": "Non ci sono login in Password.",
+  "secret.failed": "Non è stato possibile inserire la password.",
+  "secret.notAsking": "Il programma ha smesso di chiedere la password, quindi non è stata inviata.",
+  "secret.multiline": "Quella password ha più di una riga e non è stata inviata."
 }

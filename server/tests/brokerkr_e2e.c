@@ -32,6 +32,9 @@ int brokersrv_reply(int fd, uint32_t reqid, int status, const void *data, uint32
 void brokersrv_prompt_event(const char *json) { snprintf(prompt, sizeof prompt, "%s", json); nprompts++; }
 /* connection 7 stands for a system package (assets/sysapps): its owner is its plain id */
 int brokersrv_conn_system(int conn) { return conn == 7; }
+/* Passwords in the Terminal (term/termfill.c) takes the private replies that aren't the broker's */
+int termfill_reply(uint32_t id, const char *rep, size_t len) { (void)id; (void)rep; (void)len; return 0; }
+int termfill_pending(void) { return 0; }
 
 static int app_end, srv_end;
 static uint32_t next_req = 1;
