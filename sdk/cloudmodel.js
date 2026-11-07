@@ -541,10 +541,16 @@ export function errorField(r, p) {
 // an account that is connected (mounted, no error) and whose provider gives no total can be measured
 export const measurable = (acc) => !!acc && !acc.error && acc.state !== 'locked' && acc.mounted !== false && !(acc.about && acc.about.total > 0);
 
-// N4: the other accounts that kept the same old key (State has no host and port: the old fingerprint tells them); the
-// account being updated (its id, or its name for a new one) isn't counted
-export const othersWithKey = (accounts, q, self = {}) => (!q || !q.old ? 0 : (accounts || []).filter((a) => a.old === q.old
-  && a.id !== self.id && String(a.name || '').toLowerCase() !== String(self.name || '').toLowerCase()).length);
+// N4: the other accounts on the same server; the account being updated (its id, or its name for a new one) isn't counted
+// (41a35ac1) each account carries host and port: the same host:port counts; an account whose host is hidden (a locked
+// keyring) or that has none counts by the old fingerprint
+export function othersWithKey(accounts, q, self = {}) {
+  if (!q) return 0;
+  const port = (x) => Number(x) || 22;
+  const host = q.host ? String(q.host).toLowerCase() : '';
+  return (accounts || []).filter((a) => a.id !== self.id && String(a.name || '').toLowerCase() !== String(self.name || '').toLowerCase()
+    && (host && a.host ? String(a.host).toLowerCase() === host && port(a.port) === port(q.port) : !!q.old && a.old === q.old)).length;
+}
 
 // cloud.search's hits as Files' entries (17.2 item 31)
 export const searchEntries = (hits) => (hits || []).map((h) => ({ name: String(h.path).split('/').pop(), path: h.path, dir: !!h.dir, size: h.size || 0, mtime: h.mtime || 0 }));

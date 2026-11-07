@@ -549,6 +549,10 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const accs = [{ id: '1', name: 'Work', old: 'SHA256:a', new: 'SHA256:b', error: 'cloud.hostKeyChanged' }, { id: '2', name: 'Backup', old: 'SHA256:a', error: 'cloud.hostKeyChanged' },
     { id: '3', name: 'Other', old: 'SHA256:z' }, { id: '4', name: 'Plain' }];
   eq('others with the same old key, not the one asking', [M.othersWithKey(accs, { old: 'SHA256:a' }, { id: '1' }), M.othersWithKey(accs, { old: 'SHA256:a' }, { name: 'work' }), M.othersWithKey(accs, { old: 'SHA256:q' }, { id: '1' }), M.othersWithKey(accs, {}, {})], [1, 1, 0, 0]);
+  const hp = [{ id: '1', name: 'Work', host: 'nas.test', port: 22 }, { id: '2', name: 'Backup', host: 'NAS.test', port: null }, { id: '3', name: 'Web', host: 'nas.test', port: 2222 },
+    { id: '4', name: 'Locked', host: null, old: 'SHA256:a' }, { id: '5', name: 'Drive', host: null }];
+  eq('by host:port when known (22 when no port), else by the old key', [M.othersWithKey(hp, { host: 'nas.test', port: 22, old: 'SHA256:a' }, { id: '1' }),
+    M.othersWithKey(hp, { host: 'nas.test', port: 2222 }, { name: 'New' }), M.othersWithKey(hp, { host: 'other.test', port: 22, old: 'SHA256:q' }, {})], [2, 1, 0]);
   eq('the account\'s own old and new in its status box', M.changedPrints(null, accs[0]), { old: 'SHA256:a', new: 'SHA256:b' });
   const src = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
   eq('the answer passes applyToOthers', /cloud\.answer\(q\.state, 'trust', trust === 'hostKeyChanged' \? \{ applyToOthers: others > 0 && alsoOthers \}/.test(src), true);
