@@ -31,7 +31,7 @@ typedef struct {
     uint64_t flip_submit_ns; /* when that flip was queued (CLOCK_MONOTONIC, ns) */
     unsigned flip_seq;
     /* hardware cursor (cursor plane, legacy ioctl) */
-    uint32_t cursor_handle, cursor_w, cursor_h;
+    uint32_t cursor_handle, cursor_w, cursor_h, cursor_pitch;   /* plane size (the driver's cap) and row in pixels */
     uint32_t *cursor_map;
     uint64_t cursor_size;
     int cursor_ok, cursor_visible;
@@ -80,7 +80,7 @@ int  kms_flip_fb(Kms *k, uint32_t fb, void *data);
  * DRM_FORMAT_MOD_INVALID (implicit) counts as linear. */
 int  kms_scanout_ok(const Kms *k, uint32_t fourcc, uint64_t modifier);
 
-/* Hardware cursor: ARGB image (up to 64×64) and position. 0 if the driver supports it. */
+/* Hardware cursor: ARGB image (up to 64×64, in a plane of the driver's cursor size) and position. 0 if the driver supports it. */
 int  kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int hot_y);
 void kms_cursor_move(Kms *k, int x, int y);
 void kms_cursor_show(Kms *k, int visible);

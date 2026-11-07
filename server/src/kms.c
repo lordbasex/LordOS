@@ -529,9 +529,19 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
 
 /* ---- hardware cursor ---- */
 
+/* The cursor plane's size: the driver's DRM_CAP_CURSOR_WIDTH/HEIGHT (64 when it doesn't say). Some
+ * drivers scan the plane at that size whatever the ioctl says: amdgpu on a Radeon RX 580 (cap 128) read a
+ * 64×64 buffer as 128×128, squashing the arrow and showing colored stripes from past the buffer below it. */
+static uint32_t cursor_cap(int fd, uint64_t cap) {
+    struct drm_get_cap c = { .capability = cap };
+    if (xioctl(fd, DRM_IOCTL_GET_CAP, &c) || c.value < 64) return 64;
+    return c.value > 256 ? 256 : (uint32_t)c.value;
+}
+
 int kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int hot_y) {
     if (!k->cursor_handle) {
-        struct drm_mode_create_dumb c = { .width = 64, .height = 64, .bpp = 32 };
+        uint32_t cw = cursor_cap(k->fd, DRM_CAP_CURSOR_WIDTH), ch = cursor_cap(k->fd, DRM_CAP_CURSOR_HEIGHT);
+        struct drm_mode_create_dumb c = { .width = cw, .height = ch, .bpp = 32 };
         if (xioctl(k->fd, DRM_IOCTL_MODE_CREATE_DUMB, &c)) return -1;
         struct drm_mode_map_dumb m = { .handle = c.handle };
         void *map = xioctl(k->fd, DRM_IOCTL_MODE_MAP_DUMB, &m) ? MAP_FAILED
@@ -544,13 +554,14 @@ int kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int 
         k->cursor_handle = c.handle;
         k->cursor_map = map;
         k->cursor_size = c.size;
-        k->cursor_w = c.pitch / 4;
-        k->cursor_h = 64;
+        k->cursor_pitch = c.pitch / 4;
+        k->cursor_w = cw;
+        k->cursor_h = ch;
     }
     memset(k->cursor_map, 0, k->cursor_size);
-    for (int y = 0; y < h && y < 64; y++)
-        for (int x = 0; x < w && x < 64; x++) k->cursor_map[(size_t)y * k->cursor_w + x] = argb[(size_t)y * w + x];
-    struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = 64, .height = 64,
+    for (int y = 0; y < h && y < (int)k->cursor_h; y++)
+        for (int x = 0; x < w && x < (int)k->cursor_w; x++) k->cursor_map[(size_t)y * k->cursor_pitch + x] = argb[(size_t)y * w + x];
+    struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = k->cursor_w, .height = k->cursor_h,
                                   .handle = k->cursor_handle, .hot_x = hot_x, .hot_y = hot_y };
     k->cursor_ok = xioctl(k->fd, DRM_IOCTL_MODE_CURSOR2, &c) == 0;
     k->cursor_visible = k->cursor_ok;
@@ -565,7 +576,7 @@ void kms_cursor_move(Kms *k, int x, int y) {
 
 void kms_cursor_show(Kms *k, int visible) {
     if (!k->cursor_ok || k->cursor_visible == visible) return;
-    struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = 64, .height = 64,
+    struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = k->cursor_w, .height = k->cursor_h,
                                   .handle = visible ? k->cursor_handle : 0 };
     xioctl(k->fd, DRM_IOCTL_MODE_CURSOR2, &c);
     k->cursor_visible = visible;

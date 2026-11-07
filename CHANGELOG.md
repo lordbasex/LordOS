@@ -10,6 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
+
+### Fixed
+
+- **The hardware cursor on amdgpu** (Radeon RX 580): the cursor plane is created at the driver's `DRM_CAP_CURSOR_WIDTH/HEIGHT` (128 there) instead of 64×64. The driver scanned a 64×64 buffer as 128×128, squashing the arrow and showing colored stripes read from past the buffer.
+
 ## [0.8.8.5-beta] - 2026-11-07
 
 An update for 0.8.8 to 0.8.8.4 through Store → Updates and `apt`, with two new parts of the system: **Cloud**, your cloud storage accounts in Settings and in Files, built on rclone (which ships in its own package, `lordos-rclone`, rclone's official release, MIT), and **Machines**, virtual machines with their own app, from a downloaded system that installs without questions to snapshots, clones and migrating a machine from another app. Thanks to rclone's authors: Cloud talks to rclone only, over a socket no network can reach.
