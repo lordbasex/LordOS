@@ -922,6 +922,39 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   lose it too; disabled while one of those machines runs. The helper refuses too when any process holds the image
   open (`/proc/*/fd`: QEMU of any account's running machine, `vm.imageInUse`) or it is downloading, and deletes its
   part and `.json` with it; the app then ejects it from this account's machines (`lord.vm.eject`), so they still start.
+- *Install without questions (0.8.9, the mock "Unattended").* Step 3 becomes *Set up* for a card whose catalog entry
+  has an `unattended` block (Debian, Ubuntu, Fedora; not Kali yet): a switch, on by default as in the mock, *Account
+  name* (the person's own login name), *Password*, and *Computer name*, *Time zone* and *Keyboard* filled from this
+  computer (`lord.vm.hostDefaults()`: `/etc/localtime`, `/etc/default/keyboard`, `LANG`). The Review says *Without
+  questions: account … on …*. What happens:
+  - *The answer file* is the system's own installer's: a Debian **preseed**, an Ubuntu **autoinstall** (cloud-init
+    NoCloud `user-data` and `meta-data`) or a Fedora **kickstart**, made by `lord-vm --create … --unattended SPEC`
+    (`vm/vmunattend.c`). lord-server writes SPEC (0600, in the runtime folder; lord-vm reads and deletes it at once)
+    from the assistant's words, with the password replaced by its SHA-512 crypt hash (`crypt_r`, a random salt): the
+    text the person typed never reaches a file, and the answer files carry `passwd/user-password-crypted`,
+    `identity.password` or `user --iscrypted`. Every field is checked again in lord-vm (account names, no quotes or
+    control characters, a crypt hash, an RFC 1123 host name, the ISO paths and a command line without shell
+    characters); the root account is locked, the person's account is the administrator (sudo, wheel).
+  - *What is installed:* the system's own desktop (Debian's GNOME task, Ubuntu's `ubuntu-desktop-minimal`, Fedora
+    Workstation), plus `qemu-guest-agent`, and the agent is turned on for the machine. Ubuntu installs from its server
+    image with the desktop's packages added, and Fedora from its network installer (both hidden catalog entries,
+    `ubuntu-server` and `fedora-netinst`, checked against the same signed lists as the cards): the desktop images run
+    a live session that needs 4 GB and doesn't take an answer file in the same way, and Fedora's live image doesn't
+    install from a kickstart.
+  - *How it reaches the installer, with no network server and no boot menu to type into:* the first start boots the
+    installer's own kernel and initrd, read from the ISO (`vmu_iso_find`: ISO 9660 with Rock Ridge, Joliet or plain
+    names, every record bounded), with the entry's command line (`-kernel`, `-initrd`, `-append`; `{label}` becomes the
+    ISO's volume label, which Fedora's `inst.stage2` needs). Debian's preseed goes **inside the initrd**, as a second
+    cpio archive after the maker's (the kernel unpacks both and the installer reads `/preseed.cfg` before its first
+    question); Ubuntu's and Fedora's go on a **seed disk**, a 2 MiB FAT image made in C (`vmu_fat_image`, long names
+    so `user-data` and `ks.cfg` read as such) labelled `CIDATA` (cloud-init) or `OEMDRV` (anaconda), on a read-only
+    virtio disk in slot 0xa. The ISO stays in the CD drive, where each installer finds its packages. These files are
+    `<machine>/disks/unattended/{vmlinuz,initrd,cmdline,seed.img}`, 0600.
+  - *The end:* QEMU runs with `-action reboot=shutdown`, so the installer's last restart stops it (`SHUTDOWN`,
+    `guest-reset`); lord-vm then overwrites and deletes the seed disk, deletes the folder, takes the ISO out of
+    `machine.json`, and stops with the new reason `installed` (`VR_INSTALLED`, added at the end of `vmproto.h`). The
+    machine's window starts it again at once: the installed system. QEMU gives a `-kernel` boot index 0, so during
+    that first start the system disk is 1 and the CD 2.
 - *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
   releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
   and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
@@ -999,7 +1032,8 @@ Every current Linux has virtio drivers in its kernel. Cards: Ubuntu, Fedora, Deb
 **Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
 Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart. The person gives a name and password once, in the assistant;
-it reaches the guest through a small seed disk that is deleted after the first boot, and is never stored.
+it reaches the guest through a small seed disk (Debian: inside the installer's initrd) that is deleted after the first boot, and only
+its hash is ever stored (built in 0.8.9: 3.9, "Install without questions").
 
 Guest tools come from the guest's own repository: `qemu-guest-agent`, `spice-vdagent`, plus our `lordos-guest` package for what they lack.
 
@@ -1225,7 +1259,7 @@ Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app
 
 ### 6.1 Lifecycle
 
-Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (ACPI, then agent), force off. Host shutdown asks each running VM to suspend. A machine that fails or crashes shows the machine log, a likely cause when one is known (not enough memory, a missing disk, a locked file) and a fix that fits it, such as starting with less memory or going back to a snapshot. Devices that can't be saved (sound, for example) are disconnected on suspend and connected again on resume. A suspended VM may not resume after QEMU is updated: the Store warns before such an update, and the VM's state says so instead of failing silently.
+Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (the guest agent first when it answers, then also the ACPI power button 10 s later; without the agent, the button, then the agent if it shows up; built in 0.8.9), force off. Host shutdown asks each running VM to suspend. A machine that fails or crashes shows the machine log, a likely cause when one is known (not enough memory, a missing disk, a locked file) and a fix that fits it, such as starting with less memory or going back to a snapshot. Devices that can't be saved (sound, for example) are disconnected on suspend and connected again on resume. A suspended VM may not resume after QEMU is updated: the Store warns before such an update, and the VM's state says so instead of failing silently.
 
 ### 6.2 Snapshots
 
