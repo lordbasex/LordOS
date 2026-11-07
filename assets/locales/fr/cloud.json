@@ -370,5 +370,9 @@
     "one": "Recherche arrêtée plus tôt : affichage du premier résultat",
     "other": "Recherche arrêtée plus tôt : affichage des {count} premiers"
   },
-  "listCapped": "Affichage des {count} premiers éléments"
+  "listCapped": "Affichage des {count} premiers éléments",
+  "trust.others": {
+    "one": "Utiliser aussi la nouvelle clé pour mon autre compte sur ce serveur ({count})",
+    "other": "Utiliser aussi la nouvelle clé pour mes autres comptes sur ce serveur ({count})"
+  }
 }

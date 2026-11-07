@@ -370,5 +370,9 @@
     "one": "Search stopped early: showing the first {count}",
     "other": "Search stopped early: showing the first {count}"
   },
-  "listCapped": "Showing the first {count} items"
+  "listCapped": "Showing the first {count} items",
+  "trust.others": {
+    "one": "Also use the new key for my other account on this server ({count})",
+    "other": "Also use the new key for my other accounts on this server ({count})"
+  }
 }

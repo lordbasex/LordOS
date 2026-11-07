@@ -1134,6 +1134,9 @@ function QuestionSheet({ sheet }) {
   };
   // a trust question (17.2, e2e): the server's SSH host key or its certificate, by its fingerprint
   const trust = M.trustKind(q);
+  // N4: the other accounts that kept the old key get the new one too, unless unchecked
+  const [alsoOthers, setAlsoOthers] = useState(true);
+  const others = trust === 'hostKeyChanged' ? M.othersWithKey((cloudState.get() || {}).accounts, q, { id: sheet.back && sheet.back.accountId, name: sheet.name }) : 0;
   const close2 = () => setView({ sheet: sheet.back ? { ...sheet.back, error: null } : null });
   if (trust) {
     const mono = { fontFamily: 'monospace', fontSize: 12, color: t.text, direction: 'ltr', textAlign: 'start', lineHeight: 1.4 };
@@ -1142,7 +1145,7 @@ function QuestionSheet({ sheet }) {
         <Text style={{ width: 90, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end' }}>{k}</Text>
         <Text style={{ flex: 1, minWidth: 0, ...mono }}>{String(v)}</Text>
       </View>) : null);
-    const doTrust = () => { setBusy(true); cloud.answer(q.state, 'trust').then((r) => { setBusy(false); afterAdd(r, sheet.provider, sheet.name, sheet.back); }); };
+    const doTrust = () => { setBusy(true); cloud.answer(q.state, 'trust', trust === 'hostKeyChanged' ? { applyToOthers: others > 0 && alsoOthers } : {}).then((r) => { setBusy(false); afterAdd(r, sheet.provider, sheet.name, sheet.back); }); };
     return (
       <Sheet width={480} top={60} onClose={close2} label={(sheet.provider || {}).label}>
         <View style={{ padding: spacing.xl, gap: spacing.m }}>
@@ -1158,6 +1161,14 @@ function QuestionSheet({ sheet }) {
             {trust === 'certificate' ? fact(tr('cloud.trust.subject'), q.subject) : null}
             {trust === 'certificate' ? fact(tr('cloud.trust.issuer'), q.issuer) : null}
           </View>
+          {trust === 'hostKeyChanged' && others > 0 ? (
+            <View onClick={() => setAlsoOthers(!alsoOthers)} role="checkbox" aria-checked={alsoOthers ? 'true' : 'false'} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: alsoOthers ? t.accent : 'transparent', border: `1.5px solid ${alsoOthers ? t.accent : t.textDim}` }}>
+                {alsoOthers ? <Text style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>✓</Text> : null}
+              </View>
+              <Text style={{ flex: 1, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.trust.others', { count: others })}</Text>
+            </View>
+          ) : null}
           {err ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
             <Button label={tr('cloud.cancel')} onClick={close2} />

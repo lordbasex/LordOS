@@ -544,6 +544,16 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('Get Info never spins on a mount (du answers { remote: true })', /du\.remote \|\| du\.failed/.test(panels), true);
 }
 
+// ---- N4: the other accounts that kept the old key ----
+{
+  const accs = [{ id: '1', name: 'Work', old: 'SHA256:a', new: 'SHA256:b', error: 'cloud.hostKeyChanged' }, { id: '2', name: 'Backup', old: 'SHA256:a', error: 'cloud.hostKeyChanged' },
+    { id: '3', name: 'Other', old: 'SHA256:z' }, { id: '4', name: 'Plain' }];
+  eq('others with the same old key, not the one asking', [M.othersWithKey(accs, { old: 'SHA256:a' }, { id: '1' }), M.othersWithKey(accs, { old: 'SHA256:a' }, { name: 'work' }), M.othersWithKey(accs, { old: 'SHA256:q' }, { id: '1' }), M.othersWithKey(accs, {}, {})], [1, 1, 0, 0]);
+  eq('the account\'s own old and new in its status box', M.changedPrints(null, accs[0]), { old: 'SHA256:a', new: 'SHA256:b' });
+  const src = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
+  eq('the answer passes applyToOthers', /cloud\.answer\(q\.state, 'trust', trust === 'hostKeyChanged' \? \{ applyToOthers: others > 0 && alsoOthers \}/.test(src), true);
+}
+
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----
 // No one-sided physical edge in Cloud's screens: text aligns to start/end, insets are insetInline*, and a
 // physical left/top is only for a cover of the whole box, a place on the screen (the window's frame) or a ring

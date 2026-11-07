@@ -370,5 +370,9 @@
     "one": "Ricerca interrotta prima: mostro il primo",
     "other": "Ricerca interrotta prima: mostro i primi {count}"
   },
-  "listCapped": "Mostro i primi {count} elementi"
+  "listCapped": "Mostro i primi {count} elementi",
+  "trust.others": {
+    "one": "Usa la nuova chiave anche per il mio altro account su questo server ({count})",
+    "other": "Usa la nuova chiave anche per i miei altri account su questo server ({count})"
+  }
 }

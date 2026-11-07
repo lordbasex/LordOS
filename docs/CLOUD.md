@@ -981,3 +981,11 @@ The closed rc method table has 27 methods now (`operations/list`, `operations/st
 36. **Other accounts on the server (N4).** `answer(state, 'trust', { applyToOthers })` (default true): when the owner trusts
     a host's new key, the other accounts that kept the same old key for that host and port get it too, and are made again
     in rclone (rclone reads known_hosts when it makes a remote) and listed.
+
+### 18.8 N4 in the interface
+
+The "The server's identity changed" step has a check box, on by default, "Also use the new key for my other accounts on
+this server (N)", shown only when other accounts kept the same old key; its value goes to
+`cloud.answer(state, 'trust', { applyToOthers })`. State has no host or port per account, so those accounts are found by
+their `old` fingerprint (`othersWithKey`), the account being updated left out. An account with `cloud.hostKeyChanged` shows
+its own `old` and `new` in its status box.

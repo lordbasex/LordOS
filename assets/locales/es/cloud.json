@@ -370,5 +370,9 @@
     "one": "La búsqueda se detuvo antes: se muestra el primero",
     "other": "La búsqueda se detuvo antes: se muestran los primeros {count}"
   },
-  "listCapped": "Se muestran los primeros {count} elementos"
+  "listCapped": "Se muestran los primeros {count} elementos",
+  "trust.others": {
+    "one": "Usar también la clave nueva en mi otra cuenta de este servidor ({count})",
+    "other": "Usar también la clave nueva en mis otras cuentas de este servidor ({count})"
+  }
 }

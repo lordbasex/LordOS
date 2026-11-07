@@ -181,6 +181,9 @@ export function installCloudMock(home, scenario = '') {
       if (/unreachable|invalid/.test(host)) return { error: 'cloud.unreachable' };
       if (/changed/.test(host)) {
         pendingAdd = { kind, name, label: p[1] };
+        // another account kept the same old key (N4): it is offered the new one too
+        Object.assign(st.accounts[3], { error: 'cloud.hostKeyChanged', old: 'SHA256:3vVq2M3xk7Jm1o8R9pZcY6fJt2uQ0yLw5kHn4bXsE1A', new: 'SHA256:Qe7mT0c2Lw9sZb4kYh1VnR8pXuJ3dF6gAo5iCe2Mtz8' });
+        push();
         return { question: { kind: 'hostKeyChanged', state: 'mock-trust', host, port: 22, old: 'SHA256:3vVq2M3xk7Jm1o8R9pZcY6fJt2uQ0yLw5kHn4bXsE1A', new: 'SHA256:Qe7mT0c2Lw9sZb4kYh1VnR8pXuJ3dF6gAo5iCe2Mtz8' } };
       }
       if (kind === 'sftp' || /^https:/.test(host) && /self/.test(host)) {

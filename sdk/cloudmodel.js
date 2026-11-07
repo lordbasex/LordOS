@@ -514,8 +514,8 @@ export function changedPrints(r, acc) {
   const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code);
   const src = { ...(r || {}), ...(r && typeof r.error === 'object' ? r.error : {}) };
   if (!['cloud.hostKeyChanged', 'cloud.certChanged'].includes(code || (acc && acc.error))) return null;
-  const old = src.old || src.oldFingerprint || null;
-  let nw = src.new || src.fingerprint || null;
+  const old = src.old || src.oldFingerprint || (acc && acc.old) || null;
+  let nw = src.new || src.fingerprint || (acc && acc.new) || null;
   if (!nw && acc && /SHA256:|([0-9A-F]{2}:){8}/i.test(String(acc.message || ''))) nw = String(acc.message).match(/SHA256:[A-Za-z0-9+/=]+|([0-9A-F]{2}:){15,}[0-9A-F]{2}/i)[0];
   return old || nw ? { old, new: nw } : null;
 }
@@ -540,6 +540,11 @@ export function errorField(r, p) {
 }
 // an account that is connected (mounted, no error) and whose provider gives no total can be measured
 export const measurable = (acc) => !!acc && !acc.error && acc.state !== 'locked' && acc.mounted !== false && !(acc.about && acc.about.total > 0);
+
+// N4: the other accounts that kept the same old key (State has no host and port: the old fingerprint tells them); the
+// account being updated (its id, or its name for a new one) isn't counted
+export const othersWithKey = (accounts, q, self = {}) => (!q || !q.old ? 0 : (accounts || []).filter((a) => a.old === q.old
+  && a.id !== self.id && String(a.name || '').toLowerCase() !== String(self.name || '').toLowerCase()).length);
 
 // cloud.search's hits as Files' entries (17.2 item 31)
 export const searchEntries = (hits) => (hits || []).map((h) => ({ name: String(h.path).split('/').pop(), path: h.path, dir: !!h.dir, size: h.size || 0, mtime: h.mtime || 0 }));
