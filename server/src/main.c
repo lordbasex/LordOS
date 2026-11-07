@@ -755,7 +755,8 @@ static int gpu_allowed(const Server *s) {
     return !s->headless && out_count(s) >= 1 && !display_cpu_only() && !need_cpu();
 }
 
-/* The GPU stopped: every display gets its dumb buffer back (CPU path). */
+/* The GPU is stopping: every display gets its dumb buffer back (CPU path). Called before gpu_shutdown(), so
+ * no framebuffer it removes is still on screen. */
 static void cpu_takeover(Server *s) {
     prep_undo_all(s);                           /* a frame prepared for the GPU is painted again */
     for (int i = 0; i < OUT_MAX; i++) {
@@ -838,8 +839,11 @@ static void outputs_apply(Server *s) {
     }
     if (same) { display_resync_done(1, &p); return; }
     prep_undo_all(s);                           /* (outputs: views, frames and the GPU change below) */
-    if (gpu_active()) { gpu_tex_free(s->cursor_tex); s->cursor_tex = NULL; gpu_shutdown(); }
+    /* the dumb buffers go on screen before the GPU's framebuffers are removed: removing one still scanned
+     * out makes the kernel try to turn its CRTC off, which amdgpu refuses ("atomic remove_fb failed") */
+    int had_gpu = gpu_active();
     cpu_takeover(s);
+    if (had_gpu) { gpu_tex_free(s->cursor_tex); s->cursor_tex = NULL; gpu_shutdown(); }
     kms_cursor_show(k0, 0);
     int ok = p.n > 0, head[OUT_MAX];
     for (int j = 0; j < OUT_MAX; j++) head[j] = -1;
@@ -1770,11 +1774,11 @@ static int par_on, par_light;           /* the paint threads (render_frame) */
 static int cpu_switch(Server *s) {
     if (!gpu_active() || !need_cpu()) return 0;
     fprintf(stderr, "remote: composing by CPU (%s)\n", media_needs_cpu() ? "screen recording" : "protected windows on screen");
+    cpu_takeover(s);                            /* first: the GPU's framebuffers leave the screen (outputs_apply) */
     gpu_tex_free(s->cursor_tex);
     s->cursor_tex = NULL;
     gpu_shutdown();
     s->gpu_paused = 1;
-    cpu_takeover(s);
     full_damage(s);
     return 1;
 }
@@ -1893,8 +1897,8 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
         }
         if (failed) {
             fprintf(stderr, "gpu: a frame failed; going on by CPU\n");
-            gpu_shutdown();
             cpu_takeover(s);
+            gpu_shutdown();
             full_damage(s);
         }
     } else present_cpu(s, o, i, r, o == feed);

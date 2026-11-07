@@ -15,6 +15,7 @@ In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
 ### Fixed
 
 - **The hardware cursor on amdgpu** (Radeon RX 580): the cursor plane is created at the driver's `DRM_CAP_CURSOR_WIDTH/HEIGHT` (128 there) instead of 64×64. The driver scanned a 64×64 buffer as 128×128, squashing the arrow and showing colored stripes read from past the buffer.
+- **"atomic remove_fb failed" kernel warnings** when the GPU path stops (rearranging displays, screen recording, a failed GPU frame): the dumb buffers now go on screen before the GPU's framebuffers are removed. Removing a framebuffer still scanned out makes the kernel try to turn its CRTC off, which amdgpu refuses with a WARNING and a tainted kernel.
 
 ## [0.8.8.5-beta] - 2026-11-07
 
