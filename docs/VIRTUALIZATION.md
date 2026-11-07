@@ -868,19 +868,60 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   itself (`<hash>  <name>`, `<hash> *<name>` or `SHA256 (<name>) = <hash>`); the image is kept only if the SHA-256 of
   the bytes written is that one, else deleted (`vm.hashMismatch`). Root never parses the HTML or the list beyond that
   line comparison. One download of an image at a time (a lock), sizes capped by `maxMb`, lists by 1 MB.
-- *Where it lands:* `/var/lib/lordos/machines/lists/<id>-<arch>.sums` and `/var/lib/lordos/machines/images/<sha256>.iso`,
-  root's and readable by all: one copy for every account, named by its content, so an image there is the one that was
-  checked, and an account can't change it under another's machine. Removing one is `vm-image-remove`, an
-  administrator's action, since other accounts' machines may use it.
+- *Where it lands:* `/var/lib/lordos/machines/lists/<id>-<arch>.list` (the signed text of the maker's list, written only
+  after its signature verified) and `/var/lib/lordos/machines/images/<sha256>.iso` with `<sha256>.json` (what it is:
+  catalog id, architecture, file name, size), root's and readable by all: one copy for every account, named by its
+  content, so an image there is the one that was checked, and an account can't change it under another's machine.
+  Removing one is `vm-image-remove`, an administrator's action, since other accounts' machines may use it.
 - *Network:* the bytes come through the Store's downloader (`pkg/http.c`, a child as `nobody`, TLS by `lord-tls` with the
   system's certificate authorities), whose child enters `lordos-net-machines.scope` instead of the Store's
   (`fetch_batch_in`): a component of its own, firewall app `lordos:machines`, "Machines downloads" in the Monitor
   (FIREWALL.md, "Machines' downloads").
-- *Not checked yet:* the makers' OpenPGP signatures on their lists (Debian's `SHA256SUMS.sign`, Ubuntu's and Kali's
-  `SHA256SUMS.gpg`, Fedora's clear-signed `CHECKSUM`): the list comes over HTTPS from the maker's own host, and the
-  catalog that names those hosts is in our signed package. LordOS's package engine has an OpenPGP verifier
-  (`pkg/pgp.c`); pinning each maker's key in the catalog and checking the list with it is the next step (4.1, **To
-  confirm per system**). The download doesn't resume after a cut (the Store's downloader has no ranges); it starts again.
+- *The makers' signatures (0.8.9, closed 2026-11-06).* Before any hash in a list is trusted, the helper checks the
+  list's OpenPGP signature with the maker's key pinned in the package. All four sign with RSA 4096 (v4 signatures):
+  Debian with SHA-256 and Ubuntu with SHA-512 over a detached signature (`SHA256SUMS.sign`, `SHA256SUMS.gpg`), Kali
+  the same (`SHA256SUMS.gpg`, SHA-512), Fedora a clear-signed `CHECKSUM` (SHA-256, text signature), so `pkg/pgp.c`
+  needed no new algorithm, only detached signatures (`pgp_verify_detached`, binary 0x00 and text 0x01) and
+  `pgp_keyring_pin` (only the primary keys whose fingerprints the catalog lists, and their subkeys, may sign); the
+  clear-signed path now shares that verifier with InRelease (a real Debian InRelease still verifies, and one changed
+  byte fails). The keys, fetched once from each project's official source and stripped to the key and its
+  self-signatures (`gpg --export-options export-minimal`), are `packaging/keys/machines/*.asc`, installed in
+  `/usr/lib/lordos/assets/machines/keys`; each fingerprint was compared, over https, with the one the project
+  publishes, and `systems.json` says where for each (`keySource`, `fingerprintChecked`):
+
+  | Card | Key | Fingerprint | Fetched from | Fingerprint compared with |
+  |---|---|---|---|---|
+  | Debian | Debian CD signing key (2011) | `DF9B 9C49 EAA9 2984 3258 9D76 DA87 E80D 6294 BE9B` | keyring.debian.org | https://www.debian.org/CD/verify |
+  | Ubuntu | CD Image Automatic Signing Key (2012) | `8439 38DF 228D 22F7 B374 2BC0 D94A A3F0 EFE2 1092` | keyserver.ubuntu.com | https://ubuntu.com/tutorials/how-to-verify-ubuntu |
+  | Fedora | Fedora 45 | `4F50 A611 4CD5 C697 6A7F 1179 655A 4B02 F577 861E` | https://fedoraproject.org/fedora.gpg | https://fedoraproject.org/security/ |
+  | Kali | Archive Automatic Signing Key (2025), expires 2028-04-17 | `827C 8569 F251 8CC6 77FE CA1A ED65 462E C8D5 E4C5` | https://archive.kali.org/archive-key.asc | https://www.kali.org/docs/introduction/download-official-kali-linux-images/ |
+
+  A catalog entry without `signature`, `keys` or a well-formed fingerprint is refused like any malformed entry. A list
+  that isn't signed (no signature file, a 404; a Fedora list that isn't clear-signed) is refused as `vm.listUnsigned`;
+  a signature that doesn't verify with the pinned keys (a changed list, another list's signature, another key, an
+  expired or revoked key, a signature from the future, a key file that lacks a pinned key) as `vm.listBadSignature`
+  with pgp.c's reason. Only the signed text is kept (a clear-signed list without its armour), and the old unchecked
+  `<id>-<arch>.sums` of the first build is deleted. The folder listing Fedora's list is found in isn't signed and isn't
+  trusted for anything but a name that must match the entry's pattern; that list is then checked like the others.
+  Not covered: an older list, validly signed, served again (a mirror that rolls back would offer an older image of the
+  same release, still verified against its maker's signature). When a maker rotates its key (Fedora per release,
+  Kali's 2028 expiry), the catalog and its key file change with the release that adds the new card.
+- *Resumed downloads.* `pkg/http.c` grew `FetchItem.resume`: a cut download keeps `dest.part` (root's, next to its
+  final name, `<sha256>.iso.part`), and the next try asks for the rest with `Range: bytes=<size>-`. Only a 206 whose
+  `Content-Range` starts exactly there and whose length matches is appended (the hash seeded by reading the part
+  first, so the SHA-256 is over the whole file); a 200 (a server that ignores Range) starts again from the beginning,
+  a wrong 206 is dropped on a new connection and asked again without a range, a 416 too. A part that isn't a plain
+  file of root's, a link, or as big as the most the entry may be is never continued. A changed part is caught by the
+  hash at the end and deleted with the download (`vm.hashMismatch`). The Store's own downloads don't use it.
+  *Stop Download* keeps the part: the assistant says *Download stopped* with **Continue Download**, and the helper
+  says first how much is continued (`vm.downloadResumed`); Storage shows the part and removes it.
+- *Removing a downloaded image* (6.16): the Storage window lists them under the machines (the mock's *Downloads*,
+  also a category of its bar, an image in use counted once): the system and version from the catalog and the
+  image's `.json`, the file, its size, which machines of this account have it in their CD drive, and **Remove,
+  frees …** with a confirmation that says which machines start with an empty drive and that other accounts' machines
+  lose it too; disabled while one of those machines runs. The helper refuses too when any process holds the image
+  open (`/proc/*/fd`: QEMU of any account's running machine, `vm.imageInUse`) or it is downloading, and deletes its
+  part and `.json` with it; the app then ejects it from this account's machines (`lord.vm.eject`), so they still start.
 - *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
   releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
   and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
@@ -904,8 +945,49 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   a wrong hash added to the list it was downloaded and thrown away (`vm.hashMismatch`, nothing left, no `.part`); a name
   from the other architecture, a path (`../../etc/passwd`) and the image's name in place of the list's were refused
   (`admin.invalidArgument`). `lord-vm --create --iso` with that root-owned image made an arm64 machine (emulated on that
-  host) whose serial console showed GRUB 12 s after the start. Not done: the cards driven on screen in a LordOS session
-  (the app's code paths are the ones above plus `admin.run` and `fs.read`), and a whole guest installed from a card.
+  host) whose serial console showed GRUB 12 s after the start.
+
+  *Signatures, resume and removal, tested (2026-11-06).* `tests/vmcatalog_test.c` now **223** checks (the real catalog,
+  plus every list and signature as published that day for both architectures with the pinned keys, and for each: a
+  changed hash, a line added, text after a clear signature, no signature, an empty or garbage signature, another
+  maker's pinned key, a key file without the pinned key, a key that isn't pinned, a signature from the future, Kali's
+  key after its end, another list's signature; nine malformed signature entries). `tests/http_resume_test.c` **14**
+  (a server on loopback: whole, cut and resumed, cut twice, Range ignored, a wrong range, 416, a changed part, no
+  resume, an oversized part, a symbolic link in place of the part), both under ASan and UBSan in `make test`.
+  `vm_catalog_test.mjs` **43**, `vm_model_test.mjs` 152. On the amd64 build VM (VM 116) `make` builds with no warning
+  in 46 s (`-j6`) and `make test` passes in 325 s (`vm-test` 317, `vmimport_test` 141, `vm-import` 44, `pkg-test` and
+  the suites: 29 passed, 27 skipped). Live, through `vm-image-cli` against the makers' servers: Debian's list with
+  Kali's key pinned in its place was refused (`vm.listBadSignature`, `pkg.pgp.unknownKeys`), with a signature name
+  that isn't published (`vm.listUnsigned`).
+
+  *The cards driven on screen (2026-11-06).* A real headless LordOS session built from this branch on VM 116
+  (`tools/vm/e2e`, the Cloud bench's approach: a test-only theme bundle with a driver, input and pictures over the
+  session's `remote.sock`; lord-server started as root with `--user` so the session has its administration helper),
+  screenshots in `out/final/machines-e2e/`: the Debian 13 card read Debian's list and checked its signature in 2.3 s
+  (*Debian 13.7, … from its maker's signed list*); Create and Start showed the progress (*34 MB of 756 MB*); Stop
+  Download at 213 MB kept the part; after the session was restarted, Create again said *Continued from the 213 MB
+  downloaded before* and went on (a Range request through Debian's redirect to a mirror); stopped again (347,735,755 bytes),
+  shown in Storage as *Debian 13.7, amd64 (stopped)*; Continue Download finished it, and the file's SHA-256 was the
+  listed one (`a7ef94ac…e355`, 792,723,456 bytes, in three pieces). The machine (4 vCPU, 1.3 GB, 32 GB) opened on the
+  installer's boot menu; with the answers of `tools/vm/e2e/preseed-debian.cfg` added to the `linux` line, Debian
+  installed itself to the machine's disk (EFI, ext4 root and swap on `/dev/vda`) in about 6 minutes, rebooted into
+  the installed system (GRUB from the disk), and `tester` logged in on its console: Debian 13.7, kernel
+  6.12.107+deb13-amd64, booted UEFI. Storage then showed the image *In the CD drive of Debian 13.7* with Remove
+  disabled while it ran (the helper also answered `vm.imageInUse`); once off, Remove asked, deleted the image, its
+  `.json` and its lock, and emptied the machine's drive, which then started from its disk to the login prompt. The
+  Fedora 45 card: its list found in the folder's listing and checked (clear-signed), 2,925,092,864 bytes downloaded
+  in 81 s and kept, the machine created (*Create and Configure*). All eight lists (four systems, both architectures)
+  were read and their signatures checked through the session's helper (1.4 to 2.5 s each); the arm64 cards show
+  their versions (*Fedora 45, arm64: Fedora-Workstation-Live-45-1.4.aarch64.iso*).
+  *Seen on the way, not changed here:* the installed console Debian (no desktop) didn't act on the ACPI power button
+  within 60 s, so Shut Down turned it off (*It didn't shut down in time*); and inside a guest with the Shared network
+  the host itself isn't reachable (the guest has the host's address and `--no-map-gw`), so the bench serves the answers
+  file from another computer.
+
+  *Still open for the beta:* the cards' unattended install (4.1: Debian preseed, Ubuntu autoinstall, Fedora
+  kickstart; the bench types the preseed's address at the boot menu, which a person won't); the console guest's
+  ACPI shutdown above; the signatures and resume on the Pi 5 (not run now; the code paths are the same); a LordOS
+  card once LordOS publishes an ISO.
 
 
 ## 4. Guest systems
@@ -914,7 +996,7 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
 
 Every current Linux has virtio drivers in its kernel. Cards: Ubuntu, Fedora, Debian, Kali and LordOS, each for the host's architecture, plus **any ISO of that architecture** from a file. arm64 images exist for all of them; on a Pi the UEFI arm64 ISO is the one to use, not the Pi's image.
 
-**Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key where one is published (**To confirm per system**). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
+**Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
 Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart. The person gives a name and password once, in the assistant;
 it reaches the guest through a small seed disk that is deleted after the first boot, and is never stored.
@@ -1295,7 +1377,7 @@ Opened from the host meter, or Window → Storage. It answers one question: **wh
 - One bar for the volume: machines, downloads, Trash, other files, free. Colors differ in lightness too, and each has a text label and size.
 - A list with each machine under the one it came from: disk size, **what deleting it would free**, and what it shares.
 - Selecting one shows what it shares and with whom, and the split by disks, suspended state, snapshots, installation media and other.
-- **Downloads:** verified installers and images, removable, marked "can be downloaded again".
+- **Downloads:** verified installers and images, removable, marked "can be downloaded again". Built in 0.8.9 for the systems the assistant downloads, with stopped downloads (3.9, "The Linux download cards").
 - **Trash:** machines there still take space until emptied.
 - Deleting from anywhere states the same figure before asking.
 - Offers: Reclaim space (compaction, with an estimate first), delete old snapshots, remove unused media.
@@ -1888,7 +1970,7 @@ Machines (React + LordOS SDK)
 |---|---|---|
 | **0, Technical proof** | No app. KVM, QEMU, QMP and D-Bus display: a Debian 13 guest with picture and input on amd64 and Pi 5, over direct QMP. Answers 2.2's open items: 4K guest on 16K host, Pi GICv2, GICV trapping by kernel, TCG numbers, `ui-dbus` on arm64, nested checks, `device=/dev/fdset`, formats and modifiers per GPU, desktop under load. No agent, no 3D, no USB, no snapshots | Done 2026-11-04: numbers in section 13, open items in 13.8 |
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
-| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"). Still open: the gates on bare-metal amd64 (`tools/vm/bare-metal-gates.sh`, section 12) and the cards driven on screen |
+| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"), with the makers' signatures checked, resumed downloads and removal in Storage, and driven on screen in a LordOS session through a whole Debian install (2026-11-06); the gates pass on bare-metal amd64 too. Still open: the cards' unattended install and the console guest's ACPI shutdown (3.9) |
 | **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import (import of other apps' machines built, 6.22), backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
 | **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
