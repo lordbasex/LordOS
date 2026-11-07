@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.5-beta] - 2026-11-07
+
+An update for 0.8.8 to 0.8.8.4 through Store → Updates and `apt`, with two new parts of the system: **Cloud**, your cloud storage accounts in Settings and in Files, built on rclone (which ships in its own package, `lordos-rclone`, rclone's official release, MIT), and **Machines**, virtual machines with their own app, from a downloaded system that installs without questions to snapshots, clones and migrating a machine from another app. Thanks to rclone's authors: Cloud talks to rclone only, over a socket no network can reach.
+
 ### Added
 
 - **Cloud, the core** (docs/CLOUD.md; the interface comes separately). `lord-server` runs rclone's remote control for the session on a Unix socket only (`$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, in a 0700 folder), with a random user and password per start given through a memory file, its configuration in memory, in a scope and firewall app of its own (`desktop:lordos-cloud`), restarted by itself after a crash (at most 5 times a minute). It is rclone's only client, and it can only send the 28 methods of a fixed table: nothing in LordOS can ask rclone to run a command or hand out its stored credentials. `lord.cloud` offers accounts (sign-in in the browser through `rclone authorize`, servers and object storage with their fields checked against rclone's own schema), mounts in `~/Cloud/<account>`, each file's status, **Keep on This Computer** and **Free Up Space** (never for a file that is open, changed here, waiting to go up or kept), freeing space by itself below a threshold, links where the provider has them, Pause and Resume, bandwidth limits and Restart. Tokens and passwords live in the keyring; the files in `~/.config/lordos/cloud` hold none. Signing in again, or adding with an existing account's name, updates that account. Add Account lists every provider the shipped rclone has, under rclone's own names, asked each time; rclone's own setup questions (a choice, a code) reach the person through `cloud.answer`; **Empty Trash** where the provider has one, **Measure** for providers without a quota, and deleting under `~/Cloud` removes in the cloud through the mount instead of making a `.Trash` folder there. Accounts waiting for a locked keyring (as after an automatic login) connect as soon as it is unlocked, without a restart; a folder kept busy by an open file is still unmounted (lazily) and a dead mount is cleared before mounting again; renaming an account and then signing in again updates it instead of saying the name is taken. An account only counts once it answers (a wrong password, port or address is said at once, and nothing is left behind); an SFTP server's host key and an https server's untrusted certificate are shown before the account is added and checked afterwards; no account option can run a program or name a local file; Recents and search no longer walk into cloud mounts, so a cloud server that stops answering can't freeze the desktop; renaming and moving work inside cloud folders; S3 links can be long and say they can't be withdrawn early. With a cloud server down, a file that isn't on this computer fails within seconds and the account says offline until the server answers again; logging out unmounts every cloud folder; a file changed both here and in the cloud keeps the cloud's version next to it as "name (cloud copy)" before ours goes up. SFTP accounts no longer probe the server's key again and again (OpenSSH locked people out after a few tries), a second account on the same server uses the key the first trusts, and the owner can accept a server's new key when signing in again; searching inside a cloud folder works without blocking the desktop. A file edited while the server was really down no longer overwrites what changed on the server meanwhile: every retry of an upload goes through the same check, and the server's version is kept as the cloud copy.
@@ -70,9 +74,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - Machines: importing a disk image never reads another file: the image's format comes from LordOS's own check of its header (no backing file, no external data file), `qemu-img` runs sandboxed with the format named and backing turned off, and the system disk is checked again at every start.
 
+### Known issues and limitations
+
+- **Backups to Cloud** is not in this version: Backups still writes to disks and folders. It comes in a later update.
+- Cloud is verified end to end with WebDAV, SFTP (password and key), S3, FTP and SMB servers and one browser sign-in provider; every other provider rclone has is listed under **Not verified yet**. An S3 account whose server stops answering says "syncing" instead of "offline" until the server is back.
+- Machines' install without questions is checked from start to the installed desktop with Debian; Ubuntu and Fedora run their whole unattended install, and their first login is checked in the next update.
+
 ### Tests
 
-- `cloud_test` (2162 checks, with ASan) and `tests/cloud_integration.sh` (195 checks against a local WebDAV server), both passing on VM 116 (amd64) and the Raspberry Pi 5 (arm64).
+- `cloud_test` (2162 checks, with ASan) and `tests/cloud_integration.sh` (195 checks against a local WebDAV server) pass on amd64 and the Raspberry Pi 5; Cloud's end-to-end bench ran against real WebDAV (http and https), SFTP (password and key), S3 (two servers), FTP and SMB servers. Machines' release gates (disk integrity, failure recovery, leaks) pass on the Raspberry Pi 5, nested amd64 and a physical Xeon server.
 
 ## [0.8.8.4-beta] - 2026-11-06
 
@@ -3517,7 +3527,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...HEAD
+[0.8.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...v0.8.8.5-beta
 [0.8.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...v0.8.8.4-beta
 [0.8.8.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...v0.8.8.3-beta
 [0.8.8.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...v0.8.8.2-beta
