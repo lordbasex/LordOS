@@ -1100,8 +1100,17 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     without the desktop (`desktop: false`, 2 vCPU, 3 GB, 20 GB): the same autoinstall with no question through curtin,
     GRUB, *configuring cloud-init* and into *run_unattended_upgrades* (security updates from the archive), its disk at
     6.3 GB, when the build VM had under 500 MB left: the guest was paused and removed so the shared host wouldn't fill.
-    So Ubuntu's restart into the installed system and its login are **not seen yet**; they need about 8 GB free on
-    the build VM (the 3.2 GB image and a 6 to 7 GB disk; with the desktop about 12 GB).
+    With 22 GB free again, the desktop run went on for 22 minutes and then the guest sat with both vCPUs busy and no
+    disk or network traffic, its picture blank. Its disk, read afterwards (read-only, `qemu-nbd`), told why: dpkg had
+    failed at 10:49 inside `ubuntu-desktop-minimal` on the **firefox** package (`/var/crash/firefox.0.crash`: *new
+    firefox package preinst maintainer script subprocess failed with exit status 1*): Ubuntu's firefox deb only
+    installs the snap, which can't happen in the installer's target where snapd isn't running, and subiquity then
+    waits on its error screen. The autoinstall now pins firefox out (`apt.preferences`, priority -1) when it adds the
+    desktop (a browser can come from the Store afterwards); `vmunattend-test` 83. With that, the card's run (2 vCPU, 3 GB, 24 GB; the image
+    already stored) installed with nothing typed in **23 minutes** (08:02:39 to 08:25:58), the installer's restart
+    ended the first start, lord-vm removed the seed disk and the ISO, and the machine started again into the installed
+    system: GDM with the account `tester` (`u-14`), and the password typed in the assistant logged in to the Ubuntu
+    desktop (`u-15`). Shut Down through the guest agent: off in 5.5 s. Its disk took 8.9 GB.
   - **Not changed, noted:** the first start's picture can stay on *Display output is not active* while the installer
     runs at the firmware's resolution, until the window asks for a size (seen once with Debian; a start with the
     window already sized showed the installer at once).

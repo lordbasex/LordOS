@@ -203,6 +203,9 @@ static char *autoinstall(const VmUnattend *u) {
     bput(&b, "  identity:\n    hostname: \"%s\"\n    realname: \"%s\"\n    username: \"%s\"\n    password: \"%s\"\n",
          u->hostname, u->fullname[0] ? u->fullname : u->user, u->user, u->hash);
     bput(&b, "  ssh:\n    install-server: false\n  storage:\n    layout:\n      name: direct\n");
+    /* the desktop from a server image: its firefox package is a transitional one whose maintainer script installs the
+     * snap, which fails in the installer's target (no snapd running there) and stops the whole install; kept out */
+    if (u->desktop) bput(&b, "  apt:\n    preferences:\n      - package: \"firefox\"\n        pin: \"release o=Ubuntu\"\n        pin-priority: -1\n");
     bput(&b, "  packages:\n    - qemu-guest-agent\n%s", u->desktop ? "    - ubuntu-desktop-minimal\n" : "");
     bput(&b, "  shutdown: reboot\n");
     if (b.oom) { free(b.p); return NULL; }
