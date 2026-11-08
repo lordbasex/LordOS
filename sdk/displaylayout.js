@@ -7,11 +7,18 @@
 //   resolveDrop(rects, i, x, y, threshold)      on drop: a position that touches another display edge to edge
 //                                               and overlaps none (the nearest one to the snapped position)
 //   placementOk(rects, i, x, y)                 the rule lord-server checks too (out_fits in outputs.c)
+//   scaleChoices(pw, ph)                        the scales (percent) offered for a pw × ph display
+//   scaleTiles(choices, value, rec)             the five of them shown as tiles (always with the
+//                                               current and the recommended one)
 //
 // Every rect is { x, y, w, h } in the desktop's logical px (integers). `threshold` is in the same
 // units: Settings converts its 12 preview px with the preview's scale.
 
 export const SNAP_PREVIEW_PX = 12;
+
+// The scales lord-server accepts (OUT_SCALE_MIN, OUT_SCALE_MAX and OUT_SCALE_STEP in server/src/outputs.h).
+export const SCALE_MIN = 100, SCALE_MAX = 300, SCALE_STEP = 25;
+const ROOM_W = 1024, ROOM_H = 600;              // the smallest useful logical desktop (as out_scale_recommended)
 
 const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const shared = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
@@ -130,4 +137,42 @@ export function resolveDrop(rects, i, x, y, threshold) {
   let r = null;
   for (let j = 0; j < rects.length; j++) if (j !== i && (!r || rects[j].x + rects[j].w > r.x + r.w)) r = rects[j];
   return { x: r.x + r.w, y: r.y };
+}
+
+// Every step from 100 % up to the largest that still leaves a 1024 × 600 logical desktop on a
+// pw × ph display (physical px, after rotation), and always at least up to 200 % (what Settings has
+// always offered): a 15" 4K panel gets 100–300 %, a 1080p one 100–200 %.
+export function scaleChoices(pw, ph) {
+  const out = [];
+  for (let n = SCALE_MIN; n <= SCALE_MAX; n += SCALE_STEP) {
+    if (n > 200 && !(pw * 100 / n >= ROOM_W && ph * 100 / n >= ROOM_H)) break;
+    out.push(n);
+  }
+  return out;
+}
+
+// Up to `count` of the choices for the "Larger text … More space" tiles, ascending: spread evenly from
+// the smallest to the largest (100–200 % shows every step, 100–300 % every other one), then the
+// current and the recommended scale put in place of the nearest pick when they are missing.
+export function scaleTiles(choices, value, rec, count = 5) {
+  const ok = (v) => Number.isInteger(v) && v >= SCALE_MIN && v <= SCALE_MAX && (v - SCALE_MIN) % SCALE_STEP === 0;
+  const all = [...(choices || [])];
+  for (const v of [value, rec]) if (ok(v) && !all.includes(v)) all.push(v);
+  all.sort((a, b) => a - b);
+  if (all.length <= count) return all;
+  const picks = [];
+  for (let i = 0; i < count; i++) picks.push(all[Math.round(i * (all.length - 1) / (count - 1))]);
+  const kept = [];
+  for (const v of [value, rec]) {
+    if (!ok(v) || kept.includes(v)) continue;
+    kept.push(v);
+    if (picks.includes(v)) continue;
+    let best = -1;                                  // the nearest pick that is not kept already
+    for (let j = 0; j < picks.length; j++) {
+      if (kept.includes(picks[j])) continue;
+      if (best < 0 || Math.abs(picks[j] - v) < Math.abs(picks[best] - v)) best = j;
+    }
+    if (best >= 0) picks[best] = v;
+  }
+  return picks.sort((a, b) => a - b);
 }

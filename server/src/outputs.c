@@ -21,13 +21,14 @@ int out_scale_round(double f) {
 
 /* About 110 logical px per inch is what desktop UIs (and LordOS's theme) are drawn for: a 24"
  * 1080p (92 dpi) stays at 100 %, a 27" 4K (163 dpi) gets 150 %, a 13" 3K laptop 200 %. The logical
- * desktop never gets smaller than 1024 × 600. */
+ * desktop never gets smaller than 1024 × 600, and the recommendation stops at OUT_SCALE_REC_MAX. */
 int out_scale_recommended(int pw, int ph, int mm_w, int mm_h) {
     if (pw <= 0 || ph <= 0 || mm_w <= 0 || mm_h <= 0) return OUT_SCALE_MIN;
     double diag_px = sqrt((double)pw * pw + (double)ph * ph);
     double diag_in = sqrt((double)mm_w * mm_w + (double)mm_h * mm_h) / 25.4;
     if (diag_in < 3) return OUT_SCALE_MIN;          /* bogus EDID sizes (projectors report 0 or 1 cm) */
     int pct = out_scale_round(diag_px / diag_in / 110.0);
+    if (pct > OUT_SCALE_REC_MAX) pct = OUT_SCALE_REC_MAX;
     while (pct > OUT_SCALE_MIN && (pw * 100 / pct < 1024 || ph * 100 / pct < 600)) pct -= OUT_SCALE_STEP;
     return pct;
 }

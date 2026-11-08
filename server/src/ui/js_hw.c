@@ -4,7 +4,7 @@
  * arrive in JS as __lordHw(kind, data).
  *
  *   lord.display.list()                         outputs, modes, Night Light, backlight
- *   lord.display.apply(conn, w, h, mHz, rot, scale)   live (queued between frames); scale in % (100–200,
+ *   lord.display.apply(conn, w, h, mHz, rot, scale)   live (queued between frames); scale in % (100–300,
  *                                               25 % steps); true if accepted
  *   lord.display.arrange(conn, x, y, apply)     drop a display at global logical (x, y): { x, y } snapped
  *   lord.display.setMirror(on) / setMain(conn) / setCaptureAll(on)   (docs/DISPLAYS.md)

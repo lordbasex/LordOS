@@ -143,7 +143,7 @@ export function previewNight(kelvin) { if (has('display')) call(() => lord.displ
 
 // Applies a mode live and starts the 15-second countdown; keepDisplay() saves it, revert brings back
 // the previous one (also when the countdown runs out with nobody answering).
-// scale is in percent (100–200, 25 % steps; docs/DISPLAYS.md).
+// scale is in percent (100–300, 25 % steps; docs/DISPLAYS.md).
 export function applyDisplay(out, { w, h: hh, refresh = 0, rotation = 0, scale = 100, conn = out.id }) {
   if (!has('display')) return false;
   const d = displays.get();

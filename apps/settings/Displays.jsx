@@ -1,5 +1,5 @@
 // Settings → Displays: arrangement of several displays (extend or mirror), resolution, refresh rate,
-// rotation, scale (100–200 %, sharp), the main display, brightness, Night Light and video in the
+// rotation, scale (100–300 %, sharp), the main display, brightness, Night Light and video in the
 // browser (Video.jsx, docs/VIDEO.md) (docs/SETTINGS.md,
 // "Displays", and docs/DISPLAYS.md). Changes apply live with the system's 15-second "Keep these
 // display settings?" countdown (sdk/hardware.jsx) and are saved per display (EDID identity).
@@ -10,6 +10,7 @@ import {
   arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, typeScale, spacing,
   nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
   identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
+  scaleChoices, scaleTiles,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Section, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -19,7 +20,6 @@ const hz = (mhz) => {
   const v = mhz / 1000;
   return Math.abs(v - Math.round(v)) < 0.005 ? String(Math.round(v)) : v.toFixed(2);
 };
-const SCALES = [200, 175, 150, 125, 100];         // tiles: larger text first, more space last
 
 // The width of a box after layout (the page column narrows with the window).
 function useWidth(ref, fallback) {
@@ -149,17 +149,18 @@ function NumberBadge({ n, size = 16, color = '#fff', textColor = '#2c3e70' }) {
 }
 
 // One scale as a picture of the screen with a window: the larger the scale, the bigger the window
-// ("Larger text … More space"). A 2 px accent ring marks the current one.
-function ScaleTile({ n, on, rec, label, onPick, t, tr }) {
+// ("Larger text … More space"); f is where it sits between the smallest (0) and the largest tile (1).
+// A 2 px accent ring marks the current one.
+function ScaleTile({ f, on, rec, label, onPick, t, tr }) {
   const [hover, setHover] = useState(false);
-  const ww = Math.round(20 + (n - 100) * 0.26), wh = Math.round(ww * 0.64);
+  const ww = Math.round(20 + f * 26), wh = Math.round(ww * 0.64);
   return (
     <View onClick={onPick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 5 }}>
       <View style={{ width: 70, height: 48, padding: 2, borderRadius: 8, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
         <View style={{ flex: 1, borderRadius: 4, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', direction: 'ltr',
           background: 'linear-gradient(160deg, #3d7be0, #7b46cf)', opacity: hover && !on ? 0.85 : 1 }}>
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: Math.max(2, Math.round(n / 50)), backgroundColor: 'rgba(255,255,255,0.8)' }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: Math.round(2 + f * 2), backgroundColor: 'rgba(255,255,255,0.8)' }} />
           <View style={{ width: ww, height: wh, marginTop: 3, borderRadius: 2, backgroundColor: 'rgba(246,246,249,0.95)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
             <View style={{ height: Math.max(2, Math.round(wh / 6)), backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 2 }} />
@@ -172,12 +173,15 @@ function ScaleTile({ n, on, rec, label, onPick, t, tr }) {
   );
 }
 
-function ScaleTiles({ value, rec, onPick, t, tr }) {
+// The tiles: larger text first, more space last (sdk/displaylayout.js picks five of the choices).
+function ScaleTiles({ choices, value, rec, onPick, t, tr }) {
+  const tiles = scaleTiles(choices, value, rec).reverse();
+  const lo = tiles[tiles.length - 1], span = tiles[0] - lo || 1;
   return (
     <View style={{ paddingTop: spacing.m, paddingBottom: spacing.s, gap: spacing.xs }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs }}>
-        {SCALES.map((n) => (
-          <ScaleTile key={n} n={n} on={n === value} rec={n === rec} label={tr('prefs.display.scaleN', { n })} onPick={() => n !== value && onPick(n)} t={t} tr={tr} />
+        {tiles.map((n) => (
+          <ScaleTile key={n} f={(n - lo) / span} on={n === value} rec={n === rec} label={tr('prefs.display.scaleN', { n })} onPick={() => n !== value && onPick(n)} t={t} tr={tr} />
         ))}
       </View>
       <View style={{ flexDirection: 'row', paddingHorizontal: spacing.xs }}>
@@ -318,7 +322,9 @@ export function DisplaysSettings() {
   const setScale = (sc) => go(cur, { w: mode.w, h: mode.h, refresh: mode.refresh, rotation: rot, scale: sc });
   const looks = scale !== 100 && cur.w ? tr('prefs.display.looksLike', { w: cur.w, h: cur.h }) : '';
   const sizeLine = [cur.connector, cur.diagonal ? tr('prefs.display.inches', { n: (cur.diagonal / 10).toFixed(1) }) : '', `${mode.w} × ${mode.h}`, looks].filter(Boolean).join(' · ');
-  const scales = [100, 125, 150, 175, 200].map((n) => [n, n === rec ? tr('prefs.display.scaleRecommended', { n }) : tr('prefs.display.scaleN', { n })]);
+  const choices = scaleChoices(cur.pw || mode.w, cur.ph || mode.h);
+  const listed = choices.includes(scale) ? choices : [...choices, scale].sort((a, b) => a - b);
+  const scales = listed.map((n) => [n, n === rec ? tr('prefs.display.scaleRecommended', { n }) : tr('prefs.display.scaleN', { n })]);
   const several = act.length > 1 || outs.length > 1;
   const nums = displayNumbers(outs);
   return (
@@ -347,7 +353,7 @@ export function DisplaysSettings() {
           <SettingRow label={tr('prefs.display.scale')} hint={looks}>
             <PopUp width={210} value={scale} onChange={setScale} options={scales} />
           </SettingRow>
-        ) : <ScaleTiles value={scale} rec={rec} onPick={setScale} t={t} tr={tr} />}
+        ) : <ScaleTiles choices={choices} value={scale} rec={rec} onPick={setScale} t={t} tr={tr} />}
         <SettingRow label={tr('prefs.display.resolution')}>
           <PopUp width={210} value={`${curRes?.w}x${curRes?.h}`} onChange={(v) => { const [w, h] = v.split('x').map(Number); go(cur, { w, h, refresh: 0, rotation: rot, scale }); }}
             options={res.map((r) => [`${r.w}x${r.h}`, native(r) ? tr('prefs.display.native', { w: r.w, h: r.h }) : `${r.w} × ${r.h}`])} />

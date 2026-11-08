@@ -13,7 +13,8 @@ static int fails, checks;
 
 static void scale_tests(void) {
     CHECK(out_scale_valid(100) && out_scale_valid(125) && out_scale_valid(150) && out_scale_valid(175) && out_scale_valid(200));
-    CHECK(!out_scale_valid(110) && !out_scale_valid(75) && !out_scale_valid(225) && !out_scale_valid(0));
+    CHECK(out_scale_valid(225) && out_scale_valid(250) && out_scale_valid(275) && out_scale_valid(300));     /* issue #47 */
+    CHECK(!out_scale_valid(110) && !out_scale_valid(75) && !out_scale_valid(260) && !out_scale_valid(325) && !out_scale_valid(0));
     CHECK(out_scale_round(1.0) == 100);
     CHECK(out_scale_round(1.12) == 100);
     CHECK(out_scale_round(1.13) == 125);
@@ -22,14 +23,17 @@ static void scale_tests(void) {
     CHECK(out_scale_round(1.62) == 150);
     CHECK(out_scale_round(1.63) == 175);
     CHECK(out_scale_round(1.9) == 200);
-    CHECK(out_scale_round(3.0) == 200);
+    CHECK(out_scale_round(2.6) == 250);
+    CHECK(out_scale_round(3.0) == 300);
+    CHECK(out_scale_round(4.0) == 300);
     CHECK(out_scale_round(0.5) == 100);
     CHECK(out_scale_round(-1) == 100);
     /* recommended, from EDID sizes of real panels */
     CHECK(out_scale_recommended(1920, 1080, 531, 299) == 100);     /* 24" 1080p, 92 dpi */
     CHECK(out_scale_recommended(2560, 1440, 597, 336) == 100);     /* 27" 1440p, 109 dpi */
     CHECK(out_scale_recommended(3840, 2160, 597, 336) == 150);     /* 27" 4K, 163 dpi */
-    CHECK(out_scale_recommended(3840, 2160, 344, 194) == 200);     /* 15.6" 4K laptop, 282 dpi */
+    CHECK(out_scale_recommended(3840, 2160, 344, 194) == 200);     /* 15.6" 4K laptop, 282 dpi: 250 capped at OUT_SCALE_REC_MAX */
+    CHECK(out_scale_recommended(3840, 2160, 339, 191) == 200);     /* 15.3" 4K laptop (issue #47), 288 dpi */
     CHECK(out_scale_recommended(1920, 1080, 344, 194) == 125);     /* 15.6" 1080p laptop, 141 dpi */
     CHECK(out_scale_recommended(2880, 1800, 302, 189) == 200);     /* 14" 3K, 242 dpi */
     CHECK(out_scale_recommended(1366, 768, 293, 165) == 100);      /* 13.3" 1366×768: 118 dpi, but 1093 wide at 125 */
@@ -43,6 +47,8 @@ static void scale_tests(void) {
     CHECK(lw == 1463 && lh == 914);
     out_logical_size(1366, 768, 125, &lw, &lh);
     CHECK(lw == 1093 && lh == 614);
+    out_logical_size(3840, 2160, 300, &lw, &lh);
+    CHECK(lw == 1280 && lh == 720);
     out_logical_size(1920, 1080, 133, &lw, &lh);                   /* invalid → 100 */
     CHECK(lw == 1920 && lh == 1080);
 }

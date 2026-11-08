@@ -6,7 +6,7 @@
  *   - logical px: the unit of the UI engine (styles, layout, pointer, windows, Wayland surface
  *     coordinates). The desktop is one logical space; every display shows a rectangle of it.
  *   - physical px: the display's own pixels (its mode, after rotation).
- *   - scale: physical px per logical px, in percent (100, 125, 150, 175, 200).
+ *   - scale: physical px per logical px, in percent (100 to 300 in 25 % steps).
  */
 #ifndef LORD_OUTPUTS_H
 #define LORD_OUTPUTS_H
@@ -15,7 +15,10 @@
 
 #define OUT_MAX 4                       /* displays driven at once (CRTCs) */
 #define OUT_SCALE_MIN 100
-#define OUT_SCALE_MAX 200
+#define OUT_SCALE_MAX 300
+/* The largest scale recommended from the EDID density: 200 %, as before 300 % was allowed, so a
+ * display without a saved scale keeps the one it had (a 15" 4K panel would get 250 %). */
+#define OUT_SCALE_REC_MAX 200
 #define OUT_SCALE_STEP 25
 
 /* Rectangle of the global logical space. */
@@ -32,9 +35,10 @@ typedef struct {
 } OutView;
 
 /* ---- scale ---- */
-int  out_scale_valid(int pct);                          /* 100, 125, 150, 175 or 200 */
+int  out_scale_valid(int pct);                          /* 100, 125, 150 … 300 */
 int  out_scale_round(double factor);                    /* 1.37 → 125: nearest valid step, clamped */
-/* Recommended scale from the physical density (EDID size in mm). 100 when the size is unknown. */
+/* Recommended scale from the physical density (EDID size in mm), at most OUT_SCALE_REC_MAX. 100
+ * when the size is unknown. */
 int  out_scale_recommended(int pw, int ph, int mm_w, int mm_h);
 /* Logical size of a physical frame at a scale (rounded to the nearest logical pixel). */
 void out_logical_size(int pw, int ph, int pct, int *lw, int *lh);

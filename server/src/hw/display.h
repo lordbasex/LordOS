@@ -3,7 +3,7 @@
  *
  *   - lists the card's outputs with their EDID name, modes, scale and place in the arrangement;
  *   - decides the configuration of every connected display (display_plan): mode, rotation, scale
- *     (100–200 % in 25 % steps), position in the global logical space, extend or mirror, and the
+ *     (100–300 % in 25 % steps), position in the global logical space, extend or mirror, and the
  *     main display (menu bar and Dock). main.c applies it between frames (display_take_resync);
  *   - live changes are kept per display (EDID identity) and saved on "Keep" in
  *     ~/.config/lordos/displays.json;
@@ -66,7 +66,7 @@ unsigned display_hotplug_seq(void);
 /* JSON for lord.display.list(). Returns a malloc'd string. */
 char *display_list_json(void);
 /* Apply live (not saved): output id, w×h, refresh in mHz (0 = best), rotation 0..3 (×90°), scale in
- * percent (100–200, 25 % steps; 1 and 2 are read as 100 and 200). 0 if accepted. */
+ * percent (100–300, 25 % steps; 1 and 2 are read as 100 and 200). 0 if accepted. */
 int  display_request(uint32_t conn, int w, int h, int refresh_mhz, int rotation, int scale);
 /* Arrangement (extend): drop display conn at logical (x, y) relative to the main display's top-left
  * corner; it snaps next to the others (outputs.c). apply = 0 only computes. Returns 0 and the
