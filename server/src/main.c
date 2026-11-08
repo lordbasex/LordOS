@@ -1474,7 +1474,9 @@ static int gpu_start(Server *s) {
     hw_cursor_move(s);
     s->cursor_gen = 0;
     s->cursor_mode = -1;
-    fprintf(stderr, "gpu: cursor %s\n", s->hw_cursor ? "by hardware (cursor plane)" : "drawn in the composition");
+    if (s->hw_cursor)       /* the plane's size is the driver's (kms.c cursor_cap): a report shows which one it took */
+        fprintf(stderr, "gpu: cursor by hardware (cursor plane, %ux%u)\n", K0(s)->cursor_w, K0(s)->cursor_h);
+    else fprintf(stderr, "gpu: cursor drawn in the composition\n");
     full_damage(s);
     return 0;
 }

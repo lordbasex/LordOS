@@ -37,6 +37,21 @@ and its buffers and the apps' dmabufs become framebuffers with `DRM_IOCTL_MODE_A
 Diagnostics: `LORD_GPU_DEBUG=1` shows the dmabuf formats, failing imports and the frames sent by
 direct scanout. The log says `gpu: GPU composition (renderer…)` or why not.
 
+**Where to set them.** The sessions are started by `lord-sessiond`, not by a shell, so these
+variables go in the service, and `/etc/lordos/session.conf` does not read them:
+
+- for one boot: `lordos.gpu=0` on the kernel line (the boot menu's safe mode, or `e` in grub), and
+  `lordos.swcursor=1` for the GPU without its cursor plane;
+- for good: `sudo systemctl edit lordos.service` and add
+  `[Service]` / `Environment=LORD_GPU=0` (or `Environment=LORD_SW_CURSOR=1`), then log out and
+  `sudo systemctl restart lordos.service`.
+
+`lord-sessiond` passes `LORD_GPU` and `LORD_SW_CURSOR` to the login screen and every session it starts
+(`sessions with …, LORD_GPU=0` in `journalctl -u lordos`). A session that was already open keeps the
+environment it started with: the service's `KillMode=process` keeps sessions across a restart, and
+logging in returns to that session (#57: the login screen had the setting, the desktop after login did not).
+Log out first, or reboot.
+
 **Linux apps' frames (0.8.1 fix).** A Linux app's new frame on the GPU path is only a texture,
 not UI damage. Every GPU display is therefore marked (`Out.wl_new` in `main.c`) and presents it in
 the next frame. Before 0.8.1 nothing was flipped until something else changed, so typing in
@@ -103,7 +118,11 @@ milliseconds no longer turns 60 frames a second into 57.
   flip): zero copies. The buffer is returned to the app when it's no longer on screen.
 - **Cursor:** on the GPU path it goes through the KMS cursor plane (`DRM_IOCTL_MODE_CURSOR2`), so
   moving the mouse composites nothing. If the driver has no cursor plane, it's drawn as a quad
-  (`LORD_SW_CURSOR=1` forces it).
+  (`LORD_SW_CURSOR=1` or `lordos.swcursor=1` forces it). The plane's buffer is the driver's
+  `DRM_CAP_CURSOR_WIDTH/HEIGHT` (0.8.8.6). amdgpu on an RX 580 (cap 128) scanned a 64×64 buffer as
+  128×128: a squashed arrow with colored stripes under it. The same picture came from a FirePro
+  W6150M (Bonaire, Sea Islands) on the radeon driver (#57), which also gives 128 from Sea Islands on;
+  not yet confirmed on that card. The log gives the size: `gpu: cursor by hardware (cursor plane, 128x128)`.
 
 ## The dragged window on the GPU ("GPU drag", 0.8.6)
 
@@ -618,7 +637,7 @@ To test it on the AMD PC (live ISO):
 1. Boot.
 2. In the LordOS Terminal, `grep gpu: ~/.cache/lordos/session.log` (or System Information →
    Hardware → Graphics, 0.8.5): it must say
-   `GPU composition (AMD Radeon …)` and `cursor by hardware (cursor plane)`.
+   `GPU composition (AMD Radeon …)` and `cursor by hardware (cursor plane, …)` (the plane's size, the driver's).
 3. `vkcube`, `glmark2-es2-wayland`, a game (SuperTuxKart, 0 A.D.).
 4. With `LORD_GPU_DEBUG=1`, in fullscreen `direct scanout: N frames` must appear.
 

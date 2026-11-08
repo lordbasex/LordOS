@@ -131,6 +131,9 @@ void sd_cgroup_tick(void);                          /* restarts it if it died */
 
 /* "LORD_GPU=0" with lordos.gpu=0 on the kernel command line (or the service's LORD_GPU), or empty */
 extern char sd_gpu_env[24];
+/* "LORD_SW_CURSOR=1" with lordos.swcursor=1 on the kernel command line (or the service's LORD_SW_CURSOR=1): the
+ * pointer drawn in the composition instead of the GPU's cursor plane, in every session; or empty */
+extern char sd_cursor_env[24];
 /* "LORD_MAIN_DISPLAY=<connector>" for the login screen: the main display last chosen in a session shown on
  * the monitor (kept in /var/lib/lordos/main-display), or empty */
 extern char sd_main_display[64];

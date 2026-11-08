@@ -1458,7 +1458,9 @@ int main(int argc, char **argv) {
                 snprintf(rd_shared->sessions[i].user, sizeof rd_shared->sessions[i].user, "%s", pw->pw_name);
                 break;
             }
-            sd_log("%s's session is still open", pw->pw_name);
+            /* it keeps the environment it started with: LORD_GPU or LORD_SW_CURSOR set since then reach it only
+             * after logging out (KillMode=process keeps sessions across a restart of the service; #57) */
+            sd_log("%s's session is still open (it keeps the GPU settings it started with until it logs out)", pw->pw_name);
         }
         close(fd);
     }
@@ -1472,6 +1474,9 @@ int main(int argc, char **argv) {
         const char *g = getenv("LORD_GPU");
         if (strstr(cmd, "lordos.gpu=0")) snprintf(sd_gpu_env, sizeof sd_gpu_env, "LORD_GPU=0");
         else if (g && (!strcmp(g, "0") || !strcmp(g, "1"))) snprintf(sd_gpu_env, sizeof sd_gpu_env, "LORD_GPU=%s", g);
+        /* the GPU without its cursor plane, for a driver that draws that plane wrong (#57) */
+        const char *swc = getenv("LORD_SW_CURSOR");
+        if (strstr(cmd, "lordos.swcursor=1") || (swc && !strcmp(swc, "1"))) snprintf(sd_cursor_env, sizeof sd_cursor_env, "LORD_SW_CURSOR=1");
         /* key latency trace for this boot (docs/TROUBLESHOOTING.md): only root can ask for it, from the
          * boot menu or the service; timings only, see keylag.h */
         const char *k = getenv("LORD_INPUT_DEBUG");
@@ -1490,7 +1495,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    sd_log("sessions with %s%s%s", rd_conf.server, sd_gpu_env[0] ? ", " : "", sd_gpu_env);
+    sd_log("sessions with %s%s%s%s%s", rd_conf.server, sd_gpu_env[0] ? ", " : "", sd_gpu_env, sd_cursor_env[0] ? ", " : "", sd_cursor_env);
     int wk[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, wk) == 0) { wk_r = wk[0]; wk_w = wk[1]; }
     /* the network belongs to the system: lord-netd brings it up before the greeter (netsup.c) */

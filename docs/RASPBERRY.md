@@ -684,7 +684,7 @@ The order of `card0` and `card1` depends on which driver loads first.
    - the plane's modifiers (with `0x0`, linear, present);
    - `GPU composition (V3D 7.1…)`;
    - `render /dev/dri/renderD128`;
-   - `cursor by hardware (cursor plane)`.
+   - `cursor by hardware (cursor plane, …)`, with the plane's size (0.8.8.6).
 2. `journalctl -u lordos` shows `lord-sessiond: display: /dev/dri/card1` (or whichever).
 3. `LORD_GPU_DEBUG=1`:
    - the list of dmabuf formats EGL announces (it has to include UIF `0x0700000000000006` and

@@ -63,8 +63,11 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
   server never got on it (`PASSWORDS.md`).
 - **GPU:**
   - by default, each session uses it while it's on the monitor;
-  - with `lordos.gpu=0` on the kernel line (grub's safe mode) or `LORD_GPU=0` in the service,
-    lord-sessiond passes `LORD_GPU=0` to all of them;
+  - with `lordos.gpu=0` on the kernel line (grub's safe mode) or `LORD_GPU=0` in the service
+    (`systemctl edit lordos.service`, `Environment=LORD_GPU=0`), lord-sessiond passes `LORD_GPU=0` to
+    all of them; `lordos.swcursor=1` or `LORD_SW_CURSOR=1` keeps the GPU but draws the pointer in the
+    composition. A session already open keeps what it started with (the service's restart keeps it):
+    log out first (`GPU.md`, "Where to set them");
   - `LORD_GPU=1` forces the GPU, even in software (llvmpipe).
 - **Language:** it comes from `/etc/default/locale`. If the user has `~/.config/locale.conf`,
   that one is used, as before.
