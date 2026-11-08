@@ -7,9 +7,10 @@
  * It has no network and never opens a path it wasn't given.
  *
  * DQ_TTS: {"slot","file","text","backend","threads","voice_id","seed"} + optionally a WAV fd (the voice to clone,
- * up to 30 s) → DR_BLOB: a WAV (16-bit mono) in a sealed memfd. The model ("file", relative to the read-only folder
+ * up to 30 s) → DR_BLOB: a WAV (16-bit mono) in a sealed memfd; a sentence with hiss is made again (hiss.c). The model ("file", relative to the read-only folder
  * in "slot") is loaded by the first request and kept; a request for another file or backend is refused. */
 #include "helper.h"
+#include "../tts/hiss.h"
 
 #include <audiocpp.h>
 
@@ -24,6 +25,7 @@
 
 #define TEXT_MAX 4000                  /* one request is a sentence or a few; say splits longer text */
 #define VOICE_MAX_SECONDS 30
+#define HISS_TRIES 3                   /* a noisy sentence is made again with another seed, at most twice */
 #define WAV_MAX (64u << 20)
 
 static audiocpp_registry *reg;
@@ -168,24 +170,40 @@ int tts_handle(const DocMsg *m, const JVal *args) {
         if (!(voice = read_voice(m->fds[0], &frames, &rate))) { audiocpp_request_free(rq); reply_err(m->h.id, "bad-voice", ""); return 1; }
         audiocpp_request_set_voice_audio(rq, voice, frames, rate, 1);
     } else if (voice_id) audiocpp_request_set_voice_id(rq, voice_id);
-    double seed = json_num(args, "seed", -1);
-    if (seed >= 0 && seed <= 4294967295.0) {
-        char sbuf[16];
-        snprintf(sbuf, sizeof sbuf, "%u", (unsigned)seed);
-        audiocpp_request_set_option(rq, "seed", sbuf);
-    }
+    /* now and then a sentence comes out with a bed of hiss under the voice (it depends on the sentence and the seed):
+     * it is made again with another seed, up to HISS_TRIES times, and the cleanest is kept (hiss.c) */
+    double seed = json_num(args, "seed", 7);
+    unsigned base = seed >= 0 && seed <= 4294967295.0 ? (unsigned)seed : 7;
     audiocpp_result *res = NULL;
-    audiocpp_status st = audiocpp_session_run(sess, rq, &res);
-    audiocpp_request_free(rq);
-    free(voice);
     const float *s = NULL;
     size_t frames = 0, size = 0;
     int rate = 0, ch = 0;
-    if (st != AUDIOCPP_OK || !res || audiocpp_result_audio(res, &s, &frames, &rate, &ch) != AUDIOCPP_OK || ch < 1 || rate < 1) {
-        if (res) audiocpp_result_free(res);
-        reply_err(m->h.id, "synthesis", audiocpp_last_error() ? audiocpp_last_error() : "");
-        return 1;
+    double best = 1e9;
+    for (int try = 0; try < HISS_TRIES && best > TTS_HISS_MAX; try++) {
+        char sbuf[16];
+        snprintf(sbuf, sizeof sbuf, "%u", base + (unsigned)try * 1009u);
+        audiocpp_request_set_option(rq, "seed", sbuf);
+        audiocpp_result *r = NULL;
+        const float *rs = NULL;
+        size_t rf = 0;
+        int rr = 0, rc = 0;
+        if (audiocpp_session_run(sess, rq, &r) != AUDIOCPP_OK || !r || audiocpp_result_audio(r, &rs, &rf, &rr, &rc) != AUDIOCPP_OK
+            || rc < 1 || rr < 1) {
+            if (r) audiocpp_result_free(r);
+            if (res) break;                         /* keep the one already made */
+            audiocpp_request_free(rq);
+            free(voice);
+            reply_err(m->h.id, "synthesis", audiocpp_last_error() ? audiocpp_last_error() : "");
+            return 1;
+        }
+        double h = tts_hiss(rs, rf, rr, rc);
+        if (h < best) {
+            if (res) audiocpp_result_free(res);
+            res = r; s = rs; frames = rf; rate = rr; ch = rc; best = h;
+        } else audiocpp_result_free(r);
     }
+    audiocpp_request_free(rq);
+    free(voice);
     int fd = wav_memfd(s, frames, rate, ch, &size);
     audiocpp_result_free(res);
     if (fd < 0) { reply_err(m->h.id, "memory", ""); return 1; }
