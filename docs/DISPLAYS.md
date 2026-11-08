@@ -1,7 +1,7 @@
 # Several displays and sharp HiDPI
 
 LordOS drives every connected display at once, as one desktop (**extend**) or showing the same
-picture (**mirror**), and draws each display at its own scale — 100, 125, 150, 175 or 200 % — with
+picture (**mirror**), and draws each display at its own scale — 100 to 300 % in 25 % steps (the recommended one at most 200 %) — with
 text, vectors and images rasterized at the display's real resolution. A 4K panel at 150 % next to
 a 1080p one at 100 % is sharp on both. Tested on VM 118 (`lordos-notes`) with two virtio-gpu heads
 (1280×800 and 2560×1600), on the CPU path and on the GPU path (Mesa llvmpipe forced).
