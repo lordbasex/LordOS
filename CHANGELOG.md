@@ -10,7 +10,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
+## [0.8.8.6-beta] - 2026-11-08
+
+An update for 0.8.8 to 0.8.8.5 through Store → Updates and `apt` (no new ISO: the 0.8.8 live image stays the current one), with **Voice**: text to speech on the computer, without the internet (`say`, read aloud anywhere with a player, Live Speech, voices you choose in Standard or HD quality, and a Personal Voice made from your own recording); **Monitor → GPU**; the menu bar and the taskbar on every display; and the 34 issues reported on GitHub since 0.8.8.4 (#42 to #75), with the fixes found while checking them.
 
 ### Added
 
@@ -107,6 +109,15 @@ In development as **0.8.8.6-beta**; the latest release is 0.8.8.5-beta.
 - **The login screen opens on the main display you chose.** It runs as its own system user and has no `displays.json`, so it always took the first connected connector: with three monitors on a Radeon RX 580 and the first DisplayPort output dark, the password had to be typed blind. The session shown on the monitor now tells `lord-sessiond` its main display's connector when it changes (`{"a":"display","main":"HDMI-A-1"}`, only `[A-Za-z0-9-]`, up to 31 characters); `lord-sessiond` keeps it in `/var/lib/lordos/main-display` (root's, 0644) and starts the login screen with `LORD_MAIN_DISPLAY`, which its display plan uses when that connector is connected (else the first connected one, as before). The connector, not the monitor's identity, because identical monitors can report the same EDID serial (three Samsung S27F350 here).
 - **The hardware cursor on amdgpu** (Radeon RX 580): the cursor plane is created at the driver's `DRM_CAP_CURSOR_WIDTH/HEIGHT` (128 there) instead of 64×64. The driver scanned a 64×64 buffer as 128×128, squashing the arrow and showing colored stripes read from past the buffer.
 - **"atomic remove_fb failed" kernel warnings** when the GPU path stops (rearranging displays, screen recording, a failed GPU frame): the dumb buffers now go on screen before the GPU's framebuffers are removed. Removing a framebuffer still scanned out makes the kernel try to turn its CRTC off, which amdgpu refuses with a WARNING and a tainted kernel.
+
+### Known issues and limitations
+
+- The voices (`lordos-voice-*`, 142 packages, 4.9 GB in all) come from LordOS's APT repository: Settings → AI → Voice downloads them once that repository is published with them. No voice model is in the `lordos` package or an image.
+- Checked with tests and fixtures, not on the hardware: the Alps I2C touchpad (#43, #54, #67), automatic rotation with an accelerometer (#60), the GPU fan by hand on an AMD card, the menu bar and taskbar on three monitors, NVIDIA's CUDA/NVENC rows in Monitor → GPU, Tailscale and RustDesk from the Store, the Magic Mouse reconnecting at boot (#75), and the `iclouddrive` account's sign-in with a code (#65).
+- The desktop LordOS Imager 0.8.8.6 (#73) is built and signed on the maintainer's machine; its Rust code was not compiled on the Linux build host.
+- Lithuanian is a partial translation (about 9 % of the texts); the rest shows in English.
+- Shells opened before the update keep their old terminal holder until they are reopened (the Terminal's size fix applies to new tabs).
+- Logitech's special keys and buttons (MX Keys, MX Master 3) and their settings come in 0.8.8.7.
 
 ## [0.8.8.5-beta] - 2026-11-07
 
@@ -3625,7 +3636,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...HEAD
+[0.8.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...v0.8.8.6-beta
 [0.8.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...v0.8.8.5-beta
 [0.8.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...v0.8.8.4-beta
 [0.8.8.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...v0.8.8.3-beta
