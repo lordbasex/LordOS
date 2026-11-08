@@ -1,0 +1,11 @@
+# LordOS's defaults for GSettings (installed in /usr/share/glib-2.0/schemas by the lordos package; GLib's
+# dpkg trigger recompiles the schemas). They are defaults only: a value a user or an app stored wins.
+#
+# The window buttons of apps that draw their own title bar (GTK, libadwaita, Firefox, Chromium) come
+# from button-layout. Debian's default is 'appmenu:close', a lone close button on the right (#52). In a
+# LordOS session lord-server writes the theme's layout to the GSettings keyfile and serves it on the
+# settings portal (server/src/ui/portal.c); this default is what an app sees when it can't read either:
+# one restricted to "no access to your files", or one started outside the session. It is Lord Flow's,
+# the default theme's (sdk/theme.js; Lord Classic asks for ':minimize,maximize,close' at run time).
+[org.gnome.desktop.wm.preferences]
+button-layout='close,minimize,maximize:'

@@ -302,6 +302,18 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
 - **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Lord Classic
   theme asks for them on the right with the `gtkButtons` token (`:minimize,maximize,close`). GTK
   apps, Chromium and Firefox move them live when the theme changes.
+- **Where the session can't reach** (0.8.8.6, #52). Debian's default `button-layout` is
+  `appmenu:close`: a lone close button on the right, which is what an app shows when it reads neither
+  the keyfile nor the portal: one restricted to «no access to your files» (its view has no
+  `~/.config/glib-2.0` and no session bus), one started outside the session, or one on X11 (Xwayland),
+  where GTK reads only XSETTINGS, which LordOS doesn't serve. The `lordos` package now ships
+  `/usr/share/glib-2.0/schemas/90_lordos.gschema.override` (GLib's dpkg trigger compiles it) and
+  `/etc/gtk-3.0/settings.ini` and `/etc/gtk-4.0/settings.ini` (`gtk-decoration-layout`), both with
+  Lord Flow's `close,minimize,maximize:`. They are defaults only: a value stored by the user or the
+  theme (the keyfile) wins, and `~/.config/gtk-3.0/settings.ini` wins over `/etc`. Those apps don't
+  follow a theme change to Lord Classic live. `server/tests/gtk_defaults_test.mjs` compiles the
+  override next to Debian's schema and checks that it, `settings.ini`, `sdk/theme.js` and `portal.c`
+  agree.
 - **Qt/KDE.** They use the theme's frame (xdg-decoration). Qt 6 also reads `color-scheme` from the
   portal; not tested.
 - **The JS.** The SDK's `ThemeProvider` sends mode, accent and buttons with `lord.portal.set` when

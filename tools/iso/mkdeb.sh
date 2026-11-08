@@ -32,6 +32,8 @@
 #                                         image or install.sh; the package never selects it)
 #   /usr/share/grub/themes/lordos/        the boot menu theme (the ISO's disk installer and install.sh; unused on a Pi)
 #   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
+#   /usr/share/glib-2.0/schemas/90_lordos.gschema.override, /etc/gtk-{3,4}.0/settings.ini
+#                                         GTK's window-button layout where the session can't give its own (#52)
 #   (not here: /usr/lib/lordos/assets/hwreport/, the signed tested-hardware snapshot, is the lordos-hwdata
 #   package from tools/iso/mkdeb-hwdata.sh, which this one Depends on; docs/BENCHMARK.md)
 #   /usr/lib/lordos/apt/lordos.sources    the signed LordOS repository on lordos.org (updates from the
@@ -265,6 +267,11 @@ install -m 644 tools/iso/grub/lordos/theme.txt tools/iso/grub/lordos/*.png tools
 install -d "$PKG/usr/share/themes"
 cp -r assets/gtk/LordOS assets/gtk/LordOS-dark "$PKG/usr/share/themes/"
 find "$PKG/usr/share/themes" -type d -exec chmod 755 {} +; find "$PKG/usr/share/themes" -type f -exec chmod 644 {} +
+# GTK's defaults where the session can't give its own: the window buttons of apps that draw their
+# title bar (#52; docs/WAYLAND.md). GLib's dpkg trigger compiles the schema override.
+install -D -m 644 assets/gtk/90_lordos.gschema.override "$PKG/usr/share/glib-2.0/schemas/90_lordos.gschema.override"
+install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-3.0/settings.ini"
+install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-4.0/settings.ini"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-netperm.service "$PKG/usr/lib/systemd/system/lord-netperm.service"
 # fans by temperature from the first boot (docs/FANS.md): enabled by postinst, also in a chroot
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-fand.service "$PKG/usr/lib/systemd/system/lord-fand.service"
