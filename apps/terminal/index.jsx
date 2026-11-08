@@ -394,7 +394,7 @@ export default function TerminalApp() {
           <Text style={{ fontSize: 12, fontWeight: 700, color: '#000' }}>{tr('terminal.copyModeBar')}</Text>
         </View>
       )}
-      {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} />}
+      {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} wid={wid} />}
       <Overlays t={t} wid={wid} w={w} sid={sid} tab={tab} />
       {ctx && <ContextMenu t={t} x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} />}
       {w.prefs && <Preferences wid={wid} onClose={() => patchWin(wid, () => ({ prefs: false }))} />}

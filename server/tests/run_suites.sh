@@ -260,6 +260,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ]; then
         run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs
     else skip "terminal-keymap-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
+    run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
+    if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs
+    else skip "terminal-claude-test" "node"; fi
 }
 
 full() {

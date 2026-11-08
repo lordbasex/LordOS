@@ -171,6 +171,9 @@ OCRHELPER ?= $(shell pkg-config --exists tesseract 2>/dev/null && echo 1 || echo
 ifeq ($(OCRHELPER),1)
 ALL += build/lord-ocr
 endif
+# lord-claude-status: Claude Code's status line command when the Terminal is connected to it (src/term/claudebridge.c):
+# keeps Claude Code's status JSON for the Terminal's footer and runs the user's own status line. No libraries.
+ALL += build/lord-claude-status
 # lord-netperm (src/netperm, docs/FIREWALL.md step 2): the root service that applies per-app network
 # permissions with cgroup BPF programs. The programs are compiled with clang -target bpf (BPF=1,
 # if clang is available) and go inside the binary (build/bpf2c → build/gen/np_bpf.h). Without clang it still
@@ -278,7 +281,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr,$(ALL))
 	@sh tests/run_suites.sh full
@@ -787,6 +790,9 @@ build/obj/doc/h_stb.o: src/doc/h_stb.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
 build/lord-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags $(LD_PKGS)) -o $@ $(LD_SRC) build/obj/doc/h_stb.o $(shell pkg-config --libs $(LD_PKGS)) -lm
+build/lord-claude-status: src/term/claudebridge.c src/sec/json.c src/sec/json.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/term/claudebridge.c src/sec/json.c
 LO_SRC := src/doc/helper.c src/doc/h_ocr.c src/doc/wire.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 build/lord-ocr: $(LO_SRC) $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_OCR $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags tesseract) -o $@ $(LO_SRC) $(shell pkg-config --libs tesseract) -lm

@@ -569,8 +569,9 @@ static JSValue f_info(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     Term *t = &s->t;
     JSValue o = JS_NewObject(c);
     char proc[64] = "", cwd[PATH_MAX] = "";
+    pid_t pg = 0;
     if (s->alive) {
-        pid_t pg = tcgetpgrp(s->fd);
+        pg = tcgetpgrp(s->fd);
         proc_comm(pg > 0 ? pg : s->pid, proc, sizeof proc);
         char link[64];
         snprintf(link, sizeof link, "/proc/%d/cwd", (int)(pg > 0 ? pg : s->pid));
@@ -586,6 +587,8 @@ static JSValue f_info(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     JS_SetPropertyStr(c, o, "shell", JS_NewString(c, shell));
     JS_SetPropertyStr(c, o, "busy", JS_NewBool(c, proc[0] && shell[0] && strcmp(proc, shell)));
     JS_SetPropertyStr(c, o, "pid", JS_NewInt32(c, s->pid));
+    /* the foreground program's process group (its leader's pid: Claude Code's ~/.claude/sessions/<pid>.json) */
+    JS_SetPropertyStr(c, o, "fgPid", JS_NewInt32(c, pg > 0 ? (int)pg : (int)s->pid));
     JS_SetPropertyStr(c, o, "alive", JS_NewBool(c, s->alive));
     JS_SetPropertyStr(c, o, "exitCode", JS_NewInt32(c, s->exit_code));
     JS_SetPropertyStr(c, o, "cols", JS_NewInt32(c, t->cols));

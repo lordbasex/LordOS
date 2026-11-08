@@ -80,6 +80,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Text reflow on resize | ✅ | also with wide characters |
 | Mouse modes (1000/1002/1003/1006), focus (1004), bracketed paste (2004), synchronized output (2026) | ✅ | |
 | Files dropped from Files and the clipboard's image paste their shell-quoted path (❖V; Ctrl+V in Claude Code) | ✅ | `apps/terminal/paths.js`; Claude Code attaches a pasted image path |
+| Claude Code in the status bar: working or waiting for you, context used, the plan's 5-hour and weekly limits, model | ✅ | `apps/terminal/claude.js`, `ClaudeBar.jsx`, `lord-claude-status` (`server/src/term/claudebridge.c`); see "Claude Code in the status bar" |
 | A color per tab (right-click a tab), over the profile's; the tab is tinted whole | ✅ | |
 | Keys with modifiers: kitty keyboard protocol flag 1 (disambiguate; `CSI > u`, `< u`, `= u`, `? u`, a stack per screen) and xterm modifyOtherKeys 2 | ✅ | Shift+Enter is `CSI 13;2u` when a program asks (Claude Code: a new line); the other kitty flags (release events, all keys as escapes) aren't supported and the query says so |
 | DA, DSR/CPR, DECRQM, XTVERSION, window size replies | ✅ | |
@@ -163,6 +164,30 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Background image, horizontal spacing | ⏳ |
 | COLR/SVG emoji, ligatures with GPOS positioning (more precise marks over letters) | ⏳ |
 | Automatic updates, Sparkle | — it's updated with LordOS |
+
+## Claude Code in the status bar
+
+While Claude Code runs in a pane, the status bar shows `✳ Claude Code · Opus 5.5 · ● working · ctx ▰▱▱▱▱ 24% · 5h 37% · week 61%`.
+Colors: green up to 50 %, amber up to 80 %, red past it. A narrow window drops the model, then the week, then the 5 hours.
+A click on a percentage shows the exact tokens, when each limit resets and the session's estimated cost.
+
+- **Working / waiting for you:** `~/.claude/sessions/<pid>.json`, which Claude Code keeps for each running session. The pid
+  is the pane's foreground process group (`term.info().fgPid`), and the file is used only when its `pid` matches.
+- **Context and limits:** Claude Code's status line JSON (`context_window.used_percentage`, `rate_limits.five_hour`,
+  `rate_limits.seven_day`; the limits exist only for Pro, Max and Ultra plans). It reaches the Terminal only after
+  **Connect** (in the status bar, or a click on "✳ Claude Code"), which asks first and then puts
+  `/usr/lib/lordos/bin/lord-claude-status` in front of the user's status line command in `~/.claude/settings.json`.
+  A command with shell syntax goes whole through `sh -c`. Everything else in the file is kept, and the previous file is
+  saved as `settings.json.lordos-backup`. An unreadable file is left alone. Disconnect gives the original command back.
+- **lord-claude-status** (`server/src/term/claudebridge.c`, no libraries): Claude Code runs it, as the user, instead of
+  the command it wraps. It keeps the JSON as `~/.cache/lordos/claude/<session_id>.json` (session ids are checked;
+  0600 in a 0700 folder of the user's; no links followed; written whole and renamed; files older than a week removed),
+  then runs the wrapped command with the same stdin, so the status line shows exactly what it did before. lord-server
+  runs nothing: the Terminal only reads those files.
+
+Tests: `server/tests/terminal_claude_test.mjs` (the model, and that the wrapped command prints what the original did)
+and `server/tests/claude_bridge_test.sh` (the bridge: what it keeps, bad session ids, a link in place of the folder,
+the user's command and its exit status), both in `make test`.
 
 ## Shortcuts
 

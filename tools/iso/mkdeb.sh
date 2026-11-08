@@ -101,11 +101,14 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
+# Claude Code's status line bridge for the Terminal's status bar (docs/TERMINAL.md); Claude Code runs it, not lord-server
+install -m 755 server/build/lord-claude-status "$L/bin/lord-claude-status"
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
+"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" 2>/dev/null || true
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
 [ -x "$L/bin/lord-media" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-media" 2>/dev/null || true; }

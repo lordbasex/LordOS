@@ -2,15 +2,19 @@
 // and toasts.
 import {
   View, Text, TextInput, Button, Slider, SearchField, ToolbarButton, Hairline, useStore, useTheme, term, clipboard, clipboardHistory, useClock,
-  t as tr, formatTime,
+  t as tr, formatTime, weekdayName,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   meta, patchWin, getWin, selectTab, closeTab, addTab, tabTitle, sessionTitle, leaves, recentDirs, notes,
-  focusPane, wins, moveTab, commandHistory, captured,
+  focusPane, wins, moveTab, commandHistory, captured, patchMeta, toast,
 } from './state.js';
 import { terminalSettings, getProfile, profileName } from './profiles.js';
 import { programLabel, isClaude } from './paths.js';
+import {
+  sessionFile, snapshotFile, settingsFile, parseSession, parseStatus, parseSettings, isConnected, level, bar, tokens,
+  fitSegments, LEVEL_COLORS,
+} from './claude.js';
 
 const small = (t, extra) => ({ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap', ...extra });
 
@@ -80,10 +84,83 @@ export function TabBar({ t, wid, w, onTabMenu }) {
 
 // ---- status bar ----
 
-export function StatusBar({ t, sid }) {
+// Claude Code in the footer (claude.js): the session file every 2 s, the status line snapshot once connected;
+// whether it is connected is read from ~/.claude/settings.json (a few hundred bytes) only while there is no
+// snapshot, every 4 s, so "Connect" goes soon after connecting.
+function useClaude(info) {
+  const [c, setC] = useState(null);
+  const on = !!info && info.busy && isClaude(info.process);
+  const pid = info?.fgPid;
+  useEffect(() => {
+    if (!on) { setC(null); return undefined; }
+    const home = lord.fs.home();
+    const read = (path) => { try { return lord.fs.read(path); } catch (e) { return null; } };
+    let checked = 0, connected = null;
+    const tick = () => {
+      const s = parseSession(read(sessionFile(home, pid)), pid);
+      const st = s ? parseStatus(read(snapshotFile(home, s.id)), s.id) : null;
+      if (st) connected = true;
+      else if (Date.now() - checked > 4000) { checked = Date.now(); connected = isConnected(parseSettings(read(settingsFile(home)))); }
+      setC(s ? { state: s.state, st, connected } : null);
+    };
+    tick();
+    const id = setInterval(tick, 2000);
+    return () => clearInterval(id);
+  }, [on, pid]);
+  return on ? c : null;
+}
+
+// "Mon 09:00" past today, "23:40" today
+const resetLabel = (ms) => {
+  const d = new Date(ms);
+  return new Date().toDateString() === d.toDateString() ? formatTime(d) : `${weekdayName(d.getDay())} ${formatTime(d)}`;
+};
+
+function ClaudeSegments({ t, wid, sid, c, cols }) {
+  const st = c.st || {};
+  const keys = fitSegments(cols, { state: !!c.state, ctx: st.ctx != null, five: !!st.five, week: !!st.week, model: !!st.model });
+  const row = { flexDirection: 'row', alignItems: 'center', gap: 6 };
+  const withSep = (key, el) => <View key={key} style={row}><Text style={small(t)}>·</Text>{el}</View>;
+  const details = () => {
+    const parts = [];
+    if (st.ctxTokens != null) parts.push(tr('terminal.claude.ctxDetail', { used: tokens(st.ctxTokens), size: st.ctxSize ? tokens(st.ctxSize) : '?' }));
+    if (st.five) parts.push(tr('terminal.claude.fiveDetail', { pct: st.five.pct, time: st.five.resetsAt ? resetLabel(st.five.resetsAt) : '?' }));
+    if (st.week) parts.push(tr('terminal.claude.weekDetail', { pct: st.week.pct, time: st.week.resetsAt ? resetLabel(st.week.resetsAt) : '?' }));
+    if (st.cost != null) parts.push(tr('terminal.claude.costDetail', { cost: st.cost.toFixed(2) }));
+    if (parts.length) toast(wid, parts.join(' · '));
+  };
+  const seg = (key) => {
+    if (key === 'model') return <Text style={small(t)}>{st.model}</Text>;
+    if (key === 'state') {
+      const working = c.state === 'working';
+      return (
+        <Text style={small(t, { color: working ? '#32d74b' : '#ffd60a' })}>
+          {`● ${tr(working ? 'terminal.claude.working' : 'terminal.claude.waiting')}`}
+        </Text>
+      );
+    }
+    const p = key === 'ctx' ? st.ctx : st[key].pct;
+    const label = key === 'ctx' ? `${tr('terminal.claude.ctx')} ${bar(p)} ${p}%` : `${tr(key === 'five' ? 'terminal.claude.five' : 'terminal.claude.week')} ${p}%`;
+    return <Text onClick={details} style={small(t, { color: LEVEL_COLORS[level(p)] })}>{label}</Text>;
+  };
+  const order = ['model', 'state', 'ctx', 'five', 'week'].filter((k) => keys.includes(k));
+  return (
+    <View style={row}>
+      {order.map((k) => withSep(k, seg(k)))}
+      {c.connected === false && withSep('connect', (
+        <Text onClick={() => patchMeta(sid, { claudeConnect: true })} style={small(t, { color: t.accent })}>
+          {tr('terminal.claude.connect')}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+export function StatusBar({ t, sid, wid }) {
   const [info, setInfo] = useState(() => term.info(sid));
   const clock = useClock((d) => formatTime(d), 1000);
   const m = useStore(meta, (x) => x[sid]) || {};
+  const claude = useClaude(info);
   useEffect(() => {
     setInfo(term.info(sid));
     const id = setInterval(() => setInfo(term.info(sid)), 1000);
@@ -92,12 +169,16 @@ export function StatusBar({ t, sid }) {
   if (!info) return null;
   const home = lord.fs.home();
   const cwd = (m.cwd || info.cwd || '').replace(home, '~');
-  const Item = ({ label, color }) => <Text style={small(t, { color: color || t.textDim })}>{label}</Text>;
+  const Item = ({ label, color, onClick }) => <Text onClick={onClick} style={small(t, { color: color || t.textDim })}>{label}</Text>;
   return (
     <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 16, backgroundColor: t.sidebarBg }}>
       <Hairline edge="top" />
       <Item label={cwd || '~'} />
-      <Item label={info.busy ? `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}` : `${info.shell || 'shell'}`} color={info.busy ? (isClaude(info.process) ? '#d97757' : t.accent) : undefined} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Item label={info.busy ? `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}` : `${info.shell || 'shell'}`} color={info.busy ? (isClaude(info.process) ? '#d97757' : t.accent) : undefined}
+          onClick={claude ? () => patchMeta(sid, { claudeConnect: true }) : undefined} />
+        {claude && <ClaudeSegments t={t} wid={wid} sid={sid} c={claude} cols={info.cols} />}
+      </View>
       {m.lastExit > 0 && <Item label={tr('terminal.status.lastExit', { code: m.lastExit })} color="#ff453a" />}
       <View style={{ flex: 1 }} />
       {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
