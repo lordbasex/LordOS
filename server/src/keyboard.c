@@ -245,6 +245,13 @@ void kb_key(int code, int value, KeyInfo *k) {
 
 char *kb_keymap_string(void) { return keymap ? xkb_keymap_get_as_string(keymap, XKB_KEYMAP_FORMAT_TEXT_V1) : NULL; }
 
+int kb_leds(void) {
+    if (!state) return 0;
+    return (xkb_state_led_name_is_active(state, XKB_LED_NAME_NUM) > 0) << LED_NUML |
+           (xkb_state_led_name_is_active(state, XKB_LED_NAME_CAPS) > 0) << LED_CAPSL |
+           (xkb_state_led_name_is_active(state, XKB_LED_NAME_SCROLL) > 0) << LED_SCROLLL;
+}
+
 void kb_mods(uint32_t *depressed, uint32_t *latched, uint32_t *locked, uint32_t *group) {
     *depressed = *latched = *locked = *group = 0;
     if (!state) return;

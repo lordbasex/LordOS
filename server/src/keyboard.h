@@ -34,5 +34,7 @@ void kb_label(int code, int level, char *out, size_t n);
 void kb_labels_end(void);
 int  kb_has_altgr(void);                /* does Right Alt reach a third level in the active layout? */
 void kb_mods(uint32_t *depressed, uint32_t *latched, uint32_t *locked, uint32_t *group);
+/* The keyboard lights the locks should show: bit LED_NUML, LED_CAPSL and LED_SCROLLL (linux/input.h). */
+int  kb_leds(void);
 
 #endif

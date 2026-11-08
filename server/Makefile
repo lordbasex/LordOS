@@ -559,10 +559,10 @@ build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
 build/tp-test: tests/tp_test.c src/tp/tp.c src/tp/tp.h ../tests/touchpad-sim/gestures.c ../tests/touchpad-sim/gestures.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/tp_test.c src/tp/tp.c ../tests/touchpad-sim/gestures.c -lm
-# the on-screen keyboard: devices, allowed keys, the queue and XKB labels
+# the on-screen keyboard: devices, allowed keys, the queue and XKB labels; the lock lights (input.c)
 test: build/osk-test
-build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c -lxkbcommon
+build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h src/input.c src/input.h src/tp/tp.c src/tp/tp.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c src/input.c src/tp/tp.c -lxkbcommon -lm
 	./$@ || (rm -f $@; exit 1)
 
 build/ime-test: tests/ime_test.c src/ime.c src/ime.h src/keyboard.h

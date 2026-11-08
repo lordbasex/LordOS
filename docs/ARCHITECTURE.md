@@ -39,7 +39,7 @@ like React Native but on top of our display server.
 | `server/src/ui/otf.c`, `fonts.c` | **M4 done** | Our own OpenType (GSUB substitutions, CBDT emoji) and catalog of installed fonts: no HarfBuzz or fontconfig |
 | `apps/terminal/` | **M4 done** | Native Terminal app (tabs, panes, profiles…) |
 | `sdk/i18n.js`, `assets/locales/` | **M5 done** | Text, plurals and formats per language and region (see `LANGUAGES.md`) |
-| `server/src/keyboard.c` | **M5 done** | Keyboard with libxkbcommon: every XKB layout, compose |
+| `server/src/keyboard.c` | **M5 done** | Keyboard with libxkbcommon: every XKB layout, compose; the Caps Lock, Num Lock and Scroll Lock lights (`input_set_leds`, EV_LED on the grabbed keyboards) |
 | `server/src/admin.c` | **M5 done** | Privileged helper with closed actions (region, time zone, language packs) |
 | `server/src/ui/bidi.c`, `unicode.c`, `shape.c`, `textlayout.c` | **M5b done** | Full Unicode bidi, Arabic shaping and marks (GSUB/GPOS), per-script font fallback, CJK line breaking, mirrored interface (`direction`) |
 | `server/src/ime.c`, `sdk/ime.js` | **M5b done** | Input methods: Korean, Japanese (SKK), Chinese (pinyin) |

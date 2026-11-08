@@ -2723,6 +2723,7 @@ int main(int argc, char **argv) {
         for (int k = nlost - 1; k >= 0; k--) input_remove(&s.input, lost[k]);
         if (nlost) wl_input_devices_changed();
         if (s.input.count || nlost) keyboards_check(&s);
+        input_set_leds(&s.input, kb_leds());   /* Caps Lock and Num Lock lights follow the keyboard state */
         /* la GPU vuelve cuando ya nadie mira desde la red */
         if (s.gpu_paused && !s.headless && !any_flip_pending(&s) && gpu_allowed(&s)) {
             s.gpu_paused = 0;

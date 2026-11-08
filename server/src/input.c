@@ -43,6 +43,10 @@ static void add_device(Input *in, int fd, const char *path) {
     ioctl(fd, EVIOCGBIT(EV_REL, sizeof rel), rel);
     d->wheel_hires = HAS(rel, REL_WHEEL_HI_RES);
     d->hwheel_hires = HAS(rel, REL_HWHEEL_HI_RES);
+    unsigned long led[NLONGS(LED_MAX + 1)] = {0};
+    if (HAS(ev, EV_LED)) ioctl(fd, EVIOCGBIT(EV_LED, sizeof led), led);
+    for (int l = LED_NUML; l <= LED_SCROLLL; l++) if (HAS(led, l)) d->leds |= 1 << l;
+    d->led_state = -1;
     /* touchpad or touchscreen (multitouch): handled by our own driver (tp/tp.c) */
     d->tp = tp_open(fd, d->name);
     if (d->tp) tablet = 0;
@@ -64,7 +68,8 @@ int input_open(Input *in) {
     for (int i = 0; i < 64 && in->count < INPUT_MAX_DEVICES; i++) {
         char path[32];
         snprintf(path, sizeof path, "/dev/input/event%d", i);
-        int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        int fd = open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC);      /* writable: the lock lights (input_set_leds) */
+        if (fd < 0) fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd >= 0) add_device(in, fd, path);
     }
     return in->count > 0 ? 0 : -1;
@@ -118,6 +123,26 @@ void input_dispatch(Input *in, int idx, InputHandler cb, void *ud) {
             if (d->keyboard && evs[i].type == EV_KEY && evs[i].value == 1 && evs[i].code >= KEY_Q && evs[i].code <= KEY_M) d->typed = 1;
             cb(ud, d, &evs[i]);
         }
+    }
+}
+
+void input_set_leds(Input *in, int mask) {
+    for (int i = 0; i < in->count; i++) {
+        InputDevice *d = &in->dev[i];
+        int want = mask & d->leds;
+        if (!d->leds || want == d->led_state) continue;
+        struct input_event ev[4];
+        int n = 0;
+        memset(ev, 0, sizeof ev);
+        for (int l = LED_NUML; l <= LED_SCROLLL; l++)
+            if (d->leds & 1 << l) { ev[n].type = EV_LED; ev[n].code = (unsigned short)l; ev[n].value = (want >> l) & 1; n++; }
+        ev[n].type = EV_SYN;
+        ev[n].code = SYN_REPORT;
+        n++;
+        /* a device opened read-only or already revoked doesn't take it: not tried again until the lights change */
+        if (write(d->fd, ev, sizeof ev[0] * (size_t)n) < 0 && d->led_state == -1)
+            fprintf(stderr, "input: %s: could not set the lock lights: %s\n", d->name, strerror(errno));
+        d->led_state = want;
     }
 }
 

@@ -1,11 +1,15 @@
 /* osk_test.c — the on-screen keyboard's C side: which devices count as a keyboard, which keys a tap
- * may press, the queue, and the labels of real XKB layouts (skipped without xkb-data). */
+ * may press, the queue, and the labels of real XKB layouts (skipped without xkb-data). Also the
+ * keyboard lock lights (issue #67): what XKB says they are and what input_set_leds writes. */
+#include "../src/input.h"
 #include "../src/keyboard.h"
 #include "../src/osk.h"
 
+#include <fcntl.h>
 #include <linux/input.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAILED line %d: %s\n", __LINE__, #c); fails++; } } while (0)
@@ -126,12 +130,56 @@ static void test_labels(void) {
     kb_key(KEY_H, 0, &k);
 }
 
+/* Caps Lock and Num Lock turn their lights on and off; the device gets EV_LED for the lights it has, once */
+static void test_leds(void) {
+    if (kb_set("us", "")) { printf("  lock lights skipped: needs xkb-data\n"); return; }
+    KeyInfo k;
+    CHECK(kb_leds() == 0);
+    kb_key(KEY_CAPSLOCK, 1, &k);
+    kb_key(KEY_CAPSLOCK, 0, &k);
+    CHECK(kb_leds() == 1 << LED_CAPSL);
+    kb_key(KEY_NUMLOCK, 1, &k);
+    kb_key(KEY_NUMLOCK, 0, &k);
+    CHECK(kb_leds() == (1 << LED_CAPSL | 1 << LED_NUML));
+
+    int p[2];
+    CHECK(!pipe2(p, O_NONBLOCK));
+    Input in;
+    memset(&in, 0, sizeof in);
+    in.count = 2;
+    in.dev[0].fd = p[1];
+    in.dev[0].leds = 1 << LED_NUML | 1 << LED_CAPSL;     /* a laptop keyboard: no Scroll Lock light */
+    in.dev[0].led_state = -1;
+    in.dev[1].fd = -1;                                  /* a mouse: no lights, nothing written */
+    in.dev[1].led_state = -1;
+    input_set_leds(&in, kb_leds());
+    struct input_event ev[8];
+    ssize_t n = read(p[0], ev, sizeof ev);
+    CHECK(n == 3 * (ssize_t)sizeof ev[0]);
+    CHECK(ev[0].type == EV_LED && ev[0].code == LED_NUML && ev[0].value == 1);
+    CHECK(ev[1].type == EV_LED && ev[1].code == LED_CAPSL && ev[1].value == 1);
+    CHECK(ev[2].type == EV_SYN && ev[2].code == SYN_REPORT);
+    input_set_leds(&in, kb_leds());                     /* nothing changed: nothing written */
+    CHECK(read(p[0], ev, sizeof ev) < 0);
+    kb_key(KEY_CAPSLOCK, 1, &k);
+    kb_key(KEY_CAPSLOCK, 0, &k);
+    input_set_leds(&in, kb_leds());
+    n = read(p[0], ev, sizeof ev);
+    CHECK(n == 3 * (ssize_t)sizeof ev[0] && ev[1].code == LED_CAPSL && ev[1].value == 0 && ev[0].value == 1);
+    kb_key(KEY_NUMLOCK, 1, &k);
+    kb_key(KEY_NUMLOCK, 0, &k);
+    CHECK(kb_leds() == 0);
+    close(p[0]);
+    close(p[1]);
+}
+
 int main(void) {
     test_devices();
     test_counts();
     test_keys();
     test_queue();
     test_labels();
+    test_leds();
     if (fails) { printf("%d failed\n", fails); return 1; }
     printf("osk-test: ok\n");
     return 0;
