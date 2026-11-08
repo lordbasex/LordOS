@@ -40,8 +40,11 @@ export async function init() {
   options = (await invoke('load_options')) || {};
   setLanguage(options.lang || info_.lang);
   appearance.set(options.theme || 'auto');
-  await refreshDrives();
-  setInterval(refreshDrives, 2000);        // drives appear and leave: a cheap listing every 2 s
+  // drives appear and leave: the list is asked for again 2 s after the last answer came back (never
+  // while one is still running); the Rust side only lists for real when the disks changed and backs off
+  // after a failure (lordos-imager-core, drives::list_polled)
+  const poll = async () => { try { await refreshDrives(); } finally { setTimeout(poll, 2000); } };
+  await poll();
 }
 
 const toDrive = (d) => ({ ...d, name: d.path.replace(/^\/dev\/r?/, '').replace(/^\\\\\.\\/, ''), rawModel: d.model, readOnly: d.read_only, raw: d });

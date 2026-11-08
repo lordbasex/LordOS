@@ -14,6 +14,8 @@
 //!   manifest asks for administrator rights; volumes on the disk are locked and dismounted first.
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Drive {
@@ -67,13 +69,92 @@ pub(crate) fn mac_listable(internal: bool, removable_media: bool, os_internal: b
     !internal || (removable_media && !os_internal)
 }
 
+/// Windows: start the process without a console window. The app is a window-subsystem program with no
+/// console of its own, so without this flag every `powershell.exe` it starts opens a new console window
+/// on top of the app, and the drive list started one on every poll (issue #73).
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Every helper process the core waits on is built here, so none of them ever shows a window.
+#[allow(dead_code)]
+fn command(cmd: &str) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut c = std::process::Command::new(cmd);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c
+}
+
 #[allow(dead_code)]
 fn run(cmd: &str, args: &[&str]) -> Result<String> {
-    let out = std::process::Command::new(cmd).args(args).output().map_err(|e| Error::new("imager.listFailed", format!("{cmd}: {e}")))?;
+    let out = command(cmd).args(args).output().map_err(|e| Error::new("imager.listFailed", format!("{cmd}: {e}")))?;
     if !out.status.success() {
         return Err(Error::new("imager.listFailed", format!("{cmd}: {}", String::from_utf8_lossy(&out.stderr).trim())));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The app asks for the drive list every 2 s. On Windows a listing starts PowerShell (`Get-Disk`), which
+/// takes a second or more, so a poll answers from the last listing unless something changed: the
+/// listing runs again when the platform's cheap fingerprint (no process) changes, at least every
+/// [`RESCAN_EVERY`], and after a failure only once [`backoff`] has passed, so a listing that keeps
+/// failing is never restarted in a tight loop. Platforms without a fingerprint (`macos`, `linux`, whose
+/// listings are cheap) list on every poll, with the same backoff after a failure. Right before a drive
+/// is opened the app always lists afresh ([`list`]), never from here.
+pub const RESCAN_EVERY: Duration = Duration::from_secs(30);
+pub const BACKOFF_MAX: Duration = Duration::from_secs(60);
+
+/// How long to wait after `failures` failed listings in a row: 2 s, 4 s, 8 s … up to [`BACKOFF_MAX`].
+pub fn backoff(failures: u32) -> Duration {
+    if failures == 0 { return Duration::ZERO; }
+    (Duration::from_secs(2) * (1u32 << (failures - 1).min(5))).min(BACKOFF_MAX)
+}
+
+/// The state behind [`list_polled`], kept apart from the platform so its rules are tested anywhere.
+#[derive(Debug, Default)]
+pub struct Poll {
+    last_try: Option<Instant>,
+    fingerprint: Option<u64>,
+    failures: u32,
+    last: Option<Result<Vec<Drive>>>,
+}
+
+impl Poll {
+    /// Whether a real listing is due now, given the platform's current fingerprint (None: it has none).
+    pub fn due(&self, now: Instant, fp: Option<u64>) -> bool {
+        let Some(t) = self.last_try else { return true };
+        let since = now.saturating_duration_since(t);
+        if self.failures > 0 { return since >= backoff(self.failures); }
+        fp.is_none() || fp != self.fingerprint || since >= RESCAN_EVERY
+    }
+    /// Keeps a listing's outcome and returns it.
+    pub fn record(&mut self, now: Instant, fp: Option<u64>, r: Result<Vec<Drive>>) -> Result<Vec<Drive>> {
+        self.last_try = Some(now);
+        self.fingerprint = fp;
+        self.failures = if r.is_ok() { 0 } else { self.failures.saturating_add(1) };
+        self.last = Some(r.clone());
+        r
+    }
+    /// The last listing's outcome (its error while backing off).
+    pub fn last(&self) -> Result<Vec<Drive>> { self.last.clone().unwrap_or_else(|| Ok(vec![])) }
+    pub fn failures(&self) -> u32 { self.failures }
+}
+
+/// The drive list for the app's poll (see [`Poll`]).
+pub fn list_polled() -> Result<Vec<Drive>> {
+    static POLL: Mutex<Option<Poll>> = Mutex::new(None);
+    let mut g = POLL.lock().unwrap_or_else(|e| e.into_inner());
+    let p = g.get_or_insert_with(Poll::default);
+    #[cfg(windows)]
+    let fp = win::fingerprint();
+    #[cfg(not(windows))]
+    let fp = None;
+    let now = Instant::now();
+    if !p.due(now, fp) { return p.last(); }
+    p.record(now, fp, list())
 }
 
 #[cfg(target_os = "macos")]
@@ -376,6 +457,30 @@ mod win {
         d.id.parse().map_err(|_| Error::new("admin.invalidArgument", ""))
     }
 
+    /// Which disks exist and their sizes, without starting a process: each `\\.\PhysicalDriveN` is
+    /// opened with no access rights and asked its geometry (`IOCTL_DISK_GET_DRIVE_GEOMETRY_EX` needs no
+    /// access either). A stick plugged in or pulled out, or a card put in a reader, changes it.
+    pub(super) fn fingerprint() -> Option<u64> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for n in 0..64u32 {
+            let path: Vec<u16> = format!(r"\\.\PhysicalDrive{n}").encode_utf16().chain([0]).collect();
+            let hd = unsafe { CreateFileW(path.as_ptr(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, std::ptr::null(), OPEN_EXISTING, 0, std::ptr::null_mut()) };
+            if hd == INVALID_HANDLE_VALUE { continue; }
+            // DISK_GEOMETRY_EX is 32 bytes plus its variable data; 256 bytes, 8-aligned, holds it
+            let mut buf = [0u64; 32];
+            let mut got = 0u32;
+            let ok = unsafe {
+                DeviceIoControl(hd, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, std::ptr::null(), 0, buf.as_mut_ptr().cast(),
+                    std::mem::size_of_val(&buf) as u32, &mut got, std::ptr::null_mut())
+            } != 0;
+            let size = if ok { unsafe { (*(buf.as_ptr() as *const DISK_GEOMETRY_EX)).DiskSize } } else { 0 };
+            unsafe { CloseHandle(hd) };
+            (n, size).hash(&mut h);
+        }
+        Some(h.finish())
+    }
+
     fn ps(script: &str) -> Result<String> {
         run("powershell.exe", &["-NoProfile", "-NonInteractive", "-Command", script])
     }
@@ -467,5 +572,56 @@ mod tests {
         assert!(!mac_listable(true, false, true));
         assert!(!mac_listable(true, false, false));
         assert!(!mac_listable(true, true, true));
+    }
+
+    #[test]
+    fn backoff_doubles_up_to_a_minute() {
+        let s = |n| Duration::from_secs(n);
+        assert_eq!(backoff(0), Duration::ZERO);
+        assert_eq!([1, 2, 3, 4, 5].map(backoff), [s(2), s(4), s(8), s(16), s(32)]);
+        assert_eq!(backoff(6), BACKOFF_MAX);
+        assert_eq!(backoff(u32::MAX), BACKOFF_MAX);
+    }
+
+    #[test]
+    fn poll_lists_again_only_when_something_changed() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut p = Poll::default();
+        assert!(p.due(t0, Some(1)));
+        assert_eq!(p.record(t0, Some(1), Ok(vec![])), Ok(vec![]));
+        // the same disks: answered from the last listing, every 2 s poll, until RESCAN_EVERY
+        for ms in (2_000..30_000).step_by(2_000) { assert!(!p.due(at(ms), Some(1))); }
+        assert!(p.due(at(30_000), Some(1)));
+        // a stick plugged in changes the fingerprint
+        assert!(p.due(at(2_000), Some(2)));
+        // no fingerprint (macos, linux): every poll lists
+        assert!(p.due(at(2_000), None));
+    }
+
+    #[test]
+    fn poll_backs_off_after_failures_and_recovers() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let bad = || Err(Error::new("imager.listFailed", "powershell.exe"));
+        let mut p = Poll::default();
+        assert!(p.record(t0, Some(1), bad()).is_err());
+        // 2 s after the first failure, not before, even with a new fingerprint
+        assert!(!p.due(at(1_999), Some(2)));
+        assert!(!p.due(at(1_999), None));
+        assert!(p.due(at(2_000), Some(1)));
+        // while waiting, the poll answers with the failure
+        assert_eq!(p.last(), bad());
+        assert!(p.record(at(2_000), Some(1), bad()).is_err());
+        assert!(!p.due(at(5_999), Some(1)));
+        assert!(p.due(at(6_000), Some(1)));
+        for i in 0..20 { let _ = p.record(at(10_000 + i), Some(1), bad()); }
+        assert_eq!(p.failures(), 22);
+        assert!(!p.due(at(10_019 + 59_999), None));
+        assert!(p.due(at(10_019 + 60_000), None));
+        // a good listing clears the count
+        assert!(p.record(at(80_000), Some(1), Ok(vec![])).is_ok());
+        assert_eq!(p.failures(), 0);
+        assert!(!p.due(at(82_000), Some(1)));
     }
 }

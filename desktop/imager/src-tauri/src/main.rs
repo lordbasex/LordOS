@@ -71,7 +71,7 @@ fn platform(st: State<App>) -> Platform {
 
 #[tauri::command]
 async fn list_drives() -> Res<Vec<drives::Drive>> {
-    tauri::async_runtime::spawn_blocking(|| drives::list().map_err(err)).await.map_err(|e| code("imager.listFailed", e.to_string()))?
+    tauri::async_runtime::spawn_blocking(|| drives::list_polled().map_err(err)).await.map_err(|e| code("imager.listFailed", e.to_string()))?
 }
 
 // ---- releases and downloads (only GitHub's LordOS releases; the signature decides what is trusted) ----

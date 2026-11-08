@@ -132,7 +132,16 @@ user's folders). It writes nothing and runs nothing.
     powered off through udisks2 too. The `.deb` depends on `udisks2`.
   - Windows download: `Get-Disk` (USB, SD and MMC bus types; never a boot or system disk); the
     `.exe` carries an administrator manifest (`requireAdministrator`); every volume on the disk is
-    locked and dismounted before writing.
+    locked and dismounted before writing. PowerShell (and any other helper process) is started with
+    `CREATE_NO_WINDOW`, so no console window ever appears: up to 0.8.6 each drive listing opened an
+    empty PowerShell window over the app, once per poll
+    ([#73](https://github.com/lordbasex/LordOS/issues/73)).
+  - **Drive polling:** the app asks for the list 2 s after the previous answer came back (never two at
+    once). On Windows the core answers from the last `Get-Disk` listing unless the disks changed: a
+    fingerprint taken without starting a process (each `\\.\PhysicalDriveN` opened with no access
+    rights and asked its size) decides, with a full listing at least every 30 s. A failed listing is
+    retried after 2, 4, 8, 16, 32 and then every 60 s, never in a tight loop
+    (`drives::list_polled`). Right before writing, the drive is always listed afresh.
 - **The same pipeline** as in LordOS: signature and hash before erasing, decompression while
   writing with the file hashed again, read back and compare, wipe on failure or cancel.
 - **Secrets** are derived in Rust: the password as SHA-512 crypt with 200 000 rounds (`$6$`, accepted
@@ -327,7 +336,7 @@ The containers keep their own `node_modules` and cargo target folders in named v
 | `build/firstrun-fuzz` | the same with 300 000 mutations under ASan and UBSan | 0 errors |
 | `build/imager-test` (ASan/UBSan) | the real 0.8.1 `SHA256SUMS` signature: good, without the newline, tampered list, truncated list, tampered signature, missing, short, not base64, other key; the key's fingerprint; `SHA256SUMS` lookups; names and tags; the `.xz` index on one stream, many blocks, two streams and stream padding, every byte of the last 64 flipped, 40 truncations, 8 000 random edits | 461 checks |
 | `tests/imager_core_test.mjs` | the shared JS: validators, the first-run writer (and every file it writes parsed by the C parser), profiles without secrets, the release list (with hostile names and tags) | 79 checks |
-| `desktop/imager/core` (`cargo test`) | the Rust core: the same signature fixtures and the 0.8.0 signature over the 0.8.1 list, the key fingerprint, the `.xz` index, the IEEE 802.11i PSK vector, glibc's SHA-512 crypt vectors, write + verify of raw and two-stream `.xz` images to a file standing in for a device, refusals (too large, a changed file wipes the device), cancel in the middle wipes the device | 7 tests, on the development machine and on Linux |
+| `desktop/imager/core` (`cargo test`) | the Rust core: the same signature fixtures and the 0.8.0 signature over the 0.8.1 list, the key fingerprint, the `.xz` index, the IEEE 802.11i PSK vector, glibc's SHA-512 crypt vectors, write + verify of raw and two-stream `.xz` images to a file standing in for a device, refusals (too large, a changed file wipes the device), cancel in the middle wipes the device; in `drives.rs`, the Mac SD slot rule and the drive poll (2 s … 60 s backoff after failures, a new listing only when the disk fingerprint changes or after 30 s) | 7 tests, on the development machine and on Linux; the 3 drive-poll unit tests (issue #73) not run yet |
 | `server/tests/imager_write_test.sh` (root, VM 116) | `imager-write` against a virtual USB stick (the kernel's USB gadget over a file): 17 refusals (internal disk even for an administrator, system disk, partition, wrong size/model/serial, tampered list, another release's signature, missing signature, unlisted image, too large, broken `.xz`, a link to `/etc/shadow`, a file outside the home, not an image, missing signature lines, a control character), a custom image and the official 0.8.1 image written and read back independently, cancel in the middle (first MiB wiped), another user can't cancel | 24/24 |
 | `server/tests/firstrun_image_test.sh` (root, VM 116) | the real 0.8.3 Raspberry Pi image written by `imager-write`, the first-run file put on its boot partition as the user, then `lordos-firstrun --root --boot`: every file it should write, owners and modes, nothing else changed in `cmdline.txt`/`config.txt`, no Wi-Fi password anywhere, the file shredded, and a broken file applies nothing | 25/25 |
 | Native app on VM 116 | the whole flow with the 0.8.3 image to the virtual stick: written and verified; the first-run file it wrote parses, its yescrypt hash verifies with `crypt(3)` and its PSK matches `pbkdf2_hmac` | ✓ |
