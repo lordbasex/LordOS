@@ -201,6 +201,9 @@ export function setMainDisplay(conn) {
   return ok;
 }
 export function setCaptureAllDisplays(on) { return has('display') && lord.display.setCaptureAll ? lord.display.setCaptureAll(on) : false; }
+// Settings → Displays, "Rotate automatically": the built-in panel follows the accelerometer (lord-server
+// saves it in displays.json and sends the new list).
+export function setAutoRotateDisplays(on) { return has('display') && lord.display.setAutoRotate ? lord.display.setAutoRotate(on) : false; }
 
 // System dialogs are drawn outside the theme's provider: light or dark from the user's setting.
 function useSystemTokens() {

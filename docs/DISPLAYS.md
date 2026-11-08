@@ -128,7 +128,9 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
   (`wl_gpu_draw_layer` converts with `paint_view`). Direct scanout only with one display. The
   hardware cursor goes on the plane of the display under the pointer; the others hide theirs.
 - **Rotation** is per display (the frame is composed upright and copied rotated). A rotated
-  display turns the GPU path off, as before.
+  display turns the GPU path off, as before. With an accelerometer, the built-in panel can also
+  turn by itself ("Rotate automatically", `hw/accel.c`, docs/SETTINGS.md): the orientation is
+  added to the chosen rotation, and a touchscreen turns with its panel.
 - **The window-drag layer** (`docs/WINDOWS.md`) belongs to the display with most of the window:
   its layer and "what is below" are in that display's physical pixels. On the other displays the
   window is painted normally while it crosses.

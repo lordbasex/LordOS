@@ -11,7 +11,9 @@
  *     copying frames when a card has no gamma (virtio-gpu, some ARM boards);
  *   - idle: screen off (DPMS on every display) after N seconds without input, plus "lock" and
  *     "sleep" notices for the theme. Deadlines go into the main loop's poll timeout: no polling;
- *   - hotplug: hw/uevent.c calls display_hotplug() on a DRM "change" uevent. */
+ *   - hotplug: hw/uevent.c calls display_hotplug() on a DRM "change" uevent;
+ *   - automatic rotation of the built-in panel from the accelerometer (hw/accel.h): its orientation is
+ *     added to the chosen rotation, is never saved, and is read only while the screen is on. */
 #ifndef LORD_HW_DISPLAY_H
 #define LORD_HW_DISPLAY_H
 
@@ -33,7 +35,9 @@ typedef struct {
     uint32_t conn;
     char id[96], name[64], connector[32];
     struct drm_mode_modeinfo mode;
-    int rot;                            /* 0..3: ×90° clockwise, by software */
+    int rot;                            /* 0..3: ×90° clockwise, by software (the chosen one + auto_rot) */
+    int auto_rot;                       /* what automatic rotation added (built-in panel, accel.h) */
+    int builtin;                        /* eDP, LVDS or DSI: the panel of a laptop or a tablet */
     int scale;                          /* percent: 100, 125, 150, 175, 200 */
     int recommended;
     int mm_w, mm_h;
@@ -80,6 +84,12 @@ int  display_capture_all(void);
 /* Save the current configuration (modes, scales, arrangement, mirror, main display). 0 if written. */
 int  display_save(uint32_t conn);
 int  display_cpu_only(void);            /* a rotated display: composed by the CPU, no GPU path */
+/* Settings → Displays, "Rotate automatically" (hw/accel.h): the built-in panel follows the
+ * accelerometer. Saved in displays.json at once; unset, it is on for a tablet or convertible chassis. */
+void display_set_auto_rotate(int on);
+int  display_auto_rotate(void);         /* on, and there is an accelerometer */
+/* The rotation a touchscreen's positions go through: the built-in panel's, or the only display's. */
+int  display_touch_rotation(void);
 const DisplayPlan *display_current(void);   /* the plan main.c applied last (n = 0 before any) */
 
 /* Software rotation (CPU path): rect r of the upright frame (lw×lh) in physical coordinates of the

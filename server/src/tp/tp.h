@@ -77,6 +77,10 @@ const TpConfig *tp_config(void);
 void tp_set_config(const TpConfig *c);
 void tp_set_sink(const TpSink *s, void *ud);
 void tp_set_screen(int w, int h);       /* for touchscreens (mm → pixels) */
+/* A touchscreen's panel turned (0..3, ×90° clockwise, as Settings → Displays and automatic rotation
+ * turn the picture): its positions, scroll and pinch follow the picture. Taken by each touchscreen
+ * between touches, never in the middle of one. */
+void tp_set_rotation(int rot);
 
 /* Looks at the fd: if it's a touchpad or touchscreen it returns the device (and sets the monotonic
  * clock on its events); otherwise, NULL. */

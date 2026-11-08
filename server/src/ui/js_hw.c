@@ -162,6 +162,13 @@ static JSValue f_display_capture(JSContext *c, JSValueConst t, int argc, JSValue
     return JS_NewBool(c, display_capture_all());
 }
 
+/* Settings → Displays, "Rotate automatically" (shown only when there is an accelerometer) */
+static JSValue f_display_auto_rotate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc > 0) display_set_auto_rotate(JS_ToBool(c, argv[0]) > 0);
+    return JS_NewBool(c, display_auto_rotate());
+}
+
 static JSValue f_display_save(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     int conn = argc ? arg_int(c, argv[0], 0) : 0;
@@ -221,6 +228,7 @@ static const JSCFunctionListEntry display_funcs[] = {
     JS_CFUNC_DEF("setMirror", 1, f_display_mirror),
     JS_CFUNC_DEF("setMain", 1, f_display_main),
     JS_CFUNC_DEF("setCaptureAll", 1, f_display_capture),
+    JS_CFUNC_DEF("setAutoRotate", 1, f_display_auto_rotate),
     JS_CFUNC_DEF("setTemperature", 1, f_display_set_temp),
     JS_CFUNC_DEF("temperature", 0, f_display_temp),
     JS_CFUNC_DEF("sun", 4, f_display_sun),

@@ -73,6 +73,8 @@
   "defaults.tag": "{name} (padrão)",
   "display.arrangeHint": "Arraste as telas para organizá-las; elas se encaixam borda com borda. Clique em uma para identificá-la. A barra branca marca a tela principal (barra de menus e Dock).",
   "display.arrangement": "Disposição",
+  "display.autoRotate": "Girar automaticamente",
+  "display.autoRotateHint": "A tela integrada e o toque giram com o aparelho, conforme o acelerômetro. A rotação acima define qual lado fica para cima com o aparelho na posição normal.",
   "display.brightness": "Brilho",
   "display.capture": "Capturas e compartilhamento",
   "display.captureAll": "Todas as telas",

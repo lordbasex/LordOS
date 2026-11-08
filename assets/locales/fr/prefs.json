@@ -73,6 +73,8 @@
   "defaults.tag": "{name} (par défaut)",
   "display.arrangeHint": "Faites glisser les écrans pour les disposer ; ils s’aimantent bord à bord. Cliquez sur l’un d’eux pour l’identifier. La barre blanche indique l’écran principal (barre de menus et Dock).",
   "display.arrangement": "Disposition",
+  "display.autoRotate": "Rotation automatique",
+  "display.autoRotateHint": "L’écran intégré et son tactile pivotent avec l’appareil, d’après son accéléromètre. La rotation ci-dessus indique le haut quand l’appareil est tenu normalement.",
   "display.brightness": "Luminosité",
   "display.capture": "Captures et partage",
   "display.captureAll": "Tous les écrans",

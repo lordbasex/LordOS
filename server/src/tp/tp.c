@@ -83,7 +83,9 @@ enum { T_IDLE, T_TOUCH, T_TAPPED, T_DRAG_OR_DOUBLE, T_DRAGGING, T_DEAD };
 struct TpDevice {
     TpCaps c;
     int fd;
-    double rx, ry, wmm, hmm;        /* units per mm, size in mm */
+    double rx, ry, wmm, hmm;        /* units per mm, size in mm (a touchscreen's: as the picture turned) */
+    double wmm0, hmm0;              /* the sensor's own size in mm */
+    int turn;                       /* touchscreen: the rotation its positions go through (tp_set_rotation) */
     Slot s[MAX_SLOTS];
     Slot junk;                      /* events of a slot beyond MAX_SLOTS go here */
     int cur, tool, dropped;
@@ -126,6 +128,7 @@ static TpConfig cfg = { .speed = 0.5, .mouse_speed = 0.5, .tap = 1, .tap_drag = 
 static const TpSink *sink;
 static void *sink_ud;
 static int scr_w = 1920, scr_h = 1080;
+static int ts_rot;                  /* tp_set_rotation */
 static double last_key = -1e12;
 static int typing;                  /* the last key came less than DWT_TIME after the one before */
 static TpDevice *devs[MAX_DEVS];
@@ -143,6 +146,7 @@ void tp_set_config(const TpConfig *c) {
 }
 void tp_set_sink(const TpSink *s, void *ud) { sink = s; sink_ud = ud; }
 void tp_set_screen(int w, int h) { if (w > 0 && h > 0) { scr_w = w; scr_h = h; } }
+void tp_set_rotation(int rot) { ts_rot = rot & 3; }
 
 static double mono_ms(void) {
     struct timespec t;
@@ -227,8 +231,8 @@ TpDevice *tp_new(const TpCaps *caps) {
     /* no resolution: a 100 mm wide touchpad is assumed (or 300 mm for a screen); those of hover_pad ~104 × 75 */
     d->rx = d->c.x.resolution > 0 ? d->c.x.resolution : w / (d->c.kind == TP_KIND_TOUCHSCREEN ? 300.0 : d->by_size ? SIZE_W_MM : 100.0);
     d->ry = d->c.y.resolution > 0 ? d->c.y.resolution : d->by_size ? h / SIZE_H_MM : d->rx;
-    d->wmm = w / d->rx;
-    d->hmm = h / d->ry;
+    d->wmm = d->wmm0 = w / d->rx;
+    d->hmm = d->hmm0 = h / d->ry;
     for (int i = 0; i < MAX_SLOTS; i++) d->s[i].id = -1;
     devs[ndevs++] = d;
     return d;
@@ -331,8 +335,23 @@ static double dwt_time(void) { return typing ? DWT_TIME : DWT_KEY_TIME; }
 /* ---- contacts ---- */
 
 static void slot_mm(TpDevice *d, Slot *s) {
-    s->mx = (s->x - d->c.x.minimum) / d->rx;
-    s->my = (s->y - d->c.y.minimum) / d->ry;
+    double x = (s->x - d->c.x.minimum) / d->rx, y = (s->y - d->c.y.minimum) / d->ry;
+    /* a turned touchscreen: the sensor's point in the picture's frame (as display_unrotate_point) */
+    switch (d->c.kind == TP_KIND_TOUCHSCREEN ? d->turn : 0) {
+    case 1: s->mx = y; s->my = d->wmm0 - x; break;
+    case 2: s->mx = d->wmm0 - x; s->my = d->hmm0 - y; break;
+    case 3: s->mx = d->hmm0 - y; s->my = x; break;
+    default: s->mx = x; s->my = y; break;
+    }
+}
+
+/* tp_set_rotation reaches a touchscreen with no finger on it */
+static void ts_turn(TpDevice *d) {
+    if (d->c.kind != TP_KIND_TOUCHSCREEN || d->turn == ts_rot) return;
+    for (int i = 0; i < d->c.nslots; i++) if (d->s[i].was) return;
+    d->turn = ts_rot;
+    d->wmm = d->turn & 1 ? d->hmm0 : d->wmm0;
+    d->hmm = d->turn & 1 ? d->wmm0 : d->hmm0;
 }
 
 static double edge_zone(TpDevice *d) { double z = d->wmm * 0.07; return z > 7 ? 7 : z; }
@@ -917,6 +936,7 @@ static void frame(TpDevice *d) {
     double dt = d->prev_t > 0 ? (d->now - d->prev_t) / 1000.0 : 0.012;
     if (dt < 0.004) dt = 0.004;
     if (dt > 0.05) dt = 0.05;
+    ts_turn(d);
     for (int i = 0; i < d->c.nslots; i++) {
         Slot *s = &d->s[i];
         s->down = firm(d, s);

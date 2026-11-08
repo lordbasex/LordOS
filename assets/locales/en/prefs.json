@@ -73,6 +73,8 @@
   "defaults.tag": "{name} (default)",
   "display.arrangeHint": "Drag the displays to arrange them; they snap edge to edge. Click one to identify it. The white bar marks the main display (menu bar and Dock).",
   "display.arrangement": "Arrangement",
+  "display.autoRotate": "Rotate automatically",
+  "display.autoRotateHint": "The built-in screen and its touch turn with the device, following its accelerometer. Rotation above sets which way is up when the device is held normally.",
   "display.brightness": "Brightness",
   "display.capture": "Screenshots and sharing",
   "display.captureAll": "All displays",

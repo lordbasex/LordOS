@@ -1,5 +1,6 @@
 /* display.c — Settings → Displays, lord-server side (see display.h, docs/DISPLAYS.md). */
 #include "display.h"
+#include "accel.h"
 #include "edid.h"
 #include "jbuf.h"
 #include "modes.h"
@@ -47,7 +48,11 @@ static struct {
     int blank_pending;                  /* display_blank: turn off as soon as there is a card */
     int sleep_first_s;                  /* the first sleep deadline when it differs (until the next input) */
     double off_at;                      /* when the screen went off after idle (CLOCK_MONOTONIC ms) */
-} D = { .kelvin = NIGHT_K_MAX };
+    /* automatic rotation (accel.h) */
+    int auto_pref;                      /* displays.json "autoRotate": -1 unset (by the chassis), 0, 1 */
+    int orient;                         /* the accelerometer's rotation added to the built-in panel's */
+    AccelFilter af;
+} D = { .kelvin = NIGHT_K_MAX, .auto_pref = -1 };
 
 static void apply_tint_all(void);
 static int save_now(void);
@@ -148,6 +153,8 @@ static void load(void) {
     D.saved.mirror = mv && mv->type == J_BOOL && mv->num != 0;
     const JVal *ca = json_get(doc.root, "captureAll");
     D.capture_all = ca && ca->type == J_BOOL && ca->num != 0;
+    const JVal *ar = json_get(doc.root, "autoRotate");
+    D.auto_pref = ar && ar->type == J_BOOL ? ar->num != 0 : -1;
     const JVal *ds = json_get(doc.root, "displays");
     for (const JVal *v = ds && ds->type == J_OBJ ? ds->kid : NULL; v && D.saved.n < MAX_SAVED; v = v->next) {
         if (v->type != J_OBJ || !v->key || strlen(v->key) >= ID_MAX) continue;
@@ -183,7 +190,9 @@ static int store(void) {
     HBuf b = { 0 };
     hb_printf(&b, "{\n  \"main\": ");
     hb_str(&b, D.saved.main_id);
-    hb_printf(&b, ",\n  \"mirror\": %s,\n  \"captureAll\": %s,\n  \"displays\": {", D.saved.mirror ? "true" : "false", D.capture_all ? "true" : "false");
+    hb_printf(&b, ",\n  \"mirror\": %s,\n  \"captureAll\": %s,", D.saved.mirror ? "true" : "false", D.capture_all ? "true" : "false");
+    if (D.auto_pref >= 0) hb_printf(&b, "\n  \"autoRotate\": %s,", D.auto_pref ? "true" : "false");
+    hb_printf(&b, "\n  \"displays\": {");
     for (int i = 0; i < D.saved.n; i++) {
         const Cfg *s = &D.saved.c[i];
         hb_printf(&b, "%s\n    ", i ? "," : "");
@@ -268,6 +277,11 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         if (mi < 0) mi = 0;
         d->mode = k->modes[mi];
         d->rot = f ? f->rot & 3 : 0;
+        d->builtin = k->type == DRM_MODE_CONNECTOR_eDP || k->type == DRM_MODE_CONNECTOR_LVDS || k->type == DRM_MODE_CONNECTOR_DSI;
+        if (d->builtin && D.orient && display_auto_rotate()) {
+            d->auto_rot = D.orient;
+            d->rot = (d->rot + D.orient) & 3;
+        }
         int pw = d->rot & 1 ? d->mode.vdisplay : d->mode.hdisplay, ph = d->rot & 1 ? d->mode.hdisplay : d->mode.vdisplay;
         d->mm_w = (int)(d->rot & 1 ? k->mm_h : k->mm_w);
         d->mm_h = (int)(d->rot & 1 ? k->mm_w : k->mm_h);
@@ -334,6 +348,53 @@ const DisplayPlan *display_current(void) { return &D.cur; }
 int display_cpu_only(void) {
     for (int i = 0; i < D.cur.n; i++) if (D.cur.o[i].rot) return 1;
     return 0;
+}
+
+/* ---- automatic rotation ---- */
+
+int display_auto_rotate(void) {
+    static int chassis = -1;
+    if (!accel_present()) return 0;
+    if (D.auto_pref >= 0) return D.auto_pref;
+    if (chassis < 0) chassis = accel_chassis_tablet(NULL);
+    return chassis;
+}
+
+int display_touch_rotation(void) {
+    for (int i = 0; i < D.cur.n; i++) if (D.cur.o[i].builtin) return D.cur.o[i].rot;
+    return D.cur.n == 1 ? D.cur.o[0].rot : 0;
+}
+
+/* The plan changes without the user asking: what is shown now is what a failure goes back to. */
+static void auto_resync(void) {
+    if (!D.dirty) D.undo = D.live;
+    D.dirty = 1;
+}
+
+void display_set_auto_rotate(int on) {
+    on = on != 0;
+    int was = display_auto_rotate();
+    D.auto_pref = on;
+    store();
+    accel_filter_init(&D.af);           /* the next reading counts at once */
+    if (was && !on && D.orient) { D.orient = 0; auto_resync(); }
+    notify_list();
+}
+
+/* Reads only while it matters: on, on the monitor and with the screen lit. */
+static int auto_active(void) { return kms() && !D.off && display_auto_rotate(); }
+
+static void auto_tick(double now) {
+    int on = auto_active();
+    accel_want(on);
+    double v[3];
+    if (!on || !accel_latest(v) || !accel_filter_feed(&D.af, now, v[0], v[1], v[2])) return;
+    int o = D.af.cur >= 0 ? D.af.cur : 0;
+    if (o == D.orient) return;
+    D.orient = o;
+    int builtin = 0;
+    for (int i = 0; i < D.cur.n; i++) builtin |= D.cur.o[i].builtin;
+    if (builtin) { fprintf(stderr, "displays: automatic rotation, %d degrees\n", o * 90); auto_resync(); }
 }
 
 /* ---- Night Light ---- */
@@ -454,8 +515,9 @@ static void out_json(HBuf *b, const KmsOutput *all, int i) {
     int pref = mode_preferred(o->modes, o->nmodes);
     hb_printf(b, ",\"preferred\":{\"w\":%d,\"h\":%d}", pref >= 0 ? o->modes[pref].hdisplay : 0, pref >= 0 ? o->modes[pref].vdisplay : 0);
     if (d) {
-        hb_printf(b, ",\"mode\":{\"w\":%u,\"h\":%u,\"refresh\":%d},\"rotation\":%d,\"scale\":%d,\"recommended\":%d", d->mode.hdisplay,
-                  d->mode.vdisplay, mode_refresh_mhz(&d->mode), d->rot, d->scale, d->recommended);
+        /* rotation: the one chosen in Settings; autoRotation: what the accelerometer adds to it */
+        hb_printf(b, ",\"mode\":{\"w\":%u,\"h\":%u,\"refresh\":%d},\"rotation\":%d,\"autoRotation\":%d,\"scale\":%d,\"recommended\":%d", d->mode.hdisplay,
+                  d->mode.vdisplay, mode_refresh_mhz(&d->mode), (d->rot - d->auto_rot) & 3, d->auto_rot, d->scale, d->recommended);
         hb_printf(b, ",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"pw\":%d,\"ph\":%d", d->v.x, d->v.y, d->v.w, d->v.h, d->v.pw, d->v.ph);
     } else {
         int pw = pref >= 0 ? o->modes[pref].hdisplay : 0, ph = pref >= 0 ? o->modes[pref].vdisplay : 0;
@@ -481,9 +543,10 @@ char *display_list_json(void) {
     HBuf b = { 0 };
     const DisplayOut *m = D.cur.n ? &D.cur.o[D.cur.main] : NULL;
     hb_printf(&b, "{\"onMonitor\":%s,\"scale\":%d,\"rotation\":%d,\"mirror\":%s,\"captureAll\":%s,\"width\":%d,\"height\":%d,"
-                  "\"temperature\":%d,\"gammaSize\":%d,\"softTint\":%s,\"maxOutputs\":%d,\"outputs\":[",
+                  "\"temperature\":%d,\"gammaSize\":%d,\"softTint\":%s,\"maxOutputs\":%d,\"accelerometer\":%s,\"autoRotate\":%s,\"outputs\":[",
               k ? "true" : "false", m ? m->scale : 100, m ? m->rot : 0, D.cur.mirror ? "true" : "false", D.capture_all ? "true" : "false",
-              D.cur.bw, D.cur.bh, D.kelvin, k ? kms_gamma_size(k) : 0, D.soft ? "true" : "false", OUT_MAX);
+              D.cur.bw, D.cur.bh, D.kelvin, k ? kms_gamma_size(k) : 0, D.soft ? "true" : "false", OUT_MAX,
+              accel_present() ? "true" : "false", display_auto_rotate() ? "true" : "false");
     if (k) {
         KmsOutput outs[KMS_MAX_OUTPUTS];
         int n = kms_outputs(k->fd, outs, KMS_MAX_OUTPUTS), first = 1;
@@ -669,7 +732,7 @@ static int save_now(void) {
         s->w = d->mode.hdisplay;
         s->h = d->mode.vdisplay;
         s->refresh = mode_refresh_mhz(&d->mode);
-        s->rot = d->rot;
+        s->rot = (d->rot - d->auto_rot) & 3;       /* the accelerometer's part is never kept */
         s->scale = f && f->scale ? d->scale : 0;     /* never chosen: keeps following the recommendation */
         if (f && f->placed) { s->x = f->x; s->y = f->y; s->placed = 1; }
     }
@@ -765,7 +828,7 @@ void display_idle_state(int *dark, int *off_s, int *sleep_s, int *sleep_left_s) 
 double display_timeout(double now) {
     if (!screen()) return -1;
     if (D.blank_pending) return 0;
-    double best = -1, ds[3] = { deadline(D.off_s, D.done_off), deadline(D.lock_s, D.done_lock), sleep_deadline() };
+    double best = auto_active() ? ACCEL_PERIOD_MS : -1, ds[3] = { deadline(D.off_s, D.done_off), deadline(D.lock_s, D.done_lock), sleep_deadline() };
     for (int i = 0; i < 3; i++) {
         if (ds[i] < 0) continue;
         double left = ds[i] - now;
@@ -776,6 +839,7 @@ double display_timeout(double now) {
 }
 
 void display_tick(double now) {
+    auto_tick(now);
     if (!screen()) return;
     double off = deadline(D.off_s, D.done_off), lock = deadline(D.lock_s, D.done_lock), slp = sleep_deadline();
     if (D.blank_pending) {              /* the login screen of an idle lock: it stays dark (display_blank) */

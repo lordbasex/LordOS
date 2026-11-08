@@ -342,6 +342,36 @@ static void t_touchscreen(void) {
     touch_consume = 0;
 }
 
+/* A turned panel (Settings → Displays or automatic rotation, issue #60): the touch lands where the
+ * finger is in the picture, as display_unrotate_point maps a tablet's point, and scrolling follows. */
+static void t_touchscreen_turned(void) {
+    touch_consume = 0;
+    tp_set_rotation(0);
+    run("tap", TP_KIND_TOUCHSCREEN, NULL);
+    Sum s0 = summary();
+    run("scroll", TP_KIND_TOUCHSCREEN, NULL);
+    Sum c0 = summary();
+    for (int rot = 1; rot < 4; rot++) {
+        tp_set_rotation(rot);
+        run("tap", TP_KIND_TOUCHSCREEN, NULL);
+        Sum s = summary();
+        double px = s0.wx, py = s0.wy, ex = rot == 1 ? py : rot == 2 ? 1 - px : 1 - py, ey = rot == 1 ? 1 - px : rot == 2 ? 1 - py : px;
+        CHECK(!strcmp(s.btns, "Ll") && fabs(s.wx - ex) < 1e-6 && fabs(s.wy - ey) < 1e-6,
+              "rotation %d: tap at (%.3f, %.3f) of the picture, expected (%.3f, %.3f)", rot, s.wx, s.wy, ex, ey);
+        run("scroll", TP_KIND_TOUCHSCREEN, NULL);
+        Sum c = summary();
+        /* two fingers toward the sensor's top: toward the picture's left at 90° (content moves right),
+         * its bottom at 180° and its right at 270° */
+        double along = rot & 1 ? c.sx : c.sy, across = rot & 1 ? c.sy : c.sx, want = rot == 1 ? 1 : -1;
+        CHECK(fabs(along) > 100 && fabs(across) < 0.2 * fabs(along) && along * want > 0 && fabs(c0.sy) > 100,
+              "rotation %d: scroll %.0f,%.0f (upright %.0f,%.0f)", rot, c.sx, c.sy, c0.sx, c0.sy);
+    }
+    tp_set_rotation(0);
+    run("tap", TP_KIND_TOUCHSCREEN, NULL);
+    Sum s = summary();
+    CHECK(fabs(s.wx - s0.wx) < 1e-6 && fabs(s.wy - s0.wy) < 1e-6, "back to 0: the same point as before (%.3f, %.3f)", s.wx, s.wy);
+}
+
 /* ---- bcm5974 touchpad (a 2015 laptop): issue #34 ----
  *
  * What bcm5974 declares: 16 slots, x -4828..5345 and y -203..6803 without a resolution, a touch
@@ -919,6 +949,7 @@ int main(int argc, char **argv) {
     t_palm();
     t_hold();
     t_touchscreen();
+    t_touchscreen_turned();
     t_bcm5974();
     t_pin();
     t_alps();

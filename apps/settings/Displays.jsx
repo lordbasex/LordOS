@@ -1,13 +1,13 @@
 // Settings → Displays: arrangement of several displays (extend or mirror), resolution, refresh rate,
-// rotation, scale (100–300 %, sharp), the main display, brightness, Night Light and video in the
-// browser (Video.jsx, docs/VIDEO.md) (docs/SETTINGS.md,
-// "Displays", and docs/DISPLAYS.md). Changes apply live with the system's 15-second "Keep these
+// rotation (and automatic rotation of the built-in screen when there is an accelerometer), scale
+// (100–300 %, sharp), the main display, brightness, Night Light and video in the browser (Video.jsx,
+// docs/VIDEO.md) (docs/SETTINGS.md, "Displays", and docs/DISPLAYS.md). Changes apply live with the system's 15-second "Keep these
 // display settings?" countdown (sdk/hardware.jsx) and are saved per display (EDID identity).
 // Layout: the arrangement on top, then the selected display's
 // settings in inset boxes, with the scale as "Larger text … More space" tiles.
 import {
   View, Text, useTheme, useLocale, useSettings, Slider, Toggle, admin, useDisplays, applyDisplay, DisplayGlyph, addListener,
-  arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, typeScale, spacing,
+  arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, typeScale, spacing,
   nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
   identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
   scaleChoices, scaleTiles,
@@ -362,10 +362,15 @@ export function DisplaysSettings() {
           <PopUp width={210} value={mode.refresh} onChange={(refresh) => go(cur, { w: mode.w, h: mode.h, refresh, rotation: rot, scale })}
             options={(curRes?.rates || []).map((r) => [r, tr('prefs.display.hz', { hz: hz(r) })])} disabled={(curRes?.rates || []).length < 2} />
         </SettingRow>
-        <SettingRow label={tr('prefs.display.rotation')} hint={rot ? tr('prefs.display.rotationHint') : ''}>
+        <SettingRow label={tr('prefs.display.rotation')} hint={rot || cur.autoRotation ? tr('prefs.display.rotationHint') : ''}>
           <PopUp width={210} value={rot} onChange={(rotation) => go(cur, { w: mode.w, h: mode.h, refresh: mode.refresh, rotation, scale })}
             options={[[0, tr('prefs.display.rotStandard')], [1, '90°'], [2, '180°'], [3, '270°']]} />
         </SettingRow>
+        {d.accelerometer && cur.builtin ? (
+          <SettingRow label={tr('prefs.display.autoRotate')} hint={tr('prefs.display.autoRotateHint')}>
+            <Toggle small on={!!d.autoRotate} onChange={(on) => setAutoRotateDisplays(on)} />
+          </SettingRow>
+        ) : null}
       </Section>
       {msg ? <Note tone="warn" style={{ marginTop: -12 }}>{msg}</Note> : null}
 

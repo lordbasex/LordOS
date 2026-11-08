@@ -105,8 +105,25 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
 - **Rotation (90°, 180°, 270°)**, per display. Done by software: the display's frame is composed
   upright and copied rotated into the card's buffer, only the damaged rectangles. The cursor is
   composited apart so the frame stays clean. Tablets and touch screens report physical positions,
-  which are mapped back (`display_unrotate_point`) when there is one display. A rotated display
-  turns the GPU path off.
+  which are mapped back (`display_unrotate_point`) when there is one display; a touchscreen
+  (`tp/tp.c`, `tp_set_rotation`) follows the built-in panel's rotation, or the only display's, and
+  takes a new one between touches. A rotated display turns the GPU path off.
+- **Rotate automatically** (issue #60), shown only for the built-in panel (eDP, LVDS, DSI) when
+  there is an accelerometer. `hw/accel.c` finds the screen's IIO accelerometer in sysfs
+  (`/sys/bus/iio/devices/iio:deviceN/in_accel_{x,y,z}_raw`, its scale and offset; no library),
+  applies the mount matrix (udev's `ACCEL_MOUNT_MATRIX` from the systemd hwdb first, then the
+  driver's `in_mount_matrix`) and skips a sensor in a convertible's keyboard base
+  (`ACCEL_LOCATION=base`, label `accel-base`). A small thread reads it every 0.4 s, only while the
+  option is on, the session is on the monitor and the screen is lit. An edge counts as up past 35°
+  of tilt and stays up until it falls under 20° (lying flat or on a corner changes nothing); a new
+  orientation must hold 0.9 s, and readings far from 1 g (shaking) are ignored. The orientation is
+  added to the rotation chosen in the menu (which says where "up" is when the device is held
+  normally), without the "Keep these display settings?" countdown, and is never saved. The switch is
+  saved at once as `"autoRotate"` in `displays.json`; unset, it is on when the SMBIOS chassis type
+  is a tablet, convertible or detachable (30, 31, 32). `lord.display.setAutoRotate(on)`;
+  `lord.display.list()` has `accelerometer`, `autoRotate` and, per output, `rotation` (the chosen
+  one) and `autoRotation` (what the accelerometer adds). `build/accel-test --live` prints what the
+  machine's sensor reads and the rotation it gives.
 
   ![Rotated 90°](settings-displays-rotated.png)
 - **Scale** (100, 125, 150, 175, 200 %), per display, sharp: the UI is laid out in logical px and

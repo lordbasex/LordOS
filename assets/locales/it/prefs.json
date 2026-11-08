@@ -73,6 +73,8 @@
   "defaults.tag": "{name} (predefinita)",
   "display.arrangeHint": "Trascina gli schermi per disporli; si agganciano bordo a bordo. Fai clic su uno per identificarlo. La barra bianca indica lo schermo principale (barra dei menu e Dock).",
   "display.arrangement": "Disposizione",
+  "display.autoRotate": "Rotazione automatica",
+  "display.autoRotateHint": "Lo schermo integrato e il suo touch ruotano con il dispositivo, seguendo l’accelerometro. La rotazione qui sopra indica il lato in alto quando il dispositivo è tenuto normalmente.",
   "display.brightness": "Luminosità",
   "display.capture": "Istantanee e condivisione",
   "display.captureAll": "Tutti gli schermi",

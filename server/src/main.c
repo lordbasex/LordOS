@@ -845,7 +845,7 @@ static void outputs_apply(Server *s) {
         same = a->conn == b->conn && same_mode(&a->mode, &b->mode) && a->rot == b->rot && a->scale == b->scale &&
                !memcmp(&a->v, &b->v, sizeof a->v) && !strcmp(a->id, b->id);
     }
-    if (same) { display_resync_done(1, &p); return; }
+    if (same) { display_resync_done(1, &p); tp_set_rotation(display_touch_rotation()); return; }
     prep_undo_all(s);                           /* (outputs: views, frames and the GPU change below) */
     /* the dumb buffers go on screen before the GPU's framebuffers are removed: removing one still scanned
      * out makes the kernel try to turn its CRTC off, which amdgpu refuses ("atomic remove_fb failed") */
@@ -935,6 +935,7 @@ static void outputs_apply(Server *s) {
                 out_scale(o), o->v.w, o->v.h, o->v.x, o->v.y, j == p.main ? ", main" : "", p.mirror ? ", mirror" : "");
     }
     display_resync_done(ok, &p);
+    tp_set_rotation(display_touch_rotation());   /* a touchscreen turns with its panel */
     /* the login screen opens its clock and users on this session's main display (lord-sessiond keeps
      * the connector for it, docs/DISPLAYS.md): only a change is sent */
     static char told_main[32];
