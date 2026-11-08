@@ -91,6 +91,38 @@ int fw_component_scope(const char *scope, char *app, size_t n) {
     return w < 0 || (size_t)w >= n ? -1 : 0;
 }
 
+int fw_vm_scope(const char *scope, char *id, size_t n) {
+    static const size_t pl = sizeof FW_VM_SCOPE_PREFIX - 1;
+    size_t l = scope ? strnlen(scope, 128) : 0;
+    if (l <= pl + 6 || l >= 128 || strncmp(scope, FW_VM_SCOPE_PREFIX, pl) || strcmp(scope + l - 6, ".scope")) return -1;
+    size_t il = l - pl - 6;
+    if (il > 36) return -1;
+    for (size_t i = 0; i < il; i++) {
+        char c = scope[pl + i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == '-')) return -1;
+    }
+    if (id) {
+        if (il + 1 > n) return -1;
+        memcpy(id, scope + pl, il);
+        id[il] = 0;
+    }
+    return 0;
+}
+
+int fw_scope_app(const char *scope, char *app, size_t n) {
+    size_t l = scope ? strnlen(scope, FW_APP_MAX) : 0;
+    if (!l || l >= FW_APP_MAX || !app || !n) return -1;
+    if (!strncmp(scope, "lordos-net-", 11)) return fw_component_scope(scope, app, n);
+    if (!fw_vm_scope(scope, NULL, 0)) {
+        int w = snprintf(app, n, "lordos:machines");
+        return w < 0 || (size_t)w >= n ? -1 : 0;
+    }
+    if (l < 18 || strncmp(scope, "app-lordos-", 11) || strcmp(scope + l - 6, ".scope")) return -1;
+    /* the machines' prefix is reserved: a scope under it that isn't a machine's is no app */
+    if (!strncmp(scope, FW_VM_SCOPE_PREFIX, sizeof FW_VM_SCOPE_PREFIX - 1)) return -1;
+    return fw_app_canon(scope, app, n);
+}
+
 int fw_app_canon(const char *in, char *out, size_t n) {
     if (!in || !out || !n) return -1;
     size_t len = strnlen(in, FW_APP_MAX);

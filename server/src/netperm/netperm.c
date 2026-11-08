@@ -358,7 +358,8 @@ static void sync_scope(Session *s, Scope *sc) {
     np_compiled_free(&c);
 }
 
-static void drop_scope(Scope *sc) {
+/* rules: 0 when another scope of the same app still runs (its rules stay installed under the shared idx) */
+static void drop_scope(Scope *sc, int rules) {
     if (!G.bpf_ok) return;
     FWMAP_EACH(&G.flows, e) {                       /* its addresses' byte counters */
         const NpFlowKey *k = (const NpFlowKey *)(const void *)e->key;
@@ -368,7 +369,7 @@ static void drop_scope(Scope *sc) {
     }
     bpfs_map_delete(G.m_np_apps, &sc->cgid);
     bpfs_map_delete(G.m_np_counts, &sc->cgid);
-    prune(sc->idx, 0);
+    if (rules) prune(sc->idx, 0);
 }
 
 /* ---- blocklists (0.8.5, docs/FIREWALL.md "Blocklists") --------------------------------------
@@ -546,11 +547,21 @@ static void sync_user_scope(Session *s) {
 
 static int scope_app(const char *name, char *app) {
     if (!strcmp(name, "server")) { snprintf(app, FW_APP_MAX, "lordos"); return 0; }
-    size_t n = strlen(name);
-    /* (0.8.5) LordOS's own components that use the network: lordos-net-<name>.scope → lordos:<name> */
-    if (!strncmp(name, "lordos-net-", 11)) return fw_component_scope(name, app, FW_APP_MAX);
-    if (n < 18 || strncmp(name, "app-lordos-", 11) || strcmp(name + n - 6, ".scope")) return -1;
-    return fw_app_canon(name, app, FW_APP_MAX);
+    /* (0.8.5) LordOS's own components that use the network: lordos-net-<name>.scope → lordos:<name>;
+     * (0.8.8.6) a running machine's scope → lordos:machines, so several scopes can share one app */
+    return fw_scope_app(name, app, FW_APP_MAX);
+}
+
+/* Another scope of the session with the same app (its rules are installed under the same idx). */
+static int idx_shared(const Session *s, const Scope *sc) {
+    for (int i = 0; i < s->nsc; i++) if (&s->sc[i] != sc && s->sc[i].idx == sc->idx) return 1;
+    return 0;
+}
+
+/* Is cgid one of the session's scopes of app? */
+static int scope_of_app(const Session *s, uint64_t cgid, const char *app) {
+    for (int i = 0; i < s->nsc; i++) if (s->sc[i].cgid == cgid && !strcmp(s->sc[i].app, app)) return 1;
+    return 0;
 }
 
 static void scan_session(Session *s) {
@@ -591,7 +602,7 @@ static void scan_session(Session *s) {
     close(dfd);
     for (int i = 0; i < s->nsc;) {
         if (s->sc[i].seen) { i++; continue; }
-        drop_scope(&s->sc[i]);
+        drop_scope(&s->sc[i], !idx_shared(s, &s->sc[i]));
         s->sc[i] = s->sc[--s->nsc];
     }
     sync_user_scope(s);                 /* attaches/re-attaches user@ and recompiles the union */
@@ -600,7 +611,7 @@ static void scan_session(Session *s) {
 
 static void drop_session(int k) {
     Session *s = &G.sess[k];
-    for (int i = 0; i < s->nsc; i++) drop_scope(&s->sc[i]);
+    for (int i = 0; i < s->nsc; i++) drop_scope(&s->sc[i], 1);
     fwl_free(s->lists);
     s->lists = NULL;
     sync_blk(s);                        /* with no lists: removes every entry */
@@ -1221,14 +1232,15 @@ static int ref_addr_cmp(const void *a, const void *b) {
     return flow_cmp(a, b);
 }
 
-static size_t flows_json(uint64_t cgid, char *j, size_t cap) {
+/* (0.8.8.6) every scope of the app: the Machines component has one per running machine besides its downloads' */
+static size_t flows_json(const Session *s, const char *app, char *j, size_t cap) {
     static FlowRef refs[NP_MAX_FLOWS];
     static AddrAgg agg[NP_MAX_FLOWS];
     int n = 0;
     FWMAP_EACH(&G.flows, e) {
         const NpFlowKey *k = (const NpFlowKey *)(const void *)e->key;
         const FlowSt *f = e->val;
-        if (k->cgid != cgid || n >= NP_MAX_FLOWS || G.tick - f->active > FLOW_KEEP_TICKS) continue;
+        if (n >= NP_MAX_FLOWS || G.tick - f->active > FLOW_KEEP_TICKS || !scope_of_app(s, k->cgid, app)) continue;
         refs[n].k = k;
         refs[n++].f = e->val;
     }
@@ -1335,13 +1347,26 @@ static void push_counts(void) {
         j[w++] = '{';
         for (int k = 0; k < s->nsc; k++) {
             Scope *sc = &s->sc[k];
+            /* one entry per app: the scopes that share one (each running machine and the Machines
+             * downloads, all lordos:machines) are added together under the first */
+            int first = 1;
+            for (int p = 0; p < k && first; p++) first = s->sc[p].idx != sc->idx;
+            if (!first) continue;
+            uint64_t allowed = 0, denied = 0, rx = 0, tx = 0, blocked = 0;
+            double rrx = 0, rtx = 0;
+            for (int p = k; p < s->nsc; p++) {
+                const Scope *o = &s->sc[p];
+                if (o->idx != sc->idx) continue;
+                allowed += o->allowed; denied += o->denied; rx += o->rx; tx += o->tx; blocked += o->blocked;
+                rrx += o->rrx; rtx += o->rtx;
+            }
             char app[FW_APP_MAX * 2 + 4];
             json_quote(app, sizeof app, sc->app);
             w += (size_t)snprintf(j + w, cap - w, "%s%s:[%llu,%llu,%llu,%llu,%.0f,%.0f,", w > 1 ? "," : "", app,
-                                  (unsigned long long)sc->allowed, (unsigned long long)sc->denied,
-                                  (unsigned long long)sc->rx, (unsigned long long)sc->tx, sc->rrx, sc->rtx);
-            w += flows_json(sc->cgid, j + w, cap - w - 40);
-            w += (size_t)snprintf(j + w, cap - w, ",%llu]", (unsigned long long)sc->blocked);
+                                  (unsigned long long)allowed, (unsigned long long)denied,
+                                  (unsigned long long)rx, (unsigned long long)tx, rrx, rtx);
+            w += flows_json(s, sc->app, j + w, cap - w - 40);
+            w += (size_t)snprintf(j + w, cap - w, ",%llu]", (unsigned long long)blocked);
         }
         /* the essential system services: the same shape, never a connection count or a rule */
         for (int k = 0; k < 3; k++) {

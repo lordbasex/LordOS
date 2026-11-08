@@ -127,6 +127,17 @@ int fw_app_canon(const char *in, char *out, size_t n);
 int fw_component_ok(const char *name);
 /* "lordos-net-<name>.scope" of a known component → "lordos:<name>" in app. 0 ok, -1 otherwise. */
 int fw_component_scope(const char *scope, char *app, size_t n);
+/* (0.8.8.6) A running virtual machine's scope, "app-lordos-lordos-vm-<id>.scope" (vm/lordvm.c; the id is
+ * the machine's lowercase UUID, and the prefix is reserved: sec/cgroup.h app_scope_reserved). Its QEMU and
+ * passt make the guest's sockets, so the guest's traffic is the Machines component's, lordos:machines,
+ * with the same rules as the image downloads (lordos-net-machines.scope). 0 and the machine's id in id
+ * (optional, n bytes) if scope is one, -1 otherwise. */
+#define FW_VM_SCOPE_PREFIX "app-lordos-lordos-vm-"
+int fw_vm_scope(const char *scope, char *id, size_t n);
+/* The firewall app of a session scope, the one translation lord-netperm and Monitor share:
+ * lordos-net-<name>.scope → lordos:<name>, a machine's scope → lordos:machines,
+ * app-lordos-lpk-<id>.scope → lpk:<id>, app-lordos-<id>.scope → desktop:<id>. 0 ok, -1 otherwise. */
+int fw_scope_app(const char *scope, char *app, size_t n);
 
 /* Destination as text ("any", "lan", "internet", "example.com", "*.example.com", "10.0.0.0/8",
  * "2001:db8::1") → kind/wildcard/domain/fam/addr/prefix of r. 0 ok, -1 invalid. */

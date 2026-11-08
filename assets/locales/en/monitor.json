@@ -466,7 +466,7 @@
   "volt.rail.BATT": "Clock battery",
   "comp.lan": "Network search in Files",
   "comp.lanHint": "Files → Network: computers and shares on the local network.",
-  "comp.machines": "Machines downloads",
-  "comp.machinesHint": "Machines: the systems you download in the New Machine assistant, and their checksum lists.",
+  "comp.machines": "Machines",
+  "comp.machinesHint": "Machines: the network traffic of the virtual machines you run, the systems you download in the New Machine assistant, and their checksum lists. A rule for Machines applies to all of them.",
   "net.shareHolder": "{app} is sharing this session’s screen."
 }

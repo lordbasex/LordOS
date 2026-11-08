@@ -466,7 +466,7 @@
   "volt.rail.BATT": "Pile de l’horloge",
   "comp.lan": "Recherche réseau dans Fichiers",
   "comp.lanHint": "Fichiers → Réseau : ordinateurs et partages du réseau local.",
-  "comp.machines": "Téléchargements de Machines",
-  "comp.machinesHint": "Machines : les systèmes que vous téléchargez dans l’assistant Nouvelle machine, et leurs listes de sommes de contrôle.",
+  "comp.machines": "Machines",
+  "comp.machinesHint": "Machines : le trafic réseau des machines virtuelles que vous exécutez, les systèmes que vous téléchargez dans l’assistant Nouvelle machine et leurs listes de sommes de contrôle. Une règle pour Machines s’applique à tout cela.",
   "net.shareHolder": "{app} partage l’écran de cette session."
 }

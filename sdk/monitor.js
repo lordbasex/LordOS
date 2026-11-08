@@ -271,8 +271,25 @@ function clearHistory() {
   try { return !!lord.monitor.historyClear(); } catch (e) { return false; }
 }
 
+// (0.8.8.6) The machines' names by id ({ id: name }), for Monitor → Network's Machines row (a running
+// machine's connections carry its id, "cgSub"). Read again at most every 2 s, and only when an id is new.
+let vmNames = { at: 0, map: {} };
+function machineNames(ids) {
+  const want = [...(ids || [])];
+  if (!want.length || want.every((id) => id in vmNames.map) || Date.now() - vmNames.at < 2000) return vmNames.map;
+  vmNames.at = Date.now();
+  try {
+    if (typeof lord === 'undefined' || !lord.vm || typeof lord.vm.list !== 'function') return vmNames.map;
+    const map = {};
+    for (const m of lord.vm.list() || []) if (m && typeof m.id === 'string' && typeof m.name === 'string') map[m.id] = m.name;
+    vmNames.map = map;
+  } catch (e) { /* keeps the last names */ }
+  return vmNames.map;
+}
+
 let infoCache = null;
 export const monitor = {
+  machineNames,
   available,
   info: () => (infoCache ||= available() ? lord.monitor.info() : null),
   deviceUsers: () => [],                        // phase 2

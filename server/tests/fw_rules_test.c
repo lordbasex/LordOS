@@ -74,6 +74,24 @@ static void test_canon(void) {
                             "lordos-maild.scope", "app-lordos-mail.scope", "lordos-net-Mail.scope", NULL };
     for (int i = 0; badsc[i]; i++) CHECK(fw_component_scope(badsc[i], o, sizeof o) == -1);
     CHECK(fw_component_ok("lists") && !fw_component_ok("") && !fw_component_ok(NULL) && !fw_component_ok("vpn"));
+    /* (0.8.8.6) a running machine's scope is the Machines component's (its guest's traffic), with its id */
+    char vid[40];
+    CHECK(!fw_vm_scope("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", vid, sizeof vid) &&
+          !strcmp(vid, "0f8e2a6c-1b2d-4c3e-9a7b-112233445566"));
+    CHECK(!fw_scope_app("app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
+    CHECK(!fw_scope_app("lordos-net-machines.scope", o, sizeof o) && !strcmp(o, "lordos:machines"));
+    CHECK(!fw_scope_app("lordos-net-mail.scope", o, sizeof o) && !strcmp(o, "lordos:mail"));
+    CHECK(!fw_scope_app("app-lordos-firefox.scope", o, sizeof o) && !strcmp(o, "desktop:firefox"));
+    CHECK(!fw_scope_app("app-lordos-lpk-notes.scope", o, sizeof o) && !strcmp(o, "lpk:notes"));
+    CHECK(!fw_scope_app("app-lordos-lordos-vmdisplay.scope", o, sizeof o) && !strcmp(o, "desktop:lordos-vmdisplay"));
+    const char *badvm[] = { "app-lordos-lordos-vm-.scope", "app-lordos-lordos-vm-ABC.scope", "app-lordos-lordos-vm-x y.scope",
+                            "app-lordos-lordos-vm-0f8e2a6c", "app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-1122334455667.scope",
+                            "app-lordos-lordos-vm-../x.scope", "lordos-vm-0f8e.scope", NULL };
+    for (int i = 0; badvm[i]; i++) CHECK(fw_vm_scope(badvm[i], vid, sizeof vid) == -1);
+    /* under the machines' prefix but not a machine: no app at all (never desktop:lordos-vm-…) */
+    for (int i = 0; badvm[i]; i++) CHECK(fw_scope_app(badvm[i], o, sizeof o) == -1);
+    CHECK(fw_vm_scope("app-lordos-lordos-vm-0f8e.scope", vid, 4) == -1);   /* no room for the id */
+    CHECK(fw_scope_app("server", o, sizeof o) == -1 && fw_scope_app("", o, sizeof o) == -1 && fw_scope_app(NULL, o, sizeof o) == -1);
     char longid[200];
     memset(longid, 'a', sizeof longid - 1);
     longid[sizeof longid - 1] = 0;

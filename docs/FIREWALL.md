@@ -1162,11 +1162,23 @@ same fixed-size requests, no new request type, used by `lan.c` only for one unco
 
 The New Machine assistant downloads systems (`VIRTUALIZATION.md`, 3.9, "The Linux download cards"). They are a
 component of their own, `machines` (firewall app `lordos:machines`, scope `lordos-net-machines.scope`), so they show as
-"Machines downloads" in the Monitor and follow their own rules instead of the Store's. No connector is involved: the
+"Machines" in the Monitor and follow their own rules instead of the Store's. No connector is involved: the
 downloads go through the Store's downloader (`pkg/http.c`), whose child enters a component's scope before dropping to
 `nobody`; `fetch_batch_in` takes the scope (the Store keeps `lordos-net-store.scope`), and the closed actions
 `vm-image-list` and `vm-image-get` pass `lordos-net-machines.scope`. The change is the name in `FW_COMPONENTS`, a row in
 `sdk/netmodel.js` with its text in five languages, and that parameter.
+
+**The running machines' traffic (0.8.8.6).** A running machine's QEMU and passt (its user-mode network) live in
+`app-lordos-lordos-vm-<id>.scope` (`vm/lordvm.c`; the prefix is reserved, `app_scope_reserved`), so the guest's
+connections are made by sockets of that scope. Before, that scope read as the app `desktop:lordos-vm-<id>`, which has no
+`.desktop` file: Monitor showed the guest's traffic as an app named "?" (passt isn't dumpable, so no process name either,
+and with nested leaves the socket's cgroup wasn't even a known scope), and a rule for Machines didn't reach the guest.
+Now `fw_scope_app` (`fw/rules.c`), the one translation lord-netperm and Monitor (`monitor/conn.c`) share, reads a
+machine's scope (`fw_vm_scope`: the id is the machine's lowercase UUID) as `lordos:machines`, the same app as the
+downloads. Several scopes can share one app: their rules are installed once under the app's index (dropping one scope
+keeps them while another runs), and the per-second counters add them together under one key. Monitor also maps the
+scope's leaves (`qemu`, `passt`, `supervisor`) and adds the machine's id to each connection (`cgSub`), so the row reads
+"Machines · <machine name>". A name under the prefix that isn't a machine's is no app at all.
 
 ### The essential system services (0.8.5)
 

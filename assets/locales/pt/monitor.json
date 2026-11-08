@@ -466,7 +466,7 @@
   "volt.rail.BATT": "Bateria do relógio",
   "comp.lan": "Procura na rede de Arquivos",
   "comp.lanHint": "Arquivos → Rede: computadores e compartilhamentos na rede local.",
-  "comp.machines": "Downloads de Máquinas",
-  "comp.machinesHint": "Máquinas: os sistemas que você baixa no assistente Nova máquina e as listas de somas de verificação deles.",
+  "comp.machines": "Máquinas",
+  "comp.machinesHint": "Máquinas: o tráfego de rede das máquinas virtuais que você executa, os sistemas que você baixa no assistente Nova máquina e as listas de somas de verificação deles. Uma regra para Máquinas vale para tudo isso.",
   "net.shareHolder": "{app} está compartilhando a tela desta sessão."
 }

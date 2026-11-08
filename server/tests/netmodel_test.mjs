@@ -1,6 +1,6 @@
 // netmodel_test.mjs — Monitor → Network's model (sdk/netmodel.js, 0.8.5): search tokens, filters,
 // grouping and sorting. Run by tests/run_suites.sh (needs node).
-import { parseSearch, chipFor, addChips, filterFlows, groupFlows, sortTree, fold, normView, parseCidr, cidrContains, matchesSearch } from '../../sdk/netmodel.js';
+import { parseSearch, chipFor, addChips, filterFlows, groupFlows, sortTree, fold, normView, parseCidr, cidrContains, matchesSearch, connAppKey, machinesLabel } from '../../sdk/netmodel.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => {
@@ -85,6 +85,19 @@ eq('fold', fold([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 8), { list: [1, 2, 3, 4, 5, 6, 
 eq('fold all', fold([1, 2, 3], 2, true).more, 0);
 eq('view defaults', normView(null), { group: 'app', dir: 'all', proto: 'all', status: 'all', sort: 'most' });
 eq('view keeps only known values', normView({ group: 'port', dir: 'sideways', sort: 'least', x: 1 }), { group: 'port', dir: 'all', proto: 'all', status: 'all', sort: 'least' });
+
+// ---- (0.8.8.6) whose connection it is: a running machine's guest is Machines' ----
+const guest = { cgApp: 'lordos:machines', cgSub: 'vm-1', pid: -1, name: '', exe: '', self: false };
+eq('a guest connection is Machines\'', connAppKey(guest), 'lordos:machines');
+eq('the scope wins over the process', connAppKey({ cgApp: 'lordos:mail', self: true, name: 'lord-server' }), 'lordos:mail');
+eq('lord-server itself', connAppKey({ cgApp: '', self: true, name: 'lord-server' }), 'lordos');
+eq('no scope: the executable', connAppKey({ cgApp: '', exe: '/usr/bin/curl', name: 'curl' }), '/usr/bin/curl');
+eq('nothing known', connAppKey({ cgApp: '', pid: -1, name: '', exe: '' }), '?');
+eq('Machines row with the machines by name', machinesLabel('Machines', new Set(['vm-2', 'vm-1', 'vm-1']), { 'vm-1': 'Ubuntu 24.04', 'vm-2': 'Debian 13' }),
+  'Machines · Debian 13, Ubuntu 24.04');
+eq('Machines row: a name not known yet', machinesLabel('Machines', ['vm-3'], { 'vm-1': 'Ubuntu 24.04' }), 'Machines');
+eq('Machines row: only downloads', machinesLabel('Machines', null, null), 'Machines');
+eq('Machines row: two machines with one name', machinesLabel('Machines', ['a', 'b'], { a: 'Ubuntu', b: 'Ubuntu' }), 'Machines · Ubuntu');
 
 console.log(`netmodel-test: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

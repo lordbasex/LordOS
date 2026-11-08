@@ -989,8 +989,10 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   Removing one is `vm-image-remove`, an administrator's action, since other accounts' machines may use it.
 - *Network:* the bytes come through the Store's downloader (`pkg/http.c`, a child as `nobody`, TLS by `lord-tls` with the
   system's certificate authorities), whose child enters `lordos-net-machines.scope` instead of the Store's
-  (`fetch_batch_in`): a component of its own, firewall app `lordos:machines`, "Machines downloads" in the Monitor
-  (FIREWALL.md, "Machines' downloads").
+  (`fetch_batch_in`): a component of its own, firewall app `lordos:machines`, "Machines" in the Monitor
+  (FIREWALL.md, "Machines' downloads"). Since 0.8.8.6 the running machines' own traffic (their scope
+  `app-lordos-lordos-vm-<id>.scope`, where QEMU and passt run) is the same app: "Machines · <machine name>" in the
+  Monitor, and a rule for Machines applies to the guests too.
 - *The makers' signatures (0.8.9, closed 2026-11-06).* Before any hash in a list is trusted, the helper checks the
   list's OpenPGP signature with the maker's key pinned in the package. All four sign with RSA 4096 (v4 signatures):
   Debian with SHA-256 and Ubuntu with SHA-512 over a detached signature (`SHA256SUMS.sign`, `SHA256SUMS.gpg`), Kali

@@ -35,6 +35,21 @@ export const COMPONENTS = {
 };
 export const isSystemId = (id) => !!COMPONENTS[id]?.system || /^system:/.test(id || '');
 
+// (0.8.8.6) A running virtual machine's traffic is the Machines component's: its QEMU and passt run in
+// app-lordos-lordos-vm-<id>.scope, which lord-netperm and Monitor (fw_scope_app) both read as
+// lordos:machines, so the Machines rule decides for the guest. conn.c adds the machine's id ("cgSub");
+// the row names the machines: "Machines · Ubuntu 24.04". ids: the ids seen, names: { id: name }.
+// Which row a connection of conn.c's list belongs to: a socket made in an app's scope is that app's
+// ("cgApp"), whoever holds it (Mail's connector's are Mail's, a guest's are Machines'); otherwise
+// lord-server's own, then the app, the executable or the process name.
+export const connAppKey = (c) => c.cgApp || (c.self ? 'lordos' : c.app || c.exe || c.name || '?');
+
+export function machinesLabel(base, ids, names = {}) {
+  const list = [...new Set([...(ids || [])].map((id) => names?.[id]).filter((s) => typeof s === 'string' && s))];
+  list.sort((a, b) => a.localeCompare(b));
+  return list.length ? `${base} · ${list.join(', ')}` : base;
+}
+
 export const CHIP_TYPES = ['app', 'domain', 'ip', 'port', 'proto', 'country'];
 const ALIASES = { host: 'domain', name: 'domain', addr: 'ip', address: 'ip', cidr: 'ip', protocol: 'proto', cc: 'country' };
 export const GROUPS = ['app', 'domain', 'ip', 'port', 'country'];

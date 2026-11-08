@@ -26,13 +26,17 @@ import { HistoryControls, HistoryChart, useHistory } from './History.jsx';
 import { REMOTE_KEY, RemoteDetail, ShareHolderLine, remoteGroup, useRemoteDesktop } from './RemoteDesktop.jsx';
 import { TokenSearch, ViewButton, useNetView, TreeChildren, Child } from './NetTree.jsx';
 
-const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree } = netModel;
+const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree, machinesLabel } = netModel;
 
 // (0.8.5) a socket made in an app's scope is that app's (conn.c "cgApp"), whoever holds it: the ones
 // Mail's connector made are Mail's, a program in the Terminal is the Terminal's
-export const appKeyOf = (c) => c.cgApp || (c.self ? 'lordos' : c.app || c.exe || c.name || '?');
+export const appKeyOf = netModel.connAppKey;
 // The row's name: LordOS's own components by their label, LordOS itself, or the app's name.
-export const labelOf = (tr, g) => (COMPONENTS[g.key] ? tr(COMPONENTS[g.key].label) : g.key === 'lordos' ? tr('monitor.lordos') : g.name);
+// (0.8.8.6) The Machines row also names the running machines whose guests are on the network.
+export const labelOf = (tr, g) => (COMPONENTS[g.key]
+  ? (g.key === 'lordos:machines' && g.machines?.size ? machinesLabel(tr(COMPONENTS[g.key].label), g.machines, g.machineNames)
+    : tr(COMPONENTS[g.key].label))
+  : g.key === 'lordos' ? tr('monitor.lordos') : g.name);
 const countryName = (cc) => (cc ? tOptional(`countries.${cc}`) || cc : '');
 
 // Where an address is: its country, LAN / this computer, or, for a destination known only from the
@@ -107,6 +111,7 @@ function useGroups(conns) {
         apps.set(key, g);
       }
       if (c.name && c.cgApp && !c.self) g.programs.add(c.name);
+      if (c.cgSub) (g.machines ||= new Set()).add(c.cgSub);   // a running machine's guest (conn.c)
       if (!g.exe && c.exe) g.exe = c.exe;
       if (c.pid > 0) g.pids.add(c.pid);
       g.conns.push(c);
@@ -133,6 +138,7 @@ function useGroups(conns) {
       h.count++;
       g.hosts.set(c.remote, h);
     }
+    for (const g of apps.values()) if (g.machines) g.machineNames = monitor.machineNames(g.machines);
     prev.current = { t: conns.t, bytes: now };
     const list = [...apps.values()].sort((a, b) => b.sent + b.recv - (a.sent + a.recv) || b.conns.length - a.conns.length);
     return { apps: list, list: conns.list };

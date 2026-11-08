@@ -291,7 +291,8 @@ static const char *const TCP_STATE[] = { "", "ESTABLISHED", "SYN_SENT", "SYN_REC
 /* Name and executable of a pid (small per-sample cache). */
 /* ---- cgroup id → app (the session's scopes, rescanned every 5 s) ---- */
 
-static struct { uint64_t id; char app[FW_APP_MAX]; } scopes[256];
+/* sub: the machine's id for a running machine's scope (lordos:machines) and its leaves (qemu, passt) */
+static struct { uint64_t id; char app[FW_APP_MAX]; char sub[40]; } scopes[256];
 static int nscopes;
 static double scopes_t;
 
@@ -320,16 +321,33 @@ static void scopes_scan(void) {
     struct dirent *e;
     while (d && (e = readdir(d)) && nscopes < 256) {
         if (e->d_type != DT_DIR || e->d_name[0] == '.') continue;
-        char app[FW_APP_MAX];
-        if (!strncmp(e->d_name, "lordos-net-", 11)) { if (fw_component_scope(e->d_name, app, sizeof app)) continue; }
-        else if (!strncmp(e->d_name, "app-lordos-", 11)) { if (fw_app_canon(e->d_name, app, sizeof app)) continue; }
-        else if (!strcmp(e->d_name, "server")) snprintf(app, sizeof app, "lordos");
-        else continue;
+        char app[FW_APP_MAX], sub[40] = "";
+        if (!strcmp(e->d_name, "server")) snprintf(app, sizeof app, "lordos");
+        else if (fw_scope_app(e->d_name, app, sizeof app)) continue;      /* the same names as lord-netperm's */
         uint64_t id = cg_id(dfd, e->d_name);
         if (!id) continue;
+        int vm = !fw_vm_scope(e->d_name, sub, sizeof sub);
         scopes[nscopes].id = id;
         snprintf(scopes[nscopes].app, sizeof scopes[nscopes].app, "%s", app);
+        snprintf(scopes[nscopes].sub, sizeof scopes[nscopes].sub, "%s", sub);
         nscopes++;
+        /* (0.8.8.6) a machine's scope may hold leaves (lordvm.c: qemu, passt, supervisor), and a socket
+         * carries its leaf's id: the leaves are the machine's too */
+        if (!vm) continue;
+        int sfd = openat(dfd, e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        DIR *sd = sfd >= 0 ? fdopendir(dup(sfd)) : NULL;
+        struct dirent *le;
+        while (sd && (le = readdir(sd)) && nscopes < 256) {
+            if (le->d_type != DT_DIR || le->d_name[0] == '.') continue;
+            uint64_t lid = cg_id(sfd, le->d_name);
+            if (!lid) continue;
+            scopes[nscopes].id = lid;
+            snprintf(scopes[nscopes].app, sizeof scopes[nscopes].app, "%s", app);
+            snprintf(scopes[nscopes].sub, sizeof scopes[nscopes].sub, "%s", sub);
+            nscopes++;
+        }
+        if (sd) closedir(sd);
+        if (sfd >= 0) close(sfd);
     }
     if (d) closedir(d);
     if (dfd >= 0) close(dfd);
@@ -352,6 +370,13 @@ static void scopes_scan(void) {
 static const char *scope_app_of(uint64_t cg) {
     if (!cg) return "";
     for (int i = 0; i < nscopes; i++) if (scopes[i].id == cg) return scopes[i].app;
+    return "";
+}
+
+/* the running machine a cgroup belongs to (its id), or "" */
+static const char *scope_sub_of(uint64_t cg) {
+    if (!cg) return "";
+    for (int i = 0; i < nscopes; i++) if (scopes[i].id == cg) return scopes[i].sub;
     return "";
 }
 
@@ -427,6 +452,8 @@ void conn_scan(Buf *b, const Mmdb *geo) {
             mon_buf_str(b, pq >= 0 ? pinfo[pq].exe : "");
             mon_buf_printf(b, ",\"cgApp\":");
             mon_buf_str(b, scope_app_of(pq >= 0 ? pinfo[pq].cg : 0));
+            const char *psub = scope_sub_of(pq >= 0 ? pinfo[pq].cg : 0);
+            if (psub[0]) { mon_buf_printf(b, ",\"cgSub\":"); mon_buf_str(b, psub); }
             mon_buf_printf(b, ",\"sent\":null,\"recv\":null}");
             n++;
             continue;
@@ -465,7 +492,10 @@ void conn_scan(Buf *b, const Mmdb *geo) {
         mon_buf_printf(b, ",\"exe\":");
         mon_buf_str(b, pi >= 0 ? pinfo[pi].exe : "");
         mon_buf_printf(b, ",\"cgApp\":");
-        mon_buf_str(b, scope_app_of(s->cg ? s->cg : pi >= 0 ? pinfo[pi].cg : 0));
+        uint64_t ocg = s->cg ? s->cg : pi >= 0 ? pinfo[pi].cg : 0;
+        mon_buf_str(b, scope_app_of(ocg));
+        const char *sub = scope_sub_of(ocg);      /* (0.8.8.6) the running machine whose guest made it */
+        if (sub[0]) { mon_buf_printf(b, ",\"cgSub\":"); mon_buf_str(b, sub); }
         if (s->bytes) mon_buf_printf(b, ",\"sent\":%llu,\"recv\":%llu}", (unsigned long long)s->sent, (unsigned long long)s->recv);
         else mon_buf_printf(b, ",\"sent\":null,\"recv\":null}");
         n++;
