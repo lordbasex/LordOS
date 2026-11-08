@@ -1,0 +1,3 @@
+# Signed fixtures: their bytes are what the signature covers, so checkouts must not change line endings
+# (the Imager core tests read them on Windows runners too).
+* -text
