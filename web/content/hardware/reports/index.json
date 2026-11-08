@@ -1,7 +1,8 @@
 {
-  "about": "Accepted hardware reports for lordos.org/hardware and the Compatibility panel's snapshot (tools/hwreport/catalog.mjs). A community report is added here, with its issue number, only after a maintainer accepted it. The two reports below are the project's own reference machines (\"source\": \"reference\"), not community reports: VM 116's system section is its real report (lordos-sysreport report --json, 2026-10-29) and the Raspberry Pi 5 16 GB's is written from the documented machine (docs/BENCHMARK.md, docs/RASPBERRY.md) until a captured report replaces it; both carry the LordBench numbers of apps/sysinfo/references.js.",
+  "about": "Accepted hardware reports for lordos.org/hardware and the Compatibility panel's snapshot (tools/hwreport/catalog.mjs). A community report is added here, with its issue number, only after a maintainer accepted it. The two reference-*.json reports are the project's own reference machines (\"source\": \"reference\"), not community reports: VM 116's system section is its real report (lordos-sysreport report --json, 2026-10-29) and the Raspberry Pi 5 16 GB's is written from the documented machine (docs/BENCHMARK.md, docs/RASPBERRY.md) until a captured report replaces it; both carry the LordBench numbers of apps/sysinfo/references.js.",
   "reports": {
     "reference-vm116.json": { "issue": null, "fixedIn": {} },
-    "reference-pi5-16gb.json": { "issue": null, "fixedIn": {} }
+    "reference-pi5-16gb.json": { "issue": null, "fixedIn": {} },
+    "community-42-dell-latitude-7480.json": { "issue": 42, "fixedIn": {} }
   }
 }

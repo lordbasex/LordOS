@@ -210,13 +210,14 @@ ok('error paths are code too', errComment.includes('`/system/x y`'));
 
 // ---- the catalogue (catalog.mjs) ----
 const entries = readReports(REPORTS_DIR, schema);
-eq('the accepted reports', entries.map((e) => [e.file, e.report.source, e.issue]), [['reference-pi5-16gb.json', 'reference', null], ['reference-vm116.json', 'reference', null]]);
+eq('the accepted reports', entries.map((e) => [e.file, e.report.source, e.issue]), [['community-42-dell-latitude-7480.json', 'community', 42], ['reference-pi5-16gb.json', 'reference', null], ['reference-vm116.json', 'reference', null]]);
 const snap = buildSnapshot(entries);
 eq('the snapshot shipped is the one the reports give', fs.readFileSync(SNAPSHOT_FILE, 'utf8'), snapshotText(snap));
-eq('snapshot header', [snap.format, snap.version, snap.generated, snap.reports], ['lordos-hwsnapshot', 1, '2026-10-27', 2]);
-ok('snapshot entries add up', snap.devices.every((d) => d.works + d.limits + d.no === d.reports && d.references <= d.reports && /^\d+\.\d+\.\d+$/.test(d.lordos)));
+eq('snapshot header', [snap.format, snap.version, snap.generated, snap.reports], ['lordos-hwsnapshot', 1, '2026-11-06', 3]);
+ok('snapshot entries add up', snap.devices.every((d) => d.works + d.limits + d.no === d.reports && d.references <= d.reports && /^\d+\.\d+\.\d+(\.\d+)?$/.test(d.lordos)));
 ok('the snapshot is deterministic', snapshotText(buildSnapshot(readReports(REPORTS_DIR, schema))) === snapshotText(snap));
 eq('the virtio GPU is "works with limits" on VM 116', snap.devices.find((d) => d.key === 'pci:1af4:1050'), { key: 'pci:1af4:1050', component: 'gpu', name: 'Red Hat, Inc. Virtio 1.0 GPU', lordos: '0.8.5', works: 0, limits: 1, no: 0, reports: 1, references: 1 });
+eq('the first community report (#42) counts as community, not reference', snap.devices.find((d) => d.key === 'pci:8086:5916'), { key: 'pci:8086:5916', component: 'gpu', name: 'Intel Corporation HD Graphics 620', lordos: '0.8.8.4', works: 1, limits: 0, no: 0, reports: 1, references: 0 });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hwreport-test-'));
 try {
   fs.writeFileSync(path.join(tmp, 'a.json'), JSON.stringify(laptop));
@@ -232,8 +233,8 @@ try {
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 const model = buildModel(entries);
 eq('the page model', model.machines.map((m) => [m.name, m.kind, m.source, m.perf.map((p) => p.cat)]),
-  [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']]]);
-eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]), [['gpu', 'limits', 'cpu.software']]);
+  [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Dell Inc. Latitude 7480', 'laptop', 'community', []]]);
+eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]), [['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.software']]);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const html = renderSections({ ...model, machines: [{ ...model.machines[0], name: '<img src=x onerror=alert(1)>' }] }, { reference: 'Reference', state: { works: 'Works' } }, esc, (k) => `https://github.com/x/issues/${k}`);
 ok('the page sections escape report text', !html.machines.includes('<img') && html.machines.includes('&lt;img'));

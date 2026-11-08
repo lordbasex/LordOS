@@ -1,0 +1,530 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-06",
+  "source": "community",
+  "lordos": "0.8.8.4-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Dell Inc.",
+      "product": "Latitude 7480",
+      "version": "",
+      "boardVendor": "Dell Inc.",
+      "boardName": "0CY3FD",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "Dell Inc.",
+      "biosVersion": "1.41.3",
+      "biosDate": "02/09/2025",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Intel(R) Core(TM) i5-7300U CPU @ 2.60GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 2,
+      "threads": 4,
+      "minMHz": 400,
+      "maxMHz": 3500,
+      "governor": "powersave",
+      "l1dKB": 32,
+      "l1iKB": 32,
+      "l2KB": 256,
+      "l3KB": 3072
+    },
+    "memory": {
+      "totalKB": 8007072,
+      "swapKB": 8388604,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "5916",
+        "vendor": "Intel Corporation",
+        "device": "HD Graphics 620",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 5,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "AUO",
+        "product": "333d",
+        "year": 2016,
+        "widthCm": 31,
+        "heightCm": 17,
+        "diagonalTenths": 139,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "SAMSUNG MZNTY256",
+        "vendor": "ATA",
+        "bytes": 256060514304,
+        "rotational": false,
+        "removable": false,
+        "transport": "sata",
+        "link": ""
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "5904",
+        "vendor": "Intel Corporation",
+        "device": "Xeon E3-1200 v6/7th Gen Core Processor Host Bridge/DRAM Registers",
+        "driver": "skl_uncore"
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "5916",
+        "vendor": "Intel Corporation",
+        "device": "HD Graphics 620",
+        "driver": "i915"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "1903",
+        "vendor": "Intel Corporation",
+        "device": "Xeon E3-1200 v5/E3-1500 v5/6th Gen Core Processor Thermal Subsystem",
+        "driver": "proc_thermal"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "9d2f",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP USB 3.0 xHCI Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9d31",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP Thermal subsystem",
+        "driver": "intel_pch_thermal"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9d60",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP Serial IO I2C Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9d61",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP Serial IO I2C Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9d62",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP Serial IO I2C Controller #2",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "9d3a",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP CSME HECI #1",
+        "driver": "mei_me"
+      },
+      {
+        "class": "070002",
+        "className": "Serial controller",
+        "vendorId": "8086",
+        "deviceId": "9d3d",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP Active Management Technology - SOL",
+        "driver": "serial"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "8086",
+        "deviceId": "9d03",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP SATA Controller [AHCI mode]",
+        "driver": "ahci"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9d10",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP PCI Express Root Port #1",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9d12",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP PCI Express Root Port #3",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "9d14",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP PCI Express Root Port #5",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "9d4e",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point LPC/eSPI Controller",
+        "driver": ""
+      },
+      {
+        "class": "058000",
+        "className": "Memory controller",
+        "vendorId": "8086",
+        "deviceId": "9d21",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP PMC",
+        "driver": ""
+      },
+      {
+        "class": "040300",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "9d71",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP HD Audio",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "9d23",
+        "vendor": "Intel Corporation",
+        "device": "Sunrise Point-LP SMBus",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "020000",
+        "className": "Ethernet controller",
+        "vendorId": "8086",
+        "deviceId": "15d7",
+        "vendor": "Intel Corporation",
+        "device": "Ethernet Connection (4) I219-LM",
+        "driver": "e1000e"
+      },
+      {
+        "class": "ff0000",
+        "className": "Unassigned class",
+        "vendorId": "10ec",
+        "deviceId": "525a",
+        "vendor": "Realtek Semiconductor Co., Ltd.",
+        "device": "RTS525A PCI Express Card Reader",
+        "driver": "rtsx_pci"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "24fd",
+        "vendor": "Intel Corporation",
+        "device": "Wireless 8265 / 8275",
+        "driver": "iwlwifi"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "1bcf",
+        "productId": "2b96",
+        "vendor": "Sunplus Innovation Technology Inc.",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      },
+      {
+        "vendorId": "8087",
+        "productId": "0a2b",
+        "vendor": "Intel Corp.",
+        "product": "Bluetooth wireless interface",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "04f3",
+        "productId": "22b3",
+        "vendor": "Elan Microelectronics Corp.",
+        "product": "",
+        "class": "00",
+        "speedMbps": 12,
+        "driver": "usbhid"
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "e1000e",
+        "up": false,
+        "speedMbps": null
+      },
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 1
+      },
+      {
+        "kind": "battery",
+        "vendor": "Samsung SDI",
+        "model": "DELL V49407B",
+        "technology": "Li-ion",
+        "status": "Full",
+        "capacity": 100,
+        "health": 48,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "acpitz",
+        "milliC": 25000,
+        "fans": 0
+      },
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "TSKN",
+        "milliC": 30050,
+        "fans": 0
+      },
+      {
+        "sensor": "NGFF",
+        "milliC": 27050,
+        "fans": 0
+      },
+      {
+        "sensor": "TMEM",
+        "milliC": 28050,
+        "fans": 0
+      },
+      {
+        "sensor": "pch_skylake",
+        "milliC": 30500,
+        "fans": 0
+      },
+      {
+        "sensor": "B0D4",
+        "milliC": 35050,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 28000,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 34000,
+        "fans": 0
+      },
+      {
+        "sensor": "acpitz",
+        "milliC": 25000,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "drivetemp",
+        "milliC": 28000,
+        "fans": 0
+      },
+      {
+        "sensor": "AC",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "pch_skylake",
+        "milliC": 30500,
+        "fans": 0
+      },
+      {
+        "sensor": "dell_smm",
+        "milliC": 34000,
+        "fans": 1
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": 34000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.115+deb13.1-amd64",
+      "lordos": "0.8.8.4-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) HD Graphics 620 (KBL GT2)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "limits",
+      "note": "batteryWorn"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}
