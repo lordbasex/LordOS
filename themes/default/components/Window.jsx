@@ -8,11 +8,23 @@ import { Menu } from './Menu.jsx';
 
 const TITLE_H = 40;
 const DRAG_START = 6;      // px the pointer moves before a maximized window is dragged out
+const LIGHT = 13;          // a traffic light's diameter
+// bars: the glyph shown on hover, as [length, angle] bars crossing the light's center
 const LIGHTS = [
-  { key: 'close', color: '#ff5f57', glyph: '×', act: (id) => wm.close(id) },
-  { key: 'min', color: '#febc2e', glyph: '−', act: (id) => wm.minimize(id) },
-  { key: 'max', color: '#28c840', glyph: '+', act: (id) => wm.toggleMaximize(id) },
+  { key: 'close', color: '#ff5f57', bars: [[8, 45], [8, -45]], act: (id) => wm.close(id) },
+  { key: 'min', color: '#febc2e', bars: [[7, 0]], act: (id) => wm.minimize(id) },
+  { key: 'max', color: '#28c840', bars: [[7, 0], [7, 90]], act: (id) => wm.toggleMaximize(id) },
 ];
+
+// The ×, − and + drawn as bars centered on the light (issue #69: text glyphs sat off-center by their
+// font metrics). Solid colors, so where two bars cross the color does not darken twice.
+function LightGlyph({ l }) {
+  const color = solidOver('rgba(0,0,0,0.6)', l.color), w = 1.5;
+  return l.bars.map(([len, deg], i) => (
+    <View key={i} style={{ position: 'absolute', left: (LIGHT - len) / 2, top: (LIGHT - w) / 2, width: len, height: w, borderRadius: w / 2,
+      backgroundColor: color, pointerEvents: 'none', transform: deg ? `rotate(${deg}deg)` : undefined }} />
+  ));
+}
 
 // fx: the minimize effect ({ p: 0..1, x, y: where the Dock is}): the frame shrinks towards it.
 function fxStyle(fx, geo) {
@@ -88,9 +100,9 @@ export function Window({ win, app, t, focused, fx }) {
           style={{ flexDirection: 'row', gap: 8, paddingVertical: 6 }}>
           {LIGHTS.map((l) => (
             <View key={l.key} onMouseDown={(e) => e.stopPropagation()} onClick={() => l.act(win.id)}
-              style={{ width: 13, height: 13, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+              style={{ width: LIGHT, height: LIGHT, borderRadius: LIGHT / 2, direction: 'ltr',
                 backgroundColor: focused || hover ? l.color : t.lightOff }}>
-              {hover && <Text style={{ fontSize: 11, fontWeight: 700, lineHeight: 13, color: 'rgba(0,0,0,0.6)' }}>{l.glyph}</Text>}
+              {hover && <LightGlyph l={l} />}
             </View>
           ))}
         </View>
