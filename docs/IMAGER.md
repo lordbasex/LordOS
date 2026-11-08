@@ -287,7 +287,7 @@ On the development machine (the Mac download is built on one), with Rust (rustup
 ```sh
 desktop/imager/scripts/build-mac.sh
 # → desktop/imager/target/release/bundle/macos/LordOS Imager.app (6.3 MB)
-#   desktop/imager/target/universal-apple-darwin/release/bundle/dmg/lordos_imager_0.8.6_universal.dmg (7.5 MB)
+#   desktop/imager/target/universal-apple-darwin/release/bundle/dmg/lordos_imager_0.8.8.6_universal.dmg (7.5 MB)
 ```
 
 **Signing (since 2026-10-19):** the download is built for both processor families
@@ -306,7 +306,7 @@ In a Debian 13 container (Docker), so the host needs nothing but Docker:
 
 ```sh
 desktop/imager/scripts/build-linux.sh
-# → desktop/imager/target/linux/lordos_imager_0.8.6_amd64.deb (4.1 MB, depends on udisks2 and WebKitGTK 4.1)
+# → desktop/imager/target/linux/lordos_imager_0.8.8.6_amd64.deb (4.1 MB, depends on udisks2 and WebKitGTK 4.1)
 #   desktop/imager/target/linux/lordos-imager (7.6 MB)
 ```
 
@@ -317,9 +317,16 @@ xwin downloads), NSIS for the installer:
 
 ```sh
 desktop/imager/scripts/build-windows.sh
-# → desktop/imager/target/windows/lordos_imager_0.8.6_x64_setup.exe (3.3 MB)
+# → desktop/imager/target/windows/lordos_imager_0.8.8.6_x64_setup.exe (3.3 MB)
 #   desktop/imager/target/windows/lordos-imager.exe (6.2 MB, requireAdministrator)
 ```
+
+**Version.** The Imager's own version follows LordOS's numbering (four numbers for a point release, like
+`0.8.8.6`), kept in `desktop/imager/VERSION`. It is what the app shows, sends as its User-Agent and compares
+with the release files for "a newer Imager", and what the build scripts name the downloads with. Cargo and
+Tauri only take three numbers, so the crates, `package.json` and `tauri.conf.json` carry it with the last two
+numbers joined (`0.8.86`, then `0.8.87` for `0.8.8.7`; a release with three numbers such as `0.8.9` is written
+`0.8.90` there, so it still sorts after them). Bump both together.
 
 The installer is unsigned (Tauri signs only when it builds on that platform itself, or with a custom sign command).
 `.github/workflows/imager-desktop.yml` builds all three on hosted runners; it is in the tree but

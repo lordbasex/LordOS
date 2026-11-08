@@ -23,7 +23,7 @@ else
 fi
 # the download's name: lordos_imager_<version>_universal.dmg
 for dmg in "$out"/dmg/*.dmg; do
-  v=$(basename "$dmg" | sed -n 's/.*_\([0-9][0-9.]*\)_universal\.dmg$/\1/p')
+  v=$(cat VERSION)
   [ -n "$v" ] && mv "$dmg" "$out/dmg/lordos_imager_${v}_universal.dmg"
 done
 ls -la "$out"/macos "$out"/dmg

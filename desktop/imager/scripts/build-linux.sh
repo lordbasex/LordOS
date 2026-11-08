@@ -13,5 +13,5 @@ docker run --rm -v "$repo:/src" -v lordos-imager-cargo:/opt/cargo/registry \
     set -e
     npm ci --no-audit --no-fund && node build-web.mjs
     npx tauri build --bundles deb
-    mkdir -p target/linux && cp /build/release/lordos-imager target/linux/ && for f in /build/release/bundle/deb/*.deb; do v=$(basename "$f" | sed -n "s/.*_\([0-9][0-9.]*\)_amd64\.deb$/\1/p"); cp "$f" "target/linux/lordos_imager_${v}_amd64.deb"; done
+    mkdir -p target/linux && cp /build/release/lordos-imager target/linux/ && for f in /build/release/bundle/deb/*.deb; do v=$(cat VERSION); cp "$f" "target/linux/lordos_imager_${v}_amd64.deb"; done
     ls -la target/linux/'

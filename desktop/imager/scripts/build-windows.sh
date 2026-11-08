@@ -13,5 +13,5 @@ docker run --rm -v "$repo:/src" -v lordos-imager-cargo:/opt/cargo/registry -v lo
     set -e
     npm ci --no-audit --no-fund && node build-web.mjs
     npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
-    mkdir -p target/windows && for f in /build/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe; do v=$(basename "$f" | sed -n "s/.*_\([0-9][0-9.]*\)_x64-setup\.exe$/\1/p"); cp "$f" "target/windows/lordos_imager_${v}_x64_setup.exe"; cp /build/x86_64-pc-windows-msvc/release/lordos-imager.exe "target/windows/lordos_imager_${v}_x64.exe"; done
+    mkdir -p target/windows && for f in /build/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe; do v=$(cat VERSION); cp "$f" "target/windows/lordos_imager_${v}_x64_setup.exe"; cp /build/x86_64-pc-windows-msvc/release/lordos-imager.exe "target/windows/lordos_imager_${v}_x64.exe"; done
     ls -la target/windows/'

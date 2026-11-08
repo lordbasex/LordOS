@@ -15,7 +15,9 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const REPO: &str = "lordbasex/LordOS";
-const UA: &str = concat!("LordOS-Imager/", env!("CARGO_PKG_VERSION"));
+// The version people see (and compare with LordOS's release tags for "a newer Imager"): ./VERSION, four
+// numbers like LordOS's own (0.8.8.6). Cargo and Tauri only take three, so the crates say 0.8.86.
+const VERSION: &str = include_str!("../../VERSION").trim_ascii();
 
 struct App {
     cancel: Arc<AtomicBool>,
@@ -58,7 +60,7 @@ fn platform(st: State<App>) -> Platform {
     let lang = loc.split(['-', '_']).next().unwrap_or("en").to_lowercase();
     let country = loc.split(['-', '_']).nth(1).unwrap_or("").to_uppercase();
     Platform {
-        os: std::env::consts::OS, arch: std::env::consts::ARCH, version: env!("CARGO_PKG_VERSION"),
+        os: std::env::consts::OS, arch: std::env::consts::ARCH, version: VERSION,
         lang: if ["en", "es", "pt", "fr", "it"].contains(&lang.as_str()) { lang } else { "en".into() },
         timezone: iana_time_zone::get_timezone().unwrap_or_default(),
         country: if country.len() == 2 && country.bytes().all(|c| c.is_ascii_uppercase()) { country } else { String::new() },
@@ -77,7 +79,7 @@ async fn list_drives() -> Res<Vec<drives::Drive>> {
 // ---- releases and downloads (only GitHub's LordOS releases; the signature decides what is trusted) ----
 
 fn client() -> Res<reqwest::blocking::Client> {
-    reqwest::blocking::Client::builder().user_agent(UA).https_only(true).connect_timeout(std::time::Duration::from_secs(20))
+    reqwest::blocking::Client::builder().user_agent(format!("LordOS-Imager/{VERSION}")).https_only(true).connect_timeout(std::time::Duration::from_secs(20))
         .build().map_err(|e| code("imager.fetchNetwork", e.to_string()))
 }
 
