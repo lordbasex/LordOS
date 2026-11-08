@@ -185,6 +185,46 @@ and signals dispatched to handlers.
   (`StartDiscovery`/`StopDiscovery`), pair (then `Trusted = true` and `Connect`, as other desktop systems do),
   connect, disconnect and forget (`Adapter1.RemoveDevice`). A soft rfkill block is lifted with the
   closed action `bt-unblock`.
+- **Reconnecting at boot (0.8.8.6, issue #75).** A paired mouse or keyboard (an Apple Magic Mouse,
+  for one) comes back by itself: the device pages the computer and bluetoothd accepts it. Each link
+  of that chain, checked against BlueZ 5.82 (Debian 13):
+  - *The adapter is on from boot.* `bluetooth.service` is enabled (bluez's postinst, and made sure
+    by `tools/iso/build.sh` and `tools/rpi/build-img.sh`), and BlueZ's `[Policy] AutoEnable`
+    defaults to `true` (`plugins/policy.c`), so every adapter is powered when bluetoothd finds it,
+    before the login screen. LordOS ships no `/etc/bluetooth/main.conf` changes: that file is
+    bluez's conffile and BlueZ 5.82 reads no `main.conf.d`.
+  - *It listens for the device.* With the kernel's connection control, BlueZ leaves the adapter's
+    `Connectable` off for strangers and puts every stored (paired) BR/EDR device in the kernel's
+    accept list (`btd_device_set_temporary` → `MGMT_OP_ADD_DEVICE`), which keeps page scan on for
+    them while the adapter is neither discoverable nor pairable. LordOS never sets `Connectable`,
+    `Discoverable` or `Pairable`.
+  - *The device is trusted.* bluetoothd lets a returning HID device in without asking only if it
+    is `Trusted`; otherwise it asks the default agent, and at the login screen no session (no agent)
+    is running, so the device is rejected ("Authentication attempt without agent") until someone
+    logs in. Pairing from Settings trusts the device. Since 0.8.8.6 a paired device that isn't
+    trusted (a `Pair` call that failed after the bond was made or answered `AlreadyExists`, a
+    device paired with other tools) becomes trusted when the user connects it or when our agent
+    lets it use a service, which it already did for any paired device (`bt_should_trust`, tested
+    in `build/bt-test`).
+  - *The input device appears late.* The mouse's evdev node shows up when it connects; lord-sessiond
+    watches `/dev/input` (inotify) and hands the new device to whoever is on the monitor, the login
+    screen or a session (`remote/monitor.c`, `RP_INPUT_ADD`). The Magic Mouse is driven by the
+    kernel's `hid-magicmouse` and is read as a relative mouse (it reports no `BTN_TOOL_FINGER`, so
+    it is not taken for a touchpad).
+  - *ClassicBondedOnly* (`/etc/bluetooth/input.conf`, default `true`) only refuses HID devices that
+    connect without a bond; a Magic Mouse (1 or 2) bonds when it pairs, so it is not affected. It
+    stays at the default. `ClassicBondedOnly=false` is only for old mice that can't pair at all, and
+    it lets a device that merely uses a known keyboard's or mouse's address connect unencrypted and
+    type into the computer (CVE-2020-0556), so LordOS never sets it.
+- **On or off across restarts.** BlueZ doesn't keep an adapter's power: with AutoEnable it is on
+  after every boot, which is what lets a mouse reconnect at the login screen. The switch (Settings,
+  Lord Flow's Control Center, Lord Classic's Quick Settings) goes through `setBluetoothPower`, which
+  keeps the choice in `settings.json` (`bluetoothOff`); when the user's last choice was off, the
+  session turns the adapter off again at login, once per appearance of the adapter (a dongle
+  plugged in again, bluetoothd restarted), and leaves it on if it is turned on later by other means
+  (`sdk/btpowermodel.js`, tested by `tests/bt_power_model_test.mjs`). A soft rfkill block (the
+  laptop's airplane key, the Imager's "Bluetooth off") is kept across boots by systemd-rfkill and
+  lifted with `bt-unblock`.
 - **Pairing agent.** lord-server exports `org.bluez.Agent1` at `/org/lordos/BluetoothAgent` with
   the `KeyboardDisplay` capability and becomes the default agent. PIN, passkey, numeric comparison
   and authorization requests are drawn by the system (`BluetoothPrompt`, outside any app) and
@@ -214,7 +254,8 @@ radio. hci1 plays a headset (class 0x240404, discoverable, a `bluetoothctl` agen
 FIFO); from Settings on hci0: discovery, pairing with the numeric-comparison prompt, connection,
 the HFP output and input in Sound, disconnect and forget. Unit tests: `build/bt-test` (managed
 objects, property dictionaries, battery, truncated input, removal, paths, state JSON). **Not tested
-with real hardware** (no controller in the VMs).
+with real hardware** (no controller in the VMs). The reconnection at boot (issue #75) is checked
+against BlueZ 5.82's source and the unit tests above; **not yet with a real Magic Mouse**.
 
 ## Energy (Battery)
 

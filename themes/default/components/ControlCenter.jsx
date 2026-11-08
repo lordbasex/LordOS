@@ -3,7 +3,7 @@
 // Desktop & Dock → Control Center (issue #58, sdk/menubarmodel.js).
 import {
   View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, formatBytes, wm, session, addListener, t as tr,
-  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth,
+  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
   panelLeft, inBar,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -104,7 +104,7 @@ function BluetoothTile({ t, onClose, bt }) {
           {!adapter.powered ? tr('shell.cc.off') : dev ? dev.name : tr('shell.cc.on')}
         </Text>
       </View>
-      <Toggle on={!!adapter.powered} onChange={(on) => lord.bt.power(on)} />
+      <Toggle on={!!adapter.powered} onChange={(on) => setBluetoothPower(on)} />
     </Tile>
   );
 }

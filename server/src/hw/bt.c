@@ -24,6 +24,7 @@ static struct {
     char kind[20], dev[128], value[20];
 } prompt;
 static int next_prompt = 1;
+static void trust(BtDevice *d);           /* Trusted = true (see bt_should_trust) */
 
 BtModel *bt_model(void) { return &model; }
 int bt_available(void) { return owner[0] != 0; }
@@ -325,9 +326,14 @@ static int on_call(DMsg *m) {
     else if (!strcmp(mem, "RequestConfirmation") && !strcmp(sig, "ou")) { kind = "confirm"; snprintf(value, sizeof value, "%06u", dr_u32(&r)); }
     else if (!strcmp(mem, "RequestAuthorization") && !strcmp(sig, "o")) kind = "authorize";
     else if (!strcmp(mem, "AuthorizeService") && !strcmp(sig, "os")) {
-        const BtDevice *d = device(&model, dev, 0);
-        /* a device that went through pairing (the user confirmed it) may use its services */
-        if (d && (d->paired || d->bonded)) { dbus_reply(sysbus_conn(), m, NULL, NULL); return 1; }
+        BtDevice *d = device(&model, dev, 0);
+        /* a device that went through pairing (the user confirmed it) may use its services; trusted from
+         * now on, so it also gets in when no session is running (bt_should_trust) */
+        if (d && (d->paired || d->bonded)) {
+            dbus_reply(sysbus_conn(), m, NULL, NULL);
+            if (bt_should_trust("authorize", NULL, d)) trust(d);
+            return 1;
+        }
         kind = "service";
     } else if (!strcmp(mem, "DisplayPinCode") && !strcmp(sig, "os")) {
         const char *pin = dr_str(&r, NULL);
@@ -458,6 +464,33 @@ void bt_start(BtEvent fn) {
 
 /* ---- actions ---- */
 
+/* A paired device is trusted in BlueZ (Device1.Trusted) so bluetoothd accepts it when it comes back by
+ * itself, with no agent asked: at boot, a mouse or keyboard reconnects at the login screen, where no
+ * session (and so no agent) is running yet. Without it bluetoothd rejects the device ("Authentication
+ * attempt without agent") until someone logs in. Pairing from Settings trusts the device; these cover the
+ * devices that ended up paired but not trusted (a Pair call that failed after the bond was made, or that
+ * reported AlreadyExists; a device paired with other tools or before): the user connecting one, or our
+ * agent letting one use a service (which it does for any paired device), trusts it too. */
+int bt_should_trust(const char *op, const char *err, const BtDevice *d) {
+    if (!op || !d || d->trusted) return 0;
+    if (!strcmp(op, "authorize")) return d->paired || d->bonded;      /* AuthorizeService, already allowed */
+    if (!strcmp(op, "pair")) return !err || !strncmp(err, "org.bluez.Error.AlreadyExists", 29);
+    if (!strcmp(op, "connect")) return !err && (d->paired || d->bonded);
+    return 0;
+}
+
+static void trust(BtDevice *d) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, "org.bluez.Device1");
+    dw_str(&b, "Trusted");
+    dw_variant(&b, "b");
+    dw_bool(&b, 1);
+    if (sysbus_call(BLUEZ, d->path, "org.freedesktop.DBus.Properties", "Set", "ssv", &b, NULL, NULL))
+        fprintf(stderr, "bt: trusting %s so it reconnects by itself\n", d->path);
+    dw_free(&b);
+}
+
 static void op_done(const DMsg *m, void *ctx) {
     Op *o = ctx;
     const char *err = err_name(m);
@@ -471,16 +504,9 @@ static void op_done(const DMsg *m, void *ctx) {
     /* a code that was only shown has done its work, whether the pairing took or not: nothing else closes it */
     if (!strcmp(o->op, "pair") && prompt.active && !strncmp(prompt.kind, "display-", 8)) prompt_drop();
     BtDevice *d = o->path[0] ? device(&model, o->path, 0) : NULL;
+    if (d && bt_should_trust(o->op, err, d)) trust(d);
     if (!strcmp(o->op, "pair") && !err && d) {
-        /* paired: trust it (reconnects without asking) and connect */
-        DBuf b;
-        dw_init(&b);
-        dw_str(&b, "org.bluez.Device1");
-        dw_str(&b, "Trusted");
-        dw_variant(&b, "b");
-        dw_bool(&b, 1);
-        sysbus_call(BLUEZ, o->path, "org.freedesktop.DBus.Properties", "Set", "ssv", &b, NULL, NULL);
-        dw_free(&b);
+        /* paired (and trusted above): connect */
         Op *c = op_new("connect", o->path);
         if (c && !sysbus_call(BLUEZ, o->path, "org.bluez.Device1", "Connect", NULL, NULL, op_done, c)) free(c);
         else if (c) { result("pair", o->path, 1, NULL); free(o); dirty = 1; return; }

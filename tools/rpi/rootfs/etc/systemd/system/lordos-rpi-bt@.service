@@ -2,7 +2,8 @@
 Description=LordOS on Raspberry Pi: on-board Bluetooth (%I) SCO routing
 Documentation=file:///usr/share/doc/lordos/README.md
 # started by udev (90-lordos-rpi-bt.rules) when a UART Bluetooth controller appears; before
-# bluetoothd, which then powers the controller as the user left it in Settings
+# bluetoothd, which then powers the controller (BlueZ's AutoEnable; the user's session turns it off
+# again if that was their last choice in Settings, docs/SETTINGS.md)
 Before=bluetooth.service
 After=sys-subsystem-bluetooth-devices-%i.device
 BindsTo=sys-subsystem-bluetooth-devices-%i.device

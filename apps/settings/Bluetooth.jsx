@@ -2,7 +2,7 @@
 // (pair). BlueZ over the system bus, from lord-server (server/src/hw/bt.c); PIN and passkey
 // requests are drawn by the system (sdk/hardware.jsx, BluetoothPrompt). Headphones and speakers
 // show up in Sound through PipeWire. See docs/SETTINGS.md, "Bluetooth".
-import { View, Text, useTheme, useLocale, Toggle, Button, admin, useBluetooth, onBluetoothResult } from '@lordos/sdk';
+import { View, Text, useTheme, useLocale, Toggle, Button, admin, useBluetooth, onBluetoothResult, setBluetoothPower } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { GroupBox, SettingRow, PageHeader, Note, Stack } from './ui.jsx';
 
@@ -86,7 +86,7 @@ export function BluetoothSettings() {
   const near = st.devices.filter((d) => !d.paired && (d.named || d.busy)).sort((x, y) => (y.rssi ?? -200) - (x.rssi ?? -200));
   const togglePower = (on) => {
     setErr('');
-    lord.bt.power(on);
+    setBluetoothPower(on);
   };
   return (
     <Stack>
@@ -97,7 +97,7 @@ export function BluetoothSettings() {
       {err === 'blocked' ? (
         <GroupBox>
           <SettingRow label={tr('prefs.bt.err.blocked')}>
-            <Button small label={tr('prefs.bt.unblock')} onClick={() => admin.run('bt-unblock').then(() => { setErr(''); lord.bt.power(true); }, (e) => setErr(e.message))} />
+            <Button small label={tr('prefs.bt.unblock')} onClick={() => admin.run('bt-unblock').then(() => { setErr(''); setBluetoothPower(true); }, (e) => setErr(e.message))} />
           </SettingRow>
         </GroupBox>
       ) : err ? <Note tone="warn">{tr(`prefs.bt.err.${err}`) || err}</Note> : null}

@@ -7,7 +7,8 @@
 //                 from the network) or custom hours, with a 30-minute fade, plus "on until tomorrow"
 //   battery       store with lord.power.state(); low-battery notice; battery in the menu bar
 //   idle          screen off / lock / sleep after N minutes (deadlines live in lord-server)
-//   bluetooth     store with lord.bt.state(); pairing requests (<BluetoothPrompt />)
+//   bluetooth     store with lord.bt.state(); pairing requests (<BluetoothPrompt />); setBluetoothPower,
+//                 remembered and applied again at login (btpowermodel.js)
 //   polkit        a Linux app's request for administrator rights (<PolkitPrompt />)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
@@ -26,6 +27,7 @@ import { registerStatusItem } from './statusitems.js';
 import { TextInput } from './components.jsx';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
+import { btPowerAction } from './btpowermodel.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -45,6 +47,12 @@ export const useBluetooth = () => useStore(bluetooth);
 export const usePowerProfiles = () => useStore(powerProfiles);
 export const useTimedate = () => useStore(timedate);
 export const onBluetoothResult = (fn) => { btResults.add(fn); return () => btResults.delete(fn); };
+// The Bluetooth switch (Settings, Control Center, Quick Settings): the choice is kept for the next login,
+// since BlueZ powers every adapter again when it starts (btpowermodel.js).
+export function setBluetoothPower(on) {
+  settings.set({ bluetoothOff: !on });
+  return has('bt') && call(() => lord.bt.power(on), false);
+}
 export const onPowerProfileResult = (fn) => { ppdResults.add(fn); return () => ppdResults.delete(fn); };
 
 // ---- defaults kept in settings.json ----
@@ -469,6 +477,16 @@ globalThis.__lordHw = (kind, data) => {
 
 // Called once by startShell: Night Light, idle timers and the battery item.
 export function startHardware() {
+  if (has('bt')) {
+    let btDone = null;
+    const btApply = () => {
+      const r = btPowerAction(bluetooth.get(), settings.get().bluetoothOff, btDone);
+      btDone = r.done;
+      if (r.off) call(() => lord.bt.power(false));
+    };
+    bluetooth.subscribe(btApply);
+    btApply();
+  }
   if (!has('display')) return;
   nightTick();
   applyIdle();

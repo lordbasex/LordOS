@@ -4,7 +4,7 @@
 // Everything comes from the SDK's stores (sound, Bluetooth, battery, Night Light, notifications);
 // nothing here polls except the network glyph (every 5 s, Taskbar.jsx useNet).
 import {
-  View, Text, Slider, useSettings, settings, useSound, defaultSink, sound, useBluetooth, useBattery, BatteryGlyph, NowPlayingTile,
+  View, Text, Slider, useSettings, settings, useSound, defaultSink, sound, useBluetooth, setBluetoothPower, useBattery, BatteryGlyph, NowPlayingTile,
   nightActive, setNightManual, notifyPrefs, dndActive, wm, addListener, t as tr, SoundOutputList, useSoundOutputs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -69,7 +69,7 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
             {(c) => <NetworkGlyph color={c} size={16} off={!net.online} />}
           </Toggle>
           {adapter ? (
-            <Toggle t={t} on={!!adapter.powered} label={tr('shell.classic.bluetooth')} onClick={() => lord.bt.power(!adapter.powered)} onMore={() => open('bluetooth')}>
+            <Toggle t={t} on={!!adapter.powered} label={tr('shell.classic.bluetooth')} onClick={() => setBluetoothPower(!adapter.powered)} onMore={() => open('bluetooth')}>
               {(c) => <BluetoothGlyph color={c} size={16} />}
             </Toggle>
           ) : null}

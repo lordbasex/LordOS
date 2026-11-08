@@ -175,6 +175,9 @@ in_ch systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumbe
 in_ch systemctl enable lordos.service > /dev/null
 in_ch systemctl enable lord-netperm.service > /dev/null
 in_ch systemctl enable lord-fand.service > /dev/null     # fans by temperature (docs/FANS.md)
+# bluetoothd from boot, so a paired mouse or keyboard reconnects at the login screen (bluez's postinst does
+# it too; made sure, as on the Pi; docs/SETTINGS.md, "Bluetooth")
+in_ch systemctl enable bluetooth.service > /dev/null
 in_ch systemctl enable lordos-autoinstall.service > /dev/null   # runs only with lordos.auto=1 (docs/UNATTENDED.md)
 in_ch systemctl mask getty@tty1.service > /dev/null
 # the boot splash: the LordOS theme (the initramfs below is built with it); docs/ISO.md, "Boot splash"

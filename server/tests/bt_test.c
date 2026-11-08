@@ -1,7 +1,8 @@
 /* bt_test.c — BlueZ parsing for Settings → Bluetooth (src/hw/bt.c), without a bus: messages
  * are built with our own D-Bus writer (vault/dbus.c), parsed by the strict reader and fed to
  * the model. Covers GetManagedObjects, PropertiesChanged-style dictionaries, Battery1, removal,
- * object path validation and the state JSON. Run by `make test` (mk/settings.mk). */
+ * object path validation, the state JSON and which devices are trusted (bt_should_trust). Run by
+ * `make test` (mk/settings.mk). */
 #include "hw/bt.h"
 #include "vault/dbus.h"
 
@@ -188,6 +189,27 @@ int main(void) {
     CHECK(bt_parse_managed(m, &msg) != 0);
     dbus_msg_free(&msg);
     dw_free(&b);
+
+    /* which devices are made Trusted, so they reconnect at boot before anyone logs in (issue #75) */
+    BtDevice t;
+    memset(&t, 0, sizeof t);
+    t.paired = 1;
+    CHECK(bt_should_trust("pair", NULL, &t));
+    CHECK(bt_should_trust("pair", "org.bluez.Error.AlreadyExists", &t));             /* the bond was there already */
+    CHECK(bt_should_trust("pair", "org.bluez.Error.AlreadyExists: Already Paired", &t));
+    CHECK(!bt_should_trust("pair", "org.bluez.Error.AuthenticationFailed", &t));
+    CHECK(bt_should_trust("connect", NULL, &t));                                       /* the user connected a paired one */
+    CHECK(!bt_should_trust("connect", "org.bluez.Error.Failed", &t));
+    CHECK(bt_should_trust("authorize", NULL, &t));                                     /* our agent let it in anyway */
+    CHECK(!bt_should_trust("disconnect", NULL, &t) && !bt_should_trust("forget", NULL, &t) && !bt_should_trust("power", NULL, &t));
+    t.paired = 0;
+    t.bonded = 1;
+    CHECK(bt_should_trust("connect", NULL, &t) && bt_should_trust("authorize", NULL, &t));
+    t.bonded = 0;                                                                      /* never paired: never trusted */
+    CHECK(!bt_should_trust("connect", NULL, &t) && !bt_should_trust("authorize", NULL, &t));
+    t.paired = t.trusted = 1;                                                          /* already trusted: nothing to send */
+    CHECK(!bt_should_trust("pair", NULL, &t) && !bt_should_trust("connect", NULL, &t) && !bt_should_trust("authorize", NULL, &t));
+    CHECK(!bt_should_trust(NULL, NULL, &t) && !bt_should_trust("pair", NULL, NULL));
 
     printf("bt: %d/%d passed\n", checks - fails, checks);
     return fails != 0;

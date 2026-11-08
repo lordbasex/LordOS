@@ -3,7 +3,8 @@
  *
  *   - state: adapters and devices from ObjectManager.GetManagedObjects, kept up to date by the
  *     InterfacesAdded / InterfacesRemoved / PropertiesChanged signals (no polling);
- *   - actions: power, discovery, pair (then trust and connect), connect, disconnect, forget;
+ *   - actions: power, discovery, pair (then trust and connect), connect, disconnect, forget; a
+ *     paired device the user connects, or that our agent lets in, is trusted too (bt_should_trust);
  *   - pairing agent: lord-server exports org.bluez.Agent1 at /org/lordos/BluetoothAgent
  *     ("KeyboardDisplay") and registers it as the default agent. PIN and passkey requests are
  *     shown by the system (sdk/bluetooth.js) and answered with bt_answer(). Calls to the agent
@@ -68,5 +69,9 @@ void bt_apply_props(BtModel *mdl, const char *path, const char *iface, DRd *r);
 int  bt_parse_managed(BtModel *mdl, const DMsg *m);
 void bt_remove_object(BtModel *mdl, const char *path, const char *iface);
 int  bt_path_valid(const char *path);   /* /org/bluez/hciN/dev_XX_XX_XX_XX_XX_XX */
+/* Whether a device should be made Trusted after op ("pair", "connect", or "authorize": our agent let it
+ * use a service) ended with err (a D-Bus error name, NULL if it worked). Trusted devices reconnect by
+ * themselves at boot, before anyone logs in (no agent). */
+int  bt_should_trust(const char *op, const char *err, const BtDevice *d);
 
 #endif

@@ -168,7 +168,7 @@ import { startReminders } from './calendar.js';
 export {
   displays, useDisplays, applyDisplay, keepDisplay, revertDisplay, arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, displayConfirm, DisplayGlyph, nightPrefs, NIGHT_DEFAULTS, nightWindow,
   nightActive, nightAmount, setNightManual, previewNight, nightTick, sunTimes, battery, useBattery, BatteryGlyph, powerPrefs, POWER_DEFAULTS,
-  powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, timedate, useTimedate, menuClock, clockPrefs,
+  powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
 import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, startHardware } from './hardware.jsx';
