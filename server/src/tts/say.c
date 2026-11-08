@@ -2,16 +2,24 @@
  *
  *   say "Hola, ¿cómo estás?"            say -l en -v alba "Hello"          echo texto | say
  *   say -f notas.txt -o notas.wav       say -b gpu "…"                      say --voices
+ *   say -q hd -v juergen "…"             say --preview es lola
  *
  * It holds no speech code: it starts lord-tts (the sandboxed helper next to it, src/doc/h_tts.c) on a channel at
  * fd 3, gives it the models folder (read only) and, for the GPU, Mesa's shader cache folder, and sends it the text
  * a sentence at a time (saytext.c). Each sentence comes back as a WAV in a sealed memfd and is played with
  * PipeWire's pw-cat (or written with -o) while the next one is synthesized, so speech starts after the first.
  *
- * Models: <root>/models/<language>/<quality>.gguf, root being /usr/share/lordos/voice (packages) or
- * ~/.local/share/lordos/voice. Voices: <root>/voices/<name>.wav (a voice to clone), or a voice the model carries
- * (English: alba). Without -l, the language is the text's (say_language); ~/.config/lordos/voice.json's ({language,
- * voice, backend, quality}), then $LANG's, when the text is too short to tell.
+ * Models, root being /usr/share/lordos/voice (the lordos-voice-* packages) or ~/.local/share/lordos/voice:
+ *   standard  <root>/models/<language>/standard.gguf, its voices in <root>/models/<language>/embeddings/<voice>.safetensors
+ *   hd        <root>/models/<language>/hd/ (Kyutai's model.safetensors, tokenizer.model and embeddings/<voice>.safetensors)
+ * The quality is -q, else voice.json's "quality", else "auto": HD when it is installed. The voice is -v, else
+ * voice.json's "voices" for the language ({"es": "juergen"}), else its "voice", else the language's own (Lola,
+ * Rafael, Alba); a voice that isn't installed for that model falls back to the language's own, then to any that is.
+ * <root>/voices/<name>.wav is a voice to clone instead. Without -l, the language is the text's (say_language);
+ * voice.json's "language", then $LANG's, when the text is too short to tell.
+ *
+ * --preview <language> <voice> plays the voice's recorded sample, <root>/previews/<language>/<voice>.wav (the
+ * lordos-voice-previews package), so a voice can be heard before it is downloaded.
  *
  * -o - writes the WAV to stdout (its sizes are set at the end, so it must be a file); lord-server saves this way.
  *
@@ -30,6 +38,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <math.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdio.h>
@@ -45,6 +54,7 @@ extern char **environ;
 
 #define TEXT_MAX (4u << 20)
 #define PIECE_MAX 300
+#define WAV_PREVIEW_MAX (8u << 20)          /* a recorded sample: about ten seconds */
 
 static const char *const ROOTS_SYS = "/usr/share/lordos/voice";
 static int sock = -1;
@@ -61,8 +71,9 @@ static void die_as(int code, const char *msg, const char *detail) {
 static void die(const char *msg, const char *detail) { die_as(1, msg, detail); }
 
 static void usage(void) {
-    fputs("usage: say [-l es|en|pt] [-v voice] [-q standard|hd] [-b auto|cpu|gpu] [-o file.wav|-] [-f file|-] [text…]\n"
-          "       say --voices\n", stderr);
+    fputs("usage: say [-l es|en|pt] [-v voice] [-q auto|standard|hd] [-b auto|cpu|gpu] [-o file.wav|-] [-f file|-] [text…]\n"
+          "       say --voices\n"
+          "       say --preview es|en|pt <voice>\n", stderr);
     exit(2);
 }
 
@@ -84,7 +95,8 @@ static char *read_all(int fd, size_t *len) {
 }
 
 /* ~/.config/lordos/voice.json: the defaults Settings → AI → Voice keeps */
-static char conf_lang[8], conf_voice[64], conf_backend[8], conf_quality[12];
+static char conf_lang[8], conf_voice[64], conf_backend[8], conf_quality[12], conf_voices[3][64];
+static const char *const LANGS[3] = { "es", "en", "pt" };
 static void read_settings(const char *home) {
     char path[PATH_MAX];
     snprintf(path, sizeof path, "%s/.config/lordos/voice.json", home);
@@ -100,6 +112,9 @@ static void read_settings(const char *home) {
         if ((v = json_str(d.root, "voice"))) snprintf(conf_voice, sizeof conf_voice, "%s", v);
         if ((v = json_str(d.root, "backend"))) snprintf(conf_backend, sizeof conf_backend, "%s", v);
         if ((v = json_str(d.root, "quality"))) snprintf(conf_quality, sizeof conf_quality, "%s", v);
+        const JVal *vs = json_get(d.root, "voices");
+        for (int i = 0; vs && i < 3; i++)
+            if ((v = json_str(vs, LANGS[i]))) snprintf(conf_voices[i], sizeof conf_voices[i], "%s", v);
     }
     json_free(&d);
     free(t);
@@ -115,16 +130,49 @@ static int simple_name(const char *s, size_t max) {
 
 static int is_file(const char *p) { struct stat st; return !stat(p, &st) && S_ISREG(st.st_mode); }
 
+/* a language's HD model as audio.cpp names it (h_tts.c's HD_LANGUAGES), and its own voice */
+static const char *hd_language(const char *lang) {
+    return !strcmp(lang, "es") ? "spanish_24l" : !strcmp(lang, "pt") ? "portuguese_24l" : "english_2026-09_24l";
+}
+static const char *own_voice(const char *lang) { return !strcmp(lang, "es") ? "lola" : !strcmp(lang, "pt") ? "rafael" : "alba"; }
+
+/* <root>/models/<lang>/<model dir>embeddings/<voice>.safetensors: the voice is installed for that model */
+static int has_voice(const char *root, const char *lang, int hd, const char *voice) {
+    char p[PATH_MAX];
+    snprintf(p, sizeof p, "%s/models/%s/%sembeddings/%s.safetensors", root, lang, hd ? "hd/" : "", voice);
+    return is_file(p);
+}
+
+static int has_model(const char *root, const char *lang, int hd) {
+    char p[PATH_MAX];
+    snprintf(p, sizeof p, "%s/models/%s/%s", root, lang, hd ? "hd/model.safetensors" : "standard.gguf");
+    return is_file(p);
+}
+
+/* every installed voice, by language and quality; then the voices to clone */
 static void list_voices(const char *user_root) {
     const char *roots[2] = { user_root, ROOTS_SYS };
-    printf("alba (English, built in)\n");
+    for (int l = 0; l < 3; l++)
+        for (int hd = 1; hd >= 0; hd--)
+            for (int r = 0; r < 2; r++) {
+                if (!has_model(roots[r], LANGS[l], hd)) continue;
+                char dir[PATH_MAX];
+                snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", roots[r], LANGS[l], hd ? "hd/" : "");
+                DIR *d = opendir(dir);
+                for (struct dirent *e; d && (e = readdir(d));) {
+                    size_t n = strlen(e->d_name);
+                    if (n > 12 && !strcmp(e->d_name + n - 12, ".safetensors"))
+                        printf("%s %s %.*s\n", LANGS[l], hd ? "hd" : "standard", (int)(n - 12), e->d_name);
+                }
+                if (d) closedir(d);
+            }
     for (int r = 0; r < 2; r++) {
         char dir[PATH_MAX];
         snprintf(dir, sizeof dir, "%s/voices", roots[r]);
         DIR *d = opendir(dir);
         for (struct dirent *e; d && (e = readdir(d));) {
-            size_t l = strlen(e->d_name);
-            if (l > 4 && !strcmp(e->d_name + l - 4, ".wav")) printf("%.*s%s\n", (int)(l - 4), e->d_name, r ? " (LordOS)" : "");
+            size_t n = strlen(e->d_name);
+            if (n > 4 && !strcmp(e->d_name + n - 4, ".wav")) printf("clone %.*s\n", (int)(n - 4), e->d_name);
         }
         if (d) closedir(d);
     }
@@ -181,7 +229,7 @@ static void stop_helper(void) {
 
 /* one piece of text → a request (id = piece number) */
 static void request(uint32_t id, const char *text, size_t len, const char *file, const char *backend, int threads,
-                    const char *voice_id, int voice_fd) {
+                    const char *voice_id, int voice_fd, const char *language) {
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"slot\":0,\"file\":");
@@ -190,6 +238,7 @@ static void request(uint32_t id, const char *text, size_t len, const char *file,
     jb_strn(&b, text, len);
     jb_printf(&b, ",\"backend\":\"%s\",\"threads\":%d,\"seed\":7", backend, threads);
     if (voice_id) { jb_raw(&b, ",\"voice_id\":"); jb_str(&b, voice_id); }
+    if (language) { jb_raw(&b, ",\"language\":"); jb_str(&b, language); }
     jb_raw(&b, "}");
     int fds[1] = { voice_fd };
     if (b.oom || doc_send(sock, DQ_TTS, id, b.p, b.n, voice_fd >= 0 ? fds : NULL, voice_fd >= 0 ? 1 : 0)) die("lord-tts stopped", NULL);
@@ -241,6 +290,22 @@ static int write_all(int fd, const void *buf, size_t n) {
     return 0;
 }
 
+/* the model starts every text with 0.3–0.9 s of near silence (audio.cpp's own CLI does too): it is cut from the
+ * first sentence, keeping LEAD_KEEP_MS, so speech starts as soon as it is asked for */
+#define LEAD_KEEP_MS 50
+static size_t lead_silence(const int16_t *pcm, size_t n, int rate) {
+    size_t hop = (size_t)rate / 100, at = 0;
+    while (hop && at + hop <= n) {
+        double e = 0;
+        for (size_t i = at; i < at + hop; i++) e += (double)pcm[i] * pcm[i];
+        if (sqrt(e / hop) > 0.01 * 32768) break;
+        at += hop;
+    }
+    if (!hop || at + hop > n) return 0;            /* no speech found: nothing is cut */
+    size_t keep = (size_t)rate * LEAD_KEEP_MS / 1000;
+    return at > keep ? at - keep : 0;
+}
+
 /* plays a piece, SAY_LEVEL_MS at a time, each after its bands to --levels */
 static int play(const int16_t *pcm, size_t n, int rate) {
     if (levels_fd < 0) return write_all(player_fd, pcm, n * 2);
@@ -271,6 +336,49 @@ static void start_player(int rate) {
     player_fd = pfd[1];
 }
 
+/* --preview: a voice's recorded sample, <root>/previews/<lang>/<voice>.wav, a 16-bit mono WAV; played as speech is */
+static int play_preview(const char *const roots[2], const char *lang, const char *voice) {
+    int ok_lang = 0;
+    for (int i = 0; i < 3; i++) ok_lang |= !strcmp(lang, LANGS[i]);
+    if (!ok_lang || !simple_name(voice, 60)) die("a preview is a language (es, en, pt) and a voice name", NULL);
+    int fd = -1;
+    for (int r = 0; r < 2 && fd < 0; r++) {
+        char p[PATH_MAX];
+        snprintf(p, sizeof p, "%s/previews/%s/%s.wav", roots[r], lang, voice);
+        fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    }
+    if (fd < 0) die_as(EXIT_NO_VOICE, "no recorded sample of that voice", voice);
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size < 44 || st.st_size > (off_t)WAV_PREVIEW_MAX) die("not a sample", voice);
+    size_t len = (size_t)st.st_size;
+    const uint8_t *w = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (w == MAP_FAILED) die("can't read", voice);
+    /* RIFF/WAVE, its fmt chunk PCM 16-bit mono, then its data chunk; every size checked against the file */
+    uint32_t rate = 0, v32;
+    uint16_t fmt = 0, ch = 0, bits = 0;
+    const int16_t *pcm = NULL;
+    size_t n = 0;
+    if (memcmp(w, "RIFF", 4) || memcmp(w + 8, "WAVE", 4)) die("not a WAV", voice);
+    for (size_t at = 12; at + 8 <= len;) {
+        memcpy(&v32, w + at + 4, 4);
+        size_t sz = v32;
+        if (sz > len - at - 8) die("a broken WAV", voice);
+        if (!memcmp(w + at, "fmt ", 4) && sz >= 16) {
+            memcpy(&fmt, w + at + 8, 2); memcpy(&ch, w + at + 10, 2); memcpy(&rate, w + at + 12, 4); memcpy(&bits, w + at + 22, 2);
+        } else if (!memcmp(w + at, "data", 4)) { pcm = (const int16_t *)(w + at + 8); n = sz / 2; break; }
+        at += 8 + sz + (sz & 1);
+    }
+    if (fmt != 1 || ch != 1 || bits != 16 || rate < 8000 || rate > 96000 || !pcm || !n) die("the sample isn't 16-bit mono PCM", voice);
+    start_player((int)rate);
+    int r = play(pcm, n, (int)rate);
+    close(player_fd);
+    int ps;
+    while (waitpid(player, &ps, 0) < 0 && errno == EINTR) {}
+    munmap((void *)w, len);
+    return r ? 1 : 0;
+}
+
 static void on_signal(int sig) {
     (void)sig;
     if (helper > 0) kill(helper, SIGKILL);
@@ -281,6 +389,7 @@ static void on_signal(int sig) {
 int main(int argc, char **argv) {
     const char *lang = NULL, *voice = NULL, *quality = NULL, *backend = NULL, *out = NULL, *file = NULL;
     int voices = 0, nwords = 0;
+    const char *preview_lang = NULL, *preview_voice = NULL;
     /* options anywhere, as `say "texto" -o texto.wav` reads naturally; after "--", only words */
     char **words = calloc((size_t)argc, sizeof *words);
     if (!words) die("out of memory", NULL);
@@ -289,6 +398,12 @@ int main(int argc, char **argv) {
         if (only_words || a[0] != '-' || !a[1]) { words[nwords++] = argv[ai]; continue; }
         if (!strcmp(a, "--")) { only_words = 1; continue; }
         if (!strcmp(a, "--voices")) { voices = 1; continue; }
+        if (!strcmp(a, "--preview")) {
+            if (ai + 2 >= argc) usage();
+            preview_lang = argv[++ai];
+            preview_voice = argv[++ai];
+            continue;
+        }
         if (!strcmp(a, "--levels")) {
             struct stat st;
             if (!fstat(3, &st) && S_ISFIFO(st.st_mode) && !fcntl(3, F_SETFD, FD_CLOEXEC) && !fcntl(3, F_SETFL, O_WRONLY | O_NONBLOCK)) levels_fd = 3;
@@ -311,6 +426,13 @@ int main(int argc, char **argv) {
     char user_root[1100];
     snprintf(user_root, sizeof user_root, "%s/.local/share/lordos/voice", home);
     if (voices) { list_voices(user_root); return 0; }
+    if (preview_lang) {
+        const char *const proots[2] = { user_root, ROOTS_SYS };
+        signal(SIGINT, on_signal);
+        signal(SIGTERM, on_signal);
+        signal(SIGPIPE, SIG_IGN);
+        return play_preview(proots, preview_lang, preview_voice);
+    }
     read_settings(home);
 
     /* the text: the arguments, a file, or stdin */
@@ -341,37 +463,58 @@ int main(int argc, char **argv) {
         lang = say_language(text, len, fallback);
     }
     if (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt")) lang = "en";    /* the languages LordOS has voices for */
-    if (!quality) quality = conf_quality[0] ? conf_quality : "standard";
-    if (strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is standard or hd", quality);
+    if (!quality) quality = conf_quality[0] ? conf_quality : "auto";
+    if (strcmp(quality, "auto") && strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is auto, standard or hd", quality);
     const char *roots[2] = { user_root, ROOTS_SYS };
+    int li = !strcmp(lang, "es") ? 0 : !strcmp(lang, "en") ? 1 : 2;
+
+    /* the voice asked for: -v, the language's in voice.json, voice.json's own; a WAV to clone when there is one */
+    if (!voice) voice = conf_voices[li][0] ? conf_voices[li] : conf_voice[0] ? conf_voice : NULL;
+    if (voice && !simple_name(voice, 60)) die("a voice name is letters, digits, - and _", voice);
+    int voice_fd = -1;
+    char path[PATH_MAX + 128];
+    for (int r = 0; voice && r < 2 && voice_fd < 0; r++) {
+        snprintf(path, sizeof path, "%s/voices/%s.wav", roots[r], voice);
+        voice_fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    }
+
+    /* the model: HD first unless standard was asked for (auto prefers HD), then the other; in either root */
     const char *root = NULL;
-    char model_file[64], path[PATH_MAX + 128];
+    int hd = 0;
     for (int pass = 0; pass < 2 && !root; pass++) {
-        const char *q = pass ? (strcmp(quality, "hd") ? "hd" : "standard") : quality;
-        snprintf(model_file, sizeof model_file, "%s/%s.gguf", lang, q);
-        for (int r = 0; r < 2 && !root; r++) {
-            snprintf(path, sizeof path, "%s/models/%s", roots[r], model_file);
-            if (is_file(path)) root = roots[r];
-        }
+        int want_hd = !strcmp(quality, "standard") ? pass : !pass;
+        for (int r = 0; r < 2 && !root; r++)
+            if (has_model(roots[r], lang, want_hd)) { root = roots[r]; hd = want_hd; }
     }
     if (!root) die_as(EXIT_NO_MODEL, "no voice model for this language; download one in Settings → AI → Voice", lang);
+
+    /* a voice that model carries: the one asked for, else the language's own, else any installed */
+    const char *voice_id = NULL;
+    static char any[64];
+    if (voice_fd < 0) {
+        if (voice && has_voice(root, lang, hd, voice)) voice_id = voice;
+        else if (has_voice(root, lang, hd, own_voice(lang))) voice_id = own_voice(lang);
+        else {
+            char dir[PATH_MAX];
+            snprintf(dir, sizeof dir, "%s/models/%s/%sembeddings", root, lang, hd ? "hd/" : "");
+            DIR *d = opendir(dir);
+            for (struct dirent *e; d && (e = readdir(d)) && !voice_id;) {
+                size_t n = strlen(e->d_name);
+                if (n > 12 && n - 12 < sizeof any && !strcmp(e->d_name + n - 12, ".safetensors")) {
+                    snprintf(any, sizeof any, "%.*s", (int)(n - 12), e->d_name);
+                    if (simple_name(any, 60)) voice_id = any;
+                }
+            }
+            if (d) closedir(d);
+        }
+        if (!voice_id) die_as(EXIT_NO_VOICE, "no voice installed for this language; download one in Settings → AI → Voice", lang);
+    }
+    char model_file[64];
+    snprintf(model_file, sizeof model_file, "%s/%s", lang, hd ? "hd" : "standard.gguf");
+    const char *language = hd ? hd_language(lang) : NULL;
     snprintf(path, sizeof path, "%s/models", root);
     int models_fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (models_fd < 0) die("can't open", path);
-
-    /* the voice: a WAV to clone, or one the model carries */
-    if (!voice) voice = conf_voice[0] ? conf_voice : NULL;
-    int voice_fd = -1;
-    const char *voice_id = NULL;
-    if (voice) {
-        if (!simple_name(voice, 60)) die("a voice name is letters, digits, - and _", voice);
-        for (int r = 0; r < 2 && voice_fd < 0; r++) {
-            snprintf(path, sizeof path, "%s/voices/%s.wav", roots[r], voice);
-            voice_fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-        }
-        if (voice_fd < 0) voice_id = voice;
-    } else if (!strcmp(lang, "en")) voice_id = "alba";
-    else die_as(EXIT_NO_VOICE, "no voice chosen; create one in Settings → AI → Voice, or put a WAV in ~/.local/share/lordos/voice/voices", lang);
 
     /* where it runs: the GPU (Vulkan) when there is a render node, unless told otherwise */
     if (!backend) backend = conf_backend[0] ? conf_backend : "auto";
@@ -395,7 +538,7 @@ int main(int argc, char **argv) {
         /* the first piece tells whether the GPU works; "auto" falls back to the CPU */
         size_t skip, k = say_next(text, len, PIECE_MAX, &skip);
         size_t off = skip + k;
-        request(1, text + skip, k, model_file, gpu ? "vulkan" : "cpu", threads, voice_id, voice_fd);
+        request(1, text + skip, k, model_file, gpu ? "vulkan" : "cpu", threads, voice_id, voice_fd, language);
         Piece cur;
         reply(&cur);
         if (cur.err[0] && gpu && !strcmp(backend, "auto") && attempt == 0) {
@@ -417,9 +560,10 @@ int main(int argc, char **argv) {
         } else start_player(cur.rate);
         for (uint32_t id = 2;; id++) {
             size_t k2 = say_next(text + off, len - off, PIECE_MAX, &skip);
-            if (k2) request(id, text + off + skip, k2, model_file, gpu ? "vulkan" : "cpu", threads, voice_id, voice_fd);
+            if (k2) request(id, text + off + skip, k2, model_file, gpu ? "vulkan" : "cpu", threads, voice_id, voice_fd, language);
             off += skip + k2;
             /* while the next piece is synthesized, this one plays */
+            if (id == 2) { size_t cut = lead_silence(cur.pcm, cur.n, cur.rate); cur.pcm += cut; cur.n -= cut; }
             if (wav) fwrite(cur.pcm, 2, cur.n, wav);
             else if (play(cur.pcm, cur.n, cur.rate)) break;
             total += cur.n * 2;

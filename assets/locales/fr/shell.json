@@ -323,6 +323,7 @@
   "shortcuts.newDesktop": "Nouveau bureau",
   "shortcuts.closeDesktop": "Fermer le bureau",
   "shortcuts.speakSelection": "Lire la sélection à voix haute (à nouveau pour arrêter)",
+  "shortcuts.liveSpeech": "Parole en direct : tapez et c’est dit à voix haute",
   "share.sharing": "{app} partage votre écran",
   "share.sharingInput": "{app} partage votre écran et peut le contrôler",
   "share.stop": "Arrêter",
@@ -353,5 +354,10 @@
   "voice.saving": "Création du fichier audio…",
   "voice.speech": "Parole",
   "voice.start": "Commencer la lecture",
-  "voice.stop": "Arrêter la lecture"
+  "voice.stop": "Arrêter la lecture",
+  "voice.noPreview": "Il n’y a pas encore d’extrait enregistré de cette voix.",
+  "liveSpeech.placeholder": "Tapez quelque chose à dire à voix haute…",
+  "liveSpeech.recent": "Récents",
+  "liveSpeech.hint": "Entrée le dit · Échap arrête ou ferme · ❖⇧Esc",
+  "liveSpeech.title": "Parole en direct"
 }

@@ -37,7 +37,7 @@ static int paused;
 static int saving;                      /* the one in progress writes a file (speak_save) */
 static char *last_text;                 /* for speak_replay */
 static size_t last_n;
-static char last_lang[3];
+static char last_lang[3], last_voice[64];
 
 /* the wave: the bands lord-say wrote, the last RING of them */
 #define RING 256
@@ -165,7 +165,7 @@ int speak_saving(void) { return cur > 0 && saving; }
 
 int speak_replay(void) {
     if (!last_text) return -1;
-    return speak_start(last_text, last_n, last_lang[0] ? last_lang : NULL);
+    return speak_start(last_text, last_n, last_lang[0] ? last_lang : NULL, last_voice[0] ? last_voice : NULL);
 }
 
 int speak_levels(uint8_t out[SAY_BANDS]) {
@@ -246,9 +246,19 @@ static int check_args(const char *text, size_t n, const char **lang) {
     return 0;
 }
 
-int speak_start(const char *text, size_t n, const char *lang) {
+/* a voice name as say.c takes it (-v): letters, digits, - and _, at most 60 */
+static int plain_voice(const char *v) {
+    size_t n = v ? strlen(v) : 0;
+    if (!n || n > 60) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!((v[i] >= 'a' && v[i] <= 'z') || (v[i] >= 'A' && v[i] <= 'Z') || (v[i] >= '0' && v[i] <= '9') || v[i] == '_' || v[i] == '-')) return 0;
+    return 1;
+}
+
+int speak_start(const char *text, size_t n, const char *lang, const char *voice) {
     speak_stop();
     if (check_args(text, n, &lang)) return -1;
+    if (voice && !plain_voice(voice)) { errno = EINVAL; return -1; }
     if (text != last_text) {
         char *copy = malloc(n);
         if (!copy) return -1;
@@ -258,12 +268,40 @@ int speak_start(const char *text, size_t n, const char *lang) {
         last_n = n;
         snprintf(last_lang, sizeof last_lang, "%s", lang ? lang : "");
     }
+    char vbuf[64];
+    snprintf(vbuf, sizeof vbuf, "%s", voice ? voice : "");
+    if (voice != last_voice) snprintf(last_voice, sizeof last_voice, "%s", vbuf);
     int in = text_fd(text, n);
     if (in < 0) return -1;
     int lev[2];
     if (pipe2(lev, O_CLOEXEC)) { close(in); return -1; }
     fcntl(lev[0], F_SETFL, O_RDONLY | O_NONBLOCK);
-    char *argv[] = { "lord-say", "--levels", NULL };
+    char *argv[] = { "lord-say", "--levels", vbuf[0] ? "-v" : NULL, vbuf[0] ? vbuf : NULL, NULL };
+    int r = spawn_say(in, -1, lev[1], lang, argv);
+    close(in);
+    close(lev[1]);
+    if (r) { close(lev[0]); return -1; }
+    lev_fd = lev[0];
+    return 0;
+}
+
+/* a voice's recorded sample (say --preview): the language from a closed list, the voice a plain name; the player's
+ * wave as for reading; never something to read again (speak_replay keeps the text before) */
+int speak_preview(const char *lang, const char *voice) {
+    speak_stop();
+    if (!lang || (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt"))) { errno = EINVAL; return -1; }
+    if (!plain_voice(voice)) { errno = EINVAL; return -1; }
+    size_t vn = strlen(voice);
+    if (!speak_available()) { errno = ENOENT; return -1; }
+    int in = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if (in < 0) return -1;
+    int lev[2];
+    if (pipe2(lev, O_CLOEXEC)) { close(in); return -1; }
+    fcntl(lev[0], F_SETFL, O_RDONLY | O_NONBLOCK);
+    char l[3], v[61];
+    memcpy(l, lang, 3);
+    memcpy(v, voice, vn + 1);
+    char *argv[] = { "lord-say", "--levels", "--preview", l, v, NULL };
     int r = spawn_say(in, -1, lev[1], lang, argv);
     close(in);
     close(lev[1]);

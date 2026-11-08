@@ -323,6 +323,7 @@
   "shortcuts.newDesktop": "Nuova scrivania",
   "shortcuts.closeDesktop": "Chiudi la scrivania",
   "shortcuts.speakSelection": "Leggi la selezione ad alta voce (di nuovo per fermare)",
+  "shortcuts.liveSpeech": "Voce dal vivo: scrivi e viene detto ad alta voce",
   "share.sharing": "{app} sta condividendo il tuo schermo",
   "share.sharingInput": "{app} sta condividendo il tuo schermo e può controllarlo",
   "share.stop": "Interrompi",
@@ -353,5 +354,10 @@
   "voice.saving": "Creazione del file audio…",
   "voice.speech": "Voce",
   "voice.start": "Avvia lettura",
-  "voice.stop": "Interrompi lettura"
+  "voice.stop": "Interrompi lettura",
+  "voice.noPreview": "Non c’è ancora un campione registrato di quella voce.",
+  "liveSpeech.placeholder": "Scrivi qualcosa da dire ad alta voce…",
+  "liveSpeech.recent": "Recenti",
+  "liveSpeech.hint": "Invio lo dice · Esc ferma o chiude · ❖⇧Esc",
+  "liveSpeech.title": "Voce dal vivo"
 }

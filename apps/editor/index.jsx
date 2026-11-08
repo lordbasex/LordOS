@@ -382,7 +382,7 @@ export default function Editor() {
   // Ctrl+Tab switches tabs; with focus in a field (find, replace), the window
   // shortcuts (save, open, go to…) keep working: EditorView does not receive them in that case
   const selectedText = () => doc.cursors.filter(hasSel).map((k) => doc.textIn(selStart(k), selEnd(k))).join('\n');
-  // Speech reads the selection, or the whole text when nothing is selected (as a Mac's Start Speaking)
+  // Speech reads the selection, or the whole text when nothing is selected
   const speechText = () => latest.current.selectedText() || latest.current.doc.text();
   // right click on the text: the clipboard and Speech (sdk/contextmenu.jsx)
   const column = useRef(null);

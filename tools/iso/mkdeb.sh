@@ -112,6 +112,8 @@ if [ -x server/build/lord-tts ]; then
     mkdir -p "$L/lib/tts"
     cp -P server/build/lib/tts/*.so* "$L/lib/tts/"
     for f in "$L"/lib/tts/*.so*; do [ -L "$f" ] || { chmod 644 "$f"; "$STRIP" --strip-unneeded "$f" 2>/dev/null || true; }; done
+    # audio.cpp's description of Kyutai's HD model folders (server/mk/tts.mk; lord-tts reads it, docs/VOICE.md)
+    install -m 644 server/build/lib/tts/pocket_tts_dir.json "$L/lib/tts/pocket_tts_dir.json"
 fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"

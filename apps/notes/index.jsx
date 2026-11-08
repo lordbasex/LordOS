@@ -310,7 +310,7 @@ export default function Notes() {
       { label: tr('notes.menu.view'), items: [
         { label: mode === 'edit' ? tr('notes.read') : tr('notes.edit'), hint: '❖E', onClick: cmd.toggle },
         { label: tr('notes.toc'), checked: toc, onClick: cmd.toc },
-        // the selection, or the whole note when nothing is selected (as a Mac's Start Speaking)
+        // the selection, or the whole note when nothing is selected
         ...(note ? ['-', ...speechItems(() => (mode === 'edit' && api.current?.selection?.()) || note.body || '')].slice(0, -1) : []),
       ] },
     ]);

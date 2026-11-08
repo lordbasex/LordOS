@@ -1,8 +1,9 @@
 /* js_voice.c — lord.voice: reading text aloud (docs/VOICE.md, phase 2; speak.c starts lord-say).
  *
  *   lord.voice.available()              → lord-say and lord-tts are installed
- *   lord.voice.speak(text, lang?)       → true when it started; ends the reading before. lord-say tells the text's
- *                                         language; lang ('es', 'en' or 'pt', the interface's) is for a text too short
+ *   lord.voice.speak(text, lang?, voice?) → true when it started; ends the reading before. lord-say tells the text's
+ *                                         language; lang ('es', 'en' or 'pt', the interface's) is for a text too short;
+ *                                         voice, a plain name, is say's -v (Settings' "Try this voice")
  *   lord.voice.speakSelection(lang?)    → true when it started, false when the app with the keyboard (a Linux app)
  *                                         has selected nothing: its primary selection, read here, never given to JS
  *   lord.voice.save(text, path, lang?)  → true when it started: a WAV at path, nothing heard. path is in the home
@@ -10,6 +11,8 @@
  *   lord.voice.holdSelection()          → true when the app with the keyboard (a Linux app) has a selection: it is kept
  *                                         here for saveSelection, as the dialog that asks where takes the keyboard
  *   lord.voice.saveSelection(path, lang?)   the same as save, with the selection kept; forgets it
+ *   lord.voice.preview(lang, voice)     → true when it started: a voice's recorded sample (say --preview), heard as a
+ *                                         reading is, with the wave; lang is es, en or pt, voice a plain name
  *   lord.voice.pause(on)                → freezes the reading where it is, or goes on
  *   lord.voice.replay()                 → reads the last text again from the start
  *   lord.voice.stop()
@@ -66,8 +69,10 @@ static JSValue f_speak(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     char lang[3];
     size_t n = 0;
     const char *text = argc > 0 && JS_IsString(argv[0]) ? JS_ToCStringLen(c, &n, argv[0]) : NULL;
-    int ok = text && n && n <= SPEAK_TEXT_MAX && !speak_start(text, n, lang_arg(c, argc, argv, 1, lang));
+    const char *voice = argc > 2 && JS_IsString(argv[2]) ? JS_ToCString(c, argv[2]) : NULL;
+    int ok = text && n && n <= SPEAK_TEXT_MAX && !speak_start(text, n, lang_arg(c, argc, argv, 1, lang), voice);
     if (text) JS_FreeCString(c, text);
+    if (voice) JS_FreeCString(c, voice);
     return JS_NewBool(c, ok);
 }
 
@@ -77,7 +82,7 @@ static JSValue f_speak_selection(JSContext *c, JSValueConst this_val, int argc, 
     size_t n = 0;
     const char *text = wl_focus_primary(&n);
     if (!text) return JS_FALSE;
-    return JS_NewBool(c, !speak_start(text, n > SPEAK_TEXT_MAX ? SPEAK_TEXT_MAX : n, lang_arg(c, argc, argv, 0, lang)));
+    return JS_NewBool(c, !speak_start(text, n > SPEAK_TEXT_MAX ? SPEAK_TEXT_MAX : n, lang_arg(c, argc, argv, 0, lang), NULL));
 }
 
 static JSValue f_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -110,6 +115,16 @@ static JSValue f_save_selection(JSContext *c, JSValueConst this_val, int argc, J
     int ok = held && argc > 0 && !wav_target(c, argv[0], target, sizeof target)
         && !speak_save(held, held_n, lang_arg(c, argc, argv, 1, lang), target);
     forget_held();
+    return JS_NewBool(c, ok);
+}
+
+static JSValue f_preview(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *lang = JS_ToCString(c, argv[0]), *voice = JS_ToCString(c, argv[1]);
+    int ok = lang && voice && !speak_preview(lang, voice);
+    if (lang) JS_FreeCString(c, lang);
+    if (voice) JS_FreeCString(c, voice);
     return JS_NewBool(c, ok);
 }
 
@@ -151,11 +166,12 @@ static JSValue f_levels(JSContext *c, JSValueConst this_val, int argc, JSValueCo
 
 static const JSCFunctionListEntry voice_funcs[] = {
     JS_CFUNC_DEF("available", 0, f_available),
-    JS_CFUNC_DEF("speak", 2, f_speak),
+    JS_CFUNC_DEF("speak", 3, f_speak),
     JS_CFUNC_DEF("speakSelection", 1, f_speak_selection),
     JS_CFUNC_DEF("save", 3, f_save),
     JS_CFUNC_DEF("holdSelection", 0, f_hold_selection),
     JS_CFUNC_DEF("saveSelection", 2, f_save_selection),
+    JS_CFUNC_DEF("preview", 2, f_preview),
     JS_CFUNC_DEF("pause", 1, f_pause),
     JS_CFUNC_DEF("replay", 0, f_replay),
     JS_CFUNC_DEF("stop", 0, f_stop),

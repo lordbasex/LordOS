@@ -323,6 +323,7 @@
   "shortcuts.newDesktop": "New desktop",
   "shortcuts.closeDesktop": "Close desktop",
   "shortcuts.speakSelection": "Read the selection aloud (again to stop)",
+  "shortcuts.liveSpeech": "Live Speech: type and it is said aloud",
   "share.sharing": "{app} is sharing your screen",
   "share.sharingInput": "{app} is sharing and may control your screen",
   "share.stop": "Stop",
@@ -353,5 +354,10 @@
   "voice.saving": "Making the audio file…",
   "voice.speech": "Speech",
   "voice.start": "Start Speaking",
-  "voice.stop": "Stop Speaking"
+  "voice.stop": "Stop Speaking",
+  "voice.noPreview": "There’s no recorded sample of that voice yet.",
+  "liveSpeech.placeholder": "Type something to say aloud…",
+  "liveSpeech.recent": "Recent",
+  "liveSpeech.hint": "Enter says it · Esc stops or closes · ❖⇧Esc",
+  "liveSpeech.title": "Live Speech"
 }

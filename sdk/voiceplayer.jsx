@@ -18,7 +18,7 @@ import { FilePicker } from './filepicker.jsx';
 import { player, voiceSave, saveSpeechTo, musicFolder, pauseSpeaking, replaySpeaking, stopSpeaking, closePlayer } from './voice.js';
 import { placePlayer, rememberPlace, smoothBands, PLAYER_BARS } from './voiceplayermodel.js';
 
-const SIZE = { w: 432, h: 60 };
+const SIZE = { w: 480, h: 60 };
 const BAR_W = 4, BAR_GAP = 3, BAR_MAX = 28, BAR_MIN = 3;
 // violet (low) to light blue (high), one per band
 const COLORS = ['#7c5cff', '#9159fa', '#a657f3', '#bb57ea', '#d058dd', '#e45ccc', '#f062b8', '#f46c9a', '#f5807c', '#f59a5f', '#e9b64a',

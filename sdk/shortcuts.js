@@ -33,6 +33,7 @@ import { volumeUp, volumeDown, volumeMute, brightnessUp, brightnessDown, keyLigh
 import { wm } from './windows.js';
 import { switcherOpen, switcherKey } from './appswitcher.jsx';
 import { speakSelection } from './voice.js';
+import { liveSpeech } from './livespeech.jsx';
 
 const MOD_BITS = { Shift: 1, Alt: 2, Ctrl: 4, Meta: 8 };
 const NAMED = {
@@ -94,6 +95,7 @@ export const BASE = [
   { id: 'quit', keys: ['Meta+Q'], run: quitFrontApp, label: 'shell.shortcuts.quit', group: 'apps' },
   // ❖Esc reads the selection aloud, or stops reading (⌥Esc on a Mac); a full-screen app or a locked pointer keeps it (wl.c)
   { id: 'speakSelection', keys: ['Meta+Escape'], run: speakSelection, label: 'shell.shortcuts.speakSelection', group: 'system' },
+  { id: 'liveSpeech', keys: ['Meta+Shift+Escape'], run: liveSpeech.toggle, label: 'shell.shortcuts.liveSpeech', group: 'system' },
   { id: 'mediaPlay', keys: ['MediaPlayPause', 'MediaPlay', 'MediaPause'], run: mediaToggle, when: hasNowPlaying },
   { id: 'mediaNext', keys: ['MediaNext'], run: mediaNext, when: hasNowPlaying },
   { id: 'mediaPrev', keys: ['MediaPrev'], run: mediaPrev, when: hasNowPlaying },

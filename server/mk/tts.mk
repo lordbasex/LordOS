@@ -21,6 +21,15 @@ build/lib/tts/libaudiocpp.so.0: $(AUDIOCPP_DIR)/include/audiocpp.h
 	rm -f build/lib/tts/*.so*
 	cp -P build/audiocpp/bin/libaudiocpp.so* build/audiocpp/bin/libggml*.so* build/lib/tts/
 
+# the HD models are Kyutai's own folders (model.safetensors, tokenizer.model, embeddings/): audio.cpp's description of
+# Pocket TTS, made to read that folder itself rather than languages/english under it (h_tts.c)
+ifeq ($(TTSHELPER),1)
+ALL += build/lib/tts/pocket_tts_dir.json
+endif
+build/lib/tts/pocket_tts_dir.json: $(AUDIOCPP_DIR)/model_specs/pocket_tts.json
+	@mkdir -p build/lib/tts
+	python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); [s.update(roots={"language": "."}) for s in d["sources"] if s["format"] == "safetensors"]; json.dump(d, open(sys.argv[2], "w"), indent=1)' $< $@
+
 LT_SRC := src/doc/helper.c src/doc/h_tts.c src/tts/hiss.c src/doc/wire.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 build/lord-tts: $(LT_SRC) build/lib/tts/libaudiocpp.so.0 $(wildcard src/doc/*.h) src/tts/hiss.h src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_TTS $(CFLAGS) $(WARN) -std=c11 -isystem $(AUDIOCPP_DIR)/include -o $@ $(LT_SRC) \

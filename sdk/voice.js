@@ -1,6 +1,9 @@
 // voice.js — reading text aloud (docs/VOICE.md, phase 2): lord.voice starts lord-say, LordOS's `say`.
 //
-//   speak(text)              reads it, in the language it is written in (lord-say tells); ends any reading before
+//   speak(text, voice?, source?)  reads it (source: what the player names, else the window in front), in the language it is written in (lord-say tells); ends any reading before;
+//                            voice: one installed (say's -v), else the language's chosen one
+//   previewVoice(lang, voice)  plays a voice's recorded sample (lordos-voice-previews): heard before downloading it
+//   tryVoice(lang, voice)    reads the language's sample sentence with an installed voice
 //   stopSpeaking()
 //   pauseSpeaking(on)        freezes the reading where it is, or goes on
 //   replaySpeaking()         reads the last text again from the start
@@ -14,7 +17,7 @@
 //   speechMenu(getText)      the Speech submenu (Start Speaking, Stop Speaking, Save as Audio…) for an Edit menu or a
 //                            context menu; null when reading aloud is off in Settings → AI
 //   useMenusWithSpeech(wid)  an app's menus, and for a Linux app's window an Edit menu with Speech (its own selection)
-//   voiceSettings()          Settings → AI → Voice: { enabled, shortcut, player }, all on by default
+//   voiceSettings()          Settings → AI → Voice: { enabled, shortcut, player, liveSpeech }, all on by default
 //
 // A Linux app's selection is its primary selection: lord-server reads it (lord.voice.speakSelection, holdSelection) and
 // only when that app made it, so JS never sees it. When nothing can be read, a short notice says why (toast).
@@ -25,6 +28,7 @@ import { toast } from './clipboard.js';
 import { settings } from './settings.js';
 import { windowAppName } from './apps.js';
 import { userDirs } from './media.js';
+import { voiceLabel, langOf } from './voicecatalog.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.voice) || null;
 // for a text too short to tell its language (say_language in server/src/tts/saytext.c): the interface's
@@ -35,7 +39,7 @@ export const speaking = createStore(false);
 export const player = createStore(null);
 export const voiceSave = createStore(null);   // the save dialog: { text } or { held: true } (a Linux app's selection)
 
-export const VOICE_DEFAULTS = { enabled: true, shortcut: true, player: true };
+export const VOICE_DEFAULTS = { enabled: true, shortcut: true, player: true, liveSpeech: true };
 export const voiceSettings = () => ({ ...VOICE_DEFAULTS, ...(settings.get().voice || {}) });
 
 // say.c's exit statuses: what to tell the person
@@ -79,13 +83,33 @@ const sourceName = () => { const w = wm.get(wm.focused()); return w ? windowAppN
 
 export function speakAvailable() { return !!api()?.available(); }
 
-export function speak(text) {
+export function speak(text, voice, source) {
   const v = api();
   const s = String(text || '').trim();
   if (!s) return false;
   if (!v || !v.available()) { toast.set(t('shell.voice.notInstalled')); return false; }
-  const ok = v.speak(s, uiLang());
-  if (ok) started(sourceName());
+  const ok = voice ? v.speak(s, uiLang(), voice) : v.speak(s, uiLang());
+  if (ok) started(source || sourceName());
+  else toast.set(t('shell.voice.failed'));
+  return ok;
+}
+
+export function previewVoice(lang, voice) {
+  const v = api();
+  if (!v || !v.available()) { toast.set(t('shell.voice.notInstalled')); return false; }
+  const ok = v.preview(lang, voice);
+  if (ok) started(voiceLabel(voice));
+  else toast.set(t('shell.voice.noPreview'));
+  return ok;
+}
+
+export function tryVoice(lang, voice) {
+  const L = langOf(lang);
+  if (!L) return false;
+  const v = api();
+  if (!v || !v.available()) { toast.set(t('shell.voice.notInstalled')); return false; }
+  const ok = v.speak(L.sample, lang, voice);
+  if (ok) started(voiceLabel(voice));
   else toast.set(t('shell.voice.failed'));
   return ok;
 }
@@ -150,7 +174,7 @@ export function speakSelection() {
   else toast.set(t('shell.voice.nothingSelected'));
 }
 
-// ---- saving as a sound file (as macOS's Add to Music as a Spoken Track) ----
+// ---- saving as a sound file ----
 
 // a file name from the first words: letters, digits and spaces, at most 40 characters
 export function speechFileName(text) {

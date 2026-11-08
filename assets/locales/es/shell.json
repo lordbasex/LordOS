@@ -323,6 +323,7 @@
   "shortcuts.newDesktop": "Nuevo escritorio",
   "shortcuts.closeDesktop": "Cerrar escritorio",
   "shortcuts.speakSelection": "Leer la selección en voz alta (otra vez para parar)",
+  "shortcuts.liveSpeech": "Voz en tiempo real: escribí y se dice en voz alta",
   "share.sharing": "{app} está compartiendo tu pantalla",
   "share.sharingInput": "{app} comparte y puede controlar tu pantalla",
   "share.stop": "Detener",
@@ -353,5 +354,10 @@
   "voice.saving": "Creando el archivo de audio…",
   "voice.speech": "Habla",
   "voice.start": "Iniciar locución",
-  "voice.stop": "Detener locución"
+  "voice.stop": "Detener locución",
+  "voice.noPreview": "Todavía no hay una muestra grabada de esa voz.",
+  "liveSpeech.placeholder": "Escribí algo para decir en voz alta…",
+  "liveSpeech.recent": "Recientes",
+  "liveSpeech.hint": "Enter lo dice · Esc detiene o cierra · ❖⇧Esc",
+  "liveSpeech.title": "Voz en tiempo real"
 }

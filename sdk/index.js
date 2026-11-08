@@ -14,7 +14,11 @@ export { keyboard } from './keyboard.js';
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
-export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS } from './voice.js';
+export { liveSpeech } from './livespeech.jsx';
+export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS, previewVoice, tryVoice } from './voice.js';
+export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';
+export { parseWav, levelDb, quietEnough, trimSilence, joinPhrases, phraseDone } from './voicerecmodel.js';
+export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
 export { switcherPrefs, SWITCHER_DEFAULTS, validColor } from './switchermodel.js';
@@ -149,6 +153,7 @@ export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pi
 export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';
 import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
+import { LiveSpeechPanel } from './livespeech.jsx';
 export { openFileWithApps, openUrl, revealPath } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
@@ -303,7 +308,7 @@ function LocaleRoot({ children }) {
   const at = (name, ...kids) => createElement(Layer, { name }, ...kids.map((k, i) => createElement(k, { key: i })));
   return createElement(Fragment, { key: `${lang}|${region}` }, rev ? cloneElement(children, { screenRev: rev }) : children,
     at('floating', FloatingWindows),
-    at('overlay', SpotlightPanel),
+    at('overlay', SpotlightPanel, LiveSpeechPanel),
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),

@@ -171,6 +171,18 @@ done
 Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created.
 with a fake fetch), never on a real issue, because workflows for `issues` events run from the default branch.
 
+## Voice packages
+
+(0.8.8.6; [VOICE.md](VOICE.md), "Models, voices and packages".) The models and voices for reading aloud are their own
+packages, `Architecture: all`, published only when they change (a new Kyutai model or voice), not with every release:
+
+```sh
+tools/voice/fetch-voices.sh <dir>             # Kyutai's files, SHA-256 checked (needs a Hugging Face read token)
+tools/voice/make-previews.sh <dir>            # the recorded samples, with server/build/lord-say and lord-tts
+node tools/voice/mkdeb-voice.mjs <dir> <out> <YYYY.MM.DD>
+tools/release/apt-repo.sh build staging <out>/*.deb      # then live, as for any package
+```
+
 ## A newer hardware snapshot between releases
 
 (0.8.7; [BENCHMARK.md](BENCHMARK.md), "Newer snapshots between releases".) System Information's Compatibility panel

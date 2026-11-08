@@ -4,45 +4,48 @@ LordOS reads text aloud on the computer, without the internet. Speech comes from
 model weights **CC-BY-4.0**: use, redistribution and commercial use allowed, crediting Kyutai), run by **audio.cpp**
 (Apache-2.0) and its **ggml**, on the CPU or the GPU (Vulkan).
 
-**No voice model is installed by default**: the person downloads the languages they want (Settings → AI → Voice,
-phase 4). Models: Spanish, English and Portuguese, about 130 MB each. Reading aloud from the desktop (below) is on by
-default and can be turned off in Settings → AI; without a model it says so.
+**No voice model is installed by default**: the person downloads the languages, qualities and voices they want from
+Settings → AI → Voice, as signed LordOS packages (below). Reading aloud from the desktop is on by default and can be
+turned off there; without a model it says so.
 
 ## Phases
 
 | Phase | What | State |
 |---|---|---|
 | 1 | `lord-tts` (the engine) and `say` (the command) | done |
-| 2 | Read the selection anywhere, as macOS: Edit → Speech and the right-click menu, ❖Esc, the player, saving as a sound file | done |
-| 3 | Settings → AI → Voice: on/off, ❖Esc, the player and CPU / GPU / Auto (done); downloads with a progress bar, voices (record or upload, with consent) | started |
-| 4 | Models as signed LordOS packages (`lordos-voice-es`, …), a high-quality ("HD", 24-layer) model, LordOS's own voice | to do |
+| 2 | Read the selection anywhere: Edit → Speech and the right-click menu, ❖Esc, the player, saving as a sound file | done |
+| 3 | Settings → AI → Voice: models (standard and HD) and 23 voices per language as signed packages, heard before downloading; Personal Voice (read six phrases or speak freely); Live Speech | done |
+| 4 | LordOS's own voice; more languages | to do |
 
 ## `say`
 
 ```sh
-say "Hola, ¿cómo estás?"          # the default language and voice
-say -l en "Hello"                  # English's built-in voice (alba)
+say "Hola, ¿cómo estás?"          # the language's chosen voice (else its own: Lola, Rafael, Alba)
+say -v juergen "Hola"              # an installed voice
 say -l es -v mi_voz "Hola"         # a voice to clone: ~/.local/share/lordos/voice/voices/mi_voz.wav
 echo texto | say                   # stdin; terminal colors and control characters are dropped
 say -f notas.txt -o notas.wav      # to a file
 say -b cpu "…"                     # auto (the GPU when there is one), cpu or gpu
-say -q hd "…"                      # standard or hd (falls back to the other when one isn't installed)
-say --voices
+say -q hd "…"                      # auto (HD when installed), standard or hd; falls back to the other
+say --voices                       # every installed voice, by language and quality, and the voices to clone
+say --preview es lola              # a voice's recorded sample (lordos-voice-previews)
 ```
 
-Defaults: `~/.config/lordos/voice.json` (`language`, `voice`, `backend`, `quality`), then `$LANG`.
+Defaults: `~/.config/lordos/voice.json` (`voices` per language, `voice`, `language`, `backend`, `quality`), then
+`$LANG`.
 
-- **Models:** `<root>/models/<es|en|pt>/<standard|hd>.gguf`, root being `/usr/share/lordos/voice` (packages) or
-  `~/.local/share/lordos/voice`.
-- **Voices:** `<root>/voices/<name>.wav` (16-bit or float WAV, 0.5–30 s; the voice is cloned from it), or a voice the
-  model carries (English: `alba`). Spanish and Portuguese carry none.
+- **Models**, root being `/usr/share/lordos/voice` (packages) or `~/.local/share/lordos/voice`: standard
+  `<root>/models/<lang>/standard.gguf`, HD `<root>/models/<lang>/hd/` (Kyutai's `model.safetensors`, `tokenizer.model`).
+- **Voices:** `<root>/models/<lang>/[hd/]embeddings/<voice>.safetensors` (Kyutai's prepared voices), or
+  `<root>/voices/<name>.wav` (16-bit or float WAV, 0.5–30 s; the voice is cloned from it). A voice asked for that isn't
+  installed for the model falls back to the language's own, then to any installed one.
 - **Speed:** a sentence at a time; each one plays (PipeWire's `pw-cat`) while the next is synthesized. Measured on an
   i9-10900 with an RX 580: about 10 s of speech in 1.3 s on the GPU and 3 s on the CPU, 220 MB of memory.
 - `/usr/bin/say` is an alternative (`update-alternatives`), so another package's `say` can be installed too.
 
 ## Reading aloud from the desktop
 
-As on a Mac, every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
+Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
 
 - **Edit → Speech** (Text Editor, Terminal; Notes in View) and the **right-click** menu (Text Editor, Terminal, Notes):
   *Start Speaking*, *Stop Speaking*, *Save as Audio…* Start Speaking reads the selection, or the whole text when
@@ -57,7 +60,7 @@ As on a Mac, every place with text has **Speech** (`sdk/voice.js`, `speechMenu`)
 - **The wave** is real: `lord-say --levels` measures each 40 ms of audio it plays in 16 bands, 80 Hz to 8 kHz
   (`src/tts/levels.c`), and writes them to lord-server, which shows the one being heard (`speak_levels`: the time since
   the first, less the pauses; it waits when the next sentence isn't ready). In a pause the wave stands still.
-- **Save as Audio…** (as macOS's *Add to Music as a Spoken Track*): the save dialog, in the Music folder, the name
+- **Save as Audio…**: the save dialog, in the Music folder, the name
   from the first words; a 16-bit mono WAV, nothing is heard.
 - **Settings → AI → Voice** (`apps/settings/AI.jsx`): *Read aloud* (Speech and ❖Esc go away without it; `say` keeps
   working), *Keyboard shortcut ❖Esc*, *Show the player*, all on by default (`settings.voice`), and *Process with*
@@ -84,6 +87,65 @@ As on a Mac, every place with text has **Speech** (`sdk/voice.js`, `speechMenu`)
   (`renameat`), else removed. lord-say never sees a path.
 - Isolated `.lpk` apps have no `lord.voice` (the broker doesn't offer it).
 
+## Models, voices and packages (phase 3)
+
+Two qualities per language, both Kyutai's Pocket TTS:
+
+| Quality | What | Size (es / pt / en) |
+|---|---|---|
+| Standard | the 6-layer model, audio.cpp's Q8_0 GGUF: fast anywhere | 128 MB each |
+| HD | Kyutai's 24-layer model (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`), read as Kyutai ships it: more natural | 672 / 672 / 1304 MB |
+
+**23 voices** (`sdk/voicecatalog.js`), each speaking every language: Kyutai's prepared voice states (21–31 MB in HD,
+4–8 MB standard). Only voices whose recording allows redistribution and commercial use: Kyutai's own (lola, juergen,
+rafael, estelle, giovanni, daan), voice-zero (CC0), Alba McKenna and VCTK (CC-BY-4.0). Left out: jean (EARS,
+non-commercial) and cosette, javert, marius (origin not documented). Daan exists only in HD. Each language's own voice
+is the default: Lola (es), Rafael (pt), Alba (en).
+
+**Packages** (`tools/voice/mkdeb-voice.mjs`, `Architecture: all`, into `/usr/share/lordos/voice`), published in the
+signed APT repository, never fetched from Hugging Face by a LordOS system:
+
+- `lordos-voice-<lang>` and `lordos-voice-<lang>-hd`: the models;
+- `lordos-voice-<lang>-<voice>` and `…-hd`: one voice, depending on its model;
+- `lordos-voice-previews`: a recorded sample of every voice in every language (5 MB), so a voice is heard before it is
+  downloaded (`say --preview`, `lord.voice.preview`).
+
+Building them, on the maintainer's machine: `tools/voice/fetch-voices.sh <dir>` (Kyutai's gated repository needs its
+conditions accepted and a read token; each file checked against the SHA-256 Hugging Face publishes), then
+`tools/voice/make-previews.sh <dir>`, then `node tools/voice/mkdeb-voice.mjs <dir> <out> <YYYY.MM.DD>`. The packages
+are reproducible; `tools/release/apt-repo.sh build … <the .debs>` publishes them like any other.
+
+**What lord-tts does like Kyutai's own code** (`pocket_tts`, checked against it): temperature 0.3 for every model
+(audio.cpp defaults to 0.7 outside English, which made Spanish drag and stumble), and the model's character
+replacements before synthesis (quotes, brackets and, in Spanish, `¡ ¿` dropped; curly apostrophes to `'`; a dash to a
+comma). The model starts every text with 0.3–0.9 s of silence (Kyutai's code too); `say` cuts it from the first
+sentence, keeping 50 ms.
+
+## Settings → AI → Voice
+
+`apps/settings/AI.jsx`: Read aloud, ❖Esc, the player, Live Speech, Process with (Automatic / Processor / Graphics card)
+and Quality (Automatic: HD when installed / Standard / HD), then per language the two models (Download with a progress
+bar, Remove) and the voices: ▶ plays the recorded sample, Download, Try (reads the language's sample sentence), Use,
+Remove. `say` reads the choice from `~/.config/lordos/voice.json`: `{ "voices": { "es": "juergen" }, "quality",
+"backend" }`. Installing and removing go through `admin.run('pkg-install' | 'pkg-remove')` (an administrator), with
+only `lordos-voice-*` names (`sdk/voicemanager.js`).
+
+**Personal Voice** (`apps/settings/PersonalVoice.jsx`): the person's own voice, cloned by the model from a short
+recording, ready at once and usable in every language.
+
+1. What it is and the consent, required before anything is recorded (Kyutai's terms forbid cloning without it).
+2. Two ways, both offered: **read six short phrases**, one at a time in large type (each stops by itself when it was
+   read), or **speak freely** for 15–30 s about anything, with a few ideas shown, for anyone reading aloud is hard for.
+3. Three seconds of the room first: too noisy says so (the voice would copy the noise); a microphone that sends nothing
+   says so too.
+4. The recordings (lord-media, the microphone permission) are trimmed of silence and joined into one 16-bit mono WAV of
+   at most 30 s (`sdk/voicerecmodel.js`), saved as `~/.local/share/lordos/voice/voices/<name>.wav` and chosen for the
+   language. It never leaves the computer. **Use a recording…** does the same from an audio file (WAV, MP3, M4A, OGG,
+   Opus or FLAC; at least 3 s; the first 30 s, converted by lord-media).
+
+**Live Speech** (`sdk/livespeech.jsx`, ❖⇧Esc): a box to type in; Enter says it with the chosen voice, the last
+phrases stay below to be said again (in memory only). Esc stops, then closes.
+
 ## lord-tts
 
 `lord-say` holds no speech code: it starts **lord-tts** (next to it in `/usr/lib/lordos/bin`) on a `SOCK_SEQPACKET`
@@ -92,9 +154,11 @@ channel at fd 3. lord-tts is lord-doc's helper loop (`server/src/doc/helper.c`) 
 (ggml loads its CPU kernels for the running processor, and Vulkan, from there).
 
 Protocol (`src/doc/proto.h`): `DQ_INIT_FD` with the models folder (role `ro`) and `~/.cache/lordos/voice` (role `rw`),
-`DQ_INIT_GO {"mode":"tts","gpu":bool}`, then `DQ_TTS {"slot","file","text","backend","threads","voice_id","seed"}`
+`DQ_INIT_GO {"mode":"tts","gpu":bool}`, then `DQ_TTS {"slot","file","text","backend","threads","voice_id","seed","language"}`
 plus, optionally, the voice WAV's fd → `DR_BLOB`: a 16-bit mono WAV in a sealed memfd. The model is loaded by the
-first request and kept; another file or backend is refused.
+first request and kept; another file, backend or language is refused. With `language` (only `spanish_24l`,
+`portuguese_24l`, `english_2026-09_24l`), `file` is an HD model's folder, read with `lib/tts/pocket_tts_dir.json`
+(audio.cpp's own description of the model, generated at build time to read that folder).
 
 **Its sandbox** (`sandbox_apply_helper`, scope `lordos-tts`), checked by `tests/tts_test.sh`:
 

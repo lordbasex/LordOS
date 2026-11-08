@@ -323,6 +323,7 @@
   "shortcuts.newDesktop": "Nova área de trabalho",
   "shortcuts.closeDesktop": "Fechar área de trabalho",
   "shortcuts.speakSelection": "Ler a seleção em voz alta (de novo para parar)",
+  "shortcuts.liveSpeech": "Fala ao vivo: digite e é falado em voz alta",
   "share.sharing": "{app} está compartilhando sua tela",
   "share.sharingInput": "{app} compartilha e pode controlar sua tela",
   "share.stop": "Parar",
@@ -353,5 +354,10 @@
   "voice.saving": "Criando o arquivo de áudio…",
   "voice.speech": "Fala",
   "voice.start": "Iniciar fala",
-  "voice.stop": "Parar fala"
+  "voice.stop": "Parar fala",
+  "voice.noPreview": "Ainda não há uma amostra gravada dessa voz.",
+  "liveSpeech.placeholder": "Digite algo para dizer em voz alta…",
+  "liveSpeech.recent": "Recentes",
+  "liveSpeech.hint": "Enter fala · Esc para ou fecha · ❖⇧Esc",
+  "liveSpeech.title": "Fala ao vivo"
 }
