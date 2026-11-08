@@ -32,6 +32,18 @@ void pty_resize(int fd, int cols, int rows, int pw, int ph) {
     ioctl(fd, TIOCSWINSZ, &ws);
 }
 
+/* The size the pty has now, set again when it isn't the grid's: something other than this Terminal changed it
+ * (a program's `stty cols`, or before 0.8.8.6 a second lord-server that had taken the session from its holder)
+ * and the program would go on drawing for a window it isn't in. 1 if it was set, 0 if it already was the
+ * grid's, -1 if fd isn't a pty (a serial console's stream). */
+int pty_sync_size(int fd, int cols, int rows, int pw, int ph) {
+    struct winsize ws;
+    if (ioctl(fd, TIOCGWINSZ, &ws)) return -1;
+    if (ws.ws_col == cols && ws.ws_row == rows) return 0;
+    pty_resize(fd, cols, rows, pw, ph);
+    return 1;
+}
+
 static void child(int fd, const char *cwd, int id) {
     setsid();
     ioctl(fd, TIOCSCTTY, 0);

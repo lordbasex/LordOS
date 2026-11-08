@@ -670,6 +670,13 @@ build/term-secret-test: tests/term_secret_test.c src/term/tsecret.c src/term/tca
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)
 	./$@ || { rm -f $@; exit 1; }
 
+# what Claude Code needs to draw where it is: the parser cut anywhere, the grid at every scale, the pty's size,
+# one lord-server per held session (tests/term_resize_test.c)
+test: build/term-resize-test
+build/term-resize-test: tests/term_resize_test.c src/term/hold.c src/term/pty.c src/term/term.h build/obj/term/vt.o build/obj/ui/stb.o build/gen/lord_version.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_resize_test.c src/term/hold.c src/term/pty.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)
+	./$@ || { rm -f $@; exit 1; }
+
 build/term-capture-test: tests/term_capture_test.c src/term/tcapture.c src/term/tcapture.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_capture_test.c src/term/tcapture.c
 	./$@ || { rm -f $@; exit 1; }

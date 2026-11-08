@@ -1394,6 +1394,20 @@ static void csi_byte(Term *t, uint8_t b) {
     }
 }
 
+/* The byte after the ESC that ended a string (OSC, or SOS/PM/APC that are ignored): '\\' completes ST; anything
+ * else begins what follows as it would after any ESC. Another ESC starts a new sequence and a control is run:
+ * neither is swallowed (ESC ] … ESC ESC [ 14 G lost the second ESC and printed "[14G"; after an APC ended that
+ * way everything was ignored up to the next ST). */
+static void string_esc(Term *t, uint8_t b) {
+    t->state = S_GROUND;
+    if (b == '\\') return;
+    t->state = S_ESC;
+    t->ninter = 0;
+    if (b == 0x1b) return;
+    if (b < 0x20) { control(t, b); return; }
+    esc(t, b);
+}
+
 void vt_write(Term *t, const uint8_t *d, size_t n) {
     now_s = (uint32_t)time(NULL);
     for (size_t i = 0; i < n; i++) {
@@ -1436,8 +1450,7 @@ void vt_write(Term *t, const uint8_t *d, size_t n) {
         case S_OSC_ESC:
             osc(t);
             str_end(t);
-            t->state = S_GROUND;
-            if (b != '\\') { t->state = S_ESC; esc(t, b); }
+            string_esc(t, b);
             break;
         case S_DCS:
             if (b == 0x1b) t->state = S_DCS_ESC;
@@ -1473,9 +1486,7 @@ void vt_write(Term *t, const uint8_t *d, size_t n) {
             if (b == 0x1b) t->state = S_IGNORE_ESC;
             else if (b == 0x18 || b == 0x1a) t->state = S_GROUND;
             break;
-        case S_IGNORE_ESC:
-            t->state = b == '\\' ? S_GROUND : S_IGNORE;
-            break;
+        case S_IGNORE_ESC: string_esc(t, b); break;
         }
     }
 }

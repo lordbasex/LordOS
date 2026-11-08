@@ -230,6 +230,8 @@ Session *term_create(const char *cwd, int scrollback) {
     s->t.user = s;
     s->pid = pty_spawn(cwd, 80, 24, s->id, &s->fd);
     if (s->pid < 0) { vt_free(&s->t); return NULL; }
+    s->pty_cols = 80;
+    s->pty_rows = 24;
     s->ctrl = hold_spawn(s->fd, s->pid, s->key, sizeof s->key);
     s->used = 1;
     s->alive = 1;
@@ -422,9 +424,34 @@ static void adopt(int fd, int ctrl, pid_t pid, const char *key) {
     s->replay = -1;
     /* the foreground program redraws itself with whatever size the new window has */
     pty_resize(s->fd, cols, rows, 0, 0);
+    s->pty_cols = cols;
+    s->pty_rows = rows;
 }
 
 void term_restore(void) { hold_restore(adopt); }
+
+/* The pty's size is the grid's and nothing else's: given when the grid changes (term_paint), and with check at
+ * most once a second read back (TIOCGWINSZ) and given again when it isn't the grid's. A pty whose size a program
+ * or another process changed behind the Terminal's back would otherwise keep it until the window is resized:
+ * the status bar said 260×56 while Claude Code drew in 80 columns. Not for a tmux pane (its size goes to tmux,
+ * EV_RESIZE) or a session without a pty. */
+void term_size_sync(Session *s, int check) {
+    if (!s || !s->alive || s->gateway || s->fd < 0) return;
+    Term *t = &s->t;
+    int pw = t->cols * (int)t->cell_w, ph = t->rows * (int)t->cell_h;
+    if (s->pty_cols != t->cols || s->pty_rows != t->rows) {
+        pty_resize(s->fd, t->cols, t->rows, pw, ph);
+        s->pty_cols = t->cols;
+        s->pty_rows = t->rows;
+        s->size_checked = now_ms();
+        return;
+    }
+    if (!check) return;
+    double now = now_ms();
+    if (now - s->size_checked < 1000) return;
+    s->size_checked = now;
+    pty_sync_size(s->fd, t->cols, t->rows, pw, ph);
+}
 
 static void flush_out(Session *s) {
     while (s->out_len) {
@@ -492,6 +519,7 @@ void term_dispatch(int id, short revents) {
         break;
     }
     if (total) {
+        term_size_sync(s, 1);       /* the program draws: for the size the grid has (at most once a second) */
         check_secret(s);
         if (s->log) fflush(s->log);
         s->screen_changed = 1;

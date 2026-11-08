@@ -243,6 +243,7 @@ void  hold_state_path(const char *key, char *out, size_t n);
 /* pty.c */
 pid_t pty_spawn(const char *cwd, int cols, int rows, int id, int *master);
 void  pty_resize(int fd, int cols, int rows, int pw, int ph);
+int   pty_sync_size(int fd, int cols, int rows, int pw, int ph);
 void  pty_set_integration(const char *dir);
 
 /* term.c: sessions */
@@ -264,6 +265,8 @@ typedef struct {
     long long click_line;
     int dragging, mouse_btn;
     float gx, gy, gw, gh;       /* geometry of the last draw */
+    int pty_cols, pty_rows;     /* the size last given to the pty (TIOCSWINSZ): term_size_sync */
+    double size_checked;        /* when the pty's own size was last compared with the grid */
     int drawn_cx, drawn_cy, blink_on;
     int pending_render;
     Frame *frames;              /* Instant Replay: ring of past screens */
@@ -332,6 +335,23 @@ void     term_tick(double now);
 typedef void (*TermEventFn)(int id, const char *type, const char *data);
 void     term_events(TermEventFn fn);
 void     term_paint(Canvas *c, int id, float x, float y, float w, float h, float opacity);
+/* The grid that fits a terminal's content box: lw × lh logical pixels, the profile's padding and its logical
+ * cell. Only from the logical box, never from a pass's pixels: a window drawn smaller (the overview, minimize,
+ * a scaled display) is the same grid, and (lw * k) / k landing a hair under a whole cell no longer takes a
+ * column off for that pass. 0 when the box can't hold a grid (a pane not laid out yet, a 0 × 0 node): the
+ * session keeps the one it has instead of telling the program it is 2 × 1. */
+static inline int term_grid_size(float lw, float lh, int pad, int cw, int ch, int *cols, int *rows) {
+    if (cw < 1 || ch < 1) return 0;
+    float gw = lw - 2.0f * (float)pad, gh = lh - 2.0f * (float)pad;
+    if (!(gw >= cw) || !(gh >= ch)) return 0;
+    int c = (int)(gw / (float)cw + 1e-3f), r = (int)(gh / (float)ch + 1e-3f);
+    *cols = c < 2 ? 2 : c > TERM_MAX_COLS ? TERM_MAX_COLS : c;
+    *rows = r < 1 ? 1 : r > TERM_MAX_ROWS ? TERM_MAX_ROWS : r;
+    return 1;
+}
+/* The pty takes the grid's size (TIOCSWINSZ, a SIGWINCH for the program) when it changed, and at most once a
+ * second its own size is read back and set again if something else changed it (term.c). */
+void     term_size_sync(Session *s, int check);
 /* Visual order of a row with Arabic/Hebrew (term_paint.c); 0 if it stays as it is. */
 int      term_row_visual(const TermProfile *p, const Term *t, const Line *l, int cols, int *vis, uint8_t *lv);
 void     term_cell_at(Session *s, float lx, float ly, long long *line, int *col);

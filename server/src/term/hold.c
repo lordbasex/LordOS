@@ -28,13 +28,18 @@
 
 static char dir[256];
 
-/* /run/user/<uid>/lordos-term (tmpfs, wiped when the machine reboots) or, if it does not
- * exist, ~/.cache/lordos/term. Always 0700. */
+/* $XDG_RUNTIME_DIR/lordos-term (the session's, /run/user/<uid> for lord-sessiond's: a tmpfs wiped
+ * when the machine reboots) or, if there is none, ~/.cache/lordos/term. Always 0700. The session's
+ * runtime folder, as for the rest of lord-server's sockets: a lord-server started with a runtime
+ * folder of its own (a test, another session) does not find the holders of the user's desktop
+ * (0.8.8.6). */
 const char *hold_dir(void) {
     if (dir[0]) return dir;
-    char run[64];
+    char run[200];
     struct stat st;
-    snprintf(run, sizeof run, "/run/user/%d", (int)getuid());
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    if (rt && rt[0] == '/' && strlen(rt) < sizeof run - 16) snprintf(run, sizeof run, "%s", rt);
+    else snprintf(run, sizeof run, "/run/user/%d", (int)getuid());
     if (!stat(run, &st) && S_ISDIR(st.st_mode) && st.st_uid == getuid()) snprintf(dir, sizeof dir, "%s/lordos-term", run);
     else {
         const char *home = getenv("HOME");
@@ -90,6 +95,16 @@ static int send_fd(int sock, int fd, const char *msg) {
     return sendmsg(sock, &m, MSG_NOSIGNAL) < 0 ? -1 : 0;
 }
 
+/* The server at the other end of ctrl has closed it (exited, crashed): its end reads EOF or fails. The
+ * server never writes to it but the 'q' that closes the session, which is only peeked here. */
+static int peer_gone(int ctrl) {
+    struct pollfd p = { ctrl, POLLIN, 0 };
+    if (poll(&p, 1, 0) <= 0) return 0;
+    if (p.revents & (POLLHUP | POLLERR | POLLNVAL)) return 1;
+    char c;
+    return recv(ctrl, &c, 1, MSG_PEEK | MSG_DONTWAIT) == 0;
+}
+
 /* argv: --term-holder <key> <shell pid>; fds: 3 master, 4 listening socket, 5 control. */
 int hold_main(int argc, char **argv) {
     if (argc < 4 || !valid_key(argv[2])) return 2;
@@ -115,6 +130,12 @@ int hold_main(int argc, char **argv) {
         if (p[1].revents & POLLIN) {
             int s = accept4(lsock, NULL, NULL, SOCK_CLOEXEC);
             if (s < 0) continue;
+            /* One lord-server at a time: while the one that has the session is alive, nobody else gets the
+             * master. A second lord-server of the same user (a test, a headless session) used to take it as
+             * well: two readers of one pty, each taking part of the program's output (an ESC lost, half a
+             * frame missing), and each setting the pty's size for its own window (Claude Code drawing in 80
+             * columns of a 260-column window). The one that has it closes its end when it exits or crashes. */
+            if (ctrl >= 0 && !peer_gone(ctrl)) { close(s); continue; }
             struct ucred cr;
             socklen_t len = sizeof cr;
             if (getsockopt(s, SOL_SOCKET, SO_PEERCRED, &cr, &len) || cr.uid != getuid() || send_fd(s, master, msg)) { close(s); continue; }

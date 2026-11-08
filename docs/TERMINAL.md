@@ -78,6 +78,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Combining characters (é, ñ with a separate accent) | ✅ | graphemes in a global table; copied text keeps them |
 | Emoji graphemes (👍🏽, flags, 👨‍👩‍👧) | ✅ | with mode 2027 (like contour/wezterm/foot); without it `wcwidth` is respected so the shell doesn't get misaligned |
 | Text reflow on resize | ✅ | also with wide characters |
+| The program's size is the grid's (TIOCSWINSZ) | ✅ | from the pane's logical box only (`term_grid_size`): the same at every display scale, in the overview and while minimizing, none for a 0 × 0 pane; the pty's size is read back at most once a second while output arrives and set again if something else changed it (`term_size_sync`, `tests/term_resize_test.c`) |
 | Mouse modes (1000/1002/1003/1006), focus (1004), bracketed paste (2004), synchronized output (2026) | ✅ | |
 | Files dropped from Files and the clipboard's image paste their shell-quoted path (❖V; Ctrl+V in Claude Code) | ✅ | `apps/terminal/paths.js`; Claude Code attaches a pasted image path |
 | Claude Code in the status bar: working or waiting for you, context used, the plan's 5-hour and weekly limits, model | ✅ | `apps/terminal/claude.js`, `ClaudeBar.jsx`, `lord-claude-status` (`server/src/term/claudebridge.c`); see "Claude Code in the status bar" |
@@ -256,9 +257,14 @@ VM with real `.itermcolors` files (Dracula, Catppuccin) and with a binary prefer
 
 Each session has a **holder** (`lord-term-holder`, the same binary re-executed with
 `--term-holder`): an unprivileged ~2 MB process that only keeps the PTY master open and listens
-on a private unix socket (`/run/user/<uid>/lordos-term/`, 0700). If lord-server ends because of
-a signal (restart, update) the shell keeps running; on startup, the server connects to each
-holder (only from the same user, `SO_PEERCRED`) and receives the PTY via `SCM_RIGHTS`. Before
+on a private unix socket (`$XDG_RUNTIME_DIR/lordos-term/`, `/run/user/<uid>` for a session of
+lord-sessiond's, 0700). If lord-server ends because of a signal (restart, update) the shell keeps
+running; on startup, the server connects to each holder (only from the same user, `SO_PEERCRED`)
+and receives the PTY via `SCM_RIGHTS`. A holder gives its PTY to one lord-server at a time: while
+the one that has it is alive (its control connection open), another lord-server of the same user
+gets nothing (0.8.8.6; before, a test or headless lord-server took the user's shells too, read
+part of their output and set their size to its own windows). A lord-server started with another
+`XDG_RUNTIME_DIR` doesn't see the desktop's holders at all. Before
 exiting it saves the screen and history (up to 5000 lines, with colors) in a `.state` file next
 to the socket; the app saves the windows → tabs → panes arrangement in `terminal.live`. Logging
 out from the theme or Ctrl+Alt+Backspace does close the shells. Instant Replay, images and

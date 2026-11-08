@@ -586,7 +586,8 @@ void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op)
     int lcw = (int)fcw, lch = (int)fch, lpad = (int)p->padding;
     t->cell_w = fcw;
     t->cell_h = fch;
-    int cols = (int)((w / k - 2 * lpad) / lcw), rows = (int)((h / k - 2 * lpad) / lch);
+    int cols = t->cols, rows = t->rows;
+    term_grid_size(w / k, h / k, lpad, lcw, lch, &cols, &rows);
     static TermProfile scaled;
     if (k != 1) {
         scaled = *p;
@@ -598,13 +599,11 @@ void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op)
     int cw = (int)fcw, ch = (int)fch, base = (int)fbase, pad = (int)p->padding;
     const float colw = k != 1 ? lcw * k : (float)cw, rowh = k != 1 ? lch * k : (float)ch;
     if (k != 1) { cw = (int)lroundf(colw); ch = (int)ceilf(rowh); }
-    if (cols < 2) cols = 2;
-    if (rows < 1) rows = 1;
     if (cols != t->cols || rows != t->rows) {
         vt_resize(t, cols, rows);
         if (s->gateway) t->events |= EV_RESIZE;      /* tmux pane: the app notifies tmux */
-        else if (s->alive) pty_resize(s->fd, t->cols, t->rows, t->cols * lcw, t->rows * lch);
     }
+    term_size_sync(s, 0);                            /* the pty has the grid's size (a SIGWINCH if it changed) */
     /* where the terminal is, for the mouse: logical */
     s->gx = (x - paint_view.dx) / k + paint_view.x; s->gy = (y - paint_view.dy) / k + paint_view.y; s->gw = w / k; s->gh = h / k;
 
