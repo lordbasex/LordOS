@@ -3,7 +3,7 @@
 // promise and usePim() changes whenever something changes, so views re-query on it.
 import {
   View, Text, useTheme, useLocale, useAppWindow, useKeyboard, useWindowState, usePim, calendars, calendarEvents,
-  Button, Segmented, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, EmptyState, formatDate, formatTime, weekdayName, direction, textDirection, t, openDavSetup,
+  Button, Segmented, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, EmptyState, formatDate, formatTime, weekdayName, direction, textDirection, t, openDavSetup, openMailAccounts,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -225,7 +225,8 @@ function Sidebar({ cals, cursor, days, onPick, onNew, onEdit }) {
         <View style={{ paddingHorizontal: 10, paddingTop: 12, paddingBottom: 10, gap: 2 }}>
           {groups.map((g) => (
             <View key={g.key} style={{ gap: 2, marginBottom: 14 }}>
-              <Text style={{ fontSize: 11, fontWeight: 600, color: th.textDim, marginHorizontal: 8, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{g.name}</Text>
+              {g.key ? <AccountHeader name={g.name} acct={g.key} />
+                : <Text style={{ fontSize: 11, fontWeight: 600, color: th.textDim, marginHorizontal: 8, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{g.name}</Text>}
               {g.list.map((c) => <CalRow key={c.id} cal={c} onEdit={onEdit} />)}
             </View>
           ))}
@@ -242,6 +243,35 @@ function Sidebar({ cals, cursor, days, onPick, onNew, onEdit }) {
         <Hairline edge="top" />
         <Button small plain icon="⊕" label={t('calendar.newCalendar')} onClick={onNew} style={{ alignSelf: 'flex-start' }} />
       </View>
+    </View>
+  );
+}
+
+// A synced account's name over its calendars: on hover a ⋯ button, and the same menu on a right click,
+// with Account Settings… and Remove Account… (both in Mail's accounts panel: openMailAccounts).
+function AccountHeader({ name, acct, style }) {
+  const th = useTheme();
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  return (
+    <View ref={ref} onContextMenu={() => setOpen(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 18, marginHorizontal: 8, marginBottom: 2, ...style }}>
+      <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{name}</Text>
+      {hover || open ? (
+        <View onClick={() => setOpen(true)} style={{ width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: th.hover }}>
+          <Text style={{ fontSize: 11, color: th.textDim }}>⋯</Text>
+        </View>
+      ) : null}
+      {open ? (
+        <Popover anchor={ref} width={200} onClose={() => setOpen(false)}>
+          <MenuList onDone={() => setOpen(false)} items={[
+            { label: t('calendar.accountSettings'), onClick: () => openMailAccounts(acct) },
+            '-',
+            { label: t('calendar.removeAccount'), destructive: true, onClick: () => openMailAccounts(acct, { remove: true }) },
+          ]} />
+        </Popover>
+      ) : null}
     </View>
   );
 }

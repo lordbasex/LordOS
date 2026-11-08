@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HtmlView, TextView } from './HtmlView.jsx';
 import { Compose } from './Compose.jsx';
 import { AccountSetup, AccountsPanel, CertDialog, PasswordPrompt, Sheet } from './Setup.jsx';
-import { folderTree } from './foldertree.js';
+import { folderTree, toggleCollapsed } from './foldertree.js';
 import { CATEGORY_COLORS, categoryName, listDate, fullDate, folderName, addrShort, formatSize, openPath, revealPath } from './util.js';
 import { quote } from './md.js';
 import { safeName } from './util.js';
@@ -494,9 +494,11 @@ function MailMain() {
   }, []);
   useEffect(() => mailStatus.subscribe(() => setCfg(mailConfig.get())), []);
 
-  // opened from a notification or another app (Calendar and Contacts: Add Account → setup 'dav')
+  // opened from a notification or another app (Calendar and Contacts: Add Account → setup 'dav';
+  // Account Settings / Remove Account → accounts, on one of theirs)
   useEffect(() => {
     if (args?.setup === 'dav') setSheet({ setup: 'dav', preset: typeof args.preset === 'string' ? args.preset : 'other' });
+    if (typeof args?.accounts === 'string') setSheet({ accounts: args.accounts, confirm: !!args.remove });
     if (args?.acct && args?.folder) {
       setSrc({ kind: 'folder', acct: args.acct, folder: args.folder });
       if (args.uid) openItem({ acct: args.acct, folder: args.folder, uid: args.uid });
@@ -525,6 +527,12 @@ function MailMain() {
     if (!sel) return null;
     const list = sel.thread?.length ? sel.thread : [{ acct: sel.acct, folder: sel.folder, uid: sel.uid }];
     return { acct: sel.acct, folder: sel.folder, uids: list.filter((x) => x.folder === sel.folder && x.acct === sel.acct).map((x) => x.uid) };
+  };
+  // Folders with subfolders open and close; which ones are closed is kept per account in the accounts
+  // file (`collapsed`, IMAP names), so the next launch shows the same tree.
+  const toggleFolder = (a, name) => {
+    const cur = mailAccounts.get(a.id);
+    if (cur) mailAccounts.update(a.id, { collapsed: toggleCollapsed(cur.collapsed, name, a.folders) }).catch(() => {});
   };
   const specialOf = (acct, sp) => folders.find((a) => a.id === acct)?.folders.find((f) => f.special === sp)?.name;
   const act = {
@@ -650,6 +658,8 @@ function MailMain() {
           <SideRow icon="●" label={t('mail.unread')} selected={src.kind === 'unified' && src.filter === 'unread'} onClick={() => setSrc({ kind: 'unified', filter: 'unread' })} />
           <SideRow icon="⚑" label={t('mail.flagged')} selected={src.kind === 'unified' && src.filter === 'flagged'} onClick={() => setSrc({ kind: 'unified', filter: 'flagged' })} />
           {folders.map((a) => {
+            const tree = folderTree(a.folders, 8, accounts.find((x) => x.id === a.id)?.collapsed);
+            const nested = tree.some((x) => x.kids);          // a column for the triangles only when something nests
             const status = st.accounts[a.id]?.status || a.status;
             const bad = st.authFailed[a.id] || status === 'auth' || status === 'cert' || status === 'offline';
             return (
@@ -660,10 +670,12 @@ function MailMain() {
                   {bad ? <Text onClick={() => setSheet(st.authFailed[a.id] || status === 'auth' ? { password: a.id } : st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : 'accounts')}
                     style={{ fontSize: 11, color: '#ff9f0a' }}>⚠</Text> : null}
                 </View>
-                {folderTree(a.folders).map(({ f, depth }) => (
-                  <SideRow key={f.name} icon={{ folder: f }} label={folderName(f)} count={f.noselect ? 0 : f.special === 'drafts' ? f.total : f.special === 'sent' || f.special === 'trash' ? 0 : f.unread}
-                    indent={depth} dim={f.noselect}
-                    selected={src.kind === 'folder' && src.acct === a.id && src.folder === f.name} onClick={f.noselect ? undefined : () => { setSrc({ kind: 'folder', acct: a.id, folder: f.name }); setQ(''); }} />
+                {tree.map(({ f, depth, kids, open, hidden }) => (
+                  <SideRow key={f.name} icon={{ folder: f }} label={folderName(f)} count={hidden.reduce((n, h) => n + folderCount(h), folderCount(f))}
+                    indent={depth} dim={f.noselect} disclosure={nested ? (kids ? (open ? 'open' : 'closed') : 'none') : null}
+                    onDisclose={() => toggleFolder(a, f.name)}
+                    selected={src.kind === 'folder' && src.acct === a.id && src.folder === f.name}
+                    onClick={f.noselect ? (kids ? () => toggleFolder(a, f.name) : undefined) : () => { setSrc({ kind: 'folder', acct: a.id, folder: f.name }); setQ(''); }} />
                 ))}
               </View>
             );
@@ -775,7 +787,10 @@ function MailMain() {
       </View>
       {sheet === 'setup' && <AccountSetup onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
       {sheet && sheet.setup === 'dav' && <AccountSetup kind="dav" preset={sheet.preset} onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
-      {sheet === 'accounts' && <AccountsPanel onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} onAdd={() => setSheet('setup')} onPassword={(id) => setSheet({ password: id })} />}
+      {(sheet === 'accounts' || (sheet && typeof sheet.accounts === 'string')) && (
+        <AccountsPanel key={sheet.accounts ? `${sheet.accounts}|${sheet.confirm}` : 'all'} initial={sheet.accounts || null} confirm={!!sheet.confirm}
+          onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} onAdd={() => setSheet('setup')} onPassword={(id) => setSheet({ password: id })} />
+      )}
       {typeof sheet === 'object' && sheet?.cert && <CertDialog cert={sheet.cert} onClose={() => setSheet(null)} />}
       {!sheet && st.certs[0] && <CertDialog cert={st.certs[0]} onClose={() => mailStatus.set((s) => ({ ...s, certs: s.certs.slice(1) }))} />}
       {typeof sheet === 'object' && sheet?.password && <PasswordPrompt acct={sheet.password} onClose={() => setSheet(null)} />}
@@ -815,9 +830,25 @@ function CategoryDots() {
   );
 }
 
+// The unread figure a folder shows: drafts count them all, Sent and Trash none.
+const folderCount = (f) => (f.noselect ? 0 : f.special === 'drafts' ? f.total || 0 : f.special === 'sent' || f.special === 'trash' ? 0 : f.unread || 0);
+
+// A folder's disclosure triangle: points down when open, toward the text when closed.
+function Disclosure({ state, color, onClick }) {
+  const rtl = direction() === 'rtl';
+  const box = { width: 12, height: 20, [rtl ? 'marginLeft' : 'marginRight']: -4, alignItems: 'center', justifyContent: 'center' };
+  if (state === 'none') return <View style={box} />;
+  return (
+    <View onClick={(e) => { e.stopPropagation?.(); onClick(); }} style={box}>
+      <Text style={{ fontSize: 10, color }}>{state === 'open' ? '▾' : rtl ? '◂' : '▸'}</Text>
+    </View>
+  );
+}
+
 // Source-list row. icon: a glyph (drawn in the accent color), { kind } for a drawn shape,
-// { folder } for a mail folder, or an element.
-function SideRow({ icon, label, count, selected, onClick, indent = 0, dim = false }) {
+// { folder } for a mail folder, or an element. disclosure: null (no column), 'none' (an empty
+// column, to line up with the folders that have one), 'open' or 'closed'.
+function SideRow({ icon, label, count, selected, onClick, indent = 0, dim = false, disclosure = null, onDisclose }) {
   const th = useTheme();
   const [hover, setHover] = useState(false);
   const c = selected ? '#fff' : th.accent;
@@ -829,8 +860,9 @@ function SideRow({ icon, label, count, selected, onClick, indent = 0, dim = fals
   const rtl = direction() === 'rtl';
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 28, [rtl ? 'paddingRight' : 'paddingLeft']: 8 + indent * 14, [rtl ? 'paddingLeft' : 'paddingRight']: 8, borderRadius: 6,
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 28, [rtl ? 'paddingRight' : 'paddingLeft']: (disclosure ? 2 : 8) + indent * 14, [rtl ? 'paddingLeft' : 'paddingRight']: 8, borderRadius: 6,
         backgroundColor: selected ? th.accent : hover && onClick ? th.hover : 'transparent', opacity: dim ? 0.6 : 1 }}>
+      {disclosure ? <Disclosure state={disclosure} color={selected ? '#fff' : th.textDim} onClick={onDisclose} /> : null}
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{ic}</View>
       <Text style={{ flex: 1, fontSize: 13, color: selected ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{label}</Text>
       {count ? <Text style={{ fontSize: 11, fontWeight: 500, color: selected ? 'rgba(255,255,255,0.85)' : th.textDim }}>{String(count)}</Text> : null}

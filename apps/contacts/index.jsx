@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useKeyboard, useWindowState, usePim, addressBooks, contacts, contactName,
   Button, TextInput, SearchField, Hairline, EmptyState, ToolbarButton, FilePicker, addListener, direction, formatNumber, t,
-  isolatedPim, pickFileFd, closeFileFd, openDavSetup,
+  isolatedPim, pickFileFd, closeFileFd, openDavSetup, openMailAccounts,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RED, Sheet, Popover, MenuList, Layers, useLoad } from './ui.jsx';
@@ -210,7 +210,8 @@ function Sources({ books, groups, src, counts, onSrc, onNewGroup, onImport, onRe
         <SrcRow icon={<PersonGlyph size={14} />} label={t('contacts.allContacts')} count={counts.length} selected={src === 'all'} onClick={() => onSrc('all')} />
         {books.map((b) => (
           <View key={b.id} style={{ gap: 2, marginTop: 16 }}>
-            <Text style={{ fontSize: 11, fontWeight: 600, color: th.textDim, marginHorizontal: 8, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{b.acct ? b.acctName || b.acct : t('contacts.onThisComputer')}</Text>
+            {b.acct ? <AccountHeader name={b.acctName || b.acct} acct={b.acct} />
+              : <Text style={{ fontSize: 11, fontWeight: 600, color: th.textDim, marginHorizontal: 8, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{t('contacts.onThisComputer')}</Text>}
             <SrcRow icon="▤" label={b.name} count={counts.filter((c) => c.book === b.id).length} selected={src === `book:${b.id}`} onClick={() => onSrc(`book:${b.id}`)} />
             {groups.filter((g) => g.book === b.id).map((g) => (
               <SrcRow key={g.uid} indent icon="▢" label={contactName(g) || t('contacts.untitledGroup')} count={(g.members || []).length}
@@ -228,6 +229,35 @@ function Sources({ books, groups, src, counts, onSrc, onNewGroup, onImport, onRe
         <View style={{ flex: 1 }} />
         <Button small plain label={t('contacts.import')} onClick={onImport} />
       </View>
+    </View>
+  );
+}
+
+// A synced account's name over its address books: on hover a ⋯ button, and the same menu on a right click,
+// with Account Settings… and Remove Account… (both in Mail's accounts panel: openMailAccounts).
+function AccountHeader({ name, acct, style }) {
+  const th = useTheme();
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  return (
+    <View ref={ref} onContextMenu={() => setOpen(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 18, marginHorizontal: 8, marginBottom: 2, ...style }}>
+      <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{name}</Text>
+      {hover || open ? (
+        <View onClick={() => setOpen(true)} style={{ width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: th.hover }}>
+          <Text style={{ fontSize: 11, color: th.textDim }}>⋯</Text>
+        </View>
+      ) : null}
+      {open ? (
+        <Popover anchor={ref} width={200} onClose={() => setOpen(false)}>
+          <MenuList onDone={() => setOpen(false)} items={[
+            { label: t('contacts.accountSettings'), onClick: () => openMailAccounts(acct) },
+            '-',
+            { label: t('contacts.removeAccount'), destructive: true, onClick: () => openMailAccounts(acct, { remove: true }) },
+          ]} />
+        </Popover>
+      ) : null}
     </View>
   );
 }

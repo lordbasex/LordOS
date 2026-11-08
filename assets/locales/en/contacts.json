@@ -31,6 +31,8 @@
   "groups": "Groups",
   "import": "Import…",
   "addAccount": "Add Account…",
+  "accountSettings": "Account Settings…",
+  "removeAccount": "Remove Account…",
   "importFailed": "The file could not be imported.",
   "importTitle": "Import contacts (.vcf)",
   "imported": {

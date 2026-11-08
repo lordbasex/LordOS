@@ -97,6 +97,17 @@ Because it decides which servers `lord-maild` may reach, `lord.fs` cannot write 
 (`fsops_protected`): only `lord.mail.saveConfig` can, after validating it. The cache
 `~/.local/share/lordos/mail` is protected the same way.
 
+The file also keeps a little of Mail's view: each account's `collapsed` list names the folders
+whose subfolders are hidden in the sidebar (the disclosure triangles), so the tree looks the same
+at the next launch. Removing an account (Mail → Accounts → *Remove Account…*, after a confirmation)
+takes it out of the file and its password out of the keyring, and `lord-maild` deletes what it had
+downloaded for it (mail, calendars, contacts); nothing is deleted on the server. Calendar and
+Contacts cannot write this file (`sec/brokermail.c`: Mail only), so the *Account Settings…* and
+*Remove Account…* items on their account headers open Mail's accounts panel on that account
+(`openMailAccounts`). When adding an account fails (wrong password, unreachable server,
+certificate), *Edit Details* removes the half-made account and returns to the form with every field
+as it was typed.
+
 ### Certificates
 
 Every TLS connection is verified against the system CA store (loaded once, before the sandbox)

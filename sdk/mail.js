@@ -17,6 +17,7 @@
 //   OAUTH_PROVIDERS                          prepared, disabled until you register a client ID
 //   DAV_PRESETS / davPreset(id)              calendar and contacts services for Add Account (generic, or a provider)
 //   openDavSetup(preset)                     opens Mail's Add Account sheet for calendars and contacts (Calendar, Contacts)
+//   openMailAccounts(acct, { remove })       opens Mail's accounts panel on that account (remove: asks to remove it)
 //   mailStatus (store)                       { accounts: { id: { status, error } }, unread, rev, certs: [] }
 //   startMail()                              called by startShell: new-mail notifications, passwords on demand
 import { createStore } from './store.js';
@@ -109,6 +110,17 @@ const bumpStatus = () => mailStatus.set((s) => ({ ...s, rev: s.rev + 1 }));
 
 const service = (id) => `mail:${id}`;
 
+// What the store remembers about an account that is gone (or added again under the same id, as the
+// setup sheet does after Edit Details): no old "wrong password" or certificate shown for the new one.
+function forgetStatus(id) {
+  mailStatus.set((s) => {
+    const accounts = { ...s.accounts }, authFailed = { ...s.authFailed };
+    delete accounts[id];
+    delete authFailed[id];
+    return { ...s, accounts, authFailed, certs: s.certs.filter((c) => c.acct !== id) };
+  });
+}
+
 // → { password, trouble }: the saved password (or null), and why the keyring could not be read
 // (keyringTrouble: 'locked', 'missing', 'error'; null when it answered)
 async function passwordFor(acct) {
@@ -145,6 +157,7 @@ export const mailAccounts = {
   // (dav: url is where calendars are found, and contacts too unless carddav names their own address)
   async add(account, password) {
     const acct = { kind: 'mail', auth: 'password', ...account, id: account.id || mailAccounts.newId(account.email || account.name || account.url) };
+    forgetStatus(acct.id);
     // the keyring may be locked or missing (no login password, e.g. autologin): the account still
     // works for this session and Mail asks again next time
     if (password) await savePassword(acct, password);
@@ -165,6 +178,7 @@ export const mailAccounts = {
     const a = cfg.accounts.find((x) => x.id === id);
     cfg.accounts = cfg.accounts.filter((x) => x.id !== id);
     mailConfig.save(cfg);
+    forgetStatus(id);
     if (a) await keyring.remove('mail', { service: service(id), account: a.user }).catch(() => {});
   },
   async setPassword(id, password) {
@@ -229,6 +243,12 @@ export const davPreset = (id) => DAV_PRESETS.find((p) => p.id === id) || DAV_PRE
 // belong to Mail): this opens it in "Calendars & Contacts" mode.
 export function openDavSetup(preset = 'other') {
   wm.open('mail', { args: { setup: 'dav', preset, nonce: Date.now() } });
+}
+
+// Calendar and Contacts cannot write the accounts file (sec/brokermail.c: Mail only), so their
+// Account Settings… and Remove Account… open Mail's accounts panel on that account.
+export function openMailAccounts(acct, { remove = false } = {}) {
+  wm.open('mail', { args: { accounts: String(acct || ''), remove: !!remove, nonce: Date.now() } });
 }
 
 // OAuth2 (XOAUTH2) is prepared but OFF: large mail providers only hand out tokens to apps whose

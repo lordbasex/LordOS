@@ -8,6 +8,9 @@
 // - Servers that keep everything under INBOX ("INBOX.Work", Dovecot/Courier style namespaces)
 //   show those folders at the top level, as if the INBOX prefix were not there.
 // - A \Noselect container is shown (not selectable) only when something visible hangs under it.
+// - Folders named in `collapsed` (IMAP names, saved per account in Mail's accounts file as
+//   `collapsed`) hide what hangs under them; their row says so (open: false) and carries the hidden
+//   folders (`hidden`) so the sidebar can still count their unread mail.
 
 const ci = (s) => s.toUpperCase();
 
@@ -26,8 +29,11 @@ function segments(f, strip) {
   return parts;
 }
 
-// Returns [{ f, depth }] in display order.
-export function folderTree(folders, maxDepth = 8) {
+// Returns [{ f, depth, kids, open, hidden }] in display order: kids is how many visible folders hang
+// right under it (0: no disclosure triangle), open is false when it is collapsed, and hidden lists
+// every visible folder under a collapsed one.
+export function folderTree(folders, maxDepth = 8, collapsed = []) {
+  const shut = collapsed instanceof Set ? collapsed : new Set(Array.isArray(collapsed) ? collapsed : []);
   const list = (folders || []).filter((f) => f && typeof f.name === 'string' && f.name);
   // the "INBOX." personal namespace: every folder but INBOX itself (and the special ones, which
   // are roots anyway) lives under it
@@ -53,14 +59,26 @@ export function folderTree(folders, maxDepth = 8) {
   // visible: selectable, or a container with something visible under it
   const visible = (n) => !n.f.noselect || n.kids.some(visible);
   const out = [];
+  const below = (n, acc) => { for (const k of n.kids) if (visible(k)) { acc.push(k.f); below(k, acc); } return acc; };
   const walk = (n, depth) => {
     if (!visible(n)) return;
-    out.push({ f: n.f, depth: Math.min(depth, maxDepth) });
-    for (const k of [...n.kids].sort(byName)) walk(k, depth + 1);
+    const kids = n.kids.filter(visible).length;
+    const open = !kids || !shut.has(n.f.name);
+    out.push({ f: n.f, depth: Math.min(depth, maxDepth), kids, open, hidden: open ? [] : below(n, []) });
+    if (open) for (const k of [...n.kids].sort(byName)) walk(k, depth + 1);
   };
   const special = roots.filter((n) => n.f.special);       // already in their order
   const plain = roots.filter((n) => !n.f.special).sort(byName);
   for (const n of special) walk(n, 0);
   for (const n of plain) walk(n, 0);
   return out;
+}
+
+// The account's new `collapsed` list after a click on one folder's triangle: that name toggled, and
+// names of folders that no longer exist dropped (so the accounts file does not grow forever).
+export function toggleCollapsed(collapsed, name, folders) {
+  const names = new Set((folders || []).map((f) => f && f.name).filter(Boolean));
+  const cur = (Array.isArray(collapsed) ? collapsed : []).filter((n) => typeof n === 'string' && names.has(n));
+  const next = cur.includes(name) ? cur.filter((n) => n !== name) : names.has(name) ? [...cur, name] : cur;
+  return [...new Set(next)].sort();
 }

@@ -50,6 +50,8 @@
   },
   "newCalendar": "Nuevo calendario",
   "addAccount": "Agregar cuenta…",
+  "accountSettings": "Ajustes de la cuenta…",
+  "removeAccount": "Quitar cuenta…",
   "newEvent": "Nuevo evento",
   "next": "Siguiente",
   "noCalendars": "Todavía no hay calendarios.",
