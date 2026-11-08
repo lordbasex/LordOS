@@ -75,6 +75,10 @@ Built and validated:
   (about 28 min on 2 vCPU, 3 GB; 2026-11-07, VM 116, screenshots `u-01`…`u-08`).
 - [x] Kernel paths in the real ISOs match the catalog (Ubuntu `casper/`, Fedora `images/pxeboot/`).
 
+- [x] Library toolbar as in Remote Desk (Add, pictures or list, Sort, Show, search; status line with the summary), the machine
+  window's bar as grouped icons with tooltips, and a round Play over the last picture when off (2026-11-08, for 0.8.8.7;
+  headless session on the maintainer's PC, screenshots).
+
 Still open in Phase 2:
 - [x] **Ubuntu 26.04.1 unattended desktop install through its reboot and login** (2026-11-07, VM 116: 23 min on 2 vCPU,
   3 GB, 24 GB disk; login with the assistant's password, `u-14`, `u-15`; Shut Down through the agent 5.5 s). Needed the fix that
@@ -94,7 +98,10 @@ Still open in Phase 2:
 
 - [x] Migrate from another app (`.vmx`/`.vmwarevm`, `.vbox`, `.pvm`, `.ova`/`.ovf`, single VMDK/VDI/VHDX/VHD), identity kept,
   hostile-input rules, sandboxed conversion (6.22).
-- [ ] Shared folders (virtiofs, 6.x; measured in Phase 0, not built in the app). Recommended first.
+- [ ] Shared folders (virtiofs, 6.7; measured in Phase 0, not built in the app). Recommended first. The bar already shows its
+  button, dimmed.
+- [ ] A Windows guest migrated from VMware Fusion end to end (the maintainer's Windows 11, once its encryption is removed in
+  Fusion): NVMe disk, vmxnet3, the SMBIOS UUID and MAC kept, no TPM, Secure Boot off; activation checked.
 - [ ] USB passthrough of a device to a machine.
 - [ ] Bridged and Host-only networks (`vhost-net` for Bridged).
 - [ ] File copy panel with flow control and resume, Send to LordOS, drag in and out (7, target 300 MB/s).

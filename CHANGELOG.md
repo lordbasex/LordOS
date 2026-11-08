@@ -10,6 +10,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Changed
+
+- **Machines' library looks like Remote Desk.** A toolbar of icons, each named in its tooltip: Storage, what Machines
+  needs (only when something is missing), Add (New Machine, Import a machine), pictures or a list, Sort (by name,
+  running first, last used, disk space), Show (all, running, off) and a search over the name, the system and the
+  architecture. The view, the order and the filter are remembered (`settings.machinesView`). The list view has one row
+  per machine: picture, name and system, what it's doing, CPU, memory and disk. The summary of machines running, memory
+  in use and free space moved to a status line under the library; a click on free space opens Storage. An empty library
+  says "No machines yet" in the middle with New Machine and Import, and a search with no match says so.
+- **The machine window's bar is icons in groups.** The agent and what it brings (clipboard, shared folders, Apps mode) |
+  resolution and devices | shell, logs, screenshot, record | start, pause or resume, and power | Configure and full
+  screen. Each group sits in one rounded container, with a thin line between groups, and every button has its tooltip.
+  The clipboard button shows which ways it works for the machine and leads to Configure to change them; shared folders
+  and Apps mode are shown, dimmed, with "coming in a later version".
+- **A machine that is off shows one round Play button** over its last picture, dimmed, with its name and state; a
+  suspended one resumes from the same button.
+
+### Fixed
+
+- **Migrate from another app: an encrypted VMware machine is called encrypted.** A machine VMware Fusion encrypted as a
+  whole (as it does for a virtual TPM) keeps only its name and the wrapped key in the clear in its `.vmx`; the importer
+  said "not a .vmx settings file". It now names the machine and stops with *encrypted*, which tells to remove the
+  encryption in the app that made it.
+
 ## [0.8.8.6-beta] - 2026-11-08
 
 An update for 0.8.8 to 0.8.8.5 through Store → Updates and `apt` (no new ISO: the 0.8.8 live image stays the current one), with **Voice**: text to speech on the computer, without the internet (`say`, read aloud anywhere with a player, Live Speech, voices you choose in Standard or HD quality, and a Personal Voice made from your own recording); **Monitor → GPU**; the menu bar and the taskbar on every display; and the 34 issues reported on GitHub since 0.8.8.4 (#42 to #75), with the fixes found while checking them.

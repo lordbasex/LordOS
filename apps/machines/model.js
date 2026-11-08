@@ -268,6 +268,43 @@ export function doingOf(m, windowed = true) {
   return v.key;
 }
 
+// The library's view (settings.machinesView, 0.8.8.7): pictures or a list, the order, which machines show
+export const LIB_VIEWS = ['grid', 'list'];
+export const LIB_SORTS = ['name', 'state', 'last', 'disk'];
+export const LIB_SHOWS = ['all', 'running', 'off'];
+export function libView(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  return {
+    view: LIB_VIEWS.includes(o.view) ? o.view : 'grid',
+    sort: LIB_SORTS.includes(o.sort) ? o.sort : 'name',
+    show: LIB_SHOWS.includes(o.show) ? o.show : 'all',
+  };
+}
+// the machines a search and the Show filter leave: the query matches the name, the system or the architecture
+export function filterMachines(list, { query, show } = {}) {
+  const q = (query || '').trim().toLowerCase();
+  return (list || []).filter((m) => {
+    const on = stateView(m.state, m.reason).active;
+    if (show === 'running' && !on) return false;
+    if (show === 'off' && on) return false;
+    if (!q) return true;
+    const sys = m.meta?.osName || systemOf(m.name).name || '';
+    return [m.name, sys, m.arch].some((s) => (s || '').toLowerCase().includes(q));
+  });
+}
+// in order: by name, running first, last used first (the card picture is written while it runs), or the most disk first;
+// ties by name
+export function sortMachines(list, sort) {
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  const rank = (m) => { const v = stateView(m.state, m.reason); return v.key === 'running' ? 0 : v.active ? 1 : m.suspended ? 2 : 3; };
+  const key = {
+    state: (a, b) => rank(a) - rank(b),
+    last: (a, b) => (b.thumbTime || 0) - (a.thumbTime || 0),
+    disk: (a, b) => (b.diskBytes || 0) - (a.diskBytes || 0),
+  }[sort];
+  return [...(list || [])].sort((a, b) => (key && key(a, b)) || byName(a, b));
+}
+
 // What closing a machine's window does (app.json onClose): ask (the default), suspend, shutdown or keep (Keep Running)
 export const CLOSE_CHOICES = ['ask', 'suspend', 'shutdown', 'keep'];
 export const closeChoice = (meta) => (CLOSE_CHOICES.includes(meta?.onClose) ? meta.onClose : 'ask');

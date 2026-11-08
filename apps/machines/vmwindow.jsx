@@ -4,13 +4,13 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, has, Btn, MenuBtn, IconBtn, StateDot, overlayRoot, menus } from './ui.jsx';
+import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
 
 const BAR = 48;
@@ -24,22 +24,23 @@ const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'disp
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
 function AgentButton({ ctl }) {
-  const p = usePal();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const g = ctl.st?.agent, cfg = ctl.cfg || {};
-  const tone = agentTone(g, cfg.agent);
-  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : tr('machines.agent.waiting');
+  // off while the machine is: nothing to wait for
+  const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
+  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle') : tr('machines.agent.waiting');
+  const light = () => (
+    <View style={{ width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${TONE[tone]}` }}>
+      <StateDot tone={tone} size={8} />
+    </View>
+  );
   return (
     <View ref={ref}>
-      <View onClick={() => setOpen(!open)} title={label} style={{ height: 30, paddingHorizontal: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: tone === 'run' ? '#1d4d33' : p.btn }}>
-        <StateDot tone={tone} size={9} />
-        <Text style={{ fontSize: 12, fontWeight: 600, color: tone === 'run' ? '#7be3a4' : p.text }}>{tr('machines.agent.short')}</Text>
-      </View>
+      <IconBtn icon={light} label={label} on={open} onClick={() => setOpen(!open)} />
       {open ? (
         <Overlay anchor={ref}>
-          <View style={{ position: 'absolute', top: 34, left: 0, width: 300 }}>
+          <View style={{ position: 'absolute', top: 32, left: 0, width: 300 }}>
             <AgentPop ctl={ctl} onClose={() => setOpen(false)} />
           </View>
         </Overlay>
@@ -83,9 +84,10 @@ function AgentPop({ ctl, onClose }) {
   );
 }
 
+// The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
+// shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
 function Tools({ ctl, floating }) {
-  const p = usePal();
-  const { st, a, full, follow } = ctl;
+  const { st, a, follow, cfg } = ctl;
   // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
     ...resolutions(screen.width, screen.height, st?.w ? [st.w, st.h] : null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: !follow && st?.w === w && st?.h === h, disabled: !a.keys, onClick: () => ctl.fixed(w, h) })),
@@ -93,20 +95,53 @@ function Tools({ ctl, floating }) {
     { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
     { label: tr('machines.tb.sizesNote'), disabled: true },
   ];
+  const g = st?.agent;
+  const clip = cfg?.clipboard || 'off';
+  const clipOn = clip !== 'off';
+  // the clipboard's directions are part of the machine's description: they change in Configure, with it off
+  const clipItems = [
+    ...['both', 'to-guest', 'from-guest', 'off'].map((x) => ({ label: tr(`machines.cfg.clip.${x}`), checked: clip === x, disabled: true })),
+    '-',
+    g?.state === 'connected' && clipOn && !(g.caps & AGENT_CAPS.clipboard)
+      ? { label: g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper'), disabled: g.install === 1, onClick: () => lord.vm.agent(ctl.sid, 'install') } : null,
+    { label: tr('machines.tb.clipChange'), onClick: () => ctl.configure('sharing') },
+  ];
+  const resLabel = st?.w ? `${tr('machines.tb.resolution')}: ${st.w} × ${st.h}` : tr('machines.tb.resolution');
   return <>
-    {!floating ? <AgentButton ctl={ctl} /> : null}
-    {ctl.rec ? <Btn primary label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
-    <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
-    <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
-    {!floating ? <IconBtn glyph=">_" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
-    <IconBtn glyph="≡" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
-    <IconBtn glyph="◉" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
-    {!ctl.rec ? <IconBtn glyph="●" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} /> : null}
-    <IconBtn glyph={a.resume ? '▶' : '❚❚'} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />
-    <MenuBtn label={tr('machines.cmd.power')} items={ctl.power} />
-    {!floating ? <IconBtn glyph="⚙" label={tr('machines.cmd.configure')} onClick={ctl.configure} /> : null}
-    {floating ? <Btn primary label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} style={{ height: 30 }} />
-      : <IconBtn glyph="⤢" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
+    {!floating ? <>
+      <BarGroup>
+        <AgentButton ctl={ctl} />
+        <IconMenuBtn icon={icons.clipboard} label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
+        <IconBtn icon={icons.folder} label={tr('machines.tb.foldersLater')} disabled />
+        <IconBtn icon={icons.apps} label={tr('machines.tb.appsLater')} disabled />
+      </BarGroup>
+      <BarSep />
+    </> : null}
+    <BarGroup>
+      <IconMenuBtn glyph="⛶" size={15} label={resLabel} items={res} disabled={!a.keys} on={!follow} />
+      <IconMenuBtn glyph="⏏" label={tr('machines.tb.devices')} items={ctl.devices} />
+    </BarGroup>
+    <BarSep />
+    <BarGroup>
+      {!floating ? <IconBtn glyph=">_" size={12} label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
+      <IconBtn glyph="≡" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
+      <IconBtn glyph="◉" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
+      {ctl.rec ? <IconBtn icon={icons.stop} danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
+        : <IconBtn icon={icons.record} color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
+    </BarGroup>
+    {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
+    <BarSep />
+    <BarGroup>
+      {a.start ? <IconBtn glyph="▶" color="#30d158" label={st?.suspended || stateView(st?.state, st?.reason).key === 'suspended' ? tr('machines.cmd.resume') : tr('machines.start')} onClick={ctl.begin} />
+        : <IconBtn glyph={a.resume ? '▶' : null} icon={a.resume ? null : icons.pause} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />}
+      <IconMenuBtn icon={icons.power} label={tr('machines.cmd.power')} items={ctl.power} disabled={a.start} />
+    </BarGroup>
+    <BarSep />
+    <BarGroup>
+      {!floating ? <IconBtn glyph="⚙" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
+      {floating ? <IconBtn glyph="⤡" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
+        : <IconBtn glyph="⤢" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
+    </BarGroup>
   </>;
 }
 
@@ -163,6 +198,26 @@ function Card({ title, text, actions, width = 460, extra }) {
         {extra}
         {actions?.length ? <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
       </View>
+    </View>
+  );
+}
+
+// Off or suspended: the last picture, dimmed, and one round Play in the middle (a player's, 5.3)
+function OffView({ dir, name, title, hint, label, onPlay }) {
+  const [hover, setHover] = useState(false);
+  let src = '';
+  try { const st = fs.stat(`${dir}/thumb.png`); src = thumbSrc(dir, st?.mtime || 0); } catch (e) { src = ''; }
+  return (
+    <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0c0c0f' }}>
+      {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: 0.35 }} /> : null}
+      <View onClick={onPlay} title={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? 'rgba(10,132,255,0.92)' : 'rgba(0,0,0,0.55)',
+          border: '2px solid rgba(255,255,255,0.9)', boxShadow: '0 12px 34px rgba(0,0,0,0.5)' }}>
+        <Text style={{ fontSize: 40, color: '#fff', marginLeft: 7 }}>▶</Text>
+      </View>
+      <Text style={{ marginTop: 18, fontSize: 17, fontWeight: 700, color: '#f2f2f5' }}>{name}</Text>
+      <Text style={{ marginTop: 4, fontSize: 13, color: 'rgba(242,242,245,0.75)' }}>{title}</Text>
+      {hint ? <Text style={{ marginTop: 2, maxWidth: 420, fontSize: 12, color: 'rgba(242,242,245,0.6)', textAlign: 'center' }}>{hint}</Text> : null}
     </View>
   );
 }
@@ -453,7 +508,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setFollow: (on) => { setFollow(on); sized.current.last = null; },
     fixed: (w, h) => { setFollow(false); if (sid) lord.vm.resize(sid, w, h); },
     logs: () => openLogs(m0),
-    configure: () => openConfigure(m0),
+    configure: (section) => openConfigure(m0, section),
+    begin: () => begin(),
     screenshot: shot,
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
@@ -511,8 +567,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (!sid && st) {
     if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => openConfigure(m0)}
       onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
-    else if (v.key === 'suspended') card = <Card title={tr('machines.state.suspended')} text={tr('machines.win.suspendedHint')} actions={[<Btn key="s" primary label={tr('machines.cmd.resume')} onClick={() => begin()} />]} />;
-    else card = <Card title={tr(`machines.state.${v.key}`)} text={tr('machines.win.stoppedHint')} actions={[<Btn key="s" primary label={tr('machines.start')} onClick={() => begin()} />]} />;
+    else if (v.key === 'suspended') card = <OffView dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
+    else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {

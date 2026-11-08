@@ -4,13 +4,14 @@
 // disk. Double-click opens or starts; right-click has the machine's menu. FirstRun, Requirements and the Pi page are
 // the other screens of this window.
 import {
-  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText,
+  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
+  Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf } from './model.js';
+import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
 import { Assistant } from './assistant.jsx';
-import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, markColors, overlayRoot } from './ui.jsx';
+import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 
@@ -54,15 +55,14 @@ export function openLogs(m) {
   if (fresh) { wm.resize(id, 980, 600); wm.center(id); }
 }
 
-function Summary({ label, value, frac, color }) {
+// the status line under the library (5.1): machines running, the memory they use, free space (a click opens Storage)
+function Summary({ label, value, frac, color, onClick }) {
   const p = usePal();
   return (
-    <View style={{ width: 170, gap: 5 }}>
-      <View style={{ flexDirection: 'row' }}>
-        <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start' }}>{label}</Text>
-        <Text style={{ fontSize: 12, fontWeight: 700, color: p.text }}>{value}</Text>
-      </View>
-      <Bar frac={frac} color={color} />
+    <View onClick={onClick} title={onClick ? tr('machines.storage.menu') : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Text style={{ fontSize: 12, color: p.dim }}>{label}</Text>
+      <View style={{ width: 70 }}><Bar frac={frac} color={color} height={5} /></View>
+      <Text style={{ fontSize: 12, fontWeight: 600, color: p.text }}>{value}</Text>
     </View>
   );
 }
@@ -127,6 +127,44 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
   );
 }
 
+// one machine in the list view: picture, name and system, what it's doing, CPU, memory, disk; the same clicks as a card
+function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
+  const p = usePal();
+  const [hover, setHover] = useState(false);
+  const v = stateView(m.state, m.reason);
+  const a = actionsFor(m.state);
+  const sys = m.meta?.os ? { id: m.meta.os, name: m.meta.osName || '' } : systemOf(m.name);
+  const src = thumbSrc(m.dir, m.thumbTime);
+  const on = v.active;
+  const go = () => (a.open || a.start ? openMachine(m) : null);
+  const cell = (text, w, strong) => <Text style={{ width: w, fontSize: 12, fontWeight: strong ? 600 : 400, color: strong ? p.text : p.dim, textAlign: 'end', whiteSpace: 'nowrap' }}>{text}</Text>;
+  return (
+    <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
+      style={{ height: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, borderRadius: 10,
+        backgroundColor: sel ? (p.dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)') : hover ? p.raised : 'transparent', border: `1px solid ${sel ? p.accent : 'transparent'}` }}>
+      <View style={{ width: 80, height: 48, borderRadius: 7, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+        {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, width: 80, height: 48, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : <OsMark id={sys.id} size={30} />}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
+        <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{[sys.name || tr('machines.card.system'), m.arch, m.accel === 'tcg' ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ')}</Text>
+      </View>
+      <View style={{ width: 130, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <StateDot tone={v.tone} />
+        <Text style={{ fontSize: 12, color: v.why ? '#ff9a9a' : p.text, whiteSpace: 'nowrap' }}>{tr(`machines.doing.${doingOf(m, windowed)}`)}</Text>
+      </View>
+      {cell(on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—', 56)}
+      {cell(on && u?.memBytes ? `${gib(u.memBytes)} GB` : gb(m.memoryMb), 70)}
+      {cell(m.diskBytes != null ? bytes(m.diskBytes) : '—', 70, true)}
+      <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={a.open ? tr('machines.open') : tr('machines.start')}
+        style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', opacity: hover || sel ? 1 : 0, backgroundColor: p.btn }}>
+        <Text style={{ fontSize: 13, color: p.text, marginLeft: a.open ? 0 : 2 }}>{a.open ? '⤢' : '▶'}</Text>
+      </View>
+    </View>
+  );
+}
+
 // FirstRun (empty library) and its "one step first" side when virtualization isn't usable yet
 function FirstRun({ host, onNew, onImport, onCheck }) {
   const p = usePal();
@@ -140,13 +178,15 @@ function FirstRun({ host, onNew, onImport, onCheck }) {
   };
   const side = host.kvmDevice && !host.kvm ? 'allow' : !host.kvmDevice ? 'off' : null;
   return (
-    <View style={{ flex: 1, flexDirection: 'row', gap: 16 }}>
-      <View style={{ flex: 1, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
-        <AppMark size={112} />
-        <Text style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: p.text }}>{tr('machines.empty')}</Text>
-        <Text style={{ maxWidth: 380, fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'center' }}>{tr('machines.first.hint')}</Text>
-        <Btn big primary label={tr('machines.newMachine')} onClick={onNew} />
-        <Btn link label={tr('machines.first.import')} onClick={onImport} />
+    <View style={{ flex: 1, flexDirection: 'row', gap: 16, padding: 16 }}>
+      <View style={{ flex: 1, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+        <AppMark size={96} />
+        <Text style={{ marginTop: 8, fontSize: 20, fontWeight: 700, color: p.text }}>{tr('machines.empty')}</Text>
+        <Text style={{ maxWidth: 420, fontSize: 13, lineHeight: 1.5, color: p.dim, textAlign: 'center' }}>{tr('machines.first.addHint')}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+          <Btn primary label={tr('machines.newMachine')} onClick={onNew} />
+          <Btn label={tr('machines.first.import')} onClick={onImport} />
+        </View>
       </View>
       {side ? (
         <View style={{ flex: 1, padding: 28, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
@@ -303,6 +343,10 @@ export function Library() {
   const [usages, setUsages] = useState({});
   const [discard, setDiscard] = useState(null);
   const [copying, setCopying] = useState(null);
+  const [query, setQuery] = useState('');
+  const [s0] = useSettings();
+  const lv = libView(s0.machinesView);
+  const putView = (patch) => settings.set({ machinesView: { ...libView(settings.get().machinesView), ...patch } });
   const wins = useStore(windows, (ws) => ws.map((w) => w.id).join(' '));
   const prev = useRef({});
   // lord-vm jobs started from here (start with no window, discard a saved state): followed until they end, so the
@@ -352,7 +396,7 @@ export function Library() {
   }, [host?.arch]);
   if (!host) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.noBackend')}</Text></View>;
 
-  const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortMachines(filterMachines(list, { query, show: lv.show }), lv.sort);
   const sum = summaryOf(list, usages, host);
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {
@@ -385,11 +429,15 @@ export function Library() {
     ];
   };
   const rl = root.current ? lord.getLayout(root.current.id) : [0, 0, 1000, 700];
-  const cols = sorted.length <= 2 ? 2 : 3;
-  // two rows fill the window (the mock's grid); more scroll
-  const rowH = Math.max(230, Math.floor((rl[3] - 32 - 14 - 46 - 12) / 2));
+  // as many cards as fit at 300 px or more (as Remote Desk), each with the guest's 16:10 picture and its two lines
+  const cw = rl[2] - 40;
+  const cols = Math.max(1, Math.floor((cw + 14) / (300 + 14)));
+  const cardW = Math.floor((cw - 14 * (cols - 1)) / cols);
+  const rowH = Math.round(cardW * 10 / 16) + 72;
   const rows = [];
   for (let i = 0; i < sorted.length; i += cols) rows.push(sorted.slice(i, i + cols));
+  const cardProps = (m) => ({ m, u: usages[m.dir], sel: sel === m.dir, onSelect: () => setSel(m.dir), windowed: wins.split(' ').includes(winIdOf(m)),
+    onMenu: (e) => setMenu({ x: e.x, y: e.y, m }) });
 
   let body;
   if (page === 'new') body = <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
@@ -397,13 +445,18 @@ export function Library() {
     onNeeds={() => setPage('requirements')} />;
   else if (page === 'requirements') body = <Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} />;
   else if (page === 'pi') body = <PiView host={host} list={list} onBack={() => setPage('main')} />;
-  else if (!sorted.length) body = <FirstRun host={host} onNew={() => setPage('new')} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  else if (!list.length) body = <FirstRun host={host} onNew={() => setPage('new')} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : tr(`machines.lib.none.${lv.show}`)} />;
+  else if (lv.view === 'list') body = (
+    <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 16, gap: 2 }}>
+      {sorted.map((m) => <ListRow key={m.dir} {...cardProps(m)} />)}
+    </ScrollView>
+  );
   else body = (
-    <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 12 }}>
+    <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 20, gap: 14 }}>
       {rows.map((r, i) => (
-        <View key={i} style={{ flexDirection: 'row', gap: 12, height: rowH }}>
-          {r.map((m) => <Card key={m.dir} m={m} u={usages[m.dir]} sel={sel === m.dir} onSelect={() => setSel(m.dir)} windowed={wins.split(' ').includes(winIdOf(m))}
-            onMenu={(e) => setMenu({ x: e.x, y: e.y, m })} />)}
+        <View key={i} style={{ flexDirection: 'row', gap: 14, height: rowH }}>
+          {r.map((m) => <Card key={m.dir} {...cardProps(m)} />)}
           {Array.from({ length: cols - r.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
         </View>
       ))}
@@ -411,25 +464,41 @@ export function Library() {
   );
 
   const full = page === 'new' || page === 'requirements' || page === 'pi';
+  const sortItems = ['name', 'state', 'last', 'disk'].map((k) => ({ label: tr(`machines.lib.sort.${k}`), checked: lv.sort === k, onClick: () => putView({ sort: k }) }));
+  const showItems = ['all', 'running', 'off'].map((k) => ({ label: tr(`machines.lib.show.${k}`), checked: lv.show === k, onClick: () => putView({ show: k }) }));
+  const addItems = [
+    { label: tr('machines.newMachine'), detail: tr('machines.lib.newHint'), onClick: () => setPage('new') },
+    { label: tr('machines.first.import'), detail: tr('machines.lib.importHint'), onClick: () => { setNewMode('import'); setPage('new'); } },
+  ];
   return (
-    <View ref={root} style={{ flex: 1, padding: 16, gap: 14, backgroundColor: p.bg }}>
+    <View ref={root} style={{ flex: 1, backgroundColor: p.bg }}>
       {!full ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Text style={{ fontSize: 20, fontWeight: 700, color: p.text }}>{tr('machines.title')}</Text>
-          <View style={{ flex: 1 }} />
-          {sorted.length ? <>
-            <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} frac={sum.running.frac} color={p.ok} />
-            {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} frac={sum.memory.frac} color={p.mem} /> : null}
-            {sum.free ? <View onClick={openStorage} title={tr('machines.storage.menu')}><Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} /></View> : null}
-            <Btn label={tr('machines.storage.disk')} onClick={openStorage} />
+        <Toolbar>
+          <ToolbarButton icon="⛁" title={tr('machines.storage.menu')} onClick={openStorage} />
+          {host.arch === 'arm64' && host.board ? <ToolbarButton icon="ⓘ" title={tr('machines.pi.menu')} onClick={() => setPage('pi')} /> : null}
+          {missing.length || (host.kvmDevice && !host.kvm) ? <ToolbarButton icon="⚠" color={p.warn} title={tr('machines.req.menu')} onClick={() => setPage('requirements')} /> : null}
+          <ToolbarSpacer />
+          <MenuButton icon="+" title={tr('machines.lib.add')} items={addItems} minWidth={300} />
+          {list.length ? <>
+            <ToolbarGroup>
+              <ToolbarButton small icon="▦" title={tr('machines.lib.viewGrid')} active={lv.view === 'grid'} onClick={() => putView({ view: 'grid' })} />
+              <ToolbarButton small icon="≡" title={tr('machines.lib.viewList')} active={lv.view === 'list'} onClick={() => putView({ view: 'list' })} />
+            </ToolbarGroup>
+            <MenuButton icon="⇅" title={tr('machines.lib.sort')} items={sortItems} />
+            <MenuButton icon={lv.show === 'all' ? '▽' : '▼'} title={tr('machines.lib.show')} items={showItems} />
+            <SearchField value={query} onChange={setQuery} placeholder={tr('machines.lib.search')} width={180} />
           </> : null}
-          {host.arch === 'arm64' && host.board ? <Btn label={tr('machines.pi.button')} onClick={() => setPage('pi')} /> : null}
-          {missing.length || (host.kvmDevice && !host.kvm) ? <Btn label={tr('machines.req.button')} onClick={() => setPage('requirements')} style={{ backgroundColor: p.warnBg }} /> : null}
-          <Btn primary label={tr('machines.new')} onClick={() => setPage('new')} />
+        </Toolbar>
+      ) : null}
+      {error ? <Text style={{ marginHorizontal: 20, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+      {full ? <View style={{ flex: 1, padding: 16 }}>{body}</View> : body}
+      {!full && list.length ? (
+        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 20, borderTopWidth: 1, borderColor: p.line }}>
+          <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} frac={sum.running.frac} color={p.ok} />
+          {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} frac={sum.memory.frac} color={p.mem} /> : null}
+          {sum.free ? <Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} onClick={openStorage} /> : null}
         </View>
       ) : null}
-      {error ? <Text style={{ fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
-      {body}
       {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
         items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}

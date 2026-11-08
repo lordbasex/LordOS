@@ -227,5 +227,27 @@ eq('import progress', [pr.pct, pr.disk, pr.disks, pr.done], [61, 2, 2, null]);
 eq('import done', M.importProgress('{"progress":100,"disk":1,"disks":1}\n{"imported":true,"dir":"/m/x.lordvm"}').done.dir, '/m/x.lordvm');
 eq('unique names', [M.uniqueName('Work', []), M.uniqueName('Work', ['Work']), M.uniqueName('Work', ['Work', 'Work 2']), M.uniqueName('  ', [])], ['Work', 'Work 2', 'Work 3', 'Imported machine']);
 
+// the library's toolbar: view, order, Show and search (0.8.8.7)
+eq('lib view defaults', M.libView(null), { view: 'grid', sort: 'name', show: 'all' });
+eq('lib view kept', M.libView({ view: 'list', sort: 'disk', show: 'off' }), { view: 'list', sort: 'disk', show: 'off' });
+eq('lib view junk', M.libView({ view: 'x', sort: 1, show: 'running' }), { view: 'grid', sort: 'name', show: 'running' });
+const lib = [
+  { name: 'Zeta', state: 'stopped', thumbTime: 50, diskBytes: 9, arch: 'amd64' },
+  { name: 'Alpha', state: 'running', thumbTime: 10, diskBytes: 1, arch: 'amd64', meta: { osName: 'Ubuntu' } },
+  { name: 'Mid', state: 'stopped', suspended: true, thumbTime: 99, diskBytes: 5, arch: 'arm64' },
+  { name: 'Beta', state: 'paused', thumbTime: 0, arch: 'amd64' },
+];
+const names = (l) => l.map((m) => m.name);
+eq('sort name', names(M.sortMachines(lib, 'name')), ['Alpha', 'Beta', 'Mid', 'Zeta']);
+eq('sort state', names(M.sortMachines(lib, 'state')), ['Alpha', 'Beta', 'Mid', 'Zeta']);
+eq('sort last', names(M.sortMachines(lib, 'last')), ['Mid', 'Zeta', 'Alpha', 'Beta']);
+eq('sort disk', names(M.sortMachines(lib, 'disk')), ['Zeta', 'Mid', 'Alpha', 'Beta']);
+eq('sort keeps input', names(lib)[0], 'Zeta');
+eq('show running', names(M.filterMachines(lib, { show: 'running' })), ['Alpha', 'Beta']);
+eq('show off', names(M.filterMachines(lib, { show: 'off' })), ['Zeta', 'Mid']);
+eq('search system', names(M.filterMachines(lib, { query: ' ubun ' })), ['Alpha']);
+eq('search arch', names(M.filterMachines(lib, { query: 'ARM64' })), ['Mid']);
+eq('search none', M.filterMachines(lib, { query: 'nothing' }).length, 0);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

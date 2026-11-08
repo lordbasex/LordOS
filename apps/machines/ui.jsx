@@ -21,6 +21,7 @@ export function usePal() {
     track: dark ? '#44444c' : 'rgba(0,0,0,0.12)',
     line: dark ? '#3b3b43' : t.separator,
     btn: dark ? '#3b3b43' : 'rgba(0,0,0,0.07)',
+    hover: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
     text: t.text, dim: t.textDim,
     accent: '#0a84ff', cpu: '#6cb6ff', mem: '#c79bff', disk: '#ffb340', ok: '#30d158', warn: '#ffc56e', bad: '#ff9a9a',
     warnBg: dark ? '#4a3512' : '#fff1d6', badBg: dark ? '#4a2028' : '#ffe1e4',
@@ -84,19 +85,96 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
   );
 }
 
-// A toolbar button with a glyph and its name as the tooltip (the mock "Session": agent, shell, logs, screenshot,
-// record, pause, power)
-export function IconBtn({ glyph, label, onClick, disabled, on, danger }) {
+// A toolbar button with a glyph (or a drawn icon) and its name as the tooltip (the mock "Session": agent, shell, logs,
+// screenshot, record, pause, power)
+export function IconBtn({ glyph, icon, label, onClick, disabled, on, danger, color, size = 14 }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
+  const fg = on || danger ? '#fff' : color || p.text;
   return (
     <View onClick={disabled ? undefined : onClick} title={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 32, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
-        backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.btn : 'transparent' }}>
-      <Text style={{ fontSize: 14, fontWeight: 700, color: on || danger ? '#fff' : p.text }}>{glyph}</Text>
+      style={{ width: 32, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
+        backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.hover : 'transparent' }}>
+      {icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
     </View>
   );
 }
+
+// A row of bar buttons in one rounded container, and the thin line between groups (5.3: grouped, icons with tooltips)
+export function BarGroup({ children }) {
+  const p = usePal();
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1, padding: 2, borderRadius: 9, backgroundColor: p.btn }}>{children}</View>;
+}
+export function BarSep() {
+  const p = usePal();
+  return <View style={{ width: 1, height: 20, marginHorizontal: 4, backgroundColor: p.line }} />;
+}
+
+// An icon button that opens a menu under itself (resolution, devices, clipboard, power)
+export function IconMenuBtn({ glyph, icon, label, items, disabled, on, color, size }) {
+  const [open, setOpen] = useState(false);
+  const [end, setEnd] = useState(false);
+  const ref = useRef(null);
+  const show = () => {
+    if (!ref.current) return;
+    const [x] = lord.getLayout(ref.current.id);
+    setEnd(x > screen.width / 2);
+    setOpen(true);
+  };
+  return (
+    <View ref={ref}>
+      <IconBtn glyph={glyph} icon={icon} label={label} disabled={disabled} on={on || open} color={color} size={size} onClick={() => (open ? setOpen(false) : show())} />
+      {open ? (
+        <Overlay anchor={ref}>
+          <View style={{ position: 'absolute', top: 32, width: 260, ...(end ? { right: 0 } : { left: 0 }) }}>
+            <PopMenu x={0} y={0} width={260} items={items} onClose={() => setOpen(false)} />
+          </View>
+        </Overlay>
+      ) : null}
+    </View>
+  );
+}
+
+// Small icons drawn from boxes, for what no symbol in the system fonts shows well: a folder, a clipboard, app windows
+const box = (style) => <View style={{ position: 'absolute', ...style }} />;
+export const icons = {
+  folder: (c) => (
+    <View style={{ width: 16, height: 13 }}>
+      {box({ left: 0, top: 0, width: 7, height: 4, borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: c })}
+      {box({ left: 0, top: 2, width: 16, height: 11, borderRadius: 2, border: `1.6px solid ${c}` })}
+    </View>
+  ),
+  clipboard: (c) => (
+    <View style={{ width: 13, height: 16 }}>
+      {box({ left: 0, top: 2, width: 13, height: 14, borderRadius: 2, border: `1.6px solid ${c}` })}
+      {box({ left: 3.5, top: 0, width: 6, height: 4, borderRadius: 1.5, backgroundColor: c })}
+      {box({ left: 3, top: 8, width: 7, height: 1.6, backgroundColor: c })}
+      {box({ left: 3, top: 11, width: 5, height: 1.6, backgroundColor: c })}
+    </View>
+  ),
+  // the media and power symbols too: the fonts draw ⏸ and ⏺ as color emoji, and some have no ⏻
+  pause: (c) => (
+    <View style={{ width: 12, height: 13 }}>
+      {box({ left: 1, top: 0, width: 3.5, height: 13, borderRadius: 1, backgroundColor: c })}
+      {box({ left: 7.5, top: 0, width: 3.5, height: 13, borderRadius: 1, backgroundColor: c })}
+    </View>
+  ),
+  record: (c) => <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c }} />,
+  stop: (c) => <View style={{ width: 11, height: 11, borderRadius: 2, backgroundColor: c }} />,
+  power: (c) => (
+    <View style={{ width: 16, height: 16 }}>
+      {box({ left: 0, top: 1, width: 16, height: 16, borderRadius: 8, border: `1.8px solid ${c}`, borderTopColor: 'transparent' })}
+      {box({ left: 7.1, top: -1, width: 1.8, height: 9, borderRadius: 1, backgroundColor: c })}
+    </View>
+  ),
+  apps: (c) => (
+    <View style={{ width: 17, height: 14 }}>
+      {box({ left: 5, top: 0, width: 12, height: 9, borderRadius: 2, border: `1.6px solid ${c}` })}
+      {box({ left: 0, top: 4, width: 12, height: 10, borderRadius: 2, border: `1.6px solid ${c}`, backgroundColor: 'transparent' })}
+      {box({ left: 1, top: 5, width: 10, height: 2, backgroundColor: c })}
+    </View>
+  ),
+};
 
 // A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's
 // How many menus are open: while one is, a machine's window keeps the keyboard for the menu (Esc closes it and never
