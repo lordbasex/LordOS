@@ -969,7 +969,9 @@ function CredSheet({ st, sheet }) {
   const layout = M.formLayout(p);
   const [vals, setVals] = useState(() => sheet.vals || M.formValues(p));
   const [name, setName] = useState(sheet.name || '');
-  const [err, setErr] = useState(() => (sheet.error ? { text: errorMessage(sheet.error), field: M.errorField(sheet.error, p), prints: M.changedPrints(sheet.error) } : null));       // { text, field }
+  // the error, then what this provider wants instead where it has a word for it (#65)
+  const errText = (r) => { const hint = M.errorHint(p.kind, r); return hint ? `${errorMessage(r)} ${tr(hint)}` : errorMessage(r); };
+  const [err, setErr] = useState(() => (sheet.error ? { text: errText(sheet.error), field: M.errorField(sheet.error, p), prints: M.changedPrints(sheet.error) } : null));       // { text, field }
   const [busy, setBusy] = useState(false);
   const [adv, setAdv] = useState(false);
   const [auth, setAuth] = useState('password');
@@ -1000,7 +1002,7 @@ function CredSheet({ st, sheet }) {
     Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v), sheet.accountId ? { accountId: sheet.accountId } : {})).then((r) => {
       setBusy(false);
       const field = r && r.error ? M.errorField(r, p) : null;
-      if (r && r.error) { setErr({ text: errorMessage(r), field, prints: M.changedPrints(r) }); if (field && layout.advanced.some((f) => f.name === field)) setAdv(true); return; }
+      if (r && r.error) { setErr({ text: errText(r), field, prints: M.changedPrints(r) }); if (field && layout.advanced.some((f) => f.name === field)) setAdv(true); return; }
       // a question (a code, trusting the server) comes back here on an error, with what was typed
       afterAdd(r, p, name.trim(), { ...sheet, kind: 'cred', provider: p, name: name.trim(), vals: { ...vals }, error: null });
     });

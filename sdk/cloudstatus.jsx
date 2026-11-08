@@ -32,8 +32,10 @@ function Btn({ label, onClick }) {
   const th = useTheme();
   const [hover, setHover] = useState(false);
   return h(View, { onClick, onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
-    style: { flex: 1, height: 28, borderRadius: th.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: th.control, opacity: hover ? 0.85 : 1 } },
-  h(Text, { style: { fontSize: 12, fontWeight: 500, color: th.text, whiteSpace: 'nowrap' } }, label));
+    // a longer label (French, Italian) wraps to a second line inside its third of the panel instead of running out (#71)
+    style: { flex: 1, minWidth: 0, minHeight: 28, paddingHorizontal: 6, paddingVertical: 4, borderRadius: th.controlRadius, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: th.control, opacity: hover ? 0.85 : 1 } },
+  h(Text, { style: { fontSize: 12, fontWeight: 500, color: th.text, alignSelf: 'stretch', textAlign: 'center', lineHeight: 1.25 } }, label));
 }
 
 function Panel({ st, onClose }) {

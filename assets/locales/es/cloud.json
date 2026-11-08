@@ -295,6 +295,7 @@
   "check.step.deleteUp": "Borrarla en la nube",
   "add.loadFailed": "rclone no respondió con sus proveedores.",
   "notes.before": "Antes de agregar {provider}",
+  "notes.iclouddrive.password": "Usa la contraseña normal de la cuenta, no una contraseña específica para apps: rclone no las acepta para este disco.",
   "notes.iclouddrive.adp": "El cifrado de extremo a extremo adicional del disco tiene que estar desactivado en la cuenta: rclone no puede leer archivos cifrados así.",
   "notes.iclouddrive.web": "El acceso al disco desde la web tiene que estar activado en los ajustes de la cuenta.",
   "notes.iclouddrive.code": "Te pide un código de uno de tus dispositivos ahora, y de nuevo cada unos 30 días (Iniciar sesión de nuevo).",

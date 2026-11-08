@@ -295,6 +295,7 @@
   "check.step.deleteUp": "Cancellala nel cloud",
   "add.loadFailed": "rclone non ha risposto con i suoi fornitori.",
   "notes.before": "Prima di aggiungere {provider}",
+  "notes.iclouddrive.password": "Usa la password normale dell’account, non una password specifica per app: rclone non le accetta per questo disco.",
   "notes.iclouddrive.adp": "La cifratura end-to-end aggiuntiva del disco deve essere disattivata nell’account: rclone non può leggere i file cifrati così.",
   "notes.iclouddrive.web": "L’accesso al disco dal web deve essere attivo nelle impostazioni dell’account.",
   "notes.iclouddrive.code": "Chiede ora un codice da uno dei tuoi dispositivi, e di nuovo circa ogni 30 giorni (Accedi di nuovo).",

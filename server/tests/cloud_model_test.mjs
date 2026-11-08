@@ -162,6 +162,10 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('full with waiting', M.menuGlyph(st([acc('1', 'A', { about: { total: 1, used: 1, free: 0 }, up: { files: 3 } })])).badge, '!');
   eq('waiting changes count', M.menuGlyph(st([acc('1', 'A', { state: 'offline', up: { files: 4 } }), acc('2', 'B', { state: 'paused', up: { files: 1 } })])).badge, 5);
   eq('all paused', [M.allPaused(st([acc('1', 'A', { state: 'paused' })])), M.allPaused(st([acc('1', 'A', { state: 'paused' }), acc('2', 'B')])), M.allPaused(st([]))], [true, false, false]);
+  // #71: Pause All on an account in error: lord-server's pauseAll says it took, though the account still shows the error
+  eq('all paused by the option', [M.allPaused({ accounts: [acc('1', 'A', { state: 'error' })], options: { pauseAll: true } }),
+    M.allPaused({ accounts: [acc('1', 'A', { state: 'error', paused: true }), acc('2', 'B', { state: 'paused' })], options: { pauseAll: false } }),
+    M.allPaused({ accounts: [acc('1', 'A', { state: 'error' })], options: { pauseAll: false } }), M.allPaused({ accounts: [], options: { pauseAll: true } })], [true, true, false, false]);
   const now = 1.7e12;
   eq('ago', [M.ago(now - 10e3, now).key, M.ago(now - 60e3, now).vars.count, M.ago(now - 4 * 60e3, now).vars.count, M.ago(now - 3600e3, now).key, M.ago(now - 3 * 864e5, now).vars.count],
     ['cloud.ago.now', 1, 4, 'cloud.ago.h', 3]);
@@ -414,7 +418,10 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     ['text', 'password', { input: 'bool', options: [], value: 'true' }, 'number', { input: 'choice', options: [['a', 'Choice A'], ['b', 'Choice B']], value: 'b' }]);
   eq('answers', [M.questionAnswer(q({}), ' 123456 '), M.questionAnswer(q({}), ''), M.questionAnswer(q({ required: false }), ''), M.questionAnswer(q({ type: 'bool' }), 'true'),
     M.questionAnswer(q({ type: 'int' }), 'x'), M.questionAnswer(q({ type: 'int' }), '42'), M.questionAnswer(q({ isPassword: true }), ' p w ')], ['123456', null, '', 'true', null, '42', ' p w ']);
-  eq('notes before a provider', [M.notesFor('iclouddrive').length, M.notesFor('webdav')], [3, []]);
+  eq('notes before a provider', [M.notesFor('iclouddrive').length, M.notesFor('webdav')], [4, []]);
+  eq('#65: a refused password says which one', [M.errorHint('iclouddrive', { error: 'cloud.authFailed' }), M.errorHint('iclouddrive', { error: { code: 'cloud.badPassword' } }),
+    M.errorHint('iclouddrive', { error: 'cloud.unreachable' }), M.errorHint('webdav', { error: 'cloud.authFailed' }), M.errorHint('iclouddrive', null)],
+  ['cloud.notes.iclouddrive.password', 'cloud.notes.iclouddrive.password', null, null, null]);
   const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
   eq('the notes are in the catalog', M.notesFor('iclouddrive').every((k) => k.slice(6) in cat), true);
   eq('measure: only an answer without a total', [M.canMeasure({ used: 5 }), M.canMeasure({ used: 5, total: 9 }), M.canMeasure(null)], [true, false, false]);

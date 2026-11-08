@@ -313,8 +313,8 @@ export function installCloudMock(home, scenario = '') {
       return new Promise((r) => setTimeout(() => r({ hits: out.slice(0, 500), complete: out.length <= 500 }), 700));
     },
     links: (id) => JSON.parse(JSON.stringify(links[id] || [])),
-    pause(id) { for (const a of st.accounts) if (!id || a.id === id) { a.prev = a.state === 'paused' ? a.prev : a.state; a.state = 'paused'; } push(); },
-    resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; push(); },
+    pause(id) { for (const a of st.accounts) if (!id || a.id === id) { a.prev = a.state === 'paused' ? a.prev : a.state; a.state = 'paused'; } if (!id) st.options.pauseAll = true; push(); },
+    resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; if (!id) st.options.pauseAll = false; push(); },
     setOptions(o) { Object.assign(st.options, o); push(); },
     setAccountOptions(id, o) { const a = find(id); if (a) { a.options = { ...(a.options || {}), ...o }; push(); } },
     retry(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'locked') { a.state = 'ok'; delete a.error; a.about = { used: 1 }; } push(); },

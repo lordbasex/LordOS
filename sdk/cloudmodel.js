@@ -277,7 +277,12 @@ export function menuGlyph(state) {
   const waiting = accs.filter((a) => a.state === 'offline' || a.state === 'paused').reduce((s, a) => s + ((a.up && a.up.files) || 0), 0);
   return { arrow, badge: waiting > 0 ? waiting : null };
 }
-export const allPaused = (state) => { const a = (state && state.accounts) || []; return a.length > 0 && a.every((x) => x.state === 'paused'); };
+// Pause All took (#71): lord-server's own pauseAll, or every account paused. An account's state shows an error or a
+// sign-in before "paused", so the states alone kept the button on Pause All while it had worked.
+export const allPaused = (state) => {
+  const a = (state && state.accounts) || [];
+  return a.length > 0 && (!!(state.options && state.options.pauseAll) || a.every((x) => x.state === 'paused' || x.paused === true));
+};
 
 // how long ago, as the panel says it: now, minutes, hours, days
 export function ago(at, now = Date.now()) {
@@ -398,8 +403,15 @@ export function questionAnswer(q, raw) {
 }
 
 // What some providers need said before their sign-in starts (from rclone's documentation, in our words): keys of cloud.json
-const NOTES = { iclouddrive: ['cloud.notes.iclouddrive.adp', 'cloud.notes.iclouddrive.web', 'cloud.notes.iclouddrive.code'] };
+const NOTES = { iclouddrive: ['cloud.notes.iclouddrive.password', 'cloud.notes.iclouddrive.adp', 'cloud.notes.iclouddrive.web', 'cloud.notes.iclouddrive.code'] };
 export const notesFor = (kind) => NOTES[String(kind || '')] || [];
+// a refused password said again under the error where the provider wants a particular one (#65: rclone takes the phone
+// maker's account password with a code, never an app-specific password)
+const AUTH_HINT = { iclouddrive: 'cloud.notes.iclouddrive.password' };
+export const errorHint = (kind, r) => {
+  const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code);
+  return code === 'cloud.authFailed' || code === 'cloud.badPassword' ? AUTH_HINT[String(kind || '')] || null : null;
+};
 
 // Measure (17.2): a provider without a quota can be measured; the line once it was
 // only when the provider answered without a total (not when there was no answer: the account isn't connected)
