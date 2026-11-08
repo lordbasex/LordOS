@@ -264,6 +264,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "capture-layer-test (sdk/components.jsx, sdk/layers.js)" node tests/capture_layer_test.mjs
     else skip "capture-layer-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
+    else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
     if have node && [ -d ../node_modules/esbuild ]; then
         run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs

@@ -2,6 +2,9 @@
 // lists, the Trash, the desktop, a window's title bar and the start menu's right click.
 // items: [{ label, onClick, disabled, checked, destructive, hint } | '-']; submenus are flattened.
 // Keyboard: ↑/↓, Enter, Escape. `above`: the menu ends at y (a bottom taskbar) instead of starting there.
+// `boxRef`: receives the menu's node. The menu is a portal into the popover layer, so its rows are not
+// inside the panel that opened it: a panel that closes on a click outside itself must also treat a
+// click in its menu as inside (the start menu), or it unmounts the menu before the row's click lands.
 import { View, Text, Layer, ScrollView, screen, addListener, takeTextFocus, releaseTextFocus, direction } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -18,7 +21,7 @@ export function flatten(items) {
   return out.filter((it, i) => !(it === '-' && out[i - 1] === '-'));
 }
 
-export function Menu({ t, items: raw, x, y, above, onClose, width = 240 }) {
+export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef }) {
   const items = flatten(raw);
   const ref = useRef(null);
   const [active, setActive] = useState(-1);
@@ -63,7 +66,7 @@ export function Menu({ t, items: raw, x, y, above, onClose, width = 240 }) {
     )));
   return (
     <Layer name="popover">
-      <View ref={ref} style={{ position: 'absolute', left, top, width, padding: 5, borderRadius: t.menuRadius,
+      <View ref={(n) => { ref.current = n; if (boxRef) boxRef.current = n; }} style={{ position: 'absolute', left, top, width, padding: 5, borderRadius: t.menuRadius,
         backgroundColor: t.panelBg, backdropFilter: t.blur ? `blur(${t.blur}px)` : undefined, border: `1px solid ${t.windowBorder}`, boxShadow: t.shadow }}>
         {H > maxH ? <ScrollView style={{ height: maxH - 10 }}>{rows}</ScrollView> : rows}
       </View>

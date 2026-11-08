@@ -88,6 +88,7 @@ function resultGlyph(t, it, sectionId) {
 // box: the panel's place ({ left, top, width, height }, global coordinates)
 export function StartMenu({ t, box, onClose, isOnBar }) {
   const ref = useRef(null);
+  const menuRef = useRef(null);                        // the open context or power menu (a portal, outside ref)
   const list = useLauncherApps();
   const [s] = useSettings();
   const info = useSystemInfo(60000);
@@ -99,7 +100,7 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
   useStore(searchEverything.version());
   useEffect(() => { searchEverything.prepare(); }, []);
   useEffect(() => addListener('pointerdown', (e) => {
-    for (let n = e.target; n; n = n.parent) if (n === ref.current) return;
+    for (let n = e.target; n; n = n.parent) if (n === ref.current || (menuRef.current && n === menuRef.current)) return;
     if (!isOnBar(e.x, e.y)) onClose();
   }), []);
   useEffect(() => setSel(0), [query]);
@@ -239,8 +240,8 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
           <PowerGlyph color={t.text} bg={power ? hoverBg : footBg} size={16} />
         </View>
       </View>
-      {ctx && <Menu t={t} x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} items={ctxItems} />}
-      {power && <Menu t={t} x={power.x} y={power.y} above width={220} onClose={() => setPower(null)} items={powerItems.map((it) => (it === '-' ? it : { ...it, onClick: () => { onClose(); it.onClick(); } }))} />}
+      {ctx && <Menu t={t} boxRef={menuRef} x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} items={ctxItems} />}
+      {power && <Menu t={t} boxRef={menuRef} x={power.x} y={power.y} above width={220} onClose={() => setPower(null)} items={powerItems.map((it) => (it === '-' ? it : { ...it, onClick: () => { onClose(); it.onClick(); } }))} />}
     </View>
   );
 }
