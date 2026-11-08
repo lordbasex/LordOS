@@ -68,7 +68,9 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
         ? <Text style={{ fontSize: iconSize || (small ? 13 : 15), color: fg, textAlign: 'center' }}>{icon}</Text>
         : icon /* an element: a drawn glyph */}
       {label ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
-      {tip && title ? <TooltipBubble text={title} end={nearEnd(winId, ref.current)} top={h + 6} /> : null}
+      {/* in the tooltip layer (sdk/layers.js): zIndex only orders siblings, so a bubble drawn in place went
+          under whatever the window draws after the toolbar (the picture in Photos, issue #72) */}
+      {tip && title ? <Overlay anchor={ref} layer="tooltip"><TooltipBubble text={title} end={nearEnd(winId, ref.current)} top={h + 6} /></Overlay> : null}
     </View>
   );
 }
