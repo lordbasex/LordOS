@@ -25,7 +25,7 @@ const MENU_H = 28;
 // The defaults: Files first and the app launcher after it; the Trash is always last (sdk/dockmodel.js).
 const DOCK_ORDER = ['files', DOCK_LAUNCHER, 'terminal', 'calculator', 'settings', 'about'];
 
-// Area for windows: below the menu bar and without the Dock's side (unless it auto-hides),
+// Area for windows: below the menu bar and without the Dock's side (unless it hides, always or only under windows),
 // so maximized and new windows don't end up under the Dock.
 // Several displays (docs/DISPLAYS.md): the menu bar and the Dock go on the main one; the menu bar
 // also on the others with Settings → Displays → "Show menu bar on all displays".
@@ -185,7 +185,7 @@ function App() {
           onContext={(id, at) => byId.has(id) && setDockCtx({ entry: byId.get(id), at })}
           onTrash={openTrash} onTrashContext={(at) => setTrashCtx(at)} trashFull={trash.full}
           position={dp.dockPosition} size={dp.dockSize} magnify={dp.dockMagnify} maxSize={dp.dockMagnifySize}
-          autohide={dp.dockAutohide} top={MENU_H} keepOpen={!!dockCtx || !!trashCtx} area={main} />
+          hideMode={dp.dockHide} top={MENU_H} keepOpen={!!dockCtx || !!trashCtx} area={main} />
         </Layer>
         {dockCtx && <DockMenu pos={dp.dockPosition} at={dockCtx.at} onClose={() => setDockCtx(null)} items={dockMenu(byId.get(dockCtx.entry.id) || dockCtx.entry)} />}
         {trashCtx && <DockMenu pos={dp.dockPosition} at={trashCtx} onClose={() => setTrashCtx(null)} items={trashMenu({ onEmpty: () => setAskEmpty(true) })} />}

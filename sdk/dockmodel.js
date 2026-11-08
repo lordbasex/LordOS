@@ -9,6 +9,7 @@
 //
 // Positions passed to moveItem/pinItem count only the items the Dock shows (isShown): an
 // uninstalled app keeps its place in settings.json, hidden, and comes back if it is reinstalled.
+import { onDesktop } from './desktopmodel.js';
 
 //   "shell:launcher" the theme's app launcher (the only "shell" item): it moves like an app
 export const DOCK_KINDS = ['app', 'lpk', 'desktop', 'shell'];
@@ -142,4 +143,37 @@ export function cleanActions(list, max = 40) {
     if (out.length >= max) break;
   }
   return out;
+}
+
+// ---- Hiding (Settings → Desktop & Dock; issue #46) ----
+// Three modes, stored as two booleans so that a settings file read by an older LordOS still means
+// something close (it doesn't know dockIntellihide: the Dock just hides, as with 'always'):
+//   'never'    dockAutohide false                        the Dock stays; windows don't go under it
+//   'overlap'  dockAutohide true, dockIntellihide true   it hides only while a window covers its place
+//   'always'   dockAutohide true, dockIntellihide false  it hides until the pointer touches the edge
+// Both hiding modes give windows the whole display (the theme's work area), and in both the pointer
+// at the edge brings the Dock back. dockIntellihide is kept when 'never' is chosen, so the Dock's
+// keyboard shortcut (which flips dockAutohide) goes back to the mode the person picked.
+export const DOCK_HIDE_MODES = ['never', 'overlap', 'always'];
+export const dockHideMode = (p) => (!p || p.dockAutohide !== true ? 'never' : p.dockIntellihide === true ? 'overlap' : 'always');
+export function dockHideSettings(mode) {
+  if (mode === 'overlap') return { dockAutohide: true, dockIntellihide: true };
+  if (mode === 'always') return { dockAutohide: true, dockIntellihide: false };
+  return { dockAutohide: false };
+}
+
+// Does a window cover the Dock's place? rect: where the Dock is when shown, { x0, y0, x1, y1 } in
+// global coordinates (on its own display, so windows on other displays never touch it). list: every
+// window, bottom to top; active: the desktop in view. Only what is seen counts: not minimized, on this
+// desktop, and not picture-in-picture (small, floating over everything, and it can be moved aside).
+// frameOf(w) → { x, y, w, h }: where the window is drawn (a maximized one fills its work area: wm.frame).
+// displayOf(w) → { x, y, w, h }: the display of a fullscreen window, which covers all of it.
+const meets = (f, r) => !!f && f.w > 0 && f.h > 0 && f.x < r.x1 && r.x0 < f.x + f.w && f.y < r.y1 && r.y0 < f.y + f.h;
+export function dockCovered(list, active, rect, { frameOf = (w) => w, displayOf = () => null } = {}) {
+  if (!rect || !Array.isArray(list) || !(rect.x1 > rect.x0 && rect.y1 > rect.y0)) return false;
+  for (const w of list) {
+    if (!w || w.minimized || w.pip || !onDesktop(w, active)) continue;
+    if (meets(w.fullscreen ? displayOf(w) : frameOf(w), rect)) return true;
+  }
+  return false;
 }

@@ -25,17 +25,17 @@ import { createStore, useStore } from './store.js';
 import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
 import { pickWindow } from './desktopmodel.js';
 import { desktopSuffix } from './desktops.js';
-import { screen, onScreenChange } from '@lordos/runtime';
+import { screen, onScreenChange, displayFor } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
 import { restoredIds } from './sessionrestore.jsx';
 import * as fs from './fs.js';
 import {
   parseDockId, toTypedId, normalizePinned, ensureItems, moveItem, pinItem, unpinItem, isLocked, isMovable, cleanActions,
-  LAUNCHER, LOCKED, FIRST,
+  LAUNCHER, LOCKED, FIRST, dockHideMode, dockHideSettings, dockCovered, DOCK_HIDE_MODES,
 } from './dockmodel.js';
 
-export { LAUNCHER as DOCK_LAUNCHER };
+export { LAUNCHER as DOCK_LAUNCHER, dockHideSettings, DOCK_HIDE_MODES };
 
 const menuProviders = new Map();
 export function registerDockMenu(appId, fn) { menuProviders.set(appId, fn); return () => menuProviders.delete(appId); }
@@ -112,7 +112,8 @@ export const DOCK_DEFAULTS = {
   dockMagnify: true,          // magnification
   dockMagnifySize: 86,        // px of the largest icon when magnified (more than dockSize)
   dockAutohide: false,        // hides and comes back when the edge is touched
-  dockRecents: false,         // shows the most recently used apps that aren't pinned
+  dockIntellihide: false,     // with dockAutohide: hides only while a window covers it (dockmodel.js, #46)
+  dockRecents: false,        // shows the most recently used apps that aren't pinned
   taskbarPosition: 'bottom',  // 'bottom' | 'top' | 'left' | 'right' (Classic theme)
 };
 export function dockPrefs(s = settings.get()) {
@@ -122,7 +123,18 @@ export function dockPrefs(s = settings.get()) {
   if (!['bottom', 'top', 'left', 'right'].includes(p.taskbarPosition)) p.taskbarPosition = 'bottom';
   p.dockSize = Math.max(36, Math.min(80, Math.round(+p.dockSize) || 54));
   p.dockMagnifySize = Math.max(p.dockSize, Math.min(128, Math.round(+p.dockMagnifySize) || 86));
+  p.dockAutohide = p.dockAutohide === true;
+  p.dockIntellihide = p.dockIntellihide === true;
+  p.dockHide = dockHideMode(p);   // 'never' | 'overlap' | 'always'
   return p;
+}
+
+// Does a window on the showing desktop cover rect ({ x0, y0, x1, y1 }: where the Dock is when shown)?
+// Redraws the caller when windows open, close, move or change desktop. Off: always false, no work.
+export function useDockCovered(rect, on = true) {
+  const list = useStore(windows);
+  const active = useStore(activeDesktop);
+  return on && dockCovered(list, active, rect, { frameOf: wm.frame, displayOf: (w) => displayFor(w) });
 }
 
 // Recently used apps (for «Show recent apps»): each app that opens a window moves to the front.

@@ -1,5 +1,5 @@
 // dock_model_test.mjs — the Dock's pinned-list model (sdk/dockmodel.js): typed ids, migration of
-// untyped lists, move/pin/unpin edge cases, hidden (uninstalled) items and quick actions.
+// untyped lists, move/pin/unpin edge cases, hidden (uninstalled) items, quick actions and hiding (#46).
 //
 //   node tests/dock_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
 import path from 'node:path';
@@ -124,6 +124,53 @@ eq('actions drop malformed', cleanActions([
 ]), [{ id: 'good', label: 'x', args: {}, new: true }]);
 eq('actions not a list', cleanActions({ id: 'x' }), []);
 eq('actions max', cleanActions(Array.from({ length: 60 }, (_, i) => ({ id: `a${i}`, label: 'x' }))).length, 40);
+
+// ---- hiding: the three modes and "a window covers the Dock" (issue #46) ----
+const { dockHideMode, dockHideSettings, dockCovered, DOCK_HIDE_MODES } = M;
+eq('hide: defaults never', dockHideMode({}), 'never');
+eq('hide: autohide off → never (intellihide kept)', dockHideMode({ dockAutohide: false, dockIntellihide: true }), 'never');
+eq('hide: autohide → always', dockHideMode({ dockAutohide: true }), 'always');
+eq('hide: autohide + intellihide → overlap', dockHideMode({ dockAutohide: true, dockIntellihide: true }), 'overlap');
+eq('hide: junk is never', dockHideMode({ dockAutohide: 'yes', dockIntellihide: 1 }), 'never');
+eq('hide: no prefs', dockHideMode(null), 'never');
+for (const m of DOCK_HIDE_MODES) eq(`hide: ${m} round trip`, dockHideMode({ dockIntellihide: true, ...dockHideSettings(m) }), m);
+eq('hide: never keeps the chosen hiding mode for the shortcut', dockHideSettings('never'), { dockAutohide: false });
+eq('hide: unknown mode → never', dockHideSettings('sometimes'), { dockAutohide: false });
+
+// a bottom Dock on a 1920×1080 main display at 0,0 (and a second display to its right)
+const R = { x0: 700, x1: 1220, y0: 1000, y1: 1080 };
+const win = (o) => ({ id: 'w', x: 100, y: 100, w: 800, h: 600, minimized: false, ...o });
+eq('cover: nothing open', dockCovered([], 1, R), false);
+eq('cover: a window well above', dockCovered([win()], 1, R), false);
+eq('cover: a window reaching into it', dockCovered([win({ y: 500 })], 1, R), true);
+eq('cover: touching its top edge only', dockCovered([win({ y: 400, h: 600 })], 1, R), false);
+eq('cover: one pixel into it', dockCovered([win({ y: 401, h: 600 })], 1, R), true);
+eq('cover: beside it, same height', dockCovered([win({ x: 0, w: 700, y: 900 })], 1, R), false);
+eq('cover: minimized does not count', dockCovered([win({ y: 500, minimized: true })], 1, R), false);
+eq('cover: another desktop does not count', dockCovered([win({ y: 500, desktop: 2 })], 1, R), false);
+eq('cover: on the desktop in view', dockCovered([win({ y: 500, desktop: 2 })], 2, R), true);
+eq('cover: no desktop = the first', dockCovered([win({ y: 500 })], 1, R), true);
+eq('cover: picture-in-picture does not count', dockCovered([win({ y: 500, pip: { x: 800, y: 950, w: 320, h: 180 } })], 1, R), false);
+eq('cover: a window on the second display', dockCovered([win({ x: 1920, y: 500 })], 1, R), false);
+// a maximized window is drawn over its work area (frameOf), not at its stored place
+const frameOf = (w) => (w.maximized ? { x: 0, y: 28, w: 1920, h: 1052 } : w);
+eq('cover: maximized fills the work area', dockCovered([win({ maximized: true })], 1, R, { frameOf }), true);
+// fullscreen covers its display (displayOf), whatever its stored place
+const displayOf = (w) => (w.x >= 1920 ? { x: 1920, y: 0, w: 1920, h: 1080 } : { x: 0, y: 0, w: 1920, h: 1080 });
+eq('cover: fullscreen on the Dock\'s display', dockCovered([win({ fullscreen: true })], 1, R, { displayOf }), true);
+eq('cover: fullscreen on the other display', dockCovered([win({ x: 2000, fullscreen: true })], 1, R, { displayOf }), false);
+eq('cover: fullscreen with no display known', dockCovered([win({ fullscreen: true })], 1, R), false);
+eq('cover: any window of several', dockCovered([win(), win({ id: 'v', x: 1000, y: 900, w: 300, h: 300 })], 1, R), true);
+// a Linux (Wayland or X11) window is a window like any other: its frame is in the list
+eq('cover: a Linux window', dockCovered([win({ id: 'linux#3', args: { surface: 7 }, y: 700 })], 1, R), true);
+// left Dock
+const LR = { x0: 0, x1: 80, y0: 200, y1: 880 };
+eq('cover: left Dock, window at the left edge', dockCovered([win({ x: 0 })], 1, LR), true);
+eq('cover: left Dock, window right of it', dockCovered([win({ x: 80 })], 1, LR), false);
+eq('cover: no rect', dockCovered([win({ y: 500 })], 1, null), false);
+eq('cover: empty rect', dockCovered([win({ y: 500 })], 1, { x0: 5, x1: 5, y0: 0, y1: 10 }), false);
+eq('cover: zero-size window', dockCovered([win({ y: 1010, w: 0 })], 1, R), false);
+eq('cover: junk entries', dockCovered([null, 3, win({ y: 500 })], 1, R), true);
 
 console.log(bad ? `dock-model: ${bad} of ${n} failed` : `dock-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

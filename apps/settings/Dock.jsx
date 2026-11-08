@@ -1,12 +1,12 @@
-// Settings → Desktop & Dock: Dock position (bottom, left, right), size, magnification, auto-hide
-// and recent apps; in the Classic theme, the taskbar position. Saved in
-// settings.json (sdk/dock.js: DOCK_DEFAULTS) and the theme applies it live, including the work area.
-// «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
+// Settings → Desktop & Dock: Dock position (bottom, left, right), size, magnification, hiding (never,
+// only while a window covers it, always: issue #46) and recent apps; in the Classic theme, the taskbar
+// position. Saved in settings.json (sdk/dock.js: DOCK_DEFAULTS) and the theme applies it live, including
+// the work area. «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
 // Menu Bar (Taskbar in Lord Classic) and Control Center: what the bar and the panel show (issue #58,
 // sdk/menubarmodel.js); everything is on until the user turns it off.
 import {
-  View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dock, themes, spacing, typeScale,
-  menuBarPrefs, menuBarPatch, cleanerItemShown, getApp,
+  View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, dock, themes,
+  spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp,
 } from '@lordos/sdk';
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
@@ -170,8 +170,9 @@ export function DockSettings() {
         )}
       </Section>
       <Section>
-        <SettingRow label={tr('settings.dock.autohide')} hint={tr('settings.dock.autohideHint')}>
-          <Toggle small on={p.dockAutohide} onChange={(dockAutohide) => set({ dockAutohide })} />
+        <SettingRow label={tr('settings.dock.autohide')} hint={tr(`settings.dock.hideHint.${p.dockHide}`)}>
+          <Segmented small appearance="neutral" value={p.dockHide} onChange={(mode) => set(dockHideSettings(mode))}
+            options={DOCK_HIDE_MODES.map((m) => [m, tr(`settings.dock.hide.${m}`)])} />
         </SettingRow>
         <SettingRow label={tr('settings.dock.recents')} hint={tr('settings.dock.recentsHint')}>
           <Toggle small on={p.dockRecents} onChange={(dockRecents) => set({ dockRecents })} />

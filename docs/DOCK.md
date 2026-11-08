@@ -4,7 +4,7 @@ In **Settings → Desktop & Dock** you choose:
 
 - where the Dock goes (bottom, left or right);
 - its size, magnification and how much it magnifies;
-- whether it hides automatically;
+- whether it hides: never, only while a window covers it, or always (0.8.8.6, issue #46);
 - whether it shows recent apps;
 - **Reset Dock to defaults** (the theme's apps, after a confirmation in the page).
 
@@ -33,7 +33,8 @@ Everything is applied live, without restarting, and is saved in
 | `dockSize` | 36–80 (px per icon) | 54 |
 | `dockMagnify` | `true`/`false` | `true` |
 | `dockMagnifySize` | from the size up to 128 (px of the largest icon) | 86 |
-| `dockAutohide` | `true`/`false` | `false` |
+| `dockAutohide` | `true`/`false`: the Dock hides | `false` |
+| `dockIntellihide` | `true`/`false`: with `dockAutohide`, it hides only while a window covers it (0.8.8.6) | `false` |
 | `dockRecents` | `true`/`false`: the last 3 used apps that are not pinned, after a separator line | `false` |
 | `taskbarPosition` | `bottom`, `top`, `left`, `right` (Lord Classic theme) | `bottom` |
 | `taskbarAlign` | `center`, `start`: where the taskbar's buttons go when it is at the bottom or top (Lord Classic theme, 0.8.3) | `center` |
@@ -200,7 +201,7 @@ Each theme calls `configureWindows({ apps, workArea })` again when the position,
 - maximized and new windows don't end up underneath it;
 - notifications (`NotificationBanner`) adjust on their own.
 
-With "auto-hide" the area is the whole screen minus the menu bar. Windows that were
+With "auto-hide" (either hiding mode) the area is the whole screen minus the menu bar. Windows that were
 already open don't move.
 
 If there are many apps, the icons shrink so the Dock fits on the screen, counting how much it grows
@@ -218,6 +219,22 @@ The Dock is not drawn while it is hidden. A pointer listener (`useAutohide` in
 The state only changes when crossing those limits. Moving the mouse over the rest of the screen
 doesn't redraw anything, and the animation redraws only the Dock, not the desktop. Magnification
 already worked this way: its state belongs to the Dock component.
+
+### Only when a window covers it (0.8.8.6, issue #46)
+
+Settings → Desktop & Dock → **Hide the Dock** has three choices: **Never**, **When covered** and
+**Always**. They are stored as two booleans (`dockAutohide`, `dockIntellihide`; `dockHideMode()` and
+`dockHideSettings()` in `sdk/dockmodel.js`), so an older LordOS reading the file just hides the Dock,
+and ❖⌥D (which flips `dockAutohide`) goes back to the mode that was chosen.
+
+With **When covered** the Dock stays in view while no window is where it rests and slides away 300 ms
+after one gets there. `dockCovered()` (`sdk/dockmodel.js`, tested in `server/tests/dock_model_test.mjs`)
+decides it from the window list: windows on the desktop in view, not minimized, not picture-in-picture,
+with the frame they are drawn at (`wm.frame`: a maximized window fills its work area), and a fullscreen
+window covering its whole display. LordOS apps and Linux windows (Wayland and X11) are in the same list.
+The Dock is only on the main display, so a window on another display never covers it. The pointer at
+the edge still brings it over the windows, and it goes again 500 ms after the pointer leaves. A window
+moved by the mouse is moved by lord-server with no JS per frame, so the Dock answers when it is dropped.
 
 ## Above and below
 
@@ -245,7 +262,7 @@ Settings says so below "Position on screen".
 
 - A genie minimize effect: the Lord Flow theme's is a scale towards the Dock (`useMinimizing` in
   `themes/default/index.jsx`, `transform: scale` from a cached raster; `DESIGN.md`).
-- Auto-hide for the Lord Classic theme's bar.
+- Auto-hide (and hiding only when covered) for the Lord Classic theme's bar.
 - Dragging the Dock to another edge with the mouse (⇧ on the separator).
 - Quick actions for `.lpk` apps (they would need to reach the isolated process through the broker).
 - Ejecting a drive by dropping it on the Trash (Files has no draggable drive items yet).
