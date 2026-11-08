@@ -500,7 +500,7 @@ function connect() {
   helloSeen = false;
   ws = new WebSocket(`wss://${location.host}/ws?w=${w}&h=${h}&v=1`);
   ws.binaryType = 'arraybuffer';
-  ws.onopen = () => { rd.wsOpens++; sendSize(); measureHz(); };     // an existing session takes this size
+  ws.onopen = () => { rd.wsOpens++; held.clear(); sendSize(); measureHz(); };   // the old connection's keys were released when it went     // an existing session takes this size
   ws.onmessage = (e) => (typeof e.data === 'string' ? onText(JSON.parse(e.data)) : onBin(new Uint8Array(e.data)));
   ws.onclose = () => {
     ws = null;
@@ -623,7 +623,7 @@ cv.addEventListener('pointermove', (e) => {
   pend = [mx, my];
 });
 cv.addEventListener('pointerdown', (e) => {
-  cv.focus(); cv.setPointerCapture(e.pointerId);
+  cv.focus(); cv.setPointerCapture(e.pointerId); syncMods(e);
   pend = pos(e); flushMove();
   if (e.button <= 2) sendIn({ t: 'b', b: e.button, d: 1 });
   e.preventDefault();
@@ -661,18 +661,43 @@ cv.addEventListener('gesturestart', (e) => e.preventDefault());
 cv.addEventListener('gesturechange', (e) => { e.preventDefault(); pinch(e.scale, e.rotation || 0); });
 cv.addEventListener('gestureend', (e) => e.preventDefault());
 
+// Each key goes down once and up once (#44): a held key's repeats go as d 2, never as new presses, and
+// what this page holds is released when it can no longer see the keys (focus lost, page hidden).
+function releaseAll() { for (const c of held) sendIn({ t: 'k', c, d: 0 }); held.clear(); }
+// A modifier whose flag says it is up was released where this page couldn't see it (Win+L, Alt+Tab, a
+// shortcut the system kept): it goes up in the session too. AltRight is AltGr in many layouts, which
+// browsers report as AltGraph rather than altKey.
+const MODS = [[[29, 97], (e) => e.ctrlKey], [[42, 54], (e) => e.shiftKey], [[56], (e) => e.altKey],
+  [[100], (e) => e.altKey || e.getModifierState('AltGraph')], [[125, 126], (e) => e.metaKey || e.getModifierState('OS')]];
+const MOD_CODES = new Set(MODS.flatMap(([codes]) => codes));
+function up(c) { held.delete(c); sendIn({ t: 'k', c, d: 0 }); }
+function syncMods(e) {
+  for (const [codes, on] of MODS) {
+    if (on(e)) continue;
+    for (const c of codes) {
+      if (!held.has(c)) continue;
+      up(c);
+      // macOS sends no keyup for a key pressed with ⌘: when ⌘ goes up, so do they (the modifiers stay)
+      if (c === 125 || c === 126) for (const k of held) if (!MOD_CODES.has(k)) up(k);
+    }
+  }
+}
 function key(e, down) {
+  syncMods(e);
   const c = K[e.code];
   if (!c) return;
   // Ctrl+V: let the browser fire "paste" (the local clipboard goes first)
   if (down && e.code === 'KeyV' && (e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
+  if (!held.has(c) && (!down || e.repeat)) return;     // a release or repeat of what this page never sent down
   if (down) held.add(c); else held.delete(c);
-  sendIn({ t: 'k', c, d: down ? 1 : 0 });
+  sendIn({ t: 'k', c, d: down ? (e.repeat ? 2 : 1) : 0 });
 }
 cv.addEventListener('keydown', (e) => key(e, true));
 cv.addEventListener('keyup', (e) => key(e, false));
-cv.addEventListener('blur', () => { for (const c of held) sendIn({ t: 'k', c, d: 0 }); held.clear(); });
+cv.addEventListener('blur', releaseAll);
+addEventListener('blur', releaseAll);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
 document.addEventListener('paste', (e) => {
   const text = e.clipboardData && e.clipboardData.getData('text/plain');
   if (text && text !== lastSent) { sendIn({ t: 'clip', text }); lastSent = text; }

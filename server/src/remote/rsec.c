@@ -565,10 +565,11 @@ int rs_browser_input(const RsJson *j, int W, int H, RsInput *in) {
         return in->type = RS_IN_PINCH;
     }
     if (!strcmp(t, "k")) {
-        /* keyboard keys only (KEY_ESC .. KEY_MICMUTE): no BTN_* codes */
+        /* keyboard keys only (KEY_ESC .. KEY_MICMUTE): no BTN_* codes. d: 0 released, 1 pressed, 2 the
+         * browser's repeat of a key held down (KeyboardEvent.repeat), which must not count as a new press */
         if (rs_json_num(j, "c", &a) || rs_json_num(j, "d", &b) || a < 1 || a > 248) return RS_IN_NONE;
         in->a = (int)a;
-        in->b = b != 0;
+        in->b = b == 2 ? 2 : b != 0;
         return in->type = RS_IN_KEY;
     }
     if (!strcmp(t, "resize")) {

@@ -102,6 +102,32 @@ static void test_utf8(void) {
     CHECK(sw_utf8_next("\xf0\x9f\x91\x91", 4, &cp) == 4 && cp == 0x1f451);
 }
 
+/* #44: Windows browsers repeat a held Ctrl as more keydowns; xkbcommon counts presses, so each one passed on
+ * as a press left Ctrl on after the single release. Each key must reach the session down once and up once. */
+static void test_held(void) {
+    SwHeld h;
+    memset(&h, 0, sizeof h);
+    CHECK(sw_held_key(&h, 29, 1) == 1 && sw_held_down(&h, 29));
+    CHECK(sw_held_key(&h, 29, 1) == 2);             /* Ctrl's autorepeat sent as "pressed": a repeat */
+    CHECK(sw_held_key(&h, 29, 1) == 2);
+    CHECK(sw_held_key(&h, 29, 2) == 2);             /* sent as a repeat: one too */
+    CHECK(sw_held_key(&h, 30, 1) == 1);             /* Ctrl+A */
+    CHECK(sw_held_key(&h, 30, 0) == 0 && !sw_held_down(&h, 30));
+    CHECK(sw_held_key(&h, 29, 0) == 0 && !sw_held_down(&h, 29));   /* one release and Ctrl is up */
+    CHECK(sw_held_key(&h, 29, 0) == -1);            /* a release of what isn't down: dropped */
+    CHECK(sw_held_key(&h, 18, 2) == -1);            /* a repeat of what was never pressed here: dropped */
+    CHECK(!sw_held_down(&h, 18));
+    CHECK(sw_held_key(&h, 0, 1) == -1 && sw_held_key(&h, SW_KEY_CODES, 1) == -1 && sw_held_key(&h, -5, 1) == -1);
+    CHECK(sw_held_key(&h, 30, 3) == -1 && sw_held_key(&h, 30, -1) == -1 && !sw_held_down(&h, 30));
+    CHECK(sw_held_key(&h, SW_KEY_CODES - 1, 1) == 1 && sw_held_down(&h, SW_KEY_CODES - 1));
+    CHECK(!sw_held_down(&h, 0) && !sw_held_down(&h, SW_KEY_CODES) && !sw_held_down(&h, -1));
+    /* what a client still holds when it goes is listed for release */
+    sw_held_key(&h, 42, 1);
+    int n = 0;
+    for (int i = 1; i < SW_KEY_CODES; i++) n += sw_held_down(&h, i);
+    CHECK(n == 2);
+}
+
 static void test_limits(void) {
     SwBucket b = { 0 };
     int n = 0;
@@ -256,6 +282,7 @@ int main(void) {
     test_framing();
     test_messages();
     test_utf8();
+    test_held();
     test_limits();
     test_grants();
     printf("share-test: %d checks, %d failed\n", checks, fails);

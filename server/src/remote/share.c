@@ -64,7 +64,7 @@ typedef struct {
     double since;
     SwKeyLimit keys;
     SwBucket b_ptr, b_key, b_other;
-    unsigned char held[0x300 / 8];
+    SwHeld held;
     int buttons;
     long frames, dropped;
 } Conn;
@@ -201,9 +201,9 @@ static int identify(Conn *c) {
 /* ---- the end of a share ---- */
 
 static void release_input(Conn *c) {
-    for (int i = 0; i < (int)sizeof c->held * 8; i++)
-        if (c->held[i / 8] & (1u << (i % 8))) h.key(i, 0);
-    memset(c->held, 0, sizeof c->held);
+    for (int i = 1; i < SW_KEY_CODES; i++)
+        if (sw_held_down(&c->held, i)) h.key(i, 0);
+    memset(&c->held, 0, sizeof c->held);
     for (int b = 0; b < 3; b++) if (c->buttons & (1 << b)) h.button(b, 0);
     c->buttons = 0;
     if (h.no_taps) h.no_taps();
@@ -360,13 +360,11 @@ static void input(Conn *c, const SwMsg *m) {
         else h.scroll(m->phase, m->dx / 256.0, m->dy / 256.0);
         break;
     case RP_KEY: {
-        int on = (c->held[m->code / 8] >> (m->code % 8)) & 1;
+        int on = sw_held_down(&c->held, m->code);
         if (!sw_bucket_take(&c->b_key, t, KEY_RATE, KEY_RATE / 4) && (m->value || !on)) { c->dropped++; return; }
         if (m->value && (h.surface_up() || h.key_protected())) { c->dropped++; return; }
-        if (!m->value && !on) return;   /* a release of what wasn't pressed here */
-        if (m->value) c->held[m->code / 8] |= (unsigned char)(1u << (m->code % 8));
-        else c->held[m->code / 8] &= (unsigned char)~(1u << (m->code % 8));
-        h.key(m->code, m->value);
+        int v = sw_held_key(&c->held, m->code, m->value);  /* a release or repeat of what wasn't pressed here: -1 */
+        if (v >= 0) h.key(m->code, v);
         break;
     }
     case SHARE_TEXT:

@@ -186,7 +186,14 @@ Text (JSON):
     trackpad pinch (and also a mouse's Ctrl+wheel), or from `gesturechange` in WebKit browsers;
   - the bridge passes them to the session as `RP_SCROLL` and `RP_PINCH`, with clamped values;
 - `k{c,d}`, with evdev codes derived from `KeyboardEvent.code`, so the session applies the
-  layout;
+  layout. `d` is 0 released, 1 pressed, 2 a repeat (`KeyboardEvent.repeat`). Each key goes down
+  once and up once: lord-server keeps the keys each viewer holds (`sw_held_key`), turns a second
+  press into a repeat, drops a release of a key it never saw go down, and releases what is still held
+  when the viewer goes. xkbcommon counts presses of a modifier, so before this a Ctrl held on
+  Windows (whose browsers repeat a held Ctrl) stayed on after its release, even after the browser
+  closed (#44). The page also releases what it holds when it loses the focus or is hidden, and
+  releases a modifier whose flag (`ctrlKey`, `shiftKey`, `altKey`, `metaKey`) a later key or click
+  shows is up, for when the system ate the release (Win+L, Alt+Tab);
 - `clip{text}`;
 - `resize{w,h}`: on connecting and when the window is resized; if the session is on the monitor,
   the monitor wins;

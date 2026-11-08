@@ -67,6 +67,17 @@ int sw_utf8_valid(const char *s, size_t n);
 /* The next code point of valid text: returns its length in bytes (s[0..n) must be valid). */
 int sw_utf8_next(const char *s, size_t n, uint32_t *cp);
 
+/* The keys one remote client holds down (RP_KEY codes 1..0x2fe), so that each key goes down once and up once
+ * whatever the client sends. xkbcommon counts the presses of a modifier: a second "pressed" without a release
+ * (Windows repeats a held Ctrl in the browser) would leave Ctrl on after the only release (#44).
+ * sw_held_key() takes the client's value (0 released, 1 pressed, 2 repeat) and returns what the session gets:
+ * a press of a key already down becomes a repeat; -1 drops a repeat or a release of a key not pressed here.
+ * Everything still held is released (value 0) when the client goes. */
+#define SW_KEY_CODES 0x300
+typedef struct { uint8_t bit[SW_KEY_CODES / 8]; } SwHeld;
+int sw_held_key(SwHeld *h, int code, int value);
+int sw_held_down(const SwHeld *h, int code);     /* 1 if `code` is down */
+
 /* A rate limit: `rate` events a second, `burst` at once. */
 typedef struct { double tokens, at; } SwBucket;
 int sw_bucket_take(SwBucket *b, double now_ms, double rate, double burst);  /* 1 if the event may go */

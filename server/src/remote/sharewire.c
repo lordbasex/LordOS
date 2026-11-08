@@ -150,6 +150,20 @@ int sw_parse(const SwFrame *f, SwMsg *m) {
     }
 }
 
+int sw_held_down(const SwHeld *h, int code) {
+    return code > 0 && code < SW_KEY_CODES && (h->bit[code / 8] >> (code % 8)) & 1;
+}
+
+int sw_held_key(SwHeld *h, int code, int value) {
+    if (code <= 0 || code >= SW_KEY_CODES || value < 0 || value > 2) return -1;
+    int on = sw_held_down(h, code);
+    if (value == 1 && on) return 2;
+    if (!on && value != 1) return -1;
+    if (value == 1) h->bit[code / 8] |= (uint8_t)(1u << (code % 8));
+    else if (value == 0) h->bit[code / 8] &= (uint8_t)~(1u << (code % 8));
+    return value;
+}
+
 int sw_bucket_take(SwBucket *b, double now, double rate, double burst) {
     if (b->at <= 0) { b->at = now; b->tokens = burst; }
     double t = b->tokens + (now - b->at) * rate / 1000.0;

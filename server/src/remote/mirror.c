@@ -17,6 +17,7 @@
 #include "mirror.h"
 #include "proto.h"
 #include "share.h"
+#include "sharewire.h"
 #include "../vault/vclient.h"
 #include "../media/mstream.h"
 #include "../par.h"
@@ -57,6 +58,7 @@ typedef struct {
     int vinfo_sent;                 /* RP_VINFO went to it at least once */
     int vmode;                      /* the video plays: lossless tiles once still, damage right away */
     int busy;                       /* turned away: the session is shared through the API (RP_BUSY) */
+    SwHeld held;                    /* the keys this viewer holds down (RP_KEY), released when it goes */
 } Client;
 
 static int lfd = -1;
@@ -167,8 +169,16 @@ static void close_fds(Client *c) {
     c->nfds = 0;
 }
 
+/* What a viewer still holds is released when it goes (the browser closed or the network dropped). */
+static void release_keys(Client *c) {
+    for (int i = 1; i < SW_KEY_CODES; i++)
+        if (sw_held_down(&c->held, i) && cb.key) cb.key(i, 0);
+    memset(&c->held, 0, sizeof c->held);
+}
+
 static void drop(Client *c) {
     int had = c->who[0] != 0;
+    release_keys(c);
     /* lord-sessiond went away from the monitor's session: nobody vouches for who is at the screen */
     if (c->seat) share_session(SHARE_S_LEFT);
     close_fds(c);
@@ -276,7 +286,9 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         if (n >= 3 && cb.key) {
             uint16_t code;
             memcpy(&code, d, 2);
-            if (code > 0 && code < 0x2ff) cb.key(code, d[2] > 2 ? 1 : d[2]);
+            /* each key down once and up once, whatever the browser sends (sharewire.h, #44) */
+            int v = code < 0x2ff ? sw_held_key(&c->held, code, d[2] > 2 ? 1 : d[2]) : -1;
+            if (v >= 0) cb.key(code, v);
         }
         break;
     case RP_SETCLIP: if (cb.clipboard && n <= (1u << 20)) cb.clipboard((const char *)d, n); break;

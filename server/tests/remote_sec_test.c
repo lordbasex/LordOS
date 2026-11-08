@@ -272,7 +272,14 @@ static void test_json(void) {
     CHECK(jin("{\"t\":\"b\",\"b\":0,\"d\":1}", 1280, 800, &in) == RS_IN_BTN && in.a == 0 && in.b == 1);
     CHECK(jin("{\"t\":\"b\",\"b\":3,\"d\":1}", 1280, 800, &in) == RS_IN_NONE);
     CHECK(jin("{\"t\":\"w\",\"d\":-500}", 1280, 800, &in) == RS_IN_WHEEL && in.a == -10);
-    CHECK(jin("{\"t\":\"k\",\"c\":30,\"d\":1}", 1280, 800, &in) == RS_IN_KEY && in.a == 30);
+    CHECK(jin("{\"t\":\"k\",\"c\":30,\"d\":1}", 1280, 800, &in) == RS_IN_KEY && in.a == 30 && in.b == 1);
+    /* d 2: the browser's repeat of a held key, kept apart from a press (#44: a repeated Ctrl counted as
+     * presses stayed on after its release); any other non-zero value is a press, 0 a release */
+    CHECK(jin("{\"t\":\"k\",\"c\":29,\"d\":2}", 1280, 800, &in) == RS_IN_KEY && in.a == 29 && in.b == 2);
+    CHECK(jin("{\"t\":\"k\",\"c\":29,\"d\":0}", 1280, 800, &in) == RS_IN_KEY && in.b == 0);
+    CHECK(jin("{\"t\":\"k\",\"c\":29,\"d\":7}", 1280, 800, &in) == RS_IN_KEY && in.b == 1);
+    CHECK(jin("{\"t\":\"k\",\"c\":29,\"d\":-2}", 1280, 800, &in) == RS_IN_KEY && in.b == 1);
+    CHECK(jin("{\"t\":\"k\",\"c\":29}", 1280, 800, &in) == RS_IN_NONE);
     CHECK(jin("{\"t\":\"k\",\"c\":272,\"d\":1}", 1280, 800, &in) == RS_IN_NONE);    /* BTN_LEFT is not a key */
     CHECK(jin("{\"t\":\"k\",\"c\":0,\"d\":1}", 1280, 800, &in) == RS_IN_NONE);
     CHECK(jin("{\"t\":\"s\",\"p\":2,\"x\":99999999,\"y\":-99999999}", 1280, 800, &in) == RS_IN_SCROLL && in.v1 == 4000 * 256 && in.v2 == -4000 * 256);

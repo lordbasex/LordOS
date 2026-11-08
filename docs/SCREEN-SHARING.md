@@ -113,7 +113,7 @@ On VM 116 (amd64, 2026-11-01), against isolated headless sessions with a test cl
   `RP_DISPLAY`, with a dummy device; every row of the one-door rule against a root connection acting as the bridge; revoking (about 600 ms);
   12 keyframe requests on a still screen gave 3 keyframes; system surfaces, with the search open; the clipboard's start; malformed messages and
   200 connections of random bytes; the socket removed at exit; no `lord-media` zombie.
-- `share-test`, 298 checks; `share-fuzz`, 200,000 iterations under ASan and UBSan; `share_model_test.mjs`. The hour of 3 s requests (122 keyframes) is
+- `share-test`, 313 checks (a key repeated as presses goes once, #44); `share-fuzz`, 200,000 iterations under ASan and UBSan; `share_model_test.mjs`. The hour of 3 s requests (122 keyframes) is
   simulated, not live.
 - `remote.sock`: a process of the same user is closed at once, root is served, and a client that connects as root and then drops to the user
   stays connected, which is the bridge's order. The real `lord-sessiond` was not run.
