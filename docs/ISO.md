@@ -189,7 +189,8 @@ text in between.
   `/boot/grub/themes/lordos/`; the package installs it in `/usr/share/grub/themes/lordos/` (on arm64
   too since 0.8.7) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português, Français,
   safe mode, copy to RAM) are the same as before; *Check this computer* joined them in 0.8.7, and the menu's height
-  went from 290 to 344 for its six lines, and to 396 for the seven since French joined them. GRUB's theme has no scrollbar and takes the padding and the selection
+  went from 290 to 344 for its six lines, to 396 for the seven since French joined them, and to 410 with 12 px between
+  lines (18 before) for the eight since *Install automatically* joined them, which keeps the menu above the key hints. GRUB's theme has no scrollbar and takes the padding and the selection
   band's edges from that height (`get_num_shown_items`), so 290 shows five lines. `tests/livestart_test.mjs` works
   the same count out from `theme.txt` and fails if an entry wouldn't show.
 - **Boot splash:** the Plymouth theme `lordos` (`tools/boot/plymouth/lordos/`, the `script`
