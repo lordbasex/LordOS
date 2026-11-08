@@ -161,6 +161,7 @@
   "keywords.wallpaper": "fondo imagen escritorio",
   "lang.hint": "Textos de la interfaz. Se aplica al instante; las ventanas y terminales abiertas se conservan.",
   "lang.pack": "paquete instalado",
+  "lang.partial": "traducción parcial",
   "lang.title": "Idioma de LordOS",
   "light": "Claro",
   "mode": "Modo",

@@ -445,7 +445,8 @@ const plan = (s) => {
   const region = s.region || (locale.get().region && locale.get().region.startsWith(`${lang}_`) ? locale.get().region : '');
   const kb = s.kb || keyboard.active() || { layout: 'us', variant: '' };
   return {
-    lang, region: region || ({ es: 'es_ES', en: 'en_US', pt: 'pt_BR', fr: 'fr_FR', it: 'it_IT' }[lang] || 'en_US'),
+    // without a choice: the language's own region (its meta.json: lt → lt_LT), not en_US
+    lang, region: region || ({ es: 'es_ES', en: 'en_US', pt: 'pt_BR', fr: 'fr_FR', it: 'it_IT' }[lang] || languages().find((l) => l.id === lang)?.region || 'en_US'),
     zone: s.zone || lord.time.zone() || 'UTC', kb,
   };
 };

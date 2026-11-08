@@ -1,0 +1,20 @@
+{
+  "bootTest": "Matuojamas paleidimo laikas: atlikta {k} iš {n} paleidimų. Kompiuteris bus paleistas iš naujo po {s} s. Prisijungus testas taip pat sustabdomas.",
+  "bootTestCancel": "Sustabdyti testą",
+  "busy": "Akimirką…",
+  "cancel": "Atšaukti",
+  "confirmRestart": "Yra atvirų seansų: neišsaugoti darbai bus prarasti. Vis tiek paleisti iš naujo?",
+  "confirmShutdown": "Yra atvirų seansų: neišsaugoti darbai bus prarasti. Vis tiek išjungti?",
+  "error": "Nepavyko atidaryti seanso.",
+  "locked": "Ekranas užrakintas",
+  "noUsers": "Naudotojų nėra",
+  "password": "Slaptažodis",
+  "restart": "Paleisti iš naujo",
+  "shutdown": "Išjungti",
+  "wait": {
+    "one": "Per daug bandymų. Palaukite {count} sekundę.",
+    "few": "Per daug bandymų. Palaukite {count} sekundes.",
+    "other": "Per daug bandymų. Palaukite {count} sekundžių."
+  },
+  "wrong": "Neteisingas slaptažodis."
+}

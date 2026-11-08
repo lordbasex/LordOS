@@ -18,6 +18,7 @@
 // and data (each language's format.json).
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
+import { fromGlibc, regionFromEnv } from './regionformat.js';
 
 export const FALLBACK = 'en';
 // The three languages LordOS lists first everywhere (Settings, the login screen, the Imager); the
@@ -42,6 +43,13 @@ const PLURALS = {
     return 'many';
   },
   'czech-slovak': (n) => (n === 1 ? 'one' : n >= 2 && n <= 4 ? 'few' : 'other'),
+  lithuanian: (n) => {                                               // lt: 1, 21 vienas; 2–9, 22 keli; 0, 10–20 kitas
+    const m10 = n % 10, m100 = n % 100;
+    if (m100 >= 11 && m100 <= 19) return 'other';
+    if (m10 === 1) return 'one';
+    if (m10 >= 2) return 'few';
+    return 'other';
+  },
   arabic: (n) => {
     const m100 = n % 100;
     if (n === 0) return 'zero';
@@ -68,14 +76,16 @@ function catalog(lang, ns) {
   return obj;
 }
 
-// Available languages: [{ id, name (in its own language), english, plural, user }]
+// Available languages: [{ id, name (in its own language), english, plural, user, partial }]. A partial
+// language (meta.json "partial": true) translates only part of LordOS; the rest is shown in the next
+// preferred language or English (docs/LANGUAGES.md).
 export function languages() {
   const out = [];
   for (const l of lord.locale.languages()) {
     let m = {};
     try { m = JSON.parse(l.meta); } catch (e) { continue; }
     metas.set(l.id, m);
-    if (!out.some((x) => x.id === l.id)) out.push({ id: l.id, name: m.name || l.id, english: m.english || '', plural: m.plural, region: m.region, user: l.user });
+    if (!out.some((x) => x.id === l.id)) out.push({ id: l.id, name: m.name || l.id, english: m.english || '', plural: m.plural, region: m.region, user: l.user, partial: m.partial === true });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -98,7 +108,15 @@ function initial() {
   return FALLBACK;
 }
 
-export const locale = createStore({ lang: initial(), region: settings.get().region || '' });
+// The region when none was chosen in Settings: the session's LANG (the user's, else the computer's), so
+// a computer set up for lt_LT shows its 24-hour clock without a visit to Settings, and so does the
+// login screen, which only has the computer's (#45).
+function envRegion() {
+  try { return regionFromEnv(lord.locale.get()); } catch (e) { return ''; }
+}
+const ENV_REGION = envRegion();
+
+export const locale = createStore({ lang: initial(), region: settings.get().region || ENV_REGION });
 
 // The server picks the CJK font according to the language (the same ideograph is drawn differently in
 // Chinese, Japanese and Korean) and, if the language is right-to-left (meta.json "direction": "rtl"),
@@ -123,8 +141,8 @@ export const textDirection = (s) => { try { return lord.text.direction(String(s 
 settings.subscribe(() => {
   const s = settings.get();
   const cur = locale.get();
-  if ((s.language && s.language !== cur.lang) || (s.region || '') !== cur.region)
-    locale.set({ lang: s.language || cur.lang, region: s.region || '' });
+  if ((s.language && s.language !== cur.lang) || (s.region || ENV_REGION) !== cur.region)
+    locale.set({ lang: s.language || cur.lang, region: s.region || ENV_REGION });
 });
 
 function lookup(lang, key) {
@@ -177,13 +195,30 @@ export const appName = (app) => (app ? (find(`apps.${app.id}`)[0] ?? app.name) :
 
 const clock24 = () => settings.get().clock?.hour24 || 'auto';
 
+// glibc's formats for a region (sdk/regionformat.js), for a region whose language has no format.json.
+// An isolated app can't read them: lord-server publishes them with the language (`rf`, sdk/privacy.js).
+const glibcCache = new Map();
+export function regionData(region) {
+  const l = locale.get();
+  if (l.rf !== undefined) return l.rf;
+  if (!region) return null;
+  if (!glibcCache.has(region)) {
+    let g = null;
+    try { g = typeof lord.locale.formats === 'function' ? fromGlibc(lord.locale.formats(region)) : null; } catch (e) { /* not generated */ }
+    glibcCache.set(region, g);
+  }
+  return glibcCache.get(region);
+}
+
 // Day and month names in the interface language; date order,
 // separators and 12/24 h clock according to the region (es_AR, pt_BR, en_US…).
 function formats() {
   const { lang, region } = locale.get();
   const names = catalog(lang, 'format') || catalog(FALLBACK, 'format') || {};
   const rlang = region ? region.split('_')[0] : lang;
-  const rbase = catalog(rlang, 'format') || names;
+  // a region in a language LordOS isn't translated into (lt_LT with English names): glibc's clock,
+  // date order and separators for it, over the interface language's
+  const rbase = catalog(rlang, 'format') || { ...names, ...(regionData(region) || {}) };
   const r = { ...rbase, ...(rbase.regions?.[region] || {}) };
   const own = rlang === lang;
   return {
@@ -272,6 +307,7 @@ export function setPreferredLanguages(list) {
 // After installing or editing a language pack.
 export function reloadCatalogs() {
   cache.clear();
+  glibcCache.clear();
   metas.clear();
   locale.set((l) => ({ ...l }));
 }

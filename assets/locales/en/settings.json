@@ -161,6 +161,7 @@
   "keywords.wallpaper": "background picture desktop",
   "lang.hint": "Interface text. Applies instantly; open windows and terminals are kept.",
   "lang.pack": "installed pack",
+  "lang.partial": "partly translated",
   "lang.title": "LordOS language",
   "light": "Light",
   "mode": "Mode",

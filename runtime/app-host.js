@@ -34,7 +34,9 @@ function applyLocale(l) {
   if (!l || !l.lang) return;
   const cur = locale.get();
   const dir = l.dir === 'rtl' || l.dir === 'ltr' ? l.dir : undefined;
-  if (cur.lang !== l.lang || (cur.region || '') !== (l.region || '') || cur.dir !== dir) locale.set({ lang: l.lang, region: l.region || '', dir });
+  const rf = l.rf && typeof l.rf === 'object' ? l.rf : null;      // the region's glibc formats (sdk/i18n.js regionData)
+  if (cur.lang !== l.lang || (cur.region || '') !== (l.region || '') || cur.dir !== dir || JSON.stringify(cur.rf ?? null) !== JSON.stringify(rf))
+    locale.set({ lang: l.lang, region: l.region || '', dir, rf });
 }
 
 function applyState(st) {

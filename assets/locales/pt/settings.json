@@ -161,6 +161,7 @@
   "keywords.wallpaper": "fundo imagem área de trabalho",
   "lang.hint": "Textos da interface. Aplica-se na hora; janelas e terminais abertos são mantidos.",
   "lang.pack": "pacote instalado",
+  "lang.partial": "tradução parcial",
   "lang.title": "Idioma do LordOS",
   "light": "Claro",
   "mode": "Modo",

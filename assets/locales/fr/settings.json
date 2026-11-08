@@ -161,6 +161,7 @@
   "keywords.wallpaper": "arrière-plan image bureau fond d’écran",
   "lang.hint": "Texte de l’interface. S’applique immédiatement ; les fenêtres et terminaux ouverts sont conservés.",
   "lang.pack": "pack installé",
+  "lang.partial": "traduction partielle",
   "lang.title": "Langue de LordOS",
   "light": "Clair",
   "mode": "Mode",

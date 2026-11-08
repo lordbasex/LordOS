@@ -1,7 +1,8 @@
 # Language and region in LordOS
 
 LordOS handles language across the whole system, not just in the interface. It ships with
-**Spanish, English, Portuguese, French and Italian**, and more languages are added with packs, without touching code.
+**Spanish, English, Portuguese, French and Italian**, and **Lithuanian** as a partial translation (see
+"Partial languages"), and more languages are added with packs, without touching code.
 
 **Settings → Language & Region → Preferred languages** lists English, Español and Português by
 default. **+** adds another one (Français, Italiano, an installed pack); it goes first and becomes
@@ -106,6 +107,18 @@ Each language's `format.json` has month and day names, date patterns (`short`, `
 and the **order, separators and clock** from the region: English with region pt_BR gives
 «Thursday, October 15, 2026 · 21:56» and «15/10/2026 · 1.234.567,89».
 
+A region whose language has no `format.json` (English with `lt_LT`, `de_DE`, `pl_PL`…) takes its clock,
+numeric date order and separators from glibc's own data for that region (`LC_TIME` and `LC_NUMERIC`,
+read with `nl_langinfo_l` by `lord.locale.formats`, converted in `sdk/regionformat.js`): English with
+region `de_DE` gives «08.11.2026 · 21:05 · 1.234.567,89». Before 0.8.8.6 such a region fell back to
+the interface language's formats, so English with `lt_LT` showed a 12-hour clock (#45). It needs the
+region generated (`locale-gen`), which Settings does when the region is chosen.
+
+When no region was chosen in Settings, the region is the session's: the user's `LC_TIME` or `LANG`
+(`~/.config/locale.conf`, which the installer writes), else the computer's (`/etc/default/locale`). The
+login screen has no region of its own: it follows the computer's, so a computer installed with `lt_LT`
+shows a 24-hour clock there too. **Settings → Date & Time → Time format** can still force 12 or 24 hours.
+
 ## Language packs
 
 A language is a `<id>/` folder with `meta.json`, `format.json` and one JSON per namespace:
@@ -128,15 +141,29 @@ node tools/i18n-check.mjs lordos-lang-it.json                           # missin
 
 Then copy `lordos-lang-it.json` to your Downloads folder and use **Settings → Language & Region →
 Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slavic`, `polish`,
-`czech-slovak`, `arabic`. `node tools/i18n-pack.mjs export pt` exports an existing language in
+`czech-slovak`, `lithuanian`, `arabic`. `node tools/i18n-pack.mjs export pt` exports an existing language in
 the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt, fr and it (0.8.8.2: 9,342 keys), and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt, fr and it (0.8.8.2: 9,342 keys; 0.8.8.6: 11,075 keys, lt partial with 961, 8.7%), and 496 error codes from the server (0.8.8.6: 574). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
 `ALLOW` list.
+
+### Partial languages
+
+A language that translates only part of LordOS says so in its `meta.json` with `"partial": true`. Its
+missing texts are shown in the next preferred language or in English, Settings lists it as "partly
+translated", and `node tools/i18n-check.mjs` prints its coverage (complete namespaces and the started
+ones) instead of failing on the missing keys; its `{x}` variables must still match English.
+
+Lithuanian (`lt`, 0.8.8.6, #45) is the first: the login screen, the desktop (`shell`), Files, the
+installer, About, the app names, the file dialogs, and Settings' sections, Language & Region and the
+Date & Time formats, with Lithuanian plurals (`lithuanian`: 1, 21 → one; 2–9, 22 → few; 0, 10–20 →
+other) and `format.json` (2026-11-08, «2026 m. lapkričio 8 d., sekmadienis», 24 hours, «1 234 567,89»).
+Translating the rest is welcome: add the missing keys to `assets/locales/lt/` and drop `"partial"`
+when `i18n-check` reports it complete.
 
 ## Privileged helper (`lord-admin`)
 
@@ -402,6 +429,11 @@ translates the desktop, Settings, Files, About and the Calculator; the Terminal 
 - Translate the server's log messages (the ones that go to stderr, for developers).
 - `lord.locale.available()` marks as "generated" only what the server process already saw at
   startup; Settings corrects it on screen after generating.
+- The first day of the week is Monday in Calendar, Contacts and Reminders whatever the region (glibc's
+  `first_weekday` isn't read yet).
+- The installer lists only the regions of the chosen language (English with `lt_LT` is chosen afterwards
+  in Settings → Language & Region), and the first-run file of the Raspberry Pi image takes only en, es,
+  pt, fr and it.
 
 ## Packages in the VM (M5b)
 

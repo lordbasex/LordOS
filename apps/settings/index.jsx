@@ -614,7 +614,7 @@ function PreferredLanguages({ langs, onPrimary }) {
             marginHorizontal: -6, paddingHorizontal: 6, borderRadius: 6, backgroundColor: on ? (t.mode === 'dark' ? 'rgba(10,132,255,0.22)' : 'rgba(10,132,255,0.12)') : 'transparent' }}>
             <Text style={{ width: 130, fontSize: typeScale.body, fontWeight: i === 0 ? 600 : 400, color: t.text, textAlign: 'start' }}>{l.name}</Text>
             <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
-              {`${l.english}${l.user ? ` · ${tr('settings.lang.pack')}` : ''}`}</Text>
+              {`${l.english}${l.user ? ` · ${tr('settings.lang.pack')}` : ''}${l.partial ? ` · ${tr('settings.lang.partial')}` : ''}`}</Text>
             {i === 0 ? <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: t.accent }}>{tr('settings.lang.primary')}</Text> : null}
           </View>
         );
@@ -664,7 +664,7 @@ function AddLanguage({ langs, have, onAdd }) {
       <View style={{ height: 260, borderRadius: 8, border: `1px solid ${t.separator}`, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.15)' : '#fafafb' }}>
         <ScrollView style={{ padding: 4 }}>
           {ready.length ? head(tr('settings.lang.ready')) : null}
-          {ready.map((l) => row(l.id, l.name, l.english, l.user ? tr('settings.lang.pack') : '', () => onAdd(l.id)))}
+          {ready.map((l) => row(l.id, l.name, l.english, l.user ? tr('settings.lang.pack') : l.partial ? tr('settings.lang.partial') : '', () => onAdd(l.id)))}
           {later.length ? head(tr('settings.lang.notYet')) : null}
           {later.map(([id, name, en]) => row(id, name, en, '', () => setMissing(name)))}
           {!ready.length && !later.length ? <Text style={{ padding: 10, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('settings.lang.none')}</Text> : null}

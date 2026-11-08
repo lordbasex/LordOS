@@ -5,7 +5,9 @@
 //
 // Reports: keys used in the code (t('namespace.key')) that are not in the reference
 // catalog (en), keys each language is missing or has in excess compared to en, and
-// {x} variables that do not match. Exits with code 1 if something is missing.
+// {x} variables that do not match. Exits with code 1 if something is missing. A partial language
+// (meta.json "partial": true, docs/LANGUAGES.md) may miss keys: those fall back to English, and the
+// check prints its coverage instead of failing; its variables must still match.
 // With every language it also runs tools/err-check.mjs: error/status codes used by the server
 // without an English string, and prose (or Spanish) in ERR lines and JS exceptions, and
 // tools/brand-check.mjs: third-party brand names in the catalogs, Help, README and CHANGELOG.
@@ -23,13 +25,15 @@ function loadLang(id) {
   if (id.endsWith('.json') && fs.existsSync(id)) {
     const pack = JSON.parse(fs.readFileSync(id, 'utf8'));
     const { format, ...cats } = pack.catalogs;      // format.json is not texts
-    return { id: pack.meta.id, cats };
+    return { id: pack.meta.id, cats, partial: pack.meta.partial === true };
   }
   const cats = {};
   for (const f of fs.readdirSync(path.join(dir, id))) {
     if (f.endsWith('.json') && f !== 'meta.json' && f !== 'format.json') cats[f.slice(0, -5)] = JSON.parse(fs.readFileSync(path.join(dir, id, f), 'utf8'));
   }
-  return { id, cats };
+  let meta = {};
+  try { meta = JSON.parse(fs.readFileSync(path.join(dir, id, 'meta.json'), 'utf8')); } catch (e) { /* en */ }
+  return { id, cats, partial: meta.partial === true };
 }
 
 const flat = (cats) => Object.fromEntries(Object.entries(cats).flatMap(([ns, o]) => Object.entries(o).map(([k, v]) => [`${ns}.${k}`, v])));
@@ -62,12 +66,22 @@ for (const id of langs) {
   const missing = Object.keys(ref).filter((k) => !(k in cur));
   const extra = Object.keys(cur).filter((k) => !(k in ref));
   const varDiff = Object.keys(ref).filter((k) => k in cur && vars(ref[k]) !== vars(cur[k]));
+  const have = Object.keys(ref).length - missing.length;
   console.log(`${l.id}: ${Object.keys(cur).length}/${Object.keys(ref).length} keys` +
-    `${missing.length ? `, ${missing.length} missing` : ''}${extra.length ? `, ${extra.length} extra` : ''}${varDiff.length ? `, different variables in ${varDiff.length}` : ''}`);
-  for (const k of missing) console.log(`  missing ${k}`);
+    `${l.partial ? ` (partial: ${(100 * have / Object.keys(ref).length).toFixed(1)}%, the rest in English)` : ''}` +
+    `${missing.length && !l.partial ? `, ${missing.length} missing` : ''}${extra.length ? `, ${extra.length} extra` : ''}${varDiff.length ? `, different variables in ${varDiff.length}` : ''}`);
+  if (l.partial) {
+    // per namespace: complete ones by name, the started ones with their share
+    const byNs = {};
+    for (const k of Object.keys(ref)) { const ns = k.slice(0, k.indexOf('.')); (byNs[ns] ||= [0, 0])[1]++; if (k in cur) byNs[ns][0]++; }
+    const done = Object.keys(byNs).filter((ns) => byNs[ns][0] === byNs[ns][1]);
+    const started = Object.keys(byNs).filter((ns) => byNs[ns][0] && byNs[ns][0] < byNs[ns][1]);
+    console.log(`  complete: ${done.join(', ') || '—'}`);
+    if (started.length) console.log(`  started: ${started.map((ns) => `${ns} ${byNs[ns][0]}/${byNs[ns][1]}`).join(', ')}`);
+  } else for (const k of missing) console.log(`  missing ${k}`);
   for (const k of extra) console.log(`  extra   ${k}`);
   for (const k of varDiff) console.log(`  vars    ${k}: ${vars(ref[k])} ≠ ${vars(cur[k])}`);
-  bad += missing.length + varDiff.length;
+  bad += (l.partial ? 0 : missing.length) + varDiff.length;
 }
 if (!process.argv[2]) bad += checkErrors().problems.length + checkBrands().problems.length;
 process.exit(bad ? 1 : 0);

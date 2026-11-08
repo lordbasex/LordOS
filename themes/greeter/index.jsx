@@ -16,6 +16,7 @@ import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/ru
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, CORE_LANGUAGES, keyboard, settings, LordOSWordmark,
   lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, fs, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
+  regionOf, regionCountry,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -255,6 +256,11 @@ function Greeter() {
           const sys = String(m.lang || '').slice(0, 2);
           setLanguage(shipped.includes(sys) ? sys : 'en');
         }
+        // region: the computer's, for the clock and the date (lt_LT: 24 hours, #45). This screen has no
+        // choice of its own, so it follows /etc/default/locale even when that changes while it shows.
+        const reg = regionOf(m.lang || '');
+        const want = regionCountry(reg) ? reg : '';
+        if ((settings.get().region || '') !== want) settings.set({ region: want });
         // the selected user: the one from the locked screen, another (switch user), the last one
         // shown on the monitor, one with an open session or the first. Only when the screen is shown
         // again, and never over an avatar the person clicked: a late reply must not undo that click.

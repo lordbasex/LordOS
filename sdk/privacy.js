@@ -14,7 +14,7 @@ import { createElement as h, Fragment } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { statusPanelAt } from './statusitems.js';
-import { t, locale, direction } from './i18n.js';
+import { t, locale, direction, regionData } from './i18n.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
 import { osk } from './osk.js';
@@ -194,12 +194,13 @@ export function registerPrivacySection(section) {
   privacySections.set((list) => [...list.filter((s) => s.id !== section.id), section].sort((a, b) => (a.order || 50) - (b.order || 50)));
 }
 
-// Language, region and direction (RTL) also go live to isolated apps.
+// Language, region (with its formats) and direction (RTL) also go live to isolated apps.
 function publishLocale() {
   try {
     if (typeof lord === 'undefined' || !lord.broker || typeof lord.broker.publish !== 'function') return;
     const l = locale.get();
-    lord.broker.publish('locale', JSON.stringify({ lang: l.lang, region: l.region || '', dir: direction() }));
+    // rf: glibc's formats for the region, which the app can't read itself (sdk/i18n.js regionData)
+    lord.broker.publish('locale', JSON.stringify({ lang: l.lang, region: l.region || '', dir: direction(), rf: regionData(l.region || '') }));
   } catch (e) { /* no broker */ }
 }
 publishLocale();

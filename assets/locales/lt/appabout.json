@@ -1,0 +1,9 @@
+{
+  "isolated": "Veikia izoliuotai, atskirame procese",
+  "linux": "Linux programa",
+  "lordos": "LordOS programa",
+  "package": "Įdiegta programa (.lpk)",
+  "system": "Sistemos programa – LordOS dalis, patikrinta kartu su ja",
+  "title": "Apie {app}",
+  "version": "Versija {v}"
+}

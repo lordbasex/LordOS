@@ -199,6 +199,9 @@ EOF
     # glibc region names: what the installer and Settings send for every UTF-8 region (sdk/localename.js)
     if have node; then run "localename-test (sdk/localename.js)" node tests/localename_test.mjs
     else skip "localename-test" "node"; fi
+    # a region's clock, date order and separators from glibc, and the session's region (sdk/regionformat.js, #45)
+    if have node; then run "regionformat-test (sdk/regionformat.js)" node tests/regionformat_test.mjs
+    else skip "regionformat-test" "node"; fi
     # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)
     if have node; then run "desktop-model-test (sdk/desktopmodel.js)" node tests/desktop_model_test.mjs
     else skip "desktop-model-test" "node"; fi

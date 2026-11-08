@@ -55,6 +55,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/utsname.h>
+#include <langinfo.h>
 #include <locale.h>
 #include <time.h>
 #include <unistd.h>
@@ -657,6 +658,41 @@ static JSValue f_locale_available(JSContext *c, JSValueConst this_val, int argc,
     }
     if (f) fclose(f);
     return arr;
+}
+
+/* lord.locale.formats("lt_LT") → { dfmt, tfmt, am, pm, decimal, group } from glibc's own data for the
+ * region (LC_TIME, LC_NUMERIC), or null when that locale isn't generated. sdk/regionformat.js turns it
+ * into a format.json: the clock, date order and separators of a region whose language LordOS has no
+ * format.json for (#45). Only reads the compiled locale; no file name is built from the argument. */
+static JSValue f_locale_formats(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    const char *r = JS_ToCString(c, argv[0]);
+    JSValue o = JS_NULL;
+    if (r && r[0] && valid_locale_name(r)) {
+        char name[96];
+        locale_t l = (locale_t)0;
+        if (!strchr(r, '.')) {      /* "lt_LT" or "sr_RS@latin": the UTF-8 one first */
+            const char *at = strchr(r, '@');
+            int base = at ? (int)(at - r) : (int)strlen(r);
+            snprintf(name, sizeof name, "%.*s.UTF-8%s", base, r, at ? at : "");
+            l = newlocale(LC_TIME_MASK | LC_NUMERIC_MASK, name, (locale_t)0);
+        }
+        if (!l) l = newlocale(LC_TIME_MASK | LC_NUMERIC_MASK, r, (locale_t)0);
+        if (l) {
+            static const struct { const char *key; nl_item item; } items[] = {
+                { "dfmt", D_FMT }, { "tfmt", T_FMT }, { "am", AM_STR }, { "pm", PM_STR },
+                { "decimal", RADIXCHAR }, { "group", THOUSEP },
+            };
+            o = JS_NewObject(c);
+            for (size_t i = 0; i < sizeof items / sizeof items[0]; i++) {
+                const char *v = nl_langinfo_l(items[i].item, l);
+                JS_SetPropertyStr(c, o, items[i].key, JS_NewString(c, v ? v : ""));
+            }
+            freelocale(l);
+        }
+    }
+    if (r) JS_FreeCString(c, r);
+    return o;
 }
 
 static int valid_id_dot(const char *s) {
@@ -1468,6 +1504,7 @@ static const JSCFunctionListEntry locale_funcs[] = {
     JS_CFUNC_DEF("get", 0, f_locale_get),
     JS_CFUNC_DEF("set", 1, f_locale_set),
     JS_CFUNC_DEF("available", 0, f_locale_available),
+    JS_CFUNC_DEF("formats", 1, f_locale_formats),
     JS_CFUNC_DEF("catalog", 2, f_locale_catalog),
     JS_CFUNC_DEF("languages", 0, f_locale_languages),
     JS_CFUNC_DEF("installPack", 2, f_locale_install),
