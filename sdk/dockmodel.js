@@ -14,10 +14,10 @@
 export const DOCK_KINDS = ['app', 'lpk', 'desktop', 'shell'];
 export const LAUNCHER = 'shell:launcher';
 // The Dock's rules:
-//   - Files is always the first item: it can't be moved or removed;
+//   - Files, Settings and the app launcher can't be removed (no «Remove from Dock»; dragging them out
+//     or onto the Trash puts them back) but move freely, like any other app (0.8.8.6, issue #62: Files
+//     used to be fixed in the first place); Files is first in the theme's defaults;
 //   - the Trash is always the last one, drawn by the theme after a separator (not a pinned item);
-//   - Settings and the app launcher can't be removed (no «Remove from Dock»; dragging them out or
-//     onto the Trash puts them back) but move freely between Files and the Trash;
 //   - every other app is added, moved and removed freely.
 // "First" and "last" follow the Dock's reading order (the theme mirrors a bottom Dock in RTL).
 export const FIRST = 'app:files';
@@ -67,18 +67,11 @@ export function normalizePinned(list, classify) {
   return { list: out, changed: out.length !== list.length || out.some((x, i) => x !== list[i]) };
 }
 
-// Files is always the first item: whatever an operation does, it goes back to the front.
-const filesFirst = (list) => {
-  const i = list.indexOf(FIRST);
-  return i <= 0 ? list : [FIRST, ...list.slice(0, i), ...list.slice(i + 1)];
-};
-
 // Inserts id before the shown item at position index (null, past the end or not a number: after the
-// last item). list must not contain id. Nothing lands before Files: index 0 becomes "right after it".
+// last item). list must not contain id.
 function insertAt(list, id, index, isShown) {
   const shown = list.filter(isShown);
-  let k = Number.isFinite(+index) && index !== null ? Math.max(0, Math.round(+index)) : shown.length;
-  if (shown[0] === FIRST) k = Math.max(1, k);
+  const k = Number.isFinite(+index) && index !== null ? Math.max(0, Math.round(+index)) : shown.length;
   if (k >= shown.length) return [...list, id];
   const at = list.indexOf(shown[k]);
   return [...list.slice(0, at), id, ...list.slice(at)];
@@ -86,11 +79,10 @@ function insertAt(list, id, index, isShown) {
 
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-// Moves a pinned item to position toIndex among the shown items (counted without it). Files never
-// moves.
+// Moves a pinned item to position toIndex among the shown items (counted without it).
 export function moveItem(list, id, toIndex, isShown = () => true) {
-  if (!list.includes(id) || id === FIRST) return list;
-  const next = filesFirst(insertAt(list.filter((x) => x !== id), id, toIndex, isShown));
+  if (!list.includes(id)) return list;
+  const next = insertAt(list.filter((x) => x !== id), id, toIndex, isShown);
   return same(next, list) ? list : next;
 }
 
@@ -98,16 +90,17 @@ export function moveItem(list, id, toIndex, isShown = () => true) {
 export function pinItem(list, id, atIndex, isShown = () => true) {
   if (!isDockId(id)) return list;
   if (list.includes(id)) return atIndex == null ? list : moveItem(list, id, atIndex, isShown);
-  return filesFirst(insertAt(list, id, atIndex, isShown));
+  return insertAt(list, id, atIndex, isShown);
 }
 
 export const isLocked = (id, locked = LOCKED) => locked.includes(id);
-// Can the item change place? Everything but Files (the Trash is not in the list at all).
-export const isMovable = (id) => id !== FIRST;
+// Can the item change place? Every pinned item, Files included (the Trash is not in the list at all).
+export const isMovable = (id) => isDockId(id);
 export const unpinItem = (list, id, locked = LOCKED) => (list.includes(id) && !isLocked(id, locked) ? list.filter((x) => x !== id) : list);
 
 // Puts back every required item missing from list (an older settings file, or one edited by
-// hand), each after the item that comes before it in defaults; Files goes first.
+// hand), each after the item that comes before it in defaults (Files, first in the defaults, goes
+// back first); an item already there keeps the place the person gave it.
 export function ensureItems(list, required = LOCKED, defaults = []) {
   let out = list;
   for (const id of required) {
@@ -120,7 +113,7 @@ export function ensureItems(list, required = LOCKED, defaults = []) {
     }
     out = [...out.slice(0, at), id, ...out.slice(at)];
   }
-  return filesFirst(out);
+  return out;
 }
 
 // Quick actions at the top of an app's Dock menu: [{ id, label, args }], from its manifest

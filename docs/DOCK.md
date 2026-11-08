@@ -86,14 +86,14 @@ an unpinned running item until it quits.
 
 ### Rules
 
-- **Files** is always the first item: it can't be moved or removed.
 - **The Trash** is always the last item, after a separator: it can't be moved or removed.
-- **Settings** and the **app launcher** can't be removed (no «Remove from Dock»; dragging them out
-  or onto the Trash puts them back) but move freely between Files and the Trash.
+- **Files**, **Settings** and the **app launcher** can't be removed (no «Remove from Dock»; dragging
+  them out or onto the Trash puts them back) but move freely before the Trash. Files is first in the
+  defaults; since 0.8.8.6 it moves like the others (issue #62: it used to be fixed in the first place).
 - Every other app is added, moved and removed freely.
-- Nothing lands before Files or after the Trash: a drop there goes right after Files or right
-  before the Trash. «First» and «last» follow the Dock's reading order (a bottom Dock is mirrored in
-  right-to-left languages; on the sides it reads top to bottom).
+- Nothing lands after the Trash: a drop there goes right before it. «First» and «last» follow the
+  Dock's reading order (a bottom Dock is mirrored in right-to-left languages; on the sides it reads
+  top to bottom).
 - **Reset Dock to defaults** keeps these rules. An older settings file that lacks Files, Settings or
   the launcher gets them back on load.
 
@@ -116,7 +116,7 @@ a `.desktop` (`linux:…`) are dropped. An uninstalled app keeps its place hidde
 is reinstalled; nothing broken is shown.
 
 ```js
-dock.pin(id, index)     // index: position among the items the Dock shows (Files is 0)
+dock.pin(id, index)     // index: position among the items the Dock shows (0: the first one)
 dock.move(id, index)
 dock.unpin(id)          // refused for Files, Settings and the launcher
 dock.reset()            // the theme's defaults (dockPinned: null)

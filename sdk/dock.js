@@ -9,8 +9,8 @@
 //
 // Pinned items are typed ids (sdk/dockmodel.js): "app:files", "lpk:<id>", "desktop:<desktop id>"
 // and "shell:launcher". The methods also take a plain launcher id ("files", "desktop:firefox").
-// Files is always first and the Trash always last; Files, Settings and the launcher can't be
-// removed (docs/DOCK.md, "Rules").
+// The Trash is always last; Files, Settings and the launcher can't be removed but move like any
+// other app (docs/DOCK.md, "Rules").
 //
 // An app can add its own items to the menu (the Terminal: New Window, New Tab…):
 //   registerDockMenu('terminal', (entry) => [{ label: '…', onClick }])
@@ -79,7 +79,7 @@ export const dock = {
   isPinned: (id) => fromSettings().includes(dockIdOf(id)),
   canRemove: (id) => { const d = dockIdOf(id); return !!d && !isLocked(d); },
   canMove: (id) => { const d = dockIdOf(id); return !!d && isMovable(d); },
-  // index: position among the items the Dock shows (Files is 0; nothing goes before it)
+  // index: position among the items the Dock shows (0: the first one)
   pin(id, index) {
     const d = dockIdOf(id);
     if (!d) return false;
@@ -99,7 +99,7 @@ export const dock = {
     if (next !== cur) save(next);
     return next !== cur;
   },
-  // the theme's defaults again (the rules stay: Files first, the locked items present)
+  // the theme's defaults again (Files first; the locked items present)
   reset: () => settings.set({ dockPinned: null }),
 };
 

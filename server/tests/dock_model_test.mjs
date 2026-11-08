@@ -91,14 +91,19 @@ eq('unpin launcher refused', unpinItem(['shell:launcher', 'app:x'], 'shell:launc
 eq('unpin settings refused', unpinItem(['app:settings'], 'app:settings'), ['app:settings']);
 eq('launcher can move', moveItem(['app:files', 'shell:launcher', 'app:x'], 'shell:launcher', 2), ['app:files', 'app:x', 'shell:launcher']);
 eq('settings can move', moveItem(['app:files', 'app:x', 'app:settings'], 'app:settings', 1), ['app:files', 'app:settings', 'app:x']);
-// Files is first and fixed
-const F = ['app:files', 'app:a', 'app:b'];
-eq('files never moves', moveItem(F, 'app:files', 2) === F, true);
-eq('nothing before files (move)', moveItem(F, 'app:b', 0), ['app:files', 'app:b', 'app:a']);
-eq('nothing before files (pin)', pinItem(F, 'lpk:notes', 0), ['app:files', 'lpk:notes', 'app:a', 'app:b']);
-eq('pin files again at the end keeps it first', pinItem(F, 'app:files', 2) === F, true);
-eq('files put back in front by ensure', ensureItems(['app:a', 'app:files'], ['app:files'], []), ['app:files', 'app:a']);
-eq('isMovable', [M.isMovable('app:files'), M.isMovable('shell:launcher'), M.isMovable('app:settings'), M.isMovable('desktop:x')], [false, true, true, true]);
+// Files moves like any other app (issue #62), but can't be removed
+const F = ['app:files', 'shell:launcher', 'app:a', 'app:b'];
+eq('files moves', moveItem(F, 'app:files', 2), ['shell:launcher', 'app:a', 'app:files', 'app:b']);
+eq('files moves to the end', moveItem(F, 'app:files', 3), ['shell:launcher', 'app:a', 'app:b', 'app:files']);
+eq('launcher before files (move)', moveItem(F, 'shell:launcher', 0), ['shell:launcher', 'app:files', 'app:a', 'app:b']);
+eq('app before files (pin)', pinItem(F, 'lpk:notes', 0), ['lpk:notes', 'app:files', 'shell:launcher', 'app:a', 'app:b']);
+eq('pin files again with an index: moves', pinItem(F, 'app:files', 1), ['shell:launcher', 'app:files', 'app:a', 'app:b']);
+eq('a moved files keeps its place in ensure', ensureItems(['app:a', 'app:files'], ['app:files'], []), ['app:a', 'app:files']);
+eq('a missing files comes back first', ensureItems(['app:a'], ['app:files'], ['app:files', 'app:a']), ['app:files', 'app:a']);
+eq('moved files survives ensure with every rule', ensureItems(['shell:launcher', 'app:settings', 'app:files'], LOCKED, ['app:files', 'shell:launcher', 'app:settings']),
+  ['shell:launcher', 'app:settings', 'app:files']);
+eq('files still locked', unpinItem(['app:a', 'app:files'], 'app:files'), ['app:a', 'app:files']);
+eq('isMovable', [M.isMovable('app:files'), M.isMovable('shell:launcher'), M.isMovable('app:settings'), M.isMovable('desktop:x'), M.isMovable('x')], [true, true, true, true, false]);
 const DEF = ['app:files', 'shell:launcher', 'app:terminal', 'app:settings', 'app:about'];
 eq('ensure: old list without any', ensureItems(['app:terminal', 'desktop:firefox'], LOCKED, DEF),
   ['app:files', 'shell:launcher', 'app:terminal', 'app:settings', 'desktop:firefox']);

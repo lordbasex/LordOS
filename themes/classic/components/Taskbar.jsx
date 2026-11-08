@@ -4,7 +4,7 @@
 // sliver). Centered by default (Settings → Desktop & Dock → alignment); bottom, top, left or right.
 //
 // Pinning follows the same rules and SDK calls as the default theme's Dock (sdk/dock.js, docs/DOCK.md):
-// Files is first and can't be removed, Settings can't be removed, the Trash is always last; drag a
+// Files and Settings can't be removed (but move), the Trash is always last; drag a
 // button to reorder it (a line shows where it lands), drag it off the bar and hold to unpin it, drop
 // apps from the start menu. Click: opens the app or brings its window (if it was already in front,
 // minimizes it); right click: its jump list.
@@ -123,7 +123,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
   if (drag && drag.over && drag.over.index != null && barRef.current) {
     const own = drag.source === 'dock' ? drag.id : null;
     const pinned = entries.filter((e) => e.pinned && !e.recent && e.id !== own);
-    const k = Math.max(1, Math.min(pinned.length, drag.over.index));
+    const k = Math.max(0, Math.min(pinned.length, drag.over.index));
     const ref = refs.current.get((pinned[k] || pinned[pinned.length - 1])?.id);
     if (ref) {
       const [bx, by] = lord.getLayout(barRef.current.id);

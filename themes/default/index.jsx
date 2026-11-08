@@ -21,7 +21,7 @@ import { ControlCenter } from './components/ControlCenter.jsx';
 import { Menu } from './components/Menu.jsx';
 
 const MENU_H = 28;
-// Files is always first and the Trash always last (sdk/dockmodel.js); the app launcher follows Files.
+// The defaults: Files first and the app launcher after it; the Trash is always last (sdk/dockmodel.js).
 const DOCK_ORDER = ['files', DOCK_LAUNCHER, 'terminal', 'calculator', 'settings', 'about'];
 
 // Area for windows: below the menu bar and without the Dock's side (unless it auto-hides),
