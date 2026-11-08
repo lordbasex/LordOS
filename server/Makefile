@@ -165,6 +165,12 @@ DOCHELPER ?= $(shell pkg-config --exists poppler-glib libarchive cairo-pdf cairo
 ifeq ($(DOCHELPER),1)
 ALL += build/lord-doc
 endif
+# lord-ocr: the text in a picture (Screenshots), lord-doc's helper loop with Tesseract only (src/doc/h_ocr.c). It's the
+# only one that links libtesseract (and Leptonica, libarchive, libcurl and libgomp, which come with it).
+OCRHELPER ?= $(shell pkg-config --exists tesseract 2>/dev/null && echo 1 || echo 0)
+ifeq ($(OCRHELPER),1)
+ALL += build/lord-ocr
+endif
 # lord-netperm (src/netperm, docs/FIREWALL.md step 2): the root service that applies per-app network
 # permissions with cgroup BPF programs. The programs are compiled with clang -target bpf (BPF=1,
 # if clang is available) and go inside the binary (build/bpf2c → build/gen/np_bpf.h). Without clang it still
@@ -274,7 +280,7 @@ all: $(ALL)
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
 test: build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
-test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc,$(ALL))
+test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr,$(ALL))
 	@sh tests/run_suites.sh full
 SHAPE_SRC := src/ui/otf.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/unicode.c
 build/shape-test: tests/shape_test.c $(SHAPE_SRC) $(HDR)
@@ -781,6 +787,9 @@ build/obj/doc/h_stb.o: src/doc/h_stb.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
 build/lord-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags $(LD_PKGS)) -o $@ $(LD_SRC) build/obj/doc/h_stb.o $(shell pkg-config --libs $(LD_PKGS)) -lm
+LO_SRC := src/doc/helper.c src/doc/h_ocr.c src/doc/wire.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
+build/lord-ocr: $(LO_SRC) $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
+	$(CC) $(CPPFLAGS) -DLORD_HELPER_OCR $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags tesseract) -o $@ $(LO_SRC) $(shell pkg-config --libs tesseract) -lm
 # rules for extracting without leaving the folder (tests/arcpath_test.c)
 build/arcpath-test: tests/arcpath_test.c src/doc/arcpath.c src/doc/arcpath.h
 	@mkdir -p build

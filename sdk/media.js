@@ -22,6 +22,7 @@ import { useTheme } from './theme.js';
 import * as fs from './fs.js';
 import { wm } from './windows.js';
 import { canMarkup } from './imageeditmodel.js';
+import { waitFor } from './doc.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.media) || null;
 const listeners = new Map();          // id → Set(fn(type, data))
@@ -81,6 +82,16 @@ export const media = {
     return call('screenshot', app, rect || {});
   },
   crop: (id, x, y, w, hh) => call('crop', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh)),
+  // a few pixels of a screenshot or picture as RGBA bytes (Screenshots' magnifier and color picker), at most 64 × 64
+  pixels: (id, x, y, w, hh) => call('pixels', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh)),
+  // the text in a screenshot or picture (the confined lord-ocr helper, Tesseract), in these languages
+  // ('eng+spa'): resolves with the text; rejects with code no-language when that data isn't installed
+  async ocr(id, langs) {
+    const r = call('ocr', id, langs);
+    if (!r) return '';
+    const d = await waitFor(r.sid, r.req);
+    return d.text || '';
+  },
   // the image editor (issue #30): each returns the id of a NEW picture, the source stays as it was
   resize: (id, w, hh) => call('resize', id, Math.round(w), Math.round(hh)),
   rotate: (id, quarterTurns) => call('rotate', id, Math.round(quarterTurns)),

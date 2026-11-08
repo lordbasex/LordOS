@@ -718,13 +718,14 @@ installing packages and compressing.
 sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorriso grub-pc-bin \
   grub-efi-amd64-bin grub-common mtools dosfstools lintian libgbm-dev libegl-dev libgles-dev libssl-dev \
   libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-  libswresample-dev libva-dev libsrtp2-dev libusrsctp-dev clang
+  libswresample-dev libva-dev libsrtp2-dev libusrsctp-dev libtesseract-dev clang
 ```
 
 | Package | What for |
 |---|---|
 | `libssl-dev` | compiling `lord-sessiond` (remote desktop TLS), `lord-maild` (Mail) and, since 0.8.5, `lord-fetch` (the blocklists) and `lord-tls` (the package engine's HTTPS); without it, `make` builds only lord-server and `mkdeb.sh` refuses |
 | `libpoppler-glib-dev`, `libarchive-dev` | compiling `lord-doc` (PDF and archives); without them `make` skips it and the package ships without a PDF viewer |
+| `libtesseract-dev` | compiling `lord-ocr` (since 0.8.8.6: Screenshots' "copy the text"); without it `make` skips it and Screenshots says text recognition isn't available. The package then depends on `libtesseract5` and `tesseract-ocr-eng`, and recommends Spanish, Portuguese, French and Italian |
 | `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | compiling `lord-media` (video, photos, camera, recorder); without them `make` skips it |
 | `libva-dev` | optional: GPU decoding (VA-API) in `lord-media` |
 | `libsrtp2-dev`, `libusrsctp-dev` | the remote desktop (WebRTC: SRTP and the data channels) in `lord-sessiond`; required: without them `make` stops with an error for `lord-sessiond` (or build with `SESSIOND=0`), and the package always depends on `libsrtp2-1` and `libusrsctp2` |

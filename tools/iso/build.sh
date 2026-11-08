@@ -52,6 +52,7 @@ PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewi
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core
  libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon libnss-mdns
+ libtesseract5 tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-por tesseract-ocr-fra tesseract-ocr-ita
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland pciutils usbutils"

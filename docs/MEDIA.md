@@ -8,7 +8,7 @@ interface and compositing are our own.
 |---|---|---|
 | **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy |
 | **Player** | `player` | Video with synced audio, time bar, volume, `.srt` and in-track subtitles, full screen, picture in picture; music library by artist and album with covers, queue, shuffle and repeat; media keys and the Control Center |
-| **Screenshots** | `screenshots` | Screen, window or area, timer, to the clipboard or to `~/Pictures/Screenshots`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
+| **Screenshots** | `screenshots` | Screen (a file per display), window or area on any display (crosshair, magnifier with the pixel's color; C copies it), a color picker, copy the text in an area (T, OCR in the sandboxed `lord-ocr` helper), timer, to the clipboard or to `~/Pictures/Screenshots`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
 | **Camera** | `camera` | V4L2 preview, JPEG photo, H.264 + AAC video, mirror, choose camera |
 | **Recorder** | `recorder` | Record the microphone, waveform, list, rename, trim and export to Opus, MP3 or WAV |
 

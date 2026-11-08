@@ -15,6 +15,7 @@ typedef struct { int fd; const char *role; } DocInitFd;      /* role: "file" | "
 
 /* Fixed path of the helper: <folder of this binary>/lord-doc. 0 if it exists. */
 int  doc_available(void);
+int  doc_ocr_available(void);             /* <folder of this binary>/lord-ocr: sessions of mode "ocr" */
 /* New session with these startup fds (doc_session keeps them, also on failure).
  * mode: "pdf" | "arc" | "util". Returns the id (> 0) or -1. */
 int  doc_session(const char *mode, DocInitFd *fds, int n);

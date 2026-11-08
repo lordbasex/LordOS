@@ -19,7 +19,7 @@
     "other": "{count} finestre protette: nelle catture appaiono nere"
   },
   "recent": "Recenti",
-  "hintArea": "Trascina per selezionare un’area · Spazio: finestra · Esc: annulla",
+  "hintArea": "Trascina per selezionare un’area · Spazio: finestra · C: copia il colore · T: copia il testo · Esc: annulla",
   "hintWindow": "Fai clic su una finestra · Spazio: selezione · Esc: annulla",
   "savedTo": "Salvata in {folder}",
   "copied": "Copiata negli appunti",
@@ -62,5 +62,12 @@
   "tool.fill": "Oscura (riempimento pieno)",
   "tool.crop": "Ritaglia",
   "cantOpen": "Impossibile aprire questa immagine",
-  "loading": "Apertura…"
+  "loading": "Apertura…",
+  "mode.color": "Colore",
+  "hintColor": "Fai clic per copiare il colore · Esc: annulla",
+  "colorCopied": "{color} copiato",
+  "mode.text": "Testo",
+  "hintText": "Trascina sul testo per copiarlo · T: selezione · Esc: annulla",
+  "textCopied": "Testo copiato ({count} caratteri)",
+  "noText": "Nessun testo trovato nella selezione"
 }

@@ -6,6 +6,8 @@
  *   doc-test <lord-doc> zip <out.zip> <paths…>
  *   doc-test <lord-doc> pdf <file.pdf> [width]      opens, renders page 1 and measures
  *   doc-test <lord-doc> font <file.ttf>
+ *   doc-test <lord-ocr> selftest-ocr                what lord-ocr's confinement blocks
+ *   doc-test <lord-ocr> ocr <file.pgm> [langs]      the text in a gray picture (P5)
  *
  * tests/doc_evil.sh uses it with malicious archives built by tests/make_evil_archives.py. */
 #include "doc/proto.h"
@@ -13,9 +15,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -81,6 +85,29 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "selftest")) {
         start(helper, "pdf", NULL, NULL, 0);
         st = call(DQ_SELFTEST, NULL, NULL, 0, 0) == DR_DONE ? 0 : 1;
+    } else if (!strcmp(cmd, "selftest-ocr")) {
+        start(helper, "ocr", NULL, NULL, 0);
+        st = call(DQ_SELFTEST, NULL, NULL, 0, 0) == DR_DONE ? 0 : 1;
+    } else if (!strcmp(cmd, "ocr") && argc > 3) {
+        /* P5 → premultiplied ARGB32 in a memfd, as lord-server sends a screenshot */
+        FILE *f = fopen(argv[3], "rb");
+        int w = 0, h = 0, max = 0;
+        if (!f || fscanf(f, "P5 %d %d %d", &w, &h, &max) != 3 || w < 1 || h < 1 || w > 8192 || h > 8192 || max != 255) { fprintf(stderr, "not a P5 picture\n"); return 2; }
+        fgetc(f);
+        size_t n = (size_t)w * h;
+        unsigned char *g = malloc(n);
+        uint32_t *px = malloc(n * 4);
+        if (!g || !px || fread(g, 1, n, f) != n) { fprintf(stderr, "short picture\n"); return 2; }
+        fclose(f);
+        for (size_t i = 0; i < n; i++) px[i] = 0xff000000u | (uint32_t)g[i] << 16 | (uint32_t)g[i] << 8 | g[i];
+        int fd = memfd_create("ocr-test", MFD_CLOEXEC);
+        if (fd < 0 || write(fd, px, n * 4) != (ssize_t)(n * 4)) { perror("memfd"); return 2; }
+        free(g);
+        free(px);
+        char json[128];
+        snprintf(json, sizeof json, "{\"w\":%d,\"h\":%d,\"langs\":\"%s\"}", w, h, argc > 4 ? argv[4] : "eng");
+        start(helper, "ocr", NULL, NULL, 0);
+        st = call(DQ_OCR, json, &fd, 1, 0) == DR_DONE ? 0 : 1;
     } else if (!strcmp(cmd, "selftest-arc") && argc > 3) {
         /* extraction mode, with a writable folder: it still cannot leave it */
         int fd = open(argv[3], O_RDONLY | O_DIRECTORY | O_CLOEXEC);

@@ -33,6 +33,7 @@ int pdf_handle(const DocMsg *m, const JVal *args);
 int arc_handle(const DocMsg *m, const JVal *args);
 int font_handle(const DocMsg *m, const JVal *args);
 int make_handle(const DocMsg *m, const JVal *args);
+int ocr_handle(const DocMsg *m, const JVal *args);     /* lord-ocr only (h_ocr.c) */
 void pdf_thumb(const DocMsg *m, const JVal *args);     /* util session: thumbnail of a PDF */
 void pdf_warm(uint32_t id);
 

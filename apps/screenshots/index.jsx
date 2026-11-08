@@ -10,12 +10,13 @@
 // Quick Preview open the same editor on any picture (media.js openMarkup). Captures are saved in
 // ~/Pictures/Screenshots or to the clipboard.
 import {
-  View, Text, MediaView, Toggle, Segmented, GroupBox, FormRow,
-  useTheme, useAppWindow, useKeyboard, useStore, useWindows, wm, windows, typeScale,
+  View, Text, Image, MediaView, Toggle, Segmented, GroupBox, FormRow, clipboard,
+  useTheme, useAppWindow, useStore, useWindows, wm, windows, typeScale,
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { captureRect, displaysToCapture, displayAt, dragRect } from './geometry.js';
+import { captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM } from './geometry.js';
+import { ocrLangs, cleanText } from './ocr.js';
 import { Editor } from './editor.jsx';
 
 const APP = 'screenshots';
@@ -136,7 +137,36 @@ async function areaDone(r, at) {
   if (!p) { media.close(shot.handle); return; }
   const c = media.crop(shot.handle, p.x, p.y, p.w, p.h);
   media.close(shot.handle);
+  if (a.mode === 'text') { await copyText(c); return; }
   await finish(c);
+}
+
+// "Copy the text": the selection read by the lord-ocr helper, in the interface's languages, to the clipboard
+async function copyText(handle) {
+  if (!handle) return;
+  try {
+    const text = cleanText(await media.ocr(handle, ocrLangs(settings.get().languages || [settings.get().language])));
+    if (text) { clipboard.set(text); toast.set(tr('screenshots.textCopied', { count: [...text].length })); }
+    else toast.set(tr('screenshots.noText'));
+  } catch (e) { toast.set(errorText(e)); } finally { media.close(handle); }
+}
+
+// The magnifier under a logical point: the capture's pixels around it, enlarged, and the middle one's color
+// (media.pixels reads at most a 15 × 15 block). null off every display.
+function loupeAt(a, x, y) {
+  const shot = a.shots.find((sh) => !sh.display || (x >= sh.display.x && y >= sh.display.y && x < sh.display.x + sh.display.w && y < sh.display.y + sh.display.h));
+  const info = shot && media.info(shot.handle);
+  if (!info) return null;
+  const p = capturePixel(x, y, info.width, info.height, lord.screen, shot.display);
+  const half = LOUPE_PX >> 1;
+  const buf = media.pixels(shot.handle, p.x - half, p.y - half, LOUPE_PX, LOUPE_PX);
+  if (!buf) return null;
+  const rgba = new Uint8Array(buf);
+  return { data: magnify(rgba), color: middleColor(rgba).hex, px: p.x, py: p.y };
+}
+function copyColor(hex) {
+  clipboard.set(hex);
+  toast.set(tr('screenshots.colorCopied', { color: hex }));
 }
 
 export const capture = {
@@ -184,6 +214,11 @@ export const capture = {
 
 // global shortcuts
 const hasMedia = () => typeof lord !== 'undefined' && !!lord.media;
+// While a selection is open its keys are shortcuts: the dispatcher takes them, so they never reach the app in
+// front as well (a C or a Space used to be typed into a Terminal under the overlay).
+const selecting = () => !!area.get();
+const toggleWindowMode = () => area.set((x) => (x ? { ...x, mode: x.mode === 'area' ? 'window' : 'area', start: null, rect: null } : x));
+const copyUnderPointer = () => { const l = area.get()?.loupe; if (l) { copyColor(l.color); endArea(); } };
 const captureFull = () => capture.full();
 const captureArea = () => capture.area('area');
 const openPanelOrStop = () => { if (recording.get()) capture.record(); else wm.open(APP); };
@@ -191,6 +226,10 @@ addShortcuts([
   { id: 'capture.full', keys: ['Meta+Shift+3', 'PrintScreen'], when: hasMedia, run: captureFull, label: 'shell.shortcuts.captureFull', group: 'system' },
   { id: 'capture.area', keys: ['Meta+Shift+4'], when: hasMedia, run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
   { id: 'capture.panel', keys: ['Meta+Shift+5'], when: hasMedia, run: openPanelOrStop, label: 'shell.shortcuts.capturePanel', group: 'system' },
+  { id: 'capture.cancel', keys: ['Escape'], when: selecting, run: () => endArea(), listed: () => false },
+  { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: toggleWindowMode, listed: () => false },
+  { id: 'capture.copyColor', keys: ['c', 'Shift+c'], when: selecting, run: copyUnderPointer, listed: () => false },
+  { id: 'capture.textMode', keys: ['t', 'Shift+t'], when: selecting, run: () => area.set((x) => (x ? { ...x, mode: x.mode === 'text' ? 'area' : 'text', start: null, rect: null } : x)), listed: () => false },
 ]);
 
 // ---- the app's windows ----
@@ -202,23 +241,19 @@ function Overlay({ index }) {
   const d = shot?.display || null;              // this overlay's display (null: the main one, Settings' choice)
   const ox = d ? d.x : 0, oy = d ? d.y : 0;     // global → this overlay's pixels
   useEffect(() => { if (shot) media.view(shot.handle, { zoom: 1, cx: 0.5, cy: 0.5, background: 0xff000000 }); }, [shot?.handle]);
-  useKeyboard((e) => {
-    if (index !== 0) return;                    // one overlay answers the keys for all of them
-    if (e.key === 'Escape') endArea();
-    if (e.key === ' ') area.set((x) => (x ? { ...x, mode: x.mode === 'area' ? 'window' : 'area', start: null, rect: null } : x));
-  });
   useEffect(() => {
     if (index !== 0) return undefined;          // the pointer, once for every overlay
     const displays = () => (area.get()?.shots || []).map((sh) => sh.display).filter(Boolean);
     const offMove = addListener('pointermove', (e) => {
       const cur = area.get();
       if (!cur) return;
-      if (cur.start) { area.set({ ...cur, pointer: { x: e.x, y: e.y }, rect: dragRect(cur.start, e.x, e.y, cur.start.display) }); return; }
+      const loupe = cur.mode !== 'window' ? loupeAt(cur, e.x, e.y) : null;
+      if (cur.start) { area.set({ ...cur, pointer: { x: e.x, y: e.y }, loupe, rect: dragRect(cur.start, e.x, e.y, cur.start.display) }); return; }
       // the window under the pointer (the topmost one), for the window mode
       const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
       let found = null;
       for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
-      area.set({ ...cur, pointer: { x: e.x, y: e.y }, hover: found });
+      area.set({ ...cur, pointer: { x: e.x, y: e.y }, hover: found, loupe });
     });
     const offUp = addListener('pointerup', (e) => {
       const cur = area.get();
@@ -229,7 +264,8 @@ function Overlay({ index }) {
   }, [list, index]);
   if (!a || !shot) return null;
   const down = (e) => {
-    if (a.mode === 'area') area.set({ ...a, start: { x: e.x, y: e.y, display: displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), e.x, e.y) } });
+    if (a.mode === 'color') { if (a.loupe) copyColor(a.loupe.color); endArea(); return; }
+    if (a.mode === 'area' || a.mode === 'text') area.set({ ...a, start: { x: e.x, y: e.y, display: displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), e.x, e.y) } });
     else if (a.hover) areaDone(a.hover, a.hover.display);
   };
   const dim = 'rgba(0,0,0,0.35)';
@@ -255,21 +291,38 @@ function Overlay({ index }) {
         </>
       ) : <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: dim }} />}
       {/* the crosshair: guides through the pointer across this display and its coordinates on the display */}
-      {a.mode === 'area' && here ? (
+      {a.mode !== 'window' && here ? (
         <>
           <View style={{ position: 'absolute', left: 0, right: 0, top: Math.round(p.y), height: 1, backgroundColor: guide, pointerEvents: 'none' }} />
           <View style={{ position: 'absolute', top: 0, bottom: 0, left: Math.round(p.x), width: 1, backgroundColor: guide, pointerEvents: 'none' }} />
-          {!a.start && (
+          {!a.start && !a.loupe && (
             <View style={{ position: 'absolute', left: p.x + 12, top: p.y + 12, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.7)', pointerEvents: 'none' }}>
               <Text style={{ fontSize: 11, color: '#fff', fontFamily: 'monospace' }}>{`${Math.round(p.x)}, ${Math.round(p.y)}`}</Text>
             </View>
           )}
         </>
       ) : null}
+      {/* the magnifier: the capture's pixels around the pointer, its color and the capture pixel's coordinates; it
+          flips to the other side near the display's right or bottom edge */}
+      {a.mode !== 'window' && here && a.loupe ? (() => {
+        const size = LOUPE_PX * LOUPE_ZOOM, w = d ? d.w : lord.screen.width, h = d ? d.h : lord.screen.height;
+        const lx = p.x + 24 + size > w ? p.x - 24 - size : p.x + 24, ly = p.y + 24 + size + 40 > h ? p.y - 24 - size - 40 : p.y + 24;
+        return (
+          <View style={{ position: 'absolute', left: lx, top: ly, width: size, pointerEvents: 'none', borderRadius: 10, overflow: 'hidden',
+            border: '2px solid rgba(255,255,255,0.9)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', backgroundColor: 'rgba(0,0,0,0.8)' }}>
+            <Image pixels={{ width: size, height: size, data: a.loupe.data }} style={{ width: size, height: size }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6, height: 20 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: a.loupe.color, border: '1px solid rgba(255,255,255,0.6)' }} />
+              <Text style={{ fontSize: 11, color: '#fff', fontFamily: 'monospace' }}>{a.loupe.color}</Text>
+            </View>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', fontFamily: 'monospace', paddingHorizontal: 6, paddingBottom: 4 }}>{`${a.loupe.px}, ${a.loupe.py}`}</Text>
+          </View>
+        );
+      })() : null}
       {(index === 0 || (here && !a.start)) && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 18, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ paddingHorizontal: 14, height: 30, justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.7)' }}>
-            <Text style={{ fontSize: 12, color: '#fff' }}>{tr(a.mode === 'window' ? 'screenshots.hintWindow' : 'screenshots.hintArea')}</Text>
+            <Text style={{ fontSize: 12, color: '#fff' }}>{tr(a.mode === 'window' ? 'screenshots.hintWindow' : a.mode === 'color' ? 'screenshots.hintColor' : a.mode === 'text' ? 'screenshots.hintText' : 'screenshots.hintArea')}</Text>
           </View>
         </View>
       )}
@@ -369,6 +422,8 @@ function Panel() {
         <Mode glyph="▣" label={tr('screenshots.mode.full')} onClick={() => capture.full()} />
         <Mode glyph="⧈" label={tr('screenshots.mode.window')} onClick={() => capture.area('window')} />
         <Mode glyph="⬚" label={tr('screenshots.mode.area')} onClick={() => capture.area('area')} />
+        <Mode glyph="◉" label={tr('screenshots.mode.color')} onClick={() => capture.area('color')} />
+        <Mode glyph="T" label={tr('screenshots.mode.text')} onClick={() => capture.area('text')} />
         <Mode glyph={rec ? '■' : '●'} danger label={tr(rec ? 'screenshots.mode.stop' : 'screenshots.mode.record')} onClick={() => capture.record()} />
       </View>
       <GroupBox footer={null}>

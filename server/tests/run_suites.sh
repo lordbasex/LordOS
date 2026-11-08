@@ -278,6 +278,9 @@ EOF
     # document helper: malicious archives and the confinement
     if [ -x build/lord-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (lord-doc)" sh tests/doc_evil.sh
     else skip "doc_evil.sh" "build/lord-doc (Poppler and libarchive -dev packages) and python3"; fi
+    # text recognition helper: reading, bad requests and the confinement
+    if [ -x build/lord-ocr ] && [ -x build/doc-test ] && [ -r /usr/share/tesseract-ocr/5/tessdata/spa.traineddata ]; then run "ocr_test.sh (lord-ocr)" sh tests/ocr_test.sh
+    else skip "ocr_test.sh" "build/lord-ocr (libtesseract-dev) and tesseract-ocr-spa"; fi
     # sandbox: Landlock and seccomp of the running kernel
     if [ -r /sys/kernel/security/lsm ] && grep -q landlock /sys/kernel/security/lsm; then
         run "sandbox-test (app)" build/sandbox-test

@@ -16,6 +16,9 @@
 #include "../media/media_int.h"
 #include "../media/proto.h"
 #include "../media/hwdec.h"
+#include "../doc/doc.h"
+#include "../doc/proto.h"
+#include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
 #include "../fw/rules.h"
@@ -410,6 +413,73 @@ static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return n ? JS_NewInt32(c, n->id) : JS_NULL;
 }
 
+/* pixels(id, x, y, w, h) → ArrayBuffer of w × h RGBA bytes (straight alpha) from a screenshot or a decoded picture, or
+ * null: Screenshots' magnifier and color picker read a few pixels around the pointer. At most 64 × 64; pixels
+ * outside the picture come back transparent. */
+#define PIXELS_MAX 64
+static JSValue f_pixels(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    MediaSrc *s = argc >= 5 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
+    int x = arg_int_in(c, argv[1], -65536, 65536, 1 << 30), y = arg_int_in(c, argv[2], -65536, 65536, 1 << 30);
+    int w = arg_int_in(c, argv[3], 1, PIXELS_MAX, 0), h = arg_int_in(c, argv[4], 1, PIXELS_MAX, 0);
+    if (x == 1 << 30 || y == 1 << 30 || !w || !h) return js_throw_code(c, "media.invalidArguments", NULL);
+    uint8_t out[PIXELS_MAX * PIXELS_MAX * 4];
+    memset(out, 0, sizeof out);
+    for (int j = 0; j < h; j++)
+        for (int i = 0; i < w; i++) {
+            int sx = x + i, sy = y + j;
+            if (sx < 0 || sy < 0 || sx >= s->w || sy >= s->h) continue;
+            uint32_t p = s->px[(size_t)sy * (size_t)s->w + (size_t)sx];
+            uint32_t a = p >> 24;
+            uint8_t *o = out + ((size_t)j * (size_t)w + (size_t)i) * 4;
+            for (int k = 0; k < 3; k++) {        /* premultiplied → straight */
+                uint32_t v = (p >> (16 - 8 * k)) & 255;
+                o[k] = (uint8_t)(a == 255 || !a ? v : (v * 255 + a / 2) / a > 255 ? 255 : (v * 255 + a / 2) / a);
+            }
+            o[3] = (uint8_t)a;
+        }
+    return JS_NewArrayBufferCopy(c, out, (size_t)w * (size_t)h * 4);
+}
+
+/* ocr(id, langs) → { sid, req } of a lord-ocr request (the SDK waits for it: media.ocr): the text in a screenshot or
+ * picture. The pixels go to the confined lord-ocr helper in a sealed memfd (src/doc/h_ocr.c); lord-server never
+ * links Tesseract. One OCR session is kept and started again if it crashed. */
+static int ocr_sid;
+static JSValue f_ocr(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE) || s->w < 1 || s->h < 1) return JS_NULL;
+    const char *langs = JS_ToCString(c, argv[1]);
+    if (!langs) return JS_EXCEPTION;
+    /* Tesseract data names ("spa+eng"); lord-ocr checks them again */
+    size_t ll = strlen(langs);
+    int ok = ll >= 3 && ll <= 64;
+    for (size_t i = 0; ok && i < ll; i++) ok = (langs[i] >= 'a' && langs[i] <= 'z') || langs[i] == '_' || langs[i] == '+';
+    if (!ok) { JS_FreeCString(c, langs); return js_throw_code(c, "media.invalidArguments", NULL); }
+    char json[160];
+    int n = snprintf(json, sizeof json, "{\"w\":%d,\"h\":%d,\"langs\":", s->w, s->h);
+    size_t q = n > 0 && (size_t)n < sizeof json ? json_quote(json + n, sizeof json - (size_t)n - 2, langs) : 0;
+    JS_FreeCString(c, langs);
+    if (!q || (size_t)n + q + 2 > sizeof json) return js_throw_code(c, "media.invalidArguments", NULL);
+    n += (int)q;
+    json[n++] = '}';
+    json[n] = 0;
+    if (ocr_sid <= 0 || !doc_alive(ocr_sid)) {
+        if (ocr_sid > 0) doc_close(ocr_sid);
+        ocr_sid = doc_session("ocr", NULL, 0);
+        if (ocr_sid <= 0) { ocr_sid = 0; return js_throw_code(c, "media.ocrUnavailable", NULL); }
+    }
+    int fd = media_memfd_from_pixels(s->px, s->w, s->h);
+    if (fd < 0) return js_throw_code(c, "media.captureFailed", NULL);
+    int req = doc_request(ocr_sid, DQ_OCR, json, (size_t)n, &fd, 1, 0, 30000);
+    if (req <= 0) return js_throw_code(c, "media.ocrUnavailable", NULL);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "sid", JS_NewInt32(c, ocr_sid));
+    JS_SetPropertyStr(c, o, "req", JS_NewInt32(c, req));
+    return o;
+}
+
 /* rotate(id, quarterTurns) → id of a new picture turned clockwise (-3..3). */
 static JSValue f_rotate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -748,6 +818,8 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("transcode", 4, f_transcode),
     JS_CFUNC_DEF("screenshot", 2, f_screenshot),
     JS_CFUNC_DEF("crop", 5, f_crop),
+    JS_CFUNC_DEF("pixels", 5, f_pixels),
+    JS_CFUNC_DEF("ocr", 2, f_ocr),
     JS_CFUNC_DEF("resize", 3, f_resize),
     JS_CFUNC_DEF("rotate", 2, f_rotate),
     JS_CFUNC_DEF("annotate", 3, f_annotate),

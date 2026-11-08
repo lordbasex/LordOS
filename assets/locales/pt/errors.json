@@ -407,6 +407,7 @@
   "media.audioOpenFailed": "Não foi possível abrir o áudio",
   "media.cannotOpen": "Não foi possível abrir o arquivo (danificado ou formato não suportado)",
   "media.captureFailed": "Não foi possível capturar a tela",
+  "media.ocrUnavailable": "O reconhecimento de texto não está disponível (falta o auxiliar lord-ocr ou seus dados de idioma)",
   "media.convertFailed": "Não foi possível converter a imagem",
   "media.createFailed": "Não foi possível criar o arquivo",
   "media.denied.camera": "{app} não tem permissão para usar a câmera",

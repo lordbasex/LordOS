@@ -19,7 +19,7 @@
     "other": "{count} fenêtres protégées : elles apparaissent en noir sur les captures"
   },
   "recent": "Récents",
-  "hintArea": "Faites glisser pour sélectionner une zone · Espace : fenêtre · Échap : annuler",
+  "hintArea": "Faites glisser pour sélectionner une zone · Espace : fenêtre · C : copier la couleur · T : copier le texte · Échap : annuler",
   "hintWindow": "Cliquez sur une fenêtre · Espace : sélection · Échap : annuler",
   "savedTo": "Enregistré dans {folder}",
   "copied": "Copié dans le presse-papiers",
@@ -62,5 +62,12 @@
   "tool.fill": "Caviarder (remplissage plein)",
   "tool.crop": "Recadrer",
   "cantOpen": "Impossible d’ouvrir cette image",
-  "loading": "Ouverture…"
+  "loading": "Ouverture…",
+  "mode.color": "Couleur",
+  "hintColor": "Cliquez pour copier la couleur · Échap : annuler",
+  "colorCopied": "{color} copiée",
+  "mode.text": "Texte",
+  "hintText": "Faites glisser sur le texte pour le copier · T : sélection · Échap : annuler",
+  "textCopied": "Texte copié ({count} caractères)",
+  "noText": "Aucun texte trouvé dans la sélection"
 }

@@ -74,7 +74,8 @@ PKGS_BASE="initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo lo
 PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit polkitd pkexec
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
- cups avahi-daemon libnss-mdns power-profiles-daemon shared-mime-info gsettings-desktop-schemas"
+ cups avahi-daemon libnss-mdns power-profiles-daemon shared-mime-info gsettings-desktop-schemas
+ libtesseract5 tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-por tesseract-ocr-fra tesseract-ocr-ita"
 # The board has no clock that survives without a battery: systemd-timesyncd sets the time from the
 # network at boot (Settings → Date & Time, "Automatic time"); without it the clock starts months
 # behind and every signed package index is refused as "not valid yet". The rest is the same as the
@@ -108,11 +109,12 @@ PKGS_SSH="openssh-server"
 # password prompt's text for encrypted disks). See docs/RASPBERRY.md, "Boot splash".
 PKGS_SPLASH="plymouth plymouth-label"
 # to build lord-server (only in the build chroot, not in the image)
-# (the same as the ISO's build packages, docs/ISO.md: lord-doc needs Poppler and libarchive, lord-media
+# (the same as the ISO's build packages, docs/ISO.md: lord-doc needs Poppler and libarchive, lord-ocr Tesseract, lord-media
 # FFmpeg, lord-netperm's BPF programs clang; without them make silently leaves those parts out)
 PKGS_BUILD="build-essential pkg-config libxkbcommon-dev libwayland-dev wayland-protocols libgbm-dev libegl-dev libgles-dev
  libssl-dev libcrypt-dev libsrtp2-dev libusrsctp-dev freerdp3-dev dpkg-dev file clang
- libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev"
+ libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev
+ libtesseract-dev"
 
 echo "== LordOS $VERSION: Raspberry Pi image in $WORK (host $(uname -m))"
 kernel_warning() {
@@ -214,7 +216,7 @@ else
         tail -20 "$WORK/build.log"; exit 1; }
     cp "$BR/tmp/lordos.deb" "$DEB"
     # the package must be complete: the documents and media helpers and the firewall's BPF programs
-    for f in lord-doc lord-media; do
+    for f in lord-doc lord-media lord-ocr; do
         dpkg-deb -c "$DEB" | grep -q "/usr/lib/lordos/bin/$f\$" || { echo "build-img.sh: $f missing from the package (build packages, see $WORK/build.log)" >&2; exit 1; }
     done
     [ -s "$BR/src/LordOS/server/build/gen/np_bpf.h" ] || { echo "build-img.sh: lord-netperm built without its BPF programs (clang)" >&2; exit 1; }

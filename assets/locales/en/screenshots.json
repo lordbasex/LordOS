@@ -19,7 +19,7 @@
     "other": "{count} protected windows: they come out black in captures"
   },
   "recent": "Recent",
-  "hintArea": "Drag to select an area · Space: window · Esc: cancel",
+  "hintArea": "Drag to select an area · Space: window · C: copy the color · T: copy text · Esc: cancel",
   "hintWindow": "Click a window · Space: selection · Esc: cancel",
   "savedTo": "Saved to {folder}",
   "copied": "Copied to the clipboard",
@@ -62,5 +62,12 @@
   "tool.fill": "Redact (solid fill)",
   "tool.crop": "Crop",
   "cantOpen": "This picture can’t be opened",
-  "loading": "Opening…"
+  "loading": "Opening…",
+  "mode.color": "Color",
+  "hintColor": "Click to copy the color · Esc: cancel",
+  "colorCopied": "Copied {color}",
+  "mode.text": "Text",
+  "hintText": "Drag over text to copy it · T: selection · Esc: cancel",
+  "textCopied": "Copied the text ({count} characters)",
+  "noText": "No text found in the selection"
 }

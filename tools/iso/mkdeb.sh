@@ -101,8 +101,11 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
+# isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
+[ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
+[ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
 [ -x "$L/bin/lord-media" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-media" 2>/dev/null || true; }
@@ -331,6 +334,10 @@ if readelf -d "$PKG/usr/bin/lordos-testbench" 2>/dev/null | grep -q "NEEDED.*lib
 fi
 DOCDEPS=""
 if [ -x "$L/bin/lord-doc" ]; then DOCDEPS=", libpoppler-glib8t64, libarchive13t64, libcairo2, libfreetype6, libfontconfig1, poppler-data"; fi
+# lord-ocr: the library and English (libtesseract5 brings no language data); the interface's other languages
+# (the "fast" data, ~2 MB each) are Recommends
+OCRDEPS=""; OCRRECS=""
+if [ -x "$L/bin/lord-ocr" ]; then OCRDEPS=", libtesseract5, tesseract-ocr-eng"; OCRRECS=", tesseract-ocr-spa, tesseract-ocr-por, tesseract-ocr-fra, tesseract-ocr-ita"; fi
 MEDIADEPS=""
 if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, libavutil59, libswscale8, libswresample5, libva2, libva-drm2"; fi
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
@@ -353,8 +360,8 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
-Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
+Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill$OCRRECS
 Section: x11
 Priority: optional
 Protected: yes

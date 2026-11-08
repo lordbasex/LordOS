@@ -125,9 +125,10 @@ void invert_lightness(uint32_t *px, size_t n) {
  * architecture, no capabilities and with a memory cap. */
 static void lockdown(void) {
     static const char *ro[16];
-    static char extra[3][1024];
     int n = 0;
-    ro[n++] = "/usr";                      /* libraries, poppler-data, fonts, locales */
+    ro[n++] = "/usr";                      /* libraries, poppler-data, fonts, locales; lord-ocr: the tessdata */
+#ifndef LORD_HELPER_OCR
+    static char extra[3][1024];
     ro[n++] = "/etc/fonts";
     ro[n++] = "/var/cache/fontconfig";
     const char *home = getenv("HOME");
@@ -137,6 +138,7 @@ static void lockdown(void) {
     }
     const char *assets = getenv("LORD_DOC_FONTS");
     if (assets && assets[0] == '/') ro[n++] = assets;
+#endif
     ro[n] = NULL;
     static const int sys[] = {
         SYS_mkdirat, SYS_symlinkat, SYS_linkat, SYS_unlinkat, SYS_fchmod, SYS_utimensat, SYS_fstatfs, SYS_eventfd2,
@@ -150,7 +152,11 @@ static void lockdown(void) {
         else if (!strcmp(hslots[i].role, "ro")) rofd[nro++] = hslots[i].fd;
     }
     rofd[nro] = rwfd[nrw] = -1;
+#ifdef LORD_HELPER_OCR
+    SandboxHelperCfg cfg = { .name = "lordos-ocr", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024,
+#else
     SandboxHelperCfg cfg = { .name = "lordos-doc", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024,
+#endif
                              .ro_dir_fds = rofd, .rw_dir_fds = rwfd };
     int mask = sandbox_apply_helper(&cfg);
     if (getenv("LORD_DOC_DEBUG")) fprintf(stderr, "lord-doc[%d]: modo=%s caja=%#x fds=%d\n", getpid(), mode, (unsigned)mask, hnslots);
@@ -214,11 +220,16 @@ static int handle(const DocMsg *m) {
     static const JVal empty = { .type = J_OBJ };
     if (!args) args = &empty;
     int done = 0;
+#ifdef LORD_HELPER_OCR
+    /* lord-ocr: the same loop and lockdown with Tesseract only (h_ocr.c) */
+    if (!strcmp(mode, "ocr")) done = ocr_handle(m, args);
+#else
     if (!strcmp(mode, "pdf")) done = pdf_handle(m, args);
     else if (!strcmp(mode, "util")) done = font_handle(m, args);
     else if (!strcmp(mode, "arc")) done = arc_handle(m, args);
     else if (!strcmp(mode, "font")) done = font_handle(m, args);
     else if (!strcmp(mode, "make")) done = make_handle(m, args);
+#endif
     if (!done) reply_err(m->h.id, "unknown-op", "");
     json_free(&doc);
     return 0;

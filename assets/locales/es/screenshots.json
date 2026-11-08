@@ -19,7 +19,7 @@
     "other": "{count} ventanas protegidas: salen negras en las capturas"
   },
   "recent": "Recientes",
-  "hintArea": "Arrastrá para elegir un área · Espacio: ventana · Esc: cancelar",
+  "hintArea": "Arrastrá para elegir un área · Espacio: ventana · C: copiar el color · T: copiar texto · Esc: cancelar",
   "hintWindow": "Hacé clic en una ventana · Espacio: área · Esc: cancelar",
   "savedTo": "Guardada en {folder}",
   "copied": "Copiada al portapapeles",
@@ -62,5 +62,12 @@
   "tool.fill": "Tapar (relleno sólido)",
   "tool.crop": "Recortar",
   "cantOpen": "No se puede abrir esta imagen",
-  "loading": "Abriendo…"
+  "loading": "Abriendo…",
+  "mode.color": "Color",
+  "hintColor": "Hacé clic para copiar el color · Esc: cancelar",
+  "colorCopied": "Copiado {color}",
+  "mode.text": "Texto",
+  "hintText": "Arrastrá sobre el texto para copiarlo · T: selección · Esc: cancelar",
+  "textCopied": "Texto copiado ({count} caracteres)",
+  "noText": "No se encontró texto en la selección"
 }

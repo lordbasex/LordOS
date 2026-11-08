@@ -601,6 +601,20 @@ sudo apt-get install -y --no-install-recommends libpoppler-glib-dev libarchive-d
 
 Without those `-dev` packages, `make -C server` builds everything else and skips `build/lord-doc` (`DOCHELPER=0`).
 
+**To build `lord-ocr`** (text recognition, Screenshots' "copy the text", since 0.8.8.6; installed on the main
+machine on 2026-11-07):
+
+```sh
+sudo apt-get install -y libtesseract-dev tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-por tesseract-ocr-fra tesseract-ocr-ita
+```
+
+| Package | Version | What for |
+|---|---|---|
+| `libtesseract-dev` (brings `libtesseract5` and `libleptonica-dev`) | 5.5.0 | `lord-ocr` |
+| `tesseract-ocr-eng`, `-spa`, `-por`, `-fra`, `-ita` | 4.1.0 | the language data (`tests/ocr_test.sh` needs `eng` and `spa`) |
+
+Without `libtesseract-dev`, `make -C server` skips `build/lord-ocr` (`OCRHELPER=0`).
+
 **For printing** (`PRINTING.md`):
 
 ```sh

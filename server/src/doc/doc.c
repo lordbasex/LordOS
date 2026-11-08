@@ -72,7 +72,7 @@ static int next_sid = 1, next_req = 1, next_handle = 1, pending;
 static JBuf events;
 static pid_t reap[64];
 static int nreap;
-static char helper[PATH_MAX];
+static char helper[PATH_MAX], ocr_helper[PATH_MAX];
 
 static double now_ms(void) {
     struct timespec t;
@@ -99,24 +99,40 @@ static int trace(void) {
 
 /* ---- fixed path of the helper ---- */
 
-int doc_available(void) {
-    if (!helper[0]) {
-        char self[PATH_MAX];
-        ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
-        if (n <= 0) return -1;
-        self[n] = 0;
-        char *slash = strrchr(self, '/');
-        if (!slash) return -1;
-        *slash = 0;
-        if (strlen(self) + 10 > sizeof helper) return -1;
-        memcpy(helper, self, strlen(self));
-        memcpy(helper + strlen(self), "/lord-doc", 10);
-    }
+/* <folder of this binary>/<name> */
+static int helper_path(char *out, size_t size, const char *name) {
+    char self[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (n <= 0) return -1;
+    self[n] = 0;
+    char *slash = strrchr(self, '/');
+    if (!slash) return -1;
+    *slash = 0;
+    size_t ls = strlen(self), ln = strlen(name);
+    if (ls + ln + 2 > size) return -1;
+    memcpy(out, self, ls);
+    out[ls] = '/';
+    memcpy(out + ls + 1, name, ln + 1);
+    return 0;
+}
+
+static int helper_ok(const char *path) {
     struct stat st, me;
-    if (stat(helper, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
+    if (stat(path, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     /* owned by the same user as lord-server (or by root) and writable by nobody else */
     if (stat("/proc/self/exe", &me) || (st.st_uid != 0 && st.st_uid != me.st_uid) || (st.st_mode & 022)) return -1;
     return 0;
+}
+
+int doc_available(void) {
+    if (!helper[0] && helper_path(helper, sizeof helper, "lord-doc")) return -1;
+    return helper_ok(helper);
+}
+
+/* lord-ocr: the same helper loop with Tesseract only (h_ocr.c), for sessions of mode "ocr" */
+int doc_ocr_available(void) {
+    if (!ocr_helper[0] && helper_path(ocr_helper, sizeof ocr_helper, "lord-ocr")) return -1;
+    return helper_ok(ocr_helper);
 }
 
 /* ---- events ---- */
@@ -189,10 +205,12 @@ static int spawn(Sess *s) {
     const char *assets = getenv("LORD_DOC_FONTS");
     if (assets) { snprintf(fenv, sizeof fenv, "LORD_DOC_FONTS=%s", assets); envp[ne++] = fenv; }
     if (getenv("LORD_DOC_DEBUG")) envp[ne++] = "LORD_DOC_DEBUG=1";
+    int ocr = !strcmp(s->mode, "ocr");
+    if (ocr) envp[ne++] = "OMP_THREAD_LIMIT=1";       /* Tesseract's OpenMP: one thread is plenty for a selection */
     envp[ne] = NULL;
-    char *argv[] = { "lord-doc", NULL };
+    char *argv[] = { ocr ? "lord-ocr" : "lord-doc", NULL };
     pid_t pid;
-    int r = posix_spawn(&pid, helper, &fa, &at, argv, envp);
+    int r = posix_spawn(&pid, ocr ? ocr_helper : helper, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&at);
     close(sv[1]);
@@ -420,7 +438,7 @@ static void *manager(void *arg) {
 
 static int ensure_started(void) {
     if (started) return 0;
-    if (doc_available()) return -1;
+    if (doc_available() && doc_ocr_available()) return -1;
     wakefd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (wakefd < 0) return -1;
     sigset_t all, old;
@@ -437,6 +455,10 @@ static int ensure_started(void) {
 /* ---- API ---- */
 
 int doc_session(const char *mode, DocInitFd *fds, int n) {
+    if (strcmp(mode, "ocr") ? doc_available() : doc_ocr_available()) {     /* that mode's helper is missing */
+        for (int i = 0; i < n; i++) close(fds[i].fd);
+        return -1;
+    }
     pthread_mutex_lock(&mu);
     Sess *s = NULL;
     for (int i = 0; i < MAX_SESS && !s; i++) if (sess[i].state == S_FREE) s = &sess[i];

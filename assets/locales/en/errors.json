@@ -407,6 +407,7 @@
   "media.audioOpenFailed": "Could not open the audio",
   "media.cannotOpen": "Could not open the file (damaged or unsupported format)",
   "media.captureFailed": "Could not capture the screen",
+  "media.ocrUnavailable": "Text recognition isn't available (the lord-ocr helper or its language data is missing)",
   "media.convertFailed": "Could not convert the image",
   "media.createFailed": "Could not create the file",
   "media.denied.camera": "{app} does not have permission to use the camera",

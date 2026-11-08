@@ -19,7 +19,7 @@
     "other": "{count} janelas protegidas: saem pretas nas capturas"
   },
   "recent": "Recentes",
-  "hintArea": "Arraste para escolher uma área · Espaço: janela · Esc: cancelar",
+  "hintArea": "Arraste para escolher uma área · Espaço: janela · C: copiar a cor · T: copiar texto · Esc: cancelar",
   "hintWindow": "Clique numa janela · Espaço: área · Esc: cancelar",
   "savedTo": "Salva em {folder}",
   "copied": "Copiada para a área de transferência",
@@ -62,5 +62,12 @@
   "tool.fill": "Tapar (preenchimento sólido)",
   "tool.crop": "Recortar",
   "cantOpen": "Não é possível abrir esta imagem",
-  "loading": "Abrindo…"
+  "loading": "Abrindo…",
+  "mode.color": "Cor",
+  "hintColor": "Clique para copiar a cor · Esc: cancelar",
+  "colorCopied": "{color} copiada",
+  "mode.text": "Texto",
+  "hintText": "Arraste sobre o texto para copiá-lo · T: seleção · Esc: cancelar",
+  "textCopied": "Texto copiado ({count} caracteres)",
+  "noText": "Nenhum texto encontrado na seleção"
 }

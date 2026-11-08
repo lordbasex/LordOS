@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { captureView, captureRect, displaysToCapture, displayAt, dragRect } = await import(path.join(here, '../../apps/screenshots/geometry.js'));
+const { captureView, captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM } = await import(path.join(here, '../../apps/screenshots/geometry.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -67,6 +67,30 @@ eq('a selection on the left display lands in its capture', captureRect({ x: 100,
 eq('a selection on the 200 % right display, at its resolution', captureRect({ x: 3940, y: 50, w: 200, h: 100 }, 3840, 2160, three, three.displays[2]), { x: 200, y: 100, w: 400, h: 200 });
 eq('a drag stays inside the display it began on', dragRect({ x: 1800, y: 100 }, 2500, 300, three.displays[1]), { x: 1800, y: 100, w: 120, h: 200 });
 eq('a drag up and left', dragRect({ x: 500, y: 500 }, 100, 50, three.displays[1]), { x: 100, y: 50, w: 400, h: 450 });
+
+// ---- the magnifier and the color picker (0.8.8.6) ----
+eq('the capture pixel on a 200 % display', capturePixel(3940.5, 10.7, 3840, 2160, three, three.displays[2]), { x: 201, y: 21 });
+eq('the capture pixel at 100 %', capturePixel(100.2, 50.9, 1920, 1080, three, three.displays[1]), { x: 100, y: 50 });
+const block = new Uint8Array(LOUPE_PX * LOUPE_PX * 4);
+const mid = ((LOUPE_PX >> 1) * LOUPE_PX + (LOUPE_PX >> 1)) * 4;
+block.set([0x1e, 0x90, 0xff, 255], mid);
+eq('the middle pixel\'s color', middleColor(block), { hex: '#1E90FF', r: 30, g: 144, b: 255 });
+const big = magnify(block);
+eq('the magnifier is the block enlarged', big.length, (LOUPE_PX * LOUPE_ZOOM) ** 2 * 4);
+const at = (x, y) => Array.from(big.slice((y * LOUPE_PX * LOUPE_ZOOM + x) * 4, (y * LOUPE_PX * LOUPE_ZOOM + x) * 4 + 4));
+const c = (LOUPE_PX >> 1) * LOUPE_ZOOM;
+eq('inside the middle pixel: its color', at(c + 3, c + 3), [0x1e, 0x90, 0xff, 255]);
+eq('the middle pixel is outlined', at(c, c + 3), [255, 255, 255, 255]);
+eq('outside the capture: dark, opaque', at(1, 1), [0, 0, 0, 255]);
+
+// ---- copy the text (OCR) ----
+const { ocrLangs, cleanText } = await import(path.join(here, '../../apps/screenshots/ocr.js'));
+eq('the interface languages first, then the shipped ones', ocrLangs(['pt-BR']), 'por+eng+spa+fra+ita');
+eq('each once', ocrLangs(['es', 'en', 'es']), 'spa+eng+por+fra+ita');
+eq('another installed language goes first', ocrLangs(['de']), 'deu+eng+spa+por+fra+ita');
+eq('an unknown language is left out', ocrLangs(['ja']), 'eng+spa+por+fra+ita');
+eq('no languages: the shipped ones', ocrLangs(undefined), 'eng+spa+por+fra+ita');
+eq('cleaned text', cleanText('ls -la  \n\n\n\ntotal 4\f\n'), 'ls -la\n\ntotal 4');
 
 console.log(`${n - bad}/${n} screenshots geometry checks passed`);
 process.exit(bad ? 1 : 0);
