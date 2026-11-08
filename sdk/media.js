@@ -76,7 +76,8 @@ export const media = {
   poster: (path, maxSize = 512) => job(() => call('poster', path, maxSize)).then((r) => (r.ok ? call('take', r.id) : null)),
   edit: (app, path, out, opts) => job(() => call('edit', app, path, out, opts)),
   transcode: (app, path, out, opts) => job(() => call('transcode', app, path, out, opts)),
-  // screenshots (with protected windows in black)
+  // screenshots (with protected windows in black). rect: { x, y, width, height } (logical), display (its id),
+  // until (wm.frameNode(id): the screen up to that window and nothing above it, the window alone)
   async screenshot(app, rect) {
     if (!(await requestPermission(app, 'screen'))) return null;
     return call('screenshot', app, rect || {});

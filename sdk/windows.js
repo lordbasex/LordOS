@@ -502,6 +502,9 @@ export const wm = {
   frame: (w) => { if (!w.maximized) return w; const a = areaOfWindow(w); return { x: a.x, y: a.y, w: a.w, h: a.h }; },
   // The radius of the frame's corners in logical px, as the theme draws it now (0: square, or not drawn).
   cornerRadius: (id) => frameRadii.get(id) || 0,
+  // The node of the window's frame (WindowShell), 0 when the theme doesn't draw one: media.screenshot's
+  // `until`, a capture of the window alone with nothing above it (apps/screenshots, issue #70).
+  frameNode: (id) => fxNodes.get(id) || frameNodes.get(id)?.node || 0,
 };
 
 // windows: all of them, every desktop. visible: what shows on this desktop. focused: its front window.

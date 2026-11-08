@@ -86,7 +86,18 @@ static int skip_ancestor(const Node *n) {
     return 0;
 }
 
+/* paint_capture_until: the last node painted (a window, Screenshots' window capture); once it is done, nothing
+ * after it in painting order (the windows, menus and panels above it) is painted. */
+static int cap_last, cap_done;
+
+static void paint_node_body(Canvas *c, Node *n, float opacity);
 static void paint_node(Canvas *c, Node *n, float opacity) {
+    if (cap_done) return;
+    paint_node_body(c, n, opacity);
+    if (cap_last && n->id == cap_last) cap_done = 1;
+}
+
+static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_RAW || n->s.display_none) return;
     if (layer_paint(c, n, opacity)) return;
     if (n->own_tf && n->id != tf_self && tf_paint(c, n, opacity)) return;
@@ -363,7 +374,7 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     if (paint_tf_nocache) e->valid = 0;
     e->used = ++tf_tick;
     float ox = (gx0 - pad) / kr, oy = (gy0 - pad) / kr;
-    if (!e->valid || live || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
+    if (!e->valid || live || cap_last || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
         if ((size_t)w * h > e->cap) {
             uint32_t *px = realloc(e->px, (size_t)w * h * 4);
             if (!px) return 0;
@@ -2091,6 +2102,18 @@ void paint_capture(Canvas *c, Node *root) {
     paint_node(c, root, 1);
     wl_paint_popups(c);
     paint_capture_mode = 0;
+}
+
+int paint_capture_until(Canvas *c, Node *root, int last) {
+    if (!root || last <= 0) return 0;
+    paint_capture_mode = 1;
+    cap_last = last;
+    cap_done = 0;
+    paint_node(c, root, 1);
+    int reached = cap_done;
+    cap_last = cap_done = 0;
+    paint_capture_mode = 0;
+    return reached;
 }
 
 static Node *hit(Node *n, float x, float y) {

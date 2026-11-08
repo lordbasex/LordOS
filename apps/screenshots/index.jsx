@@ -128,12 +128,24 @@ function endArea(keep) {
   for (const w of windows.get()) if (w.app === APP && String(w.instance || w.id).includes('overlay')) wm.close(w.id, true);
   for (const sh of a.shots) if (sh.handle !== keep) media.close(sh.handle);
 }
+// A window alone (issue #70): the screen painted again up to that window and no further, so what covered it
+// (other windows, a menu, the Dock) is left out and the window is whole. null when lord-server can't (a window
+// the theme draws without a frame node, or one gone meanwhile): the still is cropped as before.
+async function windowAlone(r, shot) {
+  const node = r && r.win ? wm.frameNode(r.win) : 0;
+  if (!node) return null;
+  try { return await media.screenshot(APP, { ...(shot.display ? { display: shot.display.id } : null), until: node }); } catch { return null; }
+}
 async function areaDone(r, at) {
   const a = area.get();
   if (!a) return;
-  const shot = a.shots.find((sh) => !sh.display || (at && sh.display.id === at.id)) || a.shots[0];
+  let shot = a.shots.find((sh) => !sh.display || (at && sh.display.id === at.id)) || a.shots[0];
   endArea(shot.handle);
   if (!r || r.w < 3 || r.h < 3) { media.close(shot.handle); return; }
+  if (a.mode === 'window') {
+    const alone = await windowAlone(r, shot);
+    if (alone) { media.close(shot.handle); shot = { ...shot, handle: alone }; }
+  }
   // r is in logical pixels; the capture is at its display's physical resolution (2× at 200 %)
   const info = media.info(shot.handle);
   const p = info && captureRect(r, info.width, info.height, lord.screen, shot.display);
@@ -259,7 +271,7 @@ function Overlay({ index }) {
       // the window under the pointer (the topmost one), for the window mode
       const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
       let found = null;
-      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, radius: w.fullscreen ? 0 : wm.cornerRadius(w.id), title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
+      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { x: f.x, y: f.y, w: f.w, h: f.h, win: w.fullscreen ? null : w.id, radius: w.fullscreen ? 0 : wm.cornerRadius(w.id), title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
       area.set({ ...cur, pointer: { x: e.x, y: e.y }, hover: found, loupe });
     });
     const offUp = addListener('pointerup', (e) => {

@@ -360,5 +360,9 @@ Node *hit_test(Node *root, float x, float y);
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */
 extern int paint_capture_mode;
 void  paint_capture(Canvas *c, Node *root);
+/* The same, stopping after node `last` (a window's frame): what is painted after it (the windows, menus, the
+ * Dock and the panels above it) and the Wayland popups are left out, so a window comes out whole, as if
+ * nothing covered it (Screenshots' window capture, issue #70). 1 if `last` was reached and painted. */
+int   paint_capture_until(Canvas *c, Node *root, int last);
 
 #endif

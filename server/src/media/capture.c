@@ -164,7 +164,7 @@ void media_capture_size(int *w, int *h) {
     *h = (m ? m->v.ph : (int)ui.height) & ~1;
 }
 
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display) {
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until) {
     int W = (int)ui.width, H = (int)ui.height;
     if (W <= 0 || H <= 0 || !ui.root) return NULL;
     /* one display asked for (Screenshots: a file per display, an area on any of them) */
@@ -181,11 +181,16 @@ MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t
     canvas_clear(&c, 0x000000);
     PaintView keep = paint_view;
     if (m) paint_view = (PaintView){ (float)m->v.x, (float)m->v.y, (float)m->v.k, (float)m->v.dx, (float)m->v.dy, -1 };
-    paint_capture(&c, ui.root);
-    paint_capture_mode = 1;
-    wl_paint_fullscreen(&c);
-    paint_capture_mode = 0;
+    int ok = 1;
+    if (until) ok = paint_capture_until(&c, ui.root, until);     /* a window alone: nothing above it */
+    else {
+        paint_capture(&c, ui.root);
+        paint_capture_mode = 1;
+        wl_paint_fullscreen(&c);
+        paint_capture_mode = 0;
+    }
     paint_view = keep;
+    if (!ok) { free(full); return NULL; }       /* not a node on the screen: the caller crops a capture instead */
     if (w <= 0 || h <= 0) { x = 0; y = 0; w = W; h = H; }
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }

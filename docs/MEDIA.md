@@ -270,7 +270,7 @@ passes the media keys and Print Screen to LordOS even when a Wayland app has foc
 | `probe(path)`, `waveform(path, bars)`, `poster(path, side)` + `take(id)` | Jobs (`job` event); `poster` leaves RGBA pixels |
 | `edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, width, height, format, quality })` | Edited copy (Photos → Edit; `width` × `height` is the new size after the crop, both sides 1..8192 or neither) |
 | `transcode(app, path, output, { format: 'opus'\|'mp3'\|'wav', from, to })` | Export audio with trimming |
-| `screenshot(app, { x, y, width, height })` → id, `crop`, `annotate(base, ops, dest)` | Screenshots (`screen` permission) |
+| `screenshot(app, { x, y, width, height, display, until })` → id, `crop`, `annotate(base, ops, dest)` | Screenshots (`screen` permission). `until`: a window's frame node (`wm.frameNode(id)`); the screen is painted up to that window and no further (`paint_capture_until`), so a window capture is the window whole, without the windows, menus or Dock that covered it (#70) |
 | `resize(id, width, height)`, `rotate(id, quarterTurns)` → id | The markup editor (0.8.8.4, issue #30): a new picture from a capture or a decoded image; whole sides 1..8192, turns -3..3, anything else refused in C (`server/src/media/imgops.c`) |
 | `saveImage(id, output, { format })`, `copyImage(id)` | PNG/JPEG to a file or to the clipboard |
 | `screenRecord(app, output.mp4, { mic, fps })`, `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |

@@ -477,6 +477,42 @@ static void test_layers(void) {
     CHECK(hit_test(root, 20, 30) == menu && pix(20, 30) == 0xff0000, "a zIndex inside the base stays under the layers");
 }
 
+/* Screenshots' window capture (issue #70): paint_capture_until paints the screen up to a window and no further,
+ * so a window under another one, a menu or the Dock comes out whole; what is below it stays. */
+static void test_capture_until(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *dockl = layer_node(root, 10, 160, 100);
+    Node *base = view(root);
+    sn(base, "width", 160); sn(base, "height", 100);
+    Node *below = box_in(base, 0, 0, 40, 40, 0xff00ffff);         /* a window below the chosen one: cyan */
+    Node *win = box_in(base, 20, 20, 80, 60, 0xff0000ff);         /* the chosen window: blue */
+    box_in(win, 10, 10, 20, 20, 0xffffff00);                        /* its content: yellow */
+    box_in(base, 60, 40, 80, 50, 0xffff0000);                       /* a window above it: red */
+    box_in(dockl, 0, 70, 30, 30, 0xff00ff00);                       /* the Dock over its corner: green */
+    (void)below;
+    render(root, 160, 100);
+    CHECK(pix(80, 60) == 0xff0000 && pix(25, 75) == 0x00ff00, "on screen the window is covered: %06x %06x", pix(80, 60), pix(25, 75));
+    uint32_t *px = calloc(160 * 100, 4);
+    Canvas c;
+    canvas_init(&c, px, 160, 100, 160);
+    int ok = paint_capture_until(&c, root, win->id);
+    CHECK(ok, "the window was reached");
+    CHECK((px[60 * 160 + 80] & 0xffffff) == 0x0000ff, "the part a window above covered is the window's: %06x", px[60 * 160 + 80]);
+    CHECK((px[75 * 160 + 25] & 0xffffff) == 0x0000ff, "and so is the part under the Dock: %06x", px[75 * 160 + 25]);
+    CHECK((px[35 * 160 + 35] & 0xffffff) == 0xffff00, "its content is painted: %06x", px[35 * 160 + 35]);
+    CHECK((px[10 * 160 + 10] & 0xffffff) == 0x00ffff, "what is below it stays: %06x", px[10 * 160 + 10]);
+    CHECK((px[85 * 160 + 120] & 0xffffff) == 0xffffff, "a window above, outside it, isn't painted: %06x", px[85 * 160 + 120]);
+    memset(px, 0, 160 * 100 * 4);
+    CHECK(!paint_capture_until(&c, root, 999999), "a node that isn't there: not reached");
+    CHECK(!paint_capture_mode, "capture mode is over");
+    render(root, 160, 100);
+    CHECK(pix(80, 60) == 0xff0000, "the next frame paints everything again: %06x", pix(80, 60));
+    free(px);
+}
+
 /* Closing a menu repaints only where it was; the translucent, blurred menu bar above it must come
  * out as in a full repaint (before 0.8.1 the blur mixed in the bar's last frame: a lighter band). */
 static void test_backdrop_band(void) {
@@ -3108,6 +3144,7 @@ int main(int argc, char **argv) {
     test_transform_surface();
     test_transform_self_restyle();
     test_layers();
+    test_capture_until();
     test_backdrop_band();
     test_multi_damage();
     test_minimize_damage();

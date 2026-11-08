@@ -133,7 +133,9 @@ void media_view_reset(MediaSrc *s);
 /* capture.c */
 /* display: a display's connector id (lord.screen.displays[].id): that display at its physical resolution; 0 for
  * Settings' choice ("Screenshots and sharing": the main display, or every display at 100 %). */
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display);
+/* until: 0, or the node of a window's frame: the screen painted up to that window and no further, so the
+ * window is whole even where other windows covered it (paint_capture_until; NULL if it isn't reached). */
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until);
 void media_capture_size(int *w, int *h);     /* recording / remote desktop frame size (docs/DISPLAYS.md) */
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
 MediaSrc *media_resize(MediaSrc *src, int w, int h);          /* new capture source, w × h */
