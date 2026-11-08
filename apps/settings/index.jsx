@@ -6,7 +6,7 @@ import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
-  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -509,7 +509,11 @@ function LanguageRegion() {
   };
 
   const now = new Date();
-  const regionItems = locales.map((l) => [shortLocale(l.name), shortLocale(l.name), l.generated ? '✓' : '']);
+  // the country by the code, as in the installer ("Australia · en_AU"), so a search by country finds it (#53)
+  const regionItems = [...new Map(locales.map((l) => [shortLocale(l.name), l])).values()].map((l) => {
+    const r = shortLocale(l.name), cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : '';
+    return [r, name ? `${name} · ${r}` : r, l.generated ? '✓' : ''];
+  });
   const dim = { fontSize: typeScale.body, color: t.textDim, textAlign: 'end' };
   const langName = langs.find((l) => l.id === lang)?.name || lang;
   return (
