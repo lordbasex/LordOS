@@ -247,6 +247,17 @@ locked; the first app that needs it triggers a system prompt (`<KeyringPrompt />
 `startShell`) asking for the login password. When several apps ask at once (0.8.5, `sdk/vault.js`),
 the requests queue behind one box: one answer goes to all of them, a new request no longer wipes the
 field, and Cancel answers every queued request instead of bringing the box back for the next one.
+When the keyring opens by other means while the box is up (the login's password arrived late, a screen
+unlock with the password), the box closes by itself and every queued request gets its answer.
+
+Mail (0.8.8.6, issue #63) is one of those apps: lord-maild asks the session for each account's
+password once, and when the keyring is locked the session shows the prompt once (3 s after the first
+account asks, so the login's own unlock is not mistaken for a locked keyring) and answers every waiting
+account as soon as `lord-vault` broadcasts `unlocked` for `login`. A keyring that was never created
+(`no-keyring`: every login so far was automatic) cannot be made from the prompt; it is created the next
+time the person logs in or unlocks the screen with their password. When "Save to Keyring" cannot keep a
+password, Mail says so and why instead of closing as if it had (before, it failed quietly and asked again
+at every boot).
 
 ### `lord.keyring` / SDK `keyring` (native apps)
 

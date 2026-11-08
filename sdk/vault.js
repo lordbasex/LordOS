@@ -144,6 +144,16 @@ export function askKeyringUnlock() {
 if (has()) {
   onVaultEvent((ev) => {
     if (ev.ev === 'ss-prompt') prompts.set((q) => [...q, { prompt: ev.prompt }]);
+    // it opened by other means (the login's password arrived late, a screen unlock): the box has
+    // nothing left to ask, and whoever was waiting gets its answer
+    else if (ev.ev === 'unlocked' && ev.v === 'login' && prompts.get().length) {
+      const all = prompts.get();
+      for (const p of all) {
+        if (p.local) { p.local(true); continue; }
+        try { lord.vault.promptDone(p.prompt, true); } catch (e) { /* */ }
+      }
+      prompts.set((l) => l.filter((p) => !all.includes(p)));
+    }
   });
 }
 

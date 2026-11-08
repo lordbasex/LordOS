@@ -169,6 +169,7 @@ EOF
     if have node; then run "cloud-model-test (sdk/cloudmodel.js)" node tests/cloud_model_test.mjs
     else skip "cloud-model-test" "node"; fi
     if have node; then run "mail-foldertree-test (apps/mail)" node tests/mail_foldertree_test.mjs; fi
+    if have node; then run "mail-auth-model-test (sdk/mailauthmodel.js)" node tests/mail_auth_model_test.mjs; fi
     if have node; then run "balance-model-test (apps/settings/balance.js)" node tests/balance_model_test.mjs; fi
     # the lock around a system sleep (sdk/idlemodel.js, issue #36)
     if have node; then run "idle-model-test (sdk/idlemodel.js)" node tests/idle_model_test.mjs

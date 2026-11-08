@@ -11,6 +11,8 @@
 //   mailConfig.get() / mailConfig.save(cfg)  the accounts file (no passwords: those live in the keyring)
 //   mailAccounts.add(account, password)      saves the account, the password in the keyring, and starts it
 //   mailAccounts.remove(id) / setPassword(id, pw) / trustCertificate(id, which, sha256)
+//                                            (setPassword → null once the keyring kept it, else 'locked',
+//                                            'missing' or 'error': the password then lasts this session only)
 //   autoconfig(email)                        our provider table (Gmail, Yahoo and others) or a guess
 //   OAUTH_PROVIDERS                          prepared, disabled until you register a client ID
 //   DAV_PRESETS / davPreset(id)              calendar and contacts services for Add Account (generic, or a provider)
@@ -18,7 +20,8 @@
 //   mailStatus (store)                       { accounts: { id: { status, error } }, unread, rev, certs: [] }
 //   startMail()                              called by startShell: new-mail notifications, passwords on demand
 import { createStore } from './store.js';
-import { keyring } from './vault.js';
+import { keyring, askKeyringUnlock, onVaultEvent } from './vault.js';
+import { keyringTrouble, askUnlock, authAfterStatus } from './mailauthmodel.js';
 import { notify } from './notify.js';
 import { t } from './i18n.js';
 import { wm, getApp } from './windows.js';
@@ -106,9 +109,25 @@ const bumpStatus = () => mailStatus.set((s) => ({ ...s, rev: s.rev + 1 }));
 
 const service = (id) => `mail:${id}`;
 
+// → { password, trouble }: the saved password (or null), and why the keyring could not be read
+// (keyringTrouble: 'locked', 'missing', 'error'; null when it answered)
 async function passwordFor(acct) {
-  try { const it = await keyring.get('mail', { service: service(acct.id), account: acct.user }); return it ? it.secret : null; }
-  catch (e) { return null; }
+  try { const it = await keyring.get('mail', { service: service(acct.id), account: acct.user }); return { password: it ? it.secret : null, trouble: null }; }
+  catch (e) { return { password: null, trouble: keyringTrouble(e.code || 'error') }; }
+}
+
+// Keeps the password in the keyring: → null, or the keyringTrouble that kept it out (the account still
+// works for this session; Mail asks again at the next login).
+async function savePassword(acct, password) {
+  try {
+    await keyring.set('mail', { service: service(acct.id), account: acct.user, secret: password, label: `${t('mail.keyring.label')} — ${acct.email || acct.user}` });
+    mailStatus.set((s) => (s.keyringError ? { ...s, keyringError: null } : s));
+    return null;
+  } catch (e) {
+    const trouble = keyringTrouble(e.code || 'error');
+    mailStatus.set((s) => ({ ...s, keyringError: trouble }));
+    return trouble;
+  }
 }
 
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'account';
@@ -128,8 +147,7 @@ export const mailAccounts = {
     const acct = { kind: 'mail', auth: 'password', ...account, id: account.id || mailAccounts.newId(account.email || account.name || account.url) };
     // the keyring may be locked or missing (no login password, e.g. autologin): the account still
     // works for this session and Mail asks again next time
-    if (password) await keyring.set('mail', { service: service(acct.id), account: acct.user, secret: password, label: `${t('mail.keyring.label')} — ${acct.email || acct.user}` })
-      .catch((e) => { mailStatus.set((s) => ({ ...s, keyringError: e.code || 'error' })); });
+    if (password) await savePassword(acct, password);
     const cfg = mailConfig.get();
     cfg.accounts = [...cfg.accounts.filter((a) => a.id !== acct.id), acct];
     mailConfig.save(cfg);
@@ -151,11 +169,11 @@ export const mailAccounts = {
   },
   async setPassword(id, password) {
     const a = mailAccounts.get(id);
-    if (!a) return;
-    await keyring.set('mail', { service: service(id), account: a.user, secret: password, label: `${t('mail.keyring.label')} — ${a.email || a.user}` })
-      .catch((e) => { mailStatus.set((s) => ({ ...s, keyringError: e.code || 'error' })); });
+    if (!a) return null;
+    const trouble = await savePassword(a, password);
     mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [id]: false } }));
     await mailRequest('auth', { acct: id, password });
+    return trouble;
   },
   // the user looked at the certificate and chose to trust exactly this one
   trustCertificate(id, which, sha256) {
@@ -245,13 +263,16 @@ export function trackMailStatus() {
   if (tracking || !has() || !lord.mail.appMode) return;
   tracking = true;
   onMailEvent(async (ev) => {
-    if (ev.ev === 'status') mailStatus.set((s) => ({ ...s, accounts: { ...s.accounts, [ev.acct]: { status: ev.status, error: ev.error } } }));
-    else if (ev.ev === 'cert') mailStatus.set((s) => ({ ...s, certs: [...s.certs.filter((c) => !(c.acct === ev.acct && c.host === ev.host)), ev] }));
+    if (ev.ev === 'status') {
+      mailStatus.set((s) => ({ ...s, accounts: { ...s.accounts, [ev.acct]: { status: ev.status, error: ev.error } },
+        authFailed: authAfterStatus(s.authFailed, ev.acct, ev.status) }));
+    } else if (ev.ev === 'cert') mailStatus.set((s) => ({ ...s, certs: [...s.certs.filter((c) => !(c.acct === ev.acct && c.host === ev.host)), ev] }));
     else if (ev.ev === 'auth-failed') mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [ev.acct]: true } }));
     else if (ev.ev === 'need-auth') {
-      // the session answers too; here it only matters whether a password exists at all
+      // the session answers too (and asks to unlock the keyring); here it only matters whether a
+      // password can be read at all. A mark set here goes away with the account's next good status.
       const a = mailAccounts.get(ev.acct);
-      const pw = a ? await passwordFor(a) : null;
+      const pw = a ? (await passwordFor(a)).password : null;
       if (pw) mailRequest('auth', { acct: ev.acct, password: pw }).catch(() => {});
       else mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [ev.acct]: true } }));
     } else if (ev.ev === 'new' || ev.ev === 'changed' || ev.ev === 'folders' || ev.ev === 'ready') refreshCounts();
@@ -281,20 +302,54 @@ function fixDavAccounts(cfg) {
   return changed ? { ...cfg, accounts } : cfg;
 }
 
+// lord-maild asks for each account's password once (need-auth). When the session keyring is not open
+// yet (automatic login, a login password changed outside LordOS, or lord-maild asking before
+// lord-vault finished opening it at login), the accounts wait here: the system keyring prompt is
+// shown once, and every waiting account is answered as soon as the keyring opens, from that prompt,
+// a screen unlock with the password or the login itself (issue #63: before, the password was taken
+// as missing and Mail asked for it again at every boot, while its "Save to Keyring" failed quietly).
+const waitingKeyring = new Set();
+let unlockAsked = false;
+const ASK_AFTER_MS = 3000;    // lord-vault may still be opening it at login: no prompt for that
+
+async function answerNeedAuth(id) {
+  const a = mailAccounts.get(id);
+  if (!a) { waitingKeyring.delete(id); return; }
+  const { password, trouble } = await passwordFor(a);
+  if (password) {
+    waitingKeyring.delete(id);
+    mailRequest('auth', { acct: id, password }).catch(() => {});
+    return;
+  }
+  mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [id]: true } }));
+  if (trouble !== 'locked' && trouble !== 'missing') { waitingKeyring.delete(id); return; }
+  waitingKeyring.add(id);
+  if (!askUnlock(trouble, unlockAsked)) return;
+  unlockAsked = true;
+  setTimeout(() => { if (waitingKeyring.size) askKeyringUnlock(); }, ASK_AFTER_MS);
+}
+
 export function startMail() {
   if (started || !has() || !lord.mail.available()) return;
   started = true;
   const cfg = fixDavAccounts(mailConfig.get());
+  onVaultEvent((ev) => {
+    if (ev.ev !== 'unlocked' || ev.v !== 'login') return;
+    for (const id of [...waitingKeyring]) {
+      // the person typed the password in Mail meanwhile: lord-maild already has it
+      const st = mailStatus.get().accounts[id]?.status;
+      if (st === 'idle' || st === 'sync') waitingKeyring.delete(id);
+      else answerNeedAuth(id);
+    }
+  });
   onMailEvent(async (ev) => {
     if (ev.ev === 'need-auth') {
-      const a = mailAccounts.get(ev.acct);
-      const pw = a ? await passwordFor(a) : null;
-      if (pw) mailRequest('auth', { acct: ev.acct, password: pw }).catch(() => {});
-      else mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [ev.acct]: true } }));
+      answerNeedAuth(ev.acct);
     } else if (ev.ev === 'auth-failed') {
       mailStatus.set((s) => ({ ...s, authFailed: { ...s.authFailed, [ev.acct]: true } }));
     } else if (ev.ev === 'status') {
-      mailStatus.set((s) => ({ ...s, accounts: { ...s.accounts, [ev.acct]: { status: ev.status, error: ev.error } } }));
+      mailStatus.set((s) => ({ ...s, accounts: { ...s.accounts, [ev.acct]: { status: ev.status, error: ev.error } },
+        authFailed: authAfterStatus(s.authFailed, ev.acct, ev.status) }));
     } else if (ev.ev === 'cert') {
       mailStatus.set((s) => ({ ...s, certs: [...s.certs.filter((c) => !(c.acct === ev.acct && c.host === ev.host)), ev] }));
     } else if (ev.ev === 'new') {

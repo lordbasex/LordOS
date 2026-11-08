@@ -42,6 +42,9 @@ function ServerFields({ value, onChange, label }) {
   );
 }
 
+// Why the password was not kept in the keyring (sdk/mailauthmodel.js keyringTrouble), for the person
+const keyringNote = (trouble) => t(`mail.password.${trouble === 'locked' ? 'notSavedLocked' : trouble === 'missing' ? 'notSavedMissing' : 'notSavedError'}`);
+
 // Waits for the new account's first status: connected, wrong password, certificate or offline.
 function useAccountResult(id) {
   const st = useStore(mailStatus);
@@ -118,6 +121,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState('');
   const result = useAccountResult(created);
+  const keyringError = useStore(mailStatus).keyringError;
 
   const next = () => {
     setErr('');
@@ -161,7 +165,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
       }
       setCreated(id);
       setStep('result');
-    } catch (e) { setErr(e.code === 'locked' || e.code === 'no-keyring' ? t('mail.setup.keyringLocked') : `${t('mail.setup.failed')} ${e.message || ''}`); }
+    } catch (e) { setErr(`${t('mail.setup.failed')} ${e.message || ''}`); }
   };
 
   const title = kind === 'dav' ? t('mail.setup.titleDav') : t('mail.setup.title');
@@ -228,6 +232,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
             {t(`mail.setup.result.${result === 'ok' && kind === 'dav' ? 'okDav' : result || 'working'}`)}
           </Text>
           {result === 'auth' && <Text style={{ fontSize: 12, color: th.textDim }}>{t('mail.setup.authHelp')}</Text>}
+          {created && keyringError ? <Text style={{ fontSize: 12, color: '#ff9f0a' }}>{keyringNote(keyringError)}</Text> : null}
         </View>
       )}
       {err ? <Text style={{ fontSize: 12, color: '#ff453a' }}>{err}</Text> : null}
@@ -274,8 +279,24 @@ export function PasswordPrompt({ acct, onClose }) {
   const th = useTheme();
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
+  const [notSaved, setNotSaved] = useState(null);     // the keyring did not keep it: say so instead of closing
   const a = mailAccounts.get(acct);
-  const go = async () => { setBusy(true); try { await mailAccounts.setPassword(acct, pw); onClose(); } catch (e) { setBusy(false); } };
+  const go = async () => {
+    setBusy(true);
+    try { const trouble = await mailAccounts.setPassword(acct, pw); if (trouble) { setBusy(false); setNotSaved(trouble); } else onClose(); }
+    catch (e) { setBusy(false); }
+  };
+  if (notSaved) {
+    return (
+      <Sheet>
+        <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
+        <Text style={{ fontSize: 13, color: th.textDim }}>{keyringNote(notSaved)}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+          <Button primary label={t('mail.close')} onClick={onClose} />
+        </View>
+      </Sheet>
+    );
+  }
   return (
     <Sheet>
       <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
