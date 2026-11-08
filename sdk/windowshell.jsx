@@ -11,10 +11,10 @@
 //
 // A window of a hidden desktop that is still mounted (a LordOS app, useWindows mounted) stays here with
 // display: none, so it keeps its state; in the overview the window takes its place in the grid.
-import { createElement as h, useRef } from 'react';
+import { createElement as h, useEffect, useRef } from 'react';
 import { View } from '@lordos/runtime';
 import { useStore } from './store.js';
-import { wm, fxNodes, activeDesktop } from './windows.js';
+import { wm, fxNodes, frameRadii, activeDesktop } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { desktopFx } from './desktops.js';
 import { OverviewCover, OverviewPlaceholder, useOverviewPlace } from './overview.jsx';
@@ -44,6 +44,9 @@ export function WindowShell({ win, style, children, onMouseDown, resizable = tru
   const m = resizable && !win.maximized && !tv ? WINDOW_EDGE : 0;
   const inner = useRef(null);
   if (!inner.current) inner.current = (n) => { if (n && n.id) fxNodes.set(win.id, n.id); else fxNodes.delete(win.id); };
+  const radius = typeof style?.borderRadius === 'number' ? style.borderRadius : 0;
+  useEffect(() => { frameRadii.set(win.id, radius); }, [win.id, radius]);
+  useEffect(() => () => frameRadii.delete(win.id), [win.id]);
   const place = tv ? { transform: `translate(${tv.x - geo.x}px, ${tv.y - geo.y}px) scale(${tv.scale})`, transformOrigin: 'left top' } : fx && here ? fx : null;
   return (
     <View ref={wm.frameRef(win.id, m)} onMouseDown={tv ? undefined : onMouseDown}

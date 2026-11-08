@@ -20,12 +20,17 @@ export function captureView(iw, ih, screen = {}, display = null) {
 }
 
 // A logical rect { x, y, w, h } → the image's pixels, clamped to iw × ih (null if nothing is left).
+// A window's rect also has its corner radius (wm.cornerRadius, logical px): it comes back in the
+// image's pixels as `radius`, for the transparent rounded corners of a window capture (issue #70).
 export function captureRect(r, iw, ih, screen, display = null) {
   if (!r || !(iw > 0) || !(ih > 0)) return null;
   const v = captureView(iw, ih, screen, display);
   const x0 = Math.max(0, Math.floor((r.x - v.x) * v.k + 1e-6)), y0 = Math.max(0, Math.floor((r.y - v.y) * v.k + 1e-6));
   const x1 = Math.min(iw, Math.ceil((r.x + r.w - v.x) * v.k - 1e-6)), y1 = Math.min(ih, Math.ceil((r.y + r.h - v.y) * v.k - 1e-6));
-  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+  if (!(x1 > x0 && y1 > y0)) return null;
+  const out = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  if (r.radius > 0) out.radius = Math.round(r.radius * v.k);
+  return out;
 }
 
 // ---- several displays (a capture each: ❖⇧3 saves one file per display, ❖⇧4 selects on any of them) ----

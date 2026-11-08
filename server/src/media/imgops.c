@@ -168,3 +168,35 @@ void img_rotate(const uint32_t *src, int w, int h, int turns, uint32_t *dst) {
             dst[(size_t)y * ow + x] = src[(size_t)sy * w + sx];
         }
 }
+
+/* How much of the pixel (x, y) lies inside the quarter circle of radius r centered at (cx, cy): 4 × 4
+ * samples, like the cursor and the rasterizer's edges. */
+static float corner_cover(int x, int y, float cx, float cy, float r) {
+    int in = 0;
+    for (int sy = 0; sy < 4; sy++)
+        for (int sx = 0; sx < 4; sx++) {
+            float dx = x + (sx + 0.5f) / 4 - cx, dy = y + (sy + 0.5f) / 4 - cy;
+            in += dx * dx + dy * dy <= r * r;
+        }
+    return in / 16.0f;
+}
+
+void img_round_corners(uint32_t *px, int w, int h, int r) {
+    if (!px || w < 1 || h < 1 || r <= 0) return;
+    if (r > w / 2) r = w / 2;
+    if (r > h / 2) r = h / 2;
+    for (int y = 0; y < r; y++)
+        for (int x = 0; x < r; x++) {
+            /* the top-left corner's pixel; the other three are its mirror images */
+            float k = corner_cover(x, y, (float)r, (float)r, (float)r);
+            if (k >= 1) continue;
+            int at[4][2] = { { x, y }, { w - 1 - x, y }, { x, h - 1 - y }, { w - 1 - x, h - 1 - y } };
+            for (int i = 0; i < 4; i++) {
+                uint32_t *p = &px[(size_t)at[i][1] * w + at[i][0]];
+                uint32_t v = *p;               /* premultiplied: every channel scales with the coverage */
+                uint32_t a = (uint32_t)((v >> 24) * k + 0.5f), cr = (uint32_t)(((v >> 16) & 255) * k + 0.5f);
+                uint32_t cg = (uint32_t)(((v >> 8) & 255) * k + 0.5f), cb = (uint32_t)((v & 255) * k + 0.5f);
+                *p = a << 24 | cr << 16 | cg << 8 | cb;
+            }
+        }
+}

@@ -16,6 +16,7 @@
 #include "../media/media_int.h"
 #include "../media/proto.h"
 #include "../media/hwdec.h"
+#include "../media/imgops.h"
 #include "../doc/doc.h"
 #include "../doc/proto.h"
 #include "../sec/json.h"
@@ -384,13 +385,19 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     return ret;
 }
 
+/* crop(id, x, y, w, h[, radius]) → id of a new picture. radius (px): the corners outside a rounded
+ * rectangle become transparent, so a window capture keeps the window's shape (issue #70). */
 static JSValue f_crop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 5 ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (!s) return JS_NULL;
-    int v[4];
-    for (int i = 0; i < 4; i++) { double d = 0; JS_ToFloat64(c, &d, argv[1 + i]); v[i] = d == d && fabs(d) < 65536 ? (int)d : 0; }
+    int v[5] = { 0 };
+    for (int i = 0; i < 5 && 1 + i < argc; i++) { double d = 0; JS_ToFloat64(c, &d, argv[1 + i]); v[i] = d == d && fabs(d) < 65536 ? (int)d : 0; }
     MediaSrc *n = media_crop(s, v[0], v[1], v[2], v[3]);
+    if (n && v[4] > 0) {
+        img_round_corners(n->px, n->w, n->h, v[4]);
+        n->opaque = 0;
+    }
     return n ? JS_NewInt32(c, n->id) : JS_NULL;
 }
 

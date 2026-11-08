@@ -59,6 +59,9 @@ export function setWindowMemory(fn) { memory = fn; }
 const areaOfWindow = (w) => workAreaOf(displayFor(w));
 // Window id → the node of its frame inside WindowShell (the Desktops animation, sdk/desktops.js).
 export const fxNodes = new Map();
+// Window id → the corner radius its frame is drawn with (WindowShell's borderRadius; 0 when square):
+// a window capture leaves the corners outside it transparent (apps/screenshots, issue #70).
+export const frameRadii = new Map();
 // Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
 let linuxPlacement = null;
 export function setLinuxPlacement(fn) { linuxPlacement = fn; }
@@ -497,6 +500,8 @@ export const wm = {
   stopScript: () => { if (typeof lord !== 'undefined' && lord.wm) lord.wm.cancel(); },
   // Effective geometry (a maximized window takes the work area).
   frame: (w) => { if (!w.maximized) return w; const a = areaOfWindow(w); return { x: a.x, y: a.y, w: a.w, h: a.h }; },
+  // The radius of the frame's corners in logical px, as the theme draws it now (0: square, or not drawn).
+  cornerRadius: (id) => frameRadii.get(id) || 0,
 };
 
 // windows: all of them, every desktop. visible: what shows on this desktop. focused: its front window.

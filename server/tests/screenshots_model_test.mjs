@@ -39,6 +39,12 @@ eq('partly off screen: clamped', captureRect({ x: -50, y: 800, w: 200, h: 300 },
 eq('fully off screen: nothing', captureRect({ x: 1500, y: 0, w: 100, h: 100 }, 2880, 1800, s200), null);
 eq('no rect', captureRect(null, 2880, 1800, s200), null);
 
+// ---- a window's rounded corners (issue #70) ----
+eq('100 %: the radius as is', captureRect({ x: 100, y: 50, w: 800, h: 600, radius: 12 }, 1920, 1080, s100), { x: 100, y: 50, w: 800, h: 600, radius: 12 });
+eq('200 %: the radius in physical pixels', captureRect({ x: 300, y: 120, w: 640, h: 480, radius: 12 }, 2880, 1800, s200), { x: 600, y: 240, w: 1280, h: 960, radius: 24 });
+eq('175 %: rounded', captureRect({ x: 100, y: 100, w: 400, h: 300, radius: 12 }, 2880, 1800, s175), { x: 175, y: 175, w: 700, h: 525, radius: 21 });
+eq('square window: no radius', captureRect({ x: 100, y: 50, w: 800, h: 600, radius: 0 }, 1920, 1080, s100), { x: 100, y: 50, w: 800, h: 600 });
+
 // ---- several displays ----
 // main display on the right of a 100 % one: the capture is the main display only
 const two = { width: 1280 + 1440, height: 900, displays: [

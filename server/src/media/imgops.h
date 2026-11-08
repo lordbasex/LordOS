@@ -29,4 +29,9 @@ void img_rotate(const uint32_t *src, int w, int h, int turns, uint32_t *dst);
 /* The size after `turns` (odd ones swap the sides). */
 void img_rotated_size(int w, int h, int turns, int *ow, int *oh);
 
+/* The picture's own shape as a rectangle with rounded corners of radius r (px, at most half the shorter
+ * side): what falls outside becomes transparent, the edge antialiased (a window capture, issue #70).
+ * r <= 0 does nothing. */
+void img_round_corners(uint32_t *px, int w, int h, int r);
+
 #endif

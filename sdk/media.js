@@ -81,7 +81,8 @@ export const media = {
     if (!(await requestPermission(app, 'screen'))) return null;
     return call('screenshot', app, rect || {});
   },
-  crop: (id, x, y, w, hh) => call('crop', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh)),
+  // radius (optional, image px): the corners outside a rounded rectangle become transparent (a window capture)
+  crop: (id, x, y, w, hh, radius = 0) => call('crop', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh), Math.round(radius) || 0),
   // a few pixels of a screenshot or picture as RGBA bytes (Screenshots' magnifier and color picker), at most 64 × 64
   pixels: (id, x, y, w, hh) => call('pixels', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh)),
   // the text in a screenshot or picture (the confined lord-ocr helper, Tesseract), in these languages

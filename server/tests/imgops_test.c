@@ -1,7 +1,8 @@
 /* imgops_test.c — the image editor's pixel operations (src/media/imgops.c, issue #30): clipping of
  * a selection, the solid-fill and pixelate redactions (nothing of the original left inside, nothing
  * touched outside), resize (sizes, flat colors stay exact, area average when shrinking, transparency
- * kept) and quarter turns (every pixel lands where lord-media's edit job puts it).
+ * kept), quarter turns (every pixel lands where lord-media's edit job puts it) and the rounded corners
+ * of a window capture (issue #70).
  *
  *   make -C server build/imgops-test && server/build/imgops-test
  */
@@ -167,12 +168,49 @@ static void test_rotate(void) {
     CHECK(!memcmp(back, src, sizeof src), "turn 4 = none");
 }
 
+/* A window capture's rounded corners (issue #70): transparent outside, untouched inside, antialiased and
+ * still premultiplied on the edge, the four corners alike. */
+static void test_round_corners(void) {
+    int w = 40, h = 30, r = 8;
+    uint32_t *p = noise(w, h), *orig = malloc((size_t)w * h * 4);
+    memcpy(orig, p, (size_t)w * h * 4);
+    img_round_corners(p, w, h, r);
+    CHECK(p[0] == 0 && p[w - 1] == 0 && p[(h - 1) * w] == 0 && p[h * w - 1] == 0, "corner pixels are transparent");
+    CHECK(p[1 * w + 1] == 0, "near the corner too");
+    int inside_ok = 1, premul_ok = 1, partial = 0, sym = 1;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            int cx = x < r ? r : x >= w - r ? w - r : x, cy = y < r ? r : y >= h - r ? h - r : y;
+            float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+            int deep = (x >= r && x < w - r) || (y >= r && y < h - r) || dx * dx + dy * dy < (r - 1.0f) * (r - 1.0f);
+            uint32_t v = p[y * w + x], a = v >> 24;
+            if (deep && v != orig[y * w + x]) inside_ok = 0;
+            if (((v >> 16) & 255) > a || ((v >> 8) & 255) > a || (v & 255) > a) premul_ok = 0;
+            if (a > 0 && a < 255) partial++;
+            if (y < r && x < r) {
+                uint32_t am = p[y * w + (w - 1 - x)] >> 24, bm = p[(h - 1 - y) * w + x] >> 24;
+                if (am != a || bm != a) sym = 0;
+            }
+        }
+    CHECK(inside_ok, "inside the rounded rect: unchanged");
+    CHECK(premul_ok, "edge pixels stay premultiplied");
+    CHECK(partial > 0, "the edge is antialiased");
+    CHECK(sym, "the four corners are alike");
+    memcpy(p, orig, (size_t)w * h * 4);
+    img_round_corners(p, w, h, 0);
+    CHECK(!memcmp(p, orig, (size_t)w * h * 4), "radius 0 does nothing");
+    img_round_corners(p, w, h, 1000);
+    CHECK(p[0] == 0 && p[(h / 2) * w + w / 2] == orig[(h / 2) * w + w / 2], "a huge radius is clamped to half the side");
+    free(p); free(orig);
+}
+
 int main(void) {
     test_clip();
     test_fill();
     test_pixelate();
     test_resize();
     test_rotate();
+    test_round_corners();
     printf("imgops-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

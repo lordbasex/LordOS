@@ -138,7 +138,8 @@ async function areaDone(r, at) {
   const info = media.info(shot.handle);
   const p = info && captureRect(r, info.width, info.height, lord.screen, shot.display);
   if (!p) { media.close(shot.handle); return; }
-  const c = media.crop(shot.handle, p.x, p.y, p.w, p.h);
+  // a window keeps its own shape: the corners outside its rounded frame come out transparent (issue #70)
+  const c = media.crop(shot.handle, p.x, p.y, p.w, p.h, a.mode === 'window' ? p.radius : 0);
   media.close(shot.handle);
   if (a.mode === 'text') { await copyText(c); return; }
   await finish(c);
@@ -258,7 +259,7 @@ function Overlay({ index }) {
       // the window under the pointer (the topmost one), for the window mode
       const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
       let found = null;
-      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
+      for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, radius: w.fullscreen ? 0 : wm.cornerRadius(w.id), title: windowTitle(w), display: displayAt(displays(), f.x + f.w / 2, f.y + f.h / 2) }; }
       area.set({ ...cur, pointer: { x: e.x, y: e.y }, hover: found, loupe });
     });
     const offUp = addListener('pointerup', (e) => {
