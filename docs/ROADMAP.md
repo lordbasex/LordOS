@@ -697,9 +697,44 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
   changed settings, checking they survive. Done on 2026-11-03 too: the OVA's first account on VMware Fusion, and the
   OVA's download card, a step-by-step page with screenshots and a requirements page on lordos.org.
 
+## Release 0.8.8.5-beta ✅ (2026-11-07)
+
+An update for 0.8.8 to 0.8.8.4 through the Store and `apt` (`CHANGELOG.md`, "0.8.8.5-beta"); no new images.
+
+- [x] **Cloud** (`CLOUD.md`): cloud storage accounts in Settings and in Files, built on rclone, which ships in its own
+  package, `lordos-rclone` (rclone's official release binary, unmodified). Backups to Cloud is not in this version.
+- [x] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; planned for 0.8.9, shipped here): with `lord-vm` and direct
+  QMP, and the Machines app: a Control Center, a New Machine assistant that downloads Debian, Ubuntu, Fedora or Kali
+  (each maker's signed checksum list checked) and installs without questions, suspend, snapshots, Clone and Duplicate,
+  migrating a machine from another virtualization app, and an optional guest agent with a shared clipboard. QEMU and
+  passt are installed when Machines first needs them.
+
+## Release 0.8.8.6-beta (in development)
+
+An update through the Store and `apt` (`CHANGELOG.md`, "Unreleased"); the latest release is 0.8.8.5-beta.
+
+- [x] **Voice, phase 1** (`VOICE.md`): `say` and its sandboxed engine `lord-tts`, Kyutai's Pocket TTS through audio.cpp
+  on the CPU or the GPU (Vulkan), without the internet.
+- [x] **Voice, phase 2**: Speech (Start Speaking, Stop Speaking, Save as Audio…) in the Text Editor, the Terminal, Notes
+  and Linux apps' Edit menu, with a player.
+- [x] **Voice, phase 3**: Settings → AI → Voice downloads a Standard and an HD model per language (Spanish, English,
+  Portuguese) and 23 voices that speak every language, as `lordos-voice-*` packages; a personal voice and Live Speech.
+- [x] **Screenshots: copy the text** in a selection and the markup editor's Transcribe, through the new sandboxed
+  `lord-ocr` (Tesseract).
+- [x] Fixes from the community reports and new requests: automatic screen rotation and the touchscreen on a turned panel
+  ([#60](https://github.com/lordbasex/LordOS/issues/60), [#61](https://github.com/lordbasex/LordOS/issues/61)), the
+  region's formats ([#45](https://github.com/lordbasex/LordOS/issues/45),
+  [#53](https://github.com/lordbasex/LordOS/issues/53)), the keyboard layout
+  ([#55](https://github.com/lordbasex/LordOS/issues/55)), empty emoji boxes
+  ([#56](https://github.com/lordbasex/LordOS/issues/56)), Mail's passwords with a locked keyring
+  ([#63](https://github.com/lordbasex/LordOS/issues/63)), the remote desktop's stuck Ctrl
+  ([#44](https://github.com/lordbasex/LordOS/issues/44)), Cloud's panel ([#71](https://github.com/lordbasex/LordOS/issues/71)),
+  Tailscale and RustDesk in Store → Remote access ([#66](https://github.com/lordbasex/LordOS/issues/66),
+  [#68](https://github.com/lordbasex/LordOS/issues/68)), and the rest in `CHANGELOG.md`, "Fixed".
+- [x] The CPU's microcode updates on amd64, and the same command-line tools on every image (below, under 0.8.9).
+
 ## Release 0.8.9 (planned)
 
-- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; first, after 0.8.8.1): with `lord-vm` and direct QMP.
 - [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
   instead of reading each frame back and converting it.
 - [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint
@@ -717,6 +752,9 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
 - [ ] **Command-line tools on the new images** (requested 2026-11-05): `dnsutils` (dig, nslookup), `screen`, `mc`,
   `tcpdump`, `net-tools` (ifconfig, netstat, route) and `vim`, on the PC ISO and the Raspberry Pi image. Systems
   already installed get them from the Store or `apt`; decide whether the `lordos` package should also recommend them.
+  In 0.8.8.6 (in development): `screen`, `mc`, `tcpdump`, `net-tools` and `vim`, with `curl`, `wget`, `rsync`, `htop`,
+  `fdisk`, `rfkill` and `jq`, are in one list both images read (`tools/iso/packages-tools.sh`) and are Recommends of
+  `lordos`; `dnsutils` is not in it yet.
 - [ ] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO.
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
   and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
@@ -1145,7 +1183,7 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
   - **Off by default**, visible while working (menu bar indicator, every call in the Monitor), and
     reviewed like the MCP study before it ships.
 
-- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.9): a **free desktop virtualization app**, with the polish and
+- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP shipped in 0.8.8.5 as the Machines app): a **free desktop virtualization app**, with the polish and
   way of working of the best commercial ones (not Proxmox's, which only contributes the pieces underneath: KVM, QEMU and drivers).
   A generic name and our own logo, icon and colors:
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,

@@ -12,6 +12,19 @@ the components below, each under its own license.
 | Monocypher 4 | vault and keyring cryptography | CC0-1.0 or BSD-2-Clause (`third_party/monocypher/LICENCE.md`) |
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
 
+## Fetched at build time (`third_party/audiocpp`, ignored by git)
+
+`tools/tts/fetch-audiocpp.sh` puts audio.cpp at one pinned commit in `third_party/audiocpp`; `server/mk/tts.mk` builds
+its Pocket TTS family only, and the `lordos` package installs the libraries in `/usr/lib/lordos/lib/tts`. **lord-tts**
+(0.8.8.6, `docs/VOICE.md`) is the only binary that links them; `lord-server` never does. Unmodified.
+
+| Component (version) | Used for | License |
+|---|---|---|
+| audio.cpp (commit `3bbbd1d28eb8a88b202907dc102595e762340b1c`, https://github.com/0xShug0/audio.cpp) | the text-to-speech runtime (`libaudiocpp`) | Apache-2.0 (`third_party/audiocpp/LICENSE`) |
+| ggml 0.12.0, as vendored by audio.cpp (`external/ggml`) | the tensor library under audio.cpp: `libggml`, `libggml-base`, the CPU kernels of every x86-64 generation, Vulkan | MIT (`external/ggml/LICENSE`) |
+| SentencePiece 0.2.1, with its Abseil, protobuf-lite and darts-clone (`external/sentencepiece`) | the model's tokenizer, linked into `libaudiocpp` | Apache-2.0 (SentencePiece, Abseil), BSD-3-Clause (protobuf-lite, darts-clone) |
+| cJSON 1.7.19, libyaml 0.2.5 (`external/cJSON`, `external/libyaml`) | reading audio.cpp's model descriptions, linked into `libaudiocpp` | MIT |
+
 ## Data files
 
 | Data | Used for | License |
@@ -39,6 +52,25 @@ Downloaded on demand, not in this repository; each clip's author, license and so
 and in the README of the `LordOS-wallpapers` repository. NASA material (public domain), CC0, CC BY 3.0 and CC BY-SA 4.0
 works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
 
+## Voices
+
+Downloaded on demand from the signed APT repository (Settings → AI → Voice), not in this repository and not on the ISO
+or the Raspberry Pi image: the packages `lordos-voice-<lang>[-hd]` (the models), `lordos-voice-<lang>-<voice>[-hd]`
+(one voice each) and `lordos-voice-previews` (a recorded sample of every voice), built by `tools/voice/mkdeb-voice.mjs`
+into `/usr/share/lordos/voice`. The voices offered and the license of each one's source are in `sdk/voicecatalog.js`
+(`VOICES`, `SOURCE_LICENSES`); see `docs/VOICE.md`.
+
+| Data | Used for | License |
+|---|---|---|
+| Pocket TTS models by Kyutai (https://huggingface.co/kyutai/pocket-tts): the 6-layer models as audio.cpp's Q8_0 GGUF, the 24-layer HD models (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`) as Kyutai ships them | speech in Spanish, English and Portuguese | CC-BY-4.0 — Pocket TTS © Kyutai |
+| Kyutai's prepared voice embeddings (https://huggingface.co/kyutai/tts-voices): Kyutai's own voices (lola, juergen, rafael, estelle, giovanni, daan), Alba McKenna, VCTK and voice-zero | the 23 voices | CC-BY-4.0 (Kyutai, Alba McKenna, VCTK); CC0-1.0 (voice-zero) |
+| The recorded previews (`lordos-voice-previews`) | hearing a voice before downloading it | made with the models and voices above, under their licenses |
+
+Kyutai forbids cloning a voice without the person's explicit consent, impersonation and presenting generated speech as
+a real recording; LordOS shows that notice where voices are created. Voices whose recording does not allow
+redistribution and commercial use are left out (jean, from EARS: non-commercial only; cosette, javert and marius: their
+recordings' origin isn't documented).
+
 ## npm packages (bundled into the theme JavaScript at build time)
 
 | Package | License |
@@ -54,18 +86,24 @@ These are not part of this repository; they are installed from Debian.
 | libwayland-server / libwayland-client, libxkbcommon | lord-server | MIT |
 | Mesa (libgbm, libEGL, libGLESv2) | lord-server (GPU path) | MIT |
 | OpenSSL 3 | lord-sessiond, lord-maild | Apache-2.0 |
+| libsrtp2, usrsctp | lord-sessiond (the remote desktop's WebRTC video, 0.8.4) | BSD-3-Clause |
 | libcrypt | lord-sessiond | LGPL-2.1+ |
 | Poppler (glib), cairo, freetype, fontconfig | lord-doc | GPL-2.0-or-later / LGPL / FTL |
 | libarchive | lord-doc | BSD-2-Clause |
 | FFmpeg (libavcodec, libavformat, libavutil, libswscale, libswresample), libva | lord-media | LGPL-2.1+; Debian's build is GPL-2.0-or-later |
+| Tesseract (libtesseract5) and its English, Spanish, Portuguese, French and Italian data (`tesseract-ocr-*`) | lord-ocr (0.8.8.6: Screenshots' copy the text, the markup editor's Transcribe) | Apache-2.0 |
+| Vulkan loader (libvulkan1), OpenMP (libgomp1), the C++ runtime (libstdc++6) | lord-tts (0.8.8.6) | Apache-2.0 (Vulkan loader); GPL-3.0 with the GCC Runtime Library Exception |
 
 Note: `lord-doc` and `lord-media` are separate helper processes. Because they link Poppler and
 Debian's FFmpeg build, those two binaries as distributed are covered by the GPL; the MIT-licensed
 LordOS source they are built from is GPL-compatible. `lord-server` itself does not link them.
+`lord-tts` links audio.cpp and ggml (above) in the same way: a separate sandboxed helper.
 On the Raspberry Pi image, and on a Pi updated to 0.8.7, `lord-media` runs on Raspberry Pi's build of FFmpeg (`+rpt`, the
 same package names), pinned from its archive for the Pi 5's hardware HEVC (`docs/WALLPAPERS.md`).
 
 These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libfreerdp-client3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT; since 0.8.8.5 rclone's official release binary v1.75.2, unmodified, in the package `lordos-rclone`, for Cloud and Connect to Server: its signed `SHA256SUMS` is checked against Nick Craig-Wood's key `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`; `/usr/share/doc/lordos-rclone/copyright` lists the license of every Go module linked in), **fuse3** (LGPL-2.1, GPL-2.0) and openssh-client (BSD). The Store's Disk Formats item, not preinstalled, brings **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, **apfs-dkms** (GPL-2.0).
+
+Machines (0.8.8.5) ships no virtualization engine: when it is first used it asks to install, from Debian, **QEMU** (`qemu-system-x86` or `qemu-system-arm`, `qemu-system-modules-opengl`, `qemu-utils`; GPL-2.0), **passt** (GPL-2.0-or-later) and the UEFI firmware **OVMF** or **AAVMF** (`ovmf`, `qemu-efi-aarch64`; BSD-2-Clause-Patent). `lord-vm` and `lord-vmdisplay` run them as separate programs and link none of them.
 
 New on the images in 0.8.8 (installed from Debian, not linked; each keeps its own `/usr/share/doc/<package>/copyright`):
 
@@ -75,6 +113,13 @@ New on the images in 0.8.8 (installed from Debian, not linked; each keeps its ow
 | `libnss-mdns` | both ISOs and the Raspberry Pi image; recommended by `lordos` | `.local` names | LGPL-2.1-or-later |
 | `wireless-regdb` | both ISOs and the Raspberry Pi image | Wi-Fi's country rules for the kernel | ISC |
 | `firmware-brcm80211` | both ISOs (the Raspberry Pi image already had it, from Raspberry Pi's archive) | Broadcom Wi-Fi cards such as the BCM43602 | **non-free firmware** (Debian's `non-free-firmware`): Broadcom's binary licence, which allows redistribution unmodified; no source |
+
+New on the images in 0.8.8.6 (installed from Debian, not linked):
+
+| Package | Images | What for | License |
+|---|---|---|---|
+| `libtesseract5`, `tesseract-ocr-eng`, `-spa`, `-por`, `-fra`, `-ita` | both ISOs and the Raspberry Pi image; `libtesseract5` and English are dependencies of `lordos` when it ships `lord-ocr`, the other four are Recommends | text recognition (lord-ocr, above) | Apache-2.0 |
+| `intel-microcode`, `amd64-microcode` | the amd64 ISO; a dependency of `lordos` on amd64 | the processor's microcode updates, loaded at boot | **non-free firmware** (Debian's `non-free-firmware`): Intel's and AMD's binary licences, which allow redistribution unmodified; no source |
 
 ## Tools used to make website media (not shipped in LordOS)
 

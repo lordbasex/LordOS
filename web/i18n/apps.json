@@ -1115,7 +1115,7 @@
       ]
     }
   },
-  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: apps/passwords and, since 0.8.2, apps/mail, apps/calendar, apps/contacts and apps/reminders have \"process\": \"isolated\" in their manifest (built into assets/sysapps/<id> by tools/build-theme.mjs; apps/sysprobe is isolated too but hidden, a test app of System Information). System Information (sysinfo, released in 0.8.5) and LordOS Imager (imager, 0.8.4) were added on 2026-10-26; their icons were exported with tools/web/render-icons.mjs. No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/)..",
+  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: apps/passwords and, since 0.8.2, apps/mail, apps/calendar, apps/contacts and apps/reminders have \"process\": \"isolated\" in their manifest (built into assets/sysapps/<id> by tools/build-theme.mjs; apps/sysprobe is isolated too but hidden, a test app of System Information). System Information (sysinfo, released in 0.8.5) and LordOS Imager (imager, 0.8.4) were added on 2026-10-26; their icons were exported with tools/web/render-icons.mjs. Machines (machines, released in 0.8.8.5) was added on 2026-11-08; its icon (AppMark in apps/machines/library.jsx) was rendered at the size and crop tools/web/render-icons.mjs uses, and it has no screenshot because the repository holds no English capture of it. No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/)..",
   "cleaner": {
     "category": "system",
     "isolated": false,
@@ -1191,6 +1191,50 @@
         "Pastas compartilhadas por RDP, somente leitura se quiser; ainda sem verificar numa sessão real",
         "Tela cheia com barra própria",
         "Sem janela de cliente, X11 ou toolkit"
+      ]
+    }
+  },
+  "machines": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/machines/index.jsx",
+    "name": {
+      "en": "Machines",
+      "es": "Máquinas",
+      "pt": "Máquinas"
+    },
+    "tagline": {
+      "en": "Other systems in windows, each in its own sandbox",
+      "es": "Otros sistemas en ventanas, cada uno en su propio sandbox",
+      "pt": "Outros sistemas em janelas, cada um no seu próprio sandbox"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.8.5",
+        "Download a Linux system from one of four projects, checked against its maker's signed checksums",
+        "Most of them install without questions",
+        "Suspend, snapshots, Clone and Duplicate",
+        "Migrate a machine from another virtualization app (.vmx, .vbox, .pvm, .ova)",
+        "Shared clipboard through an optional guest agent",
+        "QEMU and passt are installed the first time they're needed"
+      ],
+      "es": [
+        "Nuevo en 0.8.8.5",
+        "Descargá un sistema Linux de cuatro proyectos, verificado con las sumas firmadas de quien lo publica",
+        "La mayoría se instala sin preguntas",
+        "Suspender, instantáneas, Clonar y Duplicar",
+        "Migrá una máquina de otra app de virtualización (.vmx, .vbox, .pvm, .ova)",
+        "Portapapeles compartido con un agente opcional en la máquina",
+        "QEMU y passt se instalan la primera vez que hacen falta"
+      ],
+      "pt": [
+        "Novo na 0.8.8.5",
+        "Baixe um sistema Linux de quatro projetos, verificado com as somas assinadas de quem o publica",
+        "A maioria se instala sem perguntas",
+        "Suspender, snapshots, Clonar e Duplicar",
+        "Migre uma máquina de outro app de virtualização (.vmx, .vbox, .pvm, .ova)",
+        "Área de transferência compartilhada com um agente opcional na máquina",
+        "QEMU e passt são instalados na primeira vez que forem necessários"
       ]
     }
   },
