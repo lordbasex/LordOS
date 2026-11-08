@@ -97,9 +97,9 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
-## In development for 0.8.8.6
+## New in 0.8.8.6
 
-Not released yet; the latest release is 0.8.8.5.
+Released on 8 November 2026, the latest release.
 
 - **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
 - **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard.
@@ -108,7 +108,7 @@ Not released yet; the latest release is 0.8.8.5.
 
 ## Many displays, sharp text
 
-The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100 to 200 % in 25 % steps, and in 0.8.8.6 (in development) up to 300 % for 4K laptop panels, as long as the desktop keeps at least 1024 × 600 (a 3840 × 2160 panel at 300 % is a 1280 × 720 desktop). Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
+The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100 to 200 % in 25 % steps, and since 0.8.8.6 up to 300 % for 4K laptop panels, as long as the desktop keeps at least 1024 × 600 (a 3840 × 2160 panel at 300 % is a 1280 × 720 desktop). Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
 
 [[shot:1]]
 
@@ -122,7 +122,7 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
 - **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
-- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, in 0.8.8.6 (in development), reading aloud and Live Speech; a screen reader, zoom and high contrast are on the roadmap.
+- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech; a screen reader, zoom and high contrast are on the roadmap.
 
 ## Read the source
 

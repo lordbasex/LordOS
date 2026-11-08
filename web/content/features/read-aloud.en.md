@@ -1,6 +1,6 @@
 ## The short version
 
-**In development for 0.8.8.6; not released yet. The latest release is 0.8.8.5.**
+**New in 0.8.8.6, released on 8 November 2026.**
 
 LordOS reads text aloud on your own computer, without the internet. Select something in the Text Editor, the Terminal, Notes or a Linux app such as Firefox, press **❖Esc**, and you hear it. Press ❖Esc again and it stops. Nothing you read is sent anywhere: the speech is made on your processor, or on your graphics card when it has one that helps.
 
@@ -52,7 +52,6 @@ Measured on one PC, an Intel i9-10900 with a Radeon RX 580: about 10 seconds of 
 
 ## Honest limits
 
-- **Not released yet.** All of this is in development for 0.8.8.6.
 - **Three languages:** Spanish, English and Portuguese.
 - **You download a model first.** Until then, Speech says that no voice is installed.
 - **Not tested on the Raspberry Pi** (its processor's code paths and the Pi 5's graphics driver).

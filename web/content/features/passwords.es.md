@@ -54,7 +54,7 @@ Varios métodos pueden convivir. Por defecto, la bóveda se cierra sola después
 
 [[shot:4]]
 
-## En la Terminal (0.8.8.6, en desarrollo)
+## En la Terminal (0.8.8.6)
 
 - **Completar la contraseña que pide un programa.** Cuando ssh, sudo, git o gpg piden una contraseña, una barra debajo del mensaje ofrece tus accesos de Contraseñas (primero los de ese host) o **Escribirla**. La contraseña que elegís va de `lord-vault` a la terminal en el código C de `lord-server`, por un canal privado: nunca pasa por JavaScript, la pantalla ni el registro de la sesión, y se escribe solo mientras el programa sigue pidiéndola. La barra aparece cuando la terminal está en modo contraseña (sin eco) y el mensaje nombra una contraseña, y dice qué programa la pide, así un script que imprime un mensaje falso se muestra como lo que es.
 - **Guardar una contraseña que escribiste.** Cuando escribís o pegás una contraseña para ssh, sftp, scp, rsync, mysql, psql, redis-cli, mongosh o git y el programa la acepta, LordOS ofrece guardarla, con su host, puerto y usuario, en la categoría que corresponde. Hasta que respondas, espera en una página de memoria bloqueada que se borra en toda salida (rechazada, Ctrl+C, declinada, guardada, cerrada, o a los 60 segundos). Tu propia contraseña de inicio de sesión (sudo, su, passwd, pkexec) nunca se captura, y no se captura nada mientras el programa está siendo trazado.

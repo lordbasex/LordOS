@@ -170,7 +170,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 6.7 | `lord-clean` and `lord-lan` take the helpers' sandbox | Test (`clean-test`, `lan-test`) | Holds; `clean-test` has no case yet for what a scan shows per rule or for the minimum time per step |
 | 6.11 | The on-screen keyboard's panel and System Information with serials showing are protected | Design (`protected` node) | Partly tested |
 
-## 0.8.8.6 (in development; the paper's edition of 2026-11-08, latest release 0.8.8.5)
+## 0.8.8.6 (released on 2026-11-08 as 0.8.8.6-beta; the paper's edition of 2026-11-08)
 
 | § | Claim | How | State |
 |---|---|---|---|
@@ -180,11 +180,11 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1 | 23 voices, Standard 128 MB and HD 672 MB (English 1.3 GB) per language, as signed packages; only voices whose recordings allow redistribution and commercial use | `sdk/voicecatalog.js` (`voicecatalog_test.mjs`, 21), `tools/voice/` | Holds in the catalog; the published packages in the APT repository were not checked for this edition |
 | 5.1 | Personal Voice: consent first, a room check, six phrases or 15–30 s of free speech | Test (`voicerec_model_test.mjs`, 20) | Model tested; a run with a real microphone not recorded here |
 | 5.1, 6.7 | `lord-ocr` is the only binary that links Tesseract; pixels in a sealed memfd; no home folder, `/tmp` writes, network, sockets or fork | Test (`server/tests/ocr_test.sh`, `test-full`) | Holds |
-| 5.1 | Text recognition takes about 0.3 s a selection | Measured (`CHANGELOG.md`, Unreleased) | Measured once |
+| 5.1 | Text recognition takes about 0.3 s a selection | Measured (`CHANGELOG.md`, 0.8.8.6-beta) | Measured once |
 | 6.10 | A Terminal password goes between `lord-vault` and the pty in C, never through JavaScript; a typed one is kept in one `mlock`ed page and wiped on every way out | Test (`build/term-secret-test`, 10, on a real pty; `build/term-capture-test`, 28, also under ASan and UBSan; `terminal_secret_test.mjs`) | Holds |
 | 3.3 | Shake to find the pointer | Test (`build/shake-test`, 12) | Detector tested; the cursor on screen not automated |
 | 3.3 | Alps touchpads that report pressure above their declared range | Test (a `tp-test` case built from the driver's report format) | Holds in the test; the touchpads themselves were reported by users (#43, #54, #67) |
-| 3.5 | Scales up to 300 % where the desktop keeps at least 1024 × 600 | `CHANGELOG.md`, Unreleased (#47) | Not automated; a 4K laptop panel **Untested** |
+| 3.5 | Scales up to 300 % where the desktop keeps at least 1024 × 600 | `CHANGELOG.md`, 0.8.8.6-beta (#47) | Not automated; a 4K laptop panel **Untested** |
 | 3.5 | The cursor plane at the driver's size (128 × 128 on amdgpu) and the login screen on the chosen main display | Fixed from what one PC with a Radeon RX 580 and three monitors showed | Not automated; whether each fix was seen working there is not recorded in the changelog |
 | 7.1 | Memory in use counted as `MemTotal − MemFree − (Buffers + Cached + SReclaimable − Shmem)` | Test (`sysreport-test`, `server/src/meminfo.h`) | Holds; the measured rows of §7.1 were not taken again |
 | 2.4 | `intel-microcode` and `amd64-microcode` are dependencies on amd64 | Package control file | Design; the update path against the signed repository not yet run |

@@ -1,6 +1,6 @@
 ## Em poucas palavras
 
-**Em desenvolvimento para a 0.8.8.6; ainda não foi lançado. O último lançamento é a 0.8.8.5.**
+**Novo na 0.8.8.6, lançada em 8 de novembro de 2026.**
 
 O LordOS lê texto em voz alta no seu próprio computador, sem internet. Selecione algo no Editor de Texto, no Terminal, nas Notas ou num app Linux como o Firefox, pressione **❖Esc** e você ouve. Pressione ❖Esc de novo e ele para. Nada do que você lê é enviado a lugar nenhum: a fala é feita no seu processador, ou na sua placa de vídeo quando ela ajuda.
 
@@ -52,7 +52,6 @@ Medido num PC, um Intel i9-10900 com uma Radeon RX 580: cerca de 10 segundos de 
 
 ## Limites honestos
 
-- **Ainda não foi lançado.** Tudo isso está em desenvolvimento para a 0.8.8.6.
 - **Três idiomas:** espanhol, inglês e português.
 - **Primeiro você baixa um modelo.** Até lá, a Fala avisa que nenhuma voz está instalada.
 - **Não foi testado no Raspberry Pi** (os caminhos de código do processador dele e o driver gráfico do Pi 5).

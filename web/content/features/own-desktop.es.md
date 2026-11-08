@@ -97,9 +97,9 @@ Todo en la 0.8.7, menos los dos puntos marcados 0.8.8.
 - **Las ventanas se abren donde estaban.** Tamaño, posición, maximizada y pantalla, por app, en los dos temas, para apps de LordOS y de Linux; si una pantalla ya no está o el lugar queda fuera de la pantalla, la ventana se abre en un lugar visible. Sin probar entre dos pantallas.
 - **Restaurar la sesión.** Las apps abiertas al cerrar sesión, reiniciar o apagar vuelven con sus ventanas y su escritorio, y después de un corte de luz o un fallo LordOS pregunta primero. Se guardan solo identificadores de apps, nunca rutas de documentos. Probado en una máquina virtual, con reinicios, un apagado real y un apagado forzado.
 
-## En desarrollo para la 0.8.8.6
+## Nuevo en la 0.8.8.6
 
-Todavía no se publicó; el último lanzamiento es la 0.8.8.5.
+Publicada el 8 de noviembre de 2026, el último lanzamiento.
 
 - **Leer en voz alta.** Voz en toda app con texto, ❖Esc para la selección, un reproductor pequeño con la onda de la voz, Voz en tiempo real y una Voz personal, todo en el equipo y sin internet (mirá *Leer en voz alta* en las funciones).
 - **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles.
@@ -108,7 +108,7 @@ Todavía no se publicó; el último lanzamiento es la 0.8.8.5.
 
 ## Muchas pantallas, texto nítido
 
-El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja cada una con su propia escala: del 100 al 200 % en pasos de 25 %, y en la 0.8.8.6 (en desarrollo) hasta el 300 % para paneles 4K de notebook, mientras el escritorio conserve al menos 1024 × 600 (un panel de 3840 × 2160 al 300 % es un escritorio de 1280 × 720). Texto, vectores e imágenes se rasterizan a la resolución real de cada pantalla, así que un panel 4K al 150 % al lado de uno 1080p al 100 % se ve nítido en los dos. Las apps de Linux reciben un `wl_output` por pantalla y el protocolo de escala fraccionaria, así que GTK 4, Qt 6 y Chromium también se ven nítidos. Desde 0.8.5, Ajustes → Pantallas numera cada pantalla, Identificar muestra ese número en grande en el propio monitor, y una pantalla arrastrada se pega borde con borde sin superponerse. El menú Ventana puede mover una ventana a otra pantalla, y el Dock puede asignar una app a una.
+El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja cada una con su propia escala: del 100 al 200 % en pasos de 25 %, y desde la 0.8.8.6 hasta el 300 % para paneles 4K de notebook, mientras el escritorio conserve al menos 1024 × 600 (un panel de 3840 × 2160 al 300 % es un escritorio de 1280 × 720). Texto, vectores e imágenes se rasterizan a la resolución real de cada pantalla, así que un panel 4K al 150 % al lado de uno 1080p al 100 % se ve nítido en los dos. Las apps de Linux reciben un `wl_output` por pantalla y el protocolo de escala fraccionaria, así que GTK 4, Qt 6 y Chromium también se ven nítidos. Desde 0.8.5, Ajustes → Pantallas numera cada pantalla, Identificar muestra ese número en grande en el propio monitor, y una pantalla arrastrada se pega borde con borde sin superponerse. El menú Ventana puede mover una ventana a otra pantalla, y el Dock puede asignar una app a una.
 
 [[shot:1]]
 
@@ -122,7 +122,7 @@ El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja
 - **Los fondos en movimiento copian cada cuadro en su camino a la pantalla.** En la Raspberry Pi 5, en la pantalla de inicio de sesión, a 1080p y 60 cuadros por segundo, `lord-media` usó el 41 % de un núcleo y `lord-server` el 147 %; un camino sin esa copia está planeado para una versión posterior. El decodificador por hardware de la Pi 5 maneja solo HEVC, así que los clips H.264, VP9 y AV1 no se reproducen ahí.
 - **Cambiar de tema cierra y vuelve a abrir las ventanas de LordOS,** y el texto sin guardar se pierde, sin aviso.
 - **Las apps X11 funcionan con Xwayland desde 0.8.3,** nítidas solo al 100 % de escala y pudiendo verse entre sí, como en cualquier escritorio X11. Arrastrar y soltar entre apps de Linux y los métodos de entrada de LordOS dentro de apps de Linux están pendientes (`docs/WAYLAND.md`).
-- **La accesibilidad está mayormente por delante:** hoy hay un ajuste de "reducir movimiento", un teclado en pantalla y, en la 0.8.8.6 (en desarrollo), leer en voz alta y Voz en tiempo real; un lector de pantalla, el zoom y el alto contraste están en la hoja de ruta.
+- **La accesibilidad está mayormente por delante:** hoy hay un ajuste de "reducir movimiento", un teclado en pantalla y, desde la 0.8.8.6, leer en voz alta y Voz en tiempo real; un lector de pantalla, el zoom y el alto contraste están en la hoja de ruta.
 
 ## Leé el código
 

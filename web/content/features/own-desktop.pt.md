@@ -97,9 +97,9 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 - **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
-## Em desenvolvimento para a 0.8.8.6
+## Novo na 0.8.8.6
 
-Ainda não foi lançado; o último lançamento é a 0.8.8.5.
+Lançada em 8 de novembro de 2026, o último lançamento.
 
 - **Ler em voz alta.** Fala em todo app com texto, ❖Esc para a seleção, um pequeno reprodutor com a onda da voz, Fala ao vivo e uma Voz pessoal, tudo no computador e sem internet (veja *Ler em voz alta* nos recursos).
 - **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência.
@@ -108,7 +108,7 @@ Ainda não foi lançado; o último lançamento é a 0.8.8.5.
 
 ## Várias telas, texto nítido
 
-O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e desenha cada uma na sua própria escala: de 100 a 200 % em passos de 25 %, e na 0.8.8.6 (em desenvolvimento) até 300 % para painéis 4K de notebook, desde que o desktop mantenha pelo menos 1024 × 600 (um painel de 3840 × 2160 a 300 % é um desktop de 1280 × 720). Texto, vetores e imagens são rasterizados na resolução real de cada tela, então um painel 4K a 150 % ao lado de um 1080p a 100 % fica nítido nos dois. Os apps Linux recebem um `wl_output` por tela e o protocolo de escala fracionária, então GTK 4, Qt 6 e Chromium também renderizam com nitidez. Desde a 0.8.5, Ajustes → Telas numera cada tela, Identificar mostra esse número grande no próprio monitor, e uma tela arrastada se encaixa borda com borda sem sobrepor. O menu Janela pode mover uma janela para outra tela, e o Dock pode atribuir um app a uma delas.
+O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e desenha cada uma na sua própria escala: de 100 a 200 % em passos de 25 %, e desde a 0.8.8.6 até 300 % para painéis 4K de notebook, desde que o desktop mantenha pelo menos 1024 × 600 (um painel de 3840 × 2160 a 300 % é um desktop de 1280 × 720). Texto, vetores e imagens são rasterizados na resolução real de cada tela, então um painel 4K a 150 % ao lado de um 1080p a 100 % fica nítido nos dois. Os apps Linux recebem um `wl_output` por tela e o protocolo de escala fracionária, então GTK 4, Qt 6 e Chromium também renderizam com nitidez. Desde a 0.8.5, Ajustes → Telas numera cada tela, Identificar mostra esse número grande no próprio monitor, e uma tela arrastada se encaixa borda com borda sem sobrepor. O menu Janela pode mover uma janela para outra tela, e o Dock pode atribuir um app a uma delas.
 
 [[shot:1]]
 
@@ -122,7 +122,7 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 - **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para uma versão futura. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
 - **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
 - **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Arrastar e soltar entre apps Linux e os métodos de entrada do LordOS dentro de apps Linux estão pendentes (`docs/WAYLAND.md`).
-- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, na 0.8.8.6 (em desenvolvimento), ler em voz alta e a Fala ao vivo; leitor de tela, zoom e alto contraste estão no roadmap.
+- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo; leitor de tela, zoom e alto contraste estão no roadmap.
 
 ## Leia o código
 

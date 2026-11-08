@@ -54,7 +54,7 @@ Vários métodos podem conviver. Por padrão, o cofre se tranca sozinho depois d
 
 [[shot:4]]
 
-## No Terminal (0.8.8.6, em desenvolvimento)
+## No Terminal (0.8.8.6)
 
 - **Preencher a senha que um programa pede.** Quando ssh, sudo, git ou gpg pedem uma senha, uma barra embaixo do prompt oferece seus logins do Senhas (primeiro os daquele host) ou **Digitar**. A senha que você escolhe vai do `lord-vault` ao terminal no código C do `lord-server`, por um canal privado: nunca passa pelo JavaScript, pela tela nem pelo registro da sessão, e só é escrita enquanto o programa ainda está pedindo. A barra aparece quando o terminal está em modo senha (sem eco) e o prompt nomeia uma senha, e diz qual programa está pedindo, então um script que imprime um prompt falso aparece como ele mesmo.
 - **Salvar uma senha que você digitou.** Quando você digita ou cola uma senha para ssh, sftp, scp, rsync, mysql, psql, redis-cli, mongosh ou git e o programa a aceita, o LordOS oferece salvá-la, com host, porta e usuário, na categoria certa. Até você responder, ela espera numa página de memória travada que é apagada em toda saída (recusada, Ctrl+C, declinada, salva, fechada, ou após 60 segundos). Sua própria senha de login (sudo, su, passwd, pkexec) nunca é capturada, e nada é capturado enquanto o programa está sendo rastreado.

@@ -54,7 +54,7 @@ Several methods can live side by side. The vault locks itself after 5 minutes of
 
 [[shot:4]]
 
-## In the Terminal (0.8.8.6, in development)
+## In the Terminal (0.8.8.6)
 
 - **Fill a password the program asks for.** When ssh, sudo, git or gpg asks for a password, a bar under the prompt offers your Passwords logins (the ones for that host first) or **Type It**. The password you pick goes from `lord-vault` to the terminal in `lord-server`'s C code, on a private channel: it never passes through JavaScript, the screen or the session log, and it is written only while the program is still asking. The bar appears when the terminal is in password mode (echo off) and the prompt names a password, and it says which program is asking, so a script that prints a fake prompt shows as itself.
 - **Save a password you typed.** When you type or paste a password for ssh, sftp, scp, rsync, mysql, psql, redis-cli, mongosh or git and the program accepts it, LordOS offers to save it, with its host, port and user, in the matching category. Until you answer, it waits in one locked page of memory that is wiped on every way out (rejected, Ctrl+C, declined, saved, closed, or after 60 seconds). Your own login password (sudo, su, passwd, pkexec) is never captured, and nothing is captured while the program is being traced.
