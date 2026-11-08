@@ -11,7 +11,7 @@
   "mode.stop": "Arrêter",
   "timer": "Retardateur",
   "timerNone": "Aucun",
-  "toClipboard": "Copier dans le presse-papiers au lieu d’enregistrer",
+  "toClipboard": "Copier seulement dans le presse-papiers (sans enregistrer)",
   "mic": "Enregistrer le microphone",
   "shortcuts": "❖⇧3 écran entier · ❖⇧4 sélection (Espace : fenêtre) · ❖⇧5 ce panneau ou arrêter l’enregistrement · Impr. écran",
   "protectedNote": {

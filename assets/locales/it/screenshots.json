@@ -11,7 +11,7 @@
   "mode.stop": "Interrompi",
   "timer": "Timer",
   "timerNone": "Nessuno",
-  "toClipboard": "Copia negli appunti invece di salvare",
+  "toClipboard": "Copia solo negli appunti (senza salvare)",
   "mic": "Registra il microfono",
   "shortcuts": "❖⇧3 schermo intero · ❖⇧4 selezione (Spazio: finestra) · ❖⇧5 questo pannello o interrompi la registrazione · Stamp",
   "protectedNote": {

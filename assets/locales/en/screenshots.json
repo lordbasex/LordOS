@@ -11,7 +11,7 @@
   "mode.stop": "Stop",
   "timer": "Timer",
   "timerNone": "None",
-  "toClipboard": "Copy to clipboard instead of saving",
+  "toClipboard": "Only copy to the clipboard (don't save)",
   "mic": "Record the microphone",
   "shortcuts": "❖⇧3 entire screen · ❖⇧4 selection (Space: window) · ❖⇧5 this panel or stop recording · Print Screen",
   "protectedNote": {

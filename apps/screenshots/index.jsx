@@ -64,12 +64,15 @@ const opts = () => ({ timer: 0, clipboard: false, mic: false, ...(settings.get()
 
 // ---- capture ----
 
-async function finish(handle) {
+// Saved to ~/Pictures/Screenshots and on the clipboard as well (pasted into a Terminal it goes in as its path,
+// which Claude Code attaches as an image); with "only copy" on, the clipboard alone. copy: false for the other
+// displays of a ❖⇧3 (the clipboard keeps the first one's).
+async function finish(handle, { copy = true } = {}) {
   if (!handle) return;
   const o = opts();
   let path = null;
-  if (o.clipboard) await media.copyImage(handle);
-  else {
+  if (copy || o.clipboard) await media.copyImage(handle);
+  if (!o.clipboard) {
     const r = await media.saveImage(handle, freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png'));
     if (r.ok) { path = r.path; recent.set((l) => [{ path, time: Date.now() }, ...l].slice(0, 20)); }
   }
@@ -172,7 +175,8 @@ function copyColor(hex) {
 export const capture = {
   // ❖⇧3: a file per display, as other systems do
   full: () => afterHide(() => withTimer(async () => {
-    for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h); }
+    let first = true;
+    for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h, { copy: first }); first = false; }
   })),
   area: (mode = 'area') => afterHide(() => withTimer(async () => {
     endArea();

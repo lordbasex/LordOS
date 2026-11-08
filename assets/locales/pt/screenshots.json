@@ -11,7 +11,7 @@
   "mode.stop": "Parar",
   "timer": "Temporizador",
   "timerNone": "Não",
-  "toClipboard": "Copiar para a área de transferência em vez de salvar",
+  "toClipboard": "Apenas copiar para a área de transferência (sem salvar)",
   "mic": "Gravar o microfone",
   "shortcuts": "❖⇧3 tela inteira · ❖⇧4 área (Espaço: janela) · ❖⇧5 este painel ou parar a gravação · Print Screen",
   "protectedNote": {

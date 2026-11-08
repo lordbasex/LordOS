@@ -11,7 +11,7 @@
   "mode.stop": "Detener",
   "timer": "Temporizador",
   "timerNone": "No",
-  "toClipboard": "Copiar al portapapeles en vez de guardar",
+  "toClipboard": "Solo copiar al portapapeles (sin guardar)",
   "mic": "Grabar el micrófono",
   "shortcuts": "❖⇧3 pantalla completa · ❖⇧4 área (Espacio: ventana) · ❖⇧5 este panel o detener la grabación · Impr Pant",
   "protectedNote": {
