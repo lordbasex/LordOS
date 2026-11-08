@@ -103,12 +103,23 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
 # Claude Code's status line bridge for the Terminal's status bar (docs/TERMINAL.md); Claude Code runs it, not lord-server
 install -m 755 server/build/lord-claude-status "$L/bin/lord-claude-status"
+# text to speech (docs/VOICE.md): `say` (lord-say, no libraries) and its sandboxed engine lord-tts, the only one that
+# links audio.cpp/ggml, with those libraries in lib/tts (ggml loads its CPU and Vulkan backends from there). Optional:
+# make skips lord-tts without tools/tts/fetch-audiocpp.sh's source; no voice model is installed (Settings -> AI -> Voice)
+install -m 755 server/build/lord-say "$L/bin/lord-say"
+if [ -x server/build/lord-tts ]; then
+    install -m 755 server/build/lord-tts "$L/bin/lord-tts"
+    mkdir -p "$L/lib/tts"
+    cp -P server/build/lib/tts/*.so* "$L/lib/tts/"
+    for f in "$L"/lib/tts/*.so*; do [ -L "$f" ] || { chmod 644 "$f"; "$STRIP" --strip-unneeded "$f" 2>/dev/null || true; }; done
+fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
-"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" 2>/dev/null || true
+[ -x "$L/bin/lord-tts" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-tts" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
 [ -x "$L/bin/lord-media" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-media" 2>/dev/null || true; }
@@ -341,6 +352,9 @@ if [ -x "$L/bin/lord-doc" ]; then DOCDEPS=", libpoppler-glib8t64, libarchive13t6
 # (the "fast" data, ~2 MB each) are Recommends
 OCRDEPS=""; OCRRECS=""
 if [ -x "$L/bin/lord-ocr" ]; then OCRDEPS=", libtesseract5, tesseract-ocr-eng"; OCRRECS=", tesseract-ocr-spa, tesseract-ocr-por, tesseract-ocr-fra, tesseract-ocr-ita"; fi
+# lord-tts: Vulkan's loader (the GPU is optional, the CPU always works), OpenMP and the C++ runtime
+TTSDEPS=""
+if [ -x "$L/bin/lord-tts" ]; then TTSDEPS=", libvulkan1, libgomp1, libstdc++6"; fi
 MEDIADEPS=""
 if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, libavutil59, libswscale8, libswresample5, libva2, libva-drm2"; fi
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
@@ -363,7 +377,7 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
 Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq$OCRRECS
 Section: x11
 Priority: optional
@@ -399,6 +413,10 @@ if [ "$1" = configure ]; then
     dpkg-divert --package lordos --quiet --rename --divert /usr/bin/pkexec.distrib --add /usr/bin/pkexec
     ln -sfn ../lib/lordos/bin/lord-pkexec /usr/bin/pkexec
 fi
+# `say` is LordOS's text to speech (docs/VOICE.md); an alternative, so another package's say can sit beside it
+if [ "$1" = configure ] && [ -x /usr/lib/lordos/bin/lord-say ]; then
+    update-alternatives --quiet --install /usr/bin/say say /usr/lib/lordos/bin/lord-say 50
+fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then
     /usr/lib/lordos/migrate "${2:-}"
@@ -425,6 +443,7 @@ if [ "$1" = remove ] && command -v systemctl >/dev/null 2>&1; then
     if [ -d /run/systemd/system ]; then systemctl stop lord-fand.service >/dev/null 2>&1 || true; fi
     systemctl disable lord-fand.service >/dev/null 2>&1 || true
 fi
+if [ "$1" = remove ]; then update-alternatives --quiet --remove say /usr/lib/lordos/bin/lord-say 2>/dev/null || true; fi
 # the boot splash theme goes away with the package: Plymouth back to its default theme first
 if [ "$1" = remove ] && [ -x /usr/sbin/plymouth-set-default-theme ] &&
    [ "$(/usr/sbin/plymouth-set-default-theme 2>/dev/null)" = lordos ]; then

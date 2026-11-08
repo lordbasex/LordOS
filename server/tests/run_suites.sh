@@ -282,6 +282,10 @@ EOF
     # document helper: malicious archives and the confinement
     if [ -x build/lord-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (lord-doc)" sh tests/doc_evil.sh
     else skip "doc_evil.sh" "build/lord-doc (Poppler and libarchive -dev packages) and python3"; fi
+    # text to speech (lord-tts, say): needs a voice model (docs/VOICE.md)
+    if [ -x build/lord-tts ] && [ -x build/lord-say ] && [ -x build/doc-test ] && have python3 && { [ -f "$HOME/.local/share/lordos/voice/models/es/standard.gguf" ] || [ -f /usr/share/lordos/voice/models/es/standard.gguf ]; }; then
+        run "tts_test.sh (lord-tts, say)" sh tests/tts_test.sh
+    else skip "tts_test.sh" "build/lord-tts and a voice model (Settings -> AI -> Voice)"; fi
     # text recognition helper: reading, bad requests and the confinement
     if [ -x build/lord-ocr ] && [ -x build/doc-test ] && [ -r /usr/share/tesseract-ocr/5/tessdata/spa.traineddata ]; then run "ocr_test.sh (lord-ocr)" sh tests/ocr_test.sh
     else skip "ocr_test.sh" "build/lord-ocr (libtesseract-dev) and tesseract-ocr-spa"; fi

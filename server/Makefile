@@ -283,7 +283,7 @@ all: $(ALL)
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
 test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
-test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr,$(ALL))
+test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
 SHAPE_SRC := src/ui/otf.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/unicode.c
 build/shape-test: tests/shape_test.c $(SHAPE_SRC) $(HDR)

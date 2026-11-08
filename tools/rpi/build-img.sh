@@ -114,7 +114,7 @@ PKGS_SPLASH="plymouth plymouth-label"
 PKGS_BUILD="build-essential pkg-config libxkbcommon-dev libwayland-dev wayland-protocols libgbm-dev libegl-dev libgles-dev
  libssl-dev libcrypt-dev libsrtp2-dev libusrsctp-dev freerdp3-dev dpkg-dev file clang
  libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev
- libtesseract-dev"
+ libtesseract-dev cmake glslc libvulkan-dev spirv-headers"
 
 echo "== LordOS $VERSION: Raspberry Pi image in $WORK (host $(uname -m))"
 kernel_warning() {
@@ -206,6 +206,7 @@ else
         package.json README.md server third_party assets themes tools packaging apt \
         $(cd "$ROOT" && ls code-manifest.json code-manifest.sig 2>/dev/null) | tar -C "$BR/src/LordOS" -xf -
     J=$(nproc)
+    sh "$ROOT/tools/tts/fetch-audiocpp.sh" >> "$WORK/build.log" 2>&1 || { echo "build-img.sh: can't fetch audio.cpp (tools/tts/fetch-audiocpp.sh)" >&2; exit 1; }
     in_root "$BR" sh -c "cd /src/LordOS && make -C server -j$J GPU=1 RELEASE=${RELEASE:-0} && make -C server build/canvas-test" > "$WORK/build.log" 2>&1 || {
         tail -40 "$WORK/build.log"; exit 1; }
     is_aarch64 "$BR/src/LordOS/server/build/lord-server" || { echo "build-img.sh: the binary is not aarch64" >&2; exit 1; }
@@ -216,7 +217,7 @@ else
         tail -20 "$WORK/build.log"; exit 1; }
     cp "$BR/tmp/lordos.deb" "$DEB"
     # the package must be complete: the documents and media helpers and the firewall's BPF programs
-    for f in lord-doc lord-media lord-ocr; do
+    for f in lord-doc lord-media lord-ocr lord-tts; do
         dpkg-deb -c "$DEB" | grep -q "/usr/lib/lordos/bin/$f\$" || { echo "build-img.sh: $f missing from the package (build packages, see $WORK/build.log)" >&2; exit 1; }
     done
     [ -s "$BR/src/LordOS/server/build/gen/np_bpf.h" ] || { echo "build-img.sh: lord-netperm built without its BPF programs (clang)" >&2; exit 1; }

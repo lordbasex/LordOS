@@ -615,6 +615,22 @@ sudo apt-get install -y libtesseract-dev tesseract-ocr-eng tesseract-ocr-spa tes
 
 Without `libtesseract-dev`, `make -C server` skips `build/lord-ocr` (`OCRHELPER=0`).
 
+**To build `lord-tts`** (text to speech, `say`, since 0.8.8.6; docs/VOICE.md; installed on the main machine on
+2026-11-07):
+
+```sh
+sudo apt-get install -y cmake glslc libvulkan-dev spirv-headers
+sh tools/tts/fetch-audiocpp.sh
+```
+
+| Package | Version | What for |
+|---|---|---|
+| `cmake` | 3.31 | building audio.cpp's Pocket TTS family |
+| `glslc`, `libvulkan-dev`, `spirv-headers` | 1.4.309 | ggml's Vulkan backend (the GPU) |
+
+Without them, or without `third_party/audiocpp`, `make -C server` skips `build/lord-tts` (`TTSHELPER=0`). The tests
+need a voice model in `~/.local/share/lordos/voice/models/<es|en|pt>/standard.gguf`.
+
 **For printing** (`PRINTING.md`):
 
 ```sh

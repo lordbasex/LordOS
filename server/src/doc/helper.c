@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
@@ -40,6 +41,9 @@
 Slot hslots[DOC_INIT_FDS];
 int hnslots;
 static const char *mode = "";
+#ifdef LORD_HELPER_TTS
+static int tts_gpu;                     /* {"gpu":true} in DQ_INIT_GO: the render node in the sandbox */
+#endif
 
 int hsock(void) { return SOCK; }
 
@@ -124,10 +128,46 @@ void invert_lightness(uint32_t *px, size_t n) {
  * except the received fds and the read-only folders below, syscall allowlist per
  * architecture, no capabilities and with a memory cap. */
 static void lockdown(void) {
-    static const char *ro[16];
+    static const char *ro[20];
     int n = 0;
     ro[n++] = "/usr";                      /* libraries, poppler-data, fonts, locales; lord-ocr: the tessdata */
-#ifndef LORD_HELPER_OCR
+#ifdef LORD_HELPER_TTS
+    /* lord-tts on the GPU: the Vulkan loader and Mesa find the card in /sys and open its render node themselves */
+    static char renders[4][32];
+    static const char *devs[5];
+    int nd = 0;
+    if (tts_gpu) {
+        ro[n++] = "/sys/dev/char";
+        ro[n++] = "/sys/devices";
+        ro[n++] = "/sys/bus/pci";
+        ro[n++] = "/sys/class/drm";
+        ro[n++] = "/etc/vulkan";
+        for (int i = 128; i < 136 && nd < 4; i++) {
+            snprintf(renders[nd], sizeof renders[nd], "/dev/dri/renderD%d", i);
+            if (!access(renders[nd], F_OK)) { devs[nd] = renders[nd]; nd++; }
+        }
+    }
+    devs[nd] = NULL;
+    /* the ggml backends audio.cpp loads after this: next to libaudiocpp, <this binary's folder>/../lib/tts when
+     * installed (inside /usr anyway), <this binary's folder>/lib/tts in a build tree */
+    static char libdir[2][PATH_MAX];
+    char self[PATH_MAX];
+    ssize_t sl = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (sl > 0) {
+        self[sl] = 0;
+        char *slash = strrchr(self, '/');
+        if (slash) {
+            *slash = 0;
+            static const char *const rel[] = { "/../lib/tts", "/lib/tts" };
+            for (int i = 0; i < 2; i++) {
+                char tmp[PATH_MAX + 16];
+                snprintf(tmp, sizeof tmp, "%s%s", self, rel[i]);
+                if (realpath(tmp, libdir[i])) ro[n++] = libdir[i];
+            }
+        }
+    }
+#endif
+#if !defined(LORD_HELPER_OCR) && !defined(LORD_HELPER_TTS)
     static char extra[3][1024];
     ro[n++] = "/etc/fonts";
     ro[n++] = "/var/cache/fontconfig";
@@ -142,7 +182,12 @@ static void lockdown(void) {
     ro[n] = NULL;
     static const int sys[] = {
         SYS_mkdirat, SYS_symlinkat, SYS_linkat, SYS_unlinkat, SYS_fchmod, SYS_utimensat, SYS_fstatfs, SYS_eventfd2,
-        SYS_pipe2, SYS_getcwd, SYS_umask, SYS_fadvise64, SYS_memfd_create, SYS_ftruncate, SYS_readlinkat, -1 };
+        SYS_pipe2, SYS_getcwd, SYS_umask, SYS_fadvise64, SYS_memfd_create, SYS_ftruncate, SYS_readlinkat,
+#ifdef LORD_HELPER_TTS
+        /* audio.cpp unpacks a model's files with std::filesystem (in its own cache folder, the only one it can write) */
+        SYS_mkdir, SYS_rename, SYS_renameat, SYS_renameat2, SYS_unlink, SYS_rmdir, SYS_readlink, SYS_sched_getaffinity,
+#endif
+        -1 };
     static int rofd[DOC_INIT_FDS + 1], rwfd[DOC_INIT_FDS + 1];
     int nro = 0, nrw = 0;
     for (int i = 0; i < hnslots; i++) {
@@ -154,6 +199,10 @@ static void lockdown(void) {
     rofd[nro] = rwfd[nrw] = -1;
 #ifdef LORD_HELPER_OCR
     SandboxHelperCfg cfg = { .name = "lordos-ocr", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024,
+#elif defined(LORD_HELPER_TTS)
+    SandboxHelperCfg cfg = { .name = "lordos-tts", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 4096,
+                             .allow_ioctl_classes = tts_gpu ? SANDBOX_IOCTL_DRM : 0, .dev_files = devs,
+                             .list_dirs = tts_gpu ? (const char *const[]){ "/dev/dri", NULL } : NULL,
 #else
     SandboxHelperCfg cfg = { .name = "lordos-doc", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024,
 #endif
@@ -204,6 +253,21 @@ static void selftest(uint32_t id) {
     fd = open("/usr/share/fonts", O_RDONLY | O_DIRECTORY);
     jb_printf(&b, ",\"fonts_ok\":%d", fd >= 0 ? 0 : errno);
     if (fd >= 0) close(fd);
+#ifdef LORD_HELPER_TTS
+    /* on the GPU: the render node opens, the display's node (lord-server's) doesn't, nor writing the models */
+    fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    jb_printf(&b, ",\"card0\":%d", fd >= 0 ? 0 : errno);
+    if (fd >= 0) close(fd);
+    fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
+    jb_printf(&b, ",\"render_ok\":%d", fd >= 0 ? 0 : errno);
+    if (fd >= 0) close(fd);
+    for (int i = 0; i < hnslots; i++) if (!strcmp(hslots[i].role, "ro")) {
+        int w = openat(hslots[i].fd, "lord-tts-selftest", O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+        jb_printf(&b, ",\"write_models\":%d", w >= 0 ? 0 : errno);
+        if (w >= 0) { close(w); unlinkat(hslots[i].fd, "lord-tts-selftest", 0); }
+        break;
+    }
+#endif
     jb_raw(&b, "}");
     reply_json(DR_DONE, id, &b);
 }
@@ -223,6 +287,9 @@ static int handle(const DocMsg *m) {
 #ifdef LORD_HELPER_OCR
     /* lord-ocr: the same loop and lockdown with Tesseract only (h_ocr.c) */
     if (!strcmp(mode, "ocr")) done = ocr_handle(m, args);
+#elif defined(LORD_HELPER_TTS)
+    /* lord-tts: the same loop and lockdown with Pocket TTS only (h_tts.c) */
+    if (!strcmp(mode, "tts")) done = tts_handle(m, args);
 #else
     if (!strcmp(mode, "pdf")) done = pdf_handle(m, args);
     else if (!strcmp(mode, "util")) done = font_handle(m, args);
@@ -243,7 +310,13 @@ int main(int argc, char **argv) {
     prctl(PR_SET_DUMPABLE, 0);
     struct rlimit core = { 0, 0 };
     setrlimit(RLIMIT_CORE, &core);
+#ifdef LORD_HELPER_TTS
+    /* address space, not memory: the model, ggml's thread pool and the Vulkan driver reserve far more than they use
+     * (the memory itself is capped by the cgroup, mem_max_mb) */
+    struct rlimit as = { (rlim_t)16384 << 20, (rlim_t)16384 << 20 };
+#else
     struct rlimit as = { (rlim_t)1536 << 20, (rlim_t)1536 << 20 };
+#endif
     setrlimit(RLIMIT_AS, &as);
     struct stat st;
     if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "lord-doc: lo lanza lord-server\n"); return 2; }
@@ -277,6 +350,10 @@ int main(int argc, char **argv) {
             if (m.json && !json_parse(m.json, m.len, &d, NULL, 0)) {
                 const char *s = json_str(d.root, "mode");
                 if (s) snprintf(mbuf, sizeof mbuf, "%s", s);
+#ifdef LORD_HELPER_TTS
+                const JVal *g = json_get(d.root, "gpu");
+                tts_gpu = g && g->type == J_BOOL && g->num != 0;
+#endif
             }
             mode = mbuf;
             json_free(&d);

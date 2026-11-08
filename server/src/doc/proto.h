@@ -68,6 +68,7 @@ enum {
     DQ_IMG_DECODE,      /* fd + {"maxw","maxh"} → DR_IMG */
     DQ_IMG_CONVERT,     /* input fd + output fd + {"format":"png"|"jpeg"|"pdf","quality"} → DR_DONE */
 
+    DQ_TTS = 82,        /* (lord-tts) {"slot","file","text","backend","threads","voice_id","seed"} + voice WAV fd? → DR_BLOB WAV (h_tts.c) */
     DQ_OCR = 80,        /* (lord-ocr) fd (w*h premultiplied ARGB32) + {"w","h","langs"} → {text} (h_ocr.c) */
 
     DQ_SELFTEST = 90,   /* lockdown test: tries the forbidden and says what happened (tests/doc_test.c) */

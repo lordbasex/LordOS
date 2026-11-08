@@ -140,6 +140,8 @@ static int apply_landlock(const SandboxConfig *cfg, const int *ro_fds, const int
     if (abi >= 5) dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
 #endif
     for (const char *const *p = cfg->dev_files; p && *p; p++) ll_path(rs, *p, dev);
+    /* listing only: the names in the folder, none of its files */
+    for (const char *const *p = cfg->list_dirs; p && *p; p++) ll_path(rs, *p, LANDLOCK_ACCESS_FS_READ_DIR & fs_handled);
     /* read and write: only the app's data folder */
     if (cfg->data_dir) ll_path(rs, cfg->data_dir, rw);
     /* folders passed as already open fds (helpers) */
@@ -861,7 +863,8 @@ int sandbox_apply_helper(const SandboxHelperCfg *cfg) {
     if (!drop_caps()) mask |= SB_NOCAPS;
     /* no network; read-only access to the declared folders, plus the folders that arrive as fds */
     SandboxConfig ro = { .id = cfg->name ? cfg->name : "helper", .pkg_dir = NULL, .data_dir = NULL,
-                         .runtime_dir = NULL, .ro_extra = cfg->ro_paths, .dev_files = cfg->dev_files, .network = 0 };
+                         .runtime_dir = NULL, .ro_extra = cfg->ro_paths, .dev_files = cfg->dev_files,
+                         .list_dirs = cfg->list_dirs, .network = 0 };
     int fs_ok = 0, net_ok = 0;
     if (!apply_landlock(&ro, cfg->ro_dir_fds, cfg->rw_dir_fds, &fs_ok, &net_ok)) { if (fs_ok) mask |= SB_LANDLOCK_FS; if (net_ok) mask |= SB_LANDLOCK_NET; }
     if (apply_seccomp_extra(0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1)) {

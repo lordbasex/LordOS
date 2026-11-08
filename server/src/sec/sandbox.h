@@ -23,6 +23,7 @@ typedef struct {
     const char *runtime_dir;    /* XDG_RUNTIME_DIR (for the Wayland socket; just what's needed) */
     const char *const *ro_extra;/* extra read-only folders (fonts, assets); NULL-terminated */
     const char *const *dev_files;/* exact device files opened for read and write; NULL-terminated */
+    const char *const *list_dirs;/* folders that can be listed, nothing in them opened (Landlock READ_DIR); NULL-terminated */
     int network;                /* 1 if the app declared and has the `network` permission */
 } SandboxConfig;
 
@@ -58,8 +59,10 @@ typedef struct {
      * files (no truncation). That way the helper needs no path at all. */
     const int *ro_dir_fds;
     const int *rw_dir_fds;
-    /* exact device files a decoder library opens by path itself: the Pi 5's HEVC decoder only */
+    /* exact device files a decoder library opens by path itself: the Pi 5's HEVC decoder, lord-tts's render node */
     const char *const *dev_files;
+    /* folders listed but not opened: lord-tts's /dev/dri, which libdrm lists to find the render node */
+    const char *const *list_dirs;
 } SandboxHelperCfg;
 
 /* Callers can detect the ro_dir_fds/rw_dir_fds fields. */

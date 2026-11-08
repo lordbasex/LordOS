@@ -8,6 +8,7 @@
  *   doc-test <lord-doc> font <file.ttf>
  *   doc-test <lord-ocr> selftest-ocr                what lord-ocr's confinement blocks
  *   doc-test <lord-ocr> ocr <file.pgm> [langs]      the text in a gray picture (P5)
+ *   doc-test <lord-tts> selftest-tts <models> [gpu] what lord-tts's confinement blocks (on the CPU or the GPU)
  *
  * tests/doc_evil.sh uses it with malicious archives built by tests/make_evil_archives.py. */
 #include "doc/proto.h"
@@ -34,6 +35,7 @@ static double now_ms(void) {
 
 static int sock;
 static pid_t child;
+static int go_gpu;                         /* lord-tts: {"gpu":true} in DQ_INIT_GO */
 
 static void start(const char *helper, const char *mode, const int *fds, const char *const *roles, int n) {
     int sv[2];
@@ -54,7 +56,7 @@ static void start(const char *helper, const char *mode, const int *fds, const ch
         close(fds[i]);
     }
     char j[48];
-    int l = snprintf(j, sizeof j, "{\"mode\":\"%s\"}", mode);
+    int l = snprintf(j, sizeof j, go_gpu ? "{\"mode\":\"%s\",\"gpu\":true}" : "{\"mode\":\"%s\"}", mode);
     doc_send(sock, DQ_INIT_GO, 0, j, (size_t)l, NULL, 0);
     DocMsg m;
     if (doc_recv(sock, &m) || m.h.op != DR_DONE) { fprintf(stderr, "the helper did not start\n"); exit(2); }
@@ -84,6 +86,12 @@ int main(int argc, char **argv) {
     int st = 0;
     if (!strcmp(cmd, "selftest")) {
         start(helper, "pdf", NULL, NULL, 0);
+        st = call(DQ_SELFTEST, NULL, NULL, 0, 0) == DR_DONE ? 0 : 1;
+    } else if (!strcmp(cmd, "selftest-tts") && argc > 3) {
+        int fd = open(argv[3], O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        const char *roles[] = { "ro" };
+        go_gpu = argc > 4 && !strcmp(argv[4], "gpu");
+        start(helper, "tts", &fd, roles, 1);
         st = call(DQ_SELFTEST, NULL, NULL, 0, 0) == DR_DONE ? 0 : 1;
     } else if (!strcmp(cmd, "selftest-ocr")) {
         start(helper, "ocr", NULL, NULL, 0);
