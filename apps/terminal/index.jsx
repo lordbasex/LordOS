@@ -3,7 +3,7 @@
 // La emulación (xterm-256color, color directo, mouse, imágenes en línea, marcas del shell)
 // y el dibujo están en C (server/src/term); esta app arma pestañas, paneles divididos,
 // perfiles, buscador, barra de herramientas, atajos y la ventana desplegable.
-import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, term, clipboard, addShortcuts, registerDockMenu, t as tr } from '@lordos/sdk';
+import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, term, clipboard, addShortcuts, registerDockMenu, speechMenu, registerSelection, ContextMenu, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
@@ -12,7 +12,7 @@ import {
 } from './state.js';
 import { PaneTree, paneNodes } from './Panes.jsx';
 import {
-  TabBar, TAB_COLORS, StatusBar, FindBar, Toolbelt, Overlays, ContextMenu, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
+  TabBar, TAB_COLORS, StatusBar, FindBar, Toolbelt, Overlays, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
 } from './Chrome.jsx';
 import { Preferences } from './Preferences.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
@@ -198,6 +198,9 @@ function run(wid, action) {
   }
 }
 
+// what the active pane has selected (Edit → Speech, ❖Esc)
+const selectionOf = (wid) => { const s = activeSid(getWin(wid)); return s ? term.text(s, 'selection') : ''; };
+
 function menus(wid, w) {
   const item = (action, extra = {}) => ({ label: actionLabel(action), hint: hint(action), onClick: () => run(wid, action), ...extra });
   const tab = activeTab(w);
@@ -219,6 +222,7 @@ function menus(wid, w) {
       item('pasteOneLine'), item('pasteEscaped'), '-',
       item('copyMode'), item('commandHistory'), '-',
       item('selectAll'), item('selectOutput'), '-',
+      speechMenu(() => selectionOf(wid)), '-',
       item('find'), item('findNext'), item('findPrev'), '-',
       item('autocomplete'), item('clearBuffer'), item('reset'),
     ] },
@@ -268,6 +272,9 @@ export default function TerminalApp() {
       onConfirm: () => wm.close(wid, true) } }));
     return false;
   }), [wid]);
+
+  // ❖Esc reads the active pane's selection aloud (sdk/voice.js)
+  useEffect(() => registerSelection(wid, () => selectionOf(wid)), [wid]);
 
   // proceso en primer plano de cada sesión (títulos de pestañas)
   useEffect(() => {
@@ -365,6 +372,7 @@ export default function TerminalApp() {
     setCtx({ x: e.x - rx, y: e.y - ry, items: [
       { label: actionLabel('copy'), hint: hint('copy'), disabled: !info?.hasSelection, onClick: () => run(wid, 'copy') },
       { label: actionLabel('paste'), hint: hint('paste'), onClick: () => run(wid, 'paste') },
+      speechMenu(() => term.text(s, 'selection')),
       '-',
       { label: actionLabel('splitRight'), hint: hint('splitRight'), onClick: () => run(wid, 'splitRight') },
       { label: actionLabel('splitDown'), hint: hint('splitDown'), onClick: () => run(wid, 'splitDown') },
@@ -396,7 +404,7 @@ export default function TerminalApp() {
       )}
       {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} wid={wid} />}
       <Overlays t={t} wid={wid} w={w} sid={sid} tab={tab} />
-      {ctx && <ContextMenu t={t} x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} />}
+      {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] }} />}
       {w.prefs && <Preferences wid={wid} onClose={() => patchWin(wid, () => ({ prefs: false }))} />}
     </View>
   );

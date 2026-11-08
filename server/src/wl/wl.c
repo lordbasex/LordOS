@@ -1226,8 +1226,8 @@ static void html_adopt(char *h, size_t n) {
 }
 
 /* reading an app's selection into LordOS */
-typedef struct { int fd, image, sensitive, primary, html, html_only; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
-static void prim_store(const char *t, size_t n);
+typedef struct { int fd, image, sensitive, primary, html, html_only; pid_t pid; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
+static void prim_store(const char *t, size_t n, pid_t pid);
 
 static int reader_ready(int fd, uint32_t mask, void *data) {
     Reader *rd = data;
@@ -1247,7 +1247,7 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         break;                              /* end (or error): done */
     }
     if (rd->primary) {
-        if (rd->len) prim_store(rd->buf, rd->len);
+        if (rd->len) prim_store(rd->buf, rd->len, rd->pid);
     } else if (rd->html) {
         /* the text/html beside an app's text: kept with that text (whichever of the two arrives last) */
         char *h = rd->len && rd->offer == clip_offer_gen ? malloc(rd->len) : NULL;
@@ -1548,6 +1548,15 @@ static PSource *prim_src;
 static char *prim_text;
 static size_t prim_len;
 static unsigned prim_gen;
+static pid_t prim_pid;          /* the app that made it: ❖Esc reads it aloud only in front of that app (wl_focus_primary) */
+
+static pid_t client_pid(struct wl_client *c) {
+    pid_t pid = 0;
+    uid_t uid;
+    gid_t gid;
+    if (c) wl_client_get_credentials(c, &pid, &uid, &gid);
+    return pid;
+}
 
 static int prim_rank(const char *m) {
     return !strcmp(m, "text/plain;charset=utf-8") ? 4 : !strcmp(m, "UTF8_STRING") ? 3 : !strcmp(m, "text/plain") ? 2 : text_mime(m) ? 1 : 0;
@@ -1558,7 +1567,7 @@ static void prim_offer_focus(void) {
     struct wl_resource *d;
     FOR_CLIENT(&prim_devices, key_focus->client, d) prim_offer_to(d);
 }
-static void prim_store(const char *t, size_t n) {
+static void prim_store(const char *t, size_t n, pid_t pid) {
     char *nb = malloc(n + 1);
     if (!nb) return;
     memcpy(nb, t, n);
@@ -1567,6 +1576,7 @@ static void prim_store(const char *t, size_t n) {
     free(prim_text);
     prim_text = nb;
     prim_len = strlen(nb);
+    prim_pid = pid;
     prim_gen++;
     prim_offer_focus();
 }
@@ -1625,6 +1635,7 @@ static void pdev_set_selection(struct wl_client *c, struct wl_resource *r, struc
     if (!rd) { close(p[0]); return; }
     rd->fd = p[0];
     rd->primary = 1;
+    rd->pid = client_pid(c);
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); }
 }
@@ -3785,7 +3796,13 @@ void wlx_clip_png(const unsigned char *png, size_t n, const char *origin) {
 
 void wlx_primary_text(const char *t, size_t n) {
     if (prim_src) { zwp_primary_selection_source_v1_send_cancelled(prim_src->res); prim_src = NULL; }
-    prim_store(t, n);
+    prim_store(t, n, key_focus ? client_pid(key_focus->client) : 0);     /* an X11 app's: Xwayland has the keyboard */
+}
+
+const char *wl_focus_primary(size_t *n) {
+    if (!dpy || !key_focus || !prim_text || !prim_len || !prim_pid || client_pid(key_focus->client) != prim_pid) return NULL;
+    *n = prim_len;
+    return prim_text;
 }
 
 const char *wlx_primary(size_t *n, unsigned *gen) {

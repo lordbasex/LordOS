@@ -33,6 +33,7 @@
 #include "js_imager.h"
 #include "js_logs.h"
 #include "js_help.h"
+#include "js_voice.h"
 #include "js_hw.h"
 #include "../media/media.h"
 #include "../sec/codesig.h"
@@ -435,6 +436,7 @@ static void session_context(void) {
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
+    js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);
 }

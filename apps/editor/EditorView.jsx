@@ -102,7 +102,7 @@ const Line = memo(function Line({ tokens, top, left, palette, tab }) {
 
 // ---- view ----
 
-export function EditorView({ doc, lang, t, palette, settings, matches, onChange, onCommand, apiRef, overlay }) {
+export function EditorView({ doc, lang, t, palette, settings, matches, onChange, onCommand, apiRef, overlay, onContextMenu }) {
   const { focused } = useAppWindow();
   const area = useRef(null);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -523,7 +523,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   const clicks = useRef({ time: 0, n: 0, p: null });
   const drag = useRef(null);
   const onMouseDown = (e) => {
-    if (!area.current) return;
+    if (!area.current || e.button === 2) return;     // a right click keeps the selection for its menu
     const p = posAt(e.x, e.y);
     const now = Date.now(), cl = clicks.current;
     cl.n = now - cl.time < 400 && cl.p && cl.p.l === p.l && Math.abs(cl.p.c - p.c) < 2 ? cl.n + 1 : 1;
@@ -616,7 +616,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   }
 
   return (
-    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel}
+    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu}
       style={{ flex: 1, overflow: 'hidden', backgroundColor: t.editorBg, direction: 'ltr' }}>
       {/* current line */}
       {!doc.cursors.some(hasSel) && primary.l >= first && primary.l <= last && (

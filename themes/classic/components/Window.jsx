@@ -7,7 +7,7 @@
 // Lord Classic has no global menu bar: an app that declares menus (File, Edit, View, Go…; the same
 // ones Lord Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useAppMenus, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -106,7 +106,7 @@ function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, o
 // Subscribes on its own: the app's window must not redraw when its menus change. Notes and Mail set
 // them after every draw, and redrawing them here would never end.
 function AppMenuStrip({ t, win, focused }) {
-  const menus = useAppMenus(win.id) || [];
+  const menus = useMenusWithSpeech(win.id) || [];
   return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} /> : null;
 }
 

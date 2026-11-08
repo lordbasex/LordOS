@@ -15,6 +15,9 @@ never fires twice.
   bottom of the main display with a drawn icon (speaker or muted speaker, sun, keyboard light) and a bar of 16 segments.
   It stays 1.5 s after the last press, so a held key keeps it up, then fades out in 0.2 s, or just goes with Reduce motion.
   Both themes mount `<LevelHud />` next to `<DesktopHud />`; the login and lock screens don't.
+  ❖Esc reads the selection of the window in front aloud and, pressed while reading, stops (`sdk/voice.js`,
+  [VOICE.md](VOICE.md)); Settings → AI can turn it off. Linux apps never get a ❖ combination and Esc is a system ❖
+  key, so it always reaches the desktop.
 - A theme's table, given to `useShortcuts({ grabs, table, onSuperTap, appsPaste })` from its root component
   (`flowTable` in `themes/default/index.jsx`, `classicTable` in `themes/classic/index.jsx`).
 - `addShortcuts(entries)` from a module: Screenshots and the Terminal's drop-down window. `runShortcut(id)`

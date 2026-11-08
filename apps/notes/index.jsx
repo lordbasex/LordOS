@@ -2,7 +2,7 @@
 // notes that live on the desktop as widgets (they move, resize and come back on
 // login). Everything is saved automatically in ~/Notes/<note>/nota.md (see store.js and docs/NOTES.md).
 import {
-  View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented,
+  View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker,
 } from '@lordos/sdk';
@@ -117,13 +117,18 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
     const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (Math.abs(nw - w) > 1) setW(nw); } }, 400);
     return () => clearInterval(id);
   });
+  // right click while editing: Speech, for the selection or the whole note
+  const [ctx, setCtx] = useState(null);
+  const speechText = () => editorApi.current?.selection?.() || note.body || '';
   if (mode === 'edit') {
     return (
       <View ref={box} style={{ flex: 1 }}>
         <NoteEditor value={note.body} onChange={(body) => updateNote(note.slug, { body })} size={size} colors={ink} autoFocus
           apiRef={editorApi} emojiSearch={searchEmoji} padding={compact ? 8 : 14}
           onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => onMode('read') : undefined}
-          onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }} />
+          onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}
+          onContextMenu={(e) => { const items = speechItems(speechText).filter((x) => x !== '-'); if (items.length) setCtx({ ...(box.current ? e.local(box.current) : e), items }); }} />
+        {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} />}
       </View>
     );
   }
@@ -253,12 +258,16 @@ export default function Notes() {
   const [panel, setPanel] = useState(null);             // 'emoji' | 'attach' | 'image' | 'delete'
   const [toc, setToc] = useState(true);
   const api = useRef(null);
+  // ❖Esc reads the selection aloud (sdk/voice.js); while reading a note there is no selection
+  const editing = useRef(false);
+  useEffect(() => registerSelection(wid, () => (editing.current ? api.current?.selection?.() || '' : '')), [wid]);
   useEffect(() => { if (!loaded) loadNotes(); }, []);
   useEffect(() => { if (args?.slug) { setSel(args.slug); setMode('read'); } }, [args?.nonce]);
   useEffect(() => () => flushAll(), []);
   const needle = q.trim().toLowerCase();
   const shown = list.filter((n) => !needle || `${n.title}\n${n.body}`.toLowerCase().includes(needle));
   const note = list.find((n) => n.slug === sel) || shown[0] || null;
+  editing.current = mode === 'edit';
   // block: images and attachments go on their own line
   const insert = (md, block = false) => {
     if (!md || !note) return;
@@ -301,6 +310,8 @@ export default function Notes() {
       { label: tr('notes.menu.view'), items: [
         { label: mode === 'edit' ? tr('notes.read') : tr('notes.edit'), hint: '❖E', onClick: cmd.toggle },
         { label: tr('notes.toc'), checked: toc, onClick: cmd.toc },
+        // the selection, or the whole note when nothing is selected (as a Mac's Start Speaking)
+        ...(note ? ['-', ...speechItems(() => (mode === 'edit' && api.current?.selection?.()) || note.body || '')].slice(0, -1) : []),
       ] },
     ]);
   });

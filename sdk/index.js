@@ -13,6 +13,8 @@ export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPref
 export { keyboard } from './keyboard.js';
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
+export { ContextMenu } from './contextmenu.jsx';
+export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS } from './voice.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
 export { switcherPrefs, SWITCHER_DEFAULTS, validColor } from './switchermodel.js';
@@ -146,6 +148,7 @@ export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mail
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';
+import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
 export { openFileWithApps, openUrl, revealPath } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
@@ -303,8 +306,8 @@ function LocaleRoot({ children }) {
     at('overlay', SpotlightPanel),
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
-    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, DisplayConfirm),
+    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, VoiceSavePrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';

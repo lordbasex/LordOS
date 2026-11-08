@@ -14,4 +14,9 @@ size_t say_clean(char *s, size_t len);
  * Returns 0 when nothing but space is left. */
 size_t say_next(const char *s, size_t len, size_t max, size_t *skip);
 
+/* The language of s[0..len) among the ones LordOS has voices for, "es", "en" or "pt", from its most common words
+ * and the letters only one of them uses (the first 4000 bytes). With too little to tell, the fallback (when it is one
+ * of the three; English otherwise). */
+const char *say_language(const char *s, size_t len, const char *fallback);
+
 #endif

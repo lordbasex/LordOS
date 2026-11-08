@@ -87,6 +87,8 @@ WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c 
 SRC += $(WM_SRC)
 # Clock and Help (docs/SYSTEM.md): time zones with our own TZif reader, and the help articles
 CLOCK_SRC := src/ui/tzif.c src/ui/js_help.c
+# reading text aloud: lord-server starts lord-say (mk/tts.mk builds it and lord-tts)
+CLOCK_SRC += src/tts/speak.c src/ui/js_voice.c
 SRC += $(CLOCK_SRC)
 # Logs (docs/SYSTEM.md): our own systemd journal reader, the logs-system action and lord.logs
 LOGS_SRC := src/logs/journal.c src/logs/logs_admin.c src/ui/js_logs.c

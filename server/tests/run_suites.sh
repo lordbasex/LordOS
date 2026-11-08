@@ -174,6 +174,8 @@ EOF
     if have node; then run "idle-model-test (sdk/idlemodel.js)" node tests/idle_model_test.mjs
     else skip "idle-model-test (sdk/idlemodel.js)" node; fi
     if have node; then run "vm-model-test (apps/machines/model.js)" node tests/vm_model_test.mjs; fi
+    # where the reading-aloud player goes and how its wave moves (docs/VOICE.md)
+    if have node; then run "voiceplayer-model-test (sdk/voiceplayermodel.js)" node tests/voiceplayer_model_test.mjs; fi
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build

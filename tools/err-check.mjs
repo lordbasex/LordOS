@@ -138,8 +138,9 @@ export function checkErrors({ quiet = false } = {}) {
       report(m.index, `JS exception with prose: "${t}" (use js_throw_code / js_throw_line)`);
     });
     // Spanish in any string literal (not in files whose strings are data in other languages: the localized
-    // mailbox names a server may use for Sent, Trash, Junk… in mail/folderrole.c, #28)
-    const LANG_DATA = new Set(['mail/folderrole.c']);
+    // mailbox names a server may use for Sent, Trash, Junk… in mail/folderrole.c, #28; the common words say uses to
+    // tell a text's language in tts/saytext.c)
+    const LANG_DATA = new Set(['mail/folderrole.c', 'tts/saytext.c']);
     for (let i = LANG_DATA.has(rel) ? -1 : src.indexOf('"'); i >= 0; ) {
       if (src[i - 1] === "'" && src[i + 1] === "'") { i = src.indexOf('"', i + 1); continue; }   // '"'
       const [t, end] = literal(src, i);

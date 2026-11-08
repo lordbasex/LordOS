@@ -33,6 +33,11 @@ static void split(const char *what, const char *in, size_t max, const char *want
     eqs(what, out, o, want);
 }
 
+static void lang(const char *what, const char *in, const char *fallback, const char *want) {
+    const char *got = say_language(in, strlen(in), fallback);
+    eqs(what, got, strlen(got), want);
+}
+
 int main(void) {
     clean("colors out", "\x1b[1;32mlordbasex\x1b[0m@host:~$ ls", "lordbasex@host:~$ ls");
     clean("a window title out", "\x1b]0;title\x07hola", "hola");
@@ -48,6 +53,17 @@ int main(void) {
     split("a long sentence at a comma", "uno dos tres cuatro, cinco seis siete ocho nueve diez", 30, "uno dos tres cuatro,|cinco seis siete ocho nueve|diez");
     split("one long word on a character boundary", "ñññññññññññ", 9, "ññññ|ññññ|ñññ");
     split("nothing but space", "  \n ", 200, "");
+    lang("Spanish", "Hola, ¿cómo estás? Esta es una prueba de la voz.", "en", "es");
+    lang("English", "The quick brown fox jumps over the lazy dog and runs to the river.", "es", "en");
+    lang("Portuguese", "Olá, tudo bem? Esta é uma prova da voz, não é muito difícil.", "es", "pt");
+    lang("Portuguese by its letters", "A configuração do sistema está pronta para você.", "en", "pt");
+    lang("Spanish over a Portuguese fallback", "El sistema está listo para que lo uses también.", "pt", "es");
+    lang("English in capitals", "THE FILE IS NOT IN THE FOLDER", "es", "en");
+    lang("too little to tell", "OK", "es", "es");
+    lang("a command keeps the fallback", "make -C server test 2>&1 | tail", "pt", "pt");
+    lang("empty", "", "en", "en");
+    lang("a language without voices", "OK", "fr", "en");
+    lang("terminal output in English", "Error: the file was not found in the folder and it can not be opened", "es", "en");
     printf("saytext_test: %d/%d\n", n - bad, n);
     return bad != 0;
 }

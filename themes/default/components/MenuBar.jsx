@@ -1,6 +1,6 @@
 // Top menu bar: L menu, active app, Window menu, keyboard layout,
 // Control Center and clock.
-import { View, Text, useClock, wm, getApp, session, useAppMenus, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems } from '@lordos/sdk';
+import { View, Text, useClock, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems } from '@lordos/sdk';
 import { useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -40,7 +40,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
   const refs = { logo: useRef(null), app: useRef(null), window: useRef(null), help: useRef(null) };
   const appRefs = useRef({});
   const app = focused ? getApp(focused) : null;
-  const extra = useAppMenus(focused) || [];
+  const extra = useMenusWithSpeech(focused) || [];
   // Menu position: below the item that opened it (from its right edge in Arabic/Hebrew).
   const anchorX = (ref) => {
     if (!ref?.current) return direction() === 'rtl' ? area.x + area.w - 6 : area.x + 6;

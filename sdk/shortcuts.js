@@ -32,6 +32,7 @@ import { hasNowPlaying, mediaToggle, mediaNext, mediaPrev, mediaStop } from './m
 import { volumeUp, volumeDown, volumeMute, brightnessUp, brightnessDown, keyLightUp, keyLightDown } from './hwkeys.js';
 import { wm } from './windows.js';
 import { switcherOpen, switcherKey } from './appswitcher.jsx';
+import { speakSelection } from './voice.js';
 
 const MOD_BITS = { Shift: 1, Alt: 2, Ctrl: 4, Meta: 8 };
 const NAMED = {
@@ -91,6 +92,8 @@ export const BASE = [
   { id: 'emoji', keys: ['Meta+.', 'Meta+Ctrl+Space'], run: toggleEmojiPanel, label: 'shell.shortcuts.emoji', group: 'system' },
   { id: 'lock', keys: ['Meta+L', 'Meta+Ctrl+Q'], run: lockScreen, when: canLock, label: 'shell.shortcuts.lock', group: 'system' },
   { id: 'quit', keys: ['Meta+Q'], run: quitFrontApp, label: 'shell.shortcuts.quit', group: 'apps' },
+  // ❖Esc reads the selection aloud, or stops reading (⌥Esc on a Mac); a full-screen app or a locked pointer keeps it (wl.c)
+  { id: 'speakSelection', keys: ['Meta+Escape'], run: speakSelection, label: 'shell.shortcuts.speakSelection', group: 'system' },
   { id: 'mediaPlay', keys: ['MediaPlayPause', 'MediaPlay', 'MediaPause'], run: mediaToggle, when: hasNowPlaying },
   { id: 'mediaNext', keys: ['MediaNext'], run: mediaNext, when: hasNowPlaying },
   { id: 'mediaPrev', keys: ['MediaPrev'], run: mediaPrev, when: hasNowPlaying },

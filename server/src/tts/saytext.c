@@ -86,3 +86,58 @@ size_t say_next(const char *s, size_t len, size_t max, size_t *skip) {
     while (n > 1 && (p[a + n] & 0xC0) == 0x80) n--;
     return n;
 }
+
+/* ---- which language ----
+ * The most common short words of each language LordOS has voices for, and the letters only one of them uses. */
+static const char *const WORDS_ES[] = { "el", "la", "los", "las", "de", "del", "que", "y", "en", "un", "una", "es", "por", "con",
+    "para", "no", "se", "al", "lo", "como", "más", "pero", "su", "sus", "le", "ya", "muy", "también", "fue", "ha", "este",
+    "esta", "hay", "está", "son", "yo", "me", "mi", "tu", "qué", "cuando", "donde", "porque", "sin", "sobre", "entre",
+    "hasta", "desde", "todo", "todos", NULL };
+static const char *const WORDS_EN[] = { "the", "and", "of", "to", "a", "in", "is", "it", "that", "for", "on", "with", "as",
+    "was", "be", "by", "this", "are", "or", "not", "you", "at", "from", "have", "an", "they", "which", "but", "has", "had",
+    "were", "their", "will", "can", "all", "what", "there", "if", "would", "been", "more", "when", "your", "we", "our",
+    "its", NULL };
+static const char *const WORDS_PT[] = { "o", "a", "os", "as", "de", "do", "da", "dos", "das", "que", "e", "em", "um", "uma",
+    "é", "por", "com", "para", "não", "se", "ao", "como", "mais", "mas", "seu", "sua", "você", "ele", "ela", "isso",
+    "está", "são", "eu", "meu", "minha", "quando", "onde", "porque", "sem", "sobre", "entre", "até", "desde", "também",
+    "foi", "tem", "há", "muito", "nos", NULL };
+
+static int in_list(const char *const *l, const char *w, size_t n) {
+    for (; *l; l++) if (strlen(*l) == n && !memcmp(*l, w, n)) return 1;
+    return 0;
+}
+
+static int has_at(const unsigned char *p, size_t i, size_t len, const char *u) {
+    size_t n = strlen(u);
+    return i + n <= len && !memcmp(p + i, u, n);
+}
+
+const char *say_language(const char *s, size_t len, const char *fallback) {
+    static const char *const langs[3] = { "es", "en", "pt" };
+    int score[3] = { 0, 0, 0 }, fb = 1;
+    for (int k = 0; k < 3; k++) if (fallback && !strcmp(fallback, langs[k])) fb = k;
+    const unsigned char *p = (const unsigned char *)s;
+    if (len > 4000) len = 4000;
+    char w[24];
+    size_t wn = 0;
+    for (size_t i = 0; i <= len; i++) {
+        unsigned char c = i < len ? p[i] : ' ';
+        /* the letters of a word: ASCII ones lowercased, and any UTF-8 sequence (accents) as it is */
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c >= 0x80) {
+            if (wn < sizeof w) w[wn] = (char)(c >= 'A' && c <= 'Z' ? c + 32 : c);
+            wn++;
+            if (has_at(p, i, len, "\xc3\xb1") || has_at(p, i, len, "\xc2\xbf") || has_at(p, i, len, "\xc2\xa1")) score[0] += 2;   /* ñ ¿ ¡ */
+            if (has_at(p, i, len, "\xc3\xa3") || has_at(p, i, len, "\xc3\xb5") || has_at(p, i, len, "\xc3\xa7")) score[2] += 2;   /* ã õ ç */
+            continue;
+        }
+        if (wn && wn <= sizeof w) {
+            score[0] += in_list(WORDS_ES, w, wn);
+            score[1] += in_list(WORDS_EN, w, wn);
+            score[2] += in_list(WORDS_PT, w, wn);
+        }
+        wn = 0;
+    }
+    int best = fb;
+    for (int k = 0; k < 3; k++) if (score[k] > score[best]) best = k;
+    return score[best] >= 2 && score[best] > score[fb] ? langs[best] : langs[fb];
+}

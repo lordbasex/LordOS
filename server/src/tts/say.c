@@ -10,10 +10,20 @@
  *
  * Models: <root>/models/<language>/<quality>.gguf, root being /usr/share/lordos/voice (packages) or
  * ~/.local/share/lordos/voice. Voices: <root>/voices/<name>.wav (a voice to clone), or a voice the model carries
- * (English: alba). Defaults from ~/.config/lordos/voice.json ({language, voice, backend, quality}), then $LANG. */
+ * (English: alba). Without -l, the language is the text's (say_language); ~/.config/lordos/voice.json's ({language,
+ * voice, backend, quality}), then $LANG's, when the text is too short to tell.
+ *
+ * -o - writes the WAV to stdout (its sizes are set at the end, so it must be a file); lord-server saves this way.
+ *
+ * --levels (lord-server's, speak.c): fd 3 is a pipe to it; for each SAY_LEVEL_MS of audio played, SAY_BANDS bytes, how
+ * loud each band is (levels.c), for the wave its player draws. Written without waiting: one it isn't reading is lost.
+ *
+ * Exit status: 0 spoken, 1 an error, 2 usage, 3 no model for the language, 4 no voice chosen, 5 lord-tts isn't
+ * installed, 130 stopped by a signal. lord-server (speak.c) tells the person which one it was. */
 #include "../doc/proto.h"
 #include "../doc/wire.h"
 #include "../sec/json.h"
+#include "levels.h"
 #include "saytext.h"
 
 #include <dirent.h>
@@ -40,14 +50,18 @@ static const char *const ROOTS_SYS = "/usr/share/lordos/voice";
 static int sock = -1;
 static pid_t helper = -1, player = -1;
 static int player_fd = -1;
+static int levels_fd = -1;                /* --levels: fd 3 */
 
-static void die(const char *msg, const char *detail) {
+enum { EXIT_NO_MODEL = 3, EXIT_NO_VOICE = 4, EXIT_NOT_INSTALLED = 5 };
+
+static void die_as(int code, const char *msg, const char *detail) {
     fprintf(stderr, "say: %s%s%s\n", msg, detail && *detail ? ": " : "", detail ? detail : "");
-    exit(1);
+    exit(code);
 }
+static void die(const char *msg, const char *detail) { die_as(1, msg, detail); }
 
 static void usage(void) {
-    fputs("usage: say [-l es|en|pt] [-v voice] [-q standard|hd] [-b auto|cpu|gpu] [-o file.wav] [-f file|-] [text…]\n"
+    fputs("usage: say [-l es|en|pt] [-v voice] [-q standard|hd] [-b auto|cpu|gpu] [-o file.wav|-] [-f file|-] [text…]\n"
           "       say --voices\n", stderr);
     exit(2);
 }
@@ -127,7 +141,7 @@ static void start_helper(int models_fd, int cache_fd, int gpu, const char *home)
     if (!slash) die("can't find myself", NULL);
     *slash = 0;
     snprintf(path, sizeof path, "%s/lord-tts", self);
-    if (!is_file(path)) die("speech isn't installed", path);
+    if (!is_file(path)) die_as(EXIT_NOT_INSTALLED, "speech isn't installed", path);
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) die("socketpair", strerror(errno));
     posix_spawn_file_actions_t fa;
@@ -227,6 +241,20 @@ static int write_all(int fd, const void *buf, size_t n) {
     return 0;
 }
 
+/* plays a piece, SAY_LEVEL_MS at a time, each after its bands to --levels */
+static int play(const int16_t *pcm, size_t n, int rate) {
+    if (levels_fd < 0) return write_all(player_fd, pcm, n * 2);
+    size_t step = (size_t)rate * SAY_LEVEL_MS / 1000;
+    for (size_t at = 0; at < n; at += step) {
+        size_t k = n - at < step ? n - at : step;
+        uint8_t b[SAY_BANDS];
+        say_levels(pcm + at, k, rate, b);
+        if (write(levels_fd, b, sizeof b) < 0 && errno != EAGAIN && errno != EINTR) { close(levels_fd); levels_fd = -1; }
+        if (write_all(player_fd, pcm + at, k * 2)) return -1;
+    }
+    return 0;
+}
+
 static void start_player(int rate) {
     int pfd[2];
     if (pipe2(pfd, O_CLOEXEC)) die("pipe", strerror(errno));
@@ -261,6 +289,11 @@ int main(int argc, char **argv) {
         if (only_words || a[0] != '-' || !a[1]) { words[nwords++] = argv[ai]; continue; }
         if (!strcmp(a, "--")) { only_words = 1; continue; }
         if (!strcmp(a, "--voices")) { voices = 1; continue; }
+        if (!strcmp(a, "--levels")) {
+            struct stat st;
+            if (!fstat(3, &st) && S_ISFIFO(st.st_mode) && !fcntl(3, F_SETFD, FD_CLOEXEC) && !fcntl(3, F_SETFL, O_WRONLY | O_NONBLOCK)) levels_fd = 3;
+            continue;
+        }
         if (!strcmp(a, "-h") || !strcmp(a, "--help") || a[2] || ai + 1 >= argc) usage();
         const char *v = argv[++ai];
         switch (a[1]) {
@@ -300,11 +333,14 @@ int main(int argc, char **argv) {
     len = say_clean(text, len);
     if (!len) return 0;
 
-    /* language, quality, model */
-    if (!lang) lang = conf_lang[0] ? conf_lang : NULL;
-    char envlang[3] = "";
-    if (!lang) { const char *l = getenv("LANG"); if (l && strlen(l) >= 2) { envlang[0] = l[0]; envlang[1] = l[1]; lang = envlang; } }
-    if (!lang || (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt"))) lang = "en";    /* the languages LordOS has voices for */
+    /* language: -l, or the text's own (saytext.c), the settings' or $LANG's when it is too short to tell; quality, model */
+    if (!lang) {
+        const char *fallback = conf_lang[0] ? conf_lang : NULL;
+        char envlang[3] = "";
+        if (!fallback) { const char *l = getenv("LANG"); if (l && strlen(l) >= 2) { envlang[0] = l[0]; envlang[1] = l[1]; fallback = envlang; } }
+        lang = say_language(text, len, fallback);
+    }
+    if (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt")) lang = "en";    /* the languages LordOS has voices for */
     if (!quality) quality = conf_quality[0] ? conf_quality : "standard";
     if (strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is standard or hd", quality);
     const char *roots[2] = { user_root, ROOTS_SYS };
@@ -318,7 +354,7 @@ int main(int argc, char **argv) {
             if (is_file(path)) root = roots[r];
         }
     }
-    if (!root) die("no voice model for this language; download one in Settings → AI → Voice", lang);
+    if (!root) die_as(EXIT_NO_MODEL, "no voice model for this language; download one in Settings → AI → Voice", lang);
     snprintf(path, sizeof path, "%s/models", root);
     int models_fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (models_fd < 0) die("can't open", path);
@@ -335,7 +371,7 @@ int main(int argc, char **argv) {
         }
         if (voice_fd < 0) voice_id = voice;
     } else if (!strcmp(lang, "en")) voice_id = "alba";
-    else die("no voice chosen; create one in Settings → AI → Voice, or put a WAV in ~/.local/share/lordos/voice/voices", lang);
+    else die_as(EXIT_NO_VOICE, "no voice chosen; create one in Settings → AI → Voice, or put a WAV in ~/.local/share/lordos/voice/voices", lang);
 
     /* where it runs: the GPU (Vulkan) when there is a render node, unless told otherwise */
     if (!backend) backend = conf_backend[0] ? conf_backend : "auto";
@@ -375,7 +411,7 @@ int main(int argc, char **argv) {
         FILE *wav = NULL;
         size_t total = 0;
         if (out) {
-            wav = fopen(out, "wb");
+            wav = !strcmp(out, "-") ? fdopen(dup(1), "wb") : fopen(out, "wb");
             if (!wav) die("can't write", out);
             fwrite(cur.map, 1, 44, wav);                  /* the header; its sizes are fixed at the end */
         } else start_player(cur.rate);
@@ -385,7 +421,7 @@ int main(int argc, char **argv) {
             off += skip + k2;
             /* while the next piece is synthesized, this one plays */
             if (wav) fwrite(cur.pcm, 2, cur.n, wav);
-            else if (write_all(player_fd, cur.pcm, cur.n * 2)) break;
+            else if (play(cur.pcm, cur.n, cur.rate)) break;
             total += cur.n * 2;
             piece_free(&cur);
             if (!k2) break;

@@ -59,7 +59,7 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand }) {
+export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu }) {
   const area = useRef(null);
   const token = useRef({}).current;
   const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
@@ -288,7 +288,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     return { x: ax + padding + xOf(sel.b), y: ay + padding + rowOf(sel.b) * LH - scroll, h: LH };
   };
   st.current.caret = caretRect;
-  if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take() };
+  if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take(), selection: () => text.slice(lo, hi) };
   const take = () => {
     if (textFocusOwner() === token) return;
     takeTextFocus(token, (e) => st.current.onKey(e), () => setFocusState(textFocusOwner() === token));
@@ -313,6 +313,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   };
   const onMouseDown = (e) => {
     take();
+    if (e.button === 2) return;                // a right click keeps the selection for its menu
     const p = posFromEvent(e);
     const now = Date.now(), c = clicks.current;
     c.n = now - c.t < 400 ? c.n + 1 : 1;
@@ -374,7 +375,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   }
   const caretRow = rowOf(sel.b);
   return (
-    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
+    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
       {selRects}
       {out}
       {focus && blink && caretRow >= first && caretRow <= last && (

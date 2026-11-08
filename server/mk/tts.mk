@@ -26,12 +26,16 @@ build/lord-tts: $(LT_SRC) build/lib/tts/libaudiocpp.so.0 $(wildcard src/doc/*.h)
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_TTS $(CFLAGS) $(WARN) -std=c11 -isystem $(AUDIOCPP_DIR)/include -o $@ $(LT_SRC) \
 		-Lbuild/lib/tts -l:libaudiocpp.so.0 -Wl,-rpath,'$$ORIGIN/../lib/tts:$$ORIGIN/lib/tts' -lm
 
-build/lord-say: src/tts/say.c src/tts/saytext.c src/tts/saytext.h src/doc/wire.c src/sec/json.c src/doc/wire.h src/doc/proto.h src/sec/json.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/tts/say.c src/tts/saytext.c src/doc/wire.c src/sec/json.c -lm
+build/lord-say: src/tts/say.c src/tts/saytext.c src/tts/saytext.h src/tts/levels.c src/tts/levels.h src/doc/wire.c src/sec/json.c src/doc/wire.h src/doc/proto.h src/sec/json.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/tts/say.c src/tts/saytext.c src/tts/levels.c src/doc/wire.c src/sec/json.c -lm
 
-# how say splits text into sentences (tests/saytext_test.c) and lord-tts's hiss measure (tests/hiss_test.c); lord-tts's
-# own test needs a model (tests/tts_test.sh)
-test: build/saytext-test build/hiss-test
+# how say splits text into sentences (tests/saytext_test.c), the bands of the player's wave (tests/levels_test.c) and
+# lord-tts's hiss measure (tests/hiss_test.c); lord-tts's own test needs a model (tests/tts_test.sh)
+test: build/saytext-test build/levels-test build/hiss-test
+build/levels-test: tests/levels_test.c src/tts/levels.c src/tts/levels.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/levels_test.c src/tts/levels.c -lm
+	./$@ || { rm -f $@; exit 1; }
 build/hiss-test: tests/hiss_test.c src/tts/hiss.c src/tts/hiss.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hiss_test.c src/tts/hiss.c -lm

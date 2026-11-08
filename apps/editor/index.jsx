@@ -3,7 +3,7 @@
 // project file (❖T), our own syntax highlighting and input methods.
 // See docs/EDITOR.md.
 import {
-  View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print,
+  View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print, speechItems, registerSelection, ContextMenu,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Doc, cursorAt, hasSel, selStart, selEnd } from './buffer.js';
@@ -381,8 +381,29 @@ export default function Editor() {
   };
   // Ctrl+Tab switches tabs; with focus in a field (find, replace), the window
   // shortcuts (save, open, go to…) keep working: EditorView does not receive them in that case
+  const selectedText = () => doc.cursors.filter(hasSel).map((k) => doc.textIn(selStart(k), selEnd(k))).join('\n');
+  // Speech reads the selection, or the whole text when nothing is selected (as a Mac's Start Speaking)
+  const speechText = () => latest.current.selectedText() || latest.current.doc.text();
+  // right click on the text: the clipboard and Speech (sdk/contextmenu.jsx)
+  const column = useRef(null);
+  const [ctx, setCtx] = useState(null);
+  const onContextMenu = (e) => {
+    const p = column.current ? e.local(column.current) : { x: e.x, y: e.y };
+    const any = doc.cursors.some(hasSel);
+    setCtx({ x: p.x, y: p.y, items: [
+      { label: tr('editor.cmd.cut'), hint: '❖X', disabled: !any, onClick: () => run('cut') },
+      { label: tr('editor.cmd.copy'), hint: '❖C', disabled: !any, onClick: () => run('copy') },
+      { label: tr('editor.cmd.paste'), hint: '❖V', onClick: () => run('paste') },
+      '-',
+      { label: tr('editor.cmd.selectAll'), hint: '❖A', onClick: () => run('selectAll') },
+      '-',
+      ...speechItems(speechText),
+    ].filter((x, i, a) => !(x === '-' && (i === a.length - 1 || a[i + 1] === '-'))) });
+  };
   const latest = useRef(null);
-  latest.current = { onCommand, run };
+  latest.current = { onCommand, run, selectedText, doc };
+  // ❖Esc reads the selection aloud (sdk/voice.js)
+  useEffect(() => registerSelection(wid, () => latest.current.selectedText()), [wid]);
   useKeyboard((e) => { if ((e.ctrl || e.meta) && e.key === 'Tab') latest.current.run(e.shift ? 'prevTab' : 'nextTab'); });
   useEffect(() => {
     if (!focused) return undefined;
@@ -405,7 +426,7 @@ export default function Editor() {
       { label: tr('editor.menu.edit'), items: [it('editor.cmd.undo', 'undo', '❖Z'), it('editor.cmd.redo', 'redo', '❖⇧Z'), '-', it('editor.cmd.cut', 'cut', '❖X'),
         it('editor.cmd.copy', 'copy', '❖C'), it('editor.cmd.paste', 'paste', 'Ctrl+V'), it('editor.cmd.selectAll', 'selectAll', '❖A'), '-',
         it('editor.cmd.selectNext', 'selectNext', '❖D'), it('editor.cmd.singleCursor', 'singleCursor', 'Esc'), '-', it('editor.cmd.find', 'find', '❖F'),
-        it('editor.cmd.findNext', 'findNext', '❖G'), '-', it('editor.cmd.comment', 'toggleComment', '❖/'), it('editor.cmd.duplicate', 'duplicateLines', '❖⇧D'),
+        it('editor.cmd.findNext', 'findNext', '❖G'), '-', ...speechItems(speechText), it('editor.cmd.comment', 'toggleComment', '❖/'), it('editor.cmd.duplicate', 'duplicateLines', '❖⇧D'),
         it('editor.cmd.indent', 'indent', '❖]'), it('editor.cmd.outdent', 'outdent', '❖['), it('editor.cmd.moveUp', 'moveUp', '⌥↑'), it('editor.cmd.moveDown', 'moveDown', '⌥↓')] },
       { label: tr('editor.menu.view'), items: [it('editor.cmd.toggleProject', 'toggleProject', '❖\\'), it('editor.cmd.language', 'language', '')] },
       { label: tr('editor.menu.go'), items: [it('editor.cmd.gotoLine', 'gotoLine', '❖L'), it('editor.cmd.gotoFile', 'gotoFile', '❖T'),
@@ -436,7 +457,7 @@ export default function Editor() {
           </ScrollView>
         </View>
       )}
-      <View style={{ flex: 1 }}>
+      <View ref={column} style={{ flex: 1 }}>
         {/* tabs */}
         <View style={{ height: 34, flexDirection: 'row', backgroundColor: t.sidebarBg, direction: 'ltr' }}>
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: t.separator }} />
@@ -456,9 +477,11 @@ export default function Editor() {
         </View>
         <EditorView key={tab.id} doc={doc} lang={lang} t={t} palette={palette} settings={{ tabSize: tab.tabSize, useTabs: tab.useTabs }}
           matches={find.open ? found.list.map((m, i) => ({ ...m, current: i === current })) : null}
-          onChange={bump} onCommand={onCommand} apiRef={api} overlay={editorOverlay} />
+          onChange={bump} onCommand={onCommand} apiRef={api} overlay={editorOverlay} onContextMenu={onContextMenu} />
         {find.open && <FindBar t={t} tr={tr} find={find} setFind={setFind} count={found.list.length} current={current} error={found.error}
           onNext={nextMatch} onPrev={prevMatch} onReplace={replaceOne} onReplaceAll={replaceAll} onClose={() => setFind((f) => ({ ...f, open: false }))} />}
+        {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)}
+          bounds={column.current ? { w: lord.getLayout(column.current.id)[2], h: lord.getLayout(column.current.id)[3] } : undefined} />}
         {/* status bar */}
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 14, backgroundColor: t.sidebarBg,
           direction: 'ltr' }}>

@@ -36,6 +36,7 @@ int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app wit
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
 const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
+const char *wl_focus_primary(size_t *n);    /* the text the app with the keyboard selected (primary selection), or NULL */
 const char *wl_node_app(int node);      /* the isolated app whose window that node is, or NULL */
 
 /* From JS (lord.wayland) */

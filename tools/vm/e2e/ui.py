@@ -2,7 +2,7 @@
 # (server/src/remote/proto.h), streaming frames in the background so several grabs work in one connection.
 # Machines' bench copy of the Cloud bench's (cloud-e2e, tools/cloud/e2e/ui.py), with the whole US keyboard for typing
 # into a guest (the VM window passes key codes through: the guest's layout, US in an installer, is the one that counts).
-# cmds: click:x,y dbl:x,y rclick:x,y move:x,y wheel:x,y,steps combo:a+b key:code type:text wait:s grab:out.png
+# cmds: click:x,y dbl:x,y rclick:x,y move:x,y down:x,y up:x,y (drag: down, move…, up) wheel:x,y,steps combo:a+b key:code type:text wait:s grab:out.png
 #       keyring:PASSWORD   (RP_KEYRING, as lord-sessiond after a login: opens or creates the session's keyring)
 # From ~/cloud-drv.py on VM 116 (the Cloud UI agent's), plus keyring and frames only when a grab is asked.
 import socket, struct, sys, time, threading, zlib
@@ -61,6 +61,8 @@ for a in cmds:
         x, y = (int(z) for z in v.split(",")); send(11, struct.pack("<hh", x, y)); time.sleep(0.15)
         send(12, struct.pack("<BB", 2, 1)); time.sleep(0.06); send(12, struct.pack("<BB", 2, 0)); time.sleep(0.06)
     elif c == "move": x, y = (int(z) for z in v.split(",")); send(11, struct.pack("<hh", x, y)); time.sleep(0.05)
+    elif c == "down": x, y = (int(z) for z in v.split(",")); send(11, struct.pack("<hh", x, y)); time.sleep(0.1); send(12, struct.pack("<BB", 0, 1)); time.sleep(0.06)
+    elif c == "up": x, y = (int(z) for z in v.split(",")); send(11, struct.pack("<hh", x, y)); time.sleep(0.06); send(12, struct.pack("<BB", 0, 0)); time.sleep(0.06)
     elif c == "wheel":
         x, y, st = (int(z) for z in v.split(",")); send(11, struct.pack("<hh", x, y)); time.sleep(0.1)
         for _ in range(abs(st)): send(13, struct.pack("<b", -1 if st < 0 else 1)); time.sleep(0.05)
