@@ -3,7 +3,9 @@
  *   - fan.json parser: valid files, round trip, and many broken ones (fuzz-ish);
  *   - socket request parser;
  *   - the sysfs driver against a fake tree: a Raspberry Pi 5 fan header with kernel trips and a PC
- *     Super I/O chip, take/set/release and the crash restore file.
+ *     Super I/O chip, take/set/release and the crash restore file;
+ *   - GPU fans by hand (amdgpu): the scan, the 30 % floor, the restore notes, the temperature backstop, errors, the
+ *     session that set it, and that the curve never touches them.
  * Usage: build/fan-test           runs everything
  *        build/fan-test mkfake DIR VARIANT   builds a fake tree (pi5 | pc | none) for manual runs */
 #include "fan/fancurve.h"
@@ -164,12 +166,18 @@ static void test_requests(void) {
     CHECK(req("FORCE off", &r) == 0 && r.force == FF_OFF);
     CHECK(req("FORCE 30", &r) == 0 && r.force == FF_TIMED && r.minutes == 30);
     CHECK(req("FORCE 1440", &r) == 0);
+    CHECK(req("GPUFAN 0 auto", &r) == 0 && r.type == FR_GPUFAN && r.gpu == 0 && r.pct == -1);
+    CHECK(req("GPUFAN 1 55", &r) == 0 && r.gpu == 1 && r.pct == 55);
+    CHECK(req("GPUFAN 0 0", &r) == 0 && r.pct == 0);              /* accepted, the daemon clamps it */
+    CHECK(fan_gpu_pct(0) == FAN_GPU_FLOOR && fan_gpu_pct(29) == 30 && fan_gpu_pct(64) == 64 && fan_gpu_pct(100) == 100 && fan_gpu_pct(400) == 100);
     static const char *const bad[] = {
         "", "status", "STATUS ", " STATUS", "PROFILE", "PROFILE ", "PROFILE turbo", "PROFILE quiet x", "CURVE", "CURVE ",
         "CURVE 55:30,", "CURVE 55:30,,60:50", "CURVE 55-30", "CURVE 55:30,50:40", "CURVE 55:30,60:20", "CURVE 10:30",
         "CURVE 55:300", "CURVE 00055:30", "CURVE 55:30\n", "FORCE", "FORCE 0", "FORCE 1441", "FORCE -1", "FORCE 30m",
         "FORCE on ", "SET /sys/class/hwmon/hwmon0/pwm1 255", "PROFILE quiet\tx",
         "CURVE 30:1,31:2,32:3,33:4,34:5,35:6,36:7,37:8,38:9",
+        "GPUFAN", "GPUFAN 0", "GPUFAN 0 ", "GPUFAN 4 50", "GPUFAN -1 50", "GPUFAN 0 101", "GPUFAN 0 50%", "GPUFAN 0 manual",
+        "GPUFAN 0 auto ", "GPUFAN  0 50", "GPUFAN 0 /sys/class/hwmon/hwmon3/pwm1", "GPUFAN 0 255", "gpufan 0 auto",
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         int rr = req(bad[i], &r);
@@ -262,6 +270,12 @@ static void make_pc(const char *r) {
     put(r, "sys/class/hwmon/hwmon3/pwm1", "60");
     put(r, "sys/class/hwmon/hwmon3/pwm1_enable", "2");
     put(r, "sys/class/hwmon/hwmon3/fan1_input", "1100");
+    put(r, "sys/class/hwmon/hwmon3/pwm1_min", "0");
+    put(r, "sys/class/hwmon/hwmon3/pwm1_max", "255");
+    put(r, "sys/class/hwmon/hwmon3/temp1_input", "47000");
+    put(r, "sys/class/hwmon/hwmon3/temp2_input", "52000");     /* junction: the hottest counts */
+    put(r, "sys/devices/pci0000:00/0000:01:00.0/vendor", "0x1002");
+    link_rel(r, "sys/class/hwmon/hwmon3/device", "../../../devices/pci0000:00/0000:01:00.0");
 }
 
 static void make_none(const char *r) {
@@ -340,6 +354,82 @@ static void test_sysfs(void) {
     if (f) { fputs("enable 1 9 /etc\nexec /bin/sh\n", f); fclose(f); }
     fanhw_restore_file(root, state);
     CHECK(get(root, "sys/class/hwmon/hwmon1/pwm1_enable") == 5 && get(root, "sys/class/hwmon/hwmon1/pwm2_enable") == 2);
+
+    /* the GPU fan by hand (amdgpu) */
+    snprintf(root, sizeof root, "%s/gpu", r);
+    mkdir(root, 0755);
+    make_pc(root);
+    CHECK(fanhw_scan(&h, root) == 2 && h.ng == 1 && !strcmp(h.g[0].slot, "0000:01:00.0") && h.g[0].pwm_max == 255);
+    CHECK(fanhw_gpu_temp(&h, 0) == 52000 && fanhw_gpu_rpm(&h, 0) == 1100 && fanhw_gpu_pct(&h, 0) == 24);
+    CHECK(fanhw_gpu_manual(&h, 0, 10, 1000, state) == 0);         /* 10 % asked: the 30 % floor */
+    CHECK(get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 1 && get(root, "sys/class/hwmon/hwmon3/pwm1") == 77 && h.g[0].pct == 30);
+    {
+        FILE *nf = fopen(state, "r");
+        char t[512] = "";
+        size_t k = nf ? fread(t, 1, sizeof t - 1, nf) : 0;
+        if (nf) fclose(nf);
+        t[k] = 0;
+        CHECK(strstr(t, "lord-fand 1\ngpufan 2 60 ") && strstr(t, "0000:01:00.0\n"));
+    }
+    CHECK(fanhw_gpu_manual(&h, 0, 70, 1000, state) == 0 && get(root, "sys/class/hwmon/hwmon3/pwm1") == 179 && fanhw_gpu_pct(&h, 0) == 70);
+    CHECK(fanhw_gpu_manual(&h, 1, 70, 1000, state) == -1);
+    /* the curve's fans come and go; the GPU fan's note stays */
+    fanhw_take(&h, state);
+    fanhw_release(&h);
+    fanhw_notes(&h, state, 0);
+    CHECK(access(state, F_OK) == 0 && h.g[0].manual && get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 1);
+    /* a resume that reset it: taken again on the next tick */
+    put(root, "sys/class/hwmon/hwmon3/pwm1_enable", "2");
+    put(root, "sys/class/hwmon/hwmon3/pwm1", "40");
+    fanhw_gpu_tick(&h, 0, 1, state);
+    CHECK(get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 1 && get(root, "sys/class/hwmon/hwmon3/pwm1") == 179 && h.g[0].manual);
+    /* the backstop */
+    put(root, "sys/class/hwmon/hwmon3/temp2_input", "86000");
+    fanhw_gpu_tick(&h, 0, 1, state);
+    CHECK(!h.g[0].manual && h.g[0].reverted == GR_HOT && get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2 && access(state, F_OK) != 0);
+    CHECK(fanhw_gpu_manual(&h, 0, 50, 1000, state) == -1);           /* too hot to take now */
+    CHECK(get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2);
+    put(root, "sys/class/hwmon/hwmon3/temp2_input", "60000");
+    /* the session that set it ends */
+    CHECK(fanhw_gpu_manual(&h, 0, 50, 1000, state) == 0 && h.g[0].reverted == GR_NONE);
+    fanhw_gpu_tick(&h, 0, 0, state);
+    CHECK(!h.g[0].manual && h.g[0].reverted == GR_SESSION && get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2);
+    /* read errors three ticks in a row */
+    CHECK(fanhw_gpu_manual(&h, 0, 50, 1000, state) == 0);
+    char gp[160];
+    snprintf(gp, sizeof gp, "%s/sys/class/hwmon/hwmon3/pwm1", root);
+    unlink(gp);
+    fanhw_gpu_tick(&h, 0, 1, state);
+    fanhw_gpu_tick(&h, 0, 1, state);
+    CHECK(h.g[0].manual);
+    fanhw_gpu_tick(&h, 0, 1, state);
+    CHECK(!h.g[0].manual && h.g[0].reverted == GR_ERROR && get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2);
+    put(root, "sys/class/hwmon/hwmon3/pwm1", "60");
+    /* asked back to automatic */
+    CHECK(fanhw_gpu_manual(&h, 0, 80, 1000, state) == 0);
+    fanhw_gpu_auto(&h, 0, GR_NONE, state);
+    CHECK(!h.g[0].manual && h.g[0].reverted == GR_NONE && get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2 && access(state, F_OK) != 0);
+    /* a crash while set by hand: --restore puts it back to automatic, and a tampered line is ignored */
+    CHECK(fanhw_gpu_manual(&h, 0, 80, 1000, state) == 0);
+    f = fopen(state, "a");
+    if (f) { fputs("gpufan 1 999 /etc\ngpufan 9 9 /sys/class/hwmon/hwmon1\n", f); fclose(f); }
+    CHECK(fanhw_restore_file(root, state) == 0);
+    CHECK(get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2 && get(root, "sys/class/hwmon/hwmon1/pwm1_enable") == 5 && access(state, F_OK) != 0);
+    /* the curve never writes the GPU fan */
+    FanHw h3;
+    int gpwm = get(root, "sys/class/hwmon/hwmon3/pwm1");
+    fanhw_scan(&h3, root);
+    fanhw_take(&h3, state);
+    for (int i = 0; i < h3.n; i++) fanhw_set(&h3, i, 100);
+    CHECK(get(root, "sys/class/hwmon/hwmon3/pwm1_enable") == 2 && get(root, "sys/class/hwmon/hwmon3/pwm1") == gpwm);
+    fanhw_release(&h3);
+    unlink(state);
+    /* whose session: a lord-server of that uid */
+    put(root, "proc/321/comm", "lord-server");
+    put(root, "proc/321/status", "Name:\tlord-server\nUmask:\t0022\nState:\tS\nUid:\t1000\t1000\t1000\t1000\n");
+    put(root, "proc/322/comm", "lord-servers");
+    put(root, "proc/322/status", "Name:\tx\nUid:\t1001\t1001\t1001\t1001\n");
+    CHECK(fanhw_uid_has_session(root, 1000) && !fanhw_uid_has_session(root, 1001) && !fanhw_uid_has_session(root, 1002) && fanhw_uid_has_session(root, 0));
 
     /* nothing to drive */
     snprintf(root, sizeof root, "%s/none", r);

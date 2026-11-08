@@ -25,6 +25,9 @@
  *   wantVoltage(on)             Monitor → Voltage on screen: the thread reads the voltages about every 2 s
  *   voltage()                   the latest { board, alarm, sinceBoot, chips, supplies } (monitor/voltage.c), or null
  *                               if nothing new; the sample's "volt" says whether this machine has any
+ *   wantGpu(on)                 Monitor → GPU or the Overview on screen: the thread reads the GPUs once per second
+ *   gpu(language)               the latest { t, mono, hz, cards, list, ai, say, vms, caps } (monitor/gpustat.c), each
+ *                               process in list with its app like processes(); or null if nothing new
  *   historyEnable(on)           Settings → Privacy → Monitor → "Keep a traffic history" (0.8.2)
  *   history({ from, step, n, app })  bytes per bucket from the history file (monitor/nethist.c):
  *                               { res, oldest, now, rx: [n], tx: [n], top: [[app, rx, tx]] } or null;
@@ -51,7 +54,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps, seq_volt;
+static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps, seq_volt, seq_gpu;
 
 static JSValue parse(JSContext *c, char *j, const char *what) {
     if (!j) return JS_NULL;
@@ -258,6 +261,19 @@ static JSValue f_processes(JSContext *c, JSValueConst t, int argc, JSValueConst 
     char lang[16];
     if (arg_lang(c, argc, argv, lang, sizeof lang)) return JS_EXCEPTION;
     return annotate(c, parse(c, mon_procs_json(&seq_procs), "<monitor.processes>"), lang);
+}
+
+static JSValue f_want_gpu(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    mon_want_gpu(argc > 0 && JS_ToBool(c, argv[0]) > 0);
+    return JS_TRUE;
+}
+
+static JSValue f_gpu(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char lang[16];
+    if (arg_lang(c, argc, argv, lang, sizeof lang)) return JS_EXCEPTION;
+    return annotate(c, parse(c, mon_gpu_json(&seq_gpu), "<monitor.gpu>"), lang);
 }
 
 static JSValue f_connections(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -534,6 +550,8 @@ static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("diskTemps", 0, f_disk_temps),
     JS_CFUNC_DEF("wantVoltage", 1, f_want_voltage),
     JS_CFUNC_DEF("voltage", 0, f_voltage),
+    JS_CFUNC_DEF("wantGpu", 1, f_want_gpu),
+    JS_CFUNC_DEF("gpu", 1, f_gpu),
     JS_CFUNC_DEF("historyEnable", 1, f_history_enable),
     JS_CFUNC_DEF("history", 1, f_history),
     JS_CFUNC_DEF("historyClear", 0, f_history_clear),
@@ -543,7 +561,7 @@ void js_monitor_register(JSContext *c, JSValue lord, const char *assets_dir) {
     mon_init(assets_dir);
     map_init(assets_dir);
     mon_reset();                       /* new context: the previous one's start() calls don't count */
-    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = seq_volt = 0;
+    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = seq_volt = seq_gpu = 0;
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, monitor_funcs, sizeof monitor_funcs / sizeof monitor_funcs[0]);
     JS_SetPropertyStr(c, lord, "monitor", o);

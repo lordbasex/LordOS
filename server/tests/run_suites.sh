@@ -232,6 +232,9 @@ EOF
     # (0.8.7) Monitor → Voltage's model (apps/monitor/voltmodel.js): the rpi-pmic line, states, sources, the trace
     if have node; then run "voltage-model-test (apps/monitor/voltmodel.js)" node tests/voltage_model_test.mjs
     else skip "voltage-model-test" "node"; fi
+    # (0.8.8.6) Monitor → GPU's model (apps/monitor/gpumodel.js): engine shares, clients, APIs, AI engines, the Overview
+    if have node; then run "gpu-model-test (apps/monitor/gpumodel.js)" node tests/gpu_model_test.mjs
+    else skip "gpu-model-test" "node"; fi
     # (0.8.5) System Information's model (apps/sysinfo/model.js): GPU layers, CPU reasons, Compatibility
     if have node; then run "sysinfo-model-test (apps/sysinfo/model.js)" node tests/sysinfo_model_test.mjs
     else skip "sysinfo-model-test" "node"; fi

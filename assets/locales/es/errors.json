@@ -213,6 +213,8 @@
   "fan.notAdmin": "Solo un administrador puede cambiar los ventiladores",
   "fan.saveFailed": "No se pudo guardar la configuración de los ventiladores",
   "fan.unavailable": "El servicio de ventiladores no está en marcha",
+  "fan.noGpuFan": "Esta tarjeta gráfica no tiene un ventilador que LordOS pueda controlar",
+  "fan.gpuRefused": "No se pudo poner a mano el ventilador de la tarjeta gráfica (quizás está demasiado caliente ahora)",
   "fs.alreadyInTrash": "Ya está en la Papelera",
   "fs.copyIntoItself": "No se puede copiar una carpeta dentro de sí misma",
   "fs.copyStartFailed": "No se pudo empezar la copia",

@@ -213,6 +213,8 @@
   "fan.notAdmin": "Só um administrador pode mudar as ventoinhas",
   "fan.saveFailed": "Não foi possível salvar as configurações das ventoinhas",
   "fan.unavailable": "O serviço de ventoinhas não está em execução",
+  "fan.noGpuFan": "Esta placa de vídeo não tem uma ventoinha que o LordOS possa controlar",
+  "fan.gpuRefused": "Não foi possível ajustar à mão a ventoinha da placa de vídeo (talvez esteja quente demais agora)",
   "fs.alreadyInTrash": "Já está na Lixeira",
   "fs.copyIntoItself": "Não é possível copiar uma pasta para dentro dela mesma",
   "fs.copyStartFailed": "Não foi possível iniciar a cópia",

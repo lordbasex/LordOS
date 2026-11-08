@@ -29,7 +29,8 @@ only picks a profile, and the daemon drives every fan it found.
 |---|---|---|
 | **Board** | hwmon `pwmfan` with `pwm1` + `pwm1_enable` (the Raspberry Pi 5 fan header: the official Active Cooler, or a case fan plugged there, such as the Argon ONE V5 case's blower) | `pwm1` written directly; see "The board fan and the kernel" |
 | **Motherboard** | hwmon with `pwmN` + `pwmN_enable` from an allow-listed Super I/O or fan controller driver: names starting with `nct6`, `nct7`, `it8`, `f71`, `f8000`, `w83`, `sch5`, `emc2`, `adt7`, `amc6821`, `max6650`, `max31790` | `pwmN_enable` = 1 (manual) while we drive it, the original value back afterwards |
-| **Firmware** | any other hwmon with `fanN_input` (laptop embedded controllers, GPUs, unknown drivers) | never written; listed as "managed by the firmware" with their RPM |
+| **Firmware** | any other hwmon with `fanN_input` (laptop embedded controllers, GPUs, unknown drivers) | never written by the curve; listed as "managed by the firmware" with their RPM |
+| **GPU** (0.8.8.6) | hwmon `amdgpu` with `pwm1` + `pwm1_enable` + `fan1_input` (`pwm1_min`/`pwm1_max` when present) | never by the curve; by hand only, from Monitor → GPU, for administrators: see "GPU fans" |
 
 Temperature source, first match: a thermal zone of type `cpu-thermal`, `x86_pkg_temp` or
 `cpu_thermal`; then hwmon `k10temp`, `coretemp`, `zenpower` or `cpu_thermal` (`temp1_input`);
@@ -61,7 +62,8 @@ kernel trip 4: 75000 mC (/sys/class/thermal/thermal_zone0)
 - **Laptops** usually have no writable PWM (the embedded controller owns the fan), or a vendor
   driver with its own semantics: they show "Fans managed by the firmware" with the RPM, and are
   never written.
-- **GPU** fans (`amdgpu`, `nouveau`, `radeon`) belong to their driver and are never written.
+- **GPU** fans belong to their driver and the curve never writes them. Since 0.8.8.6 an administrator can set an
+  `amdgpu` card's fan by hand ("GPU fans"); `nouveau`, `radeon`, `i915`/`xe` and anything else stay read-only.
 
 ## Profiles
 
@@ -135,6 +137,12 @@ unknown keys, wrong types or an invalid curve make it fall back to the defaults.
 | `PROFILE auto\|quiet\|balanced\|performance\|always\|custom` | administrators | `OK` or `ERR <code>` |
 | `CURVE 55:30,60:55,65:100` | administrators | sets the custom curve and selects it |
 | `FORCE off\|on\|<1..1440 minutes>` | administrators | full speed |
+| `GPUFAN <n> auto\|<0..100>` | administrators | (0.8.8.6) GPU fan `n` of lord-fand's own scan by hand (clamped to 30–100 %) or back to automatic; `ERR fan.noGpuFan`, `ERR fan.gpuRefused` |
+
+`STATUS` also has `gpuFans` (0.8.8.6): `id`, `chip` (`amdgpu`), `slot` (the PCI slot, so Monitor matches it to its
+card), `mode` (`auto` or `manual`), `set` (the duty asked for, -1 in automatic), `pct` (read back from `pwm1`; some cards
+read 0 in automatic while the fan turns), `rpm`, `temp` (the hottest sensor), `floor` (30), `backstop` (85) and
+`reverted` (`hot`, `error`, `session`, `stop` or empty: why it last went back to automatic by itself).
 
 Administrators: `SO_PEERCRED` uid 0, or a user in `sudo`, `admin` or `wheel` (the same rule as the
 admin helper). Errors are codes (`fan.notAdmin`, `fan.badRequest`, `fan.saveFailed`); the UI
@@ -144,6 +152,43 @@ a time.
 On the session side `lord.fan` (`js_fan.c`) validates everything again before sending, never waits
 more than 300 ms for an answer, and `sdk/cooling.jsx` only polls (every 2 s) while a Cooling view
 is on screen.
+
+## GPU fans (0.8.8.6)
+
+The maintainer approved a narrow exception for this (AGENTS.md, `lord-fand`): an AMD graphics card's fan set by hand,
+only inside `lord-fand`, never in `lord-server`, and only `amdgpu`.
+
+- **Found by lord-fand's own scan:** hwmon `amdgpu` with `pwm1`, `pwm1_enable` and `fan1_input`; `pwm1_min`/`pwm1_max`
+  give the range (0–255 otherwise). Clients name the card by its index in that scan, never a path or a raw PWM value.
+- **By hand:** `GPUFAN <n> <pct>` from an administrator: the percentage is clamped to **30–100 %** (`fan_gpu_pct`), and
+  refused while the card is at 85 °C or more. Before the first write, `pwm1_enable` and `pwm1` go into
+  `/run/lordos/fand.restore` (`gpufan <enable> <pwm> <device>`), then `pwm1_enable=1` and the duty. The curve's own
+  notes stay in the same file while it drives the case fans.
+- **Back to automatic** (`pwm1_enable=2`, the card's own fan table) when asked (`GPUFAN <n> auto`), and by itself:
+  above **85 °C** on any of the card's sensors (edge, junction, memory), after **3 ticks** in a row (6 s) that couldn't
+  read or write it, when **the session of the user who set it ends** (no `lord-server` of that uid in `/proc`; uid 0 has
+  no session to follow), and on stop, restart and crash (`--restore`, `ExecStopPost`: a `gpufan` note puts the card back
+  to automatic). It is never saved in `fan.json`: after a reboot the card is always automatic.
+- **Each tick** (2 s), while set by hand: the backstop, the session, and the card's state; after a suspend the driver
+  may have reset `pwm1_enable`, so it is taken again.
+- **The unit** already lets it write `/sys/devices/pci0000:00` (the RX 580 sits there). A card behind another PCI root
+  (`pci0000:40` and the like on some workstation boards) is read-only under the unit; writing fails and the fan goes back
+  to automatic with `error`.
+- **Monitor → GPU** shows the control (an Automatic switch and a 30–100 % slider) only to administrators (`canChange`)
+  and only for the card whose PCI slot lord-fand reports; everyone else sees whether it is automatic or set by hand.
+  `lord.fan.setGpuFan(n, 'auto' | pct)` (`js_fan.c`) validates again.
+
+`lord-fand --detect` on the RX 580 machine (Polaris, read-only):
+
+```
+board: other
+temperature: x86_pkg_temp (/sys/class/thermal/thermal_zone3/temp) 30.0 C
+firmware fan: amdgpu 753 rpm
+GPU fan 0: amdgpu 0000:01:00.0 at 0 %, 753 rpm, pwm 0..255 (/sys/class/hwmon/hwmon3; by hand only, GPUFAN)
+no controllable fans
+```
+
+(`pwm1` reads 0 in automatic on this card while the fan turns at 753 RPM; Monitor uses RPM ÷ `fan1_max` then.)
 
 ## The service
 
@@ -251,7 +296,12 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
   round trip, 37 broken files, 4 000 random mutations and truncations), socket requests (28
   refused lines), and the sysfs driver on fake trees: a Raspberry Pi 5 (trips raised and restored,
   the kick, read-back correction, RPM, crash restore file), a PC (`nct6798` taken and given back,
-  the `amdgpu` fan never touched, a tampered restore file ignored) and a passive machine.
+  the `amdgpu` fan never touched, a tampered restore file ignored) and a passive machine. Since 0.8.8.6 (4 224
+  checks): `GPUFAN` requests (13 refused lines), the 30 % floor, and an `amdgpu` card on the fake tree: found with its
+  PCI slot, the notes written before the first write, the curve's take and release keeping the GPU note, a reset after
+  "suspend" taken again, the 85 °C backstop (and refused when already hot), the session ending, three read errors, back
+  to automatic when asked, the crash restore (tampered `gpufan` lines ignored), the curve never touching the GPU fan, and
+  which uid has a session.
   `build/fan-test mkfake DIR pi5|pc|none` builds a tree for manual runs and screenshots.
 - On the Raspberry Pi 5 in the Argon ONE V5 case (as root from the build folder, temporary config
   and socket under `/run/lordos-test`): detection; Balanced kept the fan off at 50–53 °C during a
@@ -275,3 +325,6 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
   card) and the case's front USB ports and DAC with `dwc2` in host mode.
 - Several board fans with different curves (all fans follow one profile).
 - Temperature from disks (the vendor daemon also had an HDD curve).
+- GPU fans by hand on real hardware: only fake sysfs and `--detect` on the RX 580 (nothing was written to it). To try:
+  as an administrator, Monitor → GPU, Automatic off, the slider; `lord-fand --restore` and logging out must put
+  `pwm1_enable` back to 2.

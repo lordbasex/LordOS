@@ -213,6 +213,8 @@
   "fan.notAdmin": "Only an administrator can change the fans",
   "fan.saveFailed": "Could not save the fan settings",
   "fan.unavailable": "The fan service is not running",
+  "fan.noGpuFan": "This graphics card has no fan that LordOS can control",
+  "fan.gpuRefused": "The graphics card's fan could not be set by hand (it may be too hot right now)",
   "fs.alreadyInTrash": "It is already in the Trash",
   "fs.copyIntoItself": "A folder cannot be copied into itself",
   "fs.copyStartFailed": "Could not start the copy",

@@ -4,6 +4,9 @@
  *   lord.fan.setProfile(name)    auto|quiet|balanced|performance|always|custom   → '' or an error code
  *   lord.fan.setCurve(points)    [[°C, %], ...] (1..8 points, 30..90 °C rising, 0..100 % never falling)
  *   lord.fan.force(v)            'on' | 'off' | minutes (1..1440)
+ *   lord.fan.setGpuFan(n, v)     an amdgpu card's fan by hand (0.8.8.6): n from status().gpuFans, v 'auto' or a
+ *                                percentage 0..100 (lord-fand keeps it within 30..100 and gives it back to the card
+ *                                above 85 °C, on errors and when this session ends)
  *   lord.fan.caseConfig()        'argon-one-v5' | 'none' | null (not a LordOS Raspberry Pi image)
  *
  * Everything is validated here and again in lord-fand (which also checks that the user is an
@@ -149,6 +152,26 @@ static JSValue f_force(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return fan_command(c, req);
 }
 
+static JSValue f_set_gpu_fan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    double n;
+    char req[40];
+    if (argc < 2 || !JS_IsNumber(argv[0]) || JS_ToFloat64(c, &n, argv[0]) || n != (int)n || n < 0 || n > 3) return js_throw_code(c, "fan.badRequest", NULL);
+    if (JS_IsString(argv[1])) {
+        const char *s = JS_ToCString(c, argv[1]);
+        if (!s) return JS_EXCEPTION;
+        int ok = !strcmp(s, "auto");
+        JS_FreeCString(c, s);
+        if (!ok) return js_throw_code(c, "fan.badRequest", NULL);
+        snprintf(req, sizeof req, "GPUFAN %d auto", (int)n);
+    } else {
+        double p;
+        if (!JS_IsNumber(argv[1]) || JS_ToFloat64(c, &p, argv[1]) || p != (int)p || p < 0 || p > 100) return js_throw_code(c, "fan.badRequest", NULL);
+        snprintf(req, sizeof req, "GPUFAN %d %d", (int)n, (int)p);
+    }
+    return fan_command(c, req);
+}
+
 static JSValue f_case(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     const char *path = getenv("LORD_FAN_CASE_FILE");
@@ -175,6 +198,7 @@ static const JSCFunctionListEntry fan_funcs[] = {
     JS_CFUNC_DEF("setProfile", 1, f_set_profile),
     JS_CFUNC_DEF("setCurve", 1, f_set_curve),
     JS_CFUNC_DEF("force", 1, f_force),
+    JS_CFUNC_DEF("setGpuFan", 2, f_set_gpu_fan),
     JS_CFUNC_DEF("caseConfig", 0, f_case),
 };
 

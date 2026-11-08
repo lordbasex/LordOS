@@ -38,6 +38,10 @@ char *mon_disk_temps_json(uint64_t *seq);
  * machine has anything to show. */
 void mon_want_voltage(int on);
 char *mon_voltage_json(uint64_t *seq);
+/* Monitor → GPU and the Overview's GPU card (gpustat.h): with on, the thread reads the cards and the user's processes'
+ * DRM usage once per second; JS asks for it only while one of those views is on screen. mon_gpu_json: the latest. */
+void mon_want_gpu(int on);
+char *mon_gpu_json(uint64_t *seq);
 /* Fixed data: CPU model, cores, location from the time zone, country database. */
 char *mon_info_json(void);
 

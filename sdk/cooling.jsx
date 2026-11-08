@@ -7,6 +7,8 @@
 //   coolingVariant(s)   'argon' | 'cooler' | 'pc' | 'none': which illustration fits the hardware
 //   CoolingArt          our own drawing of that hardware; the fan spins with the real duty and the
 //                       heatsink warms from blue to orange with the temperature
+//   GpuArt              (0.8.8.6) Monitor → GPU: a graphics card whose fans turn with the real fan, or the graphics
+//                       inside a processor, in the temperature's color
 //   FanCurveChart       the profile's steps (°C → %), the hysteresis band, the live point; the steps
 //                       can be dragged when `onChange` is given
 //
@@ -61,6 +63,8 @@ export const fanControl = {
   setProfile: (p) => ask(() => lord.fan.setProfile(p)),
   setCurve: (pts) => ask(() => lord.fan.setCurve(pts)),
   force: (v) => ask(() => lord.fan.force(v)),
+  // (0.8.8.6) an amdgpu card's fan by hand: n from status.gpuFans, v 'auto' or 0..100 (lord-fand keeps 30..100)
+  setGpuFan: (n, v) => ask(() => (typeof lord.fan.setGpuFan === 'function' ? lord.fan.setGpuFan(n, v) : 'fan.unavailable')),
 };
 
 export function coolingVariant(s, caseId = fanCase.get()) {
@@ -244,6 +248,73 @@ export function CoolingArt({ variant, pct = 0, temp = null, width = 320, height 
   return h(View, { style: { width: W, height: H, borderRadius: 14, background: p.stage, overflow: 'hidden', direction: 'ltr' } },
     h(View, { style: { position: 'absolute', left: W * 0.15, right: W * 0.15, top: H * 0.1, bottom: H * 0.1, borderRadius: H, backgroundColor: heatColor(temp, th.mode === 'dark' ? 0.08 : 0.1) } }),
     h(Art, props));
+}
+
+// ---- the graphics card (Monitor → GPU, 0.8.8.6) ----
+
+// A desktop graphics card: shroud with one or two fans (they turn with the real fan and stop at 0 RPM), the board
+// with its PCIe fingers, the power connector and the bracket with the display outputs; a heat line warms with the
+// temperature and a light bar shows the load.
+function CardArt({ p, temp, load, fans, spin, W, H }) {
+  const sx = 22, sy = 26, sw = W - 44, sh = Math.round(H * 0.5);
+  const fs = Math.round(sh * 0.86);
+  const glow = heatColor(temp, 0.9);
+  const centers = fans === 1 ? [sx + sw * 0.5] : [sx + sw * 0.3, sx + sw * 0.68];
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, width: W, height: H } },
+    // the board under the shroud, its PCIe fingers and the notch
+    h(View, { style: { position: 'absolute', left: sx + 6, top: sy + sh - 4, width: sw - 12, height: 18, borderRadius: 3, background: p.pcb } }),
+    h(View, { style: { position: 'absolute', left: sx + 46, top: sy + sh + 14, flexDirection: 'row', gap: 2 } },
+      Array.from({ length: 26 }, (_, i) => h(View, { key: i, style: { width: 3, height: 8, borderRadius: 1, backgroundColor: '#d9b45b', marginLeft: i === 6 ? 6 : 0 } }))),
+    // the bracket with the outputs
+    h(View, { style: { position: 'absolute', left: 8, top: sy - 6, width: 12, height: sh + 30, borderRadius: 2, background: p.alu, border: `1px solid ${p.aluEdge}`, alignItems: 'center', paddingTop: 10, gap: 5 } },
+      [0, 1, 2, 3].map((i) => h(View, { key: i, style: { width: 6, height: i === 3 ? 10 : 8, borderRadius: 1.5, backgroundColor: p.slot } }))),
+    // the power connector
+    h(View, { style: { position: 'absolute', left: sx + sw - 46, top: sy - 9, width: 30, height: 11, borderRadius: 2, backgroundColor: '#15171a', flexDirection: 'row', gap: 2, paddingHorizontal: 3, paddingVertical: 2 } },
+      Array.from({ length: 4 }, (_, i) => h(View, { key: i, style: { width: 4.5, height: 7, borderRadius: 1, backgroundColor: '#3b4148' } }))),
+    // the shroud
+    h(View, { style: { position: 'absolute', left: sx, top: sy, width: sw, height: sh, borderRadius: 10, background: p.tower, border: `1px solid ${p.aluEdge}`, boxShadow: `0 10px 22px ${p.shadow}` } }),
+    h(View, { style: { position: 'absolute', left: sx + 10, top: sy + 4, width: sw - 20, height: 3, borderRadius: 2, backgroundColor: glow } }),
+    ...centers.map((cx, i) => h(View, { key: `f${i}`, style: { position: 'absolute', left: cx - fs / 2, top: sy + (sh - fs) / 2, width: fs, height: fs, borderRadius: fs / 2,
+      backgroundColor: p.slot, border: `2px solid ${p.aluEdge}`, alignItems: 'center', justifyContent: 'center' } },
+      h(Fan, { size: fs - 8, frame: p.slot, blade: p.blade, hub: p.hub, spin, k: i ? -1 : 1 }))),
+    // the load light
+    h(View, { style: { position: 'absolute', left: sx + 12, top: sy + sh - 9, width: sw - 24, height: 3, borderRadius: 2, backgroundColor: p.slot } },
+      h(View, { style: { width: Math.round((sw - 24) * Math.max(0, Math.min(1, load || 0))), height: 3, borderRadius: 2, backgroundColor: glow } })));
+}
+
+// Graphics inside the processor (Intel, a Raspberry Pi, a virtual machine): the package with its die, the cores and the
+// graphics block, which takes the temperature's color and fills with the load.
+function ChipArt({ p, temp, load, kind, W, H }) {
+  const s = Math.round(H * 0.78), x = (W - s) / 2, y = (H - s) / 2;
+  const glow = heatColor(temp, 0.95);
+  const virtual = kind === 'virtual', display = kind === 'display';
+  const dw = Math.round(s * 0.66), dh = Math.round(s * 0.5);
+  const gw = Math.round(dw * 0.44);
+  return h(View, { style: { position: 'absolute', left: x, top: y, width: s, height: s, borderRadius: 10, background: p.pcb, boxShadow: `0 10px 22px ${p.shadow}`,
+    border: virtual ? `2px dashed ${p.fin}` : `1px solid ${p.aluEdge}`, opacity: virtual ? 0.85 : 1, alignItems: 'center', justifyContent: 'center' } },
+    // the package's contacts around the edge
+    ...[0, 1, 2, 3].map((side) => h(View, { key: `c${side}`, style: { position: 'absolute', flexDirection: side % 2 ? 'column' : 'row', gap: 4,
+      ...(side === 0 ? { top: 5, left: 14 } : side === 1 ? { right: 5, top: 14 } : side === 2 ? { bottom: 5, left: 14 } : { left: 5, top: 14 }) } },
+      Array.from({ length: 9 }, (_, i) => h(View, { key: i, style: { width: side % 2 ? 4 : 3, height: side % 2 ? 3 : 4, borderRadius: 1, backgroundColor: '#d9b45b', opacity: 0.8 } })))),
+    // the die: cores on one side, the graphics block on the other
+    h(View, { style: { width: dw, height: dh, borderRadius: 5, backgroundColor: '#2d3238', flexDirection: 'row', padding: 5, gap: 5 } },
+      h(View, { style: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 3 } },
+        Array.from({ length: 4 }, (_, i) => h(View, { key: i, style: { width: (dw - gw - 18) / 2 - 2, height: (dh - 13) / 2, borderRadius: 2, backgroundColor: '#4a5560' } }))),
+      h(View, { style: { width: gw, borderRadius: 3, backgroundColor: display ? '#4a5560' : p.slot, overflow: 'hidden', justifyContent: 'flex-end', border: display ? 'none' : `1px solid ${glow}` } },
+        display ? null : h(View, { style: { height: `${Math.round(Math.max(0.08, Math.min(1, load || 0)) * 100)}%`, backgroundColor: glow } }))));
+}
+
+// Monitor → GPU's drawing. kind: gpumodel.js's gpuKind ('discrete' draws the card; the rest the chip). fanPct: the
+// speed the fans turn at (0 stops them).
+export function GpuArt({ kind = 'discrete', fans = 2, fanPct = 0, temp = null, load = 0, width = 280, height = 156 }) {
+  const th = useTheme();
+  const p = palette(th.mode === 'dark');
+  const card = kind === 'discrete';
+  const spin = useSpin(card ? fanPct : 0);
+  const W = width, H = height;
+  return h(View, { style: { width: W, height: H, borderRadius: 14, background: p.stage, overflow: 'hidden', direction: 'ltr' } },
+    h(View, { style: { position: 'absolute', left: W * 0.15, right: W * 0.15, top: H * 0.1, bottom: H * 0.1, borderRadius: H, backgroundColor: heatColor(temp, th.mode === 'dark' ? 0.08 : 0.1) } }),
+    card ? h(CardArt, { p, temp, load, fans, spin, W, H }) : h(ChipArt, { p, temp, load, kind, W, H }));
 }
 
 // ---- the curve chart ----

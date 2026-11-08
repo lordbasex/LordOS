@@ -23,6 +23,7 @@ import { CoolingTab } from './Cooling.jsx';
 import { ProcessesTab, ProcessLayers } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
+import { GpuTab, OverviewGpu, OverviewAiVms } from './Gpu.jsx';
 
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
@@ -125,6 +126,7 @@ registerDockActions('monitor', () => [
   { id: 'network', label: 'monitor.network', args: { tab: 'network' } },
   { id: 'cooling', label: 'monitor.tab.cooling', args: { tab: 'cooling' } },
   { id: 'disks', label: 'monitor.disks', args: { tab: 'disks' } },
+  { id: 'gpu', label: 'monitor.gpu.title', args: { tab: 'gpu' } },
 ]);
 
 function useSeries(samples) {
@@ -164,7 +166,7 @@ function TempStat({ last }) {
   );
 }
 
-function Overview({ s, last }) {
+function Overview({ s, last, onTab }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const info = monitor.info();
@@ -193,6 +195,11 @@ function Overview({ s, last }) {
           <Chart series={[{ label: tr('monitor.read'), values: s.read, color: C.read }, { label: tr('monitor.write'), values: s.write, color: C.write }]}
             format={(v) => fmt.rate(tr, v)} times={s.times} height={86} bg={card.bg} />
         </Card>
+      </View>
+      {/* (0.8.8.6) the GPU, LordOS's AI and the virtual machines: read once per second while the Overview is on screen */}
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <OverviewGpu onOpen={() => onTab?.('gpu')} style={{ flex: 2 }} />
+        <OverviewAiVms style={{ flex: 1, flexDirection: 'column' }} />
       </View>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <TempStat last={last} />
@@ -400,7 +407,7 @@ let lastTab = 'overview';
 // Each tab subscribes to what it shows, at the rate it needs: the chart tabs on every sample (4 per
 // second in front, 1 in the background); Processes and Network, once per second. The window itself
 // doesn't redraw on every sample.
-function Charts({ tab, rate }) {
+function Charts({ tab, rate, onTab }) {
   const samples = useMonitor({ everyMs: rate });
   const s = useSeries(samples);
   const last = samples[samples.length - 1];
@@ -408,7 +415,7 @@ function Charts({ tab, rate }) {
   return (
     <ScrollView resetKey={tab} style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}>
-        {tab === 'overview' && <Overview s={s} last={last} />}
+        {tab === 'overview' && <Overview s={s} last={last} onTab={onTab} />}
         {tab === 'cpu' && <CpuTab s={s} last={last} />}
         {tab === 'memory' && <MemTab s={s} last={last} />}
         {tab === 'disks' && <DisksTab s={s} last={last} />}
@@ -456,7 +463,7 @@ export default function Monitor() {
   const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);
   const view = tab === 'voltage' && !hasVolt ? 'overview' : tab;
   const tabs = [
-    ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')],
+    ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')], ['gpu', tr('monitor.gpu.title')],
     ['network', tr('monitor.network')], ['disks', tr('monitor.disks')], ['processes', tr('monitor.processes')], ['cooling', tr('monitor.tab.cooling')],
     ...(hasVolt ? [['voltage', tr('monitor.tab.voltage')]] : []),
   ];
@@ -476,6 +483,10 @@ export default function Monitor() {
         <View style={{ flex: 1, padding: 20 }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.waiting')}</Text></View>
       ) : view === 'network' ? (
         <Network prefs={prefs} />
+      ) : view === 'gpu' ? (
+        <ScrollView resetKey="gpu" style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
+        </ScrollView>
       ) : view === 'voltage' ? (
         <ScrollView resetKey="voltage" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
@@ -489,7 +500,7 @@ export default function Monitor() {
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (
-        <Charts tab={view} rate={focused === false ? 1000 : 250} />
+        <Charts tab={view} rate={focused === false ? 1000 : 250} onTab={setTab} />
       )}
       <View style={{ height: 1, backgroundColor: t.separator }} />
       <Footer />

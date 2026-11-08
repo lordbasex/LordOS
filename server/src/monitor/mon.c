@@ -14,6 +14,7 @@
 #include "procctl.h"
 #include "disktemp.h"
 #include "voltage.h"
+#include "gpustat.h"
 #include "../meminfo.h"
 
 #include <ctype.h>
@@ -129,10 +130,11 @@ void mon_buf_free(Buf *b) { free(b->p); memset(b, 0, sizeof *b); }
 static struct {
     pthread_mutex_t mu;
     pthread_cond_t cv;
-    int started, refs, want_procs, want_conns, want_geo, want_volt;
+    int started, refs, want_procs, want_conns, want_geo, want_volt, want_gpu;
     double last_poll;
-    char *sample, *procs, *conns, *detail, *dtemps, *volt;
-    uint64_t sseq, pseq, cseq, dseq, tseq, vseq;
+    char *sample, *procs, *conns, *detail, *dtemps, *volt, *gpu;
+    uint64_t sseq, pseq, cseq, dseq, tseq, vseq, gseq;
+    char home[PATH_MAX];                /* lord-say's status notes (gpustat.c) */
     int watch_disks;                    /* background disk temperatures (notifications), see below */
     int detail_pid;                     /* Get Info: 0 = none */
     unsigned long long detail_start;
@@ -682,7 +684,7 @@ static void *worker(void *arg) {
             ts.tv_nsec = (long)(ns % 1000000000LL);
             pthread_cond_timedwait(&M.cv, &M.mu, &ts);
         }
-        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, wv = M.want_volt, dpid = M.detail_pid;
+        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, wv = M.want_volt, wgpu = M.want_gpu, dpid = M.detail_pid;
         unsigned long long dstart = M.detail_start;
         pthread_mutex_unlock(&M.mu);
         if (slept || !tick) {                       /* (re)start: no stale rates */
@@ -728,6 +730,13 @@ static void *worker(void *arg) {
             proc_detail_json(&d, dpid, dstart, own, (int)getpid());
             publish(&M.detail, &M.dseq, &d);
         }
+        if (wgpu && tick % 4 == 3) {
+            /* Monitor → GPU and the Overview's GPU card: the cards and the user's processes' DRM clients, once per second */
+            static const char *const ids[] = { "/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids" };
+            const char *pci = access(ids[0], R_OK) ? ids[1] : ids[0];
+            Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home) };
+            if (g.p) publish(&M.gpu, &M.gseq, &g);
+        }
         if (wc && tick % 4 == 2) {
             if (wg && !geo_tried) { geo_tried = 1; geo_open = M.geo_path[0] && !mmdb_open(&geo, M.geo_path); }
             Buf c = { 0 };
@@ -753,13 +762,15 @@ static void *worker(void *arg) {
 void mon_init(const char *assets_dir) {
     pthread_mutex_lock(&M.mu);
     if (assets_dir && *assets_dir) snprintf(M.geo_path, sizeof M.geo_path, "%s/monitor/geoip-country.mmdb.xz", assets_dir);
+    const char *home = getenv("HOME");
+    if (home && home[0] == '/') snprintf(M.home, sizeof M.home, "%s", home);
     pthread_mutex_unlock(&M.mu);
 }
 
 void mon_reset(void) {
     pthread_mutex_lock(&M.mu);
     M.refs = 0;
-    M.want_procs = M.want_conns = M.want_geo = M.want_volt = 0;
+    M.want_procs = M.want_conns = M.want_geo = M.want_volt = M.want_gpu = 0;
     M.detail_pid = 0;
     M.watch_disks = 0;
     pthread_mutex_unlock(&M.mu);
@@ -823,6 +834,12 @@ void mon_want_voltage(int on) {
     pthread_mutex_unlock(&M.mu);
 }
 
+void mon_want_gpu(int on) {
+    pthread_mutex_lock(&M.mu);
+    M.want_gpu = !!on;
+    pthread_mutex_unlock(&M.mu);
+}
+
 static char *take(char *slot, uint64_t have, uint64_t *seq) {
     pthread_mutex_lock(&M.mu);
     M.last_poll = mon_now_ms();
@@ -838,6 +855,7 @@ char *mon_procs_json(uint64_t *seq) { return take(M.procs, M.pseq, seq); }
 char *mon_conns_json(uint64_t *seq) { return take(M.conns, M.cseq, seq); }
 char *mon_detail_json(uint64_t *seq) { return take(M.detail, M.dseq, seq); }
 char *mon_voltage_json(uint64_t *seq) { return take(M.volt, M.vseq, seq); }
+char *mon_gpu_json(uint64_t *seq) { return take(M.gpu, M.gseq, seq); }
 
 void mon_detail(int pid, unsigned long long start) {
     pthread_mutex_lock(&M.mu);

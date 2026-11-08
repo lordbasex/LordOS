@@ -222,6 +222,22 @@ int fanhw_scan(FanHw *h, const char *root) {
             pathf(en, sizeof en, "%s/pwm%d_enable", dir, ch);
             pathf(rpm, sizeof rpm, "%s/fan%d_input", dir, ch);
             int has_pwm = exists(pwm) && exists(en);
+            if (!strcmp(chip, "amdgpu") && ch == 1 && has_pwm && exists(rpm) && h->ng < FANHW_MAX_GPU) {
+                GpuFan *g = &h->g[h->ng++];
+                snprintf(g->dir, sizeof g->dir, "%s", dir);
+                pathf(p, sizeof p, "%s/device", dir);
+                if (!realpath(p, g->dev)) snprintf(g->dev, sizeof g->dev, "%s", dir);
+                const char *b = strrchr(g->dev, '/');
+                snprintf(g->slot, sizeof g->slot, "%s", b ? b + 1 : g->dev);
+                for (char *q = g->slot; *q; q++) if (*q != ':') { char c1[2] = { *q, 0 }; clean(c1); *q = c1[0]; }
+                int v;
+                pathf(p, sizeof p, "%s/pwm1_min", dir);
+                g->pwm_min = !read_int(p, &v) && v >= 0 && v < 255 ? v : 0;
+                pathf(p, sizeof p, "%s/pwm1_max", dir);
+                g->pwm_max = !read_int(p, &v) && v > g->pwm_min && v <= 255 ? v : 255;
+                g->has_rpm = 1;
+                g->pct = g->orig_enable = g->orig_pwm = -1;
+            }
             if (allowed && has_pwm && h->n < FANHW_MAX) {
                 FanTarget *t = &h->t[h->n++];
                 t->kind = board ? FK_BOARD : FK_HWMON;
@@ -261,26 +277,15 @@ static void tpath(const FanTarget *t, const char *what, char *out, size_t n) {
 
 int fanhw_take(FanHw *h, const char *state_path) {
     /* 1. the restore notes first, so a crash right after leaves enough to undo it */
-    if (state_path) {
-        char tmp[FANHW_PATH];
-        pathf(tmp, sizeof tmp, "%s.tmp", state_path);
-        FILE *f = tmp[0] ? fopen(tmp, "we") : NULL;
-        if (f) {
-            fprintf(f, "lord-fand 1\n");
-            for (int i = 0; i < h->n; i++) {
-                FanTarget *t = &h->t[i];
-                char p[FANHW_PATH];
-                tpath(t, "_enable", p, sizeof p);
-                int v;
-                if (t->kind == FK_HWMON && !read_int(p, &v)) t->orig_enable = v;
-                if (t->kind == FK_HWMON && t->orig_enable >= 0 && !strchr(t->dev, ' ') && !strchr(t->dev, '\n'))
-                    fprintf(f, "enable %d %d %s\n", t->ch, t->orig_enable, t->dev);
-            }
-            for (int i = 0; i < h->ntrips; i++) fprintf(f, "trip %d %d\n", h->trip[i], h->trip_orig[i]);
-            if (fclose(f) == 0) rename(tmp, state_path);
-            else unlink(tmp);
-        }
+    for (int i = 0; i < h->n; i++) {
+        FanTarget *t = &h->t[i];
+        char p[FANHW_PATH];
+        tpath(t, "_enable", p, sizeof p);
+        int v;
+        if (t->kind == FK_HWMON && !read_int(p, &v)) t->orig_enable = v;
     }
+    h->cpu_held = 1;
+    if (state_path) fanhw_notes(h, state_path, 1);
     int ok = 0;
     for (int i = 0; i < h->n; i++) {
         FanTarget *t = &h->t[i];
@@ -358,6 +363,7 @@ static void board_state_now(FanHw *h) {
 }
 
 void fanhw_release(FanHw *h) {
+    h->cpu_held = 0;
     for (int i = 0; i < h->ntrips; i++) {
         char p[FANHW_PATH];
         pathf(p, sizeof p, "%s/trip_point_%d_temp", h->zone, h->trip[i]);
@@ -390,6 +396,9 @@ int fanhw_restore_file(const char *root, const char *state_path) {
             if (sscanf(line, "trip %d %d%n", &a, &b, &n) == 2 && line[n] == '\n') {
                 if (b < 0 || b > 200000) continue;
                 for (int i = 0; i < h.ntrips; i++) if (h.trip[i] == a) h.trip_orig[i] = b;
+            } else if (sscanf(line, "gpufan %d %d %319s%n", &a, &b, dev, &n) == 3 && line[n] == '\n') {
+                if (a < 0 || a > 5 || b < 0 || b > 255) continue;
+                for (int i = 0; i < h.ng; i++) if (!strcmp(h.g[i].dev, dev)) { h.g[i].orig_enable = a; h.g[i].orig_pwm = b; h.g[i].manual = 1; }
             } else if (sscanf(line, "enable %d %d %319s%n", &a, &b, dev, &n) == 3 && line[n] == '\n') {
                 if (b < 0 || b > 5) continue;
                 for (int i = 0; i < h.n; i++)
@@ -405,6 +414,161 @@ int fanhw_restore_file(const char *root, const char *state_path) {
         if (raised && !f) rc = -1;   /* no notes and trips look raised: the original values are unknown */
     }
     if (f || !h.ntrips) fanhw_release(&h);
+    for (int i = 0; i < h.ng; i++) if (h.g[i].manual) fanhw_gpu_auto(&h, i, GR_STOP, NULL);   /* GPU fans: automatic */
     unlink(state_path);
     return rc;
+}
+
+/* ---- restore notes ---- */
+
+static int note_safe(const char *dev) { return dev[0] && !strchr(dev, ' ') && !strchr(dev, '\n'); }
+
+void fanhw_notes(FanHw *h, const char *state_path, int cpu) {
+    if (!state_path) return;
+    int any = 0;
+    for (int i = 0; i < h->ng; i++) any |= h->g[i].manual;
+    cpu = cpu || h->cpu_held;
+    if (cpu) any |= h->n > 0 || h->ntrips > 0;
+    if (!any) { unlink(state_path); return; }
+    char tmp[FANHW_PATH];
+    pathf(tmp, sizeof tmp, "%s.tmp", state_path);
+    FILE *f = tmp[0] ? fopen(tmp, "we") : NULL;
+    if (!f) return;
+    fprintf(f, "lord-fand 1\n");
+    if (cpu) {
+        for (int i = 0; i < h->n; i++) {
+            FanTarget *t = &h->t[i];
+            if (t->kind == FK_HWMON && t->orig_enable >= 0 && note_safe(t->dev)) fprintf(f, "enable %d %d %s\n", t->ch, t->orig_enable, t->dev);
+        }
+        for (int i = 0; i < h->ntrips; i++) fprintf(f, "trip %d %d\n", h->trip[i], h->trip_orig[i]);
+    }
+    for (int i = 0; i < h->ng; i++) {
+        GpuFan *g = &h->g[i];
+        if (g->manual && note_safe(g->dev)) fprintf(f, "gpufan %d %d %s\n", g->orig_enable < 0 ? 2 : g->orig_enable, g->orig_pwm < 0 ? 0 : g->orig_pwm, g->dev);
+    }
+    if (fclose(f) == 0) rename(tmp, state_path);
+    else unlink(tmp);
+}
+
+/* ---- GPU fans (amdgpu) ---- */
+
+const char *fanhw_revert_name(GpuRevert r) {
+    return r == GR_HOT ? "hot" : r == GR_ERROR ? "error" : r == GR_SESSION ? "session" : r == GR_STOP ? "stop" : "";
+}
+
+static void gpath(const GpuFan *g, const char *f, char *out, size_t n) { pathf(out, n, "%s/%s", g->dir, f); }
+
+int fanhw_gpu_temp(const FanHw *h, int i) {
+    if (i < 0 || i >= h->ng) return TEMP_NONE;
+    int best = TEMP_NONE;
+    for (int k = 1; k <= 3; k++) {
+        char p[FANHW_PATH], f[16];
+        snprintf(f, sizeof f, "temp%d_input", k);
+        gpath(&h->g[i], f, p, sizeof p);
+        int v;
+        if (!read_int(p, &v) && v > 0 && v < 200000 && v > best) best = v;
+    }
+    return best;
+}
+
+static int gpu_to_pwm(const GpuFan *g, int pct) { return g->pwm_min + (pct * (g->pwm_max - g->pwm_min) + 50) / 100; }
+
+int fanhw_gpu_pct(const FanHw *h, int i) {
+    if (i < 0 || i >= h->ng) return -1;
+    const GpuFan *g = &h->g[i];
+    char p[FANHW_PATH];
+    int v;
+    gpath(g, "pwm1", p, sizeof p);
+    if (read_int(p, &v) || v < 0 || v > 255) return -1;
+    if (v <= g->pwm_min) return 0;
+    return ((v - g->pwm_min) * 100 + (g->pwm_max - g->pwm_min) / 2) / (g->pwm_max - g->pwm_min);
+}
+
+int fanhw_gpu_rpm(const FanHw *h, int i) {
+    if (i < 0 || i >= h->ng) return -1;
+    char p[FANHW_PATH];
+    int v;
+    gpath(&h->g[i], "fan1_input", p, sizeof p);
+    return read_int(p, &v) || v < 0 ? -1 : v;
+}
+
+void fanhw_gpu_auto(FanHw *h, int i, GpuRevert why, const char *state_path) {
+    if (i < 0 || i >= h->ng) return;
+    GpuFan *g = &h->g[i];
+    char p[FANHW_PATH];
+    gpath(g, "pwm1_enable", p, sizeof p);
+    if (g->manual || why == GR_NONE) write_int(p, 2);   /* amdgpu's automatic: the firmware's own fan table */
+    if (g->manual && why != GR_NONE) {
+        g->reverted = why;
+        fprintf(stderr, "lord-fand: GPU fan %s back to automatic (%s)\n", g->slot, fanhw_revert_name(why));
+    }
+    g->manual = 0;
+    g->pct = -1;
+    g->errors = 0;
+    fanhw_notes(h, state_path, 0);
+}
+
+int fanhw_gpu_manual(FanHw *h, int i, int pct, unsigned owner, const char *state_path) {
+    if (i < 0 || i >= h->ng) return -1;
+    GpuFan *g = &h->g[i];
+    char en[FANHW_PATH], pw[FANHW_PATH];
+    gpath(g, "pwm1_enable", en, sizeof en);
+    gpath(g, "pwm1", pw, sizeof pw);
+    int t = fanhw_gpu_temp(h, i);
+    if (t != TEMP_NONE && t >= FANHW_GPU_BACKSTOP_C * 1000) return -1;   /* too hot to take it from the firmware now */
+    if (!g->manual) {
+        int v;
+        g->orig_enable = !read_int(en, &v) && v >= 0 && v <= 5 ? v : 2;
+        g->orig_pwm = !read_int(pw, &v) && v >= 0 && v <= 255 ? v : 0;
+        g->manual = 1;                                    /* the notes first, so a crash right after can undo it */
+        fanhw_notes(h, state_path, 0);
+        if (write_int(en, 1)) { fanhw_gpu_auto(h, i, GR_ERROR, state_path); return -1; }
+    }
+    g->pct = fan_gpu_pct(pct);
+    g->owner = owner;
+    g->errors = 0;
+    g->reverted = GR_NONE;
+    if (write_int(pw, gpu_to_pwm(g, g->pct))) { fanhw_gpu_auto(h, i, GR_ERROR, state_path); return -1; }
+    return 0;
+}
+
+void fanhw_gpu_tick(FanHw *h, int i, int session, const char *state_path) {
+    if (i < 0 || i >= h->ng || !h->g[i].manual) return;
+    GpuFan *g = &h->g[i];
+    int t = fanhw_gpu_temp(h, i);
+    if (t != TEMP_NONE && t >= FANHW_GPU_BACKSTOP_C * 1000) { fanhw_gpu_auto(h, i, GR_HOT, state_path); return; }
+    if (!session) { fanhw_gpu_auto(h, i, GR_SESSION, state_path); return; }
+    char en[FANHW_PATH], pw[FANHW_PATH];
+    gpath(g, "pwm1_enable", en, sizeof en);
+    gpath(g, "pwm1", pw, sizeof pw);
+    int e, v, want = gpu_to_pwm(g, g->pct), bad = t == TEMP_NONE;
+    /* after a suspend the driver may have reset it: take it again */
+    if (read_int(en, &e)) bad = 1;
+    else if (e != 1 && write_int(en, 1)) bad = 1;
+    if (read_int(pw, &v)) bad = 1;
+    else if (v != want && write_int(pw, want)) bad = 1;
+    g->errors = bad ? g->errors + 1 : 0;
+    if (g->errors >= FANHW_GPU_ERRORS) fanhw_gpu_auto(h, i, GR_ERROR, state_path);
+}
+
+int fanhw_uid_has_session(const char *root, unsigned uid) {
+    if (uid == 0) return 1;
+    char base[FANHW_PATH];
+    pathf(base, sizeof base, "%s/proc", root);
+    DIR *d = opendir(base);
+    if (!d) return 1;                                     /* can't tell: keep it (the backstop still holds) */
+    int found = 0;
+    for (struct dirent *e; !found && (e = readdir(d));) {
+        if (!numbered(e->d_name, "") || strlen(e->d_name) > 10) continue;
+        char p[FANHW_PATH], comm[32], st[1024];
+        pathf(p, sizeof p, "%s/%s/comm", base, e->d_name);
+        if (read_str(p, comm, sizeof comm) || strcmp(comm, "lord-server")) continue;
+        pathf(p, sizeof p, "%s/%s/status", base, e->d_name);
+        if (read_str(p, st, sizeof st)) continue;
+        const char *u = strstr(st, "\nUid:");
+        unsigned real;
+        if (u && sscanf(u + 5, "%u", &real) == 1 && real == uid) found = 1;
+    }
+    closedir(d);
+    return found;
 }

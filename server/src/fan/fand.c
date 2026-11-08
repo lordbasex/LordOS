@@ -7,9 +7,12 @@
  *   - talks to sessions over /run/lordos/fand.sock (0666) with one line per connection:
  *       STATUS                     anyone: a JSON line with temperature, fans, profile, step and
  *                                  whether this peer may change them ("canChange")
- *       PROFILE <name> / CURVE <t:p,...> / FORCE off|on|<minutes>
+ *       PROFILE <name> / CURVE <t:p,...> / FORCE off|on|<minutes> / GPUFAN <n> auto|<pct>
  *                                  administrators only (SO_PEERCRED: root, or a member of
  *                                  sudo, admin or wheel): "OK" or "ERR <code>"
+ *     GPUFAN (0.8.8.6): an amdgpu card's fan by hand, n from our own scan, pct clamped to 30..100 %. Never saved;
+ *     it goes back to automatic when asked, above 85 °C, after read/write errors, when the session of the user who
+ *     set it ends (no lord-server of that uid), and on stop, restart or crash (fanhw.h).
  *     Clients never name paths or devices: the daemon drives every fan it found.
  *   - on SIGTERM/SIGINT, and in `lord-fand --restore` (the unit's ExecStopPost, which also runs
  *     after a crash), the fans go back to the kernel or the firmware.
@@ -120,8 +123,10 @@ static void apply_profile(void) {
 static void tick(void) {
     S.temp = fanhw_temp(&S.hw);
     int want_control = S.hw.n > 0 && (S.cfg.profile != FP_AUTO || forced());
+    for (int i = 0; i < S.hw.ng; i++)
+        if (S.hw.g[i].manual) fanhw_gpu_tick(&S.hw, i, fanhw_uid_has_session(S.root, S.hw.g[i].owner), S.state);
     if (!want_control) {
-        if (S.controlling) { fanhw_release(&S.hw); unlink(S.state); S.controlling = 0; }
+        if (S.controlling) { fanhw_release(&S.hw); S.controlling = 0; fanhw_notes(&S.hw, S.state, 0); }
         S.out_pct = -1;
         S.step = -1;
         return;
@@ -161,6 +166,15 @@ static size_t status_json(char *o, size_t n, int can_change) {
             fanhw_kind_name(S.hw.t[i].kind), S.hw.t[i].chip, S.hw.t[i].ch, fanhw_pct(&S.hw, i), fanhw_rpm(&S.hw, i));
     PUT("],\"firmwareFans\":[");
     for (int i = 0; i < S.hw.nro; i++) PUT("%s{\"chip\":\"%s\",\"rpm\":%d}", i ? "," : "", S.hw.ro[i].chip, fanhw_ro_rpm(&S.hw, i));
+    PUT("],\"gpuFans\":[");
+    for (int i = 0; i < S.hw.ng; i++) {
+        const GpuFan *g = &S.hw.g[i];
+        int t = fanhw_gpu_temp(&S.hw, i);
+        PUT("%s{\"id\":%d,\"chip\":\"amdgpu\",\"slot\":\"%s\",\"mode\":\"%s\",\"set\":%d,\"pct\":%d,\"rpm\":%d,\"floor\":%d,\"backstop\":%d,\"reverted\":\"%s\",",
+            i ? "," : "", i, g->slot, g->manual ? "manual" : "auto", g->manual ? g->pct : -1, fanhw_gpu_pct(&S.hw, i), fanhw_gpu_rpm(&S.hw, i),
+            FAN_GPU_FLOOR, FANHW_GPU_BACKSTOP_C, fanhw_revert_name(g->reverted));
+        if (t > -1000000) PUT("\"temp\":%d.%d}", t / 1000, t % 1000 / 100); else PUT("\"temp\":null}");
+    }
     PUT("]}\n");
 #undef PUT
     return k < n ? k : 0;
@@ -168,10 +182,11 @@ static size_t status_json(char *o, size_t n, int can_change) {
 
 /* ---- socket ---- */
 
-static int peer_is_admin(int fd) {
+static int peer_is_admin(int fd, unsigned *uid) {
     struct ucred uc;
     socklen_t l = sizeof uc;
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &uc, &l)) return 0;
+    if (uid) *uid = uc.uid;
     if (uc.uid == 0) return 1;
     struct passwd pw, *pp = NULL;
     char pbuf[2048];
@@ -205,11 +220,21 @@ static void handle(Client *c) {
     if (fan_req_parse(c->buf, (size_t)(nl - c->buf), &r)) { reply(c->fd, "ERR fan.badRequest\n", 19); return; }
     if (r.type == FR_STATUS) {
         char o[FAND_STATUS_MAX];
-        size_t n = status_json(o, sizeof o, peer_is_admin(c->fd));
+        size_t n = status_json(o, sizeof o, peer_is_admin(c->fd, NULL));
         reply(c->fd, o, n);
         return;
     }
-    if (!peer_is_admin(c->fd)) { reply(c->fd, "ERR fan.notAdmin\n", 17); return; }
+    unsigned uid = 0;
+    if (!peer_is_admin(c->fd, &uid)) { reply(c->fd, "ERR fan.notAdmin\n", 17); return; }
+    if (r.type == FR_GPUFAN) {
+        /* by hand, in memory only: never in fan.json */
+        if (r.gpu >= S.hw.ng) { reply(c->fd, "ERR fan.noGpuFan\n", 17); return; }
+        if (r.pct < 0) fanhw_gpu_auto(&S.hw, r.gpu, GR_NONE, S.state);
+        else if (fanhw_gpu_manual(&S.hw, r.gpu, r.pct, uid, S.state)) { reply(c->fd, "ERR fan.gpuRefused\n", 19); return; }
+        fprintf(stderr, "lord-fand: %s (uid %u)\n", c->buf, uid);
+        reply(c->fd, "OK\n", 3);
+        return;
+    }
     FanConfig old = S.cfg;
     if (r.type == FR_PROFILE) S.cfg.profile = r.profile;
     else if (r.type == FR_CURVE) { S.cfg.custom = r.curve; S.cfg.profile = FP_CUSTOM; }
@@ -251,6 +276,9 @@ static int detect(void) {
                fanhw_pct(h, i), fanhw_rpm(h, i), h->t[i].dir);
     for (int i = 0; i < h->ntrips; i++) printf("kernel trip %d: %d mC (%s)\n", h->trip[i], h->trip_orig[i], h->zone);
     for (int i = 0; i < h->nro; i++) printf("firmware fan: %s %d rpm\n", h->ro[i].chip, fanhw_ro_rpm(h, i));
+    for (int i = 0; i < h->ng; i++)
+        printf("GPU fan %d: amdgpu %s at %d %%, %d rpm, pwm %d..%d (%s; by hand only, GPUFAN)\n", i, h->g[i].slot, fanhw_gpu_pct(h, i), fanhw_gpu_rpm(h, i),
+               h->g[i].pwm_min, h->g[i].pwm_max, h->g[i].dir);
     if (!h->n) printf("no controllable fans\n");
     return 0;
 }
@@ -335,7 +363,9 @@ int main(int argc, char **argv) {
         }
         for (int i = 0; i < FAND_CLIENTS; i++) if (S.cl[i].fd >= 0 && now >= S.cl[i].deadline) drop(&S.cl[i]);
     }
-    if (S.controlling) { fanhw_release(&S.hw); unlink(S.state); }
+    if (S.controlling) fanhw_release(&S.hw);
+    for (int i = 0; i < S.hw.ng; i++) if (S.hw.g[i].manual) fanhw_gpu_auto(&S.hw, i, GR_STOP, NULL);
+    unlink(S.state);
     if (lfd >= 0) { close(lfd); unlink(S.sock); }
     fprintf(stderr, "lord-fand: stopped, fans given back to the kernel/firmware\n");
     return 0;

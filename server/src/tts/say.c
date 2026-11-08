@@ -26,6 +26,11 @@
  * --levels (lord-server's, speak.c): fd 3 is a pipe to it; for each SAY_LEVEL_MS of audio played, SAY_BANDS bytes, how
  * loud each band is (levels.c), for the wave its player draws. Written without waiting: one it isn't reading is lost.
  *
+ * While it speaks or saves, ~/.cache/lordos/say/<pid> says how: "lord-say 1 <vulkan|cpu> <hd|standard> <language>
+ * <speak|save>" (Monitor → GPU shows it: lord-tts is sandboxed and its /proc isn't readable, src/monitor/gpustat.c). It
+ * goes when lord-say ends; a note whose process is gone is removed by the next lord-say. Not lord-tts's folder: the
+ * helper can't write it.
+ *
  * Exit status: 0 spoken, 1 an error, 2 usage, 3 no model for the language, 4 no voice chosen, 5 lord-tts isn't
  * installed, 130 stopped by a signal. lord-server (speak.c) tells the person which one it was. */
 #include "../doc/proto.h"
@@ -379,8 +384,40 @@ static int play_preview(const char *const roots[2], const char *lang, const char
     return r ? 1 : 0;
 }
 
+/* ---- the status note (Monitor → GPU) ---- */
+
+static char note_path[PATH_MAX];
+
+static void note_remove(void) { if (note_path[0]) unlink(note_path); }
+
+static void note_write(const char *home, int gpu, int hd, const char *lang, int save) {
+    char dir[PATH_MAX], tmp[PATH_MAX + 8];
+    snprintf(dir, sizeof dir, "%s/.cache/lordos/say", home);
+    mkdir(dir, 0700);
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    if (dfd < 0 || fstat(dfd, &st) || st.st_uid != getuid()) { if (dfd >= 0) close(dfd); return; }
+    DIR *d = fdopendir(dup(dfd));
+    for (struct dirent *e; d && (e = readdir(d));) {          /* notes left by a lord-say that was killed */
+        char *end;
+        long pid = strtol(e->d_name, &end, 10);
+        if (e->d_name[0] >= '1' && e->d_name[0] <= '9' && !*end && pid > 0 && pid != getpid() && kill((pid_t)pid, 0) && errno == ESRCH)
+            unlinkat(dfd, e->d_name, 0);
+    }
+    if (d) closedir(d);
+    close(dfd);
+    if (!note_path[0]) atexit(note_remove);
+    snprintf(note_path, sizeof note_path, "%s/%d", dir, (int)getpid());
+    snprintf(tmp, sizeof tmp, "%s.tmp", note_path);
+    FILE *f = fopen(tmp, "we");
+    if (!f) return;
+    fprintf(f, "lord-say 1 %s %s %s %s\n", gpu ? "vulkan" : "cpu", hd ? "hd" : "standard", lang, save ? "save" : "speak");
+    if (fclose(f) || rename(tmp, note_path)) unlink(tmp);
+}
+
 static void on_signal(int sig) {
     (void)sig;
+    if (note_path[0]) unlink(note_path);
     if (helper > 0) kill(helper, SIGKILL);
     if (player > 0) kill(player, SIGTERM);
     _exit(130);
@@ -551,6 +588,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "say: speech failed: %s%s%s\n", cur.err, cur.detail[0] ? ": " : "", cur.detail);
             return 1;
         }
+        note_write(home, gpu, hd, lang, out != NULL);
         FILE *wav = NULL;
         size_t total = 0;
         if (out) {

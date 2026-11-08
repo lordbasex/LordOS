@@ -42,6 +42,11 @@ Defaults: `~/.config/lordos/voice.json` (`voices` per language, `voice`, `langua
 - **Speed:** a sentence at a time; each one plays (PipeWire's `pw-cat`) while the next is synthesized. Measured on an
   i9-10900 with an RX 580: about 10 s of speech in 1.3 s on the GPU and 3 s on the CPU, 220 MB of memory.
 - `/usr/bin/say` is an alternative (`update-alternatives`), so another package's `say` can be installed too.
+- **Status note** (0.8.8.6): once the first sentence is made, `say` writes `~/.cache/lordos/say/<pid>` with
+  `lord-say 1 <vulkan|cpu> <hd|standard> <language> <speak|save>` and removes it when it ends (also on SIGINT and
+  SIGTERM; notes of `say` processes that are gone are removed by the next one). Monitor → GPU reads it to say what the
+  voice runs on (`docs/MONITOR.md`, "GPU"): lord-tts itself is sandboxed and not dumpable, so its `/proc` isn't
+  readable. It is not lord-tts's folder: the helper can't write it.
 
 ## Reading aloud from the desktop
 

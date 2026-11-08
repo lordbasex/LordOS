@@ -300,4 +300,7 @@ export const monitor = {
   // Monitor → Voltage (docs/MONITOR.md, "Voltage"): only while that view is on screen
   wantVoltage: (on) => { if (available()) lord.monitor.wantVoltage(!!on); },
   voltage: () => (available() ? lord.monitor.voltage() : null),
+  // (0.8.8.6) Monitor → GPU and the Overview's GPU card (docs/MONITOR.md, "GPU"): only while one is on screen
+  wantGpu: (on) => { if (available() && typeof lord.monitor.wantGpu === 'function') lord.monitor.wantGpu(!!on); },
+  gpu: () => (available() && typeof lord.monitor.gpu === 'function' ? lord.monitor.gpu(locale.get().lang) : null),
 };

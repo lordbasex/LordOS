@@ -107,6 +107,23 @@ export function Glyph({ name, color, size = 13 }) {
           </View>
         </View>
       );
+    case 'gpu':
+      return (
+        <View style={box}>
+          <View style={{ width: s, height: s * 0.62, borderRadius: 2, border: `${b}px solid ${color}`, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' }}>
+            {[0, 1].map((i) => <View key={i} style={{ width: s * 0.3, height: s * 0.3, borderRadius: s * 0.15, border: `${b}px solid ${color}` }} />)}
+          </View>
+          <View style={{ width: s * 0.5, height: b, marginTop: 1, backgroundColor: color }} />
+        </View>
+      );
+    case 'ai':
+      return (
+        <View style={box}>
+          <View style={{ position: 'absolute', left: s * 0.42, top: s * 0.05, width: b * 1.2, height: s * 0.9, borderRadius: b, backgroundColor: color }} />
+          <View style={{ position: 'absolute', left: s * 0.05, top: s * 0.45, width: s * 0.9, height: b * 1.2, borderRadius: b, backgroundColor: color }} />
+          <View style={{ width: s * 0.36, height: s * 0.36, borderRadius: s * 0.08, backgroundColor: color, transform: 'rotate(45deg)' }} />
+        </View>
+      );
     case 'activity':
       return (
         <View style={{ ...box, flexDirection: 'row', alignItems: 'flex-end', gap: s * 0.1 }}>

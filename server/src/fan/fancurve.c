@@ -63,6 +63,8 @@ int fan_output_pct(int pct) {
     return pct < FAN_MIN_PCT ? FAN_MIN_PCT : pct;
 }
 
+int fan_gpu_pct(int pct) { return pct < FAN_GPU_FLOOR ? FAN_GPU_FLOOR : pct > 100 ? 100 : pct; }
+
 void fan_config_default(FanConfig *cfg, int has_board_fan) {
     memset(cfg, 0, sizeof *cfg);
     /* a board fan (Raspberry Pi fan header) gets our curve from the first boot; a PC's
@@ -179,6 +181,18 @@ int fan_req_parse(const char *line, size_t len, FanReq *r) {
     if (!strncmp(line, "CURVE ", 6)) {
         r->type = FR_CURVE;
         return fan_curve_parse_text(line + 6, &r->curve);
+    }
+    if (!strncmp(line, "GPUFAN ", 7)) {
+        const char *a = line + 7;
+        int g, p;
+        r->type = FR_GPUFAN;
+        if (take_int(&a, &g) || g < 0 || g > 3 || *a != ' ') return -1;
+        a++;
+        if (!strcmp(a, "auto")) { r->gpu = g; r->pct = -1; return 0; }
+        if (take_int(&a, &p) || *a || p < 0 || p > 100) return -1;
+        r->gpu = g;
+        r->pct = p;
+        return 0;
     }
     if (!strncmp(line, "FORCE ", 6)) {
         const char *a = line + 6;

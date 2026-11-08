@@ -20,6 +20,7 @@
 #define FAN_KICK_BELOW   50      /* starting from 0 % to less than this: one tick at 100 % first */
 #define FAN_REQ_MAX      256     /* longest request line accepted on the socket */
 #define FAN_FORCE_MAX_MIN (24 * 60)
+#define FAN_GPU_FLOOR    30      /* a GPU fan set by hand never goes below this */
 
 typedef enum { FP_AUTO, FP_QUIET, FP_BALANCED, FP_PERFORMANCE, FP_ALWAYS, FP_CUSTOM, FP__COUNT } FanProfile;
 
@@ -58,6 +59,8 @@ int  fan_curve_step(const FanCurve *c, int hyst, int prev, int temp_mc);
 int  fan_curve_pct(const FanCurve *c, int step);
 /* What reaches the hardware: 0, or at least FAN_MIN_PCT, at most 100. */
 int  fan_output_pct(int pct);
+/* A GPU fan set by hand: FAN_GPU_FLOOR..100. */
+int  fan_gpu_pct(int pct);
 
 void fan_config_default(FanConfig *cfg, int has_board_fan);
 
@@ -74,14 +77,18 @@ int  fan_curve_parse_text(const char *s, FanCurve *c);
  *   STATUS
  *   PROFILE auto|quiet|balanced|performance|always|custom
  *   CURVE <t:p,...>          sets the custom curve and selects it
- *   FORCE off|on|<minutes>   minutes 1..FAN_FORCE_MAX_MIN */
-typedef enum { FR_STATUS, FR_PROFILE, FR_CURVE, FR_FORCE } FanReqType;
+ *   FORCE off|on|<minutes>   minutes 1..FAN_FORCE_MAX_MIN
+ *   GPUFAN <n> auto|<pct>    GPU fan n of lord-fand's own scan (0..FANHW_MAX_GPU-1): automatic, or pct 0..100 (the
+ *                            daemon clamps it to FAN_GPU_FLOOR..100) */
+typedef enum { FR_STATUS, FR_PROFILE, FR_CURVE, FR_FORCE, FR_GPUFAN } FanReqType;
 typedef struct {
     FanReqType type;
     FanProfile profile;
     FanCurve curve;
     FanForceMode force;
     int minutes;
+    int gpu;                    /* FR_GPUFAN: which */
+    int pct;                    /* FR_GPUFAN: -1 automatic */
 } FanReq;
 int  fan_req_parse(const char *line, size_t len, FanReq *r);   /* 0 ok, -1 refused */
 

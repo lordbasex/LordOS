@@ -21,12 +21,13 @@ blocklists arrived ("Network, second generation").
 
 | Tab | What it shows |
 |---|---|
-| Overview | CPU, Memory, Network and Disk with a 60 s chart; below, CPU temperature, fan, 1 min load, 5/15 min load and cached memory |
+| Overview | CPU, Memory, Network and Disk with a 60 s chart; (0.8.8.6) the main GPU (load, graphics memory, temperature, fan, the app using it most, "+N" with several; a click opens the GPU tab), LordOS's AI (active engine or idle) and running virtual machines; below, CPU temperature, fan, 1 min load, 5/15 min load and cached memory |
 | CPU | total usage (big chart), one chart per core, 1/5/15 load, temperature and tasks |
 | Memory | stacked bar (apps, system and drivers, file cache, free), swap, "Using the most memory" (each app's processes added up, the 8 largest) and a 60 s chart |
 | Network | apps with connections, map, summary or detail of the chosen app (see below) |
 | Disks | total read and write; one row per disk (model, `/dev`, size, temperature, health, rates); the chosen disk's temperature over the last 30 minutes and its health, with "Open in Disks" (see "Disk temperature and health") |
 | Processes | sortable table (CPU, memory, threads, PID, user), search, "Mine" / "All"; Stop and Get Info for the selected process (see "Process actions") |
+| GPU | (0.8.8.6) each graphics card drawn live, load, temperature and fan history, the apps using it, graphics memory, clocks, power, the installed APIs, LordOS's AI engines and, for administrators on amdgpu, the fan by hand (`apps/monitor/Gpu.jsx`, see "GPU") |
 | Cooling | the cooling hardware drawn live, the active fan profile, a temperature and fan history and "full speed" (`apps/monitor/Cooling.jsx`, see `FANS.md`) |
 | Voltage | (0.8.7) only on machines that report something: the input rail or battery with a trace, the board's power state and rails, motherboard sensors, batteries and adapters (`apps/monitor/Voltage.jsx`, see "Voltage") |
 
@@ -547,6 +548,90 @@ isolated session on VM 116 with that board's values as a fixture: the four state
 machine, there is no tab. Not yet tested: installed on the real Raspberry Pi, a real under-voltage event, a real motherboard
 sensor chip, a real battery or adapter.
 
+## GPU (0.8.8.6)
+
+One tab per machine, one view per graphics card (a picker when there are several). Everything comes from files the
+session user may read; nothing runs as root, nothing is executed, no library is loaded and no new one is linked.
+`monitor/gpustat.c` reads on the Monitor's thread, once per second (`tick % 4 == 3`), only after
+`lord.monitor.wantGpu(true)`; `apps/monitor/Gpu.jsx` asks while the GPU tab or the Overview is mounted and the window
+isn't minimized (other tabs: nothing is read). `apps/monitor/gpumodel.js` turns the raw counters into rates (tested by
+`server/tests/gpu_model_test.mjs`). A whole reading took 4–8 ms on the RX 580 machine with a browser running.
+
+**The drawing** (`GpuArt`, `sdk/cooling.jsx`, with Cooling's fan): a graphics card (shroud, two fans, board, PCIe
+fingers, power connector, bracket with outputs) for a discrete card, or a processor package with its graphics block
+for integrated, Raspberry Pi and virtual GPUs. The fans turn with the real fan (20 frames per second, only while the
+fan turns, the window is visible and Reduce motion is off) and stand still at 0 RPM (AMD's silent mode); the heat line
+and the load light take the temperature's color.
+
+| What | Where | Drivers |
+|---|---|---|
+| Name | `device/vendor`, `device/device` → `pci.ids` (`sysreport/ids.c`); no PCI name: by driver | all PCI |
+| Load | `device/gpu_busy_percent`; else the busiest engine summed over the user's apps' clients (marked "from your apps"); else "not reported" | amdgpu; others estimated |
+| Graphics memory | `device/mem_info_{vram,vis_vram,gtt}_{used,total}` | amdgpu; integrated: "shares the computer's memory" |
+| Temperatures, fan, power | the card's hwmon: `temp*_input` + labels (edge, junction, mem), `fan1_input`, `fan1_max`, `pwm1`/`pwm1_max`, `power1_average` or `power1_input`, `power1_cap`, `energy1_input` (power from its deltas) | amdgpu, i915/xe (power, some temps), nouveau |
+| Clocks | hwmon `freq1_input`/`freq2_input` (sclk, mclk), `pp_dpm_sclk`/`pp_dpm_mclk` (current level and top); `gt_act_freq_mhz`/`gt_cur_freq_mhz`/`gt_max_freq_mhz`; xe `tile0/gt0/freq0/{act,max}_freq` | amdgpu; i915; xe |
+| Apps | `/proc/<pid>/fd` → `/dev/dri/*`, then `/proc/<pid>/fdinfo/<fd>`: `drm-driver`, `drm-pdev`, `drm-client-id`, `drm-engine-*` (ns), `drm-engine-capacity-*`, `drm-cycles-*`/`drm-total-cycles-*` (xe), `drm-memory-*`, `drm-total-*`, `drm-resident-*`, `drm-shared-*` | every driver with DRM usage stats (amdgpu, i915, xe, v3d, msm, panfrost, nouveau on recent kernels) |
+| APIs in use | `/proc/<pid>/maps` of those processes: `libvulkan*`, `libGLX*`/`libEGL*`/`libGLESv2*`, `*_dri.so`, `libgallium-*`, `libOpenCL*`, `libcuda*`, `libva*`/`*_drv_video.so`, `libvdpau*`, `libnvcuvid`, `libnvidia-encode`, `libamdhip64`, `libggml-*` (at most 1 MB read, kept 10 s per process) | all |
+| APIs installed | Vulkan ICDs in `/usr/share/vulkan/icd.d` and `/etc/vulkan/icd.d` (`library_path`, `api_version`, read with `sec/json.c`), Mesa's `dri/*_dri.so` and `libgallium-<version>.so`, VA-API `dri/*_drv_video.so`, `vdpau/`, OpenCL `/etc/OpenCL/vendors/*.icd`, the loaders by name, `/dev/kfd` and `libamdhip64` (ROCm), `/proc/driver/nvidia/version` and `libcuda`/`libnvcuvid`/`libnvidia-encode` (NVIDIA); read once a minute | all |
+| AI | `/proc/<pid>/stat` of `lord-tts`, `lord-ocr`, `lord-say`; lord-say's note `~/.cache/lordos/say/<pid>` | — |
+| Machines | `/proc/<pid>/stat` of the user's `qemu-system-*` (CPU from tick deltas, resident memory) | — |
+
+**Apps.** Only the user's own processes are read (another user's fds are the kernel's to refuse; we don't try).
+A client duplicated across fds or handed to another process is counted once (the pair `drm-pdev` + `drm-client-id`,
+under the lowest pid). An engine's share is Δns ÷ (Δt × capacity), or Δcycles ÷ Δtotal-cycles on xe, capped at 100 %;
+the first second shows memory but no share. Processes become apps exactly as in Processes and Network (`annotate()`
+in `js_monitor.c`: the cgroup scope, then the `.desktop` program; lord-server itself is "LordOS"). Each app shows its
+busiest engine, the categories (3D, compute, video, encode, copy), its graphics memory (VRAM; on a GPU that shares the
+computer's memory, the system memory it holds) and its APIs, e.g. a browser "OpenGL (radeonsi), Video decoding",
+lord-server "OpenGL ES (radeonsi)", a game "Vulkan (RADV)".
+
+**APIs installed.** Each line is *available* only with the files that prove it (the card's driver's ICD and the
+loader, the Mesa driver for the card, …); *not installed* when this card has a driver for it that isn't there;
+*not supported* only where it can't be (CUDA/NVENC on anything but NVIDIA's driver, Vulkan on `radeon`, `vc4`,
+`simpledrm`); *not available* when nothing was found and there is no known driver. WebGPU is shown as "in browsers,
+through Vulkan". ROCm with `/dev/kfd` but no runtime says so. NVIDIA's paths are tested with fixtures only.
+
+**AI.** A small table of LordOS's AI helpers (`AI_ENGINES` in the model, `ai_name` in C): the voice (`lord-tts`,
+started by `lord-say`) and text in pictures (`lord-ocr`, Tesseract, always on the processor). lord-tts runs sandboxed and
+not dumpable, so its `/proc/<pid>/fd`, `fdinfo` and `maps` belong to root and its graphics memory is shown as hidden
+("it runs isolated"): its sandbox is untouched. What it runs on comes from lord-say, which is not sandboxed: once the first
+sentence is made it writes `~/.cache/lordos/say/<pid>` (0600 folder, not lord-tts's folder) with `lord-say 1
+<vulkan|cpu> <hd|standard> <language> <speak|save>`, removes it when it ends (also on SIGTERM), and removes notes of dead
+lord-say processes; `gpustat.c` reads it only for a running `lord-say` with that pid, as a regular file owned by the user,
+and parses it strictly (`gpu_say_parse`). So the card says "Graphics card · Vulkan (ggml)" or "Processor", Standard or HD,
+the language, and Speaking, Paused (SIGSTOP), or Saving to a file. With nothing running, it says "No AI engine is using
+the GPU right now" and summarizes the installed voice models and the quality and backend settings (`scanVoices`,
+`voiceConf`).
+
+**The fan by hand** (amdgpu only): see `FANS.md`, "GPU fans". The card shows a switch (Automatic) and a slider
+(30–100 %) to administrators when lord-fand reports a controllable fan for this card's PCI slot; everyone else sees
+whether it is automatic or set by hand.
+
+**What each driver gives** (others: whatever of the above they expose; a missing file is left out, never guessed):
+
+| Driver | Load | Memory | Sensors | Apps |
+|---|---|---|---|---|
+| amdgpu (RX 580 tested) | `gpu_busy_percent` | VRAM, GTT | edge (+ junction, mem on newer cards), fan, power, sclk/mclk | ns per engine, VRAM/GTT |
+| i915 | from apps | shared (per app: system memory) | power from energy (where exposed), frequency | ns per engine with capacity |
+| xe | from apps | VRAM on discrete | temperatures, power, frequency | cycles per engine class |
+| v3d (Raspberry Pi) | from apps | shared | none here | ns per engine |
+| virtio_gpu, vmwgfx | not reported | — | — | per app only where the driver has stats |
+| simpledrm (VM without GPU) | — | — | — | the tab says drawing is done by the processor |
+
+**Reals read on the RX 580 machine (Polaris, amdgpu, kernel 6.12):** busy 0–1 %, VRAM 344 MiB of 8 GiB, GTT 36 MiB of
+62.8 GiB, edge 47 °C, fan 753–756 RPM (fan1_max 3700; `pwm1` reads 0 in automatic on this card while the fan turns, so
+the model uses RPM ÷ fan1_max: 20 %), 19–22 W of a 145 W cap, sclk 1315–1329 MHz (DPM top 1340), mclk 300 MHz (top
+2000); a browser's GPU process: client 217, 172 MiB VRAM, engines gfx, compute, dec; libraries libEGL_mesa,
+libgallium-25.0.7, libva. Mesa 25.0.7, Vulkan RADV 1.4.305, no OpenCL platform installed, `/dev/kfd` present without
+ROCm.
+
+**Tested.** `build/gpustat-test` (fdinfo of amdgpu, i915, xe, v3d and hostile lines; pp_dpm; lord-say's note; maps
+lines; a fake machine with an RX 580-like card, a client shared by two fds, an AI helper, a VM and the installed APIs
+including NVIDIA's), `tests/gpu_model_test.mjs` (69 checks), and in a headless session of this branch on the RX 580
+machine: the tab and the Overview open with no errors, and `lord.monitor.gpu()` answers only while one of them is
+on screen. Not yet seen: a screenshot (the headless session's `remote.sock` takes only root), Intel, NVIDIA, a
+Raspberry Pi, a VM with virtio-gpu, lord-tts actually running on the GPU.
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)
@@ -661,6 +746,8 @@ server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchma
 | `diskTemps()` | (0.8.2) `{ t, disks: [{ name, model, rota, sensor, temp, tempT, tempMax, tempCrit, tempIdle, awake }] }` or `null` if nothing new; it does not keep the 4 Hz sampling alive |
 | `wantVoltage(on)` | (0.8.7) Monitor → Voltage is on screen: the thread reads the voltages about every 2 s (see "Voltage") |
 | `voltage()` | (0.8.7) `{ board, alarm, sinceBoot, chips: [{ dev, name, in: [{ i, v, label }] }], supplies: [{ name, battery, v, min }] }` or `null` if nothing new |
+| `wantGpu(on)` | (0.8.8.6) Monitor → GPU or the Overview is on screen: the thread reads the GPUs once per second (see "GPU") |
+| `gpu(language)` | (0.8.8.6) `{ t, mono, hz, cards: [{ card, driver, slot, vendor, device, vendorName, deviceName, render, busy, vramUsed, vramTotal, visUsed, visTotal, gttUsed, gttTotal, temps: [{ label, c }], fanRpm, fanMax, fanPct, powerW, powerCapW, energyUj, sclk, sclkMax, mclk, mclkMax, curMhz, maxMhz }], list: [{ pid, ppid, name, cmd, exe, self, libs, clients: [{ driver, pdev, id, engines, capacity, cycles, totalCycles, mem: { region: { memory, total, resident, shared } } }], app, appName, appIcon }], ai: [{ pid, ppid, name, state, own }], say: [{ pid, state, backend, quality, lang, mode }], vms: [{ pid, ticks, rss }], caps: { dri, va, vdpau, libs, vulkan: [{ file, lib, api }], opencl: [{ file, lib }], kfd, nvidia } }` (null: not reported) or `null` if nothing new |
 
 | `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
 | `netTotals()` | (0.8.5) `{ t, rx, tx }`: the machine's byte counters now (every interface but `lo`), without the sampling thread (the menu bar item) |

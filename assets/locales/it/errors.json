@@ -213,6 +213,8 @@
   "fan.notAdmin": "Solo un amministratore può modificare le ventole",
   "fan.saveFailed": "Impossibile salvare le impostazioni delle ventole",
   "fan.unavailable": "Il servizio delle ventole non è in esecuzione",
+  "fan.noGpuFan": "Questa scheda grafica non ha una ventola che LordOS possa controllare",
+  "fan.gpuRefused": "Impossibile impostare a mano la ventola della scheda grafica (forse è troppo calda in questo momento)",
   "fs.alreadyInTrash": "È già nel Cestino",
   "fs.copyIntoItself": "Una cartella non può essere copiata dentro sé stessa",
   "fs.copyStartFailed": "Impossibile avviare la copia",
