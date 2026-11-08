@@ -48,6 +48,9 @@ eq('the user\'s LANG', regionFromEnv({ user: { LANG: 'lt_LT.UTF-8' }, system: { 
 eq('LC_TIME first', regionFromEnv({ user: { LANG: 'en_US.UTF-8', LC_TIME: 'en_GB.UTF-8' }, system: {} }), 'en_GB');
 eq('the computer\'s (login screen)', regionFromEnv({ user: {}, system: { LANG: 'lt_LT.UTF-8' } }), 'lt_LT');
 eq('modifier kept', regionFromEnv({ system: { LANG: 'sr_RS.UTF-8@latin' } }), 'sr_RS@latin');
+eq('the computer\'s of another language is not taken', regionFromEnv({ user: {}, system: { LANG: 'en_US.UTF-8' } }, 'es'), '');
+eq('the computer\'s of the same language is', regionFromEnv({ user: {}, system: { LANG: 'es_AR.UTF-8' } }, 'es'), 'es_AR');
+eq('the user\'s is taken whatever the language', regionFromEnv({ user: { LANG: 'lt_LT.UTF-8' }, system: { LANG: 'en_US.UTF-8' } }, 'en'), 'lt_LT');
 eq('C.UTF-8 names no region', regionFromEnv({ user: {}, system: { LANG: 'C.UTF-8' } }), '');
 eq('nothing at all', regionFromEnv(null), '');
 

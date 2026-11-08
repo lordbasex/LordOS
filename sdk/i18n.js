@@ -108,15 +108,17 @@ function initial() {
   return FALLBACK;
 }
 
-// The region when none was chosen in Settings: the session's LANG (the user's, else the computer's), so
-// a computer set up for lt_LT shows its 24-hour clock without a visit to Settings, and so does the
-// login screen, which only has the computer's (#45).
-function envRegion() {
-  try { return regionFromEnv(lord.locale.get()); } catch (e) { return ''; }
+// The region when none was chosen in Settings: the session's LANG (the user's, else the computer's when it
+// is of the interface's language), so a computer set up for lt_LT shows its 24-hour clock without a visit
+// to Settings, and so does the login screen, which only has the computer's (#45). Debian's usual
+// en_US.UTF-8 doesn't turn a Spanish desktop's clock to AM/PM.
+let envLocale = null;
+function envRegion(lang) {
+  try { envLocale = envLocale || lord.locale.get(); return regionFromEnv(envLocale, lang); } catch (e) { return ''; }
 }
-const ENV_REGION = envRegion();
 
-export const locale = createStore({ lang: initial(), region: settings.get().region || ENV_REGION });
+const LANG0 = initial();
+export const locale = createStore({ lang: LANG0, region: settings.get().region || envRegion(LANG0) });
 
 // The server picks the CJK font according to the language (the same ideograph is drawn differently in
 // Chinese, Japanese and Korean) and, if the language is right-to-left (meta.json "direction": "rtl"),
@@ -141,8 +143,8 @@ export const textDirection = (s) => { try { return lord.text.direction(String(s 
 settings.subscribe(() => {
   const s = settings.get();
   const cur = locale.get();
-  if ((s.language && s.language !== cur.lang) || (s.region || ENV_REGION) !== cur.region)
-    locale.set({ lang: s.language || cur.lang, region: s.region || ENV_REGION });
+  const lang = s.language || cur.lang, region = s.region || envRegion(lang);
+  if (lang !== cur.lang || region !== cur.region) locale.set({ lang, region });
 });
 
 function lookup(lang, key) {

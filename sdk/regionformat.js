@@ -49,10 +49,16 @@ export function fromGlibc(g) {
 
 // The region a session runs in when none was chosen in Settings: the user's LC_TIME or LANG
 // (~/.config/locale.conf, which the installer and the first run write), else the computer's
-// (/etc/default/locale; the login screen has only that one). '' when it names no country (C.UTF-8).
+// (/etc/default/locale; the login screen has only that one) when it is of the interface's language
+// (lang; any when not given): Debian's en_US.UTF-8 is not a choice made for a Spanish desktop.
+// '' when it names no country (C.UTF-8).
 //   regionFromEnv({ user: {}, system: { LANG: 'lt_LT.UTF-8' } }) → 'lt_LT'
-export function regionFromEnv(env) {
+//   regionFromEnv({ user: {}, system: { LANG: 'en_US.UTF-8' } }, 'es') → ''
+export function regionFromEnv(env, lang) {
   const u = (env && env.user) || {}, s = (env && env.system) || {};
-  const r = regionOf(u.LC_TIME || u.LANG || s.LANG || '');
-  return regionCountry(r) ? r : '';
+  const mine = regionOf(u.LC_TIME || u.LANG || '');
+  if (regionCountry(mine)) return mine;
+  const sys = regionOf(s.LANG || '');
+  if (!regionCountry(sys)) return '';
+  return !lang || sys.split('_')[0] === String(lang).split(/[-_]/)[0] ? sys : '';
 }
