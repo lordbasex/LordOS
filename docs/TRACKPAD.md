@@ -234,10 +234,11 @@ live: `sdk/trackpad.js` calls `lord.input.configure`. Since 0.8.8.4 it has one s
 | Setting (key) | Default |
 |---|---|
 | Pointer size (`pointerSize`: 0.75 Small, 1 Default, 1.25 Large, 1.5 Larger, 2 Largest) | 1 |
-| Shake pointer to locate (`shakeToLocate`): four quick left-right strokes of 60 px or more within 0.9 s grow the cursor toward 200 % (the largest the cursor plane takes) in 120 ms; it holds 0.5 s after the last turn and shrinks back in 0.3 s (`server/src/shake.c`, `build/shake-test`) | on |
+| Shake pointer to locate (`shakeToLocate`): four quick left-right strokes of 60 px or more within 0.9 s grow the cursor toward 200 % (toward 300 % when it is already 200 % or larger) in 120 ms; it holds 0.5 s after the last turn and shrinks back in 0.3 s (`server/src/shake.c`, `build/shake-test`) | on |
 
 The size multiplies the display's scale (a 200 % display with Small draws the 150 % pointer, 48 px) and is capped at
-64 px, the cursor plane. It applies to LordOS's own pointers (`cursor.c`, also the shapes Linux apps ask for with
+300 %, 96 px (0.8.8.6, #47; it was 200 %, 64 px). A pointer larger than the GPU's cursor plane is drawn in the
+composition instead (docs/GPU.md). It applies to LordOS's own pointers (`cursor.c`, also the shapes Linux apps ask for with
 `cursor-shape-v1`) and sets `XCURSOR_SIZE` (24 × size) for Linux apps started afterwards; apps that draw their own
 pointer image and are already open keep theirs.
 

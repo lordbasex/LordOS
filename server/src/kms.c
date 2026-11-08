@@ -568,6 +568,10 @@ int kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int 
     return k->cursor_ok ? 0 : -1;
 }
 
+int kms_cursor_fits(const Kms *k, int w, int h) {
+    return k->cursor_handle && w > 0 && h > 0 && (uint32_t)w <= k->cursor_w && (uint32_t)h <= k->cursor_h;
+}
+
 void kms_cursor_move(Kms *k, int x, int y) {
     if (!k->cursor_ok || !k->cursor_visible) return;
     struct drm_mode_cursor c = { .flags = DRM_MODE_CURSOR_MOVE, .crtc_id = k->crtc_id, .x = x, .y = y };

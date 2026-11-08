@@ -667,6 +667,14 @@ build/term-capture-test: tests/term_capture_test.c src/term/tcapture.c src/term/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_capture_test.c src/term/tcapture.c
 	./$@ || { rm -f $@; exit 1; }
 
+# the pointer's size at each display scale, the size setting and shake to find it (src/cursor.c)
+test: build/cursor-test
+build/cursor-test: tests/cursor_test.c src/cursor.c src/cursor.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/cursor_test.c src/cursor.c -lm
+	./$@ || { rm -f $@; exit 1; }
+
 build/shake-test: tests/shake_test.c src/shake.c src/shake.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/shake_test.c src/shake.c -lm
 	./$@ || { rm -f $@; exit 1; }

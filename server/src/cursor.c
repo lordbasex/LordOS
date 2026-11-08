@@ -1,6 +1,6 @@
 /* cursor.c — our own cursors: each shape is a union of signed-distance primitives
  * (polygons, capsules, rings) in a 32×32-unit space; rasterized with 4×4 samples
- * per pixel at 1x (32 px) or 2x (64 px, what fits in the KMS cursor plane). Black fill,
+ * per pixel at 32 px × the display scale (32 px at 100 % to 96 px at 300 %). Black fill,
  * white outline and a soft shadow. No system theme is read. */
 #include "cursor.h"
 
@@ -181,10 +181,10 @@ static void build(int shape, Shape *s) {
 
 /* ---- rasterization ---- */
 
-static CursorImage cache[6][CUR_COUNT];       /* 75, 100, 125, 150, 175 and 200 % */
+static CursorImage cache[(CURSOR_PCT_MAX - 75) / 25 + 1][CUR_COUNT];   /* 75 % to 300 %, in 25 % steps */
 static int size_pct = 100;
 static unsigned size_serial;
-static int boost_8ths;                          /* shake to find it (shake.c): 0..8, toward 200 % */
+static int boost_8ths;                          /* shake to find it (shake.c): 0..8, toward cursor_shake_target */
 static int shake_on = 1;
 
 int cursor_set_size(int pct) {
@@ -210,13 +210,16 @@ void cursor_set_shake(int on) { shake_on = on != 0; if (!shake_on) cursor_set_bo
 int cursor_shake(void) { return shake_on; }
 unsigned cursor_size_serial(void) { return size_serial; }
 
+/* Shaken, the pointer grows to 200 % (64 px); one already that large or larger grows to the largest. */
+static int cursor_shake_target(int pct) { return pct < 200 ? 200 : CURSOR_PCT_MAX; }
+
 int cursor_effective_pct(int pct) {
     if (pct < 100) pct = 100;
-    if (pct > 200) pct = 200;
+    if (pct > CURSOR_PCT_MAX) pct = CURSOR_PCT_MAX;
     pct = pct * size_pct / 100;
     if (pct < 75) pct = 75;
-    if (pct > 200) pct = 200;
-    pct += (200 - pct) * boost_8ths / 8;        /* while shaken: up to the largest the plane takes */
+    if (pct > CURSOR_PCT_MAX) pct = CURSOR_PCT_MAX;
+    pct += (cursor_shake_target(pct) - pct) * boost_8ths / 8;
     return (pct + 12) / 25 * 25;
 }
 

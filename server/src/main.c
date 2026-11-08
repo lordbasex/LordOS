@@ -213,9 +213,10 @@ typedef struct {
     /* pointer: raw motion (relative-pointer) and last position (lock) */
     double rdx, rdy;
     int lx, ly;
-    /* cursor: the app's (wl_cursor) and whether it goes on the KMS cursor plane (GPU path) */
+    /* cursor: the app's (wl_cursor) and whether it goes on the KMS cursor plane (GPU path): hw_cursor_ok
+     * when the planes work, hw_cursor while the cursor is on them (not when its image is larger) */
     unsigned cursor_gen;
-    int cursor_mode, cursor_hx, cursor_hy, hw_cursor;
+    int cursor_mode, cursor_hx, cursor_hy, hw_cursor, hw_cursor_ok;
     GpuTex *cursor_tex;
     int cursor_tex_w, cursor_tex_h;
     /* session without a monitor (lord-sessiond shows it on the monitor or the remote desktop): it is
@@ -779,7 +780,7 @@ static void cpu_takeover(Server *s) {
         if (o->gdrag_on) o->full = 1;               /* the scene's GPU drag rectangle is stale */
         o->gdrag_on = o->gdragtaken = 0;
     }
-    s->hw_cursor = 0;
+    s->hw_cursor = s->hw_cursor_ok = 0;
 }
 
 static void out_free(Out *o) {
@@ -1071,7 +1072,7 @@ static void display_detach(void) {
         o->kms.fd = -1;
         o->gpu = -1;
     }
-    s->hw_cursor = 0;
+    s->hw_cursor = s->hw_cursor_ok = 0;
     s->gpu_paused = 0;
     s->headless = 1;
     display_detached();
@@ -1445,9 +1446,27 @@ static void update_cursor(Server *s) {
     s->cursor_gen = gen;
     s->cursor_mode = mode;
     static uint32_t arrow[64 * 64];
-    if (mode != 1 || w > 64 || h > 64) { arrow_argb(arrow, 64, 64); px = arrow; w = h = 64; hx = hy = 0; }
+    if (mode != 1 || w > 256 || h > 256) { arrow_argb(arrow, 64, 64); px = arrow; w = h = 64; hx = hy = 0; }
     s->cursor_hx = hx;
     s->cursor_hy = hy;
+    /* an image larger than a display's cursor plane (a 300 % display's 96 px pointer on a 64 px plane) is
+     * drawn in the composition instead; hidden, it stays where it was */
+    if (s->hw_cursor_ok && mode != 2) {
+        int fits = 1;
+        for (int i = 0; i < OUT_MAX; i++)
+            if (s->out[i].on && s->out[i].gpu >= 0 && !kms_cursor_fits(&s->out[i].kms, w, h)) fits = 0;
+        if (fits != s->hw_cursor) {
+            if (!fits) {
+                for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0) kms_cursor_show(&s->out[i].kms, 0);
+                static int said;
+                if (said++ < 3)
+                    fprintf(stderr, "gpu: a %dx%d pointer is larger than the cursor plane (%ux%u): drawn in the composition\n", w, h,
+                            K0(s)->cursor_w, K0(s)->cursor_h);
+            }
+            s->hw_cursor = fits;
+            s->cursor_dirty = 1;                /* the next frame draws it, or leaves it out */
+        }
+    }
     if (s->hw_cursor) {
         if (mode != 2)
             for (int i = 0; i < OUT_MAX; i++)
@@ -1472,6 +1491,7 @@ static int gpu_start(Server *s) {
     s->hw_cursor = getenv("LORD_SW_CURSOR") == NULL;
     for (int i = 0; i < OUT_MAX && s->hw_cursor; i++)
         if (s->out[i].on && s->out[i].gpu >= 0 && kms_cursor_image(&s->out[i].kms, arrow, 64, 64, 0, 0)) s->hw_cursor = 0;
+    s->hw_cursor_ok = s->hw_cursor;
     hw_cursor_move(s);
     s->cursor_gen = 0;
     s->cursor_mode = -1;

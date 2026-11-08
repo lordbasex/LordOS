@@ -123,6 +123,9 @@ milliseconds no longer turns 60 frames a second into 57.
   128×128: a squashed arrow with colored stripes under it. The same picture came from a FirePro
   W6150M (Bonaire, Sea Islands) on the radeon driver (#57), which also gives 128 from Sea Islands on;
   not yet confirmed on that card. The log gives the size: `gpu: cursor by hardware (cursor plane, 128x128)`.
+  A pointer larger than the plane (96 px at a 300 % display on a 64 px plane, or a Linux app's large cursor) is
+  drawn as the quad while it lasts, and goes back to the plane when it fits again (`update_cursor`, 0.8.8.6, #47):
+  `gpu: a 96x96 pointer is larger than the cursor plane (64x64): drawn in the composition`.
 
 ## The dragged window on the GPU ("GPU drag", 0.8.6)
 

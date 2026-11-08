@@ -24,21 +24,24 @@ typedef struct {
 const CursorImage *cursor_image(int shape, int scale);
 /* Cursor scale for a W×H screen (2 on 4K/HiDPI). */
 int cursor_scale_for(int W, int H);
-/* The same at a display's scale in percent (100–300; drawn at most at 200 %, the cursor plane), times the
- * pointer size setting. */
+/* The largest scale a pointer is drawn at: 300 % (96 px), the largest display scale (outputs.h). An image
+ * larger than a display's cursor plane is drawn in the composition instead (main.c, update_cursor). */
+#define CURSOR_PCT_MAX 300
+/* The same at a display's scale in percent (100–300), times the pointer size setting. */
 const CursorImage *cursor_image_pct(int shape, int pct);
 /* Pointer size (Settings → Mouse & Trackpad) in percent of the display's: 75–200, 100 = as the
- * display. The result is capped at 200 % (64 px, the cursor plane). Returns 1 if it changed. */
+ * display. The result is capped at CURSOR_PCT_MAX. Returns 1 if it changed. */
 int cursor_set_size(int pct);
 int cursor_size(void);
-/* Shake to find it (shake.h): level 0..1 grows the cursor toward 200 % (in eighths); 1 if it changed.
+/* Shake to find it (shake.h): level 0..1 grows the cursor toward 200 %, or toward CURSOR_PCT_MAX when it is
+ * already 200 % or larger (in eighths); 1 if it changed.
  * cursor_set_shake turns the gesture on or off (Settings → Mouse & Trackpad, on by default). */
 int cursor_set_boost(double level);
 void cursor_set_shake(int on);
 int cursor_shake(void);
 /* Changes each time the size changes (to redraw the cursor). */
 unsigned cursor_size_serial(void);
-/* The scale (percent, a multiple of 25 in 75–200) a display at pct gets with the size setting. */
+/* The scale (percent, a multiple of 25 in 75–CURSOR_PCT_MAX) a display at pct gets with the size setting. */
 int cursor_effective_pct(int pct);
 /* xdg_toplevel.resize edges (1 top, 2 bottom, 4 left, 8 right) → shape. */
 int cursor_for_edges(int edges);

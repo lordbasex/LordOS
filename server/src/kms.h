@@ -80,8 +80,11 @@ int  kms_flip_fb(Kms *k, uint32_t fb, void *data);
  * DRM_FORMAT_MOD_INVALID (implicit) counts as linear. */
 int  kms_scanout_ok(const Kms *k, uint32_t fourcc, uint64_t modifier);
 
-/* Hardware cursor: ARGB image (up to 64×64, in a plane of the driver's cursor size) and position. 0 if the driver supports it. */
+/* Hardware cursor: ARGB image (at most the plane, the driver's cursor size: 64×64 to 256×256) and position.
+ * 0 if the driver supports it. */
 int  kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int hot_y);
+/* 1 if a w×h image fits this display's cursor plane (made by the first kms_cursor_image). */
+int  kms_cursor_fits(const Kms *k, int w, int h);
 void kms_cursor_move(Kms *k, int x, int y);
 void kms_cursor_show(Kms *k, int visible);
 
