@@ -10,6 +10,9 @@
 //   joinPhrases(clips, rate)         → an ArrayBuffer: a WAV of the clips, GAP_MS of silence between, MAX_MS at most
 //   phraseDone(state, level, nowMs)  → the recording of a phrase can stop: speech was heard, then quiet for END_QUIET_MS
 //                                      (level: lord-media's live level, 0..1); state is kept by the caller
+//   roomCheck(samples)               → { quiet, db }: the room check's verdict and the noise it heard (dBFS, rounded)
+//   takeName(kind, nowMs, n)         → a new file name for one recording: lord-media never writes over a file, so a
+//                                      take that reused a name (the room checked again, a phrase read again) would fail
 
 export const QUIET_DB = -45;          // a quiet room; above it the voice copies the noise too
 export const SPEECH_DB = -38;         // a 20 ms frame louder than this is speech
@@ -52,6 +55,17 @@ export function levelDb(samples) {
 }
 
 export const quietEnough = (samples) => levelDb(samples) < QUIET_DB;
+
+export function roomCheck(samples) {
+  const db = levelDb(samples);
+  return { quiet: db < QUIET_DB, db: Math.round(db) };
+}
+
+export function takeName(kind, now, n) {
+  const k = String(kind || 'take').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'take';
+  const t = Math.max(0, Math.floor(Number(now) || 0)).toString(36);
+  return `personal-${k}-${t}-${Math.max(0, Math.floor(Number(n) || 0))}.wav`;
+}
 
 export function trimSilence(samples, rate) {
   const hop = Math.max(1, Math.floor(rate * 0.02));

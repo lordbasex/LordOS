@@ -17,7 +17,7 @@ export { ContextMenu } from './contextmenu.jsx';
 export { liveSpeech } from './livespeech.jsx';
 export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS, previewVoice, tryVoice } from './voice.js';
 export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';
-export { parseWav, levelDb, quietEnough, trimSilence, joinPhrases, phraseDone } from './voicerecmodel.js';
+export { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinPhrases, phraseDone } from './voicerecmodel.js';
 export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';

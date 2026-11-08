@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../sdk/voicerecmodel.js'));
-const { parseWav, levelDb, quietEnough, trimSilence, joinPhrases, phraseDone, MAX_MS, END_QUIET_MS } = M;
+const { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinPhrases, phraseDone, MAX_MS, END_QUIET_MS, QUIET_DB } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => { n++; const g = JSON.stringify(got), w = JSON.stringify(want); if (g !== w) { bad++; console.log(`✗ ${name}: want ${w}, got ${g}`); } };
@@ -60,6 +60,24 @@ ok('a short pause: go on', !phraseDone(s, 0.01, 2000) && !phraseDone(s, 0.01, 20
 ok('quiet long enough after speech: done', phraseDone(s, 0.01, 2000 + END_QUIET_MS));
 const s2 = { start: 0 };
 ok('nothing said: never done by itself', !phraseDone(s2, 0.001, 500) && !phraseDone(s2, 0.001, 9000));
+
+// the room check: its verdict agrees with quietEnough and says how loud the room was
+const hum = noise(3000, 0.05);
+const hush = noise(3000, 0.001);
+eq('room: noisy', roomCheck(hum).quiet, false);
+ok('room: the noise in dB, rounded, above the limit', Number.isInteger(roomCheck(hum).db) && roomCheck(hum).db >= QUIET_DB);
+eq('room: quiet', roomCheck(hush).quiet, true);
+eq('room: agrees with quietEnough', [roomCheck(hum).quiet, roomCheck(hush).quiet], [quietEnough(hum), quietEnough(hush)]);
+eq('room: nothing recorded is silence', roomCheck(new Int16Array(0)), { quiet: true, db: -120 });
+
+// every take gets its own file: checking the room again, or reading a phrase again, must not reuse a name
+// (lord-media refuses to write over a file, and the retry used to fail with no sign)
+const names = new Set();
+for (let k = 1; k <= 20; k++) names.add(takeName('room', 1_700_000_000_000, k));
+eq('takes in one session: all different', names.size, 20);
+ok('takes in different sessions: different', takeName('room', 1_700_000_000_000, 1) !== takeName('room', 1_700_000_000_001, 1));
+ok('take names stay a plain file name', /^personal-[a-z0-9]+-[a-z0-9]+-\d+\.wav$/.test(takeName('../x/Phrase 3', 5, 2)));
+eq('take name shape', takeName('free', 36, 7), 'personal-free-10-7.wav');
 
 console.log(`voicerec_model_test: ${n - bad}/${n}`);
 process.exit(bad ? 1 : 0);

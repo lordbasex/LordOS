@@ -7,7 +7,7 @@ import {
   View, Text, Button, Toggle, Segmented, TextInput, Layer, FilePicker, useTheme, useLocale, useSettings, useStore, useAppWindow,
   wm, media, formatBytes, spacing, typeScale, VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer,
   VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices,
-  packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName, fs,
+  packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName, takeName, errorText, fs,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note } from './ui.jsx';
@@ -184,7 +184,6 @@ function CloneSheet({ onClose }) {
   const [picking, setPicking] = useState(true);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const outPath = `${fs.home()}/${CACHE}/clone.wav`;
   useEffect(() => { for (const d of ['.cache', '.cache/lordos', CACHE]) { try { fs.mkdir(d); } catch (e) { /* there */ } } }, []);
 
   // any audio file → a WAV of its first 30 s (lord-media, sandboxed), checked for length
@@ -195,8 +194,12 @@ function CloneSheet({ onClose }) {
       const info = await media.probe(path).catch(() => null);
       const ms = info && Number.isFinite(info.duration) && info.duration > 0 ? info.duration : null;   // milliseconds (lm_image.c)
       if (ms !== null && ms < MIN_MS) throw new Error(tr('settings.ai.clone.tooShort'));
-      await media.transcode('settings', path, outPath, { format: 'wav', from: 0, to: MAX_MS });
-      setWav(outPath);
+      // a new name each time: lord-media never writes over a file, and a fixed one made the second try fail (and keep
+      // the first clip)
+      const out = `${fs.home()}/${CACHE}/${takeName('clone', Date.now(), 0)}`;
+      const r = await media.transcode('settings', path, out, { format: 'wav', from: 0, to: MAX_MS });
+      if (!r || !r.ok) throw new Error(r && r.error ? errorText(r.error) : tr('settings.ai.clone.failed'));
+      setWav(out);
     } catch (e) { setErr(e.message || tr('settings.ai.clone.failed')); }
     setBusy(false);
   };

@@ -4,7 +4,7 @@
 //
 //   intro   what it is, a quiet room, it stays on this computer; the consent (Kyutai's terms) before anything else;
 //           and how: reading six phrases, or speaking freely (for anyone reading aloud is hard for: dyslexia, ADHD…)
-//   room    3 s of the room: too noisy says so (the voice would copy the noise)
+//   room    3 s of the room: too noisy says so (the voice would copy the noise), with "Try again" right there
 //   phrase  each phrase in large type, the level as the player's colored bars; it stops by itself when the phrase
 //           was read (voicerecmodel.js phraseDone) and goes on; any phrase can be read again
 //   free    15 to 30 s about anything (a few ideas shown), a time bar; done when the person says so after 15 s, or at 30
@@ -12,10 +12,13 @@
 //   done    try it; it is the voice in use for the language
 //
 // Recordings go to ~/.cache/lordos/voice (lord-media, the microphone permission) and are read back here; only the
-// joined WAV is kept, in ~/.local/share/lordos/voice/voices, never uploaded.
+// joined WAV is kept, in ~/.local/share/lordos/voice/voices, never uploaded. lord-media never writes over a file, so
+// every take has its own name (takeName); once read, or let go, what it heard is wiped. Every way out of a recording
+// (done, too noisy, a silent microphone, Cancel, closing the sheet, an error) goes through release(): the microphone
+// is let go and the sheet is as it was, so trying again works as the first time did.
 import {
   View, Text, Button, Toggle, TextInput, Layer, useTheme, useLocale, useAppWindow, wm, media, usePlayer, spacing, typeScale, fs,
-  addOwnVoice, ownVoiceName, tryVoice, parseWav, levelDb, quietEnough, trimSilence, joinPhrases, phraseDone,
+  addOwnVoice, ownVoiceName, tryVoice, parseWav, roomCheck, takeName, trimSilence, joinPhrases, phraseDone, errorText,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -43,6 +46,22 @@ function Meter({ levels }) {
   );
 }
 
+// a take nobody needs any more: emptied (fs has no delete; the name is never used again)
+function wipe(file) {
+  try { fs.stat(file); fs.write(file, ''); } catch (e) { /* never written */ }
+}
+
+// let a recording go: lord-media finishes the file it was writing ("done" or "closed" follows), then it's wiped
+const LET_GO_MS = 5000;
+function discard(id, file) {
+  media.close(id);
+  let off = null;
+  const end = () => { if (!off) return; off(); off = null; wipe(file); };
+  off = media.on(id, (type) => { if (type === 'done' || type === 'closed') end(); });
+  setTimeout(end, LET_GO_MS);       // a recording that had not started yet sends nothing more
+  wipe(file);
+}
+
 const Dots = ({ n, at, th }) => (
   <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
     {Array.from({ length: n }, (_, i) => (
@@ -61,6 +80,7 @@ export function PersonalVoiceSheet({ lang, onClose }) {
   const [rec, setRec] = useState(0);
   const [levels, setLevels] = useState([]);
   const [warn, setWarn] = useState(null);
+  const [noisy, setNoisy] = useState(null);       // the room check heard this much noise (dB)
   const [name, setName] = useState('');
   const [made, setMade] = useState(null);
   const [how, setHow] = useState('read');         // 'read' (phrases) | 'free'
@@ -68,29 +88,42 @@ export function PersonalVoiceSheet({ lang, onClose }) {
   const clips = useRef([]);                 // Int16Array per phrase
   const rate = useRef(48000);
   const listen = useRef(null);              // phraseDone's state
-  const what = useRef(null);                // 'room' | 'phrase' | 'free' while recording
+  const what = useRef(null);                // { kind: 'room' | 'phrase' | 'free', id, file } while recording
   const watchdog = useRef(0);
   const heard = useRef(false);              // the recording has sent anything yet
+  const takes = useRef(0);
+  const alive = useRef(true);               // the sheet is still open
   const home = fs.home();
-  const path = (n) => `${home}/${CACHE}/personal-${n}.wav`;
   useEffect(() => { for (const d of ['.cache', '.cache/lordos', CACHE]) { try { fs.mkdir(d); } catch (e) { /* there */ } } }, []);
-  useEffect(() => () => { if (rec) media.close(rec); }, [rec]);
-  useEffect(() => () => clearTimeout(watchdog.current), []);
 
-  const start = async (kind, file) => {
+  // the recording in progress, if any, is let go (the microphone with it) and forgotten
+  const release = () => {
+    clearTimeout(watchdog.current);
+    const w = what.current;
+    what.current = null;
+    if (w) discard(w.id, w.file);
+  };
+  useEffect(() => () => { alive.current = false; release(); }, []);
+
+  const start = async (kind) => {
+    release();
+    setRec(0);
     setWarn(null);
+    setNoisy(null);
     setLevels([]);
-    what.current = { kind, file };
+    const file = `${home}/${CACHE}/${takeName(kind, Date.now(), ++takes.current)}`;
+    let id = null, err = null;
+    try { id = await media.audioRecord('settings', file, { appName: tr('settings.section.ai') }); } catch (e) { err = e; }
+    if (!alive.current) { if (id) discard(id, file); return; }        // closed while the permission was asked
+    if (!id) { setWarn(err ? errorText(err) : tr('settings.ai.clone.denied')); return; }
+    what.current = { kind, id, file };
     listen.current = { start: Date.now() };
-    const id = await media.audioRecord('settings', file, { appName: tr('settings.section.ai') });
-    if (!id) { setWarn(tr('settings.ai.clone.denied')); what.current = null; return; }
+    heard.current = false;
     setRec(id);
     // a microphone that sends nothing (none plugged in, muted, taken by another app): say so instead of waiting
-    clearTimeout(watchdog.current);
     watchdog.current = setTimeout(() => {
-      if (what.current && !heard.current) { what.current = null; media.close(id); setRec(0); setWarn(tr('settings.ai.pv.noMic')); }
+      if (what.current && what.current.id === id && !heard.current) { release(); setRec(0); setWarn(tr('settings.ai.pv.noMic')); }
     }, SILENT_MIC_MS);
-    heard.current = false;
   };
 
   // live: the level; the room stops after 3 s, a phrase when it was read (or after 15 s)
@@ -99,7 +132,7 @@ export function PersonalVoiceSheet({ lang, onClose }) {
     if (rp.ms > 0) heard.current = true;
     setLevels((l) => [...l.slice(-40), rp.level || 0]);
     const w = what.current;
-    if (!w) return;
+    if (!w || w.id !== rec) return;
     const stop = w.kind === 'room' ? rp.ms >= ROOM_MS : w.kind === 'free' ? rp.ms >= FREE_MAX_MS
       : (rp.ms >= PHRASE_MAX_MS || phraseDone(listen.current, rp.level || 0, Date.now()));
     if (stop) media.stop(rec);
@@ -108,18 +141,21 @@ export function PersonalVoiceSheet({ lang, onClose }) {
   // the recording ended: read it back and judge it
   useEffect(() => {
     if (!rec || !(rp.state === 'done' || rp.closed)) return;
+    clearTimeout(watchdog.current);
     media.close(rec);
     setRec(0);
     const w = what.current;
+    if (!w || w.id !== rec) return;
     what.current = null;
-    if (!w) return;
     let wav = null;
     try { wav = parseWav(fs.read(w.file, { binary: true })); } catch (e) { wav = null; }
-    if (!wav) { setWarn(tr('settings.ai.pv.unreadable')); return; }
+    wipe(w.file);
+    if (!wav) { setWarn(rp.error ? errorText(rp.error) : tr('settings.ai.pv.unreadable')); return; }
     rate.current = wav.rate;
     if (w.kind === 'room') {
-      if (quietEnough(wav.samples)) setStep(how === 'free' ? 'free' : 'phrase');
-      else setWarn(tr('settings.ai.pv.noisy', { db: Math.round(levelDb(wav.samples)) }));
+      const room = roomCheck(wav.samples);
+      if (room.quiet) setStep(how === 'free' ? 'free' : 'phrase');
+      else setNoisy(room.db);
       return;
     }
     if (w.kind === 'free') {
@@ -147,7 +183,8 @@ export function PersonalVoiceSheet({ lang, onClose }) {
       setStep('done');
     } catch (e) { setWarn(e.message); }
   };
-  const close = (n) => { if (rec) media.close(rec); onClose(n); };
+  const close = (n) => { release(); setRec(0); onClose(n); };
+  const stopNow = () => { if (rec) media.stop(rec); };
 
   const g = wm.frame(wm.get(win.id) || {});
   const title = (k) => <Text style={{ fontSize: 17, fontWeight: 700, color: th.text, textAlign: 'center' }}>{tr(k)}</Text>;
@@ -188,21 +225,22 @@ export function PersonalVoiceSheet({ lang, onClose }) {
         <Text style={{ fontSize: typeScale.caption, color: th.textDim, lineHeight: 1.4 }}>{tr('settings.ai.clone.terms')}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
           <Button label={tr('settings.ai.clone.cancel')} onClick={() => close(null)} />
-          <Button primary label={tr('settings.ai.pv.begin')} disabled={!consent} onClick={() => { clips.current = []; setStep('room'); start('room', path('room')); }} />
+          <Button primary label={tr('settings.ai.pv.begin')} disabled={!consent} onClick={() => { clips.current = []; setPhrase(0); setStep('room'); start('room'); }} />
         </View>
       </>
     );
   } else if (step === 'room') {
     content = (
       <>
-        {title('settings.ai.pv.roomTitle')}
-        {body(recording ? 'settings.ai.pv.roomListening' : 'settings.ai.pv.roomHint')}
+        {title(noisy != null && !recording ? 'settings.ai.pv.noisyTitle' : 'settings.ai.pv.roomTitle')}
+        {noisy != null && !recording ? body('settings.ai.pv.noisy', { db: noisy })
+          : body(recording ? 'settings.ai.pv.roomListening' : 'settings.ai.pv.roomHint')}
         <Meter levels={levels} />
         {warn ? <Text style={{ fontSize: typeScale.callout, color: '#ff9f0a', textAlign: 'center', lineHeight: 1.4 }}>{warn}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
           <Button label={tr('settings.ai.clone.cancel')} onClick={() => close(null)} />
-          {warn && !recording ? <Button label={tr('settings.ai.pv.continueAnyway')} onClick={() => { setWarn(null); setStep(how === 'free' ? 'free' : 'phrase'); }} /> : null}
-          {!recording ? <Button primary label={tr('settings.ai.pv.roomAgain')} onClick={() => start('room', path('room'))} /> : null}
+          {noisy != null && !recording ? <Button label={tr('settings.ai.pv.continueAnyway')} onClick={() => { setNoisy(null); setWarn(null); setStep(how === 'free' ? 'free' : 'phrase'); }} /> : null}
+          {!recording ? <Button primary label={tr('settings.ai.pv.roomAgain')} onClick={() => start('room')} /> : null}
         </View>
       </>
     );
@@ -222,7 +260,7 @@ export function PersonalVoiceSheet({ lang, onClose }) {
           <View style={{ flexDirection: 'row', gap: spacing.s }}>
             <Button label={tr('settings.ai.clone.cancel')} onClick={() => close(null)} />
             <Button primary label={recording ? tr('settings.ai.clone.stop') : clips.current[phrase] ? tr('settings.ai.pv.readAgain') : tr('settings.ai.pv.read')}
-              onClick={() => (recording ? media.stop(rec) : start('phrase', path(phrase + 1)))} />
+              onClick={() => (recording ? stopNow() : start('phrase'))} />
           </View>
         </View>
       </>
@@ -249,7 +287,7 @@ export function PersonalVoiceSheet({ lang, onClose }) {
           <Button label={tr('settings.ai.clone.cancel')} onClick={() => close(null)} />
           <Button primary disabled={recording && !enough}
             label={recording ? tr('settings.ai.pv.freeDone') : tr('settings.ai.pv.freeStart')}
-            onClick={() => (recording ? media.stop(rec) : start('free', path('free')))} />
+            onClick={() => (recording ? stopNow() : start('free'))} />
         </View>
       </>
     );
