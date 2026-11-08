@@ -64,6 +64,9 @@ static void test_vmx(void) {
     CHECK(vmi_parse_vmx("hello\n", 6, &M, err, sizeof err) < 0);
     x = "config.version = \"8\"\nmemsize = \"1024\"\nencryption.keySafe = \"vmware:key/list/(pair/...)\"\n";
     CHECK(vmi_parse_vmx(x, strlen(x), &M, err, sizeof err) == 0 && M.encrypted);
+    /* a whole-machine encrypted .vmx (VMware Fusion with a TPM): only the name and the wrapped key are in the clear */
+    x = ".encoding = \"UTF-8\"\ndisplayName = \"Windows 11 x64\"\nencryptedVM.guid = \"\"\nencryption.keySafe = \"vmware:key/list/(pair/...)\"\nencryption.data = \"AAAA\"\n";
+    CHECK(vmi_parse_vmx(x, strlen(x), &M, err, sizeof err) == 0 && M.encrypted && !strcmp(M.name, "Windows 11 x64") && M.ndisk == 0);
     x = "config.version = \"8\"\nmemsize = \"1024\"\nguestOS = \"arm-windows11-64\"\n";
     CHECK(vmi_parse_vmx(x, strlen(x), &M, err, sizeof err) == 0 && M.arch == VM_ARCH_ARM64 && M.windows);
 }

@@ -255,7 +255,18 @@ int vmi_parse_vmx(const char *text, size_t len, VmiMachine *m, char *err, size_t
     VmxKV *kv;
     int n;
     if (vmx_lines(text, len, &kv, &n)) { free(kv); return fail(err, errlen, "the settings file has too many lines"); }
-    if (!vmx_get(kv, n, "config.version") && !vmx_get(kv, n, "virtualhw.version")) { free(kv); return fail(err, errlen, "not a .vmx settings file"); }
+    /* an encrypted machine keeps only its name and the wrapped key in the clear: it is a .vmx, and what blocks it is the encryption */
+    if (!vmx_get(kv, n, "config.version") && !vmx_get(kv, n, "virtualhw.version")) {
+        if (vmx_get(kv, n, "encryption.keysafe") || vmx_get(kv, n, "encryption.data")) {
+            const char *dn = vmx_get(kv, n, "displayname");
+            if (dn) snprintf(m->name, sizeof m->name, "%s", dn);
+            m->encrypted = 1;
+            free(kv);
+            return 0;
+        }
+        free(kv);
+        return fail(err, errlen, "not a .vmx settings file");
+    }
     copy(m->name, sizeof m->name, vmx_get(kv, n, "displayname"));
     guest_os(m, vmx_get(kv, n, "guestos"));
     const char *fw = vmx_get(kv, n, "firmware");

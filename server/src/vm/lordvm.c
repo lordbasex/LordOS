@@ -4692,7 +4692,7 @@ static int imp_detect(const char *src, Imp *I, int want_arch, char *why, size_t 
     if (m->saved_state) BLOCK(I, "saved-state", NULL);
     if (m->encrypted) BLOCK(I, "encrypted", NULL);
     if (m->more_disks) BLOCK(I, "too-many-disks", NULL);
-    if (!m->ndisk && !m->problem[0]) BLOCK(I, "no-disk", NULL);
+    if (!m->ndisk && !m->problem[0] && !m->encrypted) BLOCK(I, "no-disk", NULL);
     char rel0[PATH_MAX];
     snprintf(rel0, sizeof rel0, "%s", I->settings[0] ? I->settings : real);
     *strrchr(rel0, '/') = 0;
