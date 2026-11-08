@@ -557,6 +557,49 @@ const char *cloud_default_answer(const char *opt, const char *def) {
     return def ? def : "";
 }
 
+/* ---- browsing (7.3) ---- */
+
+int cloud_mount_opts(char *out, size_t n) {
+    /* LordOS decides what stays (7.2): no age or size limit, uploads 5 s after the last change. Durations in nanoseconds.
+     * DirCacheTime: a folder is listed from the provider once an hour at most while it is read (the default, 5 minutes,
+     * made Files wait for the provider on every visit after that); PollInterval: rclone's own default, written down
+     * because the long cache counts on it where the provider has change notifications. */
+    int r = snprintf(out, n, ",\"vfsOpt\":{\"CacheMode\":\"full\",\"CacheMaxAge\":3153600000000000000,\"CacheMaxSize\":-1,"
+                     "\"WriteBack\":5000000000,\"DirCacheTime\":%lld,\"PollInterval\":%lld},\"mountOpt\":{\"AllowNonEmpty\":false}",
+                     CLOUD_DIR_CACHE_S * 1000000000LL, CLOUD_POLL_S * 1000000000LL);
+    return r < 0 || (size_t)r >= n ? -1 : 0;
+}
+
+unsigned long long cloud_seen_key(const char *id, unsigned gen, const char *rel) {
+    unsigned long long h = 1469598103934665603ull;
+    for (const char *s = id ? id : ""; *s; s++) h = (h ^ (unsigned char)*s) * 1099511628211ull;
+    h = (h ^ 0xff) * 1099511628211ull;              /* a byte no name or path has: "a"+"b/c" isn't "ab"+"/c" */
+    for (int i = 0; i < 4; i++) h = (h ^ ((gen >> (8 * i)) & 0xff)) * 1099511628211ull;
+    for (const char *s = rel ? rel : ""; *s; s++) h = (h ^ (unsigned char)*s) * 1099511628211ull;
+    return h;
+}
+
+long long cloud_seen_at(const CloudSeen *s, unsigned long long key) {
+    for (int i = 0; i < s->n; i++) if (s->it[i].key == key) return s->it[i].at;
+    return -1;
+}
+
+void cloud_seen_put(CloudSeen *s, unsigned long long key, long long now) {
+    int old = 0;
+    for (int i = 0; i < s->n; i++) {
+        if (s->it[i].key == key) { s->it[i].at = now; return; }
+        if (s->it[i].at < s->it[old].at) old = i;
+    }
+    if (s->n < CLOUD_SEEN_MAX) old = s->n++;
+    s->it[old].key = key;
+    s->it[old].at = now;
+}
+
+int cloud_browse_due(long long seen, long long now, int polls, int kept) {
+    if (polls || kept || seen < 0) return 0;
+    return now - seen >= CLOUD_STALE_S * 1000LL;
+}
+
 /* ---- options ---- */
 
 int cloud_bw_rate(long up, long down, char *out, size_t n) {

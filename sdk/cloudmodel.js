@@ -28,6 +28,19 @@ export function mergeStatus(prev, answer, asked) {
   return next;
 }
 
+// The same statuses (st, pct, error and the hold's downAt of every path): Files keeps the one it has and draws nothing
+// again, as the state is pushed twice a second while anything moves (7.3)
+export function sameStatus(a, b) {
+  if (a === b) return true;
+  const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    const x = a[k], y = b[k];
+    if (!y || x.st !== y.st || x.pct !== y.pct || x.error !== y.error || x.downAt !== y.downAt) return false;
+  }
+  return true;
+}
+
 // Which of the visible paths to ask about: only those under a cloud account, at most `max` (the rows in sight).
 export function pathsToAsk(paths, accounts, max = 400) {
   return (paths || []).filter((p) => !!accountOf(p, accounts)).slice(0, max);

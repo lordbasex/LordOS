@@ -4,7 +4,7 @@
  *
  * One command per line on stdin, one line of JSON per command on stdout:
  *   lock | unlock (the keyring stand-in) | retry ID|all | state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
- *   keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
+ *   browse PATH | keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
  *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit */
 #include "../src/cloud/cloud.h"
 
@@ -106,6 +106,7 @@ int main(void) {
         } else if (!strcmp(cmd, "remove") && a1) { char *d = strtok(NULL, " "); out(cloud_remove(a1, d && !strcmp(d, "discard"))); }
         else if (!strcmp(cmd, "rename") && a1 && rest) out(cloud_rename(a1, rest));
         else if (!strcmp(cmd, "status") && a1) { const char *p[] = { a1 }; out(cloud_status(p, 1)); }
+        else if (!strcmp(cmd, "browse") && a1) { cloud_browse(a1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "free") && a1) { const char *p[] = { a1 }; out(cloud_free(p, 1)); }
         else if (!strcmp(cmd, "keep") && a1) { const char *p[] = { a1 }; cloud_keep(p, 1, 1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "unkeep") && a1) { const char *p[] = { a1 }; cloud_keep(p, 1, 0); out(strdup("{\"ok\":true}")); }

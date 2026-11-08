@@ -336,6 +336,14 @@ mocks (Files, FilesMenu, ShareLink, GetInfo, States); the code is `apps/files/cl
   state (at most twice a second). The list view adds a **Status** column at the end in an account's folders; the icon
   and gallery views put a badge at the icon's corner: in the cloud (cloud outline), coming down (ring with the part
   that arrived), on this computer (check in a circle), kept (filled check), going up (ring), needs attention ("!").
+  An answer with the same statuses keeps the one Files has, so the list isn't drawn again twice a second while anything
+  moves.
+- **Browsing** (issue #71, docs/CLOUD.md 7.3): a folder of an account is listed from rclone's listing, which the cloud
+  side keeps current: Files calls `cloud.browse(path)` when it opens the folder and once a minute while it shows it, and
+  lists it again when the account's `listed` goes up (the folder was listed again in the background) and on that minute.
+  It is not listed on the 4-second volumes tick that local folders get (each listing is a call to rclone per file, and
+  one that fell on an expired listing waited for the provider), and the status bar doesn't ask its free space (statfs
+  there makes rclone ask the provider; the account's own space is shown).
 - **Nothing comes down by itself**: a file only in the cloud (or whose status isn't known yet) gets its type icon, not
   a thumbnail, and the column view's and the gallery's preview don't read it. Opening it, Quick Preview and Get Info's
   folder size are explicit and bring it down. The file dialog shows no thumbnails inside an account either.

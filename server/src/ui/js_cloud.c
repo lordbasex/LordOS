@@ -194,6 +194,15 @@ static JSValue f_status(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return r;
 }
 
+/* a folder of an account Files shows (docs/CLOUD.md 7.3): nothing is waited for */
+static JSValue f_browse(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *p = arg(c, argc, argv, 0);
+    if (p) cloud_browse(p);
+    fr(c, p);
+    return JS_UNDEFINED;
+}
+
 static JSValue keep_(JSContext *c, int argc, JSValueConst *argv, int on) {
     const char **p;
     int n = argc ? paths_of(c, argv[0], &p) : -1;
@@ -343,6 +352,7 @@ static const JSCFunctionListEntry fns[] = {
     JS_CFUNC_DEF("retry", 1, f_retry),
     JS_CFUNC_DEF("websiteUrl", 1, f_website),
     JS_CFUNC_DEF("status", 1, f_status),
+    JS_CFUNC_DEF("browse", 1, f_browse),
     JS_CFUNC_DEF("keep", 1, f_keep),
     JS_CFUNC_DEF("unkeep", 1, f_unkeep),
     JS_CFUNC_DEF("free", 1, f_free),

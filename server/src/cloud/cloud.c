@@ -1169,6 +1169,12 @@ static void check_links(Acc *a) {
         /* nanoseconds; rclone's "not supported" is a huge number: modtimes then don't count */
         double pr = json_num(d.root, "Precision", 1e9);
         a->precision_s = pr >= 1e17 ? 0 : pr <= 1e9 ? 1 : (int)(pr / 1e9 + 0.5);
+        /* the provider tells rclone what changed (Google Drive, OneDrive, Dropbox, Box, pCloud…): listings stay
+         * current without listing again (7.3) */
+        int polls = json_bool(f, "ChangeNotify", 0);
+        pthread_mutex_lock(&cl_mu);
+        a->polls = polls;
+        pthread_mutex_unlock(&cl_mu);
     }
     if (d.root) json_free(&d);
 }
@@ -1207,13 +1213,15 @@ static int mount_acc(Acc *a) {
     jb_init(&b);
     jb_printf(&b, "{\"fs\":\"%s:\",\"mountPoint\":", a->id);
     jb_str(&b, dir);
-    /* LordOS decides what stays (7.2): no age or size limit, uploads 5 s after the last change */
-    jb_raw(&b, ",\"vfsOpt\":{\"CacheMode\":\"full\",\"CacheMaxAge\":3153600000000000000,\"CacheMaxSize\":-1,\"WriteBack\":5000000000},"
-               "\"mountOpt\":{\"AllowNonEmpty\":false}}");
+    /* what stays, uploads, and how long a listing is kept (cloud_mount_opts, 7.2 and 7.3) */
+    char o[320];
+    if (cloud_mount_opts(o, sizeof o)) b.oom = 1;
+    jb_raw(&b, o);
+    jb_raw(&b, "}");
     int st = b.oom ? -1 : rcs(RCM_MOUNT, b.p, msg, sizeof msg, RC_SHORT);
     jb_free(&b);
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; }
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; }
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
@@ -2424,6 +2432,7 @@ static char *state_json(int light) {
             if (a->measured_at) jb_printf(&b, "%s\"measuredAt\":%lld,\"measuredBytes\":%lld,\"measuredCount\":%lld", f2 ? "" : ",", a->measured_at, a->measured_bytes, a->measured_count);
             jb_raw(&b, "}");
         } else jb_raw(&b, ",\"about\":null");
+        jb_printf(&b, ",\"listed\":%u", a->listed);
         jb_printf(&b, ",\"cacheBytes\":%lld,\"keptBytes\":%lld,\"up\":{\"files\":%d,\"bytes\":%lld,\"done\":%lld", a->cache_bytes, a->kept_bytes, a->nq, ub, ud);
         if (un) { jb_raw(&b, ",\"name\":"); jb_str(&b, un); }
         jb_printf(&b, "},\"down\":{\"files\":%d,\"bytes\":%lld,\"done\":%lld", nd, db, light ? 0 : dd);
@@ -3161,6 +3170,7 @@ char *cloud_website(const char *id) {
 }
 
 char *cloud_status(const char *const *paths, int n) { return cf_status(paths, n); }
+void  cloud_browse(const char *path) { if (started) cf_browse(path); }
 char *cloud_free(const char *const *paths, int n) { return cf_free(paths, n); }
 
 void cloud_keep(const char *const *paths, int n, int keep) {

@@ -9,6 +9,7 @@
 //   cloud.remove(id, { discardPending }) → { ok } | { error: 'pending', files }
 //   cloud.rename(id, name) / refreshAbout(id) / websiteUrl(id)
 //   cloud.status(paths) → { [path]: { st, pct?, error? } }       cloud.keep(paths) / unkeep(paths)
+//   cloud.browse(path): a folder Files shows (7.3), nothing waited for
 //   cloud.free(paths) → { freed, skipped: [{ path, reason }] }
 //   cloud.link(path, expire) → Promise<{ url } | { error }>       cloud.unlink(path) → Promise<{ ok } | { error }>
 //   cloud.links(id) → [{ path, url, expires, made }]
@@ -88,6 +89,9 @@ export const cloud = {
   retry: (id = null) => has() && lord.cloud.retry(id == null ? undefined : String(id)),
   websiteUrl: (id) => (has() ? lord.cloud.websiteUrl(String(id)) : null),
   status: (p) => (has() ? lord.cloud.status(paths(p)) || {} : {}),
+  // a folder of an account that Files shows (docs/CLOUD.md 7.3): listed again in the background when it is old, its
+  // subfolders listed ahead; the account's `listed` goes up when the folder itself was listed again
+  browse: (path) => { if (has() && typeof lord.cloud.browse === 'function') lord.cloud.browse(String(path)); },
   keep: (p) => has() && lord.cloud.keep(paths(p)),
   unkeep: (p) => has() && lord.cloud.unkeep(paths(p)),
   free: (p) => (has() ? lord.cloud.free(paths(p)) : { freed: 0, skipped: [] }),

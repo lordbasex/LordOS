@@ -50,6 +50,9 @@ void  cloud_refresh_about(const char *id);                      /* also retries 
 void  cloud_retry(const char *id);                              /* accounts not connected try again; NULL: all */
 char *cloud_website(const char *id);                            /* the address, or NULL */
 char *cloud_status(const char *const *paths, int n);
+/* a folder of an account that Files shows (docs/CLOUD.md 7.3): listed again in the background when it is old, then its
+ * subfolders listed ahead; the account's "listed" in the state goes up when the folder itself was listed again */
+void  cloud_browse(const char *path);
 /* B10: path is a cloud file not on this computer whose account can't be reached now (offline, locked, not running,
  * not mounted): 1, and lord.fs.read fails at once instead of waiting for rclone */
 int   cloud_read_would_block(const char *path);

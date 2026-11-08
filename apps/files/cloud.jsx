@@ -22,7 +22,10 @@ export function useCloudFiles(paths) {
     if (!ask.length) { setStatus((s) => (Object.keys(s).length ? {} : s)); return; }
     const answer = cloud.status(ask);
     // a file that just came down isn't shown in the cloud again by a stale answer (U3)
-    setStatus((prev) => M.mergeStatusHeld(Object.fromEntries(Object.entries(prev).filter(([p]) => ask.includes(p))), answer, ask, Date.now()));
+    setStatus((prev) => {
+      const next = M.mergeStatusHeld(Object.fromEntries(Object.entries(prev).filter(([p]) => ask.includes(p))), answer, ask, Date.now());
+      return M.sameStatus(prev, next) ? prev : next;      // nothing changed: the list isn't drawn again
+    });
   }, [key, st]);
   return {
     accounts, st, status,

@@ -675,7 +675,52 @@ static void t_state(void) {
     if (system(cmd)) {}
 }
 
+/* 7.3: the mount keeps a listing an hour and polls changes; a folder shown is listed again only when old, on a provider
+ * without change notifications and outside a kept folder; the table of folders listed in this mount */
+static void t_browse(void) {
+    char o[400];
+    CHECK(!cloud_mount_opts(o, sizeof o) && o[0] == ',');
+    CHECK(strstr(o, "\"CacheMode\":\"full\"") && strstr(o, "\"CacheMaxSize\":-1") && strstr(o, "\"WriteBack\":5000000000"));
+    CHECK(strstr(o, "\"DirCacheTime\":3600000000000,") && strstr(o, "\"PollInterval\":60000000000}"));
+    CHECK(strstr(o, "\"mountOpt\":{\"AllowNonEmpty\":false}") && o[strlen(o) - 1] == '}');
+    char body[480];
+    snprintf(body, sizeof body, "{\"fs\":\"c0000001:\",\"mountPoint\":\"/h/Cloud/W\"%s}", o);
+    JDoc d;
+    CHECK(!json_parse(body, strlen(body), &d, NULL, 0) && d.root);
+    if (d.root) {
+        const JVal *v = json_get(d.root, "vfsOpt");
+        CHECK(v && json_num(v, "DirCacheTime", 0) == 3600e9 && json_num(v, "PollInterval", 0) == 60e9 && json_num(v, "CacheMaxAge", 0) > 3e18);
+        CHECK(json_get(d.root, "mountOpt") != NULL);
+        json_free(&d);
+    }
+    CHECK(cloud_mount_opts(o, 40) == -1);
+    /* the provider sends changes, or the keeper lists it, or Files just listed it: nothing; else after 5 minutes */
+    long long now = 10LL * 3600 * 1000;
+    CHECK(!cloud_browse_due(-1, now, 0, 0));
+    CHECK(!cloud_browse_due(now - 299 * 1000, now, 0, 0));
+    CHECK(cloud_browse_due(now - 300 * 1000, now, 0, 0));
+    CHECK(!cloud_browse_due(now - 3000 * 1000, now, 1, 0));
+    CHECK(!cloud_browse_due(now - 3000 * 1000, now, 0, 1));
+    /* keys: account, mount and folder all count, and their bounds */
+    unsigned long long k = cloud_seen_key("c1", 1, "a/b");
+    CHECK(k == cloud_seen_key("c1", 1, "a/b"));
+    CHECK(k != cloud_seen_key("c1", 2, "a/b") && k != cloud_seen_key("c2", 1, "a/b") && k != cloud_seen_key("c1", 1, "a/c"));
+    CHECK(cloud_seen_key("c1a", 1, "") != cloud_seen_key("c1", 1, "a") && cloud_seen_key(NULL, 0, NULL) == cloud_seen_key("", 0, ""));
+    static CloudSeen s;
+    memset(&s, 0, sizeof s);
+    CHECK(cloud_seen_at(&s, k) == -1);
+    cloud_seen_put(&s, k, 5);
+    CHECK(cloud_seen_at(&s, k) == 5 && s.n == 1);
+    cloud_seen_put(&s, k, 9);
+    CHECK(cloud_seen_at(&s, k) == 9 && s.n == 1);
+    /* full: the oldest goes, the rest stay */
+    for (int i = 0; i < CLOUD_SEEN_MAX + 10; i++) cloud_seen_put(&s, 1000 + (unsigned long long)i, 100 + i);
+    CHECK(s.n == CLOUD_SEEN_MAX && cloud_seen_at(&s, k) == -1 && cloud_seen_at(&s, 1000) == -1);
+    CHECK(cloud_seen_at(&s, 1000 + CLOUD_SEEN_MAX + 9) == 100 + CLOUD_SEEN_MAX + 9 && cloud_seen_at(&s, 1010) == 110);
+}
+
 int main(void) {
+    t_browse();
     t_methods();
     t_http();
     t_paths();

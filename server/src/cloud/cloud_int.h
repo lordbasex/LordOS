@@ -69,6 +69,11 @@ typedef struct {
     char srv_host[256];             /* the server it talks to, for the state: N4's "other accounts on this server" */
     int srv_port;
     int precision_s;                /* the backend's modtime precision, seconds (fsinfo) */
+    int polls;                      /* the backend has change notifications (fsinfo's ChangeNotify): rclone polls them */
+    unsigned mount_gen;             /* +1 at each mount: what rclone listed before is gone */
+    unsigned listed;                /* +1 when a folder Files shows was listed again in the background (7.3) */
+    unsigned tree_gen;              /* the keeper listed the kept folders whole in this mount… */
+    time_t tree_at;                 /* …at this time */
     int nchecked;
     unsigned long long tok_hash;    /* of the secrets last saved: a refreshed token changes it */
     char *pending_secret;           /* not saved yet (keyring locked): retried */
@@ -111,6 +116,7 @@ void  ct_forget(const Acc *a);
 /* cloud_files.c */
 void  cf_start(void);                                   /* the Keep on This Computer thread */
 void  cf_kick(void);                                    /* a kept folder changed, or 5 minutes went by */
+void  cf_browse(const char *path);                      /* a folder Files shows (7.3): the browser thread takes the last one */
 char *cf_status(const char *const *paths, int n);
 char *cf_free(const char *const *paths, int n);
 void  cf_measure(void);                                 /* cache and kept bytes of every account (thread) */

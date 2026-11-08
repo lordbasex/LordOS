@@ -251,6 +251,18 @@ export default function Files() {
       if (csKey.current === searchKey) setCs({ key: searchKey, busy: false, hits: (r && r.hits) || [], complete: !r || r.complete !== false, error: r && r.error });
     });
   }, [searchKey]);
+  // a folder of a cloud account (docs/CLOUD.md 7.3): listed from rclone's listing, which the cloud side keeps current in
+  // the background (cloud.browse), and listed again here when that one changed (the account's `listed`) or once a minute,
+  // not on the 4-second volumes tick that local folders get: every listing of a mount is a call to rclone per file, and
+  // one that falls on an expired folder waits for the provider
+  const listAcc = loc.type === 'dir' ? cloudModel.accountOf(loc.path, cloudSt && cloudSt.accounts) : null;
+  const [cloudTick, setCloudTick] = useState(0);
+  useEffect(() => {
+    if (!listAcc) return undefined;
+    cloud.browse(loc.path);
+    const id = setInterval(() => { cloud.browse(loc.path); setCloudTick((n) => n + 1); }, 60000);
+    return () => clearInterval(id);
+  }, [listAcc ? loc.path : null]);
   const [entries, error] = useMemo(() => {
     if (loc.type === 'network') {
       // the places this person is connected to first, then what was found (netplaces.js, issue #59)
@@ -263,7 +275,7 @@ export default function Files() {
     }
     if (searchAcc) return [cloudModel.searchEntries(cs && cs.hits), cs && cs.error ? errorText(cs.error) : null];
     try { return [loadEntries(loc, { hidden, launcherApps }), null]; } catch (e) { return [[], e.message]; }
-  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc,
+  }, [netState, listAcc ? null : volumes, listAcc ? listAcc.listed : 0, listAcc ? cloudTick : 0, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc,
     loc.type === 'network' ? prefs.pins : null, loc.type === 'network' ? !!prefs.netAllDevices : null, loc.type === 'network' ? cloudSt : null, loc.type === 'network' ? userSettings.cloudHidden : null]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
@@ -814,7 +826,8 @@ export default function Files() {
   // columns only in folders; elsewhere, the list
   const view = shownView;
   const entriesOf = (dir) => { try { return lord.fs.list(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
-  const freeSpace = useMemo(() => { try { return curDir && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
+  // not in a cloud account: its status bar tells its own space, and statfs there waits for the provider (rclone asks it)
+  const freeSpace = useMemo(() => { try { return curDir && !curAcc && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version, !!curAcc]);
   const quickEntry = quick ? (first || flat[0]) : null;
   const infoEntry = info ? (first || (curDir ? { name: fs.basename(curDir), path: curDir, dir: true, size: 0 } : null)) : null;
   const job = jobs[0];

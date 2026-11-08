@@ -260,6 +260,7 @@ export function installCloudMock(home, scenario = '') {
       }
       return out;
     },
+    browse: () => undefined,      // a folder Files shows: nothing to list again here
     keep(paths) {
       for (const p of paths) { const a = ofPath(p); if (a && !a.kept.includes(p)) { a.kept.push(p); status[p] = 'kept'; } }
       push();

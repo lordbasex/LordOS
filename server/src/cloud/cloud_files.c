@@ -499,28 +499,156 @@ static void *keeper(void *arg) {
         for (int i = 0; i < na; i++) {
             Snap s;
             if (snap(NULL, ids[i], &s)) continue;
+            /* the kept folders listed whole again (7.3): every pass where the provider sends no changes, else after each
+             * mount and every half hour, inside the hour a listing is kept */
+            int tree = 0;
+            pthread_mutex_lock(&cl_mu);
+            Acc *a = cl_find(s.id);
+            time_t now = time(NULL);
+            if (a && (!a->polls || a->tree_gen != a->mount_gen || now - a->tree_at >= CLOUD_TREE_POLL_S)) {
+                tree = 1;
+                a->tree_gen = a->mount_gen;
+                a->tree_at = now;
+            }
+            pthread_mutex_unlock(&cl_mu);
             for (int k = 0; k < s.nkeep && s.mounted && !s.paused; k++) {
+                if (!tree) { fetch_tree(&s, s.keep[k], 0); continue; }
                 JBuf b;
                 jb_init(&b);
-                jb_printf(&b, "{\"fs\":\"%s:\",\"recursive\":true", s.id);
-                if (s.keep[k][0]) {
-                    /* vfs/refresh takes folders: a kept file refreshes its folder */
-                    char dir[CLOUD_REL_MAX + 1];
-                    cl_pf(dir, sizeof dir, "%s", s.keep[k]);
+                /* vfs/refresh takes folders: a kept file refreshes its folder, alone (not what is under it). rclone takes
+                 * "recursive" as text only: a JSON true is refused ("value must be string"), and was until 0.8.8.6 */
+                char dir[CLOUD_REL_MAX + 1];
+                cl_pf(dir, sizeof dir, "%s", s.keep[k]);
+                int whole = 1;
+                if (dir[0]) {
                     char full[PATH_MAX * 2];
                     cl_pf(full, sizeof full, "%s/%s/%s", cl_root, s.name, s.keep[k]);
                     struct stat st;
-                    if (!stat(full, &st) && !S_ISDIR(st.st_mode)) { char *sl = strrchr(dir, '/'); if (sl) *sl = 0; else dir[0] = 0; }
-                    if (dir[0]) { jb_raw(&b, ",\"dir\":"); jb_str(&b, dir); }
+                    if (!stat(full, &st) && !S_ISDIR(st.st_mode)) { whole = 0; char *sl = strrchr(dir, '/'); if (sl) *sl = 0; else dir[0] = 0; }
                 }
+                jb_printf(&b, "{\"fs\":\"%s:\",\"recursive\":\"%s\"", s.id, whole ? "true" : "false");
+                if (dir[0]) { jb_raw(&b, ",\"dir\":"); jb_str(&b, dir); }
                 jb_raw(&b, "}");
-                if (!b.oom) cl_rc_simple(RCM_VFS_REFRESH, b.p, 60000);
+                /* a whole account can take minutes; rclone's walk doesn't hold the folders it lists (measured) */
+                if (!b.oom) cl_rc_simple(RCM_VFS_REFRESH, b.p, 600000);
                 jb_free(&b);
                 fetch_tree(&s, s.keep[k], 0);
             }
             snap_free(&s);
         }
         cf_measure();
+    }
+    return NULL;
+}
+
+/* ---- a folder Files shows (7.3): listed again off the interface's thread, its subfolders listed ahead ----
+ * rclone lists a folder from the provider the first time it is read and when its listing expired, and the reader waits.
+ * Files asks here instead (cloud.browse, on opening a folder of an account and every minute while it shows it): this
+ * thread lists the folder again when it is old (cloud_browse_due), then the subfolders never listed in this mount, so the
+ * next click doesn't wait. While rclone lists one folder again it holds that folder (measured), so a folder is never
+ * listed again just because it is shown: only once it is CLOUD_STALE_S old, on a provider that sends no changes. */
+
+static pthread_mutex_t bmu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t bcv = PTHREAD_COND_INITIALIZER;
+static char bwant[PATH_MAX];
+static unsigned bgen;
+static CloudSeen seen;              /* the browser thread's only */
+
+static long long ms_now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000; }
+
+void cf_browse(const char *path) {
+    if (!path || strlen(path) >= sizeof bwant) return;
+    pthread_mutex_lock(&bmu);
+    memcpy(bwant, path, strlen(path) + 1);
+    bgen++;
+    pthread_cond_signal(&bcv);
+    pthread_mutex_unlock(&bmu);
+}
+
+static int browse_moved(unsigned gen) {
+    pthread_mutex_lock(&bmu);
+    int r = bgen != gen;
+    pthread_mutex_unlock(&bmu);
+    return r;
+}
+
+/* the account of a folder, as it is now: 0 and its id, mount and what it is; -1 not mounted or not reachable */
+static int browse_acc(const char *name, const char *rel, char *id, unsigned *gen, int *polls, int *kept) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find_name(name);
+    int ok = a && cl_running && a->mounted && !a->locked && strcmp(a->err, "cloud.offline") && strcmp(a->err, "cloud.unreachable");
+    if (ok) {
+        cl_pf(id, 16, "%s", a->id);
+        *gen = a->mount_gen;
+        *polls = a->polls;
+        *kept = cloud_kept((const char *const *)a->keep, a->nkeep, rel);
+    }
+    pthread_mutex_unlock(&cl_mu);
+    return ok ? 0 : -1;
+}
+
+static int refresh_dir(const char *id, const char *rel) {
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"fs\":\"%s:\"", id);
+    if (rel[0]) { jb_raw(&b, ",\"dir\":"); jb_str(&b, rel); }
+    jb_raw(&b, "}");
+    int st = b.oom ? -1 : cl_rc_simple(RCM_VFS_REFRESH, b.p, 60000);
+    jb_free(&b);
+    return st;
+}
+
+static void *browser(void *arg) {
+    (void)arg;
+    setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 10);
+    unsigned done = 0;
+    for (;;) {
+        char path[PATH_MAX], name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1], id[16];
+        pthread_mutex_lock(&bmu);
+        while (bgen == done) pthread_cond_wait(&bcv, &bmu);
+        done = bgen;
+        memcpy(path, bwant, sizeof path);
+        pthread_mutex_unlock(&bmu);
+        unsigned gen;
+        int polls, kept;
+        if (cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel) || browse_acc(name, rel, id, &gen, &polls, &kept)) continue;
+        unsigned long long key = cloud_seen_key(id, gen, rel);
+        long long at = cloud_seen_at(&seen, key);
+        if (cloud_browse_due(at, ms_now(), polls, kept)) {
+            if (refresh_dir(id, rel) == 200) {
+                pthread_mutex_lock(&cl_mu);
+                Acc *a = cl_find(id);
+                if (a && a->mount_gen == gen) a->listed++;      /* Files lists the folder again */
+                pthread_mutex_unlock(&cl_mu);
+                cl_changed();
+            }
+            cloud_seen_put(&seen, key, ms_now());
+        } else if (at < 0) cloud_seen_put(&seen, key, ms_now());   /* Files has just listed it */
+        if (kept) continue;                                         /* the keeper lists kept folders whole */
+        /* the subfolders never listed in this mount, through rclone's listing of this one (no provider call) */
+        char dir[PATH_MAX * 2], sub[CLOUD_AHEAD_MAX][256];
+        int ns = 0;
+        cl_pf(dir, sizeof dir, "%s/%s%s%s", cl_root, name, rel[0] ? "/" : "", rel);
+        DIR *d = opendir(dir);
+        for (struct dirent *e; d && ns < CLOUD_AHEAD_MAX && (e = readdir(d)); ) {
+            if (e->d_name[0] == '.' || strlen(e->d_name) >= sizeof sub[0]) continue;
+            int isdir = e->d_type == DT_DIR;
+            struct stat st;
+            if (e->d_type == DT_UNKNOWN) isdir = !fstatat(dirfd(d), e->d_name, &st, AT_SYMLINK_NOFOLLOW) && S_ISDIR(st.st_mode);
+            if (isdir) memcpy(sub[ns++], e->d_name, strlen(e->d_name) + 1);
+        }
+        if (d) closedir(d);
+        for (int i = 0; i < ns && !browse_moved(done); i++) {
+            char r2[CLOUD_REL_MAX + 1];
+            if ((size_t)cl_pf(r2, sizeof r2, "%s%s%s", rel, rel[0] ? "/" : "", sub[i]) >= sizeof r2 || !cloud_rel_ok(r2)) continue;
+            unsigned g2;
+            int p2, k2;
+            if (browse_acc(name, r2, id, &g2, &p2, &k2) || g2 != gen) break;
+            unsigned long long k = cloud_seen_key(id, gen, r2);
+            if (k2 || cloud_seen_at(&seen, k) >= 0) continue;
+            refresh_dir(id, r2);
+            cloud_seen_put(&seen, k, ms_now());
+        }
     }
     return NULL;
 }
@@ -534,6 +662,7 @@ void cf_start(void) {
     sigset_t all, old;
     sigfillset(&all);
     pthread_sigmask(SIG_BLOCK, &all, &old);
+    pthread_create(&th, &at, browser, NULL);
     pthread_create(&th, &at, keeper, NULL);
     pthread_sigmask(SIG_SETMASK, &old, NULL);
     pthread_attr_destroy(&at);

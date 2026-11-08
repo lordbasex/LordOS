@@ -580,4 +580,21 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('chevron and back turn in RTL', [/direction\(\) === 'rtl' \? '‹' : '›'/.test(settings), /direction\(\) === 'rtl' \? '›' : '‹'/.test(settings)], [true, true]);
 }
 
+// ---- browsing (7.3, issue #71): the same statuses don't draw Files again; a cloud folder isn't listed on the volumes tick ----
+{
+  const a = { '/c/x': { st: 'here' }, '/c/y': { st: 'down', pct: 0.5, downAt: 7 } };
+  eq('the same statuses', [M.sameStatus(a, { '/c/x': { st: 'here' }, '/c/y': { st: 'down', pct: 0.5, downAt: 7 } }), M.sameStatus({}, {}), M.sameStatus(a, a)], [true, true, true]);
+  eq('a status, a percentage, an error, a hold or a path that changed', [
+    M.sameStatus(a, { ...a, '/c/x': { st: 'kept' } }), M.sameStatus(a, { ...a, '/c/y': { ...a['/c/y'], pct: 0.6 } }),
+    M.sameStatus(a, { ...a, '/c/x': { st: 'here', error: 'cloud.transferFailed' } }), M.sameStatus(a, { ...a, '/c/y': { ...a['/c/y'], downAt: 8 } }),
+    M.sameStatus(a, { '/c/x': a['/c/x'] }), M.sameStatus(a, { '/c/x': a['/c/x'], '/c/z': a['/c/y'] })], [false, false, false, false, false, false]);
+  const files = fs.readFileSync(path.join(root, 'apps/files/index.jsx'), 'utf8');
+  eq('Files: a cloud folder is listed on its account\'s `listed` and a minute\'s tick, not on the volumes tick',
+    /listAcc \? null : volumes, listAcc \? listAcc\.listed : 0, listAcc \? cloudTick : 0/.test(files), true);
+  eq('Files: cloud.browse on opening a cloud folder and every minute', /cloud\.browse\(loc\.path\);[\s\S]{0,80}setInterval\(\(\) => \{ cloud\.browse\(loc\.path\)/.test(files), true);
+  eq('Files: no statfs in a cloud folder (rclone asks the provider)', /curDir && !curAcc && [^\n]*fs\.free\(curDir\)/.test(files), true);
+  const sdkCloud = fs.readFileSync(path.join(root, 'sdk/cloud.js'), 'utf8');
+  eq('sdk: cloud.browse goes to lord.cloud.browse', /browse: \(path\) => \{ if \(has\(\) && typeof lord\.cloud\.browse === 'function'\) lord\.cloud\.browse\(String\(path\)\)/.test(sdkCloud), true);
+}
+
 console.log(`cloud model: ${ok} checks ${process.exitCode ? 'with failures' : 'passed'}`);

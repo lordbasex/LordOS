@@ -132,6 +132,30 @@ int  cloud_bw_rate(long up_kib, long down_kib, char *out, size_t n);   /* core/b
 /* '1d' | '7d' | '30d' | 'never' → publiclink's expire ("" for never) and its seconds (0); -1 anything else */
 int  cloud_expire(const char *e, char *arg, size_t n, long long *secs);
 
+/* ---- browsing (7.3) ----
+ * rclone's VFS lists a folder from the provider when it is first read and again on the first read after its directory
+ * cache expires; that listing holds the reader (Files) for the whole round trip. The mounts keep listings an hour
+ * (CLOUD_DIR_CACHE_S) and stay current otherwise: the provider's change notifications polled every minute where rclone
+ * has them (ChangeNotify), elsewhere a folder Files shows listed again in the background once it is 5 minutes old, kept
+ * folders by the keeper. */
+#define CLOUD_DIR_CACHE_S 3600
+#define CLOUD_POLL_S 60
+#define CLOUD_STALE_S 300             /* a folder shown, on a provider without change notifications, listed again after this */
+#define CLOUD_TREE_POLL_S 1800        /* kept folders listed whole again, on a provider with change notifications */
+#define CLOUD_AHEAD_MAX 24            /* subfolders of a folder shown listed ahead, at most */
+/* mount/mount's "vfsOpt" and "mountOpt" members (a leading comma, no braces around them): 0, -1 doesn't fit */
+int  cloud_mount_opts(char *out, size_t n);
+/* the folders listed in this run of an account's mount: when, by a 64-bit key of account, mount and folder */
+#define CLOUD_SEEN_MAX 2048
+typedef struct { unsigned long long key; long long at; } CloudSeenItem;
+typedef struct { CloudSeenItem it[CLOUD_SEEN_MAX]; int n; } CloudSeen;
+unsigned long long cloud_seen_key(const char *id, unsigned gen, const char *rel);
+long long cloud_seen_at(const CloudSeen *s, unsigned long long key);      /* ms, -1 never */
+void cloud_seen_put(CloudSeen *s, unsigned long long key, long long now); /* full: the oldest goes */
+/* a folder Files shows: 1 list it again in the background now. seen: when it was last listed (ms, -1 never: it was just
+ * listed by Files itself), polls: the provider sends changes, kept: the keeper lists it */
+int  cloud_browse_due(long long seen, long long now, int polls, int kept);
+
 /* ---- files on demand (7.2) ---- */
 typedef struct {
     long long size;         /* of the file */

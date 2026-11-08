@@ -102,7 +102,9 @@ there: the scope and the socket are the boundary.
 
 Each account is mounted with `mount/mount` at `~/Cloud/<Account name>` (a folder of the home, so every app and the file pickers
 see it), `--vfs-cache-mode full`, the cache in `~/.cache/lordos/cloud/` (rclone's layout: `vfs/<id>/` for the data,
-`vfsMeta/<id>/` for what is present). Section 7 covers how files on demand are built on it. The account's id is `c` and 8 hex
+`vfsMeta/<id>/` for what is present), a listing kept an hour (`--dir-cache-time 1h`) and the provider's changes polled every
+minute where rclone has them (`--poll-interval 1m`); the options are `cloud_mount_opts` in `cloud_pure.c`. Section 7 covers
+how files on demand are built on it, 7.3 how browsing stays fast. The account's id is `c` and 8 hex
 digits; its folder is its name, which can't be empty, start with a dot or hold a slash or a control character.
 
 ## 4. Security
@@ -268,6 +270,45 @@ Context menu on files and folders of an account: **Keep on This Computer** / **F
 - **Conflicts**: a file changed here and in the cloud while offline: the cloud's version keeps the name, ours is saved next to it
   as "name (this computer).ext" and a notification says so, the same rule as Calendar's conflicts.
 
+### 7.3 Browsing (0.8.8.6, issue #71)
+
+Reported: browsing an account in Files took seconds, even with every file kept on this computer. What rclone does: it lists a
+folder from the provider the first time the folder is read and again on the first read after its listing expires
+(`--dir-cache-time`, 5 minutes by default), and whoever reads waits for that round trip; while it lists one folder again
+(`vfs/refresh` of that folder) a reader of that folder waits too. A listing of the whole tree (`recursive`) holds nothing
+while it walks. Measured with `tests/cloud_harness.c` against `rclone serve webdav` 250 ms away (2040 files and 40 folders),
+listing as `lord.fs.list` does, lordos-rclone 1.75.2 (2026-11-08, amd64; one round trip is 250 ms there, a real provider's
+listing of a large folder takes seconds):
+
+| | Before | After |
+|---|---|---|
+| The account's top, first time | 340 ms (the provider) | 334 ms: nothing is listed yet |
+| A subfolder, first time | 256 ms (the provider) | 4.8 ms: listed ahead |
+| The top, again at once | 44 ms | 38 ms |
+| The top after 5 minutes | 377 ms (the provider again) | 43 ms: from rclone's listing |
+| Two subfolders after 5 minutes | 257 and 260 ms | 2.5 and 1.1 ms |
+| statfs (Files' free space) | 251 ms, again after 5 minutes | not asked in an account |
+| Keep on This Computer's listing of kept folders | refused by rclone every pass | works |
+
+What changed:
+
+- **The mounts keep a listing an hour** (`DirCacheTime`) and poll the provider's changes every minute (`PollInterval`, rclone's
+  default, written down) where rclone has them (`ChangeNotify` in `operations/fsinfo`: Google Drive, OneDrive, Dropbox, Box,
+  pCloud…). Changes made through the mount show at once whatever the cache: rclone's listing is updated in place.
+- **`cloud.browse(path)`**: Files calls it when it opens a folder of an account and once a minute while it shows it. A thread
+  of its own (`browser` in `cloud_files.c`) lists that folder again in the background only when the provider sends no
+  changes, the folder isn't kept and its last listing is 5 minutes old (`cloud_browse_due`); then the account's `listed` in
+  the state goes up and Files lists it again from rclone's listing. Then the subfolders never listed in this mount, at most
+  24, are listed ahead, one at a time, stopping when Files opens another folder. The folders listed in a mount are kept in
+  a table of 2048 (`CloudSeen`, the oldest goes).
+- **Files** doesn't list a cloud folder on the 4-second volumes tick that local folders get (each listing is a call to
+  rclone per file, and one on an expired folder waited for the provider), and doesn't ask the free space there (statfs makes
+  rclone ask the provider's `about`).
+- **Keep on This Computer** lists kept folders whole again with `vfs/refresh` and `recursive` as text (`"true"`): rclone
+  refuses a JSON `true` ("value must be string"), so until 0.8.8.6 that listing never happened and new files in the cloud
+  reached a kept folder only when its listing expired. It runs on every pass (5 minutes) where the provider sends no
+  changes, else after each mount and every half hour. A kept file lists its own folder only, not what is under it.
+
 ## 8. Space
 
 Settings → Cloud lists the accounts, each with a bar: used, free, total (`operations/about`: `total`, `used`, `free`, `trashed`,
@@ -421,6 +462,7 @@ cloud.rename(id, name)       → { ok } | { error }
 cloud.refreshAbout(id)
 cloud.websiteUrl(id)         → string | null
 cloud.status(paths)          → { [path]: { st: 'cloud'|'down'|'here'|'kept'|'up'|'error', pct?, error? } }  (paths under ~/Cloud)
+cloud.browse(path)           (a folder Files shows: listed again in the background when old, subfolders ahead; 7.3)
 cloud.keep(paths) / cloud.unkeep(paths)
 cloud.free(paths)            → { freed, skipped: [{ path, reason: 'open'|'pending'|'kept' }] }
 cloud.link(path, expire)     → { url } | { error: 'unsupported'|… }   (expire: '1d'|'7d'|'30d'|'never')
@@ -435,7 +477,7 @@ State = {
   service: { running, version, uptimeS, rssKb, restarts, error? },
   options: { bwUp, bwDown, pauseOnBattery, pauseOnMetered, autoFree, freeBelowGb },
   accounts: [{ id, name, kind, provider, mount, state: 'ok'|'syncing'|'paused'|'signin'|'offline'|'error'|'locked', message?,
-               about: { total?, used, free?, trashed?, other? } | null, cacheBytes, keptBytes,
+               about: { total?, used, free?, trashed?, other? } | null, listed, cacheBytes, keptBytes,
                up: { files, bytes, done, name? }, down: { files, bytes, done, name? }, kept: [path], linksSupported }],
   signin: { id, kind, name, phase: 'waiting'|'done'|'failed', url, expiresAt, error? } | null,
   recent: [{ path, account, dir: 'up'|'down', at }]   (newest first, at most 20)
