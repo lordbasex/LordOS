@@ -18,9 +18,10 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
+import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, netStatus, hostName, placeEntry } from './network.jsx';
+import { connectedEntries, netGroups } from './netplaces.js';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
-import { parseAddress, sshLine, hostAddress } from './connect.js';
+import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
@@ -251,10 +252,19 @@ export default function Files() {
     });
   }, [searchKey]);
   const [entries, error] = useMemo(() => {
-    if (loc.type === 'network') return [hostEntries(netState, volumes), null];
+    if (loc.type === 'network') {
+      // the places this person is connected to first, then what was found (netplaces.js, issue #59)
+      const mine = connectedEntries({ volumes, pins: prefs.pins, accounts: cloudSt && cloudSt.accounts, hiddenAccounts: userSettings.cloudHidden || [], home: fs.home() }).map(placeEntry);
+      const found = hostEntries(netState, volumes, !!prefs.netAllDevices);
+      const all = [...mine, ...found];
+      all.foundCount = found.length;
+      all.hiddenDevices = found.hiddenDevices;
+      return [all, null];
+    }
     if (searchAcc) return [cloudModel.searchEntries(cs && cs.hits), cs && cs.error ? errorText(cs.error) : null];
     try { return [loadEntries(loc, { hidden, launcherApps }), null]; } catch (e) { return [[], e.message]; }
-  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc]);
+  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc,
+    loc.type === 'network' ? prefs.pins : null, loc.type === 'network' ? !!prefs.netAllDevices : null, loc.type === 'network' ? cloudSt : null, loc.type === 'network' ? userSettings.cloudHidden : null]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
   // what the list's extra columns need, asked once per file until something changes
@@ -267,7 +277,7 @@ export default function Files() {
   };
   const sortOpts = { statOf, foldersFirst: prefs.foldersFirst };
   const sorted = useMemo(() => sortEntries(entries, sortBy, sortOpts), [entries, sortBy.by, sortBy.desc, prefs.foldersFirst]);
-  const groups = useMemo(() => groupEntries(sorted, tab.group, tr), [sorted, tab.group]);
+  const groups = useMemo(() => (loc.type === 'network' ? netGroups(sorted, tr) : groupEntries(sorted, tab.group, tr)), [sorted, tab.group, loc.type]);
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const byPath = useMemo(() => new Map(flat.map((e) => [e.path, e])), [flat]);
   // Cloud (docs/CLOUD.md): the statuses of what is shown, the account of this folder
@@ -361,8 +371,13 @@ export default function Files() {
   // Open in Terminal: the Terminal app in a window of its own, at this folder
   const openTerminal = (path = curDir) => { if (path) wm.open('terminal', { new: true, args: { cwd: path } }); };
   // Connect to Server: returns { error, store } to show, or nothing when it went on
-  const connectTo = (text) => {
-    const a = parseAddress(text);
+  // how: for an http(s) address, 'folder' (WebDAV, in Files) or 'web' (the browser); asked when the address doesn't say
+  const connectTo = (text, how = null) => {
+    let a = parseAddress(text);
+    if (!a.error && a.kind === 'web' && how !== 'web') {
+      if (how !== 'folder' && !looksDav(a.path)) return { choose: true };
+      a = davOf(a);
+    }
     if (a.error) return { error: tr(`files.connect.err.${a.error}`, { scheme: a.scheme || '' }) };
     const clientFor = (scheme) => launcherApps.find((x) => x.kind === 'linux' && (x.mimeTypes || []).includes(`x-scheme-handler/${scheme}`));
     if (a.kind === 'mount') {
@@ -394,7 +409,7 @@ export default function Files() {
     return null;
   };
   const toTrash = (paths = selPaths) => {
-    if (!paths.length || readOnly) return;
+    if (!paths.length || readOnly || loc.type === 'network') return;
     if (loc.type === 'trash') { askDelete(paths); return; }
     // Cloud (docs/CLOUD.md 17.2): what is in a cloud account is deleted there, after asking, and never moved into a
     // .Trash folder inside the cloud; it goes to the provider's own trash where it has one, so Restore isn't offered
@@ -454,6 +469,7 @@ export default function Files() {
   };
   const open = (e) => {
     if (e.netWay) { openWay(e.netWay, e.netParent); return; }
+    if (e.netPlace) { if (e.netPlace.kind === 'pin') reconnect(e.netPlace.pin); else navigate(dirLoc(e.netPlace.path)); return; }
     if (e.netHost) { if (e.ways[0]) openWay(e.ways[0], e.netHost); else setMsg(tr('files.net.nothing')); return; }
     if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; }
     if (!e.dir && cloudModel.cantOpen(cf.accountOf(e.path), cf.status[e.path])) { setOfflineAsk(e); return; }
@@ -504,7 +520,7 @@ export default function Files() {
       next = new Set(flat.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.path));
     } else { next = selected.has(e.path) ? selected : new Set([e.path]); anchor.current = e.path; }
     setSelected(next);
-    if (!e.app && !e.netHost && !e.netWay && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
+    if (!e.app && !e.netHost && !e.netWay && !e.netPlace && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
   };
 
   // a shortcut, not a copy: a folder on a server remembers how to get back to it
@@ -559,6 +575,7 @@ export default function Files() {
         { label: tr('files.menu.quickLook'), hint: '␣', onClick: () => setQuick(true) }, { label: tr('files.menu.getInfo'), hint: '❖I', onClick: () => setInfo(true) }];
     }
     if (e.netWay) return [{ label: tr('files.net.connect'), onClick: () => open(e) }];
+    if (e.netPlace) return placeMenu(e.netPlace, e);
     if (e.netHost) {
       return [{ label: tr('files.net.connect'), onClick: () => open(e), disabled: !e.ways.length },
         ...(e.ways.length > 1 ? [{ label: tr('files.net.connectAs'), submenu: e.ways.map((w) => ({ label: w.label, onClick: () => openWay(w, e.netHost) })) }] : []), '-',
@@ -602,7 +619,11 @@ export default function Files() {
     const viewItems = VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) }));
     const sortItems = ['name', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.sort.${k}`), checked: tab.sort.by === k, onClick: () => setSort(k) }));
     const groupItems = ['none', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.groupBy.${k}`), checked: tab.group === k, onClick: () => patchTab({ group: k }) }));
-    if (loc.type === 'network') return [{ label: tr('files.net.search'), onClick: searchLan, disabled: netState.running }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
+    if (loc.type === 'network') {
+      return [{ label: tr('files.net.search'), onClick: searchLan, disabled: netState.running }, { label: tr('files.menu.connect'), hint: '❖K', onClick: () => setSheet('connect') }, '-',
+        { label: tr('files.net.allDevices'), checked: !!prefs.netAllDevices, onClick: () => setPrefs({ netAllDevices: !prefs.netAllDevices }) }, '-',
+        { label: tr('files.menu.view'), submenu: viewItems }];
+    }
     if (loc.type === 'trash') return [{ label: tr('files.menu.emptyTrash'), danger: true, onClick: askEmpty, disabled: !entries.length }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
     return [
       ...(wDir ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !clip }, '-'] : []),
@@ -629,6 +650,18 @@ export default function Files() {
     setMenu({ x: at.x, y: at.y, items: [{ label: tr(pinned ? 'files.pin.remove' : 'files.pin.add'), onClick: () => togglePin({ address, path: v.path, name: v.name }) }] });
   };
   const reconnect = (p) => { const r = connectTo(p.address); if (r?.error) setMsg(r.error); };
+  // a connected place on the Network page: open it, and what its sidebar entry offers
+  function placeMenu(p, e) {
+    if (p.kind === 'pin') return [{ label: tr('files.net.connect'), onClick: () => open(e) }, '-', { label: tr('files.pin.remove'), onClick: () => togglePin(p.pin) }];
+    const items = [{ label: tr('files.menu.open'), onClick: () => open(e) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt(dirLoc(p.path)) }];
+    if (p.kind === 'cloud') return [...items, '-', { label: tr('cloud.settingsMenu'), onClick: () => wm.open('settings', { args: { section: 'cloud', page: p.id, nonce: Date.now() } }) }];
+    const rel = volumeRelease(diskList, p.path, p.fs);
+    const address = originOf(p.path, p.fs, p.name);
+    const pinned = prefs.pins.some((x) => x.path === p.path);
+    return [...items, '-',
+      ...(address ? [{ label: tr(pinned ? 'files.pin.remove' : 'files.pin.add'), onClick: () => togglePin({ address, path: p.path, name: p.name }) }] : []),
+      ...(rel ? [{ label: tr('files.net.disconnect'), onClick: () => release(rel, p.path) }] : [])];
+  }
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
@@ -684,9 +717,9 @@ export default function Files() {
     if (mod && e.key === 'ArrowDown') { openSel(); return; }
     if (mod && (e.key === 'Backspace' || e.key === 'Delete')) { toTrash(); return; }
     if (e.key === 'Delete') { toTrash(); return; }
-    if (e.key === 'Enter') { if (first?.netHost || first?.netWay) open(first); else startRename(); return; }
+    if (e.key === 'Enter') { if (first?.netHost || first?.netWay || first?.netPlace) open(first); else startRename(); return; }
     if (e.key === 'Escape') { setSelected(new Set()); setInfo(false); return; }
-    if (space) { if (sel.length && !first?.netHost && !first?.netWay) setQuick(true); return; }
+    if (space) { if (sel.length && !first?.netHost && !first?.netWay && !first?.netPlace) setQuick(true); return; }
     const grid = tab.view === 'icons' ? cols() : 1;
     if (e.key === 'ArrowRight') { if (tab.view === 'list') { if (first?.dir) setExpanded((x) => new Set([...x, first.path])); } else moveSel(1, e); return; }
     if (e.key === 'ArrowLeft') { if (tab.view === 'list') { if (first?.dir) setExpanded((x) => { const n = new Set(x); n.delete(first.path); return n; }); } else moveSel(-1, e); return; }
@@ -969,7 +1002,7 @@ export default function Files() {
             </View>
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {msg || (loc.type === 'network' ? lanStatus(netState, flat.length) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+              {msg || (loc.type === 'network' ? netStatus(netState, entries.foundCount || 0, entries.hiddenDevices || 0) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
                 curAcc && entries.capped ? tr('cloud.listCapped', { count: formatNumber(LIST_CAP) }) : '',
                 curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '))}
             </Text>

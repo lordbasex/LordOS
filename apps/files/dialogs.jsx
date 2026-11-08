@@ -73,7 +73,7 @@ export function ConnectServer({ onConnect, onBrowse, onClose }) {
   const [help, setHelp] = useState(false);
   const [result, setResult] = useState(null);             // { error, store }
   const [sel, setSel] = useState('');
-  const go = (v = value) => { const r = onConnect(v.trim()); if (r) setResult(r); };
+  const go = (v = value, how = null) => { const r = onConnect(v.trim(), how); if (r) setResult(r); };
   const favs = p.servers.favorites;
   const row = (text, on, click, dbl) => (
     <View key={text} onClick={click} onDoubleClick={dbl} style={{ minHeight: 24, paddingHorizontal: 8, borderRadius: 5, justifyContent: 'center', backgroundColor: on ? t.accent : 'transparent' }}>
@@ -117,7 +117,16 @@ export function ConnectServer({ onConnect, onBrowse, onClose }) {
           ))}
         </ScrollView>
       ) : null}
-      {result ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{result.error}</Text> : null}
+      {result?.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{result.error}</Text> : null}
+      {result?.choose ? (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.connect.webChoice')}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+            <Button label={tr('files.connect.asWeb')} onClick={() => go(value, 'web')} />
+            <Button primary label={tr('files.connect.asFolder')} onClick={() => go(value, 'folder')} />
+          </View>
+        </View>
+      ) : null}
       <Actions>
         <Button label={tr('files.connect.browse')} onClick={onBrowse} />
         {result?.store ? <Button label={tr('files.connect.openStore')} onClick={result.store} /> : null}

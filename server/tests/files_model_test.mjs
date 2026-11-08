@@ -1,6 +1,7 @@
 // Files without a screen: what an address means and how columns move. node server/tests/files_model_test.mjs
 import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith, clampZoom, zoomWith, zoomOf, iconMetrics, listMetrics, iconColumns, ZOOM_MIN, ZOOM_MAX } from '../../apps/files/viewprefs.js';
-import { parseAddress, sshLine, remoteUri, hostAddress } from '../../apps/files/connect.js';
+import { parseAddress, sshLine, remoteUri, hostAddress, looksDav, davOf } from '../../apps/files/connect.js';
+import { offersWay, foundHosts, connectedEntries, shareKind, netGroups } from '../../apps/files/netplaces.js';
 import { normalColumns, visible, toggleColumn, moveColumn, resize, dropBefore, totalWidth, MIN_W, MAX_W } from '../../apps/files/columns.js';
 
 let ok = 0;
@@ -71,4 +72,40 @@ eq('total', totalWidth(d), 350);
   eq('junk zoom', viewFor(junk, { type: 'dir', path: '/j' }).zoom, {});
   eq('no zoom stored when usual', 'zoom' in folderViewsWith({}, '/u', { view: 'list', sort: { by: 'name' }, zoom: {} })['/u'], false);
 }
+
+// #59: an http(s) address names WebDAV by its path, or is asked about; as a folder it is webdav:// or davs://
+eq('dav paths', ['/remote.php/dav/files/ana', '/remote.php/webdav', '/dav', '/webdav/x', '/DAV', '/', '/davide', '/docs'].map(looksDav), [true, true, true, true, true, false, false, false]);
+eq('davs of https', davOf(p('https://ana@cloud.example.org/remote.php/dav/')), { scheme: 'davs', kind: 'folder', host: 'cloud.example.org', port: 0, user: 'ana', path: '/remote.php/dav', text: 'davs://ana@cloud.example.org/remote.php/dav' });
+eq('webdav of http with a port', davOf(p('http://nas:8080/dav')).text, 'webdav://nas:8080/dav');
+eq('standard port dropped', davOf(p('http://nas:80/dav')).port, 0);
+eq('davs again', p(davOf(p('https://nas/dav')).text).kind, 'folder');
+
+// #59: Network lists what has a way in, and the places this person is connected to first
+const repeater = { addr: '192.168.1.2', name: 'repeater', smb: false, nfs: false, shares: [], exports: [], services: [{ kind: 'http', port: 80 }] };
+const printer = { addr: '192.168.1.3', name: '', shares: [], exports: [], services: [{ kind: 'printer', port: 631 }] };
+const photo = { addr: '192.168.1.4', name: 'PC-PHOTO', smb: true, shares: [], exports: [], services: [] };
+const mac = { addr: '192.168.1.5', name: '', shares: [], exports: [], services: [{ kind: 'afp', port: 548 }] };
+const dav = { addr: '192.168.1.6', name: '', shares: [], exports: [], services: [{ kind: 'webdavs', port: 443 }] };
+const screen = { addr: '192.168.1.7', name: '', shares: [], exports: [], services: [{ kind: 'screen', port: 5900 }] };
+eq('ways in', [repeater, printer, photo, mac, dav, screen, null].map(offersWay), [false, false, true, true, true, true, false]);
+const fh = foundHosts([repeater, printer, photo, { addr: '' }], false);
+eq('found', [fh.shown.map((h) => h.addr), fh.hidden], [['192.168.1.4'], 2]);
+eq('every device', foundHosts([repeater, printer, photo], true).shown.length, 3);
+eq('no hosts', foundHosts(undefined).hidden, 0);
+const ce = connectedEntries({
+  home: '/home/ana',
+  volumes: [{ path: '/media/ana/Public on 192.168.1.4', name: 'Public on 192.168.1.4', fs: 'cifs' }, { path: '/media/ana/USB', name: 'USB', fs: 'vfat' },
+    { path: '/home/ana/Cloud/Drive', name: 'Drive', fs: 'fuse.rclone' }, { path: '/home/ana/.local/share/lordos/remote/davs on nas', name: 'davs on nas', fs: 'fuse.rclone' }],
+  pins: [{ address: 'smb://192.168.1.4/Public', path: '/media/ana/Public on 192.168.1.4', name: 'Public on 192.168.1.4' }, { address: 'smb://192.168.1.9/Backup', path: '/media/ana/Backup on 192.168.1.9', name: 'Backup on 192.168.1.9' }],
+  accounts: [{ id: 'g1', name: 'Drive', mount: '/home/ana/Cloud/Drive', state: 'idle' }, { id: 'h', name: 'Hidden', mount: '/home/ana/Cloud/H' }, { id: 'n', name: 'No mount' }],
+  hiddenAccounts: ['h'],
+});
+eq('connected kinds', ce.map((e) => [e.netPlace.kind, e.netPlace.path]), [['share', '/media/ana/Public on 192.168.1.4'], ['share', '/home/ana/.local/share/lordos/remote/davs on nas'],
+  ['pin', '/media/ana/Backup on 192.168.1.9'], ['cloud', '/home/ana/Cloud/Drive']]);
+eq('no file path reaches a mount point', ce.every((e) => e.path.startsWith('place:') && !e.dir), true);
+eq('nothing given', connectedEntries({ accounts: null, pins: null, volumes: null }), []);
+eq('share kinds', [shareKind('x on 1.2.3.4', 'cifs'), shareKind('e on h', 'nfs4'), shareKind('davs on nas', 'fuse.rclone'), shareKind('sftp on h:2222', 'fuse.rclone'), shareKind('odd', 'fuse.rclone')], ['smb', 'nfs', 'davs', 'sftp', 'remote']);
+const tt = (k) => k;
+eq('groups', netGroups([{ path: 'net:1' }, { path: 'place:/a', netPlace: {} }], tt).map((g) => [g.label, g.items.map((e) => e.path)]), [['files.net.group.connected', ['place:/a']], ['files.net.group.found', ['net:1']]]);
+eq('one group untitled', netGroups([{ path: 'net:1' }], tt).map((g) => g.label), ['']);
 console.log(`files-model-test: ${ok} ok`);

@@ -28,6 +28,7 @@ const DEFAULTS = {
   servers: { history: [], favorites: [] },
   favoriteFolders: [],        // { path, name, address }: folders dragged to Favorites; address when on a server
   pins: [],                   // { address, path, name }: servers kept in Locations; passwords stay in the keyring
+  netAllDevices: false,       // Network also lists the machines with nothing to open (a Wi-Fi repeater, a printer)
 };
 
 export const prefsOf = (s) => ({ ...DEFAULTS, ...(s.files || {}) });

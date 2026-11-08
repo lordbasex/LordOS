@@ -10,6 +10,7 @@ import { textDirection, direction } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
+import { fieldKey, insertAt, caretAt, clampPos } from './textfieldmodel.js';
 import { Layer } from './layers.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
@@ -335,6 +336,8 @@ export function pasteIntoFocused() {
 // secure: password field (shows •, does not go through the input method and cannot be copied).
 // selectAll: starts with all the text selected (the first key replaces it; the arrows
 // deselect it), as when renaming in Files.
+// The caret moves with ←, →, Home, End and a click, and typing, Backspace, Delete and a paste work where it is
+// (textfieldmodel.js); a value changed from outside puts it back at the end.
 export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, size = 13, selectAll = false }) {
   const t = useTheme();
   const token = useRef({}).current;
@@ -342,6 +345,10 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const [blink, setBlink] = useState(true);
   const latest = useRef();
   const caret = useRef(null);
+  const textBox = useRef(null);
+  const at = useRef({ value, pos: [...(value || '')].length });    // the caret, for the value it was placed in
+  if (at.current.value !== value) at.current = { value, pos: [...(value || '')].length };
+  const [, redraw] = useState(0);
   const secureRef = useRef(secure);
   secureRef.current = secure;
   const [allSel, setAllSel] = useState(selectAll);
@@ -368,13 +375,23 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
         return;
       }
       const all = allRef.current;
-      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || ((e.ctrl || e.meta) && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
-      else if (all && /^Arrow|^Home$|^End$/.test(e.key || '')) { setAllSel(false); allRef.current = false; return; }
-      if ((e.ctrl || e.meta) && e.base === 'v') { p.onChange(p.value + lord.clipboard.get().replace(/\n/g, ' ')); return; }
-      if (e.key === 'Backspace' || e.key === 'Delete') p.onChange(all ? '' : e.key === 'Delete' ? p.value : [...p.value].slice(0, -1).join(''));
+      if (at.current.value !== p.value) at.current = { value: p.value, pos: [...(p.value || '')].length };
+      // a value and its caret, drawn at once (a caret that only moved changes no value)
+      const put = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || ((e.ctrl || e.meta) && e.base === 'v'))) {
+        setAllSel(false); allRef.current = false;
+        if (!e.char && !((e.ctrl || e.meta) && e.base === 'v')) { put({ value: '', pos: 0 }); setBlink(true); return; }
+        at.current = { value: '', pos: 0 };              // what is typed or pasted replaces it all, in one change
+        p.value = '';
+      } else if (all && /^Arrow|^Home$|^End$/.test(e.key || '')) { setAllSel(false); allRef.current = false; return; }
+      const cur = at.current;
+      if ((e.ctrl || e.meta) && e.base === 'v') { put(insertAt(cur.value, cur.pos, lord.clipboard.get().replace(/\n/g, ' '))); return; }
+      const rtl = !secureRef.current && (p.value ? textDirection(p.value) === 'rtl' : direction() === 'rtl');
+      const k = fieldKey(cur.value, cur.pos, e, rtl);
+      if (k) put(k);
       else if (e.key === 'Enter') p.onSubmit?.(p.value);
       else if (e.key === 'Escape') p.onCancel?.();
-      else if (e.char) p.onChange(p.value + e.char);
+      else if (e.char) put(insertAt(cur.value, cur.pos, e.char));
       setBlink(true);
     });
     order?.push(token);
@@ -400,18 +417,36 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     return () => clearInterval(id);
   }, [isFocused]);
 
+  // a click puts the caret between the two characters nearest to it
+  const placeCaret = (ev) => {
+    if (!value || allSel || !textBox.current || !ev || typeof ev.local !== 'function') return;
+    const shown = secure ? '•'.repeat([...value].length) : value;
+    const rtl = !secure && textDirection(value) === 'rtl';
+    let x;
+    try { const w = lord.getLayout(textBox.current.id)[2]; const lx = ev.local(textBox.current).x; x = rtl ? w - lx : lx; } catch (e) { return; }
+    at.current = { value, pos: clampPos(value, caretAt(shown, x, (s) => lord.measureText(s, size, 400))) };
+    redraw((n) => n + 1);
+    setBlink(true);
+  };
+  const chars = [...(value || '')];
+  const pos = isFocused && !allSel ? clampPos(value, at.current.pos) : chars.length;
+  const show = (s) => (secure ? '•'.repeat([...s].length) : s);
+  const before = show(chars.slice(0, pos).join('')), after = show(chars.slice(pos).join(''));
+  const textStyle = { fontSize: size, color: allSel && isFocused ? '#fff' : t.text, whiteSpace: 'nowrap', backgroundColor: allSel && isFocused ? t.accent : 'transparent' };
   return (
-    <View onMouseDown={() => { focusedNow = true; setFocus(token); }}
+    <View onMouseDown={(ev) => { focusedNow = true; setFocus(token); placeCaret(ev); }}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {/* inputFocus 'underline' (a theme token): an accent line along the bottom edge */}
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
-      {value ? <Text style={{ fontSize: size, color: allSel && isFocused ? '#fff' : t.text, whiteSpace: 'nowrap',
-        backgroundColor: allSel && isFocused ? t.accent : 'transparent' }}>{secure ? '•'.repeat([...value].length) : value}</Text> : null}
-      {preedit && !secure ? <Preedit st={imeSt} size={size} color={t.text} accent={t.accent} /> : null}
-      {isFocused && <View ref={caret} style={{ width: 1.5, height: size + 3, marginLeft: 1, backgroundColor: blink ? t.accent : 'transparent' }} />}
+      <View ref={textBox} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {before ? <Text style={textStyle}>{before}</Text> : null}
+        {preedit && !secure ? <Preedit st={imeSt} size={size} color={t.text} accent={t.accent} /> : null}
+        {isFocused && <View ref={caret} style={{ width: 1.5, height: size + 3, marginLeft: 1, backgroundColor: blink ? t.accent : 'transparent' }} />}
+        {after ? <Text style={textStyle}>{after}</Text> : null}
+      </View>
       {!value && !preedit && <Text style={{ fontSize: size, color: t.textDim, whiteSpace: 'nowrap' }}>{placeholder || ''}</Text>}
     </View>
   );

@@ -1,12 +1,12 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr } from '@lordos/sdk';
+import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr, CloudGlyph } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { FolderGlyph } from './glyphs.jsx';
+import { FolderGlyph, DriveGlyph } from './glyphs.jsx';
+import { WAY_ORDER as ORDER, isShareFs, foundHosts, shareKind } from './netplaces.js';
 
-const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone'];
-export const isShareFs = (fs) => SHARE_FS.includes(fs);
+export { isShareFs };
 // A mounted share's folder keeps its fixed name on disk (share_leaf, lan_connect); people read it in their language.
 export const shareTitle = (name) => { const m = /^(.+) on ([^ ]+)$/.exec(name); return m ? tr('files.net.shareOn', { name: m[1], host: m[2] }) : name; };
 
@@ -247,9 +247,13 @@ export function lanStatus(st, count) {
   if (st.running) return st.total ? tr('files.net.scanning', { done: st.probed, total: st.total }) : tr('files.net.listening');
   return tr('files.net.found', { count });
 }
+// the status line, with how many machines were left out for having nothing to open
+export function netStatus(st, count, hidden) {
+  const line = lanStatus(st, count);
+  return hidden > 0 && !st.running ? `${line} · ${tr('files.net.hiddenDevices', { count: hidden })}` : line;
+}
 
-// Every way into a computer, best first. What mounts comes before a remote screen.
-const ORDER = { smb: 0, nfs: 1, sftp: 2, ssh: 3, webdavs: 4, webdav: 5, ftps: 6, ftp: 7, screen: 8, rdp: 9 };
+// Every way into a computer, best first (netplaces.js, WAY_ORDER). What mounts comes before a remote screen.
 export function hostWays(h, volumes) {
   const ways = [];
   const on = (kind, share) => volumes.find((v) => isShareFs(v.fs) && v.name === leafOf(kind, h.addr, share));
@@ -274,9 +278,43 @@ export function hostWays(h, volumes) {
   return ways.sort((a, b) => a.order - b.order);
 }
 
-export function hostEntries(st, volumes) {
-  return [...st.hosts].filter((h) => h.addr).map((h) => {
+// all: also the machines with nothing to open (a Wi-Fi repeater, a printer); the list says how many were left out
+export function hostEntries(st, volumes, all = false) {
+  const { shown, hidden } = foundHosts(st.hosts, all);
+  const out = shown.map((h) => {
     const ways = hostWays(h, volumes);
     return { name: hostName(h), path: `net:${h.addr}`, dir: ways.length > 1 || h.smb, netHost: h, ways, size: 0, mtime: 0, sub: kinds(h) };
   });
+  out.hiddenDevices = hidden;
+  return out;
+}
+
+// A connected place's row (netplaces.js): its name in the reader's language, what it is, and its icon
+export function placeEntry(e) {
+  const p = e.netPlace;
+  if (p.kind === 'cloud') return { ...e, Icon: ['signin', 'error', 'offline', 'locked'].includes(p.state) ? CloudDimIcon : CloudIcon, sub: tr('files.net.place.cloud') };
+  const Icon = p.kind === 'pin' ? PinIcon : ShareIcon;
+  const kind = shareKind(p.pin ? p.pin.name : e.name, p.fs);
+  const label = { smb: 'smb', nfs: 'nfs', sftp: 'sftp', ftp: 'ftp', ftps: 'ftp', webdav: 'webdav', davs: 'webdavs' }[kind];
+  const what = label ? tr(`files.net.kind.${label}`) : tr('files.net.place.remote');
+  return { ...e, name: shareTitle(e.name), Icon, sub: p.kind === 'pin' ? tr('files.net.place.notConnected', { kind: what }) : tr('files.net.place.connected', { kind: what }) };
+}
+
+const ShareIcon = ({ size }) => <PlaceIcon size={size} />;
+const PinIcon = ({ size }) => <PlaceIcon size={size} dim />;
+const CloudIcon = ({ size }) => <PlaceIcon size={size} cloud />;
+const CloudDimIcon = ({ size }) => <PlaceIcon size={size} cloud dim />;
+function PlaceIcon({ size, cloud, dim }) {
+  const t = useTheme();
+  const color = dim ? t.textDim : t.accent;
+  if (cloud) {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', opacity: dim ? 0.6 : 1 }}>
+        <View style={{ width: size * 0.8, height: size * 0.8, borderRadius: size * 0.2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+          <CloudGlyph kind="cloud" size={Math.round(size * 0.56)} color="#ffffff" />
+        </View>
+      </View>
+    );
+  }
+  return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}><DriveGlyph color={color} size={Math.round(size * 0.8)} /></View>;
 }

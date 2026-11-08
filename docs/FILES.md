@@ -112,6 +112,14 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 
 `apps/files/connect.js` reads an address strictly: shell metacharacters, a leading `-` and `..` are refused, and each part goes on as data. smb and nfs go to the sign-in sheet and `share-mount`, which takes private IPv4 addresses only, so a name works only if Network already saw it.
 
+**http and https (0.8.8.6, #59)** can be a web page or a WebDAV folder. A path that names WebDAV (`/dav`, `/webdav`,
+`/remote.php/…`) opens as a folder by itself; any other path makes the sheet ask, *Open as a folder* or *Open in the
+browser*. As a folder the address becomes `webdav://` (http) or `davs://` (https), and that is what Recents and a kept
+server remember (`looksDav`, `davOf` in `connect.js`).
+
+**The address field** (and every one-line `TextInput`) has a caret that ←, →, Home, End and a click move; typing,
+Backspace, Delete and a paste work where it is (`sdk/textfieldmodel.js`, `server/tests/textfield_model_test.mjs`).
+
 **sftp, ssh, ftp, ftps and WebDAV are folders in Files.** `lan/rconnect.c` starts `rclone mount` as the session user, in scope `app-lordos-lordos-rclone.scope` (firewall app `desktop:lordos-rclone`), on `~/.local/share/lordos/remote/<kind> on <host>`, and the folder is a volume in the sidebar with its eject button (`fusermount3 -u`). The configuration, with the password obscured by `rclone obscure -` over a pipe, is a memfd read through `/proc/self/fd/3`: there is no file to protect, nothing is on a command line or in the environment, and it ends with the process. It stays open in rclone for as long as the folder is mounted: emptying it once mounted hung the mount on the first reconnection (tried on VM 116 against the test server, with a control that kept it), so the obscured password stays readable by the session user's own processes while mounted. Sftp's `shell_type` and hash commands are set to none: nothing runs on the server, and rclone has nothing to save to that config. `ssh-keyscan`, `openssl` and `rclone obscure` run through `rconnect_run`: in the same scope, with `sandbox_exec_child` (Landlock: the system's folders read-only, nothing written, no TCP unless they need the server), killed at 15 s, so a stalled server can't hold the job or the password. On a kernel with no Landlock only the scope and the deadline hold (Pi 4 on the archive kernel). `rconnect_config` refuses control characters in any value, so nothing can start another key (`lan_test`). rclone, fuse3, openssh-client and openssl are dependencies of `lordos`; rclone has no sandbox beyond its scope.
 
 **Who the server is.** SFTP: `ssh-keyscan` reads the key first; a key seen for the first time shows its fingerprint and is kept in `~/.config/lordos/remote_known_hosts` (0600) only if the person accepts, a different one is refused outright, and rclone checks that file on the real connection (`known_hosts_file`, always set). ftps and https WebDAV: TLS is verified with `openssl s_client`, hostname included, and `no_check_certificate` is never set. A certificate the system doesn't trust shows its fingerprint; accepted, that certificate alone is kept per host and port under `~/.config/lordos/remote_certs` (0600) and given to rclone as `SSL_CERT_FILE`, with `SSL_CERT_DIR` pointing nowhere, so that certificate alone is trusted for that connection. An accepted certificate is checked before the system's verdict: a different one is refused even if a public authority signed it. Every SSH key that goes in the file is shown first, and an answer counts only for the fingerprint on screen. The certificate must still name the host (a subject alternative name for it): rclone's TLS has no way to accept a name mismatch except switching all checks off, which is never done, so such a server says so and doesn't connect. Plain ftp and http WebDAV say on the sheet that the password travels readable. ssh:// also offers Terminal with the line typed and **not run**: Terminal checks it against a fixed pattern, so an app that opens Terminal this way can't run anything.
@@ -203,6 +211,15 @@ Tested on VM 125 from the sidebar with the drivers present: NTFS (ntfs3), exFAT 
 
 **Files → Network** shows the computers on the local network by itself, as a place like any folder: one entry per computer, in whichever view is chosen. Opening one connects with the best way it offers (SMB, NFS, SFTP, WebDAV, FTP, then a remote screen); with more than one, its row unfolds them, and a right click has Connect as and Copy address. RDP and VNC open their apps. It
 stays off until the place is opened and leaves when it closes.
+
+**What it lists (0.8.8.6, #59, `apps/files/netplaces.js`).** First, under *Connected*, the places this person already
+uses: the shares and remote folders mounted now (open, open in a tab, keep in Locations, disconnect), the servers kept
+in Locations that aren't connected (dim; a click connects, so nothing reaches the network when Files starts) and the
+Cloud accounts (open, or their page in Settings → Cloud). Then, under *On this network*, the machines that offer a way
+in: shared folders, exports, AFP, an SFTP, WebDAV or FTP folder, or a remote screen. A machine that answered with
+nothing to open (a Wi-Fi repeater, a printer, a phone) is left out, and the status line says how many; the page's
+right-click menu has *Show every device* (`settings.files.netAllDevices`). These rows aren't the folders themselves
+(`place:` paths), so trash, rename, drag and copy can't reach a mount point from the Network page.
 
 **State of the feature:** the maintainer approved the `lan` connector on 2026-10-31, so inside a session
 `lan_socket` gets its sockets from it (`sec/netconn.h`, `NC_LAN`), counted and decided as the firewall app

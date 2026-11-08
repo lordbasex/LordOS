@@ -31,6 +31,15 @@ export function parseAddress(raw) {
   if (scheme === 'smb') out.share = out.path.split('/')[1] || '';
   return out;
 }
+// An http(s) address can be a web page or a WebDAV folder (issue #59): a path that names WebDAV goes to Files by itself,
+// anything else is asked about. The folder is the same rclone mount as webdav:// and davs:// (lan/rconnect.c).
+export const looksDav = (path) => /(^|\/)(web)?dav(\/|$)|^\/remote\.php(\/|$)/i.test(path || '');
+// the same place written as webdav:// or davs://, which is what Recents and a kept server remember
+export function davOf(a) {
+  const scheme = a.scheme === 'https' ? 'davs' : 'webdav';
+  const port = a.port === (a.scheme === 'https' ? 443 : 80) ? 0 : a.port;
+  return { scheme, kind: 'folder', host: a.host, port, user: a.user, path: a.path, text: `${scheme}://${a.user ? `${a.user}@` : ''}${a.host}${port ? `:${port}` : ''}${a.path}` };
+}
 // ssh: what is typed in Terminal, and left for the person to run
 export function sshLine(a) { return `${a.scheme}${a.port ? ` ${a.scheme === 'ssh' ? '-p' : '-P'} ${a.port}` : ''} ${a.user ? `${a.user}@` : ''}${a.host}`; }
 export const remoteUri = (a) => `${a.scheme}://${a.user ? `${a.user}@` : ''}${a.host}${a.port ? `:${a.port}` : ''}`;
