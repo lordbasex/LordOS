@@ -386,12 +386,12 @@ static int play_preview(const char *const roots[2], const char *lang, const char
 
 /* ---- the status note (Monitor → GPU) ---- */
 
-static char note_path[PATH_MAX];
+static char note_path[PATH_MAX + 16];             /* <dir>/<pid> */
 
 static void note_remove(void) { if (note_path[0]) unlink(note_path); }
 
 static void note_write(const char *home, int gpu, int hd, const char *lang, int save) {
-    char dir[PATH_MAX], tmp[PATH_MAX + 8];
+    char dir[PATH_MAX], tmp[sizeof note_path + 8];
     snprintf(dir, sizeof dir, "%s/.cache/lordos/say", home);
     mkdir(dir, 0700);
     int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
