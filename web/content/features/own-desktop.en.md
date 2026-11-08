@@ -97,9 +97,18 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
+## In development for 0.8.8.6
+
+Not released yet; the latest release is 0.8.8.5.
+
+- **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
+- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard.
+- **Shake the pointer to find it.** A few quick strokes make the cursor grow for a moment; on by default in Settings → Mouse & Trackpad.
+- **Keyboard.** The Caps Lock, Num Lock and Scroll Lock lights follow the keyboard, and a user who never chose a layout types with the computer's own instead of a Latin American default.
+
 ## Many displays, sharp text
 
-The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100, 125, 150, 175 or 200 %. Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
+The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100 to 200 % in 25 % steps, and in 0.8.8.6 (in development) up to 300 % for 4K laptop panels, as long as the desktop keeps at least 1024 × 600 (a 3840 × 2160 panel at 300 % is a 1280 × 720 desktop). Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
 
 [[shot:1]]
 
@@ -107,13 +116,13 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 
 - **Real PC GPUs are not verified yet.** The GPU path runs on the Raspberry Pi 5's V3D and on VMware's virtual GPU (SVGA3D), and was exercised with Mesa's software renderer in virtual machines. Testing on real AMD and Nvidia cards is still pending (`docs/GPU.md`).
 - **GPU drag, on by default in 0.8.7, is verified on V3D and SVGA3D only.** On a Raspberry Pi 5, in real drags, it halves the session's CPU alone and takes a memory load from 29 to 35 frames a second. On any other GPU only its self-test guards it, and `LORD_GPU_DRAG=0` turns it off (`docs/GPU.md`).
-- **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`).
+- **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`). In 0.8.8.6's development, one PC with a Radeon RX 580 and three monitors brought two fixes (the hardware cursor's size and the login screen on the chosen main display); other cards, laptop panels and hubs are untested.
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
 - **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
 - **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
-- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting; a screen reader, zoom and high contrast are on the roadmap.
+- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, in 0.8.8.6 (in development), reading aloud and Live Speech; a screen reader, zoom and high contrast are on the roadmap.
 
 ## Read the source
 

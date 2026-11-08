@@ -1,0 +1,176 @@
+{
+  "slug": "read-aloud",
+  "order": 8,
+  "title": {
+    "en": "Read aloud",
+    "es": "Leer en voz alta",
+    "pt": "Ler em voz alta"
+  },
+  "tagline": {
+    "en": "Any text read aloud on your own computer, without the internet: your choice of voices, a Personal Voice made from yours, and Live Speech. In development for 0.8.8.6.",
+    "es": "Cualquier texto leído en voz alta en tu propio equipo, sin internet: las voces que elijas, una Voz personal hecha con la tuya y Voz en tiempo real. En desarrollo para la 0.8.8.6.",
+    "pt": "Qualquer texto lido em voz alta no seu próprio computador, sem internet: as vozes que você escolher, uma Voz pessoal feita com a sua e a Fala ao vivo. Em desenvolvimento para a 0.8.8.6."
+  },
+  "lumo": {
+    "pose": "three-quarter",
+    "intro": {
+      "en": "Select some text and press ❖Esc: I'll read it to you. Everything happens on this computer, and no voice is downloaded until you choose it.",
+      "es": "Seleccioná un texto y apretá ❖Esc: te lo leo. Todo pasa en este equipo, y ninguna voz se descarga hasta que la elegís.",
+      "pt": "Selecione um texto e pressione ❖Esc: eu leio para você. Tudo acontece neste computador, e nenhuma voz é baixada até você escolher."
+    }
+  },
+  "screenshots": [],
+  "diagrams": [
+    {
+      "id": "flow",
+      "kind": "flow",
+      "title": {
+        "en": "Who does what",
+        "es": "Quién hace qué",
+        "pt": "Quem faz o quê"
+      },
+      "nodes": [
+        {
+          "id": "ui",
+          "label": {
+            "en": "Your selection",
+            "es": "Tu selección",
+            "pt": "Sua seleção"
+          },
+          "sub": {
+            "en": "Speech, ❖Esc or Live Speech",
+            "es": "Habla, ❖Esc o Voz en tiempo real",
+            "pt": "Fala, ❖Esc ou Fala ao vivo"
+          },
+          "tone": "user"
+        },
+        {
+          "id": "server",
+          "label": {
+            "en": "lord-server",
+            "es": "lord-server",
+            "pt": "lord-server"
+          },
+          "sub": {
+            "en": "Starts lord-say with fixed arguments; draws the player",
+            "es": "Arranca lord-say con argumentos fijos; dibuja el reproductor",
+            "pt": "Inicia o lord-say com argumentos fixos; desenha o reprodutor"
+          },
+          "tone": "ours"
+        },
+        {
+          "id": "say",
+          "label": {
+            "en": "lord-say",
+            "es": "lord-say",
+            "pt": "lord-say"
+          },
+          "sub": {
+            "en": "Splits sentences, plays them; no speech code",
+            "es": "Divide las oraciones y las reproduce; sin código de voz",
+            "pt": "Divide as frases e as toca; sem código de fala"
+          },
+          "tone": "ours"
+        },
+        {
+          "id": "tts",
+          "label": {
+            "en": "lord-tts",
+            "es": "lord-tts",
+            "pt": "lord-tts"
+          },
+          "sub": {
+            "en": "Sandboxed: no network, no sockets, no exec",
+            "es": "Aislado: sin red, sin sockets, sin exec",
+            "pt": "Em sandbox: sem rede, sem sockets, sem exec"
+          },
+          "tone": "kernel"
+        }
+      ],
+      "edges": [
+        {
+          "from": "ui",
+          "to": "server",
+          "label": {
+            "en": "the text",
+            "es": "el texto",
+            "pt": "o texto"
+          }
+        },
+        {
+          "from": "server",
+          "to": "say",
+          "label": {
+            "en": "sealed memory file",
+            "es": "archivo en memoria sellado",
+            "pt": "arquivo em memória selado"
+          }
+        },
+        {
+          "from": "say",
+          "to": "tts",
+          "label": {
+            "en": "one sentence at a time",
+            "es": "una oración por vez",
+            "pt": "uma frase por vez"
+          }
+        }
+      ],
+      "caption": {
+        "en": "The text never goes in a command line, and the engine that makes the speech can't reach the network or your files.",
+        "es": "El texto nunca va en una línea de comandos, y el motor que hace la voz no puede llegar a la red ni a tus archivos.",
+        "pt": "O texto nunca vai numa linha de comando, e o motor que faz a fala não alcança a rede nem seus arquivos."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "docs/VOICE.md",
+      "what": {
+        "en": "The design, models, voices and tests",
+        "es": "El diseño, los modelos, las voces y las pruebas",
+        "pt": "O projeto, os modelos, as vozes e os testes"
+      }
+    },
+    {
+      "path": "server/src/doc/h_tts.c",
+      "what": {
+        "en": "lord-tts, the sandboxed engine",
+        "es": "lord-tts, el motor aislado",
+        "pt": "lord-tts, o motor em sandbox"
+      }
+    },
+    {
+      "path": "server/src/tts/speak.c",
+      "what": {
+        "en": "How lord-server starts lord-say",
+        "es": "Cómo lord-server arranca lord-say",
+        "pt": "Como o lord-server inicia o lord-say"
+      }
+    },
+    {
+      "path": "server/src/ui/js_voice.c",
+      "what": {
+        "en": "The lord.voice API",
+        "es": "La API lord.voice",
+        "pt": "A API lord.voice"
+      }
+    },
+    {
+      "path": "apps/settings/PersonalVoice.jsx",
+      "what": {
+        "en": "Personal Voice",
+        "es": "Voz personal",
+        "pt": "Voz pessoal"
+      }
+    },
+    {
+      "path": "sdk/livespeech.jsx",
+      "what": {
+        "en": "Live Speech",
+        "es": "Voz en tiempo real",
+        "pt": "Fala ao vivo"
+      }
+    }
+  ]
+}
