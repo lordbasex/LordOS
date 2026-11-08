@@ -10,7 +10,7 @@
 //   - registerPrivacySection(): a slot so other parts (e.g. the Monitor) can add their
 //     own section to the Privacy page, without touching its code.
 import { appStatusEvent } from './appstatus.jsx';
-import { createElement as h, Fragment } from 'react';
+import { createElement as h, Fragment, useRef } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { statusPanelAt } from './statusitems.js';
@@ -167,7 +167,10 @@ export function useIndicators() {
 // an orange one for the microphone; tapping it shows which app is using it.
 export function PrivacyIndicators({ size = 8 }) {
   const list = useIndicators();
-  const [open, setOpen] = useStoreLocal();
+  // with a bar on every display there is one of these per bar: only the one tapped opens its list, under itself
+  const dotsAt = useRef(null);
+  const open = useStore(openStore) === dotsAt;
+  const setOpen = (on) => openStore.set(() => (on ? dotsAt : null));
   if (!list.length) return null;
   // the list opens toward the middle of the display: below a bar at the top, above the Classic taskbar at the bottom
   return h(View, { ref: (n) => { dotsAt.current = n; }, style: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6 }, onClick: () => setOpen(!open) },
@@ -181,11 +184,8 @@ export function PrivacyIndicators({ size = 8 }) {
         d.apps.map((a, i) => h(Text, { key: i, style: { fontSize: 12, color: '#f5f5f7' } }, a))))) : null);
 }
 
-// local mini-state without React hooks (the theme's component may not have useState available
-// in its import); we use a module store.
-const openStore = createStore(false);
-const dotsAt = { current: null };
-function useStoreLocal() { return [useStore(openStore), openStore.set]; }
+// which bar's list is open (the ref of its dots), in a module store so a tap on another bar's dots moves it there
+const openStore = createStore(null);
 
 // ---- Privacy page slots (e.g. the Monitor adds its own) ----
 export const privacySections = createStore([]);   // [{ id, order, Component }]

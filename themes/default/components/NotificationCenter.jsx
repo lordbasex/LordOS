@@ -5,7 +5,7 @@
 import {
   View, Text, ScrollView, Toggle, useStore, notifyHistory, clearNotifyHistory, settings, notifyPrefs, dndActive, useSettings,
   getApp, appName, formatTime, formatDate, monthName, weekdayName, locale, addListener, t as tr, menuBarPrefs, monthCells, weekStartFor,
-  openCalendarApp,
+  openCalendarApp, panelLeft, inBar,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -91,14 +91,16 @@ function MonthCalendar({ t, onClose }) {
 
 const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === ref.current) return true; return false; };
 
-// area: the display of the menu bar it opened from (global coordinates); top: the menu bar's height
-export function NotificationCenter({ t, top, onClose, area }) {
+// area: the display of the menu bar it opened from (global coordinates); top: the menu bar's height; at: the [x,
+// width] of the clock (or the bell) that opened it, so it sits under it, inside that display
+export function NotificationCenter({ t, top, onClose, area, at = null }) {
   const ref = useRef(null);
   const list = useStore(notifyHistory);
   const [s] = useSettings();
   const p = menuBarPrefs(s);
-  // a click on the menu bar is the clock's own (it toggles the panel); anywhere else below it closes the panel
-  useEffect(() => addListener('pointerdown', (e) => { if (!inside(e.target, ref) && e.y > area.y + top) onClose(); }), [onClose, area.y]);
+  // a click on this display's bar is the clock's own (it toggles the panel); anywhere else closes the panel, another
+  // display's bar too (its clock then opens the panel there)
+  useEffect(() => addListener('pointerdown', (e) => { if (!inside(e.target, ref) && !inBar(e.x, e.y, area, top)) onClose(); }), [onClose, area, top]);
   const dnd = dndActive();
   const setDnd = (on) => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !!on } }));
   const groups = [];
@@ -116,7 +118,7 @@ export function NotificationCenter({ t, top, onClose, area }) {
       border: `1px solid ${t.windowBorder}`, boxShadow: '0 16px 40px rgba(0,0,0,0.4)', ...extra }}>{children}</View>
   );
   return (
-    <View ref={ref} style={{ position: 'absolute', left: area.x + area.w - W - 10, top: area.y + top + 6, width: W, gap: 10 }}>
+    <View ref={ref} style={{ position: 'absolute', left: panelLeft(at, W, area), top: area.y + top + 6, width: W, gap: 10 }}>
       {panel(
         <View style={{ flex: 1 }}>
           <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 8 }}>

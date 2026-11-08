@@ -1,7 +1,7 @@
 // Drop-down / context menu. Closes when clicking outside or with Escape. Keyboard: ↑/↓ move,
 // Home/End jump, Enter/Space choose, → opens a submenu and ← closes it. A menu taller than the
 // screen scrolls (wheel or touchpad), and the keyboard keeps the highlighted item in view.
-import { View, Text, addListener, useTheme, screen, direction, ScrollView, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, Layer } from '@lordos/sdk';
+import { View, Text, addListener, useTheme, screen, direction, ScrollView, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, Layer, displayAt, insideDisplay } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 const ROW = 24, SEP_H = 9, HEAD_H = 22;
@@ -62,16 +62,17 @@ export function Menu({ x, y, items, onClose, anchor, width: minWidth = 220, abov
   const scrollRef = useRef(null);
   const [subMenu, setSubMenu] = useState(null);      // { items, x, y, keys }
   const [active, setActive] = useState(-1);
-  const width = fitWidth(items, minWidth);
+  // the display it opens on: the one under the point it was asked at (a menu bar's, the Dock's, a click's)
+  const disp = displayAt(x, y);
+  const width = Math.min(fitWidth(items, minWidth), disp.w - 8);
   // In Arabic/Hebrew x is the right edge: the menu opens to the left.
   if (side ? side === 'left' : direction() === 'rtl') x -= width;
-  // Always inside the screen; taller than it: it scrolls.
+  // Always inside that display (not spilling onto the next one); taller than it: it scrolls.
   const full = items.reduce((h, it) => h + rowH(it), 10);
-  const height = Math.min(full, screen.height - 8);
+  const height = Math.min(full, disp.h - 8);
   if (above) y -= height;
   else if (centered) y -= height / 2;
-  x = Math.max(4, Math.min(x, screen.width - width - 4));
-  y = Math.max(4, Math.min(y, screen.height - height - 4));
+  ({ x, y } = insideDisplay(x, y, width, height, disp));
   const scrolls = full > height;
 
   // the keyboard

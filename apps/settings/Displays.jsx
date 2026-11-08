@@ -10,7 +10,7 @@ import {
   arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, typeScale, spacing,
   nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
   identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
-  scaleChoices, scaleTiles,
+  scaleChoices, scaleTiles, menuBarEveryDisplay, menuBarPatch,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Section, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -379,8 +379,9 @@ export function DisplaysSettings() {
           <SettingRow label={tr('prefs.display.mirrorDisplays')} disabled={act.length < 2 && !d.mirror}>
             <Toggle small on={!!d.mirror} onChange={(on) => setDisplayMirror(on)} />
           </SettingRow>
+          {/* the same switch as Settings → Desktop & Dock → Menu Bar (on by default since 0.8.8.6) */}
           <SettingRow label={tr('prefs.display.menuBarAll')} disabled={d.mirror}>
-            <Toggle small on={!!s.menuBarAllDisplays} onChange={(on) => set({ menuBarAllDisplays: on })} />
+            <Toggle small on={menuBarEveryDisplay(s)} onChange={(on) => set(menuBarPatch(s, 'everyDisplay', on))} />
           </SettingRow>
           <SettingRow label={tr('prefs.display.capture')} hint={tr('prefs.display.captureHint')}>
             <PopUp width={170} value={d.captureAll ? 'all' : 'main'} onChange={(v) => setCaptureAllDisplays(v === 'all')}

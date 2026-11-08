@@ -6,7 +6,7 @@
 // sdk/menubarmodel.js); everything is on until the user turns it off.
 import {
   View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, dock, themes,
-  spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp,
+  spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp, menuBarEveryDisplay,
 } from '@lordos/sdk';
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
@@ -97,6 +97,8 @@ function MenuBarSection({ classic }) {
   );
   return (
     <Section title={tr(classic ? 'settings.dock.menubar.titleTaskbar' : 'settings.dock.menubar.title')} footer={tr('settings.dock.menubar.footer')}>
+      {/* Lord Flow: a full bar on each display (the Classic taskbar stays on the main display) */}
+      {classic ? null : row('everyDisplay', menuBarEveryDisplay(s), true)}
       {getApp('cleaner') ? row('cleaner', cleanerItemShown(s), true) : null}
       {row('keyboard', p.keyboard, true)}
       {row('osk', p.osk, true)}

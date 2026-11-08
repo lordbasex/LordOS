@@ -41,6 +41,8 @@ export function makeTheme({ mode, accent, effects }) {
     // This theme's own:
     menuBg: dark ? 'rgba(24,24,30,0.42)' : 'rgba(250,250,252,0.55)',
     menuText: dark ? '#f5f5f7' : '#1d1d1f',
+    // the app's menus on a display without the focused window (a bar on every display): menuText at textDim's strength
+    menuTextDim: dark ? 'rgba(245,245,247,0.55)' : 'rgba(29,29,31,0.5)',
     menuHover: dark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.08)',
     panelBg: dark ? (effects ? 'rgba(36,36,42,0.72)' : '#2a2a30') : (effects ? 'rgba(246,246,248,0.78)' : '#f2f2f5'),
     windowBorder: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.14)',

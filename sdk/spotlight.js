@@ -6,7 +6,7 @@
 // (10 km to mi, 72 f to c, 1,5 gb to mb). ↑↓ choose, Enter opens, ❖Enter shows in Files, Esc closes.
 // What is opened often rises in the results (~/.local/share/lordos/spotlight.json).
 import { createElement as h, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Image, addListener, screen, mainBox } from '@lordos/runtime';
+import { View, Text, Image, addListener, screen, mainBox, displays } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { useTheme } from './theme.js';
 import { t, tOptional, formatNumber, formatDate, locale } from './i18n.js';
@@ -20,11 +20,18 @@ import * as fs from './fs.js';
 
 export const spotlightOpen = createStore(false);
 let prevFocus = null;
+// display: where it opens (the display whose menu bar's ⌕ was clicked); without one, the main display
+let openOn = null;
 export const spotlight = {
-  open() { if (!spotlightOpen.get()) { prevFocus = focusToken(); spotlightOpen.set(true); } },
+  open(display) { if (!spotlightOpen.get()) { prevFocus = focusToken(); openOn = display && display.id != null ? display.id : null; spotlightOpen.set(true); } },
   close() { if (spotlightOpen.get()) { spotlightOpen.set(false); setTimeout(() => restoreFocus(prevFocus), 0); } },
-  toggle() { if (spotlightOpen.get()) spotlight.close(); else spotlight.open(); },
+  toggle(display) { if (spotlightOpen.get()) spotlight.close(); else spotlight.open(display); },
 };
+// the box it opens in: that display while it is still connected, else the main one
+function searchBox() {
+  const d = openOn == null ? null : displays().find((x) => x.id === openOn);
+  return d ? { left: d.x, top: d.y, width: d.w, height: d.h } : mainBox();
+}
 
 // ---- recent use (for ranking) ----
 
@@ -449,13 +456,14 @@ function Panel() {
     if (e.key === 'Tab') { const i = sections.findIndex((s) => s.items.includes(cur)); const next = sections[(i + 1) % sections.length]; if (next) setSel(flat.indexOf(next.items[0])); return true; }
     return false;
   };
-  const W = Math.min(720, mainBox().width - 40);
+  const box = searchBox();
+  const W = Math.min(720, box.width - 40);
   const listW = cur && query.trim() ? W - 260 : W;
-  return h(View, { onClick: () => spotlight.close(), style: { position: 'absolute', ...mainBox() } },
+  return h(View, { onClick: () => spotlight.close(), style: { position: 'absolute', ...box } },
     h(View, {
       onClick: (e) => e.stopPropagation(),
       style: {
-        position: 'absolute', left: Math.round((mainBox().width - W) / 2), top: Math.round(mainBox().height * 0.16), width: W,
+        position: 'absolute', left: Math.round((box.width - W) / 2), top: Math.round(box.height * 0.16), width: W,
         borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 24px 60px rgba(0,0,0,0.5)', overflow: 'hidden',
       },
     },

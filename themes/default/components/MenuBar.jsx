@@ -1,13 +1,20 @@
 // Top menu bar: L menu, active app, Window menu, keyboard layout,
 // Control Center, the notifications' bell and the clock (a click opens notifications and the calendar).
 // The keyboard layout and the bell can be turned off in Settings → Desktop & Dock → Menu Bar (issue #58).
-import { View, Text, useClock, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs } from '@lordos/sdk';
-import { useRef, useState } from 'react';
+// <MenuBars> draws one full bar per display (0.8.8.6; Settings → Desktop & Dock → Menu Bar → "Show the menu bar on
+// every display", on by default): the app's menus are lit on the focused window's display and dimmed on the others,
+// where a click lights that bar and opens the menu there. sdk/menubarmodel.js decides which bar is lit.
+import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs } from '@lordos/sdk';
+import { useState, useRef } from 'react';
 import { Menu } from './Menu.jsx';
 
 // Date and time with the region's format (sdk/i18n.js),
 // with the format chosen in Settings → Date & Time (sdk/hardware.jsx)
 const format = (d) => menuClock(d);
+// one timer for every bar's clock: N displays, one setInterval (sdk/ticker.js)
+const clockTicker = sharedTicker(format, 1000);
+// the [x, width] of a bar item (global), for the panel it opens to sit under it
+const itemAt = (ref) => { try { const [x, , w] = lord.getLayout(ref.current.id); return [x, w]; } catch (e) { return null; } };
 
 function BarItem({ t, children, onClick, active, anchorRef }) {
   const [hover, setHover] = useState(false);
@@ -20,8 +27,9 @@ function BarItem({ t, children, onClick, active, anchorRef }) {
   );
 }
 
-const Label = ({ t, children, bold }) => (
-  <Text style={{ fontSize: 13, fontWeight: bold ? 700 : 500, color: t.menuText, whiteSpace: 'nowrap' }}>{children}</Text>
+// dim: the app's menus on a display without the focused window
+const Label = ({ t, children, bold, dim }) => (
+  <Text style={{ fontSize: 13, fontWeight: bold ? 700 : 500, color: dim ? t.menuTextDim : t.menuText, whiteSpace: 'nowrap' }}>{children}</Text>
 );
 
 function ControlGlyph({ t }) {
@@ -45,14 +53,16 @@ function BellGlyph({ color, dot }) {
   );
 }
 
-// area: the display it is on (global coordinates; the main one, or each one with "menu bar on all displays")
-// clockPanel: the clock's panel is open on this bar; unread: a notification came since it was last opened
-export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, controlCenter, onClock, clockPanel, unread, area = { x: 0, y: 0, w: screen.width, h: screen.height } }) {
-  const clock = useClock(format, 1000);
+// area: the display it is on (global coordinates; the main one, or each one with "menu bar on every display")
+// clockPanel / controlCenter: that panel is open from this bar; unread: a notification came since it was last opened
+// onClock(at) / onControlCenter(at): at is the clicked item's [x, width], for the panel to open under it
+// active: the app's menus are lit here (false: dimmed, and a click first calls onActivate to light this bar)
+export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, controlCenter, onClock, clockPanel, unread, area = { x: 0, y: 0, w: screen.width, h: screen.height }, active = true, onActivate }) {
+  const clock = useStore(clockTicker);
   const [s] = useSettings();         // the active keyboard layout lives in the settings
   const bar = menuBarPrefs(s);
   const [open, setOpen] = useState(null);
-  const refs = { logo: useRef(null), app: useRef(null), window: useRef(null), help: useRef(null) };
+  const refs = { logo: useRef(null), app: useRef(null), window: useRef(null), help: useRef(null), cc: useRef(null), clock: useRef(null), bell: useRef(null) };
   const appRefs = useRef({});
   const app = focused ? getApp(focused) : null;
   const extra = useMenusWithSpeech(focused) || [];
@@ -62,7 +72,11 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
     const [x, , w] = lord.getLayout(ref.current.id);
     return direction() === 'rtl' ? x + w : x;
   };
-  const toggle = (name, ref) => setOpen((o) => (o?.name === name ? null : { name, x: anchorX(ref) }));
+  const toggle = (name, ref) => {
+    if (!active && onActivate) onActivate();
+    setOpen((o) => (o?.name === name ? null : { name, x: anchorX(ref) }));
+  };
+  const dim = !active;
   const close = () => setOpen(null);
 
   const menus = {
@@ -111,17 +125,17 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)}>
           <LordOSGlyph size={16} color={t.menuText} />
         </BarItem>
-        <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)}><Label t={t} bold>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)}><Label t={t} bold dim={dim}>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
         {extra.map((m, i) => {
           const key = `app${i}`;
           const ref = { get current() { return appRefs.current[key]; } };
           return (
             <BarItem key={key} t={t} active={open?.name === key} anchorRef={(inst) => { appRefs.current[key] = inst; }}
-              onClick={() => toggle(key, ref)}><Label t={t}>{m.label}</Label></BarItem>
+              onClick={() => toggle(key, ref)}><Label t={t} dim={dim}>{m.label}</Label></BarItem>
           );
         })}
-        <BarItem t={t} active={open?.name === 'window'} anchorRef={refs.window} onClick={() => toggle('window', refs.window)}><Label t={t}>{tr('shell.menu.window')}</Label></BarItem>
-        <BarItem t={t} active={open?.name === 'help'} anchorRef={refs.help} onClick={() => toggle('help', refs.help)}><Label t={t}>{tr('shell.menu.help')}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'window'} anchorRef={refs.window} onClick={() => toggle('window', refs.window)}><Label t={t} dim={dim}>{tr('shell.menu.window')}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'help'} anchorRef={refs.help} onClick={() => toggle('help', refs.help)}><Label t={t} dim={dim}>{tr('shell.menu.help')}</Label></BarItem>
         <View style={{ flex: 1 }} />
         {bar.keyboard ? (
           <BarItem t={t} onClick={() => keyboard.next()}>
@@ -130,12 +144,29 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         ) : null}
         <StatusItems color={t.menuText} />
         <PrivacyIndicators />
-        <BarItem t={t} onClick={() => spotlight.toggle()}><Label t={t}>⌕</Label></BarItem>
-        <BarItem t={t} active={controlCenter} onClick={onControlCenter}><ControlGlyph t={t} /></BarItem>
-        {bar.bell ? <BarItem t={t} active={clockPanel} onClick={onClock}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
-        <BarItem t={t} active={clockPanel} onClick={onClock}><Label t={t}>{clock}</Label></BarItem>
+        <BarItem t={t} onClick={() => spotlight.toggle(area)}><Label t={t}>⌕</Label></BarItem>
+        <BarItem t={t} active={controlCenter} anchorRef={refs.cc} onClick={() => onControlCenter(itemAt(refs.cc))}><ControlGlyph t={t} /></BarItem>
+        {bar.bell ? <BarItem t={t} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
+        <BarItem t={t} active={clockPanel} anchorRef={refs.clock} onClick={() => onClock(itemAt(refs.clock))}><Label t={t}>{clock}</Label></BarItem>
       </View>
       {cur && <Menu x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} />}
     </View>
   );
+}
+
+// One bar per display (only the main display's when the setting is off or the displays are mirrored). displays:
+// screenDisplays(); every: menuBarEveryDisplay(settings); mirror: screen.mirror. control / clock: the display id
+// whose Control Center / clock panel is open. onControlCenter(display, at) and onClock(display, at) open them there.
+// Adding or removing a monitor re-renders the shell (startShell's screen revision): its bar comes and goes with it.
+export function MenuBars({ t, height, displays, every, mirror, focused, focusRect, control, clock, unread, onClock, onControlCenter, onLaunchpad }) {
+  const [pin, setPin] = useState(null);       // the dimmed bar the user clicked (sdk/menubarmodel.js pinBar)
+  const bars = barDisplays(displays, every, mirror);
+  const focus = focused ? { id: focused, rect: focusRect || null } : null;
+  const lit = activeBarId(displays, bars, focus, pin);
+  return bars.map((d) => (
+    <MenuBar key={d.id + ':' + d.x} t={t} height={height} focused={focused} area={d} active={d.id === lit}
+      onActivate={() => setPin(pinBar(displays, focus, d.id))}
+      controlCenter={control === d.id} clockPanel={clock === d.id} unread={unread}
+      onClock={(at) => onClock(d, at)} onControlCenter={(at) => onControlCenter(d, at)} onLaunchpad={onLaunchpad} />
+  ));
 }

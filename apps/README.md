@@ -81,7 +81,7 @@ Store (see `docs/NATIVE-APPS.md`).
 | Session | `session.quit()`, `themes.list()`, `themes.use(id)` |
 | Apps | `useLauncherApps()` (LordOS, packages and Linux apps), `launchApp(id)`, `packages.*`, `windowIcon(w)` — see `docs/NATIVE-APPS.md` |
 | Clipboard | `clipboard.get/set(text, { secure })/use/pin/remove/clear`, `clipboardHistory` and `clipboardKind` (saved history; ❖V and ❖⇧V panels) — see `docs/SPOTLIGHT.md` |
-| Search | `spotlight.open/close/toggle` (❖Space); `spotlightCalc(text)` and `spotlightConvert(text)` |
+| Search | `spotlight.open/close/toggle` (❖Space; `open(display)` and `toggle(display)` open it on that display); `spotlightCalc(text)` and `spotlightConvert(text)` |
 | Sound | `useSound()`, `sound.setVolume/setMute/setDefault/setPort/move/meter/play`, `defaultSink(s)`, `microphones(s)` — see `docs/SOUND.md` |
 | WebAssembly | the standard `WebAssembly` global (`docs/WASM.md`); in installed apps, `loadWasm(id, path)` |
 | Canvas | `<Image pixels={{ width, height, data }} />`: RGBA pixels (for example, computed in WASM) |

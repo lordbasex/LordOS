@@ -16,7 +16,7 @@
 // slices (at most 1 minute if something is due within the hour, 10 minutes otherwise) and each
 // wake-up looks at the real time: if it jumped (clock change, suspend), everything is recomputed.
 // Anything that should have rung less than 10 minutes ago still rings; older ones are dropped.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h } from 'react';
 import { View, Text } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
@@ -24,6 +24,7 @@ import { t, formatTime } from './i18n.js';
 import { notify, dismissNotification } from './notify.js';
 import { sound } from './sound.js';
 import { registerStatusItem } from './statusitems.js';
+import { sharedTicker, idleStore } from './ticker.js';
 import { wm } from './windows.js';
 
 const MIN = 60000, LATE = 10 * MIN, SNOOZE = 9 * MIN, RING_MS = 60000;
@@ -188,10 +189,10 @@ function TimerLeft({ color }) {
   const txt = `${sec >= 3600 ? `${Math.floor(sec / 3600)}:` : ''}${String(Math.floor(sec / 60) % 60).padStart(sec >= 3600 ? 2 : 1, '0')}:${String(sec % 60).padStart(2, '0')}`;
   return h(Text, { style: { fontSize: 12, fontWeight: 600, color, fontFamily: 'monospace' } }, `⏱ ${txt}`);
 }
-// redraws every second, only while it runs
+// redraws every second, only while it runs; the menu bar of each display shares one timer (sdk/ticker.js)
+const seconds = sharedTicker(() => Math.floor(Date.now() / 1000), 1000);
 function useTick(on) {
-  const [, set] = useState(0);
-  useEffect(() => { if (!on) return undefined; const id = setInterval(() => set((x) => x + 1), 1000); return () => clearInterval(id); }, [on]);
+  useStore(on ? seconds : idleStore);
 }
 
 function ClockStatus({ color, height }) {

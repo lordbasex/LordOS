@@ -1,4 +1,4 @@
-// menubar_test.mjs — (0.8.8.6, #58) what the bar and Lord Flow's panels show: the Control Center's tiles that
+// menubar_test.mjs — (0.8.8.6, #58) what the bar and Lord Flow's panels show, and (0.8.8.6) a bar on every display: the Control Center's tiles that
 // Settings → Desktop & Dock turns off, the output list by the volume (a click makes that output the default one)
 // and the clock panel's calendar. Bundles tests/menubar_scene.mjs with esbuild (as the theme is built) over a stub
 // `lord` with two sound outputs, a Wi-Fi radio and a Bluetooth adapter that records lord.sound calls, runs it, and
@@ -68,21 +68,25 @@ const MOCK = `globalThis.__lordTest = (() => {
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-menubar-'));
 let bad = 0, n = 0;
 try {
-  const out = await esbuild.build({
-    entryPoints: [path.join(here, 'menubar_scene.mjs')], bundle: true, write: false, format: 'esm',
-    platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
-    alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
-    define: { 'process.env.NODE_ENV': '"production"' },
-    banner: { js: MOCK },
-  });
-  const file = path.join(dir, 'scene.mjs');
-  writeFileSync(file, out.outputFiles[0].contents);
-  const r = spawnSync(process.execPath, [file], { encoding: 'utf8' });
-  for (const line of r.stdout.split('\n').filter(Boolean)) {
-    n++;
-    if (!line.startsWith('ok ')) { bad++; console.log(`✗ ${line}`); }
+  // menubar_scene.mjs: the panels (#58); menubar_displays_scene.mjs: a bar on every display (0.8.8.6)
+  for (const scene of ['menubar_scene.mjs', 'menubar_displays_scene.mjs']) {
+    const out = await esbuild.build({
+      entryPoints: [path.join(here, scene)], bundle: true, write: false, format: 'esm',
+      platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
+      alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
+      define: { 'process.env.NODE_ENV': '"production"' },
+      banner: { js: MOCK },
+    });
+    const file = path.join(dir, scene);
+    writeFileSync(file, out.outputFiles[0].contents);
+    const r = spawnSync(process.execPath, [file], { encoding: 'utf8' });
+    let m = 0;
+    for (const line of r.stdout.split('\n').filter(Boolean)) {
+      n++; m++;
+      if (!line.startsWith('ok ')) { bad++; console.log(`✗ ${scene}: ${line}`); }
+    }
+    if (r.status !== 0 || !m) { bad++; console.log(`✗ ${scene} failed (${r.status}): ${r.stderr.slice(0, 2000)}`); }
   }
-  if (r.status !== 0 || !n) { bad++; console.log(`✗ the scene failed (${r.status}): ${r.stderr.slice(0, 2000)}`); }
   console.log(`menubar: ${n} checks, ${bad} failures`);
 } finally {
   rmSync(dir, { recursive: true, force: true });

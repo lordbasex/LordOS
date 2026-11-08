@@ -8,12 +8,12 @@ import {
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
   findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
-  openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory,
+  openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
-import { MenuBar } from './components/MenuBar.jsx';
+import { MenuBars } from './components/MenuBar.jsx';
 import { Dock, LaunchpadIcon, dockThickness } from './components/Dock.jsx';
 import { Window } from './components/Window.jsx';
 import { Launchpad } from './components/Launchpad.jsx';
@@ -27,10 +27,11 @@ const DOCK_ORDER = ['files', DOCK_LAUNCHER, 'terminal', 'calculator', 'settings'
 
 // Area for windows: below the menu bar and without the Dock's side (unless it hides, always or only under windows),
 // so maximized and new windows don't end up under the Dock.
-// Several displays (docs/DISPLAYS.md): the menu bar and the Dock go on the main one; the menu bar
-// also on the others with Settings → Displays → "Show menu bar on all displays".
-function workAreaFor(p, d, menuAll) {
-  const bar = d.main || menuAll ? MENU_H : 0;
+// Several displays (docs/DISPLAYS.md): the Dock goes on the main one; the menu bar on every display (each one's work
+// area starts below its own bar) unless Settings → Desktop & Dock → Menu Bar → "Show the menu bar on every display"
+// is off or the displays are mirrored, then only on the main one (sdk/menubarmodel.js hasBar).
+function workAreaFor(p, d, every) {
+  const bar = hasBar(d, every, screen.mirror) ? MENU_H : 0;
   const a = { x: d.x, y: d.y + bar, w: d.w, h: d.h - bar };
   if (!d.main || p.dockAutohide) return a;
   const k = dockThickness(p.dockSize);
@@ -39,7 +40,7 @@ function workAreaFor(p, d, menuAll) {
   else a.h -= k;
   return a;
 }
-const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s), d, !!s.menuBarAllDisplays); };
+const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s), d, menuBarEveryDisplay(s)); };
 
 // chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame
 configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
@@ -116,7 +117,7 @@ function App() {
   const minimizing = useMinimizing(windows);
   const minFx = (id) => { const m = minimizing.find((x) => x.win.id === id); return m ? { p: m.p, x: main.x + main.w / 2, y: main.y + main.h - 36 } : undefined; };
   const [launchpad, setLaunchpad] = useState(false);
-  const [control, setControl] = useState(null);         // the display whose menu bar opened it
+  const [control, setControl] = useState(null);         // { area, at }: the display whose menu bar opened it, and the item
   const [clockPanel, setClockPanel] = useState(null);   // the same, for the clock's notifications and calendar
   const history = useStore(notifyHistory);
   const seen = useRef(0);
@@ -130,11 +131,22 @@ function App() {
   const launcherApps = useLauncherApps();
   const dp = dockPrefs(s);
   // the work area follows the Dock live (position, size, auto-hide, another screen)
+  const every = menuBarEveryDisplay(s);
   useEffect(() => { configureWindows({ apps, workArea: areaFn }); },
-    [dp.dockPosition, dp.dockSize, dp.dockAutohide, s.menuBarAllDisplays, screen.width, screen.height]);
+    [dp.dockPosition, dp.dockSize, dp.dockAutohide, every, screen.mirror, screen.width, screen.height]);
+  // the bar turned on for every display: windows at the top of the other displays move below their new bar
+  const barsWere = useRef(every);
+  useEffect(() => { if (barsWere.current !== every) { barsWere.current = every; keepWindowsInWorkAreas(); } }, [every]);
   const main = mainDisplay();
   const all = screenDisplays();
-  const bars = s.menuBarAllDisplays && !screen.mirror ? all : [main];
+  // a panel opened from a bar goes on that bar's display, under the item; the same item again closes it
+  const panelToggle = (set, other) => (d, at) => { other(null); set((v) => (v && v.area.id === d.id ? null : { area: d, at })); };
+  // the focused window's frame decides which bar has the app's menus lit (sdk/menubarmodel.js activeBarId)
+  const fw = focused ? windows.find((w) => w.id === focused) : null;
+  const focusRect = fw ? wm.frame(fw) : null;
+  // a panel follows its display by id (moved in Settings → Displays) and closes when that display is unplugged
+  const ccArea = control && all.find((d) => d.id === control.area.id);
+  const clockArea = clockPanel && all.find((d) => d.id === clockPanel.area.id);
 
   // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
   const toggleLauncher = () => { closeOverview(); setLaunchpad((v) => !v); };
@@ -172,12 +184,10 @@ function App() {
             order is the layers', not this tree's, and clicks follow it. Menus go to «popover»
             by themselves (Menu.jsx). */}
         <Layer name="menubar">
-          {bars.map((d) => (
-            <MenuBar key={d.id + ':' + d.x} t={t} height={MENU_H} focused={focused} controlCenter={!!control} area={d}
-              clockPanel={!!clockPanel} unread={unread}
-              onClock={() => { setControl(null); setClockPanel((v) => (v ? null : d)); }}
-              onLaunchpad={() => setLaunchpad(true)} onControlCenter={() => { setClockPanel(null); setControl((v) => (v ? null : d)); }} />
-          ))}
+          <MenuBars t={t} height={MENU_H} displays={all} every={every} mirror={screen.mirror} focused={focused} focusRect={focusRect}
+            control={control ? control.area.id : null} clock={clockPanel ? clockPanel.area.id : null} unread={unread}
+            onClock={panelToggle(setClockPanel, setControl)} onControlCenter={panelToggle(setControl, setClockPanel)}
+            onLaunchpad={() => setLaunchpad(true)} />
         </Layer>
         <Layer name="dock">
         <Dock t={t} items={entries} running={entries.filter((e) => e.running).map((e) => e.id)}
@@ -202,11 +212,11 @@ function App() {
         <OverviewChrome />
         <DesktopHud />
         <LevelHud />
-        {control && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={control} onClose={() => setControl(null)} /></Layer>}
-        {clockPanel && <Layer name="popover"><NotificationCenter t={t} top={MENU_H} area={clockPanel} onClose={() => setClockPanel(null)} /></Layer>}
+        {ccArea && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={ccArea} at={control.at} onClose={() => setControl(null)} /></Layer>}
+        {clockArea && <Layer name="popover"><NotificationCenter t={t} top={MENU_H} area={clockArea} at={clockPanel.at} onClose={() => setClockPanel(null)} /></Layer>}
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
-            { label: tr('shell.desktop.wallpaper'), onClick: () => setControl(main) },
+            { label: tr('shell.desktop.wallpaper'), onClick: () => { const d = displayAt(context.x, context.y); setControl({ area: hasBar(d, every, screen.mirror) ? d : main, at: null }); } },
             { label: tr('shell.desktop.openLaunchpad'), onClick: () => setLaunchpad(true) },
             { label: tr('shell.desktops.overview'), onClick: () => toggleOverview() },
             '-',

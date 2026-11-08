@@ -486,6 +486,8 @@
   "dock.menubar.title": "Barra de menús",
   "dock.menubar.titleTaskbar": "Barra de tareas",
   "dock.menubar.footer": "Lo que aparece junto al reloj. Un clic en el reloj abre tus notificaciones y el calendario.",
+  "dock.menubar.everyDisplay": "Mostrar la barra de menús en todas las pantallas",
+  "dock.menubar.everyDisplayHint": "Cada pantalla tiene su propia barra con el reloj y los íconos de estado. Los menús de la app se ven encendidos en la pantalla de la ventana que estás usando.",
   "dock.menubar.cleaner": "Limpieza",
   "dock.menubar.cleanerHint": "La corona: disco, memoria, procesador y red de un vistazo. El mismo interruptor está en Limpieza → Ajustes.",
   "dock.menubar.keyboard": "Distribución del teclado",

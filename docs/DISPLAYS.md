@@ -37,8 +37,17 @@ shows in the captures.
 - **Mirror**: every display shows the main display's logical rect, each one fitted at its own
   scale (`k = min(pw / w, ph / h)`) and centered (letterbox). Each is rendered, not copied, so a
   bigger mirror is sharp.
-- The **main display** gets the menu bar and the Dock; with "Show menu bar on all displays" the
-  menu bar is drawn on each one. The work area is per display.
+- The **main display** gets the Dock. Since 0.8.8.6 Lord Flow draws a full menu bar on **every**
+  display (on by default; Settings → Desktop & Dock → Menu Bar → "Show the menu bar on every display",
+  the same switch as Displays → "Show menu bar on all displays", `settings.menuBarAllDisplays`, absent =
+  on). Each bar has its own clock, status items, search, Control Center and notifications panel,
+  which open on that display under the clicked item; the app's menus are lit on the display with the
+  focused window and dimmed on the others (a click there lights that bar and opens the menu there).
+  One timer serves every clock (`sdk/ticker.js`); which bar is lit, the panels' placement and the
+  bars per display are `sdk/menubarmodel.js` (`server/tests/menubar_model_test.mjs`,
+  `menubar_test.mjs`). Mirrored displays get the main display's bar only. The work area is per
+  display and reserves the bar's height on each display that has one. Lord Classic's taskbar stays
+  on the main display.
 
 The math is in `server/src/outputs.c` (pure functions, `build/outputs-test`, 131 checks): scale
 rounding and the recommended scale, logical ↔ physical, damage rectangles, mirrored views,

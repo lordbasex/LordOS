@@ -124,6 +124,13 @@ onScreenChange((now, old) => {
   if (!areaFn && (old.displays || []).length <= 1 && screen.displays.length <= 1) {
     area = { ...area, w: Math.max(200, area.w + now.width - old.width), h: Math.max(150, area.h + now.height - old.height) };
   }
+  keepWindowsInWorkAreas();
+});
+
+// Every window inside its display's work area: one left on a display that is gone (or outside every display) moves
+// to the main one; the others stay on their display, below its bar and within reach. Run when the screen changes and
+// when a theme changes what the work areas reserve (Lord Flow's menu bar on every display turned on).
+export function keepWindowsInWorkAreas() {
   // a window left on a display that is gone (or outside every display) moves to the main one; the
   // others stay on their display, inside its work area
   const onSome = (w) => screen.displays.some((d) => w.x < d.x + d.w - 48 && w.x + w.w > d.x + 48 && w.y < d.y + d.h - 24 && w.y + 24 > d.y);
@@ -137,7 +144,7 @@ onScreenChange((now, old) => {
       y: Math.round(keep ? Math.min(Math.max(w.y, a.y), a.y + a.h - Math.min(hh, 48)) : a.y + Math.max(0, (a.h - hh) / 2)),
     };
   }));
-});
+}
 // Menus of each window: id → [{ label, items: [{ label, hint, onClick, disabled, checked } | '-'] }]
 export const appMenus = createStore({});
 

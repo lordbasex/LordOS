@@ -355,9 +355,13 @@ With Arabic or Hebrew the engine flips rows and alignment by itself. Your part
 Use `screenDisplays()` (`[{ id, name, x, y, w, h, scale, main }]`), `mainDisplay()`,
 `displayAt(x, y)`, `displayFor(rect)` and `screen.mirror` ([DISPLAYS.md](DISPLAYS.md#the-theme-and-the-sdk)).
 The bundled themes draw a wallpaper per display at its pixel size
-(`wallpaperSrc(w, d.w * d.scale / 100, d.h * d.scale / 100)`), and put the bar and the Dock on the
-main display (Lord Flow also on the others with "Show menu bar on all displays",
-`settings.menuBarAllDisplays`). Your `workArea` function receives each display; `workAreaOf(d)` and
+(`wallpaperSrc(w, d.w * d.scale / 100, d.h * d.scale / 100)`), and put the Dock on the main display.
+Lord Flow draws a menu bar on every display (`<MenuBars>` in `themes/default/components/MenuBar.jsx`;
+off with `settings.menuBarAllDisplays === false`, read it with `menuBarEveryDisplay(settings)`):
+`barDisplays`, `hasBar`, `activeBarId`, `pinBar` and `panelLeft` (`sdk/menubarmodel.js`) say which
+displays get a bar, which work areas reserve it, which bar has the app's menus lit and where a panel
+opens; `sharedTicker` (`sdk/ticker.js`) gives every bar's clock one timer; `spotlight.toggle(display)`
+opens Search on that display. Lord Classic's taskbar is on the main display. Your `workArea` function receives each display; `workAreaOf(d)` and
 `pointerWorkArea()` read it back. New windows open on the display under the pointer, or the one the
 user assigned the app to from the Dock. The window list is global: windows are not per display.
 

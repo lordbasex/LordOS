@@ -4,6 +4,7 @@
 import {
   View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, formatBytes, wm, session, addListener, t as tr,
   useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth,
+  panelLeft, inBar,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -132,9 +133,10 @@ function NetTile({ t, onClose, ifs }) {
 
 const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === ref.current) return true; return false; };
 
-// area: the display of the menu bar it opened from (global coordinates)
-export function ControlCenter({ t, top, onClose, area = null }) {
-  const ax = area ? area.x + area.w : null, ay = area ? area.y : 0;
+// area: the display of the menu bar it opened from (global coordinates); at: the [x, width] of the bar item that
+// opened it, so it sits under that item, inside that display (sdk/menubarmodel.js panelLeft)
+export function ControlCenter({ t, top, onClose, area = null, at = null }) {
+  const left = panelLeft(at, 320, area), ay = area ? area.y : 0;
   const [s, set] = useSettings();
   const p = menuBarPrefs(s);
   let ifs = [];
@@ -146,11 +148,15 @@ export function ControlCenter({ t, top, onClose, area = null }) {
   const info = useSystemInfo(3000);
   const ref = useRef(null);
   const used = (info.memTotalKB - info.memAvailableKB) / info.memTotalKB;
-  useEffect(() => addListener('pointerdown', (e) => { if (!inside(e.target, ref) && e.y > ay + top) onClose(); }), [onClose, ay]);
+  // a click on this display's bar is its items' own (the button toggles the panel); anywhere else closes it, another
+  // display's bar too (its button then opens the panel there)
+  useEffect(() => addListener('pointerdown', (e) => {
+    if (!inside(e.target, ref) && !(area ? inBar(e.x, e.y, area, top) : e.y <= top)) onClose();
+  }), [onClose, area, top]);
 
   return (
     <View ref={ref} style={{
-      position: 'absolute', ...(ax == null ? { right: 10 } : { left: ax - 330 }), top: ay + top + 6, width: 320, padding: 12, gap: 10, borderRadius: 16,
+      position: 'absolute', ...(left == null ? { right: 10 } : { left }), top: ay + top + 6, width: 320, padding: 12, gap: 10, borderRadius: 16,
       backgroundColor: t.panelBg, backdropFilter: `blur(${t.blur}px)`, border: `1px solid ${t.windowBorder}`,
       boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
     }}>

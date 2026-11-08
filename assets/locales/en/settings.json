@@ -486,6 +486,8 @@
   "dock.menubar.title": "Menu Bar",
   "dock.menubar.titleTaskbar": "Taskbar",
   "dock.menubar.footer": "What appears next to the clock. A click on the clock opens your notifications and the calendar.",
+  "dock.menubar.everyDisplay": "Show the menu bar on every display",
+  "dock.menubar.everyDisplayHint": "Each display gets its own bar with the clock and the status items. The app's menus are lit on the display with the window you're using.",
   "dock.menubar.cleaner": "Cleaner",
   "dock.menubar.cleanerHint": "The crown: disk, memory, processor and network at a glance. The same switch is in Cleaner → Settings.",
   "dock.menubar.keyboard": "Keyboard layout",

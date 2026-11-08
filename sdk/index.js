@@ -87,6 +87,7 @@ import { refreshPackages, forgetGonePackaged, packageList as packageListOf } fro
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
+  keepWindowsInWorkAreas,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
 export { desktopName, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
@@ -106,6 +107,8 @@ export { registerSpotlightSource, searchEverything } from './spotlight.js';
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
 export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
 export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor } from './menubarmodel.js';   // what the bar shows (issue #58)
+export { menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from './menubarmodel.js';   // a bar on every display
+export { sharedTicker, idleStore } from './ticker.js';
 export { companion, statusItem, companionEvent, statusItemEvent } from './companion.js';
 export { clockAlarms, clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextAlarm, nextFire } from './alarms.js';
 export { help } from './help.js';
