@@ -10,6 +10,7 @@ import { textDirection, direction } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
+import { Layer } from './layers.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -533,7 +534,7 @@ export function FloatingWindows() {
     const offUp = addListener('pointerup', () => { drag.current = null; });
     const offKey = addListener('keydown', (e) => {
       if (e.key !== 'Escape' || hasTextFocus()) return;
-      const top = windows.get().filter((w) => w.fullscreen && onActiveDesktop(w)).pop();
+      const top = windows.get().filter((w) => w.fullscreen && !w.capture && onActiveDesktop(w)).pop();
       if (top) windows.set((ws) => ws.map((w) => (w.id === top.id ? { ...w, fullscreen: false } : w)));
     });
     return () => { offMove(); offUp(); offKey(); };
@@ -553,11 +554,15 @@ export function FloatingWindows() {
       {fs.map((w) => {
         const d = displayFor(w);              // the display the window was on (docs/DISPLAYS.md)
         const here = onDesktop(w, desktop);
-        return (
-        <View key={w.id} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000', display: here ? 'flex' : 'none' }}>
+        // a capture window (Screenshots' ❖⇧4) goes above every layer. keepFocus: a press on it is not a
+        // click elsewhere, so the menu, sheet or text field under the still stays as it was
+        const win = (
+        <View key={w.id} keepFocus={w.capture || undefined}
+          style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000', display: here ? 'flex' : 'none' }}>
           <AppHost id={w.id} focused={here} />
         </View>
         );
+        return w.capture ? <Layer key={w.id} name="capture">{win}</Layer> : win;
       })}
     </>
   );

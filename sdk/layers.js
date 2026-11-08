@@ -20,6 +20,8 @@
 //   system        system prompts: permissions, passwords and the keyring, Bluetooth pairing,
 //                 «keep this display?», the file chooser
 //   input         the input method's candidate window and the on-screen keyboard (they serve the field below)
+//   capture       Screenshots' area selection (❖⇧4): a still of the whole screen, so it covers every
+//                 layer, sheets and prompts included, and the selection works whatever is open
 //
 // Inside one layer, what opened last is on top. The lock screen and the login screen are another
 // session (lord-sessiond), above all of this.
@@ -39,7 +41,7 @@ import { direction } from './i18n.js';
 
 export const LAYERS = Object.freeze({
   dock: 10, menubar: 20, floating: 30, overlay: 40, popover: 50, modal: 60,
-  notification: 70, tooltip: 80, drag: 90, system: 100, input: 110,
+  notification: 70, tooltip: 80, drag: 90, system: 100, input: 110, capture: 120,
 });
 
 let shell = false;

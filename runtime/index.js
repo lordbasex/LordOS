@@ -213,10 +213,11 @@ const reconciler = Reconciler(host);
 
 // ---- what is open in the layers that take the keyboard ----
 // The search, the app launcher, shell sheets and system prompts (keyring, permissions, the file
-// chooser) live in the overlay, modal and system layers (sdk/layers.js). While any of them shows
+// chooser) live in the overlay, modal and system layers (sdk/layers.js), and Screenshots' area
+// selection in the capture layer. While any of them shows
 // something, the keyboard is LordOS's: no Linux app (Wayland or X11) gets the keys typed into it
 // (sdk/wayland.js asks the compositor; docs/PRIVACY.md).
-const KEYBOARD_LAYERS = new Set([40, 60, 100]);   // overlay, modal, system
+const KEYBOARD_LAYERS = new Set([40, 60, 100, 120]);   // overlay, modal, system, capture
 let keyboardBusy = false;
 const keyboardWatchers = new Set();
 function layerCount(container, d) {

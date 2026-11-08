@@ -48,6 +48,7 @@ in it, so an empty part of a layer lets the click through to whatever is below.
 | `drag` | 90 | drag images, the Dock's «poof» |
 | `system` | 100 | permission prompts, the keyring password prompt, the administrator password prompt, Bluetooth pairing, «Keep this display?», the file chooser |
 | `input` | 110 | the input method's candidate window, the on-screen keyboard (`ON-SCREEN-KEYBOARD.md`) |
+| `capture` | 120 | Screenshots' area selection (❖⇧4, `wm.setFullscreen(id, true, { capture: true })`): a still of the whole screen, so it covers every other layer and takes the pointer even with a sheet, menu, prompt or Live Speech open. A press on it is `keepFocus`: what was open under the still stays as it was |
 
 Inside one layer, what opened last is on top. The lock screen and the login screen are another
 session (`lord-sessiond`, see `SESSIONS.md`), above all of this. Menus of Wayland apps
@@ -81,8 +82,8 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
 - Used today by: the shell's menus, the SDK's `MenuButton`, the «fill from Passwords» button
   (`AutofillButton`), Settings' pop-up buttons and Passwords' pop-up menus. Calendar, Contacts and
   Reminders keep their own per-window popover host; the Terminal's preferences use an inline list.
-- **The keyboard (0.8.2).** While anything shows in the `overlay`, `modal` or `system` layers (search,
-  the launcher, sheets, system prompts), no Linux app (Wayland or X11) gets the keys: `runtime/index.js` counts each
+- **The keyboard (0.8.2).** While anything shows in the `overlay`, `modal`, `system` or `capture` layers (search,
+  the launcher, sheets, system prompts, the screenshot selection), no Linux app (Wayland or X11) gets the keys: `runtime/index.js` counts each
   layer's children after every commit and `sdk/wayland.js` gives the compositor keyboard focus 0
   ([PRIVACY.md](PRIVACY.md#system-prompts-take-the-keyboard-082)). `popover` (menus, the clipboard and
   emoji panels, which paste into the app in front) keeps the app's keyboard.

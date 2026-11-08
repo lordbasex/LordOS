@@ -187,10 +187,12 @@ export const capture = {
       shots.push({ handle: h, display: d });
     }
     area.set({ shots, mode, start: null, rect: null, hover: null, pointer: null });
+    // in the capture layer, above every other: a sheet, menu, prompt or Live Speech that was open is part of the
+    // still, and the selection is drawn over it and gets the pointer there as well
     shots.forEach((sh, i) => {
       const d = sh.display;
       const id = wm.open(APP, { instance: `overlay${i}`, args: { index: i }, ...(d ? { frame: { x: d.x, y: d.y, w: d.w, h: d.h } } : {}) });
-      wm.setFullscreen(id, true);
+      wm.setFullscreen(id, true, { capture: true });
     });
   })),
   async record() {

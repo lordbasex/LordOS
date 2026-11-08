@@ -471,7 +471,10 @@ export const wm = {
   closeWindowMenu: (id) => patch(id, { windowMenu: null }),
   // Fullscreen for a LordOS app (Player, Photos): the SDK draws it above everything,
   // without the theme's frame. Esc or wm.setFullscreen(id, false) goes back.
-  setFullscreen: (id, on = true) => windows.set((ws) => ws.map((w) => (w.id === id ? { ...w, fullscreen: !!on, minimized: false } : w))),
+  // { capture: true }: Screenshots' area selection, a still of the screen. It goes in the capture layer,
+  // above every other one (sheets, menus, prompts, Live Speech), and Esc is the selection's own.
+  setFullscreen: (id, on = true, { capture = false } = {}) => windows.set((ws) => ws.map((w) => (w.id === id
+    ? { ...w, fullscreen: !!on, capture: !!(on && capture), minimized: false } : w))),
   // Picture-in-picture: a small frameless window, always on top (frame = { x, y, w, h } or null).
   // It shows on every desktop; back from it, the window stays on the one in view.
   desktop: () => activeDesktop.get(),
