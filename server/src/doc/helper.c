@@ -185,7 +185,11 @@ static void lockdown(void) {
         SYS_pipe2, SYS_getcwd, SYS_umask, SYS_fadvise64, SYS_memfd_create, SYS_ftruncate, SYS_readlinkat,
 #ifdef LORD_HELPER_TTS
         /* audio.cpp unpacks a model's files with std::filesystem (in its own cache folder, the only one it can write) */
-        SYS_mkdir, SYS_rename, SYS_renameat, SYS_renameat2, SYS_unlink, SYS_rmdir, SYS_readlink, SYS_sched_getaffinity,
+        SYS_renameat, SYS_renameat2, SYS_sched_getaffinity,
+#ifdef SYS_mkdir
+        /* the old calls exist on x86-64 only; aarch64 has just the *at ones, allowed above */
+        SYS_mkdir, SYS_rename, SYS_unlink, SYS_rmdir, SYS_readlink,
+#endif
 #endif
         -1 };
     static int rofd[DOC_INIT_FDS + 1], rwfd[DOC_INIT_FDS + 1];

@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The voice engine builds on arm64** (Raspberry Pi 5, generic arm64): lord-tts's seccomp allow list named `SYS_mkdir`, `SYS_rename`, `SYS_unlink`, `SYS_rmdir` and `SYS_readlink`, which only x86-64 has, so `lord-tts` didn't compile for aarch64. They are now listed only where they exist; aarch64's C library uses the `*at` calls, already allowed. Nothing more is allowed than before.
 - **`make` builds the voice again**: `lord-say`, `lord-tts` and `pocket_tts_dir.json` were added to `ALL` in `server/mk/tts.mk`, which the Makefile includes after reading `all: $(ALL)`, so a plain `make` never built them and `tools/iso/mkdeb.sh` stopped on the missing `lord-say`. They are now prerequisites of `all` directly, as the other `mk/*.mk` do. (0.8.8.6-beta's packages were built with the targets named explicitly.)
 
 ## [0.8.8.6-beta] - 2026-11-08
