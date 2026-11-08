@@ -391,14 +391,18 @@ export function trashMenu({ onEmpty }) {
 // The theme starts a press with beginDockDrag on mouse down (an icon of the Dock, the app launcher
 // or the start menu); past DRAG_START px it becomes a drag. The bar that accepts drops registers
 // a target: hit(x, y) → { index } (a position among the shown pinned items) | { trash: true } | null,
-// and near(x, y) → is the pointer still close to the bar. A Dock item taken more than about 60 px
+// and near(x, y) → is the pointer still close to the bar. Several bars can register at once (Lord Classic's
+// taskbar on every display, 0.8.8.6): the first one hit takes the drop, and near is any of them. A Dock item taken more than about 60 px
 // away and held there for REMOVE_HOLD ms shows the remove cue; releasing it then unpins it (a
 // locked item springs back). dockDrag holds what is happening, for the theme to draw.
 const DRAG_START = 6, REMOVE_HOLD = 350;
 export const dockDrag = createStore(null);   // { id, Icon, x, y, source, over, out, removing, removable }
 export const dockPoof = createStore(null);   // { x, y, Icon, t0 }: the removal animation, drawn by the theme
-let target = null, press = null, holdTimer = 0, endedAt = 0;
-export function registerDockTarget(tg) { target = tg; return () => { if (target === tg) target = null; }; }
+let press = null, holdTimer = 0, endedAt = 0;
+const targets = new Set();
+export function registerDockTarget(tg) { targets.add(tg); return () => { targets.delete(tg); }; }
+const hitTarget = (x, y) => { for (const tg of targets) { const r = tg.hit(x, y); if (r) return r; } return null; };
+const nearTarget = (x, y) => { for (const tg of targets) if (tg.near(x, y)) return true; return false; };
 // true just after a drag ended (the click that follows a release must not open the app)
 export const dockDragJustEnded = () => Date.now() - endedAt < 250;
 
@@ -408,9 +412,9 @@ export function beginDockDrag({ id, Icon, x, y, source = 'dock', onStart }) {
   press = { id: d, Icon, x, y, source, onStart, started: false, outSince: 0 };
 }
 function dragState(x, y) {
-  const over = target ? target.hit(x, y) : null;
+  const over = hitTarget(x, y);
   const removable = press.source === 'dock' && dock.isPinned(press.id) && !isLocked(press.id);
-  const out = press.source === 'dock' && !over && !(target && target.near(x, y));
+  const out = press.source === 'dock' && !over && !nearTarget(x, y);
   if (out && !press.outSince) {
     press.outSince = Date.now();
     clearTimeout(holdTimer);
@@ -435,7 +439,7 @@ addListener('pointerup', (e) => {
   clearTimeout(holdTimer);
   if (!p || !p.started) return;
   endedAt = Date.now();
-  const over = target ? target.hit(e.x, e.y) : null;
+  const over = hitTarget(e.x, e.y);
   const st = dockDrag.get();
   dockDrag.set(null);
   if (over && over.trash) {

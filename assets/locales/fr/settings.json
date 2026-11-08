@@ -488,6 +488,8 @@
   "dock.menubar.footer": "Ce qui apparaît à côté de l’horloge. Un clic sur l’horloge ouvre vos notifications et le calendrier.",
   "dock.menubar.everyDisplay": "Afficher la barre des menus sur tous les écrans",
   "dock.menubar.everyDisplayHint": "Chaque écran a sa propre barre avec l’horloge et les icônes d’état. Les menus de l’app sont allumés sur l’écran de la fenêtre que vous utilisez.",
+  "dock.menubar.everyDisplayTaskbar": "Afficher la barre des tâches sur tous les écrans",
+  "dock.menubar.everyDisplayTaskbarHint": "Chaque écran a sa propre barre des tâches avec le bouton Démarrer, vos apps, la zone de notification et l’horloge. Le menu Démarrer et les panneaux s’ouvrent sur l’écran de la barre cliquée.",
   "dock.menubar.cleaner": "Nettoyage",
   "dock.menubar.cleanerHint": "La couronne : disque, mémoire, processeur et réseau d’un coup d’œil. Le même interrupteur est dans Nettoyage → Réglages.",
   "dock.menubar.keyboard": "Disposition du clavier",

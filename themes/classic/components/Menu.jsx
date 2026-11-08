@@ -5,7 +5,9 @@
 // `boxRef`: receives the menu's node. The menu is a portal into the popover layer, so its rows are not
 // inside the panel that opened it: a panel that closes on a click outside itself must also treat a
 // click in its menu as inside (the start menu), or it unmounts the menu before the row's click lands.
-import { View, Text, Layer, ScrollView, screen, addListener, takeTextFocus, releaseTextFocus, direction } from '@lordos/sdk';
+// The menu stays inside the display of the point it opens at (a jump list near the edge of one taskbar must not
+// spill onto the next display).
+import { View, Text, Layer, ScrollView, addListener, takeTextFocus, releaseTextFocus, direction, displayAt } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 const ROW = 30, SEP = 9;
@@ -45,14 +47,15 @@ export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef 
     return () => { offPtr(); releaseTextFocus(tok); };
   }, []);
   const H = items.reduce((h, it) => h + (it === '-' ? SEP : ROW), 10);
-  const maxH = Math.max(120, screen.height - 24);
+  const d = displayAt(x, y);
+  const maxH = Math.max(120, d.h - 24);
   const h = Math.min(H, maxH);
   // in right-to-left languages the menu opens toward the left of the point
   const rtl = direction() === 'rtl';
   let left = rtl ? x - width : x;
-  left = Math.max(6, Math.min(left, screen.width - width - 6));
+  left = Math.max(d.x + 6, Math.min(left, d.x + d.w - width - 6));
   let top = above ? y - h : y;
-  top = Math.max(6, Math.min(top, screen.height - h - 6));
+  top = Math.max(d.y + 6, Math.min(top, d.y + d.h - h - 6));
   const rows = items.map((it, i) => (it === '-'
     ? <View key={i} style={{ height: 1, backgroundColor: t.separator, marginVertical: 4, marginHorizontal: 6 }} />
     : (

@@ -90,15 +90,16 @@ function MenuBarSection({ classic }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const p = menuBarPrefs(s);
-  const row = (key, on, hint) => (
-    <SettingRow key={key} label={tr(`settings.dock.menubar.${key}`)} hint={hint ? tr(`settings.dock.menubar.${key}Hint`) : undefined}>
+  // text: the row's own text keys when they differ from the setting's (the taskbar's wording in Lord Classic)
+  const row = (key, on, hint, text = key) => (
+    <SettingRow key={key} label={tr(`settings.dock.menubar.${text}`)} hint={hint ? tr(`settings.dock.menubar.${text}Hint`) : undefined}>
       <Toggle small on={on} onChange={(v) => set(menuBarPatch(s, key, v))} />
     </SettingRow>
   );
   return (
     <Section title={tr(classic ? 'settings.dock.menubar.titleTaskbar' : 'settings.dock.menubar.title')} footer={tr('settings.dock.menubar.footer')}>
-      {/* Lord Flow: a full bar on each display (the Classic taskbar stays on the main display) */}
-      {classic ? null : row('everyDisplay', menuBarEveryDisplay(s), true)}
+      {/* a full bar on each display: Lord Flow's menu bar, Lord Classic's taskbar (the same setting) */}
+      {row('everyDisplay', menuBarEveryDisplay(s), true, classic ? 'everyDisplayTaskbar' : 'everyDisplay')}
       {getApp('cleaner') ? row('cleaner', cleanerItemShown(s), true) : null}
       {row('keyboard', p.keyboard, true)}
       {row('osk', p.osk, true)}

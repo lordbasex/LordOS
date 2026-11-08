@@ -8,7 +8,8 @@
 //   monthCells(year, month, first) the days of a month calendar, padded to whole weeks
 //
 // A bar on every display (0.8.8.6): Lord Flow draws one full menu bar per display, each with its own clock, status
-// items and panels; only the display with the focused window has the app's menus lit.
+// items and panels; only the display with the focused window has the app's menus lit. Lord Classic draws a whole
+// taskbar per display under the same setting (themes/classic/placement.js).
 //
 //   menuBarEveryDisplay(settings)            on unless the user turned it off (settings.menuBarAllDisplays)
 //   barDisplays(displays, every, mirror)     the displays that get a bar (the main one alone when off or mirrored)

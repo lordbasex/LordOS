@@ -361,7 +361,9 @@ off with `settings.menuBarAllDisplays === false`, read it with `menuBarEveryDisp
 `barDisplays`, `hasBar`, `activeBarId`, `pinBar` and `panelLeft` (`sdk/menubarmodel.js`) say which
 displays get a bar, which work areas reserve it, which bar has the app's menus lit and where a panel
 opens; `sharedTicker` (`sdk/ticker.js`) gives every bar's clock one timer; `spotlight.toggle(display)`
-opens Search on that display. Lord Classic's taskbar is on the main display. Your `workArea` function receives each display; `workAreaOf(d)` and
+opens Search on that display. Lord Classic draws a taskbar on every display under the same setting
+(`themes/classic/placement.js`; each bar registers its own `registerDockTarget`, and a drop goes to the first
+bar that is hit). Your `workArea` function receives each display; `workAreaOf(d)` and
 `pointerWorkArea()` read it back. New windows open on the display under the pointer, or the one the
 user assigned the app to from the Dock. The window list is global: windows are not per display.
 

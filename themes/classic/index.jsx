@@ -10,52 +10,31 @@
 //   components/Taskbar.jsx      start, search, overview, apps, Trash, tray
 //   components/StartMenu.jsx    search, pinned, recent, all apps, user and power
 //   components/QuickSettings.jsx, NotificationCenter.jsx, Menu.jsx
+//   placement.js                the work areas and the panels' places, with a taskbar on every display
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
-  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
+  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
-  menuBarPrefs,
+  menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
-import { Taskbar, BAR_H, barSize, taskbarEntries } from './components/Taskbar.jsx';
+import { Taskbar, BAR_H, taskbarEntries } from './components/Taskbar.jsx';
 import { StartMenu, startBox } from './components/StartMenu.jsx';
 import { QuickSettings } from './components/QuickSettings.jsx';
 import { NotificationCenter } from './components/NotificationCenter.jsx';
 import { Menu } from './components/Menu.jsx';
+import { workAreaFor, onBar, trayPanel } from './placement.js';
 
 // The taskbar's alignment (Settings → Desktop & Dock): 'center' (default) or 'start'.
 const alignOf = (s) => (s.taskbarAlign === 'start' ? 'start' : 'center');
 
-// Several displays (docs/DISPLAYS.md): the bar is on the main one; the others are all work area.
-function workAreaFor(pos, d = mainDisplay()) {
-  const a = { x: d.x, y: d.y, w: d.w, h: d.h };
-  if (!d.main) return a;
-  const b = barSize(pos);
-  if (pos === 'top') { a.y += b; a.h -= b; } else if (pos === 'left') { a.x += b; a.w -= b; } else if (pos === 'right') a.w -= b; else a.h -= b;
-  return a;
-}
-const areaFn = (d) => workAreaFor(dockPrefs(settings.get()).taskbarPosition, d);
-
-// Is the point over the bar? (a click there doesn't close a panel: its button toggles it)
-function onBar(pos, x, y) {
-  const b = barSize(pos), m = mainDisplay();
-  x -= m.x; y -= m.y;
-  return pos === 'top' ? y < b : pos === 'left' ? x < b : pos === 'right' ? x >= m.w - b : y >= m.h - b;
-}
-
-// A panel at the tray's end of the bar: quick settings and notifications.
-function trayPanel(pos, width, height, m = mainDisplay()) {
-  const rtl = direction() === 'rtl' && (pos === 'top' || pos === 'bottom');
-  const left = pos === 'left' ? m.x + barSize(pos) + 12 : pos === 'right' || !rtl ? m.x + m.w - (pos === 'right' ? barSize(pos) : 0) - 12 - width : m.x + 12;
-  if (pos === 'bottom') return { pos: { left, bottom: screen.height - (m.y + m.h - BAR_H - 12) }, top: m.y + m.h - BAR_H - 12 - height, left, height };
-  const top = pos === 'top' ? m.y + BAR_H + 12 : m.y + m.h - 12 - height;
-  return { pos: { left, top }, top, left, height };
-}
+// the work area of each display: without its taskbar (placement.js)
+const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s).taskbarPosition, d, menuBarEveryDisplay(s)); };
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame
 configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true });
@@ -147,49 +126,66 @@ function App() {
   const t = makeTheme(s);
   const { mounted, focused } = useWindows();
   const taskView = !!useStore(overview);
-  const [panel, setPanel] = useState(null);           // 'start' | 'quick' | 'notif' | null
+  const [panel, setPanel] = useState(null);           // { name: 'start' | 'quick' | 'notif', display: id } | null
   const [desk, setDesk] = useState(null);             // the desktop's right-click menu
-  const [askEmpty, setAskEmpty] = useState(false);
+  const [askEmpty, setAskEmpty] = useState(null);     // the display whose Trash asked to be emptied
   const history = useStore(notifyHistory);
   const seen = useRef(0);
   const pos = dockPrefs(s).taskbarPosition;
   const align = alignOf(s);
   const m = mainDisplay();
   const all = screenDisplays();
+  // a taskbar on every display (the main one alone with the setting off or mirrored displays); plugging or
+  // unplugging a monitor re-renders the shell (startShell's screen revision), so its bar comes and goes with it
+  const every = menuBarEveryDisplay(s);
+  const bars = barDisplays(all, every, screen.mirror);
   // the work area and the banners follow the bar live
   useEffect(() => {
     configureWindows({ apps, workArea: areaFn });
     setBannerPlacement(pos === 'top' ? 'top' : 'bottom');
-  }, [pos, screen.width, screen.height]);
-  const toggle = (name) => setPanel((p) => (p === name ? null : name));
+  }, [pos, every, screen.mirror, screen.width, screen.height]);
+  // the bars turned on for every display: windows at the edge of the other displays move clear of their new bar
+  const barsWere = useRef(every);
+  useEffect(() => { if (barsWere.current !== every) { barsWere.current = every; keepWindowsInWorkAreas(); } }, [every]);
+  // a panel opened from a bar goes on that bar's display; the same button again closes it, another bar's moves it
+  const toggle = (name, d) => setPanel((p) => (p && p.name === name && p.display === d.id ? null : { name, display: d.id }));
+  // from the keyboard or a gesture: the bar of the display under the pointer (the main one's if it has none)
+  const here = () => { const at = pointerDisplay(); return bars.find((b) => b.id === at.id) || bars.find((b) => b.main) || bars[0] || m; };
   const close = () => setPanel(null);
-  if (panel === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
+  // a panel follows its display by id (moved in Settings → Displays) and closes when its bar goes (unplugged, or
+  // the setting turned off)
+  const pd = panel ? bars.find((d) => d.id === panel.display) : null;
+  const open = pd ? panel.name : null;
+  useEffect(() => { if (panel && !pd) setPanel(null); });
+  if (open === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
   const unread = history.some((n) => n.id > seen.current);
 
   // ❖ alone opens the start menu (only if released without being used in a shortcut); Escape closes
   // what is open. The rest of the keys are in classicTable.
   const ui = useRef(null);
-  ui.current = { toggle, focused };
-  useShortcuts({ grabs: switcherGrabs('classic'), table: classicTable(ui), onSuperTap: () => { closeOverview(); toggle('start'); } });
+  ui.current = { toggle: (name) => toggle(name, here()), here, focused };
+  useShortcuts({ grabs: switcherGrabs('classic'), table: classicTable(ui), onSuperTap: () => { closeOverview(); toggle('start', here()); } });
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setPanel(null); setDesk(null); } }), []);
   // the overview takes the place of the open panels
   useEffect(() => { if (taskView) setPanel(null); }, [taskView]);
   // trackpad: a 3-finger swipe up opens the start menu (4 fingers: the overview), down closes them;
   // left/right switch desktops, or windows with only one desktop (docs/TRACKPAD.md)
   useEffect(() => registerGestureActions({
-    up: (g) => { if (g.fingers >= 4) openOverview(); else setPanel('start'); },
+    up: (g) => { if (g.fingers >= 4) openOverview(); else setPanel({ name: 'start', display: ui.current.here().id }); },
     down: () => { setPanel(null); closeOverview(); },
     left: desktopSwipe('left'), right: desktopSwipe('right'),
   }), []);
 
   const wallpaper = findWallpaper(t.wallpapers, s.wallpaper);
-  const isOnBar = (x, y) => onBar(pos, x, y);
+  const isOnBar = (x, y) => onBar(pos, x, y, bars);
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
-  const qsAt = trayPanel(pos, 360, m.h - BAR_H - 24, m);
+  const pm = pd || m;          // the display of the bar whose button opened the panel
+  const qsAt = trayPanel(pos, 360, pm.h - BAR_H - 24, pm);
   // without the calendar (Settings → Desktop & Dock → Taskbar) the notifications' panel is shorter
-  const ncH = Math.min(menuBarPrefs(s).calendar ? 760 : 460, m.h - (pos === 'left' || pos === 'right' ? 0 : BAR_H) - 24);
-  const ncAt = trayPanel(pos, 380, ncH, m);
+  const ncH = Math.min(menuBarPrefs(s).calendar ? 760 : 460, pm.h - (pos === 'left' || pos === 'right' ? 0 : BAR_H) - 24);
+  const ncAt = trayPanel(pos, 380, ncH, pm);
+  const trashArea = (askEmpty != null && all.find((d) => d.id === askEmpty)) || m;
   return (
     <ThemeProvider tokens={t}>
       <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#101216' : '#c9d3e0' }}>
@@ -209,19 +205,23 @@ function App() {
           </Fragment>
         ))}
         <DesktopWidgets layer="above" />
-        {/* the bar on the main display and the panels above it: each in its layer (sdk/layers.js,
+        {/* a bar on each display and the panels above them: each in its layer (sdk/layers.js,
             docs/LAYERS.md), so the order and the clicks are the layers' */}
         <Layer name="dock">
-          <View style={{ position: 'absolute', left: m.x, top: m.y, width: m.w, height: m.h, pointerEvents: 'box-none' }}>
-            <Taskbar t={t} pos={pos} align={align} start={panel === 'start'} onStart={() => { closeOverview(); toggle('start'); }}
-              onSearch={() => { closeOverview(); toggle('start'); }} taskView={taskView} onTaskView={() => toggleOverview()}
-              quick={panel === 'quick'} onQuick={() => toggle('quick')} notif={panel === 'notif'} onNotif={() => toggle('notif')} unread={unread}
-              onEmptyTrash={() => setAskEmpty(true)} />
-          </View>
+          {bars.map((d) => (
+            <View key={d.id + ':' + d.x} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, pointerEvents: 'box-none' }}>
+              <Taskbar t={t} pos={pos} align={align} area={d} start={open === 'start' && pd.id === d.id} onStart={() => { closeOverview(); toggle('start', d); }}
+                onSearch={() => { closeOverview(); toggle('start', d); }} taskView={taskView} onTaskView={() => toggleOverview()}
+                quick={open === 'quick' && pd.id === d.id} onQuick={() => toggle('quick', d)}
+                notif={open === 'notif' && pd.id === d.id} onNotif={() => toggle('notif', d)} unread={unread}
+                onEmptyTrash={() => setAskEmpty(d.id)} />
+            </View>
+          ))}
         </Layer>
-        {panel === 'start' && <Layer name="overlay"><StartMenu t={t} box={startBox(pos, align, m)} onClose={close} isOnBar={isOnBar} /></Layer>}
-        {panel === 'quick' && <Layer name="popover"><QuickSettings t={t} at={qsAt} onClose={close} isOnBar={isOnBar} /></Layer>}
-        {panel === 'notif' && <Layer name="popover"><NotificationCenter t={t} at={ncAt} onClose={close} isOnBar={isOnBar} /></Layer>}
+        {/* keyed on the display: another bar's button opens the panel anew on its own display */}
+        {open === 'start' && <Layer name="overlay"><StartMenu key={pd.id} t={t} box={startBox(pos, align, pd)} onClose={close} isOnBar={isOnBar} /></Layer>}
+        {open === 'quick' && <Layer name="popover"><QuickSettings key={pd.id} t={t} at={qsAt} onClose={close} isOnBar={isOnBar} /></Layer>}
+        {open === 'notif' && <Layer name="popover"><NotificationCenter key={pd.id} t={t} at={ncAt} onClose={close} isOnBar={isOnBar} /></Layer>}
         {desk && (
           <Menu t={t} x={desk.x} y={desk.y} onClose={() => setDesk(null)} items={[
             { label: tr('shell.desktops.overview'), onClick: () => openOverview() },
@@ -241,11 +241,11 @@ function App() {
         <OverviewChrome />
         <DesktopHud />
         <LevelHud />
-        {askEmpty && (
+        {askEmpty != null && (
           <Layer name="modal">
             <ConfirmDialog title={tr('shell.trash.confirmTitle')} detail={tr('shell.trash.confirmDetail')} okLabel={tr('shell.trash.empty')}
-              cancelLabel={tr('shell.trash.cancel')} destructive area={m}
-              onCancel={() => setAskEmpty(false)} onOk={() => { setAskEmpty(false); emptyTrash(); }} />
+              cancelLabel={tr('shell.trash.cancel')} destructive area={trashArea}
+              onCancel={() => setAskEmpty(null)} onOk={() => { setAskEmpty(null); emptyTrash(); }} />
           </Layer>
         )}
       </View>

@@ -46,8 +46,15 @@ shows in the captures.
   One timer serves every clock (`sdk/ticker.js`); which bar is lit, the panels' placement and the
   bars per display are `sdk/menubarmodel.js` (`server/tests/menubar_model_test.mjs`,
   `menubar_test.mjs`). Mirrored displays get the main display's bar only. The work area is per
-  display and reserves the bar's height on each display that has one. Lord Classic's taskbar stays
-  on the main display.
+  display and reserves the bar's height on each display that has one.
+- Lord Classic does the same with its **taskbar** (0.8.8.6, the same setting; Settings → Desktop & Dock →
+  Taskbar → "Show the taskbar on every display"): every display gets a whole taskbar (start button,
+  pinned and running apps, Trash, tray and clock). Every bar shows every app (the window list is
+  global). The start menu, quick settings, notifications and the calendar open on the display whose
+  bar was clicked; ❖, ❖A and ❖N open them on the display under the pointer. The clocks share one
+  timer and the tray's network glyph one 5 s poll; each bar takes pins dropped on it
+  (`registerDockTarget` accepts several bars). Menus stay inside the display they open on.
+  `themes/classic/placement.js`, `server/tests/classic_taskbar_test.mjs` (three monitors).
 
 The math is in `server/src/outputs.c` (pure functions, `build/outputs-test`, 131 checks): scale
 rounding and the recommended scale, logical ↔ physical, damage rectangles, mirrored views,
@@ -174,8 +181,9 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
   a window never goes under a menu bar but can go up to the top of a display without one.
 - System dialogs (permission prompts, Search, clipboard, keyring, print dialog, the display
   confirmation) go on the main display (`mainBox()`); fullscreen SDK windows cover their display.
-- Both themes: wallpaper per display, menu bar (Lord Flow) or taskbar (Lord Classic) and Dock on the main
-  display, the app launcher and Control Center on the main display (or the menu bar's display).
+- Both themes: wallpaper per display, a menu bar (Lord Flow) or a taskbar (Lord Classic) on every display
+  (the main one alone with the setting off), the Dock on the main display, the app launcher on the main
+  display and Control Center on the display of the menu bar it was opened from.
 - **Window menu → Move to <display>** (0.8.5, both themes, `sdk/windowmenu.js`): one item for every
   other display; `wm.moveToDisplay(id, displayId)` (`sdk/windows.js`) keeps a snapped window in its zone
   on the new display and keeps any other window's place relative to the work area, shrunk to fit.

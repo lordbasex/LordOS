@@ -8,13 +8,19 @@
 // button to reorder it (a line shows where it lands), drag it off the bar and hold to unpin it, drop
 // apps from the start menu. Click: opens the app or brings its window (if it was already in front,
 // minimizes it); right click: its jump list.
+//
+// One taskbar per display (0.8.8.6; Settings → Desktop & Dock → Taskbar → "Show the taskbar on every display", on by
+// default, the same settings.menuBarAllDisplays as Lord Flow's menu bar): each one is whole (start, pinned and
+// running apps, Trash, tray, clock) and every bar shows every app, as there is no per-display window list. `area`
+// is the display it is drawn on; the panels it opens go on that display (themes/classic/index.jsx). The bars share
+// one clock timer and one network poll, and each registers its own drop target for pins.
 import {
-  View, Text, Layer, useSettings, useWindows, useClock, wm, windowTitle, formatTime, formatDate, t as tr,
+  View, Text, Layer, useSettings, useWindows, wm, windowTitle, formatTime, formatDate, t as tr, settings, sharedTicker,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
-  mainDisplay, screen, toggleShowDesktop, menuBarPrefs,
+  mainDisplay, toggleShowDesktop, menuBarPrefs,
 } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 import { SearchGlyph, TaskViewGlyph, NetworkGlyph, SpeakerGlyph, BellGlyph, TrashGlyph } from '../glyphs.jsx';
 
@@ -25,7 +31,8 @@ export const barSize = (pos) => (pos === 'left' || pos === 'right' ? BAR_W : BAR
 // The taskbar's default pins (Files first; the user's own order lives in settings.dockPinned).
 export const TASKBAR_DEFAULT = ['files', 'terminal', 'store', 'settings'];
 
-// The network as the tray shows it: polled every 5 s (no per-frame work).
+// The network as the tray shows it: polled every 5 s (no per-frame work), once for every taskbar and the quick
+// settings (a shared ticker: it polls only while one of them is shown, and they re-render only when it changes).
 const VPN = (i) => ['wireguard', 'tun', 'xfrm', 'ppp'].includes(i.type) || /^(wg|ovpn|ips|ppp|oc|fvpn)-/.test(i.name);
 export function readNet() {
   if (typeof lord === 'undefined' || !lord.net) return { online: false, wifi: false, name: '', ip: '', vpn: 0 };
@@ -37,10 +44,10 @@ export function readNet() {
     ip: main?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address || '',
   };
 }
+export const netTicker = sharedTicker(() => JSON.stringify(readNet()), 5000);
 export function useNet() {
-  const [net, setNet] = useState(readNet);
-  useEffect(() => { const id = setInterval(() => setNet(readNet()), 5000); return () => clearInterval(id); }, []);
-  return net;
+  const key = useStore(netTicker);
+  return useMemo(() => JSON.parse(key), [key]);
 }
 
 // What the bar shows, in order: ❖1..❖9 open them (themes/classic/index.jsx).
@@ -60,7 +67,8 @@ function BarButton({ t, vert, active, onClick, onContextMenu, onMouseDown, onEnt
   );
 }
 
-export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onTaskView, quick, onQuick, notif, onNotif, unread, onEmptyTrash }) {
+// area: the display the bar is on (global coordinates). start / quick / notif: that panel is open from this bar.
+export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskView, onTaskView, quick, onQuick, notif, onNotif, unread, onEmptyTrash }) {
   const entries = useDockEntries(TASKBAR_DEFAULT);
   barEntries = entries;
   const { focused, windows } = useWindows();
@@ -80,7 +88,8 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
   const barRef = useRef(null);
   const trashRef = useRef(null);
   const center = align !== 'start';
-  const m = mainDisplay();
+  const m = area || mainDisplay();
+  const barId = m.id;
   useEffect(() => () => clearTimeout(tipTimer.current), []);
 
   const click = (e) => {
@@ -96,7 +105,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
     return vert ? y + h / 2 : x + w / 2;
   };
   const geo = useRef({});
-  geo.current = { entries, vert, drag };
+  geo.current = { entries, vert, drag, barId };
   useEffect(() => registerDockTarget({
     hit(x, y) {
       const g = geo.current;
@@ -105,12 +114,12 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       if (!(x >= bx - 16 && x < bx + bw + 16 && y >= by - 16 && y < by + bh + 16)) return null;
       if (trashRef.current) {
         const [tx, ty, tw, th] = lord.getLayout(trashRef.current.id);
-        if (x >= tx && x < tx + tw && y >= ty && y < ty + th) return { trash: true };
+        if (x >= tx && x < tx + tw && y >= ty && y < ty + th) return { trash: true, bar: g.barId };
       }
       const a = g.vert ? y : x;
       const own = g.drag?.source === 'dock' ? g.drag.id : null;
       const cs = g.entries.filter((e) => e.pinned && !e.recent && e.id !== own).map((e) => centerOf(e.id)).filter((c) => c != null);
-      return { index: cs.filter((c) => c < a).length };
+      return { index: cs.filter((c) => c < a).length, bar: g.barId };
     },
     near(x, y) {
       if (!barRef.current) return false;
@@ -120,9 +129,10 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
     },
   }), []);
 
-  // the drop line: before the pinned button at that index (after the last one at the end)
+  // the drop line: before the pinned button at that index (after the last one at the end), on the bar under the pointer
   let dropLine = null;
-  if (drag && drag.over && drag.over.index != null && barRef.current) {
+  const overHere = !!drag && !!drag.over && drag.over.bar === barId;
+  if (overHere && drag.over.index != null && barRef.current) {
     const own = drag.source === 'dock' ? drag.id : null;
     const pinned = entries.filter((e) => e.pinned && !e.recent && e.id !== own);
     const k = Math.max(0, Math.min(pinned.length, drag.over.index));
@@ -195,7 +205,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       {entries.map(appButton)}
       <View style={vert ? { width: 24, height: 1, marginVertical: 3, backgroundColor: t.separator } : { width: 1, height: 24, marginHorizontal: 3, backgroundColor: t.separator }} />
       <View ref={trashRef} dropTrash onMouseUp={() => setTimeout(refreshTrash, 60)}>
-        <BarButton t={t} vert={vert} active={!!drag?.over?.trash} onClick={() => { if (!dockDragJustEnded()) openTrash(); }}
+        <BarButton t={t} vert={vert} active={overHere && !!drag.over.trash} onClick={() => { if (!dockDragJustEnded()) openTrash(); }}
           onContextMenu={(ev) => setTrashAt(menuAt(ev))} onEnter={() => showTip(tr('shell.classic.trash'), trashRef.current)} onLeave={hideTip}>
           <TrashGlyph size={24} full={trash.full} dark={t.mode === 'dark'} />
         </BarButton>
@@ -246,19 +256,18 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       {trashAt && <Menu t={t} {...trashAt} onClose={() => setTrashAt(null)} items={trashMenu({ onEmpty: onEmptyTrash })} />}
       {tip && (
         <Layer name="tooltip">
-          <TipBubble t={t} tip={tip} pos={pos} />
+          <TipBubble t={t} tip={tip} pos={pos} area={m} />
         </Layer>
       )}
     </View>
   );
 }
 
-// Time over the date; its own component, so only it renders when the minute (or second) changes.
+// Time over the date; its own component, so only it renders when the minute (or second) changes. One timer for every
+// taskbar's clock (sdk/ticker.js); it reads Settings → Date & Time on each tick, so a change shows within a second.
+const clockTicker = sharedTicker((d) => `${formatTime(d, { seconds: !!settings.get().clock?.seconds })}\n${formatDate(d, 'numeric')}`, 1000);
 function TrayClock({ t, vert }) {
-  const [s] = useSettings();
-  const seconds = !!s.clock?.seconds;
-  // a different interval restarts the timer with the new format when Settings → Date & Time changes
-  const txt = useClock((d) => `${formatTime(d, { seconds })}\n${formatDate(d, 'numeric')}`, seconds ? 1000 : 1001);
+  const txt = useStore(clockTicker);
   const [time, date] = txt.split('\n');
   return (
     <View style={{ alignItems: vert ? 'center' : 'flex-end' }}>
@@ -279,12 +288,12 @@ function jumpItems(entry) {
   return items;
 }
 
-function TipBubble({ t, tip, pos }) {
+function TipBubble({ t, tip, pos, area }) {
   const w = Math.min(320, Math.max(40, tip.text.length * 7 + 20));
   const at = pos === 'bottom' ? { left: tip.x - w / 2, top: tip.y - 34 } : pos === 'top' ? { left: tip.x - w / 2, top: tip.y + tip.h + 8 }
     : pos === 'left' ? { left: tip.x + tip.w / 2 + 8, top: tip.y + tip.h / 2 - 13 } : { left: tip.x - tip.w / 2 - w - 8, top: tip.y + tip.h / 2 - 13 };
   return (
-    <View style={{ position: 'absolute', ...at, left: Math.max(4, Math.min(at.left, screen.width - w - 4)), width: w, height: 26, borderRadius: 4,
+    <View style={{ position: 'absolute', ...at, left: Math.max(area.x + 4, Math.min(at.left, area.x + area.w - w - 4)), width: w, height: 26, borderRadius: 4,
       alignItems: 'center', justifyContent: 'center', backgroundColor: t.popupBg, border: `1px solid ${t.windowBorder}`, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', pointerEvents: 'none' }}>
       <Text style={{ fontSize: 12, color: t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{tip.text}</Text>
     </View>

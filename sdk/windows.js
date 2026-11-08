@@ -37,7 +37,9 @@ export function workAreaOf(d) {
   if (areaFn) return areaFn(d);
   return d.main ? area : { x: d.x, y: d.y, w: d.w, h: d.h };
 }
-const pointerDisplay = () => (pointer.x >= 0 ? displayAt(pointer.x, pointer.y) : mainDisplay());
+// The display under the pointer (the main one before the pointer moves): Lord Classic opens the start menu there
+// from the keyboard.
+export const pointerDisplay = () => (pointer.x >= 0 ? displayAt(pointer.x, pointer.y) : mainDisplay());
 // Work area of the display under the pointer (where a new window opens).
 export const pointerWorkArea = () => workAreaOf(pointerDisplay());
 // The display an app's new windows open on: the one the user assigned it to in the Dock (Options ›

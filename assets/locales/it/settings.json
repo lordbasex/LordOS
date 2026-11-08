@@ -488,6 +488,8 @@
   "dock.menubar.footer": "Ciò che appare accanto all’orologio. Un clic sull’orologio apre le notifiche e il calendario.",
   "dock.menubar.everyDisplay": "Mostra la barra dei menu su tutti gli schermi",
   "dock.menubar.everyDisplayHint": "Ogni schermo ha la sua barra con l’orologio e le icone di stato. I menu dell’app sono accesi sullo schermo della finestra che stai usando.",
+  "dock.menubar.everyDisplayTaskbar": "Mostra la barra delle applicazioni su tutti gli schermi",
+  "dock.menubar.everyDisplayTaskbarHint": "Ogni schermo ha la sua barra delle applicazioni con il pulsante Start, le tue app, l’area di notifica e l’orologio. Il menu Start e i pannelli si aprono sullo schermo della barra che hai cliccato.",
   "dock.menubar.cleaner": "Pulizia",
   "dock.menubar.cleanerHint": "La corona: disco, memoria, processore e rete a colpo d’occhio. Lo stesso interruttore è in Pulizia → Impostazioni.",
   "dock.menubar.keyboard": "Layout della tastiera",
