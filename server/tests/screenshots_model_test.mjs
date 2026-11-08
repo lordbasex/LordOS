@@ -84,12 +84,16 @@ eq('the middle pixel is outlined', at(c, c + 3), [255, 255, 255, 255]);
 eq('outside the capture: dark, opaque', at(1, 1), [0, 0, 0, 255]);
 
 // ---- copy the text (OCR) ----
-const { ocrLangs, cleanText } = await import(path.join(here, '../../apps/screenshots/ocr.js'));
+const { ocrLangs, cleanText, transcribeRect } = await import(path.join(here, '../../apps/screenshots/ocr.js'));
 eq('the interface languages first, then the shipped ones', ocrLangs(['pt-BR']), 'por+eng+spa+fra+ita');
 eq('each once', ocrLangs(['es', 'en', 'es']), 'spa+eng+por+fra+ita');
 eq('another installed language goes first', ocrLangs(['de']), 'deu+eng+spa+por+fra+ita');
 eq('an unknown language is left out', ocrLangs(['ja']), 'eng+spa+por+fra+ita');
 eq('no languages: the shipped ones', ocrLangs(undefined), 'eng+spa+por+fra+ita');
+eq('transcribe: a drag, either way', transcribeRect(300, 80, 100, 20, 800, 600), { x: 100, y: 20, w: 200, h: 60 });
+eq('transcribe: a click reads the whole picture', transcribeRect(50, 50, 52, 53, 800, 600), { x: 0, y: 0, w: 800, h: 600 });
+eq('transcribe: clamped to the picture', transcribeRect(-40, -10, 900, 120, 800, 600), { x: 0, y: 0, w: 800, h: 120 });
+eq('transcribe: outside the picture reads nothing', transcribeRect(900, 700, 990, 790, 800, 600), null);
 eq('cleaned text', cleanText('ls -la  \n\n\n\ntotal 4\f\n'), 'ls -la\n\ntotal 4');
 
 console.log(`${n - bad}/${n} screenshots geometry checks passed`);

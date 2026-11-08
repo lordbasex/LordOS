@@ -69,5 +69,7 @@
   "mode.text": "Texto",
   "hintText": "Arraste sobre o texto para copiá-lo · T: seleção · Esc: cancelar",
   "textCopied": "Texto copiado ({count} caracteres)",
-  "noText": "Nenhum texto encontrado na seleção"
+  "noText": "Nenhum texto encontrado na seleção",
+  "tool.transcribe": "Transcrever: arraste sobre um texto para copiá-lo (um clique copia todo o texto da imagem)",
+  "reading": "Lendo o texto…"
 }

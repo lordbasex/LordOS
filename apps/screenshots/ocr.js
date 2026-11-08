@@ -21,3 +21,14 @@ export function cleanText(s) {
   return String(s || '').replace(/\f/g, '').split('\n').map((l) => l.replace(/\s+$/, '')).join('\n')
     .replace(/\n{3,}/g, '\n\n').trim();
 }
+
+// The editor's Transcribe: what a drag from (x1, y1) to (x2, y2) reads, in the picture's pixels, clamped to it; a
+// plain click (under 6 pixels either way) reads the whole picture.
+export function transcribeRect(x1, y1, x2, y2, iw, ih) {
+  if (!(iw >= 1) || !(ih >= 1)) return null;
+  const vals = [x1, y1, x2, y2];
+  if (!vals.every(Number.isFinite) || (Math.abs(x2 - x1) < 6 && Math.abs(y2 - y1) < 6)) return { x: 0, y: 0, w: Math.round(iw), h: Math.round(ih) };
+  const cl = (v, m) => Math.max(0, Math.min(m, Math.round(v)));
+  const x0 = cl(Math.min(x1, x2), iw), x3 = cl(Math.max(x1, x2), iw), y0 = cl(Math.min(y1, y2), ih), y3 = cl(Math.max(y1, y2), ih);
+  return x3 - x0 < 2 || y3 - y0 < 2 ? null : { x: x0, y: y0, w: x3 - x0, h: y3 - y0 };
+}

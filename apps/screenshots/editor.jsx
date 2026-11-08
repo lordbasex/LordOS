@@ -1,7 +1,8 @@
 // editor.jsx — the markup editor (issue #30): a screenshot right after the capture, or any picture opened
 // from Photos or Files' Quick Preview (media.js openMarkup). Arrow, box, line, text and blur; redaction
 // (pixelate, solid fill); crop with aspect presets, resize and quarter turns; Save (in place, the previous
-// file goes to the Trash) and Save as copy.
+// file goes to the Trash) and Save as copy. Transcribe copies the text in a dragged area (or the whole picture
+// with a click) to the clipboard: the picture without the annotations, read by the sandboxed lord-ocr (media.ocr).
 //
 // The pixels live in lord-server: each crop, resize or turn is a new picture (media.crop/resize/rotate,
 // server/src/media/imgops.c) and the annotations of each step are drawn over it (media.annotate). Undo
@@ -10,8 +11,10 @@
 import {
   View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, Hairline,
   useTheme, useAppWindow, useKeyboard, useStore, windows, wm, t as tr, media, fs, addListener, errorText, imageEdit as M,
+  clipboard, settings,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
+import { ocrLangs, cleanText, transcribeRect } from './ocr.js';
 
 const COLORS = ['#ff3b30', '#ffcc00', '#34c759', '#0a84ff', '#ffffff', '#1c1c1e'];
 const MAX_STEPS = 6;               // pictures kept for undoing crops, resizes and turns
@@ -155,7 +158,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
       const d = drag.current;
       if (!d) return;
       const p = at(e.x, e.y);
-      if (d.kind === 'draw') { setDraft((o) => o && { ...o, x2: p.x, y2: p.y }); return; }
+      if (d.kind === 'draw' || d.kind === 'ocr') { setDraft((o) => o && { ...o, x2: p.x, y2: p.y }); return; }
       if (d.kind === 'new') setCrop((c) => c && { ...c, r: M.dragRect(d.x, d.y, p.x, p.y, ratio, bounds) });
       else if (d.kind === 'move') setCrop((c) => c && { ...c, r: M.moveRect(d.r, p.x - d.x, p.y - d.y, bounds) });
       else setCrop((c) => c && { ...c, r: M.resizeRect(d.r, d.kind, p.x, p.y, ratio, bounds) });
@@ -165,6 +168,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
       if (!d) return;
       drag.current = null;
       if (d.kind === 'draw') setDraft((o) => { if (o && Math.hypot(o.x2 - o.x1, o.y2 - o.y1) > 3) setOps((l) => [...l, finish(o)]); return null; });
+      else if (d.kind === 'ocr') setDraft((o) => { if (o) transcribe(o); return null; });
       else setCrop((c) => (c && (c.r.w < 2 || c.r.h < 2) ? { ...c, r: M.fitRatio(bounds, ratio) } : c));
     });
     return () => { offMove(); offUp(); };
@@ -182,6 +186,11 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
       return;
     }
     if (tool === 'text') { setText({ x: p.x, y: p.y, value: '' }); return; }
+    if (tool === 'transcribe') {                       // the area shows as a blue box while dragged, never kept
+      drag.current = { kind: 'ocr' };
+      setDraft({ type: 'box', x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: '#0a84ff', width });
+      return;
+    }
     drag.current = { kind: 'draw' };
     const o = { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color, width: tool === 'blur' ? 6 : width };
     setDraft(tool === 'pixelate' ? { ...o, size: M.pixelBlock(iw, ih) } : o);
@@ -215,6 +224,19 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
       return;
     }
     try { fs.rename(r.path, path); saved(path, false); } catch (e) { flash(tr('screenshots.saveError')); }
+  };
+  // Transcribe: the text of an area of the picture (its pixels, not the annotations) to the clipboard
+  const transcribe = async (o) => {
+    const r = top && transcribeRect(o.x1, o.y1, o.x2, o.y2, iw, ih);
+    if (!r) return;
+    const c = media.crop(top.id, r.x, r.y, r.w, r.h);
+    if (!c) { flash(tr('screenshots.editError')); return; }
+    flash(tr('screenshots.reading'));
+    try {
+      const s = settings.get();
+      const txt = cleanText(await media.ocr(c, ocrLangs(s.languages || [s.language])));
+      if (txt) { clipboard.set(txt); flash(tr('screenshots.textCopied', { count: [...txt].length })); } else flash(tr('screenshots.noText'));
+    } catch (e) { flash(errorText(e)); } finally { media.close(c); }
   };
   const copy = async () => { const r = await media.copyImage(current()); flash(r.ok ? tr('screenshots.copied') : tr('screenshots.saveError')); };
 
@@ -254,6 +276,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
         <ToolbarButton icon="⟳" title={tr('screenshots.rotateRight')} onClick={() => turn(1)} />
         <ToolbarButton icon="⤡" title={tr('screenshots.resize')} active={!!size} onClick={() => (size ? setSize(null) : openResize())} />
         <ToolbarSpacer />
+        <ToolbarButton icon="Ⓣ" title={tr('screenshots.tool.transcribe')} active={tool === 'transcribe'} onClick={() => pickTool(tool === 'transcribe' ? 'arrow' : 'transcribe')} />
         <ToolbarButton icon="↶" title={tr('screenshots.undo')} onClick={undo} />
         <ToolbarButton icon="⧉" title={tr('screenshots.copy')} onClick={copy} />
         {inPlace && <Button label={tr('screenshots.saveCopy')} onClick={saveCopy} />}
