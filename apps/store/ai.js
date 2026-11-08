@@ -134,7 +134,8 @@ function MoreDrivers({ a }) {
 
 const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.arch] || info.arch || ''; };
 // The catalog's sections: "ai" (entries without a section), "commercial" (free of charge, no
-// source code: the page says so before anything is installed), "remote" (third-party remote access) and
+// source code: the page says so before anything is installed), "remote" (third-party remote access:
+// RustDesk, and Tailscale's private network; their system services are outside the per-app firewall) and
 // "suites" (featured open source suites from other projects, such as ArtCraft).
 const sectionOf = (a) => a.section || 'ai';
 export const catalogApps = (section) => (catalog.apps || []).filter((a) => !section || sectionOf(a) === section);

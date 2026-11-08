@@ -17,14 +17,14 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 
 - **Direct** (`"delivery": "direct"`): the vendor has its own signed APT repository (Claude Code,
   Claude Desktop, Visual Studio Code, Cursor, Google Chrome, Microsoft Edge, Spotify, VSCodium, Brave
-  Browser). The user's
+  Browser, Tailscale). The user's
   system adds that repository itself (a
   deb822 `.sources` file with the pinned key from `apt/keys/`) and installs and updates the package
   from the vendor. Nothing is copied to lordos.org. `apt/build.sh check` still verifies the entry.
 - **Mirrored** (everything else, and an `apt` entry with `"delivery": "mirror"`): the files are
   downloaded on the maintainer's Mac, verified, packaged when they are not a .deb, and added to
   `pool/catalog/` of lordos.org/apt by `tools/release/apt-repo.sh build <target> --catalog …`, signed
-  with the LordOS archive key together with everything else. Today: llama.cpp, whisper.cpp and codex-cli (built by LordOS) and goose and opencode (the vendor's .deb).
+  with the LordOS archive key together with everything else. Today: llama.cpp, whisper.cpp and codex-cli (built by LordOS) and goose, opencode, ArtCraft and RustDesk (the vendor's .deb).
 
 ## Schema (version 1)
 
@@ -39,12 +39,15 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
     "keywords": ["llama", "llm"],      // optional: other words the Store's search finds it by (at most 12,
                                        // 2 to 40 characters each: nicknames, joined or split names such as
                                        // "vscode" and "vs code"; apps/store/search.js)
-    "summary": { "en": "…", "es": "…", "pt": "…" },   // one short neutral line per language
+    "summary": { "en": "…", "es": "…", "pt": "…" },   // one short neutral line per language ("fr", "it"
+                                       // optional; the Store falls back to "en")
     "license": "MIT", "vendor": "ggml.ai (ggml-org)", "homepage": "https://github.com/ggml-org/llama.cpp",
     "arches": ["amd64", "arm64"],
-    "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | …
+    "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | remote | vpn | …
+                                       // (each needs store.ai.kind.<kind> in every locale; server/tests/store_search_test.mjs)
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
-                                       // (Chrome, Edge, Spotify); "remote" = third-party remote access;
+                                       // (Chrome, Edge, Spotify); "remote" = third-party remote access
+                                       // (RustDesk, Tailscale);
                                        // "suites" = open source apps and suites from other projects,
                                        // Store → Third-party apps (ArtCraft, VSCodium, Brave Browser);
                                        // missing = the AI section

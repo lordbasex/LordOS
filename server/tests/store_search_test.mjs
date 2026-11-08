@@ -83,6 +83,18 @@ eq('catalog: "vscode" brings Visual Studio Code first', cat('vscode')[0], 'vscod
 eq('catalog: "chrome"', cat('chrome')[0], 'google-chrome');
 eq('catalog: "speech recognition"', cat('speech recognition')[0], 'whisper.cpp');
 eq('catalog: "ntfs"', cat('ntfs')[0], 'disk-formats');
+eq('catalog: "vpn"', cat('vpn')[0], 'tailscale');
+eq('catalog: "wireguard"', cat('wireguard')[0], 'tailscale');
+eq('catalog: "remote desktop"', cat('remote desktop')[0], 'rustdesk');
+// every kind and section the catalog uses has its label (store.ai.kind.<kind>, store.page.<section>) in every language
+const locales = fs.readdirSync(path.join(here, '../../assets/locales'));
+for (const lang of locales) {
+  const store = JSON.parse(fs.readFileSync(path.join(here, '../../assets/locales', lang, 'store.json'), 'utf8'));
+  const kinds = [...new Set(catalog.apps.map((a) => a.kind))];
+  eq(`catalog: every kind has a label in ${lang}`, kinds.filter((k) => !store[`ai.kind.${k}`]), []);
+  const sections = [...new Set(catalog.apps.map((a) => a.section || 'ai'))];
+  eq(`catalog: every section has a page title in ${lang}`, sections.filter((s) => !store[`page.${s}`]), []);
+}
 for (const a of catalog.apps) {
   eq(`catalog: ${a.id} is found by its own name`, cat(a.name)[0], a.id);
   const k = a.keywords || [];

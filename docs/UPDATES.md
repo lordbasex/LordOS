@@ -309,16 +309,17 @@ system by LordOS's packages.
 ## Mirrored apps (catalog)
 
 LordOS offers a curated list of third-party apps (today nine AI apps; three free-of-charge
-proprietary apps in a "commercial" section: Google Chrome, Microsoft Edge and Spotify; and three open
-source apps from other projects in Store → Third-party apps: ArtCraft, VSCodium and Brave Browser)
+proprietary apps in a "commercial" section: Google Chrome, Microsoft Edge and Spotify; three open
+source apps from other projects in Store → Third-party apps: ArtCraft, VSCodium and Brave Browser;
+and, since 0.8.8.6, two in Store → Remote access: Tailscale and RustDesk)
 through the Store with its normal package engine. The list is `apt/catalog.json` in the repository (schema,
 update steps and trust rules: `apt/README.md`); the vendors' signing keys are in `apt/keys/`,
 LordOS's build recipes in `apt/recipes/`. An app reaches a system in one of two ways:
 
 | Delivery | Apps | How |
 |---|---|---|
-| **direct** | Claude Code (`claude-code`), Claude Desktop (`claude-desktop`), Visual Studio Code (`code`), Cursor (`cursor`); commercial: Google Chrome (`google-chrome-stable`, amd64 and arm64), Microsoft Edge (`microsoft-edge-stable`, amd64), Spotify (`spotify-client`, amd64); third-party apps (0.8.8.4): VSCodium (`codium`, amd64 and arm64), Brave Browser (`brave-browser`, amd64 and arm64) | the vendor has a signed APT repository: the user's system adds it (a deb822 `.sources` with the key pinned in the catalog) and installs and updates from the vendor. Nothing is copied to lordos.org. |
-| **mirror** | `llama.cpp`, `whisper.cpp`, `codex-cli` (built by LordOS); `goose`, `opencode` (the vendor's .deb) | no vendor repository: verified on the maintainer's Mac and published in `pool/catalog/` of lordos.org/apt, signed with the LordOS archive key with everything else. |
+| **direct** | Claude Code (`claude-code`), Claude Desktop (`claude-desktop`), Visual Studio Code (`code`), Cursor (`cursor`); commercial: Google Chrome (`google-chrome-stable`, amd64 and arm64), Microsoft Edge (`microsoft-edge-stable`, amd64), Spotify (`spotify-client`, amd64); third-party apps (0.8.8.4): VSCodium (`codium`, amd64 and arm64), Brave Browser (`brave-browser`, amd64 and arm64); remote access (0.8.8.6): Tailscale (`tailscale`, amd64 and arm64, suite `trixie`) | the vendor has a signed APT repository: the user's system adds it (a deb822 `.sources` with the key pinned in the catalog) and installs and updates from the vendor. Nothing is copied to lordos.org. |
+| **mirror** | `llama.cpp`, `whisper.cpp`, `codex-cli` (built by LordOS); `goose`, `opencode`, `artcraft-launcher`, `rustdesk` (the vendor's .deb) | no vendor repository: verified on the maintainer's Mac and published in `pool/catalog/` of lordos.org/apt, signed with the LordOS archive key with everything else. |
 
 The flow, on the maintainer's Mac only (like the rest of the repository):
 
@@ -375,6 +376,9 @@ cursor 3.27.14, claude-code 2.1.308, goose 1.56.0, opencode 1.19.4; of 2026-10-2
 | `codium` (1.143.17232, read on 2026-11-05) | links `/usr/bin/codium` and registers `/usr/bin/editor` (priority 0). It carries VS Code's script for adding Microsoft's repository, but behind a check that is always false for `codium`, so it adds no source and no key; the `/usr/bin/copilot` link code it also carries only acts for the `code` and `code-insiders` editions. Desktop and MIME databases refreshed. |
 | `brave-browser` (1.99.55, read on 2026-11-05) | depends on `brave-keyring`. Its postinst installs icons, `defaults.list` entries, the `x-www-browser`/`gnome-www-browser`/`brave-browser` alternatives (priority 201), an AppArmor profile when `/etc/apparmor.d/abi/4.0` exists, and the `chromemgmt` group only when `/etc/default/brave-browser` asks for it; its Chrome-style source and key writer is cut off by an `exit 0` before it runs (Brave's own comment: "Don't add the Chrome repo"), so it writes no source. |
 | `brave-keyring` (1.20) | ships `/usr/share/keyrings/brave-browser-archive-keyring.gpg` (Brave's three release keys: DBF1 A116 … 2003 8257, 47D3 2A74 … 6A73 CD96, B2A3 DCA3 … E4B0 DCA0) and `/etc/sysctl.d/30-brave.conf` (comments only). Its postinst links that keyring into `/etc/apt/trusted.gpg.d/` (trusted for every source) **unless** `/etc/apt/sources.list.d/brave-browser-release.sources` (or `.list`) already uses it as Signed-By, in which case it removes the link; postrm removes the link. |
+| `tailscale` (1.104.5, read on 2026-11-08) | depends on `iptables`; recommends `tailscale-archive-keyring` and `iproute2`. Ships `tailscaled.service`, `tailscale-wait-online.service`, `tailscale-online.target` and the conffile `/etc/default/tailscaled` (`PORT="41641"`, `FLAGS=""`). Its postinst is debhelper's standard one: `deb-systemd-helper` enables `tailscaled.service` on a new install (`was-enabled` is true when there is no earlier state) and `deb-systemd-invoke restart` starts it. It writes no source and no key. prerm stops the daemon; postrm masks the unit on remove and, on purge, deletes `/var/lib/tailscale` (the machine's node key and login). |
+| `tailscale-archive-keyring` (1.35.181) | ships `/usr/share/keyrings/tailscale-archive-keyring.gpg`, byte for byte the key LordOS pins (2596 A99E … 957F 5868); no maintainer scripts, so nothing is linked into `trusted.gpg.d`. Installed only when recommends are, and unused by LordOS's `lordos-tailscale.sources`. |
+| `rustdesk` (1.5.1, read on 2026-11-08) | depends on GTK 3, `libxdo3`, `libva*`, `gstreamer1.0-pipewire` and other Debian 13 libraries; recommends `libayatana-appindicator3-1`. Its postinst links `/usr/bin/rustdesk`, copies `rustdesk.service` to `/usr/lib/systemd/system/` (a file no package owns) and **always** runs `systemctl enable rustdesk` and `systemctl start rustdesk`: a root daemon, `rustdesk --service`, that starts with the computer. preinst stops it before an upgrade; prerm stops, disables and deletes the unit; purge deletes `/root/.config/rustdesk`. No source, no key, no setuid file. |
 | `opencode` | `/usr/bin/ai.opencode.desktop` through update-alternatives; `chrome-sandbox` made setuid only when unprivileged user namespaces don't work; an AppArmor profile copied to `/etc/apparmor.d/ai.opencode.desktop` when AppArmor is enabled. It ships electron-updater's `app-update.yml` (GitHub releases). |
 
 So that the vendor scripts and LordOS's own source agree, a direct app's source should be written
@@ -419,6 +423,57 @@ their cron job):
   configured multiple times") and `apt-get update` succeeds; with an empty `spotify.list` created
   before the install (Spotify's documented opt-out) there is no warning, but `pkg-source-add` doesn't
   write that file yet. Spotify's key goes into `trusted.gpg.d` in both cases.
+
+### Remote access: Tailscale and RustDesk (0.8.8.6, #68, #66)
+
+Both are in Store → Remote access (`"section": "remote"`), from their makers' official distribution
+only. What was checked on 2026-11-08 (`apt/build.sh check` and `apt/build.sh fetch rustdesk`, on the
+development machine): Tailscale's index for both architectures, and RustDesk's two `.deb`s against
+their pins on a second download. Neither has been installed on a LordOS system yet.
+
+**Tailscale** (`"delivery": "direct"`, `https://pkgs.tailscale.com/stable/debian`, key
+`apt/keys/tailscale.asc`, 2596 A99E AAB3 3821 893C 0A79 458C A832 957F 5868, Tailscale's own
+`trixie.gpg`). Its `Release` has a `Codename` (`trixie`) and no `Suite`, like Cursor's, so the
+catalog's suite is `trixie` and must change with LordOS's Debian release, in a reviewed pull request.
+The package writes no source, so the system keeps `lordos-tailscale.sources` and no `files` entry is
+needed. After installing:
+
+- `tailscaled` is running: its postinst enables and starts it (table above). Nothing in LordOS
+  starts or stops it.
+- There is no LordOS page for Tailscale. Signing in is in Terminal, by an administrator:
+  `sudo tailscale up` prints the sign-in address; `sudo tailscale set --operator=$USER` lets that
+  user run `tailscale` without `sudo` afterwards.
+- **Firewall.** `tailscaled` is a root system service in `system.slice`, not an app: the per-app
+  firewall doesn't see its own traffic (WireGuard on UDP 41641, Tailscale's relays over HTTPS), and
+  it isn't one of the essential services the Monitor counts (`np_sysc`). The apps' traffic over the
+  tailnet is theirs and follows their rules: Tailscale's addresses (100.64.0.0/10 and
+  fd7a:115c:a1e0::/48) are local network for LordOS (`np_is_lan4`, `np_is_lan6`), so an app with
+  "no local network" can't reach tailnet peers and one with "no internet" can, and incoming
+  connections from the tailnet to an app's port are decided like LAN ones. Nothing needs to be added
+  to lord-netperm. Not tested yet on a LordOS system.
+- **Name resolution.** LordOS uses systemd-resolved; `tailscaled` sets MagicDNS through it on its
+  own interface (`tailscale0`), which lord-netd doesn't manage (its VPNs set DNS with `resolvectl`
+  on their own interfaces). The network state lists `tailscale0` as a `tun` interface. Not tested yet.
+
+**RustDesk** (`"type": "deb"`, mirrored, 1.5.1, the GitHub release's `rustdesk-1.5.1-x86_64.deb` and
+`rustdesk-1.5.1-aarch64.deb`). The SHA-256 pins are GitHub's `digest` of each asset, confirmed by two
+downloads. RustDesk signs an update file (`rustdesk-update.json` and its Ed25519 `.sig`), but it
+lists only the Windows and macOS files, so for the `.deb`s the pin is the only check. Like every
+mirrored app, it reaches the Store once the maintainer publishes the repository with it
+(`apt-repo.sh build … --catalog`); until then its page offers to fetch the lists.
+
+- **Connecting to other computers** is what LordOS offers it for: RustDesk's window is a GTK 3 app
+  like any other Linux app, with the same firewall and permissions. Not tested yet on LordOS.
+- **Being reached from another computer is not expected to work, by design:** LordOS has no
+  ScreenCast or RemoteDesktop portal (`WAYLAND.md`), Xwayland runs rootless with XTEST off, and
+  `remote.sock` refuses the user's own processes ([GO-LINK.md](GO-LINK.md), D6). LordOS's Remote
+  Desktop (port 5673) is the way into a LordOS computer. Not tested on LordOS.
+- **Its system service.** The package's postinst always enables and starts `rustdesk.service`
+  (`rustdesk --service`, as root), and LordOS doesn't change vendor packages. That service is outside
+  the per-app firewall, like `tailscaled`, and keeps this computer registered with RustDesk's
+  servers. An administrator who only uses RustDesk to reach other computers can turn it off with
+  `sudo systemctl disable --now rustdesk`; whether the window then still connects out hasn't been
+  tested.
 
 ## The Store's banner
 
