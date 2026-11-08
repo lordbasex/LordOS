@@ -31,14 +31,30 @@ export function kindOf(e) {
   return BY_EXT.get(ext) || (TEXT_NAMES.test(e.name) ? 'text' : 'other');
 }
 
-// For "Open With" of Linux apps (their MimeType in the .desktop file).
+// For "Open With" of Linux apps (their MimeType in the .desktop file). The names are
+// shared-mime-info's; the system's own database (lord.mime.guess, see mimesOf) comes first, and this
+// table is what is known without it. Every extension of a kind with no text fallback is here, so a
+// kind never loses "Open With" for lack of a type (issue #49: the office documents had none).
 const MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp',
+  ico: 'image/vnd.microsoft.icon', tif: 'image/tiff', tiff: 'image/tiff', heic: 'image/heif', avif: 'image/avif',
   txt: 'text/plain', md: 'text/markdown', log: 'text/plain', csv: 'text/csv', html: 'text/html', htm: 'text/html', css: 'text/css',
   js: 'text/javascript', json: 'application/json', xml: 'application/xml', c: 'text/x-csrc', h: 'text/x-chdr', cpp: 'text/x-c++src',
   py: 'text/x-python', sh: 'application/x-shellscript', pdf: 'application/pdf', zip: 'application/zip', gz: 'application/gzip',
-  mp3: 'audio/mpeg', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/x-wav', mp4: 'video/mp4', mkv: 'video/x-matroska',
-  webm: 'video/webm', odt: 'application/vnd.oasis.opendocument.text', yaml: 'application/x-yaml', toml: 'application/toml',
+  tgz: 'application/x-compressed-tar', xz: 'application/x-xz', bz2: 'application/x-bzip2', zst: 'application/zstd',
+  '7z': 'application/x-7z-compressed', rar: 'application/vnd.rar', tar: 'application/x-tar', iso: 'application/x-cd-image',
+  img: 'application/x-raw-disk-image', dmg: 'application/x-apple-diskimage', lz: 'application/x-lzip', lzma: 'application/x-lzma',
+  mp3: 'audio/mpeg', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/x-opus+ogg', flac: 'audio/flac', wav: 'audio/x-wav',
+  m4a: 'audio/mp4', aac: 'audio/aac', wma: 'audio/x-ms-wma', mid: 'audio/midi', midi: 'audio/midi',
+  mp4: 'video/mp4', mkv: 'video/x-matroska', webm: 'video/webm', avi: 'video/x-msvideo', mov: 'video/quicktime', m4v: 'video/mp4',
+  wmv: 'video/x-ms-wmv', flv: 'video/x-flv', mpg: 'video/mpeg', mpeg: 'video/mpeg', ogv: 'video/ogg',
+  deb: 'application/vnd.debian.binary-package',
+  odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  odp: 'application/vnd.oasis.opendocument.presentation', rtf: 'application/rtf', epub: 'application/epub+zip',
+  doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  yaml: 'application/x-yaml', toml: 'application/toml',
 };
 
 export function mimeOf(e) {
@@ -47,6 +63,21 @@ export function mimeOf(e) {
   if (MIME[ext]) return MIME[ext];
   const k = kindOf(e);
   return k === 'text' || k === 'code' ? 'text/plain' : 'application/octet-stream';
+}
+
+// Every type an entry may be, best first: the system's MIME database's guess from the name
+// (guess(name) → type or null: lord.mime.guess, /usr/share/mime/globs2), then mimeOf's. An app that
+// declares either one opens it, so a type this table lacks still finds its apps through the system.
+export function mimesOf(e, guess) {
+  const out = [];
+  if (!e.dir && typeof guess === 'function') {
+    let g = null;
+    try { g = guess(e.name); } catch (err) { g = null; }
+    if (typeof g === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(g) && g !== 'application/octet-stream') out.push(g);
+  }
+  const own = mimeOf(e);
+  if (!out.includes(own)) out.push(own);
+  return out;
 }
 
 // Does the Linux app (mimeTypes "a/b;c/*;…") open this type?

@@ -1,7 +1,7 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
 import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText } from '@lordos/sdk';
-import { kindOf, mimeOf, appOpens, isTextual, isImage } from './kinds.js';
+import { kindOf, mimesOf, appOpens, isTextual, isImage } from './kinds.js';
 
 // Changes every time something changed on disk (a copy finished, the trash…): the views reload.
 export const fsVersion = createStore(0);
@@ -124,13 +124,17 @@ export function openersFor(e, linuxApps, t) {
   if (k === 'image') out.push({ id: 'photos', label: t('apps.photos'), run: () => wm.open('photos', { new: true, args: { path: e.path } }) });
   if (k === 'audio' || k === 'video') out.push({ id: 'player', label: t('apps.player'), run: () => wm.open('player', { args: { path: e.path } }) });
   if (isTextual(e) || k === 'other') out.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
-  const mime = mimeOf(e);
+  // the system's MIME database's type first (lord.mime.guess), then Files' own table: an app that
+  // declares either one opens the file (issue #49: an .xlsx had no type of its own here, so WPS and
+  // GridCraft, which declare it, were never offered)
+  const mimes = mimesOf(e, typeof lord.mime !== 'undefined' && lord.mime.guess ? (n) => lord.mime.guess(n) : null);
   for (const a of linuxApps) {
-    if (a.kind === 'linux' && appOpens(a.mimeTypes, mime)) out.push({ id: a.id, desktopId: a.desktopId, label: a.name, run: () => lord.apps.launchWith(a.desktopId, e.path) });
+    if (a.kind === 'linux' && mimes.some((m) => appOpens(a.mimeTypes, m))) out.push({ id: a.id, desktopId: a.desktopId, label: a.name, run: () => lord.apps.launchWith(a.desktopId, e.path) });
   }
   // the default app for this type (Settings → Default Apps, ~/.config/mimeapps.list) goes first,
-  // marked; the type comes from the system's MIME database when it knows the name
-  const def = defaultOpenerId((typeof lord.mime !== 'undefined' && lord.mime.guess(e.name)) || mime);
+  // marked
+  let def = null;
+  for (const m of mimes) if ((def = defaultOpenerId(m))) break;
   const native = nativeOf(def);
   const i = def ? out.findIndex((o) => (native ? o.id === native : o.desktopId && `${o.desktopId}.desktop` === def)) : -1;
   if (i >= 0) {
