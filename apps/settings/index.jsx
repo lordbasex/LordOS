@@ -6,7 +6,7 @@ import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
-  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -471,7 +471,7 @@ function AdminLog() {
   );
 }
 
-const shortLocale = (name) => name.replace(/\.UTF-8$/i, '');
+const shortLocale = regionOf;    // "en_GB.UTF-8" → "en_GB", "en_IN" stays (sdk/localename.js)
 
 function LanguageRegion() {
   const t = useTheme();
@@ -489,13 +489,13 @@ function LanguageRegion() {
 
   // Region for formats and for programs (LANG): generated with glibc if needed.
   const regionName = region || langs.find((l) => l.id === lang)?.region || '';
-  const generated = (name) => locales.find((l) => l.name === name)?.generated;
+  const generated = (r) => locales.find((l) => regionOf(l.name) === r)?.generated;
   async function useRegion(r) {
-    const name = `${r}.UTF-8`;
-    if (!generated(name)) {
+    const name = localeOf(r);
+    if (!generated(r)) {
       const ok = await report(admin.run('locale-gen', name), tr('settings.region.generated', { name: r }));
       if (!ok) return;
-      const l = locales.find((x) => x.name === name);
+      const l = locales.find((x) => regionOf(x.name) === r);
       if (l) l.generated = true;
     }
     lord.locale.set({ LANG: name });
@@ -537,7 +537,7 @@ function LanguageRegion() {
       </Section>
       <Section title={tr('settings.system.title')} footer={tr('settings.system.hint', { name: sys })}>
         <ValueRow label="LANG" value={sys} mono>
-          <Button small label={tr('settings.system.apply', { name: regionName || '—' })} onClick={() => regionName && report(admin.run('system-locale', `${regionName}.UTF-8`)).then((ok) => ok && setSys(`${regionName}.UTF-8`))} />
+          <Button small label={tr('settings.system.apply', { name: regionName || '—' })} onClick={() => regionName && report(admin.run('system-locale', localeOf(regionName))).then((ok) => ok && setSys(localeOf(regionName)))} />
         </ValueRow>
       </Section>
       <Section title={tr('settings.pack.title')} footer={tr('settings.pack.hint')}>

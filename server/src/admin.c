@@ -44,6 +44,7 @@
 #include "lan/share_admin.h"
 #include "remote/sgrant_admin.h"
 #include "monitor/proc_admin.h"
+#include "localename.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -425,22 +426,13 @@ int admin_known(const char *action) {
 }
 
 #ifndef LORD_NETD
-/* Valid region name supported by glibc: "es_AR.UTF-8". */
+/* Valid region name supported by glibc: "es_AR.UTF-8", "en_IN.UTF-8" (localename.h). */
 static int supported_locale(const char *name) {
     size_t n = strlen(name);
     if (!n || n > 64) return 0;
     for (const char *p = name; *p; p++)
         if (!isalnum((unsigned char)*p) && !strchr("_.-@", *p)) return 0;
-    FILE *f = fopen("/usr/share/i18n/SUPPORTED", "r");
-    if (!f) return 0;
-    char line[256];
-    int ok = 0;
-    while (!ok && fgets(line, sizeof line, f)) {
-        char loc[128], cs[64];
-        if (sscanf(line, "%127s %63s", loc, cs) == 2 && !strcmp(loc, name) && !strcmp(cs, "UTF-8")) ok = 1;
-    }
-    fclose(f);
-    return ok;
+    return locale_supported_utf8(name);
 }
 
 /* Is it already generated? glibc maps the locale archive only once per process, so

@@ -6,7 +6,7 @@
 // running system (install-account): lord.system.info().firstAccount.
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, MenuButton, useTheme, useLocale, useStore, createStore,
-  admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
+  admin, keyboard, languages, setLanguage, formatBytes, locale, regionOf, localeOf, regionCountry, tOptional, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
@@ -65,11 +65,11 @@ function Field({ label, children, hint, error }) {
 }
 
 // A list with search (regions, zones, layouts).
-function Pick({ items, value, onPick, placeholder, height = 170 }) {
+function Pick({ items, value, onPick, placeholder, height = 170, limit = 300 }) {
   const t = useTheme();
   const [q, setQ] = useState('');
   const n = q.trim().toLowerCase();
-  const shown = (n ? items.filter(([id, label]) => `${id} ${label}`.toLowerCase().includes(n)) : items).slice(0, 300);
+  const shown = (n ? items.filter(([id, label]) => `${id} ${label}`.toLowerCase().includes(n)) : items).slice(0, limit);
   return (
     <View style={{ gap: 6 }}>
       <SearchField value={q} onChange={setQ} placeholder={placeholder} />
@@ -106,10 +106,13 @@ function Language() {
   const { t: tr } = useLocale();
   const s = useStore(wiz);
   const langs = languages();
-  const [locales] = useState(() => lord.locale.available().map((l) => l.name.replace(/\.UTF-8$/i, '')));
-  const [zones] = useState(() => lord.time.zones());
+  const [locales] = useState(() => [...new Set(lord.locale.available().map((l) => regionOf(l.name)))]);
+  const [zones] = useState(() => lord.time.zones().sort((a, b) => (a === 'UTC' ? -1 : b === 'UTC' ? 1 : a.localeCompare(b))));
   const lang = s.lang || locale.get().lang.split('-')[0];
-  const regions = locales.filter((r) => r.startsWith(`${lang}_`)).map((r) => [r, r]);
+  // "United Kingdom · en_GB": found by the country's name too (#53)
+  const regions = locales.filter((r) => r.startsWith(`${lang}_`))
+    .map((r) => { const cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : ''; return [r, name ? `${name} · ${r}` : r]; })
+    .sort((a, b) => a[1].localeCompare(b[1]));
   return (
     <View>
       <Field label={tr('installer.language.language')}>
@@ -124,7 +127,8 @@ function Language() {
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Field label={tr('installer.language.zone')}>
-            <Pick items={zones.map((z) => [z, z.replace(/_/g, ' ')])} value={s.zone} onPick={(zone) => set({ zone })} placeholder={tr('installer.search')} height={116} />
+            <Pick items={zones.map((z) => [z, z.replace(/_/g, ' ')])} value={s.zone} onPick={(zone) => set({ zone })} placeholder={tr('installer.search')} height={116}
+              limit={zones.length} />
           </Field>
         </View>
       </View>
@@ -461,7 +465,7 @@ function Summary() {
         : beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
       [tr('installer.summary.swap'), mr?.where.swap ? tr('installer.summary.swapPart') : s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
     ]),
-    [tr('installer.summary.lang'), `${p.lang} · ${p.region}.UTF-8 · ${p.zone}`],
+    [tr('installer.summary.lang'), `${p.lang} · ${localeOf(p.region)} · ${p.zone}`],
     [tr('installer.summary.keyboard'), kbName(p.kb)],
     [tr('installer.summary.user'), `${s.fullname} · ${s.user} · ${tr('installer.summary.admin')}`],
     [tr('installer.summary.host'), s.host],
@@ -526,12 +530,12 @@ function startInstall() {
   set({ step: STEPS.indexOf('install'), progress: null, log: [], error: null, done: false });
   const job = FIRST_ACCOUNT ? {
     user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
-    lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
+    lang: p.lang, locale: localeOf(p.region), timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
   } : {
     mode: s.mode, ...(s.mode === 'free' ? { freeStart: s.disk.freeStart, freeEnd: s.disk.freeEnd } : {}),
     ...(s.mode === 'manual' ? manualReview(s.disk, s.manual, 0).fields : {}),
     disk: s.disk.name, user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
-    lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
+    lang: p.lang, locale: localeOf(p.region), timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
     swap: s.mode === 'manual' && manualReview(s.disk, s.manual, 0).where.swap ? 0 : s.swap,
   };
   set({ pass: '', pass2: '' });            // the password doesn't stay in the UI

@@ -47,6 +47,7 @@
 #include "freepart.h"
 #include "manualpart.h"
 #include "../users/homedirs.h"
+#include "../localename.h"
 
 #include <crypt.h>
 #include <ctype.h>
@@ -490,14 +491,17 @@ static int re_simple(const char *s, size_t max, const char *extra, int allow_emp
 }
 
 static int locale_supported(const char *name) {
-    if (!re_simple(name, 48, "_.-@", 0)) return 0;
-    FILE *f = fopen("/usr/share/i18n/SUPPORTED", "r");
-    char line[256], loc[128], cs[64];
-    int found = 0;
-    while (f && !found && fgets(line, sizeof line, f))
-        if (sscanf(line, "%127s %63s", loc, cs) == 2 && !strcmp(loc, name) && !strcmp(cs, "UTF-8")) found = 1;
-    if (f) fclose(f);
-    return found;
+    return re_simple(name, 48, "_.-@", 0) && locale_supported_utf8(name);
+}
+
+/* NULL if `tz` names a zone in /usr/share/zoneinfo ("Australia/Melbourne"), or the error. */
+static const char *timezone_check(const char *tz) {
+    if (!re_simple(tz, 60, "/_+-", 0) || strstr(tz, "..") || tz[0] == '/') return "install.badTimezone";
+    char p[PATH_MAX];
+    struct stat st;
+    snprintf(p, sizeof p, "/usr/share/zoneinfo/%s", tz);
+    if (stat(p, &st) || !S_ISREG(st.st_mode)) return "install.unknownTimezone";
+    return NULL;
 }
 
 /* What the person chose: the account, the computer's name, language, zone and keyboard. */
@@ -515,11 +519,9 @@ static const char *validate_person(Plan *pl) {
     if (!re_host(pl->hostname)) return "install.badHostname";
     if (!re_simple(pl->lang, 10, "-", 0)) return "install.badLanguage";
     if (!locale_supported(pl->locale)) return "install.badRegion";
+    const char *tz = timezone_check(pl->timezone);
+    if (tz) return tz;
     char p[PATH_MAX];
-    struct stat st;
-    if (!re_simple(pl->timezone, 60, "/_+-", 0) || strstr(pl->timezone, "..") || pl->timezone[0] == '/') return "install.badTimezone";
-    snprintf(p, sizeof p, "/usr/share/zoneinfo/%s", pl->timezone);
-    if (stat(p, &st) || !S_ISREG(st.st_mode)) return "install.unknownTimezone";
     if (!re_simple(pl->kblayout, 20, "_", 0)) return "install.badKbLayout";
     snprintf(p, sizeof p, "/usr/share/X11/xkb/symbols/%s", pl->kblayout);
     if (access(p, R_OK)) return "install.unknownKbLayout";

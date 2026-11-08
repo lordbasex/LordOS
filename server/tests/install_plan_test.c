@@ -86,6 +86,46 @@ int main(void) {
       T(parse_plan(big, &p) != 0); }
     /* it is refused like any other plan when the disk isn't listed */
     T(parse_plan("{\"mode\":\"manual\",\"disk\":\"zzz9\",\"rootPart\":4,\"espPart\":1}", &p) == 0 && !strcmp(validate(&p), "install.diskNotListed"));
+
+    /* regions (#53): SUPPORTED lists some UTF-8 regions without the codeset ("en_IN UTF-8"); the
+     * wizard always sends it, before any modifier (sdk/localename.js localeOf) */
+    { char form[64];
+      locale_utf8_form("en_IN", form, sizeof form); T(!strcmp(form, "en_IN.UTF-8"));
+      locale_utf8_form("ca_ES@valencia", form, sizeof form); T(!strcmp(form, "ca_ES.UTF-8@valencia"));
+      locale_utf8_form("en_GB.UTF-8", form, sizeof form); T(!strcmp(form, "en_GB.UTF-8"));
+      static const char sup[] = "en_GB.UTF-8 UTF-8\nen_GB ISO-8859-1\nen_IN UTF-8\nca_ES@valencia UTF-8\nde_DE ISO-8859-1\n";
+      static const char *const yes[] = { "en_GB.UTF-8", "en_IN.UTF-8", "en_IN", "ca_ES.UTF-8@valencia", NULL };
+      static const char *const no[] = { "en_GB", "de_DE.UTF-8", "en_IN.UTF-8.UTF-8", "ca_ES@valencia.UTF-8", "xx_YY.UTF-8", NULL };
+      for (int i = 0; yes[i]; i++) { FILE *f = fmemopen((void *)sup, sizeof sup - 1, "r"); T(f && locale_listed(f, yes[i])); if (f) fclose(f); }
+      for (int i = 0; no[i]; i++) { FILE *f = fmemopen((void *)sup, sizeof sup - 1, "r"); T(f && !locale_listed(f, no[i])); if (f) fclose(f); }
+      T(!locale_supported("en_GB.UTF-8;rm"));
+      T(!strcmp(timezone_check("../etc/passwd"), "install.badTimezone"));
+      T(!strcmp(timezone_check("/etc/passwd"), "install.badTimezone")); }
+    /* every UTF-8 region this machine's glibc lists, in the wizard's spelling, and every zone the wizard
+     * offers (zone1970.tab) passes the root side's checks */
+    { FILE *f = fopen("/usr/share/i18n/SUPPORTED", "r");
+      char line[256], loc[128], cs[64], form[160];
+      int n = 0, bad = 0;
+      while (f && fgets(line, sizeof line, f)) {
+          if (sscanf(line, "%127s %63s", loc, cs) != 2 || strcmp(cs, "UTF-8")) continue;
+          locale_utf8_form(loc, form, sizeof form);
+          n++;
+          if (!locale_supported(form)) { bad++; printf("region refused: %s (%s)\n", form, loc); }
+      }
+      if (f) fclose(f);
+      if (!f) printf("install-plan-test: skipped the regions: needs /usr/share/i18n/SUPPORTED (locales)\n");
+      else T(n > 100 && !bad);
+      f = fopen("/usr/share/zoneinfo/zone1970.tab", "r");
+      n = bad = 0;
+      while (f && fgets(line, sizeof line, f)) {
+          char zone[128];
+          if (line[0] == '#' || sscanf(line, "%63s %63s %127s", loc, cs, zone) != 3) continue;
+          n++;
+          if (timezone_check(zone)) { bad++; printf("zone refused: %s\n", zone); }
+      }
+      if (f) fclose(f);
+      if (!f) printf("install-plan-test: skipped the zones: needs /usr/share/zoneinfo (tzdata)\n");
+      else T(n > 100 && !bad && !timezone_check("Australia/Melbourne")); }
     printf("install-plan-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }
