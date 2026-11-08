@@ -1,6 +1,7 @@
 // Top menu bar: L menu, active app, Window menu, keyboard layout,
-// Control Center and clock.
-import { View, Text, useClock, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems } from '@lordos/sdk';
+// Control Center, the notifications' bell and the clock (a click opens notifications and the calendar).
+// The keyboard layout and the bell can be turned off in Settings → Desktop & Dock → Menu Bar (issue #58).
+import { View, Text, useClock, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs } from '@lordos/sdk';
 import { useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -32,10 +33,24 @@ function ControlGlyph({ t }) {
   return <View style={{ width: 16, height: 14 }}>{bar(0, 9)}{bar(8, 2)}</View>;
 }
 
+// A bell drawn with views (it doesn't depend on a font), with the accent's dot when there is something unread.
+function BellGlyph({ color, dot }) {
+  return (
+    <View style={{ width: 14, height: 14, alignItems: 'center' }}>
+      <View style={{ marginTop: 1, width: 10, height: 9, borderTopLeftRadius: 5, borderTopRightRadius: 5, border: `1.5px solid ${color}`, borderBottomWidth: 0 }} />
+      <View style={{ width: 13, height: 1.5, borderRadius: 1, backgroundColor: color }} />
+      <View style={{ marginTop: 1, width: 4, height: 2, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: color }} />
+      {dot ? <View style={{ position: 'absolute', right: -2, top: -1, width: 6, height: 6, borderRadius: 3, backgroundColor: dot }} /> : null}
+    </View>
+  );
+}
+
 // area: the display it is on (global coordinates; the main one, or each one with "menu bar on all displays")
-export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, controlCenter, area = { x: 0, y: 0, w: screen.width, h: screen.height } }) {
+// clockPanel: the clock's panel is open on this bar; unread: a notification came since it was last opened
+export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, controlCenter, onClock, clockPanel, unread, area = { x: 0, y: 0, w: screen.width, h: screen.height } }) {
   const clock = useClock(format, 1000);
-  useSettings();         // the active keyboard layout lives in the settings
+  const [s] = useSettings();         // the active keyboard layout lives in the settings
+  const bar = menuBarPrefs(s);
   const [open, setOpen] = useState(null);
   const refs = { logo: useRef(null), app: useRef(null), window: useRef(null), help: useRef(null) };
   const appRefs = useRef({});
@@ -108,14 +123,17 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         <BarItem t={t} active={open?.name === 'window'} anchorRef={refs.window} onClick={() => toggle('window', refs.window)}><Label t={t}>{tr('shell.menu.window')}</Label></BarItem>
         <BarItem t={t} active={open?.name === 'help'} anchorRef={refs.help} onClick={() => toggle('help', refs.help)}><Label t={t}>{tr('shell.menu.help')}</Label></BarItem>
         <View style={{ flex: 1 }} />
-        <BarItem t={t} onClick={() => keyboard.next()}>
-          <Label t={t}>{keyboard.label(keyboard.active())}</Label>
-        </BarItem>
+        {bar.keyboard ? (
+          <BarItem t={t} onClick={() => keyboard.next()}>
+            <Label t={t}>{keyboard.label(keyboard.active())}</Label>
+          </BarItem>
+        ) : null}
         <StatusItems color={t.menuText} />
         <PrivacyIndicators />
         <BarItem t={t} onClick={() => spotlight.toggle()}><Label t={t}>⌕</Label></BarItem>
         <BarItem t={t} active={controlCenter} onClick={onControlCenter}><ControlGlyph t={t} /></BarItem>
-        <BarItem t={t}><Label t={t}>{clock}</Label></BarItem>
+        {bar.bell ? <BarItem t={t} active={clockPanel} onClick={onClock}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
+        <BarItem t={t} active={clockPanel} onClick={onClock}><Label t={t}>{clock}</Label></BarItem>
       </View>
       {cur && <Menu x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} />}
     </View>

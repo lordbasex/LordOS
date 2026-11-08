@@ -4,7 +4,7 @@
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
-  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
+  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
 } from '@lordos/sdk';
@@ -221,20 +221,23 @@ function TileSpinner() {
   );
 }
 
-function MotionTile({ it, on, avail, percent, busy, onClick }) {
+// The wallpaper grids' thumbnail width (issue #58, Settings → Wallpaper → Thumbnail size): 80-240 px, 100 by default.
+const thumbWidth = (s) => Math.max(80, Math.min(240, Math.round(+s.wallpaperThumbs) || 100));
+
+function MotionTile({ it, on, avail, percent, busy, onClick, tw = 100 }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
   return (
-    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: 108, opacity: avail ? 1 : 0.45 }}>
+    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: tw + 8, opacity: avail ? 1 : 0.45 }}>
       <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
-        <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+        <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
           <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           {busy || percent != null ? <TileSpinner /> : null}
           {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
         </View>
       </View>
-      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 108 }}>{name}</Text>
+      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{name}</Text>
     </View>
   );
 }
@@ -312,7 +315,7 @@ function MotionWallpapers({ login }) {
         <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {motionItems.filter((it) => it.section === sec).map((it) => (
-              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} />
+              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} tw={thumbWidth(s)} />
             ))}
           </View>
         </Section>
@@ -342,6 +345,7 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
   const [busy, setBusy] = useState(false);
   const ids = s.wallpaperImages || [];
   const images = ids.map((id) => findWallpaper([], id)).filter(Boolean);
+  const tw = thumbWidth(s);
   const add = (path) => {
     setPicking(false);
     if (!path) return;
@@ -363,9 +367,9 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
       {images.length ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
           {images.map((w) => (
-            <View key={w.id} onClick={() => { setNote(''); Promise.resolve(onChoose(w.id)).catch((e) => setNote(errorText(e))); }} style={{ alignItems: 'center', width: 108 }}>
+            <View key={w.id} onClick={() => { setNote(''); Promise.resolve(onChoose(w.id)).catch((e) => setNote(errorText(e))); }} style={{ alignItems: 'center', width: tw + 8 }}>
               <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${curId === w.id ? t.accent : 'transparent'}` }}>
-                <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+                <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
                   <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </View>
               </View>
@@ -412,6 +416,9 @@ function Wallpapers() {
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
     .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
   const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
+  // the grids' thumbnails: 16:9 like the thumbnails themselves
+  const tw = thumbWidth(s), th = Math.round(tw * 9 / 16);
+  const cap = { fontSize: typeScale.caption, color: t.textDim };
   return (
     <Stack>
       <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
@@ -426,6 +433,13 @@ function Wallpapers() {
             <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{catName(cur.category || 'other')}</Text>
           </View>
         </View>
+        <SettingRow label={tr('settings.wallpaperThumbs.size')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, direction: 'ltr' }}>
+            <Text style={cap}>{tr('settings.wallpaperThumbs.small')}</Text>
+            <Slider value={tw} min={80} max={240} width={150} onChange={(v) => set({ wallpaperThumbs: Math.round(v) })} />
+            <Text style={cap}>{tr('settings.wallpaperThumbs.large')}</Text>
+          </View>
+        </SettingRow>
       </Section>
       <UserImages login={login} curId={shown} setNote={setNote}
         onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : set({ wallpaper: id, motion: {} }))}
@@ -433,17 +447,17 @@ function Wallpapers() {
       <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
         <Section key={c} title={catName(c)}>
-          {/* 108 px items with 10 px gaps: a category of five fits on one row in the default window */}
+          {/* 108 px items (the default size) with 10 px gaps: a category of five fits on one row in the default window */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {ws.map((w) => (
-              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: 108 }}>
+              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: tw + 8 }}>
                 <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
-                  <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+                  <View style={{ width: tw, height: th, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
                     <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </View>
                 </View>
                 <Text style={{ fontSize: typeScale.caption, color: cur.id === w.id ? t.text : t.textDim, fontWeight: cur.id === w.id ? 600 : 400,
-                  whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 108 }}>{wallpaperName(w)}</Text>
+                  whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{wallpaperName(w)}</Text>
               </View>
             ))}
           </View>

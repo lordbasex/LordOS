@@ -1,9 +1,11 @@
-// Control Center: mode, transparency, accent, wallpaper and live CPU/RAM usage.
+// Control Center: mode, transparency, the volume and its output, the network, Wi-Fi and Bluetooth, accent,
+// wallpaper and live CPU/RAM usage. The network, Wi-Fi, Bluetooth and CPU/RAM tiles can be turned off in Settings →
+// Desktop & Dock → Control Center (issue #58, sdk/menubarmodel.js).
 import {
   View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, formatBytes, wm, session, addListener, t as tr,
-  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb,
+  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth,
 } from '@lordos/sdk';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Four wallpapers fit in the tile: the current one and a few from the collection (all of them are
 // in Settings → Wallpaper, which «Change Wallpaper…» opens).
@@ -32,12 +34,25 @@ function Meter({ t, label, value, detail }) {
   );
 }
 
-// Volume of the default output (PipeWire). Click on the speaker: mute.
+// A small chevron drawn with two borders (it doesn't depend on a font): down when closed, up when open.
+function Chevron({ color, open }) {
+  return (
+    <View style={{ width: 12, height: 12, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 5, height: 5, marginTop: open ? 3 : -3, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: color, transform: `rotate(${open ? -135 : 45}deg)` }} />
+    </View>
+  );
+}
+
+// Volume of the default output (PipeWire). Click on the speaker: mute. With more than one output, the button at the
+// end lists them; choosing one makes it the default, and its own volume comes back with it.
 function SoundTile({ t }) {
   const st = useSound();
   const out = defaultSink(st);
+  const outputs = useSoundOutputs();
+  const [pick, setPick] = useState(false);
   if (!st.connected || !out) return null;
   const pct = Math.round(out.level * 100);
+  const many = outputs.length > 1;
   return (
     <Tile t={t} style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -48,9 +63,47 @@ function SoundTile({ t }) {
         <View onClick={() => sound.setMute('sink', out.index, !out.mute)} style={{ width: 26, alignItems: 'center' }}>
           <Text style={{ fontSize: 15 }}>{out.mute || pct === 0 ? '🔇' : pct < 40 ? '🔈' : pct < 75 ? '🔉' : '🔊'}</Text>
         </View>
-        <Slider value={Math.min(1, out.level)} width={196} onChange={(v) => sound.setVolume('sink', out.index, v)} />
+        <Slider value={Math.min(1, out.level)} width={many ? 168 : 196} onChange={(v) => sound.setVolume('sink', out.index, v)} />
         <Text style={{ fontSize: 11, color: t.textDim, width: 34, textAlign: 'end' }}>{out.mute ? '—' : `${pct} %`}</Text>
+        {many ? (
+          <View onClick={() => setPick((v) => !v)} title={tr('shell.cc.output')}
+            style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: pick ? t.accent : t.control }}>
+            <Chevron color={pick ? '#fff' : t.text} open={pick} />
+          </View>
+        ) : null}
       </View>
+      {many && pick ? <SoundOutputList onPick={() => setPick(false)} /> : null}
+    </Tile>
+  );
+}
+
+// The Wi-Fi radio (only when the computer has one): connected or not; a click opens Settings → Network → Wi-Fi.
+function WifiTile({ t, onClose, radios }) {
+  const on = radios.find((i) => i.addresses.some((a) => a.scope === 'global' && a.family === 4));
+  const ip = on?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address;
+  return (
+    <Tile t={t} style={{ flex: 1, gap: 3 }}>
+      <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'network', page: 'wifi' } }); }} style={{ gap: 3 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.wifi')}</Text>
+        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{on ? `${on.name} · ${ip}` : tr('shell.cc.notConnected')}</Text>
+      </View>
+    </Tile>
+  );
+}
+
+// Bluetooth (only with an adapter): the switch turns it on or off; the name opens Settings → Bluetooth.
+function BluetoothTile({ t, onClose, bt }) {
+  const adapter = bt.adapter;
+  const dev = (bt.devices || []).find((d) => d.connected);
+  return (
+    <Tile t={t} style={{ flex: 1, gap: 6 }}>
+      <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'bluetooth' } }); }} style={{ gap: 3 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.bluetooth')}</Text>
+        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          {!adapter.powered ? tr('shell.cc.off') : dev ? dev.name : tr('shell.cc.on')}
+        </Text>
+      </View>
+      <Toggle on={!!adapter.powered} onChange={(on) => lord.bt.power(on)} />
     </Tile>
   );
 }
@@ -59,9 +112,7 @@ function SoundTile({ t }) {
 const isVpnIf = (i) => ['wireguard', 'tun', 'xfrm', 'ppp'].includes(i.type) || /^(wg|ovpn|ips|ppp|oc|fvpn)-/.test(i.name);
 
 // Network state (and active VPNs); a click opens Settings → Network.
-function NetTile({ t, onClose }) {
-  if (typeof lord.net === 'undefined') return null;
-  const ifs = lord.net.interfaces();
+function NetTile({ t, onClose, ifs }) {
   const main = ifs.find((i) => !isVpnIf(i) && i.type !== 'loopback' && i.addresses.some((a) => a.scope === 'global' && a.family === 4));
   const vpns = ifs.filter((i) => isVpnIf(i) && i.up);
   const ip = main?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address;
@@ -85,6 +136,12 @@ const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === re
 export function ControlCenter({ t, top, onClose, area = null }) {
   const ax = area ? area.x + area.w : null, ay = area ? area.y : 0;
   const [s, set] = useSettings();
+  const p = menuBarPrefs(s);
+  let ifs = [];
+  try { ifs = typeof lord.net !== 'undefined' ? lord.net.interfaces() : []; } catch (e) { ifs = []; }
+  const radios = p.ccWifi ? ifs.filter((i) => i.type === 'wifi') : [];
+  const bt = useBluetooth();
+  const btShown = p.ccBluetooth && !!bt?.adapter;
   const cpu = useCpuUsage(1500);
   const info = useSystemInfo(3000);
   const ref = useRef(null);
@@ -109,7 +166,13 @@ export function ControlCenter({ t, top, onClose, area = null }) {
       </View>
       <SoundTile t={t} />
       <NowPlayingTile />
-      <NetTile t={t} onClose={onClose} />
+      {p.ccNetwork && typeof lord.net !== 'undefined' ? <NetTile t={t} onClose={onClose} ifs={ifs} /> : null}
+      {radios.length || btShown ? (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {radios.length ? <WifiTile t={t} onClose={onClose} radios={radios} /> : null}
+          {btShown ? <BluetoothTile t={t} onClose={onClose} bt={bt} /> : null}
+        </View>
+      ) : null}
       <Tile t={t} style={{ gap: 10 }}>
         <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.accent')}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -130,10 +193,10 @@ export function ControlCenter({ t, top, onClose, area = null }) {
           ))}
         </View>
       </Tile>
-      <Tile t={t} style={{ gap: 12 }}>
+      {p.ccSystem ? <Tile t={t} style={{ gap: 12 }}>
         <Meter t={t} label="CPU" value={cpu} detail={tr('shell.cc.cpuDetail', { pct: Math.round(cpu * 100), count: info.cores })} />
         <Meter t={t} label={tr('shell.cc.memory')} value={used} detail={tr('shell.cc.memDetail', { used: formatBytes((info.memTotalKB - info.memAvailableKB) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
-      </Tile>
+      </Tile> : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>
           <View onClick={() => { onClose(); wm.open('settings'); }}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.menu.settings')}</Text></View>

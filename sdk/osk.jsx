@@ -13,6 +13,8 @@ import { t as tr } from './i18n.js';
 import { keyboard } from './keyboard.js';
 import { osk, oskState } from './osk.js';
 import { KEY, TOP_GAP, letterRows, panelSize, punctuation, symbolRows } from './oskmodel.js';
+import { settings } from './settings.js';
+import { menuBarPrefs } from './menubarmodel.js';
 
 const HOLD_MS = 420, REPEAT_MS = 70, CAPS_MS = 400;
 
@@ -109,7 +111,11 @@ export function OskPanel() {
 }
 
 // In the theme's bar, next to the clock: the way to open and close it.
+// Hidden with Settings → Desktop & Dock → Menu Bar → On-screen keyboard (issue #58); ❖⌃K and Settings → Keyboard →
+// Show Keyboard still open it.
 export function OskStatus({ color, height }) {
+  const s = useStore(settings);
+  if (!menuBarPrefs(s).osk) return null;
   return (
     <View keepFocus onClick={osk.toggle} title={tr('shell.osk.name')}
       style={{ height, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>

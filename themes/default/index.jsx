@@ -8,7 +8,7 @@ import {
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
   findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
-  openOverview, closeOverview, toggleOverview, LevelHud,
+  openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
@@ -18,6 +18,7 @@ import { Dock, LaunchpadIcon, dockThickness } from './components/Dock.jsx';
 import { Window } from './components/Window.jsx';
 import { Launchpad } from './components/Launchpad.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
+import { NotificationCenter } from './components/NotificationCenter.jsx';
 import { Menu } from './components/Menu.jsx';
 
 const MENU_H = 28;
@@ -116,6 +117,11 @@ function App() {
   const minFx = (id) => { const m = minimizing.find((x) => x.win.id === id); return m ? { p: m.p, x: main.x + main.w / 2, y: main.y + main.h - 36 } : undefined; };
   const [launchpad, setLaunchpad] = useState(false);
   const [control, setControl] = useState(null);         // the display whose menu bar opened it
+  const [clockPanel, setClockPanel] = useState(null);   // the same, for the clock's notifications and calendar
+  const history = useStore(notifyHistory);
+  const seen = useRef(0);
+  if (clockPanel && history.length) seen.current = Math.max(seen.current, history[0].id);
+  const unread = history.some((n) => n.id > seen.current);
   const [context, setContext] = useState(null);
   const [dockCtx, setDockCtx] = useState(null);
   const [trashCtx, setTrashCtx] = useState(null);         // where the Trash's menu opens
@@ -133,7 +139,7 @@ function App() {
   // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
   const toggleLauncher = () => { closeOverview(); setLaunchpad((v) => !v); };
   useShortcuts({ grabs: switcherGrabs(flowGrabs()), table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
-  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setContext(null); } }), []);
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setClockPanel(null); setContext(null); } }), []);
 
   // Trackpad: a 3-finger swipe up opens the app launcher (4 fingers: the overview) and down closes
   // them; left/right switch desktops, or windows with only one desktop. See docs/TRACKPAD.md.
@@ -168,7 +174,9 @@ function App() {
         <Layer name="menubar">
           {bars.map((d) => (
             <MenuBar key={d.id + ':' + d.x} t={t} height={MENU_H} focused={focused} controlCenter={!!control} area={d}
-              onLaunchpad={() => setLaunchpad(true)} onControlCenter={() => setControl((v) => (v ? null : d))} />
+              clockPanel={!!clockPanel} unread={unread}
+              onClock={() => { setControl(null); setClockPanel((v) => (v ? null : d)); }}
+              onLaunchpad={() => setLaunchpad(true)} onControlCenter={() => { setClockPanel(null); setControl((v) => (v ? null : d)); }} />
           ))}
         </Layer>
         <Layer name="dock">
@@ -195,6 +203,7 @@ function App() {
         <DesktopHud />
         <LevelHud />
         {control && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={control} onClose={() => setControl(null)} /></Layer>}
+        {clockPanel && <Layer name="popover"><NotificationCenter t={t} top={MENU_H} area={clockPanel} onClose={() => setClockPanel(null)} /></Layer>}
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
             { label: tr('shell.desktop.wallpaper'), onClick: () => setControl(main) },

@@ -20,6 +20,7 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 | Date & Time | with Language & Region | `apps/settings/DateTime.jsx`, `hw/hw.c` (timedated) |
 | Wallpaper → Your pictures (0.8.8) | with Appearance, Desktop & Dock | `apps/settings/index.jsx` (`Wallpapers`; a PNG or JPEG of your own for the desktop or the login screen, picked with the system file dialog), `sdk/settings.js` (`addWallpaperImage`, `removeWallpaperImage`); see `WALLPAPERS.md` |
 | Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Lord Flow only), the four finger swipe and each desktop's name (0.8.8.3); see `DESKTOPS.md` |
+| Desktop & Dock → Menu Bar / Taskbar and Control Center (0.8.8.6, issue #58) | with Appearance, Wallpaper | `apps/settings/Dock.jsx` (`MenuBarSection`, `ControlCenterSection`), `sdk/menubarmodel.js` (`settings.menuBar`; everything on unless turned off, so no migration): Cleaner's item (its own `cleaner.menuItem`), the keyboard layout, the on-screen keyboard's item, the notifications bell and the clock panel's calendar in both themes; Lord Flow's Control Center tiles (processor and memory, network and VPN, Wi-Fi, Bluetooth). The volume's output list is `sdk/soundoutputs.js`; Wallpaper → Thumbnail size is `settings.wallpaperThumbs` |
 | Keyboard → App switcher (0.8.8) | with Language & Region, Date & Time | `apps/settings/Switcher.jsx`: the keys, which apps show, size and look; see `SHORTCUTS.md` |
 | Mouse & Trackpad (0.8.8: always shown) | with Keyboard | `apps/settings/Trackpad.jsx`: since 0.8.8.4 one section per device: Pointer (size), Mouse (speed, natural scrolling, primary button) and Trackpad (its rows apply when there is one); see `TRACKPAD.md` |
 | Default Apps | with Keyboard and Mouse & Trackpad | `apps/settings/DefaultApps.jsx`, `sdk/defaults.js`, `hw/defaults.c`, `hw/mimeapps.c` |
@@ -384,9 +385,11 @@ it from LordOS would make dpkg ask about it on every package update (or drop the
 
 ![Default Apps](settings-default-apps-dark.png)
 
-Browser, mail, music, video, images, PDF, text editor and terminal. Candidates are LordOS's own apps
+Browser, mail, music, video, images, PDF, text editor, terminal and calendar. Candidates are LordOS's own apps
 and the Linux apps whose `.desktop` `MimeType` covers the category (terminals: `Categories` with
-`TerminalEmulator`).
+`TerminalEmulator`; calendar (0.8.8.6, issue #58): `text/calendar` itself, not `text/*`). The calendar is the
+app a day in the clock's panel opens, in both themes (`sdk/sysopen.js` `openCalendarApp`): LordOS Calendar on
+that day, or the chosen app (Thunderbird…) as it starts.
 
 - Saved in `~/.config/mimeapps.list` (freedesktop spec: the `[Default Applications]` line is
   replaced and the app goes first in `[Added Associations]`, as GLib does; every other line is

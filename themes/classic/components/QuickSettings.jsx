@@ -1,10 +1,11 @@
 // Quick settings, from the tray: toggles for the network, Bluetooth, Do Not Disturb, Night Light,
-// dark mode and transparency, the volume, what is playing, the battery and a way into Settings.
+// dark mode and transparency, the volume and its output (the chevron by the slider lists the outputs when there is
+// more than one, issue #58), what is playing, the battery and a way into Settings.
 // Everything comes from the SDK's stores (sound, Bluetooth, battery, Night Light, notifications);
 // nothing here polls except the network glyph (every 5 s, Taskbar.jsx useNet).
 import {
   View, Text, Slider, useSettings, settings, useSound, defaultSink, sound, useBluetooth, useBattery, BatteryGlyph, NowPlayingTile,
-  nightActive, setNightManual, notifyPrefs, dndActive, wm, addListener, t as tr,
+  nightActive, setNightManual, notifyPrefs, dndActive, wm, addListener, t as tr, SoundOutputList, useSoundOutputs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NetworkGlyph, BluetoothGlyph, MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, SpeakerGlyph, GearGlyph, Chevron } from '../glyphs.jsx';
@@ -40,6 +41,9 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
   const [s, set] = useSettings();
   const st = useSound();
   const out = defaultSink(st);
+  const outputs = useSoundOutputs();
+  const many = outputs.length > 1;
+  const [pick, setPick] = useState(false);
   const bt = useBluetooth();
   const bat = useBattery();
   const net = useNet();
@@ -87,10 +91,17 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
             <View onClick={() => sound.setMute('sink', out.index, !out.mute)} style={{ width: 28, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
               <SpeakerGlyph color={t.text} size={18} level={out.mute || pct === 0 ? 0 : pct < 50 ? 1 : 2} muted={out.mute} />
             </View>
-            <Slider value={Math.min(1, out.level)} width={W - 32 - 28 - 10 - 44 - 10} onChange={(v) => sound.setVolume('sink', out.index, v)} />
+            <Slider value={Math.min(1, out.level)} width={W - 32 - 28 - 10 - 44 - 10 - (many ? 38 : 0)} onChange={(v) => sound.setVolume('sink', out.index, v)} />
             <Text style={{ width: 44, fontSize: 12, color: t.textDim, textAlign: 'right' }}>{out.mute ? '—' : `${pct} %`}</Text>
+            {many ? (
+              <View onClick={() => setPick((v) => !v)} title={tr('shell.cc.output')}
+                style={{ width: 28, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: pick ? t.hover : 'transparent' }}>
+                <Chevron color={t.text} size={5} dir={pick ? 'up' : 'down'} />
+              </View>
+            ) : null}
           </View>
         ) : null}
+        {out && st.connected && many && pick ? <SoundOutputList onPick={() => setPick(false)} /> : null}
         <NowPlayingTile style={{ borderRadius: 6 }} />
       </View>
       <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10, backgroundColor: t.panelFoot,

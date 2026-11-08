@@ -11,7 +11,7 @@
 //   "launch" broker event          one of these apps opens another one with args (no paths).
 import { wm, getApp } from './windows.js';
 import * as fs from './fs.js';
-import { defaultOpenerId, nativeOf } from './defaults.js';
+import { defaultOpenerId, defaultFor, nativeOf } from './defaults.js';
 import { events as calendarEvents } from './calendar.js';
 import { books as addressBooks, contacts } from './contacts.js';
 
@@ -23,6 +23,20 @@ export function openUrl(url) {
     const def = defaultOpenerId('x-scheme-handler/https');
     return !!def && lord.apps.launchUri(def.replace(/\.desktop$/, ''), url);
   } catch (e) { return false; }
+}
+
+// The calendar app from the clock's panel (issue #58): Settings → Default Apps → Calendar, LordOS Calendar unless the
+// user chose another one (Thunderbird…). `at` (ms) is the day clicked; only our own Calendar can go to it.
+export function openCalendarApp(at) {
+  let def = null;
+  try { def = defaultFor('calendar'); } catch (e) { def = null; }
+  const native = nativeOf(def);
+  if (def && !native) {
+    try { if (lord.apps.launch(def.replace(/\.desktop$/, ''))) return true; } catch (e) { /* not installed any more */ }
+  }
+  if (!getApp('calendar')) return false;
+  wm.open('calendar', at ? { args: { at } } : undefined);
+  return true;
 }
 
 export function openFileWithApps(path, name) {

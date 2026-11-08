@@ -57,6 +57,7 @@
   "defaults.automatic": "Automatic ({name})",
   "defaults.automaticPlain": "Automatic",
   "defaults.cat.browser": "Web browser",
+  "defaults.cat.calendar": "Calendar",
   "defaults.cat.images": "Images",
   "defaults.cat.mail": "Email",
   "defaults.cat.music": "Music",

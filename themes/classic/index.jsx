@@ -16,6 +16,7 @@ import {
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
+  menuBarPrefs,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState, Fragment } from 'react';
@@ -186,7 +187,8 @@ function App() {
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
   const qsAt = trayPanel(pos, 360, m.h - BAR_H - 24, m);
-  const ncH = Math.min(760, m.h - (pos === 'left' || pos === 'right' ? 0 : BAR_H) - 24);
+  // without the calendar (Settings → Desktop & Dock → Taskbar) the notifications' panel is shorter
+  const ncH = Math.min(menuBarPrefs(s).calendar ? 760 : 460, m.h - (pos === 'left' || pos === 'right' ? 0 : BAR_H) - 24);
   const ncAt = trayPanel(pos, 380, ncH, m);
   return (
     <ThemeProvider tokens={t}>

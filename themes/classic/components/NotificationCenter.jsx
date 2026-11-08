@@ -1,8 +1,11 @@
 // The notification panel, from the clock: this session's notifications (sdk/notify.js
-// notifyHistory) grouped by app, with Do Not Disturb and "Clear all", and a month calendar below.
+// notifyHistory) grouped by app, with Do Not Disturb and "Clear all", and a month calendar below. The calendar can be
+// turned off in Settings → Desktop & Dock → Taskbar; a click on a day opens the calendar app chosen in Settings →
+// Default Apps (issue #58, sdk/sysopen.js openCalendarApp).
 import {
   View, Text, ScrollView, Toggle, useStore, notifyHistory, clearNotifyHistory, settings, notifyPrefs, dndActive, useSettings,
-  getApp, appName, formatTime, formatDate, monthName, weekdayName, locale, addListener, wm, t as tr,
+  getApp, appName, formatTime, formatDate, monthName, weekdayName, locale, addListener, t as tr, menuBarPrefs, monthCells, weekStartFor,
+  openCalendarApp,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { BellGlyph, CloseGlyph, Chevron } from '../glyphs.jsx';
@@ -42,12 +45,9 @@ function Item({ t, n, onRemove }) {
 function MonthCalendar({ t }) {
   const today = new Date();
   const [cur, setCur] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const first = (locale.get().lang || 'en').startsWith('en') ? 0 : 1;      // the week starts on Sunday in English
+  const first = weekStartFor(locale.get().lang);      // the week starts on Sunday in English
   const y = cur.getFullYear(), m = cur.getMonth();
-  const lead = (new Date(y, m, 1).getDay() - first + 7) % 7;
-  const days = new Date(y, m + 1, 0).getDate();
-  const cells = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  while (cells.length % 7) cells.push(null);
+  const cells = monthCells(y, m, first);
   const isToday = (d) => d && y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
   const cell = (W - 32) / 7;
   return (
@@ -70,7 +70,7 @@ function MonthCalendar({ t }) {
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {cells.map((d, i) => (
-          <View key={i} onClick={d ? () => wm.open('calendar', { args: { at: new Date(y, m, d, 9).getTime() } }) : undefined}
+          <View key={i} onClick={d ? () => openCalendarApp(new Date(y, m, d, 9).getTime()) : undefined}
             style={{ width: cell, height: 32, alignItems: 'center', justifyContent: 'center' }}>
             {d ? (
               <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: isToday(d) ? t.accent : 'transparent' }}>
@@ -87,7 +87,8 @@ function MonthCalendar({ t }) {
 export function NotificationCenter({ t, at, onClose, isOnBar }) {
   const ref = useRef(null);
   const list = useStore(notifyHistory);
-  useSettings();
+  const [s] = useSettings();
+  const cal = menuBarPrefs(s).calendar;
   useEffect(() => addListener('pointerdown', (e) => {
     for (let n = e.target; n; n = n.parent) if (n === ref.current) return;
     if (!isOnBar(e.x, e.y)) onClose();
@@ -103,8 +104,8 @@ export function NotificationCenter({ t, at, onClose, isOnBar }) {
     byKey.get(k).items.push(n);
   }
   const remove = (id) => notifyHistory.set((l) => l.filter((x) => x.id !== id));
-  const calH = 300;
-  const listH = Math.max(140, at.height - calH - 12);
+  const calH = cal ? 300 : 0;
+  const listH = Math.max(140, at.height - (cal ? calH + 12 : 0));
   const panel = (children, h, extra) => (
     <View style={{ width: W, height: h, borderRadius: 10, overflow: 'hidden', backgroundColor: t.panelBg,
       backdropFilter: t.blur ? `blur(${t.blur}px)` : undefined, border: `1px solid ${t.windowBorder}`, boxShadow: t.shadow, ...extra }}>{children}</View>
@@ -147,11 +148,11 @@ export function NotificationCenter({ t, at, onClose, isOnBar }) {
             </View>
           )}
         </View>, listH)}
-      {panel(
+      {cal ? panel(
         <View style={{ padding: 16, gap: 8 }}>
           <Text style={{ fontSize: 13, color: t.text, textAlign: 'start' }}>{formatDate(new Date(), 'long')}</Text>
           <MonthCalendar t={t} />
-        </View>, calH)}
+        </View>, calH) : null}
     </View>
   );
 }

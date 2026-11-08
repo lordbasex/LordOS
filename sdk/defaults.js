@@ -3,7 +3,7 @@
 // lord.mime; the terminal goes in ~/.config/xdg-terminals.list. LordOS's own apps are written as
 // "lordos-<app>.desktop".
 //
-//   DEFAULT_CATEGORIES                  [{ id, mimes, natives }]
+//   DEFAULT_CATEGORIES                  [{ id, mimes, natives, terminal?, family? }]
 //   defaultFor(categoryId)              'lordos-photos.desktop' | 'org.gnome.Loupe.desktop' | null
 //   defaultInfo(categoryId)             { id, auto } for Settings: auto when the user chose nothing
 //   setDefaultFor(categoryId, id)       writes every MIME type of the category
@@ -26,6 +26,9 @@ export const DEFAULT_CATEGORIES = [
   { id: 'pdf', mimes: ['application/pdf'], natives: ['pdf'] },
   { id: 'text', mimes: ['text/plain', 'text/markdown', 'text/x-log'], natives: ['editor'] },
   { id: 'terminal', mimes: [], natives: ['terminal'], terminal: true },
+  // the app the clock's calendar opens (issue #58): LordOS Calendar, or one such as Thunderbird. Only apps that declare
+  // text/calendar itself: an editor that takes text/* is no calendar (family: false).
+  { id: 'calendar', mimes: ['text/calendar'], natives: ['calendar'], family: false },
 ];
 
 const cat = (id) => DEFAULT_CATEGORIES.find((c) => c.id === id);
@@ -85,7 +88,7 @@ function covers(mimeTypes, c) {
   if (!mimeTypes) return false;
   const list = mimeTypes.split(';').filter(Boolean);
   const main = c.mimes[0], top = main.split('/')[0];
-  return list.includes(main) || list.includes(`${top}/*`) || (c.id === 'browser' && list.includes('text/html') && list.includes('x-scheme-handler/http'));
+  return list.includes(main) || (c.family !== false && list.includes(`${top}/*`)) || (c.id === 'browser' && list.includes('text/html') && list.includes('x-scheme-handler/http'));
 }
 
 export function candidatesFor(id, linuxApps = []) {
@@ -105,7 +108,10 @@ export function defaultOpenerId(mime) {
   // the user's choice or the system's default, if that app is installed
   const r = resolve(mime);
   if (r && r.source !== 'declared') return r.id;
-  const c = DEFAULT_CATEGORIES.find((x) => x.mimes.includes(mime) || (x.mimes[0] && mime.startsWith(`${x.mimes[0].split('/')[0]}/`) && x.id !== 'browser' && x.id !== 'mail'));
+  // the category that lists the type itself first (text/calendar is Calendar's, not the text editor's), then the
+  // family's (text/x-foo goes to the editor)
+  const c = DEFAULT_CATEGORIES.find((x) => x.mimes.includes(mime))
+    || DEFAULT_CATEGORIES.find((x) => x.mimes[0] && x.family !== false && mime.startsWith(`${x.mimes[0].split('/')[0]}/`) && x.id !== 'browser' && x.id !== 'mail');
   const d = c ? defaultFor(c.id) : null;
   // then the category's (LordOS's own app), then the first installed app that declares the type
   return d || (r ? r.id : null);

@@ -1,7 +1,7 @@
 // The Classic taskbar: the start button, search and task view, the pinned and open apps (one button
 // per app: its windows are grouped), the Trash last, and the tray at the end (privacy dots, status
 // items, keyboard layout, quick settings, the clock with the notification bell and a "show desktop"
-// sliver). Centered by default (Settings → Desktop & Dock → alignment); bottom, top, left or right.
+// sliver). The keyboard layout and the bell can be turned off in Settings → Desktop & Dock → Taskbar. Centered by default (Settings → Desktop & Dock → alignment); bottom, top, left or right.
 //
 // Pinning follows the same rules and SDK calls as the default theme's Dock (sdk/dock.js, docs/DOCK.md):
 // Files and Settings can't be removed (but move), the Trash is always last; drag a
@@ -12,7 +12,7 @@ import {
   View, Text, Layer, useSettings, useWindows, useClock, wm, windowTitle, formatTime, formatDate, t as tr,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
-  mainDisplay, screen, toggleShowDesktop,
+  mainDisplay, screen, toggleShowDesktop, menuBarPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
@@ -64,6 +64,8 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
   const entries = useDockEntries(TASKBAR_DEFAULT);
   barEntries = entries;
   const { focused, windows } = useWindows();
+  const [s] = useSettings();
+  const bar = menuBarPrefs(s);      // what the tray shows (Settings → Desktop & Dock → Taskbar, issue #58)
   const [jump, setJump] = useState(null);
   const [trashAt, setTrashAt] = useState(null);
   const [tip, setTip] = useState(null);
@@ -213,7 +215,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       <PrivacyIndicators />
       {/* as tall as the bar's buttons, so a status item's panel opens clear of the bar (sdk/statusplace.js) */}
       {vert ? null : <StatusItems color={t.text} height={40} />}
-      {!vert && keyboard.configured().length > 1 ? (
+      {!vert && bar.keyboard && keyboard.configured().length > 1 ? (
         <BarButton t={t} width={36} onClick={() => keyboard.next()}>
           <Text style={{ fontSize: 11, fontWeight: 600, color: t.text }}>{keyboard.label(keyboard.active())}</Text>
         </BarButton>
@@ -222,7 +224,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       <BarButton t={t} vert={vert} active={notif} width={vert ? 48 : undefined} onClick={onNotif}
         style={vert ? { height: 52 } : { paddingHorizontal: 8, width: undefined, flexDirection: 'row', gap: 8 }}>
         <TrayClock t={t} vert={vert} />
-        <BellGlyph color={t.text} size={14} dot={unread ? t.accent : null} />
+        {bar.bell ? <BellGlyph color={t.text} size={14} dot={unread ? t.accent : null} /> : null}
       </BarButton>
       {vert ? null : <View onClick={toggleShowDesktop} style={{ width: 8, height: BAR_H, marginStart: 2, borderStartWidth: 1, borderColor: t.separator }} />}
     </View>

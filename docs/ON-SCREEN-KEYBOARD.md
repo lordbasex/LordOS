@@ -16,7 +16,8 @@ switches layouts. Colors come from the theme, so it follows light and dark mode 
 It opens only when someone asks for it; a text field taking focus never opens it, with or without a physical
 keyboard (decided by the maintainer on 2026-11-01, replacing the Off, Automatic and Always setting).
 
-The ways to open it: the keyboard button next to the clock (`OskStatus`, always in the bar), the shortcut ❖⌃K, and
+The ways to open it: the keyboard button next to the clock (`OskStatus`, in the bar unless Settings → Desktop & Dock →
+Menu Bar (Taskbar in Lord Classic) → On-screen keyboard turns it off, issue #58), the shortcut ❖⌃K, and
 **Show Keyboard** in Settings → Keyboard. It stays open until it's closed with one of those or its hide button.
 
 The login and lock screens are another user's session (`lordos-greeter`): there it opens only with the keyboard

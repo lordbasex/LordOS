@@ -1,4 +1,4 @@
-// Settings → Default Apps: browser, mail, music, video, images, PDF, text editor and terminal, from
+// Settings → Default Apps: browser, mail, music, video, images, PDF, text editor, terminal and calendar, from
 // LordOS's own apps and the installed Linux apps (.desktop with MimeType). Saved in
 // ~/.config/mimeapps.list (and ~/.config/xdg-terminals.list), so Files' "Open With", double
 // clicks, lord.apps.launchWith and Linux apps (xdg-open) agree. See docs/SETTINGS.md.
@@ -17,7 +17,7 @@ function nameOf(desktopId, list, apps) {
 
 const LOOK = {
   browser: ['◎', '#0a84ff'], mail: ['✉', '#30a0ff'], music: ['♪', '#ff375f'], video: ['▶', '#bf5af2'], images: ['▣', '#ff9f0a'],
-  pdf: ['⎙', '#ff453a'], text: ['✎', '#8e8e93'], terminal: ['>_', '#2c2c2e'],
+  pdf: ['⎙', '#ff453a'], text: ['✎', '#8e8e93'], terminal: ['>_', '#2c2c2e'], calendar: ['▦', '#ff3b30'],
 };
 
 export function DefaultAppsSettings() {

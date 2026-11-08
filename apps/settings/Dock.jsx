@@ -2,7 +2,12 @@
 // and recent apps; in the Classic theme, the taskbar position. Saved in
 // settings.json (sdk/dock.js: DOCK_DEFAULTS) and the theme applies it live, including the work area.
 // «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
-import { View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dock, themes, spacing, typeScale } from '@lordos/sdk';
+// Menu Bar (Taskbar in Lord Classic) and Control Center: what the bar and the panel show (issue #58,
+// sdk/menubarmodel.js); everything is on until the user turns it off.
+import {
+  View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dock, themes, spacing, typeScale,
+  menuBarPrefs, menuBarPatch, cleanerItemShown, getApp,
+} from '@lordos/sdk';
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
 import { DesktopsSection } from './Desktops.jsx';
@@ -79,6 +84,48 @@ function ResetDock({ classic }) {
   );
 }
 
+// What the bar shows next to the clock, in both themes. The Cleaner item (the crown) shares its key with
+// Cleaner → Settings.
+function MenuBarSection({ classic }) {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const p = menuBarPrefs(s);
+  const row = (key, on, hint) => (
+    <SettingRow key={key} label={tr(`settings.dock.menubar.${key}`)} hint={hint ? tr(`settings.dock.menubar.${key}Hint`) : undefined}>
+      <Toggle small on={on} onChange={(v) => set(menuBarPatch(s, key, v))} />
+    </SettingRow>
+  );
+  return (
+    <Section title={tr(classic ? 'settings.dock.menubar.titleTaskbar' : 'settings.dock.menubar.title')} footer={tr('settings.dock.menubar.footer')}>
+      {getApp('cleaner') ? row('cleaner', cleanerItemShown(s), true) : null}
+      {row('keyboard', p.keyboard, true)}
+      {row('osk', p.osk, true)}
+      {row('bell', p.bell, true)}
+      {row('calendar', p.calendar, true)}
+    </Section>
+  );
+}
+
+// Lord Flow's Control Center: the tiles that can go. Dark mode, transparency, sound and the wallpaper stay.
+function ControlCenterSection() {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const p = menuBarPrefs(s);
+  const row = (key, hint) => (    // ccSystem → settings.dock.cc.system
+    <SettingRow key={key} label={tr(`settings.dock.cc.${key.slice(2).toLowerCase()}`)} hint={hint ? tr(`settings.dock.cc.${key.slice(2).toLowerCase()}Hint`) : undefined}>
+      <Toggle small on={p[key]} onChange={(v) => set(menuBarPatch(s, key, v))} />
+    </SettingRow>
+  );
+  return (
+    <Section title={tr('settings.dock.cc.title')} footer={tr('settings.dock.cc.footer')}>
+      {row('ccSystem', true)}
+      {row('ccNetwork')}
+      {row('ccWifi', true)}
+      {row('ccBluetooth', true)}
+    </Section>
+  );
+}
+
 export function DockSettings() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -98,6 +145,7 @@ export function DockSettings() {
             </SettingRow>
           </Section>
         ) : null}
+        <MenuBarSection classic />
         <ResetDock classic />
       </Stack>
     );
@@ -129,6 +177,8 @@ export function DockSettings() {
           <Toggle small on={p.dockRecents} onChange={(dockRecents) => set({ dockRecents })} />
         </SettingRow>
       </Section>
+      <MenuBarSection />
+      <ControlCenterSection />
       <ResetDock />
     </Stack>
   );

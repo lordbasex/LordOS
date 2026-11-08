@@ -78,6 +78,7 @@ export {
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones } from './sound.js';
+export { SoundOutputList, useSoundOutputs } from './soundoutputs.js';   // choosing the output by the volume (issue #58)
 export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnections, monitorDevices, monitorDetail, MONITOR_HISTORY, diskTempHistory, DISK_TEMP_HISTORY, firewall, firewallState } from './monitor.js';
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule
 export * as netModel from './netmodel.js';        // (0.8.5) Monitor → Network: search tokens, filters, the tree
@@ -104,6 +105,7 @@ export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
 export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
+export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor } from './menubarmodel.js';   // what the bar shows (issue #58)
 export { companion, statusItem, companionEvent, statusItemEvent } from './companion.js';
 export { clockAlarms, clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextAlarm, nextFire } from './alarms.js';
 export { help } from './help.js';
@@ -155,7 +157,7 @@ export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';
 import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
 import { LiveSpeechPanel } from './livespeech.jsx';
-export { openFileWithApps, openUrl, revealPath } from './sysopen.js';   // opening files/apps for the isolated system apps
+export { openFileWithApps, openUrl, revealPath, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
 import { startReminders } from './calendar.js';
