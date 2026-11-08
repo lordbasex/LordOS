@@ -709,9 +709,9 @@ An update for 0.8.8 to 0.8.8.4 through the Store and `apt` (`CHANGELOG.md`, "0.8
   migrating a machine from another virtualization app, and an optional guest agent with a shared clipboard. QEMU and
   passt are installed when Machines first needs them.
 
-## Release 0.8.8.6-beta (in development)
+## Release 0.8.8.6-beta ✅ (2026-11-08)
 
-An update through the Store and `apt` (`CHANGELOG.md`, "Unreleased"); the latest release is 0.8.8.5-beta.
+An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.6-beta"); no new ISO.
 
 - [x] **Voice, phase 1** (`VOICE.md`): `say` and its sandboxed engine `lord-tts`, Kyutai's Pocket TTS through audio.cpp
   on the CPU or the GPU (Vulkan), without the internet.
@@ -732,6 +732,20 @@ An update through the Store and `apt` (`CHANGELOG.md`, "Unreleased"); the latest
   Tailscale and RustDesk in Store → Remote access ([#66](https://github.com/lordbasex/LordOS/issues/66),
   [#68](https://github.com/lordbasex/LordOS/issues/68)), and the rest in `CHANGELOG.md`, "Fixed".
 - [x] The CPU's microcode updates on amd64, and the same command-line tools on every image (below, under 0.8.9).
+
+## Release 0.8.8.7-beta (planned)
+
+- [ ] **Store updates install a package's new Recommends**, as `apt upgrade` does: Store → Updates (`pkg-upgrade`,
+  `server/src/pkg/pkg.c`) plans without Recommends, so a system updated from the Store to 0.8.8.6 got its new Depends
+  (the microcode) but not the command-line tools added as Recommends (`screen`, `mc`, `htop`, `tcpdump`, `jq`, `rsync`,
+  `rfkill`, Tesseract's languages…); `install.sh`, `apt` and the images do install them. Only Recommends that are new
+  in the upgraded version, so one the user removed stays removed; tests in the package engine's suite.
+- [ ] **Logitech's special keys and buttons** (MX Keys, MX Master 3/3S): evdev keys with defaults, device profiles as
+  data, and per-device actions in Settings → Keyboard and Mouse & Trackpad (work on branch `feat/special-keys`).
+  HID++ (battery, DPI, SmartShift, gesture button) is a design for review first (`docs/drafts/HIDPP.md`, needs an
+  AGENTS.md exception).
+- [ ] The LordOS Imager 0.8.8.6 for the Mac (built and signed on the maintainer's Mac) and
+  [#73](https://github.com/lordbasex/LordOS/issues/73) closed once it is published.
 
 ## Release 0.8.9 (planned)
 
