@@ -3,6 +3,7 @@
 
 #include <complex.h>
 #include <math.h>
+#include <string.h>
 #include <stdlib.h>
 
 #define N 512
@@ -66,4 +67,36 @@ double tts_hiss(const float *s, size_t frames, int rate, int ch) {
     if (used) { qsort(r, used, sizeof *r, cmp); m = r[used / 2]; }
     free(r);
     return m;
+}
+
+/* a vowel at p: ASCII, or an accented one in UTF-8 (á é í ó ú ü â ê ô ã õ à and their capitals); its length, else 0 */
+static int vowel(const unsigned char *p) {
+    if (*p < 0x80) return strchr("aeiouAEIOU", *p) && *p ? 1 : 0;
+    if (p[0] == 0xC3 && p[1]) {
+        unsigned char c = p[1] & ~0x20;          /* capitals and small letters differ in this bit */
+        return c == 0x81 || c == 0x89 || c == 0x8D || c == 0x93 || c == 0x9A || c == 0x9C || c == 0x82 || c == 0x8A
+            || c == 0x94 || c == 0x83 || c == 0x95 || c == 0x80 ? 2 : 0;
+    }
+    return 0;
+}
+
+size_t tts_syllables(const char *text) {
+    size_t n = 0;
+    int in = 0;
+    for (const unsigned char *p = (const unsigned char *)text; p && *p;) {
+        int v = vowel(p);
+        if (v) { if (!in) n++; in = 1; p += v; continue; }
+        /* "y" alone ("ya" counts its a) is a syllable in Spanish */
+        if ((*p | 0x20) == 'y' && (p == (const unsigned char *)text || !((p[-1] | 0x20) >= 'a' && (p[-1] | 0x20) <= 'z'))
+            && !((p[1] | 0x20) >= 'a' && (p[1] | 0x20) <= 'z') && !vowel(p + 1)) n++;
+        in = 0;
+        p++;
+    }
+    return n;
+}
+
+int tts_cut_short(size_t frames, int rate, size_t syllables, size_t longest) {
+    if (rate < 1) return 1;
+    if ((double)frames < 0.6 * (double)longest) return 1;
+    return syllables >= 6 && (double)frames / rate * 7.5 < (double)syllables;
 }

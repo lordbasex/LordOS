@@ -171,15 +171,14 @@ int tts_handle(const DocMsg *m, const JVal *args) {
         audiocpp_request_set_voice_audio(rq, voice, frames, rate, 1);
     } else if (voice_id) audiocpp_request_set_voice_id(rq, voice_id);
     /* now and then a sentence comes out with a bed of hiss under the voice (it depends on the sentence and the seed):
-     * it is made again with another seed, up to HISS_TRIES times, and the cleanest is kept (hiss.c) */
+     * it is made again with another seed, up to HISS_TRIES times, and the cleanest is kept (hiss.c). A try the model
+     * ended early never wins for being cleaner; when every try is cut short, the longest is kept. */
     double seed = json_num(args, "seed", 7);
     unsigned base = seed >= 0 && seed <= 4294967295.0 ? (unsigned)seed : 7;
-    audiocpp_result *res = NULL;
-    const float *s = NULL;
-    size_t frames = 0, size = 0;
-    int rate = 0, ch = 0;
-    double best = 1e9;
-    for (int try = 0; try < HISS_TRIES && best > TTS_HISS_MAX; try++) {
+    size_t syllables = tts_syllables(text);
+    struct { audiocpp_result *r; const float *s; size_t frames; int rate, ch; double hiss; } t[HISS_TRIES];
+    int n = 0, pick = -1;
+    for (int try = 0; try < HISS_TRIES; try++) {
         char sbuf[16];
         snprintf(sbuf, sizeof sbuf, "%u", base + (unsigned)try * 1009u);
         audiocpp_request_set_option(rq, "seed", sbuf);
@@ -190,18 +189,28 @@ int tts_handle(const DocMsg *m, const JVal *args) {
         if (audiocpp_session_run(sess, rq, &r) != AUDIOCPP_OK || !r || audiocpp_result_audio(r, &rs, &rf, &rr, &rc) != AUDIOCPP_OK
             || rc < 1 || rr < 1) {
             if (r) audiocpp_result_free(r);
-            if (res) break;                         /* keep the one already made */
+            if (n) break;                           /* keep the ones already made */
             audiocpp_request_free(rq);
             free(voice);
             reply_err(m->h.id, "synthesis", audiocpp_last_error() ? audiocpp_last_error() : "");
             return 1;
         }
-        double h = tts_hiss(rs, rf, rr, rc);
-        if (h < best) {
-            if (res) audiocpp_result_free(res);
-            res = r; s = rs; frames = rf; rate = rr; ch = rc; best = h;
-        } else audiocpp_result_free(r);
+        t[n].r = r; t[n].s = rs; t[n].frames = rf; t[n].rate = rr; t[n].ch = rc; t[n].hiss = tts_hiss(rs, rf, rr, rc);
+        n++;
+        size_t longest = 0;
+        for (int i = 0; i < n; i++) if (t[i].frames > longest) longest = t[i].frames;
+        pick = -1;
+        for (int i = 0; i < n; i++)
+            if (!tts_cut_short(t[i].frames, t[i].rate, syllables, longest) && (pick < 0 || t[i].hiss < t[pick].hiss)) pick = i;
+        if (pick >= 0 && t[pick].hiss <= TTS_HISS_MAX) break;
     }
+    if (pick < 0)                                   /* all cut short: the longest */
+        for (int i = 0; i < n; i++) if (pick < 0 || t[i].frames > t[pick].frames) pick = i;
+    for (int i = 0; i < n; i++) if (i != pick) audiocpp_result_free(t[i].r);
+    audiocpp_result *res = t[pick].r;
+    const float *s = t[pick].s;
+    size_t frames = t[pick].frames, size = 0;
+    int rate = t[pick].rate, ch = t[pick].ch;
     audiocpp_request_free(rq);
     free(voice);
     int fd = wav_memfd(s, frames, rate, ch, &size);

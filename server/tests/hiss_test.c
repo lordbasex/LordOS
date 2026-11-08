@@ -27,6 +27,16 @@ int main(void) {
     check("a NaN is ignored", tts_hiss(s, L, R, 1) == -100, 0);
     check("too short", tts_hiss(s, 100, R, 1) == -100, 0);
     check("no samples", tts_hiss(NULL, L, R, 1) == -100, 0);
+    /* a try the model ended early */
+    check("syllables: Spanish", tts_syllables("Hola, LordOS ya puede leer en voz alta.") == 12, (double)tts_syllables("Hola, LordOS ya puede leer en voz alta."));
+    check("syllables: accents and a lone y", tts_syllables("Acción y canción, ÁÉ") == 6, (double)tts_syllables("Acción y canción, ÁÉ"));
+    check("syllables: Portuguese", tts_syllables("Não sei, você está aí?") == 7, (double)tts_syllables("Não sei, você está aí?"));
+    check("a whole sentence (2.56 s) is fine", !tts_cut_short(61440, R, 12, 76800), 0);
+    check("\"Hola\" alone (0.88 s) is cut", tts_cut_short(21120, R, 12, 21120), 0);
+    check("1.6 s for 13 syllables is cut", tts_cut_short(38400, R, 13, 38400), 0);
+    check("under 60 % of the longest try is cut", tts_cut_short(30000, R, 3, 76800), 0);
+    check("a short word is never judged by its syllables", !tts_cut_short(11520, R, 1, 11520), 0);
+    check("no rate: cut", tts_cut_short(1000, 0, 2, 1000), 0);
     free(s);
     printf("hiss_test: %d/%d\n", n - bad, n);
     return bad != 0;
