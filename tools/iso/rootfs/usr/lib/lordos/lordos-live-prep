@@ -31,7 +31,8 @@ for arg in $(cat /proc/cmdline); do
         lordos.lang=it) LANG_UI=it ;;
     esac
 done
-# the keyboard follows the language (the SDK's default is latam); Settings → Keyboard changes it
+# the keyboard follows the language (without a choice the session would use /etc/default/keyboard's, or US
+# without one); Settings → Keyboard changes it
 case "$LANG_UI" in
     es) LOC=es_ES.UTF-8; KB=latam; DIRS="Escritorio Documentos Descargas Música Imágenes Videos" ;;
     pt) LOC=pt_BR.UTF-8; KB=br; DIRS="Área_de_trabalho Documentos Downloads Música Imagens Vídeos" ;;

@@ -2366,7 +2366,11 @@ int main(int argc, char **argv) {
         js_sys_set_assets(a);
     }
     term_init(fonts, shell);
-    kb_set("latam", "");         /* la UI elige la del usuario al cargar sus ajustes */
+    {   /* the computer's layout until the UI applies the user's (sdk/keyboard.js) */
+        char l[128], v[128];
+        kb_system_from(KB_SYSTEM_FILE, l, sizeof l, v, sizeof v);
+        if (kb_set(l, v)) kb_set("us", "");
+    }
     for (int i = 0; i < OUT_MAX; i++) { s.out[i].kms.fd = -1; s.out[i].gpu = -1; }
     s.cap.kms.fd = -1;
     s.cap.gpu = -1;

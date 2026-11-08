@@ -87,6 +87,31 @@ void kb_reset_state(void) {
     kb_set_group(g);
 }
 
+/* The computer's layouts, as Debian's installer, keyboard-configuration and the LordOS installer write
+ * them (XKBLAYOUT="us,latam", XKBVARIANT=",deadtilde"). Without the file, or with a value keyboard.c
+ * would refuse, it is "us": never a layout nobody chose (#55). */
+void kb_system_from(const char *path, char *layouts, size_t ln, char *variants, size_t vn) {
+    snprintf(layouts, ln, "us");
+    snprintf(variants, vn, "%s", "");
+    FILE *f = fopen(path, "re");
+    if (!f) return;
+    char line[256], l[128] = "", v[128] = "";
+    while (fgets(line, sizeof line, f)) {
+        char *out = !strncmp(line, "XKBLAYOUT=", 10) ? l : !strncmp(line, "XKBVARIANT=", 11) ? v : NULL;
+        if (!out) continue;
+        char *s = strchr(line, '=') + 1;
+        if (*s == '"' || *s == '\'') s++;
+        size_t k = strcspn(s, "\"'\r\n");
+        if (k >= sizeof l) continue;
+        memcpy(out, s, k);
+        out[k] = 0;
+    }
+    fclose(f);
+    if (!l[0] || !valid(l)) return;
+    snprintf(layouts, ln, "%s", l);
+    if (valid(v)) snprintf(variants, vn, "%s", v);
+}
+
 int kb_ready(void) { return state != NULL; }
 const char *kb_layouts(void) { return cur_layouts; }
 const char *kb_variants(void) { return cur_variants; }

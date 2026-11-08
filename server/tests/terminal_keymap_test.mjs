@@ -76,8 +76,8 @@ const after = migrateSettings(before);
 eq('migration 2: the profile keeps only its real mappings', after.terminal.profiles[0].keyMap.map((m) => m.combo), ['Ctrl+2']);
 eq('migration 2: a profile without mappings is untouched', after.terminal.profiles[1], { id: 'b' });
 eq('migration 2: the global mappings too', after.terminal.keyMap.map((m) => m.combo), ['Shift+Enter']);
-eq('migrations: the schema', after.schema, 3);
-eq('migrations: settings without a terminal', migrateSettings({ schema: 1, x: 1 }), { schema: 3, x: 1 });
+eq('migrations: the schema', after.schema, 4);
+eq('migrations: settings without a terminal', migrateSettings({ schema: 1, x: 1 }), { schema: 4, x: 1 });
 
 // migration 3: a default profile that types a command on open
 const ssh = { id: 'p1', name: 'TURN NAT', initialText: 'ssh ec2-user@203.0.113.7' };

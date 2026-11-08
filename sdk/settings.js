@@ -15,7 +15,7 @@ const DEFAULTS = {
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
   wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
-  keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
+  keyboard: null,        // before M5; now keyboards (see keyboard.js). It was 'latam' until 0.8.8.6 (#55)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,
   language: null,        // interface language ('es', 'en', 'pt', 'fr', 'it'…); null = the region's
@@ -38,7 +38,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 3;
+export const SETTINGS_SCHEMA = 4;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -68,6 +68,12 @@ const MIGRATIONS = [
     if (plain) return { ...s, terminal: { ...t, defaultProfile: plain.id } };
     const id = t.profiles.some((p) => p && p.id === 'default') ? `default-${t.profiles.length}` : 'default';
     return { ...s, terminal: { ...t, profiles: [{ id, name: '' }, ...t.profiles], defaultProfile: id } };
+  }],
+  [4, (s) => {            // 0.8.8.6: 'latam' was every user's default keyboard and was saved with the rest of the
+    // settings, so it reads as a choice. Nobody made it: without a list of keyboards (Settings → Keyboard) the
+    // computer's layout is used (/etc/default/keyboard, sdk/keyboard.js; #55).
+    if ((Array.isArray(s.keyboards) && s.keyboards.length) || s.keyboard !== 'latam') return s;
+    return { ...s, keyboard: null };
   }],
 ];
 export function migrateSettings(s) {

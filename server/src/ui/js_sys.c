@@ -791,6 +791,18 @@ static JSValue f_kb_current(JSContext *c, JSValueConst this_val, int argc, JSVal
     return o;
 }
 
+/* lord.keyboard.system() → { layouts: "us", variants: "" }: the computer's (/etc/default/keyboard), what a
+ * user who never chose one types with (sdk/keyboard.js) */
+static JSValue f_kb_system(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    char l[128], v[128];
+    kb_system_from(KB_SYSTEM_FILE, l, sizeof l, v, sizeof v);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "layouts", JS_NewString(c, l));
+    JS_SetPropertyStr(c, o, "variants", JS_NewString(c, v));
+    return o;
+}
+
 static JSValue f_kb_group(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     int32_t g = 0;
@@ -1452,6 +1464,7 @@ static const JSCFunctionListEntry locale_funcs[] = {
 static const JSCFunctionListEntry keyboard_funcs[] = {
     JS_CFUNC_DEF("set", 2, f_kb_set),
     JS_CFUNC_DEF("current", 0, f_kb_current),
+    JS_CFUNC_DEF("system", 0, f_kb_system),
     JS_CFUNC_DEF("setGroup", 1, f_kb_group),
     JS_CFUNC_DEF("reloadCompose", 0, f_kb_compose),
     JS_CFUNC_DEF("list", 0, f_kb_list),

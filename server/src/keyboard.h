@@ -13,6 +13,9 @@ typedef struct {
 } KeyInfo;
 
 int  kb_set(const char *layouts, const char *variants);   /* "us,latam", ",abnt2" */
+/* The computer's layouts (KB_SYSTEM_FILE: XKBLAYOUT, XKBVARIANT); "us" without a valid one. */
+#define KB_SYSTEM_FILE "/etc/default/keyboard"
+void kb_system_from(const char *path, char *layouts, size_t ln, char *variants, size_t vn);
 int  kb_set_keymap_string(const char *text);              /* app mode: the compositor's keymap */
 void kb_reset_state(void);                                /* forget held keys (app mode, the monitor taken away) */
 int  kb_ready(void);

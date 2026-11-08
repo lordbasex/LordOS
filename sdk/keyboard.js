@@ -1,6 +1,7 @@
 // keyboard.js — the user's keyboard layouts (libxkbcommon in the server).
 //
-// settings.keyboards = [{ layout: 'latam', variant: '' }, { layout: 'us', variant: '', ime: 'kana' }]
+// settings.keyboards = [{ layout: 'latam', variant: '' }, { layout: 'us', variant: '', ime: 'kana' }]; without it,
+// the computer's (/etc/default/keyboard, systemKeyboards).
 // settings.keyboardIndex = the active one. keyboard.next() switches to the next one (menu bar button
 // or ❖⌥Space). Any xkb-data layout works: keyboard.list() returns all of them with
 // their variants. With `ime` it is an input method (ime.c) on top of the Latin keyboard `layout`:
@@ -10,10 +11,22 @@ import { settings } from './settings.js';
 
 const native = () => typeof lord.keyboard !== 'undefined' && lord.keyboard.current().xkb;
 
+// The computer's layouts (/etc/default/keyboard; "us" without one), for a user who never chose any:
+// installing the lordos package on a Debian system must not change how its keyboard types (#55).
+export function systemKeyboards(sys) {
+  const layouts = String(sys?.layouts || '').split(',');
+  const variants = String(sys?.variants || '').split(',');
+  const list = layouts.map((layout, i) => ({ layout: layout.trim(), variant: (variants[i] || '').trim() })).filter((k) => k.layout);
+  return list.length ? list : [{ layout: 'us', variant: '' }];
+}
+let system = null;
+
 export function configured() {
   const s = settings.get();
   if (Array.isArray(s.keyboards) && s.keyboards.length) return s.keyboards;
-  return [{ layout: s.keyboard || 'latam', variant: '' }];      // settings from before M5
+  if (s.keyboard) return [{ layout: s.keyboard, variant: '' }];     // settings from before M5
+  if (!system) system = systemKeyboards(lord.keyboard?.system?.());
+  return system;
 }
 
 let applied = '';

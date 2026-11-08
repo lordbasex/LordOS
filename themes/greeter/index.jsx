@@ -245,7 +245,7 @@ function Greeter() {
         // a boot time test restarts soon (LordBench, bench/boottest.h): when, by this screen's clock
         setInfo((old) => ({ ...old, ...m, bootTest: m.bootTest ? { ...m.bootTest, end: Date.now() + m.bootTest.in * 1000 } : null }));
         // system keyboard and language (/etc/default/keyboard and /etc/default/locale)
-        const layouts = String(m.layouts || 'latam').split(',').filter(Boolean);
+        const layouts = String(m.layouts || 'us').split(',').filter(Boolean);     // no file: US, as the server's (#55)
         const variants = String(m.variants || '').split(',');
         const kbs = layouts.map((l, i) => ({ layout: l, variant: variants[i] || '' }));
         if (JSON.stringify(settings.get().keyboards) !== JSON.stringify(kbs)) keyboard.set(kbs);

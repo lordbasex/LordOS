@@ -165,7 +165,11 @@ actions are few and narrow.
 
 `server/src/keyboard.c` uses **libxkbcommon** with the **xkb-data** data, like GNOME and KDE.
 Any layout and variant is available (`latam`, `br`, `pt`, `us(intl)`, `fr(oss)`…), up to 4 at a
-time; the menu bar button switches to the next. Dead keys and compose sequences use the region's
+time; the menu bar button switches to the next. A user who never chose one (no `keyboards` in
+settings.json) types with the computer's layout, `XKBLAYOUT`/`XKBVARIANT` in `/etc/default/keyboard`
+(`lord.keyboard.system()`), or `us` without it; the login screen and lord-server's first keymap use the
+same file. Before 0.8.8.6 the default was `latam` whatever the computer had (#55); settings migration 4
+drops that saved default. Dead keys and compose sequences use the region's
 compose table (package `libx11-data`, which is data only). If XKB can't be loaded, the UI falls
 back to its own tables (latam and us).
 

@@ -173,7 +173,36 @@ static void test_leds(void) {
     close(p[1]);
 }
 
+/* The computer's layout (#55): /etc/default/keyboard as Debian writes it; "us" without a usable one. */
+static void sysfile(const char *path, const char *text) {
+    FILE *f = fopen(path, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+static void test_system_layout(void) {
+    char path[64], l[128], v[128];
+    snprintf(path, sizeof path, "/tmp/osk-test-kb.%d", (int)getpid());
+    sysfile(path, "# KEYBOARD CONFIGURATION FILE\nXKBMODEL=\"pc105\"\nXKBLAYOUT=\"gb\"\nXKBVARIANT=\"\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n");
+    kb_system_from(path, l, sizeof l, v, sizeof v);
+    CHECK(!strcmp(l, "gb") && !strcmp(v, ""));
+    sysfile(path, "XKBLAYOUT=us,latam\nXKBVARIANT=',deadtilde'\n");
+    kb_system_from(path, l, sizeof l, v, sizeof v);
+    CHECK(!strcmp(l, "us,latam") && !strcmp(v, ",deadtilde"));
+    sysfile(path, "XKBLAYOUT=\"us;reboot\"\nXKBVARIANT=\"intl\"\n");        /* refused: the default, not half of it */
+    kb_system_from(path, l, sizeof l, v, sizeof v);
+    CHECK(!strcmp(l, "us") && !strcmp(v, ""));
+    sysfile(path, "XKBLAYOUT=\"de\"\nXKBVARIANT=\"bad variant\"\n");
+    kb_system_from(path, l, sizeof l, v, sizeof v);
+    CHECK(!strcmp(l, "de") && !strcmp(v, ""));
+    sysfile(path, "XKBMODEL=\"pc105\"\n");
+    kb_system_from(path, l, sizeof l, v, sizeof v);
+    CHECK(!strcmp(l, "us") && !strcmp(v, ""));
+    unlink(path);
+    kb_system_from(path, l, sizeof l, v, sizeof v);                      /* no file: never latam */
+    CHECK(!strcmp(l, "us") && !strcmp(v, ""));
+}
+
 int main(void) {
+    test_system_layout();
     test_devices();
     test_counts();
     test_keys();
