@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **`make` builds the voice again**: `lord-say`, `lord-tts` and `pocket_tts_dir.json` were added to `ALL` in `server/mk/tts.mk`, which the Makefile includes after reading `all: $(ALL)`, so a plain `make` never built them and `tools/iso/mkdeb.sh` stopped on the missing `lord-say`. They are now prerequisites of `all` directly, as the other `mk/*.mk` do. (0.8.8.6-beta's packages were built with the targets named explicitly.)
+
 ## [0.8.8.6-beta] - 2026-11-08
 
 An update for 0.8.8 to 0.8.8.5 through Store → Updates and `apt` (no new ISO: the 0.8.8 live image stays the current one), with **Voice**: text to speech on the computer, without the internet (`say`, read aloud anywhere with a player, Live Speech, voices you choose in Standard or HD quality, and a Personal Voice made from your own recording); **Monitor → GPU**; the menu bar and the taskbar on every display; and the 34 issues reported on GitHub since 0.8.8.4 (#42 to #75), with the fixes found while checking them.

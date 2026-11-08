@@ -6,9 +6,13 @@
 # source, cmake, Vulkan's headers or glslc, make skips lord-tts (TTSHELPER=0); lord-say needs nothing.
 AUDIOCPP_DIR := ../third_party/audiocpp
 TTSHELPER ?= $(shell [ -f $(AUDIOCPP_DIR)/include/audiocpp.h ] && command -v cmake >/dev/null 2>&1 && command -v glslc >/dev/null 2>&1 && pkg-config --exists vulkan 2>/dev/null && echo 1 || echo 0)
+# `all:` here, not ALL +=: the Makefile's `all: $(ALL)` is read before mk/*.mk are included, so what is added to
+# ALL here never reached it (as mk/lan.mk does)
 ALL += build/lord-say
+all: build/lord-say
 ifeq ($(TTSHELPER),1)
 ALL += build/lord-tts
+all: build/lord-tts
 endif
 
 AUDIOCPP_FLAGS := -DCMAKE_BUILD_TYPE=Release -DAUDIOCPP_MODEL_SET=custom -DAUDIOCPP_MODELS=pocket_tts -DAUDIOCPP_BUILD_C_API=ON \
@@ -25,6 +29,7 @@ build/lib/tts/libaudiocpp.so.0: $(AUDIOCPP_DIR)/include/audiocpp.h
 # Pocket TTS, made to read that folder itself rather than languages/english under it (h_tts.c)
 ifeq ($(TTSHELPER),1)
 ALL += build/lib/tts/pocket_tts_dir.json
+all: build/lib/tts/pocket_tts_dir.json
 endif
 build/lib/tts/pocket_tts_dir.json: $(AUDIOCPP_DIR)/model_specs/pocket_tts.json
 	@mkdir -p build/lib/tts
