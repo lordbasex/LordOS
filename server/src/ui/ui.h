@@ -268,6 +268,7 @@ int   text_ellipsis_join(char *out, int out_size, const char *s, int len);   /* 
 void  text_set_language(const char *lang);                 /* picks the CJK font (ja/ko/zh) */
 const char *text_language(void);                         /* the UI language the SDK set ("" before) */
 int   text_script_fallback(uint32_t cp, int bold);         /* terminal: font per script */
+int   text_covered(const char *s);                         /* does an installed font draw every character? */
 int   text_direction(const char *s);                       /* 1 if the first strong character is RTL */
 
 /* image.c */

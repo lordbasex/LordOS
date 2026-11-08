@@ -184,6 +184,22 @@ static uint32_t utf8_decode(const unsigned char **p) {
     return c;
 }
 
+/* Does an installed font draw every character of `s` (the interface font, its script's, the generic ones or
+ * the emoji one, as font_for_cp picks them)? Joiners and variation selectors draw nothing of their own.
+ * Emoji & Symbols leaves out what would be a missing glyph box (#56). */
+int text_covered(const char *s) {
+    int any = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p;) {
+        uint32_t cp = utf8_decode(&p);
+        if (cp == 0x200D || (cp >= 0xFE00 && cp <= 0xFE0F)) continue;
+        any = 1;
+        if (text_font_has(0, cp) || text_script_fallback(cp, 0) >= 0) continue;
+        int e = emoji_font();
+        if (e < 0 || !text_font_has(e, cp)) return 0;
+    }
+    return any;
+}
+
 int text_needs_layout(const char *s, int font) {
     for (const unsigned char *p = (const unsigned char *)s; *p;) {
         if (*p < 0x80) { p++; continue; }

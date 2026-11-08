@@ -989,6 +989,17 @@ static JSValue f_text_direction(JSContext *c, JSValueConst this_val, int argc, J
     return JS_NewString(c, rtl ? "rtl" : "ltr");
 }
 
+/* lord.text.covered(text) → does an installed font draw every character (Emoji & Symbols, #56)? Only in the
+ * session (js_sys_register), where the pickers live; isolated apps don't get it. */
+static JSValue f_text_covered(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    const char *s = JS_ToCString(c, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    int ok = text_covered(s);
+    JS_FreeCString(c, s);
+    return JS_NewBool(c, ok);
+}
+
 /* lord.image.size(path) → { width, height } of a PNG/JPEG in the home folder (or null).
  * Used by the notes' markdown to avoid enlarging small images. */
 static JSValue f_image_size(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -2234,6 +2245,11 @@ void js_sys_register(JSContext *c, JSValue lord) {
     add_object(c, lord, "time", time_funcs, sizeof time_funcs / sizeof time_funcs[0]);
     add_object(c, lord, "keyboard", keyboard_funcs, sizeof keyboard_funcs / sizeof keyboard_funcs[0]);
     add_object(c, lord, "text", text_funcs, sizeof text_funcs / sizeof text_funcs[0]);
+    {
+        JSValue t = JS_GetPropertyStr(c, lord, "text");
+        JS_SetPropertyStr(c, t, "covered", JS_NewCFunction(c, f_text_covered, "covered", 1));
+        JS_FreeValue(c, t);
+    }
     add_object(c, lord, "image", image_funcs, sizeof image_funcs / sizeof image_funcs[0]);
     add_object(c, lord, "ime", ime_funcs, sizeof ime_funcs / sizeof ime_funcs[0]);
     add_object(c, lord, "wayland", wayland_funcs, sizeof wayland_funcs / sizeof wayland_funcs[0]);

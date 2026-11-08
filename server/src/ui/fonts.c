@@ -13,7 +13,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define MAX_ENTRIES 1024
+/* Faces, not files: a Debian desktop with fonts-noto-extra, the CJK collections or TeX Live can have more than
+ * 1024, and with that old limit the scan stopped wherever readdir() happened to be, possibly before Noto
+ * Sans, DejaVu Sans and Noto Color Emoji: every fallback glyph then drew as a missing box (#56). The array is
+ * allocated once (callers keep pointers into it) and only the entries used are touched. */
+#define MAX_ENTRIES 8192
 #define MAX_FILE (64u << 20)
 
 static FontEntry *entries;

@@ -180,6 +180,22 @@ static void check_side(const char *name, const char *s, float w, int want_left) 
     }
 }
 
+/* Emoji & Symbols leaves out what no installed font draws (#56): Inter's own letters always, an unassigned
+ * code point never; the emoji and the math sign only when this machine has a font for them. */
+static void test_covered(void) {
+    CHECK(text_covered("A") && text_covered("\xc3\xb1"), "Inter's letters are not covered");
+    CHECK(!text_covered("\xf4\x8f\xbf\xbf"), "U+10FFFF is covered");
+    CHECK(!text_covered("") && !text_covered("\xe2\x80\x8d\xef\xb8\x8f"), "nothing but a joiner is covered");
+    CHECK(!text_covered("A\xf4\x8f\xbf\xbf"), "a string with an undrawable character is covered");
+    int n;
+    const FontEntry *l = fonts_list(0, &n);
+    int dejavu = 0, color = 0;
+    for (int i = 0; i < n; i++) { if (!strcmp(l[i].family, "DejaVu Sans")) dejavu = 1; if (l[i].color) color = 1; }
+    if (dejavu) CHECK(text_covered("\xe2\x88\x80"), "U+2200 is not covered with DejaVu Sans installed");
+    if (color) CHECK(text_covered("\xf0\x9f\x98\x80\xef\xb8\x8f"), "U+1F600 is not covered with a color font installed");
+    printf("covered: letters, joiners, unassigned%s%s\n", dejavu ? ", math (DejaVu Sans)" : "", color ? ", emoji" : "");
+}
+
 static void test_ellipsis(void) {
     const char *ltr = "Quarterly report for the board, final version (2).pdf";
     const char *arabic = "\xd8\xaa\xd9\x82\xd8\xb1\xd9\x8a\xd8\xb1 \xd8\xa7\xd9\x84\xd9\x85\xd8\xa8\xd9\x8a\xd8\xb9\xd8\xa7\xd8\xaa "
@@ -3084,6 +3100,7 @@ int main(int argc, char **argv) {
     printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
     test_ellipsis();
+    test_covered();
     test_borders();
     test_logical();
     test_transform_math();

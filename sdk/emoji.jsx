@@ -25,7 +25,10 @@ import { EMOJI_GROUPS, TONED } from './emojidata.js';
 
 const TONE_CP = [null, 0x1f3fb, 0x1f3fc, 0x1f3fd, 0x1f3fe, 0x1f3ff];
 let groupsCache = null;
-const groups = () => groupsCache || (groupsCache = EMOJI_GROUPS.map(([id, s]) => ({ id, list: s.split(' ') })));
+// Can an installed font draw it (lord.text.covered)? What none can would be a missing glyph box: it is left out
+// (#56). Without that call (an isolated app), everything is shown.
+const drawable = (ch) => typeof lord === 'undefined' || typeof lord.text?.covered !== 'function' || lord.text.covered(ch);
+const groups = () => groupsCache || (groupsCache = EMOJI_GROUPS.map(([id, s]) => ({ id, list: s.split(' ').filter(drawable) })));
 const keyOf = (ch) => [...ch].map((c) => c.codePointAt(0).toString(16)).filter((x) => x !== 'fe0f').join('_');
 
 // keywords: the UI language's first, and those of the other two for searching
@@ -58,6 +61,7 @@ const uiLang = () => String(locale.get().lang || 'en').split(/[-_]/)[0];
 
 export const emoji = {
   groups,
+  drawable,
   name(ch) {
     const k = keyOf(ch.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, ''));      // without the skin tone
     const own = keywords(uiLang())[k] || keywords('en')[k] || '';

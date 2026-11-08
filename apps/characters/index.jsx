@@ -72,7 +72,7 @@ export default function Characters() {
     const [, a, b] = SYMBOL_BLOCKS[block];
     const out = [];
     for (let c = a; c <= b; c++) out.push(String.fromCodePoint(c));
-    return out;
+    return out.filter(emoji.drawable);         // no missing glyph boxes (#56)
   }, [block]);
   const choose = (ch) => { setPick(ch); if (tab === 'emoji') emoji.remember(ch.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')); };
   const side = tab === 'emoji'
