@@ -637,6 +637,140 @@ static void t_pin(void) {
     CHECK(!strcmp(s.btns, "Ll"), "click (%s)", s.btns);
 }
 
+/* ---- Alps I2C touchpad of the hid-alps driver (Dell Latitude 7480 and 5289): issues #43, #54, #67 ----
+ *
+ * What hid-alps declares for 044E:120B (U1): 5 slots, x 0..3072 and y 0..1536 with a resolution
+ * (99×47 mm in the reporter's log), ABS_MT_PRESSURE 0..64, no touch size, INPUT_PROP_POINTER and
+ * BTN_LEFT/RIGHT/MIDDLE (not a clickpad). Each report carries every slot; the pressure it sends is
+ * the low 7 bits of the sensor (0..127), and the T4 pads send a fixed 62 for any finger. A firm finger
+ * read as a palm: the pointer only moved after touching the very edge first, and taps did nothing.
+ * The sequences follow the driver's u1_raw_event; no real device was recorded. */
+
+static TpCaps alps_caps(int vendor) {
+    TpCaps c;
+    memset(&c, 0, sizeof c);
+    c.kind = TP_KIND_TOUCHPAD;
+    c.has_right = 1;
+    c.nslots = 5;
+    c.max_fingers = 5;
+    c.x = (struct input_absinfo){ .minimum = 0, .maximum = 3072, .resolution = 31 };
+    c.y = (struct input_absinfo){ .minimum = 0, .maximum = 1536, .resolution = 32 };
+    c.pressure = (struct input_absinfo){ .minimum = 0, .maximum = 64 };
+    c.has_pressure = 1;
+    c.bus = BUS_I2C;
+    c.vendor = vendor;
+    c.product = 0x120b;
+    snprintf(c.name, sizeof c.name, "DLL07A0:01 044E:120B");
+    return c;
+}
+
+static int al_live[5], al_next = 100, al_tool, al_btn;
+
+/* one report of u1_raw_event (~8 ms): pressure z per slot (0 = lifted), then the pointer emulation
+ * of input_mt_sync_frame, the buttons and SYN_REPORT */
+static void al_frame(const double *x, const double *y, const int *z, int button) {
+    int n = 0;
+    for (int i = 0; i < 5; i++) {
+        feed(NULL, ap_t, EV_ABS, ABS_MT_SLOT, i);
+        if (z[i]) {
+            if (!al_live[i]) { al_live[i] = al_next++; feed(NULL, ap_t, EV_ABS, ABS_MT_TRACKING_ID, al_live[i]); }
+            feed(NULL, ap_t, EV_ABS, ABS_MT_POSITION_X, (int)lround(x[i] * 31));
+            feed(NULL, ap_t, EV_ABS, ABS_MT_POSITION_Y, (int)lround(y[i] * 32));
+            feed(NULL, ap_t, EV_ABS, ABS_MT_PRESSURE, z[i]);
+            n++;
+        } else if (al_live[i]) { al_live[i] = 0; feed(NULL, ap_t, EV_ABS, ABS_MT_TRACKING_ID, -1); }
+    }
+    static const int tools[] = { 0, BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP, BTN_TOOL_TRIPLETAP, BTN_TOOL_QUADTAP, BTN_TOOL_QUINTTAP };
+    if (n != al_tool) {
+        if (al_tool) feed(NULL, ap_t, EV_KEY, tools[al_tool], 0);
+        if (!!n != !!al_tool) feed(NULL, ap_t, EV_KEY, BTN_TOUCH, n > 0);
+        if (n) feed(NULL, ap_t, EV_KEY, tools[n], 1);
+        al_tool = n;
+    }
+    if (button != al_btn) { feed(NULL, ap_t, EV_KEY, BTN_LEFT, button); al_btn = button; }
+    feed(NULL, ap_t, EV_SYN, SYN_REPORT, 0);
+    ap_t += 8;
+}
+
+static void al_one(double x, double y, int z, int button) {
+    double xs[5] = { x }, ys[5] = { y };
+    int zs[5] = { z };
+    al_frame(xs, ys, zs, button);
+}
+
+static int al_z0, al_zfixed;    /* pressure of the finger: ramps up from al_z0, or al_zfixed (T4) */
+static int al_z(int k) { return al_zfixed ? al_zfixed : al_z0 + k * 6 > 110 ? 110 : al_z0 + k * 6; }
+
+/* one finger in the middle of the pad, moving 30 mm to the right */
+static void al_seq_move(void) {
+    for (int k = 0; k < 40; k++) al_one(30 + k * 0.75, 25, al_z(k), 0);
+    al_one(60, 25, 0, 0);
+    ap_t += 300;
+}
+
+/* a tap in the middle: 60 ms down */
+static void al_seq_tap(void) {
+    for (int k = 0; k < 8; k++) al_one(50, 22, al_z(k), 0);
+    al_one(50, 22, 0, 0);
+    ap_t += 400;
+}
+
+/* the physical left button under the pad, no finger on it */
+static void al_seq_button(void) {
+    for (int k = 0; k < 6; k++) al_one(0, 0, 0, 1);
+    al_one(0, 0, 0, 0);
+    ap_t += 300;
+}
+
+static Sum al_go(const char *name, void (*play)(void), int vendor) {
+    TpConfig c = defaults();
+    tp_set_config(&c);
+    TpCaps k = alps_caps(vendor);
+    dev = tp_new(&k);
+    nout = 0;
+    ap_t = base_t;
+    last_tick = base_t;
+    memset(al_live, 0, sizeof al_live);
+    al_tool = al_btn = 0;
+    play();
+    ticks_until(ap_t + 3000);
+    base_t = ap_t + 10000;
+    tp_free(dev);
+    dev = NULL;
+    Sum s = summary();
+    print_sum(name, &s);
+    return s;
+}
+
+static void t_alps(void) {
+    al_z0 = 40;                                     /* U1: the pressure climbs past the declared 64 */
+    al_zfixed = 0;
+    Sum s = al_go("alps:move", al_seq_move, 0x044e);
+    CHECK(s.mx > 100 && fabs(s.my) < 20, "one finger in the middle moves the pointer: %.0f,%.0f px", s.mx, s.my);
+    al_z0 = 58;                                     /* a firm finger from the start, still within 0..64 */
+    s = al_go("alps:firm", al_seq_move, 0x044e);
+    CHECK(s.mx > 100, "a firm finger is not a palm: %.0f px", s.mx);
+    s = al_go("alps:tap", al_seq_tap, 0x044e);
+    CHECK(!strcmp(s.btns, "Ll"), "a tap clicks (%s)", s.btns);
+    al_zfixed = 62;                                 /* T4: every finger reports 62 */
+    s = al_go("alps-t4:move", al_seq_move, 0x044e);
+    CHECK(s.mx > 100, "T4: one finger moves the pointer: %.0f px", s.mx);
+    s = al_go("alps-t4:tap", al_seq_tap, 0x044e);
+    CHECK(!strcmp(s.btns, "Ll"), "T4: a tap clicks (%s)", s.btns);
+    s = al_go("alps:button", al_seq_button, 0x044e);
+    CHECK(!strcmp(s.btns, "Ll"), "the physical button clicks (%s)", s.btns);
+    /* other touchpads keep pressure palms: the same range from another maker, a heavy contact within it */
+    al_zfixed = 60;
+    s = al_go("other:heavy", al_seq_move, 0x06cb);
+    CHECK(!s.nmotion && !s.btns[0], "a heavy contact on another touchpad is still a palm: %d motions", s.nmotion);
+    /* ...unless it reports a pressure above its declared maximum: then the range can't be trusted */
+    al_zfixed = 0;
+    al_z0 = 70;
+    s = al_go("other:range", al_seq_move, 0x06cb);
+    CHECK(s.mx > 100, "a pressure above the maximum stops pressure palms: %.0f px", s.mx);
+    al_zfixed = 0;
+}
+
 static void t_settings(void) {
     /* scroll speed: ×2 at the top of the slider, ×0.5 at the bottom */
     Sum n = go("scroll", NULL);
@@ -787,6 +921,7 @@ int main(int argc, char **argv) {
     t_touchscreen();
     t_bcm5974();
     t_pin();
+    t_alps();
     t_settings();
     printf("processing a frame: %.2f µs (average over %.0f frames)\n", proc_ns / proc_frames / 1000, proc_frames);
     printf("tp-test: %d/%d passed\n", checks - fails, checks);

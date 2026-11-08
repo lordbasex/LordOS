@@ -89,7 +89,12 @@ On every `SYN_REPORT` the driver looks at the contacts in millimeters.
 
 - **Palms:**
   - a contact larger than 22 mm (`ABS_MT_TOUCH_MAJOR`), or above 1600 units on a bcm5974-class touchpad;
-  - pressure above 85 % of the range during the first 150 ms;
+  - pressure above 85 % of the range during the first 150 ms, on touchpads whose pressure can be
+    trusted. Not on the Alps pads of the `hid-alps` driver (vendor `044e`, pressure declared 0..64:
+    Dell Latitude 7480, 5289 and others, issues #43, #54, #67): it sends the sensor's low 7 bits
+    (0..127) or, on T4 pads, a fixed 62, so every firm finger was a palm. Nor on a device that
+    reports a pressure above its declared maximum (logged once). Their palms are told by the edges.
+    The log line ends in `, palms by the edges only`;
   - Touch sensitivity moves both limits: ×0.8 with Low (palms are caught sooner), ×1.25 with High;
   - a touch that starts at the left or right edge (7 mm, or 7 % of the width) and doesn't leave
     the edge within 300 ms.
@@ -511,5 +516,6 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
   - right click by long press on the touchscreen.
 - **Palm by size:** only works on devices that report `TOUCH_MAJOR` in the same units as the
   position. The others rely on pressure and edges.
-- **Tested only in the VM**, with the simulated touchpad and screen, and a simulated bcm5974. Real
+- **Tested only in the VM**, with the simulated touchpad and screen, a simulated bcm5974 and the
+  `hid-alps` report sequence (`t_alps` in `tests/tp_test.c`, written from the driver, not recorded). Real
   hardware is still missing (the checklist above), the 2015 laptop of issue #34 included.

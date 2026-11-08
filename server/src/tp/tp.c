@@ -10,7 +10,7 @@
  *   tap              click (1 finger left, 2 right, 3 middle), tap and drag
  *   physical click   clickpad: depending on how many fingers there are or the bottom corner
  *
- * Palms are discarded (large contact, high pressure, touches that start at the edges and don't
+ * Palms are discarded (large contact, high pressure where it can be trusted, touches that start at the edges and don't
  * leave them) as are touches that start while typing. On a clickpad, a finger that
  * rests at the bottom (the thumb that presses) doesn't count while there are others.
  *
@@ -90,6 +90,7 @@ struct TpDevice {
     int by_size;                    /* touches count by their size (hover_pad, SIZE_*) */
     int size_on, size_off, palm_major;  /* ABS_MT_TOUCH_MAJOR thresholds (0 = not used) */
     int jumps;                      /* pointer jumps dropped (logged once) */
+    int pressure_palm;              /* a high ABS_MT_PRESSURE means a palm (palm_pressure) */
     int phys, phys_prev, phys_btn;  /* clickpad physical click and the button that was sent */
     int btn_pending[3], btn_state[3];   /* physical buttons of a touchpad with buttons */
     double now, prev_t;
@@ -196,6 +197,17 @@ static int hover_pad(const TpCaps *c) {
     return c->vendor == 0x05ac && !c->has_pressure && (c->bus == BUS_USB || c->bus == BUS_SPI);
 }
 
+/* Does a pressure near the top of the declared range mean a palm? Not on the Alps pads of the hid-alps
+ * driver (vendor 044e: Dell Latitude 7480, 5289 and others, issues #43, #54, #67): it declares 0..64
+ * but sends the low 7 bits of the sensor (0..127, a resting finger well above 54) or, on T4 pads, a
+ * fixed 62 for every finger. Every firm finger was a palm. libinput's default palm threshold (130)
+ * can't be reached there either, so the palms of these pads are told apart by the edges only. A device
+ * that reports a pressure above its maximum (tp_event_at) loses it the same way. */
+static int palm_pressure(const TpCaps *c) {
+    if (c->kind != TP_KIND_TOUCHPAD || !c->has_pressure || c->pressure.maximum <= c->pressure.minimum) return 0;
+    return !(c->vendor == 0x044e && c->pressure.minimum == 0 && c->pressure.maximum == 64);
+}
+
 /* ---- devices ---- */
 
 TpDevice *tp_new(const TpCaps *caps) {
@@ -210,6 +222,7 @@ TpDevice *tp_new(const TpCaps *caps) {
     if (w <= 0) w = 1;
     if (h <= 0) h = 1;
     d->by_size = hover_pad(&d->c);
+    d->pressure_palm = palm_pressure(&d->c);
     if (d->by_size) { d->size_on = SIZE_TOUCH_ON; d->size_off = SIZE_TOUCH_OFF; d->palm_major = SIZE_PALM; }
     /* no resolution: a 100 mm wide touchpad is assumed (or 300 mm for a screen); those of hover_pad ~104 × 75 */
     d->rx = d->c.x.resolution > 0 ? d->c.x.resolution : w / (d->c.kind == TP_KIND_TOUCHSCREEN ? 300.0 : d->by_size ? SIZE_W_MM : 100.0);
@@ -274,8 +287,9 @@ TpDevice *tp_open(int fd, const char *name) {
     d->fd = fd;
     int clk = CLOCK_MONOTONIC;
     ioctl(fd, EVIOCSCLOCKID, &clk);
-    fprintf(stderr, "tp: %s: %s%s, %.0f×%.0f mm, %d contacts%s\n", c.name, c.kind == TP_KIND_TOUCHSCREEN ? "touchscreen" : "touchpad",
-            c.clickpad ? " (clickpad)" : "", d->wmm, d->hmm, d->c.nslots, d->by_size ? ", touches by size" : "");
+    fprintf(stderr, "tp: %s: %s%s, %.0f×%.0f mm, %d contacts%s%s\n", c.name, c.kind == TP_KIND_TOUCHSCREEN ? "touchscreen" : "touchpad",
+            c.clickpad ? " (clickpad)" : "", d->wmm, d->hmm, d->c.nslots, d->by_size ? ", touches by size" : "",
+            c.kind == TP_KIND_TOUCHPAD && c.has_pressure && !d->pressure_palm ? ", palms by the edges only" : "");
     return d;
 }
 
@@ -330,7 +344,7 @@ static int is_palm_size(TpDevice *d, const Slot *s) {
     else if (d->c.has_major && s->major > 0 && s->major / d->rx > 22.0 * sens_palm()) return 1;
     double pk = 0.85 * sens_palm();
     if (pk > 0.97) pk = 0.97;
-    if (d->c.has_pressure && d->c.pressure.maximum > d->c.pressure.minimum && !d->phys &&
+    if (d->pressure_palm && !d->phys &&
         s->pressure > d->c.pressure.minimum + pk * (d->c.pressure.maximum - d->c.pressure.minimum)) return 1;
     return 0;
 }
@@ -935,7 +949,13 @@ void tp_event_at(TpDevice *d, const struct input_event *ev, double now) {
         case ABS_MT_POSITION_X: s->x = ev->value; break;
         case ABS_MT_POSITION_Y: s->y = ev->value; break;
         case ABS_MT_TOUCH_MAJOR: s->major = ev->value; break;
-        case ABS_MT_PRESSURE: s->pressure = ev->value; break;
+        case ABS_MT_PRESSURE:
+            s->pressure = ev->value;
+            if (d->pressure_palm && ev->value > d->c.pressure.maximum) {     /* the declared range isn't the real one */
+                d->pressure_palm = 0;
+                fprintf(stderr, "tp: %s: pressure %d above its maximum %d; pressure no longer tells palms\n", d->c.name, ev->value, d->c.pressure.maximum);
+            }
+            break;
         }
         break;
     case EV_KEY: {
