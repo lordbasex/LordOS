@@ -194,8 +194,12 @@ not offered.
 ### 6.2 Signing in with the browser
 
 1. The person picks a provider and names the account ("Work", "Personal"; the name becomes the folder in `~/Cloud`).
-2. `lord-server` starts `rclone authorize <type> --auth-no-open-browser` in the cloud scope, reads the authorization URL from its
-   log, and opens it in the default browser itself; the token comes back on stdout and goes to `config/create` as `config_token`
+2. `lord-server` starts `rclone authorize <type> e30 --auth-no-open-browser` in the cloud scope, reads the authorization URL from its
+   log, and opens it in the default browser itself; the token comes back on stdout and goes to `config/create` as `config_token`.
+   `e30` is `{}` as a config blob: with it rclone prints every option the sign-in set (base64 of a JSON object), not the token
+   alone. pCloud needs that (#71): its redirect names the API host of the account's region (`eapi.pcloud.com` in Europe), saved
+   as the account's `hostname`; with the token alone a European account got "Invalid 'access_token' provided. (2094)" on
+   every call. A client's id or secret and any option refused by name are never taken from it
    (section 15: the rc state machine asks `config_is_local` first, so this path is simpler). Settings shows "Waiting for you to sign in
    in the browser…" with the time left (5 minutes), **Open Again** and **Cancel**. The redirect comes back to rclone's listener on
    `127.0.0.1:53682`, which only lives during the sign-in.

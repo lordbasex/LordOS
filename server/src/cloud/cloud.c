@@ -484,12 +484,14 @@ static int rcs(int m, const char *body, char *msg, size_t mn, int timeout) {
 /* a cloud.* code from rclone's words about an account */
 static const char *code_of(const char *msg, int oauth) {
     if (!msg || !msg[0]) return "cloud.failed";
-    if (strstr(msg, "invalid_grant") || strstr(msg, "token expired") || strstr(msg, "oauth2: ") || (oauth && strstr(msg, "401")))
+    if (strstr(msg, "invalid_grant") || strstr(msg, "token expired") || strstr(msg, "oauth2: ") ||
+        (oauth && (strstr(msg, "401") || strstr(msg, "invalid_token") || strstr(msg, "Invalid 'access_token'"))))
         return "cloud.signInAgain";
     if (strstr(msg, "no such host") || strstr(msg, "network is unreachable") || strstr(msg, "i/o timeout") || strstr(msg, "connection refused") ||
         strstr(msg, "dial tcp") || strstr(msg, "no route to host"))
         return "cloud.offline";
-    if (strstr(msg, "401") || strstr(msg, "403") || strstr(msg, "Unauthorized") || strstr(msg, "authentication") || strstr(msg, "permission denied"))
+    if (strstr(msg, "401") || strstr(msg, "403") || strstr(msg, "Unauthorized") || strstr(msg, "authentication") || strstr(msg, "permission denied") ||
+        strstr(msg, "incorrect username or password"))
         return "cloud.authFailed";
     if (strstr(msg, "directory not empty") || strstr(msg, "not empty")) return "cloud.folderNotEmpty";
     return "cloud.failed";
@@ -1839,7 +1841,7 @@ static void signin_end(const char *phase, const char *error) {
 }
 
 /* Sign In Again: the new token goes to the same account (same id, same folder) */
-static void signin_again(const char *tok) {
+static void signin_again(const char *tok, const char *opts) {
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find(si.update);
     if (!a) { signin_end("failed", "cloud.notFound"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
@@ -1848,6 +1850,7 @@ static void signin_again(const char *tok) {
     jb_init(&s);
     jb_raw(&s, "{\"token\":");
     jb_str(&s, tok);
+    jb_raw(&s, opts);                           /* checked by cloud_auth_token: pCloud's host */
     if (si.csec[0]) { jb_raw(&s, ",\"client_secret\":"); jb_str(&s, si.csec); }
     jb_raw(&s, "}");
     cpy(si.account, sizeof si.account, a->id);
@@ -1877,10 +1880,10 @@ static void signin_again(const char *tok) {
 
 /* the token came: a new account */
 static void signin_token(void) {
-    char tok[16384];
-    if (!cloud_auth_token(si.out, tok, sizeof tok)) { pthread_mutex_lock(&cl_mu); signin_end("failed", "cloud.signinFailed"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
+    char tok[16384], opts[4096];
+    if (!cloud_auth_token(si.out, tok, sizeof tok, opts, sizeof opts)) { pthread_mutex_lock(&cl_mu); signin_end("failed", "cloud.signinFailed"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
     pthread_mutex_lock(&cl_mu);
-    if (si.update[0]) { pthread_mutex_unlock(&cl_mu); signin_again(tok); explicit_bzero(tok, sizeof tok); return; }
+    if (si.update[0]) { pthread_mutex_unlock(&cl_mu); signin_again(tok, opts); explicit_bzero(tok, sizeof tok); return; }
     Acc *a = NULL;
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
     const CloudKind *k = kind_get(si.kind);
@@ -1899,6 +1902,7 @@ static void signin_token(void) {
     jb_init(&s);
     jb_raw(&s, "{\"token\":");
     jb_str(&s, tok);
+    jb_raw(&s, opts);                           /* checked by cloud_auth_token: pCloud's host */
     if (si.csec[0]) { jb_raw(&s, ",\"client_secret\":"); jb_str(&s, si.csec); }
     jb_raw(&s, "}");
     explicit_bzero(tok, sizeof tok);
@@ -1972,7 +1976,9 @@ static pid_t spawn_authorize(const CloudKind *k, const char *cid, const char *cs
     child_env(env, envbuf, sizeof envbuf, e1[0] ? e1 : NULL, e2[0] ? e2 : NULL);
     explicit_bzero(e1, sizeof e1);
     explicit_bzero(e2, sizeof e2);
-    char *argv[] = { "rclone", "authorize", (char *)k->type, "--auth-no-open-browser", "--config", "", NULL };
+    /* "e30" is "{}" as a config blob: rclone then prints every option the sign-in set, not the token alone (#71: pCloud's
+     * host for an account in Europe comes back only with the redirect; without it every call says "Invalid access_token") */
+    char *argv[] = { "rclone", "authorize", (char *)k->type, "e30", "--auth-no-open-browser", "--config", "", NULL };
     const char *bin = rclone_bin();
     pid_t p = fork();
     if (!p) {

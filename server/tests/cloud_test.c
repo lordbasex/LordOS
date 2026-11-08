@@ -202,6 +202,8 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("couldn't list files: 401 Unauthorized: "), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("failed to read private key: x509: decryption password incorrect"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("AccessDenied: Access Denied status code: 403"), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("error in ListJSON: couldn't list files: pcloud error: Invalid 'access_token' provided. (2094)"), "cloud.authFailed"));   /* #71 */
+    CHECK(!strcmp(cloud_failure_code("sign in failed: incorrect username or password"), "cloud.authFailed"));   /* #65: an app-specific password */
     CHECK(!strcmp(cloud_failure_code("dial tcp 127.0.0.1:1: connect: connection refused"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("error in ListJSON: write tcp 127.0.0.1:38242->127.0.0.1:18991: write: broken pipe"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("dial tcp: lookup nowhere.example.test: no such host"), "cloud.unreachable"));
@@ -283,7 +285,7 @@ static void t_refused(void) {
 }
 
 static void t_signin(void) {
-    char url[200], tok[4096];
+    char url[200], tok[4096], opts[1024];
     CHECK(cloud_auth_url("2026/11/06 14:51:51 NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA", url, sizeof url) &&
           !strcmp(url, "http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA"));
     CHECK(cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=abcdefgh12\n", url, sizeof url));
@@ -294,12 +296,34 @@ static void t_signin(void) {
     CHECK(!cloud_auth_url("NOTICE: Waiting for code...", url, sizeof url) && !cloud_auth_url(NULL, url, sizeof url));
     CHECK(!cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA", url, 20));
     const char *out = "Paste the following into your remote machine --->\n{\"access_token\":\"sl.x\",\"token_type\":\"bearer\",\"refresh_token\":\"r1\",\"expiry\":\"2026-11-06T18:51:51Z\"}\n<---End paste\n";
-    CHECK(cloud_auth_token(out, tok, sizeof tok) && tok[0] == '{' && strstr(tok, "\"refresh_token\":\"r1\"") && tok[strlen(tok) - 1] == '}');
-    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\nnot json\n<---End paste\n", tok, sizeof tok));
-    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"x\":1}\n<---End paste\n", tok, sizeof tok));
-    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"access_token\":\"a\nb\"}\n<---End paste\n", tok, sizeof tok));
-    CHECK(!cloud_auth_token("", tok, sizeof tok) && !cloud_auth_token(NULL, tok, sizeof tok));
-    CHECK(!cloud_auth_token(out, tok, 10));
+    CHECK(cloud_auth_token(out, tok, sizeof tok, opts, sizeof opts) && tok[0] == '{' && strstr(tok, "\"refresh_token\":\"r1\"") && tok[strlen(tok) - 1] == '}');
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\nnot json\n<---End paste\n", tok, sizeof tok, opts, sizeof opts));
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"x\":1}\n<---End paste\n", tok, sizeof tok, opts, sizeof opts));
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"access_token\":\"a\nb\"}\n<---End paste\n", tok, sizeof tok, opts, sizeof opts));
+    CHECK(!cloud_auth_token("", tok, sizeof tok, opts, sizeof opts) && !cloud_auth_token(NULL, tok, sizeof tok, opts, sizeof opts));
+    CHECK(!cloud_auth_token(out, tok, 10, opts, sizeof opts));
+    CHECK(cloud_auth_token(out, tok, sizeof tok, opts, sizeof opts) && !opts[0]);
+    /* #71: started with a config blob, rclone prints base64 of every option the sign-in set (pCloud's host in Europe) */
+    {
+        const char *blob = "{\"token\":\"{\\\"access_token\\\":\\\"p.x\\\",\\\"token_type\\\":\\\"bearer\\\",\\\"expiry\\\":\\\"0001-01-01T00:00:00Z\\\"}\","
+                           "\"hostname\":\"eapi.pcloud.com\",\"client_secret\":\"s\",\"token_url\":\"https://evil.example.test/\","
+                           "\"config_x\":\"y\",\"ssh\":\"rm -rf\",\"Bad-Key\":\"v\",\"region\":\"a\\\"b\"}";
+        char b64[2048], o2[2600];
+        cloud_b64((const unsigned char *)blob, strlen(blob), b64);
+        snprintf(o2, sizeof o2, "Paste the following into your remote machine --->\n%s\n<---End paste\n", b64);
+        CHECK(cloud_auth_token(o2, tok, sizeof tok, opts, sizeof opts) && !strcmp(tok, "{\"access_token\":\"p.x\",\"token_type\":\"bearer\",\"expiry\":\"0001-01-01T00:00:00Z\"}"));
+        CHECK(strstr(opts, ",\"hostname\":\"eapi.pcloud.com\"") && strstr(opts, ",\"region\":\"a\\\"b\"") && !strstr(opts, "client_secret") &&
+              !strstr(opts, "token") && !strstr(opts, "config_") && !strstr(opts, "ssh") && !strstr(opts, "Bad"));
+        for (char *e = strchr(b64, '='); e; e = strchr(b64, '=')) *e = 0;       /* RawStdEncoding: no padding */
+        snprintf(o2, sizeof o2, "Paste the following into your remote machine --->\n%s\n<---End paste\n", b64);
+        CHECK(cloud_auth_token(o2, tok, sizeof tok, opts, sizeof opts) && strstr(opts, "eapi.pcloud.com"));
+        CHECK(!cloud_auth_token(o2, tok, sizeof tok, opts, 8));                 /* the options don't fit: nothing */
+        const char *notok = "{\"hostname\":\"eapi.pcloud.com\"}";
+        cloud_b64((const unsigned char *)notok, strlen(notok), b64);
+        snprintf(o2, sizeof o2, "Paste the following into your remote machine --->\n%s\n<---End paste\n", b64);
+        CHECK(!cloud_auth_token(o2, tok, sizeof tok, opts, sizeof opts) && !opts[0]);
+        CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n@@@@\n<---End paste\n", tok, sizeof tok, opts, sizeof opts));
+    }
     CHECK(!strcmp(cloud_default_answer("config_refresh_token", "true"), "false"));
     CHECK(!strcmp(cloud_default_answer("config_shared_client_id", "false"), "true"));
     CHECK(!strcmp(cloud_default_answer("config_is_local", "true"), "false"));

@@ -117,8 +117,12 @@ int  cloud_url_ok(const char *url);          /* https://, printable ASCII withou
 /* ---- signing in (6.2): rclone authorize <type> --auth-no-open-browser ---- */
 /* a line of its log: 1 and the address (http://127.0.0.1:53682/auth?state=…, nothing else accepted) */
 int  cloud_auth_url(const char *line, char *url, size_t n);
-/* its stdout: 1 and the token (one JSON object) */
-int  cloud_auth_token(const char *out, char *tok, size_t n);
+/* its stdout: 1 and the token (one JSON object). Started with a config blob ("{}" in base64) as its second argument,
+ * rclone prints every option the sign-in set (configmap.Simple.Encode: base64 of a JSON object), not the token alone:
+ * pCloud's API host for the account's region (eapi.pcloud.com in Europe), which only comes back with the redirect.
+ * Those options go into opts as JSON members after the token (",\"hostname\":\"…\"", "" when none); a client's id
+ * or secret and any option refused by name (cloud_option_refused) are left out. */
+int  cloud_auth_token(const char *out, char *tok, size_t n, char *opts, size_t on);
 /* config/create's next question asked non-interactively: what to answer (the default, except these) */
 const char *cloud_default_answer(const char *option, const char *def);
 

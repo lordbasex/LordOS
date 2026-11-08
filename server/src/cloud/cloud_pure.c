@@ -296,7 +296,8 @@ const char *cloud_failure_code(const char *m) {
         "permission denied", "invalid credentials", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "login failed",
         "Login incorrect", "530 ", "wrong password", "no supported methods remain", "couldn't decrypt", "failed to parse private key",
         "cannot decode encrypted private keys", "invalid_grant", "STATUS_LOGON_FAILURE", "NT_STATUS_LOGON_FAILURE",
-        "attempted logon is invalid", "bad username or authentication", NULL };
+        "attempted logon is invalid", "bad username or authentication", "invalid_token", "Invalid 'access_token'",
+        "incorrect username or password", NULL };
     static const char *const net[] = { "connection refused", "no route to host", "no such host", "network is unreachable",
         "i/o timeout", "host is down", NULL };
     static const char *const weak[] = { "connection reset", "broken pipe", "deadline exceeded", "timeout", "EOF", NULL };
@@ -444,12 +445,92 @@ int cloud_auth_url(const char *line, char *url, size_t n) {
     return 1;
 }
 
-int cloud_auth_token(const char *out, char *tok, size_t n) {
+/* a token as rclone keeps it: one JSON object with an access or refresh token, on one line of rclone.conf */
+static int token_ok(const char *t, size_t l) {
+    JDoc d;
+    int ok = !json_parse(t, l, &d, NULL, 0);
+    if (ok) {
+        ok = d.root->type == J_OBJ && (json_str(d.root, "access_token") || json_str(d.root, "refresh_token"));
+        json_free(&d);
+    }
+    for (size_t i = 0; ok && i < l; i++) if ((unsigned char)t[i] < 0x20) ok = 0;
+    return ok;
+}
+
+/* base64 (standard or URL alphabet, padding and spaces allowed): the bytes, or -1 */
+static long b64_dec(const char *s, const char *e, unsigned char *out, size_t cap) {
+    unsigned v = 0;
+    int bits = 0;
+    size_t o = 0;
+    for (; s < e; s++) {
+        int c = (unsigned char)*s, x;
+        if (isspace(c)) continue;
+        if (c == '=') break;
+        x = c >= 'A' && c <= 'Z' ? c - 'A' : c >= 'a' && c <= 'z' ? c - 'a' + 26 : c >= '0' && c <= '9' ? c - '0' + 52
+          : c == '+' || c == '-' ? 62 : c == '/' || c == '_' ? 63 : -1;
+        if (x < 0) return -1;
+        v = (v << 6 | (unsigned)x) & 0xffffff;
+        if ((bits += 6) >= 8) { bits -= 8; if (o >= cap) return -1; out[o++] = (unsigned char)(v >> bits); }
+    }
+    return (long)o;
+}
+
+/* an option rclone set while signing in, as a JSON member after the token: its name and value already checked */
+static int opt_member(char *o, size_t on, size_t *ol, const char *k, const char *v) {
+    size_t l = *ol;
+    if (l + strlen(k) + 6 >= on) return 0;
+    l += (size_t)snprintf(o + l, on - l, ",\"%s\":\"", k);
+    for (; *v; v++) {
+        if (l + 4 >= on) return 0;
+        if (*v == '"' || *v == '\\') o[l++] = '\\';
+        o[l++] = *v;
+    }
+    o[l++] = '"';
+    o[l] = 0;
+    *ol = l;
+    return 1;
+}
+
+int cloud_auth_token(const char *out, char *tok, size_t n, char *opts, size_t on) {
+    if (!opts || !on) return 0;
+    opts[0] = 0;
     const char *a = out ? strstr(out, "--->") : NULL, *b;
     a = a ? a + 4 : out;
     if (!a) return 0;
     b = strstr(a, "<---End paste");
-    const char *s = strchr(a, '{');
+    const char *s = a;
+    while (*s && isspace((unsigned char)*s)) s++;
+    if (*s && *s != '{' && (!b || s < b)) {
+        /* the config blob (configmap.Simple.Encode): base64 of a JSON object of strings, the token one of them */
+        const char *e = b ? b : s + strlen(s);
+        size_t cap = (size_t)(e - s) * 3 / 4 + 3;
+        if (cap > 32768) return 0;
+        unsigned char *j = malloc(cap + 1);
+        if (!j) return 0;
+        long jl = b64_dec(s, e, j, cap);
+        int ok = jl > 0;
+        JDoc d;
+        if (ok) { j[jl] = 0; ok = !json_parse((char *)j, (size_t)jl, &d, NULL, 0); }
+        if (ok) {
+            const char *t = d.root->type == J_OBJ ? json_str(d.root, "token") : NULL;
+            size_t tl = t ? strlen(t) : 0;
+            ok = t && tl < n && tl <= 16384 && token_ok(t, tl);
+            if (ok) memcpy(tok, t, tl + 1);
+            size_t ol = 0;
+            for (const JVal *x = d.root->kid; ok && x; x = x->next) {
+                /* the token apart, never a client's id or secret (those are LordOS's own), nothing refused by name */
+                if (x->type != J_STR || !strcmp(x->key, "token") || !strcmp(x->key, "client_id") || !strcmp(x->key, "client_secret")) continue;
+                if (cloud_option_refused(x->key, "string") || !cloud_value_ok(x->str)) continue;
+                if (!opt_member(opts, on, &ol, x->key, x->str)) ok = 0;
+            }
+            if (!ok) { explicit_bzero(tok, n); opts[0] = 0; }
+            json_free(&d);
+        }
+        explicit_bzero(j, cap + 1);
+        free(j);
+        return ok;
+    }
+    s = strchr(a, '{');
     if (!s || (b && s > b)) return 0;
     const char *e = b ? b : s + strlen(s);
     while (e > s && e[-1] != '}') e--;
@@ -460,13 +541,7 @@ int cloud_auth_token(const char *out, char *tok, size_t n) {
     if (!t) return 0;
     memcpy(t, s, l);
     t[l] = 0;
-    JDoc d;
-    int ok = !json_parse(t, l, &d, NULL, 0);
-    if (ok) {
-        ok = d.root->type == J_OBJ && (json_str(d.root, "access_token") || json_str(d.root, "refresh_token"));
-        json_free(&d);
-    }
-    for (size_t i = 0; ok && i < l; i++) if ((unsigned char)t[i] < 0x20) ok = 0;   /* one line in rclone.conf */
+    int ok = token_ok(t, l);
     if (ok) memcpy(tok, t, l + 1);
     explicit_bzero(t, l);
     free(t);
