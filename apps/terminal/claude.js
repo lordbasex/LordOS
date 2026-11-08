@@ -30,7 +30,9 @@ function limit(w, now) {
   return resetsAt != null && resetsAt <= now ? null : { pct: p, resetsAt };
 }
 
-// The status line JSON → what the footer shows; null when it isn't that session's
+// The status line JSON → what the footer shows; null when it isn't that session's. A subscriber's limits
+// (rate_limits present) keep the 5-hour slot even when Claude Code leaves that window out (it drops a window
+// once it resets and may omit one on its own): { pct: null } shows as "5h –" instead of vanishing.
 export function parseStatus(text, id, now = Date.now()) {
   const d = parse(text);
   if (!d || d.session_id !== id) return null;
@@ -41,7 +43,7 @@ export function parseStatus(text, id, now = Date.now()) {
     ctx: pct(cw.used_percentage),
     ctxTokens: Number.isFinite(+cw.total_input_tokens) ? +cw.total_input_tokens : null,
     ctxSize: Number.isFinite(+cw.context_window_size) ? +cw.context_window_size : null,
-    five: limit(d.rate_limits?.five_hour, now),
+    five: limit(d.rate_limits?.five_hour, now) || (d.rate_limits && typeof d.rate_limits === 'object' ? { pct: null, resetsAt: null } : null),
     week: limit(d.rate_limits?.seven_day, now),
     cost: Number.isFinite(+d.cost?.total_cost_usd) ? +d.cost.total_cost_usd : null,
   };

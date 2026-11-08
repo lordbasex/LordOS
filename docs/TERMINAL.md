@@ -182,8 +182,12 @@ A click on a percentage shows the exact tokens, when each limit resets and the s
 - **lord-claude-status** (`server/src/term/claudebridge.c`, no libraries): Claude Code runs it, as the user, instead of
   the command it wraps. It keeps the JSON as `~/.cache/lordos/claude/<session_id>.json` (session ids are checked;
   0600 in a 0700 folder of the user's; no links followed; written whole and renamed; files older than a week removed),
-  then runs the wrapped command with the same stdin, so the status line shows exactly what it did before. lord-server
-  runs nothing: the Terminal only reads those files.
+  then runs the wrapped command with the same stdin, so the status line shows exactly what it did before. With no
+  command to wrap (the user had no status line) it prints LordOS's own, the footer's numbers in one line:
+  `Opus 5.5 | LordOS | main | ctx 11% | 5h 37% | sem 5%` (model, folder, git branch read from `.git/HEAD` without
+  running git, context used, the plan's limits, the labels in the user's language; control characters and `|` from the
+  input are left out). A subscriber's 5-hour window shows as `5h –` while Claude Code leaves it out (it drops a window
+  once it resets), here and in the footer. lord-server runs nothing: the Terminal only reads those files.
 
 Tests: `server/tests/terminal_claude_test.mjs` (the model, and that the wrapped command prints what the original did)
 and `server/tests/claude_bridge_test.sh` (the bridge: what it keeps, bad session ids, a link in place of the folder,

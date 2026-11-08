@@ -124,7 +124,7 @@ function ClaudeSegments({ t, wid, sid, c, cols }) {
   const details = () => {
     const parts = [];
     if (st.ctxTokens != null) parts.push(tr('terminal.claude.ctxDetail', { used: tokens(st.ctxTokens), size: st.ctxSize ? tokens(st.ctxSize) : '?' }));
-    if (st.five) parts.push(tr('terminal.claude.fiveDetail', { pct: st.five.pct, time: st.five.resetsAt ? resetLabel(st.five.resetsAt) : '?' }));
+    if (st.five && st.five.pct != null) parts.push(tr('terminal.claude.fiveDetail', { pct: st.five.pct, time: st.five.resetsAt ? resetLabel(st.five.resetsAt) : '?' }));
     if (st.week) parts.push(tr('terminal.claude.weekDetail', { pct: st.week.pct, time: st.week.resetsAt ? resetLabel(st.week.resetsAt) : '?' }));
     if (st.cost != null) parts.push(tr('terminal.claude.costDetail', { cost: st.cost.toFixed(2) }));
     if (parts.length) toast(wid, parts.join(' · '));
@@ -140,8 +140,8 @@ function ClaudeSegments({ t, wid, sid, c, cols }) {
       );
     }
     const p = key === 'ctx' ? st.ctx : st[key].pct;
-    const label = key === 'ctx' ? `${tr('terminal.claude.ctx')} ${bar(p)} ${p}%` : `${tr(key === 'five' ? 'terminal.claude.five' : 'terminal.claude.week')} ${p}%`;
-    return <Text onClick={details} style={small(t, { color: LEVEL_COLORS[level(p)] })}>{label}</Text>;
+    const label = key === 'ctx' ? `${tr('terminal.claude.ctx')} ${bar(p)} ${p}%` : `${tr(key === 'five' ? 'terminal.claude.five' : 'terminal.claude.week')} ${p == null ? '–' : `${p}%`}`;
+    return <Text onClick={details} style={small(t, p == null ? undefined : { color: LEVEL_COLORS[level(p)] })}>{label}</Text>;
   };
   const order = ['model', 'state', 'ctx', 'five', 'week'].filter((k) => keys.includes(k));
   return (

@@ -36,7 +36,8 @@ eq('all of it', parseStatus(st(), 'S1', now), {
   five: { pct: 37, resetsAt: now + 3600000 }, week: { pct: 61, resetsAt: now + 86400000 }, cost: 12.5,
 });
 eq('another session\'s snapshot', parseStatus(st(), 'S2', now), null);
-eq('a window that already reset is gone', parseStatus(st({ rate_limits: { five_hour: { used_percentage: 90, resets_at: now / 1000 - 1 } } }), 'S1', now).five, null);
+eq('a window that already reset shows as unknown', parseStatus(st({ rate_limits: { five_hour: { used_percentage: 90, resets_at: now / 1000 - 1 } } }), 'S1', now).five, { pct: null, resetsAt: null });
+eq('a subscriber without the 5-hour window keeps its slot', parseStatus(st({ rate_limits: { seven_day: { used_percentage: 5, resets_at: now / 1000 + 86400 } } }), 'S1', now).five, { pct: null, resetsAt: null });
 eq('no limits (an API key account)', parseStatus(st({ rate_limits: undefined }), 'S1', now).week, null);
 eq('no context before the first answer', parseStatus(st({ context_window: { used_percentage: null } }), 'S1', now).ctx, null);
 eq('percentages stay within 0..100', parseStatus(st({ context_window: { used_percentage: 140 } }), 'S1', now).ctx, 100);
