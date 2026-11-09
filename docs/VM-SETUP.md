@@ -1804,3 +1804,18 @@ They stay on the VM for later Brave and VSCodium tests. To remove them: `pkg-rem
 came from an isolated headless session of that tree (own `HOME` `~/i37-home`, `XDG_RUNTIME_DIR` `/tmp/i37-rt` and a
 `dbus-run-session` bus, driven over its `remote.sock`), with the LordOS GTK theme copied into that home's
 `.local/share/themes` because VM 116 doesn't have it in `/usr/share/themes`.
+
+## Step — 0.8.8.7 in development: the build machine's media and logind headers (main machine, 2026-11-09)
+
+The maintainer's main machine (bare metal, Debian 13 with LordOS) also builds the packages. 0.8.8.6 was built there
+without `lord-media` and `lord-vmdisplay` because these were missing; `tools/iso/mkdeb.sh` now refuses to package
+without them.
+
+| Package | Version | Why |
+|---|---|---|
+| `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | 7:7.1.5-0+deb13u1 | `lord-media` (screenshots, video, music, camera) |
+| `libva-dev` | 2.22.0-3 | `lord-media`'s hardware decoding |
+| `libsystemd-dev` | 257.13-1~deb13u1 | `lord-vmdisplay` and `lord-vm`'s logind inhibitor |
+
+Checked: `make -C server` builds both with no warnings, `make -C server test-full` passes, and in a throwaway headless
+session (`tools/vm/e2e`) ❖⇧3 saves to `~/Pictures/Screenshots` and puts the picture on the clipboard.
