@@ -664,6 +664,26 @@ build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/pr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST=$(HWFALL) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# the remote desktop's check of a hardware encoder's first H.264 keyframe (src/media/helper/lm_encheck.h, #94);
+# in test-full when FFmpeg's -dev packages are there; ENCHECK_VAAPI=/dev/dri/renderD128 also checks that card
+ifeq ($(MEDIA),1)
+test-full: build/encheck-test build/lmstream-test build/lord-media-encfail
+endif
+build/encheck-test: tests/encheck_test.c src/media/helper/lm_encheck.c src/media/helper/lm_encheck.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/encheck_test.c src/media/helper/lm_encheck.c \
+	    $(shell pkg-config --libs $(MEDIA_PKGS))
+	./$@ || { rm -f $@; exit 1; }
+# the live encoder end to end: build/lmstream-test build/lord-media [/dev/dri/renderD128]; with
+# build/lord-media-encfail (every VA-API keyframe fails the check) the stream must still start, from libx264
+build/lmstream-test: tests/lmstream_test.c src/media/proto.c src/media/proto.h src/media/helper/lm_encheck.c src/media/helper/lm_encheck.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lmstream_test.c src/media/proto.c \
+	    src/media/helper/lm_encheck.c $(shell pkg-config --libs $(MEDIA_PKGS))
+build/lord-media-encfail: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_ENCHECK_FAIL_TEST $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
+	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
 # the image editor's pixel operations (crop, resize, turns, redaction; src/media/imgops.c)
 build/imgops-test: tests/imgops_test.c src/media/imgops.c src/media/imgops.h
 	@mkdir -p build

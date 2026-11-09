@@ -9,6 +9,7 @@
  * goes out as Opus (20 ms). Every encoded frame goes back as MM_PACKET chunks; the bridges of the
  * session's viewers only add the per-connection encryption. */
 #include "lm.h"
+#include "lm_encheck.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -31,10 +32,16 @@ typedef struct {
     struct SwsContext *sws;
     AVFrame *yuv;
     AVPacket *pkt;
-    int w, h, codec, hw, force_key;
+    int w, h, codec, hw, force_key, fps;
     const char *name;
     unsigned kbps;
+    /* VA-API only: its first keyframe is decoded here before any packet goes out (lm_encheck.h, #94) */
+    int checking, unchecked_frames;
+    LmEncCheck chk;
 } Vid;
+
+#define VID_HWBAD (-1000)           /* the hardware encoder failed or made a stream no browser shows */
+#define VID_CHECK_FRAMES 8          /* frames the hardware encoder may take to give its first packet */
 
 typedef struct {
     AVCodecContext *c;
@@ -170,12 +177,14 @@ static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, AVB
     e->w = w & ~1;
     e->h = h & ~1;
     e->kbps = kbps;
+    e->fps = fps;
     if (e->w < 16 || e->h < 16) return -1;
     if (codec == CODEC_H264) {
         e->c = open_h264_vaapi(e, hw, fps);
         if (!e->c) e->c = open_sw(e, "libx264", fps);
     } else e->c = open_sw(e, "libvpx", fps);
     if (!e->c) return -1;
+    e->checking = e->hw;
     e->pkt = av_packet_alloc();
     e->yuv = av_frame_alloc();
     e->yuv->format = e->frames ? AV_PIX_FMT_NV12 : AV_PIX_FMT_YUV420P;
@@ -192,16 +201,41 @@ static void vid_close(Vid *e) {
     sws_freeContext(e->sws);
     av_frame_free(&e->yuv);
     av_packet_free(&e->pkt);
+    lm_encheck_free(&e->chk);
 }
 
-static void vid_drain(Vid *e) {
+/* The hardware encoder failed or its stream wouldn't play: the same session goes on with libx264, from a
+ * keyframe (no packet of the hardware's stream went out, so the browser is waiting for a first one). */
+static int vid_software(Vid *e) {
+    int codec = e->codec, w = e->w, h = e->h, fps = e->fps;
+    unsigned kbps = e->kbps;
+    vid_close(e);
+    if (vid_open(e, codec, w, h, fps, kbps, NULL)) { LM_LOG("remote desktop video: libx264 did not open either"); return -1; }
+    e->force_key = 1;
+    return 0;
+}
+
+static int vid_drain(Vid *e) {
     while (avcodec_receive_packet(e->c, e->pkt) >= 0) {
+        if (e->checking) {
+            const char *why = "not a keyframe";
+            if (!(e->pkt->flags & AV_PKT_FLAG_KEY) || lm_encheck_packet(&e->chk, e->pkt->data, (size_t)e->pkt->size, &why)) {
+                LM_LOG("remote desktop video: VA-API's first keyframe would not play (%s): libx264", why);
+                av_packet_unref(e->pkt);
+                return VID_HWBAD;
+            }
+            LM_LOG("remote desktop video: VA-API's first keyframe decodes as expected");
+            e->checking = 0;
+            lm_encheck_free(&e->chk);
+        }
         send_packet(0, e->pkt->data, (size_t)e->pkt->size, e->pkt->pts, (e->pkt->flags & AV_PKT_FLAG_KEY) != 0);
         av_packet_unref(e->pkt);
     }
+    return 0;
 }
 
-static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
+static int vid_encode(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
+    if (!e->c) return -1;
     if (!e->sws) {
         e->sws = sws_getContext(w, h, AV_PIX_FMT_BGRA, e->w, e->h, e->yuv->format, SWS_POINT, NULL, NULL, NULL);
         if (!e->sws) return -1;
@@ -211,10 +245,16 @@ static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
     const uint8_t *src[1] = { bgra };
     int stride[1] = { w * 4 };
     sws_scale(e->sws, src, stride, 0, h, e->yuv->data, e->yuv->linesize);
+    /* the first frame becomes the hardware's first keyframe: keep what it looks like, to check that one */
+    if (e->checking && !e->chk.ref && lm_encheck_ref(&e->chk, e->yuv->data[0], e->yuv->linesize[0], e->w, e->h)) e->checking = 0;
     AVFrame *in = e->yuv, *hwf = NULL;
     if (e->frames) {
         hwf = av_frame_alloc();
-        if (av_hwframe_get_buffer(e->frames, hwf, 0) < 0 || av_hwframe_transfer_data(hwf, e->yuv, 0) < 0) { av_frame_free(&hwf); return -1; }
+        if (!hwf || av_hwframe_get_buffer(e->frames, hwf, 0) < 0 || av_hwframe_transfer_data(hwf, e->yuv, 0) < 0) {
+            av_frame_free(&hwf);
+            if (e->checking) LM_LOG("remote desktop video: VA-API did not take the first frames: libx264");
+            return e->checking ? VID_HWBAD : -1;
+        }
         in = hwf;
     }
     in->pts = ms;
@@ -223,9 +263,24 @@ static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
     e->force_key = 0;
     int r = avcodec_send_frame(e->c, in);
     av_frame_free(&hwf);
-    if (r < 0) return r;
-    vid_drain(e);
+    if (r < 0) {
+        if (e->checking) LM_LOG("remote desktop video: VA-API did not take the first frames: libx264");
+        return e->checking ? VID_HWBAD : r;
+    }
+    if (vid_drain(e)) return VID_HWBAD;
+    /* still no packet from the hardware after several frames: it takes frames and gives nothing back */
+    if (e->checking && ++e->unchecked_frames >= VID_CHECK_FRAMES) {
+        LM_LOG("remote desktop video: VA-API gave no packet for %d frames: libx264", VID_CHECK_FRAMES);
+        return VID_HWBAD;
+    }
     return 0;
+}
+
+static int vid_frame(Vid *e, const uint8_t *bgra, int w, int h, int64_t ms) {
+    int r = vid_encode(e, bgra, w, h, ms);
+    if (r != VID_HWBAD) return r;
+    if (vid_software(e)) return -1;
+    return vid_encode(e, bgra, w, h, ms);
 }
 
 static void vid_rate(Vid *e, unsigned kbps) {
@@ -311,7 +366,7 @@ void lm_stream(const char *params, int ring_fd, int render) {
     static char payload[MP_PAYLOAD_MAX + 1];
     uint8_t *rmap = NULL;
     size_t ring_bytes = 0;
-    int rw = 0, rh = 0, slots = 0, stop = 0;
+    int rw = 0, rh = 0, slots = 0, stop = 0, failed = 0;
     long frames = 0;
     double enc_ms = 0, last_stats = lm_now_ms();
     while (!stop) {
@@ -342,16 +397,21 @@ void lm_stream(const char *params, int ring_fd, int render) {
                 for (int i = 0; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]);
             }
         }
+        if (!V.c) {                                         /* VA-API failed and libx264 didn't open */
+            lm_error("media.noVideoEncoder");
+            failed = 1;
+            break;
+        }
         if (ring) lm_mic_drain(ring, on_pcm);
         if (lm_now_ms() - last_stats >= 2000) {
             mp_sendv(LM_SOCK, MM_STATS, 0, frames, frames ? (int64_t)(enc_ms * 100 / frames) : 0, V.hw, V.kbps);
             last_stats = lm_now_ms();
         }
     }
-    LM_LOG("remote desktop video: %ld frames, %.2f ms each with %s", frames, frames ? enc_ms / frames : 0.0, V.name);
+    LM_LOG("remote desktop video: %ld frames, %.2f ms each with %s", frames, frames ? enc_ms / frames : 0.0, V.name ? V.name : "no encoder");
     vid_close(&V);
     if (A.c) { avcodec_free_context(&A.c); av_frame_free(&A.f); av_packet_free(&A.pkt); }
     if (ring) munmap(ring, ring_len);
     if (rmap) munmap(rmap, ring_bytes);
-    mp_sendv(LM_SOCK, MM_STATE, 0, MS_DONE, 0, 0, 0);
+    mp_sendv(LM_SOCK, MM_STATE, 0, failed ? MS_FAILED : MS_DONE, 0, 0, 0);
 }

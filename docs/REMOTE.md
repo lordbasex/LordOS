@@ -260,7 +260,16 @@ desktop sees (protected windows in black, from `media_composed`, or the GPU's re
 live encoder: `lord-media` in `MK_STREAM` mode, through a sealed memfd of 3 slots, like the screen
 recording. It uses H.264 with VA-API when the card encodes it, else libx264 (`ultrafast`,
 `zerolatency`, CRF 22 with a bit-rate cap, and the deblocking filter that `ultrafast` turns off), or VP8 with libvpx (`realtime`) for browsers without
-H.264. Every viewer of the session gets the same encoded frames over the session socket
+H.264. **VA-API's first keyframe is checked before anything goes out** (`lm_encheck.c`, #94): a driver can open
+the encoder and still hand back a stream no browser shows (no SPS/PPS in it, a broken picture), and the page then
+connected and showed nothing ("0 frames decoded"). FFmpeg's software H.264 decoder must make a picture of the
+right size from that one packet, and it must look like the frame that went in (a grid of luma samples, mean
+difference under 24 levels); if not, or if the card takes 8 frames without giving a packet or refuses one, the
+same encoder goes on with libx264 from the current frame, and the journal says why ("VA-API's first keyframe
+would not play (…): libx264"). On the RX 580 (VCE 3.4, Mesa 25.0.7) the check passes; `make -C server
+test-full` runs both ways (`lmstream-test`, with `build/lord-media-encfail`, whose check always fails).
+When no picture arrives, the page's details also say how many video packets and frames the browser received,
+its decoder and whether the computer encodes in hardware or software. Every viewer of the session gets the same encoded frames over the session socket
 (`RP_VFRAME`, `RP_AFRAME`); the bridge only packetizes and encrypts. The bit rate is the slowest
 viewer's: each bridge lowers its target on loss reported by the browser (receiver reports) and
 raises it by 25 % a second when there is none (6 % for 5 s after congestion; 300 kbit/s to 12 Mbit/s).

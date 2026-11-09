@@ -336,6 +336,15 @@ EOF
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
     else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    # the remote desktop's live encoder (#94): libx264, then VA-API with its first keyframe checked and, with a
+    # build whose check always fails, the way out to libx264 (only where a card encodes H.264)
+    if [ -x build/lord-media ] && [ -x build/lmstream-test ]; then
+        run "lmstream-test (libx264)" build/lmstream-test build/lord-media
+        if [ -e /dev/dri/renderD128 ] && [ -x build/lord-media-encfail ]; then
+            run "lmstream-test (VA-API)" build/lmstream-test build/lord-media /dev/dri/renderD128
+            run "lmstream-test (VA-API fails the check)" build/lmstream-test build/lord-media-encfail /dev/dri/renderD128
+        else skip "lmstream-test (VA-API)" "a render node"; fi
+    else skip "lmstream-test" "build/lord-media (FFmpeg -dev packages)"; fi
     # document helper: malicious archives and the confinement
     if [ -x build/lord-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (lord-doc)" sh tests/doc_evil.sh
     else skip "doc_evil.sh" "build/lord-doc (Poppler and libarchive -dev packages) and python3"; fi

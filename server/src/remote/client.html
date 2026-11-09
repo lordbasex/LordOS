@@ -435,17 +435,22 @@ function diagnose(p) {
   const base = { why: serverWhy || 'noroute', text: '' };
   if (!p || !p.getStats) return Promise.resolve(base);
   return p.getStats().then((stats) => {
-    let pairs = 0, ok = 0, udp = 0, tcp = 0, gotFrames = 0;
+    let pairs = 0, ok = 0, udp = 0, tcp = 0, gotFrames = 0, packets = 0, frames = 0, dec = '';
     stats.forEach((s) => {
       if (s.type === 'candidate-pair') { pairs++; if (s.state === 'succeeded') ok++; }
       if (s.type === 'remote-candidate') { if (s.protocol === 'tcp') tcp++; else udp++; }
-      if (s.type === 'inbound-rtp' && s.kind === 'video') gotFrames = s.framesDecoded || 0;
+      if (s.type === 'inbound-rtp' && s.kind === 'video') {
+        gotFrames = s.framesDecoded || 0; packets = s.packetsReceived || 0; frames = s.framesReceived || 0;
+        dec = String(s.decoderImplementation || '').replace(/[^\w (),.-]/g, '').slice(0, 40);
+      }
     });
+    // whether video packets arrived at all, and what the computer encodes with, tell a network problem from a codec one (#94)
+    const enc = vinfo ? (vinfo.hw ? 'hardware' : 'software') + ' encoder' : 'encoder not reported';
     const ice = p.iceConnectionState, dtls = p.connectionState;
     let why = serverWhy;
     if (!why) why = answersGot === 0 ? 'offer' : ok === 0 ? 'noroute' : dtls !== 'connected' ? 'dtls' : 'media';
     if (why === 'noroute' && ok > 0) why = 'dtls';
-    return { why, text: `ICE ${ice}, ${dtls}; ${pairs} candidate pairs (${ok} succeeded), the computer offered ${udp} UDP and ${tcp} TCP addresses still listed; ${gotFrames} frames decoded${serverWhy ? '; the computer said: ' + serverWhy : ''}` };
+    return { why, text: `ICE ${ice}, ${dtls}; ${pairs} candidate pairs (${ok} succeeded), the computer offered ${udp} UDP and ${tcp} TCP addresses still listed; ${codec || 'no'} video, ${enc}: ${packets} packets and ${frames} frames received, ${gotFrames} frames decoded${dec ? ' (' + dec + ')' : ''}${serverWhy ? '; the computer said: ' + serverWhy : ''}` };
   }).catch(() => base);
 }
 // which path the media takes (shown in the top bar): UDP, TCP or a relay
