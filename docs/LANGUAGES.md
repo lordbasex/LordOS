@@ -162,8 +162,9 @@ Lithuanian (`lt`, 0.8.8.6, #45) is the first: the login screen, the desktop (`sh
 installer, About, the app names, the file dialogs, and Settings' sections, Language & Region and the
 Date & Time formats, with Lithuanian plurals (`lithuanian`: 1, 21 → one; 2–9, 22 → few; 0, 10–20 →
 other) and `format.json` (2026-11-08, «2026 m. lapkričio 8 d., sekmadienis», 24 hours, «1 234 567,89»).
-Translating the rest is welcome: add the missing keys to `assets/locales/lt/` and drop `"partial"`
-when `i18n-check` reports it complete.
+Since 0.8.8.7 Lithuanian is complete (11,904 keys, `"partial"` dropped): the emoji names and keywords and the
+country names come from CLDR 45 (`lt` annotations and territories), the rest was translated with the terms the first
+part had set (Debesis, Parduotuvė, šiukšlinė, programų juosta…).
 
 ## Privileged helper (`lord-admin`)
 

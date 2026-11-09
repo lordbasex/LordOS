@@ -1,0 +1,81 @@
+{
+  "archiveName": "Archyvas",
+  "archiveSummary": {
+    "one": "{count} failas, {size}",
+    "few": "{count} failai, {size}",
+    "other": "{count} failų, {size}"
+  },
+  "compressOne": "Suglaudinti „{name}“",
+  "compressMany": {
+    "one": "Suglaudinti {count} elementą",
+    "few": "Suglaudinti {count} elementus",
+    "other": "Suglaudinti {count} elementų"
+  },
+  "compressing": "Glaudinama „{name}“…",
+  "compressProgress": "Glaudinama „{name}“: failų – {files}",
+  "compressed": {
+    "one": "„{name}“ paruoštas ({count} failas)",
+    "few": "„{name}“ paruoštas ({count} failai)",
+    "other": "„{name}“ paruoštas ({count} failų)"
+  },
+  "compressError": "Nepavyko suglaudinti „{name}“ ({error})",
+  "extractHere": "Išskleisti čia",
+  "extractSelected": {
+    "one": "Išskleisti {count} elementą",
+    "few": "Išskleisti {count} elementus",
+    "other": "Išskleisti {count} elementų"
+  },
+  "extracting": "Išskleidžiama „{name}“…",
+  "extractProgress": "Išskleidžiama „{name}“: failų – {files} ({pct}%)",
+  "extracted": {
+    "one": "Išskleista į „{name}“ ({count} failas)",
+    "few": "Išskleista į „{name}“ ({count} failai)",
+    "other": "Išskleista į „{name}“ ({count} failų)"
+  },
+  "extractedSkipped": {
+    "one": "Išskleista į „{name}“ ({count} failas); saugumo sumetimais praleista: {skipped}",
+    "few": "Išskleista į „{name}“ ({count} failai); saugumo sumetimais praleista: {skipped}",
+    "other": "Išskleista į „{name}“ ({count} failų); saugumo sumetimais praleista: {skipped}"
+  },
+  "extractError": "Nepavyko išskleisti „{name}“ ({error})",
+  "opening": "Atidaroma „{name}“…",
+  "loading": "Įkeliama…",
+  "locked": "apsaugota slaptažodžiu",
+  "pages": {
+    "one": "{count} puslapis",
+    "few": "{count} puslapiai",
+    "other": "{count} puslapių"
+  },
+  "more": {
+    "one": "ir dar {count}",
+    "few": "ir dar {count}",
+    "other": "ir dar {count}"
+  },
+  "err.invalid": "tai ne archyvas arba jis sugadintas",
+  "err.disk-full": "diskas pilnas",
+  "err.too-big": "jis per didelis",
+  "err.too-many": "jame per daug failų",
+  "err.corrupt": "jis sugadintas",
+  "err.write": "nepavyko įrašyti",
+  "err.unavailable": "dokumentų pagalbinė programa nepasiekiama",
+  "err.cancelled": "atšaukta",
+  "err.crash": "dokumentų pagalbinė programa netikėtai sustojo",
+  "err.timeout": "užtruko per ilgai",
+  "err.protocol": "dokumentų pagalbinė programa atsiuntė netinkamą atsakymą",
+  "err.spawn": "nepavyko paleisti dokumentų pagalbinės programos",
+  "err.closed": "dokumentas buvo uždarytas",
+  "err.bad-request": "netinkama užklausa",
+  "err.bad-field": "netinkamas formos laukas",
+  "err.bad-page": "netinkamas puslapis",
+  "err.busy": "dokumentų pagalbinė programa užimta",
+  "err.memory": "trūksta atminties",
+  "err.no-fonts": "nėra prieinamų šriftų",
+  "err.not-open": "dokumentas neatidarytas",
+  "err.nothing": "nėra ką įrašyti",
+  "err.read-only": "dokumentas skirtas tik skaityti",
+  "err.save": "nepavyko įrašyti",
+  "err.unknown-op": "nežinoma operacija",
+  "err.image": "netinkamas paveikslas",
+  "err.blob": "netinkami duomenys",
+  "err.password": "dokumentas apsaugotas slaptažodžiu"
+}

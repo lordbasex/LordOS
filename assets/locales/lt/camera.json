@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Nuotrauka {date}",
+  "videoName": "Vaizdo įrašas {date}",
+  "photo": "Nuotrauka",
+  "video": "Vaizdo įrašas",
+  "mirror": "Veidrodis",
+  "none": "Kameros nerasta",
+  "denied": "Programai „Kamera“ neleidžiama naudoti kameros. Tai pakeisite skiltyje Nustatymai → Privatumas.",
+  "error": "Nepavyko naudoti kameros: {error}",
+  "noneHint": "Prijunkite USB kamerą: ji čia atsiras savaime, nereikės iš naujo paleisti programos.",
+  "deniedTitle": "Nėra prieigos prie kameros",
+  "errorTitle": "Nepavyko atidaryti kameros"
+}

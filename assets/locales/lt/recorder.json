@@ -1,0 +1,22 @@
+{
+  "folder": "Įrašai",
+  "name": "Įrašas {date} {time}",
+  "all": "Visi įrašai",
+  "empty": "Įrašų dar nėra",
+  "hint": "Paspauskite raudoną mygtuką (arba R), kad įrašytumėte mikrofonu",
+  "denied": "Diktofonui neleidžiama naudoti mikrofono",
+  "play": "Groti",
+  "pause": "Pristabdyti",
+  "rename": "Pervardyti",
+  "trim": "Apkirpti",
+  "cancelTrim": "Atšaukti apkirpimą",
+  "saveTrim": "Įrašyti apkirptą kopiją",
+  "trimmed": "apkirptas",
+  "export": "Eksportuoti kaip",
+  "exportBtn": "Eksportuoti",
+  "working": "Eksportuojama…",
+  "exported": "Įrašyta „{name}“",
+  "exportError": "Nepavyko eksportuoti",
+  "renameError": "Nepavyko pervardyti (gal toks pavadinimas jau yra?)",
+  "emptyTitle": "Pasirinkite arba sukurkite įrašą"
+}

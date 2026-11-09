@@ -34,5 +34,6 @@
   "store": "Parduotuvė",
   "sysinfo": "Sistemos informacija",
   "sysprobe": "Smėlio dėžės patikra",
-  "terminal": "Terminalas"
+  "terminal": "Terminalas",
+  "databases": "Duomenų bazės"
 }

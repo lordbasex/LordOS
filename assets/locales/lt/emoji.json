@@ -1,0 +1,22 @@
+{
+  "search": "Ieškoti jaustukų",
+  "results": {
+    "one": "{count} rezultatas",
+    "few": "{count} rezultatai",
+    "other": "{count} rezultatų"
+  },
+  "none": "Nieko nerasta",
+  "noRecent": "Čia bus rodomi jūsų naudojami jaustukai",
+  "copied": "{text} nukopijuota: įklijuokite paspaudę Ctrl+V",
+  "more": "Daugiau…",
+  "group.recent": "Naujausi",
+  "group.smileys": "Šypsenėlės ir emocijos",
+  "group.people": "Žmonės ir kūnas",
+  "group.animals": "Gyvūnai ir gamta",
+  "group.food": "Maistas ir gėrimai",
+  "group.travel": "Kelionės ir vietos",
+  "group.activities": "Veikla",
+  "group.objects": "Objektai",
+  "group.symbols": "Simboliai",
+  "group.flags": "Vėliavos"
+}
