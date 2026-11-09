@@ -465,6 +465,53 @@ function NameField({ a, accounts }) {
   );
 }
 
+// How an account is used, said at the start and changeable on its page: only in the cloud (everything listed, a file
+// comes down when it is opened and what is copied in goes up; nothing kept here), or in sync with this computer (a whole
+// copy here and in the cloud: what is deleted on one side goes on the other, the provider's trash keeps it).
+function UseChoice({ value, onChange }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const opt = (id, title, hint) => (
+    <View key={id} onClick={() => onChange(id)} style={{ flex: 1, minWidth: 0, padding: 12, gap: 4, borderRadius: 10,
+      border: `${value === id ? 2 : 1}px solid ${value === id ? t.accent : t.separator}`, backgroundColor: value === id ? (t.mode === 'dark' ? 'rgba(10,132,255,0.12)' : 'rgba(10,132,255,0.07)') : 'transparent' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ width: 16, height: 16, borderRadius: 8, border: `2px solid ${value === id ? t.accent : t.textDim}`, alignItems: 'center', justifyContent: 'center' }}>
+          {value === id ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accent }} /> : null}
+        </View>
+        <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
+      </View>
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{hint}</Text>
+    </View>
+  );
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'stretch' }}>
+      {opt('cloud', tr('cloud.use.cloudOnly'), tr('cloud.use.cloudOnlyHint'))}
+      {opt('sync', tr('cloud.use.sync'), tr('cloud.use.syncHint'))}
+    </View>
+  );
+}
+
+// A new account signed in with a password: how to use it, before its page opens (a browser sign-in asks the same on its
+// done card).
+function ReadySheet({ st, sheet }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [use, setUse] = useState('cloud');
+  const a = (st.accounts || []).find((x) => x.id === sheet.id);
+  const done = () => { if (a && use === 'sync') cloud.keep([a.mount]); setView({ page: sheet.id, sheet: null }); };
+  return (
+    <Sheet width={560} onClose={done} label={tr('cloud.use.title')}>
+      <View style={{ padding: 18, gap: 12 }}>
+        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ready', { name: a ? a.name : '' })}</Text>
+        <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.use.title')}</Text>
+        <UseChoice value={use} onChange={setUse} />
+        <Dim t={t}>{tr('cloud.use.later')}</Dim>
+        <Actions><Button primary label={tr('cloud.done')} onClick={done} /></Actions>
+      </View>
+    </Sheet>
+  );
+}
+
 function Options({ a, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -484,7 +531,10 @@ function Options({ a, accounts }) {
   return (
     <View aria-label={tr('cloud.options')} style={box(t)}>
       {row(tr('cloud.opt.folder'), `~/Cloud/${a.name}`, <NameField a={a} accounts={accounts} />)}
-      {row(tr('cloud.opt.onDemand'), tr('cloud.opt.onDemandHint'), <Toggle small on={onDemand} onChange={(v) => (v ? cloud.unkeep([a.mount]) : cloud.keep([a.mount]))} />)}
+      <View style={{ paddingHorizontal: 14, paddingVertical: 11, gap: 8, borderBottomWidth: 1, borderBottomColor: t.separator }}>
+        <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.use.title')}</Text>
+        <UseChoice value={onDemand ? 'cloud' : 'sync'} onChange={(v) => (v === 'cloud' ? cloud.unkeep([a.mount]) : cloud.keep([a.mount]))} />
+      </View>
       {/* this account's own pause; paused by Pause All (or the battery, a metered network) is said apart, with the way out,
           so the switch doesn't look on while the account itself isn't paused */}
       {row(tr('cloud.opt.pause'), a.state === 'paused' && !a.paused ? tr('cloud.opt.pausedOther') : tr('cloud.opt.pauseHint'),
@@ -1157,6 +1207,8 @@ function afterAdd(r, p, name, back) {
   if (r && r.question) { setView({ sheet: { kind: 'question', question: r.question, provider: p, name, back } }); return; }
   if (r && r.error && back) { setView({ sheet: { ...back, error: r } }); return; }
   if (r && r.error) { setView({ sheet: { kind: 'question', provider: p, name, error: r.error } }); return; }
+  // a new account (not Sign In Again): how to use it first
+  if (r && r.id && !(back && back.again)) { setView({ page: null, sheet: { kind: 'ready', id: r.id } }); return; }
   setView({ page: r && r.id ? r.id : null, sheet: null });
 }
 
@@ -1318,9 +1370,10 @@ function SignInCard({ st, info }) {
           </View>
           <Text style={{ flex: 1, fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ready', { name: si.name })}</Text>
         </View>
-        <Dim t={t} style={{ fontSize: typeScale.body }}>{`${a && a.about ? `${fmtSpace(a.about, tr)}. ` : ''}${tr('cloud.readyBody')}`}</Dim>
+        {a && a.about ? <Dim t={t} style={{ fontSize: typeScale.body }}>{`${fmtSpace(a.about, tr)}.`}</Dim> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={showInFiles} onChange={setShowInFiles} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.showInFiles')}</Text></View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Toggle small on={keepAll} onChange={setKeepAll} /><Text style={{ fontSize: typeScale.body, color: t.text }}>{tr('cloud.keepEverything')}</Text></View>
+        <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.use.title')}</Text>
+        <UseChoice value={keepAll ? 'sync' : 'cloud'} onChange={(v) => setKeepAll(v === 'sync')} />
         <Actions>
           <Button label={tr('cloud.done')} onClick={() => { finish(); setView({ signin: null, page: a ? a.id : null }); }} />
           <Button primary label={tr('cloud.openInFiles')} onClick={() => { finish(); setView({ signin: null, page: a ? a.id : null }); if (a) wm.open('files', { new: true, args: { path: a.mount, nonce: Date.now() } }); }} />
@@ -1436,6 +1489,7 @@ export function CloudSheets() {
       {sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'again' ? <AgainSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'question' ? <QuestionSheet sheet={sh} /> : null}
+      {sh.kind === 'ready' ? <ReadySheet st={st} sheet={sh} /> : null}
       {sh.kind === 'emptyTrash' ? <EmptyTrashSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'pickFolder' && a ? (
         <FilePicker mode="folder" start={a.mount} title={tr('cloud.addFolderTitle', { name: a.name })} onClose={() => setView({ sheet: null })}

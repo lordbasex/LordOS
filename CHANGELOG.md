@@ -107,6 +107,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
+- **Cloud: "Only in the cloud" or "In sync with this computer", said plainly.** Adding an account now asks how to use
+  it, and its page has the same choice in place of the "Files on demand" switch, each with what it means: only in the
+  cloud (every file listed, a file comes down when it is opened and what is copied in goes up, nothing kept on this
+  computer) or in sync (a whole copy here and in the cloud, a deletion on one side goes to the other and the
+  provider's trash keeps it). The browser sign-in's done card asks the same in place of "Keep everything on this
+  computer".
+
 - **Passwords has a new icon**: a gold key on graphite, unlike the Store's blue bag it was taken for in the Dock.
 
 - **Cloud settings**: an account's Pause Syncing switch shows only its own pause and says when Pause All (or the

@@ -397,5 +397,11 @@
   "check.close": "Close",
   "check.notReadyPausedAll": "Every account is paused (Pause All). Resume to check this one.",
   "check.notReadyPaused": "This account is paused. Resume it to check it.",
-  "check.notReadySignin": "This account needs a new sign-in (Sign In Again) before it can be checked."
+  "check.notReadySignin": "This account needs a new sign-in (Sign In Again) before it can be checked.",
+  "use.title": "How do you want to use this account?",
+  "use.cloudOnly": "Only in the cloud",
+  "use.cloudOnlyHint": "You see all your files. A file comes down only when you open it, and what you copy in goes up. Nothing is kept on this computer.",
+  "use.sync": "In sync with this computer",
+  "use.syncHint": "A whole copy here and in the cloud. What you delete on one side is deleted on the other; the provider’s trash keeps it. It takes the account’s space on this computer.",
+  "use.later": "You can change it later on the account’s page."
 }

@@ -397,5 +397,11 @@
   "check.close": "Chiudi",
   "check.notReadyPausedAll": "Tutti gli account sono in pausa (Metti in pausa tutto). Riprendi per verificare questo.",
   "check.notReadyPaused": "Questo account è in pausa. Riprendilo per verificarlo.",
-  "check.notReadySignin": "Questo account deve accedere di nuovo (Accedi di nuovo) prima di essere verificato."
+  "check.notReadySignin": "Questo account deve accedere di nuovo (Accedi di nuovo) prima di essere verificato.",
+  "use.title": "Come vuoi usare questo account?",
+  "use.cloudOnly": "Solo nel cloud",
+  "use.cloudOnlyHint": "Vedi tutti i tuoi file. Un file viene scaricato solo quando lo apri, e ciò che copi viene caricato. Niente resta su questo computer.",
+  "use.sync": "Sincronizzato con questo computer",
+  "use.syncHint": "Una copia completa qui e nel cloud. Ciò che elimini da una parte viene eliminato dall’altra; il cestino del fornitore lo conserva. Occupa lo spazio dell’account su questo computer.",
+  "use.later": "Puoi cambiarlo più tardi nella pagina dell’account."
 }

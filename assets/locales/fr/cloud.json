@@ -397,5 +397,11 @@
   "check.close": "Fermer",
   "check.notReadyPausedAll": "Tous les comptes sont en pause (Tout suspendre). Reprenez pour vérifier celui-ci.",
   "check.notReadyPaused": "Ce compte est en pause. Reprenez-le pour le vérifier.",
-  "check.notReadySignin": "Ce compte doit être reconnecté (Se reconnecter) avant d’être vérifié."
+  "check.notReadySignin": "Ce compte doit être reconnecté (Se reconnecter) avant d’être vérifié.",
+  "use.title": "Comment voulez-vous utiliser ce compte ?",
+  "use.cloudOnly": "Seulement dans le cloud",
+  "use.cloudOnlyHint": "Vous voyez tous vos fichiers. Un fichier n’est téléchargé que quand vous l’ouvrez, et ce que vous copiez est envoyé. Rien n’est gardé sur cet ordinateur.",
+  "use.sync": "Synchronisé avec cet ordinateur",
+  "use.syncHint": "Une copie complète ici et dans le cloud. Ce que vous supprimez d’un côté l’est de l’autre ; la corbeille du fournisseur le garde. Occupe l’espace du compte sur cet ordinateur.",
+  "use.later": "Vous pourrez le changer plus tard sur la page du compte."
 }
