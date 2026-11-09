@@ -29,7 +29,8 @@ lordos-issue
 It only reads and sends nothing. It saves `~/lordos-issue-<date>.txt` with the LordOS version, the hardware (PCI and
 USB devices, CPU, memory, disks, displays, input devices, network, sound and drivers), an integrity check (LordOS's
 signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware
-messages, the session's log and this boot's errors. Addresses, your user and computer names and home paths are
+messages, the session's log, the last lines Linux apps printed (`~/.cache/lordos/apps.log`) and Xwayland's log
+(`~/.cache/lordos/xwayland.log`, without its keymap warnings), and this boot's errors. Addresses, your user and computer names and home paths are
 replaced; serial numbers, Wi-Fi names and paired devices are left out. It asks for your password to read the kernel
 log and every package file; without it (or with `--no-root`) the report is shorter. `--print` also shows it.
 **Read the file before posting it**, since issues are public, and paste it in the issue form's **Logs** box
@@ -44,6 +45,16 @@ log and every package file; without it (or with `--no-root`) the report is short
 - **VirtualBox says `VERR_ALREADY_EXISTS` when importing the OVA.** A folder from an earlier machine with the same name
   is still in `VirtualBox VMs`: removing a machine with "Remove only" keeps its files. Change the machine's name on
   the import screen, or delete that old folder.
+
+## A Linux app doesn't open
+
+LordOS starts the app from its `.desktop` file and writes everything the app prints to `~/.cache/lordos/apps.log`; an
+X11 app also starts Xwayland, whose log is `~/.cache/lordos/xwayland.log`. When an app closes right after it starts,
+its reason is there. To see it live, run the app's command from Terminal (the `Exec=` line of its `.desktop` file, for
+example `wordcraft`). Since 0.8.8.7 `lordos-issue` includes the last lines of both logs ([#95](https://github.com/lordbasex/LordOS/issues/95)).
+
+Apps built with winit (egui and Rust apps such as the Craft apps) that pick X11 whenever `DISPLAY` is set can usually be
+tried on native Wayland too: for WordCraft, `WORDCRAFT_WAYLAND=1 wordcraft`.
 
 ## A Linux app asks for administrator rights
 

@@ -173,6 +173,20 @@ have() { command -v "$1" >/dev/null 2>&1; }
     if [ -r "$HOME/.cache/lordos/session.log" ]; then tail -n 60 "$HOME/.cache/lordos/session.log"; else echo "none"; fi
     end
 
+    # A Linux app that closes as soon as it starts leaves its reason only here (#95): what the apps LordOS started
+    # printed, and Xwayland's own log for X11 apps (without xkbcomp's keymap warnings, printed at every start).
+    section "Linux apps' output (last 40 lines)"
+    if [ -r "$HOME/.cache/lordos/apps.log" ]; then tail -n 40 "$HOME/.cache/lordos/apps.log"; else echo "none"; fi
+    end
+
+    section "Xwayland's log (last 20 lines)"
+    if [ -r "$HOME/.cache/lordos/xwayland.log" ]; then
+        # (Xwayland's own messages may lack a newline, so xkbcomp's header can end someone else's line)
+        tail -n 400 "$HOME/.cache/lordos/xwayland.log" | sed -e 's/The XKEYBOARD keymap compiler (xkbcomp) reports:$//' |
+            grep -v -E '^(> |Errors from xkbcomp are not fatal|$)' | tail -n 20
+    else echo "none"; fi
+    end
+
     section "System errors in this boot (last 80)"
     if have journalctl; then journalctl -b -p warning --no-pager -o short-monotonic 2>/dev/null | tail -n 80; else echo "no journal"; fi
     end

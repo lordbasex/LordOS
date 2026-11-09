@@ -19,7 +19,7 @@ lordos-issue
 ```
 
 It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your LordOS version, PCI and USB devices (`lspci`, `lsusb`), CPU, memory, disks and partitions,
-displays, input devices, network, sound, drivers, an integrity check (LordOS's signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware messages, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
+displays, input devices, network, sound, drivers, an integrity check (LordOS's signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware messages, the session's log, what the Linux apps you opened printed and Xwayland's log, and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
 It asks for your password to read the kernel log and every package file; without it, the report is shorter. **Read the file before posting it**, since issues are public. Paste it in the **Logs** box of the form.
 
 If the problem stops you from using the desktop, press **Ctrl+Alt+F2** to get a text console, sign in and run it there. On the live
