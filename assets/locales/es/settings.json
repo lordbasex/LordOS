@@ -344,6 +344,8 @@
   "sharing.whoGroupHint": "Solo los usuarios del grupo lordos-remote.",
   "sharing.working": "Aplicando…",
   "sound.apps": "Apps",
+  "sound.headsetHint": "El micrófono de unos auriculares Bluetooth solo funciona en modo manos libres, que baja la calidad del sonido. Al elegir otro micrófono vuelve el sonido de alta calidad.",
+  "sound.headsetMic": "{name} (modo manos libres)",
   "sound.input": "Entrada",
   "sound.level": "Nivel de entrada",
   "sound.noApps": "Ninguna app está sonando.",

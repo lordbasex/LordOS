@@ -72,6 +72,7 @@ static void managed_body(DBuf *b) {
     prop_s(b, "Icon", "audio-headset");
     prop_o(b, "Adapter", "/org/bluez/hci0");
     prop_u(b, "Class", 0x240404);
+    prop_s(b, "AddressType", "public");
     prop_b(b, "Paired", 1);
     prop_b(b, "Trusted", 1);
     prop_b(b, "Connected", 0);
@@ -128,6 +129,18 @@ int main(void) {
     CHECK(!strcmp(d->name, "Auriculares de prueba") && !strcmp(d->icon, "audio-headset") && d->cls == 0x240404);
     CHECK(d->paired && d->trusted && !d->connected && d->has_rssi && d->rssi == -67 && d->battery == 80);
     CHECK(m->devices[1].battery == -1 && !strcmp(m->devices[1].adapter, "/org/bluez/hci1"));
+    /* the audio services (A2DP sink, hands-free) as 16-bit numbers, and the address type */
+    CHECK(d->nservices == 2 && d->services[0] == 0x110b && d->services[1] == 0x111e && !strcmp(d->addr_type, "public"));
+    CHECK(m->devices[1].nservices == 0 && !m->devices[1].addr_type[0] && !m->devices[1].cls);
+
+    /* UUIDs on the Bluetooth base UUID only (issue #78: the low-energy side of a headset lists a
+     * vendor's 16-bit service and no audio one) */
+    CHECK(bt_uuid16("0000febe-0000-1000-8000-00805f9b34fb") == 0xfebe);
+    CHECK(bt_uuid16("0000110B-0000-1000-8000-00805F9B34FB") == 0x110b);
+    CHECK(bt_uuid16("0000110b-0000-1000-8000-00805f9b34fc") == -1);
+    CHECK(bt_uuid16("1000110b-0000-1000-8000-00805f9b34fb") == -1);
+    CHECK(bt_uuid16("0000110g-0000-1000-8000-00805f9b34fb") == -1);
+    CHECK(bt_uuid16("9ec813b4-256b-4090-93a8-a4f0e9107733") == -1 && bt_uuid16("0000110b") == -1 && bt_uuid16(NULL) == -1);
 
     /* PropertiesChanged on the device: connected, battery gone */
     dw_init(&b);
@@ -135,6 +148,8 @@ int main(void) {
     size_t a = dw_arr_begin(&b, 8);
     prop_b(&b, "Connected", 1);
     prop_s(&b, "Alias", "Mis auriculares");
+    prop_as(&b, "UUIDs", "0000110b-0000-1000-8000-00805f9b34fb", "9ec813b4-256b-4090-93a8-a4f0e9107733");
+    prop_s(&b, "AddressType", "bogus");
     dw_arr_end(&b, a);
     a = dw_arr_begin(&b, 4);
     dw_str(&b, "RSSI");
@@ -149,6 +164,7 @@ int main(void) {
     CHECK(!r.err);
     dbus_msg_free(&msg);
     CHECK(d->connected && !strcmp(d->alias, "Mis auriculares"));
+    CHECK(d->nservices == 1 && d->services[0] == 0x110b && !d->addr_type[0]);   /* the new list replaces the old; vendor UUID dropped */
     bt_remove_object(m, d->path, "org.bluez.Battery1");
     CHECK(d->battery == -1);
 
@@ -157,6 +173,7 @@ int main(void) {
     /* without bluetoothd on the bus the state says so, but still lists what is in the model */
     CHECK(j && strstr(j, "\"available\":false") && strstr(j, "\"name\":\"Mis auriculares\"") && strstr(j, "\"connected\":true"));
     CHECK(j && strstr(j, "\"rssi\":-67") && !strstr(j, "11:22:33:44:55:66"));     /* other adapter's device: not listed */
+    CHECK(j && strstr(j, "\"addressType\":\"\",\"services\":[\"110b\"]"));
     free(j);
 
     /* a truncated dictionary is rejected by the reader, the model is not corrupted */

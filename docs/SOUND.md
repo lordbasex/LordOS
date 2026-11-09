@@ -49,7 +49,8 @@ That code was only read to follow the format: it isn't linked or copied.
 - **Handshake.** It sends `AUTH` (protocol 32, without shared memory, so the data goes over the
   socket) and `SET_CLIENT_NAME` ("LordOS", `org.lordos.Server`).
 - **State.** It subscribes to changes of sinks, sources, apps, server and cards, and requests the
-  four lists. With each notification it requests only what changed.
+  five lists. With each notification it requests only what changed. Of the cards it keeps only the
+  Bluetooth ones, with their profiles (`sound/sndcard.c`; see "Bluetooth headsets" below).
 - **Notifications to JS.** When something changed and all the replies have arrived, JS is
   notified with a `state` carrying the full state.
 - **Reconnection.** If PipeWire crashes or restarts, `snd_fd()` becomes a timer and it retries
@@ -72,6 +73,7 @@ That code was only read to follow the format: it isn't linked or copied.
 | `setDefault('sink' \| 'source', name)` | default output or input |
 | `setPort('sink' \| 'source', index, port)` | speakers ↔ headphones, etc. (a port from `ports`) |
 | `move('input', app, sink)` / `move('output', app, source)` | moves an app to another output or input |
+| `setProfile(card, profile)` | a Bluetooth card's profile (one of `cards`, one of its `profiles`): high fidelity or headset mode |
 | `meter(sourceIndex)` / `meter(-1)` | turns the meter on or off; for an output, its `monitor` is used |
 | `play('pop' \| 'notify' \| 'error')` | system sound |
 
@@ -104,17 +106,66 @@ Shape of the state:
   inputs:  [{ index, name, app, appId, icon, binary, role, pid, sink,
               volume, level, mute, corked, hasVolume, volumeWritable }],   // apps playing
   outputs: [{ …the same, with source instead of sink }],                    // apps recording
+  cards:   [{ index, name, description, api, bus, activeProfile,          // Bluetooth cards only
+              profiles: [{ name, description, sinks, sources, priority, available }] }],
 }
 ```
 
 Inputs with `monitorOf >= 0` are the "monitor" of an output, what plays through it. The UI
 normally hides them from the microphone list.
 
+## Bluetooth headsets (0.8.8.7, issue #78)
+
+A headset is one PipeWire card with several profiles: high fidelity playback (`a2dp-sink`, one
+`a2dp-sink-<codec>` per codec, `bap-sink` for LE Audio; output only) and headset mode
+(`headset-head-unit`, `-cvsd`, `-msbc`: HSP/HFP, audio over SCO, a low-quality output plus the
+microphone).
+
+**Symptom.** A headset paired fine, but chosen as the output it played nothing; the kernel logged
+`corrupted SCO packet`, `SCO packet for unknown connection handle` and `urb … submission failed (90)`
+(a MacBook Pro's Broadcom USB adapter). A speaker with only A2DP worked.
+
+**Cause.** WirePlumber 0.5 (`bluetooth.autoswitch-to-headset-profile`, on by default) gives a
+headset that has both profiles a virtual input, `bluez_input.<address>`, with `priority.session`
+2010, above a built-in microphone, so it becomes the default input; as soon as any stream records
+from it (`scripts/device/autoswitch-bluetooth-profile.lua`) the headset is switched to headset mode.
+Settings → Sound draws a level meter of the default input, so opening the page to choose the output
+switched the headset to SCO audio, which that adapter can't carry.
+
+**Fix.**
+
+- `/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf` (in the `lordos` package)
+  turns the automatic switch off. WirePlumber then keeps the profile it chose when the headset
+  connected (the highest priority available one, A2DP; `find-best-profile.lua`) and creates no
+  virtual input. It is a new file, so no migration; it applies the next time WirePlumber starts
+  (an update always asks for a restart).
+- LordOS switches the profile itself, through `lord.sound.setProfile` (`SET_CARD_PROFILE`), with the
+  rules of `sdk/btaudiomodel.js`, applied by `sound.setDefault` in `sdk/sound.js` (every output list
+  goes through it: Settings → Sound, Lord Flow's Control Center, Lord Classic's Quick Settings):
+  - choosing a headset as the output gives it its high fidelity profile, unless its microphone is
+    the chosen input (then it stays in headset mode, the only one with both). The output is made the
+    default right away and again once the switched card's new output appears;
+  - Settings → Sound lists "<headset> (headset mode)" under Input for a Bluetooth card that has a
+    microphone only in headset mode; choosing it switches the card and makes its microphone the
+    default. Choosing another microphone gives headsets in headset mode their high fidelity back;
+  - a headset that shows up in headset mode (WirePlumber restored that profile, saved when it was
+    chosen) is moved to high fidelity, once per appearance.
+  Profiles are picked like WirePlumber does: the highest priority among the available ones.
+
+`build/sound-cli profile <card> <profile>` switches one by hand.
+
+**Not tested with a real headset** (no Bluetooth audio device at hand): the profile rules are covered
+by `tests/bt_audio_model_test.mjs`, the card reply parser by `build/sound-test` (built like
+PulseAudio's `card_fill_tagstruct` for protocol 32), and the WirePlumber setting was read in
+WirePlumber 0.5.8's own scripts (`monitors/bluez.lua`, `device/autoswitch-bluetooth-profile.lua`) and
+its file parsed with `spa-json-dump` (PipeWire 1.4.2). If a headset never offers `a2dp-sink`
+(BlueZ didn't connect A2DP), LordOS can't switch to it, and the output stays in headset mode.
+
 ## Tests
 
 - `make -C server test` includes `build/sound-test`: round trip of each tagstruct type,
-  property lists, descriptors, truncated packets (none reads outside the buffer) and wrong
-  types.
+  property lists, descriptors, truncated packets (none reads outside the buffer), wrong
+  types, and card replies (`sndcard.c`: profiles, ports, cut at every byte, names too long to keep).
 - `build/sound-cli` (`make -C server build/sound-cli`) is a command-line client over the same
   `snd.c`, against the real PipeWire: `list`, `volume`, `mute`, `default`, `port`, `move`,
   `meter`, `play`, `watch`. `LORD_SND_DEBUG=1` shows every packet.

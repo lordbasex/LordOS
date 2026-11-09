@@ -344,6 +344,8 @@
   "sharing.whoGroupHint": "Solo gli utenti del gruppo lordos-remote.",
   "sharing.working": "Applicazione in corso…",
   "sound.apps": "App",
+  "sound.headsetHint": "Il microfono di una cuffia Bluetooth funziona solo in modalità vivavoce, che abbassa la qualità del suono. Scegliendo un altro microfono torna il suono di alta qualità.",
+  "sound.headsetMic": "{name} (modalità vivavoce)",
   "sound.input": "Ingresso",
   "sound.level": "Livello di ingresso",
   "sound.noApps": "Nessuna app sta riproducendo audio.",

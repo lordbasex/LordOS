@@ -344,6 +344,8 @@
   "sharing.whoGroupHint": "Só os usuários do grupo lordos-remote.",
   "sharing.working": "Aplicando…",
   "sound.apps": "Apps",
+  "sound.headsetHint": "O microfone de um fone Bluetooth só funciona no modo viva-voz, que reduz a qualidade do som. Escolher outro microfone devolve o som de alta qualidade.",
+  "sound.headsetMic": "{name} (modo viva-voz)",
   "sound.input": "Entrada",
   "sound.level": "Nível de entrada",
   "sound.noApps": "Nenhum app está tocando som.",

@@ -6,6 +6,7 @@
  *   sound-cli default sink <name>
  *   sound-cli port sink 36 <port>
  *   sound-cli move input 51 40
+ *   sound-cli profile 57 a2dp-sink     a Bluetooth card's profile (state "cards")
  *   sound-cli meter <input> [seconds]
  *   sound-cli play pop|notify|error
  *   sound-cli watch [seconds]          prints every "state" (to see changes made by others) */
@@ -50,7 +51,7 @@ static int kind_of(const char *s) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: sound-cli list|volume|mute|default|port|move|meter|play|watch ...\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: sound-cli list|volume|mute|default|port|move|profile|meter|play|watch ...\n"); return 2; }
     snd_start();
     for (int i = 0; i < 60 && !states; i++) run_for(0.05);
     if (!states) { fprintf(stderr, "no state (is PipeWire running?)\n"); return 1; }
@@ -66,6 +67,7 @@ int main(int argc, char **argv) {
     } else if (!strcmp(cmd, "mute") && argc >= 5) r = snd_set_mute(kind_of(argv[2]), (uint32_t)atoi(argv[3]), atoi(argv[4]));
     else if (!strcmp(cmd, "default") && argc >= 4) r = snd_set_default(kind_of(argv[2]), argv[3]);
     else if (!strcmp(cmd, "port") && argc >= 5) r = snd_set_port(kind_of(argv[2]), (uint32_t)atoi(argv[3]), argv[4]);
+    else if (!strcmp(cmd, "profile") && argc >= 4) r = snd_set_profile((uint32_t)atoi(argv[2]), argv[3]);
     else if (!strcmp(cmd, "move") && argc >= 5) r = snd_move(kind_of(argv[2]), (uint32_t)atoi(argv[3]), (uint32_t)atoi(argv[4]));
     else if (!strcmp(cmd, "meter") && argc >= 3) {
         r = snd_meter((uint32_t)atoi(argv[2]));

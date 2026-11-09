@@ -241,6 +241,8 @@ install -d "$L/migrations"
 install -m 644 packaging/migrations/[0-9][0-9][0-9]-*.sh "$L/migrations/"
 install -D -m 755 packaging/kernel/zz-lordos-reboot-required "$PKG/etc/kernel/postinst.d/zz-lordos-reboot-required"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
+# a Bluetooth headset plays in high fidelity until its microphone is chosen (issue #78, docs/SOUND.md)
+install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$PKG/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
 # in a virtual machine only: more headroom for emulated sound cards (docs/SOUND.md, "Virtual machines")

@@ -20,6 +20,7 @@
 
 #define BT_MAX_ADAPTERS 4
 #define BT_MAX_DEVICES 64
+#define BT_MAX_SERVICES 24              /* 16-bit service UUIDs kept per device */
 
 typedef struct {
     char path[96], address[20], alias[96];
@@ -28,7 +29,10 @@ typedef struct {
 
 typedef struct {
     char path[128], adapter[96], address[20], name[96], alias[96], icon[48];
-    uint32_t cls;
+    char addr_type[8];                  /* AddressType: "public" or "random" ("" if not reported) */
+    uint32_t cls;                       /* Class of Device: only seen over BR/EDR (classic) */
+    uint16_t services[BT_MAX_SERVICES]; /* UUIDs on the Bluetooth base UUID, as 16-bit numbers */
+    int nservices;
     uint16_t appearance;
     int paired, bonded, trusted, connected, blocked, legacy;
     int rssi, has_rssi;
@@ -69,6 +73,7 @@ void bt_apply_props(BtModel *mdl, const char *path, const char *iface, DRd *r);
 int  bt_parse_managed(BtModel *mdl, const DMsg *m);
 void bt_remove_object(BtModel *mdl, const char *path, const char *iface);
 int  bt_path_valid(const char *path);   /* /org/bluez/hciN/dev_XX_XX_XX_XX_XX_XX */
+int  bt_uuid16(const char *uuid);       /* a UUID on the Bluetooth base UUID as 16 bits, -1 otherwise */
 /* Whether a device should be made Trusted after op ("pair", "connect", or "authorize": our agent let it
  * use a service) ended with err (a D-Bus error name, NULL if it worked). Trusted devices reconnect by
  * themselves at boot, before anyone logs in (no agent). */

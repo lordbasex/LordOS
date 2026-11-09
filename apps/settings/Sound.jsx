@@ -1,7 +1,7 @@
 // Settings → Sound: outputs, inputs (with meter), per-app volume (PipeWire, sdk/sound.js).
 import {
   View, Text, useTheme, useLocale, Slider, Toggle, Button, Segmented, useSound, useSoundPeak, sound, defaultSink,
-  microphones, defaultSource, spacing, typeScale,
+  microphones, defaultSource, headsetMics, spacing, typeScale,
 } from '@lordos/sdk';
 import { useEffect } from 'react';
 import { Stack, Section, SettingRow, Note, tint } from './ui.jsx';
@@ -51,6 +51,15 @@ function deviceRows(kind, list, t) {
   ));
 }
 
+// A Bluetooth headset's microphone exists only in headset mode (issue #78): choosing it switches the headset,
+// whose sound then loses quality until another microphone is chosen.
+function headsetMicRows(list, tr) {
+  return list.map((m) => (
+    <SettingRow key={`card-${m.card}`} label={tr('settings.sound.headsetMic', { name: m.label })} onClick={() => sound.useHeadsetMic(m.card)}
+      labelStyle={{ whiteSpace: 'nowrap', overflow: 'hidden' }} />
+  ));
+}
+
 function Ports({ kind, dev }) {
   if (!dev || dev.ports.length < 2) return null;
   return (
@@ -86,6 +95,7 @@ export function SoundSettings() {
   const out = defaultSink(st);
   const mics = microphones(st);
   const mic = defaultSource(st);
+  const headsets = headsetMics(st);
   const apps = st.inputs;
   return (
     <Stack>
@@ -101,8 +111,10 @@ export function SoundSettings() {
         </Section>
       )}
       <Section title={tr('settings.sound.input')}>
-        {mics.length === 0 ? <SettingRow label={tr('settings.sound.noInputs')} disabled /> : deviceRows('source', mics, t)}
+        {mics.length + headsets.length === 0 ? <SettingRow label={tr('settings.sound.noInputs')} disabled />
+          : [...deviceRows('source', mics, t), ...headsetMicRows(headsets, tr)]}
       </Section>
+      {headsets.length > 0 || mics.some((m) => m.default && st.cards?.some((c) => c.index === m.card)) ? <Note>{tr('settings.sound.headsetHint')}</Note> : null}
       {mic && (
         <Section>
           <SettingRow label={tr('settings.sound.volume')}><Volume kind="source" item={mic} /></SettingRow>

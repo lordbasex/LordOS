@@ -344,6 +344,8 @@
   "sharing.whoGroupHint": "Only users in the lordos-remote group.",
   "sharing.working": "Applying…",
   "sound.apps": "Apps",
+  "sound.headsetHint": "A Bluetooth headset's microphone works only in headset mode, which lowers the quality of its sound. Choosing another microphone gives it back high-quality sound.",
+  "sound.headsetMic": "{name} (headset mode)",
   "sound.input": "Input",
   "sound.level": "Input level",
   "sound.noApps": "No app is playing sound.",

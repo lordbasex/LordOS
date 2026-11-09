@@ -34,6 +34,7 @@ enum {
     PA_CMD_REQUEST = 61, PA_CMD_OVERFLOW = 62, PA_CMD_UNDERFLOW = 63,
     PA_CMD_PLAYBACK_STREAM_KILLED = 64, PA_CMD_RECORD_STREAM_KILLED = 65,
     PA_CMD_SUBSCRIBE_EVENT = 66, PA_CMD_STARTED = 86,
+    PA_CMD_GET_CARD_INFO = 88, PA_CMD_GET_CARD_INFO_LIST = 89, PA_CMD_SET_CARD_PROFILE = 90,
     PA_CMD_MOVE_SINK_INPUT = 67, PA_CMD_MOVE_SOURCE_OUTPUT = 68,
     PA_CMD_SET_SINK_INPUT_MUTE = 69,
     PA_CMD_SET_SINK_PORT = 96, PA_CMD_SET_SOURCE_PORT = 97,
@@ -63,6 +64,7 @@ void ts_free(TsOut *t);
 void ts_u32(TsOut *t, uint32_t v);
 void ts_u8(TsOut *t, uint8_t v);
 void ts_u64(TsOut *t, uint64_t v);      /* 'U' (usec) */
+void ts_s64(TsOut *t, int64_t v);       /* 'r' */
 void ts_bool(TsOut *t, int v);
 void ts_timeval(TsOut *t, uint32_t sec, uint32_t usec);   /* 'T' (latency, lord-media) */
 void ts_str(TsOut *t, const char *s);   /* NULL → 'N' */

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define BLUEZ "org.bluez"
 #define AGENT_PATH "/org/lordos/BluetoothAgent"
@@ -92,6 +93,31 @@ static Val read_val(DRd *r, const char *sig) {
     return v;
 }
 
+/* "0000110b-0000-1000-8000-00805f9b34fb" → 0x110b; -1 for a UUID outside the Bluetooth base UUID
+ * (vendor services) or a malformed one. */
+int bt_uuid16(const char *u) {
+    static const char base[] = "-0000-1000-8000-00805f9b34fb";
+    if (!u || strlen(u) != 36 || strncmp(u, "0000", 4) || strncasecmp(u + 8, base, sizeof base - 1)) return -1;
+    int v = 0;
+    for (int i = 4; i < 8; i++) {
+        if (!isxdigit((unsigned char)u[i])) return -1;
+        v = v * 16 + (isdigit((unsigned char)u[i]) ? u[i] - '0' : (tolower((unsigned char)u[i]) - 'a' + 10));
+    }
+    return v;
+}
+
+/* UUIDs (as): the whole list replaces the old one, as BlueZ always sends all of it. */
+static void read_uuids(DRd *r, BtDevice *d) {
+    size_t end = dr_arr(r, 4);
+    if (d) d->nservices = 0;
+    while (!r->err && dr_more(r, end)) {
+        const char *u = dr_str(r, NULL);
+        if (r->err) break;
+        int v = bt_uuid16(u);
+        if (d && v >= 0 && d->nservices < BT_MAX_SERVICES) d->services[d->nservices++] = (uint16_t)v;
+    }
+}
+
 void bt_apply_props(BtModel *m, const char *path, const char *iface, DRd *r) {
     int is_adapter = !strcmp(iface, "org.bluez.Adapter1"), is_dev = !strcmp(iface, "org.bluez.Device1");
     int is_batt = !strcmp(iface, "org.bluez.Battery1");
@@ -103,6 +129,10 @@ void bt_apply_props(BtModel *m, const char *path, const char *iface, DRd *r) {
         const char *k = dr_str(r, NULL);
         const char *sig = dr_variant(r);
         if (r->err || !k) break;
+        if (sig && !strcmp(sig, "as") && !strcmp(k, "UUIDs")) {
+            read_uuids(r, d && is_dev ? d : NULL);
+            continue;
+        }
         Val v = read_val(r, sig);
         if (r->err) break;
         if (a) {
@@ -117,6 +147,8 @@ void bt_apply_props(BtModel *m, const char *path, const char *iface, DRd *r) {
             else if (!strcmp(k, "Name") && v.is_str) copy_str(d->name, sizeof d->name, v.s);
             else if (!strcmp(k, "Alias") && v.is_str) copy_str(d->alias, sizeof d->alias, v.s);
             else if (!strcmp(k, "Icon") && v.is_str) copy_str(d->icon, sizeof d->icon, v.s);
+            else if (!strcmp(k, "AddressType") && v.is_str)
+                copy_str(d->addr_type, sizeof d->addr_type, !strcmp(v.s, "public") || !strcmp(v.s, "random") ? v.s : "");
             else if (!strcmp(k, "Adapter") && v.is_str) copy_str(d->adapter, sizeof d->adapter, v.s);
             else if (!strcmp(k, "Class") && v.is_num) d->cls = (uint32_t)v.i;
             else if (!strcmp(k, "Appearance") && v.is_num) d->appearance = (uint16_t)v.i;
@@ -190,7 +222,11 @@ static void dev_json(HBuf *b, const BtDevice *d) {
               d->cls, d->appearance, d->paired || d->bonded ? "true" : "false", d->trusted ? "true" : "false", d->connected ? "true" : "false",
               d->blocked ? "true" : "false", d->busy ? "true" : "false", d->battery);
     if (d->has_rssi) hb_printf(b, ",\"rssi\":%d", d->rssi);
-    hb_printf(b, "}");
+    hb_printf(b, ",\"addressType\":");
+    hb_str(b, d->addr_type);
+    hb_printf(b, ",\"services\":[");
+    for (int i = 0; i < d->nservices; i++) hb_printf(b, "%s\"%04x\"", i ? "," : "", d->services[i]);
+    hb_printf(b, "]}");
 }
 
 char *bt_state_json(void) {

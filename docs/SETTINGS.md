@@ -247,7 +247,21 @@ and signals dispatched to handlers.
   }
   ```
 
+  A headset plays in high fidelity (A2DP) and switches to headset mode (HSP/HFP) only when its
+  microphone is chosen in Settings → Sound: WirePlumber's automatic switch is off
+  (`lordos-bluez-profiles.conf`) and LordOS sets the profile itself. See [SOUND.md](SOUND.md),
+  "Bluetooth headsets" (issue #78).
+
   ![A Bluetooth headset in Sound](settings-sound-bluetooth-output.png)
+- **Low-energy sides.** Some headsets are also a second, low-energy device named "LE-<name>" or
+  "LE_<name>", which only carries the maker's service for its phone app: it can't be paired and plays
+  nothing. bt.c passes BlueZ's `AddressType` and the 16-bit service UUIDs (`services`) to JS, and
+  `sdk/btlistmodel.js` (tested by `tests/bt_list_model_test.mjs`) recognizes such a device by what
+  BlueZ reports: that name, no Class of Device (never seen over classic Bluetooth) and no audio
+  service (classic or LE Audio, so LE Audio devices and hearing aids are never hidden). It is not
+  listed under Nearby when the classic device of that name is listed (nearby or paired); listed alone
+  it goes last, with "Low-energy side of <name>: wait for <name> to appear and pair that one", and if
+  pairing it fails the message says so instead of "the code did not match".
 
 Tested with `btvirt -l2` (bluez-test-tools) on VM 118: two virtual controllers on one virtual
 radio. hci1 plays a headset (class 0x240404, discoverable, a `bluetoothctl` agent fed through a

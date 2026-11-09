@@ -117,6 +117,18 @@ static JSValue f_move(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     return JS_NewBool(c, snd_move(kind, idx, dev) == 0);
 }
 
+/* setProfile(card, profile): a Bluetooth card's profile, one of the state's "cards" (issue #78). */
+static JSValue f_set_profile(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    uint32_t idx;
+    if (argc < 2 || arg_index(c, argv[0], &idx)) return JS_FALSE;
+    const char *profile = arg_name(c, argv[1]);
+    if (!profile) return JS_FALSE;
+    int ok = snd_set_profile(idx, profile) == 0;
+    JS_FreeCString(c, profile);
+    return JS_NewBool(c, ok);
+}
+
 /* meter(input index) turns the meter on ("peak" events); meter(-1) or meter() turns it off. */
 static JSValue f_meter(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
@@ -146,6 +158,7 @@ static const JSCFunctionListEntry sound_funcs[] = {
     JS_CFUNC_DEF("setDefault", 2, f_set_default),
     JS_CFUNC_DEF("setPort", 3, f_set_port),
     JS_CFUNC_DEF("move", 3, f_move),
+    JS_CFUNC_DEF("setProfile", 2, f_set_profile),
     JS_CFUNC_DEF("meter", 1, f_meter),
     JS_CFUNC_DEF("play", 1, f_play),
 };

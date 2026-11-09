@@ -2,8 +2,11 @@
 // (pair). BlueZ over the system bus, from lord-server (server/src/hw/bt.c); PIN and passkey
 // requests are drawn by the system (sdk/hardware.jsx, BluetoothPrompt). Headphones and speakers
 // show up in Sound through PipeWire. See docs/SETTINGS.md, "Bluetooth".
-import { View, Text, useTheme, useLocale, Toggle, Button, admin, useBluetooth, onBluetoothResult, setBluetoothPower } from '@lordos/sdk';
-import { useEffect, useState } from 'react';
+import {
+  View, Text, useTheme, useLocale, Toggle, Button, admin, useBluetooth, onBluetoothResult, setBluetoothPower,
+  nearbyDevices, lowEnergySide, btErrorKey,
+} from '@lordos/sdk';
+import { useEffect, useRef, useState } from 'react';
 import { GroupBox, SettingRow, PageHeader, Note, Stack } from './ui.jsx';
 
 // Monochrome glyphs (the usual 🎧 🖱 📱 are color emoji on the system fonts).
@@ -33,8 +36,11 @@ function Device({ d, tr }) {
   const status = d.busy ? tr('prefs.bt.working') : d.connected ? tr('prefs.bt.connected') : tr('prefs.bt.notConnected');
   const battery = d.battery >= 0 ? ` · ${tr('prefs.bt.battery', { pct: d.battery })}` : '';
   if (!d.paired) {
+    // a headset's low-energy side listed without its classic device (sdk/btlistmodel.js, issue #78)
+    const le = lowEnergySide(d);
+    const hint = le ? tr('prefs.bt.leSideHint', { name: le }) : d.rssi != null ? tr('prefs.bt.signal', { dbm: d.rssi }) : '';
     return (
-      <SettingRow icon={<DeviceIcon icon={d.icon} />} label={d.name} hint={d.rssi != null ? tr('prefs.bt.signal', { dbm: d.rssi }) : ''}>
+      <SettingRow icon={<DeviceIcon icon={d.icon} />} label={d.name} hint={hint}>
         {d.busy ? <Text style={{ fontSize: 12, color: t.textDim }}>{tr('prefs.bt.pairing')}</Text>
           : <Button small label={tr('prefs.bt.connect')} onClick={() => lord.bt.pair(d.path)} />}
       </SettingRow>
@@ -60,6 +66,8 @@ export function BluetoothSettings() {
   const st = useBluetooth();
   const [err, setErr] = useState('');
   const a = st?.adapter;
+  const devices = useRef([]);
+  devices.current = st?.devices || [];
   // a search of its own, for a while: the kernel doesn't listen for paired devices coming back while one runs
   const [search, setSearch] = useState(0);
   useEffect(() => {
@@ -70,9 +78,7 @@ export function BluetoothSettings() {
   }, [a?.powered, a?.path, search]);
   useEffect(() => onBluetoothResult((r) => {
     if (r.ok || r.op === 'stop') { if (r.ok && r.op !== 'stop') setErr(''); return; }
-    const key = /Blocked|rfkill/i.test(r.error) ? 'blocked' : /profile-unavailable|NotAvailable|NotSupported/i.test(r.error) ? 'noProfile'
-      : /AuthenticationFailed|AuthenticationRejected|Rejected/i.test(r.error) ? 'authFailed'
-      : /Canceled|AuthenticationCanceled/i.test(r.error) ? 'canceled' : /AlreadyExists/i.test(r.error) ? '' : 'failed';
+    const key = btErrorKey(r, devices.current);
     if (key) setErr(key);
   }), []);
   if (!st || !st.available || !a) {
@@ -83,7 +89,7 @@ export function BluetoothSettings() {
     );
   }
   const mine = st.devices.filter((d) => d.paired).sort((x, y) => (y.connected - x.connected) || x.name.localeCompare(y.name));
-  const near = st.devices.filter((d) => !d.paired && (d.named || d.busy)).sort((x, y) => (y.rssi ?? -200) - (x.rssi ?? -200));
+  const near = nearbyDevices(st.devices);
   const togglePower = (on) => {
     setErr('');
     setBluetoothPower(on);

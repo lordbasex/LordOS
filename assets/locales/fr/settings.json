@@ -344,6 +344,8 @@
   "sharing.whoGroupHint": "Uniquement les utilisateurs du groupe lordos-remote.",
   "sharing.working": "Application…",
   "sound.apps": "Apps",
+  "sound.headsetHint": "Le microphone d’un casque Bluetooth ne fonctionne qu’en mode mains libres, qui réduit la qualité du son. Choisir un autre microphone lui rend un son de haute qualité.",
+  "sound.headsetMic": "{name} (mode mains libres)",
   "sound.input": "Entrée",
   "sound.level": "Niveau d’entrée",
   "sound.noApps": "Aucune app ne diffuse de son.",

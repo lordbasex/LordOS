@@ -6,11 +6,15 @@
  * (source outputs); subscribes to changes and notifies JS with "state" when something changed
  * and all replies have arrived. If PipeWire restarts, it reconnects every 2 s.
  *
+ * Bluetooth cards (sndcard.c) are kept too, with their profiles: a headset plays well only in
+ * its high-fidelity profile, and snd_set_profile switches it (issue #78, docs/SOUND.md).
+ *
  * Extras: level meter for an input (a normal 48 kHz recording stream; the level is the largest
  * sample of each block, see snd_meter) and system sounds synthesized here (uploaded once to the
  * server's sample cache and then played with PLAY_SAMPLE). */
 #include "snd.h"
 #include "pulse.h"
+#include "sndcard.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -30,6 +34,7 @@
 #define MAX_STREAMS 64
 #define MAX_PORTS 16
 #define MAX_PENDING 256
+#define MAX_CARDS 8                     /* Bluetooth cards (sndcard.h) */
 
 typedef struct { char name[128], desc[128]; uint32_t priority, available; } Port;
 
@@ -53,6 +58,7 @@ typedef struct {
 
 typedef struct { Dev d[MAX_DEV]; int n; } DevList;
 typedef struct { Stream s[MAX_STREAMS]; int n; } StreamList;
+typedef struct { SndCard c[MAX_CARDS]; int n; } CardList;
 
 enum {
     R_NONE, R_AUTH, R_NAME, R_SERVER, R_LIST, R_ONE, R_ACK, R_RECORD, R_UPLOAD, R_PLAY,
@@ -73,6 +79,7 @@ static struct {
     char server_name[64], server_version[32], default_sink[256], default_source[256];
     DevList sinks, sources;
     StreamList inputs, outputs;
+    CardList cards;
     uint32_t meter_source, meter_channel, meter_stream_ok;
     int meter_pending;
     double peak;
@@ -150,7 +157,8 @@ static void copy(char *dst, size_t cap, const char *src) { snprintf(dst, cap, "%
 
 static int is_list_cmd(int what) {
     return what == PA_CMD_GET_SINK_INFO_LIST || what == PA_CMD_GET_SOURCE_INFO_LIST ||
-           what == PA_CMD_GET_SINK_INPUT_INFO_LIST || what == PA_CMD_GET_SOURCE_OUTPUT_INFO_LIST;
+           what == PA_CMD_GET_SINK_INPUT_INFO_LIST || what == PA_CMD_GET_SOURCE_OUTPUT_INFO_LIST ||
+           what == PA_CMD_GET_CARD_INFO_LIST;
 }
 
 static void dev_prop(void *ud, const char *key, const char *val, uint32_t len) {
@@ -258,6 +266,19 @@ static void upsert_stream(StreamList *l, const Stream *s) {
     if (l->n < MAX_STREAMS) l->s[l->n++] = *s;
 }
 
+static void remove_card(uint32_t index) {
+    CardList *l = &S.cards;
+    for (int i = 0; i < l->n; i++) if (l->c[i].index == index) { l->c[i] = l->c[--l->n]; break; }
+}
+
+/* Only Bluetooth cards are kept; one that stopped being one (never seen) is dropped. */
+static void upsert_card(const SndCard *c) {
+    CardList *l = &S.cards;
+    if (!snd_card_is_bluetooth(c)) { remove_card(c->index); return; }
+    for (int i = 0; i < l->n; i++) if (l->c[i].index == c->index) { l->c[i] = *c; return; }
+    if (l->n < MAX_CARDS) l->c[l->n++] = *c;
+}
+
 static void remove_index(int facility, uint32_t index) {
     if (facility == PA_SUB_SINK || facility == PA_SUB_SOURCE) {
         DevList *l = facility == PA_SUB_SINK ? &S.sinks : &S.sources;
@@ -270,7 +291,11 @@ static void remove_index(int facility, uint32_t index) {
 
 static void on_info(int what, TsIn *t) {
     int list = is_list_cmd(what);
-    if (is_dev_cmd(what)) {
+    if (what == PA_CMD_GET_CARD_INFO || what == PA_CMD_GET_CARD_INFO_LIST) {
+        if (list) S.cards.n = 0;
+        static SndCard c;                           /* ~6 KB: not on the stack */
+        while (!ts_eof(t) && !t->err && snd_card_parse(t, &c) == 0) upsert_card(&c);
+    } else if (is_dev_cmd(what)) {
         DevList *l = dev_list(what);
         if (list) l->n = 0;
         Dev d;
@@ -292,7 +317,7 @@ static void request_info(uint32_t cmd, uint32_t index) {
     int list = is_list_cmd((int)cmd);
     if (!list) {
         ts_u32(&t, index);
-        if (cmd == PA_CMD_GET_SINK_INFO || cmd == PA_CMD_GET_SOURCE_INFO) ts_str(&t, NULL);
+        if (cmd == PA_CMD_GET_SINK_INFO || cmd == PA_CMD_GET_SOURCE_INFO || cmd == PA_CMD_GET_CARD_INFO) ts_str(&t, NULL);
     }
     cmd_send(&t, tag, list ? R_LIST : R_ONE, (int)cmd, index);
 }
@@ -309,6 +334,7 @@ static void request_all(void) {
     request_info(PA_CMD_GET_SOURCE_INFO_LIST, 0);
     request_info(PA_CMD_GET_SINK_INPUT_INFO_LIST, 0);
     request_info(PA_CMD_GET_SOURCE_OUTPUT_INFO_LIST, 0);
+    request_info(PA_CMD_GET_CARD_INFO_LIST, 0);
 }
 
 static void on_subscribe_event(uint32_t ev, uint32_t index) {
@@ -316,6 +342,8 @@ static void on_subscribe_event(uint32_t ev, uint32_t index) {
     static const uint32_t get[] = { PA_CMD_GET_SINK_INFO, PA_CMD_GET_SOURCE_INFO, PA_CMD_GET_SINK_INPUT_INFO, PA_CMD_GET_SOURCE_OUTPUT_INFO };
     if (facility == PA_SUB_SERVER) { request_server(); return; }
     if (facility == PA_SUB_CARD) {                  /* the profile changed: the ports of its sinks/sources */
+        if (type == PA_SUB_REMOVE) { remove_card(index); S.dirty = 1; }
+        else request_info(PA_CMD_GET_CARD_INFO, index);
         request_info(PA_CMD_GET_SINK_INFO_LIST, 0);
         request_info(PA_CMD_GET_SOURCE_INFO_LIST, 0);
         return;
@@ -415,7 +443,7 @@ static void disconnect(const char *why) {
         if (S.connected) fprintf(stderr, "sound: disconnected from PipeWire (%s); retrying\n", why);
     }
     S.connected = 0;
-    S.sinks.n = S.sources.n = S.inputs.n = S.outputs.n = 0;
+    S.sinks.n = S.sources.n = S.inputs.n = S.outputs.n = S.cards.n = 0;
     S.server_name[0] = S.default_sink[0] = S.default_source[0] = 0;
     S.dirty = 1;
     arm_timer(1);
@@ -703,6 +731,33 @@ static void bstreams(Buf *b, const StreamList *l, int output) {
     }
 }
 
+static void bcards(Buf *b) {
+    for (int i = 0; i < S.cards.n; i++) {
+        const SndCard *c = &S.cards.c[i];
+        bput(b, "%s{\"index\":%u,\"name\":", i ? "," : "", c->index);
+        bstr(b, c->name);
+        bput(b, ",\"description\":");
+        bstr(b, c->desc[0] ? c->desc : c->name);
+        bput(b, ",\"api\":");
+        bstr(b, c->api);
+        bput(b, ",\"bus\":");
+        bstr(b, c->bus);
+        bput(b, ",\"activeProfile\":");
+        bstr(b, c->active);
+        bput(b, ",\"profiles\":[");
+        for (int k = 0; k < c->nprofiles; k++) {
+            const SndProfile *p = &c->profiles[k];
+            bput(b, "%s{\"name\":", k ? "," : "");
+            bstr(b, p->name);
+            bput(b, ",\"description\":");
+            bstr(b, p->desc);
+            bput(b, ",\"sinks\":%u,\"sources\":%u,\"priority\":%u,\"available\":%s}", p->sinks, p->sources, p->priority,
+                 p->available ? "true" : "false");
+        }
+        bput(b, "]}");
+    }
+}
+
 char *snd_state_json(void) {
     Buf b = { 0 };
     bput(&b, "{\"connected\":%s,\"server\":", S.connected ? "true" : "false");
@@ -722,6 +777,8 @@ char *snd_state_json(void) {
     bstreams(&b, &S.inputs, 0);
     bput(&b, "],\"outputs\":[");
     bstreams(&b, &S.outputs, 1);
+    bput(&b, "],\"cards\":[");
+    bcards(&b);
     bput(&b, "]}");
     return b.d;
 }
@@ -814,6 +871,20 @@ int snd_set_port(int kind, uint32_t index, const char *port) {
     ts_str(&t, NULL);
     ts_str(&t, port);
     return cmd_send(&t, tag, R_ACK, (int)c, index);
+}
+
+/* A Bluetooth card's profile: only a card in the state and one of its profiles. */
+int snd_set_profile(uint32_t card, const char *profile) {
+    if (!S.connected || !profile) return -1;
+    const SndCard *c = NULL;
+    for (int i = 0; i < S.cards.n; i++) if (S.cards.c[i].index == card) c = &S.cards.c[i];
+    if (!c || !snd_card_profile(c, profile)) return -1;
+    TsOut t;
+    uint32_t tag = cmd_begin(&t, PA_CMD_SET_CARD_PROFILE);
+    ts_u32(&t, card);
+    ts_str(&t, NULL);
+    ts_str(&t, profile);
+    return cmd_send(&t, tag, R_ACK, PA_CMD_SET_CARD_PROFILE, card);
 }
 
 int snd_move(int kind, uint32_t index, uint32_t device) {

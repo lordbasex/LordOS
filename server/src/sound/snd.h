@@ -27,6 +27,7 @@ int snd_set_mute(int kind, uint32_t index, int mute);
 int snd_set_default(int kind, const char *name);                        /* SND_SINK or SND_SOURCE */
 int snd_set_port(int kind, uint32_t index, const char *port);           /* SND_SINK or SND_SOURCE */
 int snd_move(int kind, uint32_t index, uint32_t device);                /* SND_INPUT → output, SND_OUTPUT → input */
+int snd_set_profile(uint32_t card, const char *profile);                /* a Bluetooth card's profile (state "cards") */
 int snd_meter(uint32_t source);         /* peak meter of an input; 0xffffffff turns it off */
 int snd_play(const char *name);         /* system sound: "pop", "notify", "error" */
 
