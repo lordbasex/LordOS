@@ -56,21 +56,37 @@ export function parseStatus(text, id, now = Date.now()) {
 // ---- read from the screen: screen, tmux, ssh ----
 
 // The line lord-claude-status prints: "Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%" (folder, branch and the
-// limits may be missing; the week's label in the user's language). The last such line on the screen; whether Claude
-// Code is working comes from its own "esc to interrupt" while it works.
-const VIEW = /^\s*(\S(?:.{0,62}?\S)?) \| (?:(.{1,128}?) \| )?(?:(.{1,128}?) \| )?ctx (\d{1,3})%(?: \| 5h (?:(\d{1,3})%|–))?(?: \| (?:week|sem|sett) (\d{1,3})%)?\s*$/;
+// limits may be missing; the week's label in the user's language). The last such line among the screen's bottom rows;
+// whether Claude Code is working comes from its own "esc to interrupt" while it works. The screen's text can come from
+// a remote host, so it is read without a backtracking pattern: only the last 12 rows, each cut at 300 characters, a line
+// without " ctx " skipped at once, and the fields split on " | " and checked one by one.
+const ROWS = 12, LINE_MAX = 300;
+const PCT = /^(\d{1,3})%$/;
+function viewOf(line) {
+  if (line.length > LINE_MAX || !line.includes(' ctx ') && !line.includes('| ctx')) return null;
+  const parts = line.trim().split(' | ');
+  const k = parts.findIndex((x) => x.startsWith('ctx '));
+  if (k < 1 || k > 3 || parts.length - k > 3) return null;
+  const ctx = PCT.exec(parts[k].slice(4));
+  if (!ctx) return null;
+  const head = parts.slice(0, k);
+  if (!head[0] || head[0].length > 64 || head.some((x) => !x || x.length > 128)) return null;
+  let five = null, week = null;
+  for (const f of parts.slice(k + 1)) {
+    const sp = f.indexOf(' ');
+    const label = sp > 0 ? f.slice(0, sp) : '', val = sp > 0 ? f.slice(sp + 1) : '';
+    const m = PCT.exec(val);
+    if (label === '5h' && !five && (m || val === '–')) five = { pct: m ? Math.min(100, +m[1]) : null, resetsAt: null };
+    else if ((label === 'week' || label === 'sem' || label === 'sett') && !week && m) week = { pct: Math.min(100, +m[1]), resetsAt: null };
+    else return null;
+  }
+  return { model: head[0], folder: head[1] || '', branch: head[2] || '', ctx: Math.min(100, +ctx[1]), five, week };
+}
 export function parseScreenStatus(text) {
-  const lines = String(text || '').split('\n');
+  const lines = String(text || '').split('\n').slice(-ROWS);
   for (let i = lines.length - 1; i >= 0; i--) {
-    const m = VIEW.exec(lines[i]);
-    if (!m) continue;
-    const n = (v) => (v == null ? null : Math.min(100, +v));
-    return {
-      model: m[1], folder: m[2] || '', branch: m[3] || '', ctx: n(m[4]),
-      five: /\| 5h /.test(lines[i]) ? { pct: n(m[5]), resetsAt: null } : null,
-      week: m[6] != null ? { pct: n(m[6]), resetsAt: null } : null,
-      state: /esc to interrupt/i.test(text) ? 'working' : 'waiting',
-    };
+    const v = viewOf(lines[i]);
+    if (v) return { ...v, state: lines.some((l) => l.includes('esc to interrupt')) ? 'working' : 'waiting' };
   }
   return null;
 }

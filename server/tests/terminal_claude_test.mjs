@@ -86,6 +86,15 @@ eq('the Italian week', parseScreenStatus(scr('Opus 5.5 | x | ctx 1% | 5h 2% | se
 eq('no such line: nothing', parseScreenStatus('ls -la\ntotal 0\n$ '), null);
 eq('a line that only looks like it is not taken', parseScreenStatus('echo "a | b | ctx 5% extra"'), null);
 eq('the last one on screen wins', parseScreenStatus('Opus 5.5 | old | ctx 1%\nmore\nOpus 5.5 | new | ctx 2%')?.folder, 'new');
+eq('only the bottom rows are read', parseScreenStatus(`Opus 5.5 | x | ctx 1%\n${'\n'.repeat(20)}`), null);
+eq('a line past 300 characters is not read', parseScreenStatus(`Opus 5.5 | ${'x'.repeat(300)} | ctx 1%`), null);
+{
+  // text a remote host controls: a screen of "| | | …" lines, with and without ctx, must stay cheap (no backtracking)
+  const evil = Array.from({ length: 60 }, (_, i) => (i % 2 ? '| '.repeat(140) : `${'| '.repeat(120)}ctx 9%`)).join('\n');
+  const t0 = Date.now();
+  for (let i = 0; i < 50; i++) parseScreenStatus(evil);
+  eq('a hostile screen is read in linear time', Date.now() - t0 < 200, true);
+}
 const v = parseScreenStatus(scr('Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%'));
 const cand = (id, model, ctx, dir) => ({ id, state: 'waiting', st: { model, ctx, dir } });
 eq('the local session that matches', matchSession(v, [cand('a', 'Opus 5.5', 12, '/x/LordOS'), cand('b', 'Opus 5.5', 44, '/mnt/HD08TB/github/LordOS')])?.id, 'b');
