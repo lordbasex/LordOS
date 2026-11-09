@@ -92,6 +92,7 @@
   "cloud.signInAgain": "Sign in again: the provider no longer accepts this account's sign-in",
   "cloud.signinCancelled": "Sign-in cancelled",
   "cloud.signinFailed": "Signing in didn't finish. Try again",
+  "cloud.signinNoDrive": "You signed in, but LordOS found no drive it can open in this account. Open the account once on the provider's website (that creates its drive), then try again",
   "cloud.signinTimeout": "Signing in took more than 5 minutes. Try again",
   "cloud.startFailed": "The cloud service couldn't start",
   "cloud.tooMany": "There are already 32 cloud accounts",

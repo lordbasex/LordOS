@@ -92,6 +92,7 @@
   "cloud.signInAgain": "Entre de novo: o provedor não aceita mais o login desta conta",
   "cloud.signinCancelled": "Login cancelado",
   "cloud.signinFailed": "O login não terminou. Tente de novo",
+  "cloud.signinNoDrive": "Você entrou, mas o LordOS não encontrou nesta conta um espaço que consiga abrir. Abra a conta uma vez no site do provedor (isso cria o espaço dela) e tente de novo",
   "cloud.signinTimeout": "O login levou mais de 5 minutos. Tente de novo",
   "cloud.startFailed": "Não foi possível iniciar o serviço de nuvem",
   "cloud.tooMany": "Já há 32 contas na nuvem",

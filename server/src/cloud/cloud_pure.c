@@ -557,6 +557,46 @@ const char *cloud_default_answer(const char *opt, const char *def) {
     return def ? def : "";
 }
 
+/* the questions whose choice is tried again after a failure (#87): only a drive, never a yes/no or a type */
+static int retry_question(const char *name) { return name && !strcmp(name, "config_driveid"); }
+
+static int was_tried(const CloudChoices *c, const char *v) {
+    for (int i = 0; i < c->ntried; i++) if (!strcmp(c->tried[i], v)) return 1;
+    return 0;
+}
+
+const char *cloud_choose(CloudChoices *c, const char *name, const char *ans, const char *const *ex, int nex) {
+    c->last = 0;
+    if (!ans) ans = "";
+    if (!retry_question(name) || nex < 2 || strlen(name) >= sizeof c->name) return ans;
+    if (strcmp(c->name, name)) {                    /* a new question: nothing of it tried yet */
+        snprintf(c->name, sizeof c->name, "%s", name);
+        c->ntried = 0;
+    }
+    c->n = nex < CLOUD_CHOICES_MAX ? nex : CLOUD_CHOICES_MAX;
+    const char *pick = ans;
+    if (!pick[0] || was_tried(c, pick)) {
+        pick = NULL;
+        for (int i = 0; i < c->n && !pick; i++) if (ex[i] && ex[i][0] && strlen(ex[i]) < sizeof c->tried[0] && !was_tried(c, ex[i])) pick = ex[i];
+        if (!pick) return ans;                      /* every one tried: rclone's default, and the error after it stands */
+    }
+    if (strlen(pick) >= sizeof c->tried[0] || c->ntried >= CLOUD_CHOICES_MAX) return pick;
+    snprintf(c->tried[c->ntried], sizeof c->tried[0], "%s", pick);
+    c->last = 1;
+    return c->tried[c->ntried++];
+}
+
+int cloud_choice_retry(CloudChoices *c) {
+    if (!c->last || c->ntried >= c->n || c->retries >= CLOUD_CHOICE_RETRIES) return 0;
+    c->retries++;
+    c->last = 0;
+    return 1;
+}
+
+int cloud_no_drive_msg(const char *msg) {
+    return msg && (strstr(msg, "No drives found") || strstr(msg, "Failed to query available drives") || strstr(msg, "Failed to query root for drive"));
+}
+
 /* ---- browsing (7.3) ---- */
 
 int cloud_mount_opts(char *out, size_t n) {

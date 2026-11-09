@@ -5,7 +5,8 @@
  * One command per line on stdin, one line of JSON per command on stdout:
  *   lock | unlock (the keyring stand-in) | retry ID|all | state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
  *   browse PATH | keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
- *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit */
+ *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit
+ *   signin KIND NAME (a browser sign-in; tests/cloud_signin_fake.sh, #87) */
 #include "../src/cloud/cloud.h"
 
 #include <errno.h>
@@ -120,6 +121,7 @@ int main(void) {
             out(got_req == req ? strdup(got_reply) : strdup("{\"error\":\"timeout\"}"));
         } else if (!strcmp(cmd, "links") && a1) out(cloud_links(a1));
         else if (!strcmp(cmd, "answer") && a1) { int req = 0; char *r = cloud_answer(a1, rest ? rest : "", 1, &req); later(r, req); }
+        else if (!strcmp(cmd, "signin") && a1 && rest) out(cloud_begin_signin(a1, rest, NULL, NULL, NULL));
         else if (!strcmp(cmd, "trash") && a1) { int req = 0; char *r = cloud_empty_trash(a1, &req); later(r, req); }
         else if (!strcmp(cmd, "measure") && a1) { int req = 0; char *r = cloud_measure(a1, &req); later(r, req); }
         else if (!strcmp(cmd, "search") && a1 && rest) { int req = 0; char *r = cloud_search(a1, rest, &req); later(r, req); }

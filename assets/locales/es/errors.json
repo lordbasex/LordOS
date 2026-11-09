@@ -92,6 +92,7 @@
   "cloud.signInAgain": "Volvé a iniciar sesión: el proveedor ya no acepta el inicio de sesión de esta cuenta",
   "cloud.signinCancelled": "Inicio de sesión cancelado",
   "cloud.signinFailed": "El inicio de sesión no terminó. Probá de nuevo",
+  "cloud.signinNoDrive": "Iniciaste sesión, pero LordOS no encontró en esta cuenta un espacio que pueda abrir. Abrí la cuenta una vez en el sitio del proveedor (eso crea su espacio) y probá de nuevo",
   "cloud.signinTimeout": "El inicio de sesión tardó más de 5 minutos. Probá de nuevo",
   "cloud.startFailed": "No se pudo iniciar el servicio de nube",
   "cloud.tooMany": "Ya hay 32 cuentas en la nube",

@@ -85,6 +85,7 @@ static struct {
     size_t el;
     char cid[256], csec[256];
     char update[16];                /* Sign In Again: the existing account */
+    char message[201];              /* rclone's words when setting the account up failed (#87), cleaned, for the card */
 } si;
 
 static struct { char path[PATH_MAX]; char account[16]; int up; long long at; } recent[RECENT_MAX];
@@ -1002,24 +1003,39 @@ static char *question_json(const char *id, const char *state, const JVal *o) {
 
 /* rclone's state machine of config/create, non-interactive. question NULL: every question answered here (the
  * default, or cloud_answer's); otherwise only LordOS's own ones, and the first other one goes back in *question (1).
- * 0 done, -1 error (msg). */
+ * 0 done, -1 error (msg).
+ * #87: an error after a drive was chosen (OneDrive's driveid_final can't open it) sends rclone back to an earlier state
+ * (ConfigError's State); that state is run again, as rclone's own config does after showing the error, and the drive
+ * question gets one not tried yet (cloud_choose), CLOUD_CHOICE_RETRIES times at most. */
 static int answer_states(const char *id, JDoc *d, char *msg, size_t mn, char **question) {
-    for (int i = 0; i < 16; i++) {
+    CloudChoices ch;
+    memset(&ch, 0, sizeof ch);
+    for (int i = 0; i < 16 + 3 * CLOUD_CHOICE_RETRIES; i++) {
         const char *e = json_str(d->root, "Error"), *state = json_str(d->root, "State");
-        if (e && e[0]) { cpy(msg, mn, e); return -1; }
-        if (!state || !state[0]) return 0;
-        const JVal *o = json_get(d->root, "Option");
-        const char *nm = json_str(o, "Name"), *def = json_str(o, "ValueStr");
-        if (question && !cloud_internal_question(nm)) {
-            *question = question_json(id, state, o);
-            return *question ? 1 : -1;
-        }
-        if (!def || !def[0]) def = json_str(o, "DefaultStr");
-        const char *ans = cloud_default_answer(nm, def);
-        if (!ans[0]) {
+        const char *ans;
+        if (e && e[0]) {
+            if (!state || !state[0] || !cloud_choice_retry(&ch)) { cpy(msg, mn, e); return -1; }
+            char clean[201];
+            cloud_clean_text(e, clean, sizeof clean);
+            fprintf(stderr, "cloud: %s: rclone said \"%s\": choosing again\n", id, clean);
+            ans = "";
+        } else {
+            if (!state || !state[0]) return 0;
+            const JVal *o = json_get(d->root, "Option");
+            const char *nm = json_str(o, "Name"), *def = json_str(o, "ValueStr");
+            if (question && !cloud_internal_question(nm)) {
+                *question = question_json(id, state, o);
+                return *question ? 1 : -1;
+            }
+            if (!def || !def[0]) def = json_str(o, "DefaultStr");
+            ans = cloud_default_answer(nm, def);
             const JVal *ex = json_get(o, "Examples");
-            const char *v = ex && ex->type == J_ARR && ex->kid ? json_str(ex->kid, "Value") : NULL;
-            if (v) ans = v;
+            const char *vals[CLOUD_CHOICES_MAX];
+            int nv = 0;
+            for (const JVal *x = ex && ex->type == J_ARR ? ex->kid : NULL; x && nv < CLOUD_CHOICES_MAX; x = x->next)
+                if (json_str(x, "Value")) vals[nv++] = json_str(x, "Value");
+            if (!ans[0] && nv) ans = vals[0];
+            ans = cloud_choose(&ch, nm, ans, vals, nv);
         }
         JBuf b;
         jb_init(&b);
@@ -1846,6 +1862,13 @@ static void signin_end(const char *phase, const char *error) {
     explicit_bzero(si.csec, sizeof si.csec);
     cpy(si.phase, sizeof si.phase, phase);
     cpy(si.error, sizeof si.error, error);
+    si.message[0] = 0;
+}
+
+/* the sign-in worked but the account couldn't be set up in rclone (with cl_mu held): the code and rclone's words (#87) */
+static void signin_setup_failed(const char *msg) {
+    signin_end("failed", cloud_no_drive_msg(msg) ? "cloud.signinNoDrive" : "cloud.signinFailed");
+    cloud_clean_text(msg ? msg : "", si.message, sizeof si.message);
 }
 
 /* Sign In Again: the new token goes to the same account (same id, same folder) */
@@ -1873,7 +1896,7 @@ static void signin_again(const char *tok, const char *opts) {
     jb_free(&s);
     if (!ok) {
         pthread_mutex_lock(&cl_mu);
-        signin_end("failed", "cloud.signinFailed");
+        signin_setup_failed(msg);
         pthread_mutex_unlock(&cl_mu);
         fprintf(stderr, "cloud: signing in again failed: %s\n", msg);
         mount_acc(a);
@@ -1922,9 +1945,13 @@ static void signin_token(void) {
     if (!s.oom) explicit_bzero(s.p, s.n);
     jb_free(&s);
     if (!ok) {
+        /* its half-made remote goes from rclone too (it holds the token) */
+        char body[64];
+        cl_pf(body, sizeof body, "{\"name\":\"%s\"}", a->id);
+        if (cl_running) rcs(RCM_DELETE, body, NULL, 0, RC_SHORT);
         pthread_mutex_lock(&cl_mu);
         acc_free(a);
-        signin_end("failed", "cloud.signinFailed");
+        signin_setup_failed(msg);
         si.account[0] = 0;
         pthread_mutex_unlock(&cl_mu);
         fprintf(stderr, "cloud: the new account could not be set up: %s\n", msg);
@@ -1995,6 +2022,10 @@ static pid_t spawn_authorize(const CloudKind *k, const char *cid, const char *cs
         syscall(SYS_close_range, 3, ~0u, 0);
         child_common();
         if (app_scope_enter(CLOUD_SCOPE) && getenv("LORDOS_SESSIOND")) _exit(126);
+#ifdef CLOUD_TEST
+        /* test builds only: tests/cloud_signin_fake.sh's stand-in lives in the build tree, which the sandbox can't run */
+        if (!getenv("LORDOS_CLOUD_FAKE_AUTHORIZE"))
+#endif
         sandbox_exec_child(1);              /* the system read-only, nothing written; the network for the redirect */
         execve(bin, argv, env);
         _exit(127);
@@ -2464,6 +2495,7 @@ static char *state_json(int light) {
         if (si.url[0]) jb_str(&b, si.url); else jb_raw(&b, "null");
         jb_printf(&b, ",\"expiresAt\":%lld", si.expires_ms);
         if (si.error[0]) { jb_raw(&b, ",\"error\":"); jb_str(&b, si.error); }
+        if (si.message[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, si.message); }
         if (si.account[0]) { jb_raw(&b, ",\"account\":"); jb_str(&b, si.account); }
         jb_raw(&b, "}");
     } else jb_raw(&b, "null");

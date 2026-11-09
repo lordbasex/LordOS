@@ -179,6 +179,9 @@ EOF
     # Cloud without a screen: status glyphs, space, providers, menus, sidebar, menu bar, notifications, the mock's shape (sdk/cloudmodel.js)
     if have node; then run "cloud-model-test (sdk/cloudmodel.js)" node tests/cloud_model_test.mjs
     else skip "cloud-model-test" "node"; fi
+    # a browser sign-in against a stand-in rclone: a second account, a drive that can't be opened, none (#87)
+    if have python3 && [ -x build/cloud-harness ]; then run "cloud-signin-fake (src/cloud, OneDrive's drive choice)" sh tests/cloud_signin_fake.sh build
+    else skip "cloud-signin-fake" "python3 and build/cloud-harness"; fi
     if have node; then run "mail-foldertree-test (apps/mail)" node tests/mail_foldertree_test.mjs; fi
     if have node; then run "mail-auth-model-test (sdk/mailauthmodel.js)" node tests/mail_auth_model_test.mjs; fi
     if have node; then run "balance-model-test (apps/settings/balance.js)" node tests/balance_model_test.mjs; fi

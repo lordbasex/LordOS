@@ -92,6 +92,7 @@
   "cloud.signInAgain": "Accedi di nuovo: il fornitore non accetta più l’accesso di questo account",
   "cloud.signinCancelled": "Accesso annullato",
   "cloud.signinFailed": "L’accesso non è stato completato. Riprova",
+  "cloud.signinNoDrive": "Hai effettuato l’accesso, ma LordOS non ha trovato in questo account uno spazio che possa aprire. Apri l’account una volta sul sito del fornitore (così si crea il suo spazio), poi riprova",
   "cloud.signinTimeout": "L’accesso ha richiesto più di 5 minuti. Riprova",
   "cloud.startFailed": "Impossibile avviare il servizio cloud",
   "cloud.tooMany": "Ci sono già 32 account cloud",

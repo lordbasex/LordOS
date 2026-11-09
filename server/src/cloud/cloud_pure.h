@@ -125,6 +125,28 @@ int  cloud_auth_url(const char *line, char *url, size_t n);
 int  cloud_auth_token(const char *out, char *tok, size_t n, char *opts, size_t on);
 /* config/create's next question asked non-interactively: what to answer (the default, except these) */
 const char *cloud_default_answer(const char *option, const char *def);
+/* #87: a choice rclone offers that may not work, the drive of a browser sign-in (OneDrive's config_driveid lists every
+ * drive /me/drives gives, a stale one sometimes first, and the account's own drive last). When the next step fails and
+ * rclone's state machine goes back (its ConfigError), the choice is made again with one not tried yet. One run of
+ * answer_states keeps one CloudChoices (zeroed). */
+#define CLOUD_CHOICES_MAX 8
+#define CLOUD_CHOICE_RETRIES 4
+typedef struct {
+    char name[64];                  /* the question whose choices are tried */
+    int n;                          /* how many it offers (at most CLOUD_CHOICES_MAX count) */
+    char tried[CLOUD_CHOICES_MAX][256];
+    int ntried;
+    int last;                       /* the last answer given was this question's */
+    int retries;
+} CloudChoices;
+/* the answer to give: ans (the default, cloud_default_answer's) unless the question was asked again after a failure, then
+ * the first example not tried yet. ex: the question's example values, nex of them. */
+const char *cloud_choose(CloudChoices *c, const char *name, const char *ans, const char *const *ex, int nex);
+/* rclone answered an error that goes back to a state: 1 to go there again (another choice remains), 0 to give up */
+int         cloud_choice_retry(CloudChoices *c);
+/* rclone's words when a sign-in worked but the account has no drive LordOS can use (OneDrive: none listed, or none that
+ * opens): cloud.signinNoDrive instead of cloud.signinFailed */
+int         cloud_no_drive_msg(const char *msg);
 
 /* ---- options ---- */
 #define CLOUD_BW_MAX (10L * 1024 * 1024)        /* KiB/s */

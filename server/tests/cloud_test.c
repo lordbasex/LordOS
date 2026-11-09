@@ -328,6 +328,48 @@ static void t_signin(void) {
     CHECK(!strcmp(cloud_default_answer("config_shared_client_id", "false"), "true"));
     CHECK(!strcmp(cloud_default_answer("config_is_local", "true"), "false"));
     CHECK(!strcmp(cloud_default_answer("region", "eu"), "eu") && !strcmp(cloud_default_answer("x", NULL), "") && !strcmp(cloud_default_answer(NULL, "d"), "d"));
+
+    /* #87: a work or school account's token is long (a JWT of a few KB): the blob still reads whole */
+    {
+        static char blob[12000], b64[17000], o3[17200], big[16384];
+        char at[4001], rt[1501];
+        memset(at, 'A', 4000); at[4000] = 0;
+        memset(rt, 'r', 1500); rt[1500] = 0;
+        snprintf(blob, sizeof blob, "{\"token\":\"{\\\"access_token\\\":\\\"%s\\\",\\\"token_type\\\":\\\"Bearer\\\",\\\"refresh_token\\\":\\\"%s\\\","
+                 "\\\"expiry\\\":\\\"2026-11-09T15:00:00Z\\\",\\\"expires_in\\\":3599}\"}", at, rt);
+        cloud_b64((const unsigned char *)blob, strlen(blob), b64);
+        snprintf(o3, sizeof o3, "Paste the following into your remote machine --->\n%s\n<---End paste\n", b64);
+        CHECK(cloud_auth_token(o3, big, sizeof big, opts, sizeof opts) && strstr(big, "\"refresh_token\":\"rrr") && strlen(big) > 5500);
+    }
+    /* #87: the drive of a browser sign-in is chosen again after rclone can't open it (OneDrive's driveid_final error) */
+    {
+        CloudChoices ch;
+        memset(&ch, 0, sizeof ch);
+        const char *drives[] = { "stale1", "b!real", "c" };
+        CHECK(!strcmp(cloud_choose(&ch, "config_type", "onedrive", (const char *[]){ "onedrive", "sharepoint" }, 2), "onedrive"));
+        CHECK(!cloud_choice_retry(&ch));                                          /* not a drive: an error after it stands */
+        CHECK(!strcmp(cloud_choose(&ch, "config_driveid", "stale1", drives, 3), "stale1"));    /* rclone's default first */
+        CHECK(cloud_choice_retry(&ch));                                           /* its error: go back */
+        CHECK(!strcmp(cloud_choose(&ch, "config_type", "onedrive", (const char *[]){ "onedrive", "sharepoint" }, 2), "onedrive"));
+        CHECK(!strcmp(cloud_choose(&ch, "config_driveid", "stale1", drives, 3), "b!real"));    /* the next one */
+        CHECK(!strcmp(cloud_choose(&ch, "config_drive_ok", "true", (const char *[]){ "true", "false" }, 2), "true"));
+        CHECK(!cloud_choice_retry(&ch));                                          /* an error after "Drive OK?": no retry */
+        CHECK(!strcmp(cloud_choose(&ch, "config_driveid", "stale1", drives, 3), "c"));
+        CHECK(cloud_choice_retry(&ch) == 0);                                      /* all three tried */
+        CHECK(!strcmp(cloud_choose(&ch, "config_driveid", "stale1", drives, 3), "stale1") && !ch.last);
+        /* one drive only: nothing to try again; a yes/no is never rotated */
+        memset(&ch, 0, sizeof ch);
+        CHECK(!strcmp(cloud_choose(&ch, "config_driveid", "only", (const char *[]){ "only" }, 1), "only") && !cloud_choice_retry(&ch));
+        CHECK(!strcmp(cloud_choose(&ch, "config_refresh_token", "false", (const char *[]){ "true", "false" }, 2), "false") && !cloud_choice_retry(&ch));
+        /* at most CLOUD_CHOICE_RETRIES times */
+        memset(&ch, 0, sizeof ch);
+        const char *many[] = { "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8" };
+        int tries = 0;
+        for (int i = 0; i < 20; i++) { cloud_choose(&ch, "config_driveid", "d1", many, 8); if (!cloud_choice_retry(&ch)) break; tries++; }
+        CHECK(tries == CLOUD_CHOICE_RETRIES);
+        CHECK(cloud_no_drive_msg("No drives found") && cloud_no_drive_msg("Failed to query available drives: /me/drives: 404; /me/drive: 404") &&
+              cloud_no_drive_msg("Failed to query root for drive \"x\": itemNotFound") && !cloud_no_drive_msg("invalid_grant") && !cloud_no_drive_msg(NULL));
+    }
 }
 
 static void t_options(void) {

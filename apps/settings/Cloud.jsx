@@ -1300,6 +1300,10 @@ function SignInCard({ st, info }) {
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(failed ? 'cloud.signin.failedTitle' : 'cloud.signin.title', { provider: p.label || '' })}</Text>
           <Dim t={t} style={{ fontSize: typeScale.body, lineHeight: 1.45 }}>
             {failed ? (info.error ? errorText(info.error) : si && si.error ? errorText(si.error) : tr('cloud.signin.expired')) : tr('cloud.signin.body', { name: info.name })}</Dim>
+          {/* what rclone said when the account couldn't be set up after the sign-in (#87): for the person and a report */}
+          {failed && !info.error && si && si.message ? (
+            <Dim t={t} style={{ fontSize: typeScale.caption, lineHeight: 1.4 }}>{tr('cloud.signin.rcloneSaid', { message: si.message })}</Dim>
+          ) : null}
         </View>
         {left ? <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('cloud.signin.left', { time: left })}</Text> : null}
       </View>

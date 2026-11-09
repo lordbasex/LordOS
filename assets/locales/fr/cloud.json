@@ -258,6 +258,7 @@
   "signin.body": "La page de connexion s’est ouverte dans votre navigateur par défaut. Quand vous y autorisez l’accès, « {name} » apparaît dans Fichiers sous Cloud.",
   "signin.left": "Encore {time}",
   "signin.expired": "Le temps pour se connecter est écoulé.",
+  "signin.rcloneSaid": "rclone a répondu : {message}",
   "signin.again": "Rouvrir la page de connexion",
   "signin.tryAgain": "Réessayer",
   "signin.rclone": "La connexion passe par rclone, le moteur open source que LordOS utilise pour le Cloud. La page du fournisseur vous demandera d’autoriser rclone.",

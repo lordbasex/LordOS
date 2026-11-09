@@ -258,6 +258,7 @@
   "signin.body": "A página de acesso abriu no navegador padrão. Quando você permitir o acesso lá, “{name}” aparece em Arquivos, em Nuvem.",
   "signin.left": "Faltam {time}",
   "signin.expired": "O tempo para entrar acabou.",
+  "signin.rcloneSaid": "O rclone disse: {message}",
   "signin.again": "Abrir a página de acesso de novo",
   "signin.tryAgain": "Tentar de novo",
   "signin.rclone": "O acesso usa o rclone, o motor de código aberto que o LordOS usa para a Nuvem. A página do provedor vai pedir para você autorizar o rclone.",

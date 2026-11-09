@@ -207,6 +207,20 @@ not offered.
    `127.0.0.1:53682`, which only lives during the sign-in.
 3. The token goes to the keyring (4.3), the account is mounted, and Files shows it.
 
+After the token, `config/create` runs the backend's own questions, answered non-interactively (`answer_states`: the
+default, or `cloud_default_answer`'s). OneDrive asks which drive (`config_driveid`, every drive `/me/drives` gives plus
+`/me/drive`, rclone's default the first) and then opens its root (`driveid_final`). The first drive listed is not always
+one that opens: when the root query fails, rclone answers with an error that sends it back to `choose_type` (its
+`ConfigError`). Until 0.8.8.7 LordOS gave up there and the sign-in card said "The sign-in to … didn't finish", although
+the browser had shown rclone's "Success!" page (#87, a second account). Now that state is run again, as rclone's own
+`config` does after showing the error, and the drive question gets the next drive not tried yet (`cloud_choose`,
+`cloud_choice_retry` in `cloud_pure.c`; only `config_driveid`, at most 4 times). With no drive that opens, the sign-in
+fails with `cloud.signinNoDrive` ("open the account once on the provider's website", which makes a work account's
+drive), the card shows rclone's own words (`signin.message`), and the half-made remote is deleted from rclone.
+`tests/cloud_signin_fake.sh` runs the sign-in through `build/cloud-harness` against `tests/cloud_fake_rclone.py`, a
+stand-in that answers OneDrive's state machine as rclone v1.75.2 runs it (one drive, a stale drive first, none, and a
+second account of the same kind); it is in `make test`. Not verified against a real Microsoft account.
+
 Client IDs (decided 2026-11-06): **0.8.8.5 uses rclone's own built-in OAuth client IDs.** `lordos-rclone` is upstream rclone,
 unpatched, so the person is signing in to rclone, exactly as with Debian's or any distribution's rclone package. Nothing hides it:
 the provider's consent page names rclone, and the sign-in sheet says so ("Signing in uses rclone, the open source engine LordOS

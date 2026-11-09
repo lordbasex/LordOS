@@ -258,6 +258,7 @@
   "signin.body": "La página de inicio de sesión se abrió en tu navegador predeterminado. Cuando permitas el acceso ahí, «{name}» aparece en Archivos, en Nube.",
   "signin.left": "Quedan {time}",
   "signin.expired": "Se terminó el tiempo para iniciar sesión.",
+  "signin.rcloneSaid": "rclone dijo: {message}",
   "signin.again": "Abrir de nuevo la página de inicio de sesión",
   "signin.tryAgain": "Probá de nuevo",
   "signin.rclone": "El inicio de sesión usa rclone, el motor de código abierto que LordOS usa para la Nube. La página del proveedor te va a pedir que permitas rclone.",

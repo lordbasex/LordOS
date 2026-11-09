@@ -258,6 +258,7 @@
   "signin.body": "The sign-in page opened in your default browser. When you allow access there, “{name}” appears in Files under Cloud.",
   "signin.left": "{time} left",
   "signin.expired": "The time to sign in ran out.",
+  "signin.rcloneSaid": "rclone said: {message}",
   "signin.again": "Open Sign-in Page Again",
   "signin.tryAgain": "Try Again",
   "signin.rclone": "Signing in uses rclone, the open source engine LordOS uses for Cloud. The provider's page will ask you to allow rclone.",

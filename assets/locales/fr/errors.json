@@ -92,6 +92,7 @@
   "cloud.signInAgain": "Reconnectez-vous : le fournisseur n’accepte plus la connexion de ce compte",
   "cloud.signinCancelled": "Connexion annulée",
   "cloud.signinFailed": "La connexion n’a pas abouti. Réessayez",
+  "cloud.signinNoDrive": "Vous êtes connecté, mais LordOS n’a trouvé dans ce compte aucun espace qu’il puisse ouvrir. Ouvrez le compte une fois sur le site du fournisseur (cela crée son espace), puis réessayez",
   "cloud.signinTimeout": "La connexion a pris plus de 5 minutes. Réessayez",
   "cloud.startFailed": "Impossible de démarrer le service de nuage",
   "cloud.tooMany": "Il y a déjà 32 comptes en nuage",

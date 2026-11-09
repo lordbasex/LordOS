@@ -258,6 +258,7 @@
   "signin.body": "La pagina di accesso si è aperta nel browser predefinito. Quando lì consenti l’accesso, «{name}» compare in File sotto Cloud.",
   "signin.left": "Restano {time}",
   "signin.expired": "Il tempo per accedere è scaduto.",
+  "signin.rcloneSaid": "rclone ha risposto: {message}",
   "signin.again": "Riapri la pagina di accesso",
   "signin.tryAgain": "Riprova",
   "signin.rclone": "L’accesso usa rclone, il motore open source che LordOS usa per il Cloud. La pagina del fornitore ti chiederà di autorizzare rclone.",
