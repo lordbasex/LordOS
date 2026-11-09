@@ -147,6 +147,8 @@
   "disk.imageTooLarge": "A imagem ({size} bytes) não cabe em {name} ({capacity} bytes)",
   "disk.internalNeedsAdmin": "Discos internos são gerenciados por um administrador",
   "disk.isPartition": "{name} é uma partição: é preciso o disco inteiro",
+  "disk.opticalReadOnly": "{name} é uma unidade óptica: um disco só é montado (somente leitura) ou ejetado",
+  "disk.ejectFailed": "Não foi possível ejetar {name}: {errno}",
   "disk.missingTool": "Falta {program}",
   "disk.mountFailed": "Não foi possível montar {name}: {errno}",
   "disk.mountedElsewhere": "{name} está montado em {path}: desmonte-o manualmente",

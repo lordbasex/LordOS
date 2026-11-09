@@ -147,6 +147,8 @@
   "disk.imageTooLarge": "The image ({size} bytes) does not fit on {name} ({capacity} bytes)",
   "disk.internalNeedsAdmin": "Internal disks are managed by an administrator",
   "disk.isPartition": "{name} is a partition: the whole disk is needed",
+  "disk.opticalReadOnly": "{name} is an optical drive: a disc is only mounted (read-only) or ejected",
+  "disk.ejectFailed": "Could not eject {name}: {errno}",
   "disk.missingTool": "{program} is missing",
   "disk.mountFailed": "Could not mount {name}: {errno}",
   "disk.mountedElsewhere": "{name} is mounted on {path}: unmount it manually",

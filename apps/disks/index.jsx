@@ -28,7 +28,10 @@ export function partTitle(p, tr) { return p.label || p.partlabel || tr('disks.pa
 export function useCanTouch() {
   const info = useSystemInfo(60000);
   const isAdmin = admin.available() && info.admin;
-  return { isAdmin, can: (d) => !!d && !d.system && !d.ro && (d.removable || isAdmin) };
+  // can: changes what is on the disk (format, erase, rename, image); use: mount, unmount, eject, which a
+  // read-only disk (a CD or DVD, a locked card) also allows
+  const use = (d) => !!d && !d.system && (d.removable || isAdmin);
+  return { isAdmin, use, can: (d) => use(d) && !d.ro };
 }
 
 // Width of a box after layout (re-measured on every render, as the Player does).
@@ -104,7 +107,7 @@ function UsageBar({ disk, part }) {
   );
 }
 
-const transportName = (tr, d) => tr(`disks.bus.${['usb', 'sata', 'nvme', 'virtio', 'mmc', 'loop', 'scsi'].includes(d.transport) ? d.transport : 'scsi'}`);
+const transportName = (tr, d) => tr(`disks.bus.${['usb', 'sata', 'nvme', 'virtio', 'mmc', 'loop', 'optical', 'scsi'].includes(d.transport) ? d.transport : 'scsi'}`);
 
 // One row of the source list: a disk (two lines, bold) or one of its partitions (indented).
 function SideRow({ selected, onClick, glyph, title, sub, indent }) {
@@ -163,16 +166,16 @@ function Sidebar({ list, sel, onSel }) {
 function DiskToolbar({ disk, part, onDialog, run, busy }) {
   const { t: tr } = useLocale();
   const t = useTheme();
-  const { can } = useCanTouch();
+  const { can, use } = useCanTouch();
   const box = useRef(null);
   const width = useWidth(box, 700);
-  const ok = can(disk);
+  const ok = can(disk), io = use(disk);
   const target = part || disk;
   const mountable = target.fstype && target.fstype !== 'swap' && target.fstype !== 'crypto_LUKS';
   const actions = [];
-  if (ok && mountable && !target.mountpoint) actions.push(['mount', tr('disks.mount'), () => run('disk-mount', target.name, tr('disks.mounted'))]);
-  if (ok && target.mountpoint) actions.push(['unmount', tr('disks.unmount'), () => run('disk-unmount', target.name, tr('disks.unmounted'))]);
-  if (ok && !part && disk.removable) actions.push(['eject', tr('disks.eject'), () => run('disk-eject', disk.name, tr('disks.ejected'))]);
+  if (io && mountable && !target.mountpoint) actions.push(['mount', tr('disks.mount'), () => run('disk-mount', target.name, tr('disks.mounted'))]);
+  if (io && target.mountpoint) actions.push(['unmount', tr('disks.unmount'), () => run('disk-unmount', target.name, tr('disks.unmounted'))]);
+  if (io && !part && disk.removable) actions.push(['eject', tr('disks.eject'), () => run('disk-eject', disk.name, tr('disks.ejected'))]);
   if (ok) actions.push(['format', tr('disks.format'), () => onDialog({ kind: 'format' })]);
   if (ok && part && ['vfat', 'exfat', 'ext2', 'ext3', 'ext4', 'ntfs'].includes(part.fstype)) actions.push(['label', tr('disks.rename'), () => onDialog({ kind: 'label' })]);
   if (ok) actions.push(['erase', tr('disks.erase'), () => onDialog({ kind: 'erase' })]);

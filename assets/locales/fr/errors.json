@@ -147,6 +147,8 @@
   "disk.imageTooLarge": "L’image ({size} octets) ne tient pas sur {name} ({capacity} octets)",
   "disk.internalNeedsAdmin": "Les disques internes sont gérés par un administrateur",
   "disk.isPartition": "{name} est une partition : il faut le disque entier",
+  "disk.opticalReadOnly": "{name} est un lecteur optique : un disque est seulement monté (en lecture seule) ou éjecté",
+  "disk.ejectFailed": "Impossible d'éjecter {name} : {errno}",
   "disk.missingTool": "{program} est manquant",
   "disk.mountFailed": "Impossible de monter {name} : {errno}",
   "disk.mountedElsewhere": "{name} est monté sur {path} : démontez-le manuellement",

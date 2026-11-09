@@ -20,6 +20,7 @@
   "bus.virtio": "Virtuale (virtio)",
   "bus.mmc": "Scheda SD",
   "bus.loop": "Immagine disco",
+  "bus.optical": "CD/DVD",
   "bus.scsi": "SCSI",
   "table.gpt": "GUID (GPT)",
   "table.dos": "MBR (DOS)",

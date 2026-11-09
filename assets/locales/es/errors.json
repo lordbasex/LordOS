@@ -147,6 +147,8 @@
   "disk.imageTooLarge": "La imagen ({size} bytes) no entra en {name} ({capacity} bytes)",
   "disk.internalNeedsAdmin": "Los discos internos los maneja un administrador",
   "disk.isPartition": "{name} es una partición: hace falta el disco entero",
+  "disk.opticalReadOnly": "{name} es una lectora óptica: un disco solo se monta (de solo lectura) o se expulsa",
+  "disk.ejectFailed": "No se pudo expulsar {name}: {errno}",
   "disk.missingTool": "Falta {program}",
   "disk.mountFailed": "No se pudo montar {name}: {errno}",
   "disk.mountedElsewhere": "{name} está montado en {path}: desmontalo a mano",

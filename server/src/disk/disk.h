@@ -38,7 +38,8 @@ int  disk_mounts(const char *name, char *out, size_t n);
 
 /* List for JS: [{ name, model, vendor, serial, size, removable, transport, rotational, ro,
  * system, table, fstype, label, uuid, mountpoint, used, avail, partitions: [{ name, number, size,
- * fstype, label, uuid, partlabel, mountpoint, used, avail, start }] }]. malloc'd; NULL on failure. */
+ * fstype, label, uuid, partlabel, mountpoint, used, avail, start }] }]. malloc'd; NULL on failure.
+ * An optical drive (sr*) is listed only while it holds a disc, with transport "optical" and ro true. */
 char *disk_list_json(void);
 /* Format and rename programs present on this machine: {"fat32":1,"exfat":1,"ext4":1,"ntfs":0} */
 char *disk_tools_json(void);

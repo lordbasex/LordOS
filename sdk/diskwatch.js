@@ -9,12 +9,15 @@
 // refreshed (smart.refresh: smart-health, which never wakes a resting disk). A notice only when a
 // disk is worse than the last time it was noticed (settings.monitor.diskHealth, by model and serial).
 // Both are off with settings.monitor.diskAlerts = false (the switch in Monitor → Disks).
+// Discs: a CD or DVD put in an optical drive while the session runs gets a notice whose Open mounts it
+// (disk-mount, read-only) and shows it in Files (a VirtualBox Guest Additions image, an install disc).
 import { settings } from './settings.js';
 import { notify } from './notify.js';
 import { t } from './i18n.js';
 import { wm } from './windows.js';
 import { smart, diskTempLimit, diskAlertPrefs } from './smart.js';
 import { disks, needsDiskFormats, openDiskFormats } from './disks.js';
+import { admin } from './admin.js';
 import { HEALTH_RANK } from './smartparse.js';
 
 const TEMP_EVERY = 30 * 1000, HEALTH_EVERY = 6 * 3600 * 1000, HEALTH_FIRST = 3 * 60 * 1000;
@@ -102,6 +105,34 @@ function offerFormats(first) {
   }
 }
 
+// A disc put in while the session runs: one notice per disc while it stays in the drive.
+const discs = new Set();
+function discsOf() {
+  const out = [];
+  try { for (const d of lord.disks.list() || []) if (d.transport === 'optical' && !d.system && d.fstype) out.push(d); } catch (e) { /* none */ }
+  return out;
+}
+function openDisc(d) {
+  const show = (path) => wm.open('files', { new: true, args: { path } });
+  if (d.mountpoint) { show(d.mountpoint); return; }
+  admin.run('disk-mount', d.name, null, { quiet: true }).then(
+    (at) => { const path = String(at || '').trim(); if (path.startsWith('/')) show(path); },
+    (e) => notify({ app: 'files', title: t('files.disk.discTitle', { name: d.label || d.model || d.name }), body: e.message }));
+}
+function offerDiscs(first) {
+  const now = discsOf();
+  const keys = new Set(now.map((d) => `${d.name}|${d.uuid || d.label}`));
+  for (const k of [...discs]) if (!keys.has(k)) discs.delete(k);      // taken out: a new insert is news again
+  for (const d of now) {
+    const key = `${d.name}|${d.uuid || d.label}`;
+    if (discs.has(key)) continue;
+    discs.add(key);
+    if (first || d.mountpoint) continue;
+    notify({ app: 'files', title: t('files.disk.discTitle', { name: d.label || d.model || d.name }), body: t('files.disk.discBody'),
+      actions: [{ id: 'open', label: t('files.disk.discOpen'), run: () => openDisc(d) }] });
+  }
+}
+
 export function startDiskWatch() {
   if (started || typeof lord === 'undefined' || !lord.monitor?.watchDisks || !lord.disks || typeof lord.greeter !== 'undefined') return;
   started = true;
@@ -109,5 +140,6 @@ export function startDiskWatch() {
   setInterval(checkTemps, TEMP_EVERY);
   setTimeout(() => { checkHealth(); setInterval(checkHealth, HEALTH_EVERY); }, HEALTH_FIRST);
   offerFormats(true);
-  disks.watch(() => offerFormats(false));
+  offerDiscs(true);
+  disks.watch(() => { offerFormats(false); offerDiscs(false); });
 }

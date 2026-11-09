@@ -344,8 +344,9 @@ static void fs_fields(Buf *b, const char *name) {
     else bput(b, "\"used\":null,\"avail\":null,\"fssize\":null,");
 }
 
+/* Optical drives (sr*) are listed only while they hold a disc (an empty drive has size 0) */
 static int skip_disk(const char *n) {
-    static const char *const pre[] = { "ram", "zram", "dm-", "md", "sr", "fd", "nbd", "mtdblock", "zd" };
+    static const char *const pre[] = { "ram", "zram", "dm-", "md", "fd", "nbd", "mtdblock", "zd" };
     for (size_t i = 0; i < sizeof pre / sizeof *pre; i++) if (!strncmp(n, pre[i], strlen(pre[i]))) return 1;
     if (!strncmp(n, "loop", 4)) {      /* only loops backed by a file (tests, images) */
         char p[PATH_MAX];
@@ -359,7 +360,8 @@ static void transport(const char *name, char *out, size_t n) {
     char bus[32] = "", path[256] = "";
     disk_udev_prop(name, "ID_BUS", bus, sizeof bus);
     disk_udev_prop(name, "ID_PATH", path, sizeof path);
-    if (!strcmp(bus, "usb") || strstr(path, "-usb-")) snprintf(out, n, "usb");
+    if (!strncmp(name, "sr", 2)) snprintf(out, n, "optical");
+    else if (!strcmp(bus, "usb") || strstr(path, "-usb-")) snprintf(out, n, "usb");
     else if (!strncmp(name, "nvme", 4)) snprintf(out, n, "nvme");
     else if (!strncmp(name, "mmcblk", 6)) snprintf(out, n, "mmc");
     else if (!strncmp(name, "loop", 4)) snprintf(out, n, "loop");
@@ -411,8 +413,9 @@ char *disk_list_json(void) {
         char ro[8] = "0", rot[8] = "0";
         sysfs(n, "ro", ro, sizeof ro);
         sysfs(n, "queue/rotational", rot, sizeof rot);
+        /* a disc is never written here (format, erase and image copies refuse it), whatever the drive says */
         bput(&b, "\"size\":%llu,\"removable\":%s,\"ro\":%s,\"rotational\":%s,\"system\":%s,", (unsigned long long)size,
-             disk_is_removable(n) ? "true" : "false", !strcmp(ro, "1") ? "true" : "false", !strcmp(rot, "1") ? "true" : "false",
+             disk_is_removable(n) ? "true" : "false", !strcmp(ro, "1") || !strncmp(n, "sr", 2) ? "true" : "false", !strcmp(rot, "1") ? "true" : "false",
              strstr(sys, key) ? "true" : "false");
         fs_fields(&b, n);
         /* partitions */

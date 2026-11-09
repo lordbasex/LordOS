@@ -48,7 +48,7 @@ export const platform = {
     return disks.list().filter((d) => d.removable && !d.system && !/^(loop|zram|sr|dm-|md)/.test(d.name)).map(driveOf);
   },
   watchDrives(fn) { return disks.watch(fn); },
-  hiddenDriveCount() { return disks.list().filter((d) => !d.removable || d.system).length; },
+  hiddenDriveCount() { return disks.list().filter((d) => (!d.removable || d.system) && d.transport !== 'optical').length; },
 
   // ---- releases and downloads (curl as the user, in ~/.cache/lordos/imager) ----
   cacheDir: () => `${fs.home()}/${CACHE}`,

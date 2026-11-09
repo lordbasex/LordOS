@@ -61,11 +61,11 @@ All are in the closed table of `admin.c` (macro `DISK_ADMIN_ACTIONS` in `disk/di
 | Action | Argument | What it does |
 |---|---|---|
 | `disk-smart` | `disk` | Reads health. `LOG smart {…}` (summary), one `LOG attr {…}` per ATA attribute and `OK <ms>` |
-| `disk-mount` | `device` | Mounts at `/media/<user>/<label>` with `mount(2)`: `nosuid,nodev`, and on FAT, exFAT and NTFS (`ntfs3`) with the user's `uid=`/`gid=`. ISO 9660 and UDF are read-only. `OK <folder>` |
+| `disk-mount` | `device` | Mounts at `/media/<user>/<label>` with `mount(2)`: `nosuid,nodev`, and on FAT, exFAT and NTFS (`ntfs3`) with the user's `uid=`/`gid=`. ISO 9660 and UDF are read-only, and a disc in an optical drive (`sr*`) always is. `OK <folder>` |
 | `share-mount` | `smb\|nfs`, private IPv4, share or export path, user, domain, password (one per line; the UI sends it with `{ quiet: true }`) | anyone. Mounts a network share at `/media/<user>/<share> on <address>` with the kernel's `cifs` or `nfs` client through `fsopen`/`fsconfig`/`fsmount`/`move_mount`, one call per option: `nosuid,nodev`, soft, short timeouts, SMB 2 or later. Everything is validated as root (`lan/lanaddr.c`); no names, no program, no shell. `OK <folder>` (`FILES.md`, "Network") |
 | `share-unmount` | folder | anyone. Only `/media/<user>/<one folder>`, and only if `/proc/self/mountinfo` says the last mount there is `cifs`, `smb3`, `nfs` or `nfs4` |
 | `disk-unmount` | `device` or `disk` | Unmounts whatever is under `/media` or `/run/media` (`umount2`) and removes the empty folder |
-| `disk-eject` | `disk` | Unmounts everything, flushes caches (`BLKFLSBUF`) and sends `START STOP UNIT` (eject). Over USB it also powers the device off (`/sys/block/<d>/device/delete`), like "Power Off" in GNOME Disks |
+| `disk-eject` | `disk` | Unmounts everything, flushes caches (`BLKFLSBUF`) and sends `START STOP UNIT` (eject). Over USB it also powers the device off (`/sys/block/<d>/device/delete`), like "Power Off" in GNOME Disks. An optical drive gets its door unlocked and `CDROMEJECT` (the tray opens; in a virtual machine the image is removed) |
 | `disk-format` | `device\nfat32\|exfat\|ext4\|ntfs\nlabel` | **Whole disk:** wipes the signatures (first and last MiB) and writes our own MBR table with one partition from 1 MiB. A `loop` image without `partscan` gets it turned on. Then the fixed-path `mkfs` runs. On ext4 the root belongs to the user (`-E root_owner=uid:gid`) |
 | `disk-label` | `partition\nlabel` | `fatlabel`, `exfatlabel`, `e2label` or `ntfslabel`. FAT, exFAT and NTFS must be unmounted |
 | `disk-erase` | `device\nquick\|zero` | `quick`: wipes the signatures (first and last MiB) and rereads the table. `zero`: writes zeros everywhere, with progress, cancellable |
@@ -87,7 +87,11 @@ and `disk-eject` or `disk-unmount` from its ⏏ (`FILES.md`).
 
 - **The same rules for all of them, on the root side (`target()` in `disk_admin.c`):**
   - the name must be a real block device (`sd*`, `vd*`, `hd*`, `xvd*`, `nvme*`, `mmcblk*`,
-    `loop*`, lowercase letters and digits only);
+    `loop*`, `sr*`, lowercase letters and digits only);
+  - an optical drive (`sr*`) is accepted only by `disk-mount` (always read-only), `disk-unmount` and
+    `disk-eject`; format, rename, erase, the image copy, SMART and the Imager refuse it
+    (`disk.opticalReadOnly`). `lord.disks.list()` shows a drive only while it holds a disc, with
+    `transport: "optical"` and `ro: true`;
   - `/dev/<name>` is checked with `lstat`: a block device with the same major:minor as sysfs;
   - a "whole disk" action refuses partitions, and vice versa.
 - **The system disk is never touched** (`disk_is_system`). It is the disk of any partition that

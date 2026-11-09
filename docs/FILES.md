@@ -45,10 +45,14 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
     the user can't open, and `/proc`, `/sys`, `/dev` and `/run`, show a lock; opening one says
     "Permission denied", or that Files doesn't show the system's internal folders), the disks and USB sticks mounted in `/media/$USER` or
     `/run/media/$USER` (checked every 4 s; ⏏ on hover ejects a removable disk with `disk-eject` and
-    unmounts another disk's partition with `disk-unmount`), every other disk with a file system that isn't mounted
-    (dimmed; a click mounts it with `disk-mount` and opens it; an internal one asks for an
+    unmounts another disk's partition with `disk-unmount`), every other disk with a file system that isn't mounted, a CD or DVD
+    in an optical drive among them (dimmed; a click mounts it with `disk-mount` and opens it, a disc read-only; an internal one asks for an
     administrator, as in Disks; the disk the system runs from is left out) and the Trash;
   - Color tags (they filter).
+
+  A disc put in an optical drive during the session (a VirtualBox Guest Additions image, an install
+  disc) brings a notice whose Open mounts it read-only and opens it in a new Files window
+  (`sdk/diskwatch.js`).
 
   Folders and the Trash accept dragged files.
 - **Views** (❖1 to ❖4):

@@ -4,7 +4,8 @@
  *                                           NVMe health log (NVME_IOCTL_ADMIN_CMD)
  *   disk-mount <device>                     mounts at /media/<user>/<label> (nosuid,nodev)
  *   disk-unmount <device>                   unmounts whatever is under /media or /run/media
- *   disk-eject <disk>                       unmounts everything, flushes caches and ejects it (USB: powers off)
+ *   disk-eject <disk>                       unmounts everything, flushes caches and ejects it (USB: powers off;
+ *                                           an optical drive opens its tray)
  *   disk-format <dev>\n<fs>\n<label>        fat32 | exfat | ext4 | ntfs (if mkfs.ntfs exists). A whole
  *                                           disk gets our own MBR table with one partition
  *   disk-label <partition>\n<label>         rename the volume
@@ -13,8 +14,11 @@
  *   disk-cancel <disk>                      stops a zero erase or an image copy
  *
  * Rules, all on the root side (the app is not trusted):
- *   - the name is a real block device (sd*, vd*, hd*, xvd*, nvme*, mmcblk*, loop*), with
+ *   - the name is a real block device (sd*, vd*, hd*, xvd*, nvme*, mmcblk*, loop*, sr*), with
  *     /dev/<name> a block device with the same number as in sysfs;
+ *   - an optical drive (sr*) only for disk-mount, disk-unmount and disk-eject: a disc is mounted
+ *     read-only (iso9660 and udf are read-only in DISK_KINDS) and never formatted, erased, renamed,
+ *     written or asked for SMART;
  *   - never the system disk (disk_is_system: /, /usr, /var, /home, /boot, swap, live…), except
  *     to read its SMART;
  *   - internal disks only for an administrator; removable ones (USB, cards) for any session user,
@@ -33,6 +37,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <linux/cdrom.h>
 #include <linux/fs.h>
 #include <linux/loop.h>
 #include <linux/nvme_ioctl.h>
@@ -60,6 +65,7 @@ typedef struct {
     char dev[48];                       /* /dev/<name> */
     int part;                           /* is a partition */
     int removable;
+    int optical;                        /* an optical drive (sr*) */
     uint64_t size;
 } Target;
 
@@ -81,16 +87,21 @@ static int split2(char *s, char **a, char **b) {
 }
 
 static int known_kind(const char *n) {
-    static const char *const pre[] = { "sd", "vd", "hd", "xvd", "nvme", "mmcblk", "loop" };
+    static const char *const pre[] = { "sd", "vd", "hd", "xvd", "nvme", "mmcblk", "loop", "sr" };
     for (size_t i = 0; i < sizeof pre / sizeof *pre; i++) if (!strncmp(n, pre[i], strlen(pre[i]))) return 1;
     return 0;
 }
 
-/* want: 0 any, 1 whole disk only, 2 partition only. allow_system: read-only use (SMART):
- * also allowed on the system disk and for any user. */
+/* want: 0 any, 1 whole disk only, 2 partition only; | OPTICAL_OK: an optical drive is accepted (mount,
+ * unmount, eject; everything else refuses it). allow_system: read-only use (SMART): also allowed on the
+ * system disk and for any user. */
+#define OPTICAL_OK 4
 static int target(const AdminReq *r, const char *name, int want, int allow_system, Target *t) {
     memset(t, 0, sizeof *t);
     if (!disk_valid_name(name) || !known_kind(name)) { admin_err("disk.badDevice", NULL); return -1; }
+    t->optical = !strncmp(name, "sr", 2);
+    if (t->optical && !(want & OPTICAL_OK)) { admin_err("disk.opticalReadOnly", "name", name, NULL); return -1; }
+    want &= 3;
     char p[PATH_MAX], devno[32];
     snprintf(p, sizeof p, "/sys/class/block/%s/dev", name);
     FILE *f = fopen(p, "re");
@@ -224,7 +235,7 @@ static void sanitize_dir(const char *in, char *out, size_t n) {
 void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     (void)len;
     Target t;
-    if (target(r, arg, 0, 0, &t)) return;
+    if (target(r, arg, OPTICAL_OK, 0, &t)) return;
     if (disk_mounts(t.name, NULL, 0)) { admin_err("disk.alreadyMounted", "name", t.name, NULL); return; }
     char fs[32], label[256], uuid[96];
     disk_udev_prop(t.name, "ID_FS_TYPE", fs, sizeof fs);
@@ -257,7 +268,8 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     snprintf(sp, sizeof sp, "/sys/class/block/%s/ro", t.name);
     FILE *f = fopen(sp, "re");
     if (f) { if (!fgets(ro, sizeof ro, f)) ro[0] = '0'; fclose(f); }
-    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME | ((DISK_KINDS[k].ro || ro[0] == '1') ? MS_RDONLY : 0);
+    /* a disc is always mounted read-only, whatever it holds */
+    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME | ((DISK_KINDS[k].ro || ro[0] == '1' || t.optical) ? MS_RDONLY : 0);
     if (mount(t.dev, dir, DISK_KINDS[k].kernel, flags, opts[0] ? opts : NULL)) {
         int e = errno;
         rmdir(dir);
@@ -272,7 +284,7 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
 void disk_act_unmount(const AdminReq *r, const char *arg, size_t len) {
     (void)len;
     Target t;
-    if (target(r, arg, 0, 0, &t)) return;
+    if (target(r, arg, OPTICAL_OK, 0, &t)) return;
     if (t.part && !disk_mounts(t.name, NULL, 0)) { admin_err("disk.notMounted", "name", t.name, NULL); return; }
     if (t.part ? unmount_dev(t.name) : unmount_disk(&t)) return;
     admin_ok("disk.unmounted", NULL);
@@ -753,7 +765,7 @@ void disk_act_write_image(const AdminReq *r, const char *arg, size_t len) {
 void disk_act_eject(const AdminReq *r, const char *arg, size_t len) {
     (void)len;
     Target t;
-    if (target(r, arg, 1, 0, &t)) return;
+    if (target(r, arg, 1 | OPTICAL_OK, 0, &t)) return;
     if (unmount_disk(&t)) return;
     sync();
     /* nobody else holds it exclusively (an erase or a copy in progress) */
@@ -763,7 +775,10 @@ void disk_act_eject(const AdminReq *r, const char *arg, size_t len) {
     int fd = open(t.dev, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd >= 0) {
         ioctl(fd, BLKFLSBUF);
-        if (!strncmp(t.name, "sd", 2)) {
+        if (t.optical) {
+            ioctl(fd, CDROM_LOCKDOOR, 0);          /* nothing of ours is mounted any more */
+            if (ioctl(fd, CDROMEJECT, 0) && errno != ENOSYS) { int e = errno; close(fd); admin_err("disk.ejectFailed", "name", t.name, "errno", lerr_errno(e), NULL); return; }
+        } else if (!strncmp(t.name, "sd", 2)) {
             uint8_t cdb[6] = { 0x1b, 0, 0, 0, 0x02, 0 };    /* START STOP UNIT: LoEj=1, Start=0 */
             uint8_t sense[32];
             sg_cmd(fd, cdb, 6, NULL, 0, SG_DXFER_NONE, sense, sizeof sense);
