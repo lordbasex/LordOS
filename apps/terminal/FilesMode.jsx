@@ -147,10 +147,12 @@ export function FilesMode({ t, wid, sid, startLocal }) {
       '-',
       { label: tr('terminal.files.permissions'), disabled: names.length !== 1, onClick: () => setSheet({ kind: 'perm', path, entry: it, boxes: permBoxes(it.perm), octal: octal(it.perm) }) },
       { label: tr('terminal.files.owner'), disabled: names.length !== 1 || it.uid == null, onClick: () => setSheet({ kind: 'owner', path, entry: it, uid: String(it.uid), gid: String(it.gid) }) },
-      { label: tr('terminal.files.info'), disabled: names.length !== 1, onClick: () => showInfo(path, it) },
+      { label: tr('terminal.files.info'), disabled: names.length !== 1, onClick: () => showInfo(path, it) },   // (file/sha256 refuse a ' or \ in the path)
       '-',
       { label: tr('terminal.files.copyPath'), onClick: () => clipboard.set(path) },
-      { label: tr('terminal.files.cdHere'), disabled: it.kind !== 'd', onClick: () => { term.paste(sid, `cd -- ${shQuote(path)}\n`); } },
+      // pasted into the tab's shell: only while the ssh is up (never into the local shell), and never a path with a quote or a
+      // backslash, which shells quote differently (fish takes \' inside single quotes as a quote)
+      { label: tr('terminal.files.cdHere'), disabled: it.kind !== 'd' || state !== 'ready' || /['\\]/.test(path), onClick: () => { term.paste(sid, `cd -- ${shQuote(path)}\n`); } },
       '-',
       { label: tr('terminal.files.delete'), destructive: true, onClick: () => setSheet({ kind: 'delete', side: 'remote', names }) },
     ] });

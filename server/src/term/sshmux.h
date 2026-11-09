@@ -48,8 +48,8 @@ void mux_alive(MuxBuf *b, uint32_t id);
 void mux_new_session(MuxBuf *b, uint32_t id, int subsystem, const char *command);
 void mux_fwd(MuxBuf *b, int open, uint32_t id, const char *listen_host, uint32_t listen_port, const char *connect_host, uint32_t connect_port);
 
-/* A remote command quoted for the remote shell: 'a'\''b' for each argument, joined by spaces.
- * -1 when an argument holds a NUL, a newline or a control character, or out is too small. */
+/* A remote command quoted for the remote shell: 'arg' for each argument, joined by spaces. -1 when an argument
+ * holds a quote, a backslash or a control character (login shells quote differently), or out is too small. */
 int  mux_quote_args(const char *const *argv, char *out, size_t cap);
 
 /* ---- talking to a master ---- */

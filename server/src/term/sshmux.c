@@ -98,9 +98,11 @@ int mux_quote_args(const char *const *argv, char *out, size_t cap) {
         if (i) PUT(' ');
         PUT('\'');
         for (const unsigned char *p = (const unsigned char *)argv[i]; *p; p++) {
-            if (*p < 0x20 || *p == 0x7f) return -1;
-            if (*p == '\'') { PUT('\''); PUT('\\'); PUT('\''); PUT('\''); }
-            else PUT((char)*p);
+            /* a quote or a backslash is refused, not escaped: the server's login shell parses the command, and
+             * its quoting rules differ (fish takes \' inside single quotes as a quote); without them '…' is a
+             * plain string in sh, bash, zsh, fish and tcsh alike */
+            if (*p < 0x20 || *p == 0x7f || *p == '\'' || *p == '\\') return -1;
+            PUT((char)*p);
         }
         PUT('\'');
     }

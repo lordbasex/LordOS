@@ -25,8 +25,10 @@ static int pass, failn;
 
 static void test_wire(void) {
     char q[256];
-    const char *a1[] = { "file", "-b", "--", "/srv/it's here", NULL };
-    CHECK(!mux_quote_args(a1, q, sizeof q) && !strcmp(q, "'file' '-b' '--' '/srv/it'\\''s here'"), "quote: %s", q);
+    const char *a1[] = { "file", "-b", "--", "/srv/my file;$(x)", NULL };
+    CHECK(!mux_quote_args(a1, q, sizeof q) && !strcmp(q, "'file' '-b' '--' '/srv/my file;$(x)'"), "quote: %s", q);
+    const char *a4[] = { "file", "/srv/it's", NULL }, *a5[] = { "file", "/srv/a\\';id;#", NULL };
+    CHECK(mux_quote_args(a4, q, sizeof q) == -1 && mux_quote_args(a5, q, sizeof q) == -1, "quote: a quote or a backslash is refused (fish quotes differently)");
     const char *a2[] = { "file", "/a\nrm -rf ~", NULL };
     CHECK(mux_quote_args(a2, q, sizeof q) == -1, "quote: a newline is refused");
     const char *a3[] = { "x", NULL };
