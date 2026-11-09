@@ -60,6 +60,20 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-fand ] || { echo "missing server/build/lord-fand (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
+# The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
+# them loses a feature with no error anywhere (0.8.8.6 shipped without lord-media: Screenshots saved and copied
+# nothing), so each one is required here. ALLOW_MISSING="lord-tts …" leaves out the ones named, on purpose.
+missing=""
+for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
+         lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" \
+         lord-tls:"" lord-sql:"" lord-vm:"" lordos-guest:""; do
+    b=${h%%:*}; need=${h#*:}
+    [ -x "server/build/$b" ] && continue
+    case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
+    missing="$missing\n  server/build/$b${need:+  (needs $need)}"
+done
+[ -z "$missing" ] || { printf "missing helpers, the package would ship without them:$missing\nmake -C server after installing what they need, or ALLOW_MISSING=\"name …\" to leave one out on purpose\n" >&2; exit 1; }
 [ -f themes/greeter/theme.bundle.js ] || { echo "missing the login screen (npm run build)" >&2; exit 1; }
 for t in themes/*/theme.bundle.js; do [ -f "$t" ] || { echo "built themes missing (npm run build)" >&2; exit 1; }; done
 

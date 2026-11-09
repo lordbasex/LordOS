@@ -72,6 +72,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The package can't be built without its helpers.** 0.8.8.6 shipped without lord-media (screenshots, video, music,
+  camera) and lord-vmdisplay, because the machine that built it lacked FFmpeg's and libsystemd's -dev packages and
+  `make` skips a helper quietly when its libraries are missing. `tools/iso/mkdeb.sh` now stops and names each missing
+  helper and what it needs; `ALLOW_MISSING="name …"` leaves one out on purpose.
 - **Screenshots says when a capture couldn't be saved or copied.** A notification names why (for example, the media
   helper is missing), and the thumbnail says so instead of "Copied to the clipboard".
 - **Media jobs no longer wait forever when lord-media is missing.** A job that failed at once (no lord-media) was freed
