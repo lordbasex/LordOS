@@ -6,6 +6,7 @@ import { View, Text, useAppWindow, addListener, ime, clipboard, hasTextFocus } f
 import { memo, useEffect, useRef, useState } from 'react';
 import { cmp, head, anchor, hasSel, selStart, selEnd, cursorAt } from './buffer.js';
 import { tokenizeLine } from './syntax.js';
+import { BAR, thumbOf, topOfThumb } from './scrollbar.js';
 
 export const FONT = 13;
 export const LH = 20;
@@ -118,7 +119,8 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   const readSize = () => {
     if (!area.current) return;
     const [, , w, h] = lord.getLayout(area.current.id);
-    if (Math.abs(w - st.current.w) > 0.5 || Math.abs(h - st.current.h) > 0.5) { st.current.w = w; st.current.h = h; setSize({ w, h }); }
+    // (not yet measured counts as changed: comparing with undefined is never true, and the area stayed 600×400)
+    if (!(Math.abs(w - st.current.w) <= 0.5) || !(Math.abs(h - st.current.h) <= 0.5)) { st.current.w = w; st.current.h = h; setSize({ w, h }); }
   };
   useEffect(() => { readSize(); const id = setInterval(readSize, 500); return () => clearInterval(id); }, []);
 
@@ -581,9 +583,34 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
     return () => { offMove(); offUp(); };
   });
 
+  // the scroll bar: drag the thumb, or click the track to jump there
+  const barDrag = useRef(null);
+  const barDown = (e) => {
+    e.stopPropagation?.();
+    if (!area.current || e.button === 2) return;
+    const [, ay] = lord.getLayout(area.current.id);
+    const h = st.current.h || size.h;
+    const th = thumbOf(h, contentH(), scroll.top);
+    if (!th) return;
+    const y = e.y - ay;
+    const grab = y >= th.pos && y <= th.pos + th.size ? y - th.pos : th.size / 2;
+    barDrag.current = { ay, grab };
+    setScroll((s) => ({ ...s, top: topOfThumb(h, contentH(), y - grab) }));
+  };
+  useEffect(() => {
+    const offMove = addListener('pointermove', (e) => {
+      const b = barDrag.current;
+      if (!b) return;
+      setScroll((s) => ({ ...s, top: topOfThumb(st.current.h || size.h, contentH(), e.y - b.ay - b.grab) }));
+    });
+    const offUp = addListener('pointerup', () => { barDrag.current = null; });
+    return () => { offMove(); offUp(); };
+  });
+
+  const contentH = () => doc.lineCount * LH + LH * 3;
   const onWheel = (e) => {
     setScroll((s) => {
-      const max = Math.max(0, doc.lineCount * LH - (st.current.h || size.h) + LH * 3);
+      const max = Math.max(0, contentH() - (st.current.h || size.h));
       const top = Math.max(0, Math.min(max, s.top + (e.shift ? 0 : e.deltaY)));
       const leftS = e.shift ? Math.max(0, s.left + e.deltaY) : s.left;
       return { top, left: leftS };
@@ -597,6 +624,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   const rows = [];
   for (let l = first; l <= last; l++) rows.push(l);
   const primary = doc.cursors[doc.cursors.length - 1];
+  const thumb = thumbOf(st.current.h || size.h, contentH(), scroll.top);
 
   // selection rectangles per visible line
   const selRects = [];
@@ -640,6 +668,12 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
             fontSize: FONT - 1, color: doc.cursors.some((k) => k.l === l) ? t.gutterActive : t.gutterText }}>{String(l + 1)}</Text>
         ))}
       </View>
+      {thumb && (
+        <View onMouseDown={barDown} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: BAR + 4 }}>
+          <View style={{ position: 'absolute', right: 2, top: thumb.pos, width: BAR - 2, height: thumb.size, borderRadius: (BAR - 2) / 2,
+            backgroundColor: t.scrollThumb }} />
+        </View>
+      )}
     </View>
   );
 }

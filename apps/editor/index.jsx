@@ -28,9 +28,9 @@ const SKIP = new Set(['node_modules', '.git', 'build', 'dist', '.cache', '__pyca
 
 const tokensFor = (mode) => (mode === 'light'
   ? { editorBg: '#ffffff', gutterBg: '#f6f6f8', gutterText: '#a1a1aa', gutterActive: '#3f3f46', lineHighlight: '#f4f4fa', caret: '#2563eb',
-      selection: '#b4d7ff', selectionBlur: '#e4e4e7', match: '#fde68a99', matchCurrent: '#f59e0b' }
+      selection: '#b4d7ff', selectionBlur: '#e4e4e7', match: '#fde68a99', matchCurrent: '#f59e0b', scrollThumb: 'rgba(0,0,0,0.28)' }
   : { editorBg: '#1e1e23', gutterBg: '#1a1a1e', gutterText: '#5c5c66', gutterActive: '#d4d4d8', lineHighlight: '#26262c', caret: '#7aa8ff',
-      selection: '#3b4f7a', selectionBlur: '#33333b', match: '#a1803066', matchCurrent: '#d6a12e' });
+      selection: '#3b4f7a', selectionBlur: '#33333b', match: '#a1803066', matchCurrent: '#d6a12e', scrollThumb: 'rgba(255,255,255,0.28)' });
 
 const relOf = (abs) => { const h = fs.home(); return abs === h ? '' : abs.startsWith(`${h}/`) ? abs.slice(h.length + 1) : abs; };
 const baseName = (p) => String(p).split('/').filter(Boolean).pop() || '';
