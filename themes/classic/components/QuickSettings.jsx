@@ -1,6 +1,8 @@
 // Quick settings, from the tray: toggles for the network, Bluetooth, Do Not Disturb, Night Light,
 // dark mode and transparency, the volume and its output (the chevron by the slider lists the outputs when there is
-// more than one, issue #58), what is playing, the battery and a way into Settings.
+// more than one, issue #58), what is playing, the battery and a way into Settings. Every tile with a Settings page
+// has the › half that opens it, as Network and Bluetooth always had: Do Not Disturb opens Notifications, Night Light
+// Displays, Dark mode and Transparency Appearance; the › at the end of the volume row opens Sound (issue #58).
 // Everything comes from the SDK's stores (sound, Bluetooth, battery, Night Light, notifications);
 // nothing here polls except the network glyph (every 5 s, Taskbar.jsx useNet).
 import {
@@ -73,16 +75,16 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
               {(c) => <BluetoothGlyph color={c} size={16} />}
             </Toggle>
           ) : null}
-          <Toggle t={t} on={dnd} label={tr('shell.classic.dnd')} onClick={() => setDnd(!dnd)}>
+          <Toggle t={t} on={dnd} label={tr('shell.classic.dnd')} onClick={() => setDnd(!dnd)} onMore={() => open('notifications')}>
             {(c, bg) => <MoonGlyph color={c} bg={bg} size={16} />}
           </Toggle>
           <Toggle t={t} on={night} label={tr('shell.classic.nightLight')} onClick={() => setNightManual(!night)} onMore={() => open('displays')}>
             {(c) => <SunGlyph color={c} size={16} />}
           </Toggle>
-          <Toggle t={t} on={s.mode === 'dark'} label={tr('shell.cc.dark')} onClick={() => set({ mode: s.mode === 'dark' ? 'light' : 'dark' })}>
+          <Toggle t={t} on={s.mode === 'dark'} label={tr('shell.cc.dark')} onClick={() => set({ mode: s.mode === 'dark' ? 'light' : 'dark' })} onMore={() => open('appearance')}>
             {(c) => <ContrastGlyph color={c} size={16} />}
           </Toggle>
-          <Toggle t={t} on={s.effects !== false} label={tr('shell.cc.effects')} onClick={() => set({ effects: s.effects === false })}>
+          <Toggle t={t} on={s.effects !== false} label={tr('shell.cc.effects')} onClick={() => set({ effects: s.effects === false })} onMore={() => open('appearance')}>
             {(c) => <LayersGlyph color={c} size={16} />}
           </Toggle>
         </View>
@@ -91,7 +93,7 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
             <View onClick={() => sound.setMute('sink', out.index, !out.mute)} style={{ width: 28, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
               <SpeakerGlyph color={t.text} size={18} level={out.mute || pct === 0 ? 0 : pct < 50 ? 1 : 2} muted={out.mute} />
             </View>
-            <Slider value={Math.min(1, out.level)} width={W - 32 - 28 - 10 - 44 - 10 - (many ? 38 : 0)} onChange={(v) => sound.setVolume('sink', out.index, v)} />
+            <Slider value={Math.min(1, out.level)} width={W - 32 - 28 - 10 - 44 - 10 - (many ? 38 : 0) - 34} onChange={(v) => sound.setVolume('sink', out.index, v)} />
             <Text style={{ width: 44, fontSize: 12, color: t.textDim, textAlign: 'right' }}>{out.mute ? '—' : `${pct} %`}</Text>
             {many ? (
               <View onClick={() => setPick((v) => !v)} title={tr('shell.cc.output')}
@@ -99,6 +101,10 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
                 <Chevron color={t.text} size={5} dir={pick ? 'up' : 'down'} />
               </View>
             ) : null}
+            <View onClick={() => open('sound')} title={tr('shell.cc.soundSettings')}
+              style={{ width: 24, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+              <Chevron color={t.text} size={5} dir="right" />
+            </View>
           </View>
         ) : null}
         {out && st.connected && many && pick ? <SoundOutputList onPick={() => setPick(false)} /> : null}

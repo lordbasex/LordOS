@@ -1,6 +1,8 @@
 // Control Center: mode, transparency, the volume and its output, the network, Wi-Fi and Bluetooth, accent,
 // wallpaper and live CPU/RAM usage. The network, Wi-Fi, Bluetooth and CPU/RAM tiles can be turned off in Settings →
 // Desktop & Dock → Control Center (issue #58, sdk/menubarmodel.js).
+// A click on a tile's name (and the line under it) opens its page in Settings, as the Wi-Fi tile always did: Dark
+// Mode, Transparency and Accent open Appearance, Sound opens Sound and Wallpaper opens Wallpaper (issue #58).
 import {
   View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, formatBytes, wm, session, addListener, t as tr,
   useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
@@ -15,6 +17,14 @@ function quickWallpapers(list, cur) {
   const current = findWallpaper(list, cur);
   const rest = QUICK.map((id) => list.find((w) => w.id === id)).filter((w) => w && w !== current);
   return [current, ...rest].filter(Boolean).slice(0, 4);
+}
+
+// Settings on one page, the Control Center closed first
+const openSettings = (onClose, section, page) => { onClose(); wm.open('settings', { args: { section, ...(page ? { page } : null) } }); };
+
+// A tile's name, a click away from its page in Settings
+function TileTitle({ t, onClick, children }) {
+  return <View onClick={onClick}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{children}</Text></View>;
 }
 
 function Tile({ t, children, style }) {
@@ -46,7 +56,7 @@ function Chevron({ color, open }) {
 
 // Volume of the default output (PipeWire). Click on the speaker: mute. With more than one output, the button at the
 // end lists them; choosing one makes it the default, and its own volume comes back with it.
-function SoundTile({ t }) {
+function SoundTile({ t, onClose }) {
   const st = useSound();
   const out = defaultSink(st);
   const outputs = useSoundOutputs();
@@ -56,7 +66,7 @@ function SoundTile({ t }) {
   const many = outputs.length > 1;
   return (
     <Tile t={t} style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View onClick={() => openSettings(onClose, 'sound')} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.sound')}</Text>
         <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden' }}>{out.description}</Text>
       </View>
@@ -84,7 +94,7 @@ function WifiTile({ t, onClose, radios }) {
   const ip = on?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address;
   return (
     <Tile t={t} style={{ flex: 1, gap: 3 }}>
-      <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'network', page: 'wifi' } }); }} style={{ gap: 3 }}>
+      <View onClick={() => openSettings(onClose, 'network', 'wifi')} style={{ gap: 3 }}>
         <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.wifi')}</Text>
         <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{on ? `${on.name} · ${ip}` : tr('shell.cc.notConnected')}</Text>
       </View>
@@ -98,7 +108,7 @@ function BluetoothTile({ t, onClose, bt }) {
   const dev = (bt.devices || []).find((d) => d.connected);
   return (
     <Tile t={t} style={{ flex: 1, gap: 6 }}>
-      <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'bluetooth' } }); }} style={{ gap: 3 }}>
+      <View onClick={() => openSettings(onClose, 'bluetooth')} style={{ gap: 3 }}>
         <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.bluetooth')}</Text>
         <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
           {!adapter.powered ? tr('shell.cc.off') : dev ? dev.name : tr('shell.cc.on')}
@@ -162,15 +172,15 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
     }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Tile t={t} style={{ flex: 1, gap: 8 }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.dark')}</Text>
+          <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.dark')}</TileTitle>
           <Toggle on={s.mode === 'dark'} onChange={(on) => set({ mode: on ? 'dark' : 'light' })} />
         </Tile>
         <Tile t={t} style={{ flex: 1, gap: 8 }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.effects')}</Text>
+          <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.effects')}</TileTitle>
           <Toggle on={s.effects} onChange={(effects) => set({ effects })} />
         </Tile>
       </View>
-      <SoundTile t={t} />
+      <SoundTile t={t} onClose={onClose} />
       <NowPlayingTile />
       {p.ccNetwork && typeof lord.net !== 'undefined' ? <NetTile t={t} onClose={onClose} ifs={ifs} /> : null}
       {radios.length || btShown ? (
@@ -180,7 +190,7 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
         </View>
       ) : null}
       <Tile t={t} style={{ gap: 10 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.accent')}</Text>
+        <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.accent')}</TileTitle>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {Object.entries(t.accents).map(([name, c]) => (
             <View key={name} onClick={() => set({ accent: name })} style={{ width: 22, height: 22, borderRadius: 11,
@@ -189,7 +199,7 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
         </View>
       </Tile>
       <Tile t={t} style={{ gap: 8 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.wallpaper')}</Text>
+        <TileTitle t={t} onClick={() => openSettings(onClose, 'wallpaper')}>{tr('shell.cc.wallpaper')}</TileTitle>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {quickWallpapers(t.wallpapers, s.wallpaper).map((w) => (
             <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ width: 62, height: 40, borderRadius: 6, overflow: 'hidden',
