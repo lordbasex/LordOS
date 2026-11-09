@@ -243,6 +243,23 @@ export function nameProblem(name, accounts, self = null) {
 // a provider's form: its fields with the defaults filled in
 export const formValues = (provider, prev = {}) => Object.fromEntries((provider?.fields || []).map((f0) => { const f = presetField(f0); return [f.name, prev[f.name] ?? (f.default != null ? String(f.default) : '')]; }));
 // the first required field still empty, or null
+// Where Passwords may keep a provider's login, for the 🔑 beside its password (Settings → Cloud): the provider's sites,
+// and for a server of the person's own the address typed in the form. [] when there is none to look under.
+const LOGIN_SITES = { iclouddrive: ['icloud.com', 'apple.com'], mega: ['mega.nz', 'mega.io'], filen: ['filen.io'], koofr: ['koofr.net'],
+  pcloud: ['pcloud.com'], internetarchive: ['archive.org'], proton: ['proton.me'], protondrive: ['proton.me'], seafile: [], webdav: [], sftp: [], ftp: [], smb: [] };
+export function loginSites(kind, values = {}) {
+  const typed = ['url', 'host', 'endpoint'].map((k) => String(values[k] || '').trim()).filter(Boolean)
+    .map((v) => v.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/[/:].*$/, '').toLowerCase()).filter((h) => /^[a-z0-9.-]+$/.test(h));
+  return [...new Set([...(LOGIN_SITES[kind] || []), ...typed])];
+}
+// the form's user and password fields, for filling both from one Passwords entry
+export function loginFields(provider) {
+  const names = (provider?.fields || []).map((f) => f.name);
+  const user = ['apple_id', 'user', 'username', 'email', 'login'].find((n) => names.includes(n)) || null;
+  const pass = ['password', 'pass'].find((n) => names.includes(n)) || null;
+  return { user, pass };
+}
+
 // again: Sign In Again, where a secret left empty keeps the one in the keyring (rclone's config/update keeps what
 // isn't given), so only the fields that aren't secret are required
 export const missingField = (provider, values, { again = false } = {}) => (provider?.fields || [])

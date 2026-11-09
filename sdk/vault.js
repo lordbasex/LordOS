@@ -209,14 +209,18 @@ export function KeyringPrompt() {
 //   <AutofillButton app="settings" service="wifi:Casa" ssid="Casa" onFill={({ username, password }) => …} />
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
 // The secret leaves lord-vault only when the user picks one.
-export function AutofillButton({ app, service, account = '', url, ssid, host, onFill }) {
+// urls: several sites the login may be kept under (a cloud provider's own and its maker's); entries found under any
+export function AutofillButton({ app, service, account = '', url, urls, ssid, host, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(null);
   const load = async () => {
     const out = [];
     if (service) { try { const k = await keyring.get(app, { service, account }); if (k) out.push({ kind: 'kr', title: k.label || service, username: k.account, secret: k.secret }); } catch (e) { /* locked */ } }
-    for (const e of await autofill(app, host !== undefined ? { host } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
+    if (urls && urls.length) {
+      const seen = new Set();
+      for (const u of urls) for (const e of await autofill(app, { url: u })) if (!seen.has(e.id)) { seen.add(e.id); out.push({ kind: 'pw', ...e }); }
+    } else for (const e of await autofill(app, host !== undefined ? { host } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
     setItems(out);
   };
   const pick = async (it) => {

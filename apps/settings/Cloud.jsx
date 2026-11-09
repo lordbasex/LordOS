@@ -6,7 +6,7 @@
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion, AutofillButton,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -1041,7 +1041,20 @@ function CredSheet({ st, sheet }) {
     </View>
   );
   const control = (f) => <FieldControl f={f} value={vals[f.name]} onChange={(x) => set(f.name, x)} onSubmit={connect} kept={!!sheet.again} />;
-  const fieldRow = (f) => row(f.name, fieldLabel(f), <View style={{ flex: 1, minWidth: 0 }}>{control(f)}</View>);
+  // the password: the 🔑 fills it, and the user beside it, from Passwords (the entries kept under the provider's sites or
+  // the server typed here), like Databases' favorites
+  const login = M.loginFields(p);
+  const sites = M.loginSites(p.kind, vals);
+  const fill = ({ username, password }) => {
+    setVals((o) => ({ ...o, ...(login.user && username ? { [login.user]: username } : {}), ...(password ? { [login.pass]: password } : {}) }));
+    setErr(null);
+  };
+  const fieldRow = (f) => row(f.name, fieldLabel(f), (
+    <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>{control(f)}</View>
+      {f.name === login.pass && sites.length ? <AutofillButton app="settings" urls={sites} onFill={fill} /> : null}
+    </View>
+  ));
   // an advanced option: its short label (a switch beside it), the control under it, rclone's whole help dimmed below
   const advRow = (f) => {
     const bool = M.fieldInput(f).input === 'bool';
