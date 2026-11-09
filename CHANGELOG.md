@@ -12,6 +12,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Terminal: profiles grouped by their tags.** Importing another terminal's profiles keeps each profile's tags, and
+  Shell → Profiles and the Dock's menu list the profiles without a tag first, then one submenu per tag in name order (a
+  profile under each of its tags), instead of one long list of every profile.
+
 - **Passwords fills and saves sign-ins across LordOS.** The password fields of Settings → Cloud (adding an account and
   Sign In Again), Files' shared-folder sign-in and Connect to Server (sftp, ftp, WebDAV), and Remote Desk's sign-in and
   credentials now have the 🔑 of Passwords, as Databases and Wi-Fi already did. For a server it lists only entries whose

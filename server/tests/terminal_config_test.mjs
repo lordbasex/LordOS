@@ -16,9 +16,10 @@ if (!esbuild) { console.log('needs node_modules (esbuild)'); process.exit(1); }
 
 const entry = `
 import * as config from './apps/terminal/config.js';
-import { terminalSettings, saveTerminalSettings } from './apps/terminal/profiles.js';
+import { terminalSettings, saveTerminalSettings, profileMenu } from './apps/terminal/profiles.js';
+import { convertProfile } from './apps/terminal/iterm.js';
 import { settings } from '@lordos/sdk';
-globalThis.__out = { ...config, terminalSettings, saveTerminalSettings, settings };`;
+globalThis.__out = { ...config, terminalSettings, saveTerminalSettings, settings, profileMenu, convertProfile };`;
 const sdkStub = {
   name: 'sdk-stub',
   setup(b) {
@@ -140,6 +141,20 @@ const eq = (what, got, want) => {
   try { m.chooseLocation(newer, 'use'); } catch (e) { code = e.code; }
   eq('newer schema refused', code, 'termconf.newer');
   eq('parse: profiles must be a list', (() => { try { m.parseConfig('{"profiles":{}}'); return null; } catch (e) { return e.code; } })(), 'termconf.corrupt');
+}
+
+// 7. iTerm2's profile tags: kept by the import, the profile menus grouped by them
+{
+  const m = load({});
+  const fonts = { byPs: () => null };
+  const p = m.convertProfile({ Name: 'PBX', Guid: 'G1', Tags: ['IPERFEX', ' NIMBUS-AMAZON ', 'IPERFEX', '', 'a\u0007b'] }, fonts, []);
+  eq('import: the tags, cleaned and once each', p.tags, ['IPERFEX', 'NIMBUS-AMAZON', 'ab']);
+  eq('import: no tags', m.convertProfile({ Name: 'X', Guid: 'G2' }, fonts, []).tags, []);
+  const ps = [{ id: 'default', name: 'Default' }, { id: 'a', name: 'PBX', tags: ['iperfex'] }, { id: 'b', name: 'Proxmox', tags: ['NIMBUS', 'IPERFEX'] }, { id: 'c', name: 'Pi' }];
+  const menu = m.profileMenu(ps, (q) => q.name);
+  eq('menu: untagged first, then one submenu per tag by name', menu.map((x) => (typeof x === 'string' ? x : x.label + ':' + x.submenu.join(','))),
+    ['Default', 'Pi', '-', 'iperfex:PBX', 'IPERFEX:Proxmox', 'NIMBUS:Proxmox']);
+  eq('menu: no tags, the plain list', m.profileMenu([{ id: 'x', name: 'X' }], (q) => q.name), ['X']);
 }
 
 console.log(`terminal_config_test: ${n - bad}/${n} checks`);

@@ -83,6 +83,7 @@ export const DEFAULT_PROFILE = {
   initialText: '',           // se escribe en el shell al abrir la sesión
   columns: 0, rows: 0,       // tamaño de ventanas nuevas (0 = el de la app)
   itermGuid: '',
+  tags: [],                  // iTerm2's profile tags: the profile menus group by them
 };
 
 const DEFAULTS = { profiles: [DEFAULT_PROFILE], defaultProfile: 'default', hotkey: 'F12', schemes: {}, shortcuts: {}, keyMap: [] };
@@ -138,4 +139,15 @@ export function newProfileId() {
 }
 
 // Nombre visible: el perfil de fábrica se traduce (también el de ajustes viejos, "Predeterminado").
+// The profile menus (Shell → Profiles, the Dock's): profiles without a tag first, then one submenu per tag in name order,
+// a profile under each of its tags, as iTerm2 does. item(p) makes a profile's menu item.
+const tagCmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+export function profileMenu(profiles, item) {
+  const tagsOf = (p) => (Array.isArray(p.tags) ? p.tags.filter((x) => typeof x === 'string' && x.trim()) : []);
+  const loose = profiles.filter((p) => !tagsOf(p).length).map(item);
+  const tags = [...new Set(profiles.flatMap(tagsOf))].sort(tagCmp);
+  if (!tags.length) return loose;
+  return [...loose, ...(loose.length ? ['-'] : []), ...tags.map((tag) => ({ label: tag, submenu: profiles.filter((p) => tagsOf(p).includes(tag)).map(item) }))];
+}
+
 export const profileName = (p) => (!p?.name || (p.id === 'default' && p.name === 'Predeterminado') ? t('terminal.profile.default') : p.name);

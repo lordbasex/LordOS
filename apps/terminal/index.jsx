@@ -18,7 +18,7 @@ import { Preferences } from './Preferences.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
 import { clipboardImage, pathsText, isClaude } from './paths.js';
-import { getProfile, schemeOf, terminalSettings, profileName } from './profiles.js';
+import { getProfile, schemeOf, terminalSettings, profileName, profileMenu } from './profiles.js';
 
 // Menú del Dock (clic derecho): nueva ventana, nueva pestaña y pestaña con un perfil.
 registerDockMenu('terminal', (entry) => {
@@ -28,7 +28,7 @@ registerDockMenu('terminal', (entry) => {
     items.push({ label: actionLabel('newTab'), onClick: () => { wm.focus(last.id); run(last.id, 'newTab'); } });
     const profiles = terminalSettings().profiles;
     if (profiles.length > 1) {
-      items.push({ label: tr('terminal.menu.profiles'), submenu: profiles.map((p) => ({ label: profileName(p), onClick: () => { wm.focus(last.id); addTab(last.id, p.id); } })) });
+      items.push({ label: tr('terminal.menu.profiles'), submenu: profileMenu(profiles, (p) => ({ label: profileName(p), onClick: () => { wm.focus(last.id); addTab(last.id, p.id); } })) });
     }
   }
   return items;
@@ -236,7 +236,7 @@ function menus(wid, w) {
       item('openQuickly'), item('editTitle'),
     ] },
     { label: tr('terminal.menu.profiles'), items: [
-      ...profiles.map((p) => ({ label: tr('terminal.menu.newTabWith', { name: profileName(p) }), onClick: () => addTab(wid, p.id) })), '-',
+      ...profileMenu(profiles, (p) => ({ label: tr('terminal.menu.newTabWith', { name: profileName(p) }), onClick: () => addTab(wid, p.id) })), '-',
       item('preferences'),
     ] },
   ];

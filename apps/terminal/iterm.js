@@ -241,6 +241,8 @@ export function convertProfile(o, fonts, warnings) {
   const name = String(o.Name || 'Imported');
   const w = (msg) => warnings.push(`${name}: ${msg}`);
   const p = { ...DEFAULT_PROFILE, id: newProfileId() + Math.random().toString(36).slice(2, 5), name, itermGuid: o.Guid || '' };
+  // its tags, which the profile menus group by (at most 16, 64 characters each)
+  if (Array.isArray(o.Tags)) p.tags = [...new Set(o.Tags.map((x) => String(x).replace(/[\u0000-\u001f]/g, '').trim().slice(0, 64)).filter(Boolean))].slice(0, 16);
 
   const scheme = schemeFrom(o, name);
   if (scheme) { p.colors = 'custom'; p.custom = scheme; } else w(T('terminal.iterm.noAnsi'));
