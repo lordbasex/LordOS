@@ -176,6 +176,7 @@ EOF
     if have node; then run "files-remote-test (apps/files/remotedirs.js)" node tests/files_remote_test.mjs; fi
     if have node; then run "textfield-model-test (sdk/textfieldmodel.js)" node tests/textfield_model_test.mjs; fi
     if have node; then run "filekinds-test (sdk/filekinds.js)" node tests/filekinds_test.mjs; fi
+    if have node; then run "thumb-cache-test (sdk/thumbcache.js)" node tests/thumb_cache_test.mjs; fi
     # Cloud without a screen: status glyphs, space, providers, menus, sidebar, menu bar, notifications, the mock's shape (sdk/cloudmodel.js)
     if have node; then run "cloud-model-test (sdk/cloudmodel.js)" node tests/cloud_model_test.mjs
     else skip "cloud-model-test" "node"; fi

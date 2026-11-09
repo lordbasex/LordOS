@@ -23,11 +23,17 @@ import * as fs from './fs.js';
 import { wm } from './windows.js';
 import { canMarkup } from './imageeditmodel.js';
 import { waitFor } from './doc.js';
+import { createThumbCache } from './thumbcache.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.media) || null;
 const listeners = new Map();          // id → Set(fn(type, data))
 const pending = new Map();            // job id → resolve
 export const thumbRev = createStore(0);   // goes up when a thumbnail arrives
+// what useThumb knows (thumbcache.js): asked once per path and size, answers wake only the components that show them
+const thumbs = createThumbCache({
+  ask: (path, size) => media.thumb(path, size),
+  onAny: () => thumbRev.set((v) => v + 1),
+});
 
 globalThis.__lordMedia = (id, type, data) => {
   if (type === 'job') {
@@ -35,7 +41,7 @@ globalThis.__lordMedia = (id, type, data) => {
     if (done) { pending.delete(data.id); done(data); }
     return;
   }
-  if (type === 'thumb') { thumbRev.set((v) => v + 1); return; }
+  if (type === 'thumb') { thumbs.arrived(data && data.src, data && data.thumb); return; }
   const set = listeners.get(id);
   if (set) for (const fn of [...set]) { try { fn(type, data); } catch (e) { console.error('media:', e?.message || e); } }
 };
@@ -210,8 +216,10 @@ export function mediaFormatTime(ms) {
 }
 
 // Thumbnail of a file (image, video or cover art): path or null; updates itself.
-export const thumbFor = (path, size = 256) => (path ? media.thumb(path, size) : null);
+export const thumbFor = (path, size = 256) => (path ? thumbs.get(path, size) : null);
 export function useThumb(path, size = 256) {
+  const [, wake] = useState(0);
+  useEffect(() => thumbs.watch(path, () => wake((n) => n + 1)), [path]);
   useStore(thumbRev);
   return thumbFor(path, size);
 }
