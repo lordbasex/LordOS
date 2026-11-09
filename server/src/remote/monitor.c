@@ -228,6 +228,14 @@ static void close_later(const int *fds, int n) {
 /* Takes the monitor away from the session that has it. */
 static void take_back(void) {
     double t0 = rd_now();
+    /* the black frame first, then master taken from the file, and only then the session told: told first, it removes its
+     * own (GPU) framebuffers while they are still on the screen, the same refused plane-off as below; without master it
+     * can't put one back up either. Master is ours again at sd_mon_show (a freshly opened card). */
+    int blacked = 0;
+    if (drm >= 0) {
+        blacked = black_out(drm);
+        ioctl(drm, DRM_IOCTL_DROP_MASTER, NULL);
+    }
     if (conn >= 0) send_msg(RP_UNDISPLAY, NULL, 0, NULL, 0);
     double tsend = rd_now();
     char slow[160] = "";
@@ -243,12 +251,11 @@ static void take_back(void) {
     double t1 = rd_now(), t2 = t1;
     int fbs = 0, had = drm >= 0;
     if (drm >= 0) {
-        black_out(drm);                 /* nothing of the session on the screen, and no display turned off */
-        fbs = drop_framebuffers(drm);
+        fbs = drop_framebuffers(drm);   /* off the screen now: nothing is turned off */
         t2 = rd_now();
-        ioctl(drm, DRM_IOCTL_DROP_MASTER, NULL);
         close(drm);
     }
+    if (had) sd_log("monitor: %d display(s) kept lit with a black frame, %d framebuffer(s) of the leaving one removed", blacked, fbs);
     double t3 = rd_now();
     /* a slow hand-off says where the time went (vmwgfx turns the output off on RMFB: about 1 s) */
     if (had && t3 - t0 > 0.25)
