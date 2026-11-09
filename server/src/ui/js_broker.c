@@ -295,6 +295,31 @@ static JSValue f_clip_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     return JS_UNDEFINED;
 }
 
+/* lord.clipboard.status(keep) → { state: 'mine' | 'cleared' | 'replaced' | 'none', left }: whether this app's own
+ * last copy is still on the clipboard and how long a secret has left (never the clipboard's text); keep = true
+ * cancels the clearing of its secret (BOP_CLIP_STATUS, sec/brokerclip.c) */
+static JSValue f_clip_status(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int keep = argc > 0 && JS_ToBool(c, argv[0]) > 0, st;
+    char *out = NULL;
+    uint32_t len = 0;
+    char state[16] = "none";
+    int left = 0;
+    if (!rpc(BOP_CLIP_STATUS, keep ? "keep" : NULL, keep ? 4 : 0, &st, &out, &len) && st == BST_OK && out && len < 32) {
+        char buf[32];
+        memcpy(buf, out, len);
+        buf[len] = 0;
+        if (sscanf(buf, "mine %d", &left) == 1) snprintf(state, sizeof state, "mine");
+        else if (!strcmp(buf, "cleared")) snprintf(state, sizeof state, "cleared");
+        else if (!strcmp(buf, "replaced")) snprintf(state, sizeof state, "replaced");
+    }
+    free(out);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "state", JS_NewString(c, state));
+    JS_SetPropertyStr(c, o, "left", JS_NewInt32(c, left < 0 ? 0 : left));
+    return o;
+}
+
 /* For js_vault.c (Passwords in app mode): lord-server opens the FIDO2 key for lord-vault after the
  * `usb` permission. 0 and the device name, or -1 with err ("denied", "no-device"…). */
 int js_broker_vault_fido(char *name, size_t n, char *err, size_t en) {
@@ -785,7 +810,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("home", 0, f_fs_home), JS_CFUNC_DEF("read", 2, f_fs_read),
     JS_CFUNC_DEF("write", 2, f_fs_write), JS_CFUNC_DEF("list", 1, f_fs_list),
 };
-static const JSCFunctionListEntry clip_funcs[] = { JS_CFUNC_DEF("get", 0, f_clip_get), JS_CFUNC_DEF("set", 1, f_clip_set) };
+static const JSCFunctionListEntry clip_funcs[] = { JS_CFUNC_DEF("get", 0, f_clip_get), JS_CFUNC_DEF("set", 1, f_clip_set), JS_CFUNC_DEF("status", 1, f_clip_status) };
 static const JSCFunctionListEntry broker_funcs[] = {
     JS_CFUNC_DEF("request", 1, f_broker_request), JS_CFUNC_DEF("device", 2, f_broker_device), JS_CFUNC_DEF("state", 0, f_broker_state),
     JS_CFUNC_DEF("pick", 2, f_broker_pick), JS_CFUNC_DEF("fdRead", 1, f_fd_read), JS_CFUNC_DEF("fdWrite", 2, f_fd_write), JS_CFUNC_DEF("fdClose", 1, f_fd_close), JS_CFUNC_DEF("fdSize", 1, f_fd_size),

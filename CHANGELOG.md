@@ -46,8 +46,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
-- **Passwords: copy the title and the notes too.** An item's title and its notes have a copy button, like every
-  field already had, so anything in an item can go to the clipboard and be pasted in another app.
+- **Passwords: copy anything, and know what became of it.** An item's title and notes have a copy button like every
+  field; a right click on an item in the list copies its title, any field, its 2FA code or its notes without opening
+  it. A copied password shows how many seconds it has before it is cleared, with **Keep** to leave it there. If
+  something replaces it right away (another app, or a running machine), Passwords says so instead of failing
+  silently. lord-server tells the app only whether its own copy is still on the clipboard, never what the clipboard
+  holds (`BOP_CLIP_STATUS`). A secret replaced by a picture is no longer cleared by mistake.
 
 - **Machines' library looks like Remote Desk.** A toolbar of icons, each named in its tooltip: Storage, what Machines
   needs (only when something is missing), Add (New Machine, Import a machine), pictures or a list, Sort (by name,

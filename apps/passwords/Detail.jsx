@@ -17,6 +17,36 @@ import { GeneratorSheet } from './Generator.jsx';
 const HIDDEN = new Set(['hidden', 'totp', 'pin']);
 const DAY = 86400;
 
+// ---- the list's right-click menu: copy anything of an item without opening it ----
+
+// Menu items for item `id` of vault `v` (ContextMenu's shape): its title, every field with a value, its 2FA
+// code and its notes. A hidden value is asked of lord-vault only when one is picked.
+export async function copyMenuItems(v, id) {
+  const e = (await req('get', { v, id })).entry;
+  const items = [];
+  if (e.title) items.push({ label: t('passwords.ctx.copy', { what: t('passwords.edit.title') }), onClick: () => copyText(e.title, t('passwords.edit.title')) });
+  const seen = {};
+  for (const f of e.f) {
+    const i = seen[f.k] = (seen[f.k] ?? -1) + 1;
+    const label = fieldLabel(f);
+    if (f.t === 'totp') {
+      if (!f.has) continue;
+      items.push({ label: t('passwords.ctx.copy', { what: t('passwords.totp.code') }), onClick: async () => {
+        try { const c = (await req('totp', { v, ids: [id] })).codes?.find((x) => x.k === f.k) || null; if (c) copySecret(c.code, t('passwords.totp.code')); } catch (x) { toast(errorText(x.code)); }
+      } });
+    } else if (HIDDEN.has(f.t)) {
+      if (!f.has) continue;
+      items.push({ label: t('passwords.ctx.copy', { what: label }), onClick: async () => {
+        try { copySecret(await revealField(v, id, f.k, i), label); } catch (x) { toast(errorText(x.code)); }
+      } });
+    } else if (f.v && f.t !== 'bool' && f.t !== 'file') {
+      items.push({ label: t('passwords.ctx.copy', { what: label }), onClick: () => copyText(f.v, label) });
+    }
+  }
+  if (e.notes) items.push('-', { label: t('passwords.ctx.copy', { what: t('passwords.field.notes') }), onClick: () => copyText(e.notes, t('passwords.field.notes')) });
+  return items;
+}
+
 // ---- 2FA code ----
 
 function TotpBox({ v, id }) {

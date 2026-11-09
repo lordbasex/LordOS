@@ -226,6 +226,16 @@ Locking frees the model block by block; every arena block is wiped on free.
 - The clipboard is cleared after 30 s (configurable: 15/30/60/120 s) if it still holds the same
   value: by `lord-server` in app mode (`BOP_CLIP_SECRET`), by the app in the in-process fallback.
   Replacing the clipboard also wipes the previous text in `lord-server` (`term_set_clipboard`).
+- While a secret waits to be cleared, the window shows how long it has left and **Keep** (it stays). If
+  something replaces a copy within 3 s (another app, a machine sharing its clipboard), Passwords warns
+  that it is gone instead of failing silently. In app mode the app asks `lord.clipboard.status(keep)`
+  (`BOP_CLIP_STATUS`, `src/sec/brokerclip.c`, `build/brokerclip-test`): lord-server answers only about
+  that app's own last copy (`mine` with the seconds left, `cleared`, `replaced`, or `none` when another
+  app copied last), never what the clipboard holds, and `keep` cancels its clearing. The clipboard's
+  generation (any copy, text or picture) decides it, so a secret replaced by a picture is not cleared
+  either.
+- Anything in an item can be copied: every field, the title, the 2FA code and the notes, from the item
+  or from the list's right-click menu (hidden values are asked of lord-vault only when one is picked).
 
 ## The session keyring (`login.lvault`)
 

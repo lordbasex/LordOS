@@ -19,6 +19,8 @@
 #include "../remote/share.h"
 #include "pkgapp.h"
 #include "statusitem.h"
+#include "brokerclip.h"
+#include "../wl/wl.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -300,20 +302,18 @@ const char *brokersrv_app_of_pid(int pid) {
 
 void brokersrv_set_vault(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].vault = 1; }
 
-/* A secret an isolated app put on the clipboard: cleared at `deadline` if it is still there
- * (compared by hash, the text itself is not kept). */
-static struct { double deadline; uint8_t hash[32]; } clip_secret;
-
 static double mono_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
 
+/* The clipboard's generation: any copy, text or picture, changes it (brokerclip.h). */
+static unsigned clip_gen(void) { return term_clipboard_gen() * 2654435761u + wl_clip_image_gen() * 40503u + 1; }
+
+/* A secret an isolated app put on the clipboard is cleared on time if nothing replaced it (brokerclip.c). */
 static void clip_secret_tick(void) {
-    if (!clip_secret.deadline || mono_s() < clip_secret.deadline) return;
-    clip_secret.deadline = 0;
-    const char *cur = term_clipboard();
-    uint8_t h[32];
-    sha256(cur ? cur : "", cur ? strlen(cur) : 0, h);
-    if (!memcmp(h, clip_secret.hash, 32)) { term_set_clipboard("", 0); term_clipboard_mark("lordos", 0); }
-    explicit_bzero(h, sizeof h);
+    unsigned g = clip_gen();
+    if (!bclip_due(g, mono_s())) return;
+    term_set_clipboard("", 0);
+    term_clipboard_mark("lordos", 0);
+    bclip_cleared(clip_gen());
 }
 
 /* Hands the companion of connection `conn` one end of a live link (media/live.h). Never waits: a companion that isn't
@@ -578,8 +578,22 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
     }
     case BOP_CLIP_SET:
         term_set_clipboard(payload, h->len);
+        term_clipboard_mark(a->id, 0);
+        bclip_copied(a->id, clip_gen(), 0, 0, mono_s());
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
+    case BOP_CLIP_STATUS: {
+        /* only about the app's own copy, never the clipboard's text: "mine <seconds left>" | "cleared" |
+         * "replaced" | "none"; payload "keep": its secret stays (no clearing) */
+        unsigned g = clip_gen();
+        if (h->len == 4 && !memcmp(payload, "keep", 4)) bclip_keep(a->id, g);
+        int left = 0, st = bclip_status(a->id, g, mono_s(), &left);
+        char out[32];
+        int n = st == BCLIP_MINE ? snprintf(out, sizeof out, "mine %d", left)
+                                 : snprintf(out, sizeof out, "%s", st == BCLIP_CLEARED ? "cleared" : st == BCLIP_REPLACED ? "replaced" : "none");
+        send_reply(fd, h->reqid, BST_OK, out, (uint32_t)n);
+        break;
+    }
     case BOP_PERM: {
         int p = perm_from_name(payload);
         if (p < 0) { send_reply(fd, h->reqid, BST_DENIED, NULL, 0); break; }
@@ -688,10 +702,7 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
         size_t tl = h->len - (size_t)(txt - payload);
         term_set_clipboard(txt, tl);
         term_clipboard_mark(a->id, 1);
-        if (secs > 0 && secs <= 600) {
-            sha256(txt, tl, clip_secret.hash);
-            clip_secret.deadline = mono_s() + secs;
-        }
+        bclip_copied(a->id, clip_gen(), 1, secs, mono_s());
         explicit_bzero(payload, h->len);
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;

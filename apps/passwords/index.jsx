@@ -7,15 +7,15 @@
 // the detail pane; under 960 px the columns get narrower so nothing is clipped.
 import {
   View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, ScrollView, SearchField, SectionTitle, ToolbarButton, EmptyState,
-  hasTextFocus, direction, wm, t, vaultAvailable,
+  hasTextFocus, direction, wm, t, vaultAvailable, ContextMenu,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { app, req, refreshStatus, wireEvents, reloadLogin } from './api.js';
+import { app, req, refreshStatus, wireEvents, reloadLogin, keepCopy, toast, errorText } from './api.js';
 import { allCategories, builtinById, catName } from './templates.js';
 import { CatIcon, EntryIcon, Overlays } from './ui.jsx';
 import { Glyph } from './glyphs.jsx';
 import { UnlockView, CreateView } from './Lock.jsx';
-import { EntryView, EntryEditor, tagColor } from './Detail.jsx';
+import { EntryView, EntryEditor, tagColor, copyMenuItems } from './Detail.jsx';
 import { SecurityView, CodesView } from './Security.jsx';
 import { GeneratorSheet } from './Generator.jsx';
 import { SettingsSheet, ImportSheet, ExportSheet, CategorySheet, TagSheet } from './Settings.jsx';
@@ -123,12 +123,12 @@ function Sidebar({ sel, onSel, issues, onNewCat, onEditCat, onEditTag }) {
 
 // ---- item list ----
 
-function ListRow({ e, cat, selected, onClick }) {
+function ListRow({ e, cat, selected, onClick, onContextMenu }) {
   const th = useTheme();
   const [hover, setHover] = useState(false);
   const dim = selected ? 'rgba(255,255,255,0.82)' : th.textDim;
   return (
-    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View onClick={onClick} onContextMenu={onContextMenu} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, borderRadius: 8,
         backgroundColor: selected ? th.accent : hover ? th.hover : 'transparent' }}>
       <EntryIcon entry={e} cat={cat} size={30} />
@@ -171,6 +171,7 @@ export default function Passwords() {
   const [sheet, setSheet] = useState(null);       // gen | settings | import | export | cat | tag
   const [sheetArg, setSheetArg] = useState(null);
   const [issues, setIssues] = useState(0);
+  const [ctx, setCtx] = useState(null);         // the list's right-click menu: { x, y, items }
   const rootRef = useRef(null);
   const winW = useWidth(rootRef, 1040);
 
@@ -197,6 +198,15 @@ export default function Passwords() {
     setCur(null);
   };
   const openSheet = (s, arg = null) => { setSheet(s); setSheetArg(arg); };
+  // right click on an item: copy any of it without opening it
+  const rowMenu = async (e, ev) => {
+    ev.stopPropagation?.();
+    const at = rootRef.current && ev.local ? ev.local(rootRef.current) : ev;
+    try {
+      const items = await copyMenuItems(v, e.id);
+      if (items.length) setCtx({ x: at.x, y: at.y, items });
+    } catch (x) { toast(errorText(x.code)); }
+  };
 
   useEffect(() => {
     if (!win?.id) return;
@@ -321,7 +331,8 @@ export default function Passwords() {
             {list.length ? (
               <ScrollView style={{ flex: 1 }}>
                 <View style={{ paddingHorizontal: 8, paddingBottom: 10, gap: 2 }}>
-                  {list.slice(0, 600).map((e) => <ListRow key={e.id} e={e} cat={catOf(e)} selected={cur === e.id} onClick={() => { setCur(e.id); setEditing(null); }} />)}
+                  {list.slice(0, 600).map((e) => <ListRow key={e.id} e={e} cat={catOf(e)} selected={cur === e.id} onClick={() => { setCur(e.id); setEditing(null); }}
+                    onContextMenu={(ev) => rowMenu(e, ev)} />)}
                   {list.length > 600 && <Text style={{ fontSize: 11, color: th.textDim, padding: 10 }}>{t('passwords.list.more', { count: list.length - 600 })}</Text>}
                 </View>
               </ScrollView>
@@ -341,10 +352,23 @@ export default function Passwords() {
       {sheet === 'cat' && <CategorySheet cat={sheetArg} onClose={() => setSheet(null)} />}
       {sheet === 'tag' && <TagSheet tag={sheetArg} onClose={() => setSheet(null)} />}
       <Overlays />
-      {st.toast && (
+      {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: winW, h: rootRef.current ? lord.getLayout(rootRef.current.id)[3] : 660 }} />}
+      {st.clip ? (
+        // the secret just copied: how long before it's cleared, and Keep
+        <View style={{ position: 'absolute', bottom: 20, left: 0, right: 0, alignItems: 'center', zIndex: 80 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingInlineStart: 14, paddingInlineEnd: 5, height: 34, borderRadius: 17,
+            backgroundColor: th.mode === 'dark' ? '#3a3a3c' : '#1c1c1e', boxShadow: '0 6px 20px rgba(0,0,0,0.3)' }}>
+            <Text style={{ fontSize: 12, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap' }}>{t('passwords.copied', { what: st.clip.label, secs: st.clip.left })}</Text>
+            <View onClick={keepCopy} style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{t('passwords.clip.keep')}</Text>
+            </View>
+          </View>
+        </View>
+      ) : st.toast && (
         <View style={{ position: 'absolute', bottom: 20, left: 0, right: 0, alignItems: 'center', zIndex: 80, pointerEvents: 'none' }}>
-          <View style={{ paddingHorizontal: 14, height: 32, justifyContent: 'center', borderRadius: 16, backgroundColor: th.mode === 'dark' ? '#3a3a3c' : '#1c1c1e', boxShadow: '0 6px 20px rgba(0,0,0,0.3)' }}>
-            <Text style={{ fontSize: 12, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap' }}>{st.toast.text}</Text>
+          <View style={{ paddingHorizontal: 14, minHeight: 32, maxWidth: 560, justifyContent: 'center', borderRadius: 16, boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+            backgroundColor: st.toast.kind === 'warn' ? '#b25000' : th.mode === 'dark' ? '#3a3a3c' : '#1c1c1e' }}>
+            <Text style={{ fontSize: 12, fontWeight: 500, color: '#fff', lineHeight: 16, paddingVertical: 8 }}>{st.toast.text}</Text>
           </View>
         </View>
       )}

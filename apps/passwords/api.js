@@ -16,6 +16,7 @@ export const app = createStore({
   meta: {}, cats: [], tags: [], entries: [],
   login: { entries: [], unlocked: false },
   toast: null,
+  clip: null,                // the secret just copied: { label, left } (its countdown)
   touch: false,              // la llave FIDO2 espera un toque
 });
 
@@ -62,32 +63,78 @@ let toastTimer = null;
 export function toast(text, kind = 'info') {
   if (toastTimer) clearTimeout(toastTimer);
   app.set((s) => ({ ...s, toast: { text, kind } }));
-  toastTimer = setTimeout(() => app.set((s) => ({ ...s, toast: null })), 2600);
+  toastTimer = setTimeout(() => app.set((s) => ({ ...s, toast: null })), kind === 'warn' ? 6000 : 2600);
 }
 
 // Copiar un secreto: marcado sensible (no entra al historial del portapapeles ni a los gestores
 // de portapapeles de las apps Linux) y se borra solo a los N segundos si sigue siendo el mismo.
-let clearTimer = null;
+let clearTimer = null, clearAt = 0;
 export function copySecret(value, label) {
   const secs = Number(app.get().meta?.clip ?? 30) || 30;
   if (appMode) {
     // app process: lord-server marks it sensitive and clears it after `secs` if unchanged
     lord.clipboard.set(value, { secure: true, clearAfter: secs });
-    toast(t('passwords.copied', { what: label, secs }));
-    return;
+  } else {
+    clipboard.set(value, { secure: true, origin: APP_ID });
+    if (clearTimer) clearTimeout(clearTimer);
+    clearAt = Date.now() + secs * 1000;
+    clearTimer = setTimeout(() => {
+      clearTimer = null;
+      try { if (lord.clipboard.get() === value) clipboard.set('', { secure: true, origin: APP_ID }); } catch (e) { /* */ }
+    }, secs * 1000);
   }
-  clipboard.set(value, { secure: true, origin: APP_ID });
-  if (clearTimer) clearTimeout(clearTimer);
-  clearTimer = setTimeout(() => {
-    clearTimer = null;
-    try { if (lord.clipboard.get() === value) clipboard.set('', { secure: true, origin: APP_ID }); } catch (e) { /* */ }
-  }, secs * 1000);
-  toast(t('passwords.copied', { what: label, secs }));
+  watchCopy(label, true, value, secs);
 }
 
 export function copyText(value, label) {
   clipboard.set(value, { origin: APP_ID });
-  toast(t('passwords.copiedPlain', { what: label }));
+  watchCopy(label, false, value, 0);
+}
+
+// What became of the copy just made: a secret's countdown (st.clip, with Keep), and a warning when something
+// replaced it right away (another app, a machine sharing its clipboard). In app mode lord-server says only
+// whether our own copy is still there (lord.clipboard.status), never what the clipboard holds.
+const SOON_MS = 3000;
+let watch = null;
+function copyState(w) {
+  if (appMode) return lord.clipboard.status ? lord.clipboard.status(false) : null;
+  let cur = null;
+  try { cur = lord.clipboard.get(); } catch (e) { return null; }
+  if (cur === w.value) return { state: 'mine', left: w.secret && clearTimer ? Math.max(0, Math.ceil((clearAt - Date.now()) / 1000)) : 0 };
+  return { state: w.secret && !clearTimer && cur === '' ? 'cleared' : 'replaced', left: 0 };
+}
+function stopWatch() { if (watch) { clearInterval(watch.timer); watch = null; } app.set((s) => ({ ...s, clip: null })); }
+function watchCopy(label, secret, value, secs) {
+  if (watch) clearInterval(watch.timer);
+  const w = { label, secret, value, t0: Date.now() };
+  watch = w;
+  if (secret) app.set((s) => ({ ...s, toast: null, clip: { label, left: secs } }));
+  else toast(t('passwords.copiedPlain', { what: label }));
+  const tick = () => {
+    const r = copyState(w);
+    if (!r) { if (!secret || Date.now() - w.t0 > SOON_MS) stopWatch(); return; }
+    if (r.state === 'mine') {
+      if (secret && r.left > 0) { app.set((s) => ({ ...s, clip: { label, left: r.left } })); return; }
+      if (!secret && Date.now() - w.t0 < SOON_MS) return;
+      stopWatch();
+      return;
+    }
+    stopWatch();
+    if (r.state === 'replaced' && Date.now() - w.t0 < SOON_MS) toast(t('passwords.clip.replaced', { what: label }), 'warn');
+    else if (r.state === 'cleared') toast(t('passwords.clip.cleared', { what: label }));
+  };
+  w.timer = setInterval(tick, 500);
+  w.value = appMode ? null : value;          // the app process never needs the text again
+}
+
+// Keep: the secret stays on the clipboard (no clearing)
+export function keepCopy() {
+  const w = watch;
+  if (!w) return;
+  if (appMode) { if (lord.clipboard.status) lord.clipboard.status(true); }
+  else if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+  stopWatch();
+  toast(t('passwords.clip.kept', { what: w.label }));
 }
 
 export async function revealField(v, id, k, i = 0) {
