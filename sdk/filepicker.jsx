@@ -74,9 +74,10 @@ function Tile({ e, on, live, th, onDown, onOpen }) {
   );
 }
 
-// mode: 'open' (the default), 'folder' (the selected folder, or the one in view) or 'save' (a name, with a question before replacing a file).
+// mode: 'open' (the default), 'folder' (the selected folder, or the one in view) or 'save' (a name, with a question before replacing a file;
+// askReplace={false}: no question, the caller asks its own, e.g. the Terminal's "use the file that is there").
 // modal: nothing else takes the keys while it is open (the portal's dialog, over everything).
-export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false }) {
+export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false, askReplace = true }) {
   const th = useTheme();
   const home = fs.home();
   const disks = useMemo(() => { try { return localDisks(fs.volumes(), home); } catch (e) { return []; } }, []);
@@ -143,7 +144,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     const target = `${dir === '/' ? '' : dir}/${fileName.trim()}`;
     const st = statOf(target);
     if (st?.dir) { setSaveName(''); go(target); return; }
-    if (st && !replacing) { setReplacing(true); return; }
+    if (st && !replacing && askReplace) { setReplacing(true); return; }
     onPick(target);
   };
   const act = (a) => {
