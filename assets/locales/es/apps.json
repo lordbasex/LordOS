@@ -34,5 +34,6 @@
   "store": "Tienda",
   "sysinfo": "Información del sistema",
   "sysprobe": "Prueba del aislamiento",
-  "terminal": "Terminal"
+  "terminal": "Terminal",
+  "databases": "Bases de datos"
 }

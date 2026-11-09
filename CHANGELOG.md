@@ -12,6 +12,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Databases (new app): a MySQL and MariaDB client.** Favorites in groups with a color each; Standard, Socket and
+  Cloud connections (managed MySQL services: writer or reader endpoint, TLS required and the provider's
+  certificate checked); passwords kept in Passwords. Per connection: a database pop-up and a table list with filter;
+  Structure (fields and indexes; every change is shown as the ALTER TABLE before it runs); Content (filter rules,
+  sort, 1000-row pages, edit a cell, add, duplicate and delete rows, keyed by the primary key); Query (line numbers,
+  highlighting, completion of tables, fields and keywords, Run Current with Ctrl+Enter and Run All, one tab per
+  result, Explain, history per favorite, and a safe mode that asks before an UPDATE or DELETE without WHERE);
+  Table Info; and a Console with every query the app sends, passwords hidden. A favorite marked production opens
+  read-only until you unlock it. On first run it finds the favorites saved by the SQL client of another computer's system on the home folder or a
+  mounted disk and imports them with their groups and colors (passwords stay in that system's keychain: each is
+  asked once). SSH tunnels, IAM tokens, relations and triggers editing, users, processes, import and export come
+  in a later phase (docs/DATABASES.md).
+  - Each connection runs in its own sandboxed helper, `lord-sql`, that speaks the MySQL protocol itself (TLS,
+    `mysql_native_password` and `caching_sha2_password`), with no sockets of its own and no files: lord-server
+    connects only to a saved favorite, through a connector of its own, so the firewall and Monitor show it as
+    "Databases" (`lordos:sql`). Everything a server sends is parsed bounds-checked and fuzzed in the tests.
+
 - **Machines: shared folders.** Up to four folders of this computer inside a machine, read-only unless you turn writing
   on for one (Configure → Sharing → Add a Folder; the bar's folder button lists them, opens each in Files and copies the
   command that mounts it in a Linux guest: `mount -t virtiofs <tag> /mnt/<tag>`). Each folder is served by its own

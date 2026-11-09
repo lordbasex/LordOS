@@ -181,6 +181,8 @@ EOF
     if have node; then run "idle-model-test (sdk/idlemodel.js)" node tests/idle_model_test.mjs
     else skip "idle-model-test (sdk/idlemodel.js)" node; fi
     if have node; then run "vm-model-test (apps/machines/model.js)" node tests/vm_model_test.mjs; fi
+    if have node; then run "databases-model-test (apps/databases/model.js)" node tests/databases_model_test.mjs; fi
+    if have node; then run "databases-plist-test (apps/databases/plist.js)" node tests/databases_plist_test.mjs; fi
     # where the reading-aloud player goes and how its wave moves (docs/VOICE.md)
     if have node; then run "voiceplayer-model-test (sdk/voiceplayermodel.js)" node tests/voiceplayer_model_test.mjs; fi
     if have node; then run "voicecatalog-test (sdk/voicecatalog.js)" node tests/voicecatalog_test.mjs; fi

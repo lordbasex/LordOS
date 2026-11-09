@@ -1,0 +1,20 @@
+{
+  "id": "databases",
+  "version": "0.1.0",
+  "name": "Databases",
+  "description": "A client for MySQL and MariaDB: favorites, structure, content, queries and a console, each connection in its own sandbox",
+  "size": [
+    1200,
+    760
+  ],
+  "minSize": [
+    900,
+    560
+  ],
+  "dock": false,
+  "singleWindow": true,
+  "permissions": [
+    "fs:home"
+  ],
+  "category": "Development"
+}

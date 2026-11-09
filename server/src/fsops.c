@@ -88,6 +88,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.config/lordos/mail",          /* Mail accounts and trusted certificates: only lord.mail.saveConfig (docs/MAIL.md) */
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
                                            "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
+                                           "/.config/lordos/databases",     /* Databases favorites (hosts, trusted certificates): only lord.sql.saveFavorites (docs/DATABASES.md) */
                                            NULL };
 
 int fsops_protected(const char *real) {

@@ -572,5 +572,7 @@
   "gpu.ai.idle": "Nenhum motor de IA está funcionando",
   "gpu.ai.idleShort": "Inativa",
   "gpu.machines": "Máquinas",
-  "gpu.vms": "Em execução · processador {cpu} % · memória {mem}"
+  "gpu.vms": "Em execução · processador {cpu} % · memória {mem}",
+  "comp.sql": "Bancos de dados",
+  "comp.sqlHint": "Bancos de dados: conexões aos servidores MySQL e MariaDB dos seus favoritos."
 }

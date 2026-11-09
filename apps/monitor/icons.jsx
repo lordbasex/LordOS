@@ -157,6 +157,14 @@ export function Glyph({ name, color, size = 13 }) {
           </View>
         </View>
       );
+    case 'database':
+      return (
+        <View style={{ ...box, gap: s * 0.06 }}>
+          <View style={{ width: s * 0.78, height: s * 0.26, borderRadius: s * 0.13, backgroundColor: color }} />
+          <View style={{ width: s * 0.78, height: s * 0.26, borderRadius: s * 0.13, border: `${b}px solid ${color}` }} />
+          <View style={{ width: s * 0.78, height: s * 0.26, borderRadius: s * 0.13, border: `${b}px solid ${color}` }} />
+        </View>
+      );
     case 'tunnel':
       return (
         <View style={box}>

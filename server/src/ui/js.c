@@ -16,6 +16,7 @@
 #include "js_print.h"
 #include "js_vault.h"
 #include "js_mail.h"
+#include "js_sql.h"
 #include "js_input.h"
 #include "js_fw.h"
 #include "js_backup.h"
@@ -423,6 +424,7 @@ static void session_context(void) {
     js_print_register(ctx, lord);      /* lord.print: CUPS over IPP and eSCL scanners */
     js_vault_register(ctx, lord);      /* lord.vault: Passwords and the keyring through the lord-vault helper */
     js_mail_register(ctx, lord);       /* lord.mail: Mail, Calendar, Contacts, Reminders via lord-maild (docs/MAIL.md) */
+    js_sql_register(ctx, lord);        /* lord.sql: Databases (MySQL / MariaDB) via lord-sql (docs/DATABASES.md) */
     js_wm_register(ctx, lord);         /* lord.wm: moving and resizing windows in C (grab.c) */
     js_input_register(ctx, lord);      /* lord.input: touchpads and touchscreens (tp/) */
     js_fw_register(ctx, lord);         /* lord.fw: per-app network permissions (lord-netperm, docs/FIREWALL.md) */

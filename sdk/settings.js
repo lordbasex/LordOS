@@ -29,6 +29,7 @@ const DEFAULTS = {
   sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
   sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
   remoteDesks: null,          // 0.8.7, the RDP and VNC apps' saved computers (no passwords)
+  databases: null,            // 0.8.8.7, Databases: { history, recent, safeMode, servers, importOffered } (apps/databases)
   machinesView: null,         // 0.8.8.7, Machines' library: { view, sort, show } (apps/machines/model.js libView)
   files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
   pickerView: null,           // 0.8.8.3, the system file dialog's List / Thumbnails: { files, images } (sdk/filepickermodel.js viewFor)

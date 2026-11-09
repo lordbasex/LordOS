@@ -154,6 +154,8 @@ export { suggestions, refreshSuggestions, reevaluate as reevaluateSuggestions, d
 export { vaultAvailable, vaultRequest, onVaultEvent, keyring, autofill, autofillReveal, KeyringPrompt, AutofillButton, askKeyringUnlock } from './vault.js';   // Passwords and keyring (docs/PASSWORDS.md)
 import { KeyringPrompt } from './vault.js';
 // Mail, Calendar, Contacts and Reminders through the sandboxed helper lord-maild (docs/MAIL.md)
+// Databases: MySQL and MariaDB through the sandboxed helper lord-sql (docs/DATABASES.md)
+export { sqlAvailable, sqlRequest, onSqlEvent, sqlFavorites, sqlPasswords } from './sql.js';
 export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mailStatus, autoconfig, OAUTH_PROVIDERS, DAV_PRESETS, davPreset, openDavSetup, openMailAccounts, trackMailStatus, isolatedPim, pickFileFd, closeFileFd } from './mail.js';
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';

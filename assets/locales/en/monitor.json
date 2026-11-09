@@ -572,5 +572,7 @@
   "gpu.ai.idle": "No AI engine is running",
   "gpu.ai.idleShort": "Idle",
   "gpu.machines": "Machines",
-  "gpu.vms": "Running · processor {cpu} % · memory {mem}"
+  "gpu.vms": "Running · processor {cpu} % · memory {mem}",
+  "comp.sql": "Databases",
+  "comp.sqlHint": "Databases: connections to MySQL and MariaDB servers in your favorites."
 }

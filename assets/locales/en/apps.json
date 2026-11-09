@@ -34,5 +34,6 @@
   "store": "Store",
   "sysinfo": "System Information",
   "sysprobe": "Sandbox Probe",
-  "terminal": "Terminal"
+  "terminal": "Terminal",
+  "databases": "Databases"
 }

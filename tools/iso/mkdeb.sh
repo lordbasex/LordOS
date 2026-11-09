@@ -157,6 +157,9 @@ if [ -x server/build/lordos-guest ]; then
     install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
     "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
 fi
+# lord-sql (0.8.8.7): the Databases app's MySQL / MariaDB client, sandboxed (docs/DATABASES.md)
+[ -x server/build/lord-sql ] && install -m 755 server/build/lord-sql "$L/bin/lord-sql"
+[ -x "$L/bin/lord-sql" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sql" 2>/dev/null || true; }
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }

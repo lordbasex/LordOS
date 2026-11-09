@@ -21,9 +21,9 @@
 
 #include <sys/socket.h>
 
-typedef enum { NC_MAIL = 0, NC_PRINT = 1, NC_LISTS = 2, NC_LAN = 3, NC_COUNT } NcComponent;
+typedef enum { NC_MAIL = 0, NC_PRINT = 1, NC_LISTS = 2, NC_LAN = 3, NC_SQL = 4, NC_COUNT } NcComponent;
 
-/* The connector's name ("mail", "print", "lists", "lan"), the same as its firewall id after "lordos:". */
+/* The connector's name ("mail", "print", "lists", "lan", "sql"), the same as its firewall id after "lordos:". */
 const char *netconn_name(NcComponent c);
 
 /* A new non-blocking, close-on-exec socket of family fam (AF_INET / AF_INET6) and type
