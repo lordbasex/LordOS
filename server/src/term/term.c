@@ -198,6 +198,13 @@ void term_set_clipboard(const char *s, size_t n) {
     clip_sensitive = 0;
 }
 
+/* Wipes the text without making it a new copy: a picture copied after a secret stays the clipboard (the
+ * generation is unchanged), and the secret's text is gone from memory. */
+void term_clipboard_wipe(void) {
+    if (clip) { explicit_bzero(clip, strlen(clip)); clip[0] = 0; }
+    clip_sensitive = 0;
+}
+
 void term_clipboard_mark(const char *origin, int sensitive) {
     snprintf(clip_origin, sizeof clip_origin, "%s", origin && origin[0] ? origin : "lordos");
     clip_sensitive = sensitive != 0;

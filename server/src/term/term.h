@@ -369,6 +369,7 @@ unsigned term_clipboard_gen(void);
 /* Where the last copied thing came from ("terminal", "lordos" or a Wayland app's app_id) and
  * whether it is sensitive (password: it does not go to the history). term_set_clipboard sets it to "terminal", 0. */
 void        term_clipboard_mark(const char *origin, int sensitive);
+void        term_clipboard_wipe(void);           /* empties the text, same generation (a newer picture stays) */
 const char *term_clipboard_origin(void);
 int         term_clipboard_sensitive(void);
 int      term_mono_font(int bold, int italic);

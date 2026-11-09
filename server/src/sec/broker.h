@@ -56,8 +56,9 @@ enum BrokerOp {
     BOP_STATUS,         /* (permission status-item) payload: JSON of its item by the clock, "" to take it off
                          * (sec/statusitem.c); the shell draws it. A choice comes back as a "status" event */
     BOP_CLIP_STATUS,    /* payload "" or "keep" → "mine <seconds left>" | "cleared" | "replaced" | "none": only whether
-                         * the app's own last copy is still on the clipboard (sec/brokerclip.c), never what it holds;
-                         * "keep" cancels the clearing of its secret */
+                         * the app's own last copy is still on the clipboard, for 3 s after it or until its secret
+                         * is cleared (sec/brokerclip.c), never what it holds; "keep" cancels the clearing of its
+                         * secret. Refused under the firewall's no-clipboard restriction */
     BOP_EVENT = 100,    /* server → app, unrequested (reqid 0): payload "type\0json" */
 };
 

@@ -231,9 +231,10 @@ Locking frees the model block by block; every arena block is wiped on free.
   that it is gone instead of failing silently. In app mode the app asks `lord.clipboard.status(keep)`
   (`BOP_CLIP_STATUS`, `src/sec/brokerclip.c`, `build/brokerclip-test`): lord-server answers only about
   that app's own last copy (`mine` with the seconds left, `cleared`, `replaced`, or `none` when another
-  app copied last), never what the clipboard holds, and `keep` cancels its clearing. The clipboard's
-  generation (any copy, text or picture) decides it, so a secret replaced by a picture is not cleared
-  either.
+  app copied last), never what the clipboard holds, and only for 3 s after the copy or until its secret
+  is cleared (5 s more), so an app can't use it to watch the clipboard; the firewall's no-clipboard
+  restriction refuses it too. `keep` cancels the clearing. A secret replaced by a picture leaves the
+  picture on the clipboard, and its text is still wiped from lord-server's memory on time.
 - Anything in an item can be copied: every field, the title, the 2FA code and the notes, from the item
   or from the list's right-click menu (hidden values are asked of lord-vault only when one is picked).
 

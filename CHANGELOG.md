@@ -51,7 +51,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   it. A copied password shows how many seconds it has before it is cleared, with **Keep** to leave it there. If
   something replaces it right away (another app, or a running machine), Passwords says so instead of failing
   silently. lord-server tells the app only whether its own copy is still on the clipboard, never what the clipboard
-  holds (`BOP_CLIP_STATUS`). A secret replaced by a picture is no longer cleared by mistake.
+  holds, only for a few seconds after the copy, and not under the firewall's no-clipboard restriction
+  (`BOP_CLIP_STATUS`). A secret replaced by a picture leaves the picture on the clipboard, and its text is still
+  wiped on time.
 
 - **Machines' library looks like Remote Desk.** A toolbar of icons, each named in its tooltip: Storage, what Machines
   needs (only when something is missing), Add (New Machine, Import a machine), pictures or a list, Sort (by name,

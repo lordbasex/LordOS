@@ -47,6 +47,7 @@ void term_set_clipboard(const char *s, size_t n) { (void)s; (void)n; }
 void term_clipboard_mark(const char *app, int secret) { (void)app; (void)secret; }
 unsigned term_clipboard_gen(void) { return 1; }
 unsigned wl_clip_image_gen(void) { return 0; }
+void term_clipboard_wipe(void) {}
 const char *kb_layouts(void) { return "us"; }
 const char *kb_variants(void) { return ""; }
 int kb_group(void) { return 0; }

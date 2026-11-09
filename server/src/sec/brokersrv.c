@@ -309,8 +309,9 @@ static unsigned clip_gen(void) { return term_clipboard_gen() * 2654435761u + wl_
 
 /* A secret an isolated app put on the clipboard is cleared on time if nothing replaced it (brokerclip.c). */
 static void clip_secret_tick(void) {
-    unsigned g = clip_gen();
-    if (!bclip_due(g, mono_s())) return;
+    int due = bclip_due(clip_gen(), term_clipboard_gen(), mono_s());
+    if (due == BCLIP_WIPE_TEXT) term_clipboard_wipe();      /* a picture came after it: it stays */
+    if (due != BCLIP_CLEAR_ALL) return;
     term_set_clipboard("", 0);
     term_clipboard_mark("lordos", 0);
     bclip_cleared(clip_gen());
@@ -579,15 +580,18 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
     case BOP_CLIP_SET:
         term_set_clipboard(payload, h->len);
         term_clipboard_mark(a->id, 0);
-        bclip_copied(a->id, clip_gen(), 0, 0, mono_s());
+        bclip_copied(a->id, clip_gen(), term_clipboard_gen(), 0, 0, mono_s());
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
     case BOP_CLIP_STATUS: {
-        /* only about the app's own copy, never the clipboard's text: "mine <seconds left>" | "cleared" |
-         * "replaced" | "none"; payload "keep": its secret stays (no clearing) */
+        /* only about the app's own copy and only for a short while (brokerclip.h), never the clipboard's text:
+         * "mine <seconds left>" | "cleared" | "replaced" | "none"; payload "keep": its secret stays. A firewall
+         * restriction on reading the clipboard covers it too */
+        if (deny_restricted(fd, h->reqid, a->id, FW_R_NO_CLIPBOARD)) break;
         unsigned g = clip_gen();
-        if (h->len == 4 && !memcmp(payload, "keep", 4)) bclip_keep(a->id, g);
-        int left = 0, st = bclip_status(a->id, g, mono_s(), &left);
+        double now = mono_s();
+        if (h->len == 4 && !memcmp(payload, "keep", 4)) bclip_keep(a->id, g, now);
+        int left = 0, st = bclip_status(a->id, g, now, &left);
         char out[32];
         int n = st == BCLIP_MINE ? snprintf(out, sizeof out, "mine %d", left)
                                  : snprintf(out, sizeof out, "%s", st == BCLIP_CLEARED ? "cleared" : st == BCLIP_REPLACED ? "replaced" : "none");
@@ -702,7 +706,7 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
         size_t tl = h->len - (size_t)(txt - payload);
         term_set_clipboard(txt, tl);
         term_clipboard_mark(a->id, 1);
-        bclip_copied(a->id, clip_gen(), 1, secs, mono_s());
+        bclip_copied(a->id, clip_gen(), term_clipboard_gen(), 1, secs, mono_s());
         explicit_bzero(payload, h->len);
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
