@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.7-beta] - 2026-11-09
+
 ### Added
 
 - **Lithuanian is complete** (GitHub #45). 0.8.8.6 translated the login screen, the desktop, Files, the installer and
@@ -4019,7 +4021,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...HEAD
+[0.8.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...v0.8.8.7-beta
 [0.8.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...v0.8.8.6-beta
 [0.8.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...v0.8.8.5-beta
 [0.8.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...v0.8.8.4-beta
