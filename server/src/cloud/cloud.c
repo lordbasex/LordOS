@@ -1134,6 +1134,18 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
 }
 static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn) { return create_remote_q(a, secret_json, fresh, msg, mn, NULL); }
 
+/* A key rclone gives back may stay in rclone.conf only when it is known not to be secret: it already was one of the
+ * account's non-secret options, or the provider offers it as a field that isn't secret. Anything else (an option rclone
+ * added itself, such as a session, or every key while the provider list isn't loaded) goes to the keyring, so a value
+ * can only move from the file into the keyring, never the other way. */
+static int known_plain(Acc *a, const KindInfo *ki, const char *key) {
+    for (int i = 0; ki && i < ki->n; i++) if (!strcmp(ki->name[i], key)) return !ki->secret[i];
+    pthread_mutex_lock(&cl_mu);
+    int was = kv_get(&a->p, key) != NULL;
+    pthread_mutex_unlock(&cl_mu);
+    return was;
+}
+
 /* config/get: the non-secret options into a->p, the secrets as a JSON object's text (malloc) */
 static char *split_remote(Acc *a, char *msg, size_t mn) {
     char body[64];
@@ -1147,7 +1159,7 @@ static char *split_remote(Acc *a, char *msg, size_t mn) {
     Params np = { .n = 0 };
     for (const JVal *x = d.root->type == J_OBJ ? d.root->kid : NULL; x; x = x->next) {
         if (x->type != J_STR || !strcmp(x->key, "type") || !cloud_key_ok(x->key)) continue;
-        if (secret_name(ki, x->key)) {
+        if (secret_name(ki, x->key) || !known_plain(a, ki, x->key)) {
             if (s.n > 1) jb_raw(&s, ",");
             jb_str(&s, x->key);
             jb_raw(&s, ":");
@@ -1304,15 +1316,7 @@ static void token_check(Acc *a) {
     char msg[128];
     a->tok_at = time(NULL);
     if (!a->configured) return;
-    pthread_mutex_lock(&cl_mu);
-    Params keep = a->p;
-    a->p.n = 0;                     /* split_remote replaces it: keep ours if config/get fails */
-    pthread_mutex_unlock(&cl_mu);
-    char *sec = split_remote(a, msg, sizeof msg);
-    pthread_mutex_lock(&cl_mu);
-    if (!sec) a->p = keep;
-    else kv_clear(&keep);
-    pthread_mutex_unlock(&cl_mu);
+    char *sec = split_remote(a, msg, sizeof msg);        /* a->p stays as it was if config/get fails */
     if (!sec) return;
     if (fnv(sec) == a->tok_hash) { wipe_free(sec); return; }
     store_secret(a, sec);

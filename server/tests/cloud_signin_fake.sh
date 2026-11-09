@@ -107,6 +107,7 @@ last=$(sed -n '/^config\/create iclouddrive/,$p' "$T/rc-session.log" | awk '/^co
 check "  the cookie rclone had last" sh -c '[ -n "$2" ] && case $1 in *"\"cookies\":\"$2\""*) exit 0 ;; esac; exit 1' x "$r" "$last"
 check "  rclone started again with it" sh -c 'grep "^config/create iclouddrive" "$1" | tail -1 | grep -q "cookies=$2\$"' x "$T/rc-session.log" "$last"
 check "  not with the first one" hasnt "$(grep '^config/create iclouddrive' "$T/rc-session.log" | tail -1)" 'cookies=cookie-0'
+check "  the session is never in rclone.conf" sh -c '[ -s "$1" ] && ! grep -q "cookie-\|trust-\|someone@" "$1"' x "$H/.config/lordos/cloud/rclone.conf"
 stop
 
 echo "cloud-signin-fake: $pass passed, $fail failed"
