@@ -216,7 +216,7 @@ export function KeyringPrompt() {
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
 // The secret leaves lord-vault only when the user picks one.
 // urls: several sites the login may be kept under (a cloud provider's own and its maker's); entries found under any
-// host / hosts: exact matches only (a server reached by its address), see autofill.
+// host / hosts: exact matches only (a server reached by its address), see autofill; with urls, both.
 export function AutofillButton({ app, service, account = '', url, urls, ssid, host, hosts, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);
@@ -224,9 +224,12 @@ export function AutofillButton({ app, service, account = '', url, urls, ssid, ho
   const load = async () => {
     const out = [];
     if (service) { try { const k = await keyring.get(app, { service, account }); if (k) out.push({ kind: 'kr', title: k.label || service, username: k.account, secret: k.secret }); } catch (e) { /* locked */ } }
-    if (urls && urls.length) {
+    if (urls && urls.length || (urls && hosts)) {
+      // a provider's own sites loosely, the servers typed exactly
       const seen = new Set();
-      for (const u of urls) for (const e of await autofill(app, { url: u })) if (!seen.has(e.id)) { seen.add(e.id); out.push({ kind: 'pw', ...e }); }
+      const add = (list) => { for (const e of list) if (!seen.has(e.id)) { seen.add(e.id); out.push({ kind: 'pw', ...e }); } };
+      for (const u of urls) add(await autofill(app, { url: u }));
+      if (hosts && hosts.length) add(await autofill(app, { hosts }));
     } else for (const e of await autofill(app, host !== undefined || hosts !== undefined ? { host, hosts } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
     setItems(out);
   };

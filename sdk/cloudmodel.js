@@ -247,10 +247,12 @@ export const formValues = (provider, prev = {}) => Object.fromEntries((provider?
 // and for a server of the person's own the address typed in the form. [] when there is none to look under.
 const LOGIN_SITES = { iclouddrive: ['icloud.com', 'apple.com'], mega: ['mega.nz', 'mega.io'], filen: ['filen.io'], koofr: ['koofr.net'],
   pcloud: ['pcloud.com'], internetarchive: ['archive.org'], proton: ['proton.me'], protondrive: ['proton.me'], seafile: [], webdav: [], sftp: [], ftp: [], smb: [] };
-export function loginSites(kind, values = {}) {
-  const typed = ['url', 'host', 'endpoint'].map((k) => String(values[k] || '').trim()).filter(Boolean)
-    .map((v) => v.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/[/:].*$/, '').toLowerCase()).filter((h) => /^[a-z0-9.-]+$/.test(h));
-  return [...new Set([...(LOGIN_SITES[kind] || []), ...typed])];
+// The sites a provider's login may be kept under in Passwords (matched loosely, as a web login), and the servers typed in
+// the form (matched exactly: a typed name must never pull another site's password, so 'bank' finds no bank login).
+export const loginSites = (kind) => [...(LOGIN_SITES[kind] || [])];
+export function typedHosts(values = {}) {
+  return [...new Set(['url', 'host', 'endpoint'].map((k) => String(values[k] || '').trim()).filter(Boolean)
+    .map((v) => v.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/[/:].*$/, '').toLowerCase()).filter((h) => /^[a-z0-9.-]+$/.test(h)))];
 }
 // the form's user and password fields, for filling both from one Passwords entry
 export function loginFields(provider) {

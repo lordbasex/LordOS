@@ -1136,7 +1136,7 @@ function CredSheet({ st, sheet }) {
   // the password: the 🔑 fills it, and the user beside it, from Passwords (the entries kept under the provider's sites or
   // the server typed here), like Databases' favorites
   const login = M.loginFields(p);
-  const sites = M.loginSites(p.kind, vals);
+  const sites = M.loginSites(p.kind), typed = M.typedHosts(vals);
   const fill = ({ username, password }) => {
     setVals((o) => ({ ...o, ...(login.user && username ? { [login.user]: username } : {}), ...(password ? { [login.pass]: password } : {}) }));
     setErr(null);
@@ -1144,7 +1144,7 @@ function CredSheet({ st, sheet }) {
   const fieldRow = (f) => row(f.name, fieldLabel(f), (
     <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <View style={{ flex: 1, minWidth: 0 }}>{control(f)}</View>
-      {f.name === login.pass && sites.length ? <AutofillButton app="settings" urls={sites} onFill={fill} /> : null}
+      {f.name === login.pass && (sites.length || typed.length) ? <AutofillButton app="settings" urls={sites} hosts={typed} onFill={fill} /> : null}
     </View>
   ));
   // an advanced option: its short label (a switch beside it), the control under it, rclone's whole help dimmed below

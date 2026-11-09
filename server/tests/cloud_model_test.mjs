@@ -650,9 +650,9 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
 
 // the 🔑 in a provider's form: where Passwords may keep its login, and which fields it fills
 eq('login sites: a provider\'s own', M.loginSites('iclouddrive'), ['icloud.com', 'apple.com']);
-eq('login sites: the server typed', M.loginSites('webdav', { url: 'https://Cloud.Example.test:8443/remote.php/dav' }), ['cloud.example.test']);
-eq('login sites: nothing to look under', M.loginSites('s3', {}), []);
-eq('login sites: a typed value that isn\'t a host', M.loginSites('sftp', { host: 'a b' }), []);
+eq('login sites: the server typed is a host, matched exactly', [M.loginSites('webdav'), M.typedHosts({ url: 'https://Cloud.Example.test:8443/remote.php/dav' })], [[], ['cloud.example.test']]);
+eq('login sites: nothing to look under', [M.loginSites('s3'), M.typedHosts({})], [[], []]);
+eq('login sites: a typed value that isn\'t a host', M.typedHosts({ host: 'a b' }), []);
 eq('login fields', [M.loginFields({ fields: [{ name: 'apple_id' }, { name: 'password' }] }), M.loginFields({ fields: [{ name: 'url' }, { name: 'user' }, { name: 'pass' }] }), M.loginFields({ fields: [] })],
   [{ user: 'apple_id', pass: 'password' }, { user: 'user', pass: 'pass' }, { user: null, pass: null }]);
 
