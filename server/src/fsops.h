@@ -21,6 +21,9 @@ int  fsops_protected_below(const char *real);  /* a protected path lies strictly
  * run time: the Terminal's configuration may be anywhere the user chose (termconf.h). "" clears a slot. */
 enum { FSOPS_PF_TERMINAL, FSOPS_PF_TERMINAL_CUSTOM, FSOPS_PF_SETTINGS, FSOPS_PF_COUNT };
 void fsops_protect_file(int slot, const char *real);
+/* real is, lies under or holds a protected path, each protected path resolved first (links followed): for folders
+ * handed to something outside lord.fs (a machine's writable share) */
+int  fsops_protected_resolved(const char *real);
 const char *fsops_home(void);                  /* the resolved home folder given to fsops_init */
 
 /* rename for lord.fs: refuses a protected path, a parent of one (as source or destination) and an existing target */

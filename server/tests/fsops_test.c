@@ -246,6 +246,28 @@ int main(void) {
     fs_recent(10, 1, hit_cb, NULL);
     CHECK(hits >= 3);
 
+    /* a protected path reached through a link (~/.config → another folder): the real folder holds settings.json, which
+     * a lexical check misses and the resolved one sees (a machine's writable share) */
+    {
+        char e[512], l[512], f[600], d[512];
+        snprintf(e, sizeof e, "%s/elsewhere", H); mkdir(e, 0755);
+        snprintf(d, sizeof d, "%s/elsewhere/lordos", H); mkdir(d, 0755);
+        snprintf(f, sizeof f, "%s/settings.json", d);
+        FILE *sf = fopen(f, "w"); if (sf) { fputs("{}", sf); fclose(sf); }
+        char keep[520];
+        snprintf(l, sizeof l, "%s/.config", H);
+        snprintf(keep, sizeof keep, "%s/.config-real", H);
+        rename(l, keep);                                /* the earlier tests' real folder, put back after */
+        if (symlink(e, l)) perror("symlink");
+        CHECK(!fsops_protected(e) && !fsops_protected_below(e));   /* lexically: nothing protected here */
+        CHECK(fsops_protected_resolved(e));             /* resolved: it holds settings.json */
+        CHECK(fsops_protected_resolved(d));
+        snprintf(d, sizeof d, "%s/Plain", H); mkdir(d, 0755);
+        CHECK(!fsops_protected_resolved(d));
+        unlink(l);
+        rename(keep, l);
+    }
+
     char cmd[300];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", H);
     if (system(cmd)) {}

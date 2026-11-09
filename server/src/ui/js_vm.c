@@ -580,7 +580,7 @@ static char refusal[48];
 static int share_writable_ok(const char *path) {
     char real[PATH_MAX];
     if (!realpath(path, real)) return 1;            /* not there: lord-vm refuses the share itself */
-    return !fsops_protected(real) && !fsops_protected_below(real);
+    return !fsops_protected_resolved(real);
 }
 static int machine_shares_ok(const char *dir) {
     VmMachine m;

@@ -117,6 +117,26 @@ int fsops_protected(const char *real) {
     return 0;
 }
 
+/* The same two questions with every protected path resolved first (a link anywhere on its way followed), for a
+ * folder handed outside lord.fs, such as a machine's writable share: with ~/.config a link to another disk, the real
+ * folder holding settings.json is not under home/.config, and a lexical check would miss it. A protected path that
+ * doesn't exist yet is taken as written. */
+static int resolved_hit(const char *real, const char *p) {
+    char r[PATH_MAX];
+    const char *q = realpath(p, r) ? r : p;
+    return under(real, q) || (strcmp(q, real) && under(q, real));
+}
+int fsops_protected_resolved(const char *real) {
+    if (fsops_protected(real) || fsops_protected_below(real)) return 1;
+    for (int i = 0; protect[i]; i++) {
+        char p[PATH_MAX + 64];
+        pathf(p, sizeof p, "%s%s", home, protect[i]);
+        if (p[0] && resolved_hit(real, p)) return 1;
+    }
+    for (int i = 0; i < FSOPS_PF_COUNT; i++) if (pfile[i][0] && resolved_hit(real, pfile[i])) return 1;
+    return 0;
+}
+
 /* Is a protected path strictly below real? (Cleaner's rule table: a rule's root must not hold one.) */
 int fsops_protected_below(const char *real) {
     for (int i = 0; i < FSOPS_PF_COUNT; i++)
