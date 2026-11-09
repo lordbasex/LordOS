@@ -121,9 +121,27 @@ int fsops_protected(const char *real) {
  * folder handed outside lord.fs, such as a machine's writable share: with ~/.config a link to another disk, the real
  * folder holding settings.json is not under home/.config, and a lexical check would miss it. A protected path that
  * doesn't exist yet is taken as written. */
+/* p with its longest existing prefix resolved and the rest added back as written: a protected file that doesn't exist
+ * yet is still where its folder really is (~/.config a link elsewhere, terminal.json not written yet). 0, or -1. */
+static int resolve_prefix(const char *p, char *out, size_t n) {
+    char head[PATH_MAX], r[PATH_MAX];
+    if (snprintf(head, sizeof head, "%s", p) >= (int)sizeof head) return -1;
+    size_t cut = strlen(head);
+    for (;;) {
+        head[cut] = 0;
+        if (realpath(cut ? head : "/", r)) break;
+        char *s = strrchr(head, '/');
+        if (!s) return -1;
+        cut = (size_t)(s - head);
+    }
+    const char *tail = p + cut;                     /* "" or "/rest/of/path" */
+    if (!strcmp(r, "/") && tail[0] == '/') tail++;
+    return pathf(out, n, "%s%s", r, tail) < 0 ? -1 : 0;
+}
+
 static int resolved_hit(const char *real, const char *p) {
-    char r[PATH_MAX];
-    const char *q = realpath(p, r) ? r : p;
+    char q[PATH_MAX];
+    if (resolve_prefix(p, q, sizeof q)) return 1;   /* can't tell where it is: treated as a hit */
     return under(real, q) || (strcmp(q, real) && under(q, real));
 }
 int fsops_protected_resolved(const char *real) {

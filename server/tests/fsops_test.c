@@ -262,6 +262,15 @@ int main(void) {
         CHECK(!fsops_protected(e) && !fsops_protected_below(e));   /* lexically: nothing protected here */
         CHECK(fsops_protected_resolved(e));             /* resolved: it holds settings.json */
         CHECK(fsops_protected_resolved(d));
+        /* a protected file not written yet, in a folder reached through the link: still seen where it would be */
+        fsops_protect_file(FSOPS_PF_TERMINAL, "");
+        char tj[600];
+        snprintf(tj, sizeof tj, "%s/.config/lordos/terminal.json", H);
+        fsops_protect_file(FSOPS_PF_TERMINAL, tj);
+        unlink(f);                                      /* settings.json gone too: only the missing file is left */
+        CHECK(fsops_protected_resolved(d));
+        CHECK(fsops_protected_resolved(e));
+        fsops_protect_file(FSOPS_PF_TERMINAL, "");
         snprintf(d, sizeof d, "%s/Plain", H); mkdir(d, 0755);
         CHECK(!fsops_protected_resolved(d));
         unlink(l);
