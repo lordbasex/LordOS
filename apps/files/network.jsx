@@ -1,14 +1,20 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr, CloudGlyph } from '@lordos/sdk';
+import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, settings, spacing, typeScale, t as tr, CloudGlyph } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { FolderGlyph, DriveGlyph } from './glyphs.jsx';
-import { WAY_ORDER as ORDER, isShareFs, foundHosts, shareKind } from './netplaces.js';
+import { WAY_ORDER as ORDER, isShareFs, foundHosts, shareKind, withHostName, shareParts } from './netplaces.js';
 
 export { isShareFs };
 // A mounted share's folder keeps its fixed name on disk (share_leaf, lan_connect); people read it in their language.
-export const shareTitle = (name) => { const m = /^(.+) on ([^ ]+)$/.exec(name); return m ? tr('files.net.shareOn', { name: m[1], host: m[2] }) : name; };
+// The server shows under the name it was found or typed under when Files knows one (netplaces.js, withHostName).
+export const shareTitle = (name) => { const p = shareParts(name, settings.get().netHostNames); return p ? tr('files.net.shareOn', { name: p.share, host: p.host }) : name; };
+export const rememberHostName = (addr, name) => {
+  const now = settings.get().netHostNames;
+  const next = withHostName(now, addr, name);
+  if (next !== now && JSON.stringify(next) !== JSON.stringify(now || {})) settings.set({ netHostNames: next });
+};
 
 // the folder share-mount makes under /media/<user> (share_leaf in server/src/lan/lanaddr.c)
 const leafOf = (kind, addr, share) => {
@@ -82,6 +88,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
         if (remember) { try { await lan.remember(ask.kind, ask.addr, key, user.trim(), password, tr('files.net.keyringLabel', { name: name, addr: ask.addr })); } catch (e) { note = tr('files.net.notRemembered'); } }
         else lan.forget(ask.kind, ask.addr, key, user.trim());
       }
+      rememberHostName(ask.addr, ask.host);
       onMounted(at, note, name);
     } catch (e) { setError(e.message); setBusy(false); }
   };

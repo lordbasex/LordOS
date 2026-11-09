@@ -1,7 +1,7 @@
 // Files without a screen: what an address means and how columns move. node server/tests/files_model_test.mjs
 import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith, clampZoom, zoomWith, zoomOf, iconMetrics, listMetrics, iconColumns, ZOOM_MIN, ZOOM_MAX } from '../../apps/files/viewprefs.js';
 import { parseAddress, sshLine, remoteUri, hostAddress, looksDav, davOf } from '../../apps/files/connect.js';
-import { offersWay, foundHosts, connectedEntries, shareKind, netGroups } from '../../apps/files/netplaces.js';
+import { offersWay, foundHosts, connectedEntries, shareKind, netGroups, withHostName, shareParts } from '../../apps/files/netplaces.js';
 import { normalColumns, visible, toggleColumn, moveColumn, resize, dropBefore, totalWidth, MIN_W, MAX_W } from '../../apps/files/columns.js';
 
 let ok = 0;
@@ -108,4 +108,16 @@ eq('share kinds', [shareKind('x on 1.2.3.4', 'cifs'), shareKind('e on h', 'nfs4'
 const tt = (k) => k;
 eq('groups', netGroups([{ path: 'net:1' }, { path: 'place:/a', netPlace: {} }], tt).map((g) => [g.label, g.items.map((e) => e.path)]), [['files.net.group.connected', ['place:/a']], ['files.net.group.found', ['net:1']]]);
 eq('one group untitled', netGroups([{ path: 'net:1' }], tt).map((g) => g.label), ['']);
+// GitHub #88: a share on 192.168.1.25 shows as the server's name once Files found or was given one
+let names = withHostName({}, '192.168.1.25', 'NAS-SALON');
+eq('share: the name kept', shareParts('software on 192.168.1.25', names), { share: 'software', host: 'NAS-SALON' });
+eq('share: no name known, the address', shareParts('software on 10.0.0.9', names), { share: 'software', host: '10.0.0.9' });
+eq('share: not a share folder', shareParts('Backup', names), null);
+eq('share: the address itself is not a name', withHostName(names, '10.0.0.9', '10.0.0.9'), names);
+eq('share: control characters refused', withHostName(names, '10.0.0.9', 'a\u0007b'), names);
+eq('share: a host named like an Object key', shareParts('x on constructor', {}), { share: 'x', host: 'constructor' });
+for (let i = 0; i < 70; i++) names = withHostName(names, `10.0.1.${i}`, `pc${i}`);
+eq('share: at most 64 names, the oldest go', [Object.keys(names).length, names['192.168.1.25'], names['10.0.1.69']], [64, undefined, 'pc69']);
+names = withHostName(names, '10.0.1.10', 'renamed');
+eq('share: a new name for an address replaces the old one', [names['10.0.1.10'], Object.keys(names).pop()], ['renamed', '10.0.1.10']);
 console.log(`files-model-test: ${ok} ok`);

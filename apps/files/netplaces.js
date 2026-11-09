@@ -58,6 +58,27 @@ export function shareKind(name, fs) {
   return m ? m[1] : 'remote';
 }
 
+// A mounted share's folder keeps the server's address (share_leaf: a name is never resolved for the mount), so the row
+// shows the name the server was found or typed under, kept by address (GitHub #88: "software on 192.168.1.25").
+const NAMES_MAX = 64;
+export function withHostName(names, addr, name) {
+  const n = String(name || '').trim();
+  if (!addr || !n || n === addr || n.length > 63 || /[\u0000-\u001f]/.test(n)) return names || {};
+  const next = { ...(names || {}) };
+  delete next[addr];
+  next[addr] = n;
+  const keys = Object.keys(next);
+  for (const k of keys.slice(0, Math.max(0, keys.length - NAMES_MAX))) delete next[k];
+  return next;
+}
+// "<share> on <host>" → { share, host } with the host's name when one is known, else null
+export function shareParts(name, names) {
+  const m = /^(.+) on ([^ ]+)$/.exec(name || '');
+  if (!m) return null;
+  const known = names && Object.prototype.hasOwnProperty.call(names, m[2]) ? names[m[2]] : '';
+  return { share: m[1], host: typeof known === 'string' && known ? known : m[2] };
+}
+
 // The page in two groups, connected first, whatever the sort; a single group needs no title.
 export function netGroups(sorted, t) {
   const connected = sorted.filter((e) => e.netPlace);

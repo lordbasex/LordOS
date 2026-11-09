@@ -18,7 +18,7 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, netStatus, hostName, placeEntry } from './network.jsx';
+import { NetGlyph, isShareFs, shareTitle, rememberHostName, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, netStatus, hostName, placeEntry } from './network.jsx';
 import { connectedEntries, netGroups } from './netplaces.js';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.js';
@@ -574,7 +574,7 @@ export default function Files() {
     // a share open to guests, or an NFS export, mounts by itself; anything else asks who connects
     if (w.share && (w.kind === 'nfs' || ['anonymous', 'guest'].includes(h.session))) {
       setMsg(tr('files.net.connecting'));
-      lan.mount({ kind: w.kind, addr: h.addr, share: w.share }).then((at) => { setMsg(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); },
+      lan.mount({ kind: w.kind, addr: h.addr, share: w.share }).then((at) => { rememberHostName(h.addr, hostName(h)); setMsg(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); },
         () => { setMsg(null); setConnAsk({ kind: w.kind, addr: h.addr, host: hostName(h), user: '', share: w.share }); });
       return;
     }
