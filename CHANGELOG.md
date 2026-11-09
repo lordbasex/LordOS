@@ -122,7 +122,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
--- **Terminal: Settings open in a window of their own.** They used to cover the terminal window they were opened from,
+-- **`whiptail` and `zstd` come with LordOS.** They are now in every image (the live ISO and the Raspberry Pi image)
+  and among the lordos package's Recommends, so an update brings them to installs that lack them.
+  - `whiptail` (61 KB) shows the questions a package asks while it installs, as dialogs in the terminal. Without it
+    debconf said "unable to initialize frontend: Dialog" and fell back to plain text.
+  - `zstd` (2.3 MB) is the compressor Debian prefers for the initramfs. Without it `update-initramfs` warned "No zstd
+    … using gzip" and made a slower one to build and unpack at boot.
+- **Updates bring the Recommends a new version adds**, as apt's full upgrade does, in Update All and when one package
+  is upgraded. Before, the package engine followed only Depends on an upgrade, so a tool newly recommended by the
+  lordos package (`whiptail`, `zstd`, and earlier the command-line tools) reached a system that was already installed
+  only through apt. A group is added only when none of its names were recommended by the installed version, so a
+  recommended package the user removed stays removed. One that can't be installed doesn't stop the update.
+- **Terminal: Settings open in a window of their own.** They used to cover the terminal window they were opened from,
   so nothing could be done in it meanwhile. Now ❖, (or Terminal → Settings) opens one Settings window, or brings it to
   the front if it is already open, and the terminal stays usable beside it. The profiles on the left are grouped by tag,
   the same groups as the Profiles menu: the untagged ones first, then one folder per tag that can be folded, with how

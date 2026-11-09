@@ -118,6 +118,11 @@ repository removes that repository. The catalog itself is described in `UPDATES.
 
 - Recommended packages are not installed by default. `--recommends` adds them, and if one of them
   can't be installed it doesn't stop the rest.
+- (0.8.8.7) **An upgrade brings the Recommends the new version adds**, as apt's full upgrade does. This holds for
+  Update All (`pkg-upgrade`) and for upgrading one package. A group is added only if none of its names were
+  recommended by the installed version, so a recommended package the user removed stays removed. They are optional:
+  one that can't be installed doesn't stop the upgrade. This is how `whiptail` and `zstd`, added to the lordos
+  package's Recommends in 0.8.8.7, reach systems that are already installed.
 - If a request forces removing something that wasn't asked for, the action fails with
   `ERR pkg.removeAlso names=a,b` ("these must also be removed"). For example:
   - installing `postfix` removes `exim4`, because they are two mail programs and can't coexist;
@@ -400,7 +405,7 @@ await admin.run('pkg-install', 'featherpad', (line) => …)    // line: "progres
 - **Sources.** One-line `.list` files and deb822 `.sources`; since 0.8.5 `Architectures:` may be
   separated by commas as well as spaces (`amd64,arm64`, as Cursor's package writes it), as apt accepts.
 - **Dependencies.** It walks those of what changes: `Pre-Depends` and `Depends`, and `Recommends`
-  with `--recommends`.
+  with `--recommends` (on an upgrade, the Recommends the new version adds, without it).
 - **Choices.** Alternatives (`a | b`) and virtual packages are tried in order. Among providers of
   a virtual package, the highest `Priority` is preferred, then the name. If a path fails, it
   backtracks, with a maximum of 4000 attempts.

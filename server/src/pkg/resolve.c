@@ -257,12 +257,53 @@ static int enqueue(S *s, int node, long expect, const char *field, int optional)
     return 0;
 }
 
+/* Does field (a relation list) name any of the k alternatives in r? */
+static int names_any(const char *field, const DebRel *r, int k) {
+    if (!field) return 0;
+    const char *p = field, *e = field + strlen(field);
+    DebRel o[MAX_ALTS];
+    int m;
+    while ((m = deb_next_group(&p, e, o, MAX_ALTS)) > 0)
+        for (int i = 0; i < m; i++)
+            for (int j = 0; j < k; j++)
+                if (o[i].nlen == r[j].nlen && !memcmp(o[i].name, r[j].name, r[j].nlen)) return 1;
+    return 0;
+}
+
+/* An upgrade brings the Recommends the new version adds, as apt's full upgrade does: only a group none of whose
+ * names the installed version already recommended, so a recommended package the user removed stays removed.
+ * Optional: one that can't be installed doesn't stop the upgrade. */
+static int enqueue_new_recommends(S *s, int node, long target, const char *field, const char *had) {
+    const char *e = field + strlen(field), *p = field;
+    DebRel r[MAX_ALTS];
+    int k;
+    for (;;) {
+        const char *g = p;
+        while (g < e && (*g == ' ' || *g == ',' || *g == '\n')) g++;
+        if ((k = deb_next_group(&p, e, r, MAX_ALTS)) <= 0) break;
+        if (names_any(had, r, k)) continue;
+        if (s->nq == s->capq) {
+            int cap = s->capq ? s->capq * 2 : 1024;
+            Item *n = realloc(s->q, sizeof *n * (size_t)cap);
+            if (!n) return -1;
+            s->q = n;
+            s->capq = cap;
+        }
+        s->q[s->nq++] = (Item){ node, target, g, p, 1 };
+    }
+    return 0;
+}
+
 static int enqueue_deps(S *s, int node) {
     Node *n = nd(s, node);
     if (!present(n)) return 0;
-    return enqueue(s, node, n->target, field_of(s, n, n->target, F_PREDEPENDS), 0) ||
-           enqueue(s, node, n->target, field_of(s, n, n->target, F_DEPENDS), 0) ||
-           (s->o->recommends && n->target >= 0 && enqueue(s, node, n->target, field_of(s, n, n->target, F_RECOMMENDS), 1));
+    if (enqueue(s, node, n->target, field_of(s, n, n->target, F_PREDEPENDS), 0) ||
+        enqueue(s, node, n->target, field_of(s, n, n->target, F_DEPENDS), 0)) return -1;
+    if (n->target < 0) return 0;
+    if (s->o->recommends) return enqueue(s, node, n->target, field_of(s, n, n->target, F_RECOMMENDS), 1);
+    if (n->inst && ver_cmp(idx_s(s->x, s->x->pkg[n->target].version), n->inst->version) > 0)
+        return enqueue_new_recommends(s, node, n->target, field_of(s, n, n->target, F_RECOMMENDS), n->inst->recommends);
+    return 0;
 }
 
 /* ---- satisfaction ---- */

@@ -367,6 +367,52 @@ static const char *HW_NEW =        /* 0.8.7 with an older snapshot */
     "Package: lordos\nStatus: install ok installed\nVersion: 0.8.7\nArchitecture: amd64\nDepends: libc6 (>= 2.38), lordos-hwdata (>= 2026.10.27)\nDescription: l\n\n"
     "Package: lordos-hwdata\nStatus: install ok installed\nVersion: 2026.10.29\nArchitecture: all\nDescription: h\n\n";
 
+/* An upgrade brings the Recommends the new version adds (0.8.8.7: whiptail and zstd), never one the installed version
+ * already had (screen: the user removed it), and one missing from the index doesn't stop it. */
+static const char *REC_REPO =
+    "Package: lordos\nVersion: 0.8.8.7\nArchitecture: amd64\nDepends: libc6\nRecommends: screen, vim, whiptail, zstd | gzip, nowhere\nFilename: pool/l.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: screen\nVersion: 1\nArchitecture: amd64\nFilename: pool/s.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: s\n\n"
+    "Package: whiptail\nVersion: 1\nArchitecture: amd64\nFilename: pool/w.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: w\n\n"
+    "Package: zstd\nVersion: 1\nArchitecture: amd64\nFilename: pool/z.deb\nSize: 1\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: z\n\n";
+static const char *REC_STATUS =
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: vim\nStatus: install ok installed\nVersion: 9\nArchitecture: amd64\nDescription: v\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.8.6\nArchitecture: amd64\nDepends: libc6\nRecommends: screen, vim\nDescription: l\n\n";
+
+static void test_new_recommends(const char *dir) {
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "http://x", "test", "main", "test", "T", "T", 0, 0, 500);
+    idxb_packages(b, s, REC_REPO, strlen(REC_REPO), "amd64");
+    char err[200], sp[600];
+    snprintf(sp, sizeof sp, "%s/rec", dir);
+    mkdir(sp, 0700);
+    CHECK(!idxb_write(b, sp, "amd64", err, sizeof err), "rec index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, sp) && x.h->npkg == 4, "rec index opened");
+    snprintf(sp, sizeof sp, "%s/rec/status", dir);
+    FILE *f = fopen(sp, "w");
+    fputs(REC_STATUS, f);
+    fclose(f);
+    Status st = { 0 };
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 3, "rec status");
+    Plan p;
+    PlanOpts o = { .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_UPGRADE, "lordos"), "rec: lordos upgraded: %s", p.err);
+    CHECK(has(&p, PA_INSTALL, "whiptail") && has(&p, PA_INSTALL, "zstd"), "rec: the new Recommends come with the upgrade");
+    CHECK(!has(&p, PA_INSTALL, "screen"), "rec: one the old version recommended (and the user removed) stays out");
+    CHECK(p.n == 3, "rec: nothing else (the missing one doesn't stop it): %d", p.n);
+    plan_free(&p);
+    const char *lo[] = { "lordos" };
+    o = (PlanOpts){ 0 };
+    plan_make(&x, &st, lo, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "whiptail") && has(&p, PA_INSTALL, "zstd") && !has(&p, PA_INSTALL, "screen"), "rec: updating lordos alone does the same");
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+}
+
 static const char *item_ver(const Plan *p, const char *name) {
     for (int i = 0; i < p->n; i++) if (!strcmp(p->items[i].name, name)) return p->items[i].version;
     return "-";
@@ -636,6 +682,7 @@ int main(int argc, char **argv) {
     test_compress();
     pin_root = dir;                     /* never the machine's own /etc/apt/preferences */
     test_resolver(dir);
+    test_new_recommends(dir);
     test_hwdata(dir);
     test_pins(dir);
     char cmd[256];
