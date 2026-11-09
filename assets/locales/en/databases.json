@@ -32,12 +32,10 @@
   "neverConnected": "never connected",
   "readOnlyLower": "read only",
   "reconnect": "Reconnect",
-
   "ago.now": "just now",
   "ago.minutes": "{n} min ago",
   "ago.hours": "{n} h ago",
   "ago.yesterday": "yesterday",
-
   "type.tcp": "Standard",
   "type.socket": "Socket",
   "type.ssh": "SSH",
@@ -48,7 +46,6 @@
   "cloud.azure": "Azure Database for MySQL",
   "cloud.gcp": "Cloud SQL for MySQL",
   "cloud.other": "Other cloud service",
-
   "color.0": "Red",
   "color.1": "Orange",
   "color.2": "Yellow",
@@ -56,7 +53,6 @@
   "color.4": "Blue",
   "color.5": "Purple",
   "color.6": "Gray",
-
   "box.server": "DATABASE SERVER",
   "box.ssh": "SSH TUNNEL",
   "box.cloud": "CLOUD DATABASE",
@@ -98,7 +94,6 @@
   "tls.systemCa": "The system's certificate authorities",
   "tls.caFile": "A CA file…",
   "tls.identity": "Check that the endpoint matches the certificate",
-
   "pw.placeholder": "asked when you connect",
   "pw.keep": "Passwords",
   "pw.keepIn": "Keep in Passwords",
@@ -108,7 +103,6 @@
   "pw.title": "Password for {name}",
   "pw.detail": "The server asks for the password of {user} on {server}. Leave it empty to connect without one.",
   "pw.imported": "This connection was imported: its password stayed with the other app. Type it once, and keep it in Passwords if you want.",
-
   "cert.title": "The server's certificate didn't check",
   "cert.detail": "{name} answered with a certificate this computer can't verify. Trust it only if you know this is the right server: from then on, only this exact certificate is accepted for it.",
   "cert.problem": "Problem: {problem}",
@@ -118,7 +112,6 @@
   "cert.trust": "Trust and Connect",
   "cert.trusted": "Trusted certificate {sha}",
   "cert.forget": "Forget it",
-
   "fav.new": "New favorite",
   "fav.newName": "New connection",
   "fav.copyName": "{name} copy",
@@ -150,7 +143,6 @@
   "group.rename": "Rename Group…",
   "group.delete": "Delete Group",
   "group.untitled": "Group",
-
   "import.menu": "Import Connections…",
   "import.title": "Import connections",
   "import.sequel-ace": "Sequel Ace",
@@ -175,17 +167,14 @@
     "one": "Imported {count} connection. Its password wasn't brought over: it's asked the first time you connect, and you can keep it in Passwords.",
     "other": "Imported {count} connections. Their passwords weren't brought over: each is asked the first time you connect, and you can keep it in Passwords."
   },
-
   "pick.ssh": "Choose the SSH key",
   "pick.cert": "Choose the client certificate",
   "pick.key": "Choose the client certificate's key",
   "pick.ca": "Choose the CA certificate",
-
   "menu.file": "File",
   "menu.view": "View",
   "menu.newConnection": "New Connection",
   "menu.closeConnection": "Close Connection",
-
   "pane.structure": "Structure",
   "pane.content": "Content",
   "pane.relations": "Relations",
@@ -221,7 +210,6 @@
   "lock.title": "Unlock {name} for changes?",
   "lock.detail": "This favorite is marked as production. Once unlocked, edits, ALTER and the queries you run can change its data until you close the connection.",
   "lock.footer": "Read only: unlock the connection in the toolbar to change it.",
-
   "info.kind": "Kind",
   "info.view": "View",
   "info.engine": "Engine",
@@ -243,7 +231,6 @@
   "info.comments": "COMMENTS",
   "info.noComment": "No comment",
   "info.create": "CREATE SYNTAX",
-
   "st.field": "Field",
   "st.type": "Type",
   "st.length": "Length",
@@ -315,7 +302,6 @@
   "index.kindUnique": "Unique",
   "index.kindPrimary": "Primary key",
   "index.kindFulltext": "Full text",
-
   "op.eq": "is",
   "op.ne": "is not",
   "op.gt": "is greater than",
@@ -371,7 +357,6 @@
   "content.addHint": "A field left empty takes its default value. For a binary column, write 0x and the hexadecimal bytes.",
   "content.insert": "Add Row",
   "content.auto": "automatic",
-
   "q.runCurrent": "Run Current",
   "q.runAll": "Run All",
   "q.explain": "Explain",
@@ -427,7 +412,6 @@
   "q.kind.table": "table",
   "q.kind.keyword": "keyword",
   "q.kind.function": "function",
-
   "console.title": "Console — {name}",
   "console.gone": "This connection is closed, and its log went with it.",
   "console.filter": "Filter the log",
@@ -448,7 +432,6 @@
     "one": "{count} entry since connecting at {time} · the log stays in memory and is cleared when you disconnect",
     "other": "{count} entries since connecting at {time} · the log stays in memory and is cleared when you disconnect"
   },
-
   "err.unavailable": "The database helper (lord-sql) isn't installed or can't start.",
   "err.notfound": "That favorite isn't saved anymore. Save it again and connect.",
   "err.dns": "The server's name couldn't be found. {message}",
@@ -467,5 +450,6 @@
   "err.badhex": "A binary value must be 0x followed by pairs of hexadecimal digits.",
   "err.norows": "Select the rows first.",
   "err.save": "The favorites couldn't be saved: {message}",
-  "err.other": "Something went wrong: {message}"
+  "err.other": "Something went wrong: {message}",
+  "err.fullAuthTls": "This server needs the password sent once over an encrypted connection. Turn on TLS (Preferred or Required) for this favorite and connect again."
 }

@@ -493,9 +493,11 @@ int my_connect(MyConn *c, const MyLogin *login, MyHandshake *hs) {
                     rc = my_write_packet(c, pw, strlen(pw) + 1);
                     if (rc) goto out;
                 } else {
-                    uint8_t ask = 0x02;
-                    if ((rc = my_write_packet(c, &ask, 1))) goto out;
-                    want_key = 1;
+                    /* Never ask for the server's RSA key over plain text: whoever sits in the middle
+                     * could hand us their own key and read the password. Full auth needs TLS (the
+                     * user logs in once with TLS on and the fast path works after that). */
+                    rc = fail(c, MY_E_TLS, "full-auth-needs-tls");
+                    goto out;
                 }
                 continue;
             }

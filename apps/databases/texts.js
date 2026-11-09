@@ -22,7 +22,7 @@ export function errText(e) {
     case 'notfound': return tr('databases.err.notfound');
     case 'dns': return tr('databases.err.dns', { message: d.message || '' });
     case 'connect': return tr('databases.err.connect', { message: d.message || '' });
-    case 'tls': return tr('databases.err.tls', { message: d.message || '' });
+    case 'tls': return d.message === 'full-auth-needs-tls' ? tr('databases.err.fullAuthTls') : tr('databases.err.tls', { message: d.message || '' });
     case 'cert': return tr('databases.err.cert');
     case 'auth': return tr('databases.err.auth');
     case 'closed': return tr('databases.err.closed');

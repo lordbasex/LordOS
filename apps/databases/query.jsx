@@ -14,7 +14,7 @@ import { run, run1, patchSession, prefs, setPrefs } from './conn.js';
 import { viewOf, patchView } from './viewstate.js';
 import {
   splitStatements, statementAt, offsetOf, isDangerous, isReadOnlySql, firstWord, wordBefore, completions, allColumnsSql, columnsByTable,
-  pushHistory, columnWidths, isNumericColumn, cellText, fmtMs, toCsv, toJson, toInserts, stripComments,
+  pushHistory, redactSql, columnWidths, isNumericColumn, cellText, fmtMs, toCsv, toJson, toInserts, stripComments,
 } from './model.js';
 import { errText, ago } from './texts.js';
 
@@ -198,7 +198,7 @@ export function Query({ s, db, tables }) {
     q.active = failed ? 'messages' : rowsShown.length ? results.indexOf(rowsShown[0]) : results.length ? 0 : 'messages';
     const fav = s.fav.id;
     const h = prefs().history || {};
-    setPrefs({ history: { ...h, [fav]: pushHistory(h[fav], list.join(';\n')) } });
+    setPrefs({ history: { ...h, [fav]: pushHistory(h[fav], redactSql(list.join(';\n'))) } });
     setRunning(false);
     bump();
   };

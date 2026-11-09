@@ -531,7 +531,8 @@ static void test_helper(void) {
     test_session("sha2 full over TLS, a whole session", &s);
 
     s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .full = 1 };
-    login("sha2 full auth with RSA", &s, open_json("preferred", "db.test", "", 0), -1, SR_OK, "\"tls\":null", 1);
+    /* the server's RSA key is never requested over plain text (a man in the middle could swap it) */
+    login("sha2 full auth without TLS is refused", &s, open_json("preferred", "db.test", "", 0), -1, SR_ERR, "\"error\":\"tls\"", 0);
     s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .switch_native = 1 };
     login("auth switch", &s, open_json("off", "db.test", "", 0), -1, SR_OK, "\"threadId\":4242", 1);
     s = (Scn){ .version = "8.0.36", .plugin = "mysql_native_password", .caps = CAPS, .deny = 1 };

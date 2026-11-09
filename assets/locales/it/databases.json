@@ -32,12 +32,10 @@
   "neverConnected": "mai connesso",
   "readOnlyLower": "sola lettura",
   "reconnect": "Riconnetti",
-
   "ago.now": "proprio ora",
   "ago.minutes": "{n} min fa",
   "ago.hours": "{n} h fa",
   "ago.yesterday": "ieri",
-
   "type.tcp": "Standard",
   "type.socket": "Socket",
   "type.ssh": "SSH",
@@ -48,7 +46,6 @@
   "cloud.azure": "Azure Database for MySQL",
   "cloud.gcp": "Cloud SQL for MySQL",
   "cloud.other": "Altro servizio cloud",
-
   "color.0": "Rosso",
   "color.1": "Arancione",
   "color.2": "Giallo",
@@ -56,7 +53,6 @@
   "color.4": "Blu",
   "color.5": "Viola",
   "color.6": "Grigio",
-
   "box.server": "SERVER DI DATABASE",
   "box.ssh": "TUNNEL SSH",
   "box.cloud": "DATABASE CLOUD",
@@ -98,7 +94,6 @@
   "tls.systemCa": "Le autorità di certificazione del sistema",
   "tls.caFile": "Un file CA…",
   "tls.identity": "Controlla che l’endpoint corrisponda al certificato",
-
   "pw.placeholder": "chiesta alla connessione",
   "pw.keep": "Password",
   "pw.keepIn": "Conserva in Password",
@@ -108,7 +103,6 @@
   "pw.title": "Password per {name}",
   "pw.detail": "Il server chiede la password di {user} su {server}. Lasciala vuota per connetterti senza.",
   "pw.imported": "Questa connessione è stata importata: la sua password è rimasta nell’altra app. Scrivila una volta e, se vuoi, conservala in Password.",
-
   "cert.title": "Il certificato del server non è stato verificato",
   "cert.detail": "{name} ha risposto con un certificato che questo computer non può verificare. Fidati solo se sai che è il server giusto: da quel momento, per esso viene accettato solo questo esatto certificato.",
   "cert.problem": "Problema: {problem}",
@@ -118,7 +112,6 @@
   "cert.trust": "Fidati e connetti",
   "cert.trusted": "Certificato attendibile {sha}",
   "cert.forget": "Dimenticalo",
-
   "fav.new": "Nuovo preferito",
   "fav.newName": "Nuova connessione",
   "fav.copyName": "{name} copia",
@@ -150,7 +143,6 @@
   "group.rename": "Rinomina gruppo…",
   "group.delete": "Elimina gruppo",
   "group.untitled": "Gruppo",
-
   "import.menu": "Importa connessioni…",
   "import.title": "Importa connessioni",
   "import.sequel-ace": "Sequel Ace",
@@ -175,17 +167,14 @@
     "one": "Importata {count} connessione. La sua password non è stata trasferita: viene chiesta alla prima connessione, e puoi conservarla in Password.",
     "other": "Importate {count} connessioni. Le loro password non sono state trasferite: ognuna viene chiesta alla prima connessione, e puoi conservarla in Password."
   },
-
   "pick.ssh": "Scegli la chiave SSH",
   "pick.cert": "Scegli il certificato client",
   "pick.key": "Scegli la chiave del certificato client",
   "pick.ca": "Scegli il certificato CA",
-
   "menu.file": "File",
   "menu.view": "Vista",
   "menu.newConnection": "Nuova connessione",
   "menu.closeConnection": "Chiudi connessione",
-
   "pane.structure": "Struttura",
   "pane.content": "Contenuto",
   "pane.relations": "Relazioni",
@@ -221,7 +210,6 @@
   "lock.title": "Sbloccare {name} per le modifiche?",
   "lock.detail": "Questo preferito è segnato come produzione. Una volta sbloccato, le modifiche, ALTER e le query che esegui possono cambiarne i dati finché non chiudi la connessione.",
   "lock.footer": "Sola lettura: sblocca la connessione nella barra degli strumenti per modificarla.",
-
   "info.kind": "Tipo",
   "info.view": "Vista",
   "info.engine": "Motore",
@@ -243,7 +231,6 @@
   "info.comments": "COMMENTI",
   "info.noComment": "Nessun commento",
   "info.create": "SINTASSI CREATE",
-
   "st.field": "Campo",
   "st.type": "Tipo",
   "st.length": "Lunghezza",
@@ -315,7 +302,6 @@
   "index.kindUnique": "Univoco",
   "index.kindPrimary": "Chiave primaria",
   "index.kindFulltext": "Testo completo",
-
   "op.eq": "è",
   "op.ne": "non è",
   "op.gt": "è maggiore di",
@@ -371,7 +357,6 @@
   "content.addHint": "Un campo lasciato vuoto prende il suo valore predefinito. Per una colonna binaria, scrivi 0x e i byte in esadecimale.",
   "content.insert": "Aggiungi riga",
   "content.auto": "automatico",
-
   "q.runCurrent": "Esegui corrente",
   "q.runAll": "Esegui tutto",
   "q.explain": "Spiega",
@@ -427,7 +412,6 @@
   "q.kind.table": "tabella",
   "q.kind.keyword": "parola chiave",
   "q.kind.function": "funzione",
-
   "console.title": "Console — {name}",
   "console.gone": "Questa connessione è chiusa, e il suo registro se n’è andato con lei.",
   "console.filter": "Filtra il registro",
@@ -448,7 +432,6 @@
     "one": "{count} voce dalla connessione alle {time} · il registro resta in memoria e si cancella alla disconnessione",
     "other": "{count} voci dalla connessione alle {time} · il registro resta in memoria e si cancella alla disconnessione"
   },
-
   "err.unavailable": "L’assistente dei database (lord-sql) non è installato o non riesce ad avviarsi.",
   "err.notfound": "Quel preferito non è più salvato. Salvalo di nuovo e connettiti.",
   "err.dns": "Il nome del server non è stato trovato. {message}",
@@ -467,5 +450,6 @@
   "err.badhex": "Un valore binario deve essere 0x seguito da coppie di cifre esadecimali.",
   "err.norows": "Seleziona prima le righe.",
   "err.save": "Impossibile salvare i preferiti: {message}",
-  "err.other": "Qualcosa è andato storto: {message}"
+  "err.other": "Qualcosa è andato storto: {message}",
+  "err.fullAuthTls": "Questo server deve ricevere la password una volta su una connessione cifrata. Attiva TLS (Preferito o Obbligatorio) per questo preferito e riconnettiti."
 }

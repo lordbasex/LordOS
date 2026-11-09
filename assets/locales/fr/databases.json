@@ -32,12 +32,10 @@
   "neverConnected": "jamais connecté",
   "readOnlyLower": "lecture seule",
   "reconnect": "Se reconnecter",
-
   "ago.now": "à l’instant",
   "ago.minutes": "il y a {n} min",
   "ago.hours": "il y a {n} h",
   "ago.yesterday": "hier",
-
   "type.tcp": "Standard",
   "type.socket": "Socket",
   "type.ssh": "SSH",
@@ -48,7 +46,6 @@
   "cloud.azure": "Azure Database for MySQL",
   "cloud.gcp": "Cloud SQL for MySQL",
   "cloud.other": "Autre service cloud",
-
   "color.0": "Rouge",
   "color.1": "Orange",
   "color.2": "Jaune",
@@ -56,7 +53,6 @@
   "color.4": "Bleu",
   "color.5": "Violet",
   "color.6": "Gris",
-
   "box.server": "SERVEUR DE BASES DE DONNÉES",
   "box.ssh": "TUNNEL SSH",
   "box.cloud": "BASE DE DONNÉES CLOUD",
@@ -98,7 +94,6 @@
   "tls.systemCa": "Les autorités de certification du système",
   "tls.caFile": "Un fichier CA…",
   "tls.identity": "Vérifier que le point de terminaison correspond au certificat",
-
   "pw.placeholder": "demandé à la connexion",
   "pw.keep": "Mots de passe",
   "pw.keepIn": "Garder dans Mots de passe",
@@ -108,7 +103,6 @@
   "pw.title": "Mot de passe pour {name}",
   "pw.detail": "Le serveur demande le mot de passe de {user} sur {server}. Laissez-le vide pour vous connecter sans.",
   "pw.imported": "Cette connexion a été importée : son mot de passe est resté dans l’autre app. Saisissez-le une fois, et gardez-le dans Mots de passe si vous le souhaitez.",
-
   "cert.title": "Le certificat du serveur n’a pas pu être vérifié",
   "cert.detail": "{name} a répondu avec un certificat que cet ordinateur ne peut pas vérifier. Faites-lui confiance seulement si vous savez que c’est le bon serveur : dès lors, seul ce certificat précis sera accepté pour lui.",
   "cert.problem": "Problème : {problem}",
@@ -118,7 +112,6 @@
   "cert.trust": "Faire confiance et se connecter",
   "cert.trusted": "Certificat approuvé {sha}",
   "cert.forget": "L’oublier",
-
   "fav.new": "Nouveau favori",
   "fav.newName": "Nouvelle connexion",
   "fav.copyName": "{name} copie",
@@ -150,7 +143,6 @@
   "group.rename": "Renommer le groupe…",
   "group.delete": "Supprimer le groupe",
   "group.untitled": "Groupe",
-
   "import.menu": "Importer des connexions…",
   "import.title": "Importer des connexions",
   "import.sequel-ace": "Sequel Ace",
@@ -175,17 +167,14 @@
     "one": "{count} connexion importée. Son mot de passe n’a pas été repris : il est demandé à la première connexion, et vous pouvez le garder dans Mots de passe.",
     "other": "{count} connexions importées. Leurs mots de passe n’ont pas été repris : chacun est demandé à la première connexion, et vous pouvez le garder dans Mots de passe."
   },
-
   "pick.ssh": "Choisir la clé SSH",
   "pick.cert": "Choisir le certificat client",
   "pick.key": "Choisir la clé du certificat client",
   "pick.ca": "Choisir le certificat CA",
-
   "menu.file": "Fichier",
   "menu.view": "Présentation",
   "menu.newConnection": "Nouvelle connexion",
   "menu.closeConnection": "Fermer la connexion",
-
   "pane.structure": "Structure",
   "pane.content": "Contenu",
   "pane.relations": "Relations",
@@ -221,7 +210,6 @@
   "lock.title": "Déverrouiller {name} pour le modifier ?",
   "lock.detail": "Ce favori est marqué comme production. Une fois déverrouillé, les modifications, ALTER et les requêtes que vous exécutez peuvent changer ses données jusqu’à la fermeture de la connexion.",
   "lock.footer": "Lecture seule : déverrouillez la connexion dans la barre d’outils pour la modifier.",
-
   "info.kind": "Type",
   "info.view": "Vue",
   "info.engine": "Moteur",
@@ -243,7 +231,6 @@
   "info.comments": "COMMENTAIRES",
   "info.noComment": "Aucun commentaire",
   "info.create": "SYNTAXE CREATE",
-
   "st.field": "Champ",
   "st.type": "Type",
   "st.length": "Longueur",
@@ -315,7 +302,6 @@
   "index.kindUnique": "Unique",
   "index.kindPrimary": "Clé primaire",
   "index.kindFulltext": "Texte intégral",
-
   "op.eq": "est",
   "op.ne": "n’est pas",
   "op.gt": "est supérieur à",
@@ -371,7 +357,6 @@
   "content.addHint": "Un champ laissé vide prend sa valeur par défaut. Pour une colonne binaire, écrivez 0x et les octets en hexadécimal.",
   "content.insert": "Ajouter la ligne",
   "content.auto": "automatique",
-
   "q.runCurrent": "Exécuter l’actuelle",
   "q.runAll": "Tout exécuter",
   "q.explain": "Expliquer",
@@ -427,7 +412,6 @@
   "q.kind.table": "table",
   "q.kind.keyword": "mot-clé",
   "q.kind.function": "fonction",
-
   "console.title": "Console — {name}",
   "console.gone": "Cette connexion est fermée, et son journal est parti avec elle.",
   "console.filter": "Filtrer le journal",
@@ -448,7 +432,6 @@
     "one": "{count} entrée depuis la connexion à {time} · le journal reste en mémoire et est effacé à la déconnexion",
     "other": "{count} entrées depuis la connexion à {time} · le journal reste en mémoire et est effacé à la déconnexion"
   },
-
   "err.unavailable": "L’assistant de bases de données (lord-sql) n’est pas installé ou ne peut pas démarrer.",
   "err.notfound": "Ce favori n’est plus enregistré. Enregistrez-le de nouveau et connectez-vous.",
   "err.dns": "Le nom du serveur est introuvable. {message}",
@@ -467,5 +450,6 @@
   "err.badhex": "Une valeur binaire doit être 0x suivi de paires de chiffres hexadécimaux.",
   "err.norows": "Sélectionnez d’abord les lignes.",
   "err.save": "Impossible d’enregistrer les favoris : {message}",
-  "err.other": "Une erreur est survenue : {message}"
+  "err.other": "Une erreur est survenue : {message}",
+  "err.fullAuthTls": "Ce serveur doit recevoir le mot de passe une fois par une connexion chiffrée. Activez TLS (Préféré ou Obligatoire) pour ce favori et reconnectez-vous."
 }
