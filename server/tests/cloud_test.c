@@ -216,6 +216,10 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("failed to read private key: x509: decryption password incorrect"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("AccessDenied: Access Denied status code: 403"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("error in ListJSON: couldn't list files: pcloud error: Invalid 'access_token' provided. (2094)"), "cloud.authFailed"));   /* #71 */
+    /* an iCloud session the provider no longer takes: a new sign-in, not a mount every 30 s */
+    CHECK(!strcmp(cloud_failure_code("requestPCS(iclouddrive): HTTP error 500 (500 Internal Server Error) returned body: \"{\\\"success\\\":false,\\\"error\\\":\\\"Missing X-APPLE-WEBAUTH-TOKEN cookie\\\"}\""), "cloud.signInAgain"));
+    CHECK(!strcmp(cloud_failure_code("requestPCS(iclouddrive): HTTP error 421 (421 Misdirected Request)"), "cloud.signInAgain"));
+    CHECK(!cloud_failure_code("requestPCS(iclouddrive): HTTP error 503 (503 Service Unavailable)") || strcmp(cloud_failure_code("requestPCS(iclouddrive): HTTP error 503 (503 Service Unavailable)"), "cloud.signInAgain"));
     CHECK(!strcmp(cloud_failure_code("sign in failed: incorrect username or password"), "cloud.authFailed"));   /* #65: an app-specific password */
     CHECK(!strcmp(cloud_failure_code("dial tcp 127.0.0.1:1: connect: connection refused"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("error in ListJSON: write tcp 127.0.0.1:38242->127.0.0.1:18991: write: broken pipe"), "cloud.unreachable"));

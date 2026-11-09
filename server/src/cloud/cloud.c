@@ -1260,6 +1260,9 @@ static int mount_acc(Acc *a) {
         const char *fc = cloud_failure_code(msg);
         cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
         set_message(a, msg);
+        /* refused credentials don't come back by themselves: tried again in 30 minutes (or at once with Sign In Again,
+         * Retry or a restart), not every 30 seconds, which some providers answer by locking the account */
+        if (!strcmp(a->err, "cloud.signInAgain") || !strcmp(a->err, "cloud.authFailed")) a->retry_at = time(NULL) + 1800;
     }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
