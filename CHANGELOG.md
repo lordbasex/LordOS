@@ -107,7 +107,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
-- **Cloud: "Only in the cloud" or "In sync with this computer", said plainly.** Adding an account now asks how to use
+-- **Terminal: Settings open in a window of their own.** They used to cover the terminal window they were opened from,
+  so nothing could be done in it meanwhile. Now ❖, (or Terminal → Settings) opens one Settings window, or brings it to
+  the front if it is already open, and the terminal stays usable beside it. The profiles on the left are grouped by tag,
+  the same groups as the Profiles menu: the untagged ones first, then one folder per tag that can be folded, with how
+  many profiles it holds; a profile with two tags is in both. A search field filters by name, and by tag: a tag that
+  matches shows its whole folder. The profile's sections (General, Colors, Text, Window, Terminal, Keys, Triggers and
+  Config File) are tabs centred above the form, under the profile's name, its star and its tags, instead of a second
+  list in the sidebar. Changes are still saved as they are made; Done or Esc closes the window.
+ **Cloud: "Only in the cloud" or "In sync with this computer", said plainly.** Adding an account now asks how to use
   it, and its page has the same choice in place of the "Files on demand" switch, each with what it means: only in the
   cloud (every file listed, a file comes down when it is opened and what is copied in goes up, nothing kept on this
   computer) or in sync (a whole copy here and in the cloud, a deletion on one side goes to the other and the

@@ -150,4 +150,18 @@ export function profileMenu(profiles, item) {
   return [...loose, ...(loose.length ? ['-'] : []), ...tags.map((tag) => ({ label: tag, submenu: profiles.filter((p) => tagsOf(p).includes(tag)).map(item) }))];
 }
 
+// The profile lists of Preferences and the Profiles window: the profiles without a tag first, then one group per tag (in
+// the menu's order; a profile with two tags is in both). query, ignoring case, keeps a whole group whose tag holds it and,
+// in every group, the profiles whose name holds it; a group with none left is dropped. [{ tag: null | string, items }]
+export function profileGroups(profiles, query = '') {
+  const tagsOf = (p) => (Array.isArray(p.tags) ? p.tags.filter((x) => typeof x === 'string' && x.trim()) : []);
+  const q = String(query || '').trim().toLowerCase();
+  const named = (p) => !q || profileName(p).toLowerCase().includes(q);
+  const loose = profiles.filter((p) => !tagsOf(p).length && named(p));
+  const tags = [...new Set(profiles.flatMap(tagsOf))].sort(tagCmp);
+  return [{ tag: null, items: loose }, ...tags.map((tag) => ({ tag,
+    items: profiles.filter((p) => tagsOf(p).includes(tag) && (named(p) || tag.toLowerCase().includes(q))) }))]
+    .filter((g) => g.items.length);
+}
+
 export const profileName = (p) => (!p?.name || (p.id === 'default' && p.name === 'Predeterminado') ? t('terminal.profile.default') : p.name);

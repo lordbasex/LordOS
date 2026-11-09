@@ -124,7 +124,7 @@ export function ensureWin(wid, args) {
     tabs = [newTab(null, null, sid)];
   }
   wins.set((w) => ({ ...w, [wid]: {
-    tabs, active: tabs[0].id, find: null, prefs: false, toolbelt: false, popup: null, dialog: null,
+    tabs, active: tabs[0].id, find: null, toolbelt: false, popup: null, dialog: null,
     broadcast: false, timestamps: false, fontDelta: 0, toasts: [], composer: false, copyMode: null, replay: null,
   } }));
   for (const t of tabs) for (const sid of leaves(t.root)) configureSession(sid);

@@ -1,14 +1,14 @@
 // Preferences.jsx — the profile editor, configurable shortcuts
-// and the profile import from other terminal emulators. Laid out as a preferences pane (docs/DESIGN.md): a sidebar
-// with the profiles and the sections, and a form with a right-aligned label column that stacks the
-// labels above the controls when the window is narrow.
+// and the profile import from other terminal emulators. Its own window (terminal#prefs), so the terminal stays usable
+// beside it: a sidebar with the profiles grouped by tag and a search, and the profile's sections as tabs centred above a
+// form with a right-aligned label column that stacks the labels above the controls when the window is narrow.
 import {
-  View, Text, TextInput, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, SectionTitle, Hairline, GroupBox, ToolbarButton, ToolbarGroup,
+  View, Text, TextInput, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, Hairline, GroupBox, ToolbarButton, ToolbarGroup, SearchField,
   useStore, useTheme, fs, spacing, typeScale, direction, FilePicker, revealPath, errorText, t as T,
 } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName } from './profiles.js';
-import { reconfigureAll, patchWin } from './state.js';
+import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName, profileGroups } from './profiles.js';
+import { reconfigureAll } from './state.js';
 import { DEFAULT_BINDINGS, ACTION_IDS, actionLabel, bindings, comboLabel, keyCapture, hint } from './keys.js';
 import { importIterm } from './iterm.js';
 import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConfig } from './config.js';
@@ -19,9 +19,6 @@ const SECTIONS = () => [
   ['terminal', T('terminal.prefs.sec.terminal')], ['keys', T('terminal.prefs.sec.keys')], ['triggers', T('terminal.prefs.sec.triggers')],
   ['file', T('terminal.prefs.sec.file')],
 ];
-
-// Monochrome glyphs of the sections in the sidebar.
-const SECTION_ICON = { general: '≡', colors: '◐', text: 'A', window: '▭', terminal: '▤', keys: '⌨', triggers: '⟳', file: '▣' };
 
 const ANSI_NAMES = () => ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'].map((c) => T(`terminal.prefs.ansi.${c}`));
 
@@ -427,6 +424,8 @@ export function Preferences({ wid, onClose }) {
   const [sel, setSel] = useState(cfg.defaultProfile);
   const [section, setSection] = useState('general');
   const [importing, setImporting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [closed, setClosed] = useState({});          // tag → folded in the list
   const [notice, setNotice] = useState(null);
   const pane = useRef(null);
   const paneW = useWidth(pane);
@@ -674,43 +673,59 @@ export function Preferences({ wid, onClose }) {
     ),
   };
 
-  const sectionLabel = SECTIONS().find(([id]) => id === section)?.[1] || '';
+  const groups = profileGroups(cfg.profiles, query);
+  const tagsOf = (x) => (Array.isArray(x.tags) ? x.tags.filter((g) => typeof g === 'string' && g.trim()) : []);
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: t.windowBg, flexDirection: 'row' }}>
-      <View style={{ width: narrowWin ? 168 : 196, backgroundColor: t.sidebarBg, paddingTop: spacing.s }}>
+      <View style={{ width: narrowWin ? 200 : 250, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
+        <View style={{ padding: 10 }}>
+          <SearchField value={query} onChange={setQuery} placeholder={T('terminal.prefs.search')} />
+        </View>
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m }}>
-            <SectionTitle>{T('terminal.prefs.profiles')}</SectionTitle>
-            {cfg.profiles.map((x) => (
-              <SidebarItem key={x.id} label={profileName(x)} detail={x.id === cfg.defaultProfile ? '★' : null} selected={x.id === p.id} onClick={() => setSel(x.id)} />
-            ))}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.s, paddingHorizontal: spacing.xs }}>
-              <ToolbarGroup>
-                <ToolbarButton small icon="+" title={T('terminal.prefs.newProfile')} onClick={() => addProfile(null)} />
-                <ToolbarButton small icon="−" title={T('terminal.prefs.remove')} disabled={cfg.profiles.length < 2} onClick={removeProfile} />
-              </ToolbarGroup>
-              <ToolbarButton small icon="⧉" title={T('terminal.prefs.duplicate')} onClick={() => addProfile(p)} />
-            </View>
-            <View style={{ height: 1, backgroundColor: t.separator, marginVertical: spacing.m, marginHorizontal: spacing.xs }} />
-            {SECTIONS().map(([id, label]) => (
-              <SidebarItem key={id} label={label} selected={id === section} onClick={() => setSection(id)} icon={SECTION_ICON[id]} />
-            ))}
+            {groups.map((g) => {
+              const shut = g.tag !== null && !query && !!closed[g.tag];
+              return (
+                <View key={g.tag ?? ''}>
+                  {g.tag !== null && (
+                    <View onClick={() => setClosed((c) => ({ ...c, [g.tag]: !shut }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 6, marginTop: 4 }}>
+                      <Text style={{ width: 10, fontSize: 9, color: t.textDim }}>{shut ? (direction() === 'rtl' ? '◀' : '▶') : '▼'}</Text>
+                      <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{g.tag.toUpperCase()}</Text>
+                      <Text style={{ fontSize: 11, color: t.textDim }}>{g.items.length}</Text>
+                    </View>
+                  )}
+                  {!shut && g.items.map((x) => (
+                    <View key={x.id} style={{ paddingLeft: g.tag !== null ? 10 : 0 }}>
+                      <SidebarItem label={profileName(x)} detail={x.id === cfg.defaultProfile ? '★' : null} selected={x.id === p.id} onClick={() => setSel(x.id)} />
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+            {!groups.length && <Text style={{ padding: 8, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{T('terminal.prefs.noMatch')}</Text>}
           </View>
         </ScrollView>
-        <View style={{ padding: 10, gap: spacing.s }}>
+        <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Hairline edge="top" />
+          <ToolbarGroup>
+            <ToolbarButton small icon="+" title={T('terminal.prefs.newProfile')} onClick={() => addProfile(null)} />
+            <ToolbarButton small icon="−" title={T('terminal.prefs.remove')} disabled={cfg.profiles.length < 2} onClick={removeProfile} />
+          </ToolbarGroup>
+          <ToolbarButton small icon="⧉" title={T('terminal.prefs.duplicate')} onClick={() => addProfile(p)} />
+          <View style={{ flex: 1 }} />
           <Button small plain label={T('terminal.prefs.importBtn')} onClick={() => setImporting(true)} />
         </View>
       </View>
       <View ref={pane} style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.xl }}>
+        <View style={{ alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.xl, paddingTop: spacing.m, paddingBottom: spacing.m }}>
           <Hairline edge="bottom" />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{sectionLabel}</Text>
-            <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{profileName(p)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, maxWidth: '100%' }}>
+            <Text style={{ flexShrink: 1, fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profileName(p)}</Text>
+            {p.id === cfg.defaultProfile && <Text style={{ fontSize: typeScale.caption, color: '#ffd60a' }}>★</Text>}
+            {tagsOf(p).length ? <Text style={{ flexShrink: 1, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tagsOf(p).join(' · ')}</Text> : null}
           </View>
-          <Button primary label={T('terminal.prefs.done')} onClick={onClose} />
+          <Segmented small options={SECTIONS()} value={section} onChange={setSection} style={{ flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%' }} />
         </View>
         {notice && (
           <View style={{ marginHorizontal: spacing.xl, marginTop: spacing.m, paddingHorizontal: spacing.m, paddingVertical: spacing.s, borderRadius: 8, backgroundColor: 'rgba(50,215,75,0.16)' }}>
@@ -718,10 +733,17 @@ export function Preferences({ wid, onClose }) {
           </View>
         )}
         <ScrollView style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.l, paddingBottom: spacing.xl }}>
-            <Narrow.Provider value={narrow}>{body[section]}</Narrow.Provider>
+          <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.l, paddingBottom: spacing.xl, alignItems: 'center' }}>
+            <View style={{ width: '100%', maxWidth: 760 }}>
+              <Narrow.Provider value={narrow}>{body[section]}</Narrow.Provider>
+            </View>
           </View>
         </ScrollView>
+        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.xl }}>
+          <Hairline edge="top" />
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{T('terminal.prefs.autosave')}</Text>
+          <Button primary label={T('terminal.prefs.done')} onClick={onClose} />
+        </View>
       </View>
       {importing && (
         <ImportPanel t={t} onClose={() => setImporting(false)}
@@ -731,5 +753,4 @@ export function Preferences({ wid, onClose }) {
   );
 }
 
-export const closePrefs = (wid) => patchWin(wid, () => ({ prefs: false }));
 export { hint };

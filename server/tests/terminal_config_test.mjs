@@ -16,10 +16,10 @@ if (!esbuild) { console.log('needs node_modules (esbuild)'); process.exit(1); }
 
 const entry = `
 import * as config from './apps/terminal/config.js';
-import { terminalSettings, saveTerminalSettings, profileMenu } from './apps/terminal/profiles.js';
+import { terminalSettings, saveTerminalSettings, profileMenu, profileGroups } from './apps/terminal/profiles.js';
 import { convertProfile } from './apps/terminal/iterm.js';
 import { settings } from '@lordos/sdk';
-globalThis.__out = { ...config, terminalSettings, saveTerminalSettings, settings, profileMenu, convertProfile };`;
+globalThis.__out = { ...config, terminalSettings, saveTerminalSettings, settings, profileMenu, profileGroups, convertProfile };`;
 const sdkStub = {
   name: 'sdk-stub',
   setup(b) {
@@ -155,6 +155,11 @@ const eq = (what, got, want) => {
   eq('menu: untagged first, then one submenu per tag by name', menu.map((x) => (typeof x === 'string' ? x : x.label + ':' + x.submenu.join(','))),
     ['Default', 'Pi', '-', 'iperfex:PBX', 'IPERFEX:Proxmox', 'NIMBUS:Proxmox']);
   eq('menu: no tags, the plain list', m.profileMenu([{ id: 'x', name: 'X' }], (q) => q.name), ['X']);
+  const g = (q) => m.profileGroups(ps, q).map((x) => `${x.tag}:${x.items.map((p) => p.name).join(',')}`);
+  eq('groups: untagged first, then one per tag, a profile in each of its tags', g(''), ['null:Default,Pi', 'iperfex:PBX', 'IPERFEX:Proxmox', 'NIMBUS:Proxmox']);
+  eq('groups: the search looks at names', g('prox'), ['IPERFEX:Proxmox', 'NIMBUS:Proxmox']);
+  eq('groups: and at tags, ignoring case', g('nimbus'), ['NIMBUS:Proxmox']);
+  eq('groups: nothing found, no groups', g('zzz'), []);
 }
 
 console.log(`terminal_config_test: ${n - bad}/${n} checks`);

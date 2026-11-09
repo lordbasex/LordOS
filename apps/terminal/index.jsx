@@ -3,7 +3,7 @@
 // La emulación (xterm-256color, color directo, mouse, imágenes en línea, marcas del shell)
 // y el dibujo están en C (server/src/term); esta app arma pestañas, paneles divididos,
 // perfiles, buscador, barra de herramientas, atajos y la ventana desplegable.
-import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, term, clipboard, addShortcuts, registerDockMenu, speechMenu, registerSelection, ContextMenu, t as tr } from '@lordos/sdk';
+import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, pointerWorkArea, term, clipboard, addShortcuts, registerDockMenu, speechMenu, registerSelection, ContextMenu, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
@@ -160,7 +160,7 @@ function run(wid, action) {
     case 'autocomplete': openAutocomplete(wid, sid); break;
     case 'composer': patchWin(wid, (x) => ({ composer: !x.composer })); break;
     case 'openQuickly': patchWin(wid, () => ({ popup: { kind: 'quick' } })); break;
-    case 'preferences': patchWin(wid, () => ({ prefs: true })); break;
+    case 'preferences': openPrefsWindow(); break;
     case 'toolbelt': patchWin(wid, (x) => ({ toolbelt: !x.toolbelt })); break;
     case 'timestamps': toggleTimestamps(wid); break;
     case 'editTitle': patchWin(wid, () => ({ popup: { kind: 'title' } })); break;
@@ -242,9 +242,40 @@ function menus(wid, w) {
   ];
 }
 
+// ---- ventana de Preferencias: una ventana propia (terminal#prefs), así la terminal sigue usable al lado ----
+
+const PREFS_ID = 'terminal#prefs';
+export function openPrefsWindow() {
+  if (wm.get(PREFS_ID)) { wm.focus(PREFS_ID); return; }
+  const a = pointerWorkArea();
+  const w = Math.min(1040, a.w - 40), h = Math.min(720, a.h - 40);
+  wm.open('terminal', { instance: 'prefs', frame: { x: Math.round(a.x + (a.w - w) / 2), y: Math.round(a.y + (a.h - h) / 2), w, h } });
+}
+
+function PrefsWindow() {
+  const { id: wid } = useAppWindow();
+  useEffect(() => { wm.setTitle(wid, tr('terminal.prefs.title')); }, []);
+  useKeyboard((e) => {
+    const cap = keyCapture.get();
+    if (cap) {
+      if (MODIFIER_CODES.has(e.code)) return;
+      keyCapture.set(null);
+      if (e.key !== 'Escape' || e.meta || e.ctrl || e.alt || e.shift) { const c = comboOf(e); if (c) cap.onCombo(c); }
+      return;
+    }
+    if (e.key === 'Escape') wm.close(wid);
+  });
+  return <Preferences wid={wid} onClose={() => wm.close(wid)} />;
+}
+
 // ---- ventana ----
 
 export default function TerminalApp() {
+  const { id } = useAppWindow();
+  return id === PREFS_ID ? <PrefsWindow /> : <TerminalWindow />;
+}
+
+function TerminalWindow() {
   const t = useTheme();
   const { id: wid, focused, args } = useAppWindow();
   if (!getWin(wid)) ensureWin(wid, args);
@@ -304,7 +335,6 @@ export default function TerminalApp() {
       if (e.key !== 'Escape' || e.meta || e.ctrl || e.alt || e.shift) { const c = comboOf(e); if (c) cap.onCombo(c); }
       return;
     }
-    if (cur.prefs) { if (e.key === 'Escape') patchWin(wid, () => ({ prefs: false })); return; }
     if (cur.dialog) { if (e.key === 'Escape') patchWin(wid, () => ({ dialog: null })); if (e.key === 'Enter') { const fn = cur.dialog.onConfirm; patchWin(wid, () => ({ dialog: null })); fn(); } return; }
     if (popupKey(wid, cur, s, e)) return;
     if (cur.copyMode != null) {
@@ -405,7 +435,6 @@ export default function TerminalApp() {
       {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} wid={wid} />}
       <Overlays t={t} wid={wid} w={w} sid={sid} tab={tab} />
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] }} />}
-      {w.prefs && <Preferences wid={wid} onClose={() => patchWin(wid, () => ({ prefs: false }))} />}
     </View>
   );
 }

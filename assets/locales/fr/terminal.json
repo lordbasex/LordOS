@@ -383,5 +383,9 @@
   "claude.unreadable": "~/.claude/settings.json n’est pas un JSON valide, il n’a donc pas été modifié. Corrigez-le et réessayez.",
   "claude.connected": "Connecté : le contexte et les limites s’affichent dès la prochaine mise à jour de Claude Code",
   "claude.disconnected": "Déconnecté de la status line de Claude Code",
-  "claude.writeFailed": "Impossible de modifier ~/.claude/settings.json"
+  "claude.writeFailed": "Impossible de modifier ~/.claude/settings.json",
+  "prefs.title": "Réglages du Terminal",
+  "prefs.search": "Rechercher profils et étiquettes",
+  "prefs.noMatch": "Aucun profil ne correspond",
+  "prefs.autosave": "Les modifications sont enregistrées au fur et à mesure."
 }
