@@ -15,6 +15,16 @@
       "since": "0.8.8.5",
       "date": "2026-11-06",
       "evidence": "maintainer test: server/tests/cloud_providers_check.sh against rclone serve s3 (one bucket, access key and secret), VM 116 amd64, rclone v1.75.2: every step passed; links not confirmed (the stand-in gives http:// links and LordOS keeps only https ones)"
+    },
+    "mega": {
+      "since": "0.8.8.7",
+      "date": "2026-11-09",
+      "evidence": "issue #80: a person's Check This Account report, LordOS 0.8.8.6 x86_64 (a laptop, installed), rclone v1.75.2: 10 of 10 steps passed, links included"
+    },
+    "filen": {
+      "since": "0.8.8.7",
+      "date": "2026-11-09",
+      "evidence": "issue #81: a person's Check This Account report, LordOS 0.8.8.6 x86_64 (a laptop, installed), rclone v1.75.2: 9 of 10 steps passed; the link step skipped because the backend has no public links (noLinks), which is right for it"
     }
   }
 }

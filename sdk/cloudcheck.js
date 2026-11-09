@@ -138,6 +138,11 @@ export const ABOUT_FIELDS = ['total', 'used', 'free', 'trashed', 'other'];
 export const aboutFields = (about) => ABOUT_FIELDS.filter((k) => about && about[k] != null);
 
 const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, Math.max(n, String(s).length));
+// A step skipped for one of these is not a failure (#81: "link skipped noLinks" read as an error). The screen says it
+// in the person's words (cloud.check.note.<note>); the report, which goes to GitHub in English, says it after the word.
+export const SKIP_NOTES = ['noSpaceInfo', 'noLinks', 'notReached'];
+const REPORT_NOTE = { noSpaceInfo: 'the provider gives no space information, not a failure', noLinks: 'the provider has no links, not a failure',
+  notReached: 'not run: an earlier step failed' };
 // facts: only these fields are read; anything else passed in (the account's name, its folder, an email…) is ignored
 export function buildReport(facts) {
   const f = facts || {};
@@ -155,7 +160,7 @@ export function buildReport(facts) {
     `Space info: ${(f.aboutFields || []).filter((k) => ABOUT_FIELDS.includes(k)).join(', ') || 'none'}`,
     `Links supported: ${yn(f.linksSupported)}`,
     'Steps:',
-    ...steps.map((s) => `  ${pad(s.id, 9)} ${pad(s.result || 'skipped', 8)} ${pad(`${Math.max(0, Math.round(s.ms || 0))} ms`, 10)}${word(s.note) ? ` ${word(s.note)}` : ''}`.trimEnd()),
+    ...steps.map((s) => `  ${pad(s.id, 9)} ${pad(s.result || 'skipped', 8)} ${pad(`${Math.max(0, Math.round(s.ms || 0))} ms`, 10)}${word(s.note) ? ` ${word(s.note)}` : ''}${s.result === 'skipped' && REPORT_NOTE[s.note] ? ` (${REPORT_NOTE[s.note]})` : ''}`.trimEnd()),
     `Result: ${n('pass')} passed, ${n('fail')} failed, ${n('skipped') + steps.filter((s) => !s.result).length} skipped`,
   ].join('\n');
 }

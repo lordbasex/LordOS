@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
-import { runCheck, buildReport, issueUrl, aboutFields, checkWorks, CHECK_STEPS } from '../../sdk/cloudcheck.js';
+import { runCheck, buildReport, issueUrl, aboutFields, checkWorks, CHECK_STEPS, SKIP_NOTES } from '../../sdk/cloudcheck.js';
 import CLOUD_PROVIDERS from '../../assets/cloud/providers.json';
 
 const M = cloudModel;
@@ -592,7 +592,9 @@ function CheckAccount({ a, st, p, verified }) {
             <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 }}>
               <Text style={{ width: 14, fontSize: 12, fontWeight: 700, color: s.result ? mark[s.result][1] : t.textDim, textAlign: 'center' }}>{s.result ? mark[s.result][0] : '·'}</Text>
               <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr(`cloud.check.step.${s.id}`)}</Text>
-              <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{s.result ? (s.result === 'skipped' ? tr('cloud.check.skipped') : `${Math.round(s.ms)} ms`) : ''}</Text>
+              {/* a skip says why: a feature the provider doesn't have is not a failure (#81) */}
+              <Text style={{ flexShrink: 1, fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{s.result ? (s.result === 'skipped'
+                ? (SKIP_NOTES.includes(s.note) ? tr(`cloud.check.note.${s.note}`) : tr('cloud.check.skipped')) : `${Math.round(s.ms)} ms`) : ''}</Text>
             </View>
           ))}
         </View>

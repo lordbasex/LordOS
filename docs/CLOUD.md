@@ -611,6 +611,8 @@ was really checked end to end. Today:
 | `webdav` | `cloud_integration.sh` and `cloud_providers_check.sh` against `rclone serve webdav`, VM 116 (amd64), 13/13 |
 | `sftp` | `cloud_providers_check.sh` against the machine's own OpenSSH `sshd` on 127.0.0.1, a throwaway user and key (`key_pem`), 14/14; SFTP has no links |
 | `s3` | `cloud_providers_check.sh` against `rclone serve s3` (one bucket, access key and secret), 13/13; links not confirmed: the stand-in's links are `http://` and `lord-server` keeps only `https` ones (`cloud_url_ok`), which a real S3 service gives |
+| `mega` | issue #80 (since 0.8.8.7): a person's Check This Account report on 0.8.8.6 (x86_64), rclone v1.75.2, 10 of 10 steps passed, links included |
+| `filen` | issue #81 (since 0.8.8.7): a person's report on 0.8.8.6 (x86_64), rclone v1.75.2, 9 of 10 passed; the link step skipped (`noLinks`: the backend has no public links), which is right for it |
 
 `server/tests/cloud_providers_check.sh <build> <rclone> [webdav] [sftp] [s3]` runs Check This Account's steps through
 `build/cloud-harness` (the same `src/cloud`), with the files checked on the server's side too: 40/40 on VM 116 with rclone
@@ -656,6 +658,12 @@ Then a **report** with nothing personal: LordOS version and architecture, rclone
 label, whether it is verified, **own app: yes/no** (no IDs), which `about` fields the provider gives (not their values),
 whether it has links, each step's result, time and a fixed note word (never an error's text, which can hold a path), and
 the totals. No account name, email, file names but the check's, links or tokens. **Copy Report** and **Tell Us on GitHub**.
+
+A step skipped because the provider lacks the feature is not a failure, and since 0.8.8.7 (#81, where "link skipped
+noLinks" was read as an error) both the screen and the report say so: the step's line reads "Not offered by this
+provider, not a failure" (`noLinks`), "This provider doesn't tell, not a failure" (`noSpaceInfo`) or "Not run: an
+earlier step failed" (`notReached`) instead of "skipped" (`SKIP_NOTES`, `cloud.check.note.*`), and the report adds the
+same in English after the note word, e.g. `link skipped 0 ms noLinks (the provider has no links, not a failure)`.
 
 ### 19.4 GitHub
 

@@ -9,7 +9,7 @@ import * as M from '../../sdk/cloudmodel.js';
 import { glyphPixels, ringPixels, GLYPH_KINDS, glyphCacheSize } from '../../sdk/cloudglyphs.js';
 import { cloudPlaces, cloudRoot, pathCrumbs } from '../../sdk/filepickermodel.js';
 import { installCloudMock } from '../../sdk/cloudmock.js';
-import { runCheck, buildReport, issueUrl, checkFolder, randomBytes, hashBytes, aboutFields, checkWorks, CHECK_STEPS, CHECK_SIZE, ISSUE_URL_MAX, encodeQuery } from '../../sdk/cloudcheck.js';
+import { runCheck, buildReport, issueUrl, checkFolder, randomBytes, hashBytes, aboutFields, checkWorks, CHECK_STEPS, CHECK_SIZE, ISSUE_URL_MAX, encodeQuery, SKIP_NOTES } from '../../sdk/cloudcheck.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let ok = 0;
@@ -301,7 +301,8 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
 // ---- every text the model and the screens name is in each catalog ----
 {
   const dynamic = [...M.STATUSES.map((s) => `cloud.status.${s}`), ...M.EXPIRY.map((x) => `cloud.expiry.${x}`), ...M.GROUPS.map((g) => `cloud.group.${g}`),
-    ...['empty', 'long', 'chars', 'taken'].map((x) => `cloud.name.${x}`), ...['files', 'other', 'trash'].map((x) => `cloud.space.part.${x}`)];
+    ...['empty', 'long', 'chars', 'taken'].map((x) => `cloud.name.${x}`), ...['files', 'other', 'trash'].map((x) => `cloud.space.part.${x}`),
+    ...SKIP_NOTES.map((x) => `cloud.check.note.${x}`), ...CHECK_STEPS.map((x) => `cloud.check.step.${x}`)];
   const src = fs.readFileSync(path.join(root, 'sdk/cloudmodel.js'), 'utf8');
   const named = [...src.matchAll(/'(cloud\.[a-z]+\.[A-Za-z]+)'/g)].map((m) => m[1]);
   for (const lang of ['en', 'es', 'fr', 'it', 'pt']) {
@@ -318,7 +319,8 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const v = Object.entries(data.verified || {});
   eq('verified: only tested kinds, each with since, date and evidence', v.every(([k, e]) => /^[a-z0-9]+$/.test(k) && /^\d+\.\d+\.\d+(\.\d+)?$/.test(e.since) && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
     && /^(maintainer test: .{20,}|issue #\d+)/.test(e.evidence)), true);
-  eq('verified today', v.map(([k]) => k).sort(), ['s3', 'sftp', 'webdav']);
+  eq('verified today (#80, #81: issue reports)', v.map(([k]) => k).sort(), ['filen', 'mega', 's3', 'sftp', 'webdav']);
+  eq('#80 #81 evidence names the issue', [data.verified.mega.evidence.startsWith('issue #80'), data.verified.filen.evidence.startsWith('issue #81')], [true, true]);
   const P = (kind, label, group) => ({ kind, label, group, hint: '', fields: [] });
   const list = [P('drive', 'Drive', 'oauth'), P('dropbox', 'Dropbox', 'oauth'), P('webdav', 'WebDAV', 'server'), P('sftp', 'SFTP', 'server'), P('smb', 'SMB', 'server'),
     P('s3', 'S3', 'object'), P('b2', 'Backblaze B2', 'object'), P('crypt', 'Encrypted folder', 'crypt')];
@@ -344,6 +346,10 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('report: what it says', ['LordOS: 0.8.8.5 (x86_64)', 'rclone: v1.75.2', 'Provider: pCloud (pcloud)', 'Verified on LordOS: no', 'Own app: yes', 'Space info: total, used', 'Links supported: yes',
     '  link      skipped  70 ms      noLinks', 'Result: 9 passed, 1 failed, 1 skipped'].filter((l) => !rep.includes(l)), []);
   eq('report: only the check\'s steps', rep.includes('secret'), false);
+  // #81: a step skipped for a feature the provider lacks says it isn't a failure; a failed step never gets that phrase
+  eq('#81 report: a skip explained', [rep.includes('  link      skipped  70 ms      noLinks (the provider has no links, not a failure)'),
+    buildReport({ steps: [{ id: 'link', result: 'fail', note: 'noLinks' }, { id: 'read', result: 'skipped', note: 'notReached' }] }).split('\n').filter((l) => l.startsWith('  ') && l.includes('(')).map((l) => l.trim())],
+  [true, ['read      skipped  0 ms       notReached (not run: an earlier step failed)']]);
   eq('report: an odd version or label stays plain', buildReport({ version: 'x\nEvil: 1', label: 'A\nB', steps: [] }).split('\n').length, 10);
   eq('works', [checkWorks(steps), checkWorks([{ result: 'fail' }]), checkWorks([{ result: 'fail' }, { result: 'fail' }, { result: 'fail' }])], ['yes', 'partly', 'no']);
   const u = issueUrl({ label: 'pCloud', report: rep, version: '0.8.8.5 · Beta' });
