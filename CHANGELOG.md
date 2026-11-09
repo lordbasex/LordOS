@@ -46,6 +46,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Passwords: copy the title and the notes too.** An item's title and its notes have a copy button, like every
+  field already had, so anything in an item can go to the clipboard and be pasted in another app.
+
 - **Machines' library looks like Remote Desk.** A toolbar of icons, each named in its tooltip: Storage, what Machines
   needs (only when something is missing), Add (New Machine, Import a machine), pictures or a list, Sort (by name,
   running first, last used, disk space), Show (all, running, off) and a search over the name, the system and the

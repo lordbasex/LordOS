@@ -257,6 +257,7 @@ export function EntryView({ v, id, onEdit, onDeleted }) {
             </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: compact ? 8 : 12 }}>
+            {e.title ? <IconButton glyph="⧉" tip={t('passwords.copyTitle')} onClick={() => copyText(e.title, t('passwords.edit.title'))} /> : null}
             {v === 'main' && <IconButton glyph={e.fav ? '★' : '☆'} active={e.fav} color={e.fav ? '#ffb300' : undefined}
               tip={e.fav ? t('passwords.unfav') : t('passwords.fav')} onClick={() => act('fav', { on: !e.fav })} />}
             {!e.trash && <Button primary label={t('passwords.edit.button')} onClick={() => onEdit(e)} />}
@@ -289,7 +290,10 @@ export function EntryView({ v, id, onEdit, onDeleted }) {
         {b?.settingsLink && !appMode && <Button small label={t('passwords.vpn.openSettings')} onClick={() => wm.open('settings', { args: { page: 'network' } })} style={{ alignSelf: 'flex-start' }} />}
         {e.notes ? (
           <View style={{ gap: 6 }}>
-            <Label>{t('passwords.field.notes')}</Label>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flex: 1 }}><Label>{t('passwords.field.notes')}</Label></View>
+              <IconButton glyph="⧉" tip={t('passwords.copy')} onClick={() => copyText(e.notes, t('passwords.field.notes'))} />
+            </View>
             <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, border: `1px solid ${th.separator}`,
               backgroundColor: th.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)' }}><Markdown source={e.notes} width={Math.max(160, paneW - 74)} /></View>
           </View>
