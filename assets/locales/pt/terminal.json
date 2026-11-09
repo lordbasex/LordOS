@@ -207,6 +207,7 @@
     "one": "{count} gatilho",
     "other": "{count} gatilhos"
   },
+  "prefs.import.types": "digita “{text}” ao abrir",
   "prefs.import.warnings": "Avisos",
   "prefs.importBtn": "Importar perfis…",
   "prefs.imported": "Perfis importados",

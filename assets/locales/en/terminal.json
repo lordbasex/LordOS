@@ -207,6 +207,7 @@
     "one": "{count} trigger",
     "other": "{count} triggers"
   },
+  "prefs.import.types": "types “{text}” when it opens",
   "prefs.import.warnings": "Warnings",
   "prefs.importBtn": "Import Profiles…",
   "prefs.imported": "Imported profiles",

@@ -207,6 +207,7 @@
     "one": "{count} disparador",
     "other": "{count} disparadores"
   },
+  "prefs.import.types": "escribe «{text}» al abrir",
   "prefs.import.warnings": "Avisos",
   "prefs.importBtn": "Importar perfiles…",
   "prefs.imported": "Perfiles importados",

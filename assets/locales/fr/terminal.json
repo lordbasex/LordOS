@@ -207,6 +207,7 @@
     "one": "{count} déclencheur",
     "other": "{count} déclencheurs"
   },
+  "prefs.import.types": "tape « {text} » à l’ouverture",
   "prefs.import.warnings": "Avertissements",
   "prefs.importBtn": "Importer des profils…",
   "prefs.imported": "Profils importés",

@@ -242,7 +242,12 @@ function ImportPanel({ t, onClose, onDone }) {
       // the same iTerm2 profile, or (a LordTerminal export) the same profile id: replaced, not duplicated
       let i = np.itermGuid ? profiles.findIndex((x) => x.itermGuid === np.itermGuid) : -1;
       if (i < 0 && result.kind === 'lordos') i = profiles.findIndex((x) => x.id === np.id);
-      const prof = i >= 0 ? { ...np, id: profiles[i].id } : np;
+      // the default profile is never replaced by one that types a command when it opens (every new tab would run
+      // it): that one comes in as a profile of its own, a menu away
+      const types = !!String(np.initialText || '').trim();
+      if (i >= 0 && types && profiles[i].id === defaultProfile) i = -1;
+      const taken = i < 0 && profiles.some((x) => x.id === np.id);
+      const prof = i >= 0 ? { ...np, id: profiles[i].id } : taken ? { ...np, id: newProfileId() + added } : np;
       if (i >= 0) profiles[i] = prof; else profiles.push(prof);
       // a profile that types a command when it opens never becomes the default: every new tab would run it
       if (makeDefault && np.itermGuid && np.itermGuid === result.defaultGuid && !String(np.initialText || '').trim()) defaultProfile = prof.id;
@@ -291,6 +296,7 @@ function ImportPanel({ t, onClose, onDone }) {
                         {s.ansi.slice(1, 7).map((c, i) => <View key={i} style={{ flex: 1, backgroundColor: c, borderRadius: 1 }} />)}
                       </View>
                       <Text style={{ fontSize: 13, color: t.text }}>{profileName(p)}{p.itermGuid && p.itermGuid === result.defaultGuid ? '  ★' : ''}</Text>
+                      {String(p.initialText || '').trim() ? <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{T('terminal.prefs.import.types', { text: String(p.initialText).trim().slice(0, 60) })}</Text> : null}
                       <Text style={{ fontSize: 11, color: t.textDim }}>{[`${p.font || 'JetBrains Mono'} ${p.fontSize} pt`, p.ligatures && T('terminal.prefs.import.ligatures'), p.triggers.length && T('terminal.prefs.import.triggers', { count: p.triggers.length }), p.keyMap.length && T('terminal.prefs.import.keys', { count: p.keyMap.length })].filter(Boolean).join(' · ')}</Text>
                     </View>
                   );

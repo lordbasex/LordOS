@@ -207,6 +207,7 @@
     "one": "{count} trigger",
     "other": "{count} trigger"
   },
+  "prefs.import.types": "scrive «{text}» all’apertura",
   "prefs.import.warnings": "Avvisi",
   "prefs.importBtn": "Importa profili…",
   "prefs.imported": "Profili importati",
