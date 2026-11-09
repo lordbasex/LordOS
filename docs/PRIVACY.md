@@ -109,7 +109,7 @@ checked in `lord-server`:
 | Request | What `lord-server` does |
 |---|---|
 | `fs.home/read/write/list` | only inside `~/.local/share/lordos/appdata/<id>`; everything else is **denied** |
-| `clipboard.get` | with the `clipboard` permission granted, or once within 2 s of a paste the person asked for in that app's window: the compositor saw Ctrl+V or Shift+Insert reach it, or the clipboard panel pasted into it (0.8.8.7, `sec/brokerclip.c`; before, Mail, Calendar, Contacts, Reminders and Passwords could not paste at all, GitHub #64); `clipboard.set` always |
+| `clipboard.get` | with the `clipboard` permission granted, or, while it has not been decided (never once denied), once within 2 s of a paste the person asked for in that app's window: the compositor saw Ctrl+V or Shift+Insert reach it, or the clipboard panel pasted into it (0.8.8.7, `sec/brokerclip.c`; before, Mail, Calendar, Contacts, Reminders and Passwords could not paste at all, GitHub #64); `clipboard.set` always |
 | `broker.request(perm)` | allowed/denied according to what is stored; if "ask", it queues a **system prompt** and replies when the user decides (the app waits) |
 | `broker.device(kind, on)` | turns the camera/microphone indicator on/off, only if that permission is granted |
 | `broker.pick(save, name)` | **powerbox**: lord-server draws the open/save dialog and passes the app **only the fd** of the chosen file (SCM_RIGHTS); the app doesn't see the folder |

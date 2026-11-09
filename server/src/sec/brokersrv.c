@@ -574,8 +574,10 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
     }
     case BOP_CLIP_GET: {
         if (deny_restricted(fd, h->reqid, a->id, FW_R_NO_CLIPBOARD)) break;
-        /* the clipboard permission, or a paste the person just asked for in this app's window (brokerclip.h) */
-        if (perm_get(a->id, PERM_CLIPBOARD) != PERM_ALLOW && !bclip_paste_take(a->id, mono_s())) {
+        /* the clipboard permission, or, while the person hasn't decided it, a paste they just asked for in this app's
+         * window (brokerclip.h); a permission they denied stays denied */
+        PermState cst = restrict_perm_pkg(a->id, PERM_CLIPBOARD);
+        if (cst != PERM_ALLOW && !(cst == PERM_ASK && bclip_paste_take(a->id, mono_s()))) {
             send_reply(fd, h->reqid, BST_DENIED, NULL, 0);
             break;
         }
