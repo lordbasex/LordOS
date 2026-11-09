@@ -12,6 +12,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Passwords fills and saves sign-ins across LordOS.** The password fields of Settings → Cloud (adding an account and
+  Sign In Again), Files' shared-folder sign-in and Connect to Server (sftp, ftp, WebDAV), and Remote Desk's sign-in and
+  credentials now have the 🔑 of Passwords, as Databases and Wi-Fi already did. For a server it lists only entries whose
+  host field or site is exactly the address the password goes to, never a guess from a title and never the name a
+  machine announces on the local network, so a device can't take a kept server's name and be offered its password; for
+  a cloud provider, the entries kept under its sites. When a server accepts a password typed in the form (not one
+  filled from Passwords or the keyring), the app asks whether to save it in Passwords; nothing is saved until Save is
+  chosen, and the password never goes to a file or a log. Sign In Again for a cloud account keeps the saved user and
+  password when the fields are left empty. Isolated apps (Mail, Calendar, Contacts, Reminders) can still only use their
+  own keyring items.
+
 - **Cloud: pause one account and filter Recent from the menu bar** (GitHub #83). Each account in the menu bar's Cloud
   panel has its own Pause or Resume button (or Unlock Keyring / Sign In Again when needed). Clicking accounts shows only
   their recent files; click again to remove one, or Show All to clear. With one account chosen, Show in Files and Cloud
@@ -92,6 +103,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
+- **Passwords has a new icon**: a gold key on graphite, unlike the Store's blue bag it was taken for in the Dock.
+
+- **Cloud settings**: an account's Pause Syncing switch shows only its own pause and says when Pause All (or the
+  battery, a metered network) paused it, with Resume All beside it; Check This Account has Close and waits for an
+  account that works before it runs.
+
 - **Cloud: accounts in name order** (GitHub #86). Files' sidebar, Files → Network, the file dialog, Settings → Cloud
   and the menu bar panel list accounts by name, ignoring case and accents and ordering numbers by value ("Drive 2"
   before "Drive 10"), instead of the order they were added in. Each account keeps its color.
