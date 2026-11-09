@@ -1,7 +1,7 @@
 // login_model_test.mjs — sign-in forms and Passwords (sdk/loginmodel.js): the 🔑 of a server reached by its address
 // offers only entries for exactly that host (no title guesses), "Save to Passwords?" is not offered for a login kept
 // already or a password that was filled, and what a sign-in is saved as.
-import { hostOf, loginHosts, hostMatches, exactMatches, alreadySaved, typedSecret, loginEntry, LOGIN_KINDS } from '../../sdk/loginmodel.js';
+import { hostOf, loginHosts, shareHosts, hostMatches, exactMatches, alreadySaved, typedSecret, loginEntry, LOGIN_KINDS } from '../../sdk/loginmodel.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => { n++; if (JSON.stringify(got) !== JSON.stringify(want)) { bad++; console.log(`✗ ${what}\n    got  ${JSON.stringify(got)}\n    want ${JSON.stringify(want)}`); } };
@@ -37,6 +37,18 @@ eq('entries for the address or the name it was found under, trash left out',
   exactMatches(entries, ['192.168.1.10', 'NAS.local']).map((e) => e.id), ['a', 'c']);
 eq('each listed with its user name and host', exactMatches(entries, ['nas.local'])[0], { id: 'c', title: 'nas backup', username: 'root', host: 'nas.local' });
 eq('none without a host', exactMatches(entries, []), []);
+
+// a shared folder: only the address the password goes to, never the name the machine announces
+eq('share: the address only', shareHosts({ addr: '192.168.1.10', host: 'nas.local' }), ['192.168.1.10']);
+eq('spoofing: a device at another address announcing a kept server\'s name is offered nothing',
+  exactMatches(entries, shareHosts({ addr: '192.168.1.66', host: 'nas.local' })), []);
+eq('spoofing: announcing a kept server\'s address as its name changes nothing',
+  exactMatches(entries, shareHosts({ addr: '192.168.1.66', host: '192.168.1.10' })), []);
+eq('spoofing: a typed name resolved from announcements to another address is offered nothing',
+  exactMatches(entries, shareHosts({ addr: '192.168.1.66', host: 'nas.local', user: 'ana' })), []);
+eq('the real server, at its address', exactMatches(entries, shareHosts({ addr: '192.168.1.10', host: 'whatever' })).map((e) => e.id), ['a']);
+eq('no address, nothing', shareHosts({ host: 'nas.local' }), []);
+eq('kept already is checked against the address too', alreadySaved(entries, shareHosts({ addr: '192.168.1.66', host: '192.168.1.10' }), 'ana'), false);
 
 // already saved
 eq('kept for that host and user', alreadySaved(entries, ['192.168.1.10'], 'ana'), true);

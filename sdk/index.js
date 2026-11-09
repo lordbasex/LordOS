@@ -154,7 +154,7 @@ export { lordosUpdate, restartNeeded, updatePrefs, setUpdatePrefs, UPDATE_DEFAUL
 // Store → Discover, "Suggested for your computer": packages for the detected hardware (docs/PACKAGES.md)
 export { suggestions, refreshSuggestions, reevaluate as reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen, unseenSuggestions } from './suggestions.js';
 export { vaultAvailable, vaultRequest, onVaultEvent, keyring, autofill, autofillReveal, KeyringPrompt, AutofillButton, askKeyringUnlock, passwordsState, saveLogin, SaveLoginOffer } from './vault.js';   // Passwords and keyring (docs/PASSWORDS.md)
-export { loginHosts, typedSecret, loginEntry } from './loginmodel.js';   // sign-in forms and Passwords: exact hosts, typed or filled
+export { loginHosts, shareHosts, typedSecret, loginEntry } from './loginmodel.js';   // sign-in forms and Passwords: exact hosts, typed or filled
 import { KeyringPrompt } from './vault.js';
 // Mail, Calendar, Contacts and Reminders through the sandboxed helper lord-maild (docs/MAIL.md)
 // Databases: MySQL and MariaDB through the sandboxed helper lord-sql (docs/DATABASES.md)

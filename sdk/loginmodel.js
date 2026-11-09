@@ -4,7 +4,8 @@
 //
 //   hostOf(text)                     "smb://ana@NAS.local:445/x" → "nas.local" ("www." dropped, IPv6 brackets kept out)
 //   loginHosts(...hosts)             the distinct non-empty hosts a form signs in to (the address, the name it was found under)
-//   hostMatches(entry, host)         an entry of the Passwords list is for exactly that host
+//   shareHosts(ask)                  a shared folder's sign-in: its address only, never the name it announces
+//   hostMatches(entry, host)        an entry of the Passwords list is for exactly that host
 //   exactMatches(entries, hosts)     the entries to offer: [{ id, title, username, host }], not in the trash, each once
 //   alreadySaved(entries, hosts, user)  Passwords already keeps a login for one of these hosts (and that user, when given)
 //   typedSecret(password, filled)    the person typed the password in this form (not filled from Passwords or the keyring)
@@ -27,6 +28,14 @@ export function loginHosts(...hosts) {
   const out = [];
   for (const x of hosts.flat()) { const h = hostOf(x); if (h && !out.includes(h)) out.push(h); }
   return out;
+}
+
+// The hosts a shared folder's sign-in (Files' ConnectSheet) is matched and saved under: only the address the password
+// goes to. Never the name the server is shown under: on the local network that is what the machine announces about
+// itself (mDNS, NetBIOS), or what a typed name was resolved to from those announcements, so any device could take
+// the name of a server kept in Passwords and be offered its password. ask: { addr, host }.
+export function shareHosts(ask) {
+  return loginHosts(ask && ask.addr);
 }
 
 export function hostMatches(e, host) {

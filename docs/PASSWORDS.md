@@ -350,8 +350,11 @@ lists what the app saved in the keyring for that service plus matching Passwords
 or by SSID for Wi-Fi; an entry's `host` field counts too) while the vault is unlocked; the secret leaves
 `lord-vault` only when the user picks one. `account` names the keyring item's account when the app saved one. `host` asks for exact matches only (an
 entry's `host` field or its site's host, no title guesses, nothing when empty), each listed with its host.
-`hosts` does the same for every address a server goes by (Files: a shared folder's address and the host name it was
-found or typed under; a name a machine only announces, with spaces, is not a host). The rules are in `sdk/loginmodel.js`
+`hosts` does the same for several hosts. A shared folder (Files) is matched and saved only under the address the
+password goes to (`shareHosts`): never the name it is shown under, which on the local network is what the machine
+announces about itself (mDNS, NetBIOS) or a typed name resolved from those announcements, so any device could claim a
+kept server's name and be offered its password. Connect to Server (sftp, ftp, WebDAV) uses the host the person typed or
+the address found; Remote Desk the computer's saved address. The rules are in `sdk/loginmodel.js`
 (test: `cd server && node tests/login_model_test.mjs`).
 Used in Settings → Network (Wi-Fi password, VPN credentials), Settings → Cloud, Databases (each connection's password),
 Files (shared folders, Connect to Server for sftp, ftp and WebDAV) and Remote Desk (the sign-in and the credentials).

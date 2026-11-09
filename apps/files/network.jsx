@@ -2,7 +2,7 @@
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
 import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, settings, spacing, typeScale, t as tr, CloudGlyph,
-  AutofillButton, SaveLoginOffer, loginHosts, typedSecret } from '@lordos/sdk';
+  AutofillButton, SaveLoginOffer, loginHosts, shareHosts, typedSecret } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { FolderGlyph, DriveGlyph } from './glyphs.jsx';
 import { WAY_ORDER as ORDER, isShareFs, foundHosts, shareKind, withHostName, shareParts } from './netplaces.js';
@@ -53,7 +53,8 @@ function kinds(h) {
 
 // Connecting: who connects, then the folders that server shows them, so nobody has to know a share's name. It's only
 // asked for when the server can't list them. The password goes to lord-lan for the list, to the action for the mount
-// and, only if asked, to the keyring. The 🔑 offers Passwords entries for exactly this server's address or host name;
+// and, only if asked, to the keyring. The 🔑 offers Passwords entries for exactly this server's address (never the name
+// it announces on the network, which any device can claim);
 // once a password the person typed is accepted, "Save to Passwords?" (sdk/vault.js SaveLoginOffer) before the folder opens.
 export function ConnectSheet({ ask, onClose, onMounted }) {
   const t = useTheme();
@@ -63,7 +64,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
   const [remember, setRemember] = useState(false);
   const filled = useRef('');                              // the password as the keyring or Passwords filled it
   const [offer, setOffer] = useState(null);               // { at, note, name, login }: mounted, asking whether to save
-  const hosts = loginHosts(ask.host, ask.addr);
+  const hosts = shareHosts(ask);                          // the address the password goes to, never an announced name
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [list, setList] = useState(null);                 // the server's folders, once signed in
@@ -95,7 +96,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
       }
       rememberHostName(ask.addr, ask.host);
       if (!g && !nfs && typedSecret(password, filled.current)) {
-        setOffer({ at, note, name, login: { kind: ask.kind, host: hosts[0] || ask.addr, user: user.trim(), password } });
+        setOffer({ at, note, name, login: { kind: ask.kind, host: ask.addr, user: user.trim(), password } });
         return;
       }
       onMounted(at, note, name);
@@ -193,7 +194,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
   const key = `${ask.host}:${ask.port || 0}${ask.path || ''}`;
   const filled = useRef('');                              // the password as the keyring or Passwords filled it
   const [offer, setOffer] = useState(null);               // { path, login }: connected, asking whether to save
-  const hosts = loginHosts(ask.host);
+  const hosts = loginHosts(ask.host);                     // what the person typed (resolved by the connector), or a found address
   useEffect(() => { lan.saved(ask.kind, key, '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); filled.current = s.password; setRemember(true); } }); }, []);
   const go = async () => {
     if (busy) return;
