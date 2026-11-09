@@ -152,7 +152,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
       { label: tr('terminal.files.copyPath'), onClick: () => clipboard.set(path) },
       // pasted into the tab's shell: only while the ssh is up (never into the local shell), and never a path with a quote or a
       // backslash, which shells quote differently (fish takes \' inside single quotes as a quote)
-      { label: tr('terminal.files.cdHere'), disabled: it.kind !== 'd' || state !== 'ready' || /['\\]/.test(path), onClick: () => { term.paste(sid, `cd -- ${shQuote(path)}\n`); } },
+      { label: tr('terminal.files.cdHere'), disabled: it.kind !== 'd' || state !== 'ready' || /['\\\x00-\x1f\x7f]/.test(path), onClick: () => { term.paste(sid, `cd -- ${shQuote(path)}\n`); } },
       '-',
       { label: tr('terminal.files.delete'), destructive: true, onClick: () => setSheet({ kind: 'delete', side: 'remote', names }) },
     ] });
