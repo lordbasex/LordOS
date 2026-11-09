@@ -359,7 +359,12 @@ All three emit OSC 133 (prompt, command, output, exit code), OSC 7 (directory) a
 RemoteHost (user@host, for automatic profile switching) and define
 `imgcat [-w width] [-h height] file…` and `lord_badge text`.
 
-## Files mode, transfers and port forwards (0.8.8.7, in development)
+## Files mode, transfers and port forwards (0.8.8.7)
+
+Status: Files mode is built (lord-sftp, term/sftpc.c, lord.sftp, apps/terminal/FilesMode.jsx and sftp.js; tested end to
+end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Still in development: uploading by
+dropping on the terminal, downloading from `ls` output, the profile's port forwards and their tab badge (the server's
+side of forwards, lord.sftp's `forward`, is built and tested), Open With and Edit for remote files.
 
 Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
 **the tab's own ssh session**: one login, no second connection, no password or code asked again.
