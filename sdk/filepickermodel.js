@@ -97,6 +97,25 @@ export function enterAction(a) {
   return primaryAction(a);
 }
 
+// ---- the size of the thumbnails (issue #58) ----
+
+// Files' zoom steps (apps/files/viewprefs.js, issue #33): ZOOM_MIN to ZOOM_MAX, 0 the usual size. The dialog's
+// thumbnails take the same steps and the same control as Files' status bar (fileparts.jsx ZoomControl).
+export const ZOOM_MIN = -2, ZOOM_MAX = 4;
+export const clampZoom = (z) => (Number.isInteger(z) ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)) : 0);
+const THUMBS = [48, 60, 72, 96, 128, 160, 200];
+// A tile at a step: its picture, its width and its height (step 0 is the 72 px picture of a 104 × 118 tile).
+export function thumbMetrics(z) {
+  const thumb = THUMBS[clampZoom(z) - ZOOM_MIN];
+  return { thumb, tileW: Math.max(88, thumb + 32), tileH: thumb + 46 };
+}
+// The step saved with the view (settings.pickerView.zoom: { files, images }), one per kind of dialog like the view.
+export const zoomFor = (saved, images) => clampZoom(saved?.zoom?.[images ? 'images' : 'files'] ?? 0);
+export function saveZoom(saved, images, z) {
+  const zoom = { ...(saved?.zoom || {}), [images ? 'images' : 'files']: clampZoom(z) };
+  return { ...(saved || {}), zoom };
+}
+
 // ---- the List / Thumbnails switch ----
 
 // Does the dialog take only pictures (the wallpaper, a Notes image, a portal's image/* filter)?

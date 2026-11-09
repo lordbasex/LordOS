@@ -1,4 +1,5 @@
 // viewprefs.js — what each place in Files shows and how wide the sidebar is, no screen (docs/FILES.md, "Settings").
+import { ZOOM_MIN, ZOOM_MAX, clampZoom } from '../../sdk/filepickermodel.js';
 export const SIDE_MIN = 150, SIDE_MAX = 360, SIDE_DEFAULT = 200;
 export const clampSide = (w) => Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(Number(w) || SIDE_DEFAULT)));
 const MAX_FOLDER_VIEWS = 400;
@@ -10,9 +11,9 @@ export const viewKey = (loc) => (loc.type === 'dir' ? loc.path : loc.type === 'a
 // Zoom (issue #33): a step from ZOOM_MIN to ZOOM_MAX, 0 the usual size, kept per place and per view (icons and list
 // each have their own, as a picture folder may want big icons and a small list). Steps, not a free scale, so every
 // size is one that was looked at and the keys and the slider land on the same ones.
-export const ZOOM_MIN = -2, ZOOM_MAX = 4;
+// The steps are shared with the file dialog's thumbnails (sdk/filepickermodel.js, issue #58).
+export { ZOOM_MIN, ZOOM_MAX, clampZoom };
 export const ZOOM_VIEWS = ['icons', 'list'];
-export const clampZoom = (z) => (Number.isInteger(z) ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)) : 0);
 const ICONS = { icon: [32, 48, 64, 80, 96, 128, 160], font: [10, 11, 12, 13, 14, 15, 16] };
 const LIST = { icon: [12, 14, 16, 20, 24, 32, 40], font: [11, 12, 13, 14, 15, 17, 19], row: [20, 22, 24, 28, 32, 40, 48] };
 // sizes of the icon view at a step: the icon, the card's width, the name's font and line height

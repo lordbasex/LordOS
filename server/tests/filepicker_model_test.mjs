@@ -1,5 +1,7 @@
 // The system file dialog without a screen. node server/tests/filepicker_model_test.mjs
-import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep } from '../../sdk/filepickermodel.js';
+import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep,
+  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom } from '../../sdk/filepickermodel.js';
+import { ZOOM_MIN as FILES_MIN, ZOOM_MAX as FILES_MAX } from '../../apps/files/viewprefs.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -101,5 +103,28 @@ eq('grid left rtl', gridStep('ArrowLeft', 5, true), 1);
 eq('grid down', gridStep('ArrowDown', 5), 5);
 eq('grid up', gridStep('ArrowUp', 5), -5);
 eq('grid other', gridStep('Home', 5), 0);
+
+// the thumbnails' size (issue #58): Files' steps, a tile per step, one remembered size per kind of dialog
+eq('the same steps as Files', [ZOOM_MIN, ZOOM_MAX], [FILES_MIN, FILES_MAX]);
+eq('step 0 is the old tile', thumbMetrics(0), { thumb: 72, tileW: 104, tileH: 118 });
+eq('smallest', thumbMetrics(ZOOM_MIN), { thumb: 48, tileW: 88, tileH: 94 });
+eq('largest', thumbMetrics(ZOOM_MAX), { thumb: 200, tileW: 232, tileH: 246 });
+eq('beyond the steps', thumbMetrics(99), thumbMetrics(ZOOM_MAX));
+eq('not a step', thumbMetrics(1.5), thumbMetrics(0));
+let grows = true;
+for (let z = ZOOM_MIN; z < ZOOM_MAX; z++) if (!(thumbMetrics(z + 1).thumb > thumbMetrics(z).thumb)) grows = false;
+eq('each step is larger', grows, true);
+eq('clamp high', clampZoom(9), ZOOM_MAX);
+eq('clamp low', clampZoom(-9), ZOOM_MIN);
+eq('clamp junk', clampZoom('3'), 0);
+eq('no size saved', zoomFor(null, true), 0);
+eq('saved for pictures', zoomFor({ zoom: { images: 3 } }, true), 3);
+eq('pictures and files apart', zoomFor({ zoom: { images: 3 } }, false), 0);
+eq('saved junk', zoomFor({ zoom: { files: 'big' } }, false), 0);
+eq('saved out of range', zoomFor({ zoom: { files: 40 } }, false), ZOOM_MAX);
+eq('save size keeps the view', saveZoom({ images: 'thumbs' }, true, 2), { images: 'thumbs', zoom: { images: 2 } });
+eq('save size beside the other', saveZoom({ zoom: { files: -1 } }, true, 4), { zoom: { files: -1, images: 4 } });
+eq('save size, nothing yet', saveZoom(null, false, 7), { zoom: { files: ZOOM_MAX } });
+eq('the view saved after keeps the size', saveView(saveZoom(null, true, 1), true, 'list'), { zoom: { images: 1 }, images: 'list' });
 
 console.log(process.exitCode ? 'FAILED' : `ok ${ok}`);

@@ -1,9 +1,11 @@
 // fileparts.jsx — what Files and the system file dialog (filepicker.jsx) draw the same way: the
-// sidebar's rows, the list's rows, the crumbs of a path and the user's folders.
+// sidebar's rows, the list's rows, the crumbs of a path, the user's folders and the size control.
 import { useEffect, useState } from 'react';
 import { View, Text } from '@lordos/runtime';
-import { direction, formatDate, formatTime } from './i18n.js';
+import { direction, formatDate, formatTime, t as tr } from './i18n.js';
 import { typeScale, spacing } from './controls.jsx';
+import { Slider } from './components.jsx';
+import { ZOOM_MIN, ZOOM_MAX } from './filepickermodel.js';
 import { FolderGlyph } from './fileglyphs.jsx';
 import * as fs from './fs.js';
 
@@ -85,4 +87,22 @@ export function userDirs() {
     if (dir && existing.has(dir)) out.push({ label, path: `${home}/${dir}` });
   }
   return out;
+}
+
+// The size control (issue #33; the file dialog's thumbnails since issue #58): a small and a large glyph around a
+// slider of steps (ZOOM_MIN to ZOOM_MAX); the glyphs step, a double click on the slider goes back to the usual size.
+// slider false: only the glyphs (a narrow window). style: where it goes (Files: the end of its status bar).
+export function ZoomControl({ t, zoom, slider = true, onStep, onSet, style }) {
+  const glyph = (size, d, title, off) => (
+    <View title={title} onClick={off ? undefined : () => onStep(d)} style={{ width: 18, height: 20, alignItems: 'center', justifyContent: 'center', opacity: off ? 0.35 : 1 }}>
+      <View style={{ width: size, height: size, borderRadius: 2, border: `1.5px solid ${t.textDim}` }} />
+    </View>
+  );
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr', ...style }}>
+      {glyph(7, -1, tr('files.zoom.out'), zoom <= ZOOM_MIN)}
+      {slider ? <View title={tr('files.zoom.label')} onDoubleClick={() => onSet(0)}><Slider value={zoom} min={ZOOM_MIN} max={ZOOM_MAX} width={84} onChange={onSet} /></View> : null}
+      {glyph(12, 1, tr('files.zoom.in'), zoom >= ZOOM_MAX)}
+    </View>
+  );
 }

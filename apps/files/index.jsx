@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber,
+  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -25,7 +25,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
-import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth } from '../../sdk/fileparts.jsx';
+import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { useCloudFiles, CloudSection, TransfersPill, footerLine, cloudMenuItems, ShareSheet, CloudInfo, OfflineDialog } from './cloud.jsx';
 import { createRemoteDirs } from './remotedirs.js';
@@ -153,22 +153,9 @@ function ScopeChip({ label, on, onClick, t }) {
   );
 }
 
-// The status bar's zoom (issue #33): a small and a large glyph around a slider of steps; the glyphs step, a
-// double click on the slider goes back to the usual size. Narrow windows keep only the glyphs.
-function ZoomControl({ t, zoom, slider, onStep, onSet }) {
-  const glyph = (size, d, title, off) => (
-    <View title={title} onClick={off ? undefined : () => onStep(d)} style={{ width: 18, height: 20, alignItems: 'center', justifyContent: 'center', opacity: off ? 0.35 : 1 }}>
-      <View style={{ width: size, height: size, borderRadius: 2, border: `1.5px solid ${t.textDim}` }} />
-    </View>
-  );
-  return (
-    <View style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: spacing.m, flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr' }}>
-      {glyph(7, -1, tr('files.zoom.out'), zoom <= ZOOM_MIN)}
-      {slider ? <View title={tr('files.zoom.label')} onDoubleClick={() => onSet(0)}><Slider value={zoom} min={ZOOM_MIN} max={ZOOM_MAX} width={84} onChange={onSet} /></View> : null}
-      {glyph(12, 1, tr('files.zoom.in'), zoom >= ZOOM_MAX)}
-    </View>
-  );
-}
+// The status bar's zoom (issue #33) is the SDK's ZoomControl (sdk/fileparts.jsx), shared with the file dialog's
+// thumbnails. Narrow windows keep only the glyphs.
+const ZOOM_AT = { position: 'absolute', top: 0, bottom: 0, insetInlineEnd: spacing.m };
 
 // ---- the window ----
 
@@ -1113,7 +1100,7 @@ export default function Files() {
           backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.025)' }}>
           <Hairline edge="top" />
           {zoomable && (
-            <ZoomControl t={t} zoom={zoom} slider={!narrow} onStep={zoomStep} onSet={setZoom} />
+            <ZoomControl t={t} zoom={zoom} slider={!narrow} onStep={zoomStep} onSet={setZoom} style={ZOOM_AT} />
           )}
           {job ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>

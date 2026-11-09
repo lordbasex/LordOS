@@ -6,6 +6,8 @@
 // A List / Thumbnails switch in the toolbar (remembered in settings.pickerView; thumbnails when the
 // dialog takes only pictures): the thumbnails are lord-media's (useThumb, the cache Files and Photos
 // use), asked for only for the tiles in sight, and a file shows its type icon until its own arrives.
+// In Thumbnails the toolbar has Files' size control (ZoomControl, the same steps; remembered in
+// settings.pickerView.zoom, one for pictures and one for the rest; issue #58).
 //
 //   <FilePicker onPick={(path) => …} onClose={() => …} filter={/\.(png|jpe?g)$/i} title={t('…')} multiple />
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -21,14 +23,14 @@ import { useThumb } from './media.js';
 import { kindOf } from './filekinds.js';
 import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
-import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs } from './fileparts.jsx';
+import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs, ZoomControl } from './fileparts.jsx';
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
-  imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot } from './filepickermodel.js';
+  imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
 import { cloudState } from './cloud.js';
 import { CloudGlyph } from './cloudui.jsx';
 
 const ROW_H = 24;
-const TILE_W = 104, TILE_H = 118, THUMB = 72, GRID_PAD = 8;
+const GRID_PAD = 8;     // the tiles' sizes come from the size control (thumbMetrics)
 const THUMB_KINDS = ['image', 'video', 'audio'];
 const SIDE_W = 176, DATE_W = 150, SIZE_W = 84;
 const COL_TITLE = { name: 'files.col.name', date: 'files.col.date', size: 'files.col.size' };
@@ -48,25 +50,25 @@ function SortTitle({ k, width, sort, onSort, t: th }) {
 
 // A tile's picture: its thumbnail once lord-media has made it, its type icon until then (and for good
 // when it has none). Mounted only for the tiles in sight, so a big folder asks for a screenful.
-function Thumb({ e, dark }) {
+function Thumb({ e, dark, size }) {
   const src = useThumb(e.path, 256);
-  if (!src) return <EntryIcon e={e} size={THUMB} dark={dark} thumb={false} />;
+  if (!src) return <EntryIcon e={e} size={size} dark={dark} thumb={false} />;
   return (
-    <View style={{ width: THUMB, height: THUMB, alignItems: 'center', justifyContent: 'center' }}>
-      <Image src={src} style={{ width: THUMB, height: THUMB, objectFit: 'contain' }} />
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Image src={src} style={{ width: size, height: size, objectFit: 'contain' }} />
     </View>
   );
 }
 
-function Tile({ e, on, live, th, onDown, onOpen }) {
+function Tile({ e, on, live, th, m, onDown, onOpen }) {
   const dark = th.mode === 'dark';
   const pictured = live && !e.dir && THUMB_KINDS.includes(kindOf(e)) && !/\.svg$/i.test(e.name);
   return (
-    <View onMouseDown={onDown} onDoubleClick={onOpen} style={{ width: TILE_W, height: TILE_H, paddingTop: 6, alignItems: 'center', gap: 4 }}>
+    <View onMouseDown={onDown} onDoubleClick={onOpen} style={{ width: m.tileW, height: m.tileH, paddingTop: 6, alignItems: 'center', gap: 4 }}>
       <View style={{ padding: 4, borderRadius: 7, backgroundColor: on ? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
-        {pictured ? <Thumb e={e} dark={dark} /> : <EntryIcon e={e} size={THUMB} dark={dark} thumb={false} />}
+        {pictured ? <Thumb e={e} dark={dark} size={m.thumb} /> : <EntryIcon e={e} size={m.thumb} dark={dark} thumb={false} />}
       </View>
-      <View style={{ maxWidth: TILE_W - 8, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: on ? th.accent : 'transparent', alignItems: 'center' }}>
+      <View style={{ maxWidth: m.tileW - 8, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: on ? th.accent : 'transparent', alignItems: 'center' }}>
         <Text style={{ fontSize: 12, lineHeight: 16, maxHeight: 32, color: on ? '#fff' : th.text, textAlign: 'center', whiteSpace: 'normal', overflow: 'hidden',
           textOverflow: 'ellipsis', numberOfLines: 2 }}>{e.name}</Text>
       </View>
@@ -106,7 +108,16 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     scroll.current?.scrollTo(0);
   };
   const thumbs = view === 'thumbs';
-  const cols = Math.max(1, Math.floor((listW - 2 * GRID_PAD) / TILE_W));
+  // the thumbnails' size: Files' steps and control, remembered like the view
+  const [zoom, setZoomNow] = useState(() => zoomFor(settings.get().pickerView, images));
+  const setZoom = (z) => {
+    const next = clampZoom(Math.round(z));
+    if (next === zoom) return;
+    setZoomNow(next);
+    settings.set((s) => ({ ...s, pickerView: saveZoom(s.pickerView, images, next) }));
+  };
+  const m = thumbMetrics(zoom);
+  const cols = Math.max(1, Math.floor((listW - 2 * GRID_PAD) / m.tileW));
   const [sight, setSight] = useState({ y: 0, h: 0 });
 
   const rows = useMemo(() => {
@@ -122,7 +133,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     const i = rows.findIndex((r) => r.path === path);
     const s = scroll.current;
     if (i < 0 || !s) return;
-    const rowH = thumbs ? TILE_H : ROW_H, top = (thumbs ? Math.floor(i / cols) : i) * rowH, box = lord.getLayout(listBox.current.id)[3];
+    const rowH = thumbs ? m.tileH : ROW_H, top = (thumbs ? Math.floor(i / cols) : i) * rowH, box = lord.getLayout(listBox.current.id)[3];
     if (top < s.offset()) s.scrollTo(top);
     else if (top + 2 * rowH > s.offset() + box) s.scrollTo(top + 2 * rowH - box);
   };
@@ -182,6 +193,10 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     if (e.key === 'Enter') { act(enterAction(state)); return; }
     if (e.alt && e.key === 'ArrowLeft') { goBack(); return; }
     if (e.alt && e.key === 'ArrowRight') { goForward(); return; }
+    // Ctrl + and Ctrl − change the thumbnails' size, as in Files
+    const base = e.base || e.char || '';
+    if (thumbs && e.ctrl && (base === '+' || base === '=' || e.char === '+' || e.key === '+')) { setZoom(zoom + 1); return; }
+    if (thumbs && e.ctrl && (base === '-' || base === '_' || e.key === '-')) { setZoom(zoom - 1); return; }
     const by = thumbs ? gridStep(e.key, cols, direction() === 'rtl') : 0;
     if (by) { moveTo(stepRow(rows, cursor, by)); return; }
     if (e.key === 'ArrowDown') { moveTo(stepRow(rows, cursor, 1)); return; }
@@ -257,6 +272,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, overflow: 'hidden' }}>
             <PathCrumbs t={th} crumbs={shown} onGo={(i) => go(shown[i].path)} />
           </View>
+          {thumbs ? <ZoomControl t={th} zoom={zoom} slider={!narrow} onStep={(d) => setZoom(zoom + d)} onSet={setZoom} /> : null}
           <ToolbarGroup>
             <ToolbarButton icon="≡" iconSize={14} small title={t('shell.picker.viewList')} active={!thumbs} onClick={() => setView('list')} />
             <ToolbarButton icon="▦" iconSize={14} small title={t('shell.picker.viewThumbs')} active={thumbs} onClick={() => setView('thumbs')} />
@@ -274,9 +290,9 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
             {thumbs ? (
               <View style={{ paddingHorizontal: GRID_PAD, paddingBottom: 12, flexDirection: 'row', flexWrap: 'wrap' }}>
                 {(() => {
-                  const [from, to] = liveRange(sight.y, sight.h, TILE_H, cols, rows.length);
+                  const [from, to] = liveRange(sight.y, sight.h, m.tileH, cols, rows.length);
                   return rows.map((e, i) => (
-                    <Tile key={e.path} e={e} th={th} on={e.path === cursor || chosen.includes(e.path)} live={i >= from && i < to && !inCloud}
+                    <Tile key={e.path} e={e} th={th} m={m} on={e.path === cursor || chosen.includes(e.path)} live={i >= from && i < to && !inCloud}
                       onDown={(ev) => { ev.stopPropagation(); hold(); select(e, ev); }} onOpen={(ev) => { ev.stopPropagation(); openRow(e); }} />
                   ));
                 })()}

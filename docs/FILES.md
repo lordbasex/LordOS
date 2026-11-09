@@ -484,6 +484,11 @@ powerbox) the dialog looks and works like Files, built from Files' own pieces
   none (folders, documents, SVG). Videos and music show a frame or the cover. In Thumbnails the arrows move by tile
   and by row (reversed right to left) and sorting keeps the list's last choice. In an isolated app's own process
   (Mail, Contacts, Passwords) the switch works but is not remembered: that process has no settings file.
+- **Thumbnail size (0.8.8.7, [#58](https://github.com/lordbasex/LordOS/issues/58)):** in Thumbnails the toolbar has
+  Files' size control (`ZoomControl` in `sdk/fileparts.jsx`, now shared: a small and a large glyph around a slider; a
+  double click on the slider goes back to the usual size; a narrow dialog keeps only the glyphs) and Ctrl + / Ctrl −
+  step it. It takes Files' seven steps (`ZOOM_MIN`…`ZOOM_MAX`, `sdk/filepickermodel.js`): pictures of 48 to 200 px,
+  72 px being the old tile. The size is remembered with the view (`pickerView.zoom`, `{ files, images }`).
 
 Local disks are new here: an app that asks through the dialog can now be given a file on one, when the person picks
 it. The same dialog answers `org.freedesktop.portal.FileChooser` for Linux apps with no file dialog of their own,
