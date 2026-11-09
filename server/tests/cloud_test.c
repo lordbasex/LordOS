@@ -216,6 +216,15 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("failed to read private key: x509: decryption password incorrect"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("AccessDenied: Access Denied status code: 403"), "cloud.authFailed"));
     CHECK(!strcmp(cloud_failure_code("error in ListJSON: couldn't list files: pcloud error: Invalid 'access_token' provided. (2094)"), "cloud.authFailed"));   /* #71 */
+    /* the session summary: lengths and names, never a value */
+    {
+        char sum[200];
+        cloud_session_summary("abcdef", "X-APPLE-WEBAUTH-TOKEN=\"v=2:t=SECRET\"; X-APPLE-WEBAUTH-USER=\"u\";bad name=1; ", sum, sizeof sum);
+        CHECK(!strcmp(sum, "trust token 6 chars; cookies: X-APPLE-WEBAUTH-TOKEN X-APPLE-WEBAUTH-USER"));
+        CHECK(!strstr(sum, "SECRET"));
+        cloud_session_summary("", "", sum, sizeof sum);
+        CHECK(!strcmp(sum, "trust token 0 chars; cookies: none"));
+    }
     /* an iCloud session the provider no longer takes: a new sign-in, not a mount every 30 s */
     CHECK(!strcmp(cloud_failure_code("requestPCS(iclouddrive): HTTP error 500 (500 Internal Server Error) returned body: \"{\\\"success\\\":false,\\\"error\\\":\\\"Missing X-APPLE-WEBAUTH-TOKEN cookie\\\"}\""), "cloud.signInAgain"));
     CHECK(!strcmp(cloud_failure_code("requestPCS(iclouddrive): HTTP error 421 (421 Misdirected Request)"), "cloud.signInAgain"));

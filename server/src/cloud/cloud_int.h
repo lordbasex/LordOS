@@ -34,7 +34,8 @@ typedef struct {
     /* this run of rclone */
     int configured, mounted, held;  /* held: Pause is holding its uploads back */
     int locked;                     /* 1 keyring locked, 2 no keyring */
-    int fresh_tried;                /* a refused saved session was dropped once this run (mount_acc) */
+    int fresh_tried;
+    char sess[400];                 /* the last session summary logged (cloud_session_summary) */                /* a refused saved session was dropped once this run (mount_acc) */
     char err[96];                   /* a cloud.* code, or "" */
     char message[256];              /* rclone's own words, for Get Info */
     int have_about;

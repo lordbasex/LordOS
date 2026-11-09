@@ -1109,6 +1109,12 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
     }
     JDoc sd;
     if (secret_json && !json_parse(secret_json, strlen(secret_json), &sd, NULL, 0)) {
+        if (!fresh && !strcmp(a->k->type, "iclouddrive")) {        /* what the keyring gives rclone at its start */
+            const JVal *tt = json_get(sd.root, "trust_token"), *ck = json_get(sd.root, "cookies");
+            char sum[400];
+            cloud_session_summary(tt && tt->type == J_STR ? tt->str : "", ck && ck->type == J_STR ? ck->str : "", sum, sizeof sum);
+            fprintf(stderr, "cloud: %s: session from the keyring: %s\n", a->id, sum);
+        }
         for (const JVal *x = sd.root->type == J_OBJ ? sd.root->kid : NULL; x; x = x->next) {
             if (x->type != J_STR || !cloud_key_ok(x->key)) continue;
             if (cloud_option_refused(x->key, "string") && !keep_internal(x->key)) continue;
@@ -1167,6 +1173,12 @@ static char *split_remote(Acc *a, char *msg, size_t mn) {
         } else if (!cloud_field_hidden(a->k, x->key)) kv_set(&np, x->key, x->str);
     }
     jb_raw(&s, "}");
+    if (!strcmp(a->k->type, "iclouddrive")) {
+        const JVal *tt = json_get(d.root, "trust_token"), *ck = json_get(d.root, "cookies");
+        char sum[400];
+        cloud_session_summary(tt && tt->type == J_STR ? tt->str : "", ck && ck->type == J_STR ? ck->str : "", sum, sizeof sum);
+        if (strcmp(sum, a->sess)) { fprintf(stderr, "cloud: %s: rclone's session now: %s\n", a->id, sum); cpy(a->sess, sizeof a->sess, sum); }
+    }
     json_free(&d);
     pthread_mutex_lock(&cl_mu);
     kv_clear(&a->p);

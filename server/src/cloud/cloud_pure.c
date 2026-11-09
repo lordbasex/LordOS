@@ -820,3 +820,24 @@ int cloud_server_of(const char *type, const char *host, const char *port, const 
     }
     return def;
 }
+
+/* What an iCloud Drive session holds, for the log: the trust token's length and the cookies' names, never a value
+ * (rclone keeps the cookies as "name=value; name=value"). Shown when it changes, to tell a session that wasn't kept from
+ * one the provider refuses. */
+void cloud_session_summary(const char *trust, const char *cookies, char *out, size_t n) {
+    if (!out || !n) return;
+    size_t o = (size_t)snprintf(out, n, "trust token %zu chars; cookies:", trust ? strlen(trust) : 0);
+    int names = 0;
+    for (const char *p = cookies ? cookies : ""; *p && o < n; ) {
+        while (*p == ' ' || *p == ';') p++;
+        const char *q = p;
+        while (*q && *q != '=' && *q != ';') q++;
+        size_t l = (size_t)(q - p);
+        int ok = l > 0 && l <= 48;
+        for (size_t i = 0; ok && i < l; i++) ok = (p[i] >= 'A' && p[i] <= 'Z') || (p[i] >= 'a' && p[i] <= 'z') || (p[i] >= '0' && p[i] <= '9') || p[i] == '-' || p[i] == '_';
+        if (ok && names < 16) { o += (size_t)snprintf(out + o, o < n ? n - o : 0, " %.*s", (int)l, p); names++; }
+        while (*q && *q != ';') q++;
+        p = q;
+    }
+    if (!names && o < n) snprintf(out + o, n - o, " none");
+}
