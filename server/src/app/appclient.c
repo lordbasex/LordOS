@@ -588,13 +588,15 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
             if (w->used && w->configured && w->need_render && !w->frame_pending) render(w);
         }
         wl_display_flush(dpy);
-        struct pollfd pfd[3];
+        struct pollfd pfd[4];
         int n = 0;
         pfd[n].fd = wfd; pfd[n].events = POLLIN; n++;
         int bfd = js_broker_fd();
         if (bfd >= 0) { pfd[n].fd = bfd; pfd[n].events = POLLIN; n++; }
         int cfd = js_broker_companion_fd(), ci = -1;
         if (cfd >= 0) { ci = n; pfd[n].fd = cfd; pfd[n].events = POLLIN; n++; }
+        int ifd = image_async_fd(), ii = -1;                /* thumbnails decoded off this thread (ui/image.c) */
+        if (ifd >= 0) { ii = n; pfd[n].fd = ifd; pfd[n].events = POLLIN; n++; }
         int wait = delay < 0 ? 100 : (int)ceil(delay);
         if (js_broker_pending()) wait = 0;       /* events that arrived during an RPC */
         if (wl_display_prepare_read(dpy) != 0) { wl_display_dispatch_pending(dpy); continue; }
@@ -603,6 +605,7 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         wl_display_dispatch_pending(dpy);
         if ((bfd >= 0 && (pfd[1].revents & POLLIN)) || js_broker_pending()) js_broker_poll();
         if (ci >= 0 && pfd[ci].revents) js_broker_companion_read();
+        if (ii >= 0 && pfd[ii].revents) image_async_dispatch();
         if (pfd[0].revents & (POLLHUP | POLLERR)) break;
     }
     js_shutdown();

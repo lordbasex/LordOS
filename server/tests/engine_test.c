@@ -8,11 +8,14 @@
  *   make drag-golden             writes test_drag_exact's golden hashes (only on the reference code)
  * Fallback fonts are looked up as in LordOS (DejaVu Sans covers Arabic and Hebrew in the build
  * container); the checks don't depend on which font draws a script. */
+#include <limits.h>
 #include <math.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "bench/lbinput.h"
 #include "gpu/gcontend.h"
@@ -2887,6 +2890,110 @@ static void tr_set_old(Node *n, const char *k, double v) {
     if (memcmp(&before, &n->s, sizeof before) || !before.ext || memcmp(&xb, n->s.ext, STYLE_EXT_VALUES)) node_invalidate(n);
 }
 
+/* The image cache (issues #71 and #82): a folder of photos in Files made lord-server decode every one full size on the
+ * interface's thread and keep it for good, until it ran out of memory. Thumbnails ("thumb:<px>:<path>") are decoded by
+ * workers to fit px x px, nodes hold images by count, and idle images are dropped past IMG_IDLE_BYTES. */
+static int wait_thumbs(int want) {
+    int got = 0;
+    for (int i = 0; i < 400 && got < want; i++) {
+        struct pollfd p = { image_async_fd(), POLLIN, 0 };
+        if (p.fd >= 0 && poll(&p, 1, 25) > 0) got += image_async_dispatch();
+    }
+    return got;
+}
+
+static void test_image_cache(void) {
+    ui_reset();
+    const char *wall = "../assets/wallpapers/lumo/lordos-lumo-aurora.jpg";     /* 1672 x 941 */
+    char real[PATH_MAX];
+    if (!realpath(wall, real)) { printf("image cache: skipped (no %s)\n", wall); return; }
+    int tw, th;
+    image_thumb_size(4000, 3000, 128, &tw, &th);
+    CHECK(tw == 128 && th == 96, "thumb size of 4000x3000 in 128: %dx%d", tw, th);
+    image_thumb_size(941, 1672, 256, &tw, &th);
+    CHECK(tw == 144 && th == 256, "thumb size of a portrait picture: %dx%d", tw, th);
+    image_thumb_size(50, 40, 256, &tw, &th);
+    CHECK(tw == 50 && th == 40, "a small picture is never enlarged: %dx%d", tw, th);
+    image_thumb_size(10000, 1, 64, &tw, &th);
+    CHECK(tw == 64 && th == 1, "a sliver keeps one row: %dx%d", tw, th);
+
+    int n0, idle0, n, idle;
+    size_t b0, b;
+    image_cache_stats(&n0, &idle0, &b0);
+
+    /* a thumbnail: empty at first, shared, decoded off this thread to fit, its node repainted */
+    Node *nd = node_new(NODE_IMAGE), *nd2 = node_new(NODE_IMAGE);
+    nd->img = image_get_thumb(real, 128);
+    nd2->img = image_get_thumb(real, 128);
+    CHECK(nd->img && nd->img == nd2->img, "two nodes share one thumbnail");
+    int w = -1, h = -1;
+    if (nd->img) image_size(nd->img, &w, &h);
+    CHECK(w == 0 && h == 0, "a thumbnail is empty until decoded: %dx%d", w, h);
+    nd->paint_dirty = 0;
+    CHECK(wait_thumbs(1) == 1, "the thumbnail is decoded by a worker");
+    if (nd->img) image_size(nd->img, &w, &h);
+    CHECK(w == 128 && h == 72, "decoded to fit 128 x 128: %dx%d", w, h);
+    CHECK(nd->paint_dirty, "its node is painted again");
+    image_cache_stats(&n, &idle, &b);
+    CHECK(n == n0 + 1 && b - b0 == 128 * 72 * 4, "one thumbnail cached, %zu bytes (not the full picture)", b - b0);
+
+    /* a file that isn't a picture: the thumbnail fails, nothing retried, nothing kept but the entry */
+    Node *bad = node_new(NODE_IMAGE);
+    bad->img = image_get_thumb("/proc/self/status", 128);
+    wait_thumbs(1);
+    if (bad->img) image_size(bad->img, &w, &h);
+    CHECK(bad->img && w == 0 && h == 0, "a file that doesn't decode stays empty");
+    node_destroy(bad);
+
+    /* still decoding when its node goes: dropped at once (a folder left before its pictures were made) */
+    char many[64][PATH_MAX + 16];
+    Image *pend[64];
+    for (int i = 0; i < 64; i++) { snprintf(many[i], sizeof many[i], "%s#%d", real, i); pend[i] = image_get_thumb(many[i], 64); }
+    for (int i = 0; i < 64; i++) image_release(pend[i]);
+    wait_thumbs(64);
+    image_cache_stats(&n, &idle, &b);
+    CHECK(n <= n0 + 1 + 1 + 64 && b - b0 == 128 * 72 * 4, "thumbnails dropped while decoding hold no pixels (%d cached)", n - n0);
+
+    int idle1;
+    image_cache_stats(&n, &idle1, &b);
+    node_destroy(nd);
+    image_cache_stats(&n, &idle, &b);
+    CHECK(idle == idle1, "still shown by one node: not idle");
+    node_destroy(nd2);
+    image_cache_stats(&n, &idle, &b);
+    CHECK(idle == idle1 + 1, "shown by no node: idle, kept for coming back");
+
+    /* full-size pictures nobody shows: at most IMG_IDLE_BYTES of them stay (each path is its own entry) */
+    char dir[] = "/tmp/engine-img-XXXXXX";
+    if (!mkdtemp(dir)) { CHECK(0, "mkdtemp"); return; }
+    char link[24][PATH_MAX];
+    int made = 0;
+    for (int i = 0; i < 24; i++) {
+        snprintf(link[i], sizeof link[i], "%s/p%02d.jpg", dir, i);
+        if (!symlink(real, link[i])) made++;
+    }
+    size_t peak = 0;
+    for (int i = 0; i < made; i++) {
+        Node *f = node_new(NODE_IMAGE);
+        f->img = image_get(link[i]);
+        CHECK(f->img != NULL, "full picture %d loads", i);
+        node_destroy(f);
+        image_cache_stats(&n, &idle, &b);
+        if (b > peak) peak = b;
+    }
+    CHECK(made == 24 && peak <= b0 + IMG_IDLE_BYTES + 128 * 72 * 4, "24 full pictures of 6 MB shown and closed: at most %u MB idle (peak %zu MB)",
+          IMG_IDLE_BYTES >> 20, peak >> 20);
+    /* one still shown is never dropped */
+    Node *keep = node_new(NODE_IMAGE);
+    keep->img = image_get(link[0]);
+    for (int i = 1; i < made; i++) { Image *t = image_get(link[i]); image_release(t); }
+    if (keep->img) image_size(keep->img, &w, &h);
+    CHECK(keep->img && w == 1672 && h == 941, "a picture still shown keeps its pixels: %dx%d", w, h);
+    node_destroy(keep);
+    for (int i = 0; i < made; i++) unlink(link[i]);
+    rmdir(dir);
+}
+
 static void test_transform_restyle(void) {
     ui_reset();
     TScene a = tr_scene(), b = tr_scene();
@@ -3182,6 +3289,7 @@ int main(int argc, char **argv) {
     test_wrap_basis_height();
     test_overlay_scrollbar();
     test_transform_restyle();
+    test_image_cache();
     printf("engine-test: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 #endif

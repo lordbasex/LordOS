@@ -3,7 +3,7 @@
 // (issue #49: .xlsx and the other office documents had no type, so no app was ever offered).
 //
 //   node tests/filekinds_test.mjs        (from server/; run_suites.sh runs it when node exists)
-import { kindOf, mimeOf, mimesOf, appOpens } from '../../sdk/filekinds.js';
+import { kindOf, mimeOf, mimesOf, appOpens, thumbSrc } from '../../sdk/filekinds.js';
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -61,6 +61,15 @@ eq('GridCraft does not open .docx', opens(gridcraft, f('a.docx'), null), false);
 eq('found through the guess only', opens('application/x-custom;', f('a.custom'), () => 'application/x-custom'), true);
 eq('text app opens code', opens('text/plain;', f('a.py'), () => 'text/x-python'), true);
 eq('image/* opens heic', opens('image/*;', f('a.heic'), null), true);
+
+// ---- the src of a picture shown small (issues #71, #82: never the full picture) ----
+eq('icon of 64 asks 128', thumbSrc('/h/a.jpg', 64), 'thumb:128:/h/a.jpg');
+eq('list row of 32 asks 64', thumbSrc('/h/a.jpg', 32), 'thumb:64:/h/a.jpg');
+eq('near sizes share one', thumbSrc('/h/a.jpg', 70), 'thumb:256:/h/a.jpg');
+eq('tiny asks the smallest', thumbSrc('/h/a.jpg', 4), 'thumb:64:/h/a.jpg');
+eq('never past 2048', thumbSrc('/h/a.jpg', 5000), 'thumb:2048:/h/a.jpg');
+eq('a bad size still asks the smallest', thumbSrc('/h/a.jpg', NaN), 'thumb:64:/h/a.jpg');
+eq('the path is kept as it is', thumbSrc('/h/x:y #1.png', 64), 'thumb:128:/h/x:y #1.png');
 
 console.log(bad ? `filekinds: ${bad} of ${n} failed` : `filekinds: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

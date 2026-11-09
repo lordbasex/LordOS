@@ -186,10 +186,16 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         const char *src = JS_IsString(argv[2]) ? JS_ToCString(c, argv[2]) : NULL;
         if (src) {
             char path[2048];
-            if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
+            /* "thumb:<px>:<absolute path>": a picture shown small (Files, the file dialog), decoded off this thread to
+             * fit px x px (image.c): a folder of photos never holds full-size pictures or waits on a slow disk */
+            const char *num = !strncmp(src, "thumb:", 6) ? src + 6 : NULL;
+            size_t nl = num ? strspn(num, "0123456789") : 0;
+            if (num) {
+                if (nl && nl <= 5 && num[nl] == ':' && num[nl + 1] == '/') n->img = image_get_thumb(num + nl + 1, atoi(num));
+            } else if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
             else if (!strncmp(src, "asset:", 6) && !strstr(src, "..")) snprintf(path, sizeof path, "%s/%s", js_sys_assets(), src + 6);
             else snprintf(path, sizeof path, "%s/%s", ui.theme_dir, src);
-            n->img = image_get(path);
+            if (!num) n->img = image_get(path);
             JS_FreeCString(c, src);
         }
         node_invalidate(n);

@@ -2,7 +2,7 @@
 // the extension) and image thumbnails. Drawn with nodes (no images), except the thumbnails.
 import { View, Text, Image } from '@lordos/runtime';
 import { useThumb } from './media.js';
-import { kindOf, extOf, isImage, KIND_COLOR } from './filekinds.js';
+import { kindOf, extOf, isImage, thumbSrc, KIND_COLOR } from './filekinds.js';
 
 export function FolderGlyph({ size: s, special }) {
   return (
@@ -66,7 +66,7 @@ export function EntryIcon({ e, size, dark, thumb = true }) {
   if (thumb && isImage(e) && size >= 32 && e.size < 24 * 1024 * 1024) {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Image src={e.path} style={{ width: size, height: size, objectFit: 'contain' }} />
+        <Image src={thumbSrc(e.path, size)} style={{ width: size, height: size, objectFit: 'contain' }} />
       </View>
     );
   }

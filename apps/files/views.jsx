@@ -3,7 +3,7 @@
 import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots } from './glyphs.jsx';
-import { kindOf, isImage, isTextual } from './kinds.js';
+import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
@@ -268,7 +268,7 @@ export function Preview({ e, big = false, name, noRead = false }) {
   if (!e) return null;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 16 }}>
-      {isImage(e) && !noRead ? <Image src={e.path} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
+      {isImage(e) && !noRead ? <Image src={thumbSrc(e.path, big ? 1024 : 512)} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
         : text != null ? (
           <View style={{ alignSelf: 'stretch', flex: 1, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#16161a' : '#fbfbfd', border: `1px solid ${t.separator}`, padding: 12, overflow: 'hidden', direction: 'ltr' }}>
             <Text style={{ fontFamily: 'monospace', fontSize: big ? 12 : 10, color: t.text, lineHeight: big ? 17 : 14 }}>{text.split('\n').slice(0, big ? 200 : 60).join('\n')}</Text>

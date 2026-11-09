@@ -1039,6 +1039,7 @@ static JSValue f_image_size(JSContext *c, JSValueConst this_val, int argc, JSVal
     if (!img) return JS_NULL;
     int w = 0, h = 0;
     image_size(img, &w, &h);
+    image_release(img);
     JSValue o = JS_NewObject(c);
     JS_SetPropertyStr(c, o, "width", JS_NewInt32(c, w));
     JS_SetPropertyStr(c, o, "height", JS_NewInt32(c, h));

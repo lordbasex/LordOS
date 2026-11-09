@@ -272,7 +272,18 @@ int   text_covered(const char *s);                         /* does an installed 
 int   text_direction(const char *s);                       /* 1 if the first strong character is RTL */
 
 /* image.c */
-Image *image_get(const char *path);
+#define IMG_MAX_PIXELS (1 << 26)            /* 67 Mpx: a larger picture isn't decoded (256 MB as ARGB) */
+#define IMG_IDLE_BYTES (64u << 20)          /* images no node shows, kept for coming back, up to this many bytes */
+#define IMG_IDLE_MAX 512                    /* and this many */
+#define IMG_THREADS 2                       /* thumbnail decoders */
+#define IMG_QUEUE_MAX 8192                  /* thumbnails waiting; more are not made */
+#define IMG_THUMB_MAX 2048                  /* the largest thumbnail side */
+Image *image_get(const char *path);          /* adds a holder: image_release when done */
+Image *image_get_thumb(const char *path, int max);   /* decoded off this thread, to fit max x max; empty until then */
+int    image_async_fd(void);                 /* readable when thumbnails are ready (-1 before the first) */
+int    image_async_dispatch(void);           /* puts them in; repaints their nodes; how many */
+void   image_thumb_size(int w, int h, int max, int *tw, int *th);
+void   image_cache_stats(int *count, int *idle, size_t *bytes);
 void   image_size(const Image *img, int *w, int *h);
 Image *image_pixels(Image *img, int w, int h, const uint8_t *rgba);
 Image *image_argb(Image *img, int w, int h, const uint32_t *argb);   /* premultiplied ARGB (doc/doc.c) */

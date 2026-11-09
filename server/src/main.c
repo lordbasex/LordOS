@@ -2693,6 +2693,8 @@ int main(int argc, char **argv) {
         if (clbase >= 0) pfd[n++] = (struct pollfd){ cloud_fd(), POLLIN, 0 };
         int fabase = fsasync_fd() >= 0 ? n : -1;                 /* lord.fs.*Async answers (Files on slow mounts) */
         if (fabase >= 0) pfd[n++] = (struct pollfd){ fsasync_fd(), POLLIN, 0 };
+        int imbase = image_async_fd() >= 0 ? n : -1;              /* thumbnails decoded off this thread (ui/image.c) */
+        if (imbase >= 0) pfd[n++] = (struct pollfd){ image_async_fd(), POLLIN, 0 };
         int sbase = snd_fd() >= 0 ? n : -1;
         if (sbase >= 0) pfd[n++] = (struct pollfd){ snd_fd(), POLLIN, 0 };
         int pbase = portal_fd() >= 0 ? n : -1;
@@ -2770,6 +2772,7 @@ int main(int argc, char **argv) {
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
         if (fabase >= 0 && pfd[fabase].revents) js_fs_dispatch();
+        if (imbase >= 0 && pfd[imbase].revents) image_async_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
         if (nm) mirror_dispatch(pfd + mbase, nm);

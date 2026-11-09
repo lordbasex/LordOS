@@ -267,7 +267,7 @@ int node_children_ordered(Node *n, Node **out, int max) {
 /* Deletes all nodes (theme change). The whole screen is left to repaint. */
 void ui_reset(void) {
     for (int i = 0; i < ui.cap; i++)
-        if (ui.nodes[i]) { free(ui.nodes[i]->text); free(ui.nodes[i]->tf); free(ui.nodes[i]->s.ext); free(ui.nodes[i]); ui.nodes[i] = NULL; }
+        if (ui.nodes[i]) { image_release(ui.nodes[i]->img); free(ui.nodes[i]->text); free(ui.nodes[i]->tf); free(ui.nodes[i]->s.ext); free(ui.nodes[i]); ui.nodes[i] = NULL; }
     ui.root = NULL;
     ui.damage = (Box){0, 0, ui.width, ui.height};
     ui.dirty = 1;
