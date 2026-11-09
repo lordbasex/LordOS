@@ -26,6 +26,22 @@ function nearEnd(winId, node) {
   } catch (e) { return false; }
 }
 
+// A MenuButton's menu opens upward when it wouldn't fit between the button and the window's bottom edge (a button in a
+// footer, near the bottom of the window) and there is more room above: the height is the rows' own (24, 40 with a
+// detail line, 9 a separator) plus the menu's padding and border.
+export const menuHeight = (items) => (items || []).reduce((h, it) => h + (it === '-' ? 9 : it && it.detail ? 40 : 24), 12);
+export function opensUp(btn, win, height) {
+  if (!btn || !win || !(win.h > 0)) return false;
+  const below = win.y + win.h - (btn.y + btn.h + 4), above = btn.y - win.y - 4;
+  return below < height && above > below;
+}
+function nearBottom(winId, node, items) {
+  try {
+    const [x, y, w, h] = lord.getLayout(node.id);
+    return opensUp({ x, y, w, h }, wm.get(winId), menuHeight(items));
+  } catch (e) { return false; }
+}
+
 // Hover tooltip (shown after a short delay), for icon-only toolbar items.
 function useTooltip(title) {
   const [show, setShow] = useState(false);
@@ -132,6 +148,7 @@ export function MenuButton({ icon = '⋯', label, title, items, small, onOpenCha
     });
   }, [open]);
   const end = open && nearEnd(winId, btn.current);
+  const up = open && nearBottom(winId, btn.current, items);
   // the menu goes in the overlay layer (sdk/layers.js): above the rest of the window, whatever
   // comes after the button, and not clipped by a scrolling parent
   return (
@@ -140,7 +157,7 @@ export function MenuButton({ icon = '⋯', label, title, items, small, onOpenCha
         : <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />}
       {open && (
         <Overlay anchor={btn}>
-          <View ref={menu} style={{ position: 'absolute', top: (trigger ? lord.getLayout(btn.current.id)[3] : small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,
+          <View ref={menu} style={{ position: 'absolute', [up ? 'bottom' : 'top']: (trigger ? lord.getLayout(btn.current.id)[3] : small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,
             minWidth, paddingVertical: 5, paddingHorizontal: 5, borderRadius: t.menuRadius, backgroundColor: popupBg(t),
             border: `1px solid ${t.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
             {items.map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: t.separator }} />

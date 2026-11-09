@@ -168,6 +168,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A "More" menu near the bottom of a window opens upward.** Every app's ⋯ button (the SDK's `MenuButton`) opened
+  its menu downward, so a button in a footer, like the favorites' ⋯ in Databases, had its menu cut off by the window's
+  bottom edge. The menu now opens upward when it doesn't fit below the button and there is more room above.
+- **Databases: a folder of favorites can be deleted or renamed even when it is empty.** Rename Folder and Delete
+  Folder were only in the ⋯ menu, and only for the folder of the selected favorite, so a folder with no favorites
+  could not be removed. A right click on a folder now opens its own menu with New Favorite, Rename and Delete.
+  Deleting a folder still moves what was in it up one level.
 - **Displays keep their signal across lock, logout and login, and logging out doesn't freeze the desktop.** At every
   hand-off of the monitor, lord-sessiond removed the leaving session's framebuffers while they were still on the
   screen; amdgpu refuses to turn a plane off that way ("atomic remove_fb failed with -22" in the kernel log at every

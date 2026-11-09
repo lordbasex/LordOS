@@ -3,7 +3,7 @@
 // the production / read-only switches; Test Connection and Connect. The password is asked in a sheet when Passwords
 // doesn't keep it or the server refuses it; a certificate that doesn't check asks to be trusted by its sha256. The first
 // run (and File > Import Connections) offers Sequel Ace's and Sequel Pro's favorites.
-import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillButton, useStore, sqlAvailable, sqlPasswords, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillButton, ContextMenu, useStore, sqlAvailable, sqlPasswords, t as tr } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePal, Icons, Dot, Btn, IconBtn, Check, Popup, Field, Box, Note, Sheet, MONO, MenuGlyph } from './ui.jsx';
 import { store, favRev, readFavorites, writeFavorites, openSession, testFavorite, prefs, setPrefs } from './conn.js';
@@ -29,7 +29,9 @@ export function Connect({ onConnected }) {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState(null);         // { kind, text }
   const [busy, setBusy] = useState('');               // 'test' | 'connect'
-  const [sheet, setSheet] = useState(null);           // { kind: 'password' | 'cert' | 'import' | 'group' | 'delete' | 'pick', … }
+  const [sheet, setSheet] = useState(null);
+  const [groupMenu, setGroupMenu] = useState(null);   // { x, y, group }: a folder's own menu (right click), empty ones too
+  const rootRef = useRef(null);           // { kind: 'password' | 'cert' | 'import' | 'group' | 'delete' | 'pick', … }
   const [banner, setBanner] = useState(null);         // first run: what the import would bring
   const [collapsed, setCollapsed] = useState({});
   const nextStatus = useRef(null);                    // a message that survives the selection changing to what it's about
@@ -244,7 +246,7 @@ export function Connect({ onConnected }) {
   );
 
   return (
-    <View style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
+    <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
       {/* favorites */}
       <View style={{ width: 260, backgroundColor: p.side }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: p.line }} />
@@ -260,7 +262,8 @@ export function Connect({ onConnected }) {
             const closed = collapsed[g.id] ?? !g.expanded;
             return (
               <View key={g.id}>
-                <View onClick={() => setCollapsed((c) => ({ ...c, [g.id]: !closed }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, marginHorizontal: 8, paddingLeft: 10 + depth * 14, paddingRight: 10 }}>
+                <View onClick={() => setCollapsed((c) => ({ ...c, [g.id]: !closed }))}
+                  onContextMenu={(e) => { const pt = rootRef.current ? e.local(rootRef.current) : { x: e.x, y: e.y }; setGroupMenu({ x: pt.x, y: pt.y, group: g }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, marginHorizontal: 8, paddingLeft: 10 + depth * 14, paddingRight: 10 }}>
                   <Text style={{ width: 10, fontSize: 9, color: p.dim }}>{closed ? '▶' : '▼'}</Text>
                   {Icons.folder(p.dim, 13)}
                   <Text style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{g.name || tr('databases.group.untitled')}</Text>
@@ -411,6 +414,12 @@ export function Connect({ onConnected }) {
       {sheet?.kind === 'password' ? <PasswordSheet sheet={sheet} busy={busy === 'connect'} onCancel={() => setSheet(null)} onGo={(pw, keep) => connect(sheet.fav, pw, keep)} /> : null}
       {sheet?.kind === 'cert' ? <CertSheet sheet={sheet} onCancel={() => setSheet(null)} onTrust={() => trust(sheet)} /> : null}
       {sheet?.kind === 'import' ? <ImportSheet files={sheet.files} onCancel={() => setSheet(null)} onImport={doImport} /> : null}
+      {groupMenu ? <ContextMenu x={groupMenu.x} y={groupMenu.y} onClose={() => setGroupMenu(null)} items={[
+        { label: tr('databases.fav.new'), onClick: () => newFavorite(groupMenu.group.id) },
+        { label: tr('databases.group.rename'), onClick: () => setSheet({ kind: 'group', group: groupMenu.group, name: groupMenu.group.name || '' }) },
+        '-',
+        { label: tr('databases.group.delete'), destructive: true, onClick: () => removeGroup(groupMenu.group) },
+      ]} /> : null}
       {sheet?.kind === 'group' ? <GroupSheet sheet={sheet} onCancel={() => setSheet(null)} onSave={(name) => saveGroup(name, sheet.group)} /> : null}
       {sheet?.kind === 'delete' ? (
         <ConfirmDialog title={tr('databases.fav.deleteTitle', { name: sheet.fav.name })} detail={tr('databases.fav.deleteDetail')} destructive
