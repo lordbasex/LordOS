@@ -217,6 +217,7 @@
   "fan.gpuRefused": "Impossibile impostare a mano la ventola della scheda grafica (forse è troppo calda in questo momento)",
   "fs.alreadyInTrash": "È già nel Cestino",
   "fs.copyIntoItself": "Una cartella non può essere copiata dentro sé stessa",
+  "fs.busy": "Troppe richieste sono in attesa di cartelle lente; riprova tra un momento",
   "fs.copyStartFailed": "Impossibile avviare la copia",
   "fs.exists": "Esiste già un elemento con quel nome",
   "fs.moveRemoveFailed": "Copiato, ma non è stato possibile rimuovere l’originale: {errno}",

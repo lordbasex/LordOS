@@ -217,6 +217,7 @@
   "fan.gpuRefused": "Não foi possível ajustar à mão a ventoinha da placa de vídeo (talvez esteja quente demais agora)",
   "fs.alreadyInTrash": "Já está na Lixeira",
   "fs.copyIntoItself": "Não é possível copiar uma pasta para dentro dela mesma",
+  "fs.busy": "Há pedidos demais esperando por pastas lentas; tente de novo em um momento",
   "fs.copyStartFailed": "Não foi possível iniciar a cópia",
   "fs.exists": "Já existe algo com esse nome",
   "fs.moveRemoveFailed": "Copiado, mas não foi possível remover o original: {errno}",

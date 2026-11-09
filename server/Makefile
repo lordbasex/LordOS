@@ -56,7 +56,7 @@ MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/cap
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
@@ -283,7 +283,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -562,6 +562,9 @@ build/canvas-test: tests/canvas_test.c src/canvas.c src/canvas.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DLORD_CANVAS_TEST -o $@ tests/canvas_test.c src/canvas.c -lm
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
+# lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
+build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread
 # touchpad driver (src/tp): gestures of the simulated touchpad (../tests/touchpad-sim) → what's recognized
 build/tp-test: tests/tp_test.c src/tp/tp.c src/tp/tp.h ../tests/touchpad-sim/gestures.c ../tests/touchpad-sim/gestures.h
 	@mkdir -p build

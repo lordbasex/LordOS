@@ -3,6 +3,8 @@
 // ~/.local/share/applications, ~/.config/autostart, ~/.local/share/lordos/apps or
 // ~/.config/lordos/settings.json (see server/src/ui/js_sys.c and server/src/fsops.c).
 import { useEffect, useState } from 'react';
+import { codeError } from './errors.js';
+import { remoteOf } from './mountmodel.js';
 
 export const home = () => lord.fs.home();
 
@@ -59,3 +61,45 @@ export const free = (path) => lord.fs.free(path);              // { total, free 
 export const search = (dir, text, opts) => lord.fs.search(dir, text, opts);   // by name, no hidden files
 export const recent = (limit = 60, days = 30) => lord.fs.recent(limit, days);
 export const volumes = () => lord.fs.volumes();                // [{ path, name, fs, total, free }]
+
+// ---- off the interface's thread (server/src/fsasync.c, 0.8.8.7) ----
+// A folder on a Cloud account (rclone), a Connect to Server or SMB/NFS share answers when its server does: the calls
+// above would hold the whole desktop until then. These run on lord-server's workers, with the same checks, and answer
+// with a Promise; an error is an Error with `code` and `params` (errors.js). isRemote(path) says which folders need
+// them (from the mount table, without touching the path). Isolated apps without them fall back to the calls above.
+const waiting = new Map();          // req → settle(answer)
+globalThis.__lordFsReply = (req, res) => {
+  const done = waiting.get(req);
+  if (done) { waiting.delete(req); done(res); }
+};
+function later(fn, sync, path) {
+  if (typeof lord.fs[fn] !== 'function') return Promise.resolve().then(() => sync(path));
+  let req;
+  try { req = lord.fs[fn](path); } catch (e) { return Promise.reject(e); }
+  return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(r || {}))));
+}
+// [{ name, link, dir, locked?, size, mtime, mode, user, group, atime, ctime }] (as lord.fs.list, with what the list
+// view's columns would ask lord.fs.stat for)
+export const listAsync = (path) => later('listAsync', (p) => ({ entries: lord.fs.list(p) }), path).then((r) => r.entries || []);
+export const statAsync = (path) => later('statAsync', (p) => ({ stat: lord.fs.stat(p) }), path).then((r) => r.stat);
+export const trashAsync = (path) => later('trashAsync', (p) => ({ ok: lord.fs.trash(p) }), path).then(() => true);
+export const freeAsync = (path) => later('freeAsync', (p) => lord.fs.free(p), path).then((r) => ({ total: r.total, free: r.free }));
+export const mkdirAsync = (path) => later('mkdirAsync', (p) => ({ ok: lord.fs.mkdir(p) }), path).then(() => true);
+export function renameAsync(from, to) {
+  if (typeof lord.fs.renameAsync !== 'function') return Promise.resolve().then(() => lord.fs.rename(from, to));
+  let req;
+  try { req = lord.fs.renameAsync(from, to); } catch (e) { return Promise.reject(e); }
+  return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(true))));
+}
+// the mount table, read at most once a second (a string match per question after that: Files asks per row)
+let mounts = null, mountsAt = 0;
+export function isRemote(path) {
+  if (!path || typeof path !== 'string' || typeof lord.fs.mounts !== 'function') return false;
+  const now = Date.now();
+  if (!mounts || now - mountsAt > 1000) {
+    try { mounts = lord.fs.mounts(); } catch (e) { mounts = []; }
+    mountsAt = now;
+  }
+  const full = path.startsWith('/') ? path : `${home()}/${path}`;
+  return remoteOf(full, mounts);
+}

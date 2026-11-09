@@ -33,6 +33,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   whole (as it does for a virtual TPM) keeps only its name and the wrapped key in the clear in its `.vmx`; the importer
   said "not a .vmx settings file". It now names the machine and stops with *encrypted*, which tells to remove the
   encryption in the app that made it.
+- **Files: a Cloud or network folder never freezes the desktop any more.** Deleting a file inside an iCloud folder
+  (any Cloud account, mounted by rclone through FUSE) froze the whole desktop, pointer and every window, until rclone
+  finished, and going back to the parent folder could freeze it again until rclone answered. lord-server is one thread
+  for input, layout, painting and JS, and Files read those folders with synchronous `lord.fs` calls on it: the folder's
+  listing (`lord.fs.list`: a `readdir`, a `stat` per item and a `realpath` per subfolder, `apps/files/locations.js`), a
+  `lord.fs.stat` per row for the list view's extra columns, the folder's own `stat` (is it writable) and `statvfs` (free
+  space). On a FUSE mount each of those waits for rclone, which asks the provider when its listing is old or was just
+  changed; and while the delete (on the Cloud's own thread since 0.8.5) runs `unlink`, the kernel holds that folder's lock,
+  so the listing Files asked for right after waited for the provider too. Now:
+  - New `lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync` run on a small pool of
+    worker threads (`server/src/fsasync.c`, at most 6 threads and 256 requests; a full queue answers `fs.busy` at once)
+    and answer through an eventfd the main loop polls (`__lordFsReply`). A worker resolves and checks each path with
+    exactly the functions the synchronous calls use, now shared in `fsops.c` (`fsops_resolve_readable / _target /
+    _stat`, `fsops_list`, `fsops_stat`): the writable roots, `/proc`, `/sys`, `/dev` and `/run`, the `fsops_protected`
+    deny list (also for a parent of a protected path), a share that stopped answering, and only the Trash as a way to
+    delete. No new operation and no way to run commands.
+  - `lord.fs.mounts()` gives the mount table, and `fs.isRemote(path)` in the SDK says from it (no file system call)
+    whether a folder is on a Cloud account, Connect to Server, SMB, NFS or other FUSE mount.
+  - Files lists those folders off the thread and keeps each listing (`apps/files/remotedirs.js`): a folder opens at once
+    with "Loading…" the first time, a folder seen before (going back) shows its last listing while a new one comes, the
+    status bar says "Waiting for the folder to answer…" when a listing takes longer than 0.4 s, and the window, the
+    Dock and every other app keep answering meanwhile. The listing brings what the list view's columns need, so rows
+    aren't asked one by one. Deleting in a Cloud account, or moving to the Trash on a share, takes the items off the view
+    at once; a new listing when it ends brings back any the provider refused, with the reason in the status bar. New
+    Folder, Rename, the folder's write permission, its free space, Get Info, the column view, unfolded folders in the
+    list view, favorites and the names a copy or paste picks run off the thread there as well.
+  - A move inside a Cloud account or a share (a rename at the provider) runs on the copy job's thread instead of the
+    interface's.
+  - Local folders keep the synchronous calls (nothing changes there).
+  - Tests: `build/fsasync-test` holds requests in a fake slow file system and checks that submitting never waits, that
+    other folders answer meanwhile, a full queue, every answer, and that each refusal is the synchronous call's own
+    (outside the roots, `/proc`, protected files and their parents, renaming onto an existing name);
+    `tests/files_remote_test.mjs` checks the listings Files keeps (one at a time per folder, the last one shown while a
+    new one runs, items hidden during a delete and back only if still there) and which folders count as slow.
 
 ## [0.8.8.6-beta] - 2026-11-08
 

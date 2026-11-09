@@ -28,6 +28,7 @@ import { ALL_COLUMNS, toggleColumn } from './columns.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { useCloudFiles, CloudSection, TransfersPill, footerLine, cloudMenuItems, ShareSheet, CloudInfo, OfflineDialog } from './cloud.jsx';
+import { createRemoteDirs } from './remotedirs.js';
 
 export function Icon({ size: s }) {
   return (
@@ -227,6 +228,12 @@ export default function Files() {
   const [sharing, setSharing] = useState(null);           // Cloud: the Share Link sheet's entry
   const [offlineAsk, setOfflineAsk] = useState(null);     // Cloud: a file that isn't here, with the cloud out of reach
   const [userSettings] = useSettings();
+  // folders on a Cloud account or a network share: listed, created, renamed and sent to the Trash off lord-server's
+  // thread (fs.*Async, server/src/fsasync.c), so a provider that takes seconds never freezes the desktop (0.8.8.7)
+  const [remoteVer, setRemoteVer] = useState(0);
+  const rdirs = useMemo(() => createRemoteDirs({ list: (dir) => fs.listAsync(dir), onChange: () => setRemoteVer((n) => n + 1) }), []);
+  // the names in a slow folder, as last listed (copies and new folders pick free names from them); undefined elsewhere
+  const knownNames = (dir) => (fs.isRemote(dir) ? (rdirs.get(dir).entries || []).map((e) => e.name) : undefined);
   const root = useRef(null);
   const rootWidthRef = useRef(960);
   const press = useRef(null);
@@ -263,6 +270,18 @@ export default function Files() {
     const id = setInterval(() => { cloud.browse(loc.path); setCloudTick((n) => n + 1); }, 60000);
     return () => clearInterval(id);
   }, [listAcc ? loc.path : null]);
+  // a folder whose file system may be slow (fs.isRemote: rclone's Cloud mounts, Connect to Server, SMB/NFS): its listing
+  // comes from rdirs, which asks lord-server's workers and shows the last listing meanwhile
+  const remoteDir = loc.type === 'dir' && fs.isRemote(loc.path);
+  const remoteSeen = useRef(null);
+  useEffect(() => {
+    if (!remoteDir) { remoteSeen.current = null; return; }
+    const first = remoteSeen.current !== loc.path;
+    remoteSeen.current = loc.path;
+    // the first look at a folder lists it (rdirs.get); one seen before (going back) is listed again behind its last
+    // listing, and so is the shown one when something changed
+    if (!first || rdirs.has(loc.path)) rdirs.refresh(loc.path);
+  }, [remoteDir, loc.path, version, listAcc ? listAcc.listed : 0, listAcc ? cloudTick : 0, listAcc ? null : volumes]);
   const [entries, error] = useMemo(() => {
     if (loc.type === 'network') {
       // the places this person is connected to first, then what was found (netplaces.js, issue #59)
@@ -274,9 +293,26 @@ export default function Files() {
       return [all, null];
     }
     if (searchAcc) return [cloudModel.searchEntries(cs && cs.hits), cs && cs.error ? errorText(cs.error) : null];
+    if (remoteDir) {
+      const r = rdirs.get(loc.path);
+      const raw = r.entries || [];
+      const out = raw.filter((e) => hidden || !e.name.startsWith('.')).map((e) => ({ ...e, path: `${loc.path === '/' ? '' : loc.path}/${e.name}` }));
+      out.capped = raw.length === LIST_CAP;
+      out.loading = !r.entries;
+      out.busy = r.busy;
+      return [out, r.error && !raw.length ? r.error : null];
+    }
     try { return [loadEntries(loc, { hidden, launcherApps }), null]; } catch (e) { return [[], e.message]; }
-  }, [netState, listAcc ? null : volumes, listAcc ? listAcc.listed : 0, listAcc ? cloudTick : 0, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc,
+  }, [netState, listAcc ? null : volumes, listAcc ? listAcc.listed : 0, listAcc ? cloudTick : 0, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer, cs, !!searchAcc, remoteDir, remoteVer,
     loc.type === 'network' ? prefs.pins : null, loc.type === 'network' ? !!prefs.netAllDevices : null, loc.type === 'network' ? cloudSt : null, loc.type === 'network' ? userSettings.cloudHidden : null]);
+  // a slow folder still being listed: the status bar says so once it takes longer than a blink (no flicker on a fast one)
+  const listBusy = !!entries.busy;
+  const [waitShown, setWaitShown] = useState(false);
+  useEffect(() => {
+    if (!listBusy) { setWaitShown(false); return undefined; }
+    const id = setTimeout(() => setWaitShown(true), 400);
+    return () => clearTimeout(id);
+  }, [listBusy, loc.path]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
   // what the list's extra columns need, asked once per file until something changes
@@ -284,7 +320,13 @@ export default function Files() {
   const statOf = (e) => {
     if (stats.current.v !== version) stats.current = { v: version, m: new Map() };
     const m = stats.current.m;
-    if (!m.has(e.path)) { let st = null; if (!e.trash && !e.app && !e.arc) { try { st = lord.fs.stat(e.path); } catch (err) { /* gone */ } } m.set(e.path, st); }
+    if (!m.has(e.path)) {
+      let st = null;
+      // a slow folder's listing already brings what the columns need (fs.listAsync): its files aren't asked one by one
+      if (e.mode != null && e.user != null) st = e;
+      else if (!e.trash && !e.app && !e.arc && !e.netHost && !e.netWay && !fs.isRemote(e.path)) { try { st = lord.fs.stat(e.path); } catch (err) { /* gone */ } }
+      m.set(e.path, st);
+    }
     return m.get(e.path);
   };
   const sortOpts = { statOf, foldersFirst: prefs.foldersFirst };
@@ -298,7 +340,24 @@ export default function Files() {
   const curAcc = curDir ? cf.accountOf(curDir) : null;
   // outside the home folder and the user's disks a folder is only browsed (lord.fs reads there but
   // doesn't write): the actions that change it are left out
-  const readOnly = useMemo(() => { if (!curDir) return false; try { return !fs.stat(curDir).writable; } catch (e) { return true; } }, [curDir, version]);
+  // on a slow folder that is asked off the thread too, with the space left (rdirs' folders: fs.isRemote)
+  const curRemote = !!curDir && fs.isRemote(curDir);
+  const [remoteInfo, setRemoteInfo] = useState(null);     // { path, writable, free }
+  useEffect(() => {
+    if (!curRemote) return undefined;
+    let live = true;
+    const dir = curDir;
+    const put = (p) => { if (live) setRemoteInfo((x) => ({ ...(x && x.path === dir ? x : { path: dir }), ...p })); };
+    fs.statAsync(dir).then((s) => put({ writable: !!(s && s.writable) }), () => put({ writable: false }));
+    // not in a cloud account: its status bar tells its own space, and statfs there waits for the provider
+    if (!curAcc && !dir.includes('/.local/share/lordos/remote/')) fs.freeAsync(dir).then((f) => put({ free: f }), () => {});
+    return () => { live = false; };
+  }, [curRemote ? curDir : null, version, !!curAcc]);
+  const readOnly = useMemo(() => {
+    if (!curDir) return false;
+    if (curRemote) return !!remoteInfo && remoteInfo.path === curDir && remoteInfo.writable === false;
+    try { return !fs.stat(curDir).writable; } catch (e) { return true; }
+  }, [curDir, version, curRemote, remoteInfo]);
   const wDir = readOnly ? null : curDir;
   const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
 
@@ -337,6 +396,19 @@ export default function Files() {
   const report = (e) => { console.log(`files: ${e?.message || e}`); setMsg(String(e?.message || e)); };
   const newFolder = (withPaths) => {
     if (!wDir) return;
+    if (fs.isRemote(wDir)) {
+      // a slow folder: the names it shows, and the folder made off the thread (the field opens when it exists)
+      const dir = wDir;
+      const name = freeName(dir, tr('files.newFolder'), new Set((rdirs.get(dir).entries || []).map((e) => e.name)));
+      fs.mkdirAsync(`${dir}/${name}`).then(() => {
+        if (withPaths && withPaths.length) transfer(withPaths, `${dir}/${name}`, true, new Set());
+        rdirs.refresh(dir);
+        bump();
+        setSelected(new Set([`${dir}/${name}`]));
+        setRenaming({ path: `${dir}/${name}`, value: name });
+      }, report);
+      return;
+    }
     const name = freeName(wDir, tr('files.newFolder'));
     try {
       fs.mkdir(`${wDir}/${name}`);
@@ -354,7 +426,14 @@ export default function Files() {
     const name = r.value.trim();
     if (!name || name === fs.basename(r.path) || name.includes('/')) return;
     const to = `${fs.parent(r.path)}/${name}`;
-    const go = () => { try { fs.rename(r.path, to); moveTags(r.path, to); bump(); setSelected(new Set([to])); } catch (e) { report(e); } };
+    const go = () => {
+      if (fs.isRemote(r.path)) {
+        // on a slow folder the server renames it (rclone moves it at the provider): off the thread, shown when done
+        fs.renameAsync(r.path, to).then(() => { moveTags(r.path, to); rdirs.settle([r.path]); bump(); setSelected(new Set([to])); }, report);
+        return;
+      }
+      try { fs.rename(r.path, to); moveTags(r.path, to); bump(); setSelected(new Set([to])); } catch (e) { report(e); }
+    };
     const ext = (n) => { const i = n.lastIndexOf('.'); return i > 0 ? n.slice(i + 1).toLowerCase() : ''; };
     const entry = byPath.get(r.path);
     if (prefs.warnExtension && entry && !entry.dir && ext(name) !== ext(entry.name)) {
@@ -427,14 +506,36 @@ export default function Files() {
     // .Trash folder inside the cloud; it goes to the provider's own trash where it has one, so Restore isn't offered
     const split = cloudModel.splitTrash(paths, cf.accounts);
     let n = 0;
-    for (const p of split.local) { try { fs.trash(p); n++; } catch (e) { report(e); } }
+    // on a slow folder (a network share, Connect to Server) the move to its Trash runs off the thread: the items leave the
+    // view at once and come back only if the move failed
+    const slow = split.local.filter((p) => fs.isRemote(p));
+    for (const p of split.local) { if (slow.includes(p)) continue; try { fs.trash(p); n++; } catch (e) { report(e); } }
     if (n) { setMsg(tr('files.trashed', { count: n })); bump(); }
+    if (slow.length) {
+      rdirs.hide(slow);
+      setSelected(new Set());
+      Promise.all(slow.map((p) => fs.trashAsync(p).then(() => 1, (e) => { report(e); return 0; }))).then((done) => {
+        rdirs.settle(slow);
+        const k = done.reduce((a, b) => a + b, 0);
+        if (k) { setMsg(tr('files.trashed', { count: k })); bump(); }
+      });
+    }
     const ask = (i) => {
       const g = split.cloud[i];
       if (!g) return;
       const pr = cloudModel.deletePrompt(g.acc, g.paths.length);
       setConfirm({ text: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars), ok: tr('cloud.delete.ok'), destructive: true, run: () => {
-        cloud.delete(g.paths).then((r) => { setMsg(r && r.error ? errorText(r.error) : tr('cloud.delete.done', { count: g.paths.length, provider: cloudModel.providerName(g.acc) })); bump(); });
+        // the delete runs on the cloud's thread; the items leave the view now, and a new listing (off this thread too)
+        // brings back any the provider refused
+        rdirs.hide(g.paths);
+        setSelected(new Set());
+        cloud.delete(g.paths).then((r) => {
+          rdirs.settle(g.paths);
+          const failed = (r && r.failed) || [];
+          setMsg(r && r.error ? errorText(r.error) : failed.length ? errorText(failed[0].error)
+            : tr('cloud.delete.done', { count: g.paths.length, provider: cloudModel.providerName(g.acc) }));
+          bump();
+        });
         setTimeout(() => ask(i + 1), 0);
       } });
     };
@@ -460,8 +561,8 @@ export default function Files() {
       () => { setVolumes(fs.volumes()); setMsg(tr(r.action === 'disk-eject' ? 'disks.ejected' : 'disks.unmounted')); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); },
       (e) => setMsg(e.message));
   };
-  const duplicate = (paths = selPaths) => { if (wDir && paths.length) transfer(paths, wDir, false); };
-  const doPaste = () => { if (wDir) paste(wDir); };
+  const duplicate = (paths = selPaths) => { if (wDir && paths.length) transfer(paths, wDir, false, knownNames(wDir)); };
+  const doPaste = () => { if (wDir) paste(wDir, knownNames(wDir)); };
   const ctx = { navigate, linuxApps: launcherApps, t: tr, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
@@ -537,13 +638,16 @@ export default function Files() {
 
   // a shortcut, not a copy: a folder on a server remembers how to get back to it
   const addFavorite = (path) => {
-    try { if (!fs.stat(path).dir) return; } catch (e) { return; }
+    const known = byPath.get(path);
+    if (known) { if (!known.dir) return; } else { try { if (!fs.stat(path).dir) return; } catch (e) { return; } }
     const v = fs.volumes().find((x) => isShareFs(x.fs) && (path === x.path || path.startsWith(`${x.path}/`)));
     addFavoriteFolder({ path, name: v && path === v.path ? v.name : fs.basename(path), address: v ? originOf(v.path, v.fs, v.name) : '' });
   };
   const offline = (f) => !!f.address && !volumes.some((v) => f.path === v.path || f.path.startsWith(`${v.path}/`));
   const openFavorite = (f) => {
     if (offline(f)) { reconnect(f); return; }
+    // on a Cloud account or a share the folder opens at once: its listing (off the thread) says if it is gone
+    if (fs.isRemote(f.path)) { navigate(dirLoc(f.path)); return; }
     try { if (fs.stat(f.path).dir) { navigate(dirLoc(f.path)); return; } } catch (e) { /* below */ }
     setMsg(tr('files.fav.gone', { name: f.name }));
   };
@@ -572,7 +676,7 @@ export default function Files() {
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
       if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { trashRef.current(p.paths); return; }       // (cloud paths are asked about and deleted there)
-      transfer(p.paths, target, !e.alt);
+      transfer(p.paths, target, !e.alt, knownNames(target));
     });
     return () => { mv(); up(); };
   }, []);
@@ -807,7 +911,7 @@ export default function Files() {
   const viewCtx = {
     scrollKey: `${active}|${loc.type}|${loc.path || ''}|${loc.inner || ''}|${loc.color || ''}|${loc.root || ''}|${loc.query || ''}`,   // a new place opens at the top
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
-    emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
+    emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (entries.loading ? tr('files.loading') : null) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
     onItemDown, onOpen: open, onContext, statOf, zoom, onZoomWheel,
     cloud: { on: !!curAcc && loc.type === 'dir', status: cf.status }, cloudOnly: cf.cloudOnly,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
@@ -820,14 +924,20 @@ export default function Files() {
       if (e?.netHost?.smb && !e.netHost.shares.length && !expanded.has(p)) { openWay(e.ways[0], e.netHost); return; }
       toggleExpanded(p);
     },
+    listOf: (dir) => listOf(dir),
     isDir: (p) => { const e = byPath.get(p); if (e) return e.dir; try { return lord.fs.stat(p).dir; } catch (err) { return false; } },
     entryAt: (p) => byPath.get(p) || (() => { try { const s = lord.fs.stat(p); return { name: s.name, path: s.path, dir: s.dir, size: s.size, mtime: s.mtime }; } catch (err) { return null; } })(),
   };
   // columns only in folders; elsewhere, the list
   const view = shownView;
-  const entriesOf = (dir) => { try { return lord.fs.list(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
+  const entriesOf = (dir) => { try { return listOf(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
   // not in a cloud account: its status bar tells its own space, and statfs there waits for the provider (rclone asks it)
-  const freeSpace = useMemo(() => { try { return curDir && !curAcc && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version, !!curAcc]);
+  const freeSpace = useMemo(() => {
+    if (curRemote) return remoteInfo && remoteInfo.path === curDir ? remoteInfo.free || null : null;
+    try { return curDir && !curAcc && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; }
+  }, [curDir, version, !!curAcc, curRemote, remoteInfo]);
+  // what a folder in the column view or an unfolded one in the list shows: a slow one from rdirs, never on this thread
+  const listOf = (dir) => (fs.isRemote(dir) ? rdirs.get(dir).entries || [] : lord.fs.list(dir));
   const quickEntry = quick ? (first || flat[0]) : null;
   const infoEntry = info ? (first || (curDir ? { name: fs.basename(curDir), path: curDir, dir: true, size: 0 } : null)) : null;
   const job = jobs[0];
@@ -1016,6 +1126,7 @@ export default function Files() {
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {msg || (loc.type === 'network' ? netStatus(netState, entries.foundCount || 0, entries.hiddenDevices || 0) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+                waitShown ? tr('files.status.waiting') : '',
                 curAcc && entries.capped ? tr('cloud.listCapped', { count: formatNumber(LIST_CAP) }) : '',
                 curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '))}
             </Text>

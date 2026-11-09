@@ -203,7 +203,7 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
     );
     if (open) {
       let kids = ctx.kidsOf(e) || [];
-      if (!e.netHost) try { kids = sortEntries(lord.fs.list(e.path).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort, ctx.sortOpts); } catch (err) { /* no permission */ }
+      if (!e.netHost) try { kids = sortEntries((ctx.listOf ? ctx.listOf(e.path) : lord.fs.list(e.path)).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort, ctx.sortOpts); } catch (err) { /* no permission */ }
       rows.push(...ListRows({ items: kids, depth: depth + 1, ctx, t, sort, alt }));
     }
   }

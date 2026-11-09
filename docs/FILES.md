@@ -300,6 +300,20 @@ answer". `fs_volumes` no longer calls `statvfs` on shares, and the Trash leaves 
 Left open: a server that dies inside the 3 seconds an answer is trusted, and paths other than `lord.fs`'s (Quick
 Preview's helpers, thumbnails) opened right after it, can still block for the kernel's time.
 
+**A server that is only slow (0.8.8.7).** A share that answers, but in seconds, passes `fsops_share_down`, and a Cloud
+account (rclone, under `~/Cloud`) isn't one of those shares at all: deleting a file in an iCloud folder froze the
+desktop until rclone finished, because Files listed the folder again (and asked its `stat`, and one `stat` per row for
+the list view's columns) on the interface's thread while the FUSE `unlink` still held the folder's lock in the kernel,
+and going back to the parent waited for rclone's listing. Files now asks every folder for which `fs.isRemote(path)`
+says so (`lord.fs.mounts()`: the mount table's `fuse.*`, `cifs`, `smb3`, `nfs*`, `9p`… mounts) through
+`lord.fs.listAsync / statAsync / trashAsync / freeAsync / mkdirAsync / renameAsync`, which run on
+`server/src/fsasync.c`'s workers (at most 6; 256 requests queued, `fs.busy` past that) with the same `fsops.c`
+resolution and checks as the synchronous calls, and answer through `__lordFsReply`. `apps/files/remotedirs.js` keeps
+each folder's last listing (shown while a new one comes), lists a folder once at a time, and hides items while a delete
+or a move to the Trash runs until a new listing says whether they are gone. A move inside such a mount renames on the
+copy job's thread. Still on the interface's thread there: the path checks and `lstat`s `lord.fs.copy` makes before starting a job, a
+thumbnail of a file already downloaded, Quick Preview's text, and Go to Folder.
+
 **The traffic of a mounted share isn't in the firewall.** The kernel's client opens its own sockets, outside any
 app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app as `ROADMAP.md` first said.
 

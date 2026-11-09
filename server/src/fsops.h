@@ -26,6 +26,7 @@ int  fsops_rename(const char *from, const char *to, char *err, size_t errlen);
 #define FSJOB_MAX 8
 typedef struct {
     int id, used, move, done, failed, cancel;
+    int try_rename;                 /* a move on a slow mount: the rename is tried on the job's thread, not the caller's */
     char src[4096], dst[4096];
     volatile uint64_t bytes, total, files;
     char error[256];
@@ -54,8 +55,40 @@ int  fs_search(const char *real, const char *needle, int limit, int depth, FsHit
 /* real is on a cloud, network or other FUSE mount (fuse.*, cifs, smb3, nfs*, 9p…), from the mount table: the interface's
  * thread mustn't walk it (lord.fs.du and search answer at once there) */
 int  fsops_remote_path(const char *real);
+/* every mount point and whether it is one of those (the same test), from the mount table only */
+typedef void (*FsMountFn)(void *ud, const char *path, int remote);
+void fs_mounts(FsMountFn fn, void *ud);
 int  fs_recent(int limit, int days, FsHitFn fn, void *ud);
 typedef void (*FsVolFn)(void *ud, const char *path, const char *fstype, double total, double avail);
 void fs_volumes(FsVolFn fn, void *ud);
+
+/* ---- what lord.fs.list / stat / trash resolve and read (interface's thread and fsasync.c's workers alike) ----
+ * path: absolute or relative to the home folder, as JS gives it. down (optional) is set when the path was refused
+ * because the share it lies on doesn't answer (fsops_share_down). */
+int fsops_resolve_readable(const char *path, char *out, int *down);    /* 0; -1 refused or missing; -2 exists but not read */
+/* A destination inside the writable roots, even if it doesn't exist yet: the parent resolved, the last name kept.
+ * 0; -1 outside the roots; -2 protected (fsops_protected). dir (optional) gets the resolved parent. */
+int fsops_resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn, int *down);
+/* lord.fs.stat's: 0 in the writable roots, 1 read-only elsewhere where reading is allowed, -1 refused, -2 protected */
+int fsops_resolve_stat(const char *path, char *target, size_t n, int *down);
+typedef struct {
+    const char *name;
+    int link, dir, locked;
+    double size, mtime, atime, ctime;
+    unsigned mode;
+    uid_t uid;
+    gid_t gid;
+} FsEntry;
+typedef void (*FsListFn)(void *ud, const FsEntry *e);
+int fsops_list(const char *dir, int max, FsListFn fn, void *ud);   /* entries given, or -1 (errno) */
+typedef struct {
+    char name[256], path[4096], target[4096], user[64], group[64];
+    int dir, link, has_target, has_btime, writable;
+    unsigned mode;
+    double size, mtime, atime, ctime, btime;
+} FsStat;
+int fsops_stat(const char *target, int writable_root, FsStat *o);  /* 0, or -1 (errno) */
+void fsops_user_name(uid_t u, char *out, size_t n);                /* "?" when unknown (thread-safe) */
+void fsops_group_name(gid_t g, char *out, size_t n);
 
 #endif

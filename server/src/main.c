@@ -24,6 +24,7 @@
 #include "backup/backup.h"
 #include "cloud/cloud.h"
 #include "ui/js_cloud.h"
+#include "fsasync.h"
 #include "sound/snd.h"
 #include "keyboard.h"
 #include "ui/js_sys.h"
@@ -2690,6 +2691,8 @@ int main(int argc, char **argv) {
         if (bkbase >= 0) pfd[n++] = (struct pollfd){ backup_fd(), POLLIN, 0 };
         int clbase = cloud_fd() >= 0 ? n : -1;
         if (clbase >= 0) pfd[n++] = (struct pollfd){ cloud_fd(), POLLIN, 0 };
+        int fabase = fsasync_fd() >= 0 ? n : -1;                 /* lord.fs.*Async answers (Files on slow mounts) */
+        if (fabase >= 0) pfd[n++] = (struct pollfd){ fsasync_fd(), POLLIN, 0 };
         int sbase = snd_fd() >= 0 ? n : -1;
         if (sbase >= 0) pfd[n++] = (struct pollfd){ snd_fd(), POLLIN, 0 };
         int pbase = portal_fd() >= 0 ? n : -1;
@@ -2766,6 +2769,7 @@ int main(int argc, char **argv) {
         if (pbase >= 0 && pfd[pbase].revents) portal_dispatch();
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
+        if (fabase >= 0 && pfd[fabase].revents) js_fs_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
         if (nm) mirror_dispatch(pfd + mbase, nm);

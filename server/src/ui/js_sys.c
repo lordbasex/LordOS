@@ -35,6 +35,7 @@
 #include "../wl/xwayland.h"
 #include "../keyboard.h"
 #include "../fsops.h"
+#include "../fsasync.h"
 #include "../remote/mirror.h"
 #include "js_share.h"
 #include "../pkg/crypto.h"
@@ -95,21 +96,12 @@ static int resolve_in_home(const char *path, char *out) {
 }
 
 /* The same for reading only (list, read, stat, du, free, search): the whole tree as the session
- * user except the pseudo-filesystems (fsops_readable; Files → This computer, 0.8.5). */
+ * user except the pseudo-filesystems (fsops_readable; Files → This computer, 0.8.5). The rules live in
+ * fsops.c, shared with the Async variants that run on fsasync.c's workers. */
 static int resolve_readable(const char *path, char *out) {
-    char full[PATH_MAX * 2];
-    if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
-    else snprintf(full, sizeof full, "%s/%s", home, path);
-    if (gone(full) || !realpath(full, out)) return -1;
-    return fsops_readable(out) ? 0 : -2;      /* -2: exists, but one of the folders not read */
-}
-
-/* A folder Files shows with a lock: the system's permissions don't let this user open it, or it is
- * one of the pseudo-filesystems lord.fs doesn't read (fsops_readable). */
-static int dir_locked(const char *path) {
-    char real[PATH_MAX];
-    if (!realpath(path, real) || !fsops_readable(real)) return 1;
-    return access(real, R_OK | X_OK) != 0;
+    int down = 0, r = fsops_resolve_readable(path, out, &down);
+    share_down = down;
+    return r;      /* -2: exists, but one of the folders not read */
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
@@ -147,6 +139,24 @@ static JSValue f_fs_home(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return JS_NewString(c, home);
 }
 
+#define FS_LIST_MAX 5000                /* apps/files/locations.js LIST_CAP */
+
+typedef struct { JSContext *c; JSValue arr; uint32_t n; } ListAcc;
+
+static void list_cb(void *ud, const FsEntry *e) {
+    ListAcc *a = ud;
+    JSContext *c = a->c;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "name", JS_NewString(c, e->name));
+    JS_SetPropertyStr(c, o, "link", JS_NewBool(c, e->link));
+    JS_SetPropertyStr(c, o, "dir", JS_NewBool(c, e->dir));
+    /* a folder this user can't open (shown with a lock in This computer) */
+    if (e->locked) JS_SetPropertyStr(c, o, "locked", JS_TRUE);
+    JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, e->size));
+    JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, e->mtime));
+    JS_SetPropertyUint32(c, a->arr, a->n++, o);
+}
+
 static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *p = JS_ToCString(c, argv[0]);
@@ -159,31 +169,9 @@ static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
         if (bad == -2) return js_throw_code(c, "fs.systemFolder", NULL);
         return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     }
-    DIR *d = opendir(dir);
-    if (!d) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
-    JSValue arr = JS_NewArray(c);
-    uint32_t i = 0;
-    struct dirent *e;
-    while ((e = readdir(d)) && i < 5000) {
-        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
-        char fp[PATH_MAX * 2];
-        struct stat st;
-        snprintf(fp, sizeof fp, "%s/%s", dir, e->d_name);
-        struct stat lst;
-        int link = !lstat(fp, &lst) && S_ISLNK(lst.st_mode);
-        if (stat(fp, &st)) { if (!link) continue; st = lst; }     /* broken link: shown anyway */
-        JSValue o = JS_NewObject(c);
-        JS_SetPropertyStr(c, o, "name", JS_NewString(c, e->d_name));
-        JS_SetPropertyStr(c, o, "link", JS_NewBool(c, link));
-        JS_SetPropertyStr(c, o, "dir", JS_NewBool(c, S_ISDIR(st.st_mode)));
-        /* a folder this user can't open (shown with a lock in This computer) */
-        if (S_ISDIR(st.st_mode) && dir_locked(fp)) JS_SetPropertyStr(c, o, "locked", JS_TRUE);
-        JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, (double)st.st_size));
-        JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, (double)st.st_mtime * 1000));
-        JS_SetPropertyUint32(c, arr, i++, o);
-    }
-    closedir(d);
-    return arr;
+    ListAcc a = { c, JS_NewArray(c), 0 };
+    if (fsops_list(dir, FS_LIST_MAX, list_cb, &a) < 0) { int e = errno; JS_FreeValue(c, a.arr); return js_throw_code(c, "sys.errno", "errno", lerr_errno(e), NULL); }
+    return a.arr;
 }
 
 /* lord.fs.read(path, 'text' | 'binary') — content of a regular file in $HOME, the user's disks or
@@ -1073,23 +1061,9 @@ static const JSCFunctionListEntry text_funcs[] = {
  * parent folder is resolved (realpath) and the last component must be a plain name.
  * Rejects the protected folders. out = real folder + "/" + name. */
 static int resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn) {
-    char full[PATH_MAX * 2];
-    if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
-    else snprintf(full, sizeof full, "%s/%s", home, path);
-    size_t len = strlen(full);
-    while (len > 1 && full[len - 1] == '/') full[--len] = 0;
-    char *slash = strrchr(full, '/');
-    if (!slash) return -1;
-    const char *base = slash + 1;
-    if (!base[0] || !strcmp(base, ".") || !strcmp(base, "..") || strlen(base) > 255) return -1;
-    *slash = 0;
-    char rdir[PATH_MAX];
-    if (gone(full) || !realpath(full[0] ? full : "/", rdir)) return -1;
-    if (!fsops_allowed(rdir)) return -1;
-    if ((size_t)snprintf(out, n, "%s/%s", rdir, base) >= n) return -1;
-    if (dir && (size_t)snprintf(dir, dn, "%s", rdir) >= dn) return -1;
-    if (fsops_protected(out)) return -2;
-    return 0;
+    int down = 0, r = fsops_resolve_target(path, out, n, dir, dn, &down);   /* fsops.c: shared with fsasync.c */
+    share_down = down;
+    return r;
 }
 
 int js_sys_resolve_target(const char *path, char *out, size_t n) { return resolve_target(path, out, n, NULL, 0); }
@@ -1298,57 +1272,29 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     const char *p = JS_ToCString(c, argv[0]);
     if (!p) return JS_EXCEPTION;
     char target[PATH_MAX + 300];
-    int r = resolve_target(p, target, sizeof target, NULL, 0);
-    if (r == -1) {
-        /* outside the writable roots: the same answer, read-only, where reading is allowed
-         * (its folder resolved, the last name kept, so a link is described, not followed) */
-        char full[PATH_MAX * 2], rdir[PATH_MAX];
-        if (p[0] == '/') snprintf(full, sizeof full, "%s", p); else snprintf(full, sizeof full, "%s/%s", home, p);
-        size_t len = strlen(full);
-        while (len > 1 && full[len - 1] == '/') full[--len] = 0;
-        char *slash = strrchr(full, '/');
-        const char *base = slash ? slash + 1 : "";
-        if (slash && !strcmp(full, "/")) { if (fsops_readable("/")) { snprintf(target, sizeof target, "/"); r = 1; } }
-        else if (slash && base[0] && strcmp(base, ".") && strcmp(base, "..")) {
-            *slash = 0;
-            if (realpath(full[0] ? full : "/", rdir) && fsops_readable(rdir) &&
-                (size_t)snprintf(target, sizeof target, "%s%s%s", rdir, strcmp(rdir, "/") ? "/" : "", base) < sizeof target &&
-                fsops_readable(target)) r = 1;
-        }
-    }
+    int down = 0, r = fsops_resolve_stat(p, target, sizeof target, &down);    /* fsops.c: shared with fsasync.c */
+    share_down = down;
     JS_FreeCString(c, p);
     if (r == -1) return fs_path_error(c, r);
-    struct statx sx;
-    if (statx(AT_FDCWD, target, AT_SYMLINK_NOFOLLOW, STATX_BASIC_STATS | STATX_BTIME, &sx)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
+    FsStat s;
+    if (fsops_stat(target, r == 0, &s)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
     JSValue o = JS_NewObject(c);
-    const char *base = strrchr(target, '/');
-    JS_SetPropertyStr(c, o, "name", JS_NewString(c, base ? base + 1 : target));
-    JS_SetPropertyStr(c, o, "path", JS_NewString(c, target));
-    int link = S_ISLNK(sx.stx_mode);
-    struct stat st;
-    int dir = S_ISDIR(sx.stx_mode) || (link && !stat(target, &st) && S_ISDIR(st.st_mode));
-    JS_SetPropertyStr(c, o, "dir", JS_NewBool(c, dir));
-    JS_SetPropertyStr(c, o, "link", JS_NewBool(c, link));
-    if (link) {
-        char t[PATH_MAX];
-        ssize_t n = readlink(target, t, sizeof t - 1);
-        if (n >= 0) { t[n] = 0; JS_SetPropertyStr(c, o, "target", JS_NewString(c, t)); }
-    }
+    JS_SetPropertyStr(c, o, "name", JS_NewString(c, s.name));
+    JS_SetPropertyStr(c, o, "path", JS_NewString(c, s.path));
+    JS_SetPropertyStr(c, o, "dir", JS_NewBool(c, s.dir));
+    JS_SetPropertyStr(c, o, "link", JS_NewBool(c, s.link));
+    if (s.has_target) JS_SetPropertyStr(c, o, "target", JS_NewString(c, s.target));
     char mode[8];
-    snprintf(mode, sizeof mode, "%04o", sx.stx_mode & 07777);
+    snprintf(mode, sizeof mode, "%04o", s.mode);
     JS_SetPropertyStr(c, o, "mode", JS_NewString(c, mode));
-    JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, (double)sx.stx_size));
-    struct passwd *pw = getpwuid(sx.stx_uid);
-    struct group *gr = getgrgid(sx.stx_gid);
-    JS_SetPropertyStr(c, o, "user", JS_NewString(c, pw ? pw->pw_name : "?"));
-    JS_SetPropertyStr(c, o, "group", JS_NewString(c, gr ? gr->gr_name : "?"));
-#define TS(k, f) JS_SetPropertyStr(c, o, k, JS_NewFloat64(c, (double)sx.f.tv_sec * 1000 + sx.f.tv_nsec / 1e6))
-    TS("mtime", stx_mtime);
-    TS("atime", stx_atime);
-    TS("ctime", stx_ctime);
-    if (sx.stx_mask & STATX_BTIME) TS("btime", stx_btime);
-#undef TS
-    JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, r == 0 && access(target, W_OK) == 0));
+    JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, s.size));
+    JS_SetPropertyStr(c, o, "user", JS_NewString(c, s.user));
+    JS_SetPropertyStr(c, o, "group", JS_NewString(c, s.group));
+    JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, s.mtime));
+    JS_SetPropertyStr(c, o, "atime", JS_NewFloat64(c, s.atime));
+    JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
+    if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
+    JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
     return o;
 }
 
@@ -1465,7 +1411,62 @@ static JSValue f_fs_volumes(JSContext *c, JSValueConst this_val, int argc, JSVal
     return a.arr;
 }
 
+/* ---- lord.fs: the calls that may wait on a slow file system, off this thread (fsasync.c) ----
+ * listAsync(path) / statAsync(path) / trashAsync(path) / freeAsync(path) / mkdirAsync(path) / renameAsync(from, to)
+ * → req; the answer comes as __lordFsReply(req, { entries } | { stat } | { ok } | { total, free } | { error: code line }).
+ * The worker resolves and checks the paths with the same fsops.c functions as list / stat / trash / free / mkdir /
+ * rename above. */
+static JSValue fs_async(JSContext *c, JSValueConst arg, int op) {
+    const char *p = JS_ToCString(c, arg);
+    if (!p) return JS_EXCEPTION;
+    char err[256] = "";
+    int req = fsasync_submit(op, p, err, sizeof err);
+    JS_FreeCString(c, p);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
+static JSValue f_fs_list_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_LIST); }
+static JSValue f_fs_stat_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_STAT); }
+static JSValue f_fs_trash_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_TRASH); }
+static JSValue f_fs_free_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_FREE); }
+static JSValue f_fs_mkdir_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_MKDIR); }
+static JSValue f_fs_rename_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
+    char err[256] = "";
+    int req = a && b ? fsasync_submit2(FSA_RENAME, a, b, err, sizeof err) : -2;
+    if (a) JS_FreeCString(c, a);
+    if (b) JS_FreeCString(c, b);
+    if (req == -2) return JS_EXCEPTION;
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
+
+/* lord.fs.mounts() → [{ path, remote }]: every mount point, and whether it is a cloud, network or other FUSE mount
+ * (fsops_remote_path's test), from the mount table without touching any path. sdk/fs.js isRemote(path) uses it: Files
+ * lists and changes those folders with the Async calls. */
+static void mount_cb(void *ud, const char *path, int remote) {
+    Acc *a = ud;
+    JSValue o = JS_NewObject(a->c);
+    JS_SetPropertyStr(a->c, o, "path", JS_NewString(a->c, path));
+    JS_SetPropertyStr(a->c, o, "remote", JS_NewBool(a->c, remote));
+    JS_SetPropertyUint32(a->c, a->arr, a->n++, o);
+}
+static JSValue f_fs_mounts(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    Acc a = { c, JS_NewArray(c), 0 };
+    fs_mounts(mount_cb, &a);
+    return a.arr;
+}
+
 static const JSCFunctionListEntry fs_funcs[] = {
+    JS_CFUNC_DEF("listAsync", 1, f_fs_list_async),
+    JS_CFUNC_DEF("statAsync", 1, f_fs_stat_async),
+    JS_CFUNC_DEF("trashAsync", 1, f_fs_trash_async),
+    JS_CFUNC_DEF("freeAsync", 1, f_fs_free_async),
+    JS_CFUNC_DEF("mkdirAsync", 1, f_fs_mkdir_async),
+    JS_CFUNC_DEF("renameAsync", 2, f_fs_rename_async),
+    JS_CFUNC_DEF("mounts", 0, f_fs_mounts),
     JS_CFUNC_DEF("home", 0, f_fs_home),
     JS_CFUNC_DEF("list", 1, f_fs_list),
     JS_CFUNC_DEF("read", 2, f_fs_read),

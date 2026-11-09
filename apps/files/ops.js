@@ -44,8 +44,10 @@ export const jobErrors = createStore([]);
 function watchJobs() { if (!polling) polling = setInterval(poll, 250); poll(); }
 
 // Copy or move several paths to a folder. Copying to the same place = duplicate with a free name.
-export function transfer(paths, destDir, move) {
-  const existing = new Set(lord.fs.list(destDir).map((e) => e.name));
+// known: the names already in destDir when the caller has them (a slow folder's listing, apps/files/remotedirs.js),
+// so a Cloud or network folder isn't listed here on the interface's thread; a name taken since is refused (fs.exists)
+export function transfer(paths, destDir, move, known) {
+  const existing = known ? new Set(known) : new Set(lord.fs.list(destDir).map((e) => e.name));
   const errors = [];
   for (const p of paths) {
     const name = fs.basename(p);
@@ -63,10 +65,10 @@ export function transfer(paths, destDir, move) {
   return errors;
 }
 
-export function paste(destDir) {
+export function paste(destDir, known) {
   const c = fileClipboard.get();
   if (!c || !c.paths.length) return;
-  transfer(c.paths, destDir, c.mode === 'cut');
+  transfer(c.paths, destDir, c.mode === 'cut', known);
   if (c.mode === 'cut') fileClipboard.set(null);
 }
 

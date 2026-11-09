@@ -22,6 +22,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <ftw.h>
 #include <limits.h>
 #include <pthread.h>
@@ -238,6 +240,15 @@ static int copy_tree(const char *s, const char *d, FsJob *j, int depth) {
 
 static void *job_main(void *arg) {
     FsJob *j = arg;
+    if (j->try_rename) {
+        if (!rename(j->src, j->dst)) { __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE); return NULL; }   /* same disk */
+        if (errno != EXDEV) {
+            seterrno(j->error, sizeof j->error, errno);
+            j->failed = 1;
+            __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE);
+            return NULL;
+        }
+    }
     walk_total(j->src, j, 0);
     int r = copy_tree(j->src, j->dst, j, 0);
     if (r) {
@@ -268,8 +279,11 @@ int fsjob_start(const char *src, const char *dst, int move, char *err, size_t er
     j->move = move;
     pathf(j->src, sizeof j->src, "%s", src);
     pathf(j->dst, sizeof j->dst, "%s", dst);
-    if (move && rename(src, dst) == 0) { j->done = 1; return j->id; }   /* same disk: instant */
-    if (move && errno != EXDEV) { int e = errno; j->used = 0; seterrno(err, errlen, e); return -1; }
+    /* a move inside a Cloud account or a network share is a call to its server (rclone moves the file there): the
+     * rename goes to the job's thread, so the interface's never waits for it (0.8.8.7) */
+    j->try_rename = move && (fsops_remote_path(src) || fsops_remote_path(dst));
+    if (move && !j->try_rename && rename(src, dst) == 0) { j->done = 1; return j->id; }   /* same disk: instant */
+    if (move && !j->try_rename && errno != EXDEV) { int e = errno; j->used = 0; seterrno(err, errlen, e); return -1; }
     pthread_t t;
     pthread_attr_t a;
     pthread_attr_init(&a);
@@ -647,6 +661,11 @@ static void search_dir(const char *p, Search *s, int depth) {
     if (d) closedir(d);
 }
 
+static int remote_type(const char *ty) {
+    return !strncmp(ty, "fuse.", 5) || !strcmp(ty, "cifs") || !strcmp(ty, "smb3") || !strncmp(ty, "nfs", 3) ||
+           !strcmp(ty, "9p") || !strcmp(ty, "ceph") || !strcmp(ty, "glusterfs") || !strcmp(ty, "davfs");
+}
+
 int fsops_remote_path(const char *real) {
     FILE *f = fopen("/proc/self/mounts", "re");
     if (!f) return 0;
@@ -660,11 +679,22 @@ int fsops_remote_path(const char *real) {
         int in = !strcmp(mnt, "/") || (!strncmp(real, mnt, l) && (real[l] == 0 || real[l] == '/'));
         if (!in || l < best) continue;
         best = l;
-        remote = !strncmp(ty, "fuse.", 5) || !strcmp(ty, "cifs") || !strcmp(ty, "smb3") || !strncmp(ty, "nfs", 3) ||
-                 !strcmp(ty, "9p") || !strcmp(ty, "ceph") || !strcmp(ty, "glusterfs") || !strcmp(ty, "davfs");
+        remote = remote_type(ty);
     }
     fclose(f);
     return remote;
+}
+
+void fs_mounts(FsMountFn fn, void *ud) {
+    FILE *f = fopen("/proc/self/mounts", "re");
+    if (!f) return;
+    char line[4096], dev[1024], mnt[2048], ty[64];
+    while (fgets(line, sizeof line, f)) {
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, ty) != 3) continue;
+        unescape_mount(mnt);
+        fn(ud, mnt, remote_type(ty));
+    }
+    fclose(f);
 }
 
 int fs_search(const char *real, const char *needle, int limit, int depth, FsHitFn fn, void *ud) {
@@ -874,4 +904,150 @@ void fs_volumes(FsVolFn fn, void *ud) {
         fn(ud, mnt, fstype, total, avail);
     }
     fclose(f);
+}
+
+/* ---- resolving lord.fs paths, listing and stat (shared by the interface's thread and fsasync.c) ----
+ * The same functions answer lord.fs.list / stat / trash on the interface's thread and their Async variants on fsasync.c's
+ * workers, so a path is checked by exactly the same rules wherever it runs. Thread-safe: no static buffers, getpwuid_r. */
+
+static void full_of(const char *path, char *full, size_t n) {
+    if (path[0] == '/') pathf(full, n, "%s", path);
+    else pathf(full, n, "%s/%s", home, path);
+}
+
+int fsops_resolve_readable(const char *path, char *out, int *down) {
+    char full[PATH_MAX * 2];
+    if (down) *down = 0;
+    full_of(path, full, sizeof full);
+    if (!full[0]) return -1;
+    int d = fsops_share_down(full);
+    if (down) *down = d;
+    if (d || !realpath(full, out)) return -1;
+    return fsops_readable(out) ? 0 : -2;      /* -2: exists, but one of the folders not read */
+}
+
+int fsops_resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn, int *down) {
+    char full[PATH_MAX * 2];
+    if (down) *down = 0;
+    full_of(path, full, sizeof full);
+    size_t len = strlen(full);
+    while (len > 1 && full[len - 1] == '/') full[--len] = 0;
+    char *slash = strrchr(full, '/');
+    if (!slash) return -1;
+    const char *base = slash + 1;
+    if (!base[0] || !strcmp(base, ".") || !strcmp(base, "..") || strlen(base) > 255) return -1;
+    *slash = 0;
+    char rdir[PATH_MAX];
+    int d = fsops_share_down(full);
+    if (down) *down = d;
+    if (d || !realpath(full[0] ? full : "/", rdir)) return -1;
+    if (!fsops_allowed(rdir)) return -1;
+    if ((size_t)snprintf(out, n, "%s/%s", rdir, base) >= n) return -1;
+    if (dir && (size_t)snprintf(dir, dn, "%s", rdir) >= dn) return -1;
+    if (fsops_protected(out)) return -2;
+    return 0;
+}
+
+int fsops_resolve_stat(const char *path, char *target, size_t n, int *down) {
+    int r = fsops_resolve_target(path, target, n, NULL, 0, down);
+    if (r != -1) return r;
+    /* outside the writable roots: the same answer, read-only, where reading is allowed
+     * (its folder resolved, the last name kept, so a link is described, not followed) */
+    char full[PATH_MAX * 2], rdir[PATH_MAX];
+    full_of(path, full, sizeof full);
+    size_t len = strlen(full);
+    while (len > 1 && full[len - 1] == '/') full[--len] = 0;
+    char *slash = strrchr(full, '/');
+    const char *base = slash ? slash + 1 : "";
+    if (slash && !strcmp(full, "/")) { if (fsops_readable("/")) { pathf(target, n, "/"); return 1; } }
+    else if (slash && base[0] && strcmp(base, ".") && strcmp(base, "..")) {
+        *slash = 0;
+        if (realpath(full[0] ? full : "/", rdir) && fsops_readable(rdir) &&
+            (size_t)snprintf(target, n, "%s%s%s", rdir, strcmp(rdir, "/") ? "/" : "", base) < n &&
+            fsops_readable(target)) return 1;
+    }
+    return -1;
+}
+
+/* A folder Files shows with a lock: the system's permissions don't let this user open it, or it is one of the
+ * pseudo-filesystems lord.fs doesn't read (fsops_readable). */
+static int dir_locked(const char *path) {
+    char real[PATH_MAX];
+    if (!realpath(path, real) || !fsops_readable(real)) return 1;
+    return access(real, R_OK | X_OK) != 0;
+}
+
+void fsops_user_name(uid_t u, char *out, size_t n) {
+    struct passwd pw, *res = NULL;
+    char buf[1024];
+    if (!getpwuid_r(u, &pw, buf, sizeof buf, &res) && res) pathf(out, n, "%s", res->pw_name);
+    else pathf(out, n, "?");
+}
+
+void fsops_group_name(gid_t g, char *out, size_t n) {
+    struct group gr, *res = NULL;
+    char buf[4096];
+    if (!getgrgid_r(g, &gr, buf, sizeof buf, &res) && res) pathf(out, n, "%s", res->gr_name);
+    else pathf(out, n, "?");
+}
+
+int fsops_list(const char *dir, int max, FsListFn fn, void *ud) {
+    DIR *d = opendir(dir);
+    if (!d) return -1;
+    int i = 0;
+    struct dirent *e;
+    while (i < max && (e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        char fp[PATH_MAX * 2];
+        struct stat st, lst;
+        if (pathf(fp, sizeof fp, "%s/%s", dir, e->d_name) < 0) continue;
+        int link = !lstat(fp, &lst) && S_ISLNK(lst.st_mode);
+        if (stat(fp, &st)) { if (!link) continue; st = lst; }     /* broken link: shown anyway */
+        FsEntry x;
+        memset(&x, 0, sizeof x);
+        x.name = e->d_name;
+        x.link = link;
+        x.dir = S_ISDIR(st.st_mode);
+        x.locked = x.dir && dir_locked(fp);      /* a folder this user can't open (shown with a lock in This computer) */
+        x.size = (double)st.st_size;
+        x.mtime = (double)st.st_mtime * 1000;
+        x.atime = (double)st.st_atime * 1000;
+        x.ctime = (double)st.st_ctime * 1000;
+        x.mode = st.st_mode & 07777;
+        x.uid = st.st_uid;
+        x.gid = st.st_gid;
+        fn(ud, &x);
+        i++;
+    }
+    closedir(d);
+    return i;
+}
+
+int fsops_stat(const char *target, int writable_root, FsStat *o) {
+    struct statx sx;
+    memset(o, 0, sizeof *o);
+    if (statx(AT_FDCWD, target, AT_SYMLINK_NOFOLLOW, STATX_BASIC_STATS | STATX_BTIME, &sx)) return -1;
+    const char *base = strrchr(target, '/');
+    pathf(o->name, sizeof o->name, "%s", base ? base + 1 : target);
+    pathf(o->path, sizeof o->path, "%s", target);
+    o->link = S_ISLNK(sx.stx_mode);
+    struct stat st;
+    o->dir = S_ISDIR(sx.stx_mode) || (o->link && !stat(target, &st) && S_ISDIR(st.st_mode));
+    if (o->link) {
+        ssize_t n = readlink(target, o->target, sizeof o->target - 1);
+        if (n >= 0) { o->target[n] = 0; o->has_target = 1; }
+    }
+    o->mode = sx.stx_mode & 07777;
+    o->size = (double)sx.stx_size;
+    fsops_user_name(sx.stx_uid, o->user, sizeof o->user);
+    fsops_group_name(sx.stx_gid, o->group, sizeof o->group);
+#define TS(f) ((double)sx.f.tv_sec * 1000 + sx.f.tv_nsec / 1e6)
+    o->mtime = TS(stx_mtime);
+    o->atime = TS(stx_atime);
+    o->ctime = TS(stx_ctime);
+    o->has_btime = !!(sx.stx_mask & STATX_BTIME);
+    if (o->has_btime) o->btime = TS(stx_btime);
+#undef TS
+    o->writable = writable_root && access(target, W_OK) == 0;
+    return 0;
 }

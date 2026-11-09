@@ -30,6 +30,7 @@
 #include "js_media.h"
 #include "js_wm.h"
 #include "js_disk.h"
+#include "../fsasync.h"
 #include "js_imager.h"
 #include "js_logs.h"
 #include "js_help.h"
@@ -796,6 +797,24 @@ void js_cloud_reply(int req, const char *json) {
     JS_FreeValue(ctx, call_global("__lordCloudReply", 2, args));
     JS_FreeValue(ctx, args[1]);
     drain_jobs();
+}
+
+/* lord.fs.*Async (fsasync.c): a finished request → __lordFsReply(req, answer). */
+static void fs_reply(void *ud, int req, const char *json) {
+    (void)ud;
+    if (!ctx) return;
+    JSValueConst args[2] = { JS_NewInt32(ctx, req), JS_ParseJSON(ctx, json, strlen(json), "<fs>") };
+    if (JS_IsException(args[1])) {
+        static const char bad[] = "{\"error\":\"sys.badArgument\"}";
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        args[1] = JS_ParseJSON(ctx, bad, sizeof bad - 1, "<fs>");
+    }
+    JS_FreeValue(ctx, call_global("__lordFsReply", 2, args));
+    JS_FreeValue(ctx, args[1]);
+}
+
+void js_fs_dispatch(void) {
+    if (fsasync_dispatch(fs_reply, NULL)) drain_jobs();
 }
 
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */

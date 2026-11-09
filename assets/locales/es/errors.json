@@ -217,6 +217,7 @@
   "fan.gpuRefused": "No se pudo poner a mano el ventilador de la tarjeta gráfica (quizás está demasiado caliente ahora)",
   "fs.alreadyInTrash": "Ya está en la Papelera",
   "fs.copyIntoItself": "No se puede copiar una carpeta dentro de sí misma",
+  "fs.busy": "Hay demasiadas consultas esperando a carpetas lentas; inténtalo de nuevo en un momento",
   "fs.copyStartFailed": "No se pudo empezar la copia",
   "fs.exists": "Ya existe algo con ese nombre",
   "fs.moveRemoveFailed": "Se copió, pero no se pudo quitar el original: {errno}",

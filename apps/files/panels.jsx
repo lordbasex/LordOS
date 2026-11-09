@@ -1,6 +1,6 @@
 // panels.jsx — Quick Preview, Get Info and confirm (the context menu is the SDK's, sdk/contextmenu.jsx).
 // All are drawn inside the window, with coordinates relative to it.
-import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, useTheme, formatBytes, formatDate, formatTime, direction, typeScale, spacing, t as tr, openMarkup, imageEdit } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, useTheme, formatBytes, formatDate, formatTime, direction, typeScale, spacing, t as tr, openMarkup, imageEdit, fs } from '@lordos/sdk';
 export { ContextMenu } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
@@ -58,6 +58,13 @@ export function InfoPanel({ e, onClose, openers, extra }) {
   useEffect(() => {
     setSt(null); setDu(null);
     if (!e || e.app) return undefined;
+    if (fs.isRemote(e.path)) {
+      // a Cloud or network item: asked off lord-server's thread (fs.statAsync), the size is the listing's
+      let live = true;
+      fs.statAsync(e.path).then((s) => { if (live) setSt(s); }, (err) => { if (live) setSt({ error: err.message }); });
+      if (e.dir) setDu({ remote: true });
+      return () => { live = false; };
+    }
     try { setSt(lord.fs.stat(e.path)); } catch (err) { setSt({ error: err.message }); }
     if (!e.dir) return undefined;
     // a cloud or network mount answers { remote: true } without walking it: the listing's size, or nothing

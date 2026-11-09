@@ -217,6 +217,7 @@
   "fan.gpuRefused": "The graphics card's fan could not be set by hand (it may be too hot right now)",
   "fs.alreadyInTrash": "It is already in the Trash",
   "fs.copyIntoItself": "A folder cannot be copied into itself",
+  "fs.busy": "Too many file requests are waiting on slow folders; try again in a moment",
   "fs.copyStartFailed": "Could not start the copy",
   "fs.exists": "Something with that name already exists",
   "fs.moveRemoveFailed": "Copied, but the original could not be removed: {errno}",

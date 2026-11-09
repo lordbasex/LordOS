@@ -142,6 +142,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
+    run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
@@ -167,6 +168,7 @@ EOF
     else skip "oldkernels-test" "node"; fi
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
+    if have node; then run "files-remote-test (apps/files/remotedirs.js)" node tests/files_remote_test.mjs; fi
     if have node; then run "textfield-model-test (sdk/textfieldmodel.js)" node tests/textfield_model_test.mjs; fi
     if have node; then run "filekinds-test (sdk/filekinds.js)" node tests/filekinds_test.mjs; fi
     # Cloud without a screen: status glyphs, space, providers, menus, sidebar, menu bar, notifications, the mock's shape (sdk/cloudmodel.js)
