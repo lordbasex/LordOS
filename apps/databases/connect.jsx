@@ -487,10 +487,10 @@ function FileRow({ path, onPick, onClear }) {
   );
 }
 
-// 🔑 next to a password field: what Databases kept for this favorite, and the Passwords entries for its host
-// (a Database entry's host field, or a site), while the vault is unlocked
+// 🔑 next to a password field: what Databases kept for this favorite, and the Passwords entries whose host
+// field or site is exactly the favorite's host (none for a socket), while the vault is unlocked
 function PasswordsFill({ fav, onFill }) {
-  return <AutofillButton app="databases" service={sqlPasswords.service(fav)} account={fav.user || ''} url={fav.type === 'socket' ? undefined : fav.host} onFill={onFill} />;
+  return <AutofillButton app="databases" service={sqlPasswords.service(fav)} account={fav.user || ''} host={fav.type === 'socket' ? '' : fav.host || ''} onFill={onFill} />;
 }
 
 function PasswordSheet({ sheet, busy, onCancel, onGo }) {

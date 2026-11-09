@@ -337,7 +337,8 @@ How it works (`sec/brokerkr.c`, `ui/js_vault.c`):
 `<AutofillButton app service|url|ssid onFill />` is a small 🔑 button next to a login field. It
 lists what the app saved in the keyring for that service plus matching Passwords items (by host,
 or by SSID for Wi-Fi; an entry's `host` field counts too) while the vault is unlocked; the secret leaves
-`lord-vault` only when the user picks one. `account` names the keyring item's account when the app saved one.
+`lord-vault` only when the user picks one. `account` names the keyring item's account when the app saved one. `host` asks for exact matches only (an
+entry's `host` field or its site's host, no title guesses, nothing when empty), each listed with its host.
 Used in Settings → Network (Wi-Fi password, VPN credentials) and Databases (each connection's password).
 
 ### In the Terminal (0.8.8.6)

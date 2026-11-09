@@ -10,7 +10,7 @@
 //       inside an isolated .lpk app it goes through the broker and the owner is the app's own id
 //   autofill(app, { url | service })                → [{ id, title, username }] from Passwords (if it is unlocked)
 //   <KeyringPrompt />                               system prompt to unlock the keyring (mounted by startShell)
-//   <AutofillButton app service|url|ssid account? onFill />   "fill from Passwords" next to a login field
+//   <AutofillButton app service|url|ssid|host account? onFill />   "fill from Passwords" next to a login field
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -114,13 +114,21 @@ export const keyring = {
 const hostOf = (u) => String(u || '').replace(/^[a-z]+:\/\//i, '').split(/[/:?#]/)[0].toLowerCase().replace(/^www\./, '');
 
 // Passwords entries that match a site, a service or a Wi-Fi network (only while the vault is unlocked).
-export async function autofill(app, { url, service, ssid } = {}) {
+// `host` (Databases): only entries whose host field or site is exactly that host; none without one.
+export async function autofill(app, { url, service, ssid, host: exact } = {}) {
+  if (exact !== undefined) {
+    const h = hostOf(exact);
+    if (!h) return [];
+    let all;
+    try { all = (await vaultRequest('list')).entries || []; } catch (e) { return []; }
+    return all.filter((e) => !e.trash && (hostOf(e.host) === h || hostOf(e.url) === h)).map((e) => ({ id: e.id, title: e.title, username: e.sub || '', host: e.host || hostOf(e.url) }));
+  }
   const host = hostOf(url || service);
   if (!host && !ssid) return [];
   let list;
   try { list = (await vaultRequest('list')).entries || []; } catch (e) { return []; }
   const hit = (e) => (ssid ? e.cat === 'wifi' && e.sub === ssid
-    : hostOf(e.url) === host || hostOf(e.url).endsWith(`.${host}`) || (hostOf(e.url) && host.endsWith(`.${hostOf(e.url)}`)) || hostOf(e.host) === host ||
+    : hostOf(e.url) === host || hostOf(e.url).endsWith(`.${host}`) || (hostOf(e.url) && host.endsWith(`.${hostOf(e.url)}`)) ||
       String(e.title).toLowerCase().includes(host.split('.')[0]));
   return list.filter((e) => !e.trash && hit(e)).map((e) => ({ id: e.id, title: e.title, username: e.sub || '' }));
 }
@@ -201,14 +209,14 @@ export function KeyringPrompt() {
 //   <AutofillButton app="settings" service="wifi:Casa" ssid="Casa" onFill={({ username, password }) => …} />
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
 // The secret leaves lord-vault only when the user picks one.
-export function AutofillButton({ app, service, account = '', url, ssid, onFill }) {
+export function AutofillButton({ app, service, account = '', url, ssid, host, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(null);
   const load = async () => {
     const out = [];
     if (service) { try { const k = await keyring.get(app, { service, account }); if (k) out.push({ kind: 'kr', title: k.label || service, username: k.account, secret: k.secret }); } catch (e) { /* locked */ } }
-    for (const e of await autofill(app, { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
+    for (const e of await autofill(app, host !== undefined ? { host } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
     setItems(out);
   };
   const pick = async (it) => {
@@ -227,5 +235,5 @@ export function AutofillButton({ app, service, account = '', url, ssid, onFill }
       items == null ? null : !items.length ? h(Text, { style: { fontSize: 12, color: th.textDim, padding: 6 } }, t('passwords.autofill.none'))
         : items.map((it, i) => h(View, { key: i, onClick: () => pick(it), style: { padding: 6, borderRadius: 6 } },
           h(Text, { style: { fontSize: 13, color: th.text } }, it.title),
-          it.username ? h(Text, { style: { fontSize: 11, color: th.textDim } }, it.username) : null)))) : null);
+          it.username || it.host ? h(Text, { style: { fontSize: 11, color: th.textDim } }, [it.username, it.host].filter(Boolean).join(' · ')) : null)))) : null);
 }
