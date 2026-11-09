@@ -387,5 +387,15 @@
   "prefs.title": "Réglages du Terminal",
   "prefs.search": "Rechercher profils et étiquettes",
   "prefs.noMatch": "Aucun profil ne correspond",
-  "prefs.autosave": "Les modifications sont enregistrées au fur et à mesure."
+  "prefs.autosave": "Les modifications sont enregistrées au fur et à mesure.",
+  "action.openProfiles": "Profils…",
+  "profilesWin.title": "Profils",
+  "profilesWin.tab": "Nouvel onglet",
+  "profilesWin.window": "Nouvelle fenêtre",
+  "profilesWin.splitRight": "Diviser à droite",
+  "profilesWin.splitDown": "Diviser en bas",
+  "profilesWin.opensIn": "Un clic ouvre dans :",
+  "profilesWin.closeAfter": "Fermer cette fenêtre après l’ouverture d’un profil",
+  "profilesWin.edit": "Modifier les profils…",
+  "profilesWin.loginShell": "Shell de connexion"
 }

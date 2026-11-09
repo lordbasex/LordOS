@@ -387,5 +387,15 @@
   "prefs.title": "Preferências do Terminal",
   "prefs.search": "Buscar perfis e etiquetas",
   "prefs.noMatch": "Nenhum perfil corresponde",
-  "prefs.autosave": "As alterações são salvas automaticamente."
+  "prefs.autosave": "As alterações são salvas automaticamente.",
+  "action.openProfiles": "Perfis…",
+  "profilesWin.title": "Perfis",
+  "profilesWin.tab": "Nova aba",
+  "profilesWin.window": "Nova janela",
+  "profilesWin.splitRight": "Dividir à direita",
+  "profilesWin.splitDown": "Dividir abaixo",
+  "profilesWin.opensIn": "Um clique abre em:",
+  "profilesWin.closeAfter": "Fechar esta janela ao abrir um perfil",
+  "profilesWin.edit": "Editar perfis…",
+  "profilesWin.loginShell": "Shell de login"
 }

@@ -74,6 +74,7 @@ export const DEFAULT_BINDINGS = {
   autocomplete: ['Super+;'],
   composer: ['Super+Shift+.'],
   openQuickly: ['Super+Shift+o'],
+  openProfiles: ['Super+o'],
   preferences: ['Super+,'],
   toolbelt: ['Super+Shift+b'],
   timestamps: ['Super+Shift+e'],

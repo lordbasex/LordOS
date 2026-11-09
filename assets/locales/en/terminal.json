@@ -387,5 +387,15 @@
   "prefs.title": "Terminal Settings",
   "prefs.search": "Search profiles and tags",
   "prefs.noMatch": "No profile matches",
-  "prefs.autosave": "Changes are saved as you make them."
+  "prefs.autosave": "Changes are saved as you make them.",
+  "action.openProfiles": "Profiles…",
+  "profilesWin.title": "Profiles",
+  "profilesWin.tab": "New Tab",
+  "profilesWin.window": "New Window",
+  "profilesWin.splitRight": "Split Right",
+  "profilesWin.splitDown": "Split Down",
+  "profilesWin.opensIn": "One click opens in:",
+  "profilesWin.closeAfter": "Close this window after opening a profile",
+  "profilesWin.edit": "Edit Profiles…",
+  "profilesWin.loginShell": "Login shell"
 }

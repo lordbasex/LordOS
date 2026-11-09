@@ -8,13 +8,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
   selectTab, focusPane, zoom, toggleZoom, toggleTimestamps, leaves, tabTitle, busyIn, toggleHotkeyWindow, toast,
-  undoClose, paneToTab, equalize, moveTab, saveArrangement, restoreArrangement, toggleAlert, meta as metaStore,
+  undoClose, paneToTab, equalize, moveTab, saveArrangement, restoreArrangement, toggleAlert, meta as metaStore, noteTermFocus,
 } from './state.js';
 import { PaneTree, paneNodes } from './Panes.jsx';
 import {
   TabBar, TAB_COLORS, StatusBar, FindBar, Toolbelt, Overlays, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
 } from './Chrome.jsx';
 import { Preferences } from './Preferences.jsx';
+import { ProfilesWindow } from './ProfilesWindow.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
 import { clipboardImage, pathsText, isClaude } from './paths.js';
@@ -161,6 +162,7 @@ function run(wid, action) {
     case 'composer': patchWin(wid, (x) => ({ composer: !x.composer })); break;
     case 'openQuickly': patchWin(wid, () => ({ popup: { kind: 'quick' } })); break;
     case 'preferences': openPrefsWindow(); break;
+    case 'openProfiles': openProfilesWindow(); break;
     case 'toolbelt': patchWin(wid, (x) => ({ toolbelt: !x.toolbelt })); break;
     case 'timestamps': toggleTimestamps(wid); break;
     case 'editTitle': patchWin(wid, () => ({ popup: { kind: 'title' } })); break;
@@ -237,7 +239,7 @@ function menus(wid, w) {
     ] },
     { label: tr('terminal.menu.profiles'), items: [
       ...profileMenu(profiles, (p) => ({ label: tr('terminal.menu.newTabWith', { name: profileName(p) }), onClick: () => addTab(wid, p.id) })), '-',
-      item('preferences'),
+      item('openProfiles'), item('preferences'),
     ] },
   ];
 }
@@ -268,11 +270,23 @@ function PrefsWindow() {
   return <Preferences wid={wid} onClose={() => wm.close(wid)} />;
 }
 
+// ---- ventana Perfiles (❖O): terminal#profiles, un clic abre el perfil ----
+
+const PROFILES_ID = 'terminal#profiles';
+export function openProfilesWindow() {
+  if (wm.get(PROFILES_ID)) { wm.focus(PROFILES_ID); return; }
+  const a = pointerWorkArea();
+  const w = Math.min(720, a.w - 40), h = Math.min(560, a.h - 40);
+  wm.open('terminal', { instance: 'profiles', frame: { x: Math.round(a.x + (a.w - w) / 2), y: Math.round(a.y + (a.h - h) / 3), w, h } });
+}
+
 // ---- ventana ----
 
 export default function TerminalApp() {
   const { id } = useAppWindow();
-  return id === PREFS_ID ? <PrefsWindow /> : <TerminalWindow />;
+  if (id === PREFS_ID) return <PrefsWindow />;
+  if (id === PROFILES_ID) return <ProfilesWindow onEdit={openPrefsWindow} />;
+  return <TerminalWindow />;
 }
 
 function TerminalWindow() {
@@ -289,6 +303,7 @@ function TerminalWindow() {
 
   // título de la ventana = el de la pestaña activa
   useEffect(() => { if (tab) wm.setTitle(wid, tabTitle(tab)); });
+  useEffect(() => { if (focused) noteTermFocus(wid); }, [focused]);
 
   // menús en la barra del tema
   useEffect(() => { if (w) wm.setMenus(wid, menus(wid, w)); }, [w]);

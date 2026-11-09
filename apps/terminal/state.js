@@ -195,12 +195,12 @@ export function focusPane(wid, sid) {
   if (wid && wid !== f.wid) wm.focus(f.wid);
 }
 
-export function split(wid, dir) {
+export function split(wid, dir, profileId) {
   const w = getWin(wid);
   const tab = activeTab(w);
   if (!tab) return;
   const cur = tab.focus;
-  const sid = createSession(meta.get()[cur]?.profile, cur);
+  const sid = createSession(profileId || meta.get()[cur]?.profile, cur);
   const root = replaceLeaf(tab.root, cur, (leaf) => ({ type: 'split', id: nextId('s'), dir, ratio: 0.5, a: leaf, b: { type: 'leaf', sid } }));
   patchWin(wid, (x) => ({ tabs: x.tabs.map((t) => (t.id === tab.id ? { ...t, root, focus: sid, zoom: false } : t)) }));
   configureSession(sid);
@@ -620,6 +620,14 @@ function restoreLive() {
   }), 0);
 }
 restoreLive();
+
+// The terminal window used last (the Profiles window opens there); the first one left when it's gone.
+let lastTerm = null;
+export const noteTermFocus = (wid) => { lastTerm = wid; };
+export const lastTermWin = () => (lastTerm && getWin(lastTerm) ? lastTerm : Object.keys(wins.get())[0] || null);
+
+// A new terminal window with one tab of that profile. Returns its id.
+export const openWindowWithProfile = (profileId) => openWindowWithTabs([newTab(profileId)]);
 
 // Abre una ventana de Terminal con pestañas ya armadas (sesiones existentes). Devuelve su id.
 export function openWindowWithTabs(tabs, frame) {

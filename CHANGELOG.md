@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Terminal: a Profiles window (❖O, Profiles → Profiles…).** It works like the Profiles window of other terminals: a search by name or tag, the
+  profiles grouped by tag (the folders fold), each with its star when it is the default and what it runs (its ssh line
+  or the login shell). **One click opens the profile**, with no Enter or double click. The arrows move the selection and
+  Enter opens it; Esc closes the window. Below the list, a choice of where one click opens it: New Tab, New Window,
+  Split Right or Split Down, in the terminal window used last. "Close this window after opening a profile" (on by
+  default) and Edit Profiles…, which opens Settings, complete it. Both choices are remembered in `terminal.json`.
 - **Terminal: profiles grouped by their tags.** Importing another terminal's profiles keeps each profile's tags, and
   Shell → Profiles and the Dock's menu list the profiles without a tag first, then one submenu per tag in name order (a
   profile under each of its tags), instead of one long list of every profile.
