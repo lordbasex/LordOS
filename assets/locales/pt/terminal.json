@@ -471,5 +471,10 @@
   "files.err.protected": "Essa pasta está protegida",
   "files.err.unsupported": "O servidor não permite isso",
   "files.err.timeout": "O servidor não respondeu a tempo",
-  "files.err.failed": "Falhou"
+  "files.err.failed": "Falhou",
+  "files.sheet.conflict": "Já existe no servidor",
+  "files.conflictHint": "“{name}” e {count} item(ns) no total já estão lá. O que o envio faz com eles?",
+  "files.conflict.replace": "Substituir",
+  "files.conflict.keep": "Manter ambos",
+  "files.conflict.skip": "Pular"
 }

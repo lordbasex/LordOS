@@ -471,5 +471,10 @@
   "files.err.protected": "Ce dossier est protégé",
   "files.err.unsupported": "Le serveur ne le permet pas",
   "files.err.timeout": "Le serveur n’a pas répondu à temps",
-  "files.err.failed": "Échec"
+  "files.err.failed": "Échec",
+  "files.sheet.conflict": "Déjà sur le serveur",
+  "files.conflictHint": "« {name} » et {count} élément(s) au total y sont déjà. Que faire lors de l’envoi ?",
+  "files.conflict.replace": "Remplacer",
+  "files.conflict.keep": "Garder les deux",
+  "files.conflict.skip": "Ignorer"
 }

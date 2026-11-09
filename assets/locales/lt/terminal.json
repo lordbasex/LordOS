@@ -478,5 +478,10 @@
   "files.err.protected": "Šis aplankas apsaugotas",
   "files.err.unsupported": "Serveris to nepalaiko",
   "files.err.timeout": "Serveris laiku neatsakė",
-  "files.err.failed": "Nepavyko"
+  "files.err.failed": "Nepavyko",
+  "files.sheet.conflict": "Jau yra serveryje",
+  "files.conflictHint": "„{name}“ ir iš viso elementų: {count} jau yra ten. Ką daryti įkeliant?",
+  "files.conflict.replace": "Pakeisti",
+  "files.conflict.keep": "Palikti abu",
+  "files.conflict.skip": "Praleisti"
 }

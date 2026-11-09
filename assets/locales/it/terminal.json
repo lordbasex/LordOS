@@ -471,5 +471,10 @@
   "files.err.protected": "Quella cartella è protetta",
   "files.err.unsupported": "Il server non lo consente",
   "files.err.timeout": "Il server non ha risposto in tempo",
-  "files.err.failed": "Non riuscito"
+  "files.err.failed": "Non riuscito",
+  "files.sheet.conflict": "Già sul server",
+  "files.conflictHint": "«{name}» e {count} elemento/i in tutto ci sono già. Cosa deve fare il caricamento?",
+  "files.conflict.replace": "Sostituisci",
+  "files.conflict.keep": "Mantieni entrambi",
+  "files.conflict.skip": "Salta"
 }

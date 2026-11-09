@@ -471,5 +471,10 @@
   "files.err.protected": "Esa carpeta está protegida",
   "files.err.unsupported": "El servidor no lo permite",
   "files.err.timeout": "El servidor no respondió a tiempo",
-  "files.err.failed": "Falló"
+  "files.err.failed": "Falló",
+  "files.sheet.conflict": "Ya existe en el servidor",
+  "files.conflictHint": "«{name}» y {count} elemento(s) en total ya están ahí. ¿Qué hace la subida con ellos?",
+  "files.conflict.replace": "Reemplazar",
+  "files.conflict.keep": "Mantener ambos",
+  "files.conflict.skip": "Saltar"
 }

@@ -116,20 +116,38 @@ export function FilesMode({ t, wid, sid, startLocal }) {
     };
     try { await walk(rpath, lpath, rlist.filter((e) => names.includes(e.name)), 0); } catch (x) { setMsg(errText(x)); }
   };
-  const upload = async (names, ldir = lpath, rdir = rpath, list = llist) => {
-    const walk = async (ld, rd, entries, depth) => {
+  // An upload never replaces a file on the server unasked: names already there are asked about first (Replace, Keep
+  // Both, Skip), and that choice applies inside folders that already exist too.
+  const upload = async (names, policy = null, ldir = lpath, rdir = rpath, list = llist) => {
+    const top = list.filter((e) => names.includes(e.name));
+    if (!policy && rdir === rpath) {
+      const clash = top.filter((e) => e.kind === '-' && rlist.some((r) => r.name === e.name));
+      if (clash.length) { setSheet({ kind: 'conflict', names, count: clash.length, first: clash[0].name }); return; }
+    }
+    const walk = async (ld, rd, entries, depth, there) => {
+      let taken = new Set(there);
       for (const e of entries) {
         if (e.kind === 'd') {
           if (depth > 20) continue;
-          try { await request('mkdir', { conn, path: joinPath(rd, e.name) }); } catch (x) { /* there already */ }
+          let existed = false;
+          try { await request('mkdir', { conn, path: joinPath(rd, e.name) }); } catch (x) { existed = true; }
+          let inside = [];
+          if (existed) { try { inside = ((await request('list', { conn, path: joinPath(rd, e.name) })).entries || []).map((r) => r.name); } catch (x) { inside = []; } }
           const sub = (await fs.listAsync(joinPath(ld, e.name))).map(fromLocal);
-          await walk(joinPath(ld, e.name), joinPath(rd, e.name), sub, depth + 1);
+          await walk(joinPath(ld, e.name), joinPath(rd, e.name), sub, depth + 1, inside);
         } else if (e.kind === '-') {
-          try { await transfer('up', conn, { src: joinPath(ld, e.name), path: joinPath(rd, e.name), perm: e.perm & 0o777 }, e.name); } catch (x) { setMsg(`${e.name}: ${errText(x)}`); }
+          let name = e.name;
+          if (taken.has(name)) {
+            if (policy === 'skip') continue;
+            if (policy === 'keep') name = freeName(name, taken);
+            else if (policy !== 'replace') continue;          // never replaced without a choice
+          }
+          taken = new Set([...taken, name]);
+          try { await transfer('up', conn, { src: joinPath(ld, e.name), path: joinPath(rd, name), perm: e.perm & 0o777 }, name); } catch (x) { setMsg(`${e.name}: ${errText(x)}`); }
         }
       }
     };
-    try { await walk(ldir, rdir, list.filter((e) => names.includes(e.name)), 0); } catch (x) { setMsg(errText(x)); }
+    try { await walk(ldir, rdir, top, 0, rdir === rpath ? rlist.map((r) => r.name) : []); } catch (x) { setMsg(errText(x)); }
   };
 
   // ---- operations ----
@@ -196,6 +214,8 @@ export function FilesMode({ t, wid, sid, startLocal }) {
       run(() => request('chown', { conn, path: s.path, uid: +s.uid, gid: +s.gid }));
     } else if (s.kind === 'delete') {
       run(async () => { for (const n of s.names) { const e = rlist.find((x) => x.name === n); await request('remove', { conn, path: joinPath(rpath, n), dir: e && e.kind === 'd' }); } });
+    } else if (s.kind === 'conflict') {
+      upload(s.names, s.choice || 'keep');
     } else if (s.kind === 'password' && s.value) {
       open(true, s.value);
     }
@@ -362,6 +382,16 @@ function Sheet({ t, sheet, setSheet, onApply, onSha }) {
     <View style={{ gap: 8 }}>
       <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('terminal.files.passwordHint')}</Text>
       <TextInput autoFocus secure value={s.value || ''} onChange={(v) => set({ value: v })} onSubmit={onApply} />
+    </View>
+  );
+  else if (s.kind === 'conflict') body = (
+    <View style={{ gap: 8 }}>
+      <Text style={{ fontSize: 12.5, color: t.text, textAlign: 'start', lineHeight: 1.4 }}>{tr('terminal.files.conflictHint', { count: s.count, name: s.first })}</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {['replace', 'keep', 'skip'].map((c) => (
+          <Button key={c} small primary={(s.choice || 'keep') === c} label={tr(`terminal.files.conflict.${c}`)} onClick={() => set({ choice: c })} />
+        ))}
+      </View>
     </View>
   );
   else if (s.kind === 'delete') body = <Text style={{ fontSize: 12.5, color: t.text, textAlign: 'start', lineHeight: 1.4 }}>{tr('terminal.files.deleteHint')}</Text>;

@@ -471,5 +471,10 @@
   "files.err.protected": "That folder is protected",
   "files.err.unsupported": "The server doesn’t support that",
   "files.err.timeout": "The server didn’t answer in time",
-  "files.err.failed": "It failed"
+  "files.err.failed": "It failed",
+  "files.sheet.conflict": "Already on the server",
+  "files.conflictHint": "“{name}” and {count} item(s) in all are already there. What should the upload do with them?",
+  "files.conflict.replace": "Replace",
+  "files.conflict.keep": "Keep Both",
+  "files.conflict.skip": "Skip"
 }

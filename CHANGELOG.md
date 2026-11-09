@@ -40,6 +40,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Transfers** run on channels of their own, so the listing stays usable and each one can be cancelled. Uploads are
     orange and downloads blue, with a speed graph of the last minute. A download never replaces a file unasked, and
     the local files follow lord.fs's rules.
+  - An upload never replaces a file on the server unasked: when names are already there, a sheet asks Replace, Keep
+    Both (a free name such as `notes (2).txt`) or Skip, and the choice applies inside existing folders too.
   - Not shared: an `ssh` opened before this version, or one made from inside another server.
 - **Terminal: the Claude Code footer inside screen or tmux, and over ssh.** The footer showed Claude Code's state,
   context and limits only when `claude` was the pane's own process. Inside `screen` or `tmux`, or on a server reached
