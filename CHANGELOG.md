@@ -140,6 +140,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Cloud: an account signed in with a password and a device code no longer asks for a new sign-in after every logout or reboot.** rclone keeps the
+  account's session (cookies, trust token) in its options and updates it in memory, but only accounts signed in
+  through a browser were read back into the keyring, so rclone started again with the session of the first sign-in,
+  which the provider refuses. Every account is now read back every 5 minutes and once more before rclone stops. An
+  option rclone gives back stays out of `rclone.conf` unless it is known not to be secret. When the provider does
+  refuse the session, the account says Sign In Again (instead of "couldn't open the account's folder") and is tried
+  again after 30 minutes instead of every 30 seconds.
+
 - **Files: a folder of photos no longer runs the desktop out of memory** (GitHub #71, #82). Each JPEG or PNG icon was
   the whole picture, decoded on lord-server's interface thread and kept until the session ended: a 12-megapixel photo
   took 48 MB, so opening a folder of phone photos (a cloud account kept on this computer, for example) froze the
