@@ -32,6 +32,14 @@ step() { printf '  %s\n' "$1" >&3; }
 echo "Collecting the report, it takes under a minute:" >&2
 host=$(hostname 2>/dev/null)
 user=${SUDO_USER:-$(id -un)}
+# The user's own files are read as the user, never as root: under sudo, a link the user made in ~/.cache (to
+# /etc/shadow, say) must not end up in a report the user gets back.
+as_user() {
+    if [ "$(id -u)" = 0 ] && [ -n "$SUDO_USER" ]; then runuser -u "$SUDO_USER" -- "$@"; else "$@"; fi
+}
+user_log() {    # user_log FILE N: the last N lines of a regular file in the user's cache, or "none"
+    if as_user test -f "$1" && ! as_user test -L "$1"; then as_user tail -n "$2" -- "$1"; else echo "none"; fi
+}
 
 clean() {
     sed -E \
@@ -170,19 +178,19 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
     step "logs"
     section "This session's log (last 60 lines)"
-    if [ -r "$HOME/.cache/lordos/session.log" ]; then tail -n 60 "$HOME/.cache/lordos/session.log"; else echo "none"; fi
+    user_log "$HOME/.cache/lordos/session.log" 60
     end
 
     # A Linux app that closes as soon as it starts leaves its reason only here (#95): what the apps LordOS started
     # printed, and Xwayland's own log for X11 apps (without xkbcomp's keymap warnings, printed at every start).
     section "Linux apps' output (last 40 lines)"
-    if [ -r "$HOME/.cache/lordos/apps.log" ]; then tail -n 40 "$HOME/.cache/lordos/apps.log"; else echo "none"; fi
+    user_log "$HOME/.cache/lordos/apps.log" 40
     end
 
     section "Xwayland's log (last 20 lines)"
-    if [ -r "$HOME/.cache/lordos/xwayland.log" ]; then
+    if as_user test -f "$HOME/.cache/lordos/xwayland.log" && ! as_user test -L "$HOME/.cache/lordos/xwayland.log"; then
         # (Xwayland's own messages may lack a newline, so xkbcomp's header can end someone else's line)
-        tail -n 400 "$HOME/.cache/lordos/xwayland.log" | sed -e 's/The XKEYBOARD keymap compiler (xkbcomp) reports:$//' |
+        user_log "$HOME/.cache/lordos/xwayland.log" 400 | sed -e 's/The XKEYBOARD keymap compiler (xkbcomp) reports:$//' |
             grep -v -E '^(> |Errors from xkbcomp are not fatal|$)' | tail -n 20
     else echo "none"; fi
     end
