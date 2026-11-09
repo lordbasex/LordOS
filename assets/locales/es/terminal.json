@@ -208,6 +208,9 @@
     "other": "{count} disparadores"
   },
   "prefs.import.types": "escribe «{text}» al abrir",
+  "prefs.import.sends": "{count} disparador(es) escriben texto, p. ej. «{text}»",
+  "prefs.import.typingKeys": "{count} tecla(s) escriben texto",
+  "prefs.import.withKeys": "Importar también {count} combinación(es) de teclas globales que escriben texto ({list}): esa tecla lo escribiría en cada pestaña",
   "prefs.import.warnings": "Avisos",
   "prefs.importBtn": "Importar perfiles…",
   "prefs.imported": "Perfiles importados",

@@ -208,6 +208,9 @@
     "other": "{count} gatilhos"
   },
   "prefs.import.types": "digita “{text}” ao abrir",
+  "prefs.import.sends": "{count} gatilho(s) digitam texto, p. ex. “{text}”",
+  "prefs.import.typingKeys": "{count} tecla(s) digitam texto",
+  "prefs.import.withKeys": "Importar também {count} mapeamento(s) de teclas globais que digitam texto ({list}): a tecla digitaria isso em cada aba",
   "prefs.import.warnings": "Avisos",
   "prefs.importBtn": "Importar perfis…",
   "prefs.imported": "Perfis importados",

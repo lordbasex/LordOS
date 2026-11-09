@@ -21,7 +21,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   with five rotating backups beside it. If the chosen place isn't there (a disk not mounted, a renamed folder), the
   Terminal keeps working from the last good copy, read-only, says so, and goes back to the file when it returns; a file
   changed from outside (a restore, a `git pull`) is read again within 2 s. Export Profiles… and Import Profiles… take
-  LordTerminal JSON as well as other terminal emulators' files. The file is protected from other apps' file operations
+  LordTerminal JSON as well as other terminal emulators' files; a profile that would type into the shell by itself
+  (initial text, a trigger that sends text, a key that types text) never replaces the default profile, the import list
+  says what it would type, and global key mappings that type text come in only when you turn that option on. The file is protected from other apps' file operations
   wherever it is (`lord.termconf`, docs/TERMINAL.md "Configuration file").
 
 - **Databases (new app): a MySQL and MariaDB client.** Favorites in groups with a color each; Standard, Socket and

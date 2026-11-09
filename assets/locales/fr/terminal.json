@@ -208,6 +208,9 @@
     "other": "{count} déclencheurs"
   },
   "prefs.import.types": "tape « {text} » à l’ouverture",
+  "prefs.import.sends": "{count} déclencheur(s) tapent du texte, p. ex. « {text} »",
+  "prefs.import.typingKeys": "{count} touche(s) tapent du texte",
+  "prefs.import.withKeys": "Importer aussi {count} raccourci(s) globaux qui tapent du texte ({list}) : la touche le taperait dans chaque onglet",
   "prefs.import.warnings": "Avertissements",
   "prefs.importBtn": "Importer des profils…",
   "prefs.imported": "Profils importés",

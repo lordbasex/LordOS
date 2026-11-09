@@ -208,6 +208,9 @@
     "other": "{count} triggers"
   },
   "prefs.import.types": "types “{text}” when it opens",
+  "prefs.import.sends": "{count} trigger(s) type text, e.g. “{text}”",
+  "prefs.import.typingKeys": "{count} key(s) type text",
+  "prefs.import.withKeys": "Also import {count} global key mapping(s) that type text ({list}): a key would type it in every tab",
   "prefs.import.warnings": "Warnings",
   "prefs.importBtn": "Import Profiles…",
   "prefs.imported": "Imported profiles",

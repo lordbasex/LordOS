@@ -208,6 +208,9 @@
     "other": "{count} trigger"
   },
   "prefs.import.types": "scrive «{text}» all’apertura",
+  "prefs.import.sends": "{count} trigger scrivono testo, ad es. «{text}»",
+  "prefs.import.typingKeys": "{count} tasto/i scrivono testo",
+  "prefs.import.withKeys": "Importa anche {count} mappatura/e di tasti globali che scrivono testo ({list}): il tasto lo scriverebbe in ogni scheda",
   "prefs.import.warnings": "Avvisi",
   "prefs.importBtn": "Importa profili…",
   "prefs.imported": "Profili importati",

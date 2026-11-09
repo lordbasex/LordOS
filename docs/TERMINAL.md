@@ -267,9 +267,10 @@ Before 0.8.8.7 this was the `"terminal"` key of `settings.json`.
   files are refused to `lord.fs` (`fsops_protect_file`, wherever the file is), like `settings.json` and its migration
   backup. Only `lord.termconf` writes them; isolated apps never have it.
 - **Export Profiles…** writes the whole configuration as JSON (`0600`, never over the active file); **Import
-  Profiles…** takes that JSON (profiles replaced by id, except that the default profile is never replaced by one that
-  types a command when it opens: that one comes in as a new profile; the list shows each imported profile's command
-  before importing; schemes and key mappings added) or another terminal emulator's
+  Profiles…** takes that JSON (profiles replaced by id, schemes added). A profile that types into the shell by itself
+  (an initial text, a `send` trigger, a key mapping that sends text) never replaces the default profile or becomes it:
+  it comes in as a profile of its own, and the list says what it would type before importing. Global key mappings that
+  send text are imported only when that option, off by default and listing the keys, is turned on or another terminal emulator's
   files (below), and writes the result to the configuration file.
 - Tests: `build/termconf-test` (paths, missing and unavailable places, atomic `0600` writes, backups, the migration,
   protection) and `tests/terminal_config_test.mjs` (the move, read-only, choosing a place, refused files).

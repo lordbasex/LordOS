@@ -217,11 +217,28 @@ function readImport(path) {
   return importIterm(text, path, fontsApi());
 }
 
+// What an imported profile would type into a shell by itself or on a key (security scan F1): its initial text, its
+// 'send' triggers and its key mappings that send text. Each is said in the import list, and such a profile never
+// replaces the default one or becomes it.
+const TYPING_KEYS = new Set(['text', 'escape', 'hex']);
+const typingKey = (m) => !!m && TYPING_KEYS.has(m.action);
+function typesInto(p) {
+  const out = [];
+  const init = String(p.initialText || '').trim();
+  if (init) out.push(T('terminal.prefs.import.types', { text: init.slice(0, 60) }));
+  const sends = (p.triggers || []).filter((x) => x && x.action === 'send');
+  if (sends.length) out.push(T('terminal.prefs.import.sends', { count: sends.length, text: String(sends[0].param || '').slice(0, 40) }));
+  const keys = (p.keyMap || []).filter(typingKey);
+  if (keys.length) out.push(T('terminal.prefs.import.typingKeys', { count: keys.length }));
+  return out;
+}
+
 function ImportPanel({ t, onClose, onDone }) {
   const [path, setPath] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [pick, setPick] = useState({});
+  const [withKeys, setWithKeys] = useState(false);   // global key mappings that type text: only when asked
   const [files] = useState(candidates);
   const load = (p) => {
     setPath(p);
@@ -242,25 +259,26 @@ function ImportPanel({ t, onClose, onDone }) {
       // the same iTerm2 profile, or (a LordTerminal export) the same profile id: replaced, not duplicated
       let i = np.itermGuid ? profiles.findIndex((x) => x.itermGuid === np.itermGuid) : -1;
       if (i < 0 && result.kind === 'lordos') i = profiles.findIndex((x) => x.id === np.id);
-      // the default profile is never replaced by one that types a command when it opens (every new tab would run
+      // the default profile is never replaced by one that types into the shell by itself (every new tab would run
       // it): that one comes in as a profile of its own, a menu away
-      const types = !!String(np.initialText || '').trim();
+      const types = typesInto(np).length > 0;
       if (i >= 0 && types && profiles[i].id === defaultProfile) i = -1;
       const taken = i < 0 && profiles.some((x) => x.id === np.id);
       const prof = i >= 0 ? { ...np, id: profiles[i].id } : taken ? { ...np, id: newProfileId() + added } : np;
       if (i >= 0) profiles[i] = prof; else profiles.push(prof);
       // a profile that types a command when it opens never becomes the default: every new tab would run it
-      if (makeDefault && np.itermGuid && np.itermGuid === result.defaultGuid && !String(np.initialText || '').trim()) defaultProfile = prof.id;
+      if (makeDefault && np.itermGuid && np.itermGuid === result.defaultGuid && !types) defaultProfile = prof.id;
       added++;
     }
     const schemes = { ...(cfg.schemes || {}) };
     for (const s of result.schemes) {
       if (result.kind === 'lordos') { const { id, ...sc } = s; schemes[id] = sc; } else schemes[`it_${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`] = s;
     }
-    const keyMap = [...(cfg.keyMap || []).filter((m) => !result.keyMap.some((k) => k.combo === m.combo)), ...result.keyMap];
+    const incoming = result.keyMap.filter((m) => withKeys || !typingKey(m));
+    const keyMap = [...(cfg.keyMap || []).filter((m) => !incoming.some((k) => k.combo === m.combo)), ...incoming];
     saveTerminalSettings({ profiles, defaultProfile, schemes, keyMap });
     reconfigureAll();
-    onDone(T('terminal.prefs.import.done', { p: added, s: result.schemes.length, k: result.keyMap.length }),
+    onDone(T('terminal.prefs.import.done', { p: added, s: result.schemes.length, k: incoming.length }),
       result.profiles.find((x) => pick[x.id])?.id);
   };
   return (
@@ -296,7 +314,7 @@ function ImportPanel({ t, onClose, onDone }) {
                         {s.ansi.slice(1, 7).map((c, i) => <View key={i} style={{ flex: 1, backgroundColor: c, borderRadius: 1 }} />)}
                       </View>
                       <Text style={{ fontSize: 13, color: t.text }}>{profileName(p)}{p.itermGuid && p.itermGuid === result.defaultGuid ? '  ★' : ''}</Text>
-                      {String(p.initialText || '').trim() ? <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{T('terminal.prefs.import.types', { text: String(p.initialText).trim().slice(0, 60) })}</Text> : null}
+                      {typesInto(p).map((w, i) => <Text key={i} style={{ fontSize: 11, color: '#ff9f0a' }}>{w}</Text>)}
                       <Text style={{ fontSize: 11, color: t.textDim }}>{[`${p.font || 'JetBrains Mono'} ${p.fontSize} pt`, p.ligatures && T('terminal.prefs.import.ligatures'), p.triggers.length && T('terminal.prefs.import.triggers', { count: p.triggers.length }), p.keyMap.length && T('terminal.prefs.import.keys', { count: p.keyMap.length })].filter(Boolean).join(' · ')}</Text>
                     </View>
                   );
@@ -305,6 +323,12 @@ function ImportPanel({ t, onClose, onDone }) {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s }}>
                   {result.schemes.slice(0, 12).map((s) => <SchemeCard key={s.name} t={t} id={s.name} scheme={s} selected={false} onClick={() => {}} />)}
                 </View>
+                {result.keyMap.some(typingKey) && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: spacing.m }}>
+                    <Toggle small on={withKeys} onChange={setWithKeys} />
+                    <Text style={{ fontSize: 12, color: '#ff9f0a', flex: 1, textAlign: 'start' }}>{T('terminal.prefs.import.withKeys', { count: result.keyMap.filter(typingKey).length, list: result.keyMap.filter(typingKey).slice(0, 4).map((m) => m.combo).join(', ') })}</Text>
+                  </View>
+                )}
                 {result.warnings.length > 0 && <Heading t={t}>{T('terminal.prefs.import.warnings')}</Heading>}
                 {result.warnings.map((w, i) => <Text key={i} style={{ fontSize: 12, color: t.textDim, lineHeight: 1.5 }}>• {w}</Text>)}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, marginTop: spacing.m, justifyContent: 'flex-end' }}>
