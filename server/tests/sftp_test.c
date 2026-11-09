@@ -203,6 +203,9 @@ static void test_real(const char *bin, const char *server) {
     a = ask(&rn, SP_STAT, "{\"path\":\"relative\"}", -1, &t);
     CHECK(a && t == SE_ERR && strstr(a, "\"bad\""), "relative path refused: %s", a ? a : "-");
     free(a);
+    a = ask(&rn, SP_LIST, "{\"path\":\".\"}", -1, &t);
+    CHECK(a && t == SE_OK && strstr(a, "\"path\":\"/"), "list of . gives the home folder's real path: %.120s", a ? a : "-");
+    free(a);
     /* removing: the file, then the empty folder */
     snprintf(q, sizeof q, "{\"path\":\"%s/sub/moved.bin\"}", dir);
     a = ask(&rn, SP_REMOVE, q, -1, &t);

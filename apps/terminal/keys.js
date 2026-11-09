@@ -75,6 +75,7 @@ export const DEFAULT_BINDINGS = {
   composer: ['Super+Shift+.'],
   openQuickly: ['Super+Shift+o'],
   openProfiles: ['Super+o'],
+  filesMode: ['Super+Shift+f'],
   preferences: ['Super+,'],
   toolbelt: ['Super+Shift+b'],
   timestamps: ['Super+Shift+e'],

@@ -16,6 +16,7 @@ import {
 } from './Chrome.jsx';
 import { Preferences } from './Preferences.jsx';
 import { ProfilesWindow } from './ProfilesWindow.jsx';
+import { FilesMode } from './FilesMode.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
 import { clipboardImage, pathsText, isClaude } from './paths.js';
@@ -163,6 +164,7 @@ function run(wid, action) {
     case 'openQuickly': patchWin(wid, () => ({ popup: { kind: 'quick' } })); break;
     case 'preferences': openPrefsWindow(); break;
     case 'openProfiles': openProfilesWindow(); break;
+    case 'filesMode': toggleFiles(wid); break;
     case 'toolbelt': patchWin(wid, (x) => ({ toolbelt: !x.toolbelt })); break;
     case 'timestamps': toggleTimestamps(wid); break;
     case 'editTitle': patchWin(wid, () => ({ popup: { kind: 'title' } })); break;
@@ -235,7 +237,8 @@ function menus(wid, w) {
       item('instantReplay'),
       item('prevMark'), item('nextMark'), item('setMark'), '-',
       item('timestamps', { checked: w.timestamps }), item('toolbelt', { checked: w.toolbelt }),
-      item('openQuickly'), item('editTitle'),
+      item('openQuickly'), item('editTitle'), '-',
+      item('filesMode', { checked: !!tab?.files }),
     ] },
     { label: tr('terminal.menu.profiles'), items: [
       ...profileMenu(profiles, (p) => ({ label: tr('terminal.menu.newTabWith', { name: profileName(p) }), onClick: () => addTab(wid, p.id) })), '-',
@@ -268,6 +271,15 @@ function PrefsWindow() {
     if (e.key === 'Escape') wm.close(wid);
   });
   return <Preferences wid={wid} onClose={() => wm.close(wid)} />;
+}
+
+// ---- modo Archivos (FilesMode.jsx): la pestaña activa muestra los archivos del servidor sobre su sesión ssh ----
+
+export function toggleFiles(wid, tabId) {
+  patchWin(wid, (x) => {
+    const id = tabId || x.active;
+    return { tabs: x.tabs.map((tb) => (tb.id === id ? { ...tb, files: !tb.files } : tb)) };
+  });
 }
 
 // ---- ventana Perfiles (❖O): terminal#profiles, un clic abre el perfil ----
@@ -370,6 +382,8 @@ function TerminalWindow() {
       return;
     }
     if (isHotkey(e)) return;
+    // Files mode covers the panes: shortcuts still work, nothing is typed into the session behind it
+    if (activeTab(cur)?.files) { const a = MODIFIER_CODES.has(e.code) ? null : actionOf(e); if (a) run(wid, a); return; }
     // la puerta de tmux -CC no recibe teclas (es el canal de comandos); Esc desconecta
     if (s != null && isGateway(s)) { if (e.key === 'Escape') detach(s); else if (actionOf(e)) run(wid, actionOf(e)); return; }
     const mapping = MODIFIER_CODES.has(e.code) ? null : keyMappingOf(e, getProfile(meta.get()[s]?.profile));
@@ -406,6 +420,8 @@ function TerminalWindow() {
       { label: tr('terminal.prefs.tabColor'), disabled: true, onClick: () => {} },
       { swatches: [null, ...TAB_COLORS].map((hex) => ({ hex, on: (tb.color || null) === hex, onClick: () => setColor(hex) })) },
       '-',
+      { label: tr(tb.files ? 'terminal.files.backToTerminal' : 'terminal.files.showServerFiles'), onClick: () => { selectTab(wid, tb.id); toggleFiles(wid, tb.id); } },
+      '-',
       { label: actionLabel('editTitle'), onClick: () => { selectTab(wid, tb.id); run(wid, 'editTitle'); } },
       { label: actionLabel('closeTab'), onClick: () => closeTab(wid, tb.id) },
     ] });
@@ -437,6 +453,7 @@ function TerminalWindow() {
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <PaneTree wid={wid} tab={tab} windowFocused={focused} divider={t.separator} bg={paneBg} onContextMenu={onContextMenu} />
+          {tab?.files && sid != null && <FilesMode key={`${tab.id}:${sid}`} t={t} wid={wid} sid={sid} />}
           {w.find && sid != null && <FindBar key={sid} t={t} wid={wid} sid={sid} find={w.find} />}
         </View>
         {w.toolbelt && <Toolbelt t={t} wid={wid} w={w} sid={sid} />}

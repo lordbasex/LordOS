@@ -166,8 +166,11 @@ static int realpath_of(uint32_t rid, const char *path, char *outp, size_t cap) {
 
 static const char *str_of(const JVal *o, const char *k) { const char *s = json_str(o, k); return s && sf_path_ok(s) ? s : NULL; }
 
+/* a listing may start at "." (the user's home folder on the server, which REALPATH gives) */
+static const char *dir_of(const JVal *q) { const char *s = json_str(q, "path"); return s && !strcmp(s, ".") ? s : str_of(q, "path"); }
+
 static void do_list(uint32_t rid, const JVal *q) {
-    const char *path = str_of(q, "path");
+    const char *path = dir_of(q);
     if (!path) { reply_err(rid, "bad", NULL); return; }
     static char real[SFTP_NAME_MAX + 1];
     if (realpath_of(rid, path, real, sizeof real)) return;

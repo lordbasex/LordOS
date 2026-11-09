@@ -12,6 +12,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Terminal: Files mode, the server's files over the tab's own ssh session.** It is one view per tab: this
+  computer on the left and the server on the right, in the terminal's look. It is turned on with the footer's Files
+  switch, View → Server Files (SFTP) (❖⇧F) or a right click on the tab. It covers the panes and the shell stays alive
+  behind it.
+  - It uses the same connection, with no second login and no password or code asked again. The shell integration's
+    `ssh` (bash, zsh, fish) makes the connection a connection-sharing master, with one socket per shell in a 0700 folder
+    of the session and `ControlPersist=no`. Options the user passes are left alone, and `LORD_SSH_MUX=0` turns this off.
+    lord-server finds that master by its pid being the tab's foreground process and opens a new channel on it with
+    OpenSSH's own multiplexing protocol. It runs no program.
+  - SFTP is spoken by **lord-sftp**, a new sandboxed helper that gets the channel and the local file as descriptors,
+    never a path. Names with `/` or control characters, and odd owner names, are left out of listings.
+  - **Toolbar:** New Folder, Refresh, Hidden, Filter, and As Root, which uses the server's sftp-server through `sudo`;
+    when sudo needs a password, a sheet asks for it once and it isn't kept. The local side refreshes every 3 s and the
+    server's every 5 s and after each change.
+  - **Right click on the server:** Download, Rename, New Folder, Permissions (boxes and octal), Change Owner, Information
+    (`file`, size, owner, permissions, and SHA-256 computed on the server), Copy Path, Open Terminal Here (`cd`),
+    Delete. **Right click on this computer:** Upload, Rename, New Folder, Copy Path, Move to Trash.
+  - Double click opens a folder or transfers a file. The arrows between the sides upload and download the selection,
+    folders included.
+  - **Transfers** run on channels of their own, so the listing stays usable and each one can be cancelled. Uploads are
+    orange and downloads blue, with a speed graph of the last minute. A download never replaces a file unasked, and
+    the local files follow lord.fs's rules.
+  - Not shared: an `ssh` opened before this version, or one made from inside another server.
 - **Terminal: the Claude Code footer inside screen or tmux, and over ssh.** The footer showed Claude Code's state,
   context and limits only when `claude` was the pane's own process. Inside `screen` or `tmux`, or on a server reached
   with `ssh`, the pane's process is `screen`, `tmux` or `ssh`, so nothing showed. Now the Terminal reads Claude Code's

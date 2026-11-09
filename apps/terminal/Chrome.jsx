@@ -178,6 +178,24 @@ function ClaudeSegments({ t, wid, sid, c, cols }) {
   );
 }
 
+// Files mode's switch on the right of the footer (FilesMode.jsx): on while the pane runs ssh (or the mode is on);
+// grey otherwise, its title saying why
+function FilesSwitch({ t, wid, info }) {
+  const w = useStore(wins, (x) => x[wid]);
+  const tab = w && w.tabs.find((x) => x.id === w.active);
+  const on = !!tab?.files;
+  const can = on || info.process === 'ssh';
+  return (
+    <View title={can ? null : tr('terminal.files.needsSsh')} onClick={can ? () => patchWin(wid, (x) => ({ tabs: x.tabs.map((tb) => (tb.id === x.active ? { ...tb, files: !tb.files } : tb)) })) : undefined}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 18, paddingHorizontal: 6, borderRadius: 5, backgroundColor: on ? 'rgba(10,132,255,0.22)' : 'transparent', opacity: can ? 1 : 0.45 }}>
+      <Text style={small(t, { color: on ? t.text : t.textDim })}>{tr('terminal.files.switch')}</Text>
+      <View style={{ width: 24, height: 13, borderRadius: 7, backgroundColor: on ? t.accent : t.control }}>
+        <View style={{ position: 'absolute', top: 2, [on ? 'right' : 'left']: 2, width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' }} />
+      </View>
+    </View>
+  );
+}
+
 export function StatusBar({ t, sid, wid }) {
   const [info, setInfo] = useState(() => term.info(sid));
   const clock = useClock((d) => formatTime(d), 1000);
@@ -206,6 +224,7 @@ export function StatusBar({ t, sid, wid }) {
       <View style={{ flex: 1 }} />
       {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
       {info.altScreen && <Item label={tr('terminal.status.altScreen')} />}
+      <FilesSwitch t={t} wid={wid} info={info} />
       <Item label={`${info.cols}×${info.rows}`} />
       <Item label={clock} />
     </View>
