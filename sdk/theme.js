@@ -3,6 +3,7 @@
 import { createContext, createElement, useContext, useEffect } from 'react';
 import { settings } from './settings.js';
 import { createStore } from './store.js';
+import { windowButtonsPref, gtkButtonLayout } from './windowbuttons.js';
 
 // Minimal tokens every theme must provide (see themes/README.md).
 export const DEFAULT_TOKENS = {
@@ -54,7 +55,8 @@ function publishTokens(value) {
 
 // Linux apps (GTK, GNOME, Qt) read the mode, accent and title-bar button order through
 // org.freedesktop.portal.Settings, served by lord-server (ui/portal.c). gtkButtons is the
-// GTK order: traffic lights on the left, or buttons on the right in a taskbar-style theme.
+// GTK order: traffic lights on the left, or buttons on the right in a taskbar-style theme, unless the person chose
+// a side in Settings → Desktop & Dock → Title bars (sdk/windowbuttons.js, issue #58).
 const GNOME_ACCENTS = { azul: 'blue', violeta: 'purple', rosa: 'pink', naranja: 'orange', verde: 'green', grafito: 'slate',
   rojo: 'red', amarillo: 'yellow', turquesa: 'teal', celeste: 'blue' };
 let portalSent = '';
@@ -63,7 +65,7 @@ function syncPortal(value) {
     if (typeof lord === 'undefined' || !lord.portal) return;
     const name = settings.get().accent || '';
     const msg = { dark: value.mode !== 'light', accent: /^#[0-9a-f]{6}$/i.test(value.accent) ? value.accent : '#0a84ff',
-      accentName: GNOME_ACCENTS[name] || 'blue', buttons: value.gtkButtons || 'close,minimize,maximize:' };
+      accentName: GNOME_ACCENTS[name] || 'blue', buttons: gtkButtonLayout(windowButtonsPref(settings.get()), value.gtkButtons) };
     const json = JSON.stringify(msg);
     if (json !== portalSent) { portalSent = json; lord.portal.set(msg); }
   } catch (e) { /* no portal */ }

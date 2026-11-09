@@ -301,7 +301,10 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   - GTK 3 has no accent: its own stays blue.
 - **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Lord Classic
   theme asks for them on the right with the `gtkButtons` token (`:minimize,maximize,close`). GTK
-  apps, Chromium and Firefox move them live when the theme changes.
+  apps, Chromium and Firefox move them live when the theme changes. Since 0.8.8.7 (#58) Settings →
+  Desktop & Dock → Title bars → Window buttons (`settings.windowButtons`: `auto`, `left`, `right`;
+  `sdk/windowbuttons.js`) puts both themes' frames on one side, and the same side is published here:
+  Left is `close,minimize,maximize:`, Right `:minimize,maximize,close`, Automatic the theme's token.
 - **Where the session can't reach** (0.8.8.6, #52). Debian's default `button-layout` is
   `appmenu:close`: a lone close button on the right, which is what an app shows when it reads neither
   the keyfile nor the portal: one restricted to «no access to your files» (its view has no

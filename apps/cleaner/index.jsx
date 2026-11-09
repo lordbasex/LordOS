@@ -3,7 +3,7 @@
 // paths, never authority. Scanning runs in the sandboxed lord-clean helper; plans and their execution stay in
 // lord-server (lord.clean). Sections appear only for what works.
 import {
-  View, cleaner, wm, windows, useStore, useAppWindow, useSettings, userDirs, t as tr, formatBytes, spacing,
+  View, cleaner, wm, windows, useStore, useAppWindow, useSettings, useWindowButtons, themes, userDirs, t as tr, formatBytes, spacing,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Sky, Tints, Tile, Orb, Enter, Pill, GlassButton, PalProvider, usePal, tween } from './ui.jsx';
@@ -295,8 +295,11 @@ function Body() {
   const failed = info.state === 'failed' && info.error ? tr(`cleaner.error.${info.error}`) : '';
 
   // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Lord Classic
-  // draws its own buttons at the end of the top edge (themes/classic/components/Window.jsx), so that edge is taller.
-  const classic = s.theme === 'classic', topEdge = classic ? 34 : 14;
+  // draws its own buttons on the top edge (themes/classic/components/Window.jsx), so that edge is taller. In Lord Flow
+  // the lights are the sidebar's, unless the window buttons go at the end: the theme draws them there (issue #58).
+  // the theme that is running (settings.theme is null until one is chosen in Appearance)
+  const classic = themes.current() === 'classic', topEdge = classic ? 34 : 14;
+  const lightsAtStart = useWindowButtons(true).atStart, ownLights = !classic && lightsAtStart;
   const move = () => wm.beginMove(winId), zoom = () => wm.toggleMaximize(winId);
 
   return (
@@ -304,7 +307,7 @@ function Body() {
       <Sky />
       <Tints section={section} />
       <View ref={side} style={{ width: 236, flexShrink: 0, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14, gap: 4, overflow: 'hidden', backgroundColor: p.side, borderInlineEnd: `1px solid ${p.line}` }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, marginBottom: spacing.m }}>{classic ? null : <Lights id={winId} />}<View onMouseDown={move} onDoubleClick={zoom} style={{ flex: 1, alignSelf: 'stretch', minHeight: 16 }} /></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, marginBottom: spacing.m }}>{ownLights ? <Lights id={winId} /> : null}<View onMouseDown={move} onDoubleClick={zoom} style={{ flex: 1, alignSelf: 'stretch', minHeight: 16 }} /></View>
         {SECTIONS.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} badge={pipe && id === 'scan' ? `${pipe.step + 1}/${MODULES.length}` : ''} />)}
         <View style={{ flex: 1 }} />
         {BOTTOM.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} />)}

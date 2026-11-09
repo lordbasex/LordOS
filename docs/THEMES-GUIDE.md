@@ -140,7 +140,12 @@ the accent and the title-bar button order through the settings portal (`publishT
   the apps ([DESIGN.md](DESIGN.md#theme-tokens-for-the-shared-controls)).
 - Scroll bars: `scrollThumb`, `scrollThumbHover`, `scrollRadius`, `scrollThumbBorder`.
 - `gtkButtons`: the GTK title-bar button order sent to Linux apps (`':minimize,maximize,close'` for
-  buttons on the right; by default `'close,minimize,maximize:'`).
+  buttons on the right; by default `'close,minimize,maximize:'`). It is used while Settings → Desktop &
+  Dock → Title bars → Window buttons is Automatic; Left or Right override it.
+- Window buttons: a theme's frame asks `useWindowButtons(themeStart)` (from `@lordos/sdk`; `themeStart` is
+  where the theme puts them by itself) and draws its buttons first in the title bar's row when `atStart`,
+  in the returned `order` (`'close'`, `'minimize'`, `'maximize'`, close always nearest the corner). Left
+  and Right are the screen's sides in every language; Automatic follows the reading direction (#58).
 - `radius`: a general corner radius (default 8).
 
 `ThemeProvider` adds two tokens from the user's settings: `scrollBars` and `reduceMotion`. The

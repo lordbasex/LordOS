@@ -7,7 +7,9 @@
 // Lord Classic has no global menu bar: an app that declares menus (File, Edit, View, Go…; the same
 // ones Lord Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, t as tr } from '@lordos/sdk';
+// Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
+// icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -118,6 +120,7 @@ export function Window({ win, t, focused, app }) {
   const [menu, setMenu] = useState(null);
   const hoverTimer = useRef(0), leaveTimer = useRef(0);
   const flat = win.maximized || !!win.snapped;
+  const { atStart, order } = useWindowButtons(false);
   useEffect(() => {
     const offMove = addListener('pointermove', (e) => {
       const d = drag.current;
@@ -167,10 +170,11 @@ export function Window({ win, t, focused, app }) {
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: TITLE_H, flexDirection: 'row', pointerEvents: 'box-none' }}>
-            <View style={{ flex: 1, pointerEvents: 'none' }} />
-            <FrameButton t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
-            <FrameButton t={t} focused={focused} onClick={() => wm.toggleMaximize(win.id)}>{(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}</FrameButton>
-            <FrameButton t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+            {atStart ? null : <View style={{ flex: 1, pointerEvents: 'none' }} />}
+            {order.map((k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+              : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
+                : <FrameButton key={k} t={t} focused={focused} onClick={() => wm.toggleMaximize(win.id)}>{(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}</FrameButton>))}
+            {atStart ? <View style={{ flex: 1, pointerEvents: 'none' }} /> : null}
           </View>
         ) : null}
         {wmenu && (
@@ -187,10 +191,19 @@ export function Window({ win, t, focused, app }) {
   const openLayouts = () => {
     if (!maxRef.current) return;
     const [x, y, w, h] = lord.getLayout(maxRef.current.id);
-    setLayouts({ x: x + w / 2 - BTN_W / 2, y: y + h + 4 });
+    // under the button: ending there when the buttons are on the window's right, starting there when on its left
+    setLayouts(x + w / 2 < geo.x + geo.w / 2 ? { left: x, y: y + h + 4 } : { x: x + w / 2 - BTN_W / 2, y: y + h + 4 });
   };
   const enterMax = () => { clearTimeout(leaveTimer.current); clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(openLayouts, 550); };
   const titleMenu = (e) => setMenu({ x: e.x, y: e.y });
+  const button = (k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+    : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
+      : (
+        <FrameButton key={k} t={t} focused={focused} anchor={maxRef} onClick={() => { setLayouts(null); wm.toggleMaximize(win.id); }} onEnter={enterMax} onLeave={leaveMax}>
+          {(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}
+        </FrameButton>
+      ));
+  const buttons = <View style={{ flexDirection: 'row', gap: 8 }}>{order.map(button)}</View>;
   return (
     <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{
       borderRadius: flat ? 0 : 8, backgroundColor: app.transparent ? 'transparent' : t.windowBg, overflow: 'hidden',
@@ -202,15 +215,12 @@ export function Window({ win, t, focused, app }) {
         if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false };
       }}
         onDoubleClick={() => wm.toggleMaximize(win.id)} onContextMenu={titleMenu}
-        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingStart: 12, gap: 8,
+        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', ...(atStart ? { paddingEnd: 12 } : { paddingStart: 12 }), gap: 8,
           backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
+        {atStart ? buttons : null}
         {Icon ? <Icon size={16} /> : null}
         <Text style={{ flex: 1, fontSize: 12, color: focused ? t.text : t.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{windowTitle(win)}</Text>
-        <FrameButton t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
-        <FrameButton t={t} focused={focused} anchor={maxRef} onClick={() => { setLayouts(null); wm.toggleMaximize(win.id); }} onEnter={enterMax} onLeave={leaveMax}>
-          {(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}
-        </FrameButton>
-        <FrameButton t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+        {atStart ? null : buttons}
       </View>
       <AppMenuStrip t={t} win={win} focused={focused} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>

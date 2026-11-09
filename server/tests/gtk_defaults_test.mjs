@@ -45,8 +45,9 @@ eq('override: Lord Flow\'s layout', wm['button-layout'], `'${WANT}'`);
 const ini = read('assets/gtk/settings.ini').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 eq('settings.ini: one group and one key', ini, ['[Settings]', `gtk-decoration-layout=${WANT}`]);
 
-const theme = /value\.gtkButtons \|\| '([^']*)'/.exec(read('sdk/theme.js'));
-eq('sdk/theme.js default', theme && theme[1], WANT);
+// the theme's own layout or this default, unless Settings → Desktop & Dock → Title bars chose a side (#58)
+const theme = /themeLayout \|\| '([^']*)'/.exec(read('sdk/windowbuttons.js'));
+eq('sdk/windowbuttons.js default', theme && theme[1], WANT);
 const portal = /buttons\[64\] = "([^"]*)"/.exec(read('server/src/ui/portal.c'));
 eq('portal.c default', portal && portal[1], WANT);
 const classic = /gtkButtons:\s*'([^']*)'/.exec(read('themes/classic/tokens.js'));

@@ -3,10 +3,11 @@
 // position. Saved in settings.json (sdk/dock.js: DOCK_DEFAULTS) and the theme applies it live, including
 // the work area. «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
 // Menu Bar (Taskbar in Lord Classic) and Control Center: what the bar and the panel show (issue #58,
-// sdk/menubarmodel.js); everything is on until the user turns it off.
+// sdk/menubarmodel.js); everything is on until the user turns it off. Title bars: the side of the window buttons in
+// both themes (sdk/windowbuttons.js, issue #58).
 import {
   View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, dock, themes,
-  spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp, menuBarEveryDisplay,
+  spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp, menuBarEveryDisplay, WINDOW_BUTTON_SIDES, windowButtonsPref,
 } from '@lordos/sdk';
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
@@ -129,6 +130,21 @@ function ControlCenterSection() {
   );
 }
 
+// Where the close, minimize and maximize buttons go: the theme's own side, the left or the right, in Lord Flow and
+// Lord Classic alike (and for Linux apps that draw their own title bar).
+function WindowsSection({ classic }) {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  return (
+    <Section title={tr('settings.dock.windows.title')} footer={tr(classic ? 'settings.dock.windows.footerClassic' : 'settings.dock.windows.footer')}>
+      <SettingRow label={tr('settings.dock.windows.buttons')}>
+        <Segmented small appearance="neutral" value={windowButtonsPref(s)} onChange={(windowButtons) => set({ windowButtons })}
+          options={WINDOW_BUTTON_SIDES.map((v) => [v, tr(`settings.dock.windows.${v}`)])} />
+      </SettingRow>
+    </Section>
+  );
+}
+
 export function DockSettings() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -149,6 +165,7 @@ export function DockSettings() {
           </Section>
         ) : null}
         <MenuBarSection classic />
+        <WindowsSection classic />
         <ResetDock classic />
       </Stack>
     );
@@ -183,6 +200,7 @@ export function DockSettings() {
       </Section>
       <MenuBarSection />
       <ControlCenterSection />
+      <WindowsSection />
       <ResetDock />
     </Stack>
   );

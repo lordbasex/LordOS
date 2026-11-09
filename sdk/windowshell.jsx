@@ -18,6 +18,18 @@ import { wm, fxNodes, frameRadii, activeDesktop } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { desktopFx } from './desktops.js';
 import { OverviewCover, OverviewPlaceholder, useOverviewPlace } from './overview.jsx';
+import { useSettings } from './settings.js';
+import { direction } from './i18n.js';
+import { windowButtonsPref, buttonsAtStart, buttonOrder } from './windowbuttons.js';
+
+// Where a title bar's buttons go (Settings → Desktop & Dock → Title bars, issue #58; sdk/windowbuttons.js).
+// themeStart: the theme's own place (Lord Flow true, Lord Classic false). atStart: first in the title bar's row;
+// order: the buttons in the row's order ('close', 'minimize', 'maximize').
+export function useWindowButtons(themeStart) {
+  const [s] = useSettings();
+  const atStart = buttonsAtStart(windowButtonsPref(s), themeStart, direction() === 'rtl');
+  return { atStart, order: buttonOrder(atStart) };
+}
 
 export const WINDOW_EDGE = 6;     // px of border outside the frame
 const INSIDE = 3;                 // and inside

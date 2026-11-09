@@ -164,6 +164,7 @@ EOF
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
     if have node; then run "bt-audio-model-test (sdk/btaudiomodel.js)" node tests/bt_audio_model_test.mjs; fi
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
+    if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
