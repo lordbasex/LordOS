@@ -124,11 +124,23 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(200, {'State': '', 'Option': None, 'Error': ''})
         if m == 'config/get' and (req.get('name') or '') in SESSIONS:
             return self.answer(200, dict(SESSIONS[req.get('name')]))
+        if m == 'config/update' and (req.get('name') or '') in SESSIONS:
+            s = SESSIONS[req.get('name')]
+            params = req.get('parameters') or {}
+            if params.get('cookies') == '':
+                s['cookies'] = 'signed-in-again'      # a sign-in with the password and the trust token
+            log(m, 'iclouddrive', 'cookies=' + repr(params.get('cookies')))
+            return self.answer(200, {'State': '', 'Option': None, 'Error': ''})
         if m == 'mount/mount':
             name = (req.get('fs') or '').rstrip(':')
             if name in SESSIONS:
-                SESSIONS[name]['cookies'] = next_cookie()
-                log(m, 'iclouddrive', 'cookies=' + SESSIONS[name]['cookies'])
+                s = SESSIONS[name]
+                # "refused": a provider that refuses a saved session (rclone issue 9658), not one from a sign-in
+                if CFG.get('session') == 'refused' and s['cookies'] != 'signed-in-again':
+                    log(m, 'iclouddrive', 'refused')
+                    return self.answer(500, {'error': 'requestPCS(iclouddrive): HTTP error 500 (500 Internal Server Error) returned body: "{\\"success\\":false,\\"error\\":\\"Missing X-APPLE-WEBAUTH-TOKEN cookie\\"}"', 'status': 500})
+                s['cookies'] = next_cookie()
+                log(m, 'iclouddrive', 'cookies=' + s['cookies'])
         if m in ('config/create', 'config/update'):
             st, res = opt.get('state', ''), opt.get('result', '')
             if m == 'config/create':

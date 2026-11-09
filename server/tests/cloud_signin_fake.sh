@@ -110,5 +110,16 @@ check "  not with the first one" hasnt "$(grep '^config/create iclouddrive' "$T/
 check "  the session is never in rclone.conf" sh -c '[ -s "$1" ] && ! grep -q "cookie-\|trust-\|someone@" "$1"' x "$H/.config/lordos/cloud/rclone.conf"
 stop
 
+# 5. a saved session the provider refuses (rclone issue 9658): the cookies are dropped once, the trust token kept, and
+#    the account mounts again without a new sign-in
+run refused
+sed -i 's/}$/,"session":"refused"}/' "$H/.fake-rclone.json"
+r=$(cmd add iclouddrive iCloud '{"apple_id":"someone@example.test","password":"pw-not-real"}')
+cmd wait '"name":"iCloud"' 10 >/dev/null; cmd sleep 2500 >/dev/null
+check "refused session: the cookies are dropped once" sh -c '[ "$(grep -c "^config/update iclouddrive cookies=.." "$1")" = 1 ]' x "$T/rc-refused.log"
+check "  then the mount goes on with a new session" sh -c 'grep -q "^mount/mount iclouddrive cookies=cookie-" "$1"' x "$T/rc-refused.log"
+check "  the log says why" sh -c 'grep -q "refused its saved session" "$1"' x "$T/harness-refused.log"
+stop
+
 echo "cloud-signin-fake: $pass passed, $fail failed"
 [ "$fail" = 0 ]

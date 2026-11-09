@@ -172,8 +172,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   account's session (cookies, trust token) in its options and updates it in memory, but only accounts signed in
   through a browser were read back into the keyring, so rclone started again with the session of the first sign-in,
   which the provider refuses. Every account is now read back every 5 minutes and once more before rclone stops. An
-  option rclone gives back stays out of `rclone.conf` unless it is known not to be secret. When the provider does
-  refuse the session, the account says Sign In Again (instead of "couldn't open the account's folder") and is tried
+  option rclone gives back stays out of `rclone.conf` unless it is known not to be secret. When the provider refuses a saved
+  session the way rclone sometimes does for a password provider after a restart (its issue 9658: "Missing
+  WEBAUTH-TOKEN cookie", whether or not the account has end-to-end encryption), the session is dropped once and rclone signs in
+  again with the password and the kept trust token, which asks for no code while the token lasts. If that fails too, the account says Sign In Again (instead of "couldn't open the account's folder") and is tried
   again after 30 minutes instead of every 30 seconds.
 
 - **Files: a folder of photos no longer runs the desktop out of memory** (GitHub #71, #82). Each JPEG or PNG icon was

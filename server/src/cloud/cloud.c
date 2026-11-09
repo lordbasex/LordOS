@@ -1236,6 +1236,27 @@ static void about_acc(Acc *a) {
     cl_changed();
 }
 
+/* The provider refused the saved session (rclone issue 9658: iCloud Drive, with or without Advanced Data Protection, after
+ * a restart of rclone: "requestPCS … Missing X-APPLE-WEBAUTH-TOKEN cookie"). rclone reuses the saved cookies and never
+ * signs in again on that error; without them it signs in with the password and the trust token, which asks for no code
+ * while the token lasts (about 30 days), and saves a new session. So once per run, the cookies are dropped (the trust
+ * token kept) and the mount is tried again. 1 if the account was updated. */
+static int drop_session(Acc *a, const char *msg) {
+    if (a->fresh_tried || strcmp(a->k->type, "iclouddrive") || !strstr(msg, "requestPCS")) return 0;
+    a->fresh_tried = 1;
+    char body[160];
+    cl_pf(body, sizeof body, "{\"name\":\"%s\",\"parameters\":{\"cookies\":\"\"},\"opt\":{\"nonInteractive\":true,\"noObscure\":true}}", a->id);
+    char m2[256] = "";
+    JDoc d;
+    int st = rcj(RCM_UPDATE, body, &d, m2, sizeof m2, RC_LONG);
+    /* a question back (a code is needed after all): the person signs in again, as before */
+    int question = d.root && json_str(d.root, "State") && json_str(d.root, "State")[0];
+    if (d.root) json_free(&d);
+    fprintf(stderr, "cloud: %s: the provider refused its saved session; signing in again with the kept trust token: %s\n",
+            a->id, st == 200 && !question ? "done" : "a new sign-in is needed");
+    return st == 200 && !question;
+}
+
 static int mount_acc(Acc *a) {
     char dir[PATH_MAX], msg[256];
     mkdirs(cl_root, 0700);
@@ -1266,6 +1287,7 @@ static int mount_acc(Acc *a) {
     }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
+    else if (drop_session(a, msg)) { token_check(a); return mount_acc(a); }   /* once: fresh_tried */
     cl_changed();
     return st == 200 ? 0 : -1;
 }
