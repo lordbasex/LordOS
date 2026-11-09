@@ -431,6 +431,8 @@ void vm_list_json(VjB *b, const VModel *m) {
         vb_ks(b, "sub", subtitle(e, tmp, sizeof tmp));
         const char *url = vm_field(e, "url");
         if (url && url[0]) vb_ks(b, "url", url);
+        const char *host = vm_field(e, "host");     /* Network, SSH and Database entries: autofill matches it */
+        if (host && host[0]) vb_ks(b, "host", host);
         if (e->fav) vb_kb(b, "fav", 1);
         if (e->arch) vb_kb(b, "arch", 1);
         if (e->trash) vb_kn(b, "trash", (double)e->trash);

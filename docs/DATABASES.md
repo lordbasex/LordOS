@@ -29,8 +29,11 @@ apps/databases  ──lord.sql.request/poll──▶  lord-server (ui/js_sql.c, 
   no files) before it reads a byte from the server. It links OpenSSL (TLS starts in the middle of the MySQL
   handshake, and `caching_sha2_password` without TLS needs RSA), which makes it the fifth binary to do so.
 - **One connection, one process.** Closing or cancelling kills it; a crash only closes that tab.
-- **Passwords** live in the keyring (`databases:<favorite id>`, account = user), reach lord-sql in memory in
-  the `open` request, and are never written to disk, the console or logs.
+- **Passwords** live in the keyring (`databases:<favorite id>`, account = user, shown in Passwords under the
+  session keyring), reach lord-sql in memory in the `open` request, and are never written to disk, the console
+  or logs. Every password field has the 🔑 `<AutofillButton>`: the password kept for that favorite, and the
+  Passwords entries whose host is the favorite's (a Database, Network or SSH entry's host field, or a site's
+  URL) while the vault is unlocked; the secret leaves lord-vault only when the user picks one.
 - **Certificates** are checked against the system store (or the favorite's CA file, opened by lord-server)
   and the host name. A failure is an event; only an explicit Trust stores that sha256 in the favorite.
 - **The compositor never waits**: every call is asynchronous; results are polled.

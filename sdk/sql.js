@@ -6,7 +6,7 @@
 //   sqlRequest(op, args)                 → promise with the reply, or an Error with .code (and .data)
 //   onSqlEvent(fn)                       events: closed, cert, crash
 //   sqlFavorites.get() / save(file)      favorites.json (no passwords: those live in the keyring)
-//   sqlPasswords.get(fav) / set(fav, pw) / remove(fav)
+//   sqlPasswords.get(fav) / set(fav, pw) / remove(fav) / service(fav)
 import { keyring } from './vault.js';
 import { t } from './i18n.js';
 
@@ -70,6 +70,7 @@ export const sqlFavorites = {
 const service = (fav) => `databases:${fav.id}`;
 
 export const sqlPasswords = {
+  service,                                     // the keyring service (<AutofillButton service>)
   async get(fav) {
     try { const it = await keyring.get('databases', { service: service(fav), account: fav.user || '' }); return it ? it.secret : null; }
     catch (e) { return null; }

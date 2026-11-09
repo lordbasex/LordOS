@@ -28,6 +28,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `mysql_native_password` and `caching_sha2_password`), with no sockets of its own and no files: lord-server
     connects only to a saved favorite, through a connector of its own, so the firewall and Monitor show it as
     "Databases" (`lordos:sql`). Everything a server sends is parsed bounds-checked and fuzzed in the tests.
+  - Integrated with Passwords: every password field has the 🔑 button, which offers the password kept for that
+    connection and the Passwords entries for the same host (a Database, Network or SSH entry's host, or a site),
+    while Passwords is unlocked; the password leaves Passwords only when you pick one. Autofill in native apps now
+    also matches an entry's host field.
 
 - **Machines: shared folders.** Up to four folders of this computer inside a machine, read-only unless you turn writing
   on for one (Configure → Sharing → Add a Folder; the bar's folder button lists them, opens each in Files and copies the

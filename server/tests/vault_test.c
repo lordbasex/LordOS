@@ -269,6 +269,21 @@ static void test_model(void) {
     vm_entry_json(&b, ne, 1, 0);
     check(b.p && strstr(b.p, "s3cr3t"), "with reveal they do");
     vb_free(&b);
+    /* the light list carries a Database entry's host (autofill matches it), never its password */
+    {
+        const char *db = "{\"cat\":\"database\",\"title\":\"Shop\",\"f\":[{\"k\":\"host\",\"t\":\"text\",\"v\":\"db.example.net\"},"
+                         "{\"k\":\"username\",\"t\":\"text\",\"v\":\"shop\"},{\"k\":\"password\",\"t\":\"hidden\",\"v\":\"Db-s3cr3t\"}]}";
+        VModel md;
+        vm_init(&md);
+        vj_parse(&j, db, strlen(db));
+        vm_upsert(&md, &j, 0, NULL, err, sizeof err);
+        vj_free(&j);
+        vb_init(&b);
+        vm_list_json(&b, &md);
+        check(b.p && strstr(b.p, "\"host\":\"db.example.net\"") && !strstr(b.p, "Db-s3cr3t"), "list: host, no password");
+        vb_free(&b);
+        vm_free(&md);
+    }
     /* content round trip */
     size_t dl;
     char *dump = vm_dump(&m, &dl);

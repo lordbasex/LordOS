@@ -3,7 +3,7 @@
 // the production / read-only switches; Test Connection and Connect. The password is asked in a sheet when Passwords
 // doesn't keep it or the server refuses it; a certificate that doesn't check asks to be trusted by its sha256. The first
 // run (and File > Import Connections) offers Sequel Ace's and Sequel Pro's favorites.
-import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, useStore, sqlAvailable, sqlPasswords, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillButton, useStore, sqlAvailable, sqlPasswords, t as tr } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePal, Icons, Dot, Btn, IconBtn, Check, Popup, Field, Box, Note, Sheet, MONO, MenuGlyph } from './ui.jsx';
 import { store, favRev, readFavorites, writeFavorites, openSession, testFavorite, prefs, setPrefs } from './conn.js';
@@ -238,6 +238,7 @@ export function Connect({ onConnected }) {
   const pwField = (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       <TextInput secure value={password} onChange={setPassword} placeholder={tr('databases.pw.placeholder')} style={{ flex: 1 }} onSubmit={go} />
+      <PasswordsFill fav={draft} onFill={({ username, password: pw }) => { setPassword(pw || ''); if (username && !draft.user) set({ user: username }); }} />
       <Btn label={tr('databases.pw.keep')} icon={(c) => Icons.lock(c, 12)} onClick={keepPassword} />
     </View>
   );
@@ -486,6 +487,12 @@ function FileRow({ path, onPick, onClear }) {
   );
 }
 
+// 🔑 next to a password field: what Databases kept for this favorite, and the Passwords entries for its host
+// (a Database entry's host field, or a site), while the vault is unlocked
+function PasswordsFill({ fav, onFill }) {
+  return <AutofillButton app="databases" service={sqlPasswords.service(fav)} account={fav.user || ''} url={fav.type === 'socket' ? undefined : fav.host} onFill={onFill} />;
+}
+
 function PasswordSheet({ sheet, busy, onCancel, onGo }) {
   const p = usePal();
   const [pw, setPw] = useState('');
@@ -498,7 +505,10 @@ function PasswordSheet({ sheet, busy, onCancel, onGo }) {
         {tr('databases.pw.detail', { user: f.user || '—', server: f.type === 'socket' ? f.socket : `${f.host}:${f.port}` })}
       </Text>
       {f.imported?.from ? <Text style={{ fontSize: 12, color: p.dim, lineHeight: 1.4, textAlign: 'start' }}>{tr('databases.pw.imported')}</Text> : null}
-      <TextInput secure autoFocus value={pw} onChange={setPw} onSubmit={() => onGo(pw, keep)} placeholder={tr('databases.f.password')} />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TextInput secure autoFocus value={pw} onChange={setPw} onSubmit={() => onGo(pw, keep)} placeholder={tr('databases.f.password')} style={{ flex: 1 }} />
+        <PasswordsFill fav={f} onFill={({ password }) => setPw(password || '')} />
+      </View>
       <Check on={keep} onChange={setKeep} label={tr('databases.pw.keepIn')} />
       {sheet.error ? <Note kind="bad">{sheet.error}</Note> : null}
     </Sheet>

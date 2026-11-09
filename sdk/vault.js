@@ -10,7 +10,7 @@
 //       inside an isolated .lpk app it goes through the broker and the owner is the app's own id
 //   autofill(app, { url | service })                → [{ id, title, username }] from Passwords (if it is unlocked)
 //   <KeyringPrompt />                               system prompt to unlock the keyring (mounted by startShell)
-//   <AutofillButton app service|url|ssid onFill />   "fill from Passwords" next to a login field
+//   <AutofillButton app service|url|ssid account? onFill />   "fill from Passwords" next to a login field
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -120,7 +120,7 @@ export async function autofill(app, { url, service, ssid } = {}) {
   let list;
   try { list = (await vaultRequest('list')).entries || []; } catch (e) { return []; }
   const hit = (e) => (ssid ? e.cat === 'wifi' && e.sub === ssid
-    : hostOf(e.url) === host || hostOf(e.url).endsWith(`.${host}`) || (hostOf(e.url) && host.endsWith(`.${hostOf(e.url)}`)) ||
+    : hostOf(e.url) === host || hostOf(e.url).endsWith(`.${host}`) || (hostOf(e.url) && host.endsWith(`.${hostOf(e.url)}`)) || hostOf(e.host) === host ||
       String(e.title).toLowerCase().includes(host.split('.')[0]));
   return list.filter((e) => !e.trash && hit(e)).map((e) => ({ id: e.id, title: e.title, username: e.sub || '' }));
 }
@@ -201,13 +201,13 @@ export function KeyringPrompt() {
 //   <AutofillButton app="settings" service="wifi:Casa" ssid="Casa" onFill={({ username, password }) => …} />
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
 // The secret leaves lord-vault only when the user picks one.
-export function AutofillButton({ app, service, url, ssid, onFill }) {
+export function AutofillButton({ app, service, account = '', url, ssid, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(null);
   const load = async () => {
     const out = [];
-    if (service) { try { const k = await keyring.get(app, { service }); if (k) out.push({ kind: 'kr', title: k.label || service, username: k.account, secret: k.secret }); } catch (e) { /* locked */ } }
+    if (service) { try { const k = await keyring.get(app, { service, account }); if (k) out.push({ kind: 'kr', title: k.label || service, username: k.account, secret: k.secret }); } catch (e) { /* locked */ } }
     for (const e of await autofill(app, { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
     setItems(out);
   };
