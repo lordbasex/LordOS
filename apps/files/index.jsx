@@ -55,6 +55,13 @@ const localKeys = (items) => items.map((i) => (typeof i === 'string' ? i : { ...
 
 const VIEWS = ['icons', 'list', 'columns', 'gallery'];
 const VIEW_GLYPH = { icons: '▦', list: '≡', columns: '◫', gallery: '▣' };
+// the toolbar's New Folder: a small folder with a plus on it
+const NewFolderGlyph = () => (
+  <View style={{ width: 18, height: 18, justifyContent: 'center' }}>
+    <FolderGlyph size={18} />
+    <Text style={{ position: 'absolute', left: 0, right: 0, top: 2, fontSize: 12, fontWeight: 700, color: '#ffffff', textAlign: 'center' }}>+</Text>
+  </View>
+);
 let tabSeq = 1;
 const newTab = (loc, from) => ({ id: tabSeq++, loc, back: [], fwd: [], view: from?.view || 'icons', sort: from?.sort || { by: 'name', desc: false }, zoom: from?.zoom || {}, group: from?.group || 'none', chain: [] });
 // State of each window: it survives the interface being remounted (a language change).
@@ -1041,6 +1048,7 @@ export default function Files() {
             <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
             <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
           </ToolbarGroup>
+          <ToolbarButton icon={<NewFolderGlyph />} title={tr('files.menu.newFolder')} onClick={() => newFolder(null)} disabled={!wDir} />
           {/* the folder's name is in the window's title bar, every theme draws it there */}
           <View style={{ flex: 1, minWidth: 0 }} />
           {curAcc && !tight ? <TransfersPill t={t} accounts={cf.accounts} acc={curAcc} /> : null}

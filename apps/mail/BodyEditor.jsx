@@ -2,7 +2,7 @@
 // one caret with selection, undo, and markdown shortcuts (Ctrl+B, Ctrl+I, Ctrl+K, lists). It is
 // the editor of the Notes app (apps/notes/NoteEditor.jsx), kept as a copy because apps cannot
 // import each other; the font is monospaced so every width is measured once per character.
-import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener } from '@lordos/sdk';
+import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener, requestPermission } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 const MONO = 1400;
@@ -58,7 +58,7 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, caret = null }) {
+export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, caret = null }) {
   const area = useRef(null);
   const token = useRef({}).current;
   const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
@@ -204,6 +204,24 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
     setSugg(null);
   };
 
+  // ---- clipboard ----
+  // Isolated Mail reads the clipboard through the broker: Ctrl+V is a paste lord-server saw, so it may read
+  // it once; Paste from the menu is not, so it asks for the clipboard permission (the system prompt) and
+  // reads it only if the person allows it. A permission denied stays denied (the prompt is not shown again).
+  const paste = async (fromMenu) => {
+    const st2 = lord.clipboard.state ? lord.clipboard.state() : { kind: 'text' };
+    if (st2.kind === 'image' && onPasteImage) { const md = onPasteImage(); if (md) insert(`${lo > 0 && text[lo - 1] !== '\n' ? '\n' : ''}${md}\n`, 'edit'); return; }
+    let txt = '';
+    try { txt = clipboard.get(); } catch (e) {
+      if (!fromMenu || !(await requestPermission('mail', 'clipboard'))) return;
+      try { txt = clipboard.get(); } catch (e2) { return; }
+    }
+    // after the prompt this render's text and selection may be old: the current insert
+    if (txt) st.current.insert(txt.replace(/\r\n/g, '\n'), 'edit');
+  };
+  const copy = () => { if (hi > lo) clipboard.set(text.slice(lo, hi)); };
+  const cut = () => { if (hi > lo) { clipboard.set(text.slice(lo, hi)); replace(lo, hi, '', 'edit'); } };
+
   const undo = () => { const s = st.current; const u = s.undo.pop(); if (!u) return; s.redo.push({ text, sel }); onChange(u.text); setSel(u.sel); s.last = 0; };
   const redo = () => { const s = st.current; const r = s.redo.pop(); if (!r) return; s.undo.push({ text, sel }); onChange(r.text); setSel(r.sel); s.last = 0; };
 
@@ -221,15 +239,9 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
       if (b === 'z' && !e.shift) return undo();
       if ((b === 'z' && e.shift) || b === 'y') return redo();
       if (b === 'a') return setSel({ a: 0, b: text.length });
-      if (b === 'c') { if (hi > lo) clipboard.set(text.slice(lo, hi)); return undefined; }
-      if (b === 'x') { if (hi > lo) { clipboard.set(text.slice(lo, hi)); replace(lo, hi, '', 'edit'); } return undefined; }
-      if (b === 'v') {
-        const st2 = lord.clipboard.state ? lord.clipboard.state() : { kind: 'text' };
-        if (st2.kind === 'image' && onPasteImage) { const md = onPasteImage(); if (md) insert(`${lo > 0 && text[lo - 1] !== '\n' ? '\n' : ''}${md}\n`, 'edit'); return undefined; }
-        const txt = clipboard.get();
-        if (txt) insert(txt.replace(/\r\n/g, '\n'), 'edit');
-        return undefined;
-      }
+      if (b === 'c') { copy(); return undefined; }
+      if (b === 'x') { cut(); return undefined; }
+      if (b === 'v') { paste(false); return undefined; }
       if (b === 'b') return wrap('**');
       if (b === 'i' && !e.shift) return wrap('*');
       if (b === 'k') { if (hi > lo) { const s = text.slice(lo, hi); replace(lo, hi, `[${s}](url)`, 'edit', lo + s.length + 3); } else replace(lo, hi, '[](url)', 'edit', lo + 1); return undefined; }
@@ -281,6 +293,7 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
 
   // the handler changes on every render: the text focus calls the current one
   st.current.onKey = onKey;
+  st.current.insert = insert;
   const caretRect = () => {
     if (!area.current) return null;
     const [ax, ay] = lord.getLayout(area.current.id);
@@ -289,6 +302,7 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
   st.current.caret = caretRect;
   if (apiRef) apiRef.current = {
     insert: (txt) => insert(txt, 'edit'), focus: () => take(),
+    hasSelection: () => hi > lo, cut, copy, paste: () => paste(true), selectAll: () => { take(); setSel({ a: 0, b: text.length }); },
     wrap: (a, b) => wrap(a, b), list: (kind) => listify(kind),
     quote: () => linePrefix((l) => (/^>\s?/.test(l) ? l.replace(/^>\s?/, '') : `> ${l}`)),
     link: () => { if (hi > lo) { const s = text.slice(lo, hi); replace(lo, hi, `[${s}](https://)`, 'edit', lo + s.length + 3); } else replace(lo, hi, '[](https://)', 'edit', lo + 1); },
@@ -318,6 +332,8 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
   const onMouseDown = (e) => {
     take();
     const p = posFromEvent(e);
+    // a right click inside the selection keeps it, for Cut and Copy in the menu
+    if (e.button === 2) { if (p < lo || p > hi) setSel({ a: p, b: p }); return; }
     const now = Date.now(), c = clicks.current;
     c.n = now - c.t < 400 ? c.n + 1 : 1;
     c.t = now;
@@ -378,7 +394,7 @@ export function BodyEditor({ value, onChange, size = 14, colors, onPasteImage, e
   }
   const caretRow = rowOf(sel.b);
   return (
-    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
+    <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
       {selRects}
       {out}
       {focus && blink && caretRow >= first && caretRow <= last && (
