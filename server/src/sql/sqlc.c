@@ -487,8 +487,16 @@ static char *read_big(int fd, size_t *len) {
 }
 
 /* {"conn":N, + the helper's object */
+/* The helper's reply with lord-server's own conn in front. The reply must be one JSON object with no
+ * "conn" of its own: a compromised helper must not name another connection (JSON.parse keeps the
+ * last of two equal keys). */
 static char *with_conn(int conn, const char *data, size_t len, size_t *out_len) {
     if (!data || len < 2 || data[0] != '{') return NULL;
+    JDoc d;
+    if (json_parse(data, len, &d, NULL, 0)) return NULL;
+    int ok = d.root && d.root->type == J_OBJ && !json_get(d.root, "conn");
+    json_free(&d);
+    if (!ok) return NULL;
     size_t rest = len - 1;
     int empty = 0;
     for (size_t i = 1; i < len && !empty; i++) { if (data[i] == '}') empty = 1; else if (data[i] != ' ') break; }
@@ -532,7 +540,11 @@ static void on_reply(Slot *s, int id, int type, char *data, size_t len) {
             size_t n = 0;
             char *w = with_conn(s->conn, data, len, &n);
             free(data);
-            if (!w) { push_err(id, "closed", "bad reply"); return; }
+            if (!w) {                                    /* a helper that breaks the protocol is ended */
+                push_err(id, "closed", "bad reply");
+                if (s->pid > 0) kill(s->pid, SIGKILL);
+                return;
+            }
             s->ready = 1;
             push_own(id, SQL_OK, w, n);
             return;
