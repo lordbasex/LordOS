@@ -168,6 +168,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Displays keep their signal across lock, logout and login, and logging out doesn't freeze the desktop.** At every
+  hand-off of the monitor, lord-sessiond removed the leaving session's framebuffers while they were still on the
+  screen; amdgpu refuses to turn a plane off that way ("atomic remove_fb failed with -22" in the kernel log at every
+  lock and logout) and the displays went dark, and a DisplayPort monitor put to sleep like that may not wake up until it
+  is unplugged. Every lit display now gets a black frame of its own mode first, let go with CLOSEFB (it stays until the
+  next session or the login screen shows its own), so nothing of the session stays visible and no link drops. Logging
+  out asks lord-sessiond for the login screen at once; the session then closes its apps and unmounts its cloud folders
+  off the screen, instead of leaving the desktop frozen for seconds meanwhile.
+
 - **A click anywhere in a window brings it forward, and the keyboard with it.** A sheet or dialog that keeps its clicks
   to itself (Settings → Cloud's sign-in, Mail's, Contacts' and Calendar's sheets, the file dialog, Monitor's map
   buttons, and more) stopped the click before the window could come forward. With another window in front (Passwords,

@@ -2801,6 +2801,10 @@ int main(int argc, char **argv) {
         term_events(js_term_event);
     }
 
+    /* a logout on the monitor: lord-sessiond takes it back now (a black frame on every display, the login screen up),
+     * so closing the apps and unmounting the cloud folders below happens off the screen instead of behind a frozen
+     * desktop for seconds */
+    if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
     cloud_stop();                         /* B11: every cloud folder unmounted (lazily if busy), then rclone quits */

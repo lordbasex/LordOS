@@ -129,6 +129,51 @@ static int send_msg(int type, const void *d, size_t n, const int *fds, int nfds)
  * last frame of an unlocked desktop. The session itself frees them when it handles RP_UNDISPLAY,
  * but that is asynchronous and a stuck or hostile session never does. Removing the one on the
  * screen turns that output off, which is what a switch shows anyway. */
+/* Before the leaving session's framebuffers go: every lit CRTC shows a black frame of its own mode, let go with CLOSEFB.
+ * Removing a framebuffer that is still on the screen makes the kernel turn the plane off, which amdgpu refuses ("atomic
+ * remove_fb failed with -22" at every lock and logout) and which drops a DisplayPort link: a monitor that went to deep
+ * sleep that way may not wake up again until it is unplugged. A black frame of the same mode keeps the signal, shows
+ * nothing of the session, and stays (closed, it no longer belongs to the file) until the next one shows its own. With no
+ * CLOSEFB (a kernel before 6.9) the black frame is removed with the rest, as before. Returns the CRTCs blacked out. */
+static int black_out(int fd) {
+    uint32_t crtcs[16], conns[32];
+    struct drm_mode_card_res r = { .crtc_id_ptr = (uint64_t)(uintptr_t)crtcs, .count_crtcs = 16,
+                                   .connector_id_ptr = (uint64_t)(uintptr_t)conns, .count_connectors = 32 };
+    if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r)) return 0;
+    uint32_t nc = r.count_crtcs < 16 ? r.count_crtcs : 16, nk = r.count_connectors < 32 ? r.count_connectors : 32;
+    int done = 0;
+    for (uint32_t i = 0; i < nc; i++) {
+        struct drm_mode_crtc c = { .crtc_id = crtcs[i] };
+        if (ioctl(fd, DRM_IOCTL_MODE_GETCRTC, &c) || !c.fb_id || !c.mode_valid || !c.mode.hdisplay || !c.mode.vdisplay) continue;
+        /* the connectors this CRTC drives */
+        uint32_t on[8];
+        uint32_t n = 0;
+        for (uint32_t j = 0; j < nk && n < 8; j++) {
+            struct drm_mode_get_connector k = { .connector_id = conns[j] };
+            if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &k) || !k.encoder_id) continue;
+            struct drm_mode_get_encoder e = { .encoder_id = k.encoder_id };
+            if (!ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &e) && e.crtc_id == crtcs[i]) on[n++] = conns[j];
+        }
+        if (!n) continue;
+        struct drm_mode_create_dumb d = { .width = c.mode.hdisplay, .height = c.mode.vdisplay, .bpp = 32 };
+        if (ioctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &d)) continue;       /* a new dumb buffer is zeroed: black */
+        struct drm_mode_fb_cmd f = { .width = d.width, .height = d.height, .pitch = d.pitch, .bpp = 32, .depth = 24, .handle = d.handle };
+        int ok = !ioctl(fd, DRM_IOCTL_MODE_ADDFB, &f);
+        if (ok) {
+            struct drm_mode_crtc set = { .crtc_id = crtcs[i], .fb_id = f.fb_id, .set_connectors_ptr = (uint64_t)(uintptr_t)on,
+                                         .count_connectors = n, .mode = c.mode, .mode_valid = 1 };
+            if (!ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set)) {
+                struct drm_mode_closefb cf = { .fb_id = f.fb_id };
+                if (ioctl(fd, DRM_IOCTL_MODE_CLOSEFB, &cf)) { /* an older kernel: drop_framebuffers removes it */ }
+                done++;
+            } else ioctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id);
+        }
+        struct drm_gem_close g = { .handle = d.handle };                /* the framebuffer keeps the buffer */
+        ioctl(fd, DRM_IOCTL_GEM_CLOSE, &g);
+    }
+    return done;
+}
+
 static int drop_framebuffers(int fd) {
     int total = 0;
     for (int pass = 0; pass < 16; pass++) {
@@ -198,6 +243,7 @@ static void take_back(void) {
     double t1 = rd_now(), t2 = t1;
     int fbs = 0, had = drm >= 0;
     if (drm >= 0) {
+        black_out(drm);                 /* nothing of the session on the screen, and no display turned off */
         fbs = drop_framebuffers(drm);
         t2 = rd_now();
         ioctl(drm, DRM_IOCTL_DROP_MASTER, NULL);

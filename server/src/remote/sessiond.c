@@ -1013,6 +1013,9 @@ static void from_shown(int type, const char *j) {
             leave_for_greeter("lock");
         }
         else if (strstr(j, "\"switch\"")) { sd_log("%s is switching user", shown_user); leave_for_greeter("switch"); }
+        /* a logout: the login screen at once; the session closes its apps and unmounts its cloud folders afterwards,
+         * off the screen, instead of leaving a frozen desktop up meanwhile */
+        else if (!strcmp(a, "logout")) { sd_log("%s is logging out", shown_user); leave_for_greeter("login"); }
         return;
     }
     if (type != RP_GREETER || shown != 'g') return;
