@@ -8,6 +8,7 @@
 #include "../term/term.h"
 #include "../term/termfill.h"
 #include "../term/tcapture.h"
+#include "../term/sftpc.h"
 #include "js_sys.h"
 #include "js_err.h"
 
@@ -850,7 +851,17 @@ static const JSCFunctionListEntry clip_funcs[] = {
     JS_CFUNC_DEF("deleteSaved", 1, f_clip_delete_saved),
 };
 
+/* Files mode (term/sftpc.c): a session's foreground process group, to find its ssh master by pid */
+static pid_t fg_of_session(int sid) {
+    Session *s = term_get(sid);
+    if (!s || !s->alive || s->fd < 0) return -1;
+    pid_t pg = tcgetpgrp(s->fd);
+    return pg > 0 ? pg : -1;
+}
+
 void js_term_register(JSContext *c, JSValue lord) {
+    sftp_set_fg(fg_of_session);
+    sftp_mux_dir();                     /* the ssh masters' folder, before the first shell starts */
     JSValue t = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, t, term_funcs, sizeof term_funcs / sizeof term_funcs[0]);
     JS_SetPropertyStr(c, lord, "term", t);

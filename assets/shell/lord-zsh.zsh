@@ -56,3 +56,15 @@ lord_imgcat() {
 }
 (( $+commands[imgcat] )) || alias imgcat=lord_imgcat
 lord_badge() { printf '\033]1337;SetBadgeFormat=%s\007' "$(printf %s "$*" | base64 -w0)"; }
+
+# ssh: shareable for Files mode, as in bash (one socket per shell in the terminal's 0700 folder). LORD_SSH_MUX=0 turns it off.
+ssh() {
+    if [[ -n "$LORD_SSH_MUX_DIR" && -d "$LORD_SSH_MUX_DIR" && "${LORD_SSH_MUX:-1}" != 0 ]]; then
+        case " $* " in
+            *ControlPath*|*ControlMaster*|*" -S "*|*" -O "*|*" -M "*) command ssh "$@"; return ;;
+        esac
+        command ssh -o ControlMaster=auto -o "ControlPath=$LORD_SSH_MUX_DIR/%C-$$" -o ControlPersist=no "$@"
+    else
+        command ssh "$@"
+    fi
+}

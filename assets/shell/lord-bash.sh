@@ -8,6 +8,8 @@
 #   OSC 133;D;n     terminó el comando con código n (marca azul o roja)
 #   OSC 7           directorio actual (pestañas nuevas abren ahí)
 #   OSC 1337;RemoteHost=usuario@host   para el cambio automático de perfil por host
+# y una función ssh: la conexión queda compartible (ControlMaster) con su socket en la carpeta de la terminal,
+# así el modo Archivos abre SFTP sobre la misma sesión, sin otro login (docs/TERMINAL.md, "Files mode").
 
 [ -r /etc/profile ] && . /etc/profile
 if [ -r ~/.bash_profile ]; then . ~/.bash_profile
@@ -71,3 +73,17 @@ command -v imgcat >/dev/null 2>&1 || alias imgcat=lord_imgcat
 
 # Insignia (badge) en la esquina de la terminal: lord_badge "texto"
 lord_badge() { printf '\033]1337;SetBadgeFormat=%s\007' "$(printf %s "$*" | base64 -w0)"; }
+
+# ssh: la conexión de esta pestaña, compartible por el modo Archivos (un socket por shell, en la carpeta 0700 de
+# la terminal; ControlPersist=no: se cierra con la sesión). Si ya pasás tus propias opciones de multiplexado,
+# no se toca nada. LORD_SSH_MUX=0 lo apaga.
+ssh() {
+    if [ -n "$LORD_SSH_MUX_DIR" ] && [ -d "$LORD_SSH_MUX_DIR" ] && [ "${LORD_SSH_MUX:-1}" != 0 ]; then
+        case " $* " in
+            *ControlPath*|*ControlMaster*|*" -S "*|*" -O "*|*" -M "*) command ssh "$@"; return ;;
+        esac
+        command ssh -o ControlMaster=auto -o "ControlPath=$LORD_SSH_MUX_DIR/%C-$$" -o ControlPersist=no "$@"
+    else
+        command ssh "$@"
+    fi
+}

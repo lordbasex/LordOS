@@ -94,6 +94,16 @@ static void child(int fd, const char *cwd, int id) {
     setenv("SHELL", shell, 1);
     if (pw) { setenv("USER", pw->pw_name, 1); setenv("LOGNAME", pw->pw_name, 1); }
     if (!getenv("LANG")) setenv("LANG", "C.UTF-8", 1);
+    /* Files mode (docs/TERMINAL.md): the shell integration's ssh becomes a connection-sharing master with its
+     * control socket in this folder (lord-server's, 0700), so Files mode can open SFTP on the same connection */
+    {
+        const char *rt = getenv("XDG_RUNTIME_DIR");
+        char mux[256];
+        struct stat ms;
+        if (rt && rt[0] == '/' && (size_t)snprintf(mux, sizeof mux, "%s/lordos-term/ssh", rt) < sizeof mux &&
+            !lstat(mux, &ms) && S_ISDIR(ms.st_mode) && ms.st_uid == getuid() && !(ms.st_mode & 077)) setenv("LORD_SSH_MUX_DIR", mux, 1);
+        else unsetenv("LORD_SSH_MUX_DIR");
+    }
 
     const char *base = strrchr(shell, '/') ? strrchr(shell, '/') + 1 : shell;
     char rc[1200], argv0[64];

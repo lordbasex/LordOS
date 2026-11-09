@@ -65,4 +65,16 @@ if status is-interactive; and test "$TERM_PROGRAM" = LordTerminal; and not set -
     function lord_badge
         printf '\e]1337;SetBadgeFormat=%s\a' (printf %s "$argv" | base64 -w0)
     end
+    # ssh: shareable for Files mode, as in bash (one socket per shell in the terminal's 0700 folder). LORD_SSH_MUX=0 turns it off.
+    function ssh --wraps ssh
+        if test -n "$LORD_SSH_MUX_DIR"; and test -d "$LORD_SSH_MUX_DIR"; and test "$LORD_SSH_MUX" != 0
+            if string match -qr -- '(ControlPath|ControlMaster|^-S$|^-O$|^-M$)' $argv
+                command ssh $argv
+            else
+                command ssh -o ControlMaster=auto -o "ControlPath=$LORD_SSH_MUX_DIR/%C-$fish_pid" -o ControlPersist=no $argv
+            end
+        else
+            command ssh $argv
+        end
+    end
 end
