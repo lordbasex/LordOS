@@ -54,7 +54,7 @@ app; ❖ combinations still belong to LordOS.
 ## How to open an app
 
 From the LordOS Terminal: every new tab has `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
-`GDK_BACKEND=wayland` and `QT_QPA_PLATFORM=wayland`, so `featherpad &`, `gtk4-demo &` or
+`GDK_BACKEND=wayland,x11` and `QT_QPA_PLATFORM=wayland`, so `featherpad &`, `gtk4-demo &` or
 `foot &` is enough. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
@@ -482,6 +482,44 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   it has the keyboard: an app can't keep an old offer to read later copies (`build/clip-offers`).
 - **Drag and drop** between X11 and Wayland apps: not yet (LordOS has no Wayland drag and drop
   yet). Inside X (X app to X app) it's X's own protocol; not tested.
+
+### VMware Tools (`open-vm-tools-desktop`)
+
+VMware's copy and paste between the guest and the host is done by `vmware-user`
+(`/usr/bin/vmware-user-suid-wrapper` → `vmtoolsd -n vmusr`), an X11 client without visible windows:
+its `dndcp` plugin calls `gdk_set_allowed_backends("x11")` and then `gtk_init`, takes CLIPBOARD and
+PRIMARY in X when the host copies, and reads X's CLIPBOARD when the host asks for the guest's. On a
+Wayland session the wrapper also opens `/dev/uinput` (for drag and drop) because
+`XDG_SESSION_TYPE=wayland`. Other desktops start it from `/etc/xdg/autostart/vmware-user.desktop`.
+
+What works with LordOS (0.8.8.7, issue #76):
+
+- **It can run.** Until 0.8.8.6 the session had `GDK_BACKEND=wayland`; GTK then skips every backend
+  the program doesn't allow, so `vmware-user` stopped at `gtk_init` ("cannot open display"). Now it is
+  `GDK_BACKEND=wayland,x11`: GTK apps still open on Wayland, and a program that only allows X11 gets
+  Xwayland.
+- **Host → guest.** When the host copies, `vmware-user` takes CLIPBOARD in X; XFixes tells the
+  window manager, which reads it as with any X app, and it becomes LordOS's clipboard (the history
+  shows `x11` as its source: the agent has no managed window).
+- **Guest → host, from an X11 app**: the X app answers `vmware-user` directly.
+
+What doesn't, and why:
+
+- **Nothing starts it.** LordOS doesn't run XDG autostart entries (`/etc/xdg/autostart`,
+  `~/.config/autostart`), and lord-server only launches the programs listed in `AGENTS.md`. Starting
+  `vmware-user` by itself in a VMware guest is a new launcher exception (a setuid-root program, so it
+  can't run with `no_new_privs`) that needs the maintainer's approval. Until then it can be started
+  from the Terminal: `setsid vmware-user &` (it lives until the session ends).
+- **Guest → host, from LordOS or a Wayland app.** LordOS's selection is in X only while an X window
+  has the keyboard ("LordOS → X11" above). `vmware-user` never has it: when the pointer leaves the
+  VMware window the keyboard is still on a LordOS window, so what was copied there is not readable by
+  `vmware-user`. Offering it would make it readable by every X client while the agent runs (the
+  requestor of a selection isn't authenticated and the data lands in a window property any X client
+  can read), which also needs the maintainer's approval.
+- Drag and drop of files: not supported (see above), and not tested.
+
+Not tested on VMware yet: the guest side was checked against `open-vm-tools-desktop`
+2:12.5.0-2+deb13u1 (Debian 13) by reading what its binaries call, not on a VMware host.
 
 ### HiDPI and displays
 

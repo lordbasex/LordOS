@@ -3649,7 +3649,10 @@ int wl_start(void) {
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
     setenv("XDG_CURRENT_DESKTOP", "LordOS", 1);
-    setenv("GDK_BACKEND", "wayland", 1);
+    /* Wayland first; x11 only for a GTK program that allows nothing else (gdk_set_allowed_backends:
+     * VMware's vmware-user agent). With "wayland" alone GTK skips x11 and such a program can't open
+     * any display (docs/WAYLAND.md, "VMware Tools") */
+    setenv("GDK_BACKEND", "wayland,x11", 1);
     setenv("QT_QPA_PLATFORM", "wayland", 1);
     setenv("MOZ_ENABLE_WAYLAND", "1", 1);
     clip_seen = term_clipboard_gen();
