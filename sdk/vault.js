@@ -10,7 +10,10 @@
 //       inside an isolated .lpk app it goes through the broker and the owner is the app's own id
 //   autofill(app, { url | service })                → [{ id, title, username }] from Passwords (if it is unlocked)
 //   <KeyringPrompt />                               system prompt to unlock the keyring (mounted by startShell)
-//   <AutofillButton app service|url|ssid|host account? onFill />   "fill from Passwords" next to a login field
+//   <AutofillButton app service|url|ssid|host|hosts account? onFill />   "fill from Passwords" next to a login field
+//   passwordsState()                                → 'unlocked' | 'locked' | null (no Passwords vault, or no lord.vault)
+//   saveLogin(login)                                a sign-in the person typed, as a new Passwords entry (loginmodel.js)
+//   <SaveLoginOffer login onDone />                 "Save the password for … in Passwords?" after a sign-in worked
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -18,6 +21,8 @@ import { useTheme } from './theme.js';
 import { t } from './i18n.js';
 import { TextInput, Button } from './components.jsx';
 import { Overlay } from './layers.js';
+import { launchApp } from './apps.js';
+import { exactMatches, alreadySaved, loginEntry, loginHosts } from './loginmodel.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.vault !== 'undefined';
 export const vaultAvailable = () => has() && lord.vault.available();
@@ -114,14 +119,15 @@ export const keyring = {
 const hostOf = (u) => String(u || '').replace(/^[a-z]+:\/\//i, '').split(/[/:?#]/)[0].toLowerCase().replace(/^www\./, '');
 
 // Passwords entries that match a site, a service or a Wi-Fi network (only while the vault is unlocked).
-// `host` (Databases): only entries whose host field or site is exactly that host; none without one.
-export async function autofill(app, { url, service, ssid, host: exact } = {}) {
-  if (exact !== undefined) {
-    const h = hostOf(exact);
-    if (!h) return [];
+// `host` (Databases) or `hosts` (a server reached by its address: Files, Remote Desk): only entries whose host field
+// or site is exactly one of them (loginmodel.js); none without one.
+export async function autofill(app, { url, service, ssid, host: exact, hosts } = {}) {
+  if (exact !== undefined || hosts !== undefined) {
+    const hs = loginHosts(exact, hosts || []);
+    if (!hs.length) return [];
     let all;
     try { all = (await vaultRequest('list')).entries || []; } catch (e) { return []; }
-    return all.filter((e) => !e.trash && (hostOf(e.host) === h || hostOf(e.url) === h)).map((e) => ({ id: e.id, title: e.title, username: e.sub || '', host: e.host || hostOf(e.url) }));
+    return exactMatches(all, hs);
   }
   const host = hostOf(url || service);
   if (!host && !ssid) return [];
@@ -210,7 +216,8 @@ export function KeyringPrompt() {
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
 // The secret leaves lord-vault only when the user picks one.
 // urls: several sites the login may be kept under (a cloud provider's own and its maker's); entries found under any
-export function AutofillButton({ app, service, account = '', url, urls, ssid, host, onFill }) {
+// host / hosts: exact matches only (a server reached by its address), see autofill.
+export function AutofillButton({ app, service, account = '', url, urls, ssid, host, hosts, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(null);
@@ -220,7 +227,7 @@ export function AutofillButton({ app, service, account = '', url, urls, ssid, ho
     if (urls && urls.length) {
       const seen = new Set();
       for (const u of urls) for (const e of await autofill(app, { url: u })) if (!seen.has(e.id)) { seen.add(e.id); out.push({ kind: 'pw', ...e }); }
-    } else for (const e of await autofill(app, host !== undefined ? { host } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
+    } else for (const e of await autofill(app, host !== undefined || hosts !== undefined ? { host, hosts } : { url, service: url ? undefined : service, ssid })) out.push({ kind: 'pw', ...e });
     setItems(out);
   };
   const pick = async (it) => {
@@ -240,4 +247,66 @@ export function AutofillButton({ app, service, account = '', url, urls, ssid, ho
         : items.map((it, i) => h(View, { key: i, onClick: () => pick(it), style: { padding: 6, borderRadius: 6 } },
           h(Text, { style: { fontSize: 13, color: th.text } }, it.title),
           it.username || it.host ? h(Text, { style: { fontSize: 11, color: th.textDim } }, [it.username, it.host].filter(Boolean).join(' · ')) : null)))) : null);
+}
+
+// ---- "Save to Passwords?" after a sign-in the person typed ----
+//
+// Never silent: the form shows <SaveLoginOffer> once the server accepted the password, and only Save writes. The value
+// goes from the form's memory to lord-vault with the same `save` request the Passwords app uses (shell apps only:
+// an isolated app has no lord.vault), never to a file or the console.
+
+export async function passwordsState() {
+  if (!vaultAvailable()) return null;
+  try {
+    const st = await vaultRequest('status');
+    return st.main?.unlocked ? 'unlocked' : st.main?.exists ? 'locked' : null;
+  } catch (e) { return null; }
+}
+
+// login: { kind, host, port, user, password } (loginmodel.js loginEntry). → the reply ({ ok, id }) or an error with .code
+export function saveLogin(login) {
+  const entry = loginEntry(login);
+  if (!entry) return Promise.reject(Object.assign(new Error('bad-entry'), { code: 'bad-entry' }));
+  return vaultRequest('save', { v: 'main', entry });
+}
+
+// login: as saveLogin, plus `hosts` (every address that server goes by) for "already kept"; onDone('saved' | 'skip')
+// once the person answered, or at once when there is nothing to offer (no Passwords vault, or a login for that host and
+// user is kept already). style: where it goes (a sheet's own row by default).
+export function SaveLoginOffer({ login, hosts, onDone, style }) {
+  const th = useTheme();
+  const [st, setSt] = useState(null);          // null: checking; 'ask' | 'locked' | 'busy' | 'failed'
+  const done = useRef(false);
+  const finish = (how) => { if (!done.current) { done.current = true; onDone(how); } };
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const s = await passwordsState();
+      if (!live) return;
+      if (!s || !loginEntry(login)) { finish('skip'); return; }
+      if (s === 'locked') { setSt('locked'); return; }
+      let list = [];
+      try { list = (await vaultRequest('list')).entries || []; } catch (e) { /* locked meanwhile: asked below */ }
+      if (!live) return;
+      if (alreadySaved(list, loginHosts(login.host, hosts || []), login.user)) finish('skip'); else setSt('ask');
+    })();
+    return () => { live = false; };
+  }, []);
+  if (!st) return null;
+  const save = async () => {
+    setSt('busy');
+    try { await saveLogin(login); finish('saved'); }
+    catch (e) { setSt(e.code === 'locked' ? 'locked' : 'failed'); }
+  };
+  const entry = loginEntry(login);
+  return h(View, { style: { gap: 6, ...style } },
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8 } },
+      h(Text, { style: { fontSize: 14 } }, '🔑'),
+      h(Text, { style: { flex: 1, minWidth: 0, fontSize: 13, color: th.text, textAlign: 'start' } }, t('passwords.saveOffer.ask', { title: entry ? entry.title : '' }))),
+    st === 'locked' || st === 'failed' ? h(Text, { style: { fontSize: 12, color: st === 'failed' ? '#ff453a' : th.textDim, textAlign: 'start' } },
+      t(st === 'failed' ? 'passwords.saveOffer.failed' : 'passwords.saveOffer.locked')) : null,
+    h(View, { style: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 } },
+      st === 'locked' ? h(Button, { label: t('passwords.saveOffer.open'), onClick: () => launchApp('passwords') }) : null,
+      h(Button, { label: t('passwords.saveOffer.notNow'), onClick: () => finish('skip') }),
+      h(Button, { primary: true, label: t('passwords.saveOffer.save'), disabled: st === 'busy', onClick: save })));
 }

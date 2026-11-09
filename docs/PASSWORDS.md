@@ -350,7 +350,20 @@ lists what the app saved in the keyring for that service plus matching Passwords
 or by SSID for Wi-Fi; an entry's `host` field counts too) while the vault is unlocked; the secret leaves
 `lord-vault` only when the user picks one. `account` names the keyring item's account when the app saved one. `host` asks for exact matches only (an
 entry's `host` field or its site's host, no title guesses, nothing when empty), each listed with its host.
-Used in Settings → Network (Wi-Fi password, VPN credentials) and Databases (each connection's password).
+`hosts` does the same for every address a server goes by (Files: a shared folder's address and the host name it was
+found or typed under; a name a machine only announces, with spaces, is not a host). The rules are in `sdk/loginmodel.js`
+(test: `cd server && node tests/login_model_test.mjs`).
+Used in Settings → Network (Wi-Fi password, VPN credentials), Settings → Cloud, Databases (each connection's password),
+Files (shared folders, Connect to Server for sftp, ftp and WebDAV) and Remote Desk (the sign-in and the credentials).
+
+**Save to Passwords? (0.8.8.7).** After a sign-in in Files or Remote Desk that the server accepted, with a password the
+person typed in that form (not one filled by the 🔑 or remembered in the keyring), `<SaveLoginOffer login onDone />`
+asks "Save the password for SMB ana@nas.local in Passwords?". Nothing is shown when there is no Passwords vault or it
+already keeps a login for that host and user; a locked vault gets **Open Passwords** and Save tries again. Only Save
+writes: `saveLogin()` sends the existing `save` request (`v: "main"`) with a `network` entry (device SMB, FTP, WebDAV,
+RDP or VNC; host, port, user name, password) or an `ssh` one for sftp. The value goes from the form's memory to
+`lord-vault` and nowhere else (no file, no console). Isolated apps (Mail) have no `lord.vault` and get neither the
+Passwords entries nor this offer; the broker gives them only their own keyring items.
 
 ### In the Terminal (0.8.8.6)
 
