@@ -283,6 +283,7 @@
   "check.private": "The report has no account name, email, file names, links or passwords.",
   "check.copy": "Copy Report",
   "check.copied": "Report copied",
+  "check.noBrowser": "No web browser opened the page. The report is copied: open github.com/lordbasex/LordOS/issues in a browser and paste it into a new Cloud provider report.",
   "check.step.about": "Space information",
   "check.step.list": "List the account",
   "check.step.folder": "Make a check folder",

@@ -105,6 +105,29 @@ int main(void) {
     CHECK("its Exec ran", appeared(path));
     CHECK("the raw name with spaces is not an id", apps_launch("Lord Spaced App") != 0);
 
+    /* a web address for the browser (lord.apps.launchUri): Cloud's GitHub issue form with its report is ~1.5 KB (#79) */
+    snprintf(path, sizeof path, "%s/.local/share/applications/lord-web.desktop", home);
+    f = fopen(path, "w");
+    if (f) { fprintf(f, "[Desktop Entry]\nType=Application\nName=Web\nMimeType=x-scheme-handler/https;\nExec=/usr/bin/touch %s/web %%u\n", home); fclose(f); }
+    char url[APPS_URI_WEB_MAX + 64];
+    int ul = snprintf(url, sizeof url, "https://github.com/o/r/issues/new?template=x.yml&report=");
+    while (ul < 2000) url[ul++] = 'a';
+    url[ul] = 0;
+    CHECK("a 2000-character web address launches", apps_launch_uri("lord-web", url) == 0);
+    snprintf(path, sizeof path, "%s/web", home);
+    CHECK("the browser's Exec ran", appeared(path));
+    while (ul < APPS_URI_WEB_MAX + 1) url[ul++] = 'a';
+    url[ul] = 0;
+    CHECK("a web address over the limit is refused", apps_launch_uri("lord-web", url) != 0);
+    CHECK("parentheses are refused (encode them)", apps_launch_uri("lord-web", "https://example.org/a(b)") != 0);
+    CHECK("quotes and spaces are refused", apps_launch_uri("lord-web", "https://example.org/a'b") != 0 && apps_launch_uri("lord-web", "https://example.org/a b") != 0);
+    char vnc[400];
+    snprintf(vnc, sizeof vnc, "vnc://");
+    for (int i = 6; i < 320; i++) vnc[i] = 'h';
+    vnc[320] = 0;
+    CHECK("other schemes keep 300 characters", apps_launch_uri("lord-web", vnc) != 0);
+    CHECK("an app without the scheme is refused", apps_launch_uri("lord-demo", "https://example.org/") != 0);
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}

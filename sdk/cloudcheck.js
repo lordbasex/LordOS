@@ -167,11 +167,15 @@ export const checkWorks = (steps) => {
 // ---- GitHub ----
 
 export const ISSUE_BASE = 'https://github.com/lordbasex/LordOS/issues/new';
-export const ISSUE_URL_MAX = 7000;
+// The browser gets the address through lord.apps.launchUri, which takes at most 3000 characters for a web address
+// (APPS_URI_WEB_MAX in server/src/apps.h) and none of ! ' ( ) * (encodeURIComponent leaves those as they are, and the
+// report has "(x86_64)"): until #79 the button did nothing, the address was refused.
+export const ISSUE_URL_MAX = 3000;
 const TRUNC = '\n[truncated]';
+export const encodeQuery = (v) => encodeURIComponent(v).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 export function issueUrl({ label, report = '', version = '' } = {}) {
   const lab = String(label || '').slice(0, 80);
-  const q = (k, v) => `&${k}=${encodeURIComponent(v)}`;
+  const q = (k, v) => `&${k}=${encodeQuery(v)}`;
   const head = `${ISSUE_BASE}?template=cloud-provider.yml${q('title', `Cloud provider: ${lab}`)}${q('provider', lab)}${version ? q('version', String(version).slice(0, 40)) : ''}`;
   if (!report) return head;
   let r = String(report);

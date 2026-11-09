@@ -651,8 +651,13 @@ the totals. No account name, email, file names but the check's, links or tokens.
 `.github/ISSUE_TEMPLATE/cloud-provider.yml` is an issue form (label `cloud-provider`): provider, does it work (yes, partly,
 no), the report, LordOS version, anything else. **Tell Us on GitHub** opens
 `https://github.com/lordbasex/LordOS/issues/new?template=cloud-provider.yml&title=Cloud provider: <label>&provider=<label>&version=…&report=…`
-(every value URL-encoded) in the default browser; the report is cut at a line, with "[truncated]", so the address stays
-under 7000 characters. From the Add Account sheet's line the same address goes without a report. A maintainer who
+(every value URL-encoded, `! ' ( ) *` too) in the default browser through `lord.apps.launchUri`, which takes a web address
+of at most 3000 characters (`APPS_URI_WEB_MAX`, `server/src/apps.h`; other schemes keep 300) and no quotes, spaces or
+parentheses. A full report makes an address of about 1.5 KB; a longer one is cut at a line, with "[truncated]", so the
+address stays under 3000 characters (`ISSUE_URL_MAX`). Until 0.8.8.7 the launcher's limit was 300 characters for every
+scheme and the report's "(x86_64)" went unencoded, so the button did nothing (#79). Without a browser that takes the
+address, the report is copied and a note says where to paste it. From the Add Account sheet's line the same address goes
+without a report. A maintainer who
 confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"`.
 
 ### 17.2 Additions decided on 2026-11-06 (maintainer)

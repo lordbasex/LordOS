@@ -749,13 +749,15 @@ int apps_launch_with(const char *id, const char *path) {
 }
 
 /* A remote desktop or web address for the app that declares that scheme: vnc:// or rdp:// and a strict set of characters.
- * It goes as ONE argument, never through a shell. */
+ * It goes as ONE argument, never through a shell. A web address may be longer (APPS_URI_WEB_MAX): Cloud's "Tell Us on
+ * GitHub" prefills an issue form with the check's report, about 1.5 KB (#79); the launcher's argument buffer is 4 KB. */
 int apps_launch_uri(const char *id, const char *uri) {
     static const char *const schemes[] = { "vnc", "rdp", "http", "https" };
     size_t n = uri ? strlen(uri) : 0;
-    if (n < 7 || n > 300) return -1;
+    int web = n >= 4 && !strncmp(uri, "http", 4);
+    if (n < 7 || n > (web ? APPS_URI_WEB_MAX : 300)) return -1;
     /* a web address also has a query: it still goes as one argument, and quotes, spaces and backslashes stay out */
-    const char *chars = !strncmp(uri, "http", 4) ? ":/.-_@[]?=&%#+~,;" : ":/.-_@[]";
+    const char *chars = web ? ":/.-_@[]?=&%#+~,;" : ":/.-_@[]";
     for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)uri[i]) && !strchr(chars, uri[i])) return -1;
     for (size_t i = 0; i < 4; i++) {
         size_t l = strlen(schemes[i]);

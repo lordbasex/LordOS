@@ -283,6 +283,7 @@
   "check.private": "Il rapporto non contiene nome dell’account, email, nomi di file, link né password.",
   "check.copy": "Copia rapporto",
   "check.copied": "Rapporto copiato",
+  "check.noBrowser": "Nessun browser ha aperto la pagina. Il rapporto è copiato: apri github.com/lordbasex/LordOS/issues in un browser e incollalo in una nuova segnalazione di fornitore cloud.",
   "check.step.about": "Informazioni sullo spazio",
   "check.step.list": "Elenca l’account",
   "check.step.folder": "Crea una cartella di controllo",

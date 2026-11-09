@@ -283,6 +283,7 @@
   "check.private": "Le rapport ne contient ni nom de compte, ni e-mail, ni noms de fichiers, ni liens, ni mots de passe.",
   "check.copy": "Copier le rapport",
   "check.copied": "Rapport copié",
+  "check.noBrowser": "Aucun navigateur n’a ouvert la page. Le rapport est copié : ouvrez github.com/lordbasex/LordOS/issues dans un navigateur et collez-le dans un nouveau rapport de fournisseur cloud.",
   "check.step.about": "Informations d’espace",
   "check.step.list": "Lister le compte",
   "check.step.folder": "Créer un dossier de vérification",

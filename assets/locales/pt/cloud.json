@@ -283,6 +283,7 @@
   "check.private": "O relatório não tem nome da conta, e-mail, nomes de arquivos, links nem senhas.",
   "check.copy": "Copiar relatório",
   "check.copied": "Relatório copiado",
+  "check.noBrowser": "Nenhum navegador abriu a página. O relatório foi copiado: abra github.com/lordbasex/LordOS/issues em um navegador e cole-o em um novo relatório de provedor de nuvem.",
   "check.step.about": "Informação de espaço",
   "check.step.list": "Listar a conta",
   "check.step.folder": "Criar uma pasta de verificação",

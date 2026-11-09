@@ -608,7 +608,10 @@ function CheckAccount({ a, st, p, verified }) {
           <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.check.private')}</Dim>
           <Actions start>
             <Button small label={tr('cloud.check.copy')} onClick={() => { clipboard.set(c.report); toast.set(tr('cloud.check.copied')); }} />
-            <Button small label={tr('cloud.tellUs')} onClick={() => openUrl(issueUrl({ label, report: c.report, version: lordosVersion().version }))} />
+            {/* the issue form, prefilled; without a browser that takes it, the report is copied and the person told (#79) */}
+            <Button small label={tr('cloud.tellUs')} onClick={() => {
+              if (!openUrl(issueUrl({ label, report: c.report, version: lordosVersion().version }))) { clipboard.set(c.report); toast.set(tr('cloud.check.noBrowser')); }
+            }} />
           </Actions>
         </View>
       ) : null}

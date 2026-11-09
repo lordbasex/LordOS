@@ -9,7 +9,7 @@ import * as M from '../../sdk/cloudmodel.js';
 import { glyphPixels, ringPixels, GLYPH_KINDS, glyphCacheSize } from '../../sdk/cloudglyphs.js';
 import { cloudPlaces, cloudRoot, pathCrumbs } from '../../sdk/filepickermodel.js';
 import { installCloudMock } from '../../sdk/cloudmock.js';
-import { runCheck, buildReport, issueUrl, checkFolder, randomBytes, hashBytes, aboutFields, checkWorks, CHECK_STEPS, CHECK_SIZE, ISSUE_URL_MAX } from '../../sdk/cloudcheck.js';
+import { runCheck, buildReport, issueUrl, checkFolder, randomBytes, hashBytes, aboutFields, checkWorks, CHECK_STEPS, CHECK_SIZE, ISSUE_URL_MAX, encodeQuery } from '../../sdk/cloudcheck.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let ok = 0;
@@ -333,6 +333,13 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('long report: under the limit, truncated at a line, said so', [lu.length <= ISSUE_URL_MAX, decodeURIComponent(lu.split('&report=')[1]).endsWith('\n[truncated]'), /line \d+ ä€\n\[truncated\]$/.test(decodeURIComponent(lu.split('&report=')[1]))], [true, true, true]);
   const one = issueUrl({ label: 'X', report: 'y'.repeat(20000) });
   eq('one huge line: under the limit', [one.length <= ISSUE_URL_MAX, one.endsWith(encodeURIComponent('\n[truncated]'))], [true, true]);
+  // #79: lord.apps.launchUri takes a web address of at most 3000 characters, and none of ! ' ( ) * (apps.c)
+  const real = buildReport({ version: '0.8.8.6 · Beta', arch: 'x86_64', rclone: 'v1.75.2', kind: 'onedrive', label: 'Microsoft OneDrive (Business)', verified: false, ownApp: false,
+    aboutFields: ['total', 'used', 'free', 'trashed'], linksSupported: true, steps: CHECK_STEPS.map((id) => ({ id, result: 'pass', ms: 123456 })) });
+  const ru = issueUrl({ label: 'Microsoft OneDrive (Business)', report: real, version: '0.8.8.6 · Beta' });
+  eq('#79: a real report fits the launcher whole, in its characters', [ISSUE_URL_MAX <= 3000, ru.length <= ISSUE_URL_MAX, /^[A-Za-z0-9:/.\-_@[\]?=&%#+~,;]+$/.test(ru), decodeURIComponent(ru.split('&report=')[1]) === real],
+    [true, true, true, true]);
+  eq('#79: ! \' ( ) * encoded', [encodeQuery("a(b)!'*"), issueUrl({ label: 'X (y)' }).includes('provider=X%20%28y%29')], ['a%28b%29%21%27%2A', true]);
   eq('the template exists with those field ids', ['id: provider', 'id: works', 'id: report', 'id: version', 'cloud-provider'].every((x) => fs.readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/cloud-provider.yml'), 'utf8').includes(x)), true);
 }
 

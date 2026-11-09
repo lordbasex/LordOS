@@ -283,6 +283,7 @@
   "check.private": "El informe no tiene el nombre de la cuenta, correos, nombres de archivos, enlaces ni contraseñas.",
   "check.copy": "Copiar informe",
   "check.copied": "Informe copiado",
+  "check.noBrowser": "Ningún navegador abrió la página. El informe está copiado: abrí github.com/lordbasex/LordOS/issues en un navegador y pegalo en un informe nuevo de proveedor de nube.",
   "check.step.about": "Información de espacio",
   "check.step.list": "Listar la cuenta",
   "check.step.folder": "Crear una carpeta de comprobación",
