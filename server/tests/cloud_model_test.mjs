@@ -640,4 +640,12 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('sdk: cloud.browse goes to lord.cloud.browse', /browse: \(path\) => \{ if \(has\(\) && typeof lord\.cloud\.browse === 'function'\) lord\.cloud\.browse\(String\(path\)\)/.test(sdkCloud), true);
 }
 
+// Sign In Again: a secret left empty keeps the keyring's (an iCloud account asked for its Apple ID and password again)
+{
+  const ic = { fields: [{ name: 'service', required: true, secret: false }, { name: 'apple_id', required: true, secret: true }, { name: 'password', required: true, secret: true }] };
+  eq('add: every required field', M.missingField(ic, { service: 'drive' }), 'apple_id');
+  eq('sign in again: the secrets may stay empty', M.missingField(ic, { service: 'drive' }, { again: true }), null);
+  eq('sign in again: a field that isn\'t secret is still required', M.missingField(ic, {}, { again: true }), 'service');
+}
+
 console.log(`cloud model: ${ok} checks ${process.exitCode ? 'with failures' : 'passed'}`);

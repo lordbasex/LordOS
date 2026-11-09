@@ -389,5 +389,10 @@
   "trust.others": {
     "one": "Usar también la clave nueva en mi otra cuenta de este servidor ({count})",
     "other": "Usar también la clave nueva en mis otras cuentas de este servidor ({count})"
-  }
+  },
+  "cred.keptInKeyring": "Guardado en el llavero (dejalo vacío para usarlo)",
+  "opt.pausedOther": "En pausa por todas las cuentas (Pausar todo, batería o red medida); este interruptor es solo para esta cuenta",
+  "opt.pausedAll": "Todas las cuentas están en pausa",
+  "check.notReady": "La cuenta no está funcionando ahora (en pausa, esperando un inicio de sesión o con un error). Resolvé eso primero y después comprobala.",
+  "check.close": "Cerrar"
 }

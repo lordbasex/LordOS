@@ -389,5 +389,10 @@
   "trust.others": {
     "one": "Usa la nuova chiave anche per il mio altro account su questo server ({count})",
     "other": "Usa la nuova chiave anche per i miei altri account su questo server ({count})"
-  }
+  },
+  "cred.keptInKeyring": "Salvato nel portachiavi (lascia vuoto per tenerlo)",
+  "opt.pausedOther": "In pausa per tutti gli account (Metti in pausa tutto, batteria o rete a consumo); questo interruttore è solo per questo account",
+  "opt.pausedAll": "Tutti gli account sono in pausa",
+  "check.notReady": "L’account non funziona in questo momento (in pausa, in attesa di un accesso o con un errore). Risolvi prima questo, poi verificalo.",
+  "check.close": "Chiudi"
 }

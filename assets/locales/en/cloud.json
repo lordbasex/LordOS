@@ -389,5 +389,10 @@
   "trust.others": {
     "one": "Also use the new key for my other account on this server ({count})",
     "other": "Also use the new key for my other accounts on this server ({count})"
-  }
+  },
+  "cred.keptInKeyring": "Saved in the keyring (leave empty to keep it)",
+  "opt.pausedOther": "Paused for every account (Pause All, battery or a metered network); this switch is for this account alone",
+  "opt.pausedAll": "Every account is paused",
+  "check.notReady": "The account isn’t working right now (paused, waiting for a sign-in, or with an error). Fix that first, then check it.",
+  "check.close": "Close"
 }

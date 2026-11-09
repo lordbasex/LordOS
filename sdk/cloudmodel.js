@@ -243,7 +243,10 @@ export function nameProblem(name, accounts, self = null) {
 // a provider's form: its fields with the defaults filled in
 export const formValues = (provider, prev = {}) => Object.fromEntries((provider?.fields || []).map((f0) => { const f = presetField(f0); return [f.name, prev[f.name] ?? (f.default != null ? String(f.default) : '')]; }));
 // the first required field still empty, or null
-export const missingField = (provider, values) => (provider?.fields || []).find((f) => f.required && !String(values[f.name] ?? '').trim())?.name || null;
+// again: Sign In Again, where a secret left empty keeps the one in the keyring (rclone's config/update keeps what
+// isn't given), so only the fields that aren't secret are required
+export const missingField = (provider, values, { again = false } = {}) => (provider?.fields || [])
+  .find((f) => f.required && !(again && f.secret) && !String(values[f.name] ?? '').trim())?.name || null;
 // only the fields the provider has, without control characters (lord-server checks again)
 export const cleanFields = (provider, values) => Object.fromEntries((provider?.fields || []).filter((f) => String(values[f.name] ?? '') !== '')
   .map((f) => [f.name, String(values[f.name]).replace(/[\x00-\x1f\x7f]/g, '')]));

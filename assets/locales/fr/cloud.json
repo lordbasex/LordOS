@@ -389,5 +389,10 @@
   "trust.others": {
     "one": "Utiliser aussi la nouvelle clé pour mon autre compte sur ce serveur ({count})",
     "other": "Utiliser aussi la nouvelle clé pour mes autres comptes sur ce serveur ({count})"
-  }
+  },
+  "cred.keptInKeyring": "Enregistré dans le trousseau (laissez vide pour le garder)",
+  "opt.pausedOther": "En pause pour tous les comptes (Tout suspendre, batterie ou réseau limité) ; ce bouton ne concerne que ce compte",
+  "opt.pausedAll": "Tous les comptes sont en pause",
+  "check.notReady": "Le compte ne fonctionne pas pour l’instant (en pause, en attente de connexion ou en erreur). Réglez cela d’abord, puis vérifiez-le.",
+  "check.close": "Fermer"
 }

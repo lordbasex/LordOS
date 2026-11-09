@@ -468,6 +468,7 @@ function NameField({ a, accounts }) {
 function Options({ a, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
+  const pauseAll = !!(useCloud().options || {}).pauseAll;
   const onDemand = !(a.kept || []).includes(a.mount);
   const own = cloud.accountOptionsSupported();
   const ao = a.options || {};
@@ -484,7 +485,12 @@ function Options({ a, accounts }) {
     <View aria-label={tr('cloud.options')} style={box(t)}>
       {row(tr('cloud.opt.folder'), `~/Cloud/${a.name}`, <NameField a={a} accounts={accounts} />)}
       {row(tr('cloud.opt.onDemand'), tr('cloud.opt.onDemandHint'), <Toggle small on={onDemand} onChange={(v) => (v ? cloud.unkeep([a.mount]) : cloud.keep([a.mount]))} />)}
-      {row(tr('cloud.opt.pause'), tr('cloud.opt.pauseHint'), <Toggle small on={a.state === 'paused' || !!a.paused} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />, !own)}
+      {/* this account's own pause; paused by Pause All (or the battery, a metered network) is said apart, with the way out,
+          so the switch doesn't look on while the account itself isn't paused */}
+      {row(tr('cloud.opt.pause'), a.state === 'paused' && !a.paused ? tr('cloud.opt.pausedOther') : tr('cloud.opt.pauseHint'),
+        <Toggle small on={!!a.paused} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />, !own)}
+      {a.state === 'paused' && !a.paused && pauseAll
+        ? row(tr('cloud.opt.pausedAll'), '', <Button small label={tr('cloud.resumeAll')} onClick={() => cloud.resume(null)} />) : null}
       {/* an account's own options only where lord-server has them (not in 0.8.8.5: docs/CLOUD.md 17.1) */}
       {own ? row(tr('cloud.opt.unmetered'), '', <Toggle small on={!!ao.unmeteredOnly} onChange={(v) => cloud.setAccountOptions(a.id, { unmeteredOnly: v })} />) : null}
       {own ? row(tr('cloud.opt.uploadLimit'), tr('cloud.opt.thisAccount'),
@@ -582,10 +588,18 @@ function CheckAccount({ a, st, p, verified }) {
     }, () => save({ running: false }));
   };
   const mark = { pass: ['✓', tint.ok], fail: ['✕', tint.error], skipped: ['–', t.textDim] };
+  // an account that isn't working now (paused, waiting for a sign-in, an error) would only time out step after step:
+  // the check waits for it, and says why
+  const notReady = !c.running && (a.state === 'paused' || a.state === 'signin' || !!a.error || a.mounted === false);
+  const close = () => { checks.set(a.id, { running: false, steps: null, report: '' }); checkRev.set((x) => x + 1); };
   return (
     <View style={{ gap: 8 }}>
       <Dim t={t}>{tr(verified ? 'cloud.check.hintVerified' : 'cloud.check.hint')}</Dim>
-      <Actions start><Button small primary={!verified} disabled={c.running} label={tr(c.running ? 'cloud.check.running' : c.steps ? 'cloud.check.again' : 'cloud.check.run')} onClick={start} /></Actions>
+      {notReady ? <Text style={{ fontSize: typeScale.callout, color: tint.warn, textAlign: 'start' }}>{tr('cloud.check.notReady')}</Text> : null}
+      <Actions start>
+        <Button small primary={!verified} disabled={c.running || notReady} label={tr(c.running ? 'cloud.check.running' : c.steps ? 'cloud.check.again' : 'cloud.check.run')} onClick={start} />
+        {c.steps && !c.running ? <Button small label={tr('cloud.check.close')} onClick={close} /> : null}
+      </Actions>
       {c.steps ? (
         <View style={{ gap: 2 }}>
           {c.steps.map((s) => (
@@ -946,7 +960,8 @@ const fieldLabel = (f) => tOptional(`cloud.field.${f.name}`) || M.shortLabel(f.h
 
 // One field of a provider's form, by its kind (M.fieldInput): a masked field only for a password, a switch for a
 // yes/no, a menu for rclone's choices, else text
-function FieldControl({ f, value, onChange, onSubmit }) {
+function FieldControl({ f, value, onChange, onSubmit, kept }) {
+  const { t: tr } = useLocale();
   const how = M.fieldInput(f);
   if (how.input === 'bool') {
     const on = String(value || f.default || 'false') === 'true';
@@ -958,7 +973,8 @@ function FieldControl({ f, value, onChange, onSubmit }) {
       ? <Segmented small fill value={value || how.options[0]} onChange={onChange} options={opts.map(([v]) => [v, v.charAt(0).toUpperCase() + v.slice(1)])} />
       : <PopUp width={250} value={value || how.options[0]} onChange={onChange} options={opts} />;
   }
-  return <TextInput secure={how.input === 'password'} value={value || ''} placeholder={f.examples && f.examples[0] && how.input !== 'password' ? String(f.examples[0]) : ''}
+  // Sign In Again: a secret left empty keeps the one in the keyring
+  return <TextInput secure={how.input === 'password'} value={value || ''} placeholder={kept && f.secret ? tr('cloud.cred.keptInKeyring') : f.examples && f.examples[0] && how.input !== 'password' ? String(f.examples[0]) : ''}
     style={{ direction: 'ltr' }} onChange={onChange} onSubmit={onSubmit} />;
 }
 
@@ -999,7 +1015,7 @@ function CredSheet({ st, sheet }) {
       if (auth === 'password') { delete v[layout.auth.key]; delete v[layout.auth.passphrase]; }
       else { delete v[layout.auth.password]; if (!v[layout.auth.key]) { setErr({ text: tr('cloud.sftp.chooseKey'), field: '__key' }); return; } }
     }
-    const miss = M.missingField(p, v);
+    const miss = M.missingField(p, v, { again: !!sheet.again });
     if (miss && !(layout.auth && Object.values(layout.auth).includes(miss))) { setErr({ text: tr('cloud.field.required'), field: miss }); if (layout.advanced.some((f) => f.name === miss)) setAdv(true); return; }
     const bad = sheet.again ? null : M.nameProblem(name, st.accounts);
     if (bad) { setErr({ text: tr(`cloud.name.${bad}`), field: '__name' }); return; }
@@ -1024,7 +1040,7 @@ function CredSheet({ st, sheet }) {
       {help ? <Text style={{ marginInlineStart: 140, fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{help}</Text> : null}
     </View>
   );
-  const control = (f) => <FieldControl f={f} value={vals[f.name]} onChange={(x) => set(f.name, x)} onSubmit={connect} />;
+  const control = (f) => <FieldControl f={f} value={vals[f.name]} onChange={(x) => set(f.name, x)} onSubmit={connect} kept={!!sheet.again} />;
   const fieldRow = (f) => row(f.name, fieldLabel(f), <View style={{ flex: 1, minWidth: 0 }}>{control(f)}</View>);
   // an advanced option: its short label (a switch beside it), the control under it, rclone's whole help dimmed below
   const advRow = (f) => {
