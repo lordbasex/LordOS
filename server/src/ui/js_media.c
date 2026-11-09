@@ -660,8 +660,10 @@ static JSValue f_screen_record(JSContext *c, JSValueConst t, int argc, JSValueCo
     close(fd);
     if (render >= 0) close(render);
     if (s->sock < 0 || media_screenrec_start(s, opt_int(c, o, "fps", 30, 5, 60))) {
+        /* no lord-media (0.8.8.6 shipped without it, GitHub #77) is said as such, not as "another recording" */
+        int nohelper = s->sock < 0;
         media_src_close(s);
-        ret = js_throw_code(c, "rec.startFailed", NULL);
+        ret = js_throw_code(c, nohelper ? "media.noHelper" : "rec.startFailed", NULL);
         goto out;
     }
     ret = JS_NewInt32(c, s->id);

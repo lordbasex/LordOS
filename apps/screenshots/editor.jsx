@@ -203,12 +203,14 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
   // ---- saving ----
   const plan = () => M.savePlan(path, tr('screenshots.edited'));
   const saved = (p, copy) => { flash(tr(copy ? 'screenshots.savedCopy' : 'screenshots.savedName', { name: nameOf(p) })); onSaved?.(p); };
+  // the reason goes with it (the media helper missing, a full disk…), never a bare "Could not save" (issue #77)
+  const saveFailed = (error) => flash(error ? `${tr('screenshots.saveError')}: ${errorText(error)}` : tr('screenshots.saveError'));
   const saveCopy = async () => {
     const pl = plan();
     const out = path ? M.freeCopy(pl, exists) : newCapturePath();
     if (!out || !current()) { flash(tr('screenshots.saveError')); return; }
     const r = await media.saveImage(current(), out, { format: pl.format });
-    if (!r.ok) { flash(tr('screenshots.saveError')); return; }
+    if (!r.ok) { saveFailed(r.error); return; }
     if (!path) setPath(r.path);                      // a capture only on the clipboard now has a file
     saved(r.path, !!path);
   };
@@ -216,7 +218,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
     const pl = plan();
     if (!path || !pl.replace) { await saveCopy(); return; }
     const r = await media.saveImage(current(), pl.temp, { format: pl.format });
-    if (!r.ok) { flash(tr('screenshots.saveError')); return; }
+    if (!r.ok) { saveFailed(r.error); return; }
     try { fs.trash(path); } catch (e) {
       // the original can't go to the Trash: the edit stays, as a copy
       const out = M.freeCopy(pl, exists);
@@ -238,7 +240,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
       if (txt) { clipboard.set(txt); flash(tr('screenshots.textCopied', { count: [...txt].length })); } else flash(tr('screenshots.noText'));
     } catch (e) { flash(errorText(e)); } finally { media.close(c); }
   };
-  const copy = async () => { const r = await media.copyImage(current()); flash(r.ok ? tr('screenshots.copied') : tr('screenshots.saveError')); };
+  const copy = async () => { const r = await media.copyImage(current()); flash(r.ok ? tr('screenshots.copied') : `${tr('screenshots.notCopied')}: ${errorText(r.error || 'media.noHelper')}`); };
 
   useKeyboard((e) => {
     const k = String(e.base || '').toLowerCase();

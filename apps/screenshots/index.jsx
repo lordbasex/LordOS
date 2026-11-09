@@ -114,8 +114,12 @@ function withTimer(fn) {
 // notification settings would hide a banner, so then it is a toast.
 function refused(err) {
   const body = errorText(err || { code: 'media.denied.screen', params: { app: tr('apps.screenshots') } });
+  // Privacy is offered only when a permission is the reason: lord-media missing or a recording that didn't
+  // start is not fixed there (issue #77)
+  const code = err && typeof err === 'object' ? String(err.code || '') : String(err || '');
+  const denied = !err || !code || code.startsWith('media.denied') || code.startsWith('fw.restricted');
   const banner = notify({ app: APP, label: tr('apps.screenshots'), title: tr('screenshots.refused'), body,
-    actions: [{ id: 'privacy', label: tr('screenshots.refused.open'), run: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) }] });
+    actions: !denied ? [] : [{ id: 'privacy', label: tr('screenshots.refused.open'), run: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) }] });
   if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(body);
 }
 async function allowed(ask) {
