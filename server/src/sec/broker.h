@@ -107,6 +107,9 @@ int  brokersrv_new_window(const char *id);
 int  brokersrv_quit(const char *id);
 /* The id of the isolated app whose process is `pid` (a Wayland client's pid), or NULL. */
 const char *brokersrv_app_of_pid(int pid);
+/* The compositor delivered a paste (Ctrl+V, Shift+Insert, the clipboard panel) to isolated app `app`'s window: it
+ * may read the clipboard once, right away (brokerclip.h, bclip_paste_gesture). */
+void brokersrv_paste_gesture(const char *app);
 /* The theme publishes its state (type "theme" or "locale", JSON) and it's forwarded live to every
  * isolated app; it's also kept for the ones that start later (BOP_STATE). */
 int  brokersrv_publish(const char *kind, const char *json, size_t len);

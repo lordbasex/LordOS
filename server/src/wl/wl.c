@@ -2738,12 +2738,22 @@ const char *wl_node_app(int node) {
     return NULL;
 }
 
+/* A paste the person asked for, reaching an isolated LordOS app: it may read the clipboard once for it (brokerclip.h).
+ * mods: the core modifiers the app sees with the key (bit 0 Shift, bit 2 Ctrl). */
+static void note_paste(int code, uint32_t mods) {
+    if (!key_focus) return;
+    if (!((code == KEY_V && (mods & 1u << 2)) || (code == KEY_INSERT && (mods & 1u)))) return;
+    const char *app = app_of_client(key_focus->client);
+    if (app) brokersrv_paste_gesture(app);
+}
+
 int wl_send_paste(void) {
     if (!dpy || !key_focus) return 0;
     unsigned t = now_ms();
     uint32_t d, l, lk, g;
     kb_mods(&d, &l, &lk, &g);
     struct wl_resource *kb;
+    note_paste(KEY_V, d | (1u << 2));
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
         wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d | (1u << 2), l, lk, g);
         wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, KEY_V, WL_KEYBOARD_KEY_STATE_PRESSED);
@@ -2770,6 +2780,7 @@ static void send_key_to_focus(int code, int value) {
     if (keylag_enabled) keylag_sent_wl(keylag_traceable());
     uint32_t d, l, lk, g;
     kb_mods(&d, &l, &lk, &g);
+    if (value == 1) note_paste(code, d);
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
         wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
@@ -2829,6 +2840,7 @@ static void send_remapped(int code, int press) {
     kb_mods(&d, &l, &lk, &g);
     d &= ~(1u << 6);
     uint32_t held = d | 1u << 2 | (focus_terminal ? 1u : 0);
+    if (press) note_paste(code, held);
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
         if (press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), held, l, lk, g);

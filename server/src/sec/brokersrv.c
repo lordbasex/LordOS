@@ -294,6 +294,8 @@ int brokersrv_quit(const char *id) {
     return sent;
 }
 
+void brokersrv_paste_gesture(const char *app) { bclip_paste_gesture(app, mono_s()); }
+
 const char *brokersrv_app_of_pid(int pid) {
     if (pid <= 0) return NULL;
     for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].pid == pid) return apps[i].id;
@@ -572,7 +574,11 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
     }
     case BOP_CLIP_GET: {
         if (deny_restricted(fd, h->reqid, a->id, FW_R_NO_CLIPBOARD)) break;
-        if (perm_get(a->id, PERM_CLIPBOARD) != PERM_ALLOW) { send_reply(fd, h->reqid, BST_DENIED, NULL, 0); break; }
+        /* the clipboard permission, or a paste the person just asked for in this app's window (brokerclip.h) */
+        if (perm_get(a->id, PERM_CLIPBOARD) != PERM_ALLOW && !bclip_paste_take(a->id, mono_s())) {
+            send_reply(fd, h->reqid, BST_DENIED, NULL, 0);
+            break;
+        }
         const char *txt = term_clipboard();
         send_reply(fd, h->reqid, BST_OK, txt ? txt : "", txt ? (uint32_t)strlen(txt) : 0);
         break;

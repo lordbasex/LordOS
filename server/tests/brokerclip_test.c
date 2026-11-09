@@ -63,6 +63,21 @@ int main(void) {
     check(!bclip_due(51, 51, 700), "its countdown is gone");
     check(bclip_status("mail", 51, 602, &left) == BCLIP_MINE, "the other app's copy");
 
+    /* a paste the person asked for: one read, by that app, soon after the keys */
+    check(!bclip_paste_take("mail", 700), "no gesture: no read");
+    bclip_paste_gesture("mail", 700);
+    check(!bclip_paste_take("calendar", 700.1), "another app can't use it");
+    check(bclip_paste_take("mail", 700.5), "the app whose window got Ctrl+V reads once");
+    check(!bclip_paste_take("mail", 700.6), "and only once");
+    bclip_paste_gesture("mail", 710);
+    check(!bclip_paste_take("mail", 712.5), "too late: none");
+    bclip_paste_gesture("mail", 720);
+    bclip_paste_gesture("reminders", 720.2);
+    check(!bclip_paste_take("mail", 720.3) && bclip_paste_take("reminders", 720.3), "the latest gesture wins");
+    bclip_paste_gesture(NULL, 730);
+    bclip_paste_gesture("", 730);
+    check(!bclip_paste_take("", 730.1), "no app: nothing");
+
     printf("brokerclip-test: %d/%d\n", total - fails, total);
     return fails != 0;
 }

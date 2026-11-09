@@ -25,4 +25,12 @@ int bclip_status(const char *app, unsigned gen, double now, int *left);
 /* `app`'s secret, still on the clipboard, stays there (no clearing): 1, or 0 when it isn't its copy */
 int bclip_keep(const char *app, unsigned gen, double now);
 
+/* A paste the person asked for (GitHub #64: Mail, Calendar, Contacts, Reminders and Passwords couldn't paste): the
+ * compositor saw Ctrl+V or Shift+Insert reach `app`'s window, or the clipboard panel pasted into it. The app may then
+ * read the clipboard once, within 2 s, without the clipboard permission, which still governs every other read. A new
+ * gesture for another app replaces it. */
+void bclip_paste_gesture(const char *app, double now);
+/* 1 (and the gesture is used up) when `app` may read the clipboard now for a paste, 0 otherwise */
+int bclip_paste_take(const char *app, double now);
+
 #endif

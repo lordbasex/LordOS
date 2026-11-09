@@ -54,3 +54,20 @@ int bclip_keep(const char *app, unsigned gen, double now) {
     C.until = now;                          /* nothing more to ask about */
     return 1;
 }
+
+/* ---- a paste the person asked for ---- */
+
+static struct { char app[64]; double until; } P;
+#define PASTE_WINDOW 2.0            /* the app's read must follow the keys this soon */
+
+void bclip_paste_gesture(const char *app, double now) {
+    if (!app || !*app) return;
+    snprintf(P.app, sizeof P.app, "%s", app);
+    P.until = now + PASTE_WINDOW;
+}
+
+int bclip_paste_take(const char *app, double now) {
+    if (!app || !P.app[0] || strcmp(P.app, app) || now > P.until) return 0;
+    P.app[0] = 0;                           /* one read per paste */
+    return 1;
+}

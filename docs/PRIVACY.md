@@ -109,7 +109,7 @@ checked in `lord-server`:
 | Request | What `lord-server` does |
 |---|---|
 | `fs.home/read/write/list` | only inside `~/.local/share/lordos/appdata/<id>`; everything else is **denied** |
-| `clipboard.get` | only with the `clipboard` permission granted; `clipboard.set` always |
+| `clipboard.get` | with the `clipboard` permission granted, or once within 2 s of a paste the person asked for in that app's window: the compositor saw Ctrl+V or Shift+Insert reach it, or the clipboard panel pasted into it (0.8.8.7, `sec/brokerclip.c`; before, Mail, Calendar, Contacts, Reminders and Passwords could not paste at all, GitHub #64); `clipboard.set` always |
 | `broker.request(perm)` | allowed/denied according to what is stored; if "ask", it queues a **system prompt** and replies when the user decides (the app waits) |
 | `broker.device(kind, on)` | turns the camera/microphone indicator on/off, only if that permission is granted |
 | `broker.pick(save, name)` | **powerbox**: lord-server draws the open/save dialog and passes the app **only the fd** of the chosen file (SCM_RIGHTS); the app doesn't see the folder |
@@ -226,7 +226,7 @@ sandbox[evil]: cgroup=1 landlock-fs=1 landlock-net=1 seccomp=1 nopriv=1 nocaps=1
 | read `~/.ssh/id_rsa` | blocked (the broker only serves the app's folder; Landlock hides it anyway) |
 | read `~/.config/lordos/settings.json` | blocked |
 | write outside its folder | blocked |
-| silently read the clipboard | blocked (no `clipboard` permission) |
+| silently read the clipboard | blocked (no `clipboard` permission; a paste needs the person's keys, seen by the compositor, not by the app) |
 | open `/etc/shadow` | blocked |
 | open a network socket, `exec /bin/sh`, `ptrace`, new unix sockets | blocked by seccomp (see `sandbox-test`) |
 | open a device (`/dev/dri/card0`, `/dev/video0`) | blocked by Landlock (the app doesn't see `/dev`; the camera will arrive as an fd after consent). The VM has no `/dev/video0`: tested with the graphics card |
