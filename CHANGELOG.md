@@ -12,6 +12,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Photos: the cloud folders kept on this computer** (GitHub #89). A Cloud section in the sidebar lists every folder a
+  cloud account keeps on this computer (Keep on This Computer); their pictures are all local, so they open without the
+  network. Folders only in the cloud are left out, and these folders are read off the compositor's thread, so Photos
+  never waits for a provider.
+
+- **Text Editor: a scroll bar** (GitHub #84). Drag it, or click the track to jump there; Ctrl+End (❖↓ in Lord Flow)
+  still goes to the last line. With it, the editor reads its real height: until now it kept 600 × 400, so Page Up and
+  Page Down, keeping the cursor in view and the end of the scroll were off in any other window size.
+
 - **Terminal: its own configuration file, wherever you want it.** Profiles, colors, key mappings, shortcuts, the hotkey
   and the windows to restore move out of `settings.json` into `~/.config/lordos/terminal.json` (with a schema number),
   so they can be backed up, versioned or synced on their own. The move is automatic and loses nothing: `settings.json`
@@ -64,6 +73,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
+- **Every app that changed has a new version** (GitHub #91). 0.8.8.6 changed Files, Monitor, Settings and others and
+  the Store still showed their old versions. Each app changed since 0.8.8.5 gets its next version, and a release
+  package is refused when an app changed and its version didn't (`tools/app-versions.mjs`).
+
+- **Files: a connected share shows its server's name** (GitHub #88). A share found on the network by its name showed
+  as "software on 192.168.1.25" once connected; Files now keeps the name the server was found or typed under and shows
+  it in the sidebar, the title and Network's list. The folder on disk keeps the address (a name is never resolved for
+  the mount).
+
   A folder shared with write access can't be, sit under or hold a file this computer protects (settings.json, the
   Terminal's configuration wherever it is, launchers): the machine could change what this computer runs. Checked when
   the share is made and again before every start; read-only sharing is unaffected.
@@ -93,6 +111,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   suspended one resumes from the same button.
 
 ### Fixed
+
+- **Mail, Calendar, Contacts, Reminders and Passwords can paste** (GitHub #64). These apps run isolated, and reading
+  the clipboard needs a permission they never ask for, so Ctrl+V did nothing. Now a paste the person asks for in the
+  app's window (Ctrl+V or Shift+Insert, which lord-server sees reach it, or the clipboard panel) lets that app read the
+  clipboard once within 2 seconds. The app can't fake the keys, and any other read still needs the permission.
+
+- **Photos: a picture that can't be opened says why** (GitHub #90). 0.8.8.6 shipped without the media helper and every
+  picture showed as a black screen with nothing said, because the decoding failed before the picture could be told.
+  It now shows "This image cannot be opened" and the reason. 0.8.8.7's package has the helper again (and the
+  packaging refuses a package without it).
 
 - **The package can't be built without its helpers.** 0.8.8.6 shipped without lord-media (screenshots, video, music,
   camera) and lord-vmdisplay, because the machine that built it lacked FFmpeg's and libsystemd's -dev packages and
