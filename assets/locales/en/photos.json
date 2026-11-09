@@ -52,5 +52,6 @@
   "crop.square": "Square",
   "size": "Size",
   "keepRatio": "Keep proportions",
-  "sizeInvalid": "Width and height must be whole numbers from 1 to {max}"
+  "sizeInvalid": "Width and height must be whole numbers from 1 to {max}",
+  "cloud": "Cloud"
 }

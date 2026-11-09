@@ -52,5 +52,6 @@
   "crop.square": "Quadrado",
   "size": "Tamanho",
   "keepRatio": "Manter as proporções",
-  "sizeInvalid": "A largura e a altura devem ser números inteiros de 1 a {max}"
+  "sizeInvalid": "A largura e a altura devem ser números inteiros de 1 a {max}",
+  "cloud": "Nuvem"
 }

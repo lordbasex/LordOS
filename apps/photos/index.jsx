@@ -1,6 +1,7 @@
 // Photos — image viewer and library (our own design, in the style of desktop viewers).
 //
-// The library is the XDG pictures folder, ~/Pictures by default (and its folders), with thumbnails in ~/.cache/lordos/thumbs. The
+// The library is the XDG pictures folder, ~/Pictures by default (and its folders), and the cloud folders kept on this
+// computer (places.js), with thumbnails in ~/.cache/lordos/thumbs. The
 // viewer decodes with lord-media (PNG, JPEG, animated GIF, WebP, BMP; HEIC/AVIF if FFmpeg can)
 // and C draws it: zoom, panning, rotation, full screen and slideshow. Edits (crop with aspect presets
 // and handles, a new size, rotation, brightness and contrast) are saved as a copy: the original is left
@@ -8,9 +9,10 @@
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
-  Segmented, TextInput, Toggle, openMarkup, imageEdit as M,
+  Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
+import { keptPlaces, inPlaces } from './places.js';
 
 const APP = 'photos';
 const handledNonce = new Map();      // «Open with» already handled, per window
@@ -37,6 +39,20 @@ function listImages(dir, depth, out) {
   for (const e of list) {
     const p = `${dir}/${e.name}`;
     if (e.dir) { if (depth > 0) listImages(p, depth - 1, out); }
+    else if (IMAGE.test(e.name)) out.push({ path: p, name: e.name, size: e.size, mtime: e.mtime });
+  }
+}
+
+// the same, without waiting on the compositor's thread: a cloud folder is on a network mount, where a listing can wait
+// for the provider (the session must never freeze for it)
+async function listImagesAsync(dir, depth, out, alive) {
+  if (depth < 0 || out.length > 4000 || !alive()) return;
+  let list = [];
+  try { list = await fs.listAsync(dir); } catch (e) { return; }
+  for (const e of list) {
+    if (!alive()) return;
+    const p = `${dir}/${e.name}`;
+    if (e.dir) { if (depth > 0 && !e.name.startsWith('.')) await listImagesAsync(p, depth - 1, out, alive); }
     else if (IMAGE.test(e.name)) out.push({ path: p, name: e.name, size: e.size, mtime: e.mtime });
   }
 }
@@ -383,11 +399,20 @@ export default function Photos() {
   const [rev, setRev] = useState(0);
   const winW = useStore(windows, (ws) => ws.find((w) => w.id === win.id)?.w || 980);
 
+  const places = keptPlaces(useCloud().accounts);
+
   useEffect(() => {
     const out = [];
-    listImages(folder, all ? 4 : 0, out);
-    out.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
-    setItems(out);
+    const byMtime = (a, b) => (b.mtime || 0) - (a.mtime || 0);
+    if (!inPlaces(places, folder)) {
+      listImages(folder, all ? 4 : 0, out);
+      setItems(out.sort(byMtime));
+      return undefined;
+    }
+    let live = true;
+    setItems([]);
+    listImagesAsync(folder, 4, out, () => live).then(() => { if (live) setItems(out.sort(byMtime)); });
+    return () => { live = false; };
   }, [folder, all, rev]);
 
   // open what Files sent: the image and its neighbors in the same folder
@@ -429,11 +454,16 @@ export default function Photos() {
         {subfolders(dirs.pictures).map((f) => (
           <SidebarItem key={f} label={baseName(f)} icon={<FolderGlyph on={!all && folder === f} />} selected={!all && folder === f} onClick={() => { setFolder(f); setAll(false); }} />
         ))}
+        {places.length > 0 && <View style={{ height: 8 }} />}
+        {places.length > 0 && <SectionTitle>{tr('photos.cloud')}</SectionTitle>}
+        {places.map((k) => (
+          <SidebarItem key={k.path} label={k.label} icon={<FolderGlyph on={folder === k.path} />} selected={folder === k.path} onClick={() => { setFolder(k.path); setAll(true); }} />
+        ))}
       </View>
       <View style={{ flex: 1 }}>
         <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 12 }}>
           <View style={{ flex: 1, overflow: 'hidden' }}>
-            <Text style={{ fontSize: narrow ? 17 : 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' }}>{all ? tr('photos.allPhotos') : baseName(folder)}</Text>
+            <Text style={{ fontSize: narrow ? 17 : 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' }}>{places.find((k) => k.path === folder)?.label || (all ? tr('photos.allPhotos') : baseName(folder))}</Text>
             <Text style={{ fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' }}>{tr('photos.count', { count: items.length })}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, direction: 'ltr' }}>

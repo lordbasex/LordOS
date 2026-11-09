@@ -52,5 +52,6 @@
   "crop.square": "Carré",
   "size": "Taille",
   "keepRatio": "Conserver les proportions",
-  "sizeInvalid": "La largeur et la hauteur doivent être des nombres entiers de 1 à {max}"
+  "sizeInvalid": "La largeur et la hauteur doivent être des nombres entiers de 1 à {max}",
+  "cloud": "Cloud"
 }
