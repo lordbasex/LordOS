@@ -591,11 +591,21 @@ function CheckAccount({ a, st, p, verified }) {
   // an account that isn't working now (paused, waiting for a sign-in, an error) would only time out step after step:
   // the check waits for it, and says why
   const notReady = !c.running && (a.state === 'paused' || a.state === 'signin' || !!a.error || a.mounted === false);
+  // what holds it, in words, with the way out where there is one
+  const pausedAll = a.state === 'paused' && !a.paused && !!(st.options || {}).pauseAll;
+  const why = !notReady ? null : pausedAll ? ['cloud.check.notReadyPausedAll', 'cloud.resumeAll', () => cloud.resume(null)]
+    : a.paused ? ['cloud.check.notReadyPaused', 'cloud.menu.resume', () => cloud.resume(a.id)]
+      : a.state === 'signin' ? ['cloud.check.notReadySignin', null, null] : ['cloud.check.notReady', null, null];
   const close = () => { checks.set(a.id, { running: false, steps: null, report: '' }); checkRev.set((x) => x + 1); };
   return (
     <View style={{ gap: 8 }}>
       <Dim t={t}>{tr(verified ? 'cloud.check.hintVerified' : 'cloud.check.hint')}</Dim>
-      {notReady ? <Text style={{ fontSize: typeScale.callout, color: tint.warn, textAlign: 'start' }}>{tr('cloud.check.notReady')}</Text> : null}
+      {why ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: tint.warn, textAlign: 'start' }}>{tr(why[0])}</Text>
+          {why[1] ? <Button small label={tr(why[1])} onClick={why[2]} /> : null}
+        </View>
+      ) : null}
       <Actions start>
         <Button small primary={!verified} disabled={c.running || notReady} label={tr(c.running ? 'cloud.check.running' : c.steps ? 'cloud.check.again' : 'cloud.check.run')} onClick={start} />
         {c.steps && !c.running ? <Button small label={tr('cloud.check.close')} onClick={close} /> : null}

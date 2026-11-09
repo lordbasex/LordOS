@@ -394,5 +394,8 @@
   "opt.pausedOther": "En pausa por todas las cuentas (Pausar todo, batería o red medida); este interruptor es solo para esta cuenta",
   "opt.pausedAll": "Todas las cuentas están en pausa",
   "check.notReady": "La cuenta no está funcionando ahora (en pausa, esperando un inicio de sesión o con un error). Resolvé eso primero y después comprobala.",
-  "check.close": "Cerrar"
+  "check.close": "Cerrar",
+  "check.notReadyPausedAll": "Todas las cuentas están en pausa (Pausar todo). Reanudá para comprobar esta.",
+  "check.notReadyPaused": "Esta cuenta está en pausa. Reanudala para comprobarla.",
+  "check.notReadySignin": "Esta cuenta necesita iniciar sesión de nuevo (Iniciar sesión de nuevo) antes de comprobarla."
 }

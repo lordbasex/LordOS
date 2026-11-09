@@ -394,5 +394,8 @@
   "opt.pausedOther": "Em pausa para todas as contas (Pausar tudo, bateria ou rede limitada); este botão é só para esta conta",
   "opt.pausedAll": "Todas as contas estão em pausa",
   "check.notReady": "A conta não está funcionando agora (em pausa, aguardando login ou com erro). Resolva isso primeiro e depois verifique.",
-  "check.close": "Fechar"
+  "check.close": "Fechar",
+  "check.notReadyPausedAll": "Todas as contas estão em pausa (Pausar tudo). Retome para verificar esta.",
+  "check.notReadyPaused": "Esta conta está em pausa. Retome-a para verificá-la.",
+  "check.notReadySignin": "Esta conta precisa de um novo login (Entrar novamente) antes de ser verificada."
 }

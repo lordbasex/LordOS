@@ -394,5 +394,8 @@
   "opt.pausedOther": "In pausa per tutti gli account (Metti in pausa tutto, batteria o rete a consumo); questo interruttore è solo per questo account",
   "opt.pausedAll": "Tutti gli account sono in pausa",
   "check.notReady": "L’account non funziona in questo momento (in pausa, in attesa di un accesso o con un errore). Risolvi prima questo, poi verificalo.",
-  "check.close": "Chiudi"
+  "check.close": "Chiudi",
+  "check.notReadyPausedAll": "Tutti gli account sono in pausa (Metti in pausa tutto). Riprendi per verificare questo.",
+  "check.notReadyPaused": "Questo account è in pausa. Riprendilo per verificarlo.",
+  "check.notReadySignin": "Questo account deve accedere di nuovo (Accedi di nuovo) prima di essere verificato."
 }

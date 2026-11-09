@@ -394,5 +394,8 @@
   "opt.pausedOther": "Paused for every account (Pause All, battery or a metered network); this switch is for this account alone",
   "opt.pausedAll": "Every account is paused",
   "check.notReady": "The account isn’t working right now (paused, waiting for a sign-in, or with an error). Fix that first, then check it.",
-  "check.close": "Close"
+  "check.close": "Close",
+  "check.notReadyPausedAll": "Every account is paused (Pause All). Resume to check this one.",
+  "check.notReadyPaused": "This account is paused. Resume it to check it.",
+  "check.notReadySignin": "This account needs a new sign-in (Sign In Again) before it can be checked."
 }
