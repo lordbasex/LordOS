@@ -10,6 +10,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Machines: shared folders.** Up to four folders of this computer inside a machine, read-only unless you turn writing
+  on for one (Configure → Sharing → Add a Folder; the bar's folder button lists them, opens each in Files and copies the
+  command that mounts it in a Linux guest: `mount -t virtiofs <tag> /mnt/<tag>`). Each folder is served by its own
+  `virtiofsd` (Debian's), started by `lord-vm` as you, in its own namespaces with only that folder mounted and its own
+  seccomp filter; QEMU gets an already connected socket and never the folder. Only a real folder inside your home (not
+  all of it) or on a disk under `/media` or `/mnt` can be shared, never a hidden one nor the machines' library, checked
+  when it's chosen and again at every start. The guest's memory is shared with the helper only on machines that share a
+  folder. Suspend, resume and snapshots with memory keep the folder mounted. `machine.json` schema 4 (`shares`);
+  `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
+
 ### Changed
 
 - **Machines' library looks like Remote Desk.** A toolbar of icons, each named in its tooltip: Storage, what Machines
@@ -22,8 +34,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **The machine window's bar is icons in groups.** The agent and what it brings (clipboard, shared folders, Apps mode) |
   resolution and devices | shell, logs, screenshot, record | start, pause or resume, and power | Configure and full
   screen. Each group sits in one rounded container, with a thin line between groups, and every button has its tooltip.
-  The clipboard button shows which ways it works for the machine and leads to Configure to change them; shared folders
-  and Apps mode are shown, dimmed, with "coming in a later version".
+  The clipboard button shows which ways it works for the machine and leads to Configure to change them; the folder button
+  lists the shared folders; Apps mode is shown, dimmed, with "coming in a later version".
 - **A machine that is off shows one round Play button** over its last picture, dimmed, with its name and state; a
   suspended one resumes from the same button.
 
@@ -33,7 +45,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   whole (as it does for a virtual TPM) keeps only its name and the wrapped key in the clear in its `.vmx`; the importer
   said "not a .vmx settings file". It now names the machine and stops with *encrypted*, which tells to remove the
   encryption in the app that made it.
-- **Files: a Cloud or network folder never freezes the desktop any more.** Deleting a file inside an iCloud folder
+- **Files: a Cloud or network folder never freezes the desktop any more.** Deleting a file inside a Cloud account's folder
   (any Cloud account, mounted by rclone through FUSE) froze the whole desktop, pointer and every window, until rclone
   finished, and going back to the parent folder could freeze it again until rclone answered. lord-server is one thread
   for input, layout, painting and JS, and Files read those folders with synchronous `lord.fs` calls on it: the folder's

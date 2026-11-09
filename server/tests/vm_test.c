@@ -13,6 +13,7 @@
 #include "vm/vmops.h"
 #include "vm/vmagent.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +63,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "4", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "5", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -109,7 +110,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
-    n9.schema = 4;
+    n9.schema = VM_SCHEMA + 1;
     CHECK(vm_machine_save("/nonexistent-dir", &n9) != VM_OK);
     /* schema 2: base (a .qcow2 in a .shared folder), agent, clipboard; not in a schema 1 file */
     struct { const char *add; int want; } s2[] = {
@@ -162,6 +163,68 @@ static void test_schema(void) {
         }
         snprintf(t, sizeof t, "%.*s\"schema\":2%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s3[i].add);
         CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s3[i].want != VM_OK);    /* never in schema 2 */
+    }
+    /* schema 4 (0.8.8.7): shared folders; never in schema 3 */
+    struct { const char *add; int want; } s4[] = {
+        { "\"shares\":[{\"tag\":\"work\",\"path\":\"/home/u/Work\"}]", VM_OK },
+        { "\"shares\":[{\"tag\":\"work\",\"path\":\"/home/u/Work\",\"writable\":true},{\"tag\":\"m-2_x\",\"path\":\"/media/u/Disk\"}]", VM_OK },
+        { "\"shares\":[{\"tag\":\"a b\",\"path\":\"/home/u/Work\"}]", VM_E_RANGE }, { "\"shares\":[{\"tag\":\"\",\"path\":\"/home/u/Work\"}]", VM_E_RANGE },
+        { "\"shares\":[{\"tag\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"path\":\"/home/u/Work\"}]", VM_E_RANGE },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"Work\"}]", VM_E_RANGE }, { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/../etc\"}]", VM_E_RANGE },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/a,b\"}]", VM_E_RANGE }, { "\"shares\":[{\"tag\":\"w\"}]", VM_E_FIELD },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/W\",\"writable\":1}]", VM_E_FIELD },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/W\",\"mode\":\"rw\"}]", VM_E_FIELD },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/W\"},{\"tag\":\"w\",\"path\":\"/home/u/X\"}]", VM_E_RANGE },
+        { "\"shares\":[{\"tag\":\"w\",\"path\":\"/home/u/W\"},{\"tag\":\"x\",\"path\":\"/home/u/W\"}]", VM_E_RANGE },
+        { "\"shares\":[{\"tag\":\"a\",\"path\":\"/a\"},{\"tag\":\"b\",\"path\":\"/b\"},{\"tag\":\"c\",\"path\":\"/c\"},{\"tag\":\"d\",\"path\":\"/d\"},{\"tag\":\"e\",\"path\":\"/e\"}]", VM_E_RANGE },
+        { "\"shares\":{}", VM_E_FIELD },
+    };
+    for (size_t i = 0; i < sizeof s4 / sizeof s4[0]; i++) {
+        char t[4096];
+        const char *at = strstr(GOOD, "\"schema\":1");
+        snprintf(t, sizeof t, "%.*s\"schema\":4%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s4[i].add);
+        int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+        if (r != s4[i].want) fprintf(stderr, "  schema 4 %s: got %d (%s)\n", s4[i].add, r, err);
+        CHECK(r == s4[i].want);
+        if (r == VM_OK) {
+            char *jj = vm_machine_json(&m);
+            CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+            free(jj);
+        }
+        snprintf(t, sizeof t, "%.*s\"schema\":3%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s4[i].add);
+        CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s4[i].want != VM_OK);    /* never in schema 3 */
+    }
+    /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
+     * hidden, never the library or what holds it */
+    {
+        char hm[] = "/tmp/vm-share.XXXXXX";
+        if (mkdtemp(hm)) {
+            char real[PATH_MAX], d[PATH_MAX + 64], lib[PATH_MAX + 64], lnk[PATH_MAX + 64];
+            CHECK(realpath(hm, real) != NULL);
+            snprintf(d, sizeof d, "%s/Work", real); mkdir(d, 0700);
+            snprintf(lib, sizeof lib, "%s/Machines", real); mkdir(lib, 0700);
+            snprintf(lnk, sizeof lnk, "%s/.config", real); mkdir(lnk, 0700);
+            snprintf(lnk, sizeof lnk, "%s/Machines/A.lordvm", real); mkdir(lnk, 0700);
+            CHECK(vm_share_allowed(d, real, "u", lib, err, sizeof err) == 0);
+            CHECK(vm_share_allowed(real, real, "u", lib, err, sizeof err) < 0);            /* all of home */
+            CHECK(vm_share_allowed(lib, real, "u", lib, err, sizeof err) < 0);             /* the library */
+            CHECK(vm_share_allowed(lnk, real, "u", lib, err, sizeof err) < 0);             /* a machine inside it */
+            snprintf(lnk, sizeof lnk, "%s/.config", real);
+            CHECK(vm_share_allowed(lnk, real, "u", lib, err, sizeof err) < 0);             /* hidden */
+            CHECK(vm_share_allowed(d, real, "u", real, err, sizeof err) < 0);
+            snprintf(lnk, sizeof lnk, "%s/Link", real);
+            CHECK(!symlink(d, lnk) && vm_share_allowed(lnk, real, "u", lib, err, sizeof err) < 0);   /* a symbolic link */
+            snprintf(lnk, sizeof lnk, "%s/Missing", real);
+            CHECK(vm_share_allowed(lnk, real, "u", lib, err, sizeof err) < 0);
+            CHECK(vm_share_allowed("/etc", real, "u", lib, err, sizeof err) < 0);
+            CHECK(vm_share_allowed("/", real, "u", lib, err, sizeof err) < 0);
+            CHECK(vm_share_allowed("/mnt", real, "u", lib, err, sizeof err) < 0);
+            snprintf(lnk, sizeof lnk, "%s/Link", real); unlink(lnk);
+            snprintf(lnk, sizeof lnk, "%s/Machines/A.lordvm", real); rmdir(lnk);
+            rmdir(lib); rmdir(d);
+            snprintf(lnk, sizeof lnk, "%s/.config", real); rmdir(lnk);
+            rmdir(real);
+        }
     }
     /* amd64 with bios: no firmware_code */
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);

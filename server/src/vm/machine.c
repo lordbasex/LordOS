@@ -5,6 +5,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,6 +138,41 @@ static int path_valid(const char *s) {
     return 1;
 }
 
+int vm_tag_valid(const char *t) {
+    size_t n = strlen(t);
+    if (!n || n > VM_TAG_MAX) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = t[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_')) return 0;
+    }
+    return 1;
+}
+
+/* a is b, or inside it */
+static int under_or_is(const char *a, const char *b) {
+    size_t n = strlen(b);
+    while (n > 1 && b[n - 1] == '/') n--;
+    return !strncmp(a, b, n) && (a[n] == 0 || a[n] == '/');
+}
+
+int vm_share_allowed(const char *path, const char *home, const char *user, const char *library, char *err, size_t n) {
+    if (!path_valid(path)) return fail(err, n, -1, "not an absolute path without '..', ',' or control characters");
+    char real[PATH_MAX];
+    if (!realpath(path, real)) return fail(err, n, -1, "the folder doesn't exist");
+    if (strcmp(real, path)) return fail(err, n, -1, "the path goes through a symbolic link (the folder is %s)", real);
+    struct stat st;
+    if (stat(real, &st) || !S_ISDIR(st.st_mode)) return fail(err, n, -1, "not a folder");
+    for (const char *c = real; (c = strchr(c, '/')); c++) if (c[1] == '.') return fail(err, n, -1, "hidden folders (settings, keys) can't be shared");
+    char media[300];
+    snprintf(media, sizeof media, "/media/%s", user && *user ? user : "-");
+    int place = (home && *home && under_or_is(real, home) && strcmp(real, home)) || (under_or_is(real, media) && strcmp(real, media)) ||
+                (under_or_is(real, "/mnt") && strcmp(real, "/mnt"));
+    if (!place) return fail(err, n, -1, "only a folder inside the home folder (not all of it) or on a disk under /media or /mnt can be shared");
+    if (library && *library && (under_or_is(real, library) || under_or_is(library, real)))
+        return fail(err, n, -1, "the machines' library can't be shared, nor a folder holding it");
+    return 0;
+}
+
 int vm_base_valid(const char *s) {
     size_t n = s ? strlen(s) : 0;
     return n > 15 && path_valid(s) && strstr(s, "/.shared/") && !strchr(strstr(s, "/.shared/") + 9, '/') && !strcmp(s + n - 6, ".qcow2");
@@ -191,6 +227,17 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     }
     if (m->n_data && m->base[0]) return fail(err, n, VM_E_RANGE, "a linked clone has no data disks");
     if (m->rtc != VM_RTC_UTC && m->rtc != VM_RTC_LOCAL) return fail(err, n, VM_E_RANGE, "rtc");
+    if (m->n_shares < 0 || m->n_shares > VM_SHARES) return fail(err, n, VM_E_RANGE, "at most %d shares", VM_SHARES);
+    for (int i = 0; i < m->n_shares; i++) {
+        if (!vm_tag_valid(m->share_tag[i])) return fail(err, n, VM_E_RANGE, "shares: tag is 1 to %d letters, digits, '-' or '_'", VM_TAG_MAX);
+        if (!path_valid(m->share_path[i])) return fail(err, n, VM_E_RANGE, "shares: path must be an absolute path without '..', ',' or control characters");
+        if (m->share_rw[i] != 0 && m->share_rw[i] != 1) return fail(err, n, VM_E_RANGE, "shares: writable");
+        for (int k = 0; k < i; k++) {
+            if (!strcmp(m->share_tag[i], m->share_tag[k])) return fail(err, n, VM_E_RANGE, "shares: the same tag twice");
+            if (!strcmp(m->share_path[i], m->share_path[k])) return fail(err, n, VM_E_RANGE, "shares: the same folder twice");
+        }
+    }
+    if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -227,7 +274,8 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
 static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
-    "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc", NULL,
+    "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
+    "shares", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -314,6 +362,25 @@ static int parse3(const JVal *o, VmMachine *m, char *err, size_t n) {
     return VM_OK;
 }
 
+/* schema 4's keys */
+static int parse4(const JVal *o, VmMachine *m, char *err, size_t n) {
+    const JVal *x = json_get(o, "shares");
+    if (!x) return VM_OK;
+    if (x->type != J_ARR) return fail(err, n, VM_E_FIELD, "shares must be a list");
+    if (x->len > VM_SHARES) return fail(err, n, VM_E_RANGE, "at most %d shares", VM_SHARES);
+    for (const JVal *e = x->kid; e; e = e->next) {
+        if (e->type != J_OBJ) return fail(err, n, VM_E_FIELD, "shares: objects");
+        for (const JVal *k = e->kid; k; k = k->next)
+            if (strcmp(k->key, "tag") && strcmp(k->key, "path") && strcmp(k->key, "writable")) return fail(err, n, VM_E_FIELD, "shares: unknown key");
+        int i = m->n_shares++, r;
+        if ((r = get_str(e, "tag", m->share_tag[i], sizeof m->share_tag[i], 1, err, n)) || (r = get_str(e, "path", m->share_path[i], sizeof m->share_path[i], 1, err, n))) return r;
+        const JVal *w = json_get(e, "writable");
+        if (w && w->type != J_BOOL) return fail(err, n, VM_E_FIELD, "shares: writable must be true or false");
+        m->share_rw[i] = w ? json_bool(e, "writable", 0) : 0;
+    }
+    return VM_OK;
+}
+
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t n) {
     memset(m, 0, sizeof *m);
     if (len > 64 * 1024) return fail(err, n, VM_E_JSON, "machine.json is larger than 64 KB");
@@ -350,7 +417,7 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->agent = a ? json_bool(o, "agent", 0) : 0;
         if (json_get(o, "clipboard") && (r = get_enum(o, "clipboard", CLIPS, &m->clipboard, err, n))) goto out;
     }
-    if ((r = parse3(o, m, err, n))) goto out;
+    if ((r = parse3(o, m, err, n)) || (r = parse4(o, m, err, n))) goto out;
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -405,6 +472,15 @@ char *vm_machine_json(const VmMachine *m) {
             jb_raw(&b, "]");
         }
         if (m->rtc) jb_printf(&b, ",\n  \"rtc\": \"%s\"", RTCS[m->rtc]);
+    }
+    if (m->schema >= 4 && m->n_shares) {
+        jb_raw(&b, ",\n  \"shares\": [");
+        for (int i = 0; i < m->n_shares; i++) {
+            jb_raw(&b, i ? ", {\"tag\": " : "{\"tag\": "); jb_str(&b, m->share_tag[i]);
+            jb_raw(&b, ", \"path\": "); jb_str(&b, m->share_path[i]);
+            jb_printf(&b, ", \"writable\": %s}", m->share_rw[i] ? "true" : "false");
+        }
+        jb_raw(&b, "]");
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);

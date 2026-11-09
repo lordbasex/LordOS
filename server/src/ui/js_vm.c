@@ -278,6 +278,18 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
             set_int(c, o, "dataDisks", m.n_data);
             {
+                /* shared folders (6.7): [{ tag, path, writable }] */
+                JSValue sh = JS_NewArray(c);
+                for (int i = 0; i < m.n_shares; i++) {
+                    JSValue e = JS_NewObject(c);
+                    set_str(c, e, "tag", m.share_tag[i]);
+                    set_str(c, e, "path", m.share_path[i]);
+                    JS_SetPropertyStr(c, e, "writable", JS_NewBool(c, m.share_rw[i]));
+                    JS_SetPropertyUint32(c, sh, (uint32_t)i, e);
+                }
+                JS_SetPropertyStr(c, o, "shares", sh);
+            }
+            {
                 char ip[PATH_MAX + 320];
                 snprintf(ip, sizeof ip, "%s/imported.json", dir);
                 JS_SetPropertyStr(c, o, "imported", JS_NewBool(c, !access(ip, F_OK)));
@@ -559,12 +571,13 @@ static int spawn_job(char *const args[], const char *dir) {
     return slot + 1;
 }
 
-/* set(dir, { name, vcpus, memoryMb, diskGb, network, iso }) → job id: lord-vm --set on a machine that is off (Configure) */
+/* set(dir, { name, vcpus, memoryMb, diskGb, network, iso, shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
+ * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[32], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[32 + 2 * VM_SHARES], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -612,6 +625,27 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (known) { snprintf(nicm, sizeof nicm, "%s", ns); args[n++] = "--nic-model"; args[n++] = nicm; } else ok = 0;
         if (ns) JS_FreeCString(c, ns);
     }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "shares");
+    if (JS_IsArray(c, v)) {
+        uint32_t len = 0;
+        JSValue l = JS_GetPropertyStr(c, v, "length");
+        JS_ToUint32(c, &len, l);
+        JS_FreeValue(c, l);
+        if (len > VM_SHARES) ok = 0;
+        else if (!len) { args[n++] = "--shares"; args[n++] = "none"; }
+        for (uint32_t i = 0; ok && i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i), tv = JS_GetPropertyStr(c, e, "tag"), pv = JS_GetPropertyStr(c, e, "path"), wv = JS_GetPropertyStr(c, e, "writable");
+            const char *ts = JS_IsString(tv) ? JS_ToCString(c, tv) : NULL, *ps = JS_IsString(pv) ? JS_ToCString(c, pv) : NULL;
+            if (ts && ps && vm_tag_valid(ts) && ps[0] == '/' && strlen(ps) < VM_PATH_MAX && (JS_IsBool(wv) || JS_IsUndefined(wv))) {
+                snprintf(shv[i], sizeof shv[i], "%s:%s:%s", JS_ToBool(c, wv) ? "rw" : "ro", ts, ps);
+                args[n++] = "--share"; args[n++] = shv[i];
+            } else ok = 0;
+            if (ts) JS_FreeCString(c, ts);
+            if (ps) JS_FreeCString(c, ps);
+            JS_FreeValue(c, tv); JS_FreeValue(c, pv); JS_FreeValue(c, wv); JS_FreeValue(c, e);
+        }
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
     if (JS_IsString(v)) {

@@ -20,9 +20,9 @@
 #include <stdint.h>
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
- * smbios, disk_serial, data_disks, rtc. An older file is read as is and written as the current schema, with a copy of the old
+ * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. An older file is read as is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 3
+#define VM_SCHEMA 4
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -42,6 +42,8 @@ enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
 #define VM_DATA_DISKS  4            /* disks/data-1.qcow2 ... data-4.qcow2 */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
 #define VM_SERIAL_MAX  20           /* a disk's serial: ATA's 20 characters */
+#define VM_SHARES      4            /* shared folders (6.7), each a vhost-user-fs device on PCI slots 0xb to 0xe */
+#define VM_TAG_MAX     32           /* a share's mount tag: letters, digits, '-', '_' (virtio-fs allows 36 bytes) */
 
 /* Limits that hold on every computer */
 #define VM_NAME_MAX       64            /* bytes of UTF-8 */
@@ -93,6 +95,12 @@ typedef struct {
     int data_gb[VM_DATA_DISKS];
     char data_serial[VM_DATA_DISKS][VM_SERIAL_MAX + 1];
     int rtc;                            /* VM_RTC_* */
+    /* schema 4: folders of this computer the guest mounts (6.7), each served by its own virtiofsd; read-only unless
+     * share_rw. The path is checked again where it's used (vm_share_allowed): this file only keeps it */
+    int n_shares;
+    char share_tag[VM_SHARES][VM_TAG_MAX + 1];
+    char share_path[VM_SHARES][VM_PATH_MAX];
+    int share_rw[VM_SHARES];
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -114,6 +122,14 @@ enum {
     VM_E_HOST,          /* doesn't fit this computer */
     VM_E_IO,
 };
+
+/* a share's mount tag: 1 to VM_TAG_MAX of [A-Za-z0-9_-] */
+int vm_tag_valid(const char *t);
+/* whether a folder may be shared with a guest: an existing directory, given as its real path (no symbolic link on the
+ * way), inside home (not home itself) or under /media/<user> or /mnt, with no hidden component (".config", ".ssh"...),
+ * and neither inside nor holding the machines' library (a guest could otherwise rewrite its own machine.json) nor the
+ * machine's own folder. home and library are real paths. 0 allowed, else -1 and why in err */
+int vm_share_allowed(const char *path, const char *home, const char *user, const char *library, char *err, size_t errlen);
 
 /* parses machine.json text; err (optional) gets the reason in English. VM_OK or VM_E_* */
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t errlen);

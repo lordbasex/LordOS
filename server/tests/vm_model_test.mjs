@@ -249,5 +249,10 @@ eq('search system', names(M.filterMachines(lib, { query: ' ubun ' })), ['Alpha']
 eq('search arch', names(M.filterMachines(lib, { query: 'ARM64' })), ['Mid']);
 eq('search none', M.filterMachines(lib, { query: 'nothing' }).length, 0);
 
+// shared folders' tags
+eq('share tag', [M.shareTag('Proyectos 2026'), M.shareTag('Música'), M.shareTag('...'), M.shareTag('Work', ['work', 'Work-2'])], ['Proyectos-2026', 'Musica', 'share', 'Work-3']);
+eq('share tag length', M.shareTag('a'.repeat(60)).length, 28);
+eq('mount command', M.mountCommand('Work'), 'sudo mkdir -p /mnt/Work && sudo mount -t virtiofs Work /mnt/Work');
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

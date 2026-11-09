@@ -1,9 +1,9 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf } from './model.js';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 
@@ -44,6 +44,7 @@ export function Configure({ dir, section: section0 }) {
   const [job, setJob] = useState(0);
   const [msg, setMsg] = useState(null);
   const [picking, setPicking] = useState(false);
+  const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
   const load = () => {
     const x = has() ? lord.vm.list().find((y) => y.dir === dir) : null;
@@ -67,11 +68,13 @@ export function Configure({ dir, section: section0 }) {
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
-  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', ...draft };
+  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
-  const dirty = Object.keys(draft).some((k) => draft[k] !== m[k]);
+  // the shares list is compared by value
+  const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(m[k] || []) : val !== m[k]);
+  const dirty = Object.keys(draft).some((k) => differs(k, draft[k]));
   const save = (patch) => {
-    const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => val !== m[k]));
+    const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => differs(k, val)));
     if (!Object.keys(change).length) return;
     const id = lord.vm.set(dir, change);
     if (!id) setMsg({ ok: false, text: tr('machines.cfg.refused') }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
@@ -86,7 +89,10 @@ export function Configure({ dir, section: section0 }) {
     network: tr(`machines.cfg.net.${m.network}`),
     sound: tr('machines.cfg.sum.sound'),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
-    sharing: tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
+    // "Nothing shared" only when neither the clipboard nor a folder is
+    sharing: m.shares?.length ? [m.clipboard && m.clipboard !== 'off' ? tr(`machines.cfg.clipSum.${m.clipboard}`) : null,
+      m.shares.length === 1 ? tr('machines.cfg.shareSum1') : tr('machines.cfg.shareSum', { n: m.shares.length })].filter(Boolean).join(', ')
+      : tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
     agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
     boot: m.firmware === 'uefi' ? 'UEFI' : 'BIOS',
     security: tr('machines.cfg.sum.security'),
@@ -211,7 +217,25 @@ export function Configure({ dir, section: section0 }) {
           options={['off', 'to-guest', 'from-guest', 'both'].map((k) => [k, tr(`machines.cfg.clip.${k}`)])} /></Off>
       </Row>
     </Group>
-    <Later text={tr('machines.cfg.laterFolders')} />
+    <Group>
+      <Row label={tr('machines.cfg.shares')} note={tr('machines.cfg.sharesNote') + (offNote ? ` ${offNote}` : '')} last={!cur.shares.length}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.shareAdd')} disabled={running || !!job || cur.shares.length >= 4} onClick={() => setPickShare(true)} /></View></Off>
+      </Row>
+      {cur.shares.map((x, i) => (
+        <Row key={x.tag} label={x.path.split('/').pop()} last={i === cur.shares.length - 1}
+          note={tr('machines.cfg.shareMount', { cmd: mountCommand(x.tag) })}>
+          <Off off={running}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{x.path}</Text>
+              <Text style={{ fontSize: 12, color: p.text }}>{tr('machines.cfg.shareWritable')}</Text>
+              <Toggle on={!!x.writable} onChange={(w) => set({ shares: cur.shares.map((y, k) => (k === i ? { ...y, writable: w } : y)) })} />
+              <Btn label={tr('machines.cfg.shareCopy')} onClick={() => clipboard.set(mountCommand(x.tag))} style={{ height: 28 }} />
+              <Btn label={tr('machines.cfg.shareRemove')} danger onClick={() => set({ shares: cur.shares.filter((_, k) => k !== i) })} style={{ height: 28 }} />
+            </View>
+          </Off>
+        </Row>
+      ))}
+    </Group>
   </>;
   else if (sec === 'agent') pane = <>
     <Group>
@@ -258,6 +282,13 @@ export function Configure({ dir, section: section0 }) {
           </View>
         ) : null}
       </View>
+      {pickShare ? <FilePicker mode="folder" title={tr('machines.cfg.shareAdd')} onClose={() => setPickShare(false)}
+        onPick={(x) => {
+          setPickShare(false);
+          const path = Array.isArray(x) ? x[0] : x;
+          if (!path || cur.shares.some((y) => y.path === path)) return;
+          set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), cur.shares.map((y) => y.tag)), path, writable: false }] });
+        }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
     </View>

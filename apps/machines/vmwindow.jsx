@@ -8,7 +8,7 @@ import {
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
@@ -106,13 +106,22 @@ function Tools({ ctl, floating }) {
       ? { label: g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper'), disabled: g.install === 1, onClick: () => lord.vm.agent(ctl.sid, 'install') } : null,
     { label: tr('machines.tb.clipChange'), onClick: () => ctl.configure('sharing') },
   ];
+  // shared folders (6.7): each one opens in Files; the mount command for a Linux guest is a click away
+  const shares = cfg?.shares || [];
+  const shareItems = [
+    ...shares.map((x) => ({ label: `${x.path.split('/').pop()}  ·  ${x.tag}`, hint: tr(x.writable ? 'machines.tb.shareRw' : 'machines.tb.shareRo'), onClick: () => revealPath(x.path) })),
+    ...shares.map((x) => ({ label: tr('machines.tb.shareCopy', { tag: x.tag }), onClick: () => clipboard.set(mountCommand(x.tag)) })),
+    shares.length ? '-' : null,
+    !shares.length ? { label: tr('machines.tb.sharesNone'), disabled: true } : null,
+    { label: shares.length ? tr('machines.tb.shareChange') : tr('machines.tb.shareAdd'), onClick: () => ctl.configure('sharing') },
+  ];
   const resLabel = st?.w ? `${tr('machines.tb.resolution')}: ${st.w} × ${st.h}` : tr('machines.tb.resolution');
   return <>
     {!floating ? <>
       <BarGroup>
         <AgentButton ctl={ctl} />
         <IconMenuBtn icon={icons.clipboard} label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
-        <IconBtn icon={icons.folder} label={tr('machines.tb.foldersLater')} disabled />
+        <IconMenuBtn icon={icons.folder} label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
         <IconBtn icon={icons.apps} label={tr('machines.tb.appsLater')} disabled />
       </BarGroup>
       <BarSep />
@@ -480,7 +489,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [] }); } }, [sid, st?.state]);
   const clipSent = useRef('');
   useEffect(() => {
     if (!focused || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined) return;
@@ -524,7 +533,6 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.tb.cdChoose'), disabled: !cdOk, onClick: () => setPickCd(true) },
       { label: tr('machines.tb.cdEject'), disabled: !cdOk || !iso, onClick: () => cdTo('') },
       '-',
-      { label: tr('machines.tb.folders'), disabled: true, hint: tr('machines.later') },
       { label: tr('machines.tb.sound'), disabled: true, hint: tr('machines.later') },
     ],
   };

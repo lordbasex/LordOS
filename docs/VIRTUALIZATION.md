@@ -98,8 +98,10 @@ Still open in Phase 2:
 
 - [x] Migrate from another app (`.vmx`/`.vmwarevm`, `.vbox`, `.pvm`, `.ova`/`.ovf`, single VMDK/VDI/VHDX/VHD), identity kept,
   hostile-input rules, sandboxed conversion (6.22).
-- [ ] Shared folders (virtiofs, 6.7; measured in Phase 0, not built in the app). Recommended first. The bar already shows its
-  button, dimmed.
+- [x] Shared folders (virtiofs, 6.7): built for 0.8.8.7 (2026-11-08). Checked in a headless session on the maintainer's PC
+  (amd64, KVM) with a Debian 13 guest: mount, read, write, read-only refused, a host symlink resolving in the guest,
+  Suspend and resume with the folder mounted (a change made on the host meanwhile seen after), a snapshot with memory
+  and its revert. Not yet on the Pi 5 (arm64) nor with a virtio-win guest.
 - [ ] A Windows guest migrated from VMware Fusion end to end (the maintainer's Windows 11, once its encryption is removed in
   Fusion): NVMe disk, vmxnet3, the SMBIOS UUID and MAC kept, no TPM, Secure Boot off; activation checked.
 - [ ] USB passthrough of a device to a machine.
@@ -1519,6 +1521,20 @@ Each forwarded port has a scope: **Only this computer** by default, or **Your ne
 ### 6.7 Shared folders
 
 `virtiofsd` 1.13.2 (Debian, **Measured**), one per folder, in a sandbox of its own that can reach only that folder. **QEMU never gets the folder**: it holds a vhost-user socket, so a broken QEMU still can't open your files. The reverse needs saying: vhost-user requires guest memory to be shared, so a broken `virtiofsd` can read that guest's memory, and only that guest's. Machines with no shared folder don't run it, and don't pay the shared-memory backend. Linux guests mount it natively. virtio-win guests use the virtio-win virtiofs driver plus WinFsp (a separate dependency to review). Read-only by default, as in Remote Desk. Fallback: a small SMB share reachable only by that guest.
+
+**Built (0.8.8.7).** `machine.json` schema 4 `shares`: up to 4 `{ tag, path, writable }`. `lord-vm --set DIR --share
+ro|rw:TAG:FOLDER` (repeated; `--shares none` empties the list), Configure → Sharing (Add a Folder, Writable, Copy Command,
+Remove) and the bar's folder button (each folder opens in Files; the mount command is copied). Which folders
+(`vm_share_allowed`, checked on `--set` and again at every start): a real directory inside home but not home itself, or under
+`/media/<user>` or `/mnt`; nothing hidden; never the library or what holds it. At start `lord-vm` binds a listening socket in
+the machine's run folder, starts `virtiofsd --fd=3 --sandbox=namespace --seccomp=kill --cache=auto
+--migration-mode=find-paths [--readonly]` on it (a cgroup leaf of 256 MB, two CPUs; its log in `log/virtiofsd-N.log`),
+connects, removes the path and gives QEMU the connected socket (`-chardev socket,fd=`; QEMU can't make sockets). With a share,
+the guest's memory is `memory-backend-memfd,share=on`; without one nothing changes. Each folder is a `vhost-user-fs-pci` on
+slots 0xb–0xe. Suspend and snapshots with memory work: virtiofsd hands its state over (`find-paths`), and the shares can't
+change while a state is saved. A snapshot never rolls back the host's folder: on revert the guest sees the folder as it is
+now. The package `virtiofsd` comes with "What Machines Needs" (`vm-enable`), like passt. In the guest: `mount -t virtiofs
+TAG /mnt/TAG`; mounting it by itself through the agent is still to do.
 
 **Measured on 2026-11-04** (virtiofsd 1.13.2, `--readonly --sandbox namespace`, section 13.5):
 

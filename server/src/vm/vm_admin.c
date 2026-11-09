@@ -40,6 +40,8 @@ int vm_missing_packages(int arches, char *out, size_t n) {
     if (arches && !have_glob("/usr/lib/*/qemu/ui-dbus.so")) add(out, n, &k, "qemu-system-modules-opengl");
     if (arches && !have("/usr/bin/qemu-img")) add(out, n, &k, "qemu-utils");
     if (arches && !have("/usr/bin/passt")) add(out, n, &k, "passt");
+    /* shared folders (6.7): one virtiofsd per folder, only for machines that share one */
+    if (arches && !have("/usr/libexec/virtiofsd")) add(out, n, &k, "virtiofsd");
     return k;
 }
 

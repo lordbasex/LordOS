@@ -233,6 +233,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     ['display', have('qemu-system-modules-opengl') ? 'ready' : 'missing'],
     ['disk', have('qemu-utils') ? 'ready' : 'missing'],
     ['network', have('passt') ? 'ready' : 'missing'],
+    ['folders', have('virtiofsd') ? 'ready' : 'missing'],
   ];
   const install = async () => {
     setBusy(true); setMsg(null);

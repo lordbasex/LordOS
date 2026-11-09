@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -74,10 +75,12 @@ static char *test_path(const char *env, const char *def) {
 }
 #define QEMU_IMG test_path("LORDVM_TEST_QEMU_IMG", "/usr/bin/qemu-img")
 #define PASST    test_path("LORDVM_TEST_PASST", "/usr/bin/passt")
+#define VIRTIOFSD test_path("LORDVM_TEST_VIRTIOFSD", "/usr/libexec/virtiofsd")
 #define QEMU_BIN_OF(a) test_path((a) ? "LORDVM_TEST_QEMU_AMD64" : "LORDVM_TEST_QEMU_ARM64", QEMU_BIN[a])
 #else
 #define QEMU_IMG "/usr/bin/qemu-img"
 #define PASST    "/usr/bin/passt"
+#define VIRTIOFSD "/usr/libexec/virtiofsd"
 #define QEMU_BIN_OF(a) QEMU_BIN[a]
 #endif
 static const char *const QEMU_BIN[2] = { "/usr/bin/qemu-system-aarch64", "/usr/bin/qemu-system-x86_64" };
@@ -738,6 +741,8 @@ static struct {
     Client cl[MAX_CLIENTS];
     int ncl;
     int serial_fd, serial_log, qemu_err, passt_err, sig_fd;
+    pid_t vfs[VM_SHARES];                   /* shared folders (6.7): each one's virtiofsd, and QEMU's end of its socket */
+    int vfs_q[VM_SHARES];
     off_t serial_bytes;
     int lock_fd;
     int sandbox, cg_mode;
@@ -898,7 +903,7 @@ static int cg_write(const char *dir, const char *file, const char *val) {
     return r;
 }
 
-static int qemu_procs_fd = -1, passt_procs_fd = -1;
+static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1;
 
 /* the machine's scope, then leaves inside it when the scope is ours to divide (3.7) */
 static void setup_cgroups(void) {
@@ -925,9 +930,10 @@ static void setup_cgroups(void) {
     snprintf(leaf, sizeof leaf, "%s/supervisor", self);
     if ((mkdir(leaf, 0755) && errno != EEXIST) || cg_write(leaf, "cgroup.procs", "0")) { vlog("cgroup: can't make leaves in %s: %s", self, strerror(errno)); return; }
     if (cg_write(self, "cgroup.subtree_control", "+memory +cpu +pids")) vlog("cgroup: controllers in %s: %s (limits may not apply)", self, strerror(errno));
-    char q[PATH_MAX + 32], p[PATH_MAX + 32], val[64];
+    char q[PATH_MAX + 32], p[PATH_MAX + 32], v[PATH_MAX + 32], val[64];
     snprintf(q, sizeof q, "%s/qemu", self);
     snprintf(p, sizeof p, "%s/passt", self);
+    snprintf(v, sizeof v, "%s/virtiofsd", self);
     if ((mkdir(q, 0755) && errno != EEXIST) || (mkdir(p, 0755) && errno != EEXIST)) { vlog("cgroup: can't make leaves: %s", strerror(errno)); return; }
     snprintf(val, sizeof val, "%ld", limit * 1024L * 1024L);
     int lq = cg_write(q, "memory.max", val);
@@ -936,6 +942,14 @@ static void setup_cgroups(void) {
     cg_write(q, "memory.swap.max", "0");
     cg_write(p, "memory.max", "134217728");
     cg_write(p, "cpu.max", "200000 100000");
+    if (S.m.n_shares && (!mkdir(v, 0755) || errno == EEXIST)) {
+        /* the shared folders' virtiofsd: 256 MB and two CPUs together (they cache file data in the guest, not here) */
+        cg_write(v, "memory.max", "268435456");
+        cg_write(v, "cpu.max", "200000 100000");
+        char vf[PATH_MAX + 64];
+        snprintf(vf, sizeof vf, "%s/cgroup.procs", v);
+        vfs_procs_fd = open(vf, O_WRONLY | O_CLOEXEC);
+    }
     char f[PATH_MAX + 64];
     snprintf(f, sizeof f, "%s/cgroup.procs", q);
     qemu_procs_fd = open(f, O_WRONLY | O_CLOEXEC);
@@ -999,6 +1013,74 @@ static pid_t spawn_passt(int net_fd, int err_fd) {
     char *env[] = { NULL };
     execve(PASST, argv, env);
     _exit(127);
+}
+
+/* A shared folder (6.7): its virtiofsd, started on a listening socket in the machine's run folder, and lord-vm connects
+ * to it at once; the connection goes to QEMU (which can't make sockets) and the path is removed. virtiofsd's own
+ * sandbox puts it in new namespaces with only the folder mounted (pivot_root), under its own seccomp filter: neither ours
+ * nor Landlock, which forbid the namespaces and mounts that sandbox is made of. It sees QEMU's guest memory (vhost-user),
+ * only this machine's. Read-only unless the share says writable. The folder was checked by vm_share_allowed. Returns
+ * QEMU's end of the connection, or -1 with why in err. */
+static void fail_start(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static int spawn_virtiofsd(int i, char *err, size_t errlen) {
+    char path[PATH_MAX + 32];
+    snprintf(path, sizeof path, "%s/fs%d.sock", S.rundir, i);
+    struct sockaddr_un a = { .sun_family = AF_UNIX };
+    if (strlen(path) >= sizeof a.sun_path) { snprintf(err, errlen, "the run folder's path is too long"); return -1; }
+    memcpy(a.sun_path, path, strlen(path) + 1);
+    unlink(path);
+    int l = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (l < 0 || bind(l, (struct sockaddr *)&a, sizeof a) || listen(l, 1)) { snprintf(err, errlen, "socket: %s", strerror(errno)); if (l >= 0) close(l); unlink(path); return -1; }
+    char logp[PATH_MAX + 64];
+    snprintf(logp, sizeof logp, "%s/log/virtiofsd-%d.log", S.dir, i + 1);
+    int lf = open(logp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    pid_t pid = fork();
+    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(l); if (lf >= 0) close(lf); unlink(path); return -1; }
+    if (!pid) {
+        child_common(vfs_procs_fd);
+        int null = open("/dev/null", O_RDWR);
+        dup2(null, 0);
+        dup2(lf >= 0 ? lf : null, 1);
+        dup2(lf >= 0 ? lf : null, 2);
+        int fds[1] = { l };
+        place_fds(fds, 1);
+        char dir[VM_PATH_MAX + 16];
+        snprintf(dir, sizeof dir, "--shared-dir=%s", S.m.share_path[i]);
+        /* find-paths: a suspended machine's open files are found again by their paths when it resumes (6.1) */
+        char *argv[] = { VIRTIOFSD, "--fd=3", dir, "--sandbox=namespace", "--seccomp=kill", "--cache=auto", "--migration-mode=find-paths",
+                         "--migration-on-error=guest-error", "--log-level=warn", S.m.share_rw[i] ? NULL : "--readonly", NULL };
+        char *env[] = { NULL };
+        execve(VIRTIOFSD, argv, env);
+        _exit(127);
+    }
+    close(l);
+    if (lf >= 0) close(lf);
+    int c = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    int ok = c >= 0 && !connect(c, (struct sockaddr *)&a, sizeof a);
+    unlink(path);
+    if (!ok) { snprintf(err, errlen, "can't reach virtiofsd: %s", strerror(errno)); if (c >= 0) close(c); kill(pid, SIGKILL); waitpid(pid, NULL, 0); return -1; }
+    S.vfs[i] = pid;
+    vlog("share %d: virtiofsd pid %d, tag %s, %s, %s", i + 1, (int)pid, S.m.share_tag[i], S.m.share_rw[i] ? "writable" : "read-only", S.m.share_path[i]);
+    return c;
+}
+
+/* every share's folder, checked again now (it may have become a link or moved since it was chosen), then its virtiofsd */
+static int start_shares(void) {
+    if (!file_exists(VIRTIOFSD)) { fail_start("virtiofsd isn't installed (shared folders)"); return -1; }
+    const struct passwd *pw = getpwuid(getuid());
+    char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX], err[200];
+    if (!pw || !realpath(pw->pw_dir, home)) { fail_start("shared folders: can't find the home folder"); return -1; }
+    snprintf(parent, sizeof parent, "%s", S.dir);
+    char *sl = strrchr(parent, '/');
+    if (sl && sl != parent) *sl = 0;
+    if (!realpath(parent, lib)) snprintf(lib, sizeof lib, "%s", parent);
+    for (int i = 0; i < S.m.n_shares; i++) {
+        if (vm_share_allowed(S.m.share_path[i], home, pw->pw_name, lib, err, sizeof err)) { fail_start("shared folder %s: %s", S.m.share_tag[i], err); return -1; }
+        S.vfs_q[i] = spawn_virtiofsd(i, err, sizeof err);
+        if (S.vfs_q[i] < 0) { fail_start("shared folder %s: %s", S.m.share_tag[i], err); return -1; }
+    }
+    S.sandbox |= VMS_PDEATHSIG;
+    return 0;
 }
 
 /* passt's keeper (6.5): a child forked before lord-vm applies its own Landlock, which leaves lord-vm unable to start a
@@ -1124,7 +1206,9 @@ static void build_qemu_args(void) {
     opt_escape(esc, sizeof esc, m->name);
     arg("-name"); argf("guest=%s,debug-threads=on", esc);
     arg("-uuid"); arg(m->id);
-    arg("-machine"); argf("%s,dump-guest-core=off%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "");
+    /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory */
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", m->n_shares ? ",memory-backend=mem" : "");
+    if (m->n_shares) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     arg("-cpu"); arg(kvm ? "host" : "max");
@@ -1275,9 +1359,13 @@ static void build_qemu_args(void) {
     if (S.resuming) { arg("-incoming"); arg("defer"); }
     /* credentials: memfds at fd 7, 8, ... (never their values on the command line) */
     for (int i = 0; i < S.ncreds; i++) { arg("-smbios"); argf("type=11,path=/proc/self/fd/%d", (m->agent ? 9 : 7) + i); }
+    /* shared folders: each virtiofsd's connection after the credentials, a device on slots 0xb to 0xe */
+    for (int i = 0; i < m->n_shares; i++) {
+        arg("-chardev"); argf("socket,id=vfs%d,fd=%d", i, (m->agent ? 9 : 7) + S.ncreds + i);
+        arg("-device"); argf("vhost-user-fs-pci,id=share%d,chardev=vfs%d,tag=%s,addr=0x%x", i, i, m->share_tag[i], 0xb + i);
+    }
 }
 
-static void fail_start(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void fail_start(const char *fmt, ...) {
     char d[160];
     va_list ap;
@@ -1375,6 +1463,7 @@ static int start_machine(void) {
         vlog("passt: pid %d", (int)S.passt);
         S.sandbox |= VMS_PDEATHSIG;
     }
+    if (S.m.n_shares && start_shares()) return -1;
     build_qemu_args();
     {
         char line[8192];
@@ -1399,10 +1488,11 @@ static int start_machine(void) {
         dup2(qerr[1], 1);
         dup2(qerr[1], 2);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + 1], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 1], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
+        for (int i = 0; i < S.m.n_shares; i++) fds[nf++] = S.vfs_q[i];
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -1430,6 +1520,7 @@ static int start_machine(void) {
         S.ag_next = now_ms() + 1000;
     }
     for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
+    for (int i = 0; i < S.m.n_shares; i++) if (S.vfs_q[i] >= 0) { close(S.vfs_q[i]); S.vfs_q[i] = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -2827,6 +2918,7 @@ static void qemu_exited(int status) {
     if (S.suspending) { if (S.susp_fd >= 0) close(S.susp_fd); S.susp_fd = -1; suspend_cleanup_tmp(); vm_op_end(S.dir); S.suspending = 0; reply(S.susp_client, S.susp_seq, VME_QMP, "QEMU stopped while saving"); }
     if (S.passt > 0) kill(S.passt, SIGTERM);
     if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGTERM, NULL, 0);
+    for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) kill(S.vfs[i], SIGTERM);
     if (why == VR_INSTALLED) unattended_done();
     set_state(st, why, code, d);
 }
@@ -2854,6 +2946,8 @@ static void unattended_done(void) {
     vlog("unattended: the installer's files and the seed disk are removed, the ISO is out of the drive: the next start is the installed system");
 }
 
+static int vfs_index(pid_t p) { for (int i = 0; i < VM_SHARES; i++) if (p > 0 && S.vfs[i] == p) return i; return -1; }
+
 static void reap(void) {
     int status;
     pid_t p;
@@ -2863,6 +2957,12 @@ static void reap(void) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             S.passt = 0;
             if (!S.qemu_done) { int sig = WIFSIGNALED(status); net_lost(sig, sig ? WTERMSIG(status) : WEXITSTATUS(status)); }
+        } else if (vfs_index(p) >= 0) {
+            int k = vfs_index(p);
+            S.vfs[k] = 0;
+            vlog("share %d: virtiofsd exited (%s %d)", k + 1, WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
+            /* it also ends by itself when QEMU closes the connection (a suspend, a shutdown): news only while the machine runs on */
+            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, S.m.share_tag[k]);
         } else if (p == S.keeper) { vlog("network: passt's keeper ended"); S.keeper = 0; if (S.keeper_fd >= 0) close(S.keeper_fd); S.keeper_fd = -1; }
     }
 }
@@ -3442,6 +3542,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     if (start_machine()) {
         /* never ran: nothing of it may stay behind */
         if (S.passt > 0) { kill(S.passt, SIGKILL); waitpid(S.passt, NULL, 0); }
+        for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) { kill(S.vfs[i], SIGKILL); waitpid(S.vfs[i], NULL, 0); S.vfs[i] = 0; }
         if (S.qemu > 0) { kill(S.qemu, SIGKILL); waitpid(S.qemu, NULL, 0); }
         for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
         S.qemu = 0;
@@ -3606,10 +3707,20 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
     int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1;
+    /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
+     * empties it */
+    const char *share[VM_SHARES + 1];
+    int nshare = 0, shares_set = 0;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--share")) {
+            if (nshare >= VM_SHARES) { fprintf(stderr, "lord-vm: at most %d shared folders\n", VM_SHARES); return 2; }
+            share[nshare++] = v; shares_set = 1;
+            continue;
+        }
+        if (!strcmp(a, "--shares")) { if (strcmp(v, "none")) { fprintf(stderr, "lord-vm: --shares none\n"); return 2; } shares_set = 1; continue; }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
         if (!strcmp(a, "--nic-model")) {
             for (int k = 0; VM_NIC_MODELS[k]; k++) if (!strcmp(v, VM_NIC_MODELS[k])) nicm = k;
@@ -3643,7 +3754,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -3661,6 +3772,30 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (agent >= 0) m.agent = agent;
     if (clip >= 0) m.clipboard = clip;
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
+    if (shares_set) {
+        const struct passwd *pw = getpwuid(getuid());
+        char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX];
+        if (!pw || !realpath(pw->pw_dir, home)) { fprintf(stderr, "lord-vm: can't find the home folder\n"); goto out; }
+        snprintf(parent, sizeof parent, "%s", real);
+        char *sl = strrchr(parent, '/');
+        if (sl && sl != parent) *sl = 0;
+        if (!realpath(parent, lib)) snprintf(lib, sizeof lib, "%s", parent);
+        m.n_shares = 0;
+        for (int i = 0; i < nshare; i++) {
+            const char *x = share[i], *c1 = strchr(x, ':'), *c2 = c1 ? strchr(c1 + 1, ':') : NULL;
+            int rw = c1 && c1 - x == 2 && !strncmp(x, "rw", 2), ro = c1 && c1 - x == 2 && !strncmp(x, "ro", 2);
+            if ((!rw && !ro) || !c2 || (size_t)(c2 - c1 - 1) > VM_TAG_MAX) { fprintf(stderr, "lord-vm: --share ro|rw:TAG:PATH\n"); goto out; }
+            char path[PATH_MAX], ferr[200];
+            if (!realpath(c2 + 1, path)) { fprintf(stderr, "lord-vm: %s: %s\n", c2 + 1, strerror(errno)); goto out; }
+            if (vm_share_allowed(path, home, pw->pw_name, lib, ferr, sizeof ferr)) { fprintf(stderr, "lord-vm: %s: %s\n", path, ferr); goto out; }
+            if (strlen(path) >= sizeof m.share_path[0]) { fprintf(stderr, "lord-vm: %s: the path is too long\n", path); goto out; }
+            int k = m.n_shares++;
+            snprintf(m.share_tag[k], sizeof m.share_tag[k], "%.*s", (int)(c2 - c1 - 1), c1 + 1);
+            memcpy(m.share_path[k], path, strlen(path) + 1);
+            m.share_rw[k] = rw;
+        }
+        if (m.n_shares) m.schema = VM_SCHEMA;
+    }
     if (disk) {
         if (disk < m.disk_gb) { fprintf(stderr, "lord-vm: the disk can only grow (it has %d GB)\n", m.disk_gb); goto out; }
         m.disk_gb = disk;
@@ -5175,6 +5310,7 @@ static int usage(void) {
             "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
             "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both]   (also on --create)\n"
+            "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"

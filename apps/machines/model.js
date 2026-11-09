@@ -327,11 +327,21 @@ export function agentLines(agent, cfg) {
     ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
     ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : 'needsHelper'],
     ['resolution', 'works'],
-    ['folders', 'later'], ['apps', 'later'],
+    ['folders', cfg?.shares?.length ? 'works' : 'none'], ['apps', 'later'],
   ];
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
+// a shared folder's mount tag from its name (6.7): letters, digits, '-' and '_', at most 32, not one already used
+export function shareTag(name, used = []) {
+  const base = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28) || 'share';
+  const taken = new Set(used.map((x) => x.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 100; i++) { const t = `${base}-${i}`; if (!taken.has(t.toLowerCase())) return t; }
+  return base;
+}
+// the command that mounts it in a Linux guest
+export const mountCommand = (tag) => `sudo mkdir -p /mnt/${tag} && sudo mount -t virtiofs ${tag} /mnt/${tag}`;
 // which way the clipboard may go
 export const clipTo = (c) => c === 'both' || c === 'to-guest';
 export const clipFrom = (c) => c === 'both' || c === 'from-guest';
