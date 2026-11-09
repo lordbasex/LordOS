@@ -52,6 +52,7 @@ typedef struct MyConn {
     int (*rd)(void *io, void *buf, size_t n);   /* exactly n bytes: 0, or -1 */
     int (*wr)(void *io, const void *buf, size_t n);
     int (*tls)(void *io);                       /* starts TLS: 0, MY_E_TLS or MY_E_CERT */
+    int (*trusted)(void *io);                   /* the TLS peer's certificate was verified or pinned (NULL: never) */
     void *io;
     uint8_t seq;
     uint8_t *pkt;                               /* the last packet (reassembled), NUL after it */

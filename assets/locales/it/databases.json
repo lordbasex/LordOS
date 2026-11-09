@@ -451,5 +451,5 @@
   "err.norows": "Seleziona prima le righe.",
   "err.save": "Impossibile salvare i preferiti: {message}",
   "err.other": "Qualcosa è andato storto: {message}",
-  "err.fullAuthTls": "Questo server deve ricevere la password una volta su una connessione cifrata. Attiva TLS (Preferito o Obbligatorio) per questo preferito e riconnettiti."
+  "err.fullAuthTls": "Questo server deve ricevere la password una volta su una connessione cifrata con il certificato verificato, così nessuno nel mezzo può leggerla. Imposta TLS su Verifica per questo preferito (o fidati del certificato del server quando richiesto) e riconnettiti."
 }

@@ -489,13 +489,15 @@ int my_connect(MyConn *c, const MyLogin *login, MyHandshake *hs) {
         if (t == 0x01 && !strcmp(plugin, "caching_sha2_password") && c->len == 2) {
             if (c->pkt[1] == 3) continue;        /* fast auth: the OK follows */
             if (c->pkt[1] == 4) {                /* full auth */
-                if (c->is_tls) {
+                if (c->is_tls && c->trusted && c->trusted(c->io)) {
                     rc = my_write_packet(c, pw, strlen(pw) + 1);
                     if (rc) goto out;
                 } else {
-                    /* Never ask for the server's RSA key over plain text: whoever sits in the middle
-                     * could hand us their own key and read the password. Full auth needs TLS (the
-                     * user logs in once with TLS on and the fast path works after that). */
+                    /* The password itself goes only to a server whose certificate was checked (verified, or
+                     * the fingerprint the user trusted): over plain text, or TLS with any certificate, whoever
+                     * sits in the middle would read it (and the server's RSA key is never asked for, they
+                     * could hand us their own). Full auth needs TLS "verify" or a trusted certificate (the
+                     * user logs in once that way and the fast path works after that). */
                     rc = fail(c, MY_E_TLS, "full-auth-needs-tls");
                     goto out;
                 }

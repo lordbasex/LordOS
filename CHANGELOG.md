@@ -40,6 +40,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `mysql_native_password` and `caching_sha2_password`), with no sockets of its own and no files: lord-server
     connects only to a saved favorite, through a connector of its own, so the firewall and Monitor show it as
     "Databases" (`lordos:sql`). Everything a server sends is parsed bounds-checked and fuzzed in the tests.
+  - A password is sent as such (MySQL 8's first login of a user) only over TLS whose certificate was verified or
+    trusted by fingerprint, never to an unchecked certificate, so a machine in the middle can't read it.
   - Integrated with Passwords: every password field has the 🔑 button, which offers the password kept for that
     connection and the Passwords entries whose host is exactly the connection's (a Database, Network or SSH
     entry's host, or a site), each shown with its host, while Passwords is unlocked; the password leaves Passwords

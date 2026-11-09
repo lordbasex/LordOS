@@ -451,5 +451,5 @@
   "err.norows": "Selecione as linhas primeiro.",
   "err.save": "Não foi possível salvar os favoritos: {message}",
   "err.other": "Algo deu errado: {message}",
-  "err.fullAuthTls": "Este servidor precisa receber a senha uma vez por uma conexão criptografada. Ative o TLS (Preferido ou Obrigatório) neste favorito e conecte de novo."
+  "err.fullAuthTls": "Este servidor precisa receber a senha uma vez por uma conexão criptografada com o certificado verificado, para ninguém no meio conseguir lê-la. Coloque o TLS em Verificar neste favorito (ou confie no certificado do servidor quando for perguntado) e conecte de novo."
 }

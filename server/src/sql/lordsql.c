@@ -154,11 +154,15 @@ static int io_tls(void *p) {
     s->verified = vr == X509_V_OK;
     if (!s->host[0]) s->verified = 0;            /* no name to check it against */
     if (!s->verified) snprintf(s->problem, sizeof s->problem, "%s", peer ? X509_verify_cert_error_string(vr) : "no certificate");
-    if (s->mode == TLS_VERIFY && !s->verified) {
-        if (same_fp(s->trust, s->sha256)) { s->pinned = 1; return MY_OK; }
-        return MY_E_CERT;
-    }
+    if (!s->verified && same_fp(s->trust, s->sha256)) s->pinned = 1;   /* the certificate the user chose to trust */
+    if (s->mode == TLS_VERIFY && !s->verified && !s->pinned) return MY_E_CERT;
     return MY_OK;
+}
+
+/* a password may go to this peer only when its certificate was checked (mysqlproto.c, full auth) */
+static int io_trusted(void *p) {
+    Io *s = p;
+    return s->ssl && (s->verified || s->pinned);
 }
 
 /* ---- replies ---- */
@@ -427,6 +431,7 @@ int main(void) {
     c.rd = io_rd;
     c.wr = io_wr;
     c.tls = io_tls;
+    c.trusted = io_trusted;
     c.io = &io;
     const JVal *pw = json_get(d.root, "password");
     const char *user = json_str(d.root, "user"), *db = json_str(d.root, "database");

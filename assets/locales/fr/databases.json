@@ -451,5 +451,5 @@
   "err.norows": "Sélectionnez d’abord les lignes.",
   "err.save": "Impossible d’enregistrer les favoris : {message}",
   "err.other": "Une erreur est survenue : {message}",
-  "err.fullAuthTls": "Ce serveur doit recevoir le mot de passe une fois par une connexion chiffrée. Activez TLS (Préféré ou Obligatoire) pour ce favori et reconnectez-vous."
+  "err.fullAuthTls": "Ce serveur doit recevoir le mot de passe une fois par une connexion chiffrée dont le certificat a été vérifié, pour que personne au milieu ne puisse le lire. Réglez TLS sur Vérifier pour ce favori (ou faites confiance au certificat du serveur quand on vous le demande) et reconnectez-vous."
 }

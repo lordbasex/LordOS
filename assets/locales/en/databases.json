@@ -451,5 +451,5 @@
   "err.norows": "Select the rows first.",
   "err.save": "The favorites couldn't be saved: {message}",
   "err.other": "Something went wrong: {message}",
-  "err.fullAuthTls": "This server needs the password sent once over an encrypted connection. Turn on TLS (Preferred or Required) for this favorite and connect again."
+  "err.fullAuthTls": "This server needs the password sent once over an encrypted connection whose certificate was checked, so nobody in between can read it. Set TLS to Verify for this favorite (or trust the server’s certificate when asked) and connect again."
 }

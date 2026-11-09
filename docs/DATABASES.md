@@ -37,6 +37,10 @@ apps/databases  ──lord.sql.request/poll──▶  lord-server (ui/js_sql.c, 
   user picks one.
 - **Certificates** are checked against the system store (or the favorite's CA file, opened by lord-server)
   and the host name. A failure is an event; only an explicit Trust stores that sha256 in the favorite.
+- **The password itself** (`caching_sha2_password` full authentication, the first login of a user on MySQL 8)
+  goes only over TLS whose certificate was verified or trusted by fingerprint: over plain text, or TLS with an
+  unchecked certificate (`preferred`, `required`), whoever sits in the middle could read it, so the login fails
+  with `tls` and asks for `verify`. The server's RSA key is never requested.
 - **The compositor never waits**: every call is asynchronous; results are polled.
 - **Not in the broker**: isolated `.lpk` apps get no `lord.sql`.
 

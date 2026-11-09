@@ -451,7 +451,8 @@ static void test_session(const char *name, Scn *s) {
     s->password = "s3cret pass";
     s->session = 1;
     if (start(&h, s)) { CHECK(0, "start"); return; }
-    open_req(&h, open_json("preferred", "db.test", "", 0), NULL, 0);
+    /* the certificate trusted by fingerprint: full auth may send the password (an unverified peer never gets it) */
+    open_req(&h, open_json("preferred", "db.test", fp, 0), NULL, 0);
     char *j;
     size_t n;
     int op = reply(&h, &j, &n, 15000);
@@ -569,7 +570,15 @@ static void test_helper(void) {
     s = (Scn){ .version = "8.0.36", .plugin = "mysql_native_password", .caps = CAPS };
     login("TLS required, not offered", &s, open_json("required", "db.test", "", 0), -1, SR_ERR, "{\"error\":\"tls\"}", 0);
     s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .offer_tls = 1, .full = 1 };
-    login("sha2 full auth over TLS", &s, open_json("required", "db.test", "", 0), -1, SR_OK, "\"verified\":false", 1);
+    login("sha2 full auth over unverified TLS is refused", &s, open_json("required", "db.test", "", 0), -1, SR_ERR, "\"error\":\"tls\"", 0);
+    s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .offer_tls = 1, .full = 1 };
+    login("sha2 full auth over preferred TLS, self-signed, is refused", &s, open_json("preferred", "db.test", "", 0), -1, SR_ERR, "\"error\":\"tls\"", 0);
+    s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .offer_tls = 1, .full = 1 };
+    login("sha2 full auth over TLS with the trusted fingerprint", &s, open_json("required", "db.test", fp, 0), -1, SR_OK, "\"verified\":false,\"pinned\":true", 1);
+    ca = open(cert_path, O_RDONLY | O_CLOEXEC);
+    s = (Scn){ .version = "8.0.36", .plugin = "caching_sha2_password", .caps = CAPS, .offer_tls = 1, .full = 1 };
+    login("sha2 full auth over verified TLS", &s, open_json("verify", "db.test", "", 1), ca, SR_OK, "\"verified\":true", 1);
+    close(ca);
     s = (Scn){ .version = "8.0.36", .plugin = "mysql_native_password", .caps = CAPS, .offer_tls = 1 };
     login("TLS off, offered", &s, open_json("off", "db.test", "", 0), -1, SR_OK, "\"tls\":null", 1);
     CHECK(!s.tls_used, "TLS off stays plain");
