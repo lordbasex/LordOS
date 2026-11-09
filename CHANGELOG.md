@@ -12,6 +12,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Cloud: pause one account and filter Recent from the menu bar** (GitHub #83). Each account in the menu bar's Cloud
+  panel has its own Pause or Resume button (or Unlock Keyring / Sign In Again when needed). Clicking accounts shows only
+  their recent files; click again to remove one, or Show All to clear. With one account chosen, Show in Files and Cloud
+  Settings open that account.
+
+- **Window buttons on the left or the right in both themes** (GitHub #58). Settings → Desktop & Dock → Title bars →
+  Window buttons: Automatic, Left or Right. Automatic keeps each theme's side (mirrored in right-to-left languages as
+  before); Left puts close, minimize, maximize at the left edge and Right puts minimize, maximize, close at the right
+  edge, in Lord Flow and Lord Classic alike. Linux apps that draw their own title bar get the same side.
+
+- **Thumbnail size in the file dialog** (GitHub #58). In Thumbnails, the system file dialog (adding a wallpaper, a
+  Notes image, a contact photo, a Linux app's file chooser) has Files' size control: seven steps, pictures from 48 to
+  200 px, Ctrl + and Ctrl −, remembered for picture dialogs and for the rest.
+
+- **Control Center opens every tile's Settings page** (GitHub #58). As Wi-Fi and Bluetooth already did, a click on a
+  tile's name in Lord Flow opens its page: Dark Mode, Transparency and Accent Color open Appearance, Sound opens Sound,
+  Wallpaper opens Wallpaper. In Lord Classic's quick settings, Do Not Disturb, Dark Mode and Transparency get the "›"
+  half, and a new "›" at the end of the volume row opens Sound.
+
 - **Photos: the cloud folders kept on this computer** (GitHub #89). A Cloud section in the sidebar lists every folder a
   cloud account keeps on this computer (Keep on This Computer); their pictures are all local, so they open without the
   network. Folders only in the cloud are left out, and these folders are read off the compositor's thread, so Photos
@@ -73,6 +92,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
+- **Cloud: accounts in name order** (GitHub #86). Files' sidebar, Files → Network, the file dialog, Settings → Cloud
+  and the menu bar panel list accounts by name, ignoring case and accents and ordering numbers by value ("Drive 2"
+  before "Drive 10"), instead of the order they were added in. Each account keeps its color.
+
+- **Cloud: two more providers verified, and clearer check results** (GitHub #80, #81). Two providers whose Check This
+  Account reports passed on 0.8.8.6 are listed as verified in Add Account, with the issues as evidence. A step skipped
+  because the provider lacks the feature, such as links, says "Not offered by this provider, not a failure" on screen
+  and in the report instead of a bare "skipped".
+
 - **Every app that changed has a new version** (GitHub #91). 0.8.8.6 changed Files, Monitor, Settings and others and
   the Store still showed their old versions. Each app changed since 0.8.8.5 gets its next version, and a release
   package is refused when an app changed and its version didn't (`tools/app-versions.mjs`).
@@ -111,6 +139,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   suspended one resumes from the same button.
 
 ### Fixed
+
+- **Files: a folder of photos no longer runs the desktop out of memory** (GitHub #71, #82). Each JPEG or PNG icon was
+  the whole picture, decoded on lord-server's interface thread and kept until the session ended: a 12-megapixel photo
+  took 48 MB, so opening a folder of phone photos (a cloud account kept on this computer, for example) froze the
+  desktop and lord-server ran out of memory and the session ended. Icons and the preview are now thumbnails made by two
+  background threads at the size shown; pictures no window shows are kept up to 64 MB and then let go, and nothing over
+  67 megapixels is decoded. Measured with 1,520 12-megapixel photos: from 10 GB in 23 seconds (then killed) to 265 MB
+  at most, no pause over 0.4 s; with 300 of them, 154 MB once the thumbnails are made.
+
+- **Thumbnails: a big folder of videos no longer keeps the desktop busy.** Every thumbnail asked lord-server again on
+  each redraw, and every answer, or failure, redrew all of them; with 1,500 videos and no media helper (as 0.8.8.6
+  shipped) the desktop stayed unresponsive for minutes. Each thumbnail is now asked once (again at most every 5 s while
+  it is being made, every minute once known) and an answer redraws only the items that show it.
+
+- **Bluetooth headsets play in high fidelity** (GitHub #78). A headset that paired but stayed silent as the output now
+  plays. The sound server switched a headset to its low-quality hands-free mode whenever anything recorded (even the
+  level meter in Settings → Sound), which some adapters can't carry at all. That automatic switch is off
+  (`/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf`) and LordOS picks the profile itself: choosing a
+  headset as the output gives it high-fidelity playback unless its microphone is the chosen input, which Settings →
+  Sound offers as "(headset mode)". Settings → Bluetooth no longer offers the low-energy side some headsets also
+  advertise as "LE-<name>" when the headset's own entry is listed, and a failed pairing of it says why instead of "the
+  code did not match". Not yet tested with a real headset.
+
+- **Cloud: Tell Us on GitHub works** (GitHub #79). After Check This Account the button opens the provider issue form
+  with the report filled in. The browser launcher refused any web address over 300 characters and the report's
+  parentheses went unencoded, so nothing happened. A web address may now be up to 3000 characters (other schemes keep
+  300, same allowed characters), and when no browser takes it the report is copied with a note saying where to paste it.
+
+- **Cloud: a second browser sign-in no longer fails after the provider's success page** (GitHub #87). When a provider
+  listed first a drive that can't be opened, setting up the account stopped and Settings said the sign-in didn't
+  finish. LordOS now tries the next drive (up to four); if the account has no usable drive it says so (open the account
+  once on the provider's website), shows rclone's own message and removes the half-made account. Tested against a
+  local stand-in for rclone, not a real account.
+
+- **Cloud: Keep on This Computer shows a steady badge, and the check understands kept accounts** (GitHub #71). A kept
+  folder keeps the "coming down" badge until every file in it is on this computer, instead of flashing the green check
+  between files. On an account kept on this computer, Check This Account skips Free Up Space ("Kept on this computer,
+  so not freed: not a failure") instead of failing after 40 seconds.
+
+- **Window screenshots include the window's open dialog** (GitHub #58). Choosing a window with ❖⇧4 and Space left out a
+  dialog the window had open (the file dialog of Settings → Wallpaper → Choose picture…). A sheet an app opens is now
+  painted over its window in the capture; other windows' sheets, menus and the Dock are still left out, and protected
+  windows stay black.
 
 - **Mail, Calendar, Contacts, Reminders and Passwords can paste** (GitHub #64). These apps run isolated, and reading
   the clipboard needs a permission they never ask for, so Ctrl+V did nothing. Now a paste the person asks for in the
