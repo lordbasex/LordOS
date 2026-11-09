@@ -633,7 +633,9 @@ static void job_finish(Job *j, int status, int fd) {
     }
     case JP_IMAGE: {
         MediaSrc *s = media_src_get(j->src);
-        if (s && s->kind == SK_IMAGE && s->job == j->id) {
+        /* s->job is still 0 when the job fails inside media_job itself (no lord-media): the picture must still get its
+         * error, or Photos stays black with nothing said (GitHub #90) */
+        if (s && s->kind == SK_IMAGE && (s->job == j->id || s->job == 0)) {
             int w = 0, h = 0;
             sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
             uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= MP_MAX_DIM && h <= MP_MAX_DIM) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
