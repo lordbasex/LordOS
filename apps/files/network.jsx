@@ -1,7 +1,8 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, settings, spacing, typeScale, t as tr, CloudGlyph } from '@lordos/sdk';
+import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, settings, spacing, typeScale, t as tr, CloudGlyph,
+  AutofillButton, SaveLoginOffer, loginHosts, typedSecret } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { FolderGlyph, DriveGlyph } from './glyphs.jsx';
 import { WAY_ORDER as ORDER, isShareFs, foundHosts, shareKind, withHostName, shareParts } from './netplaces.js';
@@ -52,13 +53,17 @@ function kinds(h) {
 
 // Connecting: who connects, then the folders that server shows them, so nobody has to know a share's name. It's only
 // asked for when the server can't list them. The password goes to lord-lan for the list, to the action for the mount
-// and, only if asked, to the keyring.
+// and, only if asked, to the keyring. The 🔑 offers Passwords entries for exactly this server's address or host name;
+// once a password the person typed is accepted, "Save to Passwords?" (sdk/vault.js SaveLoginOffer) before the folder opens.
 export function ConnectSheet({ ask, onClose, onMounted }) {
   const t = useTheme();
   const [share, setShare] = useState(ask.share || '');
   const [user, setUser] = useState(ask.user || '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const filled = useRef('');                              // the password as the keyring or Passwords filled it
+  const [offer, setOffer] = useState(null);               // { at, note, name, login }: mounted, asking whether to save
+  const hosts = loginHosts(ask.host, ask.addr);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [list, setList] = useState(null);                 // the server's folders, once signed in
@@ -68,7 +73,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
   const needName = nfs ? !ask.share : !ask.share && typed;
   useEffect(() => {
     if (nfs) return;
-    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => s || (ask.share ? lan.saved(ask.kind, ask.addr, '') : null)).then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
+    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => s || (ask.share ? lan.saved(ask.kind, ask.addr, '') : null)).then((s) => { if (s) { setUser(s.user); setPassword(s.password); filled.current = s.password; setRemember(true); } });
   }, []);
   // DOMAIN\user, as people write it
   const who = (g) => {
@@ -89,6 +94,10 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
         else lan.forget(ask.kind, ask.addr, key, user.trim());
       }
       rememberHostName(ask.addr, ask.host);
+      if (!g && !nfs && typedSecret(password, filled.current)) {
+        setOffer({ at, note, name, login: { kind: ask.kind, host: hosts[0] || ask.addr, user: user.trim(), password } });
+        return;
+      }
       onMounted(at, note, name);
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -118,7 +127,10 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
       <View style={{ width: 380, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('files.net.connectTo', { name: ask.host })}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tr(`files.net.kind.${ask.kind}`)} · ${ask.addr}`}</Text>
-        {list ? (
+        {offer ? (
+          <SaveLoginOffer login={offer.login} hosts={hosts} style={{ marginTop: spacing.s }}
+            onDone={() => { const o = offer; setOffer(null); setPassword(''); onMounted(o.at, o.note, o.name); }} />
+        ) : list ? (
           <>
             <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('files.net.pickShare')}</Text>
             <ScrollView style={{ maxHeight: 220 }}>
@@ -142,7 +154,12 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
             {ask.share ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{ask.share}</Text> : null}
             {needName ? field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => signIn(false)} onCancel={onClose} />) : null}
             {!nfs && field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus={!needName} onSubmit={() => signIn(false)} onCancel={onClose} />)}
-            {!nfs && field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={() => signIn(false)} onCancel={onClose} />)}
+            {!nfs && field(tr('files.net.password'), (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+                <View style={{ flex: 1, minWidth: 0 }}><TextInput secure value={password} onChange={setPassword} onSubmit={() => signIn(false)} onCancel={onClose} /></View>
+                <AutofillButton app="files" hosts={hosts} onFill={({ username, password: pw }) => { if (username) setUser(username); setPassword(pw || ''); filled.current = pw || ''; }} />
+              </View>
+            ))}
             {!nfs && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
                 <Toggle small on={remember} onChange={setRemember} />
@@ -174,7 +191,10 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
   const [confirm, setConfirm] = useState(null);           // { print, res }: a key or certificate seen for the first time
   const answer = (yes) => { confirm.res(yes); setConfirm(null); };
   const key = `${ask.host}:${ask.port || 0}${ask.path || ''}`;
-  useEffect(() => { lan.saved(ask.kind, key, '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } }); }, []);
+  const filled = useRef('');                              // the password as the keyring or Passwords filled it
+  const [offer, setOffer] = useState(null);               // { path, login }: connected, asking whether to save
+  const hosts = loginHosts(ask.host);
+  useEffect(() => { lan.saved(ask.kind, key, '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); filled.current = s.password; setRemember(true); } }); }, []);
   const go = async () => {
     if (busy) return;
     setBusy(true); setError(''); setPkg('');
@@ -186,6 +206,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
     if (r.state === 'missing') { setPkg(r.package); setError(tr('files.connect.err.package', { name: r.package })); return; }
     if (r.state !== 'done') { setError(tr('files.connect.err.failed')); return; }
     if (user.trim()) { if (remember) lan.remember(ask.kind, key, '', user.trim(), password, tr('files.net.keyringLabel', { name: ask.kind, addr: ask.host })).catch(() => {}); else lan.forget(ask.kind, key, '', user.trim()); }
+    if (typedSecret(password, filled.current)) { setOffer({ path: r.path, login: { kind: ask.kind, host: ask.host, port: ask.port, user: user.trim(), password } }); return; }
     onMounted(r.path);
   };
   const field = (label, input) => <View style={{ gap: 3 }}><Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{label}</Text>{input}</View>;
@@ -194,9 +215,18 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
       <View style={{ width: 380, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('files.net.connectTo', { name: ask.host })}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{ask.kind}</Text>
+        {offer ? (
+          <SaveLoginOffer login={offer.login} hosts={hosts} style={{ marginTop: spacing.s }}
+            onDone={() => { const p = offer.path; setOffer(null); setPassword(''); onMounted(p); }} />
+        ) : <>
         <FormFields>
         {field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus onSubmit={go} onCancel={onClose} />)}
-        {field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={go} onCancel={onClose} />)}
+        {field(tr('files.net.password'), (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+            <View style={{ flex: 1, minWidth: 0 }}><TextInput secure value={password} onChange={setPassword} onSubmit={go} onCancel={onClose} /></View>
+            <AutofillButton app="files" hosts={hosts} onFill={({ username, password: pw }) => { if (username) setUser(username); setPassword(pw || ''); filled.current = pw || ''; }} />
+          </View>
+        ))}
         </FormFields>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
           <Toggle small on={remember} onChange={setRemember} />
@@ -219,6 +249,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
           <Button label={tr('files.cancel')} onClick={onClose} disabled={busy} />
           <Button primary label={busy ? tr('files.net.connecting') : tr('files.net.connect')} onClick={go} disabled={busy} />
         </View>
+        </>}
       </View>
     </View>
   );
