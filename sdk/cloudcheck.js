@@ -81,8 +81,13 @@ export async function runCheck(acc, env, onStep = () => {}) {
     if (upOk) {
       await run('free', async () => {
         let last = null;
+        // a folder kept on this computer (Keep on This Computer on the account, #71) is never freed: that is what the
+        // person asked for, so the step doesn't apply (it failed with cloud.notFreed.kept after 40 s until 0.8.8.7)
+        const kept = () => (((cloud.status([file]) || {})[file] || {}).st === 'kept') || ((last && last.skipped) || []).some((s) => s && s.reason === 'kept');
+        if (kept()) return { skipped: true, note: 'kept' };
         // rclone holds a file open for a few seconds after the last write: "open" is tried again
-        const ok = await until(() => { last = cloud.free([file]) || {}; return last.freed > 0 || ((cloud.status([file]) || {})[file] || {}).st === 'cloud'; }, FREE_TIMEOUT, 2000);
+        const ok = await until(() => { last = cloud.free([file]) || {}; return last.freed > 0 || ((cloud.status([file]) || {})[file] || {}).st === 'cloud' || kept(); }, FREE_TIMEOUT, 2000);
+        if (ok && !(last && last.freed > 0) && kept()) return { skipped: true, note: 'kept' };
         if (!ok) throw Object.assign(new Error(''), { code: `cloud.notFreed.${((last && last.skipped && last.skipped[0]) || {}).reason || 'unknown'}` });
         return true;
       });
@@ -140,9 +145,9 @@ export const aboutFields = (about) => ABOUT_FIELDS.filter((k) => about && about[
 const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, Math.max(n, String(s).length));
 // A step skipped for one of these is not a failure (#81: "link skipped noLinks" read as an error). The screen says it
 // in the person's words (cloud.check.note.<note>); the report, which goes to GitHub in English, says it after the word.
-export const SKIP_NOTES = ['noSpaceInfo', 'noLinks', 'notReached'];
+export const SKIP_NOTES = ['noSpaceInfo', 'noLinks', 'notReached', 'kept'];
 const REPORT_NOTE = { noSpaceInfo: 'the provider gives no space information, not a failure', noLinks: 'the provider has no links, not a failure',
-  notReached: 'not run: an earlier step failed' };
+  notReached: 'not run: an earlier step failed', kept: 'the account keeps its files on this computer, so nothing is freed; not a failure' };
 // facts: only these fields are read; anything else passed in (the account's name, its folder, an email…) is ignored
 export function buildReport(facts) {
   const f = facts || {};

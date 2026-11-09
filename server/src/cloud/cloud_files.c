@@ -218,10 +218,12 @@ char *cf_status(const char *const *paths, int n) {
         const char *s;
         double pct = -1;
         if (!rel[0] || (!stat(mp, &st) && S_ISDIR(st.st_mode))) {
-            /* a folder: kept, or the direction of what moves inside it */
+            /* a folder: kept, or the direction of what moves inside it. A kept folder whose files are still coming down
+             * stays "down" between one file and the next, not kept for a moment each time one ends (#71) */
             int up = 0, down = 0;
             for (int k = 0; k < a->nq; k++) up |= under(a->q[k].name, rel);
             for (int k = 0; k < a->nt; k++) { if (a->t[k].up) up |= under(a->t[k].name, rel); else down |= under(a->t[k].name, rel); }
+            down |= cloud_kept_busy((const char *const *)a->keep, a->keep_busy, a->nkeep, rel);
             s = up ? "up" : down ? "down" : cloud_kept((const char *const *)a->keep, a->nkeep, rel) ? "kept" : "cloud";
         } else {
             CloudMeta m;
@@ -438,42 +440,65 @@ static int still_ok(const char *id) {
     return ok;
 }
 
+/* One kept entry's pass of the keeper (#71): the entry is marked as coming down when a file of it is missing, and
+ * cleared when a pass read everything (a pass that stopped, paused or gone, leaves it as it was) */
+typedef struct { const char *root; int marked, incomplete; } KeepPass;
+
+static void keep_busy_set(const char *id, const char *root, int busy) {
+    int changed = 0;
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    for (int i = 0; a && i < a->nkeep; i++)
+        if (!strcmp(a->keep[i], root) && a->keep_busy[i] != busy) { a->keep_busy[i] = (unsigned char)busy; changed = 1; }
+    pthread_mutex_unlock(&cl_mu);
+    if (changed) cl_changed();
+}
+
 /* reads one file to the end: rclone keeps what was read */
-static void fetch(const Snap *s, const char *rel) {
+static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
     CloudMeta m;
     if (!read_meta(s->id, rel, &m) && m.cached >= m.size) return;
+    if (!kp->marked) { keep_busy_set(s->id, kp->root, 1); kp->marked = 1; }
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s/%s", cl_root, s->name, rel);
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) return;
+    if (fd < 0) { kp->incomplete = 1; return; }
     static char buf[1 << 20];
     long long done = 0;
     ssize_t n;
     while ((n = read(fd, buf, sizeof buf)) > 0) {
         done += n;
-        if ((done & ((64 << 20) - 1)) < n && !still_ok(s->id)) break;      /* every 64 MB: paused, gone? */
+        if ((done & ((64 << 20) - 1)) < n && !still_ok(s->id)) { kp->incomplete = 1; break; }   /* every 64 MB: paused, gone? */
     }
+    if (n < 0) kp->incomplete = 1;
     posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
     close(fd);
 }
 
-static void fetch_tree(const Snap *s, const char *rel, int depth) {
+static void fetch_tree(const Snap *s, const char *rel, int depth, KeepPass *kp) {
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s%s%s", cl_root, s->name, rel[0] ? "/" : "", rel);
     struct stat st;
-    if (lstat(p, &st)) return;
-    if (S_ISREG(st.st_mode)) { fetch(s, rel); return; }
+    if (lstat(p, &st)) return;                      /* gone (in the cloud too): nothing to bring */
+    if (S_ISREG(st.st_mode)) { fetch(s, rel, kp); return; }
     if (!S_ISDIR(st.st_mode) || depth > WALK_DEPTH) return;
     DIR *d = opendir(p);
-    if (!d) return;
+    if (!d) { kp->incomplete = 1; return; }
     for (struct dirent *e; (e = readdir(d)); ) {
         if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
         char r[CLOUD_REL_MAX * 2 + 2];
         if ((size_t)cl_pf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", e->d_name) > CLOUD_REL_MAX) continue;
-        if (!still_ok(s->id)) break;
-        fetch_tree(s, r, depth + 1);
+        if (!still_ok(s->id)) { kp->incomplete = 1; break; }
+        fetch_tree(s, r, depth + 1, kp);
     }
     closedir(d);
+}
+
+/* a whole pass over one kept entry; when it read everything, the entry is all here */
+static void fetch_kept(const Snap *s, const char *root) {
+    KeepPass kp = { root, 0, 0 };
+    fetch_tree(s, root, 0, &kp);
+    if (!kp.incomplete) keep_busy_set(s->id, root, 0);
 }
 
 static void *keeper(void *arg) {
@@ -512,7 +537,7 @@ static void *keeper(void *arg) {
             }
             pthread_mutex_unlock(&cl_mu);
             for (int k = 0; k < s.nkeep && s.mounted && !s.paused; k++) {
-                if (!tree) { fetch_tree(&s, s.keep[k], 0); continue; }
+                if (!tree) { fetch_kept(&s, s.keep[k]); continue; }
                 JBuf b;
                 jb_init(&b);
                 /* vfs/refresh takes folders: a kept file refreshes its folder, alone (not what is under it). rclone takes
@@ -532,7 +557,7 @@ static void *keeper(void *arg) {
                 /* a whole account can take minutes; rclone's walk doesn't hold the folders it lists (measured) */
                 if (!b.oom) cl_rc_simple(RCM_VFS_REFRESH, b.p, 600000);
                 jb_free(&b);
-                fetch_tree(&s, s.keep[k], 0);
+                fetch_kept(&s, s.keep[k]);
             }
             snap_free(&s);
         }

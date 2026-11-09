@@ -109,6 +109,19 @@ static void t_paths(void) {
     CHECK(!cloud_kept(kept, 2, "Projectsx") && !cloud_kept(kept, 2, "Photos") && !cloud_kept(kept, 2, "Photos/2025/x") && !cloud_kept(kept, 0, "a"));
     const char *all[] = { "" };
     CHECK(cloud_kept(all, 1, "anything/at/all"));
+    {
+        /* #71: which folders are still coming down as a whole */
+        const char *k2[] = { "Projects", "Photos/2026" };
+        unsigned char busy[2] = { 0, 1 };
+        CHECK(cloud_kept_busy(k2, busy, 2, "Photos/2026") && cloud_kept_busy(k2, busy, 2, "Photos/2026/trip") && cloud_kept_busy(k2, busy, 2, "Photos"));
+        CHECK(cloud_kept_busy(k2, busy, 2, ""));                                  /* the account's folder holds it */
+        CHECK(!cloud_kept_busy(k2, busy, 2, "Projects") && !cloud_kept_busy(k2, busy, 2, "Photos/2025") && !cloud_kept_busy(k2, busy, 2, "Photo"));
+        CHECK(!cloud_kept_busy(k2, busy, 2, "Photos/20") && !cloud_kept_busy(k2, NULL, 2, "Photos") && !cloud_kept_busy(k2, busy, 2, NULL));
+        unsigned char none[2] = { 0, 0 };
+        CHECK(!cloud_kept_busy(k2, none, 2, "Photos/2026") && !cloud_kept_busy(k2, none, 2, ""));
+        unsigned char whole = 1;
+        CHECK(cloud_kept_busy(all, &whole, 1, "x/y") && cloud_kept_busy(all, &whole, 1, ""));
+    }
 }
 
 static int has_brand(const char *s) {
@@ -644,6 +657,40 @@ static void t_state(void) {
         json_free(&d);
     }
     free(s);
+    /* #71: a kept folder whose files are still coming down stays "down" between one file and the next (and the folder
+     * that holds it); once the keeper got them all, kept again */
+    {
+        char pk[1024], pw[1024];
+        snprintf(pk, sizeof pk, "%s/Cloud/Work/Kept", home);
+        snprintf(pw, sizeof pw, "%s/Cloud/Work", home);
+        const char *pks[] = { pk, pw, p4 };
+        int at = -1;
+        pthread_mutex_lock(&cl_mu);
+        Acc *w = cl_find("cab12cd34");
+        for (int i = 0; w && i < w->nkeep; i++) if (!strcmp(w->keep[i], "Kept")) at = i;
+        if (at >= 0) w->keep_busy[at] = 1;
+        pthread_mutex_unlock(&cl_mu);
+        CHECK(at >= 0);
+        s = cloud_status(pks, 3);
+        CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+        if (s && d.root) {
+            CHECK(!strcmp(json_str(json_get(d.root, pk), "st"), "down"));
+            CHECK(!strcmp(json_str(json_get(d.root, pw), "st"), "up"));               /* the account's folder: a queued upload wins */
+            CHECK(!strcmp(json_str(json_get(d.root, p4), "st"), "kept"));        /* a file already here stays kept */
+            json_free(&d);
+        }
+        free(s);
+        pthread_mutex_lock(&cl_mu);
+        if (w && at >= 0) w->keep_busy[at] = 0;
+        pthread_mutex_unlock(&cl_mu);
+        s = cloud_status(pks, 2);
+        CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+        if (s && d.root) {
+            CHECK(!strcmp(json_str(json_get(d.root, pk), "st"), "kept"));
+            json_free(&d);
+        }
+        free(s);
+    }
     /* Free Up Space on everything: only the clean files go */
     char top[1024];
     snprintf(top, sizeof top, "%s/Cloud/Work", home);

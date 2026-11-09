@@ -79,6 +79,8 @@ typedef struct {
     char *pending_secret;           /* not saved yet (keyring locked): retried */
     time_t about_at, tok_at, retry_at;
     char *keep[KEEP_MAX];
+    unsigned char keep_busy[KEEP_MAX];   /* #71: keep[i]'s files aren't all here yet (set when kept, or when the keeper
+                                          * finds one missing; cleared when a pass of the keeper got them all) */
     int nkeep;
     char *errn[ERRN_MAX];           /* files whose last transfer failed */
     int nerrn;

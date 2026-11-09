@@ -3215,8 +3215,15 @@ void cloud_keep(const char *const *paths, int n, int keep) {
         if (!a) continue;
         int at = -1;
         for (int k = 0; k < a->nkeep; k++) if (!strcmp(a->keep[k], rel)) at = k;
-        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep[a->nkeep++] = d; changed = 1; } }
-        else if (!keep && at >= 0) { free(a->keep[at]); a->keep[at] = a->keep[--a->nkeep]; changed = 1; }
+        /* a new kept entry is coming down until the keeper's first pass over it ends (#71) */
+        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; } }
+        else if (!keep && at >= 0) {
+            free(a->keep[at]);
+            a->keep[at] = a->keep[--a->nkeep];
+            a->keep_busy[at] = a->keep_busy[a->nkeep];
+            a->keep_busy[a->nkeep] = 0;
+            changed = 1;
+        }
     }
     if (changed) cl_save_keep();
     pthread_mutex_unlock(&cl_mu);

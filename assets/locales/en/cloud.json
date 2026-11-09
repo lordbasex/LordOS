@@ -289,6 +289,7 @@
   "check.note.noLinks": "Not offered by this provider, not a failure",
   "check.note.noSpaceInfo": "This provider doesn't tell, not a failure",
   "check.note.notReached": "Not run: an earlier step failed",
+  "check.note.kept": "Kept on this computer, so not freed: not a failure",
   "check.works.yes": "Everything worked",
   "check.works.partly": "Some steps failed",
   "check.works.no": "This account doesn't work as it should",

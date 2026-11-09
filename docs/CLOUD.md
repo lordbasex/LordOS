@@ -259,6 +259,14 @@ In Files every file of a cloud account has a status, as a small glyph in the ico
 | Uploading | arrow up with progress | changed here, going up |
 | Error | exclamation | the last upload or download failed; Get Info says why |
 
+A folder's glyph says what happens inside it: going up, coming down, kept, or in the cloud. A kept folder whose files are
+still coming down keeps the "coming down" glyph until all of them are here (0.8.8.7, #71): before, it showed kept each
+time one file ended and the next hadn't started. `lord-server` marks a kept entry as coming down when it is kept and
+when the keeper finds a file of it missing (`keep_busy`), and clears the mark when a pass of the keeper read everything
+(a pass stopped by Pause or an unmount leaves it); `cloud_kept_busy` also gives "coming down" to the folders that hold
+such an entry. Check This Account skips **Free Up Space** on an account that keeps its files here ("Kept on this
+computer, so not freed: not a failure"): it failed with `cloud.notFreed.kept` after 40 seconds until 0.8.8.7.
+
 Context menu on files and folders of an account: **Keep on This Computer** / **Free Up Space**, **Copy Link** / **Share Link…**
 / **Stop Sharing**, **Open on Website**, **Get Info** (where it is, size in the cloud and here, last synced, link).
 

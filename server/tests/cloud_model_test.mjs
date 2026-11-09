@@ -380,7 +380,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     checkFolder({ group: 'object', mount: '/m' }, [], 't').path], ['/m/.lordos-check-t', '/m/alpha/.lordos-check-t', '/m/lordos-check-t']);
   // a world: files in a map, a cloud that sends what is written up after two looks, a clock that sleeps instantly
   const world = (opts = {}) => {
-    let clock = 1.7e12;
+    let clock = 1.7e12, frees = 0;
     const files = new Map([['/h/Cloud/W', 'dir'], ['/h/Cloud/W/docs', 'dir']]);
     const st = new Map();
     const looks = new Map();
@@ -401,14 +401,14 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
       status: (ps) => Object.fromEntries(ps.map((p) => {
         const n = (looks.get(p) || 0) + 1; looks.set(p, n);
         if (opts.fail && st.get(p) === 'up') return [p, { st: 'error', error: 'cloud.transferFailed' }];
-        if (st.get(p) === 'up' && n > 2) { st.set(p, 'here'); acc.up = { files: 0 }; }
+        if (st.get(p) === 'up' && n > 2) { st.set(p, opts.kept ? 'kept' : 'here'); acc.up = { files: 0 }; }
         if (!st.get(p) && acc.up.files) acc.up = { files: 0 };
         return [p, { st: st.get(p) || 'cloud' }];
       })),
-      free: (ps) => { st.set(ps[0], 'cloud'); return { freed: CHECK_SIZE, skipped: [] }; },
+      free: (ps) => { if (opts.kept) { frees++; return { freed: 0, skipped: [{ path: ps[0], reason: 'kept' }] }; } st.set(ps[0], 'cloud'); return { freed: CHECK_SIZE, skipped: [] }; },
       link: async () => ({ url: 'https://x.test/s/1' }), unlink: async () => ({ ok: true }),
     };
-    return { acc, files, trash, env: { fs: fsx, cloud: cl, sleep: async (ms) => { clock += ms; }, now: () => clock } };
+    return { acc, files, trash, frees: () => frees, clock: () => clock, env: { fs: fsx, cloud: cl, sleep: async (ms) => { clock += ms; }, now: () => clock } };
   };
   const res = (s) => s.map((x) => `${x.id}:${x.result}${x.note ? `(${x.note})` : ''}`).join(' ');
   let w = world({ links: true });
@@ -428,6 +428,13 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   w = world({ corrupt: true });
   out = await runCheck(w.acc, w.env);
   eq('different bytes back: read fails', out.find((x) => x.id === 'read').note, 'cloud.checkMismatch');
+  // #71: an account kept on this computer: its files are never freed, so the step is skipped (not 40 s, then failed)
+  w = world({ kept: true, links: true });
+  const t0 = w.clock();
+  out = await runCheck(w.acc, w.env);
+  eq('#71 kept account: free skipped (kept), the rest passes', res(out), CHECK_STEPS.map((id) => (id === 'free' ? 'free:skipped(kept)' : `${id}:pass`)).join(' '));
+  eq('#71 kept account: free not tried for 40 s', [w.frees(), out.find((x) => x.id === 'free').ms < 5000, w.clock() - t0 < 60e3], [0, true, true]);
+  eq('#71 kept: the report says it is not a failure', buildReport({ steps: out }).includes('free      skipped  0 ms       kept (the account keeps its files on this computer'), true);
   w = world({ group: 'object' });
   out = await runCheck(w.acc, w.env);
   eq('object storage: inside the first bucket', [out.every((x) => x.result !== 'fail'), [...w.files.keys()].some((k) => k.startsWith('/h/.cache/'))], [true, false]);

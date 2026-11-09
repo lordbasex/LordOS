@@ -69,6 +69,9 @@ int  cloud_split(const char *root, const char *path, char *name, size_t nn, char
 int  cloud_key_ok(const char *key);          /* an rclone option name: [a-z0-9_], 1 to 64 */
 int  cloud_value_ok(const char *v);          /* a field's value: no control characters, at most CLOUD_VALUE_MAX */
 int  cloud_kept(const char *const *kept, int n, const char *rel);   /* rel is a kept folder or file, or inside one */
+/* #71: a folder still coming down as a whole: rel is inside a kept entry whose files aren't all here yet (busy[i]), or
+ * holds one. Its glyph stays "coming down" between one file and the next instead of flipping to kept. */
+int  cloud_kept_busy(const char *const *kept, const unsigned char *busy, int n, const char *rel);
 
 /* ---- providers (6.1) ---- */
 typedef struct {

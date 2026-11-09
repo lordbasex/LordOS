@@ -289,6 +289,7 @@
   "check.note.noLinks": "Este proveedor no lo ofrece, no es un error",
   "check.note.noSpaceInfo": "Este proveedor no lo informa, no es un error",
   "check.note.notReached": "No se hizo: falló un paso anterior",
+  "check.note.kept": "Se conserva en esta computadora, así que no se libera: no es un error",
   "check.works.yes": "Todo funcionó",
   "check.works.partly": "Algunos pasos fallaron",
   "check.works.no": "Esta cuenta no funciona como debería",
