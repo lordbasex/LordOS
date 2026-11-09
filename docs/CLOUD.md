@@ -330,6 +330,17 @@ What changed:
   refuses a JSON `true` ("value must be string"), so until 0.8.8.6 that listing never happened and new files in the cloud
   reached a kept folder only when its listing expired. It runs on every pass (5 minutes) where the provider sends no
   changes, else after each mount and every half hour. A kept file lists its own folder only, not what is under it.
+- **A provider that stops answering (0.8.8.7, issue #85).** Reported: pCloud resumed after a 10-minute pause while its
+  address couldn't be resolved (`dial tcp: lookup eapi.pcloud.com: i/o timeout`); the desktop froze for 2 to 3 seconds
+  again and again for minutes. The keeper walked the kept tree through the mount, and rclone held each folder about 15 s
+  while it tried the provider, folder after folder; whatever else read those folders waited with it. Now the keeper
+  doesn't walk an account that is offline (`cloud.unreachable` or `cloud.offline`), nor one not checked since it was
+  mounted, resumed (Pause, Pause All, back on power): `check_acc` lists the account once first (`keeper_wait`) and calls
+  the keeper back when it answers. A call through the mount that fails with EIO or a time out (`cloud_mount_gave_up`)
+  ends the pass at once and asks for that check now (`cl_check_soon`); a check that answers doesn't restart the keeper by
+  itself, so a file that always fails can't make the two call each other. And `lord.fs.list` of a folder that holds a cloud
+  or network mount (`~/Cloud`) lists that mount as a folder without a stat of its root (`fsops_list`, `remote_children`):
+  that stat was the provider's round trip, on the interface's thread.
 
 ## 8. Space
 

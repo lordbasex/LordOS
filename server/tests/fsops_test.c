@@ -53,7 +53,27 @@ static void count_cb(void *ud, const char *id, const char *name, const char *ori
 static int hits;
 static void hit_cb(void *ud, const char *p, int dir, double size, double mtime) { (void)ud; (void)p; (void)dir; (void)size; (void)mtime; hits++; }
 
+/* #85: a cloud or network mount inside a listed folder is listed as a folder without a stat of its root (which waits for
+ * the server). Needs such a mount on this machine (the first fuse.*, cifs or nfs one whose parent can be read). */
+typedef struct { const char *want; int seen, dir; double mtime; } MountSeen;
+static void mount_cb(void *ud, const FsEntry *e) { MountSeen *m = ud; if (!strcmp(e->name, m->want)) { m->seen = 1; m->dir = e->dir; m->mtime = e->mtime; } }
+static void test_remote_child(void) {
+    FILE *f = fopen("/proc/self/mounts", "re");
+    char line[4096], dev[1024], mnt[2048], ty[64], found[2048] = "";
+    while (f && !found[0] && fgets(line, sizeof line, f))
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, ty) == 3 && (!strncmp(ty, "fuse.", 5) || !strcmp(ty, "cifs") || !strncmp(ty, "nfs", 3)) &&
+            !strchr(mnt, '\\') && strrchr(mnt, '/') != mnt) snprintf(found, sizeof found, "%s", mnt);
+    if (f) fclose(f);
+    if (!found[0]) { printf("fsops-test: remote mount listing skipped: needs a fuse, cifs or nfs mount\n"); return; }
+    char *slash = strrchr(found, '/');
+    *slash = 0;
+    MountSeen m = { slash + 1, 0, 0, -1 };
+    CHECK(fsops_list(found, 100000, mount_cb, &m) >= 0);
+    CHECK(m.seen && m.dir && m.mtime == 0);        /* a folder, not stat'ed: no time */
+}
+
 int main(void) {
+    test_remote_child();
     snprintf(H, sizeof H, "/tmp/fsops-test-%d", (int)getpid());
     mkdir(H, 0755);
     fsops_init(H, "nadie");

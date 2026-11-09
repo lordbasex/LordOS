@@ -33,7 +33,7 @@
 /* what one account looks like, copied out from under cl_mu */
 typedef struct {
     char id[16], name[CLOUD_NAME_MAX + 1];
-    int in_use, mounted, paused;
+    int in_use, mounted, paused, offline;
     char **keep;
     int nkeep;
     char **q;
@@ -50,6 +50,7 @@ static int snap(const char *name, const char *id, Snap *s) {
     s->in_use = a->in_use;
     s->mounted = a->mounted;
     s->paused = cl_paused(a);
+    s->offline = cloud_err_offline(a->err) || a->keeper_wait;      /* or not checked yet since it was mounted or resumed */
     s->keep = calloc((size_t)a->nkeep + 1, sizeof *s->keep);
     s->q = calloc((size_t)a->nq + 1, sizeof *s->q);
     for (int i = 0; s->keep && i < a->nkeep; i++) s->keep[s->nkeep++] = strdup(a->keep[i]);
@@ -250,7 +251,7 @@ int cloud_read_would_block(const char *path) {
     if (!cl_root[0] || !path || cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel) || !rel[0]) return 0;
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find_name(name);
-    int down = a && (!cl_running || !a->mounted || a->locked || !strcmp(a->err, "cloud.unreachable") || !strcmp(a->err, "cloud.offline"));
+    int down = a && (!cl_running || !a->mounted || a->locked || cloud_err_offline(a->err));
     char id[16] = "";
     if (a) cl_pf(id, sizeof id, "%s", a->id);
     pthread_mutex_unlock(&cl_mu);
@@ -435,14 +436,26 @@ void cf_kick(void) {
 static int still_ok(const char *id) {
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find(id);
-    int ok = a && a->mounted && !cl_paused(a);
+    int ok = a && a->mounted && !cl_paused(a) && !cloud_err_offline(a->err);
     pthread_mutex_unlock(&cl_mu);
     return ok;
 }
 
 /* One kept entry's pass of the keeper (#71): the entry is marked as coming down when a file of it is missing, and
  * cleared when a pass read everything (a pass that stopped, paused or gone, leaves it as it was) */
-typedef struct { const char *root; int marked, incomplete; } KeepPass;
+typedef struct { const char *root; int marked, incomplete, gave_up; } KeepPass;
+
+/* #85: a call through the mount failed because the provider didn't answer (pCloud after a pause, its address not found
+ * for minutes): rclone held each folder while it waited, so a pass that went on walked folder after folder, 15 s each,
+ * and whatever else read those folders waited with it. The pass stops at the first one and the account is checked now;
+ * the keeper comes back when the check finds it answering (check_acc) */
+static void gave_up(const Snap *s, KeepPass *kp, int err) {
+    kp->incomplete = 1;
+    if (kp->gave_up || !cloud_mount_gave_up(err)) return;
+    kp->gave_up = 1;
+    fprintf(stderr, "cloud: %s: the provider didn't answer through the mount: Keep on This Computer waits for it\n", s->id);
+    cl_check_soon(s->id);
+}
 
 static void keep_busy_set(const char *id, const char *root, int busy) {
     int changed = 0;
@@ -462,7 +475,7 @@ static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s/%s", cl_root, s->name, rel);
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) { kp->incomplete = 1; return; }
+    if (fd < 0) { gave_up(s, kp, errno); return; }
     static char buf[1 << 20];
     long long done = 0;
     ssize_t n;
@@ -470,7 +483,7 @@ static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
         done += n;
         if ((done & ((64 << 20) - 1)) < n && !still_ok(s->id)) { kp->incomplete = 1; break; }   /* every 64 MB: paused, gone? */
     }
-    if (n < 0) kp->incomplete = 1;
+    if (n < 0) gave_up(s, kp, errno);
     posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
     close(fd);
 }
@@ -479,26 +492,29 @@ static void fetch_tree(const Snap *s, const char *rel, int depth, KeepPass *kp) 
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s%s%s", cl_root, s->name, rel[0] ? "/" : "", rel);
     struct stat st;
-    if (lstat(p, &st)) return;                      /* gone (in the cloud too): nothing to bring */
+    if (lstat(p, &st)) { if (errno != ENOENT) gave_up(s, kp, errno); return; }   /* ENOENT: gone (in the cloud too) */
     if (S_ISREG(st.st_mode)) { fetch(s, rel, kp); return; }
     if (!S_ISDIR(st.st_mode) || depth > WALK_DEPTH) return;
     DIR *d = opendir(p);
-    if (!d) { kp->incomplete = 1; return; }
-    for (struct dirent *e; (e = readdir(d)); ) {
+    if (!d) { gave_up(s, kp, errno); return; }
+    errno = 0;
+    for (struct dirent *e; (e = readdir(d)); errno = 0) {
         if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
         char r[CLOUD_REL_MAX * 2 + 2];
         if ((size_t)cl_pf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", e->d_name) > CLOUD_REL_MAX) continue;
-        if (!still_ok(s->id)) { kp->incomplete = 1; break; }
+        if (kp->gave_up || !still_ok(s->id)) { kp->incomplete = 1; break; }
         fetch_tree(s, r, depth + 1, kp);
     }
+    if (errno && !kp->incomplete) gave_up(s, kp, errno);       /* readdir failed part way */
     closedir(d);
 }
 
-/* a whole pass over one kept entry; when it read everything, the entry is all here */
-static void fetch_kept(const Snap *s, const char *root) {
-    KeepPass kp = { root, 0, 0 };
+/* a whole pass over one kept entry; when it read everything, the entry is all here. -1: the provider didn't answer */
+static int fetch_kept(const Snap *s, const char *root) {
+    KeepPass kp = { root, 0, 0, 0 };
     fetch_tree(s, root, 0, &kp);
     if (!kp.incomplete) keep_busy_set(s->id, root, 0);
+    return kp.gave_up ? -1 : 0;
 }
 
 static void *keeper(void *arg) {
@@ -524,6 +540,9 @@ static void *keeper(void *arg) {
         for (int i = 0; i < na; i++) {
             Snap s;
             if (snap(NULL, ids[i], &s)) continue;
+            /* #85: nothing walks an account whose provider doesn't answer, nor one not checked yet since it was mounted or
+             * resumed: check_acc lists it first (every 30 s while it doesn't answer) and calls the keeper back */
+            if (!s.mounted || s.paused || s.offline) { snap_free(&s); continue; }
             /* the kept folders listed whole again (7.3): every pass where the provider sends no changes, else after each
              * mount and every half hour, inside the hour a listing is kept */
             int tree = 0;
@@ -536,8 +555,8 @@ static void *keeper(void *arg) {
                 a->tree_at = now;
             }
             pthread_mutex_unlock(&cl_mu);
-            for (int k = 0; k < s.nkeep && s.mounted && !s.paused; k++) {
-                if (!tree) { fetch_kept(&s, s.keep[k]); continue; }
+            for (int k = 0; k < s.nkeep && still_ok(s.id); k++) {
+                if (!tree) { if (fetch_kept(&s, s.keep[k])) break; continue; }
                 JBuf b;
                 jb_init(&b);
                 /* vfs/refresh takes folders: a kept file refreshes its folder, alone (not what is under it). rclone takes
@@ -555,9 +574,10 @@ static void *keeper(void *arg) {
                 if (dir[0]) { jb_raw(&b, ",\"dir\":"); jb_str(&b, dir); }
                 jb_raw(&b, "}");
                 /* a whole account can take minutes; rclone's walk doesn't hold the folders it lists (measured) */
-                if (!b.oom) cl_rc_simple(RCM_VFS_REFRESH, b.p, 600000);
+                int st = b.oom ? -1 : cl_rc_simple(RCM_VFS_REFRESH, b.p, 600000);
                 jb_free(&b);
-                fetch_kept(&s, s.keep[k]);
+                if (st != 200) cl_check_soon(s.id);           /* the provider may not be answering: asked now */
+                if (fetch_kept(&s, s.keep[k])) break;
             }
             snap_free(&s);
         }
@@ -601,7 +621,7 @@ static int browse_moved(unsigned gen) {
 static int browse_acc(const char *name, const char *rel, char *id, unsigned *gen, int *polls, int *kept) {
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find_name(name);
-    int ok = a && cl_running && a->mounted && !a->locked && strcmp(a->err, "cloud.offline") && strcmp(a->err, "cloud.unreachable");
+    int ok = a && cl_running && a->mounted && !a->locked && !cloud_err_offline(a->err);
     if (ok) {
         cl_pf(id, 16, "%s", a->id);
         *gen = a->mount_gen;

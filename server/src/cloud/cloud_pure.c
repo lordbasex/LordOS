@@ -3,6 +3,7 @@
 #include "../sec/json.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -326,6 +327,12 @@ const char *cloud_failure_code(const char *m) {
     for (int i = 0; auth[i]; i++) if (strstr(m, auth[i])) return "cloud.authFailed";
     for (int i = 0; weak[i]; i++) if (strstr(m, weak[i])) return "cloud.unreachable";
     return NULL;
+}
+
+int cloud_err_offline(const char *err) { return err && (!strcmp(err, "cloud.offline") || !strcmp(err, "cloud.unreachable")); }
+
+int cloud_mount_gave_up(int err) {
+    return err == EIO || err == ETIMEDOUT || err == ENOTCONN || err == ECONNABORTED || err == EHOSTUNREACH || err == ENETUNREACH;
 }
 
 void cloud_clean_text(const char *in, char *out, size_t n) {

@@ -7,6 +7,7 @@
 #include "../src/cloud/cloud_int.h"
 #include "../src/sec/json.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -233,6 +234,12 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("dial tcp 127.0.0.1:1: connect: connection refused"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("error in ListJSON: write tcp 127.0.0.1:38242->127.0.0.1:18991: write: broken pipe"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("dial tcp: lookup nowhere.example.test: no such host"), "cloud.unreachable"));
+    /* #85: pCloud after a pause, with DNS not answering: an account that doesn't answer, and the mount's EIO, stop the keeper */
+    CHECK(!strcmp(cloud_failure_code("IO error: couldn't list files: Get \"https://eapi.pcloud.com/listfolder?folderid=1\": dial tcp: lookup eapi.pcloud.com: i/o timeout"), "cloud.unreachable"));
+    CHECK(cloud_err_offline("cloud.unreachable") && cloud_err_offline("cloud.offline"));
+    CHECK(!cloud_err_offline("") && !cloud_err_offline(NULL) && !cloud_err_offline("cloud.authFailed") && !cloud_err_offline("cloud.listFailed"));
+    CHECK(cloud_mount_gave_up(EIO) && cloud_mount_gave_up(ETIMEDOUT) && cloud_mount_gave_up(ENOTCONN));
+    CHECK(!cloud_mount_gave_up(ENOENT) && !cloud_mount_gave_up(EACCES) && !cloud_mount_gave_up(ENOTDIR) && !cloud_mount_gave_up(0));
     CHECK(!strcmp(cloud_failure_code("dial tcp 10.255.255.1:22: i/o timeout"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("parse \"http://127.0.0.1:99999\": invalid port \":99999\" after host"), "cloud.badAddress"));
     CHECK(!strcmp(cloud_failure_code("Get \"ftp://x\": unsupported protocol scheme \"ftp\""), "cloud.badAddress"));

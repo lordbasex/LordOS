@@ -101,6 +101,11 @@ int              cloud_internal_question(const char *opt);
 int              cloud_option_refused(const char *name, const char *type);
 /* rclone's words when an account didn't work → cloud.authFailed | cloud.unreachable | cloud.badAddress | NULL (other) */
 const char      *cloud_failure_code(const char *msg);
+/* #85: an account whose provider doesn't answer now (err is the account's cloud.* code): nothing walks its folder */
+int              cloud_err_offline(const char *err);
+/* #85: what a call through the mount failed with (errno) means the provider didn't answer (rclone's "IO error": EIO, or a
+ * time out), not that the file is gone: the keeper stops its pass there instead of waiting on every folder */
+int              cloud_mount_gave_up(int err);
 /* a message fit for Get Info: HTML tags dropped, white space collapsed, cut at a character boundary to fit n (≤ n-1 bytes) */
 void             cloud_clean_text(const char *in, char *out, size_t n);
 /* the conflict rule (7.2): did the object in the cloud change since this copy came down? fingerprint as kept in vfsMeta,

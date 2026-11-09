@@ -1287,7 +1287,7 @@ static int mount_acc(Acc *a) {
     int st = b.oom ? -1 : rcs(RCM_MOUNT, b.p, msg, sizeof msg, RC_SHORT);
     jb_free(&b);
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; }
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; }
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
@@ -1506,6 +1506,10 @@ static void check_acc(Acc *a) {
     int bad = verify_remote(a, msg, sizeof msg);
     const char *c = bad ? cloud_failure_code(msg) : NULL;
     pthread_mutex_lock(&cl_mu);
+    /* the keeper waits for this check after a mount or a resume, and while offline (#85); a folder that didn't answer only
+     * brings the check sooner, so a file that always fails can't make the keeper and the check call each other */
+    int keeper_waits = a->keeper_wait || cloud_err_offline(a->err);
+    a->keeper_wait = 0;
     /* offline: listed every 30 s, so it comes back as soon as the server does */
     a->check_at = time(NULL) + (!bad ? 600 : c && !strcmp(c, "cloud.unreachable") ? 30 : 120);
     if (bad) {
@@ -1514,6 +1518,7 @@ static void check_acc(Acc *a) {
         set_message(a, msg);
     } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; a->fp_old[0] = a->fp_new[0] = 0; }
     int key = bad && c && !strcmp(c, "cloud.hostKeyChanged") && !a->fp_new[0];
+    keeper_waits = keeper_waits && !cloud_err_offline(a->err);
     pthread_mutex_unlock(&cl_mu);
     /* U12: a key that changed, seen by rclone: the kept fingerprint and, once, the server's new one */
     if (key) {
@@ -1526,6 +1531,15 @@ static void check_acc(Acc *a) {
         cpy(a->fp_new, sizeof a->fp_new, n[0] ? n : "?");
         pthread_mutex_unlock(&cl_mu);
     }
+    if (keeper_waits) cf_kick();
+    cl_changed();
+}
+
+void cl_check_soon(const char *id) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    if (a) a->check_at = 0;
+    pthread_mutex_unlock(&cl_mu);
     cl_changed();
 }
 
@@ -2816,7 +2830,14 @@ static void *worker(void *arg) {
             if (now >= next_slow) {                 /* every minute */
                 next_slow = now + 60000;
                 int b = on_battery();
-                if (b != on_batt) { on_batt = b; cf_kick(); }
+                if (b != on_batt) {
+                    on_batt = b;
+                    /* back on power: as a resume, each account is listed once before the keeper walks it (#85) */
+                    pthread_mutex_lock(&cl_mu);
+                    for (int i = 0; !b && opt.pause_batt && i < ACC_MAX; i++) if (cl_acc[i].used && cl_acc[i].mounted) { cl_acc[i].check_at = 0; cl_acc[i].keeper_wait = 1; }
+                    pthread_mutex_unlock(&cl_mu);
+                    cf_kick();
+                }
                 if (cl_running) cf_measure();
                 if (cl_running && opt.auto_free && ticks % 5 == 0) cf_auto_free(opt.free_below);
                 if (ticks % 5 == 0) cf_kick();
@@ -3337,12 +3358,14 @@ char *cloud_links(const char *id) {
 
 void cloud_pause(const char *id, int pause) {
     pthread_mutex_lock(&cl_mu);
+    /* #85: a resumed account is listed once before the keeper walks its kept folders again: a provider that stopped
+     * answering while it was paused is found by one listing, not by a walk that waits on every folder */
     if (!id) {
         opt.pause_all = pause;
-        if (!pause) for (int i = 0; i < ACC_MAX; i++) cl_acc[i].paused = 0;
+        if (!pause) for (int i = 0; i < ACC_MAX; i++) { cl_acc[i].paused = 0; if (cl_acc[i].used && cl_acc[i].mounted) { cl_acc[i].check_at = 0; cl_acc[i].keeper_wait = 1; } }
     } else {
         Acc *a = cl_find(id);
-        if (a) a->paused = pause;
+        if (a) { a->paused = pause; if (!pause && a->mounted) { a->check_at = 0; a->keeper_wait = 1; } }
     }
     save_accounts();
     pthread_mutex_unlock(&cl_mu);

@@ -64,6 +64,7 @@ typedef struct {
     char *pend_tsec;                /* the same over the kept ones, for the checks (B15) */
     int pend_upd;
     time_t check_at;                /* the next listing that checks a mounted account still answers */
+    int keeper_wait;                /* mounted or resumed, not checked since: the keeper waits for check_acc (#85) */
     char *checked[Q_MAX];           /* queued files the conflict rule already looked at (7.2) */
 #define SYNCED_MAX 64
     struct { char rel[CLOUD_REL_MAX + 1]; char fp[256]; } synced[SYNCED_MAX];   /* our last uploads, as the cloud has them (N5) */
@@ -104,7 +105,8 @@ void  cl_changed(void);                     /* push the state soon */
 int   cl_paused(const Acc *a);              /* Pause, Pause All or on battery */
 void  cl_save_keep(void);                   /* with cl_mu held */
 int   cl_rc_simple(int m, const char *body, int timeout);   /* an rc call whose answer doesn't matter: its status */
-void  cl_reply(int req, char *json);        /* an asynchronous answer for JS (takes json) */
+void  cl_reply(int req, char *json);
+void  cl_check_soon(const char *id);        /* the account is listed on the next tick (check_acc): does it answer? (#85) */        /* an asynchronous answer for JS (takes json) */
 int   cl_next_req(void);
 
 /* cloud_trust.c */

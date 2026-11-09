@@ -1049,13 +1049,53 @@ void fsops_group_name(gid_t g, char *out, size_t n) {
     else pathf(out, n, "?");
 }
 
+/* #85: the cloud and network mounts right inside dir (~/Cloud's accounts, a share mounted in the home folder), from
+ * /proc/self/mounts: their root is the server's, and rclone holds a folder while it lists it from the provider, so a stat
+ * of ~/Cloud/<account> waited for a provider that didn't answer, on the interface's thread when Files showed ~/Cloud.
+ * They are listed as folders without touching them. names gets each one's last component; the count is returned. */
+#define LIST_MOUNTS_MAX 32
+static int remote_children(const char *dir, char names[][256]) {
+    FILE *f = fopen("/proc/self/mounts", "re");
+    if (!f) return 0;
+    char line[4096], dev[1024], mnt[2048], ty[64];
+    size_t dl = strlen(dir);
+    while (dl > 0 && dir[dl - 1] == '/') dl--;          /* "/" is the empty prefix */
+    int n = 0;
+    while (n < LIST_MOUNTS_MAX && fgets(line, sizeof line, f)) {
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, ty) != 3 || !remote_type(ty)) continue;
+        unescape_mount(mnt);
+        if (strncmp(mnt, dir, dl) || mnt[dl] != '/') continue;
+        const char *leaf = mnt + dl + 1;
+        if (!leaf[0] || strchr(leaf, '/') || strlen(leaf) >= 256) continue;
+        memcpy(names[n++], leaf, strlen(leaf) + 1);
+    }
+    fclose(f);
+    return n;
+}
+
 int fsops_list(const char *dir, int max, FsListFn fn, void *ud) {
     DIR *d = opendir(dir);
     if (!d) return -1;
+    static __thread char mounts[LIST_MOUNTS_MAX][256];
+    int nm = remote_children(dir, mounts);
     int i = 0;
     struct dirent *e;
     while (i < max && (e = readdir(d))) {
         if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        int mounted = 0;
+        for (int k = 0; k < nm && !mounted; k++) mounted = !strcmp(mounts[k], e->d_name);
+        if (mounted) {
+            FsEntry x;
+            memset(&x, 0, sizeof x);
+            x.name = e->d_name;
+            x.dir = 1;
+            x.mode = 0700;
+            x.uid = getuid();
+            x.gid = getgid();
+            fn(ud, &x);
+            i++;
+            continue;
+        }
         char fp[PATH_MAX * 2];
         struct stat st, lst;
         if (pathf(fp, sizeof fp, "%s/%s", dir, e->d_name) < 0) continue;
