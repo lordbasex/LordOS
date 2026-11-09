@@ -4,7 +4,6 @@
  *   ~/.config/lordos/cloud/rclone.conf     each account's type and non-secret options (0600, no secret in it)
  *   ~/.config/lordos/cloud/keep.json       Keep on This Computer, per account
  *   ~/.config/lordos/cloud/links.json      the links made from LordOS (rclone can't list them)
- *   ~/.config/lordos/cloud/rclone-debug    when it exists, rclone logs at DEBUG (a diagnosis, docs/CLOUD.md)
  *   ~/.cache/lordos/cloud/                 rclone's VFS cache (vfs/<id>/, vfsMeta/<id>/)
  *   ~/.cache/lordos/cloud.log              rclone's log (the Logs app shows it)
  *   $XDG_RUNTIME_DIR/lordos/cloud/rc.sock  the rc socket, in a 0700 folder
@@ -655,14 +654,8 @@ static int daemon_start(void) {
         cl_pf(old, sizeof old, "%s/.cache/lordos/cloud.old", cl_home);
         rename(log_path, old);
     }
-    /* a diagnosis the person turns on: rclone at DEBUG while ~/.config/lordos/cloud/rclone-debug exists (iCloud Drive's
-     * sign-in steps, with each cookie as its length and a hash, never its value) */
-    char dbg[PATH_MAX + 32];
-    cl_pf(dbg, sizeof dbg, "%s/.config/lordos/cloud/rclone-debug", cl_home);
-    const char *level = access(dbg, F_OK) ? "NOTICE" : "DEBUG";
-    if (level[0] == 'D') fprintf(stderr, "cloud: rclone logs at DEBUG (%s exists)\n", dbg);
     char *argv[] = { "rclone", "rcd", "--rc-addr", addr, "--rc-htpasswd", "/proc/self/fd/3", "--config", "", "--cache-dir", cache,
-                     "--log-file", log_path, "--log-level", (char *)level, "--use-mmap", "--buffer-size", "16M", "--transfers", "4",
+                     "--log-file", log_path, "--log-level", "NOTICE", "--use-mmap", "--buffer-size", "16M", "--transfers", "4",
                      /* B10: a server that doesn't answer fails a cold read in about 8 s, not minutes (measured: 8.6 s
                       * refused, >200 s with rclone's defaults); uploads are retried by the VFS queue anyway */
                      "--contimeout", "5s", "--timeout", "30s", "--low-level-retries", "1",

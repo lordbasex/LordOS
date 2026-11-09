@@ -400,11 +400,6 @@ In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
    and a line "Only LordOS can reach it: it listens on no network address."
 5. **About rclone**: version, MIT license, link to rclone.org.
 
-**Diagnosing a provider (0.8.8.7).** rclone logs at NOTICE to `~/.cache/lordos/cloud.log`. While
-`~/.config/lordos/cloud/rclone-debug` exists (an empty file; `touch` it, then Settings → Cloud → Service → Restart),
-rclone logs at DEBUG; remove it and restart to go back. iCloud Drive's backend writes its sign-in steps with each cookie
-as its length and a hash, never its value; other backends may write more (paths, request ids), so turn it off once done.
-
 ## 13. Later
 
 Two-way sync of chosen local folders (Desktop, Documents) with `bisync`; **Share Folder on Network** (4.4); photo upload from the
