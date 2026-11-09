@@ -312,7 +312,7 @@
   "notes.iclouddrive.password": "Use a senha normal da conta, não uma senha específica de app: o rclone não as aceita para este disco.",
   "notes.iclouddrive.adp": "A criptografia de ponta a ponta extra do disco tem de estar desativada na conta: o rclone não consegue ler arquivos criptografados assim.",
   "notes.iclouddrive.web": "O acesso ao disco pela web tem de estar ativado nos ajustes da conta.",
-  "notes.iclouddrive.code": "Pede um código de um dos seus dispositivos agora, e de novo a cada uns 30 dias (Entrar de novo).",
+  "notes.iclouddrive.code": "Pede um código de um dos seus dispositivos agora. Por um problema em aberto entre o rclone e o provedor, pode pedir de novo cada vez que o rclone inicia (ao sair da sessão ou reiniciar), até que uma versão do rclone corrija.",
   "question.title": "{provider} pergunta",
   "trash.empty": "Esvaziar lixeira",
   "trash.title": "Esvaziar a lixeira de “{name}”?",

@@ -312,7 +312,7 @@
   "notes.iclouddrive.password": "Utilisez le mot de passe habituel du compte, pas un mot de passe pour app : rclone ne les accepte pas pour ce disque.",
   "notes.iclouddrive.adp": "Le chiffrement de bout en bout supplémentaire du disque doit être désactivé dans le compte : rclone ne peut pas lire les fichiers chiffrés ainsi.",
   "notes.iclouddrive.web": "L’accès au disque depuis le web doit être activé dans les réglages du compte.",
-  "notes.iclouddrive.code": "Un code d’un de vos appareils est demandé maintenant, puis environ tous les 30 jours (Se reconnecter).",
+  "notes.iclouddrive.code": "Un code d’un de vos appareils est demandé maintenant. À cause d’un problème ouvert entre rclone et le fournisseur, il peut être redemandé à chaque démarrage de rclone (après une déconnexion ou un redémarrage), jusqu’à ce qu’une version de rclone le corrige.",
   "question.title": "{provider} demande",
   "trash.empty": "Vider la corbeille",
   "trash.title": "Vider la corbeille de « {name} » ?",

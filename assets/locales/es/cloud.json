@@ -312,7 +312,7 @@
   "notes.iclouddrive.password": "Usa la contraseña normal de la cuenta, no una contraseña específica para apps: rclone no las acepta para este disco.",
   "notes.iclouddrive.adp": "El cifrado de extremo a extremo adicional del disco tiene que estar desactivado en la cuenta: rclone no puede leer archivos cifrados así.",
   "notes.iclouddrive.web": "El acceso al disco desde la web tiene que estar activado en los ajustes de la cuenta.",
-  "notes.iclouddrive.code": "Te pide un código de uno de tus dispositivos ahora, y de nuevo cada unos 30 días (Iniciar sesión de nuevo).",
+  "notes.iclouddrive.code": "Te pide un código de uno de tus dispositivos ahora. Por un problema abierto entre rclone y el proveedor, puede volver a pedirlo cada vez que rclone arranca (al cerrar sesión o reiniciar), hasta que una versión de rclone lo arregle.",
   "question.title": "{provider} pregunta",
   "trash.empty": "Vaciar papelera",
   "trash.title": "¿Vaciar la papelera de «{name}»?",

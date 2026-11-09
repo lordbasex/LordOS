@@ -296,6 +296,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `tests/files_remote_test.mjs` checks the listings Files keeps (one at a time per folder, the last one shown while a
     new one runs, items hidden during a delete and back only if still there) and which folders count as slow.
 
+### Known issues and limitations
+
+- **A cloud account signed in with a password and a device code may ask for the code again after every logout or
+  restart.** The session is kept in the keyring, but the provider refuses it when rclone starts again, and signing in
+  with the kept trust token asks for a new code (an open problem in rclone's backend for that provider: its issues 9658
+  and 9966, with fixes proposed and not released yet). LordOS says so when the account is added, asks for a new sign-in
+  instead of failing quietly, and tries again every 30 minutes instead of every 30 seconds. lordos-rclone will follow
+  rclone's release with the fix. (A build with the proposed escrow fix was tried and did not help this account.)
+
 ## [0.8.8.6-beta] - 2026-11-08
 
 An update for 0.8.8 to 0.8.8.5 through Store → Updates and `apt` (no new ISO: the 0.8.8 live image stays the current one), with **Voice**: text to speech on the computer, without the internet (`say`, read aloud anywhere with a player, Live Speech, voices you choose in Standard or HD quality, and a Personal Voice made from your own recording); **Monitor → GPU**; the menu bar and the taskbar on every display; and the 34 issues reported on GitHub since 0.8.8.4 (#42 to #75), with the fixes found while checking them.

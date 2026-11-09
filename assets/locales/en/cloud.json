@@ -312,7 +312,7 @@
   "notes.iclouddrive.password": "Use the account's regular password, not an app-specific password: rclone doesn't accept those for this drive.",
   "notes.iclouddrive.adp": "The account's extra end-to-end encryption for the drive must be off: rclone can't read files encrypted that way.",
   "notes.iclouddrive.web": "Access to the drive from the web must be on in the account's settings.",
-  "notes.iclouddrive.code": "It asks for a code from one of your devices now, and again about every 30 days (Sign In Again).",
+  "notes.iclouddrive.code": "It asks for a code from one of your devices now. Because of an open problem between rclone and the provider, it may ask again each time rclone starts (after a logout or a restart) until a version of rclone fixes it.",
   "question.title": "{provider} asks",
   "trash.empty": "Empty Trash",
   "trash.title": "Empty the trash of “{name}”?",
