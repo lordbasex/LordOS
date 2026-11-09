@@ -347,8 +347,81 @@ All three emit OSC 133 (prompt, command, output, exit code), OSC 7 (directory) a
 RemoteHost (user@host, for automatic profile switching) and define
 `imgcat [-w width] [-h height] file…` and `lord_badge text`.
 
+## Files mode, transfers and port forwards (0.8.8.7, in development)
+
+Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
+**the tab's own ssh session**: one login, no second connection, no password or code asked again.
+
+### How the session is reused
+
+- An `ssh` started by the Terminal (a profile whose command is SSH, or `ssh` typed in a shell with the integration
+  loaded) gets `-o ControlMaster=auto -o ControlPath=$XDG_RUNTIME_DIR/lordos-term/ssh/%C -o ControlPersist=no`. The
+  folder is the user's and 0700. The integration adds these options to the ssh it runs, as a shell function. The user's
+  `~/.ssh/config` is never changed, and an `ssh` that already sets `ControlPath` or `ControlMaster` is left as it is.
+- `lord-server` knows which tab owns which control socket: the ssh is the tab's foreground process, and the socket is
+  named by `%C`, which is computed from that process's own command line.
+- To list, copy, download or forward, `lord-server` opens a **new channel** through the control socket with the
+  OpenSSH multiplexing protocol (`MUX_C_NEW_SESSION` with the `sftp` subsystem and fd passing, `MUX_C_OPEN_FWD` for a
+  forward). **It runs no program**: no `ssh`, `sftp` or `scp` is executed.
+- The SFTP protocol is spoken by a new sandboxed helper, **`lord-sftp`**. It gets the channel's fds and, for a
+  download or an upload, the local file's fd. It never gets a path, it is held by `sandbox_apply_helper()`, and it has
+  no socket, connect, exec or clone. Replies from the server are untrusted data, so their parser has its own test and
+  a fuzz case.
+- **Remote commands** come only from a closed list, each with its arguments checked in C:
+  - `file -b -- <path>` (Info)
+  - `sha256sum -- <path>` (Info)
+  - `sudo -n /usr/lib/openssh/sftp-server` or the `sftp-server` path the server reports ("As root")
+  - `cd` is not one of them: "Open terminal here" types `cd -- '<path>'` into the tab, as the user could.
+- **As root:** `sudo -n` first. If sudo needs a password, a sheet asks for it once per session; it is written to that
+  channel's stdin and wiped, never kept and never sent to JS.
+- Not reusable: an `ssh` opened before the update (its channel was not set up when it connected), and an ssh made from
+  inside the server to another one (a hop). There the Files switch is grey and says why.
+
+### Files mode
+
+- **Turned on** from the footer's Files switch (right), Window → Server Files (SFTP) (❖⇧F) or the tab's right click.
+  It changes the tab's view; the shell stays alive behind it.
+- **Layout:** this computer on the left (the tab's local directory), the server on the right (the remote shell's
+  directory, from OSC 7), and the transfers queue with a speed graph at the bottom. Uploads are orange and downloads
+  blue (they also differ in lightness and arrow).
+- **Toolbar:** New Folder, Refresh, Show Hidden, Filter, As Root.
+- **Refreshing:** the local side refreshes at once (inotify). The remote side refreshes after each of our own
+  operations and every 5 s while it is shown. Refresh is for changes made from elsewhere.
+- **Right click on a remote item:**
+  - Download, Open With…
+  - Edit: the file is downloaded and uploaded again on save.
+  - Rename (F2), New Folder, Duplicate, Compress (.tar.gz)
+  - Permissions (chmod, as boxes and octal), Change Owner (chown)
+  - Info: `file`, size, owner, permissions, modified, and SHA-256 computed on the server
+  - Copy Remote Path, Open Terminal Here, Delete…
+- **A name that already exists:** Replace, Keep Both or Skip, with "apply to all".
+
+### In terminal mode
+
+- **Upload by dropping:** a file dropped from Files onto the terminal goes up to the remote shell's directory in the
+  background. A floating notice (it can be hidden) and the footer show the progress. Nothing is typed into the
+  terminal and it is never blocked. Dropping with ⌥ pastes the path as text, as before.
+- **Download from the output:** file names printed by `ls`/`ls -la` are underlined under the pointer. ❖ + click
+  downloads to Downloads, with the same notice in blue. A right click offers Download To…, Quick Look, Open With…,
+  Edit, Info, Copy Remote Path and Show in Files mode. The name is resolved against the remote directory from OSC 7.
+
+### Port forwards
+
+- **In the profile, tab SSH:** a list of forwards, each "server host:port → 127.0.0.1:port". The server side can be
+  `localhost:80`, or another machine the server reaches. The local port is **automatic** (LordOS picks a free one) or
+  fixed. It listens on **127.0.0.1 only**.
+- They open when that profile's ssh connects, through the same control socket (`MUX_C_OPEN_FWD`), and close with the
+  session.
+- **On the tab:** a badge `⇄ 80→54321`. Clicking it lists each forward with its state and connections, with Open (in
+  the browser, http/https), Copy and Close, and a field to add a forward for this session only.
+- **When connected:** a notice with the address and Open in Browser / Copy. The footer shows how many forwards are open.
+
 ## Security
 
+- (0.8.8.7, in development) Files mode, transfers and forwards start **no** process: they open channels on the tab's
+  own ssh control socket (OpenSSH multiplexing protocol), and the SFTP replies are parsed by the sandboxed `lord-sftp`
+  helper. Remote commands come only from a closed list (`file`, `sha256sum`, `sudo -n sftp-server`). Forwards listen on
+  127.0.0.1 only.
 - `lord.term.create()` is the only LordOS API that starts a process. It only launches the login
   shell of the user already running the session, with no arguments chosen by JS (apart from the
   initial directory).
