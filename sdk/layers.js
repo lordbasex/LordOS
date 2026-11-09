@@ -38,6 +38,7 @@ import { createElement as h, Fragment, useContext, useEffect, useRef } from 'rea
 import { View, layerContainer, createPortal, addListener } from '@lordos/runtime';
 import { AppWindowContext } from './components.jsx';
 import { direction } from './i18n.js';
+import { wm } from './windows.js';
 
 export const LAYERS = Object.freeze({
   dock: 10, menubar: 20, floating: 30, overlay: 40, popover: 50, modal: 60,
@@ -50,11 +51,22 @@ let shell = false;
 export function enableShellLayers() { shell = true; }
 export const shellLayers = () => shell;
 
+// A window's sheet: a modal layer opened from inside an app's window (Settings → Wallpaper's file dialog) is drawn
+// in a box of the layer's size that is registered as the window's (wm.addSheet), so Screenshots' window capture
+// paints it over the window instead of leaving it out with the other layers (issue #58).
+function SheetBox({ win, children }) {
+  const box = useRef(null);
+  useEffect(() => wm.addSheet(win, box.current?.id), [win]);
+  return h(View, { ref: box, style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, children);
+}
+
 export function Layer({ name, children }) {
   const z = LAYERS[name];
   if (z == null) throw new Error(`unknown layer: ${name}`);
+  const win = useContext(AppWindowContext);
   const c = shell ? layerContainer(z) : null;
-  return c ? createPortal(children, c) : h(Fragment, null, children);
+  if (!c) return h(Fragment, null, children);
+  return createPortal(name === 'modal' && win?.id ? h(SheetBox, { win: win.id }, children) : children, c);
 }
 
 const insideOf = (inst, ref) => {

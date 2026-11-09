@@ -64,6 +64,9 @@ export const fxNodes = new Map();
 // Window id → the corner radius its frame is drawn with (WindowShell's borderRadius; 0 when square):
 // a window capture leaves the corners outside it transparent (apps/screenshots, issue #70).
 export const frameRadii = new Map();
+// Window id → the nodes of its sheets in a shell layer (a <Layer name="modal"> drawn by the window's app, such as
+// Settings → Wallpaper's file dialog; sdk/layers.js): a window capture paints them over the window (issue #58).
+const sheets = new Map();
 // Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
 let linuxPlacement = null;
 export function setLinuxPlacement(fn) { linuxPlacement = fn; }
@@ -514,6 +517,16 @@ export const wm = {
   // The node of the window's frame (WindowShell), 0 when the theme doesn't draw one: media.screenshot's
   // `until`, a capture of the window alone with nothing above it (apps/screenshots, issue #70).
   frameNode: (id) => fxNodes.get(id) || frameNodes.get(id)?.node || 0,
+  // The window's sheets (wm.addSheet): media.screenshot's `also`, painted over the window in its capture.
+  sheetNodes: (id) => [...(sheets.get(id) || [])],
+  // A sheet of the window enters (sdk/layers.js); the function returned takes it out.
+  addSheet(id, node) {
+    if (!id || !node) return () => {};
+    let set = sheets.get(id);
+    if (!set) sheets.set(id, set = new Set());
+    set.add(node);
+    return () => { const s = sheets.get(id); if (s) { s.delete(node); if (!s.size) sheets.delete(id); } };
+  },
 };
 
 // windows: all of them, every desktop. visible: what shows on this desktop. focused: its front window.

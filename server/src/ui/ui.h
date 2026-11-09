@@ -362,7 +362,11 @@ extern int paint_capture_mode;
 void  paint_capture(Canvas *c, Node *root);
 /* The same, stopping after node `last` (a window's frame): what is painted after it (the windows, menus, the
  * Dock and the panels above it) and the Wayland popups are left out, so a window comes out whole, as if
- * nothing covered it (Screenshots' window capture, issue #70). 1 if `last` was reached and painted. */
-int   paint_capture_until(Canvas *c, Node *root, int last);
+ * nothing covered it (Screenshots' window capture, issue #70). 1 if `last` was reached and painted.
+ * also (n ids, at most PAINT_ALSO_MAX): nodes painted over it afterwards, in that order, each only if it is in
+ * root's tree: the sheets and dialogs the window has in a shell layer (the file dialog of Settings → Wallpaper,
+ * issue #58), which are painted after every window and would otherwise be left out. */
+enum { PAINT_ALSO_MAX = 8 };
+int   paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n);
 
 #endif

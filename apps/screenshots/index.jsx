@@ -139,12 +139,13 @@ function endArea(keep) {
   for (const sh of a.shots) if (sh.handle !== keep) media.close(sh.handle);
 }
 // A window alone (issue #70): the screen painted again up to that window and no further, so what covered it
-// (other windows, a menu, the Dock) is left out and the window is whole. null when lord-server can't (a window
-// the theme draws without a frame node, or one gone meanwhile): the still is cropped as before.
+// (other windows, a menu, the Dock) is left out and the window is whole. Its sheets are painted over it (a dialog
+// its app opened in the modal layer, such as Settings → Wallpaper's file dialog, issue #58). null when lord-server
+// can't (a window the theme draws without a frame node, or one gone meanwhile): the still is cropped as before.
 async function windowAlone(r, shot) {
   const node = r && r.win ? wm.frameNode(r.win) : 0;
   if (!node) return null;
-  try { return await media.screenshot(APP, { ...(shot.display ? { display: shot.display.id } : null), until: node }); } catch { return null; }
+  try { return await media.screenshot(APP, { ...(shot.display ? { display: shot.display.id } : null), until: node, also: wm.sheetNodes(r.win) }); } catch { return null; }
 }
 async function areaDone(r, at) {
   const a = area.get();

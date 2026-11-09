@@ -164,7 +164,7 @@ void media_capture_size(int *w, int *h) {
     *h = (m ? m->v.ph : (int)ui.height) & ~1;
 }
 
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until) {
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until, const int *also, int nalso) {
     int W = (int)ui.width, H = (int)ui.height;
     if (W <= 0 || H <= 0 || !ui.root) return NULL;
     /* one display asked for (Screenshots: a file per display, an area on any of them) */
@@ -182,7 +182,7 @@ MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t
     PaintView keep = paint_view;
     if (m) paint_view = (PaintView){ (float)m->v.x, (float)m->v.y, (float)m->v.k, (float)m->v.dx, (float)m->v.dy, -1 };
     int ok = 1;
-    if (until) ok = paint_capture_until(&c, ui.root, until);     /* a window alone: nothing above it */
+    if (until) ok = paint_capture_until(&c, ui.root, until, also, nalso);   /* a window alone: nothing above it but its sheets */
     else {
         paint_capture(&c, ui.root);
         paint_capture_mode = 1;

@@ -14,6 +14,7 @@
  *   - the decoder (lord-media) never receives a path: lord-server opens the file and passes the fd. */
 #include "js_media.h"
 #include "../media/media_int.h"
+#include "ui.h"
 #include "../media/proto.h"
 #include "../media/hwdec.h"
 #include "../media/imgops.h"
@@ -367,8 +368,9 @@ static JSValue f_transcode(JSContext *c, JSValueConst t, int argc, JSValueConst 
 
 /* ---- screenshots ---- */
 
-/* screenshot(app, { x, y, width, height, display, until }?) → id (with protected windows in black). until: the node
- * of a window's frame (wm.frameNode): what is above that window is left out (Screenshots' window capture). */
+/* screenshot(app, { x, y, width, height, display, until, also }?) → id (with protected windows in black). until: the
+ * node of a window's frame (wm.frameNode): what is above that window is left out (Screenshots' window capture).
+ * also: with until, up to PAINT_ALSO_MAX node ids painted over the window (its sheets, wm.sheetNodes); others ignored. */
 static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = argc ? arg_app(c, argv[0]) : NULL;
@@ -377,9 +379,27 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (!permitted(c, app, PERM_SCREEN)) ret = JS_EXCEPTION;
     else {
         JSValueConst o = argc > 1 ? argv[1] : JS_UNDEFINED;
+        int also[PAINT_ALSO_MAX], nalso = 0;
+        if (JS_IsObject(o)) {
+            JSValue a = JS_GetPropertyStr(c, o, "also");
+            if (JS_IsArray(c, a)) {
+                uint32_t len = 0;
+                JSValue lv = JS_GetPropertyStr(c, a, "length");
+                JS_ToUint32(c, &len, lv);
+                JS_FreeValue(c, lv);
+                for (uint32_t i = 0; i < len && nalso < PAINT_ALSO_MAX; i++) {
+                    JSValue v = JS_GetPropertyUint32(c, a, i);
+                    int32_t id = 0;
+                    if (JS_IsNumber(v) && !JS_ToInt32(c, &id, v) && id > 0) also[nalso++] = id;
+                    JS_FreeValue(c, v);
+                }
+            }
+            JS_FreeValue(c, a);
+        }
         MediaSrc *s = media_screenshot(app, opt_int(c, o, "x", 0, -65536, 65536), opt_int(c, o, "y", 0, -65536, 65536),
                                        opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536),
-                                       (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30), opt_int(c, o, "until", 0, 0, 1 << 30));
+                                       (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30), opt_int(c, o, "until", 0, 0, 1 << 30),
+                                       also, nalso);
         ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, "media.captureFailed", NULL);
     }
     JS_FreeCString(c, app);

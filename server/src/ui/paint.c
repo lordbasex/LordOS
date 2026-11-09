@@ -2104,7 +2104,13 @@ void paint_capture(Canvas *c, Node *root) {
     paint_capture_mode = 0;
 }
 
-int paint_capture_until(Canvas *c, Node *root, int last) {
+/* n is in root's tree (a node removed from it, or another tree's, is not painted) */
+static int in_tree(const Node *n, const Node *root) {
+    for (int depth = 0; n && depth < 4096; n = n->parent, depth++) if (n == root) return 1;
+    return 0;
+}
+
+int paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n) {
     if (!root || last <= 0) return 0;
     paint_capture_mode = 1;
     cap_last = last;
@@ -2112,6 +2118,11 @@ int paint_capture_until(Canvas *c, Node *root, int last) {
     paint_node(c, root, 1);
     int reached = cap_done;
     cap_last = cap_done = 0;
+    /* the window's sheets, over it: their layer has no opacity, clip or transform of its own to inherit */
+    for (int i = 0; reached && also && i < n && i < PAINT_ALSO_MAX; i++) {
+        Node *s = also[i] > 0 && also[i] != last ? node_get(also[i]) : NULL;
+        if (s && s != root && in_tree(s, root)) paint_node(c, s, 1);
+    }
     paint_capture_mode = 0;
     return reached;
 }

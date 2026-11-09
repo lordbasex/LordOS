@@ -87,6 +87,11 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
   layer's children after every commit and `sdk/wayland.js` gives the compositor keyboard focus 0
   ([PRIVACY.md](PRIVACY.md#system-prompts-take-the-keyboard-082)). `popover` (menus, the clipboard and
   emoji panels, which paste into the app in front) keeps the app's keyboard.
+- **A window's sheets (0.8.8.7).** A `<Layer name="modal">` rendered inside an app's window (Settings' file
+  dialogs and sheets) is drawn in a box of the layer's size registered as that window's (`wm.addSheet`,
+  `wm.sheetNodes`). Screenshots' window capture paints those boxes over the window (`media.screenshot`'s `also`,
+  `paint_capture_until`), so a window with a dialog open comes out with its dialog, and the other windows'
+  sheets and every other layer are still left out (#58).
 - **Don't** fight the order with large `zIndex` values: they only order siblings. A new kind of
   surface gets a row in the table above (and in `sdk/layers.js`) instead.
 

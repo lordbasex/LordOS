@@ -77,7 +77,8 @@ export const media = {
   edit: (app, path, out, opts) => job(() => call('edit', app, path, out, opts)),
   transcode: (app, path, out, opts) => job(() => call('transcode', app, path, out, opts)),
   // screenshots (with protected windows in black). rect: { x, y, width, height } (logical), display (its id),
-  // until (wm.frameNode(id): the screen up to that window and nothing above it, the window alone)
+  // until (wm.frameNode(id): the screen up to that window and nothing above it, the window alone) and also (with
+  // until: wm.sheetNodes(id), that window's sheets painted over it)
   async screenshot(app, rect) {
     if (!(await requestPermission(app, 'screen'))) return null;
     return call('screenshot', app, rect || {});

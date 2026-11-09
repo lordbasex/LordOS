@@ -498,7 +498,7 @@ static void test_capture_until(void) {
     uint32_t *px = calloc(160 * 100, 4);
     Canvas c;
     canvas_init(&c, px, 160, 100, 160);
-    int ok = paint_capture_until(&c, root, win->id);
+    int ok = paint_capture_until(&c, root, win->id, NULL, 0);
     CHECK(ok, "the window was reached");
     CHECK((px[60 * 160 + 80] & 0xffffff) == 0x0000ff, "the part a window above covered is the window's: %06x", px[60 * 160 + 80]);
     CHECK((px[75 * 160 + 25] & 0xffffff) == 0x0000ff, "and so is the part under the Dock: %06x", px[75 * 160 + 25]);
@@ -506,10 +506,32 @@ static void test_capture_until(void) {
     CHECK((px[10 * 160 + 10] & 0xffffff) == 0x00ffff, "what is below it stays: %06x", px[10 * 160 + 10]);
     CHECK((px[85 * 160 + 120] & 0xffffff) == 0xffffff, "a window above, outside it, isn't painted: %06x", px[85 * 160 + 120]);
     memset(px, 0, 160 * 100 * 4);
-    CHECK(!paint_capture_until(&c, root, 999999), "a node that isn't there: not reached");
+    CHECK(!paint_capture_until(&c, root, 999999, NULL, 0), "a node that isn't there: not reached");
     CHECK(!paint_capture_mode, "capture mode is over");
     render(root, 160, 100);
     CHECK(pix(80, 60) == 0xff0000, "the next frame paints everything again: %06x", pix(80, 60));
+
+    /* issue #58: the window's sheet (the file dialog of Settings → Wallpaper) is in the modal layer, painted after
+     * every window: passed as `also`, it is painted over the window; the rest of that layer still is not */
+    Node *modal = layer_node(root, 60, 160, 100);
+    Node *sheet = view(modal);                                      /* the window's sheet wrapper (sdk/layers.js) */
+    ss(sheet, "position", "absolute");
+    sn(sheet, "left", 0); sn(sheet, "top", 0); sn(sheet, "width", 160); sn(sheet, "height", 100);
+    ss(sheet, "pointerEvents", "box-none");
+    box_in(sheet, 30, 30, 40, 30, 0xffff00ff);                      /* the dialog: magenta */
+    box_in(modal, 110, 5, 30, 20, 0xff808080);                      /* another window's sheet: grey */
+    render(root, 160, 100);
+    memset(px, 0, 160 * 100 * 4);
+    int also[2] = { sheet->id, 999999 };
+    CHECK(paint_capture_until(&c, root, win->id, also, 2), "reached with its sheet");
+    CHECK((px[40 * 160 + 40] & 0xffffff) == 0xff00ff, "the sheet is painted over the window: %06x", px[40 * 160 + 40]);
+    CHECK((px[70 * 160 + 90] & 0xffffff) == 0x0000ff, "the window around the sheet stays: %06x", px[70 * 160 + 90]);
+    CHECK((px[10 * 160 + 120] & 0xffffff) == 0xffffff, "another sheet of that layer isn't painted: %06x", px[10 * 160 + 120]);
+    memset(px, 0, 160 * 100 * 4);
+    node_detach(sheet);
+    CHECK(paint_capture_until(&c, root, win->id, also, 1), "a sheet gone meanwhile: the window alone");
+    CHECK((px[40 * 160 + 40] & 0xffffff) == 0xffff00, "a sheet out of the tree isn't painted: %06x", px[40 * 160 + 40]);
+    CHECK(!paint_capture_mode, "capture mode is over");
     free(px);
 }
 
