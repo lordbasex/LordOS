@@ -1,6 +1,7 @@
 // events.js — mouse and keyboard events sent by lord-server, with DOM-style bubbling.
 // Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
-// onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe.
+// onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe; onMouseDownCapture runs before them, outermost first,
+// and nothing inside can stop it (a window comes forward on any press in it, even one a sheet keeps to itself).
 // keepFocus on a View: a press inside it is not a click elsewhere: the global 'pointerdown' listeners
 // don't hear it, so a text field keeps the focus and an open menu stays (the on-screen keyboard).
 import { DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority } from 'react-reconciler/constants';
@@ -82,6 +83,10 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
   });
   else if (type === 'down') run(DiscreteEventPriority, () => {
     down = chain;
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const h = chain[i].props.onMouseDownCapture;
+      if (typeof h === 'function') { const ev = makeEvent('mousedown', target, x, y, button); ev.currentTarget = chain[i]; h(ev); }
+    }
     dispatch(chain, 'onMouseDown', makeEvent('mousedown', target, x, y, button));
     if (chain.some((n) => n.props.keepFocus)) return;
     fire('pointerdown', makeEvent('pointerdown', target, x, y, button));

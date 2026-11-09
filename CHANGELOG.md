@@ -157,6 +157,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A click anywhere in a window brings it forward, and the keyboard with it.** A sheet or dialog that keeps its clicks
+  to itself (Settings → Cloud's sign-in, Mail's, Contacts' and Calendar's sheets, the file dialog, Monitor's map
+  buttons, and more) stopped the click before the window could come forward. With another window in front (Passwords,
+  opened to unlock it for the 🔑), the code typed into the Settings sheet went to that window instead. The runtime now
+  has a capture phase for presses (`onMouseDownCapture`, outermost first, which nothing inside can stop), and windows
+  come forward there.
+
 - **Cloud: an account signed in with a password and a device code no longer asks for a new sign-in after every logout or reboot.** rclone keeps the
   account's session (cookies, trust token) in its options and updates it in memory, but only accounts signed in
   through a browser were read back into the keyring, so rclone started again with the session of the first sign-in,
