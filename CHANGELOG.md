@@ -72,6 +72,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Media jobs no longer wait forever when lord-media is missing.** A job that failed at once (no lord-media) was freed
+  before lord-server returned its id, so the app got a wrong id and never heard the job end: Screenshots saved and
+  copied nothing and said nothing. The id is now taken first (`src/media/media.c`).
+
 - **Migrate from another app: an encrypted VMware machine is called encrypted.** A machine VMware Fusion encrypted as a
   whole (as it does for a virtual TPM) keeps only its name and the wrapped key in the clear in its `.vmx`; the importer
   said "not a .vmx settings file". It now names the machine and stops with *encrypted*, which tells to remove the

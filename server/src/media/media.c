@@ -751,8 +751,9 @@ int media_job(int bg, int kind, int purpose, const int *fds, int nfds, int64_t a
     if (queue_tail[bg]) queue_tail[bg]->next = j; else queue[bg] = j;
     queue_tail[bg] = j;
     queued[bg]++;
+    int id = j->id;         /* worker_kick may finish and free it right away (no lord-media: the job fails) */
     worker_kick(bg);
-    return j->id;
+    return id;
 }
 
 static void worker_dispatch(int bg) {
