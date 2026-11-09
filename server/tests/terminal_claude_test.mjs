@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   BRIDGE, parseSession, parseStatus, level, bar, tokens, fitSegments, wrapCommand, unwrapCommand, isConnected,
-  connectSettings, disconnectSettings, parseSettings,
+  connectSettings, disconnectSettings, parseSettings, parseScreenStatus, matchSession,
 } from '../../apps/terminal/claude.js';
 
 let n = 0, bad = 0;
@@ -33,7 +33,7 @@ const st = (o) => JSON.stringify({
 });
 eq('all of it', parseStatus(st(), 'S1', now), {
   model: 'Opus 5.5', ctx: 24, ctxTokens: 236989, ctxSize: 1000000,
-  five: { pct: 37, resetsAt: now + 3600000 }, week: { pct: 61, resetsAt: now + 86400000 }, cost: 12.5,
+  five: { pct: 37, resetsAt: now + 3600000 }, week: { pct: 61, resetsAt: now + 86400000 }, cost: 12.5, dir: '',
 });
 eq('another session\'s snapshot', parseStatus(st(), 'S2', now), null);
 eq('a window that already reset shows as unknown', parseStatus(st({ rate_limits: { five_hour: { used_percentage: 90, resets_at: now / 1000 - 1 } } }), 'S1', now).five, { pct: null, resetsAt: null });
@@ -74,6 +74,24 @@ eq('no status line before: none after', disconnectSettings(connectSettings({ mod
 eq('the original settings object is not changed', settings.statusLine.command, mine);
 eq('empty settings file', parseSettings(''), {});
 eq('unreadable settings are not overwritten', parseSettings('{ broken'), null);
+
+// ---- read from the screen (screen, tmux, ssh) ----
+const scr = (line, extra = '') => `some output\n${extra}\n❯ \n────\n  ${line}\n  ⏵⏵ auto mode on (shift+tab to cycle)\n`;
+eq('the status line on screen', parseScreenStatus(scr('Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%')),
+  { model: 'Opus 5.5', folder: 'LordOS', branch: 'main', ctx: 44, five: { pct: null, resetsAt: null }, week: { pct: 26, resetsAt: null }, state: 'waiting' });
+eq('working while it says esc to interrupt', parseScreenStatus(scr('Opus 5.5 | srv | ctx 9% | 5h 3% | week 1%', '✶ Thinking… (esc to interrupt)'))?.state, 'working');
+eq('no branch: the folder stays the folder', [parseScreenStatus(scr('Opus 5.5 | srv | ctx 9%'))?.folder, parseScreenStatus(scr('Opus 5.5 | srv | ctx 9%'))?.branch], ['srv', '']);
+eq('no limits (an API key): no 5h, no week', [parseScreenStatus(scr('Sonnet 5.5 | x | ctx 1%'))?.five, parseScreenStatus(scr('Sonnet 5.5 | x | ctx 1%'))?.week], [null, null]);
+eq('the Italian week', parseScreenStatus(scr('Opus 5.5 | x | ctx 1% | 5h 2% | sett 3%'))?.week?.pct, 3);
+eq('no such line: nothing', parseScreenStatus('ls -la\ntotal 0\n$ '), null);
+eq('a line that only looks like it is not taken', parseScreenStatus('echo "a | b | ctx 5% extra"'), null);
+eq('the last one on screen wins', parseScreenStatus('Opus 5.5 | old | ctx 1%\nmore\nOpus 5.5 | new | ctx 2%')?.folder, 'new');
+const v = parseScreenStatus(scr('Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%'));
+const cand = (id, model, ctx, dir) => ({ id, state: 'waiting', st: { model, ctx, dir } });
+eq('the local session that matches', matchSession(v, [cand('a', 'Opus 5.5', 12, '/x/LordOS'), cand('b', 'Opus 5.5', 44, '/mnt/HD08TB/github/LordOS')])?.id, 'b');
+eq('another folder with the same numbers is not it', matchSession(v, [cand('a', 'Opus 5.5', 44, '/srv/other')]), null);
+eq('two that could be it: neither', matchSession(v, [cand('a', 'Opus 5.5', 44, '/a/LordOS'), cand('b', 'Opus 5.5', 44, '/b/LordOS')]), null);
+eq('nothing on screen: nothing', matchSession(null, [cand('a', 'Opus 5.5', 44, '/a/LordOS')]), null);
 
 console.log(`${n - bad}/${n} terminal claude checks passed`);
 if (bad) process.exit(1);

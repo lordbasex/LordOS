@@ -12,6 +12,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Terminal: the Claude Code footer inside screen or tmux, and over ssh.** The footer showed Claude Code's state,
+  context and limits only when `claude` was the pane's own process. Inside `screen` or `tmux`, or on a server reached
+  with `ssh`, the pane's process is `screen`, `tmux` or `ssh`, so nothing showed. Now the Terminal reads Claude Code's
+  status line on the pane's screen every 2 s, the line lord-claude-status prints:
+  `Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%`. "esc to interrupt" on screen tells it Claude Code is working.
+  - In a local screen or tmux, the session with the same model, context and folder in `~/.claude/sessions` gives the
+    exact state, tokens, resets and cost.
+  - Over ssh, the screen's numbers are shown. The server's Claude Code has to print that line.
+  - The footer says `✳ Claude Code · screen` (or tmux, ssh).
 - **Terminal: a Profiles window (❖O, Profiles → Profiles…).** It works like the Profiles window of other terminals: a search by name or tag, the
   profiles grouped by tag (the folders fold), each with its star when it is the default and what it runs (its ssh line
   or the login shell). **One click opens the profile**, with no Enter or double click. The arrows move the selection and

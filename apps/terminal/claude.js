@@ -4,6 +4,9 @@
 //    foreground process group): the session's id and whether it is working or waiting for the user;
 //  - ~/.cache/lordos/claude/<session>.json, the status line JSON lord-claude-status keeps once the Terminal is
 //    connected (server/src/term/claudebridge.c): the context window and the plan's 5-hour and weekly limits.
+// When Claude Code runs inside screen or tmux, or on another computer over ssh, the pane's process isn't claude: then
+// its status line as lord-claude-status prints it is read from the screen (parseScreenStatus), and inside a local
+// screen or tmux the session that matches it gives the rest (matchSession).
 
 export const BRIDGE = '/usr/lib/lordos/bin/lord-claude-status';
 export const sessionFile = (home, pid) => `${home}/.claude/sessions/${pid}.json`;
@@ -46,7 +49,40 @@ export function parseStatus(text, id, now = Date.now()) {
     five: limit(d.rate_limits?.five_hour, now) || (d.rate_limits && typeof d.rate_limits === 'object' ? { pct: null, resetsAt: null } : null),
     week: limit(d.rate_limits?.seven_day, now),
     cost: Number.isFinite(+d.cost?.total_cost_usd) ? +d.cost.total_cost_usd : null,
+    dir: typeof d.workspace?.current_dir === 'string' ? d.workspace.current_dir : typeof d.cwd === 'string' ? d.cwd : '',
   };
+}
+
+// ---- read from the screen: screen, tmux, ssh ----
+
+// The line lord-claude-status prints: "Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%" (folder, branch and the
+// limits may be missing; the week's label in the user's language). The last such line on the screen; whether Claude
+// Code is working comes from its own "esc to interrupt" while it works.
+const VIEW = /^\s*(\S(?:.{0,62}?\S)?) \| (?:(.{1,128}?) \| )?(?:(.{1,128}?) \| )?ctx (\d{1,3})%(?: \| 5h (?:(\d{1,3})%|–))?(?: \| (?:week|sem|sett) (\d{1,3})%)?\s*$/;
+export function parseScreenStatus(text) {
+  const lines = String(text || '').split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = VIEW.exec(lines[i]);
+    if (!m) continue;
+    const n = (v) => (v == null ? null : Math.min(100, +v));
+    return {
+      model: m[1], folder: m[2] || '', branch: m[3] || '', ctx: n(m[4]),
+      five: /\| 5h /.test(lines[i]) ? { pct: n(m[5]), resetsAt: null } : null,
+      week: m[6] != null ? { pct: n(m[6]), resetsAt: null } : null,
+      state: /esc to interrupt/i.test(text) ? 'working' : 'waiting',
+    };
+  }
+  return null;
+}
+
+const baseName = (d) => String(d || '').replace(/\/+$/, '').split('/').pop() || '/';
+// Of the local sessions [{ id, state, st }], the one whose status line is the one on screen: same model, context and
+// folder. null when none is, or when more than one could be (then the screen's numbers are shown as they are).
+export function matchSession(view, sessions) {
+  if (!view) return null;
+  const hits = (sessions || []).filter((x) => x && x.st && x.st.model === view.model && x.st.ctx === view.ctx
+    && (!view.folder || baseName(x.st.dir) === view.folder));
+  return hits.length === 1 ? hits[0] : null;
 }
 
 // green up to half, amber up to 80 %, red past it

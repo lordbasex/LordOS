@@ -190,6 +190,18 @@ A click on a percentage shows the exact tokens, when each limit resets and the s
   input are left out). A subscriber's 5-hour window shows as `5h –` while Claude Code leaves it out (it drops a window
   once it resets), here and in the footer. lord-server runs nothing: the Terminal only reads those files.
 
+- **Inside screen or tmux, or over ssh** (0.8.8.7): there the pane's foreground process is `screen`, `tmux`, `ssh` or
+  `mosh-client`, not `claude`. In that case the Terminal reads the pane's screen (`term.text(sid, 'screen')`) every 2 s
+  and looks for the last line in lord-claude-status's shape, `Opus 5.5 | LordOS | main | ctx 44% | 5h – | sem 26%`
+  (`parseScreenStatus`). "esc to interrupt" on screen means it is working.
+  - In a local screen or tmux, the session in `~/.claude/sessions/` whose snapshot has the same model, context and
+    folder gives the exact state, tokens, resets and cost (`matchSession`). If none matches, or more than one could,
+    the screen's numbers are shown as they are.
+  - Over ssh, only the screen's numbers are shown. There is no Connect, because the remote's settings aren't ours. The
+    remote's Claude Code must print that line, which is what lord-claude-status prints there. Installing it on a server
+    from the Terminal comes with Files mode.
+  - The footer shows `✳ Claude Code · screen` (or `tmux`, `ssh`).
+
 Tests: `server/tests/terminal_claude_test.mjs` (the model, and that the wrapped command prints what the original did)
 and `server/tests/claude_bridge_test.sh` (the bridge: what it keeps, bad session ids, a link in place of the folder,
 the user's command and its exit status), both in `make test`.

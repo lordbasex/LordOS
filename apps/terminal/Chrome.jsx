@@ -12,7 +12,7 @@ import {
 import { terminalSettings, getProfile, profileName } from './profiles.js';
 import { programLabel, isClaude } from './paths.js';
 import {
-  sessionFile, snapshotFile, settingsFile, parseSession, parseStatus, parseSettings, isConnected, level, bar, tokens,
+  sessionFile, snapshotFile, settingsFile, parseSession, parseStatus, parseSettings, isConnected, level, bar, tokens, parseScreenStatus, matchSession,
   fitSegments, LEVEL_COLORS,
 } from './claude.js';
 
@@ -87,16 +87,38 @@ export function TabBar({ t, wid, w, onTabMenu }) {
 // Claude Code in the footer (claude.js): the session file every 2 s, the status line snapshot once connected;
 // whether it is connected is read from ~/.claude/settings.json (a few hundred bytes) only while there is no
 // snapshot, every 4 s, so "Connect" goes soon after connecting.
-function useClaude(info) {
+// Inside screen or tmux, or over ssh, the pane's process isn't claude: its status line is read from the screen, and
+// for a local screen or tmux the session that matches it (same model, context and folder) gives the rest. Over ssh
+// only what the screen shows (no exact tokens, resets or cost; no Connect: the remote's settings aren't ours).
+const VIA_SCREEN = ['screen', 'tmux', 'ssh', 'mosh-client'];
+function useClaude(info, sid) {
   const [c, setC] = useState(null);
-  const on = !!info && info.busy && isClaude(info.process);
+  const direct = !!info && info.busy && isClaude(info.process);
+  const via = !!info && info.busy && !direct && VIA_SCREEN.includes(info.process) ? info.process : null;
+  const on = direct || !!via;
   const pid = info?.fgPid;
   useEffect(() => {
     if (!on) { setC(null); return undefined; }
     const home = lord.fs.home();
     const read = (path) => { try { return lord.fs.read(path); } catch (e) { return null; } };
     let checked = 0, connected = null;
+    const local = () => {
+      let names = [];
+      try { names = lord.fs.list(`${home}/.claude/sessions`).map((e) => e.name); } catch (e) { names = []; }
+      return names.filter((n) => /^\d{1,9}\.json$/.test(n)).slice(0, 64).map((n) => {
+        const p = parseInt(n, 10);
+        const ses = parseSession(read(sessionFile(home, p)), p);
+        return ses && { ...ses, st: parseStatus(read(snapshotFile(home, ses.id)), ses.id) };
+      }).filter(Boolean);
+    };
     const tick = () => {
+      if (via) {
+        const view = parseScreenStatus(term.text(sid, 'screen'));
+        const m = view && via !== 'ssh' && via !== 'mosh-client' ? matchSession(view, local()) : null;
+        setC(m ? { state: m.state, st: m.st, connected: true, via }
+          : view ? { state: view.state, st: { model: view.model, ctx: view.ctx, five: view.five, week: view.week }, connected: undefined, via } : null);
+        return;
+      }
       const s = parseSession(read(sessionFile(home, pid)), pid);
       const st = s ? parseStatus(read(snapshotFile(home, s.id)), s.id) : null;
       if (st) connected = true;
@@ -106,7 +128,7 @@ function useClaude(info) {
     tick();
     const id = setInterval(tick, 2000);
     return () => clearInterval(id);
-  }, [on, pid]);
+  }, [on, pid, via, sid]);
   return on ? c : null;
 }
 
@@ -160,7 +182,7 @@ export function StatusBar({ t, sid, wid }) {
   const [info, setInfo] = useState(() => term.info(sid));
   const clock = useClock((d) => formatTime(d), 1000);
   const m = useStore(meta, (x) => x[sid]) || {};
-  const claude = useClaude(info);
+  const claude = useClaude(info, sid);
   useEffect(() => {
     setInfo(term.info(sid));
     const id = setInterval(() => setInfo(term.info(sid)), 1000);
@@ -175,8 +197,9 @@ export function StatusBar({ t, sid, wid }) {
       <Hairline edge="top" />
       <Item label={cwd || '~'} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Item label={info.busy ? `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}` : `${info.shell || 'shell'}`} color={info.busy ? (isClaude(info.process) ? '#d97757' : t.accent) : undefined}
-          onClick={claude ? () => patchMeta(sid, { claudeConnect: true }) : undefined} />
+        <Item label={info.busy ? (claude?.via ? `✳ ${programLabel('claude')} · ${programLabel(info.process)}` : `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}`) : `${info.shell || 'shell'}`}
+          color={info.busy ? (isClaude(info.process) || claude?.via ? '#d97757' : t.accent) : undefined}
+          onClick={claude && !claude.via ? () => patchMeta(sid, { claudeConnect: true }) : undefined} />
         {claude && <ClaudeSegments t={t} wid={wid} sid={sid} c={claude} cols={info.cols} />}
       </View>
       {m.lastExit > 0 && <Item label={tr('terminal.status.lastExit', { code: m.lastExit })} color="#ff453a" />}
