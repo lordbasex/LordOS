@@ -28,7 +28,9 @@ apps/quicknotes/
 Store shows it next to the app (Installed: "LordOS app · 0.8.5"). The native apps started at `0.8.5`,
 the LordOS version they first shipped in; from then on an app's version changes when the app changes,
 apart from LordOS's, so the apps can later live in repositories of their own. An app added later starts
-at the release it first ships in (`cleaner` and `remote-desk`, 0.8.7).
+at the release it first ships in (`cleaner` and `remote-desk`, 0.8.7). A release package refuses an app whose files
+changed since the previous release while its version stayed the same (`node tools/app-versions.mjs`, run by
+`tools/iso/mkdeb.sh` for a release; `--bump` raises the patch number of each one).
 
 Optional fields: `"transparent": true` (the theme paints no background under the content; the
 app draws its own, e.g. the Terminal with transparency) and `"minSize": [width, height]`.

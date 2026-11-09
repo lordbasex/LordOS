@@ -222,6 +222,8 @@ install -m 644 code-manifest.json "$L/code-manifest.json"
 if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ ! -f "$L/code-manifest.sig" ]; then
     echo "missing code-manifest.sig: sign the manifest on the maintainer's machine (tools/release/sign-code.sh)" >&2; exit 1
 fi
+# a release: every app that changed since the previous release has a new version (tools/app-versions.mjs, #91)
+if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ -d .git ]; then node tools/app-versions.mjs || exit 1; fi
 # (0.8.7) the tested-hardware snapshot for System Information's Compatibility panel is not in this package: it
 # is lordos-hwdata (tools/iso/mkdeb-hwdata.sh, Depends below), so a newer one can be published between releases
 # the check is the same on any architecture: building another architecture's package on this host

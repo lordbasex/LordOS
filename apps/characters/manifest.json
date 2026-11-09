@@ -1,6 +1,6 @@
 {
   "id": "characters",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "name": "Emoji & Symbols",
   "description": "Emoji by category with search and skin tones, and Unicode symbols by block (quick picker with ❖.)",
   "size": [860, 560],
