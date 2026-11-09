@@ -403,5 +403,12 @@
   "use.cloudOnlyHint": "You see all your files. A file comes down only when you open it, and what you copy in goes up. Nothing is kept on this computer.",
   "use.sync": "In sync with this computer",
   "use.syncHint": "A whole copy here and in the cloud. What you delete on one side is deleted on the other; the provider’s trash keeps it. It takes the account’s space on this computer.",
-  "use.later": "You can change it later on the account’s page."
+  "use.later": "You can change it later on the account’s page.",
+  "known.iclouddrive": "This is a known problem in rclone, not in LordOS: the provider refuses the saved session each time rclone starts again (after a logout or a restart), so it asks for a new code. LordOS doesn’t try again by itself, so no codes reach your devices. Sign in again when you want to use it. You can follow the problem on rclone’s issue and add your log there.",
+  "known.open": "See the Problem in rclone",
+  "known.copyLog": "Copy Log for rclone",
+  "known.copied": "Log copied, with nothing personal: paste it in rclone’s issue",
+  "known.noLog": "There is no log to copy yet",
+  "files.signin": "{name} needs a new sign-in",
+  "files.signinOpen": "Sign In…"
 }

@@ -484,6 +484,31 @@ export const errorHint = (kind, r) => {
   return code === 'cloud.authFailed' || code === 'cloud.badPassword' ? AUTH_HINT[String(kind || '')] || null : null;
 };
 
+// A known problem in rclone's backend for a provider, said where its account waits for a sign-in, with rclone's issue so
+// people can follow it and add their log there: { key (cloud.json), url } or null. The password-and-code provider asks
+// for the code again each time rclone starts (rclone issues 9658 and 9966).
+const KNOWN_ISSUES = { iclouddrive: 'https://github.com/rclone/rclone/issues/9966' };
+export const knownIssue = (kind) => (KNOWN_ISSUES[String(kind || '')] ? { key: `cloud.known.${kind}`, url: KNOWN_ISSUES[kind] } : null);
+// The lines of rclone's log about one kind of provider, to paste in rclone's issue: the last `max` lines that name it
+// (or, for the password-and-code provider, its sign-in steps), under a header. Nothing personal: e-mail addresses, the
+// home folder, query strings and long tokens are replaced, and `own` (the account's names, its user) are taken out.
+export function rcloneLogExcerpt(text, { kind, header = [], own = [], home = '', max = 40 } = {}) {
+  const k = String(kind || '');
+  if (!k) return '';
+  const signin = k === 'iclouddrive' ? /authSRP|signin|2fa|trust|escrow|requestPCS|webauth/i : null;
+  const lines = String(text || '').split('\n').filter((l) => l.includes(k) || (signin && signin.test(l))).slice(-max);
+  const words = own.map((w) => String(w || '').trim()).filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
+  const clean = (l) => {
+    let s = l;
+    for (const w of words) s = s.split(w).join('[account]');
+    if (home && home.length > 1) s = s.split(home).join('~');
+    return s.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[e-mail]')
+      .replace(/(https?:\/\/[^\s"?\\]+)\?[^\s"\\]*/g, '$1?[…]')
+      .replace(/[A-Za-z0-9+/_=-]{32,}/g, '[token]');
+  };
+  return [...header, '', ...(lines.length ? lines.map(clean) : ['(no lines about this provider)'])].join('\n');
+}
+
 // Measure (17.2): a provider without a quota can be measured; the line once it was
 // only when the provider answered without a total (not when there was no answer: the account isn't connected)
 export const canMeasure = (about) => !!about && !(about.total > 0);

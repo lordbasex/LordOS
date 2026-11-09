@@ -84,7 +84,7 @@ export function IconView({ groups, ctx }) {
             </View>
           </View>
         ))}
-        {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} style={{ minHeight: 260 }} />}
+        {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 260 }} />}
       </View>
     </ScrollView>
   );
@@ -241,7 +241,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
                 {ListRows({ items: g.items, depth: 0, ctx: inner, t, sort, alt })}
               </View>
             ))}
-            {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} style={{ minHeight: 240 }} />}
+            {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 240 }} />}
           </View>
         </ScrollView>
       </View>
@@ -335,7 +335,7 @@ export function GalleryView({ entries, ctx }) {
   const from = Math.max(0, idx - 4);
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} noRead={ctx.cloudOnly?.(cur)} /> : <EmptyState title={ctx.emptyText} />}</View>
+      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} noRead={ctx.cloudOnly?.(cur)} /> : <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} />}</View>
       {cur && ctx.renaming?.path === cur.path ? <View style={{ alignItems: 'center', paddingBottom: 8 }}><Name e={cur} ctx={ctx} /></View> : null}
       <View style={{ height: 97, borderTopWidth: 1, borderTopColor: t.separator, flexDirection: 'row', gap: 8, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', direction: 'ltr', overflow: 'hidden' }}>
         {entries.slice(from, from + 9).map((e) => {

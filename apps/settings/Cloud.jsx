@@ -786,6 +786,37 @@ function AgainSheet({ st, sheet }) {
   );
 }
 
+// A known problem in rclone for this kind of provider (M.knownIssue), while the account waits for a sign-in: what happens
+// and why, rclone's issue, and the lines of rclone's log about it with nothing personal, to paste there.
+function KnownIssue({ a }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const k = M.knownIssue(a.kind);
+  if (!k || a.state !== 'signin') return null;
+  const copyLog = () => {
+    let text = '';
+    try { text = lord.fs.read(`${lord.fs.home()}/.cache/lordos/${lord.cloud && lord.cloud.logName ? lord.cloud.logName() : 'cloud.log'}`, 'text') || ''; } catch (e) { text = ''; }
+    if (!text) { toast.set(tr('cloud.known.noLog')); return; }
+    let info = {};
+    try { info = systemInfo() || {}; } catch (e) { /* none */ }
+    const mountName = String(a.mount || '').split('/').pop();
+    clipboard.set(M.rcloneLogExcerpt(text.slice(-262144), { kind: a.kind, home: lord.fs.home(), own: [a.name, mountName],
+      header: [`LordOS ${lordosVersion(info).version || ''} ${info.arch || ''}`.trim(), `rclone ${(cloud.state().service || {}).version || ''}`.trim(), `backend: ${a.kind}`] }));
+    toast.set(tr('cloud.known.copied'));
+  };
+  return (
+    <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 8, border: `1px solid ${tint.warn}` }]}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.files.signin', { name: a.name })}</Text>
+      <Dim t={t}>{tr(k.key)}</Dim>
+      <Actions start>
+        <Button small primary label={tr('cloud.signInAgain')} onClick={() => signInAgain(a)} />
+        <Button small label={tr('cloud.known.open')} onClick={() => openUrl(k.url)} />
+        <Button small label={tr('cloud.known.copyLog')} onClick={copyLog} />
+      </Actions>
+    </View>
+  );
+}
+
 function AccountPage({ a, st }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -804,6 +835,7 @@ function AccountPage({ a, st }) {
   const wide = (wm.frame(wm.get(win.id) || {}).w || 880) >= 900;
   const left = (
     <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
+      <KnownIssue a={a} />
       <SpaceCard a={a} accounts={accs} />
       <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
       <LinksList a={a} />

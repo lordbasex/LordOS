@@ -403,5 +403,12 @@
   "use.cloudOnlyHint": "Vedi tutti i tuoi file. Un file viene scaricato solo quando lo apri, e ciò che copi viene caricato. Niente resta su questo computer.",
   "use.sync": "Sincronizzato con questo computer",
   "use.syncHint": "Una copia completa qui e nel cloud. Ciò che elimini da una parte viene eliminato dall’altra; il cestino del fornitore lo conserva. Occupa lo spazio dell’account su questo computer.",
-  "use.later": "Puoi cambiarlo più tardi nella pagina dell’account."
+  "use.later": "Puoi cambiarlo più tardi nella pagina dell’account.",
+  "known.iclouddrive": "È un problema noto di rclone, non di LordOS: il fornitore rifiuta la sessione salvata ogni volta che rclone si riavvia (dopo un logout o un riavvio), quindi chiede un nuovo codice. LordOS non riprova da solo, così nessun codice arriva ai tuoi dispositivi. Accedi di nuovo quando vuoi usarlo. Puoi seguire il problema nella issue di rclone e aggiungere lì il tuo registro.",
+  "known.open": "Vedi il problema su rclone",
+  "known.copyLog": "Copia il registro per rclone",
+  "known.copied": "Registro copiato, senza nulla di personale: incollalo nella issue di rclone",
+  "known.noLog": "Non c’è ancora un registro da copiare",
+  "files.signin": "{name} richiede un nuovo accesso",
+  "files.signinOpen": "Accedi…"
 }

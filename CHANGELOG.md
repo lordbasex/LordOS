@@ -301,9 +301,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **A cloud account signed in with a password and a device code may ask for the code again after every logout or
   restart.** The session is kept in the keyring, but the provider refuses it when rclone starts again, and signing in
   with the kept trust token asks for a new code (an open problem in rclone's backend for that provider: its issues 9658
-  and 9966, with fixes proposed and not released yet). LordOS says so when the account is added, asks for a new sign-in
-  instead of failing quietly, and tries again every 30 minutes instead of every 30 seconds. lordos-rclone will follow
-  rclone's release with the fix. (A build with the proposed escrow fix was tried and did not help this account.)
+  and 9966, with fixes proposed and not released yet). LordOS says so when the account is added and asks for a new
+  sign-in instead of failing quietly. An account waiting for a sign-in is no longer tried again by itself: not every 30
+  minutes, and not when its folder is opened in Files, because each try could send a code to the person's devices. The
+  account's page in Settings explains it and links rclone's issue. It also has **Copy Log for rclone**: the last lines
+  of rclone's log about that backend, with the account's name, e-mail addresses, the home folder, query strings and
+  long tokens taken out, ready to paste in the issue. In Files, the account's folder says that it needs a new sign-in
+  instead of "Folder is empty", with **Sign In…** (it opens the account in Settings) and the issue's link. lordos-rclone
+  will follow rclone's release with the fix. A build with the proposed escrow fix (rclone PR 10048, reviewed line by
+  line) was tried with a real account and did not help, so it is not shipped.
+- **The browser sign-in drive and the password-and-code drive (`onedrive`, `iclouddrive`) are verified providers now:** tested end to end by the maintainer with their own accounts
+  on a bare-metal machine. They are listed first in Add Account, and **Check This Account** for them moves under
+  **Advanced**.
 
 ## [0.8.8.6-beta] - 2026-11-08
 

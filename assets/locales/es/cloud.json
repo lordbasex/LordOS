@@ -403,5 +403,12 @@
   "use.cloudOnlyHint": "Ves todos tus archivos. Un archivo se descarga solo cuando lo abrís, y lo que copiás se sube. No se guarda nada en este equipo.",
   "use.sync": "Sincronizar con este equipo",
   "use.syncHint": "Una copia completa acá y en la nube. Lo que borrás de un lado se borra del otro; la papelera del proveedor lo guarda. Ocupa el espacio de la cuenta en este equipo.",
-  "use.later": "Lo podés cambiar después en la página de la cuenta."
+  "use.later": "Lo podés cambiar después en la página de la cuenta.",
+  "known.iclouddrive": "Es un problema conocido de rclone, no de LordOS: el proveedor rechaza la sesión guardada cada vez que rclone vuelve a arrancar (al cerrar sesión o reiniciar), así que pide un código nuevo. LordOS no lo reintenta solo, así no te llegan códigos a tus dispositivos. Iniciá sesión de nuevo cuando la quieras usar. Podés seguir el problema en el issue de rclone y sumar tu registro ahí.",
+  "known.open": "Ver el problema en rclone",
+  "known.copyLog": "Copiar el registro para rclone",
+  "known.copied": "Registro copiado, sin nada personal: pegalo en el issue de rclone",
+  "known.noLog": "Todavía no hay registro para copiar",
+  "files.signin": "{name} necesita que inicies sesión de nuevo",
+  "files.signinOpen": "Iniciar sesión…"
 }

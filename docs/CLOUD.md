@@ -635,6 +635,8 @@ was really checked end to end. Today:
 | `s3` | `cloud_providers_check.sh` against `rclone serve s3` (one bucket, access key and secret), 13/13; links not confirmed: the stand-in's links are `http://` and `lord-server` keeps only `https` ones (`cloud_url_ok`), which a real S3 service gives |
 | `mega` | issue #80 (since 0.8.8.7): a person's Check This Account report on 0.8.8.6 (x86_64), rclone v1.75.2, 10 of 10 steps passed, links included |
 | `filen` | issue #81 (since 0.8.8.7): a person's report on 0.8.8.6 (x86_64), rclone v1.75.2, 9 of 10 passed; the link step skipped (`noLinks`: the backend has no public links), which is right for it |
+| `onedrive` | maintainer test (since 0.8.8.7) with the maintainer's own account on their bare-metal machine, rclone v1.75.2: browser sign-in, both ways of using it, files opened, copied up and deleted, pause and resume, across logouts and restarts |
+| `iclouddrive` | maintainer test (since 0.8.8.7) with the maintainer's own account (without the extra end-to-end encryption), rclone v1.75.2: password and device code, files listed, opened, copied up and deleted. Known limit: the code is asked again after each start of rclone (rclone issues 9658 and 9966); see 19.5 |
 
 `server/tests/cloud_providers_check.sh <build> <rclone> [webdav] [sftp] [s3]` runs Check This Account's steps through
 `build/cloud-harness` (the same `src/cloud`), with the files checked on the server's side too: 40/40 on VM 116 with rclone
@@ -1087,3 +1089,23 @@ this server (N)", shown only when other accounts kept the same old key; its valu
 port (State's `host`/`port`, 17.2 item 37; 22 when no port), or, when an account's host is hidden by a locked keyring or
 absent, the same `old` fingerprint; the account being updated is left out. An account with `cloud.hostKeyChanged` shows
 its own `old` and `new` in its status box.
+
+### 19.5 A known problem in rclone
+
+`M.knownIssue(kind)` names a provider whose rclone backend has a known problem, with rclone's issue: today
+`iclouddrive` (rclone issue 9966, with 9658). Apple refuses the saved session each time rclone starts again, so a new
+code is needed after a logout or a restart. LordOS checked its side: the trust token and cookies are kept in the keyring
+and given back to rclone. The proposed escrow fix (rclone PR 10048) was built and tried with the maintainer's account,
+and it did not help.
+
+An account in `signin` is never tried again by itself: not every 30 minutes, and not when its folder is opened.
+`cloud_refresh_about` skips it. Each try can send a code to the person's devices. It is tried again only on Sign In
+Again, on Retry, or the next time rclone starts. While it waits:
+
+- **Settings:** the account's page shows a box with what happens and why, and three buttons: **Sign In Again**,
+  **See the Problem in rclone**, and **Copy Log for rclone**. The last one runs `M.rcloneLogExcerpt` over the end of
+  `cloud.log`. It keeps the last 40 lines about the backend, under a header with the LordOS version, the rclone version
+  and the backend. It replaces the account's name, e-mail addresses, the home folder, query strings and long tokens.
+- **Files:** the account's folder shows that it needs a new sign-in instead of "Folder is empty", with **Sign In…**
+  (which opens Settings → Cloud → the account) and the issue's button.
+

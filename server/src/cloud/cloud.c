@@ -1293,9 +1293,12 @@ static int mount_acc(Acc *a) {
         const char *fc = cloud_failure_code(msg);
         cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
         set_message(a, msg);
-        /* refused credentials don't come back by themselves: tried again in 30 minutes (or at once with Sign In Again,
-         * Retry or a restart), not every 30 seconds, which some providers answer by locking the account */
-        if (!strcmp(a->err, "cloud.signInAgain") || !strcmp(a->err, "cloud.authFailed")) a->retry_at = time(NULL) + 1800;
+        /* refused credentials don't come back by themselves: a refused password is tried again in 30 minutes, not every
+         * 30 seconds, which some providers answer by locking the account; an account that needs a new sign-in is not
+         * tried again by itself at all (each try can send a code to the person's devices) until Sign In Again, Retry
+         * or the next start of rclone */
+        if (!strcmp(a->err, "cloud.signInAgain")) a->retry_at = time(NULL) + 10 * 365 * 86400L;
+        else if (!strcmp(a->err, "cloud.authFailed")) a->retry_at = time(NULL) + 1800;
     }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
@@ -3227,9 +3230,10 @@ char *cloud_rename(const char *id, const char *name) {
 void cloud_refresh_about(const char *id) {
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find(id);
-    int down = a && (!a->configured || !a->mounted);
+    /* a cheap moment to try a waiting account again, but not one waiting for a new sign-in (Sign In Again) */
+    int down = a && (!a->configured || !a->mounted) && strcmp(a->err, "cloud.signInAgain");
     pthread_mutex_unlock(&cl_mu);
-    if (down) cloud_retry(id);              /* a cheap moment to try a waiting account again */
+    if (down) cloud_retry(id);
     Job *j = new_job(J_ABOUT, id, NULL, NULL);
     if (j) push_job(j);
 }

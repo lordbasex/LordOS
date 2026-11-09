@@ -403,5 +403,12 @@
   "use.cloudOnlyHint": "Vous voyez tous vos fichiers. Un fichier n’est téléchargé que quand vous l’ouvrez, et ce que vous copiez est envoyé. Rien n’est gardé sur cet ordinateur.",
   "use.sync": "Synchronisé avec cet ordinateur",
   "use.syncHint": "Une copie complète ici et dans le cloud. Ce que vous supprimez d’un côté l’est de l’autre ; la corbeille du fournisseur le garde. Occupe l’espace du compte sur cet ordinateur.",
-  "use.later": "Vous pourrez le changer plus tard sur la page du compte."
+  "use.later": "Vous pourrez le changer plus tard sur la page du compte.",
+  "known.iclouddrive": "C’est un problème connu de rclone, pas de LordOS : le fournisseur refuse la session enregistrée à chaque redémarrage de rclone (après une déconnexion ou un redémarrage), il demande donc un nouveau code. LordOS ne réessaie pas tout seul, donc aucun code n’arrive sur vos appareils. Reconnectez-vous quand vous voulez l’utiliser. Vous pouvez suivre le problème sur le ticket de rclone et y ajouter votre journal.",
+  "known.open": "Voir le problème chez rclone",
+  "known.copyLog": "Copier le journal pour rclone",
+  "known.copied": "Journal copié, sans rien de personnel : collez-le dans le ticket de rclone",
+  "known.noLog": "Il n’y a pas encore de journal à copier",
+  "files.signin": "{name} demande une nouvelle connexion",
+  "files.signinOpen": "Se connecter…"
 }

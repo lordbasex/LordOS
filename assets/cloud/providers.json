@@ -25,6 +25,16 @@
       "since": "0.8.8.7",
       "date": "2026-11-09",
       "evidence": "issue #81: a person's Check This Account report, LordOS 0.8.8.6 x86_64 (a laptop, installed), rclone v1.75.2: 9 of 10 steps passed; the link step skipped because the backend has no public links (noLinks), which is right for it"
+    },
+    "onedrive": {
+      "since": "0.8.8.7",
+      "date": "2026-11-09",
+      "evidence": "maintainer test: on the maintainer's own machine (bare metal, LordOS 0.8.8.7 staging, rclone v1.75.2): browser sign-in, Only in the Cloud and Sync with This Computer, files opened, copied up and deleted, pause and resume, across logouts and restarts"
+    },
+    "iclouddrive": {
+      "since": "0.8.8.7",
+      "date": "2026-11-09",
+      "evidence": "maintainer test: on the maintainer's own machine (bare metal, LordOS 0.8.8.7 staging, rclone v1.75.2, an account without the extra end-to-end encryption): password and device code, files listed, opened, copied up and deleted; known limit: the code is asked again after each start of rclone (rclone issues 9658 and 9966)"
     }
   }
 }

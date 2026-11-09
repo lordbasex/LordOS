@@ -319,7 +319,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const v = Object.entries(data.verified || {});
   eq('verified: only tested kinds, each with since, date and evidence', v.every(([k, e]) => /^[a-z0-9]+$/.test(k) && /^\d+\.\d+\.\d+(\.\d+)?$/.test(e.since) && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
     && /^(maintainer test: .{20,}|issue #\d+)/.test(e.evidence)), true);
-  eq('verified today (#80, #81: issue reports)', v.map(([k]) => k).sort(), ['filen', 'mega', 's3', 'sftp', 'webdav']);
+  eq('verified today (#80, #81: issue reports; onedrive, iclouddrive: the maintainer\'s own accounts)', v.map(([k]) => k).sort(), ['filen', 'iclouddrive', 'mega', 'onedrive', 's3', 'sftp', 'webdav']);
   eq('#80 #81 evidence names the issue', [data.verified.mega.evidence.startsWith('issue #80'), data.verified.filen.evidence.startsWith('issue #81')], [true, true]);
   const P = (kind, label, group) => ({ kind, label, group, hint: '', fields: [] });
   const list = [P('drive', 'Drive', 'oauth'), P('dropbox', 'Dropbox', 'oauth'), P('webdav', 'WebDAV', 'server'), P('sftp', 'SFTP', 'server'), P('smb', 'SMB', 'server'),
@@ -655,5 +655,28 @@ eq('login sites: nothing to look under', M.loginSites('s3', {}), []);
 eq('login sites: a typed value that isn\'t a host', M.loginSites('sftp', { host: 'a b' }), []);
 eq('login fields', [M.loginFields({ fields: [{ name: 'apple_id' }, { name: 'password' }] }), M.loginFields({ fields: [{ name: 'url' }, { name: 'user' }, { name: 'pass' }] }), M.loginFields({ fields: [] })],
   [{ user: 'apple_id', pass: 'password' }, { user: 'user', pass: 'pass' }, { user: null, pass: null }]);
+
+// rclone's known problem with the password-and-code provider: its issue, and the log lines to paste there
+eq('known issue: the provider with one', M.knownIssue('iclouddrive'), { key: 'cloud.known.iclouddrive', url: 'https://github.com/rclone/rclone/issues/9966' });
+eq('known issue: others have none', [M.knownIssue('onedrive'), M.knownIssue(''), M.knownIssue(null)], [null, null, null]);
+{
+  const log = ['2026/11/09 17:00:00 NOTICE: onedrive: something else',
+    '2026/11/09 17:01:13 NOTICE: iclouddrive: Advanced Data Protection enabled, requesting PCS cookies for iclouddrive',
+    '2026/11/09 17:01:14 ERROR : rc: "mount/mount": error: requestPCS(iclouddrive): HTTP error 500 returned body: "Missing X-APPLE-WEBAUTH-TOKEN cookie"',
+    '2026/11/09 17:01:15 ERROR : rc: "config/update": error: authSRPInit: HTTP error 400 for someone@example.test at /home/ana/Cloud/iCloud',
+    '2026/11/09 17:01:16 ERROR : iclouddrive: GET https://p1.icloud.com/ws?dsid=123&token=abc failed, session ' + 'A'.repeat(40),
+    '2026/11/09 17:01:17 ERROR : Mi iCloud de Ana: iclouddrive: couldn\'t list'].join('\n');
+  const x = M.rcloneLogExcerpt(log, { kind: 'iclouddrive', header: ['LordOS 0.8.8.7', 'rclone v1.75.2'], own: ['Mi iCloud de Ana', 'ab'], home: '/home/ana' });
+  const lines = x.split('\n');
+  eq('rclone log: the header, an empty line, then only its lines', [lines[0], lines[1], lines[2], lines.length], ['LordOS 0.8.8.7', 'rclone v1.75.2', '', 8]);
+  eq('rclone log: other providers left out', !!(!x.includes('onedrive')), true);
+  eq('rclone log: the sign-in step kept', !!(x.includes('authSRPInit')), true);
+  eq('rclone log: no e-mail, home, query or token', !!(!/someone@|\/home\/ana|dsid=|token=abc|AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/.test(x)), true);
+  eq('rclone log: replaced, not dropped', !!(x.includes('[e-mail]') && x.includes('~/Cloud/iCloud') && x.includes('https://p1.icloud.com/ws?[…]') && x.includes('[token]')), true);
+  eq('rclone log: the account\'s name out, a short word kept', !!(x.includes('[account]: iclouddrive') && !x.includes('Mi iCloud de Ana') && x.includes('Data Protection enabled')), true);
+  eq('rclone log: the last lines only', M.rcloneLogExcerpt(log, { kind: 'iclouddrive', max: 2 }).split('\n').length, 3);
+  eq('rclone log: nothing about it says so', M.rcloneLogExcerpt('x', { kind: 'webdav' }), '\n(no lines about this provider)');
+  eq('rclone log: no kind, nothing', M.rcloneLogExcerpt(log, {}), '');
+}
 
 console.log(`cloud model: ${ok} checks ${process.exitCode ? 'with failures' : 'passed'}`);

@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber,
+  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -895,10 +895,21 @@ export default function Files() {
   const content = (rootWidthRef.current || 960) - sideW;
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
+  // a cloud account waiting for a new sign-in is not tried again by itself: its folder says so instead of "empty", with
+  // the way to Sign In Again in Settings and, for a provider with a known problem in rclone, why and rclone's issue
+  const waitAcc = curAcc && loc.type === 'dir' && curAcc.state === 'signin' ? curAcc : null;
+  const known = waitAcc ? cloudModel.knownIssue(waitAcc.kind) : null;
   const viewCtx = {
     scrollKey: `${active}|${loc.type}|${loc.path || ''}|${loc.inner || ''}|${loc.color || ''}|${loc.root || ''}|${loc.query || ''}`,   // a new place opens at the top
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
-    emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (entries.loading ? tr('files.loading') : null) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
+    emptyText: waitAcc ? tr('cloud.files.signin', { name: waitAcc.name }) : (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (entries.loading ? tr('files.loading') : null) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
+    emptyHint: known ? tr(known.key) : null,
+    emptyAction: waitAcc ? (
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Button primary label={tr('cloud.files.signinOpen')} onClick={() => wm.open('settings', { args: { section: 'cloud', page: waitAcc.id, nonce: Date.now() } })} />
+        {known ? <Button label={tr('cloud.known.open')} onClick={() => openUrl(known.url)} /> : null}
+      </View>
+    ) : null,
     onItemDown, onOpen: open, onContext, statOf, zoom, onZoomWheel,
     cloud: { on: !!curAcc && loc.type === 'dir', status: cf.status }, cloudOnly: cf.cloudOnly,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
