@@ -70,17 +70,27 @@ const opts = () => ({ timer: 0, clipboard: false, mic: false, ...(settings.get()
 async function finish(handle, { copy = true } = {}) {
   if (!handle) return;
   const o = opts();
-  let path = null;
-  if (copy || o.clipboard) await media.copyImage(handle);
+  let path = null, failed = null;
+  if (copy || o.clipboard) { const c = await media.copyImage(handle); if (!c.ok) failed = { what: 'copy', error: c.error }; }
   if (!o.clipboard) {
     const r = await media.saveImage(handle, freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png'));
     if (r.ok) { path = r.path; recent.set((l) => [{ path, time: Date.now() }, ...l].slice(0, 20)); }
+    else failed = { what: failed ? 'both' : 'save', error: r.error };
   }
-  showThumb(handle, path);
+  if (failed) notSaved(failed);
+  showThumb(handle, path, failed ? failed.what : null);
 }
 
-function showThumb(handle, path) {
-  const id = wm.open(APP, { instance: 'thumb', args: { handle, path } });
+// The capture was taken but couldn't be saved or copied (lord-media missing, a full disk…): said, never silent
+function notSaved({ what, error }) {
+  const title = tr(what === 'copy' ? 'screenshots.notCopied' : what === 'both' ? 'screenshots.notKept' : 'screenshots.notSaved');
+  const body = errorText(error || 'media.noHelper');
+  const banner = notify({ app: APP, label: tr('apps.screenshots'), title, body });
+  if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(`${title}: ${body}`);
+}
+
+function showThumb(handle, path, failed = null) {
+  const id = wm.open(APP, { instance: 'thumb', args: { handle, path, failed } });
   const w = 240, h = 150;
   wm.setPip(id, { x: lord.screen.width - w - 20, y: lord.screen.height - h - 90, w, h });
 }
@@ -349,7 +359,7 @@ function Overlay({ index }) {
   );
 }
 
-function Thumb({ handle, path }) {
+function Thumb({ handle, path, failed }) {
   const win = useAppWindow();
   const [hover, setHover] = useState(false);
   useEffect(() => {
@@ -367,7 +377,7 @@ function Thumb({ handle, path }) {
       }}>
       <MediaView media={handle} style={{ flex: 1 }} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: 'rgba(0,0,0,0.55)' }}>
-        <Text style={{ fontSize: 11, color: '#fff' }}>{path ? tr('screenshots.savedTo', { folder: tr('screenshots.folder') }) : tr('screenshots.copied')}</Text>
+        <Text style={{ fontSize: 11, color: '#fff' }}>{path ? tr('screenshots.savedTo', { folder: tr('screenshots.folder') }) : failed === 'copy' ? tr('screenshots.notCopied') : failed === 'both' ? tr('screenshots.notKept') : tr('screenshots.copied')}</Text>
       </View>
     </View>
   );
@@ -476,7 +486,7 @@ export default function Screenshots() {
   const inst = String(win.id).split('#')[1] || '';
   const a = win.args || {};
   if (String(inst).startsWith('overlay') && a.index != null) return <Overlay index={a.index} />;
-  if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} />;
+  if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} failed={a.failed} />;
   if (inst === 'count') return <Countdown secs={a.secs} start={a.start} />;
   if (inst === 'rec') return <RecBadge />;
   if (inst.startsWith('edit') && (a.handle || a.path)) return <MarkupWindow handle={a.handle} path={a.path} />;

@@ -72,6 +72,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Screenshots says when a capture couldn't be saved or copied.** A notification names why (for example, the media
+  helper is missing), and the thumbnail says so instead of "Copied to the clipboard".
 - **Media jobs no longer wait forever when lord-media is missing.** A job that failed at once (no lord-media) was freed
   before lord-server returned its id, so the app got a wrong id and never heard the job end: Screenshots saved and
   copied nothing and said nothing. The id is now taken first (`src/media/media.c`).
