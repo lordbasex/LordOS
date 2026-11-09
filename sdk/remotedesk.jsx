@@ -5,7 +5,9 @@
 //     shared picture and takes the input from here. There is no client window;
 //   the settings (args.prefs): General, Credentials and Groups.
 // Addresses are in settings, passwords only in the keyring (sdk/lan.js, service rdesk://<credential id>/). The data and
-// its migration from older versions are in sdk/remotedeskmodel.js.
+// its migration from older versions are in sdk/remotedeskmodel.js. The password fields have the 🔑 of Passwords (entries
+// for exactly the computer's address, sdk/loginmodel.js); a password typed in the sign-in that the computer accepted gets
+// "Save to Passwords?" over the session (sdk/vault.js SaveLoginOffer).
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, Image, MediaView, addListener } from '@lordos/runtime';
 import { useTheme, popupBg } from './theme.js';
@@ -16,6 +18,8 @@ import { home as fsHome, stat as fsStat, read as fsRead, write as fsWrite } from
 import { FilePicker } from './filepicker.jsx';
 import { settings, useSettings } from './settings.js';
 import { lan } from './lan.js';
+import { AutofillButton, SaveLoginOffer } from './vault.js';
+import { loginHosts, typedSecret } from './loginmodel.js';
 import { certCheck } from './remotecert.js';
 import { t as tr } from './i18n.js';
 import { Button, ScrollView, TextInput, Toggle } from './components.jsx';
@@ -92,7 +96,7 @@ function Pill({ text }) {
 }
 
 // ---- the session ----
-function Screen({ id, st, onEnd, focused, name, winId, folders, swap }) {
+function Screen({ id, st, onEnd, focused, name, winId, folders, swap, extra }) {
   const box = useRef(null);
   const buttons = useRef(0);
   const down = useRef(new Map());
@@ -123,7 +127,8 @@ function Screen({ id, st, onEnd, focused, name, winId, folders, swap }) {
       onMouseMove: (e) => ptr(e),
       onWheel: (e) => { const x = e.deltaY < 0 ? 8 : 16; ptr(e, x); ptr(e); } },
     st.media ? h(MediaView, { media: st.media, style: { flex: 1 } }) : null),
-    h(SessionBar, { id, name, winId, folders, onEnd }));
+    h(SessionBar, { id, name, winId, folders, onEnd }),
+    extra || null);
 }
 
 function sendCad(id) {
@@ -186,7 +191,8 @@ function Popup({ value, options, onChange, extra = [], width }) {
 
 // ---- credentials ----
 // cred: the one to edit, or null for a new one. onSave(cred) after it is in settings and its password in the keyring.
-function CredentialSheet({ cred, onCancel, onSave }) {
+// hosts: the computers it is for (the 🔑 offers Passwords entries for exactly those addresses).
+function CredentialSheet({ cred, hosts, onCancel, onSave }) {
   const t = useTheme();
   const [user, setUser] = useState(cred ? credText({ user: cred.user, domain: '' }) : '');
   const [domain, setDomain] = useState(cred?.domain || '');
@@ -207,7 +213,9 @@ function CredentialSheet({ cred, onCancel, onSave }) {
   return h(Sheet, { width: 440 },
     h(Title, null, tr(cred ? 'remotedesk.credEdit' : 'remotedesk.credAddTitle')),
     h(Row, { label: tr('remotedesk.user') }, h(TextInput, { value: user, onChange: setUser, placeholder: tr('remotedesk.userHint'), autoFocus: true, onSubmit: save })),
-    h(Row, { label: tr('remotedesk.password') }, h(TextInput, { value: password, onChange: setPassword, secure: true, placeholder: cred ? tr('remotedesk.passwordKeep') : '', onSubmit: save })),
+    h(Row, { label: tr('remotedesk.password') }, h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8 } },
+      h(View, { style: { flex: 1, minWidth: 0 } }, h(TextInput, { value: password, onChange: setPassword, secure: true, placeholder: cred ? tr('remotedesk.passwordKeep') : '', onSubmit: save })),
+      h(AutofillButton, { app: 'remote-desk', hosts: loginHosts(hosts || []), onFill: ({ username, password: pw }) => { if (username && !user) setUser(username); setPassword(pw || ''); } }))),
     h(Row, { label: tr('remotedesk.domain'), top: true }, h(View, { style: { gap: 4 } },
       h(TextInput, { value: user.includes('\\') ? split.domain : domain, onChange: setDomain, placeholder: tr('remotedesk.domainHint') }),
       h(Note, null, tr('remotedesk.domainWhy')))),
@@ -325,7 +333,7 @@ function DeviceSheet({ start, onCancel, onSaved }) {
     h(Buttons, null,
       h(Button, { label: tr('remotedesk.cancel'), onClick: onCancel }),
       h(Button, { primary: true, label: tr('remotedesk.save'), disabled: !parsed, onClick: save })),
-    credSheet ? h(CredentialSheet, { cred: null, onCancel: () => setCredSheet(false), onSave: (c) => { set({ cred: c.id }); setCredSheet(false); } }) : null);
+    credSheet ? h(CredentialSheet, { cred: null, hosts: parsed ? [parsed.host] : [], onCancel: () => setCredSheet(false), onSave: (c) => { set({ cred: c.id }); setCredSheet(false); } }) : null);
 }
 
 // the resolutions to choose from: automatic, the presets, the custom ones (Settings → Resolutions) and the device's own
@@ -581,6 +589,8 @@ function SessionWindow({ winId, devId, focused }) {
   const [error, setError] = useWindowState('remote.error', '');
   const [prompt, setPrompt] = useWindowState('remote.prompt', null);      // { note } : asks for what is missing
   const [retry, setRetry] = useWindowState('remote.retry', 0);
+  // "Save to Passwords?" once the computer accepted a password typed in the sign-in: kept in memory only, until answered
+  const [saveOffer, setSaveOffer] = useWindowState('remote.saveOffer', null);
   const [editing, setEditing] = useState(false);
   const secret = useRef(null);              // the password of this session, in memory while it lasts (a reconnection)
   const started = useRef(false);
@@ -606,7 +616,7 @@ function SessionWindow({ winId, devId, focused }) {
   }, [winId, id, live, full, d?.proto]);
   useEffect(() => () => { if (id && !windows.get().some((w) => w.id === winId)) lord.rdesk.close(id); }, [id]);
   const stop = () => { if (id) lord.rdesk.close(id); setId(0); setSt(null); setEntered(false); wm.setFullscreen(winId, false); };
-  const close = () => { stop(); secret.current = null; wm.close(winId); };
+  const close = () => { stop(); secret.current = null; setSaveOffer(null); wm.close(winId); };
   const start = (sec) => {
     setError('');
     setPrompt(null);
@@ -645,6 +655,7 @@ function SessionWindow({ winId, devId, focused }) {
           putDevice(d.id, { last: Date.now() });
           const sec = secret.current;
           if (sec?.saveTo && sec.password) { rememberCred(sec.saveTo, sec.password); secret.current = { ...sec, saveTo: null }; }
+          if (sec?.offer) { setSaveOffer(sec.offer); secret.current = { ...secret.current, offer: null }; }
           if (d.full) wm.setFullscreen(winId, true);
           if (desksOf(settings.get()).pictures !== false) {
             for (const ms of PICTURE_AT) timers.push(setTimeout(() => { if (lord.rdesk.snapshot(id, d.id)) putDevice(d.id, { shot: Date.now() }); }, ms));
@@ -674,7 +685,10 @@ function SessionWindow({ winId, devId, focused }) {
     setSt({ ...st, cert: '' });
   };
   if (!d) return h(EmptyState, { mascot: 'confused', title: tr('remotedesk.err.gone'), action: h(Button, { label: tr('remotedesk.close'), onClick: close }) });
-  if (st?.state === 'connected' && st.media && id) return h(Screen, { id, st, focused, onEnd: close, name, winId, folders: d.folders || [], swap: !!d.swap });
+  const offerBar = saveOffer ? h(View, { style: { position: 'absolute', right: 12, bottom: 12, width: 420, maxWidth: '90%', padding: 12, borderRadius: 10,
+    backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 8px 24px rgba(0,0,0,0.45)', zIndex: 30 } },
+  h(SaveLoginOffer, { login: saveOffer, hosts: [d.host], onDone: () => setSaveOffer(null) })) : null;
+  if (st?.state === 'connected' && st.media && id) return h(Screen, { id, st, focused, onEnd: close, name, winId, folders: d.folders || [], swap: !!d.swap, extra: offerBar });
   const trusted = r.certs || {};
   const cert = st?.cert ? certCheck(trusted, keyOf(d), st.cert) : null;
   return h(View, { ref: root, style: { flex: 1, backgroundColor: t.windowBg } },
@@ -704,6 +718,7 @@ function SignIn({ d, cred, note, onCancel, onGo }) {
   const [user, setUser] = useState(cred ? credText(cred) : '');
   const [password, setPassword] = useState('');
   const [keep, setKeep] = useState(true);
+  const filled = useRef('');                // the password as Passwords filled it: no "Save to Passwords?" for that one
   const split = splitUser(user, cred?.domain || '');
   const bad = rdp && (!split.user || !userOk(split.user) || !domainOk(split.domain));
   const go = async () => {
@@ -715,15 +730,24 @@ function SignIn({ d, cred, note, onCancel, onGo }) {
         putDesks((x) => ({ creds: [...x.creds, c].slice(-MAX_CREDS), devices: x.devices.map((y) => (y.id === d.id ? { ...y, cred: c.id } : y)) }));
       }
     }
-    // the password goes to the keyring once the computer accepted it (SessionWindow), never a wrong one
-    onGo({ user: rdp ? (c ? c.user : split.user) : '', domain: rdp ? (c ? c.domain : split.domain) : '', password, saveTo: keep ? c : null });
+    // the password goes to the keyring once the computer accepted it (SessionWindow), never a wrong one; so does the
+    // offer to save it in Passwords, for one the person typed
+    const who = rdp ? (c ? { user: c.user, domain: c.domain } : split) : { user: '', domain: '' };
+    const offer = typedSecret(password, filled.current) ? { kind: d.proto, host: d.host, port: d.port, user: credText(who), password } : null;
+    onGo({ user: who.user, domain: who.domain, password, saveTo: keep ? c : null, offer });
   };
   return h(Sheet, { width: 420 },
     h(Title, null, tr('remotedesk.signIn', { name: titleOf(d) })),
     note ? h(Note, { color: RED }, note) : null,
     rdp ? h(Row, { label: tr('remotedesk.user') }, cred ? h(Text, { style: { fontSize: 13, color: t.text, textAlign: 'start' } }, credText(cred))
       : h(TextInput, { value: user, onChange: setUser, placeholder: tr('remotedesk.userHint'), autoFocus: true, onSubmit: go })) : null,
-    h(Row, { label: tr('remotedesk.password') }, h(TextInput, { value: password, onChange: setPassword, secure: true, autoFocus: !rdp || !!cred, onSubmit: go })),
+    h(Row, { label: tr('remotedesk.password') }, h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8 } },
+      h(View, { style: { flex: 1, minWidth: 0 } }, h(TextInput, { value: password, onChange: setPassword, secure: true, autoFocus: !rdp || !!cred, onSubmit: go })),
+      h(AutofillButton, { app: 'remote-desk', hosts: loginHosts(d.host), onFill: ({ username, password: pw }) => {
+        if (rdp && !cred && username) setUser(username);
+        setPassword(pw || '');
+        filled.current = pw || '';
+      } }))),
     !rdp ? h(Note, null, tr('remotedesk.vncPwHint')) : null,
     h(Check, { on: keep, onChange: setKeep, label: tr(cred ? 'remotedesk.rememberPw' : 'remotedesk.saveCred') }),
     h(Buttons, null,
@@ -836,7 +860,8 @@ function PrefsWindow({ winId }) {
         h(View, { key: 'n', style: { flexDirection: 'row', gap: 8 } },
           h(View, { style: { flex: 1 } }, h(TextInput, { value: group, onChange: setGroup, placeholder: tr('remotedesk.groupNew'), onSubmit: addGroup })),
           h(Button, { label: tr('remotedesk.groupAdd'), disabled: !group.trim(), onClick: addGroup }))] : null),
-    edit ? h(CredentialSheet, { cred: edit.cred, onCancel: () => setEdit(null), onSave: (c) => { setEdit(null); setCur(c.id); } }) : null);
+    edit ? h(CredentialSheet, { cred: edit.cred, hosts: edit.cred ? r.devices.filter((d) => d.cred === edit.cred.id).map((d) => d.host) : [],
+      onCancel: () => setEdit(null), onSave: (c) => { setEdit(null); setCur(c.id); } }) : null);
 }
 
 const openPrefs = () => wm.open('remote-desk', { instance: 'prefs', args: { prefs: true } });
