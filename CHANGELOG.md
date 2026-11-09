@@ -18,7 +18,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `virtiofsd` (Debian's), started by `lord-vm` as you, in its own namespaces with only that folder mounted and its own
   seccomp filter; QEMU gets an already connected socket and never the folder. Only a real folder inside your home (not
   all of it) or on a disk under `/media` or `/mnt` can be shared, never a hidden one nor the machines' library, checked
-  when it's chosen and again at every start. The guest's memory is shared with the helper only on machines that share a
+  when it's chosen and again at every start; virtiofsd gets the folder as it was checked (opened once without following a
+  link), so swapping a folder of its path for a link afterwards changes nothing. The guest's memory is shared with the helper only on machines that share a
   folder. Suspend, resume and snapshots with memory keep the folder mounted. `machine.json` schema 4 (`shares`);
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 

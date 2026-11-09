@@ -1022,30 +1022,59 @@ static pid_t spawn_passt(int net_fd, int err_fd) {
  * only this machine's. Read-only unless the share says writable. The folder was checked by vm_share_allowed. Returns
  * QEMU's end of the connection, or -1 with why in err. */
 static void fail_start(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+/* the shared folder, opened once and without following a link at any step (O_PATH), then checked by what it is: its
+ * path read back from the descriptor must be the one in machine.json. virtiofsd gets this descriptor
+ * (--shared-dir=/proc/self/fd/4), so a folder of the path swapped for a link after the check (by a guest that can write
+ * a parent of it through another share, for one) changes nothing. -1 with why in err */
+static int open_share(const char *path, char *err, size_t errlen) {
+    int fd = open("/", O_PATH | O_DIRECTORY | O_CLOEXEC);
+    char part[NAME_MAX + 1];
+    for (const char *p = path; fd >= 0 && *p; ) {
+        while (*p == '/') p++;
+        if (!*p) break;
+        size_t n = strcspn(p, "/");
+        if (n > NAME_MAX) { close(fd); snprintf(err, errlen, "a name in the path is too long"); return -1; }
+        memcpy(part, p, n);
+        part[n] = 0;
+        p += n;
+        int next = openat(fd, part, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        close(fd);
+        fd = next;
+    }
+    if (fd < 0) { snprintf(err, errlen, "the folder can't be opened without following a link: %s", strerror(errno)); return -1; }
+    char self[64], real[PATH_MAX];
+    snprintf(self, sizeof self, "/proc/self/fd/%d", fd);
+    ssize_t r = readlink(self, real, sizeof real - 1);
+    if (r <= 0 || (real[r] = 0, strcmp(real, path))) { close(fd); snprintf(err, errlen, "the folder changed while it was being opened"); return -1; }
+    return fd;
+}
+
 static int spawn_virtiofsd(int i, char *err, size_t errlen) {
+    int dfd = open_share(S.m.share_path[i], err, errlen);
+    if (dfd < 0) return -1;
     char path[PATH_MAX + 32];
     snprintf(path, sizeof path, "%s/fs%d.sock", S.rundir, i);
     struct sockaddr_un a = { .sun_family = AF_UNIX };
-    if (strlen(path) >= sizeof a.sun_path) { snprintf(err, errlen, "the run folder's path is too long"); return -1; }
+    if (strlen(path) >= sizeof a.sun_path) { snprintf(err, errlen, "the run folder's path is too long"); close(dfd); return -1; }
     memcpy(a.sun_path, path, strlen(path) + 1);
     unlink(path);
     int l = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (l < 0 || bind(l, (struct sockaddr *)&a, sizeof a) || listen(l, 1)) { snprintf(err, errlen, "socket: %s", strerror(errno)); if (l >= 0) close(l); unlink(path); return -1; }
+    if (l < 0 || bind(l, (struct sockaddr *)&a, sizeof a) || listen(l, 1)) { snprintf(err, errlen, "socket: %s", strerror(errno)); if (l >= 0) close(l); close(dfd); unlink(path); return -1; }
     char logp[PATH_MAX + 64];
     snprintf(logp, sizeof logp, "%s/log/virtiofsd-%d.log", S.dir, i + 1);
     int lf = open(logp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     pid_t pid = fork();
-    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(l); if (lf >= 0) close(lf); unlink(path); return -1; }
+    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(l); close(dfd); if (lf >= 0) close(lf); unlink(path); return -1; }
     if (!pid) {
         child_common(vfs_procs_fd);
         int null = open("/dev/null", O_RDWR);
         dup2(null, 0);
         dup2(lf >= 0 ? lf : null, 1);
         dup2(lf >= 0 ? lf : null, 2);
-        int fds[1] = { l };
-        place_fds(fds, 1);
-        char dir[VM_PATH_MAX + 16];
-        snprintf(dir, sizeof dir, "--shared-dir=%s", S.m.share_path[i]);
+        /* 3 the listening socket, 4 the folder as it was checked (open_share) */
+        int fds[2] = { l, dfd };
+        place_fds(fds, 2);
+        char dir[] = "--shared-dir=/proc/self/fd/4";
         /* find-paths: a suspended machine's open files are found again by their paths when it resumes (6.1) */
         char *argv[] = { VIRTIOFSD, "--fd=3", dir, "--sandbox=namespace", "--seccomp=kill", "--cache=auto", "--migration-mode=find-paths",
                          "--migration-on-error=guest-error", "--log-level=warn", S.m.share_rw[i] ? NULL : "--readonly", NULL };
@@ -1054,6 +1083,7 @@ static int spawn_virtiofsd(int i, char *err, size_t errlen) {
         _exit(127);
     }
     close(l);
+    close(dfd);
     if (lf >= 0) close(lf);
     int c = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     int ok = c >= 0 && !connect(c, (struct sockaddr *)&a, sizeof a);

@@ -1527,8 +1527,10 @@ ro|rw:TAG:FOLDER` (repeated; `--shares none` empties the list), Configure → Sh
 Remove) and the bar's folder button (each folder opens in Files; the mount command is copied). Which folders
 (`vm_share_allowed`, checked on `--set` and again at every start): a real directory inside home but not home itself, or under
 `/media/<user>` or `/mnt`; nothing hidden; never the library or what holds it. At start `lord-vm` binds a listening socket in
-the machine's run folder, starts `virtiofsd --fd=3 --sandbox=namespace --seccomp=kill --cache=auto
---migration-mode=find-paths [--readonly]` on it (a cgroup leaf of 256 MB, two CPUs; its log in `log/virtiofsd-N.log`),
+the machine's run folder, opens the folder once without following a link at any step (`O_PATH` per component, its path read
+back from the descriptor must match), and starts `virtiofsd --fd=3 --shared-dir=/proc/self/fd/4 --sandbox=namespace
+--seccomp=kill --cache=auto --migration-mode=find-paths [--readonly]` on that socket and that descriptor, so a folder of
+the path swapped for a link after the check changes nothing (a cgroup leaf of 256 MB, two CPUs; its log in `log/virtiofsd-N.log`),
 connects, removes the path and gives QEMU the connected socket (`-chardev socket,fd=`; QEMU can't make sockets). With a share,
 the guest's memory is `memory-backend-memfd,share=on`; without one nothing changes. Each folder is a `vhost-user-fs-pci` on
 slots 0xb–0xe. Suspend and snapshots with memory work: virtiofsd hands its state over (`find-paths`), and the shares can't
