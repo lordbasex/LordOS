@@ -1,6 +1,7 @@
 // filepickermodel.js — the system file dialog without a screen: where it may start, which disks it
 // lists, what a path's crumbs are, and what Enter and the primary button do.
 // node server/tests/filepicker_model_test.mjs
+import { sortAccounts } from './cloudmodel.js';
 
 // a disk that goes away over the network would hold the interface: the dialog lists local disks only
 const NETWORK_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone', 'fuse.sshfs'];
@@ -25,9 +26,9 @@ export function cloudRoot(path, home) {
   return name ? `${c}${name}` : null;
 }
 
-// The dialog's Cloud places: every account's folder, in their order, but a locked keyring's (nothing to list).
+// The dialog's Cloud places: every account's folder, by name as in Files (#86), but a locked keyring's (nothing to list).
 // accounts: cloud.state().accounts; hidden: the ids taken out of Files (settings.cloudHidden).
-export const cloudPlaces = (accounts, home, hidden = []) => (accounts || [])
+export const cloudPlaces = (accounts, home, hidden = []) => sortAccounts(accounts)
   .filter((a) => a && a.mount && cloudRoot(a.mount, home) === a.mount && a.state !== 'locked' && !hidden.includes(a.id))
   .map((a) => ({ id: a.id, name: a.name, path: a.mount }));
 

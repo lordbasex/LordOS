@@ -104,6 +104,7 @@ eq('connected kinds', ce.map((e) => [e.netPlace.kind, e.netPlace.path]), [['shar
   ['pin', '/media/ana/Backup on 192.168.1.9'], ['cloud', '/home/ana/Cloud/Drive']]);
 eq('no file path reaches a mount point', ce.every((e) => e.path.startsWith('place:') && !e.dir), true);
 eq('nothing given', connectedEntries({ accounts: null, pins: null, volumes: null }), []);
+eq('#86: cloud accounts by name', connectedEntries({ accounts: [{ id: 'a', name: 'work', mount: '/h/Cloud/work' }, { id: 'b', name: 'Box', mount: '/h/Cloud/Box' }] }).map((e) => e.name), ['Box', 'work']);
 eq('share kinds', [shareKind('x on 1.2.3.4', 'cifs'), shareKind('e on h', 'nfs4'), shareKind('davs on nas', 'fuse.rclone'), shareKind('sftp on h:2222', 'fuse.rclone'), shareKind('odd', 'fuse.rclone')], ['smb', 'nfs', 'davs', 'sftp', 'remote']);
 const tt = (k) => k;
 eq('groups', netGroups([{ path: 'net:1' }, { path: 'place:/a', netPlace: {} }], tt).map((g) => [g.label, g.items.map((e) => e.path)]), [['files.net.group.connected', ['place:/a']], ['files.net.group.found', ['net:1']]]);

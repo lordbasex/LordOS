@@ -55,6 +55,28 @@ export const accountColor = (accounts, id) => {
   return ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
 };
 
+// Accounts are listed by name (#86): case and accents aside ("éte" with "Ete"), numbers by value ("Drive 2" before
+// "Drive 10"), then by id so equal names keep one order. The colors stay those of the order they were added in
+// (accountColor over the unsorted list). Text pieces go through localeCompare (the language's order where the
+// engine has one; QuickJS compares code points, which the folding above already makes case- and accent-blind).
+const nameKey = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const isDigits = (s) => s.charCodeAt(0) >= 48 && s.charCodeAt(0) <= 57;
+export function compareNames(a, b) {
+  const x = nameKey(a).match(/\d+|\D+/g) || [], y = nameKey(b).match(/\d+|\D+/g) || [];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const p = x[i], q = y[i];
+    let d;
+    if (isDigits(p) && isDigits(q)) {
+      const u = p.replace(/^0+(?=\d)/, ''), v = q.replace(/^0+(?=\d)/, '');
+      d = u.length - v.length || (u < v ? -1 : u > v ? 1 : 0) || p.length - q.length;
+    } else d = p.localeCompare(q);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  return Math.sign(x.length - y.length);
+}
+export const sortAccounts = (accounts) => [...(accounts || [])].sort((a, b) => compareNames(a && a.name, b && b.name)
+  || (String(a && a.id) < String(b && b.id) ? -1 : String(a && a.id) > String(b && b.id) ? 1 : 0));
+
 const inside = (path, root) => !!root && (path === root || String(path).startsWith(`${root}/`));
 export const accountOf = (path, accounts) => (accounts || []).find((a) => inside(path, a.mount)) || null;
 // the path inside its account ('' for the account's folder itself)
@@ -268,10 +290,10 @@ export function cloudMenu(sel, { single = false, linksSupported = false, shared 
 
 export const SIDE_SECTIONS = ['favorites', 'cloud', 'locations', 'tags'];
 export const sideSections = (accounts) => SIDE_SECTIONS.filter((s) => s !== 'cloud' || (accounts || []).length > 0);
-// the Cloud section's rows: the accounts in their order; hidden: ids the person took out of Files
+// the Cloud section's rows: the accounts by name (#86); hidden: ids the person took out of Files
 export function cloudSideItems(accounts, hidden = [], service = null) {
   const down = !!service && service.running === false;
-  return (accounts || []).filter((a) => !hidden.includes(a.id)).map((a) => {
+  return sortAccounts(accounts).filter((a) => !hidden.includes(a.id)).map((a) => {
     const u = usage(a.about);
     return { id: a.id, name: a.name, path: a.mount, color: accountColor(accounts, a.id), pct: u && u.pct != null ? u.pct : null,
       alert: down || NEEDS_YOU.includes(a.state), dim: down || DIM_STATES.includes(a.state) };

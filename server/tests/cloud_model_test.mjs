@@ -148,8 +148,17 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('cloud between Favorites and Locations', M.SIDE_SECTIONS.indexOf('cloud') === M.SIDE_SECTIONS.indexOf('favorites') + 1 && M.SIDE_SECTIONS.indexOf('locations') === M.SIDE_SECTIONS.indexOf('cloud') + 1, true);
   const accs = [acc('1', 'Personal', { about: { total: 100, used: 31 } }), acc('2', 'Work', { state: 'syncing' }), acc('3', 'NAS', { state: 'signin', about: { total: 10, used: 1 } }), acc('4', 'Off', { state: 'offline' })];
   const items = M.cloudSideItems(accs, ['2']);
-  eq('rows', items.map((i) => [i.name, i.pct, i.alert, i.dim]), [['Personal', 0.31, false, false], ['NAS', 0.1, true, true], ['Off', null, false, true]]);
-  eq('row path and color', [items[0].path, items[0].color], [`${H}/Cloud/Personal`, '#0a84ff']);
+  eq('rows, by name (#86)', items.map((i) => [i.name, i.pct, i.alert, i.dim]), [['NAS', 0.1, true, true], ['Off', null, false, true], ['Personal', 0.31, false, false]]);
+  eq('row path and color: the color of the order they were added in', [items[2].path, items[2].color, items[0].color], [`${H}/Cloud/Personal`, '#0a84ff', '#ff9f0a']);
+  // #86: by name whatever the order they were added in, case and accents aside, numbers by value, ties by id
+  const names = (list) => M.sortAccounts(list).map((a) => a.name);
+  eq('#86 sort', names([acc('1', 'pCloud Work'), acc('2', 'Drive 10'), acc('3', 'drive 2'), acc('4', 'Équipe'), acc('5', 'Box'), acc('6', 'OneDrive - Perso'), acc('7', 'eté')]),
+    ['Box', 'drive 2', 'Drive 10', 'Équipe', 'eté', 'OneDrive - Perso', 'pCloud Work']);
+  eq('#86 sort: equal names by id, input untouched', [M.sortAccounts([acc('b', 'Same'), acc('a', 'same')]).map((a) => a.id), names([]), names(null)], [['a', 'b'], [], []]);
+  const input = [acc('1', 'Zeta'), acc('2', 'Alpha')];
+  M.sortAccounts(input);
+  eq('#86 sort: a copy', input.map((a) => a.name), ['Zeta', 'Alpha']);
+  eq('#86 compareNames', [M.compareNames('a', 'B'), M.compareNames('File 9', 'file 09'), M.compareNames('x', 'x 1'), M.compareNames('Ä', 'a')], [-1, -1, -1, 0]);
 }
 
 // ---- the menu bar item ----

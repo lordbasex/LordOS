@@ -18,7 +18,7 @@ import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { notify } from './notify.js';
 import { openUrl } from './sysopen.js';
 import { cloud, cloudState } from './cloud.js';
-import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, transitions as transitionsOf } from './cloudmodel.js';
+import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, sortAccounts, transitions as transitionsOf } from './cloudmodel.js';
 import { CloudGlyph, AccountBadge } from './cloudui.jsx';
 import { installCloudMock } from './cloudmock.js';
 import { askKeyringUnlock } from './vault.js';
@@ -51,7 +51,7 @@ function Panel({ st, onClose }) {
       h(Text, { style: { flex: 1, fontSize: 14, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('cloud.title')),
       head ? h(Text, { style: { fontSize: 12, color: th.textDim } }, head) : null),
     h(View, { style: { paddingHorizontal: 10, paddingBottom: 8, gap: 2 } },
-      ...accs.map((a) => {
+      ...sortAccounts(accs).map((a) => {
         const line = stateLine(a, st.service);
         const u = usage(a.about);
         const text = line.key === 'cloud.state.ok' && u ? `${t(line.key)} · ${u.total != null ? t('cloud.space.usedOf', { used: formatBytes(u.used), total: formatBytes(u.total) }) : t('cloud.space.usedOnly', { used: formatBytes(u.used) })}` : t(line.key, line.vars);

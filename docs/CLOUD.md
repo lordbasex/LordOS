@@ -360,7 +360,9 @@ needs sign-in), the last changes (file, account, up or down, time) with **Show i
 In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
 
 1. **Accounts**: one row per account with its glyph, name, provider, a space bar and its state; **+** adds one (the provider sheet,
-   6.1). A row opens the account (6.3).
+   6.1). A row opens the account (6.3). Since 0.8.8.7 (#86) every list of accounts is by name: Settings, the menu bar
+   panel, Files' sidebar and Network, and the file dialog (`sortAccounts`/`compareNames` in `sdk/cloudmodel.js`: case and
+   accents aside, numbers by value, equal names by id). An account keeps the color of the order it was added in.
 2. **On this computer**: cache use per account, the free-space threshold (7.2), **Free Up Space**.
 3. **Bandwidth**: upload and download limits, "Pause on battery", "Pause on metered networks".
 4. **Service**: state (running, its version, uptime, memory), **Restart**, **Show Log** (opens the Logs app on the unit),

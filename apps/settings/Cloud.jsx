@@ -252,7 +252,7 @@ function Overview({ st }) {
       <AllAccounts st={st} />
       {accs.length ? (
         <View aria-label={tr('cloud.accounts')} style={box(t)}>
-          {accs.map((a, i) => <AccountRow key={a.id} a={a} accounts={accs} last={i === accs.length - 1} />)}
+          {M.sortAccounts(accs).map((a, i) => <AccountRow key={a.id} a={a} accounts={accs} last={i === accs.length - 1} />)}
         </View>
       ) : null}
       <View aria-label={tr('cloud.onThisComputer')} style={box(t)}>

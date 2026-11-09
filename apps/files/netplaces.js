@@ -2,6 +2,7 @@
 // and remote folders mounted now, servers kept in Locations (connected again only when clicked, so nothing reaches the
 // network when Files starts) and the Cloud accounts; then the machines found on the network that offer a way in. A
 // Wi-Fi repeater or a printer has nothing to open here, so it is left out unless every device is asked for.
+import { sortAccounts } from '../../sdk/cloudmodel.js';
 
 // Every way into a computer, best first (network.jsx, hostWays). What mounts comes before a remote screen.
 export const WAY_ORDER = { smb: 0, nfs: 1, sftp: 2, ssh: 3, webdavs: 4, webdav: 5, ftps: 6, ftp: 7, screen: 8, rdp: 9 };
@@ -42,7 +43,7 @@ export function connectedEntries({ volumes = [], pins = [], accounts = [], hidde
     seen.add(p.path);
     out.push({ name: p.name, path: `place:${p.path}`, dir: false, size: 0, mtime: 0, netPlace: { kind: 'pin', path: p.path, pin: p } });
   }
-  for (const a of accounts || []) {
+  for (const a of sortAccounts(accounts)) {           // by name, as in the sidebar (#86)
     if (!a || !a.mount || (hiddenAccounts || []).includes(a.id) || seen.has(a.mount)) continue;
     seen.add(a.mount);
     out.push({ name: a.name, path: `place:${a.mount}`, dir: false, size: 0, mtime: 0, netPlace: { kind: 'cloud', path: a.mount, id: a.id, state: a.state } });

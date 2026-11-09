@@ -1,6 +1,6 @@
 // The system file dialog without a screen. node server/tests/filepicker_model_test.mjs
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep,
-  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom } from '../../sdk/filepickermodel.js';
+  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom, cloudPlaces } from '../../sdk/filepickermodel.js';
 import { ZOOM_MIN as FILES_MIN, ZOOM_MAX as FILES_MAX } from '../../apps/files/viewprefs.js';
 
 let ok = 0;
@@ -103,6 +103,7 @@ eq('grid left rtl', gridStep('ArrowLeft', 5, true), 1);
 eq('grid down', gridStep('ArrowDown', 5), 5);
 eq('grid up', gridStep('ArrowUp', 5), -5);
 eq('grid other', gridStep('Home', 5), 0);
+eq('#86: cloud places by name', cloudPlaces([{ id: 'a', name: 'work', mount: '/h/Cloud/work' }, { id: 'b', name: 'Box', mount: '/h/Cloud/Box' }], '/h').map((p) => p.name), ['Box', 'work']);
 
 // the thumbnails' size (issue #58): Files' steps, a tile per step, one remembered size per kind of dialog
 eq('the same steps as Files', [ZOOM_MIN, ZOOM_MAX], [FILES_MIN, FILES_MAX]);
