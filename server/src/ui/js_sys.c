@@ -18,6 +18,7 @@
 #include "js_sys.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
+#include "../termconf.h"
 #include "ui.h"
 #include "fonts.h"
 #include "../admin.h"
@@ -78,6 +79,7 @@ void js_sys_init(void) {
     const char *h = getenv("HOME");
     if (!h || !realpath(h, home)) snprintf(home, sizeof home, "/nonexistent");
     fsops_init(home, getenv("USER"));
+    termconf_init(home);              /* the Terminal's file and settings.json's family are protected from here on */
     perm_init(home);
     apply_locale_conf();
 }

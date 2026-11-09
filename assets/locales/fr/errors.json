@@ -814,5 +814,17 @@
   "vm.removeFailed": "L’image n’a pas pu être supprimée",
   "vm.listUnsigned": "{name} n’est pas signée par son éditeur, ses empreintes ne sont donc pas fiables : refusée",
   "vm.listBadSignature": "La signature de {name} ne se vérifie pas avec la clé épinglée de son éditeur ({reason}) : refusée",
-  "vm.imageInUse": "Une machine allumée a cette image dans son lecteur de CD : éteignez-la d’abord"
+  "vm.imageInUse": "Une machine allumée a cette image dans son lecteur de CD : éteignez-la d’abord",
+  "termconf.badPath": "Ce n’est pas un emplacement valide pour la configuration du Terminal (un fichier .json au chemin absolu dans votre dossier personnel ou sur un disque monté)",
+  "termconf.missing": "Le fichier de configuration du Terminal n’est pas là",
+  "termconf.unavailable": "son dossier n’est pas là : un disque non monté, ou un dossier déplacé ou renommé",
+  "termconf.denied": "pas la permission de le lire ou de l’écrire",
+  "termconf.notRegular": "ce n’est pas un fichier ordinaire (un lien ou un dossier)",
+  "termconf.tooLarge": "le fichier est trop gros (plus de 4 Mo)",
+  "termconf.writeFailed": "il n’a pas pu être écrit",
+  "termconf.exists": "le fichier de configuration du Terminal existe déjà",
+  "termconf.backupFailed": "settings.json n’a pas pu être sauvegardé, donc rien n’a été déplacé",
+  "termconf.verifyFailed": "le nouveau fichier ne s’est pas relu à l’identique, donc rien n’a été déplacé",
+  "termconf.corrupt": "le fichier n’est pas un JSON valide pour le Terminal",
+  "termconf.newer": "le fichier a été écrit par un LordOS plus récent"
 }

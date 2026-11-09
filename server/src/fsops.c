@@ -91,7 +91,24 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.config/lordos/databases",     /* Databases favorites (hosts, trusted certificates): only lord.sql.saveFavorites (docs/DATABASES.md) */
                                            NULL };
 
+static char pfile[FSOPS_PF_COUNT][PATH_MAX];
+
+void fsops_protect_file(int slot, const char *real) {
+    if (slot < 0 || slot >= FSOPS_PF_COUNT) return;
+    if (!real || snprintf(pfile[slot], sizeof pfile[slot], "%s", real) >= (int)sizeof pfile[slot]) pfile[slot][0] = 0;
+}
+
+/* real is one of the protected files or of its family */
+static int pfile_match(const char *real) {
+    for (int i = 0; i < FSOPS_PF_COUNT; i++) {
+        size_t n = strlen(pfile[i]);
+        if (n && !strncmp(real, pfile[i], n) && (real[n] == 0 || real[n] == '.')) return 1;
+    }
+    return 0;
+}
+
 int fsops_protected(const char *real) {
+    if (pfile_match(real)) return 1;
     for (int i = 0; protect[i]; i++) {
         char p[PATH_MAX + 64];
         pathf(p, sizeof p, "%s%s", home, protect[i]);
@@ -102,6 +119,8 @@ int fsops_protected(const char *real) {
 
 /* Is a protected path strictly below real? (Cleaner's rule table: a rule's root must not hold one.) */
 int fsops_protected_below(const char *real) {
+    for (int i = 0; i < FSOPS_PF_COUNT; i++)
+        if (pfile[i][0] && strcmp(pfile[i], real) && under(pfile[i], real)) return 1;
     for (int i = 0; protect[i]; i++) {
         char p[PATH_MAX + 64];
         pathf(p, sizeof p, "%s%s", home, protect[i]);

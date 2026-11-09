@@ -17,6 +17,10 @@ int fsops_share_down(const char *path);
 int  fsops_readable(const char *real);         /* (0.8.5) read-only: the whole tree but /proc, /sys, /dev, /run */
 int  fsops_protected(const char *real);        /* folders JS does not write to (launcher, apps, settings) */
 int  fsops_protected_below(const char *real);  /* a protected path lies strictly below real (rule tables) */
+/* Files protected with their family (the file, and "<file>." followed by anything: .tmp-…, .1 … .5, .bak), set at
+ * run time: the Terminal's configuration may be anywhere the user chose (termconf.h). "" clears a slot. */
+enum { FSOPS_PF_TERMINAL, FSOPS_PF_TERMINAL_CUSTOM, FSOPS_PF_SETTINGS, FSOPS_PF_COUNT };
+void fsops_protect_file(int slot, const char *real);
 const char *fsops_home(void);                  /* the resolved home folder given to fsops_init */
 
 /* rename for lord.fs: refuses a protected path, a parent of one (as source or destination) and an existing target */

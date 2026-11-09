@@ -814,5 +814,17 @@
   "vm.removeFailed": "Não foi possível apagar a imagem",
   "vm.listUnsigned": "{name} não é assinada por quem a faz, então seus hashes não são confiáveis: recusada",
   "vm.listBadSignature": "A assinatura de {name} não confere com a chave fixada de quem a faz ({reason}): recusada",
-  "vm.imageInUse": "Uma máquina ligada tem essa imagem no drive de CD: desligue-a primeiro"
+  "vm.imageInUse": "Uma máquina ligada tem essa imagem no drive de CD: desligue-a primeiro",
+  "termconf.badPath": "Esse não é um local válido para a configuração do Terminal (um arquivo .json com caminho absoluto na sua pasta pessoal ou num disco montado)",
+  "termconf.missing": "O arquivo de configuração do Terminal não está lá",
+  "termconf.unavailable": "a pasta dele não está lá: um disco não montado, ou uma pasta movida ou renomeada",
+  "termconf.denied": "sem permissão para lê-lo ou gravá-lo",
+  "termconf.notRegular": "não é um arquivo comum (um link ou uma pasta)",
+  "termconf.tooLarge": "o arquivo é grande demais (mais de 4 MB)",
+  "termconf.writeFailed": "não foi possível gravá-lo",
+  "termconf.exists": "o arquivo de configuração do Terminal já existe",
+  "termconf.backupFailed": "não foi possível fazer backup do settings.json, então nada foi movido",
+  "termconf.verifyFailed": "o arquivo novo não foi lido igual, então nada foi movido",
+  "termconf.corrupt": "o arquivo não é um JSON válido para o Terminal",
+  "termconf.newer": "o arquivo foi gravado por um LordOS mais novo"
 }

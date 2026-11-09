@@ -814,5 +814,17 @@
   "vm.removeFailed": "The image couldn't be deleted",
   "vm.listUnsigned": "{name} isn't signed by its maker, so its hashes can't be trusted: refused",
   "vm.listBadSignature": "The signature on {name} doesn't verify with its maker's pinned key ({reason}): refused",
-  "vm.imageInUse": "A running machine has that image in its CD drive: shut it down first"
+  "vm.imageInUse": "A running machine has that image in its CD drive: shut it down first",
+  "termconf.badPath": "That isn’t a valid place for the Terminal’s configuration (an absolute .json file in your home folder or on a mounted disk)",
+  "termconf.missing": "The Terminal’s configuration file isn’t there",
+  "termconf.unavailable": "its folder isn’t there: a disk that isn’t mounted, or a folder that was moved or renamed",
+  "termconf.denied": "no permission to read or write it",
+  "termconf.notRegular": "it isn’t a plain file (a link or a folder)",
+  "termconf.tooLarge": "the file is too large (over 4 MB)",
+  "termconf.writeFailed": "it couldn’t be written",
+  "termconf.exists": "the Terminal’s configuration file already exists",
+  "termconf.backupFailed": "settings.json couldn’t be backed up, so nothing was moved",
+  "termconf.verifyFailed": "the new file didn’t read back the same, so nothing was moved",
+  "termconf.corrupt": "the file isn’t valid JSON for the Terminal",
+  "termconf.newer": "the file was written by a newer LordOS"
 }
