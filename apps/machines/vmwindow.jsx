@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus } from './ui.jsx';
+import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
 
 const BAR = 48;
@@ -314,7 +314,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
     }
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
-    if (!id) { setErr(active ? tr('machines.win.cantAttach') : tr('machines.win.cantStart')); return; }
+    if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
     setErr(''); setSt(null); setSid(id);
   };

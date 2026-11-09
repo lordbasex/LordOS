@@ -1,10 +1,13 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Overlay, screen, addListener, useTheme, t as tr } from '@lordos/sdk';
+import { View, Text, Overlay, screen, addListener, useTheme, errorText, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
 export const has = () => typeof lord !== 'undefined' && !!lord.vm;
+// why lord.vm refused a start or a change (it returned 0), or the fallback text: a writable shared folder that holds a
+// protected file (vm.shareProtected) is said as such
+export const vmRefusal = (fallback) => { const r = lord.vm.refusal ? lord.vm.refusal() : null; return r ? errorText(r) : fallback; };
 export const gb = (mb) => (mb >= 1024 ? `${Math.round((mb / 1024) * 10) / 10} GB` : `${mb} MB`);
 export const bytes = (b) => (b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >= 1e9 ? `${Math.round(b / 1e8) / 10} GB` : `${Math.round(b / 1e6)} MB`);
 export const gib = (b) => `${Math.round((b / 1073741824) * 10) / 10}`;

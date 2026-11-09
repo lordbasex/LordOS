@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
 import { Assistant } from './assistant.jsx';
-import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot } from './ui.jsx';
+import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 
@@ -353,7 +353,7 @@ export function Library() {
   // lord-vm jobs started from here (start with no window, discard a saved state): followed until they end, so the
   // engine frees them, and a failure is shown
   const jobs = useRef([]);
-  const follow = (id, name) => { if (!id) { setError(tr('machines.cfg.refused')); return; } jobs.current.push({ id, name }); };
+  const follow = (id, name) => { if (!id) { setError(vmRefusal(tr('machines.cfg.refused'))); return; } jobs.current.push({ id, name }); };
   const root = useRef(null);
   overlayRoot.current = root.current;
 

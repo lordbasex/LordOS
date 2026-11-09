@@ -826,5 +826,6 @@
   "termconf.backupFailed": "non è stato possibile fare il backup di settings.json, quindi non è stato spostato nulla",
   "termconf.verifyFailed": "il nuovo file non si è riletto uguale, quindi non è stato spostato nulla",
   "termconf.corrupt": "il file non è un JSON valido per il Terminale",
-  "termconf.newer": "il file è stato scritto da un LordOS più recente"
+  "termconf.newer": "il file è stato scritto da un LordOS più recente",
+  "vm.shareProtected": "Una cartella condivisa in scrittura non può essere né contenere un file protetto di questo computer (come la configurazione del Terminale o settings.json): la macchina potrebbe cambiare ciò che questo computer esegue. Condividila in sola lettura, o condividi una cartella senza quel file."
 }

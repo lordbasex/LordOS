@@ -62,6 +62,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-vm --set --share ro|rw:TAG:FOLDER`, `--shares none`. "What Machines Needs" installs `virtiofsd`.
 
 ### Changed
+  A folder shared with write access can't be, sit under or hold a file this computer protects (settings.json, the
+  Terminal's configuration wherever it is, launchers): the machine could change what this computer runs. Checked when
+  the share is made and again before every start; read-only sharing is unaffected.
 
 - **Passwords: copy anything, and know what became of it.** An item's title and notes have a copy button like every
   field; a right click on an item in the list copies its title, any field, its 2FA code or its notes without opening

@@ -4,7 +4,7 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
-import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark } from './ui.jsx';
+import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
@@ -77,7 +77,7 @@ export function Configure({ dir, section: section0 }) {
     const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => differs(k, val)));
     if (!Object.keys(change).length) return;
     const id = lord.vm.set(dir, change);
-    if (!id) setMsg({ ok: false, text: tr('machines.cfg.refused') }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
+    if (!id) setMsg({ ok: false, text: vmRefusal(tr('machines.cfg.refused')) }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
   };
   const emulated = m.accel === 'tcg';
   const prof = profileOf({ ...m, ...draft }, host, meta.profile);

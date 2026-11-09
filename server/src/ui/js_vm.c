@@ -30,6 +30,7 @@
 #include "../sec/json.h"
 #include "ui.h"
 #include "../term/term.h"
+#include "../fsops.h"
 
 #include <crypt.h>
 #include <dirent.h>
@@ -571,6 +572,31 @@ static int spawn_job(char *const args[], const char *dir) {
     return slot + 1;
 }
 
+/* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
+ * protects (settings.json, the Terminal's configuration wherever the user put it, launchers…), or the guest could rewrite
+ * what the host runs. Checked when the shares are set and again before every start: the Terminal's file can move into a
+ * shared folder after the share was made. The reason a call returned 0 is kept for refusal(). */
+static char refusal[48];
+static int share_writable_ok(const char *path) {
+    char real[PATH_MAX];
+    if (!realpath(path, real)) return 1;            /* not there: lord-vm refuses the share itself */
+    return !fsops_protected(real) && !fsops_protected_below(real);
+}
+static int machine_shares_ok(const char *dir) {
+    VmMachine m;
+    char err[256];
+    if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return 1;   /* a bad machine.json is lord-vm's to report */
+    for (int i = 0; i < m.n_shares; i++)
+        if (m.share_rw[i] && !share_writable_ok(m.share_path[i])) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); return 0; }
+    return 1;
+}
+static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    JSValue r = refusal[0] ? JS_NewString(c, refusal) : JS_NULL;
+    refusal[0] = 0;
+    return r;
+}
+
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, iso, shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -637,7 +663,8 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         for (uint32_t i = 0; ok && i < len; i++) {
             JSValue e = JS_GetPropertyUint32(c, v, i), tv = JS_GetPropertyStr(c, e, "tag"), pv = JS_GetPropertyStr(c, e, "path"), wv = JS_GetPropertyStr(c, e, "writable");
             const char *ts = JS_IsString(tv) ? JS_ToCString(c, tv) : NULL, *ps = JS_IsString(pv) ? JS_ToCString(c, pv) : NULL;
-            if (ts && ps && vm_tag_valid(ts) && ps[0] == '/' && strlen(ps) < VM_PATH_MAX && (JS_IsBool(wv) || JS_IsUndefined(wv))) {
+            if (ts && ps && JS_ToBool(c, wv) && !share_writable_ok(ps)) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); ok = 0; }
+            else if (ts && ps && vm_tag_valid(ts) && ps[0] == '/' && strlen(ps) < VM_PATH_MAX && (JS_IsBool(wv) || JS_IsUndefined(wv))) {
                 snprintf(shv[i], sizeof shv[i], "%s:%s:%s", JS_ToBool(c, wv) ? "rw" : "ro", ts, ps);
                 args[n++] = "--share"; args[n++] = shv[i];
             } else ok = 0;
@@ -998,6 +1025,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
+    if (!machine_shares_ok(dir)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return JS_NewInt32(c, 0);
     if (pipe2(ep, O_CLOEXEC)) { close(sv[0]); close(sv[1]); return JS_NewInt32(c, 0); }
@@ -1887,7 +1915,7 @@ static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     char dir[PATH_MAX], creds[PATH_MAX];
-    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir)) return JS_NewInt32(c, 0);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
     int id = spawn_job(args, dir);
@@ -2460,7 +2488,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
-    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

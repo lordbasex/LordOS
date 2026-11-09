@@ -826,5 +826,6 @@
   "termconf.backupFailed": "settings.json couldn’t be backed up, so nothing was moved",
   "termconf.verifyFailed": "the new file didn’t read back the same, so nothing was moved",
   "termconf.corrupt": "the file isn’t valid JSON for the Terminal",
-  "termconf.newer": "the file was written by a newer LordOS"
+  "termconf.newer": "the file was written by a newer LordOS",
+  "vm.shareProtected": "A folder shared with write access can’t be, or hold, a protected file of this computer (such as the Terminal’s configuration or settings.json): the machine could change what this computer runs. Share it read-only, or share a folder without it."
 }
