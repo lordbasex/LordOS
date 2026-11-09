@@ -26,8 +26,8 @@ eq('literal number', literal(42), '42');
 eq('literal float', literal(-1.5), '-1.5');
 eq('literal NaN', literal(NaN), 'NULL');
 eq('literal bool', [literal(true), literal(false)], ['1', '0']);
-eq('literal string', literal("it's"), "'it\\'s'");
-eq('literal escapes', literal('a\0b\nc\rd\\e\'f"g\x1ah'), "'a\\0b\\nc\\rd\\\\e\\'f\\\"g\\Zh'");
+eq('literal string', literal("it's"), "'it''s'");
+eq('literal escapes', literal('a\0b\nc\rd\\e\'f"g\x1ah'), "'a\\0b\\nc\\rd\\\\e''f\"g\\Zh'");
 eq('escapeString plain', escapeString('hello wörld'), 'hello wörld');
 eq('literal hex', literal(`${HEX_PREFIX}deadBEEF`), "X'DEADBEEF'");
 eq('literal empty hex', literal(HEX_PREFIX), "''");
@@ -56,7 +56,7 @@ eq('rule >', ruleSql({ column: 'n', op: '>', value: '3' }), "`n` > '3'");
 eq('rule <', ruleSql({ column: 'n', op: '<', value: '3' }), "`n` < '3'");
 eq('rule contains', ruleSql({ column: 'notes', op: 'contains', value: '50%_off' }), "`notes` LIKE '%50\\\\%\\\\_off%'");
 eq('rule begins', ruleSql({ column: 'name', op: 'begins', value: 'Ac' }), "`name` LIKE 'Ac%'");
-eq('rule ends', ruleSql({ column: 'name', op: 'ends', value: "o'" }), "`name` LIKE '%o\\''");
+eq('rule ends', ruleSql({ column: 'name', op: 'ends', value: "o'" }), "`name` LIKE '%o'''");
 eq('rule not contains', ruleSql({ column: 'a', op: 'notContains', value: 'x' }), "`a` NOT LIKE '%x%'");
 eq('rule like backslash', ruleSql({ column: 'p', op: 'contains', value: 'C:\\' }), "`p` LIKE '%C:\\\\\\\\%'");
 eq('rule is null', ruleSql({ column: 'notes', op: 'isNull' }), '`notes` IS NULL');
@@ -141,7 +141,7 @@ const row = ['12533', '3877', 'paid', '1240.00', 'EUR', 'Invoice', '2026-11-08 2
 const key = rowKey(fields, indexes);
 eq('rowKey primary', key, { cols: ['id'] });
 eq('update cell', updateCellSql({ db: 'shop', table: 'orders', key, columns, row, column: 'notes', value: "Acme's" }),
-  { sql: "UPDATE `shop`.`orders` SET `notes` = 'Acme\\'s' WHERE `id` = '12533' LIMIT 1" });
+  { sql: "UPDATE `shop`.`orders` SET `notes` = 'Acme''s' WHERE `id` = '12533' LIMIT 1" });
 eq('update cell null', updateCellSql({ db: 'shop', table: 'orders', key, columns, row, column: 'notes', value: null }).sql, "UPDATE `shop`.`orders` SET `notes` = NULL WHERE `id` = '12533' LIMIT 1");
 eq('update no key', updateCellSql({ db: 'shop', table: 'orders', key: { error: 'nokey' }, columns, row, column: 'notes', value: 'x' }), { error: 'nokey' });
 eq('update bad hex', updateCellSql({ db: 'd', table: 't', key, columns, row, column: 'notes', value: `${HEX_PREFIX}zz` }), { error: 'badhex' });
@@ -175,7 +175,7 @@ eq('columnDef null default', columnDef(fields[4]), '`notes` TEXT COLLATE utf8mb4
 eq('columnDef expr', columnDef(fields[5]), '`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP()');
 eq('columnDef on update', columnDef(fields[6]), '`updated_at` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP()');
 eq('columnDef unsigned ignored on text', columnDef({ name: 'x', type: 'varchar', length: '20', unsigned: true, nullable: true, def: { kind: 'value', value: "a'b" } }),
-  "`x` VARCHAR(20) NULL DEFAULT 'a\\'b'");
+  "`x` VARCHAR(20) NULL DEFAULT 'a''b'");
 eq('alter modify', alterSql('shop', 'orders', [{ op: 'change', from: 'status', field: status }]),
   "ALTER TABLE `shop`.`orders`\n  MODIFY `status` ENUM('pending','paid','shipped') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending'");
 eq('alter rename', alterClause({ op: 'change', from: 'notes', field: { ...fields[4], name: 'note' } }), 'CHANGE `notes` `note` TEXT COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL');
@@ -295,7 +295,7 @@ eq('columnsByTable', columnsByTable({ rows: [['t', 'a', 'int(11)'], ['t', 'b', '
 // ---- copy as ----
 eq('csv', toCsv(['a', 'b'], [['1', 'x,y'], [null, 'q"']]), 'a,b\n1,"x,y"\nNULL,"q"""');
 eq('json', JSON.parse(toJson(['a', 'b'], [['1', null], [`${HEX_PREFIX}ff`, 'x']])), [{ a: '1', b: null }, { a: '0xff', b: 'x' }]);
-eq('inserts', toInserts('t', ['a', 'b'], [['1', null], ["o'k", 'x']]), "INSERT INTO `t` (`a`, `b`) VALUES\n  ('1', NULL),\n  ('o\\'k', 'x');");
+eq('inserts', toInserts('t', ['a', 'b'], [['1', null], ["o'k", 'x']]), "INSERT INTO `t` (`a`, `b`) VALUES\n  ('1', NULL),\n  ('o''k', 'x');");
 eq('inserts none', toInserts('t', ['a'], []), '');
 
 // ---- favorites ----
@@ -342,5 +342,32 @@ eq('fmtMs', [fmtMs(4.27), fmtMs(42.4), fmtMs(12345)], ['4.3 ms', '42 ms', '12.3 
 eq('widths', columnWidths(['id', 'a long column name'], [['1', 'x']]).length, 2);
 eq('widths bounds', columnWidths(['x'], [['y'.repeat(500)]], { max: 200 })[0], 200);
 eq('errorCode', [errorCode({ code: 'auth' }), errorCode({ code: 'weird' }), errorCode(null)], ['auth', 'other', 'other']);
+
+
+// security scan F4: a stored value can't end the literal early, with or without NO_BACKSLASH_ESCAPES
+// (a literal read the way the server reads it: in NBE mode a backslash is an ordinary character)
+function readLiteral(sql, nbe) {
+  if (sql[0] !== "'") return -1;
+  for (let i = 1; i < sql.length; i++) {
+    if (!nbe && sql[i] === '\\') { i++; continue; }
+    if (sql[i] === "'") { if (sql[i + 1] === "'") { i++; continue; } return i + 1; }
+  }
+  return -1;
+}
+for (const v of ["x\\'; DROP TABLE accounts; -- ", "\\", "'", "a\\''b", "\\'\\'"]) {
+  const l = literal(v);
+  eq(`F4 literal is whole (default mode): ${JSON.stringify(v)}`, readLiteral(l, false), l.length);
+  eq(`F4 literal is whole (NO_BACKSLASH_ESCAPES): ${JSON.stringify(v)}`, readLiteral(l, true), l.length);
+}
+// security scan F3: table names from the server never become patterns
+{
+  const evil = { tables: ['(.+)+!', '(', 'orders'], columns: { orders: [{ name: 'id', type: 'int' }], '(.+)+!': [{ name: 'boom', type: 'int' }] } };
+  const t0 = Date.now();
+  const got = completions('i', evil, { text: 'SELECT * FROM orders WHERE aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }).map((c) => c.label);
+  eq('F3 completion with hostile table names is quick', Date.now() - t0 < 200, true);
+  eq('F3 completion still finds the used table', got.includes('id'), true);
+  eq('F3 a table named "(" does not throw', Array.isArray(completions('o', evil, { text: '(' })), true);
+  eq('F3 alias with a hostile qualifier does not throw', Array.isArray(completions('', evil, { qualifier: '(.+)+', text: 'FROM orders o' })), true);
+}
 
 console.log(`databases model: ${ok} checks${process.exitCode ? ', FAILED' : ' passed'}`);

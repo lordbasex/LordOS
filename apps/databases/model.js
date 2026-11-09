@@ -15,8 +15,14 @@ export const HEX_PREFIX = '\u0000hex:';
 export const isHexValue = (v) => typeof v === 'string' && v.startsWith(HEX_PREFIX);
 export const hexOf = (v) => (isHexValue(v) ? v.slice(HEX_PREFIX.length) : '');
 
-const ESC = { '\0': '\\0', '\n': '\\n', '\r': '\\r', '\\': '\\\\', "'": "\\'", '"': '\\"', '\x1a': '\\Z' };
-export const escapeString = (s) => String(s).replace(/[\0\n\r\\'"\x1a]/g, (c) => ESC[c]);
+// A single quote is doubled, never backslashed: under sql_mode NO_BACKSLASH_ESCAPES a backslash is an ordinary
+// character, and a stored value ending in \' would close the string (security scan F4). '' means a quote in every
+// mode, so no value can end the literal early; the backslash escapes below only change data in that mode.
+const ESC = { '\0': '\\0', '\n': '\\n', '\r': '\\r', '\\': '\\\\', "'": "''", '\x1a': '\\Z' };
+export const escapeString = (s) => String(s).replace(/[\0\n\r\\'\x1a]/g, (c) => ESC[c]);
+// text from the server or the editor inside a RegExp: every metacharacter literal (security scan F3: a table named
+// "(.+)+!" made completion backtrack and froze lord-server's JS thread)
+export const reEscape = (s) => String(s).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 // A value as a MySQL literal: NULL, a number, X'…' for binary, or a quoted string.
 export function literal(v) {
@@ -622,13 +628,15 @@ export function completions(prefix, schema, { qualifier = '', text = '', limit =
   const cols = schema?.columns || {};
   if (qualifier) {
     // an alias: FROM orders o / JOIN customers AS c
-    const alias = new RegExp(`\\b(?:FROM|JOIN|UPDATE|INTO)\\s+\`?([\\w$]+)\`?(?:\\s+AS)?\\s+\`?${qualifier.replace(/[$]/g, '\\$')}\`?\\b`, 'i').exec(text);
+    const alias = new RegExp(`\\b(?:FROM|JOIN|UPDATE|INTO)\\s+\`?([\\w$]+)\`?(?:\\s+AS)?\\s+\`?${reEscape(qualifier)}\`?\\b`, 'i').exec(text);
     const table = cols[qualifier] ? qualifier : alias ? alias[1] : '';
     for (const c of cols[table] || []) add(c.name, 'column', `${c.type} · ${table}`);
     return out.slice(0, limit);
   }
   if (!p) return [];
-  const used = tables.filter((tb) => new RegExp(`\\b${tb.replace(/[$]/g, '\\$')}\\b`, 'i').test(text));
+  // a whole word of the query text, compared as words (no pattern built from server data)
+  const words = new Set((String(text).match(/[\w$]+/g) || []).map((w) => w.toLowerCase()));
+  const used = tables.filter((tb) => words.has(String(tb).toLowerCase()));
   for (const tb of used) for (const c of cols[tb] || []) add(c.name, 'column', `${c.type} · ${tb}`);
   for (const tb of tables) add(tb, 'table');
   for (const k of KEYWORDS) add(k, FUNCS.has(k) ? 'function' : 'keyword');

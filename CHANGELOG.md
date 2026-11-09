@@ -42,6 +42,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     "Databases" (`lordos:sql`). Everything a server sends is parsed bounds-checked and fuzzed in the tests.
   - A password is sent as such (MySQL 8's first login of a user) only over TLS whose certificate was verified or
     trusted by fingerprint, never to an unchecked certificate, so a machine in the middle can't read it.
+  - Values written back into SQL (editing, deleting or duplicating a row) quote a `'` as `''`, which no stored value
+    can turn into the end of the string under any `sql_mode` (`NO_BACKSLASH_ESCAPES` included); completion compares
+    table names as words and never builds a pattern from what the server returns.
   - Integrated with Passwords: every password field has the 🔑 button, which offers the password kept for that
     connection and the Passwords entries whose host is exactly the connection's (a Database, Network or SSH
     entry's host, or a site), each shown with its host, while Passwords is unlocked; the password leaves Passwords
