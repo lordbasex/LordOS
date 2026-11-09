@@ -330,12 +330,28 @@ export function ago(at, now = Date.now()) {
 // Opening a file only in the cloud can't work: its account is offline, locked or not mounted (17.2 item 19, cloud.offline)
 export const cantOpen = (acc, s) => !!acc && !!s && s.st === 'cloud' && (acc.state === 'offline' || acc.state === 'locked' || acc.mounted === false || acc.error === 'cloud.offline');
 
-// The panel's Recent rows: [{ path, name, where, dir, ago }] newest first, at most n.
-export function recentRows(recent, accounts, now = Date.now(), n = 5) {
-  return (recent || []).slice(0, n).map((r) => {
-    const acc = (accounts || []).find((a) => a.id === r.account) || accountOf(r.path, accounts);
-    return { path: r.path, name: String(r.path).split('/').pop(), where: whereLine(r.path, acc), dir: r.dir === 'up' ? 'up' : 'down', ago: ago(r.at, now) };
-  });
+// The panel's Recent rows: [{ path, name, where, dir, ago, account }] newest first, at most n. only: the ids of the
+// accounts clicked in the panel (#83), [] for every account; lord-server keeps the last 20, so a narrowed list still fills.
+export function recentRows(recent, accounts, now = Date.now(), n = 5, only = []) {
+  const ids = only || [];
+  return (recent || []).map((r) => ({ r, acc: (accounts || []).find((a) => a.id === r.account) || accountOf(r.path, accounts) }))
+    .filter((x) => !ids.length || (!!x.acc && ids.includes(x.acc.id))).slice(0, n)
+    .map(({ r, acc }) => ({ path: r.path, name: String(r.path).split('/').pop(), where: whereLine(r.path, acc), dir: r.dir === 'up' ? 'up' : 'down', ago: ago(r.at, now),
+      account: acc ? acc.id : null }));
+}
+// #83: clicking an account in the panel adds it to the Recent filter, clicking it again takes it out; ids of accounts
+// that are gone drop out (liveOnly).
+export const toggleOnly = (only, id) => ((only || []).includes(id) ? (only || []).filter((x) => x !== id) : [...(only || []), id]);
+export const liveOnly = (only, accounts) => (only || []).filter((id) => (accounts || []).some((a) => a.id === id));
+// #83: the small button on an account's row in the panel. A locked keyring: unlock; a sign-in: Sign In Again (Settings);
+// its own pause: resume; paused by Pause All, the battery or a metered network: none (Resume All, or nothing to do);
+// otherwise pause.
+export function panelAction(acc) {
+  if (!acc) return null;
+  if (acc.error === 'cloud.keyringLocked' || acc.state === 'locked') return 'unlock';
+  if (acc.state === 'signin') return 'signin';
+  if (acc.paused === true) return 'resume';
+  return acc.state === 'paused' ? null : 'pause';
 }
 
 // ---- notifications (the States mock) ----

@@ -182,6 +182,20 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const rows = M.recentRows([{ path: `${H}/Cloud/Work/Projects/Budget 2027.ods`, account: '2', dir: 'up', at: now }, { path: `${H}/Cloud/Work/x.jpg`, account: '9', dir: 'down', at: now - 7200e3 }], accs, now);
   eq('recent rows', rows.map((r) => [r.name, r.where, r.dir, r.ago.key]), [['Budget 2027.ods', 'Work › Projects', 'up', 'cloud.ago.now'], ['x.jpg', 'Work', 'down', 'cloud.ago.h']]);
   eq('recent at most n', M.recentRows(Array.from({ length: 20 }, (_, i) => ({ path: `/x/${i}`, at: now })), [], now, 5).length, 5);
+  // #83: Recent narrowed to the accounts clicked in the panel, one or more; [] is every account
+  const two = [acc('2', 'Work'), acc('3', 'Home')];
+  const rec = [...Array.from({ length: 8 }, (_, i) => ({ path: `${H}/Cloud/Work/w${i}`, account: '2', dir: 'up', at: now - i })),
+    { path: `${H}/Cloud/Home/h0`, account: '3', dir: 'down', at: now - 100 }, { path: `${H}/Cloud/Home/h1`, dir: 'down', at: now - 200 }, { path: '/elsewhere/z', account: '9', at: now - 300 }];
+  eq('#83 recent: every account', M.recentRows(rec, two, now).map((r) => r.name), ['w0', 'w1', 'w2', 'w3', 'w4']);
+  eq('#83 recent: one account, found by id or by path, still five deep', [M.recentRows(rec, two, now, 5, ['3']).map((r) => r.name), M.recentRows(rec, two, now, 5, ['2']).length], [['h0', 'h1'], 5]);
+  eq('#83 recent: two accounts', M.recentRows(rec, two, now, 20, ['3', '2']).map((r) => r.account), [...Array(8).fill('2'), '3', '3']);
+  eq('#83 recent: an account without recent files', M.recentRows(rec, [...two, acc('4', 'Empty')], now, 5, ['4']), []);
+  eq('#83 toggle', [M.toggleOnly([], 'a'), M.toggleOnly(['a'], 'b'), M.toggleOnly(['a', 'b'], 'a'), M.toggleOnly(null, 'a')], [['a'], ['a', 'b'], ['b'], ['a']]);
+  eq('#83 an account that is gone drops out', M.liveOnly(['2', 'x'], two), ['2']);
+  eq('#83 the row button', [M.panelAction(acc('1', 'A')), M.panelAction(acc('1', 'A', { state: 'syncing' })), M.panelAction(acc('1', 'A', { state: 'paused', paused: true })),
+    M.panelAction(acc('1', 'A', { state: 'paused', paused: false })), M.panelAction(acc('1', 'A', { state: 'signin' })), M.panelAction(acc('1', 'A', { state: 'locked' })),
+    M.panelAction(acc('1', 'A', { state: 'error', error: 'cloud.keyringLocked' })), M.panelAction(acc('1', 'A', { state: 'error', error: 'cloud.offline' })), M.panelAction(null)],
+  ['pause', 'pause', 'resume', null, 'signin', 'unlock', 'unlock', 'pause', null]);
 }
 
 // ---- notifications ----

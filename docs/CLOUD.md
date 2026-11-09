@@ -355,6 +355,15 @@ badge for errors or waiting changes. Its panel: each account's state (up to date
 needs sign-in), the last changes (file, account, up or down, time) with **Show in Files**, **Pause All** / **Resume**, and
 **Cloud Settings…**. Following the Lord Classic rule (#29), the panel opens toward the middle of the screen.
 
+Since 0.8.8.7 (#83), each account's row has a small button: **Pause** or **Resume** for that account alone (its own
+pause, the same as Settings → Cloud → the account → Pause syncing), **Unlock Keyring…** for a locked keyring, **Sign In
+Again** for an account that needs it (opens its page in Settings). An account paused only by Pause All, the battery or a
+metered network has no button (Resume All, or nothing to do). Clicking an account's row shows only its recent files
+under **Recent**; clicking more accounts adds them, clicking one again takes it out, and **Show All** clears the choice.
+The choice stays while the session runs. With one account chosen, **Show in Files** and **Cloud Settings…** open that
+account; with none or several, Show in Files opens `~/Cloud`. `recentRows(…, only)`, `toggleOnly`, `liveOnly` and
+`panelAction` in `sdk/cloudmodel.js` decide it (`cloud_model_test.mjs`).
+
 ## 12. Settings → Cloud
 
 In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
