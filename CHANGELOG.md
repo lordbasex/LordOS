@@ -12,6 +12,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Terminal: its own configuration file, wherever you want it.** Profiles, colors, key mappings, shortcuts, the hotkey
+  and the windows to restore move out of `settings.json` into `~/.config/lordos/terminal.json` (with a schema number),
+  so they can be backed up, versioned or synced on their own. The move is automatic and loses nothing: `settings.json`
+  is backed up first (`settings.json.pre-terminal-migration.bak`) and the section leaves it only after the new file reads
+  back the same. Preferences → Config File shows where it is and can put it anywhere in your home folder or on a mounted
+  disk (move the current configuration there, or use the file already there), and back. Every write is atomic, `0600`,
+  with five rotating backups beside it. If the chosen place isn't there (a disk not mounted, a renamed folder), the
+  Terminal keeps working from the last good copy, read-only, says so, and goes back to the file when it returns; a file
+  changed from outside (a restore, a `git pull`) is read again within 2 s. Export Profiles… and Import Profiles… take
+  LordTerminal JSON as well as other terminal emulators' files. The file is protected from other apps' file operations
+  wherever it is (`lord.termconf`, docs/TERMINAL.md "Configuration file").
+
 - **Databases (new app): a MySQL and MariaDB client.** Favorites in groups with a color each; Standard, Socket and
   Cloud connections (managed MySQL services: writer or reader endpoint, TLS required and the provider's
   certificate checked); passwords kept in Passwords. Per connection: a database pop-up and a table list with filter;

@@ -4,22 +4,24 @@
 // labels above the controls when the window is narrow.
 import {
   View, Text, TextInput, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, SectionTitle, Hairline, GroupBox, ToolbarButton, ToolbarGroup,
-  useSettings, useStore, useTheme, fs, spacing, typeScale, direction, t as T,
+  useStore, useTheme, fs, spacing, typeScale, direction, FilePicker, revealPath, errorText, t as T,
 } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName } from './profiles.js';
 import { reconfigureAll, patchWin } from './state.js';
 import { DEFAULT_BINDINGS, ACTION_IDS, actionLabel, bindings, comboLabel, keyCapture, hint } from './keys.js';
 import { importIterm } from './iterm.js';
+import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConfig } from './config.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
   ['general', T('terminal.prefs.sec.general')], ['colors', T('terminal.prefs.sec.colors')], ['text', T('terminal.prefs.sec.text')], ['window', T('terminal.prefs.sec.window')],
   ['terminal', T('terminal.prefs.sec.terminal')], ['keys', T('terminal.prefs.sec.keys')], ['triggers', T('terminal.prefs.sec.triggers')],
+  ['file', T('terminal.prefs.sec.file')],
 ];
 
 // Monochrome glyphs of the sections in the sidebar.
-const SECTION_ICON = { general: '≡', colors: '◐', text: 'A', window: '▭', terminal: '▤', keys: '⌨', triggers: '⟳' };
+const SECTION_ICON = { general: '≡', colors: '◐', text: 'A', window: '▭', terminal: '▤', keys: '⌨', triggers: '⟳', file: '▣' };
 
 const ANSI_NAMES = () => ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'].map((c) => T(`terminal.prefs.ansi.${c}`));
 
@@ -200,7 +202,19 @@ function readImport(path) {
   const rel = path.replace(/^~\/?/, '');
   const bytes = fs.read(rel, { binary: true });
   const head = String.fromCharCode(...new Uint8Array(bytes.slice(0, 8)));
-  return importIterm(head === 'bplist00' ? bytes : fs.read(rel), path, fontsApi());
+  if (head === 'bplist00') return importIterm(bytes, path, fontsApi());
+  const text = fs.read(rel);
+  // a LordTerminal export (or a terminal.json): its profiles, schemes and key mappings as they are
+  if (/^\s*\{/.test(text)) {
+    let data = null;
+    try { data = parseConfig(text); } catch (e) { data = null; }
+    if (data && Array.isArray(data.profiles)) {
+      return { kind: 'lordos', profiles: data.profiles.filter((x) => x && x.id).map((x) => ({ ...DEFAULT_PROFILE, ...x })),
+        schemes: Object.entries(data.schemes || {}).map(([id, sc]) => ({ ...sc, id })), keyMap: Array.isArray(data.keyMap) ? data.keyMap : [],
+        warnings: [], defaultGuid: null };
+    }
+  }
+  return importIterm(text, path, fontsApi());
 }
 
 function ImportPanel({ t, onClose, onDone }) {
@@ -225,7 +239,9 @@ function ImportPanel({ t, onClose, onDone }) {
     let added = 0;
     for (const np of result.profiles) {
       if (!pick[np.id]) continue;
-      const i = np.itermGuid ? profiles.findIndex((x) => x.itermGuid === np.itermGuid) : -1;
+      // the same iTerm2 profile, or (a LordTerminal export) the same profile id: replaced, not duplicated
+      let i = np.itermGuid ? profiles.findIndex((x) => x.itermGuid === np.itermGuid) : -1;
+      if (i < 0 && result.kind === 'lordos') i = profiles.findIndex((x) => x.id === np.id);
       const prof = i >= 0 ? { ...np, id: profiles[i].id } : np;
       if (i >= 0) profiles[i] = prof; else profiles.push(prof);
       // a profile that types a command when it opens never becomes the default: every new tab would run it
@@ -233,7 +249,9 @@ function ImportPanel({ t, onClose, onDone }) {
       added++;
     }
     const schemes = { ...(cfg.schemes || {}) };
-    for (const s of result.schemes) schemes[`it_${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`] = s;
+    for (const s of result.schemes) {
+      if (result.kind === 'lordos') { const { id, ...sc } = s; schemes[id] = sc; } else schemes[`it_${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`] = s;
+    }
     const keyMap = [...(cfg.keyMap || []).filter((m) => !result.keyMap.some((k) => k.combo === m.combo)), ...result.keyMap];
     saveTerminalSettings({ profiles, defaultProfile, schemes, keyMap });
     reconfigureAll();
@@ -272,7 +290,7 @@ function ImportPanel({ t, onClose, onDone }) {
                       <View style={{ width: 54, height: 20, borderRadius: 4, backgroundColor: s.bg, flexDirection: 'row', gap: 1, padding: 3 }}>
                         {s.ansi.slice(1, 7).map((c, i) => <View key={i} style={{ flex: 1, backgroundColor: c, borderRadius: 1 }} />)}
                       </View>
-                      <Text style={{ fontSize: 13, color: t.text }}>{p.name}{p.itermGuid && p.itermGuid === result.defaultGuid ? '  ★' : ''}</Text>
+                      <Text style={{ fontSize: 13, color: t.text }}>{profileName(p)}{p.itermGuid && p.itermGuid === result.defaultGuid ? '  ★' : ''}</Text>
                       <Text style={{ fontSize: 11, color: t.textDim }}>{[`${p.font || 'JetBrains Mono'} ${p.fontSize} pt`, p.ligatures && T('terminal.prefs.import.ligatures'), p.triggers.length && T('terminal.prefs.import.triggers', { count: p.triggers.length }), p.keyMap.length && T('terminal.prefs.import.keys', { count: p.keyMap.length })].filter(Boolean).join(' · ')}</Text>
                     </View>
                   );
@@ -296,11 +314,85 @@ function ImportPanel({ t, onClose, onDone }) {
   );
 }
 
+// ---- the configuration file (config.js) ----
+
+const homePath = (p) => (String(p).startsWith('~/') ? `${fs.home()}/${p.slice(2)}` : String(p));
+const shortPath = (p) => { const h = fs.home(); return p && p.startsWith(`${h}/`) ? `~/${p.slice(h.length + 1)}` : p || ''; };
+
+// Where the file is, a different place, back to the default one, import and export; and what happens when the
+// chosen place isn't there (read-only from the last good copy, Retry, Choose Another).
+function ConfigFileSection({ t, onImport, onNotice }) {
+  const st = useStore(termConfig);
+  const [picking, setPicking] = useState(null);      // 'location' | 'export'
+  const [ask, setAsk] = useState(null);              // { path, exists }
+  const [error, setError] = useState(null);
+  const move = (path, how) => {
+    setAsk(null);
+    try { chooseLocation(path, how); setError(null); reconfigureAll(); onNotice(T(path ? 'terminal.prefs.file.moved' : 'terminal.prefs.file.backDefault', { path: shortPath(termConfig.get().path) })); }
+    catch (e) { setError(errorText(e)); }
+  };
+  const picked = (raw) => {
+    const path = homePath(raw);
+    setPicking(null);
+    if (!/\.json$/i.test(path)) { setError(T('terminal.prefs.file.mustJson')); return; }
+    if (path === st.path) return;
+    let exists = false;
+    try { exists = !!fs.stat(path); } catch (e) { exists = false; }
+    setAsk({ path, exists });
+  };
+  const exportTo = (raw) => {
+    setPicking(null);
+    try { lord.termconf.exportTo(homePath(raw), serializeConfig(st.data || {})); setError(null); onNotice(T('terminal.prefs.file.exported', { path: shortPath(homePath(raw)) })); }
+    catch (e) { setError(errorText(e)); }
+  };
+  const Note = ({ children, bad }) => (
+    <View style={{ paddingHorizontal: spacing.m, paddingVertical: spacing.s, borderRadius: 8, marginBottom: spacing.m, backgroundColor: bad ? 'rgba(255,159,10,0.16)' : t.control }}>
+      <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.45, textAlign: 'start' }}>{children}</Text>
+    </View>
+  );
+  return (
+    <>
+      <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.file.intro')}</Text>
+      {st.readOnly ? (
+        <Note bad>{T('terminal.prefs.file.away', { path: shortPath(st.path), why: errorText(st.problem || 'termconf.unavailable') })}</Note>
+      ) : st.problem ? <Note bad>{errorText(st.problem)}</Note> : null}
+      {error ? <Note bad>{error}</Note> : null}
+      <Field t={t} label={T('terminal.prefs.file.where')} note={st.custom ? T('terminal.prefs.file.cacheNote', { path: shortPath(st.cache) }) : T('terminal.prefs.file.defaultNote')}>
+        <TextInput value={shortPath(st.path)} onChange={() => {}} readOnly style={{ flex: 1, minWidth: 220 }} />
+        <Button small label={T('terminal.prefs.file.show')} onClick={() => revealPath(st.readOnly ? st.cache : st.path)} />
+      </Field>
+      <Field t={t} label="">
+        <Button small label={T('terminal.prefs.file.choose')} onClick={() => setPicking('location')} />
+        {st.custom && <Button small label={T('terminal.prefs.file.reset')} onClick={() => move('', 'move')} />}
+        {st.readOnly && <Button small label={T('terminal.prefs.file.retry')} onClick={() => { if (retryTermConfig()) { setError(null); reconfigureAll(); onNotice(T('terminal.prefs.file.back')); } }} />}
+      </Field>
+      <Field t={t} label={T('terminal.prefs.file.profiles')} note={T('terminal.prefs.file.backupsNote')}>
+        <Button small label={T('terminal.prefs.file.import')} onClick={onImport} />
+        <Button small label={T('terminal.prefs.file.export')} onClick={() => setPicking('export')} />
+      </Field>
+      {ask && (
+        <View style={{ marginTop: spacing.m, padding: spacing.m, borderRadius: 10, gap: spacing.s, borderWidth: 1, borderColor: t.separator }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{shortPath(ask.path)}</Text>
+          <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.45, textAlign: 'start' }}>{T(ask.exists ? 'terminal.prefs.file.askExists' : 'terminal.prefs.file.askMove')}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, justifyContent: 'flex-end' }}>
+            <Button small label={T('terminal.prefs.cancel')} onClick={() => setAsk(null)} />
+            {ask.exists && <Button small label={T('terminal.prefs.file.replace')} onClick={() => move(ask.path, 'move')} />}
+            <Button small primary label={T(ask.exists ? 'terminal.prefs.file.useThere' : 'terminal.prefs.file.moveThere')} onClick={() => move(ask.path, ask.exists ? 'use' : 'move')} />
+          </View>
+        </View>
+      )}
+      {picking && <FilePicker mode="save" modal askReplace={picking === 'export'} name={picking === 'export' ? 'terminal-profiles.json' : 'terminal.json'}
+        title={T(picking === 'export' ? 'terminal.prefs.file.exportTitle' : 'terminal.prefs.file.chooseTitle')}
+        onClose={() => setPicking(null)} onPick={(p) => (picking === 'export' ? exportTo(p) : picked(p))} />}
+    </>
+  );
+}
+
 // ---- preferences ----
 
 export function Preferences({ wid, onClose }) {
   const t = useTheme();
-  useSettings();        // re-render on save
+  useStore(termConfig);        // re-render on save, and when the file is read again
   const cfg = terminalSettings();
   const [sel, setSel] = useState(cfg.defaultProfile);
   const [section, setSection] = useState('general');
@@ -524,6 +616,7 @@ export function Preferences({ wid, onClose }) {
         </GroupBox>
       </>
     ),
+    file: <ConfigFileSection t={t} onImport={() => setImporting(true)} onNotice={setNotice} />,
     triggers: (
       <>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.triggersHint')}</Text>

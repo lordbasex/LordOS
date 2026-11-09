@@ -1,6 +1,7 @@
 // profiles.js — Terminal profiles and color schemes.
-// Se guardan en ~/.config/lordos/settings.json bajo la clave "terminal".
-import { settings, t } from '@lordos/sdk';
+// They live in the Terminal's own file, ~/.config/lordos/terminal.json or the one the user chose (config.js).
+import { t } from '@lordos/sdk';
+import { termConfig, loadTermConfig, saveTermConfig } from './config.js';
 
 const ansi = (s) => s.split(' ').map((h) => `#${h}`);
 
@@ -87,14 +88,16 @@ export const DEFAULT_PROFILE = {
 const DEFAULTS = { profiles: [DEFAULT_PROFILE], defaultProfile: 'default', hotkey: 'F12', schemes: {}, shortcuts: {}, keyMap: [] };
 
 export function terminalSettings() {
-  const t = settings.get().terminal || {};
+  loadTermConfig();
+  const t = termConfig.get().data || {};
   const profiles = (t.profiles && t.profiles.length ? t.profiles : DEFAULTS.profiles).map((p) => ({ ...DEFAULT_PROFILE, ...p }));
   return { ...DEFAULTS, ...t, profiles };
 }
 
+// false while the chosen file is away (read-only): the change stays in memory (Preferences says so)
 export function saveTerminalSettings(patch) {
-  const cur = terminalSettings();
-  settings.set({ terminal: { ...cur, ...patch } });
+  loadTermConfig();
+  return saveTermConfig({ ...(termConfig.get().data || {}), ...patch });
 }
 
 export const getProfile = (id) => {

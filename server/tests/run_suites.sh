@@ -299,6 +299,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ]; then
         run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs
     else skip "terminal-keymap-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.7) the Terminal's own configuration file: the move out of settings.json, a chosen place, read-only
+    if have node && [ -d ../node_modules/esbuild ]; then
+        run "terminal-config-test (apps/terminal/config.js)" node tests/terminal_config_test.mjs
+    else skip "terminal-config-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #55) the keyboard of a user who never chose one: the computer's, settings migration 4
     if have node && [ -d ../node_modules/esbuild ]; then
         run "keyboard-default-test (sdk/keyboard.js, sdk/settings.js)" node tests/keyboard_default_test.mjs

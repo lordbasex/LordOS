@@ -111,7 +111,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Transparency and blur | ✅ | since 0.8.5 the window's 1-pixel border and the line under its title bar are drawn opaque in both themes, so nothing behind the window shows through them |
 | Status bar | ✅ | directory, process, exit code, size, time |
 | Toolbelt | ✅ | jobs, recent commands, captured output, clipboard, directories, profiles, notes |
-| Save/restore window arrangement | ✅ | in `settings.json` |
+| Save/restore window arrangement | ✅ | in the configuration file (`terminal.json`) |
 | Undo pane close | ✅ | 5 s, ❖Z |
 | Open Quickly (search sessions) | ✅ | ❖⇧O |
 | Restore sessions when switching themes | ✅ | the same windows, tabs and panes are reopened |
@@ -216,8 +216,8 @@ Super on its own opens the app launcher only if released without having done a s
 | Dropdown window | F12 |
 
 The full list is in `apps/terminal/keys.js` and in Preferences → Keys, where they can also be
-changed (click on the shortcut and press the new combination). Changes are saved in
-`settings.json` (`terminal.shortcuts`, `terminal.keyMap`, `perfil.keyMap`).
+changed (click on the shortcut and press the new combination). Changes are saved in the
+configuration file (`shortcuts`, `keyMap`, and each profile's `keyMap`; see "Configuration file").
 
 ## Fonts, ligatures and emoji
 
@@ -233,6 +233,44 @@ changed (click on the shortcut and press the new combination). Changes are saved
   its `ccmp`.
 - Fallback for missing characters: profile font → "non-ASCII" font → JetBrains Mono → DejaVu
   Sans Mono → Noto Sans Mono → DejaVu Sans → Noto Sans Symbols → Inter → emoji → empty box.
+
+## Configuration file
+
+(0.8.8.7) Profiles, color schemes, key mappings, shortcuts, the hotkey and the windows to restore live in their own
+file, so they can be backed up, versioned or kept in a synced folder: `~/.config/lordos/terminal.json` by default,
+`{ "schema": 1, "profiles": […], "defaultProfile", "hotkey", "schemes", "shortcuts", "keyMap", "live", "arrangement" }`.
+Before 0.8.8.7 this was the `"terminal"` key of `settings.json`.
+
+- **The move** (`apps/terminal/config.js`, at the Terminal's first use in a session): when `settings.json` still has
+  `"terminal"` and `terminal.json` doesn't exist, `settings.json` is copied to
+  `settings.json.pre-terminal-migration.bak`, the section is written to `terminal.json` and read back, and only then
+  removed from `settings.json`. Every field is kept as it was (`itermGuid` too). If `terminal.json` is already there it
+  wins and nothing is overwritten.
+- **Another place**: Preferences → **Config File** → *Choose Location…* (a `.json` file in the home folder or on a
+  mounted disk, for example `~/Backups/LordOS-Terminal/terminal.json`). If no file is there the configuration is moved
+  to it; if one is, *Use the File That Is There* or *Replace It*. `settings.json` keeps only `"terminalConfigPath"`;
+  every later change (profiles, colors, shortcuts, an import) is written there. *Back to the Default Location* moves
+  it back. *Show in Files* opens its folder.
+- **Writing** (`server/src/termconf.c`, `lord.termconf` in `ui/js_termconf.c`): a temporary file, `fsync`, `rename`,
+  the folder `fsync`ed; always `0600` (a profile's initial text can name SSH keys). Before a write, when the newest
+  backup is more than 10 minutes old, the backups move up (`terminal.json.1` … `.5`). A chosen file's folder is never
+  created: a disk that isn't mounted must not get an empty configuration in its mount point. With a chosen file,
+  `~/.config/lordos/terminal.json` is kept as a copy of the last good version (the cache).
+- **When the chosen place isn't there** (a disk not mounted, a folder renamed, no permission, a file that isn't valid
+  JSON or has a newer schema): the Terminal uses the cache read-only and says so in Preferences → Config File, with
+  *Try Again* and *Choose Location…*; changes stay on screen and aren't written anywhere. Every 2 s it looks again and
+  goes back to the file as soon as it is there.
+- **Changed from outside** (a backup restored, a `git pull`): within 2 s the file is read again and the windows take
+  it; the cache follows, and the chosen file itself is left exactly as it is. A deleted default file is written again
+  from what is in memory.
+- **Protected**: a profile can type a command when a session opens, so the active file, its backups and temporary
+  files are refused to `lord.fs` (`fsops_protect_file`, wherever the file is), like `settings.json` and its migration
+  backup. Only `lord.termconf` writes them; isolated apps never have it.
+- **Export Profiles…** writes the whole configuration as JSON (`0600`, never over the active file); **Import
+  Profiles…** takes that JSON (profiles replaced by id, schemes and key mappings added) or another terminal emulator's
+  files (below), and writes the result to the configuration file.
+- Tests: `build/termconf-test` (paths, missing and unavailable places, atomic `0600` writes, backups, the migration,
+  protection) and `tests/terminal_config_test.mjs` (the move, read-only, choosing a place, refused files).
 
 ## Importing profiles from other terminal emulators
 
