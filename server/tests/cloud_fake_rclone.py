@@ -7,6 +7,10 @@
 #   "real"           one drive that opens
 #   "stale,real"     a drive first that can't be opened (driveid_final's ConfigError back to choose_type), then the real
 #   "none"           no drive at all (chooseDrive's ConfigError "No drives found")
+# A password account (iclouddrive) keeps a session in its options as the real backend does ("cookies", "trust_token"):
+# using it (each mount) gives it a newer cookie, in memory, as rclone's does when the provider refreshes the session;
+# config/get shows the current one and config/create logs the one it was given, so a test sees whether lord-server
+# kept the newest one across a restart of rclone.
 # Every rc call is appended to its "log" file as "method state result" lines. Test builds only (LORDOS_CLOUD_RCLONE).
 import base64, json, os, socketserver, sys, time
 from http.server import BaseHTTPRequestHandler
@@ -70,6 +74,19 @@ def config_step(state, result):
 
 
 CONFIG = {}
+SESSIONS = {}           # password accounts by name: their options, the session among them
+
+
+def next_cookie():
+    p = os.path.join(os.environ.get('HOME', '/nonexistent'), '.fake-cookie-n')
+    try:
+        with open(p) as f:
+            n = int(f.read() or 0) + 1
+    except (OSError, ValueError):
+        n = 1
+    with open(p, 'w') as f:
+        f.write(str(n))
+    return 'cookie-%d' % n
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -97,6 +114,21 @@ class Handler(BaseHTTPRequestHandler):
             req = {}
         m = self.path.lstrip('/')
         opt = req.get('opt') or {}
+        if m == 'config/create' and req.get('type') == 'iclouddrive':
+            params = dict(req.get('parameters') or {})
+            params['type'] = 'iclouddrive'
+            params.setdefault('cookies', 'cookie-0')
+            params.setdefault('trust_token', 'trust-0')
+            SESSIONS[req.get('name', '')] = params
+            log(m, 'iclouddrive', 'cookies=' + params['cookies'])
+            return self.answer(200, {'State': '', 'Option': None, 'Error': ''})
+        if m == 'config/get' and (req.get('name') or '') in SESSIONS:
+            return self.answer(200, dict(SESSIONS[req.get('name')]))
+        if m == 'mount/mount':
+            name = (req.get('fs') or '').rstrip(':')
+            if name in SESSIONS:
+                SESSIONS[name]['cookies'] = next_cookie()
+                log(m, 'iclouddrive', 'cookies=' + SESSIONS[name]['cookies'])
         if m in ('config/create', 'config/update'):
             st, res = opt.get('state', ''), opt.get('result', '')
             if m == 'config/create':
@@ -111,7 +143,10 @@ class Handler(BaseHTTPRequestHandler):
         if m == 'config/providers':
             return self.answer(200, {'providers': [{'Name': 'onedrive', 'Description': 'Microsoft OneDrive', 'Prefix': 'onedrive', 'Options': [
                 {'Name': 'client_id', 'Type': 'string', 'Sensitive': True}, {'Name': 'client_secret', 'Type': 'string', 'IsPassword': True},
-                {'Name': 'token', 'Type': 'string', 'Sensitive': True}, {'Name': 'region', 'Type': 'string', 'Default': 'global'}]}]})
+                {'Name': 'token', 'Type': 'string', 'Sensitive': True}, {'Name': 'region', 'Type': 'string', 'Default': 'global'}]},
+                {'Name': 'iclouddrive', 'Description': 'iCloud Drive', 'Prefix': 'iclouddrive', 'Options': [
+                {'Name': 'apple_id', 'Type': 'string', 'Sensitive': True, 'Required': True}, {'Name': 'password', 'Type': 'string', 'IsPassword': True, 'Required': True},
+                {'Name': 'trust_token', 'Type': 'string', 'Sensitive': True, 'Hide': 3}, {'Name': 'cookies', 'Type': 'string', 'Sensitive': True, 'Hide': 3}]}]})
         if m == 'config/get':
             return self.answer(200, dict(CONFIG))
         if m == 'mount/mount':

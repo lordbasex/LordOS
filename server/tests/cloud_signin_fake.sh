@@ -8,7 +8,8 @@
 # 1. one drive: the account is made (the second sign-in of the same kind too, under another name);
 # 2. a stale drive listed first (driveid_final fails and sends rclone back to choose_type): LordOS goes back and takes
 #    the next drive, the account is made with it;
-# 3. no drive at all: the sign-in fails with cloud.signinNoDrive and rclone's words, and the half-made remote is deleted.
+# 3. no drive at all: the sign-in fails with cloud.signinNoDrive and rclone's words, and the half-made remote is deleted;
+# 4. a password account's session (iCloud's cookies) changed in rclone survives a restart of rclone.
 set -u
 B=${1:?build dir}
 case $B in /*) ;; *) B=$(pwd)/$B ;; esac
@@ -87,6 +88,25 @@ check "  and rclone's words" has "$r" '"message":"No drives found"'
 check "  no account is left" has "$r" '"accounts":[]'
 check "  its remote is deleted in rclone" sh -c 'grep -q "^config/delete" "$1"' x "$T/rc-none.log"
 check "  no token in the state" hasnt "$r" 'AAAAAAAAAA'
+stop
+
+# 4. a password account's session (iCloud's cookies): rclone changes it in memory, lord-server keeps the newest in the
+#    keyring and gives it back to rclone when it starts again (a logout, a reboot), so no new sign-in is asked for
+run session
+r=$(cmd add iclouddrive iCloud '{"apple_id":"someone@example.test","password":"pw-not-real"}')
+id=$(printf '%s' "$r" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+cmd wait '"name":"iCloud"' 10 >/dev/null
+cmd sleep 2500 >/dev/null                           # it is mounted once: rclone has a newer session
+check "session: the account is made" sh -c '[ -n "$1" ]' x "$id"
+cmd restart >/dev/null
+cmd wait '"running":true' 10 >/dev/null; cmd sleep 1500 >/dev/null
+r=$(cmd secret "$id")
+check "session: before rclone stops, its newest session goes to the keyring" has "$r" '"cookies":"cookie-'
+# the session rclone had when it was stopped: the last mount before the restart's config/create
+last=$(sed -n '/^config\/create iclouddrive/,$p' "$T/rc-session.log" | awk '/^config\/create iclouddrive/{n++} n==1 && /^mount\/mount iclouddrive/{c=$3} END{sub("cookies=","",c); print c}')
+check "  the cookie rclone had last" sh -c '[ -n "$2" ] && case $1 in *"\"cookies\":\"$2\""*) exit 0 ;; esac; exit 1' x "$r" "$last"
+check "  rclone started again with it" sh -c 'grep "^config/create iclouddrive" "$1" | tail -1 | grep -q "cookies=$2\$"' x "$T/rc-session.log" "$last"
+check "  not with the first one" hasnt "$(grep '^config/create iclouddrive' "$T/rc-session.log" | tail -1)" 'cookies=cookie-0'
 stop
 
 echo "cloud-signin-fake: $pass passed, $fail failed"

@@ -11,7 +11,8 @@
  * The secrets of an account (token, password, key) are one keyring item, "cloud:<id>", a JSON object of rclone
  * options exactly as config/get gives them (passwords obscured by rclone). At each start of rclone they go to it
  * with config/create over the socket; rclone keeps its configuration in memory only (--config ""). A token rclone
- * refreshed is read back with config/get every 5 minutes and saved in the keyring. */
+ * changed (a refreshed token, a provider's session) is read back with config/get every 5 minutes and before rclone
+ * stops, and saved in the keyring. */
 #include "cloud_int.h"
 #include "../doc/wire.h"
 #include "../errcode.h"
@@ -740,8 +741,12 @@ static void unmount_acc(Acc *a) {
     clear_stale(d);
 }
 
+static void token_check(Acc *a);
+
 static void daemon_stop(void) {
     if (!cl_running) return;
+    /* what rclone changed since the last check (up to 5 minutes) would be lost with it */
+    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && cl_acc[i].configured) token_check(&cl_acc[i]);
     for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && cl_acc[i].mounted) unmount_acc(&cl_acc[i]);
     rcs(RCM_QUIT, "{}", NULL, 0, 2000);
     pid_t p = dmn.pid;
@@ -1290,11 +1295,15 @@ static void bring_up(Acc *a) {
     else cl_changed();
 }
 
-/* a refreshed token: rclone has it in memory, the keyring gets it */
+/* What rclone changed in an account's secrets, in memory, goes to the keyring: an OAuth token it refreshed, and also
+ * the session a password provider keeps (iCloud's cookies and trust token, updated after the code from a device and
+ * on later sign-ins). Only OAuth accounts were read back, so an iCloud account came up after a restart of rclone (a
+ * logout, a reboot) with the session of its first sign-in, which the provider refuses ("Missing
+ * X-APPLE-WEBAUTH-TOKEN cookie"): the person had to sign in again with a code every time. */
 static void token_check(Acc *a) {
     char msg[128];
     a->tok_at = time(NULL);
-    if (strcmp(a->k->group, "oauth") || !a->configured) return;
+    if (!a->configured) return;
     pthread_mutex_lock(&cl_mu);
     Params keep = a->p;
     a->p.n = 0;                     /* split_remote replaces it: keep ours if config/get fails */
