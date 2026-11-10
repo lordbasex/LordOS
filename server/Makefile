@@ -30,7 +30,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            staging/cursor-shape/cursor-shape-v1 unstable/tablet/tablet-unstable-v2 \
            staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
            unstable/primary-selection/primary-selection-unstable-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
-           unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1
+           unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
+           unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -609,7 +610,8 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 unstable/relative-pointer/relative-pointer-unstable-v1 unstable/pointer-constraints/pointer-constraints-unstable-v1 \
                 unstable/pointer-gestures/pointer-gestures-unstable-v1 unstable/primary-selection/primary-selection-unstable-v1 \
                 stable/viewporter/viewporter staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
-                stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1
+                stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
+                unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -626,6 +628,10 @@ build/dmabuf-client: tests/dmabuf_client.c $(CLIENT_GEN)
 # (tests/deco_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/deco-client)
 build/deco-client: tests/deco_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/deco_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# A dialog over another process's window: xdg-foreign-v2 and xdg-dialog-v1
+# (tests/dialog_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dialog-client)
+build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dialog_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 
 # Clipboard and primary-selection offers bound to their selection (tests/xwayland/clip_offers.sh, docs/WAYLAND.md)
 build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)
