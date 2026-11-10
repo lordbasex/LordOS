@@ -48,6 +48,11 @@ static void test_validator(void) {
     CHECK(!valid("{\"version\":1,\"favorites\":{}}"), "favorites not a list");
     CHECK(!valid("{\"version\":1,\"favorites\":[1]}"), "favorite not an object");
     CHECK(!valid("{\"version\":1,\"groups\":[\"g\"]}"), "group not an object");
+    CHECK(valid("{\"version\":1,\"groups\":[{\"id\":\"g\",\"name\":\"A\",\"color\":4}]}"), "a group with a color");
+    CHECK(valid("{\"version\":1,\"groups\":[{\"id\":\"g\",\"color\":null}]}"), "a group without one");
+    CHECK(!valid("{\"version\":1,\"groups\":[{\"id\":\"g\",\"color\":7}]}"), "a group color past gray");
+    CHECK(!valid("{\"version\":1,\"groups\":[{\"id\":\"g\",\"color\":1.5}]}"), "a group color not whole");
+    CHECK(!valid("{\"version\":1,\"groups\":[{\"id\":\"g\",\"color\":\"red\"}]}"), "a group color as text");
     /* secrets, wherever they are */
     CHECK(!valid_fav("\"password\":\"x\""), "password");
     CHECK(!valid_fav("\"Password\":\"\""), "Password, even empty");

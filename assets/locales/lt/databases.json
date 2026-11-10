@@ -142,6 +142,8 @@
   "group.name": "Grupės pavadinimas",
   "group.rename": "Pervardyti grupę…",
   "group.delete": "Ištrinti grupę",
+  "group.color": "Spalva",
+  "color.none": "Jokios",
   "group.untitled": "Grupė",
   "import.menu": "Importuoti ryšius…",
   "import.title": "Importuoti ryšius",

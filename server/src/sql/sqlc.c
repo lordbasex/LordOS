@@ -212,9 +212,13 @@ int sql_favorites_valid(const char *json, size_t len, char *why, size_t wn) {
     if (gs && (gs->type != J_ARR || gs->len > SQL_FAV_MAX)) { bad(why, wn, "bad groups"); goto out; }
     if (fs && (fs->type != J_ARR || fs->len > SQL_FAV_MAX)) { bad(why, wn, "bad favorites"); goto out; }
     for (const JVal *g = gs ? gs->kid : NULL; g; g = g->next) {
-        const JVal *p = json_get(g, "parent");
+        const JVal *p = json_get(g, "parent"), *c = json_get(g, "color");
         if (g->type != J_OBJ || !good_id(json_get(g, "id")) || !opt_text(g, "name", 256) || !opt_bool(g, "expanded") ||
-            (p && p->type != J_NULL && !good_id(p))) { bad(why, wn, "bad group"); goto out; }
+            (p && p->type != J_NULL && !good_id(p)) ||
+            /* a group's color: as a favorite's, null or 0–6 */
+            (c && c->type != J_NULL && !(c->type == J_NUM && c->num >= 0 && c->num <= 6 && c->num == (double)(int)c->num))) {
+            bad(why, wn, "bad group"); goto out;
+        }
     }
     for (const JVal *f = fs ? fs->kid : NULL; f; f = f->next) {
         if (!fav_valid(f, why, wn)) goto out;

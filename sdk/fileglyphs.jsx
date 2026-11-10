@@ -4,13 +4,20 @@ import { View, Text, Image } from '@lordos/runtime';
 import { useThumb } from './media.js';
 import { kindOf, extOf, isImage, thumbSrc, KIND_COLOR } from './filekinds.js';
 
-export function FolderGlyph({ size: s, special }) {
+// tint: a tag's color (#rrggbb): the folder is drawn in it instead of blue
+const mix = (hex, to, k) => {
+  const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (to - v) * k));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+};
+export function FolderGlyph({ size: s, special, tint }) {
+  const t = /^#[0-9a-f]{6}$/i.test(tint || '') ? tint : null;
+  const tab = t ? mix(t, 0, 0.12) : '#2f8cf0', top = t ? mix(t, 255, 0.45) : '#8fd0ff', bottom = t || '#3c9cff';
   return (
     <View style={{ width: s, height: s, justifyContent: 'center' }}>
       <View style={{ width: s, height: s * 0.8 }}>
-        <View style={{ position: 'absolute', left: 0, top: 0, width: s * 0.42, height: s * 0.24, borderRadius: s * 0.07, backgroundColor: '#2f8cf0' }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, width: s * 0.42, height: s * 0.24, borderRadius: s * 0.07, backgroundColor: tab }} />
         <View style={{ position: 'absolute', left: 0, top: s * 0.11, width: s, height: s * 0.69, borderRadius: s * 0.09,
-          background: 'linear-gradient(180deg, #8fd0ff, #3c9cff)' }} />
+          background: `linear-gradient(180deg, ${top}, ${bottom})` }} />
         {special ? <Text style={{ position: 'absolute', left: 0, right: 0, top: s * 0.28, textAlign: 'center', fontSize: s * 0.3,
           fontWeight: 700, color: 'rgba(16,80,160,0.55)' }}>{special}</Text> : null}
       </View>
@@ -48,7 +55,7 @@ function ComputerGlyph({ size, way }) {
   );
 }
 
-export function EntryIcon({ e, size, dark, thumb = true }) {
+export function EntryIcon({ e, size, dark, thumb = true, tint }) {
   if (e.netWay?.mode === 'share') return <FolderGlyph size={size} />;
   if (e.netHost || e.netWay) return <ComputerGlyph size={size} way={!!e.netWay} />;
   if (e.Icon) return <e.Icon size={size} />;
@@ -57,12 +64,12 @@ export function EntryIcon({ e, size, dark, thumb = true }) {
     // a folder the user can't open (This computer): the system's permissions say no
     return (
       <View style={{ width: size, height: size }}>
-        <FolderGlyph size={size} special={e.special} />
+        <FolderGlyph size={size} special={e.special} tint={tint} />
         <Text style={{ position: 'absolute', right: 0, bottom: 0, fontSize: Math.max(9, Math.round(size * 0.32)) }}>🔒</Text>
       </View>
     );
   }
-  if (kind === 'folder') return <FolderGlyph size={size} special={e.special} />;
+  if (kind === 'folder') return <FolderGlyph size={size} special={e.special} tint={tint} />;
   if (thumb && isImage(e) && size >= 32 && e.size < 24 * 1024 * 1024) {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -93,6 +100,9 @@ function MediaThumb({ e, size, kind, dark }) {
 }
 
 export const TAG_COLORS = { red: '#ff453a', orange: '#ff9f0a', yellow: '#ffd60a', green: '#30d158', blue: '#0a84ff', purple: '#bf5af2', gray: '#8e8e93' };
+
+// a tagged folder's color: its first tag's
+export const tagTint = (tags) => (tags && tags.length ? TAG_COLORS[tags[0]] : undefined);
 
 export function TagDots({ tags, size = 8 }) {
   if (!tags || !tags.length) return null;

@@ -70,6 +70,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Databases: choosing a favorite's color shows which one is chosen, and it is kept at once.** The ring around the
+  chosen dot was drawn with two shadows and a spread, which the interface engine doesn't draw, so nothing seemed to
+  happen; it is a border now. The color is also written at once (the dot in the list changes) without Save Changes.
 - **Terminal Settings: drop-down lists (font, non-ASCII font, a trigger's action) float over the form.** They pushed
   the rest of the section down while open. A click outside or Escape closes them.
 - **Terminal Settings: a new port forward shows no error before its port is typed**, and the scrollback sizes are
@@ -86,6 +89,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   there is no file opens the folder's menu on either side: New Folder, Upload or Download the other side's selection
   here, Refresh, Hidden, Enclosing Folder, Copy Path, and Show in Files or Open Terminal Here (cd). The server side
   starts in the directory the remote shell's title names when the shell reports none. Its menus stay inside the view.
+- **Databases: a group of favorites has a color too.** Its folder is drawn in it; it is chosen in the group's sheet (New
+  Group, Rename Group…) or from the group's menu (Color › Red … Gray, None). Kept in `favorites.json` as the group's
+  `color` (0–6, as a favorite's), which lord-server now checks like a favorite's (`sqlc_test.c`, 5 more checks).
+- **Files: a tagged folder is drawn in its tag's color** (its first tag), in every view and in Get Info,
+  and in the list view the tag dots sit right after the name instead of at the far end of the Name column.
 - **Terminal Settings: Escape closes what is open, not the whole window.** With a list, the trigger sheet, Import or
   the file chooser open, Escape closed Settings; it now closes the newest of them, and the window only when none is.
 - **Releasing ❖ after a ❖ + click no longer opens the app launcher.** The shell took any press and release of ❖ with no

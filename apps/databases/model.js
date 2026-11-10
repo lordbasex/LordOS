@@ -670,6 +670,8 @@ export function toInserts(table, columns, rows) {
 
 // red, orange, yellow, green, blue, purple, gray (favorites.json "color" 0–6; Sequel Ace's colorIndex uses the same order)
 export const FAV_COLORS = ['#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#0a84ff', '#bf5af2', '#8e8e93'];
+// a group's color, as a favorite's: 0–6 or null (favorites.json "color" on the group; lord-server checks it too)
+export const groupColor = (g) => (Number.isInteger(g?.color) && g.color >= 0 && g.color < FAV_COLORS.length ? g.color : null);
 export const colorOf = (fav) => (Number.isInteger(fav?.color) && fav.color >= 0 && fav.color < FAV_COLORS.length ? FAV_COLORS[fav.color] : null);
 export const FAV_TYPES = ['tcp', 'socket', 'ssh', 'cloud'];
 export const TLS_MODES = ['off', 'preferred', 'required', 'verify'];

@@ -7,7 +7,7 @@ import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillB
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePal, Icons, Dot, Btn, IconBtn, Check, Popup, Field, Box, Note, Sheet, MONO, MenuGlyph } from './ui.jsx';
 import { store, favRev, readFavorites, writeFavorites, openSession, testFavorite, prefs, setPrefs } from './conn.js';
-import { FAV_COLORS, colorOf, blankFavorite, normalizeFavorite, validateFavorite, cleanFavorite, newFavoriteId, newGroupId, groupTree } from './model.js';
+import { FAV_COLORS, colorOf, groupColor, blankFavorite, normalizeFavorite, validateFavorite, cleanFavorite, newFavoriteId, newGroupId, groupTree } from './model.js';
 import { errText, cloudOptions, ago, favLine, serverName, favProblems } from './texts.js';
 import { findSequelFiles, previewImports } from './importer.js';
 import { mergeImport } from './plist.js';
@@ -82,6 +82,18 @@ export function Connect({ onConnected }) {
   // ---- favorites file edits ----
   const save = (next) => { try { writeFavorites(next); return true; } catch (e) { setStatus({ kind: 'bad', text: errText({ code: 'save', message: e.message }) }); return false; } };
   const set = (patch) => { setDraft((d) => ({ ...d, ...patch })); setDirty(true); setStatus(null); };
+  // a color is applied at once: the dot in the list changes without Save Changes (the rest of the draft stays a draft)
+  function setColor(i) {
+    const color = draft.color === i ? null : i;
+    setDraft((d) => ({ ...d, color }));
+    if (draft.quick) return;
+    const cur = readFavorites();
+    if (cur.favorites.some((x) => x.id === draft.id)) save({ ...cur, favorites: cur.favorites.map((x) => (x.id === draft.id ? { ...x, color } : x)) });
+  }
+  function setGroupColor(g, color) {
+    const cur = readFavorites();
+    save({ ...cur, groups: cur.groups.map((x) => (x.id === g.id ? { ...x, color } : x)) });
+  }
   const setIn = (k, patch) => { setDraft((d) => ({ ...d, [k]: { ...d[k], ...patch } })); setDirty(true); setStatus(null); };
 
   // the draft as a favorite in the file → its saved form, or null (with the problem shown)
@@ -136,9 +148,9 @@ export function Connect({ onConnected }) {
     const cur = readFavorites();
     save({ ...cur, favorites: cur.favorites.map((x) => (x.id === draft.id ? { ...x, group } : x)) });
   }
-  function saveGroup(name, g) {
+  function saveGroup(name, g, color = null) {
     const cur = readFavorites();
-    const groups = g ? cur.groups.map((x) => (x.id === g.id ? { ...x, name } : x)) : [...cur.groups, { id: newGroupId(cur.groups.map((x) => x.id)), name, parent: null, expanded: true }];
+    const groups = g ? cur.groups.map((x) => (x.id === g.id ? { ...x, name, color } : x)) : [...cur.groups, { id: newGroupId(cur.groups.map((x) => x.id)), name, parent: null, expanded: true, color }];
     if (save({ ...cur, groups })) setSheet(null);
   }
   function removeGroup(g) {
@@ -265,7 +277,7 @@ export function Connect({ onConnected }) {
                 <View onClick={() => setCollapsed((c) => ({ ...c, [g.id]: !closed }))}
                   onContextMenu={(e) => { const pt = rootRef.current ? e.local(rootRef.current) : { x: e.x, y: e.y }; setGroupMenu({ x: pt.x, y: pt.y, group: g }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, marginHorizontal: 8, paddingLeft: 10 + depth * 14, paddingRight: 10 }}>
                   <Text style={{ width: 10, fontSize: 9, color: p.dim }}>{closed ? '▶' : '▼'}</Text>
-                  {Icons.folder(p.dim, 13)}
+                  {Icons.folder(FAV_COLORS[groupColor(g)] || p.dim, 13)}
                   <Text style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{g.name || tr('databases.group.untitled')}</Text>
                 </View>
                 {closed ? null : visible.filter((f) => f.group === g.id).map((f) => favRow(f, depth + 1))}
@@ -308,12 +320,7 @@ export function Connect({ onConnected }) {
                 {draft.quick ? tr('databases.quickHint') : [srv, at ? tr('databases.lastConnected', { when: ago(at) }) : tr('databases.neverConnected')].filter(Boolean).join(' · ')}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 6, direction: 'ltr' }}>
-              {FAV_COLORS.map((c, i) => (
-                <View key={c} onClick={() => set({ color: draft.color === i ? null : i })} title={tr(`databases.color.${i}`)}
-                  style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c, ...(draft.color === i ? { boxShadow: `0 0 0 2px ${p.bg}, 0 0 0 4px ${c}` } : null) }} />
-              ))}
-            </View>
+            <ColorDots value={draft.color} onPick={setColor} />
           </View>
 
           <View style={{ alignItems: 'center' }}>
@@ -417,10 +424,15 @@ export function Connect({ onConnected }) {
       {groupMenu ? <ContextMenu x={groupMenu.x} y={groupMenu.y} onClose={() => setGroupMenu(null)} items={[
         { label: tr('databases.fav.new'), onClick: () => newFavorite(groupMenu.group.id) },
         { label: tr('databases.group.rename'), onClick: () => setSheet({ kind: 'group', group: groupMenu.group, name: groupMenu.group.name || '' }) },
+        { label: tr('databases.group.color'), submenu: [
+          ...FAV_COLORS.map((c, i) => ({ label: tr(`databases.color.${i}`), checked: groupColor(groupMenu.group) === i, onClick: () => setGroupColor(groupMenu.group, i) })),
+          '-',
+          { label: tr('databases.color.none'), checked: groupColor(groupMenu.group) === null, onClick: () => setGroupColor(groupMenu.group, null) },
+        ] },
         '-',
         { label: tr('databases.group.delete'), destructive: true, onClick: () => removeGroup(groupMenu.group) },
       ]} /> : null}
-      {sheet?.kind === 'group' ? <GroupSheet sheet={sheet} onCancel={() => setSheet(null)} onSave={(name) => saveGroup(name, sheet.group)} /> : null}
+      {sheet?.kind === 'group' ? <GroupSheet sheet={sheet} onCancel={() => setSheet(null)} onSave={(name, color) => saveGroup(name, sheet.group, color)} /> : null}
       {sheet?.kind === 'delete' ? (
         <ConfirmDialog title={tr('databases.fav.deleteTitle', { name: sheet.fav.name })} detail={tr('databases.fav.deleteDetail')} destructive
           okLabel={tr('databases.fav.delete')} cancelLabel={tr('databases.cancel')} onOk={() => remove(sheet.fav)} onCancel={() => setSheet(null)} />
@@ -574,12 +586,34 @@ function ImportSheet({ files, onCancel, onImport }) {
 }
 
 function GroupSheet({ sheet, onCancel, onSave }) {
+  const p = usePal();
   const [name, setName] = useState(sheet.name || '');
+  const [color, setColor] = useState(groupColor(sheet.group));
   const ok = name.trim().length > 0 && name.length <= 120;
+  const done = () => ok && onSave(name.trim(), color);
   return (
     <Sheet title={sheet.group ? tr('databases.group.rename') : tr('databases.group.new')} onCancel={onCancel} width={400}
-      actions={[<Btn key="c" label={tr('databases.cancel')} onClick={onCancel} />, <Btn key="s" primary disabled={!ok} label={tr('databases.save')} onClick={() => ok && onSave(name.trim())} />]}>
-      <TextInput autoFocus value={name} onChange={setName} onSubmit={() => ok && onSave(name.trim())} placeholder={tr('databases.group.name')} />
+      actions={[<Btn key="c" label={tr('databases.cancel')} onClick={onCancel} />, <Btn key="s" primary disabled={!ok} label={tr('databases.save')} onClick={done} />]}>
+      <TextInput autoFocus value={name} onChange={setName} onSubmit={done} placeholder={tr('databases.group.name')} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
+        <Text style={{ fontSize: 12.5, color: p.dim }}>{tr('databases.group.color')}</Text>
+        <ColorDots value={color} onPick={(i) => setColor((c) => (c === i ? null : i))} />
+      </View>
     </Sheet>
+  );
+}
+
+// the seven colors: the chosen one has a ring (a border: the engine draws one shadow, without spread); a second click
+// on it takes it away
+function ColorDots({ value, onPick }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 4, direction: 'ltr', alignItems: 'center' }}>
+      {FAV_COLORS.map((c, i) => (
+        <View key={c} onClick={() => onPick(i)} title={tr(`databases.color.${i}`)}
+          style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', border: `2px solid ${value === i ? c : 'transparent'}` }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c }} />
+        </View>
+      ))}
+    </View>
   );
 }

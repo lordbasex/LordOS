@@ -142,6 +142,8 @@
   "group.name": "Nom du groupe",
   "group.rename": "Renommer le groupe…",
   "group.delete": "Supprimer le groupe",
+  "group.color": "Couleur",
+  "color.none": "Aucune",
   "group.untitled": "Groupe",
   "import.menu": "Importer des connexions…",
   "import.title": "Importer des connexions",

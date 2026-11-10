@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, use
 export { ContextMenu } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
-import { EntryIcon, TagDots } from './glyphs.jsx';
+import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
 import { tagsOf, commentOf, setComment } from './ops.js';
 import { QuickContent } from './quicklook.jsx';
 
@@ -79,7 +79,7 @@ export function InfoPanel({ e, onClose, openers, extra }) {
     <View style={{ position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: 16, top: 56, ...(extra ? { bottom: 16 } : null), width: 360, borderRadius: 12,
       padding: spacing.l, gap: 10, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.4)' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
-        <EntryIcon e={e} size={48} dark={t.mode === 'dark'} />
+        <EntryIcon e={e} size={48} dark={t.mode === 'dark'} tint={tagTint(tagsOf(e.path))} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.name}</Text>
           <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{`${kindLabel(e)} · ${size}`}</Text>

@@ -2,7 +2,7 @@
 // columns (Miller, with a preview) and gallery.
 import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { EntryIcon, TagDots } from './glyphs.jsx';
+import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
 import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
@@ -71,7 +71,7 @@ export function IconView({ groups, ctx }) {
                   <View key={e.path} {...itemHandlers(e, ctx)}
                     style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
                     <View style={{ padding: 4, borderRadius: 7, backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
-                      <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} />
+                      <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} tint={tagTint(tagsOf(e.path))} />
                       {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: -4, bottom: -4 }}><StatusBadge s={ctx.cloud.status[e.path]} size={Math.max(20, Math.round(m.icon * 0.36))} /></View> : null}
                     </View>
                     <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
@@ -191,9 +191,11 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
             {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
           </View>
           {/* thumbnails from 32 px up, as in the icon view */}
-          <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32 && !ctx.cloudOnly?.(e)} />
-          <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} font={m.font} color={sel ? '#fff' : t.text} /></View>
-          <TagDots tags={tagsOf(e.path)} size={7} />
+          <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32 && !ctx.cloudOnly?.(e)} tint={tagTint(tagsOf(e.path))} />
+          {/* the tag dots right after the name (not at the column's end); the name keeps the room when renamed */}
+          <View style={{ flexShrink: 1, minWidth: 0, ...(ctx.renaming?.path === e.path || !tagsOf(e.path).length ? { flex: 1 } : null) }}><Name e={e} ctx={ctx} font={m.font} color={sel ? '#fff' : t.text} /></View>
+          <TagDots tags={tagsOf(e.path)} size={8} />
+          {tagsOf(e.path).length && ctx.renaming?.path !== e.path ? <View style={{ flex: 1 }} /> : null}
         </View>
         {visible(ctx.columns).map((k) => (k === 'tags'
           ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
@@ -308,7 +310,7 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
                       onMouseDown={(ev) => { ev.stopPropagation(); setChain([...chain.slice(0, level), e.path]); ctx.onItemDown(e, ev); }}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 24, paddingHorizontal: 8, borderRadius: 5,
                         backgroundColor: ctx.dropTarget === e.path || sel ? (ctx.selected.has(e.path) ? t.accent : t.hover) : 'transparent' }}>
-                      <EntryIcon e={e} size={16} dark={t.mode === 'dark'} thumb={false} />
+                      <EntryIcon e={e} size={16} dark={t.mode === 'dark'} thumb={false} tint={tagTint(tagsOf(e.path))} />
                       <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} color={ctx.selected.has(e.path) ? '#fff' : t.text} /></View>
                       {e.dir && <Text style={{ fontSize: 12, color: ctx.selected.has(e.path) ? '#fff' : t.textDim }}>›</Text>}
                     </View>
@@ -344,7 +346,7 @@ export function GalleryView({ entries, ctx }) {
             <View key={e.path} {...itemHandlers(e, ctx)}
               style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center', borderRadius: 8,
                 border: `2px solid ${sel ? t.accent : 'transparent'}`, backgroundColor: sel ? t.hover : 'transparent' }}>
-              <EntryIcon e={e} size={56} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} />
+              <EntryIcon e={e} size={56} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} tint={tagTint(tagsOf(e.path))} />
               {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: 2, bottom: 2 }}><StatusBadge s={ctx.cloud.status[e.path]} size={18} /></View> : null}
             </View>
           );
