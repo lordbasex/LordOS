@@ -68,6 +68,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The live ISO's boot menu no longer reads "{live}".** GRUB draws the 16 px Inter bitmap without smoothing, and its
+  3-pixel "(" looked like "{" in every entry. The entries now use " · " ("LordOS 0.8.8.8 · live", "Install automatically ·
+  lordos-auto.conf: erases the disk it names"), in `tools/iso/build.sh`, `docs/ISO.md` and `docs/UNATTENDED.md`.
+- **Sidebar labels that don't fit end in "…".** `SidebarItem` cut long labels mid-word ("Teclado y métodos de entra" in
+  Help in Spanish); it now ends them with an ellipsis.
+- **The unattended install's `ssh_key` and `after = poweroff` are tested.** On VM 127, an install with both powered off when
+  done, and with Settings → Sharing → Remote login turned on, `ssh` with the file's key logged in, with the host key
+  fingerprint Settings shows (`docs/UNATTENDED.md`, `docs/VM-SETUP.md`).
 - **Terminal: Profiles → a profile's item is its name.** It read "New Tab: name" in every item of the submenus.
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the

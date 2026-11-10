@@ -37,12 +37,12 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 
 | Entry | What for |
 |---|---|
-| LordOS (live) | normal, in English (the default language) |
-| Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
-| LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
-| LordOS (Español) / LordOS (Português) / LordOS (Français) | `lordos.lang=es` / `lordos.lang=pt` / `lordos.lang=fr`: the interface in that language the first time |
-| LordOS (copy to RAM) | `toram`: copies the system to memory and the USB stick can be removed. The ISO is about 1.1 GB and all of it goes to memory, so give the machine at least 4 GB |
-| Install automatically (lordos-auto.conf: erases the disk it names) | `lordos.auto=1` (in the package since 0.8.8.1; on the ISO from 0.8.9): the unattended install from a configuration file on a disk labelled `LORDOSAUTO`, in text, also on the first serial port. Never the default; it stops before touching any disk when something is missing or doesn't match. See [UNATTENDED.md](UNATTENDED.md) |
+| LordOS · live | normal, in English (the default language) |
+| Check this computer · nothing is installed | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
+| LordOS · safe mode: no GPU | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
+| LordOS · Español / LordOS · Português / LordOS · Français | `lordos.lang=es` / `lordos.lang=pt` / `lordos.lang=fr`: the interface in that language the first time |
+| LordOS · copy to RAM | `toram`: copies the system to memory and the USB stick can be removed. The ISO is about 1.1 GB and all of it goes to memory, so give the machine at least 4 GB |
+| Install automatically · lordos-auto.conf: erases the disk it names | `lordos.auto=1` (in the package since 0.8.8.1; on the ISO from 0.8.9): the unattended install from a configuration file on a disk labelled `LORDOSAUTO`, in text, also on the first serial port. Never the default; it stops before touching any disk when something is missing or doesn't match. See [UNATTENDED.md](UNATTENDED.md) |
 
 The GRUB menu itself is in English (GRUB's default). Every entry except safe mode and the unattended install
 boots with the boot splash (`splash`); those two boot in text (`nosplash`).

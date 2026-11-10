@@ -241,35 +241,35 @@ loadfont /boot/grub/themes/lordos/inter-regular-14.pf2
 loadfont /boot/grub/themes/lordos/inter-regular-16.pf2
 loadfont /boot/grub/themes/lordos/inter-semibold-16.pf2
 set theme=/boot/grub/themes/lordos/theme.txt
-menuentry "LordOS $VERSION (live)" {
+menuentry "LordOS $VERSION · live" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=en
     initrd /live/initrd.img
 }
-menuentry "Check this computer (nothing is installed)" {
+menuentry "Check this computer · nothing is installed" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.check=1 lordos.lang=en
     initrd /live/initrd.img
 }
-menuentry "LordOS $VERSION (safe mode: no GPU)" {
+menuentry "LordOS $VERSION · safe mode: no GPU" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 nosplash lordos.gpu=0 lordos.lang=en
     initrd /live/initrd.img
 }
-menuentry "LordOS $VERSION (Español)" {
+menuentry "LordOS $VERSION · Español" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=es
     initrd /live/initrd.img
 }
-menuentry "LordOS $VERSION (Português)" {
+menuentry "LordOS $VERSION · Português" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=pt
     initrd /live/initrd.img
 }
-menuentry "LordOS $VERSION (Français)" {
+menuentry "LordOS $VERSION · Français" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=fr
     initrd /live/initrd.img
 }
-menuentry "LordOS $VERSION (copy to RAM: the USB drive can be removed)" {
+menuentry "LordOS $VERSION · copy to RAM: the USB drive can be removed" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 toram lordos.lang=en
     initrd /live/initrd.img
 }
-menuentry "Install automatically (lordos-auto.conf: erases the disk it names)" {
+menuentry "Install automatically · lordos-auto.conf: erases the disk it names" {
     linux /live/vmlinuz boot=live components loglevel=3 nosplash lordos.auto=1 lordos.lang=en console=tty1 console=ttyS0,115200
     initrd /live/initrd.img
 }

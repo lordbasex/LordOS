@@ -1833,3 +1833,18 @@ with `bind-address = 0.0.0.0` so the test's SSH server (on another machine) can 
 The ISO's helper check refused a package without `lord-ocr` and `lord-tts`: installed `libtesseract-dev` (lord-ocr) and
 `cmake glslc libvulkan-dev spirv-headers` (lord-tts's Vulkan build, as on the Raspberry Pi for 0.8.8.7), then
 `sh tools/tts/fetch-audiocpp.sh`, `make -C server RELEASE=1` and `sudo tools/iso/build.sh /var/tmp/lordos-iso-0888`.
+
+## Step — VM 127 `lordos-autotest`: an installed LordOS for the desktop-parity tests (2026-11-10)
+
+VM 127 (4 cores, 8 GB, `vga: std`, a 32 GB `virtio0` disk) is installed from the 0.8.8.8 development ISO with the
+unattended install ([UNATTENDED.md](UNATTENDED.md): `lang = es`, `ssh_key`, `after = poweroff`, the configuration on a small
+`LORDOSAUTO` ISO as the second CD drive). Then Settings → Sharing → Remote login (SSH) turned on in the VM, and the host key
+fingerprint compared with the one Settings shows. Test apps, from Debian (tests only, not part of LordOS):
+
+```sh
+sudo apt-get install -y chromium gtk-4-examples foot mpv xterm python3-gi gir1.2-gtk-4.0 wl-clipboard
+```
+
+Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
+monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
+the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.

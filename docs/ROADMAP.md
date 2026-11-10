@@ -769,7 +769,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.6-beta"); no new I
   In 0.8.8.6 (in development): `screen`, `mc`, `tcpdump`, `net-tools` and `vim`, with `curl`, `wget`, `rsync`, `htop`,
   `fdisk`, `rfkill` and `jq`, are in one list both images read (`tools/iso/packages-tools.sh`) and are Recommends of
   `lordos`; `dnsutils` is not in it yet.
-- [ ] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO.
+- [x] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO. GRUB draws
+  the 16 px Inter bitmap without smoothing, and its 3-pixel "(" reads as "{". The entries use " · " instead (0.8.8.8).
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
   and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
   the site and the release notes point at it. It can ship on its own before 0.8.9.

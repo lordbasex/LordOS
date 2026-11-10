@@ -12,7 +12,7 @@ boot menu entry, and it stops, touching nothing, at the first thing that is miss
 
 ## How it runs
 
-1. Boot the live ISO and pick **Install automatically (lordos-auto.conf: erases the disk it names)** in the boot
+1. Boot the live ISO and pick **Install automatically · lordos-auto.conf: erases the disk it names** in the boot
    menu. The entry adds `lordos.auto=1` to the kernel command line, shows the boot as text (no splash) and also
    writes it to the first serial port.
 2. `lordos-autoinstall.service` starts before the login screen. It runs only with `lordos.auto=1` and only on
@@ -123,8 +123,9 @@ with the live ISO and a `LORDOSAUTO` ISO made by `make-auto-disk.sh` as two CD d
 | The boot menu | Install automatically is the last entry; the menu still starts the live system by default |
 | An erase install of `/dev/vda` from the file, `autologin = yes`, `after = reboot` | found the file in about 8 s, printed the plan, partitioned, copied, configured and installed the boot loader in 72 s, printed `DONE` and restarted; the whole log on the serial port |
 | The installed system, started from the disk | reached the desktop signed in as the file's user, with no login screen |
+| 0.8.8.8 in development (VM 127, 2026-11-10): an erase install with `lang = es`, `ssh_key`, `after = poweroff`, then Settings → Sharing → Remote login turned on | installed and powered off in about 90 s; the desktop started in Spanish, signed in; with remote login on, `ssh` with the file's key logged in with no password and the host key fingerprint was the one Settings shows |
 | The same entry with `disk_bytes` one byte off | `STOP /dev/vda has 34359738368 bytes, lordos-auto.conf expects 34359738369`; the disk's partition table identical before and after, and the live system started |
 
-Not tested yet: mode `free`, `ssh_key` with remote login turned on, `after = poweroff`, a USB stick with a FAT
+Not tested yet: mode `free`, a USB stick with a FAT
 `LORDOSAUTO` file system, UEFI firmware and the arm64 ISO.
 
