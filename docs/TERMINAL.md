@@ -479,6 +479,11 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - The child doesn't inherit capabilities (cleared with `capset`), blocked signals, server
   descriptors or the `SUDO_*` variables.
 - OSC 52 can only **write** the clipboard; reading it from a program isn't allowed.
+- (0.8.8.8, in development) A paste, from the clipboard or the primary selection (which any app, or a web page whose
+  text is selected, can fill), types no control character but tab and the line ends (`src/term/pastefilter.c`, as
+  xterm and VTE do). Removing only the bracketed-paste end marker `ESC[201~` in one pass let `ESC[201` `ESC[201~` `~`
+  rebuild it, so the shell ran what followed as typed. Found by Claude Security before release
+  (`build/pastefilter-test`).
 - Session logging and "Save contents" write only inside `$HOME`.
 - Holders don't read or write the PTY or run anything; their socket and the `.state` files
   (which contain the screen text) are in a 0700 folder of the user.

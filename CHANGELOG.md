@@ -139,6 +139,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A paste into the Terminal can no longer end bracketed paste early and run a command.** `term_paste` removed the
+  end marker `ESC[201~` in one pass, so text such as `ESC[201` `ESC[201~` `~` rebuilt it: with middle-click paste
+  taking the primary selection, which any app or a selected web page fills, the shell ran what followed without
+  Enter. Every control character but tab and the line ends is now dropped from a paste, as xterm and VTE do
+  (`server/src/term/pastefilter.c`, `build/pastefilter-test`). Found by Claude Security before release.
 - **Now Playing titles that don't fit end in "…".** The tile cut a long title mid-word.
 - **The live ISO's boot menu no longer reads "{live}".** GRUB draws the 16 px Inter bitmap without smoothing, and its
   3-pixel "(" looked like "{" in every entry. The entries now use " · " ("LordOS 0.8.8.8 · live", "Install automatically ·

@@ -1,6 +1,7 @@
 /* term.c — terminal sessions: PTY ↔ emulator, keyboard, mouse, clipboard, events
  * for the app (title, directory, bell, process exit) and cursor blinking. */
 #include "term.h"
+#include "pastefilter.h"
 #include "tcapture.h"
 #include "../ui/ui.h"
 #include "../ui/fonts.h"
@@ -1071,12 +1072,7 @@ void term_paste(Session *s, const char *text) {
     size_t n = strlen(text);
     char *buf = malloc(n + 1);
     if (!buf) return;
-    size_t o = 0;
-    for (size_t i = 0; i < n; i++) {
-        if (text[i] == '\r' && text[i + 1] == '\n') continue;
-        if (text[i] == '\033' && !strncmp(text + i, "\033[201~", 6)) { i += 5; continue; }
-        buf[o++] = text[i] == '\n' ? '\r' : text[i];
-    }
+    size_t o = paste_filter(text, n, buf);   /* no control but tab and line ends: no sequence survives */
     if (s->t.modes & M_BRACKETED) send(s, "\033[200~");
     s->typing = 1;                          /* a pasted password is the user's too (tcapture.c) */
     term_input(s, buf, o);
