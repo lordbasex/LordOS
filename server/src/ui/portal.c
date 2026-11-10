@@ -1,8 +1,9 @@
-/* portal.c — our own org.freedesktop.portal.Settings, FileChooser, OpenURI and Inhibit (without
- * xdg-desktop-portal), and org.freedesktop.ScreenSaver: GTK, GNOME (libadwaita) and Qt apps read from
- * here the dark/light mode, the accent color, the order of the title bar buttons and the GTK 3 theme,
- * and follow LordOS's changes live (SettingChanged); they open links and files the way LordOS does and
- * keep the screen on while a video plays. Uses Passwords' own D-Bus client (vault/dbus.c). See
+/* portal.c — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit and GlobalShortcuts
+ * (without xdg-desktop-portal), and org.freedesktop.ScreenSaver: GTK, GNOME (libadwaita) and Qt apps read
+ * from here the dark/light mode, the accent color, the order of the title bar buttons and the GTK 3 theme,
+ * and follow LordOS's changes live (SettingChanged); they open links and files the way LordOS does, keep
+ * the screen on while a video plays and get the shortcuts the person gave them (push-to-talk). Uses
+ * Passwords' own D-Bus client (vault/dbus.c). See
  * docs/WAYLAND.md, "GTK and GNOME apps", and docs/FLATPAK.md, "Portals".
  *
  * GTK 3 outside Flatpak doesn't read the portal: it reads GSettings. lord-server gives the apps
@@ -10,13 +11,17 @@
  * GLib watches: GTK 3 also changes live (without dconf or running gsettings). */
 #include "portal.h"
 #include "portalcheck.h"
+#include "gshort.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
 #include "../sec/appid.h"
 #include "../vault/dbus.h"
+#include "../wl/keygrab.h"
 #include "../wl/wl.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <limits.h>
 #include <stdio.h>
@@ -24,6 +29,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #define BUS_NAME "org.freedesktop.portal.Desktop"
@@ -167,6 +173,15 @@ static const char introspect_xml[] =
     "  <method name=\"Inhibit\"><arg type=\"s\" direction=\"in\"/><arg type=\"u\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
     "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
     " </interface>\n"
+    " <interface name=\"org.freedesktop.portal.GlobalShortcuts\">\n"
+    "  <method name=\"CreateSession\"><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"BindShortcuts\"><arg type=\"o\" direction=\"in\"/><arg type=\"a(sa{sv})\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"ListShortcuts\"><arg type=\"o\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <signal name=\"Activated\"><arg type=\"o\"/><arg type=\"s\"/><arg type=\"t\"/><arg type=\"a{sv}\"/></signal>\n"
+    "  <signal name=\"Deactivated\"><arg type=\"o\"/><arg type=\"s\"/><arg type=\"t\"/><arg type=\"a{sv}\"/></signal>\n"
+    "  <signal name=\"ShortcutsChanged\"><arg type=\"o\"/><arg type=\"a(sa{sv})\"/></signal>\n"
+    "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
+    " </interface>\n"
     " <interface name=\"org.freedesktop.DBus.Properties\">\n"
     "  <method name=\"Get\"><arg type=\"s\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"v\" direction=\"out\"/></method>\n"
     "  <method name=\"GetAll\"><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"out\"/></method>\n"
@@ -190,9 +205,9 @@ static Pick picks[MAX_PICKS];
 static int npicks, pick_seq;
 
 /* The Request object a call gets: OBJ_PATH/request/SENDER/TOKEN, the form the spec gives, so an app
- * can listen for its Response before it calls. A token with other characters is cut to the allowed
- * ones; with none left it is ours. */
-static void request_path(const char *sender, const char *token, int id, char *out, size_t n) {
+ * can listen for its Response before it calls (a session's is OBJ_PATH/session/SENDER/TOKEN). A token
+ * with other characters is cut to the allowed ones; with none left it is ours. */
+static void object_path(const char *kind, const char *sender, const char *token, int id, char *out, size_t n) {
     char who[256] = "", tok[65] = "";
     size_t w = 0;
     for (const char *s = sender + (sender[0] == ':'); *s && w + 1 < sizeof who; s++) who[w++] = *s == '.' ? '_' : *s;
@@ -200,7 +215,11 @@ static void request_path(const char *sender, const char *token, int id, char *ou
     for (const char *s = token; *s && t + 1 < sizeof tok; s++)
         if ((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '0' && *s <= '9') || *s == '_') tok[t++] = *s;
     if (!t) snprintf(tok, sizeof tok, "lordos%d", id);
-    snprintf(out, n, "%s/request/%s/%s", OBJ_PATH, who, tok);
+    snprintf(out, n, "%s/%s/%s/%s", OBJ_PATH, kind, who, tok);
+}
+
+static void request_path(const char *sender, const char *token, int id, char *out, size_t n) {
+    object_path("request", sender, token, id, out, n);
 }
 
 /* Response(u code, a{sv} results) with no results: 0 done, 1 cancelled, 2 refused */
@@ -411,19 +430,24 @@ static const char *opt_token(DRd *r) {
 
 /* The bus said which process asked (GetConnectionUnixProcessID): it is in front when it is the process
  * with the keyboard or in the same app scope. Only now does the shell hear of it. */
+/* The process's name, only to show the person (the kernel's, which the process can set) */
+static void comm_of(unsigned pid, char *comm, size_t n) {
+    comm[0] = 0;
+    if (!pid) return;
+    char path[48];
+    snprintf(path, sizeof path, "/proc/%u/comm", pid);
+    FILE *f = fopen(path, "re");
+    if (f) { if (!fgets(comm, (int)n, f)) comm[0] = 0; fclose(f); }
+    comm[strcspn(comm, "\n")] = 0;
+}
+
 static void open_show(Open *o, unsigned pid) {
     int fp = wl_focus_pid();
     char who[128] = "", front_app[128] = "", comm[32] = "";
     int front = pid && fp > 0 && (int)pid == fp;
     if (pid && appid_of_pid(pid, who, sizeof who) != 0) who[0] = 0;
     if (!front && who[0] && fp > 0 && appid_of_pid((unsigned)fp, front_app, sizeof front_app) == 0) front = !strcmp(who, front_app);
-    if (pid) {
-        char path[48];
-        snprintf(path, sizeof path, "/proc/%u/comm", pid);
-        FILE *f = fopen(path, "re");
-        if (f) { if (!fgets(comm, sizeof comm, f)) comm[0] = 0; fclose(f); }
-        comm[strcspn(comm, "\n")] = 0;
-    }
+    comm_of(pid, comm, sizeof comm);
     HBuf j = { 0 };
     hb_printf(&j, "{\"id\":%d,\"kind\":\"%s\",\"front\":%s,\"target\":", o->id, open_kinds[o->kind], front ? "true" : "false");
     hb_str(&j, o->target);
@@ -601,9 +625,545 @@ static void screensaver(const DMsg *m) {
     dw_free(&b);
 }
 
+/* ---- org.freedesktop.portal.GlobalShortcuts (version 1) ----
+ * Push-to-talk in a call app, a recorder's hotkeys: an app opens a session, proposes its shortcuts
+ * (an id, a description, a preferred trigger) and LordOS's own sheet asks the person (hw event
+ * "portal-shortcuts", sdk/globalshortcuts.jsx): each one takes the proposed key, another pressed there,
+ * or none, and nothing is bound until the person answers (lord.portal.shortcutsChosen). The rules
+ * (triggers, the keys LordOS keeps, a session's states, the store) are in gshort.c. The decisions are
+ * kept per app, by the app's scope (sec/appid.h), in ~/.config/lordos/global-shortcuts.json, which
+ * lord.fs can't write (fsops_protected); a later session of the same app gets them without asking, and
+ * Settings → Keyboard changes or forgets them. An app in no scope of its own is asked every time and
+ * nothing of it is kept.
+ *
+ * A bound key goes to the app, pressed and released (Activated and Deactivated with the session's
+ * handle, the shortcut's id and a time in ms), and to nothing else: not the focused app, not the shell,
+ * as GNOME and KDE do. Only to the connection that opened the session and only while it is BOUND: a
+ * closed session or a connection that left the bus gets nothing more. A key LordOS keeps (gs_kept,
+ * checked again at each press, since the theme's table can change) is never delivered. */
+#define GS_IFACE      "org.freedesktop.portal.GlobalShortcuts"
+#define SES_IFACE     "org.freedesktop.portal.Session"
+#define GS_FILE       "global-shortcuts.json"
+#define MAX_GSESS     32
+#define GSESS_PER_APP 4
+#define GS_MAX_SC     32
+#define GS_MAX_HELD   16
+
+typedef struct { char id[GS_ID_MAX], desc[GS_DESC_MAX]; GsKey want, key; int has_want, bound; } GsShortcut;
+/* app: "desktop:<id>" from the scope, "" with none (nothing kept); known: the bus said which pid */
+typedef struct {
+    int id, state, known, over;
+    uint32_t serial;
+    char sender[256], path[400], req[400], app[GS_APP_MAX], comm[32];
+    int n;
+    GsShortcut sc[GS_MAX_SC];
+} GSess;
+static GSess gsess[MAX_GSESS];
+static int ngsess, gsess_seq, gs_paused;
+static GsStore gstore;
+/* the keys whose press went to an app: their repeats are taken and their release is Deactivated */
+static struct { int code, sess; char id[GS_ID_MAX]; } held[GS_MAX_HELD];
+static int nheld;
+
+static uint64_t ms_now(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * 1000 + (uint64_t)t.tv_nsec / 1000000;
+}
+
+static int gs_file(char *path, size_t n, int make_dir) {
+    const char *home = getenv("HOME");
+    if (!home || home[0] != '/') return -1;
+    char dir[512];
+    if (make_dir) {
+        snprintf(dir, sizeof dir, "%s/.config", home);
+        mkdir(dir, 0700);
+        snprintf(dir, sizeof dir, "%s/.config/lordos", home);
+        mkdir(dir, 0700);
+    }
+    return snprintf(path, n, "%s/.config/lordos/" GS_FILE, home) >= (int)n ? -1 : 0;
+}
+
+static void gs_load(void) {
+    char path[600];
+    gstore.n = 0;
+    if (gs_file(path, sizeof path, 0)) return;
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return;
+    char *buf = malloc(256 * 1024);
+    ssize_t got = buf ? read(fd, buf, 256 * 1024 - 1) : -1;
+    close(fd);
+    if (got > 0 && gs_store_load(&gstore, buf, (size_t)got)) fprintf(stderr, "portal: %s is not valid JSON; no global shortcuts kept\n", path);
+    free(buf);
+}
+
+static void gs_save(void) {
+    char path[600], tmp[620];
+    if (gs_file(path, sizeof path, 1)) return;
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    char *json = gs_store_json(&gstore);
+    if (!json) return;
+    unlink(tmp);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    size_t len = strlen(json);
+    int ok = fd >= 0 && write(fd, json, len) == (ssize_t)len;
+    if (fd >= 0) ok = close(fd) == 0 && ok;
+    if (ok && rename(tmp, path) == 0) { free(json); return; }
+    fprintf(stderr, "portal: can't write %s: %s\n", path, strerror(errno));
+    unlink(tmp);
+    free(json);
+}
+
+static GSess *gsess_by_id(int id) {
+    for (int i = 0; i < ngsess; i++) if (gsess[i].id == id) return &gsess[i];
+    return NULL;
+}
+
+/* the session at path, if the connection asking is the one that opened it */
+static GSess *gsess_of(const char *path, const char *sender) {
+    for (int i = 0; sender && path && i < ngsess; i++)
+        if (!strcmp(gsess[i].path, path) && !strcmp(gsess[i].sender, sender)) return &gsess[i];
+    return NULL;
+}
+
+/* Who else has k: a kept decision of another app or of another shortcut of this one, or a live session
+ * (an app in no scope keeps its bindings only there). The app or process name, or NULL. */
+static const char *gs_owner(const GsKey *k, const GSess *me, const char *id) {
+    const GsEntry *e = gs_store_owner(&gstore, k, me->app, id);
+    if (e) return e->app;
+    for (int i = 0; i < ngsess; i++) {
+        const GSess *o = &gsess[i];
+        for (int j = 0; j < o->n; j++) {
+            if (!o->sc[j].bound || !gs_same(&o->sc[j].key, k)) continue;
+            int same_app = o == me || (me->app[0] && !strcmp(o->app, me->app));
+            if (same_app && !strcmp(o->sc[j].id, id)) continue;
+            return o->app[0] ? o->app : o->comm;
+        }
+    }
+    return NULL;
+}
+
+/* a(sa{sv}) of the bound shortcuts: description and trigger_description (the form sdk/shortcuts.js writes) */
+static void gs_put_list(DBuf *b, const GSess *s) {
+    size_t a = dw_arr_begin(b, 8);
+    for (int i = 0; i < s->n; i++) {
+        if (!s->sc[i].bound) continue;
+        char trig[64];
+        gs_format(&s->sc[i].key, trig, sizeof trig);
+        dw_struct(b);
+        dw_str(b, s->sc[i].id);
+        size_t d = dw_arr_begin(b, 8);
+        dw_struct(b); dw_str(b, "description"); dw_variant(b, "s"); dw_str(b, s->sc[i].desc);
+        dw_struct(b); dw_str(b, "trigger_description"); dw_variant(b, "s"); dw_str(b, trig);
+        dw_arr_end(b, d);
+    }
+    dw_arr_end(b, a);
+}
+
+static void gs_respond(const GSess *s, const char *handle) {
+    if (!up) return;
+    DBuf b;
+    dw_init(&b);
+    dw_u32(&b, 0);
+    size_t a = dw_arr_begin(&b, 8);
+    dw_struct(&b);
+    dw_str(&b, "shortcuts");
+    dw_variant(&b, "a(sa{sv})");
+    gs_put_list(&b, s);
+    dw_arr_end(&b, a);
+    DHdr h = { .type = DBUS_SIGNAL, .path = handle, .iface = REQ_IFACE, .member = "Response", .dest = s->sender, .sig = "ua{sv}" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+}
+
+/* Activated or Deactivated, to the session's connection only */
+static void gs_signal(const GSess *s, const char *member, const char *id) {
+    if (!up) return;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, s->path);
+    dw_str(&b, id);
+    dw_u64(&b, ms_now());
+    size_t a = dw_arr_begin(&b, 8);
+    dw_arr_end(&b, a);
+    DHdr h = { .type = DBUS_SIGNAL, .path = OBJ_PATH, .iface = GS_IFACE, .member = member, .dest = s->sender, .sig = "osta{sv}" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+}
+
+static void gs_changed_signal(const GSess *s) {
+    if (!up) return;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, s->path);
+    gs_put_list(&b, s);
+    DHdr h = { .type = DBUS_SIGNAL, .path = OBJ_PATH, .iface = GS_IFACE, .member = "ShortcutsChanged", .dest = s->sender, .sig = "oa(sa{sv})" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+}
+
+/* A shortcut's binding from what is kept: still free and nobody else's, otherwise unassigned. 1 when
+ * the app has decided about it. */
+static int gs_from_store(GSess *s, GsShortcut *sc) {
+    GsEntry *e = s->app[0] ? gs_store_find(&gstore, s->app, sc->id) : NULL;
+    sc->bound = 0;
+    if (!e) return 0;
+    if (e->bound && gs_kept(&e->key) == GS_FREE && !gs_owner(&e->key, s, sc->id)) { sc->key = e->key; sc->bound = 1; }
+    return 1;
+}
+
+/* The kept decisions for app changed (another of its sessions' sheet, Settings): its bound sessions
+ * follow them and are told with ShortcutsChanged, and the shell redraws Settings. */
+static void gs_app_changed(const char *app, const GSess *except) {
+    for (int i = 0; app[0] && i < ngsess; i++) {
+        GSess *o = &gsess[i];
+        if (o == except || o->state != GSS_BOUND || strcmp(o->app, app)) continue;
+        for (int j = 0; j < o->n; j++) gs_from_store(o, &o->sc[j]);
+        gs_changed_signal(o);
+    }
+    hw_emit("portal-shortcuts-changed", "null");
+}
+
+static void gs_sheet(const GSess *s) {
+    HBuf j = { 0 };
+    hb_printf(&j, "{\"id\":%d,\"parent\":%d,\"app\":", s->id, s->over);
+    hb_str(&j, s->app);
+    hb_printf(&j, ",\"comm\":");
+    hb_str(&j, s->comm);
+    hb_printf(&j, ",\"shortcuts\":[");
+    for (int i = 0; i < s->n; i++) {
+        const GsShortcut *sc = &s->sc[i];
+        char want[64] = "", now[64] = "";
+        if (sc->has_want) gs_format(&sc->want, want, sizeof want);
+        if (sc->bound) gs_format(&sc->key, now, sizeof now);
+        const char *owner = sc->has_want ? gs_owner(&sc->want, s, sc->id) : NULL;
+        hb_printf(&j, "%s{\"id\":", i ? "," : "");
+        hb_str(&j, sc->id);
+        hb_printf(&j, ",\"description\":");
+        hb_str(&j, sc->desc);
+        hb_printf(&j, ",\"proposed\":");
+        hb_str(&j, want);
+        hb_printf(&j, ",\"kept\":%d,\"owner\":", sc->has_want ? gs_kept(&sc->want) : GS_FREE);
+        hb_str(&j, owner ? owner : "");
+        hb_printf(&j, ",\"current\":");
+        hb_str(&j, now);
+        hb_printf(&j, "}");
+    }
+    hb_printf(&j, "]}");
+    char *json = hb_take(&j);
+    if (json) hw_emit("portal-shortcuts", json);
+    free(json);
+}
+
+static void gs_sheet_gone(const GSess *s) {
+    char j[32];
+    snprintf(j, sizeof j, "{\"id\":%d}", s->id);
+    hw_emit("portal-shortcuts-gone", j);
+}
+
+static void gsess_drop(int i) {
+    if (gsess[i].state == GSS_ASKING) gs_sheet_gone(&gsess[i]);
+    memmove(&gsess[i], &gsess[i + 1], sizeof gsess[0] * (size_t)(ngsess - i - 1));
+    ngsess--;
+}
+
+/* CreateSession(a{sv}) → the Request; its Response names the session. The bus is asked for the
+ * caller's pid first, so its answer is here before the app can call BindShortcuts. */
+static void gs_create(const DMsg *m) {
+    if (!m->sig || strcmp(m->sig, "a{sv}") || !m->sender) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    int mine = 0;
+    for (int i = 0; i < ngsess; i++) mine += !strcmp(gsess[i].sender, m->sender);
+    if (ngsess >= MAX_GSESS || mine >= GSESS_PER_APP) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "too many sessions"); return; }
+    DRd r;
+    dr_init(&r, m);
+    const char *token = "", *stoken = "";
+    size_t end = dr_arr(&r, 8);
+    while (!r.err && dr_more(&r, end)) {
+        dr_struct(&r);
+        const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
+        if (r.err) break;
+        if (!strcmp(k, "handle_token") && !strcmp(sig, "s")) token = dr_str(&r, NULL);
+        else if (!strcmp(k, "session_handle_token") && !strcmp(sig, "s")) stoken = dr_str(&r, NULL);
+        else dr_skip(&r, sig);
+    }
+    if (r.err) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "options"); return; }
+    GSess *s = &gsess[ngsess];
+    memset(s, 0, sizeof *s);
+    s->id = ++gsess_seq;
+    snprintf(s->sender, sizeof s->sender, "%s", m->sender);
+    object_path("session", m->sender, stoken, s->id, s->path, sizeof s->path);
+    for (int i = 0; i < ngsess; i++)
+        if (!strcmp(gsess[i].path, s->path)) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "session exists"); return; }
+    s->state = gs_step(GSS_NONE, GSO_CREATE);
+    ngsess++;
+    char handle[400];
+    request_path(m->sender, token, s->id, handle, sizeof handle);
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, handle);
+    dbus_reply(&conn, m, "o", &b);
+    dw_free(&b);
+    dw_init(&b);
+    dw_str(&b, m->sender);
+    DHdr q = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
+               .member = "GetConnectionUnixProcessID", .dest = "org.freedesktop.DBus", .sig = "s" };
+    s->serial = dbus_send(&conn, &q, &b);
+    dw_free(&b);
+    if (!s->serial) s->known = 1;           /* unknown: an app in no scope */
+    /* session_handle as a string, the way xdg-desktop-portal sends it */
+    dw_init(&b);
+    dw_u32(&b, 0);
+    size_t a = dw_arr_begin(&b, 8);
+    dw_struct(&b);
+    dw_str(&b, "session_handle");
+    dw_variant(&b, "s");
+    dw_str(&b, s->path);
+    dw_arr_end(&b, a);
+    DHdr h = { .type = DBUS_SIGNAL, .path = handle, .iface = REQ_IFACE, .member = "Response", .dest = s->sender, .sig = "ua{sv}" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+}
+
+static void gs_pid(GSess *s, unsigned pid) {
+    s->known = 1;
+    if (!pid || appid_of_pid(pid, s->app, sizeof s->app) != 0) s->app[0] = 0;
+    comm_of(pid, s->comm, sizeof s->comm);
+}
+
+/* BindShortcuts(o session, a(sa{sv}) shortcuts, s parent_window, a{sv} options) → the Request */
+static void gs_bind(const DMsg *m) {
+    if (!m->sig || strcmp(m->sig, "oa(sa{sv})sa{sv}")) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    DRd r;
+    dr_init(&r, m);
+    GSess *s = gsess_of(dr_str(&r, NULL), m->sender);
+    if (!s) { dbus_error(&conn, m, "org.freedesktop.portal.Error.NotFound", "no such session"); return; }
+    if (gs_step(s->state, GSO_BIND) < 0) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "the session is already bound or asking"); return; }
+    static GsShortcut sc[GS_MAX_SC];
+    int n = 0, bad = 0;
+    size_t end = dr_arr(&r, 8);
+    while (!r.err && !bad && dr_more(&r, end)) {
+        dr_struct(&r);
+        const char *id = dr_str(&r, NULL);
+        if (n >= GS_MAX_SC || !gs_id_valid(id)) { bad = 1; break; }
+        for (int i = 0; i < n && !bad; i++) bad = !strcmp(sc[i].id, id);
+        GsShortcut *c = &sc[n];
+        memset(c, 0, sizeof *c);
+        snprintf(c->id, sizeof c->id, "%s", id);
+        size_t oe = dr_arr(&r, 8);
+        while (!r.err && dr_more(&r, oe)) {
+            dr_struct(&r);
+            const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
+            if (r.err) break;
+            if (!strcmp(k, "description") && !strcmp(sig, "s")) gs_text(c->desc, sizeof c->desc, dr_str(&r, NULL));
+            else if (!strcmp(k, "preferred_trigger") && !strcmp(sig, "s")) c->has_want = !gs_parse(dr_str(&r, NULL), &c->want);
+            else dr_skip(&r, sig);
+        }
+        n++;
+    }
+    const char *parent = bad ? "" : dr_str(&r, NULL);
+    const char *token = bad ? "" : opt_token(&r);
+    if (r.err || bad || !n) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "shortcuts"); return; }
+    s->over = !strncmp(parent, "wayland:", 8) ? wl_foreign_surface(parent + 8) : 0;
+    memcpy(s->sc, sc, sizeof sc[0] * (size_t)n);
+    s->n = n;
+    request_path(m->sender, token, s->id, s->req, sizeof s->req);
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, s->req);
+    dbus_reply(&conn, m, "o", &b);
+    dw_free(&b);
+    /* the person decided about every one of them before: no sheet */
+    int decided = 0;
+    for (int i = 0; i < n; i++) decided += gs_from_store(s, &s->sc[i]);
+    s->state = gs_step(s->state, GSO_BIND);
+    if (s->app[0] && decided == n) {
+        s->state = gs_step(s->state, GSO_ANSWER);
+        gs_respond(s, s->req);
+        return;
+    }
+    gs_sheet(s);
+}
+
+void portal_shortcuts_chosen(int id, const char *const *ids, const char *const *triggers, int n) {
+    GSess *s = gsess_by_id(id);
+    if (!s || gs_step(s->state, GSO_ANSWER) < 0) return;
+    if (n < 0) {                            /* cancelled: the app may ask again */
+        s->state = gs_step(s->state, GSO_CANCEL);
+        respond(s->sender, s->req, 1);
+        return;
+    }
+    /* in order, so of two shortcuts given the same keys only the first gets them */
+    for (int i = 0; i < s->n; i++) s->sc[i].bound = 0;
+    for (int i = 0; i < s->n; i++) {
+        GsShortcut *sc = &s->sc[i];
+        const char *trig = NULL;
+        for (int k = 0; k < n && !trig; k++) if (ids[k] && !strcmp(ids[k], sc->id)) trig = triggers[k] ? triggers[k] : "";
+        GsKey key;
+        int ok = trig && trig[0] && !gs_parse(trig, &key) && gs_kept(&key) == GS_FREE && !gs_owner(&key, s, sc->id);
+        if (ok) { sc->key = key; sc->bound = 1; }
+        if (s->app[0] && trig) gs_store_set(&gstore, s->app, sc->id, sc->desc, ok ? &key : NULL);
+    }
+    if (s->app[0]) gs_save();
+    s->state = gs_step(s->state, GSO_ANSWER);
+    gs_respond(s, s->req);
+    if (s->app[0]) gs_app_changed(s->app, s);
+    else hw_emit("portal-shortcuts-changed", "null");
+}
+
+/* ListShortcuts(o session, a{sv}) → the Request, answered at once with the bound ones */
+static void gs_list(const DMsg *m) {
+    if (!m->sig || strcmp(m->sig, "oa{sv}")) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    DRd r;
+    dr_init(&r, m);
+    GSess *s = gsess_of(dr_str(&r, NULL), m->sender);
+    const char *token = opt_token(&r);
+    if (r.err) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "options"); return; }
+    if (!s || gs_step(s->state, GSO_LIST) < 0) { dbus_error(&conn, m, "org.freedesktop.portal.Error.NotFound", "no such session"); return; }
+    char handle[400];
+    request_path(m->sender, token, s->id, handle, sizeof handle);
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, handle);
+    dbus_reply(&conn, m, "o", &b);
+    dw_free(&b);
+    gs_respond(s, handle);
+}
+
+/* Session.Close on the session's own object, only from the connection that opened it */
+static void gs_close(const DMsg *m) {
+    for (int i = 0; m->sender && i < ngsess; i++)
+        if (!strcmp(gsess[i].path, m->path) && !strcmp(gsess[i].sender, m->sender)) {
+            gsess_drop(i);
+            dbus_reply(&conn, m, NULL, NULL);
+            return;
+        }
+    dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such session");
+}
+
+static int gs_session_path(const char *p) {
+    static const char pre[] = OBJ_PATH "/session/";
+    return p && !strncmp(p, pre, sizeof pre - 1);
+}
+
+int portal_shortcut_key(int code, int value, char letter, unsigned mods) {
+    if (value == 0 || value == 2) {
+        int hit = 0;
+        for (int i = nheld; i-- > 0;) {
+            if (held[i].code != code) continue;
+            hit = 1;
+            if (value == 2) continue;
+            GSess *s = gsess_by_id(held[i].sess);
+            if (s && gs_step(s->state, GSO_KEY) >= 0) gs_signal(s, "Deactivated", held[i].id);
+            memmove(&held[i], &held[i + 1], sizeof held[0] * (size_t)(nheld - i - 1));
+            nheld--;
+        }
+        return hit;
+    }
+    if (value != 1 || !up || gs_paused) return 0;
+    int hit = 0;
+    for (int i = 0; i < ngsess; i++) {
+        GSess *s = &gsess[i];
+        if (gs_step(s->state, GSO_KEY) < 0) continue;
+        for (int j = 0; j < s->n; j++) {
+            const GsShortcut *sc = &s->sc[j];
+            if (!sc->bound || !gs_match(&sc->key, code, letter, mods) || gs_kept(&sc->key) != GS_FREE) continue;
+            int again = 0;                  /* pressed again with its release lost (the keyboard unplugged) */
+            for (int k = 0; k < nheld; k++) again |= held[k].code == code && held[k].sess == s->id && !strcmp(held[k].id, sc->id);
+            if (!again && nheld < GS_MAX_HELD) {
+                held[nheld].code = code;
+                held[nheld].sess = s->id;
+                snprintf(held[nheld].id, sizeof held[nheld].id, "%s", sc->id);
+                nheld++;
+            }
+            gs_signal(s, "Activated", sc->id);
+            hit = 1;
+        }
+    }
+    return hit;
+}
+
+void portal_shortcuts_pause(int on) { gs_paused = !!on; }
+
+/* For Settings: [{app, id, description, trigger}] of every kept decision */
+char *portal_shortcuts_list(void) {
+    HBuf j = { 0 };
+    hb_printf(&j, "[");
+    for (int i = 0; i < gstore.n; i++) {
+        const GsEntry *e = &gstore.e[i];
+        char trig[64] = "";
+        if (e->bound) gs_format(&e->key, trig, sizeof trig);
+        hb_printf(&j, "%s{\"app\":", i ? "," : "");
+        hb_str(&j, e->app);
+        hb_printf(&j, ",\"id\":");
+        hb_str(&j, e->id);
+        hb_printf(&j, ",\"description\":");
+        hb_str(&j, e->desc);
+        hb_printf(&j, ",\"trigger\":");
+        hb_str(&j, trig);
+        hb_printf(&j, "}");
+    }
+    hb_printf(&j, "]");
+    return hb_take(&j);
+}
+
+int portal_shortcut_check(const char *trigger, int session, const char *app, const char *id, char *out, size_t n,
+                          int *kept, char *owner, size_t on) {
+    GsKey k;
+    if (!trigger || gs_parse(trigger, &k)) return -1;
+    gs_format(&k, out, n);
+    *kept = gs_kept(&k);
+    static GSess none;
+    const GSess *s = session ? gsess_by_id(session) : NULL;
+    if (!s) { memset(&none, 0, sizeof none); snprintf(none.app, sizeof none.app, "%s", app ? app : ""); s = &none; }
+    const char *o = gs_owner(&k, s, id ? id : "");
+    snprintf(owner, on, "%s", o ? o : "");
+    return 0;
+}
+
+int portal_shortcut_set(const char *app, const char *id, const char *trigger) {
+    if (!app || !app[0] || !id || !gs_store_find(&gstore, app, id)) return -1;
+    GsKey k;
+    int bind = trigger && trigger[0];
+    if (bind) {
+        static GSess me;
+        memset(&me, 0, sizeof me);
+        snprintf(me.app, sizeof me.app, "%s", app);
+        if (gs_parse(trigger, &k) || gs_kept(&k) != GS_FREE || gs_owner(&k, &me, id)) return -1;
+    }
+    gs_store_set(&gstore, app, id, NULL, bind ? &k : NULL);
+    gs_save();
+    gs_app_changed(app, NULL);
+    return 0;
+}
+
+int portal_shortcuts_forget(const char *app) {
+    if (!app || !app[0]) return 0;
+    int gone = gs_store_forget(&gstore, app);
+    if (gone) gs_save();
+    for (int i = 0; i < ngsess; i++) {
+        GSess *o = &gsess[i];
+        if (o->state != GSS_BOUND || strcmp(o->app, app)) continue;
+        for (int j = 0; j < o->n; j++) o->sc[j].bound = 0;
+        gs_changed_signal(o);
+    }
+    hw_emit("portal-shortcuts-changed", "null");
+    return gone;
+}
+
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
+    for (int i = 0; i < ngsess; i++) {
+        if (gsess[i].known || gsess[i].serial != m->reply_serial) continue;
+        uint32_t pid = 0;
+        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
+        gs_pid(&gsess[i], pid);
+        return;
+    }
     for (int i = 0; i < nopens; i++) {
         if (opens[i].shown || opens[i].serial != m->reply_serial) continue;
         uint32_t pid = 0;
@@ -614,7 +1174,7 @@ static void on_reply(const DMsg *m) {
 }
 
 /* NameOwnerChanged(name, old, new) with no new owner: that connection is gone, and so are its holds,
- * its open requests and its file dialogs */
+ * its open requests, its file dialogs and its shortcut sessions */
 static void on_signal(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus") || !m->member || strcmp(m->member, "NameOwnerChanged")
         || !m->sig || strcmp(m->sig, "sss")) return;
@@ -627,9 +1187,11 @@ static void on_signal(const DMsg *m) {
     for (int i = nholds; i-- > 0;) if (!strcmp(holds[i].sender, name)) hold_drop(i);
     for (int i = nopens; i-- > 0;) if (!strcmp(opens[i].sender, name)) open_drop(i, 1);
     for (int i = npicks; i-- > 0;) if (!strcmp(picks[i].sender, name)) pick_drop(i);
+    for (int i = ngsess; i-- > 0;) if (!strcmp(gsess[i].sender, name)) gsess_drop(i);
 }
 
-/* Request.Close: the app no longer wants it (a dialog, an open or a hold); only the app that asked */
+/* Request.Close: the app no longer wants it (a dialog, an open, a hold or a shortcuts sheet); only the
+ * app that asked */
 static void request_close(const DMsg *m) {
     int found = 0;
     for (int i = 0; m->sender && !found && i < npicks; i++)
@@ -638,13 +1200,20 @@ static void request_close(const DMsg *m) {
         if (!strcmp(opens[i].handle, m->path) && !strcmp(opens[i].sender, m->sender)) { open_drop(i, 1); found = 1; }
     for (int i = 0; m->sender && !found && i < nholds; i++)
         if (!strcmp(holds[i].handle, m->path) && !strcmp(holds[i].sender, m->sender)) { hold_drop(i); found = 1; }
+    for (int i = 0; m->sender && !found && i < ngsess; i++)
+        if (gsess[i].state == GSS_ASKING && !strcmp(gsess[i].req, m->path) && !strcmp(gsess[i].sender, m->sender)) {
+            gs_sheet_gone(&gsess[i]);
+            gsess[i].state = gs_step(gsess[i].state, GSO_CANCEL);
+            found = 1;
+        }
     if (found) { dbus_reply(&conn, m, NULL, NULL); return; }
     dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such request");
 }
 
 /* the version property of each interface served here */
 static int version_of(const char *iface) {
-    return !strcmp(iface, IFACE) || !strcmp(iface, FC_IFACE) ? 2 : !strcmp(iface, OU_IFACE) ? 3 : !strcmp(iface, INH_IFACE) ? 1 : -1;
+    return !strcmp(iface, IFACE) || !strcmp(iface, FC_IFACE) ? 2 : !strcmp(iface, OU_IFACE) ? 3
+         : !strcmp(iface, INH_IFACE) || !strcmp(iface, GS_IFACE) ? 1 : -1;
 }
 
 static int screensaver_path(const char *p) { return p && (!strcmp(p, "/ScreenSaver") || !strcmp(p, "/org/freedesktop/ScreenSaver")); }
@@ -679,6 +1248,7 @@ static void handle(const DMsg *m) {
         return;
     }
     if (!strcmp(iface, REQ_IFACE) && !strcmp(mem, "Close") && m->path) { request_close(m); return; }
+    if (!strcmp(iface, SES_IFACE) && !strcmp(mem, "Close") && gs_session_path(m->path)) { gs_close(m); return; }
     if (screensaver_path(m->path)) { screensaver(m); return; }
     if (!m->path || strcmp(m->path, OBJ_PATH)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no existe"); return; }
     if (!strcmp(iface, "org.freedesktop.DBus.Properties")) {
@@ -713,6 +1283,9 @@ static void handle(const DMsg *m) {
     if (!strcmp(iface, OU_IFACE) && !strcmp(mem, "OpenFile")) { open_call(m, 1, 0); return; }
     if (!strcmp(iface, OU_IFACE) && !strcmp(mem, "OpenDirectory")) { open_call(m, 1, 1); return; }
     if (!strcmp(iface, INH_IFACE) && !strcmp(mem, "Inhibit")) { inhibit(m); return; }
+    if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "CreateSession")) { gs_create(m); return; }
+    if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "BindShortcuts")) { gs_bind(m); return; }
+    if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "ListShortcuts")) { gs_list(m); return; }
     if (!strcmp(iface, IFACE) || !iface[0]) {
         if (!strcmp(mem, "ReadAll") && m->sig && !strcmp(m->sig, "as")) { read_all(m); return; }
         if (!strcmp(mem, "Read") && m->sig && !strcmp(m->sig, "ss")) { read_one(m, 1); return; }
@@ -751,6 +1324,7 @@ int portal_start(void) {
         return -1;
     }
     int ss = own_name(SS_NAME);
+    gs_load();
     /* the connections that leave the bus: their holds and requests go with them */
     DBuf b;
     dw_init(&b);
@@ -760,7 +1334,7 @@ int portal_start(void) {
     dbus_send(&conn, &h, &b);
     dw_free(&b);
     up = 1;
-    fprintf(stderr, "portal: Settings, FileChooser, OpenURI and Inhibit on the session bus%s\n",
+    fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit and GlobalShortcuts on the session bus%s\n",
             ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
     return 0;
 }
@@ -779,6 +1353,8 @@ void portal_dispatch(void) {
         up = 0;
         nholds = 0;                         /* nobody can let them go any more */
         while (nopens) open_drop(nopens - 1, 1);
+        while (ngsess) gsess_drop(ngsess - 1);  /* no app can get a shortcut any more */
+        nheld = 0;
     }
 }
 

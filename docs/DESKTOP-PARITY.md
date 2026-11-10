@@ -53,7 +53,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | 🟨 registers and shows; SVG-only icons show a letter (needs an SVG rasterizer: ⛔) |
 | XDG autostart (`/etc/xdg/autostart`, `~/.config/autostart`) through a closed launcher, listed in Settings | sync clients, VPNs and messengers start with the session | M | ⛔ a new launch path |
 | Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | 🟨 built, to check on the VM |
-| Global shortcuts portal | push-to-talk, OBS | M | ⬜ |
+| Global shortcuts portal | push-to-talk, OBS | M | 🟨 built, to check on the VM |
 | Drop onto isolated apps (Mail attaches, Calendar and Contacts import): the dropped files granted to that app as the file chooser grants them | Mail can't take a dragged file | M | ⛔ a new broker message and grant |
 | Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | ✅ checked on VM 127 |
 

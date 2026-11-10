@@ -182,6 +182,8 @@ export {
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
 import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, startHardware } from './hardware.jsx';
+import { GlobalShortcutsPrompt } from './globalshortcuts.jsx';
+export { KeyComboField, useGlobalShortcuts, checkGlobalShortcut, setGlobalShortcut, forgetGlobalShortcuts } from './globalshortcuts.jsx';
 import { startTray } from './trayitems.jsx';
 // Settings → Displays: numbering, Identify (a big number on each real display) and magnetic arrangement
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
@@ -330,7 +332,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, VoiceSavePrompt, DisplayConfirm),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, VoiceSavePrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';
