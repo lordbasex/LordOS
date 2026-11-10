@@ -128,8 +128,8 @@ const char *wl_clip_files_from(void);                   /* the app that copied t
 int         wl_clip_set_files(const char *list, size_t len, int count, int cut);
 
 /* Drag and drop from LordOS's Files (lord.wayland.dragFiles): while its drag is over a Linux window the
- * compositor offers these paths (each one already checked: absolute, existing, no NUL or newline) as
- * text/uri-list and text/plain. Only while a button is down and no app's drag runs; 1 if it started.
+ * compositor offers these paths (each one already checked: absolute, existing, UTF-8, no NUL or line break;
+ * at most URIL_MAX_PATHS) as text/uri-list and text/plain, encoded by urilist.c as Files' copy is. Only while a button is down and no app's drag runs; 1 if it started.
  * The last release drops (or cancels); wl_drag_files_end cancels one still running. wl_drag_files_taken:
  * the action the window under the pointer agreed (1 copy, 2 move), 0 if it takes nothing. */
 int  wl_drag_files(const char *const *paths, int n);

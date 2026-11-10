@@ -1612,7 +1612,8 @@ static JSValue f_wl_fullscreen(JSContext *c, JSValueConst this_val, int argc, JS
 
 /* lord.wayland.dragFiles(paths) → bool: the paths Files is dragging, offered to the Linux window under the
  * pointer while the drag is over one (wl_drag_files); dragFiles(null) ends a drag still running. Only paths:
- * absolute, existing, without a NUL or a newline, at most URIL_MAX_PATHS; one that is not refuses them all.
+ * absolute, existing, valid UTF-8, without a NUL or a line break (uril_path_ok), at most URIL_MAX_PATHS; one
+ * that is not refuses them all.
  * Nothing runs and nothing is read here: the app that takes the drop opens the files itself. */
 static JSValue f_wl_drag_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;

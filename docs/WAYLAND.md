@@ -249,7 +249,7 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   bits. A source, an icon, a target or a whole client that goes away mid-drag ends that part cleanly: the
   source destroyed cancels the drag (the target gets `leave`), and the icon destroyed just stops being drawn.
 - **From Files to a Linux app.** When a Files drag starts, Files hands its paths to lord-server
-  (`lord.wayland.dragFiles`). Only paths are accepted: absolute, existing, without a NUL or a newline, at most
+  (`lord.wayland.dragFiles`). Only paths are accepted: absolute, existing, UTF-8, without a NUL or a line break, at most
   256. While the drag is over a Linux window, the compositor is the source: it offers `text/uri-list`
   (`file://` URIs, percent-encoded, CRLF separated) and `text/plain` (the paths, one per line), encoded as
   Files' copy to the clipboard is (`uril_encode`), and writes
