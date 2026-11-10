@@ -170,6 +170,7 @@ export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mail
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';
+import { ScreenCastPrompt } from './screencast.jsx';
 import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
 import { LiveSpeechPanel } from './livespeech.jsx';
 export { openFileWithApps, openUrl, revealPath, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
@@ -334,7 +335,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, VoiceSavePrompt, DisplayConfirm),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, VoiceSavePrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';

@@ -16,6 +16,7 @@ import { admin } from './admin.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
 import { shareAppId, shareAskList, staleGrants } from './sharemodel.js';
+import { castRuns, castShown, castStop } from './screencast.jsx';
 
 const api = () => typeof lord !== 'undefined' && lord.share;
 export const shareHolder = createStore(null);
@@ -70,29 +71,36 @@ export const share = {
 };
 
 // One pill per display, in the notification layer, above fullscreen windows. Unlike the remote desktop's
-// notice this one takes clicks.
+// notice this one takes clicks. It also shows what Linux apps are shown through the ScreenCast portal
+// (sdk/screencast.jsx), a pill each under the API's, with the same Stop; their frames wait for it too.
 export function ShareBadge() {
   const c = useStore(shareHolder);
+  const casts = useStore(castRuns);
   const token = c ? c.token : 0;
   useEffect(() => {
     if (!token || !api()) return undefined;
     lord.share.shown(token);
     return () => { if (lord.share.status()?.token === token) lord.share.hidden(); };
   }, [token]);
-  if (!c) return null;
+  const castIds = casts.map((r) => r.id).join(',');
+  useEffect(() => { for (const r of casts) castShown(r.id); }, [castIds]);
+  const pills = [
+    ...(c ? [{ key: 'share', text: t(c.input ? 'shell.share.sharingInput' : 'shell.share.sharing', { app: c.name }), stop: () => share.stop() }] : []),
+    ...casts.map((r) => ({ key: `cast${r.id}`, text: t('shell.share.castSharing', { app: r.name }), stop: () => castStop(r.id) })),
+  ];
+  if (!pills.length) return null;
   const list = screen.displays?.length ? screen.displays : [{ x: 0, y: 0, w: screen.width }];
-  return h(View, { style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, list.map((d, i) => h(View, {
-    key: i,
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, list.flatMap((d, i) => pills.map((p, k) => h(View, {
+    key: `${i}-${p.key}`,
     style: {
-      position: 'absolute', left: (d.x || 0) + (d.w || screen.width) - 432, top: (d.y || 0) + 66, width: 420, flexDirection: 'row', alignItems: 'center', gap: 8,
+      position: 'absolute', left: (d.x || 0) + (d.w || screen.width) - 432, top: (d.y || 0) + 66 + k * 40, width: 420, flexDirection: 'row', alignItems: 'center', gap: 8,
       paddingHorizontal: 12, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,69,58,0.95)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
     },
   },
   h(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' } }),
-  h(Text, { style: { flex: 1, fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden' } },
-    t(c.input ? 'shell.share.sharingInput' : 'shell.share.sharing', { app: c.name })),
-  h(View, { onClick: () => share.stop(), style: { paddingHorizontal: 10, height: 22, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' } },
-    h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, t('shell.share.stop'))))));
+  h(Text, { style: { flex: 1, fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden' } }, p.text),
+  h(View, { onClick: p.stop, style: { paddingHorizontal: 10, height: 22, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' } },
+    h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, t('shell.share.stop')))))));
 }
 
 async function answer(a, allow) {

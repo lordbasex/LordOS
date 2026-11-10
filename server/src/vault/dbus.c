@@ -502,6 +502,7 @@ int dbus_build(const DHdr *h, const DBuf *body, DBuf *out) {
     field_s(out, 6, "s", h->dest);
     field_s(out, 7, "s", h->sender);
     if (h->sig && h->sig[0]) field_s(out, 8, "g", h->sig);
+    if (h->unix_fds) { dw_struct(out); dw_u8(out, 9); dw_sig(out, "u"); dw_u32(out, h->unix_fds); }
     dw_arr_end(out, mark);
     dw_align(out, 8);
     if (body && body->n) w_put(out, body->p, body->n);
@@ -675,6 +676,8 @@ int dbus_open_fds(DConn *c, int fd, int timeout_ms) { return open_conn(c, fd, ti
 void dbus_close(DConn *c) {
     for (int i = 0; i < c->fdq_n && i < DBUS_MAX_FDS; i++) close(c->fdq[i]);
     c->fdq_n = 0;
+    for (int i = 0; i < c->fdout_n && i < DBUS_MAX_FDS; i++) close(c->fdout[i].fd);
+    c->fdout_n = 0;
     if (c->fd >= 0) close(c->fd);
     if (c->in) { explicit_bzero(c->in, c->in_cap); free(c->in); }
     if (c->out) { explicit_bzero(c->out, c->out_cap); free(c->out); }
@@ -684,15 +687,44 @@ void dbus_close(DConn *c) {
 
 int dbus_pending_out(const DConn *c) { return c->out_n > c->out_off; }
 
+/* Sends up to n bytes from the output offset; with fd >= 0 the fd goes with the first of them (sendmsg). */
+static ssize_t send_out(DConn *c, size_t n, int fd) {
+    if (fd < 0) return send(c->fd, c->out + c->out_off, n, MSG_NOSIGNAL | MSG_DONTWAIT);
+    struct iovec io = { c->out + c->out_off, n };
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cb;
+    memset(&cb, 0, sizeof cb);
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cb.b, .msg_controllen = sizeof cb.b };
+    struct cmsghdr *h = CMSG_FIRSTHDR(&mh);
+    h->cmsg_level = SOL_SOCKET;
+    h->cmsg_type = SCM_RIGHTS;
+    h->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(h), &fd, sizeof fd);
+    return sendmsg(c->fd, &mh, MSG_NOSIGNAL | MSG_DONTWAIT);
+}
+
 int dbus_flush(DConn *c) {
     if (c->dead) return -1;
     while (c->out_off < c->out_n) {
-        ssize_t k = send(c->fd, c->out + c->out_off, c->out_n - c->out_off, MSG_NOSIGNAL | MSG_DONTWAIT);
+        /* a message with an fd starts a send of its own, so the fd arrives with its first byte */
+        size_t n = c->out_n - c->out_off;
+        int fd = -1;
+        if (c->fdout_n) {
+            if (c->fdout[0].at == c->out_off) {
+                fd = c->fdout[0].fd;
+                if (c->fdout_n > 1) n = c->fdout[1].at - c->out_off;
+            } else n = c->fdout[0].at - c->out_off;
+        }
+        ssize_t k = send_out(c, n, fd);
         if (k < 0) {
             if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EWOULDBLOCK) break;
             c->dead = 1;
             return -1;
+        }
+        if (fd >= 0 && k > 0) {                 /* it left: our copy goes */
+            close(fd);
+            c->fdout_n--;
+            memmove(c->fdout, c->fdout + 1, (size_t)c->fdout_n * sizeof c->fdout[0]);
         }
         c->out_off += (size_t)k;
     }
@@ -701,13 +733,24 @@ int dbus_flush(DConn *c) {
         size_t rest = c->out_n - c->out_off;
         memmove(c->out, c->out + c->out_off, rest);
         explicit_bzero(c->out + rest, c->out_n - rest);
+        for (int i = 0; i < c->fdout_n; i++) c->fdout[i].at -= c->out_off;
         c->out_n = rest;
         c->out_off = 0;
     }
     return 0;
 }
 
-uint32_t dbus_send(DConn *c, DHdr *h, const DBuf *body) {
+static uint32_t queue_msg(DConn *c, DHdr *h, const DBuf *body, int fd);
+
+uint32_t dbus_send(DConn *c, DHdr *h, const DBuf *body) { return queue_msg(c, h, body, -1); }
+
+uint32_t dbus_send_fd(DConn *c, DHdr *h, const DBuf *body, int fd) {
+    if (!c->unix_fds || fd < 0 || c->fdout_n >= DBUS_MAX_FDS) return 0;
+    h->unix_fds = 1;
+    return queue_msg(c, h, body, fd);
+}
+
+static uint32_t queue_msg(DConn *c, DHdr *h, const DBuf *body, int fd) {
     if (c->dead) return 0;
     if (!h->serial) { if (++c->serial == 0) c->serial = 1; h->serial = c->serial; }
     DBuf msg;
@@ -721,6 +764,12 @@ uint32_t dbus_send(DConn *c, DHdr *h, const DBuf *body) {
         if (c->out) { memcpy(p, c->out, c->out_n); explicit_bzero(c->out, c->out_cap); free(c->out); }
         c->out = p;
         c->out_cap = nc;
+    }
+    if (fd >= 0) {
+        int copy = fcntl(fd, F_DUPFD_CLOEXEC, 3);
+        if (copy < 0) { dw_free(&msg); return 0; }
+        c->fdout[c->fdout_n].at = c->out_n;
+        c->fdout[c->fdout_n++].fd = copy;
     }
     memcpy(c->out + c->out_n, msg.p, msg.n);
     c->out_n += msg.n;

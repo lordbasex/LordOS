@@ -975,6 +975,90 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
   validated by our own D-Bus code. `server/tests/tray_model_test.mjs`: which items show, the layout as
   the SDK's menu, where it opens. Not yet checked on the VM with real apps.
 
+## Sharing a screen or a window (ScreenCast, 0.8.8.8, in development)
+
+A browser's video call ("share a window / entire screen"), a recorder or a chat app asks the desktop for a screen or
+a window through `org.freedesktop.portal.ScreenCast`. LordOS serves it itself, on the portal name lord-server already
+owns (`server/src/ui/portal.c`), with no `xdg-desktop-portal`: version 4, `CreateSession`, `SelectSources`, `Start`,
+`OpenPipeWireRemote` and the `Session` object. The frames go to the app as a PipeWire video stream made by the
+sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3` (approved 2026-11-10).
+
+- **The sessions** (`server/src/cast/castsm.c`, a state machine with no I/O): `CreateSession` → `SelectSources` once
+  (types monitor and window, `multiple`, `cursor_mode` hidden or embedded) → `Start` → `OpenPipeWireRemote`, only
+  then. A session belongs to the bus name that made it; another sender's is "not found". At most 16 sessions, 4 per
+  app, one chooser on screen at a time. `AvailableSourceTypes` is 3 (monitor and window) when `lord-screencast` is next
+  to lord-server and the bus passes fds, else 0; `AvailableCursorModes` is 3 (hidden, embedded): the cursor as
+  metadata isn't offered. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the
+  person picks every time.
+- **The chooser** (`sdk/screencast.jsx`, `sdk/screencastmodel.js`): `Start` asks the bus which process called
+  (`GetConnectionUnixProcessID`, the socket's credentials), and the system layer shows the app's name (only an
+  identity LordOS verified: the app id of its launcher's scope, `appid_of_pid`; a process it can't tell is "An unknown
+  program" with a warning, never its `/proc/<pid>/comm`, which any process sets), the displays and the open windows
+  (not minimized), each with a picture of it
+  now (`lord.portal.castThumb`, only while that chooser is up; painted in capture mode, so a protected window is
+  black there too). Nothing is shared until the person picks and presses Share; Cancel answers response 1 and the app
+  may `Start` again. An app with "no screen capture" (Firewall, `restrict_blocks(FW_R_NO_SCREEN)`) gets response 2
+  with no question. It fails closed, as the PipeWire guard does (`csm_gate`): a sender LordOS can't identify also gets
+  response 2 while any app with "no screen capture" runs (it may be that app, out of its scope), and the chooser with
+  the warning otherwise.
+- **While it shares.** The screen-sharing API's indicator (`ShareBadge`, `sdk/share.js`) shows one more pill per
+  session, "{app} can see what you chose to share", with its Stop. lord-server sends no frame until that pill is on
+  screen (`lord.portal.castShown`). Stop, a lock or a user switch (`remote/mirror.c`), the shell being replaced, the
+  window being closed (its node destroyed: `node_gone_hook`; a share holds each node id with its never-reused serial,
+  `Node.serial` and `node_ref`, so a later window that gets the same id is never captured), the helper failing or the
+  app leaving the bus end the session, and the app hears
+  `Session.Closed` (not when it closed the session itself).
+- **The pixels** (`server/src/cast/cast.c`). Each source is painted again in capture mode, as Screenshots does: a
+  display is `paint_capture` at that display's own view and scale plus a fullscreen app (`wl_paint_fullscreen`); a
+  window is `paint_capture_node`, that window's frame and its sheets alone, so nothing above it shows and nothing
+  below it either, sharp on the display it is mostly on, its stream resized with it (a new ring, the consumer
+  renegotiates). Protected windows (Passwords) are black, as in every capture. Only what changed is painted: the
+  frame's UI damage (`paint_ui` → `cast_damage`) and, because on the GPU path an app's new frame is only a texture,
+  the boxes of the Linux apps' windows and menus that committed (`wl_content_track`/`wl_content_take`). The pointer,
+  when embedded, is the LordOS arrow drawn into the frame.
+- **The ring** (`server/src/cast/castproto.h`): per stream a memfd of three whole frames, sealed against shrinking
+  and growing; the helper gets a read-only reopen. lord-server writes a free slot (only the part of it older than
+  the source's canvas), sends `CM_FRAME`, and the slot is the helper's until its `CM_DONE`. Frames go only when the
+  consumer is streaming (`CM_WANT`), never faster than the rate it negotiated (at most 60 a second). With nothing
+  changing nothing is sent. Each side checks every message (`cast_check_helper`, `cast_check_server`): a slot the
+  helper doesn't hold, a node twice, an answer nobody asked for or a frame of another size ends the session.
+- **`lord-screencast`** (`server/src/cast/lordscreencast.c`): one per session, from `<lord-server dir>/lord-screencast`
+  (root's or the user's, not writable by others), no arguments, `LANG` only, the channel on fd 3. lord-server opens
+  the connections to the user's PipeWire itself (`$XDG_RUNTIME_DIR/pipewire-0`: a socket owned by the user, the
+  daemon at the other end checked with `SO_PEERCRED`) and passes them. The helper sets PipeWire up with no real-time
+  module, no D-Bus and no devices, then `sandbox_apply_helper` (scope `lordos-screencast`, `/usr` read-only, extra
+  syscalls only the three `timerfd_*`; no socket, connect, bind, clone of a process or exec) before the connection says
+  a word. Each source is a `Video/Source` node (`media.role` Screen, `node.name` `lordos-screencast-N`), BGRx or RGBx,
+  the source's size, a variable rate up to 60, PipeWire's own memfd buffers, driven by us (`PW_STREAM_FLAG_DRIVER`).
+  Once its nodes exist, its own connection lowers its permissions: read-only for everything (a link is only made
+  between nodes whose owners see each other) and full only for its nodes, so it can execute no factory: no node of its
+  own to record with, no link, no module. It never runs a thread of its own.
+- **The app's connection.** `OpenPipeWireRemote` is answered later, with an fd: lord-server opens a second connection,
+  the helper restricts it to the core, the client-node factory (to make the app's own stream) and the session's
+  nodes, with `PW_ID_ANY` to nothing for everything else and whatever comes later, waits for the daemon to apply it,
+  and hands it back (`pw_core_steal_fd`). A client can only lower its own permissions, so the app can't widen them.
+  The session manager links the app's stream to the node as for any other.
+- **Other apps.** Any PipeWire client could see a node, so the PipeWire guard (`sec/pwguard.c`) treats a shared
+  screen as a capture node of its own kind: hidden, with its ports, from every app with "no screen capture"
+  (`pwguard_node_flag`).
+- **What it costs.** Nothing when nothing is shared: no helper runs, nothing is tracked, painted or copied. Sharing
+  1920×1080 at 30 frames a second, every frame different, on the main machine's CPU path (Intel Core i9-10900,
+  `make -C server screencast-bench`, three runs): lord-server's copy into the ring 1.0–1.2 ms a frame (3–3.5 % of
+  one core), `lord-screencast` 2.8–3.2 % of one core (0.9–1.1 ms a frame, copying into PipeWire's buffer), plus
+  painting the changed part again in capture mode: the whole 1920×1080 desktop took 1.5 ms (a headless session's,
+  wallpaper, menu bar and Dock), a window or a video only its own area. A still screen sends no frames.
+- **Not yet.** dmabuf buffers (the frames are shared memory); the cursor as metadata; restoring a choice
+  (`restore_token`); a window's menus (popups) in a window share; audio. Not yet checked with a browser on the VM.
+- **Tests** (`make -C server test`): `build/castsm-test` (every call in its state and refused in the others, Cancel,
+  the app's `Request.Close` of its `Start`, the limits, an app leaving the bus, who gets the chooser: `csm_gate`),
+  `build/engine-test` (`test_node_ref`: a destroyed node's id taken by another, never its serial), `build/castproto-test` (the ring's
+  limits and header, slots and who holds them, each side refusing what the other may not say, the rate, the channel
+  over a real socketpair; with ASan and UBSan), `build/screencast-test` (`tests/screencast_test.sh`: `lord-screencast`
+  against a private PipeWire daemon of its own: the node, the app's connection seeing only the stream and the one
+  factory, frames reaching the app pixel for pixel, a resize, a frame of a wrong size ending it; "skipped: needs
+  pipewire" without the daemon), `build/dbus-test` (fds sent with replies, in order), `build/pwguard-test` (a screen
+  node is not a camera) and `tests/screencast_model_test.mjs` (the chooser's choices).
+
 ## Pending
 
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):

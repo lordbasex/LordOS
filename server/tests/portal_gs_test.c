@@ -24,6 +24,15 @@ int wl_focus_pid(void) { return 0; }
 int wl_foreign_surface(const char *h) { (void)h; return 0; }
 static const char *fake_app = "desktop:com.example.Talk";
 int appid_of_pid(unsigned pid, char *out, size_t n) { (void)pid; if (!fake_app) return 1; snprintf(out, n, "%s", fake_app); return 0; }
+/* the ScreenCast side of the same portal (no helper here: only its sessions, which share the session paths) */
+int appid_running(int (*match)(const char *app, void *u), void *u) { (void)match; (void)u; return 0; }
+int restrict_blocks(const char *fwid, uint32_t flag) { (void)fwid; (void)flag; return 0; }
+int cast_available(void) { return 0; }
+int cast_begin(int id, const CastSource *src, int n, int cursor_embedded) { (void)id; (void)src; (void)n; (void)cursor_embedded; return -1; }
+void cast_end(int id) { (void)id; }
+int cast_remote(int id, uint32_t req) { (void)id; (void)req; return -1; }
+void cast_shown(int id) { (void)id; }
+int cast_thumb(const CastSource *src, int max) { (void)src; (void)max; return 0; }
 
 static DConn app;
 typedef struct { char member[64], sig[64], path[400], s1[400], s2[128]; uint32_t code; uint64_t t; int type; char err[128]; int nlist; char list[8][128]; } Got;

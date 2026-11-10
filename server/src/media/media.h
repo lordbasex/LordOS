@@ -53,6 +53,9 @@ typedef struct { int x, y, mode; const uint32_t *px; int w, h, hx, hy; } MediaCu
  * recording. out = the frame already composited (without cursor). */
 const Canvas *media_composed(const Canvas *out, int remote, const MediaCursor *cur);
 
+/* The LordOS arrow with its tip at (x, y), as the recordings draw the pointer (sharing a screen, cast/cast.c). */
+void media_draw_arrow(Canvas *c, int x, int y);
+
 /* Protected windows present in the tree (counted at the moment). */
 int media_protected_count(void);
 

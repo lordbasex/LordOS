@@ -112,6 +112,7 @@ typedef struct {
     uint32_t serial, reply_serial;
     const char *path, *iface, *member, *error, *dest, *sig;
     const char *sender;                  /* only set by the bus (and by tests acting as the bus) */
+    uint32_t unix_fds;                   /* fds the message carries (dbus_send_fd sets it) */
 } DHdr;
 int dbus_build(const DHdr *h, const DBuf *body, DBuf *out);
 
@@ -125,6 +126,9 @@ typedef struct {
     int dead;
     int unix_fds;                        /* the bus agreed to pass fds (dbus_open_fds) */
     int fdq[DBUS_MAX_FDS], fdq_n;        /* fds received and not yet given to a message */
+    /* fds to send (dbus_send_fd): each goes with the byte at out offset `at`, the first of its message */
+    struct { size_t at; int fd; } fdout[DBUS_MAX_FDS];
+    int fdout_n;
 } DConn;
 
 /* Connects (without authenticating) to the session bus: DBUS_SESSION_BUS_ADDRESS (unix:path= or
@@ -141,6 +145,9 @@ int  dbus_open_fds(DConn *c, int fd, int timeout_ms);
 void dbus_close(DConn *c);                        /* closes the fd (and fds received) and wipes the buffers */
 /* Queues a message (h->serial is filled in if 0) and tries to send it. Returns the serial or 0. */
 uint32_t dbus_send(DConn *c, DHdr *h, const DBuf *body);
+/* The same, carrying one fd (a copy is sent; the caller keeps fd): its 'h' in the body is index 0. Only on a
+ * connection that negotiated fds; 0 otherwise, or with DBUS_MAX_FDS of them still waiting to leave. */
+uint32_t dbus_send_fd(DConn *c, DHdr *h, const DBuf *body, int fd);
 int  dbus_flush(DConn *c);                        /* sends what it can; -1 if disconnected */
 int  dbus_pending_out(const DConn *c);
 /* Reads what is available (non-blocking) and delivers the next complete message in m: 1 message,

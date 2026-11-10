@@ -9,7 +9,9 @@
  *     (our own client: modexp + HKDF + AES-128-CBC), create, search, read, change, delete,
  *     properties, introspection, lock and unlock with a prompt (Prompt + Completed);
  *   - fds (issue #36, logind's Inhibit): a reply carrying one is delivered with it only on a connection
- *     that negotiated fds, refused everywhere else; an 'h' with no fds is refused. */
+ *     that negotiated fds, refused everywhere else; an 'h' with no fds is refused.
+ *   - sending fds (the ScreenCast portal's OpenPipeWireRemote, ui/portal.c): each fd leaves with the first
+ *     byte of its own message, in order with the plain messages queued around it. */
 #include "vault/dbus.h"
 #include "vault/secretsvc.h"
 #include "vault/smem.h"
@@ -849,6 +851,54 @@ static void t_service_flow(void) {
     dbus_close(&bus);
 }
 
+/* Two connections over a socketpair, both with fds negotiated: plain, fd, plain, fd queued while the socket is full
+ * of nothing yet; the other side gets four messages in order, the fds on the two that carry them. */
+static void t_send_fds(void) {
+    int sv[2], p1[2], p2[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) || pipe(p1) || pipe(p2)) { check(0, "socketpair/pipe"); return; }
+    DConn a, b;
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.fd = sv[0]; a.unix_fds = 1;
+    b.fd = sv[1]; b.unix_fds = 1;
+    DConn plain;
+    memset(&plain, 0, sizeof plain);
+    plain.fd = -1;
+    DHdr h0 = { .type = DBUS_SIGNAL, .path = "/a", .iface = "a.b", .member = "C" };
+    check(dbus_send_fd(&plain, &h0, NULL, p1[1]) == 0, "no fds on a connection that didn't negotiate them");
+    DBuf body;
+    dw_init(&body);
+    dw_u32(&body, 0);
+    for (int i = 0; i < 4; i++) {
+        DHdr h = { .type = DBUS_SIGNAL, .path = "/a", .iface = "a.b", .member = i & 1 ? "Fd" : "Plain", .sig = i & 1 ? "h" : NULL };
+        uint32_t s = i & 1 ? dbus_send_fd(&a, &h, &body, i == 1 ? p1[1] : p2[1]) : dbus_send(&a, &h, NULL);
+        check(s != 0, "queued");
+    }
+    check(dbus_flush(&a) == 0 && !dbus_pending_out(&a) && a.fdout_n == 0, "all sent, no fd copy kept");
+    close(p1[1]);
+    close(p2[1]);
+    int got = 0, fds_ok = 1;
+    DMsg m;
+    while (got < 4 && dbus_next(&b, &m) == 1) {
+        int want_fd = got & 1;
+        if (strcmp(m.member, want_fd ? "Fd" : "Plain") || m.n_fds != want_fd) fds_ok = 0;
+        if (want_fd && m.n_fds == 1) {
+            check(write(m.fds[0], "x", 1) == 1, "the fd is the pipe's write end");
+        }
+        dbus_msg_free(&m);
+        got++;
+    }
+    check(got == 4 && fds_ok, "four messages in order, an fd with each that carries one");
+    char ch;
+    check(read(p1[0], &ch, 1) == 1 && read(p1[0], &ch, 1) == 0, "first pipe: written once, no copy left open");
+    check(read(p2[0], &ch, 1) == 1 && read(p2[0], &ch, 1) == 0, "second pipe: written once, no copy left open");
+    dw_free(&body);
+    close(p1[0]);
+    close(p2[0]);
+    dbus_close(&a);
+    dbus_close(&b);
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
     signal(SIGPIPE, SIG_IGN);
@@ -857,6 +907,7 @@ int main(int argc, char **argv) {
     t_reject();
     t_modexp();
     t_fds();
+    t_send_fds();
     /* fuzz over our own and captured messages */
     size_t len;
     uint8_t *v = valid_msg(&len);

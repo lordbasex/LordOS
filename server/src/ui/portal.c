@@ -1,9 +1,9 @@
-/* portal.c — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit and GlobalShortcuts
- * (without xdg-desktop-portal), and org.freedesktop.ScreenSaver: GTK, GNOME (libadwaita) and Qt apps read
- * from here the dark/light mode, the accent color, the order of the title bar buttons and the GTK 3 theme,
- * and follow LordOS's changes live (SettingChanged); they open links and files the way LordOS does, keep
- * the screen on while a video plays and get the shortcuts the person gave them (push-to-talk). Uses
- * Passwords' own D-Bus client (vault/dbus.c). See
+/* portal.c — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and
+ * ScreenCast (without xdg-desktop-portal), and org.freedesktop.ScreenSaver: GTK, GNOME (libadwaita) and Qt apps
+ * read from here the dark/light mode, the accent color, the order of the title bar buttons and the GTK 3 theme,
+ * and follow LordOS's changes live (SettingChanged); they open links and files the way LordOS does, keep the
+ * screen on while a video plays, get the shortcuts the person gave them (push-to-talk) and share a screen or a
+ * window the person picks. Uses Passwords' own D-Bus client (vault/dbus.c). See
  * docs/WAYLAND.md, "GTK and GNOME apps", and docs/FLATPAK.md, "Portals".
  *
  * GTK 3 outside Flatpak doesn't read the portal: it reads GSettings. lord-server gives the apps
@@ -16,9 +16,14 @@
 #include "../hw/jbuf.h"
 #include "../fsops.h"
 #include "../sec/appid.h"
+#include "../sec/restrict.h"
+#include "../fw/rules.h"
 #include "../vault/dbus.h"
 #include "../wl/keygrab.h"
 #include "../wl/wl.h"
+#include "../cast/cast.h"
+#include "../cast/castsm.h"
+#include "../cast/castproto.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -180,6 +185,15 @@ static const char introspect_xml[] =
     "  <signal name=\"Activated\"><arg type=\"o\"/><arg type=\"s\"/><arg type=\"t\"/><arg type=\"a{sv}\"/></signal>\n"
     "  <signal name=\"Deactivated\"><arg type=\"o\"/><arg type=\"s\"/><arg type=\"t\"/><arg type=\"a{sv}\"/></signal>\n"
     "  <signal name=\"ShortcutsChanged\"><arg type=\"o\"/><arg type=\"a(sa{sv})\"/></signal>\n"
+    "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
+    " </interface>\n"
+    " <interface name=\"org.freedesktop.portal.ScreenCast\">\n"
+    "  <method name=\"CreateSession\"><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"SelectSources\"><arg type=\"o\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"Start\"><arg type=\"o\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"OpenPipeWireRemote\"><arg type=\"o\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"h\" direction=\"out\"/></method>\n"
+    "  <property name=\"AvailableSourceTypes\" type=\"u\" access=\"read\"/>\n"
+    "  <property name=\"AvailableCursorModes\" type=\"u\" access=\"read\"/>\n"
     "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
     " </interface>\n"
     " <interface name=\"org.freedesktop.DBus.Properties\">\n"
@@ -1154,6 +1168,416 @@ int portal_shortcuts_forget(const char *app) {
     return gone;
 }
 
+/* ---- org.freedesktop.portal.ScreenCast ----
+ * A browser's video call, a recorder or a chat app asks to share "a window or the entire screen". The sessions follow
+ * cast/castsm.c: CreateSession, SelectSources (monitor and window, one or several, the pointer hidden or drawn in),
+ * Start and OpenPipeWireRemote. Start shows LordOS's own chooser (hw event "portal-cast", sdk/screencast.jsx): the
+ * displays and the open windows, with pictures, and the name of the app asking; nothing is shared until the person
+ * picks, and Cancel answers 1. Then lord-screencast (cast/cast.c) makes one PipeWire stream per source and the app gets
+ * their nodes; OpenPipeWireRemote gives it a PipeWire connection that sees only those. While a session runs the shell
+ * shows the sharing indicator with its Stop (hw event "portal-casts"); no frame goes before it is on screen
+ * (lord.portal.castShown). Stop, a lock, the app's Close or the app leaving the bus end it, and the app hears
+ * Session.Closed when it wasn't the one closing. persist_mode is accepted and nothing is kept: no restore_token is
+ * ever given, so the person picks every time. The cursor as metadata isn't offered. */
+#define SC_IFACE   "org.freedesktop.portal.ScreenCast"
+#define SESS_IFACE "org.freedesktop.portal.Session"
+#define SC_VERSION 4
+#define MAX_RCALLS 8
+#define THUMB_W    320
+_Static_assert((int)CSM_TYPE_MONITOR == (int)CAST_SRC_MONITOR && (int)CSM_TYPE_WINDOW == (int)CAST_SRC_WINDOW, "the portal's types are the helper's");
+_Static_assert((int)CSM_MAX_SOURCES == CAST_MAX_STREAMS, "one stream per source");
+
+static CastSm csm;
+/* per session (the same index as csm.s): who asked (the app LordOS verified, "" when it can't tell: never the name a
+ * process gives itself in /proc/<pid>/comm, which any process sets), and the bus's answer we wait for */
+static struct { char who[128]; uint32_t serial; } cast_app[CSM_MAX];
+/* OpenPipeWireRemote calls answered when the helper hands the connection back */
+typedef struct { int sess; uint32_t req, serial; char sender[256]; } RCall;
+static RCall rcalls[MAX_RCALLS];
+static int nrcalls;
+static uint32_t rcall_seq;
+
+static int cast_idx(const CsSess *s) { return (int)(s - csm.s); }
+
+static void cast_error(const DMsg *m, int e) {
+    const char *name = e == CSM_E_ARGS ? "org.freedesktop.DBus.Error.InvalidArgs" : e == CSM_E_NOTFOUND ? "org.freedesktop.portal.Error.NotFound"
+                     : "org.freedesktop.portal.Error.Failed";
+    const char *text = e == CSM_E_STATE ? "not now in this session" : e == CSM_E_FULL ? "too many sessions" : e == CSM_E_BUSY ? "another app is asking"
+                     : e == CSM_E_NOTFOUND ? "no such session" : "arguments";
+    dbus_error(&conn, m, name, text);
+}
+
+/* the options the ScreenCast calls take */
+typedef struct { const char *token, *session_token; uint32_t types, cursor, persist; int multiple; } CastOpts;
+
+static int cast_opts(DRd *r, CastOpts *o) {
+    memset(o, 0, sizeof *o);
+    o->token = o->session_token = "";
+    size_t end = dr_arr(r, 8);
+    while (!r->err && dr_more(r, end)) {
+        dr_struct(r);
+        const char *k = dr_str(r, NULL), *sig = dr_variant(r);
+        if (r->err) break;
+        int is_s = !strcmp(sig, "s"), is_u = !strcmp(sig, "u"), is_b = !strcmp(sig, "b");
+        if (!strcmp(k, "handle_token") && is_s) o->token = dr_str(r, NULL);
+        else if (!strcmp(k, "session_handle_token") && is_s) o->session_token = dr_str(r, NULL);
+        else if (!strcmp(k, "types") && is_u) o->types = dr_u32(r);
+        else if (!strcmp(k, "cursor_mode") && is_u) o->cursor = dr_u32(r);
+        else if (!strcmp(k, "persist_mode") && is_u) o->persist = dr_u32(r);
+        else if (!strcmp(k, "multiple") && is_b) o->multiple = dr_bool(r);
+        else if (!strcmp(k, "types") || !strcmp(k, "cursor_mode") || !strcmp(k, "persist_mode") || !strcmp(k, "multiple")) return -1;
+        else dr_skip(r, sig);           /* restore_token and the rest: nothing is restored */
+    }
+    return r->err ? -1 : 0;
+}
+
+static void reply_handle(const DMsg *m, const char *handle) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, handle);
+    dbus_reply(&conn, m, "o", &b);
+    dw_free(&b);
+}
+
+/* The shell's indicator: the sessions sharing now and who they are for */
+static void casts_changed(void) {
+    HBuf j = { 0 };
+    hb_printf(&j, "[");
+    int first = 1;
+    for (int i = 0; i < CSM_MAX; i++) {
+        if (csm.s[i].st != CS_STARTED) continue;
+        hb_printf(&j, "%s{\"id\":%d,\"who\":", first ? "" : ",", csm.s[i].id);
+        hb_str(&j, cast_app[i].who);
+        hb_printf(&j, "}");
+        first = 0;
+    }
+    hb_printf(&j, "]");
+    char *json = hb_take(&j);
+    if (json) hw_emit("portal-casts", json);
+    free(json);
+}
+
+static void chooser_gone(int id) {
+    char j[32];
+    snprintf(j, sizeof j, "{\"id\":%d}", id);
+    hw_emit("portal-cast-gone", j);
+}
+
+static void rcall_drop(int i, int fd) {
+    RCall *c = &rcalls[i];
+    if (up) {
+        if (fd >= 0) {
+            DBuf b;
+            dw_init(&b);
+            dw_u32(&b, 0);              /* the fd's index */
+            DHdr h = { .type = DBUS_RETURN, .reply_serial = c->serial, .dest = c->sender, .sig = "h" };
+            if (!dbus_send_fd(&conn, &h, &b, fd)) fd = -1;
+            dw_free(&b);
+        }
+        if (fd < 0) {
+            DBuf b;
+            dw_init(&b);
+            dw_str(&b, "no connection to share through");
+            DHdr h = { .type = DBUS_ERROR, .reply_serial = c->serial, .dest = c->sender, .error = "org.freedesktop.portal.Error.Failed", .sig = "s" };
+            dbus_send(&conn, &h, &b);
+            dw_free(&b);
+        }
+        dbus_flush(&conn);
+    }
+    memmove(&rcalls[i], &rcalls[i + 1], sizeof rcalls[0] * (size_t)(nrcalls - i - 1));
+    nrcalls--;
+}
+
+/* A session ends here. closed: the app didn't close it itself, so it hears Session.Closed (and a Start it waits for
+ * hears response 2). */
+static void cast_close(CsSess *s, int closed) {
+    int id = s->id;
+    if (s->st == CS_CHOOSING) chooser_gone(id);
+    if (closed && (s->st == CS_CHOOSING || s->st == CS_STARTING)) respond(s->sender, s->req, 2);
+    int was = s->st == CS_STARTED;
+    cast_end(id);
+    for (int i = nrcalls; i-- > 0;) if (rcalls[i].sess == id) rcall_drop(i, -1);
+    if (closed && up) {
+        DBuf b;
+        dw_init(&b);
+        size_t a = dw_arr_begin(&b, 8);
+        dw_arr_end(&b, a);
+        DHdr h = { .type = DBUS_SIGNAL, .path = s->path, .iface = SESS_IFACE, .member = "Closed", .dest = s->sender, .sig = "a{sv}" };
+        dbus_send(&conn, &h, &b);
+        dw_free(&b);
+        dbus_flush(&conn);
+    }
+    memset(&cast_app[cast_idx(s)], 0, sizeof cast_app[0]);
+    csm_end(s);
+    if (was) casts_changed();
+}
+
+static void sc_create(const DMsg *m) {
+    if (!m->sig || strcmp(m->sig, "a{sv}") || !m->sender) { cast_error(m, CSM_E_ARGS); return; }
+    DRd r;
+    dr_init(&r, m);
+    CastOpts o;
+    if (cast_opts(&r, &o)) { cast_error(m, CSM_E_ARGS); return; }
+    CsSess *s = NULL;
+    int e = csm_create(&csm, m->sender, o.session_token, &s);
+    if (e) { cast_error(m, e); return; }
+    memset(&cast_app[cast_idx(s)], 0, sizeof cast_app[0]);
+    char handle[400];
+    request_path(m->sender, o.token, s->id, handle, sizeof handle);
+    reply_handle(m, handle);
+    DBuf b;
+    dw_init(&b);
+    dw_u32(&b, 0);
+    size_t a = dw_arr_begin(&b, 8);
+    dw_struct(&b);
+    dw_str(&b, "session_handle");
+    dw_variant(&b, "s");
+    dw_str(&b, s->path);
+    dw_arr_end(&b, a);
+    DHdr h = { .type = DBUS_SIGNAL, .path = handle, .iface = REQ_IFACE, .member = "Response", .dest = m->sender, .sig = "ua{sv}" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+}
+
+/* SelectSources(o, a{sv}), Start(o, s, a{sv}) and OpenPipeWireRemote(o, a{sv}): the session, the sender's, and the
+ * options */
+static CsSess *sc_session(const DMsg *m, const char *sig, DRd *r, CastOpts *o) {
+    if (!m->sig || strcmp(m->sig, sig) || !m->sender) { cast_error(m, CSM_E_ARGS); return NULL; }
+    dr_init(r, m);
+    const char *path = dr_str(r, NULL);
+    if (sig[1] == 's') dr_str(r, NULL);     /* Start's parent window: the chooser is the system's, over everything */
+    if (r->err || cast_opts(r, o)) { cast_error(m, CSM_E_ARGS); return NULL; }
+    CsSess *s = csm_find(&csm, m->sender, path);
+    if (!s) cast_error(m, CSM_E_NOTFOUND);
+    return s;
+}
+
+static void sc_select(const DMsg *m) {
+    DRd r;
+    CastOpts o;
+    CsSess *s = sc_session(m, "oa{sv}", &r, &o);
+    if (!s) return;
+    int e = csm_select(&csm, s, o.types, o.multiple, o.cursor, o.persist);
+    if (e) { cast_error(m, e); return; }
+    char handle[400];
+    request_path(m->sender, o.token, s->id, handle, sizeof handle);
+    reply_handle(m, handle);
+    respond(m->sender, handle, 0);
+}
+
+static void sc_start(const DMsg *m) {
+    DRd r;
+    CastOpts o;
+    CsSess *s = sc_session(m, "osa{sv}", &r, &o);
+    if (!s) return;
+    char handle[400];
+    request_path(m->sender, o.token, s->id, handle, sizeof handle);
+    int e = csm_start(&csm, s, handle);
+    if (e) { cast_error(m, e); return; }
+    reply_handle(m, handle);
+    if (!cast_available()) {                /* no helper: nothing can be shared */
+        respond(m->sender, handle, 2);
+        csm_chosen(&csm, s, NULL, 0);
+        return;
+    }
+    /* who asked: the bus answers from the socket's credentials, never the app; the chooser waits for it */
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, m->sender);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
+               .member = "GetConnectionUnixProcessID", .dest = "org.freedesktop.DBus", .sig = "s" };
+    cast_app[cast_idx(s)].serial = dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    if (!cast_app[cast_idx(s)].serial) { respond(m->sender, handle, 2); csm_chosen(&csm, s, NULL, 0); }
+}
+
+static int screen_restricted(const char *app, void *u) { (void)u; return restrict_blocks(app, FW_R_NO_SCREEN); }
+
+/* The bus said which process asked: the chooser goes up, unless the firewall keeps this app from the screen. The
+ * chooser names only an app LordOS verified (its launcher's scope); a process it can't tell is "an unknown program",
+ * never the name it gives itself, and is refused while an app with "no screen capture" runs (csm_gate). */
+static void cast_ask(CsSess *s, unsigned pid) {
+    int i = cast_idx(s);
+    cast_app[i].serial = 0;
+    char *who = cast_app[i].who;
+    who[0] = 0;
+    int known = pid && appid_of_pid(pid, who, sizeof cast_app[i].who) == 0 && who[0];
+    if (!known) who[0] = 0;
+    int gate = csm_gate(known, known && restrict_blocks(who, FW_R_NO_SCREEN), !known && appid_running(screen_restricted, NULL));
+    if (gate == CSM_GATE_REFUSE) {
+        if (known) fprintf(stderr, "portal: %s may not share the screen (its restrictions)\n", who);
+        else fprintf(stderr, "portal: an unknown program (pid %u) may not share the screen while an app with no screen capture runs\n", pid);
+        respond(s->sender, s->req, 2);
+        csm_chosen(&csm, s, NULL, 0);
+        return;
+    }
+    HBuf j = { 0 };
+    hb_printf(&j, "{\"id\":%d,\"monitor\":%s,\"window\":%s,\"multiple\":%s,\"who\":", s->id, s->types & CSM_TYPE_MONITOR ? "true" : "false",
+              s->types & CSM_TYPE_WINDOW ? "true" : "false", s->multiple ? "true" : "false");
+    hb_str(&j, who);
+    hb_printf(&j, "}");
+    char *json = hb_take(&j);
+    if (json) hw_emit("portal-cast", json);
+    else { respond(s->sender, s->req, 2); csm_chosen(&csm, s, NULL, 0); }
+    free(json);
+}
+
+static void sc_remote(const DMsg *m) {
+    DRd r;
+    CastOpts o;
+    CsSess *s = sc_session(m, "oa{sv}", &r, &o);
+    if (!s) return;
+    if (!csm_may_remote(s)) { cast_error(m, CSM_E_STATE); return; }
+    if (nrcalls >= MAX_RCALLS || !conn.unix_fds) { cast_error(m, CSM_E_FULL); return; }
+    if (!++rcall_seq) ++rcall_seq;
+    if (cast_remote(s->id, rcall_seq)) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "no connection to share through"); return; }
+    RCall *c = &rcalls[nrcalls++];
+    c->sess = s->id;
+    c->req = rcall_seq;
+    c->serial = m->serial;
+    snprintf(c->sender, sizeof c->sender, "%s", m->sender);
+}
+
+/* Session.Close, and its version, on the session's own object */
+static void sc_session_call(const DMsg *m) {
+    const char *iface = m->iface ? m->iface : "", *mem = m->member;
+    CsSess *s = csm_find(&csm, m->sender, m->path);
+    if (!s) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such session"); return; }
+    if ((!strcmp(iface, SESS_IFACE) || !iface[0]) && !strcmp(mem, "Close")) {
+        cast_close(s, 0);
+        dbus_reply(&conn, m, NULL, NULL);
+        return;
+    }
+    if (!strcmp(iface, "org.freedesktop.DBus.Properties") && (!strcmp(mem, "Get") || !strcmp(mem, "GetAll"))) {
+        DBuf b;
+        dw_init(&b);
+        if (!strcmp(mem, "Get")) {
+            dw_variant(&b, "u");
+            dw_u32(&b, 1);
+            dbus_reply(&conn, m, "v", &b);
+        } else {
+            size_t a = dw_arr_begin(&b, 8);
+            dw_struct(&b);
+            dw_str(&b, "version");
+            dw_variant(&b, "u");
+            dw_u32(&b, 1);
+            dw_arr_end(&b, a);
+            dbus_reply(&conn, m, "a{sv}", &b);
+        }
+        dw_free(&b);
+        return;
+    }
+    dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownMethod", "unknown method");
+}
+
+static int is_session_path(const char *p) { return p && !strncmp(p, OBJ_PATH "/session/", sizeof OBJ_PATH "/session/" - 1); }
+
+/* ScreenCast's properties: the source types only when the helper is there */
+static void sc_prop(DBuf *b, const char *name) {
+    uint32_t v = !strcmp(name, "AvailableSourceTypes") ? (cast_available() && conn.unix_fds ? CSM_TYPES : 0)
+               : !strcmp(name, "AvailableCursorModes") ? CSM_CURSORS : SC_VERSION;
+    dw_variant(b, "u");
+    dw_u32(b, v);
+}
+
+void portal_cast_chosen(int id, const CastSource *src, int n) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (!s || s->st != CS_CHOOSING) return;
+    char req[CSM_PATH_MAX];
+    snprintf(req, sizeof req, "%s", s->req);
+    uint32_t kinds[CSM_MAX_SOURCES];
+    if (n < 0) n = 0;
+    for (int i = 0; i < n && i < CSM_MAX_SOURCES; i++) kinds[i] = (uint32_t)src[i].kind;
+    int e = csm_chosen(&csm, s, kinds, n);
+    if (e) { respond(s->sender, req, 2); csm_chosen(&csm, s, NULL, 0); return; }
+    if (n == 0) { respond(s->sender, req, 1); return; }        /* Cancel */
+    if (cast_begin(id, src, n, s->cursor == CSM_CURSOR_EMBEDDED)) { respond(s->sender, req, 2); csm_failed(s); }
+}
+
+void portal_cast_streams(int id, const CastStreamInfo *info, int n) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (!s || s->st != CS_STARTING || !up) { cast_end(id); return; }
+    char req[CSM_PATH_MAX];
+    snprintf(req, sizeof req, "%s", s->req);
+    csm_started(s);
+    DBuf b;
+    dw_init(&b);
+    dw_u32(&b, 0);
+    size_t a = dw_arr_begin(&b, 8);
+    dw_struct(&b);
+    dw_str(&b, "streams");
+    dw_variant(&b, "a(ua{sv})");
+    size_t sa = dw_arr_begin(&b, 8);
+    for (int i = 0; i < n; i++) {
+        dw_struct(&b);
+        dw_u32(&b, info[i].node);
+        size_t pa = dw_arr_begin(&b, 8);
+        if (info[i].kind == CAST_SRC_MONITOR) {     /* where a display sits; a window's place isn't the app's business */
+            dw_struct(&b);
+            dw_str(&b, "position");
+            dw_variant(&b, "(ii)");
+            dw_struct(&b);
+            dw_i32(&b, info[i].x);
+            dw_i32(&b, info[i].y);
+        }
+        dw_struct(&b);
+        dw_str(&b, "size");
+        dw_variant(&b, "(ii)");
+        dw_struct(&b);
+        dw_i32(&b, info[i].w);
+        dw_i32(&b, info[i].h);
+        dw_struct(&b);
+        dw_str(&b, "source_type");
+        dw_variant(&b, "u");
+        dw_u32(&b, (uint32_t)info[i].kind);
+        dw_arr_end(&b, pa);
+    }
+    dw_arr_end(&b, sa);
+    dw_arr_end(&b, a);
+    DHdr h = { .type = DBUS_SIGNAL, .path = req, .iface = REQ_IFACE, .member = "Response", .dest = s->sender, .sig = "ua{sv}" };
+    dbus_send(&conn, &h, &b);
+    dw_free(&b);
+    dbus_flush(&conn);
+    int i = cast_idx(s);
+    if (cast_app[i].who[0]) fprintf(stderr, "portal: %s is sharing %d source%s\n", cast_app[i].who, n, n == 1 ? "" : "s");
+    else fprintf(stderr, "portal: an unknown program is sharing %d source%s\n", n, n == 1 ? "" : "s");
+    casts_changed();
+}
+
+void portal_cast_failed(int id) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (!s || s->st != CS_STARTING) return;
+    respond(s->sender, s->req, 2);
+    csm_failed(s);
+}
+
+void portal_cast_lost(int id) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (s) cast_close(s, 1);
+}
+
+void portal_cast_remote(int id, uint32_t req, int fd) {
+    for (int i = 0; i < nrcalls; i++)
+        if (rcalls[i].sess == id && rcalls[i].req == req) { rcall_drop(i, fd); break; }
+    if (fd >= 0) close(fd);
+}
+
+void portal_cast_stop(int id) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (s && s->st == CS_STARTED) cast_close(s, 1);
+}
+
+void portal_cast_shown(int id) {
+    CsSess *s = csm_by_id(&csm, id);
+    if (s && s->st == CS_STARTED) cast_shown(id);
+}
+
+int portal_cast_thumb(int id, const CastSource *src) {
+    CsSess *s = csm_by_id(&csm, id);
+    return s && s->st == CS_CHOOSING ? cast_thumb(src, THUMB_W) : 0;
+}
+
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
@@ -1162,6 +1586,13 @@ static void on_reply(const DMsg *m) {
         uint32_t pid = 0;
         if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
         gs_pid(&gsess[i], pid);
+        return;
+    }
+    for (int i = 0; i < CSM_MAX; i++) {
+        if (csm.s[i].st != CS_CHOOSING || !cast_app[i].serial || cast_app[i].serial != m->reply_serial) continue;
+        uint32_t pid = 0;
+        if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
+        cast_ask(&csm.s[i], pid);
         return;
     }
     for (int i = 0; i < nopens; i++) {
@@ -1174,7 +1605,7 @@ static void on_reply(const DMsg *m) {
 }
 
 /* NameOwnerChanged(name, old, new) with no new owner: that connection is gone, and so are its holds,
- * its open requests, its file dialogs and its shortcut sessions */
+ * its open requests, its file dialogs, its shortcut sessions and its screen casts */
 static void on_signal(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus") || !m->member || strcmp(m->member, "NameOwnerChanged")
         || !m->sig || strcmp(m->sig, "sss")) return;
@@ -1188,10 +1619,12 @@ static void on_signal(const DMsg *m) {
     for (int i = nopens; i-- > 0;) if (!strcmp(opens[i].sender, name)) open_drop(i, 1);
     for (int i = npicks; i-- > 0;) if (!strcmp(picks[i].sender, name)) pick_drop(i);
     for (int i = ngsess; i-- > 0;) if (!strcmp(gsess[i].sender, name)) gsess_drop(i);
+    int ids[CSM_MAX], n = csm_gone(&csm, name, ids, CSM_MAX);
+    for (int i = 0; i < n; i++) { CsSess *s = csm_by_id(&csm, ids[i]); if (s) cast_close(s, 0); }
 }
 
-/* Request.Close: the app no longer wants it (a dialog, an open, a hold or a shortcuts sheet); only the
- * app that asked */
+/* Request.Close: the app no longer wants it (a dialog, an open, a hold, a shortcuts sheet or a screen cast's
+ * Start); only the app that asked */
 static void request_close(const DMsg *m) {
     int found = 0;
     for (int i = 0; m->sender && !found && i < npicks; i++)
@@ -1206,6 +1639,16 @@ static void request_close(const DMsg *m) {
             gsess[i].state = gs_step(gsess[i].state, GSO_CANCEL);
             found = 1;
         }
+    /* a screen cast's Start: no Response, and the session stays as it was before Start */
+    int was_choosing = 0;
+    for (int i = 0; m->sender && i < CSM_MAX; i++)
+        if (csm.s[i].st == CS_CHOOSING && !strcmp(csm.s[i].req, m->path) && !strcmp(csm.s[i].sender, m->sender)) was_choosing = 1;
+    CsSess *cs = NULL;
+    if (!found && csm_request_close(&csm, m->sender, m->path, &cs) == CSM_OK) {
+        if (was_choosing) chooser_gone(cs->id);
+        cast_end(cs->id);
+        found = 1;
+    }
     if (found) { dbus_reply(&conn, m, NULL, NULL); return; }
     dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such request");
 }
@@ -1213,7 +1656,7 @@ static void request_close(const DMsg *m) {
 /* the version property of each interface served here */
 static int version_of(const char *iface) {
     return !strcmp(iface, IFACE) || !strcmp(iface, FC_IFACE) ? 2 : !strcmp(iface, OU_IFACE) ? 3
-         : !strcmp(iface, INH_IFACE) || !strcmp(iface, GS_IFACE) ? 1 : -1;
+         : !strcmp(iface, INH_IFACE) || !strcmp(iface, GS_IFACE) ? 1 : !strcmp(iface, SC_IFACE) ? SC_VERSION : -1;
 }
 
 static int screensaver_path(const char *p) { return p && (!strcmp(p, "/ScreenSaver") || !strcmp(p, "/org/freedesktop/ScreenSaver")); }
@@ -1250,6 +1693,7 @@ static void handle(const DMsg *m) {
     if (!strcmp(iface, REQ_IFACE) && !strcmp(mem, "Close") && m->path) { request_close(m); return; }
     if (!strcmp(iface, SES_IFACE) && !strcmp(mem, "Close") && gs_session_path(m->path)) { gs_close(m); return; }
     if (screensaver_path(m->path)) { screensaver(m); return; }
+    if (is_session_path(m->path)) { sc_session_call(m); return; }
     if (!m->path || strcmp(m->path, OBJ_PATH)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no existe"); return; }
     if (!strcmp(iface, "org.freedesktop.DBus.Properties")) {
         DRd r;
@@ -1259,18 +1703,23 @@ static void handle(const DMsg *m) {
         if (version < 0) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownInterface", "interfaz"); return; }
         DBuf b;
         dw_init(&b);
+        int sc = !strcmp(pi, SC_IFACE);
         if (!strcmp(mem, "Get")) {
             const char *prop = dr_str(&r, NULL);
-            if (r.err || strcmp(prop, "version")) { dw_free(&b); dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownProperty", "propiedad"); return; }
-            dw_variant(&b, "u");
-            dw_u32(&b, (uint32_t)version);
+            int known = !r.err && (!strcmp(prop, "version") || (sc && (!strcmp(prop, "AvailableSourceTypes") || !strcmp(prop, "AvailableCursorModes"))));
+            if (!known) { dw_free(&b); dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownProperty", "propiedad"); return; }
+            if (sc) sc_prop(&b, prop);
+            else { dw_variant(&b, "u"); dw_u32(&b, (uint32_t)version); }
             dbus_reply(&conn, m, "v", &b);
         } else if (!strcmp(mem, "GetAll")) {
+            static const char *const sc_props[] = { "version", "AvailableSourceTypes", "AvailableCursorModes" };
             size_t a = dw_arr_begin(&b, 8);
-            dw_struct(&b);
-            dw_str(&b, "version");
-            dw_variant(&b, "u");
-            dw_u32(&b, (uint32_t)version);
+            for (int k = 0; k < (sc ? 3 : 1); k++) {
+                dw_struct(&b);
+                dw_str(&b, sc_props[k]);
+                if (sc) sc_prop(&b, sc_props[k]);
+                else { dw_variant(&b, "u"); dw_u32(&b, (uint32_t)version); }
+            }
             dw_arr_end(&b, a);
             dbus_reply(&conn, m, "a{sv}", &b);
         } else dbus_error(&conn, m, "org.freedesktop.DBus.Error.PropertyReadOnly", "read-only");
@@ -1286,6 +1735,10 @@ static void handle(const DMsg *m) {
     if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "CreateSession")) { gs_create(m); return; }
     if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "BindShortcuts")) { gs_bind(m); return; }
     if (!strcmp(iface, GS_IFACE) && !strcmp(mem, "ListShortcuts")) { gs_list(m); return; }
+    if (!strcmp(iface, SC_IFACE) && !strcmp(mem, "CreateSession")) { sc_create(m); return; }
+    if (!strcmp(iface, SC_IFACE) && !strcmp(mem, "SelectSources")) { sc_select(m); return; }
+    if (!strcmp(iface, SC_IFACE) && !strcmp(mem, "Start")) { sc_start(m); return; }
+    if (!strcmp(iface, SC_IFACE) && !strcmp(mem, "OpenPipeWireRemote")) { sc_remote(m); return; }
     if (!strcmp(iface, IFACE) || !iface[0]) {
         if (!strcmp(mem, "ReadAll") && m->sig && !strcmp(m->sig, "as")) { read_all(m); return; }
         if (!strcmp(mem, "Read") && m->sig && !strcmp(m->sig, "ss")) { read_one(m, 1); return; }
@@ -1334,7 +1787,8 @@ int portal_start(void) {
     dbus_send(&conn, &h, &b);
     dw_free(&b);
     up = 1;
-    fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit and GlobalShortcuts on the session bus%s\n",
+    csm_init(&csm);
+    fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and ScreenCast on the session bus%s\n",
             ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
     return 0;
 }
@@ -1355,6 +1809,8 @@ void portal_dispatch(void) {
         while (nopens) open_drop(nopens - 1, 1);
         while (ngsess) gsess_drop(ngsess - 1);  /* no app can get a shortcut any more */
         nheld = 0;
+        for (int i = 0; i < CSM_MAX; i++) if (csm.s[i].st != CS_FREE) cast_close(&csm.s[i], 0);
+        nrcalls = 0;
     }
 }
 

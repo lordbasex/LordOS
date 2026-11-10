@@ -393,9 +393,9 @@ build/gshort-test: tests/gshort_test.c src/ui/gshort.c src/ui/gshort.h src/wl/ke
 	./$@ || { rm -f $@; exit 1; }
 # the same portal over a private session bus, a second connection as the app (tests/run_suites.sh, needs dbus-run-session)
 test: build/portal-gs-test
-build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c
+build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build

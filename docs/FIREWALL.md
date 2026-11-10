@@ -97,7 +97,7 @@ A valid id:
   | no incoming connections | `no-incoming` | same | same | same |
   | no camera | `no-camera` | broker (`brokercam.c`) | `js_media.c` | `lord-netperm` (`cgroup/dev`) and the PipeWire guard |
   | no microphone | `no-mic` | broker (`BOP_MIC`, camera videos) | `js_media.c` | the PipeWire guard and `lord-netperm` (ALSA capture nodes) |
-  | no screen capture | `no-screen` | broker (the `screen` permission; isolated apps have no capture API) | `js_media.c` | by design (no capture protocol), and `lord-netperm` (`/dev/fb*`) |
+  | no screen capture | `no-screen` | broker (the `screen` permission; isolated apps have no capture API) | `js_media.c` | by design (no capture protocol), the ScreenCast portal (`ui/portal.c` refuses the app before any question; the PipeWire guard hides every shared screen from it), and `lord-netperm` (`/dev/fb*`) |
   | no USB | `no-usb` | broker (`BOP_VAULT_FIDO`, the `usb` permission) | not offered (the desktop itself) | `lord-netperm` (`cgroup/dev`) |
   | no Bluetooth | `no-bluetooth` | broker (the `bluetooth` permission; no Bluetooth API in app mode) | not offered (the desktop itself) | `lord-netperm` (`socket(AF_BLUETOOTH)`); BlueZ over D-Bus is not covered |
   | no access to your files | `no-files` | broker (file picker, camera saves, the `files` permission) | not offered (the desktop itself) | the launcher (own namespaces + Landlock), at the next launch |
@@ -231,9 +231,14 @@ The system bus policy can't tell two apps of the same user apart; mediating it p
 D-Bus proxy per app in front of the system bus, which isn't built. `no-files` doesn't hide the
 system bus either (see below).
 
-**Screen capture.** No Linux app can copy the screen, restricted or not: the compositor
+**Screen capture.** No Linux app can copy the screen on its own, restricted or not: the compositor
 (`wl/wl.c`) offers no screencopy, image-capture or dmabuf-export protocol, and no
-`xdg-desktop-portal` screen-cast backend is installed, so PipeWire has no screen node. Since 0.8.3
+`xdg-desktop-portal` screen-cast backend is installed. Since 0.8.8.8 an app may *ask* for a screen or a
+window through LordOS's own ScreenCast portal (`ui/portal.c`, `WAYLAND.md` "Sharing a screen or a
+window"): only what the person picks in LordOS's chooser is shared, and only while the indicator shows it.
+An app with `no-screen` is answered "refused" before any question, and the PipeWire guard
+(`sec/pwguard.c`) hides every shared screen's node (a `Video/Source` with `media.role` Screen) from it,
+so it can't read another app's share either. Since 0.8.3
 X11 apps run through Xwayland, which is a Wayland client like any other: an X app can read other X
 apps' windows on the shared X display, but never a Wayland or LordOS window (rootless, no root
 picture), and a restricted app gets no X display at all (`PRIVACY.md`, "X11 apps"). `screen.sh`

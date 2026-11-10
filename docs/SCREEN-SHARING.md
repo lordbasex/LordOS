@@ -6,6 +6,11 @@ consent. It's stage 1 of [GO-LINK.md](GO-LINK.md), general, and knows nothing ab
 the media and input formats. Code: `server/src/remote/share.c`, `sharewire.c` (format and limits), `sharegrant.c` and `sgrant_admin.c`
 (grants), `server/src/ui/js_share.c`, `sdk/share.js`.
 
+Linux apps (a browser's video call, a recorder) use neither door: they ask through LordOS's own ScreenCast portal (0.8.8.8,
+[WAYLAND.md](WAYLAND.md), "Sharing a screen or a window"), where the person picks a screen or a window every time and the frames go
+to a PipeWire stream. It shows in this API's indicator, a pill per session with the same Stop, and its frames also wait for the pill to
+be on screen. A lock or a user switch ends it, as it ends a share here.
+
 ## Who may connect
 
 `$XDG_RUNTIME_DIR/lordos/share.sock`, 0600, created only by a user session. **The login screen's `lord-server` doesn't create it.**

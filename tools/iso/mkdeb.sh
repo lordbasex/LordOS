@@ -66,6 +66,7 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 missing=""
 for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
+         lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
@@ -177,6 +178,10 @@ fi
 # lord-sftp (0.8.8.7): the Terminal's Files mode, SFTP over the tab's own ssh session, sandboxed (docs/TERMINAL.md)
 [ -x server/build/lord-sftp ] && install -m 755 server/build/lord-sftp "$L/bin/lord-sftp"
 [ -x "$L/bin/lord-sftp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sftp" 2>/dev/null || true; }
+# lord-screencast (0.8.8.8): a screen or a window shared with a Linux app (the ScreenCast portal), sandboxed, the only
+# binary that links libpipewire-0.3 (docs/WAYLAND.md "Sharing a screen or a window"); lord-server only starts this one
+[ -x server/build/lord-screencast ] && install -m 755 server/build/lord-screencast "$L/bin/lord-screencast"
+[ -x "$L/bin/lord-screencast" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-screencast" 2>/dev/null || true; }
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }
@@ -388,6 +393,8 @@ if [ -x "$L/bin/lord-ocr" ]; then OCRDEPS=", libtesseract5, tesseract-ocr-eng"; 
 # lord-tts: Vulkan's loader (the GPU is optional, the CPU always works), OpenMP and the C++ runtime
 TTSDEPS=""
 if [ -x "$L/bin/lord-tts" ]; then TTSDEPS=", libvulkan1, libgomp1, libstdc++6"; fi
+CASTDEPS=""
+if [ -x "$L/bin/lord-screencast" ]; then CASTDEPS=", libpipewire-0.3-0t64"; fi
 MEDIADEPS=""
 if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, libavutil59, libswscale8, libswresample5, libva2, libva-drm2"; fi
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
@@ -410,7 +417,7 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$RTCDEPS$MICROCODEDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
 Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
 Section: x11
 Priority: optional

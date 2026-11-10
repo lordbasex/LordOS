@@ -90,6 +90,8 @@
 #include "../hw/notifyd.h"
 #include "../hw/pkagent.h"
 #include "portal.h"
+#include "../cast/castproto.h"
+#include "ui.h"
 #include "sni.h"
 #include "../hw/ppd.h"
 
@@ -472,6 +474,87 @@ static JSValue f_portal_pause_shortcuts(JSContext *c, JSValueConst t, int argc, 
     return JS_UNDEFINED;
 }
 
+/* A source of the ScreenCast chooser: { display: id } (lord.screen.displays) or { node, also } (wm.frameNode,
+ * wm.sheetNodes), each node id with the serial of the node it names now (the share follows that node, never a later
+ * one with its id). 0, or -1 for anything else or a window that isn't there. */
+static int cast_source(JSContext *c, JSValueConst v, CastSource *out) {
+    memset(out, 0, sizeof *out);
+    if (!JS_IsObject(v)) return -1;
+    JSValue d = JS_GetPropertyStr(c, v, "display"), n = JS_GetPropertyStr(c, v, "node");
+    int r = -1;
+    if (JS_IsNumber(d)) {
+        out->kind = CAST_SRC_MONITOR;
+        out->display = (uint32_t)arg_int(c, d, 0);
+        r = 0;
+    } else if (JS_IsNumber(n) && arg_int(c, n, 0) > 0) {
+        out->kind = CAST_SRC_WINDOW;
+        out->node = arg_int(c, n, 0);
+        Node *w = node_get(out->node);
+        if (w) out->serial = w->serial;
+        JSValue a = JS_GetPropertyStr(c, v, "also");
+        if (JS_IsArray(c, a)) {
+            uint32_t len = 0;
+            JSValue lv = JS_GetPropertyStr(c, a, "length");
+            JS_ToUint32(c, &len, lv);
+            JS_FreeValue(c, lv);
+            for (uint32_t i = 0; i < len && out->nalso < CAST_ALSO_MAX; i++) {
+                JSValue e = JS_GetPropertyUint32(c, a, i);
+                int id = JS_IsNumber(e) ? arg_int(c, e, 0) : 0;
+                Node *sh = id > 0 ? node_get(id) : NULL;
+                if (sh) { out->also[out->nalso] = id; out->also_serial[out->nalso++] = sh->serial; }
+                JS_FreeValue(c, e);
+            }
+        }
+        JS_FreeValue(c, a);
+        r = out->serial ? 0 : -1;
+    }
+    JS_FreeValue(c, d);
+    JS_FreeValue(c, n);
+    return r;
+}
+
+/* lord.portal.cast(id, sources | null): the person's picks in the ScreenCast chooser (null or [] is Cancel) */
+static JSValue f_portal_cast(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_UNDEFINED;
+    int id = arg_int(c, argv[0], -1), n = 0, bad = 0;
+    CastSource src[CAST_MAX_STREAMS];
+    if (argc > 1 && JS_IsArray(c, argv[1])) {
+        uint32_t len = 0;
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        JS_ToUint32(c, &len, lv);
+        JS_FreeValue(c, lv);
+        if (len > CAST_MAX_STREAMS) bad = 1;
+        for (uint32_t i = 0; i < len && !bad; i++) {
+            JSValue v = JS_GetPropertyUint32(c, argv[1], i);
+            if (cast_source(c, v, &src[n])) bad = 1; else n++;
+            JS_FreeValue(c, v);
+        }
+    }
+    portal_cast_chosen(id, src, bad ? -1 : n);
+    return JS_UNDEFINED;
+}
+
+/* lord.portal.castThumb(id, source): a picture of it for the chooser of session id (a lord.media id), or 0 */
+static JSValue f_portal_cast_thumb(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    CastSource src;
+    if (argc < 2 || cast_source(c, argv[1], &src)) return JS_NewInt32(c, 0);
+    return JS_NewInt32(c, portal_cast_thumb(arg_int(c, argv[0], -1), &src));
+}
+
+/* lord.portal.castShown(id) / castStop(id): the sharing indicator of session id is on screen / its Stop */
+static JSValue f_portal_cast_shown(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc >= 1) portal_cast_shown(arg_int(c, argv[0], -1));
+    return JS_UNDEFINED;
+}
+static JSValue f_portal_cast_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc >= 1) portal_cast_stop(arg_int(c, argv[0], -1));
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry portal_funcs[] = {
     JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
     JS_CFUNC_DEF("opened", 2, f_portal_opened),
@@ -482,6 +565,10 @@ static const JSCFunctionListEntry portal_funcs[] = {
     JS_CFUNC_DEF("setShortcut", 3, f_portal_set_shortcut),
     JS_CFUNC_DEF("forgetShortcuts", 1, f_portal_forget_shortcuts),
     JS_CFUNC_DEF("pauseShortcuts", 1, f_portal_pause_shortcuts),
+    JS_CFUNC_DEF("cast", 2, f_portal_cast),
+    JS_CFUNC_DEF("castThumb", 2, f_portal_cast_thumb),
+    JS_CFUNC_DEF("castShown", 1, f_portal_cast_shown),
+    JS_CFUNC_DEF("castStop", 1, f_portal_cast_stop),
 };
 
 /* lord.sni: the tray icons of Linux apps (ui/sni.c). Only the desktop's own context has it, never an isolated app. */

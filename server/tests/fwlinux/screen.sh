@@ -8,8 +8,9 @@
 #     rootless, so an X11 app sees only X11 windows, never Wayland or LordOS windows; restricted apps
 #     get no DISPLAY (docs/FIREWALL.md);
 #   - no screen-cast portal is installed that could hand a PipeWire screen stream to an app
-#     (xdg-desktop-portal with a ScreenCast backend);
-#   - no PipeWire node is a screen source;
+#     (xdg-desktop-portal with a ScreenCast backend); LordOS's own ScreenCast portal (0.8.8.8) shares only
+#     what the person picks, refuses no-screen apps and the PipeWire guard hides its nodes from them;
+#   - no PipeWire node is a screen source (while nobody shares);
 #   - a restricted app can't read the framebuffer device (/dev/fb*, lord-netperm's cgroup/dev).
 #
 #   bash server/tests/fwlinux/screen.sh     (after make -C server build/wl-globals)

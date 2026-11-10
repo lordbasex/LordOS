@@ -538,6 +538,39 @@ static void test_capture_until(void) {
     free(px);
 }
 
+/* A node's id goes to the next node once it is destroyed; its serial never does (node_ref, what a shared window holds
+ * on to in cast/cast.c): the id names another window, the id with the serial names nothing, and the destroy hook is
+ * told of the node that went with its serial, even when the whole tree goes (a theme change). */
+static int gone_n, gone_id;
+static uint64_t gone_serial;
+static void on_gone(int id, uint64_t serial) { gone_n++; gone_id = id; gone_serial = serial; }
+static void test_node_ref(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *win = view(root);
+    int id = win->id;
+    uint64_t serial = win->serial;
+    CHECK(serial && node_ref(id, serial) == win, "the window by its id and serial");
+    CHECK(!node_ref(id, 0) && !node_ref(id, serial + 1) && !node_ref(0, serial), "a wrong serial, none or no id: nothing");
+    node_gone_hook = on_gone;
+    gone_n = 0;
+    node_destroy(win);
+    CHECK(gone_n == 1 && gone_id == id && gone_serial == serial, "the hook heard the window go: %d, %d", gone_n, gone_id);
+    Node *other = view(root);
+    CHECK(other->id == id, "another window took its id: %d, %d", other->id, id);
+    CHECK(other->serial != serial && other->serial > serial, "but not its serial");
+    CHECK(node_get(id) == other && !node_ref(id, serial), "the id alone names the other window, with the serial nothing");
+    CHECK(!node_ref_ok(other, id, serial) && node_ref_ok(other, id, other->serial), "node_ref_ok: the same rule");
+    gone_n = 0;
+    ui_reset();
+    CHECK(gone_n == 2, "a reset tells of every node: %d", gone_n);
+    node_gone_hook = NULL;
+    Node *again = view(NULL);
+    CHECK(again->serial > serial && !node_ref(again->id, serial), "after a reset no serial comes back");
+    ui_reset();
+}
+
 /* Closing a menu repaints only where it was; the translucent, blurred menu bar above it must come
  * out as in a full repaint (before 0.8.1 the blur mixed in the bar's last frame: a lighter band). */
 static void test_backdrop_band(void) {
@@ -3274,6 +3307,7 @@ int main(int argc, char **argv) {
     test_transform_self_restyle();
     test_layers();
     test_capture_until();
+    test_node_ref();
     test_backdrop_band();
     test_multi_damage();
     test_minimize_damage();

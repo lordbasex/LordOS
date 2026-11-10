@@ -9,8 +9,9 @@
  * the app (the PID's cgroup → the launcher's scope → desktop:<id>) and, if that app is
  * restricted (sec/restrict.h):
  *   - hides from that client every capture node: Audio/Source* and Audio/Duplex for "no
- *     microphone", Video/Source for "no camera", and their ports (permission 0, so it can neither
- *     see nor link them), and every other client (so it can't change anyone's permissions);
+ *     microphone", Video/Source for "no camera", a shared screen or window (lord-screencast's
+ *     Video/Source, media.role Screen) for "no screen capture", and their ports (permission 0, so it
+ *     can neither see nor link them), and every other client (so it can't change anyone's permissions);
  *   - destroys every capture stream that client creates (Stream/Input/Audio, Stream/Input/Video),
  *     as soon as it appears.
  * The rules are lord.fw's store (the one Settings edits), read every second: a restriction set or
@@ -43,5 +44,9 @@ int  pwpod_string(PwPod p, const char **s);
 uint32_t pwguard_capture_flag(const char *media_class);
 /* The same for a stream an app creates to capture ("Stream/Input/Audio" → FW_R_NO_MIC). */
 uint32_t pwguard_stream_flag(const char *media_class);
+/* A node's flag from its global's properties: a screen shared with an app (the ScreenCast portal's lord-screencast: a
+ * Video/Source whose media.role is Screen, or named lordos-screencast-*) is FW_R_NO_SCREEN, not a camera; else as
+ * pwguard_capture_flag. Any app's node that says so is hidden from no-screen apps, which only hides it more. */
+uint32_t pwguard_node_flag(const char *media_class, const char *media_role, const char *node_name);
 
 #endif

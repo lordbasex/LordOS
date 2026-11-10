@@ -33,6 +33,7 @@ Node *node_new(int type) {
     Node *n = calloc(1, sizeof *n);
     if (!n) return NULL;
     n->id = id;
+    n->serial = ++ui.serial;
     n->type = type;
     style_defaults(&n->s);
     ui.nodes[id] = n;
@@ -41,6 +42,13 @@ Node *node_new(int type) {
 }
 
 Node *node_get(int id) { return id > 0 && id < ui.cap ? ui.nodes[id] : NULL; }
+
+Node *node_ref(int id, uint64_t serial) {
+    Node *n = node_get(id);
+    return node_ref_ok(n, id, serial) ? n : NULL;
+}
+
+void (*node_gone_hook)(int id, uint64_t serial);
 
 int node_count(void) {
     int n = 0;
@@ -212,6 +220,7 @@ void node_destroy(Node *n) {
     node_detach(n);
     while (n->first) node_destroy(n->first);
     if (ui.root == n) ui.root = NULL;
+    if (node_gone_hook) node_gone_hook(n->id, n->serial);
     ui.nodes[n->id] = NULL;
     image_release(n->img);
     free(n->text);
@@ -266,6 +275,8 @@ int node_children_ordered(Node *n, Node **out, int max) {
 
 /* Deletes all nodes (theme change). The whole screen is left to repaint. */
 void ui_reset(void) {
+    for (int i = 0; i < ui.cap; i++)
+        if (ui.nodes[i] && node_gone_hook) node_gone_hook(i, ui.nodes[i]->serial);
     for (int i = 0; i < ui.cap; i++)
         if (ui.nodes[i]) { image_release(ui.nodes[i]->img); free(ui.nodes[i]->text); free(ui.nodes[i]->tf); free(ui.nodes[i]->s.ext); free(ui.nodes[i]); ui.nodes[i] = NULL; }
     ui.root = NULL;

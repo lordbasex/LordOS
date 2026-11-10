@@ -30,6 +30,8 @@ The port is **5673**, which spells "LORD" on a phone keypad.
 Apps have another door, with consent and an indicator ([SCREEN-SHARING.md](SCREEN-SHARING.md)). One door at a time per session: while an
 app shares, a sign-in here is told so and the page retries every 30 s; while a viewer is connected here, a share can't start. Nothing else
 about 5673 changed.
+Linux apps asking through the ScreenCast portal (0.8.8.8, [WAYLAND.md](WAYLAND.md), "Sharing a screen or a window") are a third
+path: the person picks a screen or a window in LordOS's chooser, it shows in the same indicator, and it doesn't hold this door shut.
 
 **5673 and the lock.** Locking cuts every connected browser (the bridge acts on the lock message) and ends that user's cookies, but
 `remote.sock` itself goes on giving frames to root, and a new sign-in with the account's password isn't checked against the lock: it sees

@@ -59,6 +59,7 @@
 #include "ui/grab.h"
 #include "ui/js_wm.h"
 #include "ui/portal.h"
+#include "cast/cast.h"
 #include "ui/sni.h"
 #include "ui/js_logs.h"
 #include "hw/hw.h"
@@ -1247,6 +1248,7 @@ static Box paint_ui(Server *s) {
     double t1 = now_ms();
     if (paint_damage(ui.root)) d = ui.damage;
     ui.damage = (Box){ 0, 0, 0, 0 };
+    if (!box_empty(d)) cast_damage(d.x0, d.y0, d.x1, d.y1);   /* a shared screen or window (cast/cast.c): nothing if none */
     /* the window being dragged: its layer and what is below belong to the display with most of it */
     int ln = paint_layer_node();
     Node *lnode = ln ? node_get(ln) : NULL;
@@ -2278,6 +2280,7 @@ static int switch_theme(const char *current) {
     ui.theme_request[0] = 0;
     fprintf(stderr, "lord-server: cambiando a tema %s\n", path);
     share_shell_gone();                 /* the indicator goes with the old shell */
+    cast_end_all();                     /* and with it what Linux apps were shown (the ScreenCast portal) */
     js_shutdown();
     ui_reset();
     term_detach_all();
@@ -2664,6 +2667,11 @@ int main(int argc, char **argv) {
             if (s.headless || soft) pace_next += period;
         }
         if (wants && pace > 0 && (delay < 0 || pace < delay)) delay = pace;
+        /* sharing a screen or a window with a Linux app (the ScreenCast portal): its frames, after this render's damage */
+        cast_pointer(s.cx, s.cy);
+        cast_tick();
+        double cad = cast_timeout();
+        if (cad >= 0 && (delay < 0 || cad < delay)) delay = cad;
 
         int wait = delay < 0 ? -1 : (int)ceil(delay);
         if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.theme_request[0] || ui.quit_requested) wait = 0;
@@ -2676,7 +2684,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[137 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[141 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -2714,6 +2722,8 @@ int main(int argc, char **argv) {
         n += nm;
         int shbase = n, nsh = share_pollfds(pfd + n, 8);
         n += nsh;
+        int cabase = n, nca = cast_pollfds(pfd + n, 4);        /* lord-screencast, one per shared session */
+        n += nca;
         int brkbase = n, nbrk = brokersrv_pollfds(pfd + n, 32);   /* apps .lpk aisladas (broker) */
         n += nbrk;
         int abr = n, nabr = brokersrv_audio_pollfds(pfd + n, 16);  /* micrófono de las apps aisladas (PipeWire) */
@@ -2785,6 +2795,7 @@ int main(int argc, char **argv) {
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
         if (nm) mirror_dispatch(pfd + mbase, nm);
         if (nsh) share_dispatch(pfd + shbase, nsh);
+        if (nca) cast_dispatch(pfd + cabase, nca);
         if (nbrk) brokersrv_dispatch(pfd + brkbase, nbrk);
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
@@ -2820,6 +2831,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);
     input_close(&s.input);
+    cast_end_all();
     share_stop();
     mirror_stop();
     gpu_tex_free(s.cursor_tex);

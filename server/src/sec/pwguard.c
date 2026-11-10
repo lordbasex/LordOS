@@ -1,4 +1,4 @@
-/* pwguard.c — "no microphone" / "no camera" for Linux apps inside PipeWire (see pwguard.h).
+/* pwguard.c — "no microphone", "no camera" and "no screen capture" for Linux apps inside PipeWire (see pwguard.h).
  *
  * A minimal client of PipeWire's native protocol (version 3): each message is a 16-byte header
  * (object id; opcode << 24 | payload size; sequence; number of fds) and a SPA POD Struct.
@@ -55,7 +55,7 @@ typedef struct {
     int daemon;                 /* pipewire-pulse's own connection: the streams of modules a pulse client loaded */
     int resolved;               /* app worked out (needs the client's info) */
     char app[FW_APP_MAX];
-    uint32_t want, applied;     /* restrictions (FW_R_NO_MIC | FW_R_NO_CAMERA) to apply / applied */
+    uint32_t want, applied;     /* restrictions (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN) to apply / applied */
     int live;
 } PgClient;
 
@@ -239,6 +239,12 @@ uint32_t pwguard_capture_flag(const char *mc) {
     return 0;
 }
 
+uint32_t pwguard_node_flag(const char *mc, const char *role, const char *name) {
+    if (mc && !strncmp(mc, "Video/Source", 12) && ((role && !strcmp(role, "Screen")) || (name && !strncmp(name, "lordos-screencast-", 18))))
+        return FW_R_NO_SCREEN;
+    return pwguard_capture_flag(mc);
+}
+
 uint32_t pwguard_stream_flag(const char *mc) {
     if (!mc) return 0;
     if (!strcmp(mc, "Stream/Input/Audio")) return FW_R_NO_MIC;
@@ -256,7 +262,9 @@ static PgNode *node_by_id(uint32_t id) {
     return NULL;
 }
 
-/* Restricted apps are running (an app scope of this session whose app has no-mic or no-camera):
+#define GUARDED (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN)
+
+/* Restricted apps are running (an app scope of this session whose app has no-mic, no-camera or no-screen):
  * only then are clients we can't identify treated as restricted, so normal use without
  * restrictions never pays for it. */
 static int guard_armed;
@@ -267,12 +275,13 @@ static uint32_t client_restrictions(PgClient *c) {
     /* pipewire-pulse's own connection carries the capture streams of modules any pulse client
      * loaded (module-loopback from the microphone into a pipe or a TCP server): while restricted
      * apps run they can't be told apart, so they are closed */
-    if (c->daemon) return guard_armed ? (FW_R_NO_MIC | FW_R_NO_CAMERA) : 0;
-    if (c->unverified) return guard_armed ? (FW_R_NO_MIC | FW_R_NO_CAMERA) : 0;
+    if (c->daemon) return guard_armed ? GUARDED : 0;
+    if (c->unverified) return guard_armed ? GUARDED : 0;
     if (!c->app[0]) return 0;
     uint32_t f = 0;
     if (restrict_blocks(c->app, FW_R_NO_MIC)) f |= FW_R_NO_MIC;
     if (restrict_blocks(c->app, FW_R_NO_CAMERA)) f |= FW_R_NO_CAMERA;
+    if (restrict_blocks(c->app, FW_R_NO_SCREEN)) f |= FW_R_NO_SCREEN;   /* the screens Linux apps are shown (ScreenCast) */
     return f;
 }
 
@@ -518,23 +527,13 @@ static void resolve(PgClient *c) {
     }
 }
 
-/* Re-arms the guard: is any restricted app of this session running? (its scope is there) */
-static void arm(void) {
-    char dir[96];
-    snprintf(dir, sizeof dir, "/sys/fs/cgroup/system.slice/lordos.service/lordos-session-%u", (unsigned)getuid());
-    DIR *d = opendir(dir);
-    int armed = 0;
-    struct dirent *e;
-    while (d && (e = readdir(d)) && !armed) {
-        char path[512], app[FW_APP_MAX];
-        if (strncmp(e->d_name, "app-lordos-", 11)) continue;
-        snprintf(path, sizeof path, "/system.slice/lordos.service/lordos-session-%u/%s", (unsigned)getuid(), e->d_name);
-        if (appid_of_cgroup(path, app, sizeof app)) continue;
-        armed = restrict_blocks(app, FW_R_NO_MIC) || restrict_blocks(app, FW_R_NO_CAMERA);
-    }
-    if (d) closedir(d);
-    guard_armed = armed;
+static int guarded(const char *app, void *u) {
+    (void)u;
+    return restrict_blocks(app, FW_R_NO_MIC) || restrict_blocks(app, FW_R_NO_CAMERA) || restrict_blocks(app, FW_R_NO_SCREEN);
 }
+
+/* Re-arms the guard: is any restricted app of this session running? (its scope is there) */
+static void arm(void) { guard_armed = appid_running(guarded, NULL); }
 
 /* ---- events -------------------------------------------------------------------------------- */
 
@@ -569,7 +568,7 @@ static void on_global(PwPod body) {
             if (P.cl[i].live && &P.cl[i] != c && P.cl[i].applied) apply_permissions(&P.cl[i], P.cl[i].applied);
     } else if (!strcmp(type, "PipeWire:Interface:Node") && has_props) {
         const char *mc = dict_get(props, "media.class"), *cid = dict_get(props, "client.id");
-        uint32_t flag = pwguard_capture_flag(mc), stream = pwguard_stream_flag(mc);
+        uint32_t flag = pwguard_node_flag(mc, dict_get(props, "media.role"), dict_get(props, "node.name")), stream = pwguard_stream_flag(mc);
         if (!flag && !stream) return;
         PgNode *nd = NULL;
         for (int i = 0; i < MAX_NODES && !nd; i++) if (!P.node[i].live) nd = &P.node[i];

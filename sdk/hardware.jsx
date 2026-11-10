@@ -25,7 +25,7 @@ import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatDate, formatTime, weekdayName } from './i18n.js';
 import { notify, dismissNotification } from './notify.js';
-import { linuxAppFor, shortAppName } from './apps.js';
+import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput } from './components.jsx';
@@ -38,6 +38,7 @@ import { wm } from './windows.js';
 import { linuxPlayersChanged } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
+import { castEvent, castNames } from './screencast.jsx';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -403,6 +404,18 @@ function asker(p) {
   return app ? shortAppName(app) : id || p.comm || t('passwords.polkit.unknown');
 }
 
+// the ScreenCast chooser and its pill (sdk/screencast.jsx) name only the app lord-server verified (its launcher's
+// scope), never the name a process gives itself: with none they say it is an unknown program
+function castAsker(p) {
+  const who = typeof p?.who === 'string' ? p.who : '';
+  if (who.startsWith('desktop:')) {
+    const app = linuxAppFor(who.slice(8));
+    return app ? shortAppName(app) : who.slice(8);
+  }
+  return who.startsWith('lpk:') ? who.slice(4) : who;
+}
+castNames({ app: castAsker, window: windowAppName });
+
 export function PolkitPrompt() {
   const p = useStore(polkitPrompt);
   const th = useSystemTokens();
@@ -543,6 +556,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-open': portalOpen(data); break;
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
     case 'portal-shortcuts': case 'portal-shortcuts-gone': case 'portal-shortcuts-changed': globalShortcutsEvent(kind, data); break;
+    case 'portal-cast': case 'portal-cast-gone': case 'portal-casts': castEvent(kind, data); break;   // ScreenCast (screencast.jsx)
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

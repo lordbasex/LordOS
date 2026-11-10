@@ -79,6 +79,8 @@ static const char *const arrow[] = {
     "XooX XooX", "XoX  XooX", "XX    XooX", "X     XooX", "       XX", NULL,
 };
 
+void media_draw_arrow(Canvas *c, int x, int y) { canvas_bitmap(c, x, y, arrow, 0xff000000u, 0xffffffffu); }
+
 static void feed_recording(const Canvas *src, const MediaCursor *cur) {
     MediaSrc *s = rec;
     if (!s || !s->in_map || s->sock < 0) return;
