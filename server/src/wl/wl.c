@@ -2175,7 +2175,7 @@ static const struct xdg_toplevel_interface toplevel_impl = {
 };
 static void top_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
-    if (!s) return;
+    if (!s || s->top != r) return;
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
@@ -2204,7 +2204,7 @@ static void pop_reposition(struct wl_client *c, struct wl_resource *r, struct wl
 static const struct xdg_popup_interface popup_impl = { .destroy = pop_destroy, .grab = pop_grab, .reposition = pop_reposition };
 static void pop_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
-    if (!s) return;
+    if (!s || s->popup != r) return;
     unmap_popup(s);
     s->popup = NULL;
     s->mapped = 0;
@@ -2217,6 +2217,7 @@ static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl
 static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
+    if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
     struct wl_resource *t = wl_resource_create(c, &xdg_toplevel_interface, wl_resource_get_version(r), id);
     if (!t) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(t, &toplevel_impl, s, top_gone);
@@ -2236,6 +2237,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
 static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
+    if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
     struct wl_resource *p = wl_resource_create(c, &xdg_popup_interface, wl_resource_get_version(r), id);
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &popup_impl, s, pop_gone);
@@ -2262,7 +2264,7 @@ static const struct xdg_surface_interface xdg_surface_impl = {
 };
 static void xs_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
-    if (s) s->xdg = NULL;
+    if (s && s->xdg == r) s->xdg = NULL;
 }
 
 static void wm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
@@ -2274,6 +2276,9 @@ static void wm_positioner(struct wl_client *c, struct wl_resource *r, uint32_t i
 }
 static void wm_get_xdg_surface(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
     Surf *s = wl_resource_get_user_data(surface);
+    /* one xdg_surface per wl_surface: a second one would keep pointing at the Surf after it is freed */
+    if (!s || s->xdg) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface already has an xdg_surface"); return; }
+    if (s->role == R_SUB || s->role == R_CURSOR) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
     struct wl_resource *x = wl_resource_create(c, &xdg_surface_interface, wl_resource_get_version(r), id);
     if (!x) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(x, &xdg_surface_impl, s, xs_gone);
@@ -2333,6 +2338,7 @@ static void deco_gone(struct wl_resource *r) {
 static void decm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void decm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *toplevel) {
     Surf *s = wl_resource_get_user_data(toplevel);
+    if (s && s->deco) { wl_resource_post_error(r, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ALREADY_CONSTRUCTED, "the toplevel already has a decoration object"); return; }
     struct wl_resource *d = wl_resource_create(c, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(d, &deco_impl, s, deco_gone);
@@ -2391,6 +2397,7 @@ static void kde_create(struct wl_client *c, struct wl_resource *r, uint32_t id, 
     struct wl_resource *d = wl_resource_create(c, &kde_deco_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(d, &kde_deco_impl, s, kde_gone);
+    if (s && s->kde) wl_resource_set_user_data(s->kde, NULL);   /* no error in this protocol: the old one is detached */
     if (s) s->kde = d;
     wl_resource_post_event(d, 0, KDE_DECO_SERVER);
 }

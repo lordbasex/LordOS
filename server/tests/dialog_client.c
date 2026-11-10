@@ -214,6 +214,26 @@ int main(int argc, char **argv) {
         xdg_dialog_v1_destroy(d2);
         wl_display_disconnect(c.dpy);
     }
+
+    /* a second xdg_surface, or a second xdg_toplevel, for the same window is a protocol error: the extra object
+     * would otherwise keep pointing at the window after it is freed */
+    for (int twice_top = 0; twice_top < 2; twice_top++) {
+        Conn d;
+        if (connect_to(&d)) continue;
+        struct wl_surface *ws = wl_compositor_create_surface(d.comp);
+        struct xdg_surface *x1 = xdg_wm_base_get_xdg_surface(d.wmbase, ws);
+        if (twice_top) {
+            xdg_surface_get_toplevel(x1);
+            xdg_surface_get_toplevel(x1);
+        } else {
+            xdg_wm_base_get_xdg_surface(d.wmbase, ws);
+        }
+        wl_display_roundtrip(d.dpy);
+        check(twice_top ? "a second toplevel is refused" : "a second xdg_surface is refused", wl_display_get_error(d.dpy) != 0, 1);
+        wl_display_disconnect(d.dpy);
+        wl_display_roundtrip(a.dpy);
+        check("the compositor is still up after the refusal", wl_display_get_error(a.dpy), 0);
+    }
     printf("%d checks, %d failed\n", checks, fails);
     wl_display_disconnect(b.dpy);
     wl_display_disconnect(a.dpy);
