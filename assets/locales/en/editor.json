@@ -1,4 +1,5 @@
 {
+  "drop.open": "Drop to open {count} item(s)",
   "binary": "looks like a binary file",
   "cancel": "Cancel",
   "cmd.close": "Close tab",

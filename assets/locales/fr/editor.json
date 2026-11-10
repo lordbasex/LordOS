@@ -1,4 +1,5 @@
 {
+  "drop.open": "Déposez pour ouvrir {count} élément(s)",
   "binary": "semble être un fichier binaire",
   "cancel": "Annuler",
   "cmd.close": "Fermer l’onglet",

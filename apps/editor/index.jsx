@@ -237,6 +237,7 @@ export default function Editor() {
   const [root, setRoot] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
   const [overlay, setOverlay] = useState(null);       // 'open' | 'folder' | 'saveAs' | 'gotoFile' | 'gotoLine' | 'lang' | {confirm}
+  const [dropOver, setDropOver] = useState(null);     // files dragged from Files over the window: how many
   const [find, setFind] = useState({ open: false, query: '', replace: '', regex: false, caseSensitive: false });
   const [msg, setMsg] = useState(null);
   const [lineQuery, setLineQuery] = useState('');
@@ -441,8 +442,18 @@ export default function Editor() {
   const nsel = doc.cursors.filter(hasSel).reduce((n, x) => n + doc.textIn(selStart(x), selEnd(x)).length, 0);
   const editorOverlay = !!overlay;
 
+  // files dragged from Files: a file opens in a tab, a folder becomes the project
+  const dropFiles = (paths) => {
+    setDropOver(null);
+    for (const pth of paths || []) {
+      let st = null;
+      try { st = fs.stat(pth); } catch (e) { st = null; }
+      if (st && st.dir) { setRoot(relOf(pth)); setExpanded(new Set()); } else openPath(pth);
+    }
+  };
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.editorBg }}>
+    <View onFilesDrop={dropFiles} onFilesOver={(paths) => setDropOver(paths ? paths.length : null)}
+      style={{ flex: 1, flexDirection: 'row', backgroundColor: t.editorBg }}>
       {root !== null && (
         <View style={{ width: 220, backgroundColor: t.sidebarBg }}>
           <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: t.separator }} />
@@ -572,6 +583,13 @@ export default function Editor() {
           </View>
         </View>
       )}
+      {/* over everything else, so it is not drawn under the panes */}
+      {dropOver ? (
+        <View style={{ position: 'absolute', left: 8, top: 8, right: 8, bottom: 8, borderRadius: 10, pointerEvents: 'none', alignItems: 'center', justifyContent: 'center',
+          border: `2px dashed ${t.accent}`, backgroundColor: 'rgba(10,132,255,0.10)' }}>
+          <Text style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{tr('editor.drop.open', { count: dropOver })}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

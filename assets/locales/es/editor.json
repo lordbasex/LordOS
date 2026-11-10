@@ -1,4 +1,5 @@
 {
+  "drop.open": "Soltá para abrir {count} elemento(s)",
   "binary": "parece un archivo binario",
   "cancel": "Cancelar",
   "cmd.close": "Cerrar pestaña",

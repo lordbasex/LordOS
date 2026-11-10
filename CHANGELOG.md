@@ -70,6 +70,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Text Editor: files dragged from Files open in it.** A file opens in a tab and a folder becomes the project; while
+  the drag is over the window it is outlined and says so.
 - **Files: what is dragged keeps following the pointer into another app.** The dragged icon was drawn inside the Files
   window and vanished at its edge; it is now in the desktop's drag layer, above every window, and shows a green + over a
   window that takes files (the Terminal, for one).

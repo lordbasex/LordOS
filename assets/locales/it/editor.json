@@ -1,4 +1,5 @@
 {
+  "drop.open": "Rilascia per aprire {count} elemento/i",
   "binary": "sembra un file binario",
   "cancel": "Annulla",
   "cmd.close": "Chiudi scheda",
