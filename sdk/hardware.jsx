@@ -10,6 +10,8 @@
 //   bluetooth     store with lord.bt.state(); pairing requests (<BluetoothPrompt />); setBluetoothPower,
 //                 remembered and applied again at login (btpowermodel.js)
 //   polkit        a Linux app's request for administrator rights (<PolkitPrompt />)
+//   portal open   a Linux app asks to open a link or a file (OpenURI): opened like everything else, and asked
+//                 first when the app is not the one in front (<PortalOpenPrompt />, portalopenmodel.js)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -28,6 +30,9 @@ import { TextInput } from './components.jsx';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
+import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
+import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
+import { wm } from './windows.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -430,6 +435,67 @@ export function PolkitPrompt() {
     h(View, { style: { width: 110 } }, h(DialogButton, { label: t('passwords.cancel'), onClick: () => lord.polkit.cancel(p.id), th })))));
 }
 
+// ---- A Linux app asks to open a link or a file (org.freedesktop.portal.OpenURI, server/src/ui/portal.c) ----
+//
+// lord-server already checked a local file and says whether the app is the one in front. It opens the way
+// everything else here does (sysopen.js); an app in the background waits for the person, one question at a
+// time, with the host or the file's name first so a long address can't hide where it goes.
+
+export const portalOpens = createStore([]);
+
+// A file is opened by its name, so lord-server checks right before that it is still the file it checked
+// when the app asked (not swapped while the question was up); otherwise it is refused.
+function runOpen(id, plan) {
+  try {
+    if (plan.action === 'url') return openUrl(plan.target) ? 0 : 2;
+    if (!lord.portal.still || lord.portal.still(id) !== true) return 2;
+    if (plan.action === 'file') openFileWithApps(plan.target);
+    else if (plan.action === 'folder') wm.open('files', { new: true, args: { path: plan.target, nonce: Date.now() } });
+    else if (plan.action === 'reveal') revealPath(plan.target);
+    else return 2;
+    return 0;
+  } catch (e) { return 2; }
+}
+
+function portalOpen(req) {
+  if (!req || !has('portal') || !lord.portal.opened) return;
+  const plan = openPlan(req);
+  if (plan.action === 'refuse') lord.portal.opened(req.id, 2);
+  else if (!plan.ask) lord.portal.opened(req.id, runOpen(req.id, plan));
+  else portalOpens.set([...portalOpens.get(), { ...req, plan }]);
+}
+
+function answerOpen(p, yes) {
+  portalOpens.set(portalOpens.get().filter((x) => x.id !== p.id));
+  lord.portal.opened(p.id, yes ? runOpen(p.id, p.plan) : 1);
+}
+
+export function PortalOpenPrompt() {
+  const list = useStore(portalOpens);
+  const th = useSystemTokens();
+  const p = list[0];
+  if (!p) return null;
+  const { action, target } = p.plan;
+  const web = action === 'url';
+  const file = splitPath(target);
+  const app = asker(p);
+  const title = web ? t('shell.portalOpen.titleUrl', { app }) : action === 'file' ? t('shell.portalOpen.titleFile', { app })
+    : action === 'folder' ? t('shell.portalOpen.titleFolder', { app }) : t('shell.portalOpen.titleReveal', { app });
+  const line = { alignSelf: 'stretch', direction: 'ltr', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis' };
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
+  h(View, { style: { marginTop: 90, width: 380, borderRadius: 14, padding: 22, gap: 10, alignItems: 'center', backgroundColor: th.windowBg,
+    border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
+  h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center' } }, title),
+  h(Text, { style: { ...line, fontSize: 13, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' } }, web ? urlHost(target) : file.name),
+  h(Text, { style: { ...line, fontSize: 11, color: th.textDim, numberOfLines: 2 } }, (web ? target : file.dir).slice(0, 300)),
+  h(Text, { style: { fontSize: 12, color: th.textDim, textAlign: 'center', lineHeight: 1.4 } }, t('shell.portalOpen.body')),
+  h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
+    h(DialogButton, { label: t('shell.portalOpen.cancel'), onClick: () => answerOpen(p, false), th }),
+    h(DialogButton, { label: action === 'reveal' ? t('shell.portalOpen.show') : t('shell.portalOpen.open'), primary: true, th,
+      onClick: () => answerOpen(p, true) }))));
+}
+
 // ---- Linux apps' notifications (org.freedesktop.Notifications, server/src/hw/notifyd.c) ----
 
 const fromLinux = new Map();            // D-Bus id → our notification id
@@ -469,6 +535,8 @@ globalThis.__lordHw = (kind, data) => {
     case 'timedate': timedate.set(data); break;
     case 'polkit': polkitPrompt.set(data); break;
     case 'portal-file': portalFile.set(data); break;
+    case 'portal-open': portalOpen(data); break;
+    case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
     case 'notify': linuxNotify(data); break;
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     default: break;

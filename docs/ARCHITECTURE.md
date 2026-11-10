@@ -225,9 +225,11 @@ Sockets and services a user session's `lord-server` offers besides its own (0.8.
   started, separate from remote desktop, with a consent prompt, an indicator with Stop and grants in a root-owned
   file. The login screen's `lord-server` doesn't create it, and it stops delivering while the session is locked or
   away from the monitor. See `SCREEN-SHARING.md`.
-- **Its own xdg portal:** `org.freedesktop.portal.Settings` (mode, accent, button order) and
-  `org.freedesktop.portal.FileChooser` (the system file dialog for Linux apps) on the session bus
-  (`server/src/ui/portal.c`), without xdg-desktop-portal. See `WAYLAND.md`.
+- **Its own xdg portal:** `org.freedesktop.portal.Settings` (mode, accent, button order),
+  `org.freedesktop.portal.FileChooser` (the system file dialog for Linux apps), `OpenURI` (links and files
+  opened the way LordOS opens them, asked first for an app in the background) and `Inhibit`, plus
+  `org.freedesktop.ScreenSaver`'s Inhibit (both count as the compositor's idle inhibition), on the session bus
+  (`server/src/ui/portal.c`), without xdg-desktop-portal. See `WAYLAND.md` and `FLATPAK.md`, "Portals".
 
 Data shipped with LordOS for the Monitor (`MONITOR.md`): `assets/monitor/geoip-country.mmdb.xz`
 (DB-IP Lite Country, CC BY 4.0, read by our own MaxMind DB reader) and the Natural

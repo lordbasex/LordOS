@@ -360,8 +360,24 @@ static JSValue f_portal_chosen(JSContext *c, JSValueConst t, int argc, JSValueCo
     return JS_UNDEFINED;
 }
 
+/* lord.portal.opened(id, code): the shell opened what an app asked for (0), the person said no (1) or it was refused (2) */
+static JSValue f_portal_opened(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2) return JS_UNDEFINED;
+    portal_open_done(arg_int(c, argv[0], -1), arg_int(c, argv[1], 2));
+    return JS_UNDEFINED;
+}
+
+/* lord.portal.still(id): the file an app asked to open is still the one lord-server checked (portal_open_still) */
+static JSValue f_portal_still(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    return JS_NewBool(c, argc >= 1 && portal_open_still(arg_int(c, argv[0], -1)));
+}
+
 static const JSCFunctionListEntry portal_funcs[] = {
     JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
+    JS_CFUNC_DEF("opened", 2, f_portal_opened),
+    JS_CFUNC_DEF("still", 1, f_portal_still),
 };
 
 static const JSCFunctionListEntry bt_funcs[] = {

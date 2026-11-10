@@ -168,6 +168,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
+    run "portal-check-test" build/portal-check-test
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
@@ -301,6 +302,9 @@ EOF
     # (0.8.8.8) files dragged from Files onto Notes, Photos, Player and PDF Viewer: which ones each takes (sdk/filedrop.js)
     if have node; then run "filedrop-test (sdk/filedrop.js)" node tests/filedrop_test.mjs
     else skip "filedrop-test" "node"; fi
+    # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
+    if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
+    else skip "portal-open-model-test" "node"; fi
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi
