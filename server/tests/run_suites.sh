@@ -292,6 +292,9 @@ EOF
     # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
     if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
     else skip "terminal-fwdports-test" "node"; fi
+    # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
+    if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
+    else skip "dialog-keys-test" "node"; fi
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi
