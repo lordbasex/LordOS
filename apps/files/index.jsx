@@ -7,6 +7,7 @@ import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
+  wayland,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -663,17 +664,29 @@ export default function Files() {
       const p = press.current;
       if (!p) return;
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
+      // the drag starts: a Linux window it goes over gets the paths too (lord-server offers them as text/uri-list)
+      if (!p.moved && !p.favOnly) p.linux = wayland.dragFiles(p.paths);
       p.moved = true;
       const target = dropOf(e.target);
-      // over another app's window that takes files: the ghost says so (a +)
-      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly, takes: !target && !p.favOnly && !!filesDropOf(e.target) });
+      // over another app's window that takes files, or a Linux window that agreed to: the ghost says so (a +)
+      const takes = !target && !p.favOnly && (!!filesDropOf(e.target) || (p.linux && !!wayland.dragTaken()));
+      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly, takes });
       tellOver(!target && !p.favOnly ? filesOverOf(e.target) : null, p.paths, { alt: !!e.alt });
       setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
       const p = press.current;
       press.current = null;
-      if (!p || !p.moved) return;
+      if (!p) {
+        // a Linux app's files released over a folder of this window: copied there once lord-server has read them
+        const into = dropOf(e.target);
+        let mine = false;
+        for (let n = e.target; n && !mine; n = n.parent) mine = n === root.current;
+        if (mine && into && into !== 'fav:' && into !== 'trash:') wayland.takeDrop((paths) => transfer(paths, into, false, knownNames(into)));
+        return;
+      }
+      if (!p.moved) return;
+      if (p.linux) wayland.endDrag();       // released over a Linux window, lord-server already dropped it there
       const target = dropOf(e.target);
       setDrag(null); setDropTarget(null);
       tellOver(null);

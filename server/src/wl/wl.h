@@ -110,6 +110,22 @@ int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lord
 const char *wl_clip_html(size_t *len);
 void        wl_clip_set_html(const char *html, size_t n);
 
+/* Drag and drop from LordOS's Files (lord.wayland.dragFiles): while its drag is over a Linux window the
+ * compositor offers these paths (each one already checked: absolute, existing, no NUL or newline) as
+ * text/uri-list and text/plain. Only while a button is down and no app's drag runs; 1 if it started.
+ * The last release drops (or cancels); wl_drag_files_end cancels one still running. wl_drag_files_taken:
+ * the action the window under the pointer agreed (1 copy, 2 move), 0 if it takes nothing. */
+int  wl_drag_files(const char *const *paths, int n);
+void wl_drag_files_end(void);
+int  wl_drag_files_taken(void);
+/* And the other way: a Linux app's drag of files released over LordOS itself. Files claims it at the release
+ * (wl_drop_claim: 1 for the first caller while its list is being read); once read, the "filesdrop" event (window
+ * 0) says the local paths are ready: wl_drop_paths gives them (n paths, each ended by its NUL), wl_drop_clear
+ * forgets them. A drop nobody claimed is cancelled. */
+int  wl_drop_claim(void);
+const char *wl_drop_paths(int *n);
+void wl_drop_clear(void);
+
 /* xdg-foreign-v2: the window an app exported with that handle (a portal's "wayland:<handle>" parent),
  * or 0 if no live window has it */
 int  wl_foreign_surface(const char *handle);

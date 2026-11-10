@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below) |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon (in development, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps") |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -205,6 +205,49 @@ the home folder and survives reboots. Image previews are first stored in
 
 Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53 MB of RSS
 (each window keeps a copy of its buffer).
+
+## Drag and drop (in development: built, to check on the VM)
+
+The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file lists in `urilist.c`:
+
+- **Between Linux apps.** An app starts a drag with `wl_data_device.start_drag` and the serial of the press
+  it is in. The serial must be the one of a press of that client, with the button still down, on the window
+  that got it: any other serial cancels the source and nothing happens. A second `start_drag` while a drag
+  runs is cancelled too. While the button is down no app gets the pointer: the surface under it gets
+  `enter`, `motion` and `leave` on its data device, with a new `wl_data_offer` each time it enters (the
+  source's types and, from version 3, its actions). The target's `accept` and `set_actions` reach the source
+  (`target`, `action`). The action is the target's preferred one, else copy, move or ask, in that order. A
+  source without `set_actions` (before version 3) copies. A drag without a source stays inside the app that
+  started it.
+- **The drop.** Releasing over a surface whose offer accepted a type (and agreed an action, from version 3)
+  sends `drop` and `dnd_drop_performed`. The offer keeps reading until the target calls `finish`, which
+  sends `dnd_finished`. A target that destroys the offer without finishing is cancelled (before version 3
+  that counts as finished). Releasing anywhere else, or pressing Escape, cancels.
+- **The icon** (role "dnd icon") is drawn under the pointer above everything, moved by its `attach` offset
+  (or `wl_surface.offset` from version 5). An icon that has another role is a protocol error, and so is a
+  source used for a drag given as the selection, or the other way round, and an action mask with unknown
+  bits. A source, an icon, a target or a whole client that goes away mid-drag ends that part cleanly: the
+  source destroyed cancels the drag (the target gets `leave`), and the icon destroyed just stops being drawn.
+- **From Files to a Linux app.** When a Files drag starts, Files hands its paths to lord-server
+  (`lord.wayland.dragFiles`). Only paths are accepted: absolute, existing, without a NUL or a newline, at most
+  256. While the drag is over a Linux window, the compositor is the source: it offers `text/uri-list`
+  (`file://` URIs, percent-encoded, CRLF separated) and `text/plain` (the paths, one per line), and writes
+  them itself to the app's pipe, non-blocking and from the event loop. Files' rule for the action stays: it
+  moves, and ⌥ copies, unless the app prefers another. The ghost shows the + once the app agreed. Nothing is
+  run or read for the app: it opens the files itself.
+- **From a Linux app to Files.** A drag that offers `text/uri-list` and may copy, released over LordOS
+  itself, is taken by the compositor. The app is told "copy" while the pointer is over LordOS. At the release,
+  Files claims it if a folder of its window is under the pointer (`lord.wayland.takeDrop`). The list is read
+  (at most 1 MB, non-blocking), its local `file://` paths (an empty host or `localhost`; `%00`, newlines and
+  other hosts are dropped) are copied into that folder, and the app gets `dnd_finished`. A drop no Files
+  window claimed, or with no local path in it, is cancelled.
+- **Not yet:** X11 apps (Xwayland) take no drop and can't start one: that needs an XDND bridge in `xwm.c`.
+  Isolated LordOS apps take no drop either: that needs a grant of its own (`DESKTOP-PARITY.md`). Touch drags
+  are not supported.
+- **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry),
+  and `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
+  protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
+  actions, a second drag, the icon and the source destroyed mid-drag, receive, drop and finish.
 
 **Moving and resizing** (`xdg_toplevel.move`/`resize`) is tracked by lord-server in C, with no JS
 per frame, just like LordOS windows; while it lasts, the app doesn't receive the pointer. All
@@ -545,8 +588,9 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
 - **Offers are bound to their selection.** A `wl_data_offer` (and a primary offer) carries the
   generation it was made for and only gives data for that selection, and only to its client while
   it has the keyboard: an app can't keep an old offer to read later copies (`build/clip-offers`).
-- **Drag and drop** between X11 and Wayland apps: not yet (LordOS has no Wayland drag and drop
-  yet). Inside X (X app to X app) it's X's own protocol; not tested.
+- **Drag and drop** between X11 and Wayland apps: not yet. Wayland drag and drop is in development (see
+  "Drag and drop"), but the XDND bridge in `xwm.c` isn't there. Inside X (X app to X app) it's X's own
+  protocol; not tested.
 
 ### VMware Tools (`open-vm-tools-desktop`)
 
@@ -622,7 +666,8 @@ display.
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- Drag and drop, `text-input` (LordOS input methods inside Wayland apps). (Activation,
+- Drag and drop with X11 apps (an XDND bridge in `xwm.c`); Wayland drag and drop is in development, see
+  "Drag and drop". `text-input` (LordOS input methods inside Wayland apps). (Activation,
   `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 

@@ -4,7 +4,7 @@
  *
  * Globals: wl_compositor 6, wl_subcompositor, wl_shm (from libwayland), wl_output 4, wl_seat 7
  * (pointer and keyboard with the XKB keymap from keyboard.c), wl_data_device_manager 3 (clipboard
- * shared with LordOS's), xdg_wm_base 6, zxdg_decoration_manager_v1, and for dialogs over their window
+ * shared with LordOS's, and drag and drop), xdg_wm_base 6, zxdg_decoration_manager_v1, and for dialogs over their window
  * zxdg_exporter_v2/zxdg_importer_v2 (xdg-foreign) and xdg_wm_dialog_v1.
  *
  * Each surface copies its shared-memory buffer on commit (and releases it right away):
@@ -15,7 +15,8 @@
  *
  * X11 apps go through Xwayland (xwayland.c starts it on demand, xwm.c is the X window manager):
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
- * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps).
+ * (wlx_attach). Not there yet: drag and drop with X11 apps (XDND), text-input (LordOS input methods inside
+ * Wayland apps).
  *
  * xdg_activation_v1: a window asks to come forward with a token; only one LordOS issued when it
  * launched the app, or one the app in front asked for, raises it; any other marks it as wanting
@@ -73,8 +74,9 @@
 #include "../ui/ui.h"
 #include "../sec/broker.h"
 #include "wlregion.h"
+#include "urilist.h"
 
-enum { R_NONE, R_TOPLEVEL, R_POPUP, R_SUB, R_CURSOR };
+enum { R_NONE, R_TOPLEVEL, R_POPUP, R_SUB, R_CURSOR, R_DNDICON };
 
 /* An app's dmabuf buffer (zwp_linux_dmabuf_v1). Refcounted: 1 for the wl_buffer, 1 for the
  * surface showing it and 1 while it is on screen via direct scanout. */
@@ -135,6 +137,7 @@ struct Surf {
     /* wp_presentation */
     struct wl_list p_feedback, feedback;
     int cursor_hx, cursor_hy, p_hx, p_hy;   /* cursor role: hotspot */
+    int dnd_x, dnd_y, p_dnd_x, p_dnd_y;     /* drag icon role: where it goes from the pointer (attach and offset add up) */
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
@@ -256,6 +259,15 @@ static void emit(Surf *s, const char *type, const char *fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(e->json, sizeof e->json, fmt, ap);
     va_end(ap);
+}
+
+/* An event that belongs to no window (id 0: LordOS's own, such as files an app dropped on it). */
+static void emit_id(int id, const char *type, const char *json) {
+    if (nev == 64) return;
+    Ev *e = &evq[nev++];
+    e->id = id;
+    snprintf(e->type, sizeof e->type, "%s", type);
+    snprintf(e->json, sizeof e->json, "%s", json);
 }
 
 void wl_events(WlEventFn fn) {
@@ -530,12 +542,14 @@ static void apply_viewport(Surf *s) {
 /* ---- wl_surface ---- */
 
 static void surface_commit_role(Surf *s);
+static void dnd_icon_damage(void);
 
 static void srf_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 
 static void srf_attach(struct wl_client *c, struct wl_resource *r, struct wl_resource *buf, int32_t x, int32_t y) {
-    (void)c; (void)x; (void)y;
+    (void)c;
     Surf *s = wl_resource_get_user_data(r);
+    if (wl_resource_get_version(r) < 5) { s->p_dnd_x += x; s->p_dnd_y += y; }   /* from version 5 that is wl_surface.offset */
     if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
     s->p_buf = buf;
     s->p_attached = 1;
@@ -601,6 +615,15 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
         if (s == cursor_surf) cursor_gen++;
         return;
     }
+    if (s->role == R_DNDICON) {
+        dnd_icon_damage();
+        s->dnd_x += s->p_dnd_x;
+        s->dnd_y += s->p_dnd_y;
+        s->p_dnd_x = s->p_dnd_y = 0;
+        dnd_icon_damage();
+        return;
+    }
+    s->p_dnd_x = s->p_dnd_y = 0;
     if (s->p_geom) {
         s->gx = s->p_gx; s->gy = s->p_gy; s->gw = s->p_gw; s->gh = s->p_gh;
         s->has_geom = 1;
@@ -617,7 +640,12 @@ static void srf_scale(struct wl_client *c, struct wl_resource *r, int32_t sc) {
     if (sc < 1) { wl_resource_post_error(r, WL_SURFACE_ERROR_INVALID_SCALE, "buffer scale must be positive"); return; }
     if (s) s->p_bscale = sc > 8 ? 8 : sc;
 }
-static void srf_offset(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y) { (void)c; (void)r; (void)x; (void)y; }
+static void srf_offset(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    s->p_dnd_x += x;
+    s->p_dnd_y += y;
+}
 
 static const struct wl_surface_interface surface_impl = {
     .destroy = srf_destroy, .attach = srf_attach, .damage = srf_damage, .frame = srf_frame,
@@ -821,11 +849,13 @@ static void bind_wm_dialog(struct wl_client *c, void *data, uint32_t ver, uint32
     wl_resource_set_implementation(r, &wm_dialog_impl, NULL, NULL);
 }
 
+static void dnd_surface_gone(Surf *s);
 static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    dnd_surface_gone(s);
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     orphan_dialogs(s);
@@ -849,6 +879,7 @@ static void surface_gone(struct wl_resource *r) {
     wl_resource_for_each_safe(cb, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(cb); wl_resource_destroy(cb); }
     wl_resource_for_each_safe(cb, tmp, &s->sent_feedback) { wp_presentation_feedback_send_discarded(cb); wl_resource_destroy(cb); }
     if (s->viewport) wl_resource_set_user_data(s->viewport, NULL);
+    if (s->sub) wl_resource_set_user_data(s->sub, NULL);
     if (s->frac) wl_resource_set_user_data(s->frac, NULL);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
@@ -956,6 +987,11 @@ static void sub_gone(struct wl_resource *r) {
 static void subc_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *parent) {
     Surf *s = wl_resource_get_user_data(surface), *p = wl_resource_get_user_data(parent);
+    /* one wl_subsurface per wl_surface, and not for a surface that has another role (cursor, drag icon) */
+    if (s->sub || s->role == R_CURSOR || s->role == R_DNDICON || s == p) {
+        wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface already has a role");
+        return;
+    }
     struct wl_resource *res = wl_resource_create(c, &wl_subsurface_interface, wl_resource_get_version(r), id);
     if (!res) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(res, &subsurface_impl, s, sub_gone);
@@ -1336,8 +1372,10 @@ static uint32_t input_serial(struct wl_client *c) {
 }
 /* A client that left: its serials stop counting (another one may get the same address). */
 static struct wl_listener client_created;
+static void dnd_client_gone(struct wl_client *c);
 static void client_destroyed(struct wl_listener *l, void *data) {
     xact_client_gone(data);
+    dnd_client_gone(data);
     wl_list_remove(&l->link);
     free(l);
 }
@@ -1427,7 +1465,11 @@ void wl_keymap_changed(void) {
 
 #define MAX_MIMES 32
 #define CLIP_MAX (16u << 20)
-typedef struct { struct wl_resource *res; char mimes[MAX_MIMES][256]; int nmimes; } Source;
+typedef struct DOffer DOffer;
+/* used: 1 once it was a selection, 2 once it started a drag (a source serves one of the two); actions: its
+ * set_actions (drag and drop); offer: its drag offer that may still read it (the one under the pointer, or the
+ * dropped one until it finishes) */
+typedef struct { struct wl_resource *res; char mimes[MAX_MIMES][256]; int nmimes; uint32_t actions; int actions_set, used; DOffer *offer; } Source;
 static Source *selection;           /* source of the app owning the selection, or NULL (LordOS) */
 /* Bumped whenever the selection changes: an offer is only good for the selection it was made for,
  * and only while its client has the keyboard (an app can't keep an old offer to read later copies). */
@@ -1464,11 +1506,21 @@ static void src_offer(struct wl_client *c, struct wl_resource *r, const char *mi
     if (s->nmimes < MAX_MIMES && strlen(mime) < sizeof s->mimes[0]) snprintf(s->mimes[s->nmimes++], sizeof s->mimes[0], "%s", mime);
 }
 static void src_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-static void src_actions(struct wl_client *c, struct wl_resource *r, uint32_t a) { (void)c; (void)r; (void)a; }
+#define DND_ALL (WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY | WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE | WL_DATA_DEVICE_MANAGER_DND_ACTION_ASK)
+static void src_actions(struct wl_client *c, struct wl_resource *r, uint32_t a) {
+    (void)c;
+    Source *s = wl_resource_get_user_data(r);
+    if (a & ~(uint32_t)DND_ALL) { wl_resource_post_error(r, WL_DATA_SOURCE_ERROR_INVALID_ACTION_MASK, "invalid dnd actions 0x%x", a); return; }
+    if (s->used) return;                /* only before start_drag (lenient: ignored, not an error) */
+    s->actions = a;
+    s->actions_set = 1;
+}
 static const struct wl_data_source_interface source_impl = { .offer = src_offer, .destroy = src_destroy, .set_actions = src_actions };
 static void offer_to_focus(void);
+static void dnd_source_gone(Source *s);
 static void src_gone(struct wl_resource *r) {
     Source *s = wl_resource_get_user_data(r);
+    dnd_source_gone(s);
     if (selection == s) {
         selection = NULL;
         clip_offer_gen++;
@@ -1783,19 +1835,19 @@ static void offer_to_focus(void) {
 }
 
 static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resource *src, struct wl_resource *origin_,
-                     struct wl_resource *icon, uint32_t serial) {
-    (void)c; (void)r; (void)origin_; (void)icon; (void)serial;
-    if (src) wl_data_source_send_cancelled(src);     /* drag and drop: not yet */
-}
+                     struct wl_resource *icon, uint32_t serial);
 static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct wl_resource *src, uint32_t serial) {
-    (void)c; (void)r; (void)serial;
+    (void)c; (void)serial;
     Source *s = src ? wl_resource_get_user_data(src) : NULL;
+    if (s && s->used == 2) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source started a drag"); return; }
+    if (s) s->used = 1;
     if (selection && selection != s) wl_data_source_send_cancelled(selection->res);
     selection = s;
     clip_offer_gen++;
     if (s) read_selection(s);
     offer_to_focus();                   /* the new selection, to the client with the keyboard (the owner, usually) */
 }
+static void dev_gone(struct wl_resource *r);
 static const struct wl_data_device_interface device_impl = { .start_drag = dev_drag, .set_selection = dev_set_selection, .release = res_release };
 
 static void ddm_create_source(struct wl_client *c, struct wl_resource *r, uint32_t id) {
@@ -1809,7 +1861,7 @@ static void ddm_get_device(struct wl_client *c, struct wl_resource *r, uint32_t 
     (void)seat;
     struct wl_resource *d = wl_resource_create(c, &wl_data_device_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
-    wl_resource_set_implementation(d, &device_impl, NULL, link_gone);
+    wl_resource_set_implementation(d, &device_impl, NULL, dev_gone);
     wl_list_insert(&data_devices, wl_resource_get_link(d));
     if (key_focus && key_focus->client == c) offer_selection(d);
 }
@@ -2278,7 +2330,7 @@ static void wm_get_xdg_surface(struct wl_client *c, struct wl_resource *r, uint3
     Surf *s = wl_resource_get_user_data(surface);
     /* one xdg_surface per wl_surface: a second one would keep pointing at the Surf after it is freed */
     if (!s || s->xdg) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface already has an xdg_surface"); return; }
-    if (s->role == R_SUB || s->role == R_CURSOR) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
+    if (s->role == R_SUB || s->role == R_CURSOR || s->role == R_DNDICON) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
     struct wl_resource *x = wl_resource_create(c, &xdg_surface_interface, wl_resource_get_version(r), id);
     if (!x) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(x, &xdg_surface_impl, s, xs_gone);
@@ -2727,6 +2779,7 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
     canvas_set_clip(c, old);
 }
 
+static Surf *dnd_icon_at(float *x, float *y);
 void wl_paint_popups(Canvas *c) {
     if (gpu_active() && !paint_capture_mode) return;    /* GPU path: they go in layer 1 */
     for (int i = 0; i < npopups; i++) {
@@ -2739,6 +2792,9 @@ void wl_paint_popups(Canvas *c) {
         }
         paint_tree(c, popups[i], x, y, 1, (Rect){ -65536, -65536, 65536, 65536 });
     }
+    float ix, iy;
+    Surf *icon = dnd_icon_at(&ix, &iy);
+    if (icon) paint_tree(c, icon, ix, iy, 1, (Rect){ -65536, -65536, 65536, 65536 });
 }
 
 /* Texture with a surface's current content (GPU path). */
@@ -2782,7 +2838,7 @@ static void fs_box(float *x, float *y, float *sx, float *sy) {
     *y = fy - fs_surf->gy * *sy;
 }
 
-int wl_gpu_layers_empty(void) { return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups; }
+int wl_gpu_layers_empty(void) { float x, y; return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups && !dnd_icon_at(&x, &y); }
 
 void wl_gpu_draw_layer(int layer) {
     Rect all = { -65536, -65536, 65536, 65536 };
@@ -2809,6 +2865,9 @@ void wl_gpu_draw_layer(int layer) {
         float x, y;
         if (origin(popups[i], &x, &y)) draw_tree(popups[i], x, y, 1, 1, all);
     }
+    float ix, iy;
+    Surf *icon = dnd_icon_at(&ix, &iy);
+    if (icon) draw_tree(icon, ix, iy, 1, 1, all);
 }
 
 /* CPU path: fullscreen and its menus are copied over the already built frame. */
@@ -2837,6 +2896,9 @@ void wl_paint_fullscreen(Canvas *out) {
         float px, py;
         if (origin(popups[i], &px, &py)) paint_tree(out, popups[i], px, py, 1, (Rect){ -65536, -65536, 65536, 65536 });
     }
+    float ix, iy;
+    Surf *icon = dnd_icon_at(&ix, &iy);
+    if (icon) paint_tree(out, icon, ix, iy, 1, (Rect){ -65536, -65536, 65536, 65536 });
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
@@ -2854,7 +2916,8 @@ static void scanout_done(void *data) {
 }
 
 int wl_try_scanout(int cursor_free) {
-    if (!gpu_active() || !fs_surf || !fs_surf->dmabuf || npopups || fs_surf->nkids || !cursor_free) return 0;
+    float ix, iy;
+    if (!gpu_active() || !fs_surf || !fs_surf->dmabuf || npopups || fs_surf->nkids || !cursor_free || dnd_icon_at(&ix, &iy)) return 0;
     Dmabuf *d = fs_surf->dmabuf;
     int pw = 0, ph = 0, nused = 0;              /* one display, at its physical size */
     for (int i = 0; i < OUT_MAX; i++) if (oslots[i].used) { nused++; pw = oslots[i].o.pw; ph = oslots[i].o.ph; }
@@ -2945,8 +3008,477 @@ static void dismiss_popups(void) {
     for (int i = npopups - 1; i >= 0; i--) if (popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
 }
 
+/* The surface under the pointer, a button held or not: menus first, then fullscreen, then the window the UI's
+ * hit test found. lx, ly: the point in that surface. */
+static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
+    Surf *target = NULL;
+    for (int i = npopups - 1; i >= 0 && !target; i--) {
+        float ox, oy;
+        if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
+    }
+    if (!target && fs_surf && fs_surf->content) {
+        float ox, oy;
+        if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, lx, ly);
+    } else if (!target && hit && hit->type == NODE_SURFACE) {
+        Surf *s = find(hit->term);
+        float ox, oy;
+        if (s && origin(s, &ox, &oy)) target = surface_at(s, x - ox, y - oy, lx, ly);
+    }
+    return target;
+}
+
+/* ---- drag and drop (wl_data_device.start_drag) ----
+ * A Linux app starts a drag with the serial of the press it is in, on the window that got it. From then on
+ * the pointer goes to no app until every button is up: the surface under it gets enter, motion and leave on its
+ * data device, with a new wl_data_offer each time it enters (the source's types and, from version 3, its
+ * actions). Releasing over a surface whose offer accepted a type (and agreed an action, from version 3) drops
+ * there; anywhere else, or Escape, cancels. The icon (role "dnd icon") is drawn under the pointer above
+ * everything. A second start_drag while one runs is cancelled.
+ *
+ * LordOS's Files is a source too (lord.wayland.dragFiles, wl_drag_files): while its drag is over a Linux
+ * window the compositor offers the paths as text/uri-list and text/plain and writes them itself, from the event
+ * loop and without blocking (send_bytes). And a target: an app's drag of files (text/uri-list) released over
+ * LordOS itself is read by the compositor and handed to JS, where Files copies them into the folder under the
+ * pointer (dnd_take_files). Xwayland's windows take no drop yet (no XDND bridge), and neither do isolated
+ * LordOS apps (a drop there needs a grant of its own, docs/DESKTOP-PARITY.md). */
+
+#define DND_COPY WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY
+#define DND_MOVE WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE
+#define DND_ASK WL_DATA_DEVICE_MANAGER_DND_ACTION_ASK
+#define DND_RECEIVES 16                 /* receive requests one offer may make */
+
+/* src: the client source while this is its offer (Source.offer), else NULL; lord: the generation of LordOS's
+ * paths it offers (0: none) */
+struct DOffer {
+    struct wl_resource *res;
+    Source *src;
+    unsigned lord;
+    uint32_t dest, pref, action;        /* the target's set_actions, and the action agreed */
+    int accepted, dropped, finished, receives;
+};
+
+static struct {
+    int on;                             /* a drag is running */
+    struct wl_client *client;           /* who started it (NULL: LordOS's Files) */
+    Source *src;                        /* its source (NULL: LordOS's paths, or a drag inside one client) */
+    int lord;
+    Surf *icon, *focus;                 /* the icon, and the surface under the pointer that got enter */
+    struct wl_resource *dev;            /* the data device that got enter */
+    DOffer *offer;                      /* the offer made for focus */
+    int over_lord;                      /* over LordOS itself, told to the source as a copy of its files */
+} drag;
+static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
+static int alt_down;                    /* Alt held: a Files drag copies instead of moving, as inside LordOS */
+/* the press a start_drag may name: its serials (one per wl_pointer of that client) and the surface it went to */
+static uint32_t press_serials[4];
+static int npress;
+static Surf *press_surf;
+/* LordOS's paths (wl_drag_files): kept after the drop for the offer reading them */
+static char *lord_uris, *lord_text;
+static size_t lord_uris_len, lord_text_len;
+static unsigned lord_gen;
+static const char *const lord_mimes[] = { "text/uri-list", "text/plain;charset=utf-8", "text/plain", "UTF8_STRING" };
+#define NLORD_MIMES (sizeof lord_mimes / sizeof *lord_mimes)
+
+static const char *app_of_client(struct wl_client *cl);
+
+/* An app's files dropped on LordOS (dnd_take_files): read from its source, then its local paths for JS. */
+static struct {
+    Source *src;                        /* the source being read, while it lives */
+    int fd, claimed;                    /* claimed: Files took it at the release (wl_drop_claim) */
+    struct wl_event_source *ev;
+    char *buf, *paths;                  /* what the app wrote; the paths, each ended by its NUL */
+    size_t len, cap;
+    int npaths;
+} in_drop = { .fd = -1 };
+
+/* The drag icon, if one is shown, and where (under the pointer, moved by its attach and offset). */
+static Surf *dnd_icon_at(float *x, float *y) {
+    if (!drag.icon || !drag.icon->content) return NULL;
+    *x = last_x + (float)drag.icon->dnd_x;
+    *y = last_y + (float)drag.icon->dnd_y;
+    return drag.icon;
+}
+static void dnd_icon_damage(void) {
+    float x, y;
+    Surf *icon = dnd_icon_at(&x, &y);
+    if (!icon) return;
+    if (gpu_active()) { need_frame = 1; return; }          /* above the UI, like the menus */
+    damage_add((Box){ x - 2, y - 2, x + icon->lw + 2, y + icon->lh + 2 });
+    ui.dirty = 1;
+}
+
+static int dnd_offers(const DOffer *o, const char *mime) {
+    if (!mime) return 0;
+    if (o->src) {
+        for (int i = 0; i < o->src->nmimes; i++) if (!strcmp(o->src->mimes[i], mime)) return 1;
+        return 0;
+    }
+    if (o->lord && o->lord == lord_gen) for (size_t i = 0; i < NLORD_MIMES; i++) if (!strcmp(lord_mimes[i], mime)) return 1;
+    return 0;
+}
+
+/* The action both sides take: the target's preferred one, else (Files) move or copy as inside LordOS, else
+ * copy, move, ask in that order. A source without set_actions (before version 3) copies. */
+static uint32_t dnd_source_actions(void) {
+    if (drag.lord) return DND_COPY | DND_MOVE;
+    return drag.src && drag.src->actions_set ? drag.src->actions : DND_COPY;
+}
+static void dnd_choose(DOffer *o) {
+    uint32_t both = dnd_source_actions() & o->dest, want = drag.lord ? (alt_down ? DND_COPY : DND_MOVE) : 0, a = 0;
+    if (o->pref & both) a = o->pref;
+    else if (want & both) a = want;
+    else if (both & DND_COPY) a = DND_COPY;
+    else if (both & DND_MOVE) a = DND_MOVE;
+    else if (both & DND_ASK) a = DND_ASK;
+    if (a == o->action) return;
+    o->action = a;
+    if (wl_resource_get_version(o->res) >= 3) wl_data_offer_send_action(o->res, a);
+    if (o->src && wl_resource_get_version(o->src->res) >= 3) wl_data_source_send_action(o->src->res, a);
+}
+
+static void dnd_accept(struct wl_client *c, struct wl_resource *r, uint32_t serial, const char *mime) {
+    (void)c; (void)serial;
+    DOffer *o = wl_resource_get_user_data(r);
+    if (!o || o != drag.offer || o->dropped) return;
+    o->accepted = dnd_offers(o, mime);
+    if (o->src) wl_data_source_send_target(o->src->res, o->accepted ? mime : NULL);
+}
+static void dnd_receive(struct wl_client *c, struct wl_resource *r, const char *mime, int32_t fd) {
+    (void)c;
+    DOffer *o = wl_resource_get_user_data(r);
+    /* only the offer under the pointer, or the dropped one until it finishes, and only for a type it offered */
+    if (!o || (o != drag.offer && !o->dropped) || o->finished || !dnd_offers(o, mime) || ++o->receives > DND_RECEIVES) { close(fd); return; }
+    if (o->src) { wl_data_source_send_send(o->src->res, mime, fd); close(fd); return; }
+    if (!strcmp(mime, "text/uri-list")) send_bytes(fd, lord_uris, lord_uris_len);
+    else send_bytes(fd, lord_text, lord_text_len);
+}
+static void dnd_finish(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    DOffer *o = wl_resource_get_user_data(r);
+    if (!o || o->finished) return;
+    if (!o->dropped || !o->accepted || !o->action || o->action == DND_ASK) {
+        wl_resource_post_error(r, WL_DATA_OFFER_ERROR_INVALID_FINISH, "finish without a drop, a type or an action");
+        return;
+    }
+    o->finished = 1;
+    if (o->src) {
+        if (wl_resource_get_version(o->src->res) >= 3) wl_data_source_send_dnd_finished(o->src->res);
+        o->src->offer = NULL;
+        o->src = NULL;
+    }
+}
+static void dnd_set_actions(struct wl_client *c, struct wl_resource *r, uint32_t actions, uint32_t pref) {
+    (void)c;
+    if (actions & ~(uint32_t)DND_ALL) { wl_resource_post_error(r, WL_DATA_OFFER_ERROR_INVALID_ACTION_MASK, "invalid dnd actions 0x%x", actions); return; }
+    if (pref && (!(pref & actions) || (pref & (pref - 1)))) { wl_resource_post_error(r, WL_DATA_OFFER_ERROR_INVALID_ACTION, "invalid preferred action 0x%x", pref); return; }
+    DOffer *o = wl_resource_get_user_data(r);
+    /* after the drop only an "ask" is settled this way */
+    if (!o || o->finished || (o != drag.offer && !(o->dropped && o->action == DND_ASK))) return;
+    o->dest = actions;
+    o->pref = pref;
+    dnd_choose(o);
+}
+static void dnd_offer_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wl_data_offer_interface dnd_offer_impl = {
+    .accept = dnd_accept, .receive = dnd_receive, .destroy = dnd_offer_destroy, .finish = dnd_finish, .set_actions = dnd_set_actions,
+};
+static void dnd_offer_gone(struct wl_resource *r) {
+    DOffer *o = wl_resource_get_user_data(r);
+    if (!o) return;
+    if (drag.offer == o) drag.offer = NULL;
+    if (o->src) {
+        /* dropped and never finished: an offer before version 3 can't finish (it is done), a newer one gave up */
+        if (o->dropped && !o->finished && wl_resource_get_version(o->src->res) >= 3) {
+            if (wl_resource_get_version(r) < 3) wl_data_source_send_dnd_finished(o->src->res);
+            else wl_data_source_send_cancelled(o->src->res);
+        }
+        if (o->src->offer == o) o->src->offer = NULL;
+    }
+    free(o);
+}
+
+/* The surface under the pointer leaves the drag: leave, and its offer stops reading the source (unless it was
+ * dropped there: then it reads until it finishes). */
+static void dnd_leave(void) {
+    if (drag.over_lord && drag.src) wl_data_source_send_target(drag.src->res, NULL);
+    drag.over_lord = 0;
+    if (drag.dev) wl_data_device_send_leave(drag.dev);
+    DOffer *o = drag.offer;
+    if (o && !o->dropped) {
+        if (o->src && o->src->offer == o) o->src->offer = NULL;
+        o->src = NULL;
+        o->lord = 0;
+        if (drag.src) wl_data_source_send_target(drag.src->res, NULL);
+    }
+    drag.focus = NULL;
+    drag.dev = NULL;
+    drag.offer = NULL;
+}
+
+/* The newest data device of a client (where the drag's events go). */
+static struct wl_resource *dnd_device(struct wl_client *c) {
+    struct wl_resource *d;
+    FOR_CLIENT(&data_devices, c, d) return d;
+    return NULL;
+}
+
+/* Who may take the drag: a Wayland app's surface; a drag without a source stays inside the client that started it. */
+static int dnd_takes(Surf *t) {
+    if (!t || t->client == xwl_client || app_of_client(t->client)) return 0;
+    return drag.src || drag.lord || t->client == drag.client;
+}
+
+/* An app's drag that carries files and may copy them: LordOS itself takes it (Files, dnd_take_files). */
+static int dnd_files_in(void) {
+    if (!drag.src || !(dnd_source_actions() & DND_COPY)) return 0;
+    for (int i = 0; i < drag.src->nmimes; i++) if (!strcmp(drag.src->mimes[i], "text/uri-list")) return 1;
+    return 0;
+}
+static void dnd_over_lord(void) {
+    if (drag.over_lord || !dnd_files_in()) return;
+    drag.over_lord = 1;
+    wl_data_source_send_target(drag.src->res, "text/uri-list");
+    if (wl_resource_get_version(drag.src->res) >= 3) wl_data_source_send_action(drag.src->res, DND_COPY);
+}
+
+static void dnd_focus(Surf *t, float lx, float ly) {
+    if (t != drag.focus && t && !dnd_takes(t)) t = NULL;
+    if (t == drag.focus) {
+        if (t && drag.dev) wl_data_device_send_motion(drag.dev, now_ms(), wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+        if (!t) dnd_over_lord();
+        return;
+    }
+    dnd_leave();
+    if (!t) { dnd_over_lord(); return; }
+    drag.focus = t;
+    if (!(drag.dev = dnd_device(t->client))) return;
+    struct wl_resource *ores = NULL;
+    if (drag.src || drag.lord) {
+        DOffer *o = calloc(1, sizeof *o);
+        ores = o ? wl_resource_create(t->client, &wl_data_offer_interface, wl_resource_get_version(drag.dev), 0) : NULL;
+        if (!ores) { free(o); wl_client_post_no_memory(t->client); drag.dev = NULL; return; }
+        o->res = ores;
+        if (wl_resource_get_version(ores) < 3) o->dest = o->pref = DND_COPY;   /* before version 3 a drop copies */
+        wl_resource_set_implementation(ores, &dnd_offer_impl, o, dnd_offer_gone);
+        wl_data_device_send_data_offer(drag.dev, ores);
+        if (drag.src) {
+            o->src = drag.src;
+            drag.src->offer = o;
+            for (int i = 0; i < drag.src->nmimes; i++) wl_data_offer_send_offer(ores, drag.src->mimes[i]);
+        } else {
+            o->lord = lord_gen;
+            for (size_t i = 0; i < NLORD_MIMES; i++) wl_data_offer_send_offer(ores, lord_mimes[i]);
+        }
+        if (wl_resource_get_version(ores) >= 3) wl_data_offer_send_source_actions(ores, dnd_source_actions());
+        drag.offer = o;
+    }
+    wl_data_device_send_enter(drag.dev, wl_display_next_serial(dpy), t->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly), ores);
+    if (drag.offer) dnd_choose(drag.offer);     /* before version 3 the target copies; a newer one says so itself */
+}
+
+static void dnd_end(void) {
+    dnd_icon_damage();
+    memset(&drag, 0, sizeof drag);
+}
+static void dnd_cancel(void) {
+    if (!drag.on) return;
+    dnd_leave();
+    if (drag.src) wl_data_source_send_cancelled(drag.src->res);
+    dnd_end();
+}
+
+/* The app's files dropped on LordOS: its list is read (at most URIL_MAX_BYTES, from the event loop), then the
+ * local paths go to JS ("filesdrop" on window 0) if Files claimed the drop at the release; otherwise, or if the
+ * list had none, the source is told cancelled. */
+static void in_drop_close(void) {
+    if (in_drop.ev) wl_event_source_remove(in_drop.ev);
+    if (in_drop.fd >= 0) close(in_drop.fd);
+    free(in_drop.buf);
+    in_drop.ev = NULL;
+    in_drop.fd = -1;
+    in_drop.buf = NULL;
+    in_drop.len = in_drop.cap = 0;
+}
+static int in_drop_ready(int fd, uint32_t mask, void *data) {
+    (void)mask; (void)data;
+    for (;;) {
+        if (in_drop.len + 4096 > in_drop.cap) {
+            size_t cap = in_drop.cap ? in_drop.cap * 2 : 8192;
+            char *nb = cap <= URIL_MAX_BYTES ? realloc(in_drop.buf, cap) : NULL;
+            if (!nb) break;                 /* a longer list: what fits is used */
+            in_drop.buf = nb;
+            in_drop.cap = cap;
+        }
+        ssize_t n = read(fd, in_drop.buf + in_drop.len, in_drop.cap - in_drop.len);
+        if (n > 0) { in_drop.len += (size_t)n; continue; }
+        if (n < 0 && (errno == EAGAIN || errno == EINTR)) return 0;
+        break;                              /* end (or error): done */
+    }
+    free(in_drop.paths);
+    in_drop.paths = in_drop.len ? malloc(in_drop.len + 1) : NULL;
+    in_drop.npaths = in_drop.paths ? uril_decode(in_drop.buf, in_drop.len, in_drop.paths, in_drop.len + 1, URIL_MAX_PATHS) : 0;
+    if (in_drop.npaths < 0) in_drop.npaths = 0;
+    int ok = in_drop.claimed && in_drop.npaths > 0;
+    if (in_drop.src && ok && wl_resource_get_version(in_drop.src->res) >= 3) wl_data_source_send_dnd_finished(in_drop.src->res);
+    else if (in_drop.src && !ok) wl_data_source_send_cancelled(in_drop.src->res);
+    in_drop.src = NULL;
+    in_drop_close();
+    if (ok) emit_id(0, "filesdrop", "{}");
+    else { free(in_drop.paths); in_drop.paths = NULL; in_drop.npaths = 0; }
+    return 0;
+}
+static void dnd_take_files(void) {
+    Source *src = drag.src;
+    int p[2];
+    if (in_drop.src) wl_data_source_send_cancelled(in_drop.src->res);     /* one still being read gives way */
+    in_drop.src = NULL;
+    in_drop_close();
+    in_drop.claimed = 0;
+    if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { wl_data_source_send_cancelled(src->res); return; }
+    wl_data_source_send_send(src->res, "text/uri-list", p[1]);
+    close(p[1]);
+    if (wl_resource_get_version(src->res) >= 3) wl_data_source_send_dnd_drop_performed(src->res);
+    in_drop.fd = p[0];
+    in_drop.ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, in_drop_ready, NULL);
+    if (!in_drop.ev) { in_drop_close(); wl_data_source_send_cancelled(src->res); return; }
+    in_drop.src = src;
+}
+int wl_drop_claim(void) {
+    if (!in_drop.src || in_drop.claimed) return 0;
+    in_drop.claimed = 1;
+    return 1;
+}
+const char *wl_drop_paths(int *n) {
+    *n = in_drop.paths ? in_drop.npaths : 0;
+    return *n ? in_drop.paths : NULL;
+}
+void wl_drop_clear(void) {
+    free(in_drop.paths);
+    in_drop.paths = NULL;
+    in_drop.npaths = 0;
+}
+
+static void dnd_drop(void) {
+    DOffer *o = drag.offer;
+    int ok = drag.focus && drag.dev && (o ? o->accepted && (wl_resource_get_version(o->res) < 3 || o->action) : !drag.src && !drag.lord);
+    if (!ok && drag.over_lord && drag.src) {   /* files on LordOS itself */
+        dnd_take_files();
+        drag.over_lord = 0;
+        dnd_end();
+        return;
+    }
+    if (!ok) { dnd_cancel(); return; }
+    wl_data_device_send_drop(drag.dev);
+    if (o) o->dropped = 1;
+    if (drag.src && wl_resource_get_version(drag.src->res) >= 3) wl_data_source_send_dnd_drop_performed(drag.src->res);
+    dnd_leave();                        /* the session ends; the dropped offer still reads until it finishes */
+    dnd_end();
+}
+
+/* Pointer input while a drag runs: no app gets it, the surface under it gets the drag. The last release drops. */
+static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *down) {
+    float lx = 0, ly = 0;
+    dnd_icon_damage();
+    last_x = x;
+    last_y = y;
+    dnd_icon_damage();
+    Surf *t = surface_under(x, y, hit, &lx, &ly);
+    dnd_focus(t, lx, ly);
+    int released = 0;
+    for (int i = 0; i < nbuttons; i++) {
+        buttons_held += down[i] ? 1 : -1;
+        if (!down[i] && !seat_held) released = 1;
+    }
+    if (buttons_held < 0) buttons_held = 0;
+    if (released) {
+        dnd_drop();
+        buttons_held = 0;
+        npress = 0;
+        press_surf = NULL;
+        t = surface_under(x, y, hit, &lx, &ly);
+        pointer_enter(t, lx, ly);       /* the pointer is the app's again */
+    }
+    return t ? 1 : 0;
+}
+
+static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resource *src_res, struct wl_resource *origin_res,
+                     struct wl_resource *icon_res, uint32_t serial) {
+    Source *src = src_res ? wl_resource_get_user_data(src_res) : NULL;
+    Surf *o = wl_resource_get_user_data(origin_res), *icon = icon_res ? wl_resource_get_user_data(icon_res) : NULL;
+    if (icon && icon->role != R_NONE && icon->role != R_DNDICON) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_ROLE, "the icon has another role"); return; }
+    if (src && src->used) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source was already used"); return; }
+    if (src) src->used = 2;
+    /* the press it names: this client's, current (a button still down), on the window that got it */
+    int ok = !drag.on && o && o->client == c && buttons_held > 0 && press_surf && press_surf->client == c &&
+             toplevel_of(o) == toplevel_of(press_surf), known = 0;
+    for (int i = 0; ok && i < npress; i++) if (press_serials[i] == serial) known = 1;
+    if (!ok || !known) {
+        if (src) wl_data_source_send_cancelled(src->res);
+        return;
+    }
+    if (icon) icon->role = R_DNDICON;
+    Surf *under = pointer_focus;
+    pointer_enter(NULL, 0, 0);          /* no app has the pointer while it drags */
+    memset(&drag, 0, sizeof drag);
+    drag.on = 1;
+    drag.client = c;
+    drag.src = src;
+    drag.icon = icon;
+    float ox, oy;
+    if (under && origin(under, &ox, &oy)) dnd_focus(under, last_x - ox, last_y - oy);
+    dnd_icon_damage();
+}
+
+/* A source, a surface, a data device or a client that went away mid-drag. */
+static void dnd_source_gone(Source *s) {
+    if (s->offer) s->offer->src = NULL;
+    if (in_drop.src == s) in_drop.src = NULL;
+    if (drag.src == s) { drag.src = NULL; dnd_cancel(); }
+}
+static void dnd_surface_gone(Surf *s) {
+    if (press_surf == s) { press_surf = NULL; npress = 0; }
+    if (drag.icon == s) { dnd_icon_damage(); drag.icon = NULL; }
+    if (drag.focus == s) dnd_leave();
+}
+static void dev_gone(struct wl_resource *r) {
+    if (drag.dev == r) drag.dev = NULL;
+    link_gone(r);
+}
+static void dnd_client_gone(struct wl_client *c) {
+    if (drag.on && drag.client == c) dnd_cancel();
+}
+
+int wl_drag_files(const char *const *paths, int n) {
+    if (!dpy || drag.on || seat_held <= 0) return 0;
+    char *u = malloc(URIL_MAX_BYTES), *t = malloc(URIL_MAX_BYTES);
+    size_t un = u ? uril_encode(paths, n, u, URIL_MAX_BYTES) : 0, tn = un && t ? uril_plain(paths, n, t, URIL_MAX_BYTES) : 0;
+    if (!un || !tn) { free(u); free(t); return 0; }
+    char *ru = realloc(u, un + 1), *rt = realloc(t, tn + 1);
+    free(lord_uris);
+    free(lord_text);
+    lord_uris = ru ? ru : u;
+    lord_text = rt ? rt : t;
+    lord_uris_len = un;
+    lord_text_len = tn;
+    lord_gen++;
+    memset(&drag, 0, sizeof drag);
+    drag.on = drag.lord = 1;
+    pointer_enter(NULL, 0, 0);          /* the window under it was only hovered: now the drag goes to it */
+    return 1;
+}
+void wl_drag_files_end(void) {
+    if (drag.on && drag.lord) dnd_cancel();
+}
+int wl_drag_files_taken(void) {
+    return drag.on && drag.lord && drag.offer && drag.offer->accepted && drag.offer->action ? (int)drag.offer->action : 0;
+}
+
 int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel) {
     if (!dpy) return 0;
+    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
+    if (seat_held < 0) seat_held = 0;
+    if (drag.on) return dnd_pointer(x, y, hit, nbuttons, down);
     last_x = x;
     last_y = y;
     Surf *target = NULL;
@@ -2956,18 +3488,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
         target = pointer_focus;
         if (origin(target, &ox, &oy)) { lx = x - ox; ly = y - oy; }
     } else {
-        for (int i = npopups - 1; i >= 0 && !target; i--) {
-            float ox, oy;
-            if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, &lx, &ly);
-        }
-        if (!target && fs_surf && fs_surf->content) {
-            float ox, oy;
-            if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, &lx, &ly);
-        } else if (!target && hit && hit->type == NODE_SURFACE) {
-            Surf *s = find(hit->term);
-            float ox, oy;
-            if (s && origin(s, &ox, &oy)) target = surface_at(s, x - ox, y - oy, &lx, &ly);
-        }
+        target = surface_under(x, y, hit, &lx, &ly);
     }
     for (int i = 0; i < nbuttons; i++)          /* click outside the menus: they close */
         if (down[i] && npopups && (!target || target->role != R_POPUP)) {
@@ -2983,6 +3504,8 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     while (owner && owner->role == R_SUB) owner = owner->parent;
     int held = owner && owner->role == R_TOPLEVEL && modal_over(owner);
     if (held) wheel = 0;
+    for (int i = 0; i < nbuttons; i++)          /* a new press: the one a start_drag may name */
+        if (down[i] && !held) { npress = 0; press_surf = target; }
     unsigned t = now_ms();
     struct wl_resource *p;
     FOR_CLIENT(&pointers, target->client, p) {
@@ -2991,8 +3514,9 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
         for (int i = 0; i < nbuttons; i++) {
             if (held && down[i]) continue;
             uint32_t b = button[i] == 0 ? BTN_LEFT : button[i] == 1 ? BTN_MIDDLE : BTN_RIGHT;
-            wl_pointer_send_button(p, input_serial(target->client), t, b,
-                                   down[i] ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+            uint32_t serial = input_serial(target->client);
+            if (down[i] && npress < (int)(sizeof press_serials / sizeof *press_serials)) press_serials[npress++] = serial;
+            wl_pointer_send_button(p, serial, t, b, down[i] ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
         }
         if (wheel) wl_input_wheel(p, t, wheel);      /* axis + axis_source wheel + value120 (wl_input.c) */
         if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
@@ -3002,6 +3526,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
         if (down[i]) { press_x = x; press_y = y; }
     }
     if (buttons_held < 0) buttons_held = 0;
+    if (!buttons_held) { npress = 0; press_surf = NULL; }
     Surf *top = target;
     while (top && top->role == R_SUB) top = top->parent;
     if (fs_surf && fs_surf->content) return 2;  /* fullscreen: the UI does not see the pointer */
@@ -3010,6 +3535,9 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
 
 void wl_pointer_grab(int nbuttons, const int *down) {
     if (!dpy) return;
+    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
+    if (seat_held < 0) seat_held = 0;
+    dnd_cancel();                       /* a window move took the pointer: no drop at its release */
     pointer_enter(NULL, 0, 0);
     for (int i = 0; i < nbuttons; i++) buttons_held += down[i] ? 1 : -1;
     if (buttons_held < 0) buttons_held = 0;
@@ -3160,6 +3688,15 @@ int wl_key(int code, int value, const KeyInfo *k) {
     unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
     unsigned char *was_remapped = code >= 0 && code < KEY_SLOTS ? &remapped[code] : NULL;
     unsigned mods = (k->shift ? KG_SHIFT : 0u) | (k->ctrl ? KG_CTRL : 0u) | (k->alt ? KG_ALT : 0u) | (k->meta ? KG_META : 0u);
+    if (code == KEY_LEFTALT || code == KEY_RIGHTALT) {     /* a Files drag over a Linux window: ⌥ copies */
+        alt_down = value != 0;
+        if (drag.on && drag.offer) dnd_choose(drag.offer);
+    }
+    if (drag.on && code == KEY_ESC) {                      /* Escape cancels a drag; LordOS still sees it for its own */
+        int lord = drag.lord;
+        if (value == 1) dnd_cancel();
+        if (!lord) return 1;
+    }
     if (was_grabbed && *was_grabbed) {
         if (!value) *was_grabbed = 0;
         return 0;
