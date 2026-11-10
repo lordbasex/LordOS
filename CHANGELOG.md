@@ -42,6 +42,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Copy Remote Path. New: `term.lineAt(sid, x, y)` (the line under the pointer, split at its cell) and
   `apps/terminal/lsnames.js` with `terminal_lsnames_test.mjs` (21 checks). Checked on a real session: a file and a
   folder with a subfolder.
+- **Terminal: Open, Open With and Edit for a file on the server (Files mode).** Open and Open With (the app LordOS
+  picks, then each Linux app that declares the type) bring the file down to a folder of its own under
+  `~/.cache/lordos/terminal-remote` and open it. Edit opens it in the Text Editor and sends each save back up to the
+  same path, while Files mode is open; it is the only upload that replaces a file without asking, since that file is
+  the one chosen for editing. Checked on a real session: an edit saved with ❖S reached the server's file.
 
 ### Fixed
 

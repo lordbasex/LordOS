@@ -522,5 +522,12 @@
   "ls.notFoundHome": "“{name}” isn't in the remote home folder (the server's shell doesn't report its folder)",
   "ls.renamed": "Already in Downloads: saved as “{name}”",
   "drop.downloading": "Downloading from the server",
-  "drop.downloaded": "Downloaded to this computer"
+  "drop.downloaded": "Downloaded to this computer",
+  "files.open": "Open",
+  "files.openWith": "Open With",
+  "files.openDefault": "Default App",
+  "files.edit": "Edit (saves go back to the server)",
+  "files.fetching": "Getting “{name}” from the server…",
+  "files.editing": "Editing “{name}”: each save goes back to the server while Files mode is open",
+  "files.savedRemote": "“{name}” saved on the server"
 }

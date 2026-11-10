@@ -365,7 +365,7 @@ Status: Files mode is built (lord-sftp, term/sftpc.c, lord.sftp, apps/terminal/F
 end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Port forwards are built (0.8.8.8,
 apps/terminal/forwards.js and ForwardsPanel.jsx, checked on a real session against a private sshd), and so are uploads
 by dropping on the terminal (dropupload.js, DropHud.jsx), the remote shell's directory and downloads from `ls`
-output (lsnames.js, term.lineAt) (0.8.8.8). Still in development: Open With and Edit for remote files.
+output (lsnames.js, term.lineAt), and Open, Open With and Edit for remote files (remoteopen.js) (0.8.8.8).
 
 Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
 **the tab's own ssh session**: one login, no second connection, no password or code asked again.
@@ -406,8 +406,12 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - **Refreshing:** the local side refreshes at once (inotify). The remote side refreshes after each of our own
   operations and every 5 s while it is shown. Refresh is for changes made from elsewhere.
 - **Right click on a remote item:**
-  - Download, Open With…
-  - Edit: the file is downloaded and uploaded again on save.
+  - Download, Open, Open With › (the app LordOS picks, then each Linux app that declares the type): the file comes down
+    to a folder of its own under `~/.cache/lordos/terminal-remote` and opens there.
+  - Edit: the file comes down the same way and opens in the Text Editor; each save (the copy's size or time, steady
+    for one look, checked every 1.5 s) goes back up to the same path. It is the only upload that replaces a file
+    without asking, since that file is the one the person chose to edit. It stops when Files mode closes or the
+    connection ends.
   - Rename (F2), New Folder, Duplicate, Compress (.tar.gz)
   - Permissions (chmod, as boxes and octal), Change Owner (chown)
   - Info: `file`, size, owner, permissions, modified, and SHA-256 computed on the server

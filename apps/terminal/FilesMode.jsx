@@ -3,9 +3,10 @@
 // shell stays alive behind it. A toolbar (up, new folder, refresh, hidden, filter, as root), right-click menus, the
 // transfers queue with its speed graph (uploads orange, downloads blue) and the sheets: new folder, rename,
 // permissions and owner, information, delete, the sudo password.
-import { View, Text, TextInput, Button, ScrollView, ContextMenu, Hairline, fs, clipboard, term, useStore, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ScrollView, ContextMenu, Hairline, fs, clipboard, term, useStore, useLauncherApps, wm, getApp, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { meta } from './state.js';
+import { fetchRemote, openersFor, watchEdit } from './remoteopen.js';
 import {
   request, transfer, cancel, clearFinished, transfers, closedConns, samplesOf, speedSeries,
   permString, permBoxes, boxesPerm, octal, parseOctal, parentOf, joinPath, baseName, goodName, sortEntries, visible, size, rate, freeName, fromLocal, errCode,
@@ -42,6 +43,9 @@ export function FilesMode({ t, wid, sid, startLocal }) {
   const [msg, setMsg] = useState(null);
   const box = useRef(null);
   const closedAt = useStore(closedConns);
+  const launcherApps = useLauncherApps();
+  const edits = useRef(new Map());              // remote path → stop() of its Edit (remoteopen.js)
+  useEffect(() => () => { for (const stop of edits.current.values()) stop(); edits.current.clear(); }, [conn]);
   const jobs = useStore(transfers);
 
   const open = async (asRoot = false, password) => {
@@ -158,6 +162,24 @@ export function FilesMode({ t, wid, sid, startLocal }) {
 
   // ---- operations ----
   const run = async (fn) => { try { await fn(); } catch (e) { setMsg(errText(e)); } loadRemote(); loadLocal(); };
+  // Open / Open With: the file comes down to the cache and opens; Edit: in the Text Editor, each save goes back up
+  const openRemote = async (path, opener) => {
+    setMsg(tr('terminal.files.fetching', { name: baseName(path) }));
+    try { opener.run(await fetchRemote(conn, path)); setMsg(null); } catch (x) { setMsg(`${baseName(path)}: ${errText(x)}`); }
+  };
+  const editRemote = async (path, it) => {
+    const name = baseName(path);
+    edits.current.get(path)?.();
+    setMsg(tr('terminal.files.fetching', { name }));
+    let local;
+    try { local = await fetchRemote(conn, path); } catch (x) { setMsg(`${name}: ${errText(x)}`); return; }
+    if (getApp('editor')) wm.open('editor', { new: true, args: { path: local } }); else openersFor(name, [])[0].run(local);
+    edits.current.set(path, watchEdit(conn, path, local, it.perm, {
+      onSaved: () => { setMsg(tr('terminal.files.savedRemote', { name })); loadRemote(); },
+      onError: (code) => setMsg(`${name}: ${errText({ code })}`),
+    }));
+    setMsg(tr('terminal.files.editing', { name }));
+  };
   const remoteMenu = (e, name) => {
     const it = rlist.find((x) => x.name === name);
     const names = chosen('remote').includes(name) ? chosen('remote') : [name];
@@ -165,6 +187,11 @@ export function FilesMode({ t, wid, sid, startLocal }) {
     const path = joinPath(rpath, name);
     setMenu({ x: e.x, y: e.y, items: [
       { label: tr('terminal.files.download'), onClick: () => download(names) },
+      ...(names.length === 1 && it.kind === '-' ? [
+        { label: tr('terminal.files.open'), onClick: () => openRemote(path, openersFor(name, [])[0]) },
+        { label: tr('terminal.files.openWith'), submenu: openersFor(name, launcherApps).map((o) => ({ label: o.label, onClick: () => openRemote(path, o) })) },
+        { label: tr('terminal.files.edit'), onClick: () => editRemote(path, it) },
+      ] : []),
       '-',
       { label: tr('terminal.files.rename'), disabled: names.length !== 1, onClick: () => setSheet({ kind: 'rename', side: 'remote', name, value: name }) },
       { label: tr('terminal.files.newFolder'), onClick: () => setSheet({ kind: 'mkdir', side: 'remote', value: '' }) },

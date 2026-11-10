@@ -522,5 +522,12 @@
   "ls.notFoundHome": "“{name}” no está en la carpeta personal remota (la shell del servidor no informa su carpeta)",
   "ls.renamed": "Ya estaba en Descargas: se guardó como “{name}”",
   "drop.downloading": "Descargando del servidor",
-  "drop.downloaded": "Descargado a esta computadora"
+  "drop.downloaded": "Descargado a esta computadora",
+  "files.open": "Abrir",
+  "files.openWith": "Abrir con",
+  "files.openDefault": "App predeterminada",
+  "files.edit": "Editar (al guardar vuelve al servidor)",
+  "files.fetching": "Trayendo “{name}” del servidor…",
+  "files.editing": "Editando “{name}”: cada vez que guardes vuelve al servidor mientras el modo Archivos esté abierto",
+  "files.savedRemote": "“{name}” guardado en el servidor"
 }

@@ -532,5 +532,12 @@
   "ls.notFoundHome": "„{name}“ nėra nuotoliniame namų aplanke (serverio apvalkalas nenurodo savo aplanko)",
   "ls.renamed": "Jau buvo atsisiuntimuose: išsaugota kaip „{name}“",
   "drop.downloading": "Atsisiunčiama iš serverio",
-  "drop.downloaded": "Atsisiųsta į šį kompiuterį"
+  "drop.downloaded": "Atsisiųsta į šį kompiuterį",
+  "files.open": "Atidaryti",
+  "files.openWith": "Atidaryti su",
+  "files.openDefault": "Numatytoji programa",
+  "files.edit": "Redaguoti (išsaugojus grįžta į serverį)",
+  "files.fetching": "Gaunamas „{name}“ iš serverio…",
+  "files.editing": "Redaguojamas „{name}“: kiekvienas išsaugojimas grįžta į serverį, kol atidarytas failų režimas",
+  "files.savedRemote": "„{name}“ išsaugotas serveryje"
 }
