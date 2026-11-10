@@ -443,9 +443,12 @@ export function PolkitPrompt() {
 
 export const portalOpens = createStore([]);
 
-function runOpen(plan) {
+// A file is opened by its name, so lord-server checks right before that it is still the file it checked
+// when the app asked (not swapped while the question was up); otherwise it is refused.
+function runOpen(id, plan) {
   try {
     if (plan.action === 'url') return openUrl(plan.target) ? 0 : 2;
+    if (!lord.portal.still || lord.portal.still(id) !== true) return 2;
     if (plan.action === 'file') openFileWithApps(plan.target);
     else if (plan.action === 'folder') wm.open('files', { new: true, args: { path: plan.target, nonce: Date.now() } });
     else if (plan.action === 'reveal') revealPath(plan.target);
@@ -458,13 +461,13 @@ function portalOpen(req) {
   if (!req || !has('portal') || !lord.portal.opened) return;
   const plan = openPlan(req);
   if (plan.action === 'refuse') lord.portal.opened(req.id, 2);
-  else if (!plan.ask) lord.portal.opened(req.id, runOpen(plan));
+  else if (!plan.ask) lord.portal.opened(req.id, runOpen(req.id, plan));
   else portalOpens.set([...portalOpens.get(), { ...req, plan }]);
 }
 
 function answerOpen(p, yes) {
   portalOpens.set(portalOpens.get().filter((x) => x.id !== p.id));
-  lord.portal.opened(p.id, yes ? runOpen(p.plan) : 1);
+  lord.portal.opened(p.id, yes ? runOpen(p.id, p.plan) : 1);
 }
 
 export function PortalOpenPrompt() {

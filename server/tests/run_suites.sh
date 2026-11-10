@@ -142,6 +142,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
+    run "portal-check-test" build/portal-check-test
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test

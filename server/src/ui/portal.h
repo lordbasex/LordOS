@@ -11,6 +11,9 @@ void portal_dispatch(void);
 void portal_file_chosen(int id, const char *const *paths, int n);
 /* The shell's answer to an OpenURI request (lord.portal.opened): 0 opened, 1 cancelled, 2 refused. */
 void portal_open_done(int id, int code);
+/* Right before the shell opens what request id named (lord.portal.still): 1 when a local file is still the
+ * one checked when the app asked (or it is a web address), 0 otherwise. */
+int  portal_open_still(int id);
 /* An app holds idle or sleep off (Inhibit portal, ScreenSaver.Inhibit): counts as wl_idle_inhibited. */
 int  portal_inhibited(void);
 /* From JS (lord.portal.set): mode, accent (0..1), GNOME accent name and GTK button order. */

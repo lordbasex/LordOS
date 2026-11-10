@@ -9,6 +9,7 @@
  * GSETTINGS_BACKEND=keyfile and writes those same keys to ~/.config/glib-2.0/settings/keyfile, which
  * GLib watches: GTK 3 also changes live (without dconf or running gsettings). */
 #include "portal.h"
+#include "portalcheck.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
@@ -341,14 +342,19 @@ void portal_file_chosen(int id, const char *const *paths, int n) {
  * app that asks is not the one with the keyboard, the person is asked first, as other desktops do: an
  * app in the background can't open things on its own. OpenFile and OpenDirectory get the file as an
  * fd: only its name is used (nothing is read or written through it, and it is closed with the
- * message), and that name must still lead to the same file. */
+ * message), and that name must still lead to the same file. The file is opened by its name later, after
+ * the person answers, so the shell asks lord.portal.still(id) right before: the same device, inode and
+ * type, the same real path, still allowed; a file swapped in the meantime is refused. A web address is
+ * handed on only when every URL parser reads its host the same way (portalcheck.c, portal_web_host), so
+ * the question names the host the browser goes to. */
 #define OU_IFACE  "org.freedesktop.portal.OpenURI"
 #define MAX_OPENS 8
 #define URI_MAX   4096
 
-enum { O_URI, O_FILE, O_FOLDER, O_REVEAL };
+enum { O_URI = PORTAL_URI, O_FILE = PORTAL_FILE, O_FOLDER = PORTAL_FOLDER, O_REVEAL = PORTAL_REVEAL };
 static const char *const open_kinds[] = { "uri", "file", "folder", "reveal" };
-typedef struct { int id, kind, shown; uint32_t serial; char sender[256], handle[400]; char *target; } Open;
+/* seen: the local file as it was when the app asked, checked again before the shell opens it (portal_open_still) */
+typedef struct { int id, kind, shown; uint32_t serial; char sender[256], handle[400]; char *target; PortalSeen seen; } Open;
 static Open opens[MAX_OPENS];
 static int nopens, open_seq;
 
@@ -363,37 +369,12 @@ static void open_drop(int i, int tell) {
     nopens--;
 }
 
-/* A local file an app asks to open or show: inside the home folder or the user's mounts and outside
- * the folders lord.fs protects (launchers, autostart, settings…). Opening, unlike showing, never takes
- * an executable or a launcher (.desktop): opening must never run something. The kind or -1. */
-static int local_kind(const char *real, const struct stat *st, int kind) {
-    if (!fsops_allowed(real) || fsops_protected(real)) return -1;
-    if (!S_ISREG(st->st_mode) && !S_ISDIR(st->st_mode)) return -1;
-    if (kind == O_REVEAL) return O_REVEAL;
-    if (S_ISDIR(st->st_mode)) return O_FOLDER;
-    size_t l = strlen(real);
-    if ((st->st_mode & 0111) || (l >= 8 && !strcasecmp(real + l - 8, ".desktop"))) return -1;
-    return O_FILE;
-}
-
-/* The file behind an fd: its name, followed to the real path, has to be the same file (device and inode) */
-static int fd_kind(int fd, int kind, char *real) {
-    struct stat a, b;
-    char link[64], name[PATH_MAX];
-    snprintf(link, sizeof link, "/proc/self/fd/%d", fd);
-    ssize_t l = readlink(link, name, sizeof name - 1);
-    if (l <= 0 || fstat(fd, &a)) return -1;
-    name[l] = 0;
-    if (name[0] != '/' || !realpath(name, real) || stat(real, &b) || a.st_dev != b.st_dev || a.st_ino != b.st_ino) return -1;
-    return local_kind(real, &b, kind);
-}
-
 static int hexval(char c) {
     return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
 }
 
 /* file:///path or file://localhost/path, %XX decoded (a NUL is refused) */
-static int file_uri_kind(const char *uri, char *real) {
+static int file_uri_kind(const char *uri, char *real, PortalSeen *seen) {
     const char *p = uri + 7;
     if (!strncasecmp(p, "localhost/", 10)) p += 9;
     if (*p != '/') return -1;
@@ -408,9 +389,7 @@ static int file_uri_kind(const char *uri, char *real) {
         p += 2;
     }
     name[o] = 0;
-    struct stat st;
-    if (!realpath(name, real) || stat(real, &st)) return -1;
-    return local_kind(real, &st, O_FILE);
+    return portal_file_kind(name, O_FILE, real, seen);
 }
 
 /* a{sv} options: only handle_token is read (writable, ask and activation_token are not needed here) */
@@ -461,20 +440,22 @@ static void open_call(const DMsg *m, int by_fd, int reveal) {
     DRd r;
     dr_init(&r, m);
     dr_str(&r, NULL);                       /* the parent window: the question is the system's, over everything */
-    char real[PATH_MAX] = "";
+    char real[PATH_MAX] = "", host[256];
     const char *target = real;
     int kind = O_URI;
+    PortalSeen seen = { 0 };
     if (by_fd) {
         uint32_t i = dr_u32(&r);
         if (r.err || i >= (uint32_t)m->n_fds) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "fd"); return; }
-        kind = fd_kind(m->fds[i], reveal ? O_REVEAL : O_FILE, real);
+        kind = portal_fd_kind(m->fds[i], reveal ? O_REVEAL : O_FILE, real, &seen);
     } else {
         uint32_t n = 0;
         const char *uri = dr_str(&r, &n);
         int ok = !r.err && n > 0 && n <= URI_MAX;
         for (uint32_t i = 0; ok && i < n; i++) ok = (unsigned char)uri[i] > 0x20 && uri[i] != 0x7f;
         if (!ok) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "uri"); return; }
-        if (!strncasecmp(uri, "file://", 7)) kind = file_uri_kind(uri, real);
+        if (!strncasecmp(uri, "file://", 7)) kind = file_uri_kind(uri, real, &seen);
+        else if (portal_web_host(uri, host, sizeof host)) { dbus_error(&conn, m, "org.freedesktop.portal.Error.NotAllowed", "not a web address apps may open"); return; }
         else target = uri;
     }
     const char *token = opt_token(&r);
@@ -484,6 +465,7 @@ static void open_call(const DMsg *m, int by_fd, int reveal) {
     memset(o, 0, sizeof *o);
     o->id = ++open_seq;
     o->kind = kind;
+    o->seen = seen;
     snprintf(o->sender, sizeof o->sender, "%s", m->sender);
     request_path(m->sender, token, o->id, o->handle, sizeof o->handle);
     if (!(o->target = strdup(target))) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "memory"); return; }
@@ -501,6 +483,13 @@ static void open_call(const DMsg *m, int by_fd, int reveal) {
     o->serial = dbus_send(&conn, &h, &b);
     dw_free(&b);
     if (!o->serial) open_show(o, 0);        /* unknown: treated as an app in the background */
+}
+
+int portal_open_still(int id) {
+    for (int i = 0; i < nopens; i++)
+        if (opens[i].id == id && opens[i].shown)
+            return opens[i].kind == O_URI || portal_file_still(opens[i].target, opens[i].kind, &opens[i].seen);
+    return 0;
 }
 
 void portal_open_done(int id, int code) {
