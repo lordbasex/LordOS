@@ -15,6 +15,7 @@
 #include "../hw/display.h"
 #include "../hw/hw_admin.h"
 #include "../hw/sleeplock.h"
+#include "../hw/logindlock.h"
 #include "js_sys.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
@@ -2229,6 +2230,7 @@ static JSValue f_session_lock(JSContext *c, JSValueConst this_val, int argc, JSV
              sleep, sleep_left);
     mirror_session(j);
     sleeplock_lock_sent();              /* before sleep: logind waits until the monitor is taken (#36) */
+    logindlock_lock_sent(display_on_monitor());   /* logind's LockedHint (loginctl shows it) */
     return JS_NewBool(c, mirror_clients() > 0);
 }
 

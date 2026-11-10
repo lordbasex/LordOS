@@ -6,8 +6,8 @@
 #include <string.h>
 
 #define MAX_PENDING 64
-#define MAX_HANDLERS 8                  /* bt, ppd, timedate and sleeplock today */
-#define MAX_WATCH 8                     /* BlueZ, two power-profiles names, polkit and logind today */
+#define MAX_HANDLERS 8                  /* bt, ppd, timedate, sleeplock and logindlock today */
+#define MAX_WATCH 8                     /* BlueZ, two power-profiles names, polkit and logind (twice) today */
 
 typedef struct { uint32_t serial; SbReply cb; void *ctx; } Pending;
 typedef struct { char name[64]; SbOwner fn; } Watch;

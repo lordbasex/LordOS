@@ -64,6 +64,7 @@
 #include "hw/hw.h"
 #include "hw/pkagent.h"
 #include "hw/sleeplock.h"
+#include "hw/logindlock.h"
 #include "hw/modes.h"
 #include "ui/js_hw.h"
 #include "outputs.h"
@@ -1029,6 +1030,7 @@ static void display_attach(const int *fds, int n, int flags) {
     struct stat st;
     if (fstat(o0->kms.fd, &st) == 0) wl_set_drm_device(st.st_rdev);
     display_attached();                 /* Night Light, idle timers, the list in Settings; queues a resync */
+    logindlock_shown();                 /* unlocked: logind's LockedHint goes back to false (hw/logindlock.c) */
     remote_typed = 0;
     keyboards_check(s);
     display_take_resync();

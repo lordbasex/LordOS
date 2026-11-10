@@ -9,6 +9,7 @@
 #include "sysbus.h"
 #include "pkagent.h"
 #include "sleeplock.h"
+#include "logindlock.h"
 #include "uevent.h"
 
 #include <stdio.h>
@@ -75,6 +76,8 @@ void hw_start(const DisplayHost *h, int with_bus) {
         sysbus_add_match("type='signal',sender='org.freedesktop.timedate1',interface='org.freedesktop.DBus.Properties',path='/org/freedesktop/timedate1'");
         /* a session lord-sessiond shows can be locked: it locks before the computer sleeps (#36) */
         if (getenv("LORDOS_SESSIOND")) sleeplock_start();
+        /* and locks when logind is asked to (loginctl lock-session, lock-sessions) */
+        if (getenv("LORDOS_SESSIOND")) logindlock_start();
     }
 }
 
