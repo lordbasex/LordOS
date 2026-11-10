@@ -831,8 +831,8 @@ void xwm_dnd_enter(XWin *w, const char *const *mimes, int n, int x, int y, uint3
     DO.on = 1;
     DO.target = w->id;
     DO.gen = ++dnd_gen;
-    DO.x = x;
-    DO.y = y;
+    DO.x = xws_to_x(x, wlx_scale());                /* XdndPosition is in the root's X pixels */
+    DO.y = xws_to_x(y, wlx_scale());
     DO.want = want;
     DO.version = x11_xdnd_version(w->xdnd_aware);
     if (!DO.version) return;                        /* it takes no XDND drop: nothing is sent */
@@ -856,8 +856,8 @@ void xwm_dnd_enter(XWin *w, const char *const *mimes, int n, int x, int y, uint3
 
 void xwm_dnd_motion(int x, int y, uint32_t want) {
     if (!DO.on || DO.dropped) return;
-    DO.x = x;
-    DO.y = y;
+    DO.x = xws_to_x(x, wlx_scale());
+    DO.y = xws_to_x(y, wlx_scale());
     DO.want = want;
     if (!DO.entered) return;
     /* one position at a time: the next waits for the target's status (or a second without one) */

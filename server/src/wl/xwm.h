@@ -34,7 +34,7 @@ void xwm_close(XWin *w);
 void xwm_tick(void);                           /* once per loop (wl_flush): clipboard changes, output */
 /* Drag and drop with X apps (XDND, see xwm.c). Actions are wl_data_device_manager's bits (1 copy, 2 move, 4 ask).
  * A drag of LordOS's Files or of a Wayland app over an X window: xwm is its XDND source. mimes: its types;
- * x, y: the pointer (logical, the X root's coordinates); want: the action asked for. */
+ * x, y: the pointer (logical; xwm turns them into the X root's X pixels, xwscale.h); want: the action asked for. */
 void xwm_dnd_enter(XWin *w, const char *const *mimes, int n, int x, int y, uint32_t want);
 void xwm_dnd_motion(int x, int y, uint32_t want);
 void xwm_dnd_leave(void);
