@@ -70,6 +70,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Text fields select and edit as in any desktop (every LordOS app).** The SDK's TextInput and TextArea had a caret but
+  no selection: Ctrl/⌘+A, Shift with ← → ↑ ↓ Home End, a drag with the mouse (also past the field's edges), a double
+  click on a word, typing or pasting over the selection, Backspace and Delete on it, Ctrl/⌘+C and X (never from a
+  password field), and Ctrl or ⌥ with ← → and Backspace by word now work. The text is drawn in one piece with the caret
+  and the selection over it: placing the caret in a word no longer opened a gap in it (it was drawn between the two
+  halves). A value longer than a one-line field scrolls to keep the caret in sight. `editKey`, `replaceSel`,
+  `selRange`, `wordAt` in `sdk/textfieldmodel.js` (23 more checks) and `areaEdit` in `sdk/textareamodel.js` (6 more).
 - **Terminal: files dropped on an ssh pane go to the remote shell's directory**, found as for a download from `ls` (the
   reported one, the prompt's, the title's, then the home), not always to the home on a server without the LordOS
   integration.

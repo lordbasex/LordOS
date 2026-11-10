@@ -39,3 +39,33 @@ const w = (t) => [...t].length * 10;
 eq('click positions', [caretAt('abcd', 0, w), caretAt('abcd', 4, w), caretAt('abcd', 6, w), caretAt('abcd', 21, w), caretAt('abcd', 500, w), caretAt('', 30, w), caretAt('ab', -5, w)], [0, 0, 1, 2, 4, 0, 0]);
 
 console.log(`textfield-model-test: ${ok} ok`);
+
+// ---- selection (0.8.8.8): the person selects and types over it, as in any text field
+import('../../sdk/textfieldmodel.js').then(({ editKey, replaceSel, selRange, selectedText, wordAt }) => {
+  const S = (value, pos, anchor = null) => ({ value, pos, anchor });
+  const K = (key, more = {}) => ({ key, ...more });
+  eq('ctrl+a selects all', editKey(S('ssh pi', 3), K('a', { ctrl: true, base: 'a' })), S('ssh pi', 6, 0));
+  eq('cmd+a selects all', selectedText(editKey(S('ssh pi', 0), K('a', { meta: true, base: 'a' }))), 'ssh pi');
+  eq('typing over a selection replaces it', replaceSel(S('ssh old-host', 12, 4), 'pi'), S('ssh pi', 6));
+  eq('Backspace on a selection deletes it', editKey(S('abcdef', 4, 1), K('Backspace')), S('aef', 1));
+  eq('Delete on a selection deletes it', editKey(S('abcdef', 1, 4), K('Delete')), S('aef', 1));
+  eq('shift+← extends', editKey(editKey(S('abcd', 4), K('ArrowLeft', { shift: true })), K('ArrowLeft', { shift: true })), S('abcd', 2, 4));
+  eq('shift+→ after shift+← shrinks', editKey(S('abcd', 2, 4), K('ArrowRight', { shift: true })), S('abcd', 3, 4));
+  eq('← collapses to the start', editKey(S('abcd', 3, 1), K('ArrowLeft')), S('abcd', 1));
+  eq('→ collapses to the end', editKey(S('abcd', 1, 3), K('ArrowRight')), S('abcd', 3));
+  eq('shift+Home selects to the start', editKey(S('abcd', 3), K('Home', { shift: true })), S('abcd', 0, 3));
+  eq('shift+End selects to the end', selRange(editKey(S('abcd', 1), K('End', { shift: true }))), [1, 4]);
+  eq('ctrl+← jumps a word', editKey(S('ssh -o Server', 13), K('ArrowLeft', { ctrl: true })).pos, 7);
+  eq('ctrl+→ jumps a word', editKey(S('ssh -o Server', 0), K('ArrowRight', { ctrl: true })).pos, 3);
+  eq('ctrl+shift+← selects a word', selectedText(editKey(S('ssh pi', 6), K('ArrowLeft', { ctrl: true, shift: true }))), 'pi');
+  eq('ctrl+Backspace deletes a word', editKey(S('ssh old-host', 12), K('Backspace', { ctrl: true })), S('ssh old-', 8));
+  eq('⌘+← is the window\'s', editKey(S('ab', 1), K('ArrowLeft', { meta: true })), null);
+  eq('a plain letter is not a key here', editKey(S('ab', 1), K('x', { char: 'x' })), null);
+  eq('double click on a word', wordAt('-o ServerAliveInterval=60', 8), [3, 22]);
+  eq('double click just after a word', wordAt('ssh pi', 3), [0, 3]);
+  eq('double click on punctuation', wordAt('a==b', 1), [1, 3]);
+  eq('double click on an accented word', wordAt('año próximo', 6), [4, 11]);
+  eq('no selection without an anchor', selRange(S('ab', 1)), null);
+  eq('an anchor at the caret is no selection', selRange(S('ab', 1, 1)), null);
+  console.log(`textfield-model selection: ${ok} checks`);
+});

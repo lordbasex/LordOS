@@ -4,7 +4,8 @@
 //   rowOf(rows, pos)                → the row the caret is drawn in (at a wrap, the start of the next row)
 //   areaKey(value, pos, e, rows, measure) → { value, pos } for a key that edits or moves, or null
 //   posAt(value, rows, x, row, measure)   → the position nearest x in that row (a click)
-import { fieldKey, insertAt, caretAt, clampPos } from './textfieldmodel.js';
+//   areaEdit(s, e, rows, measure)         → as areaKey on a { value, pos, anchor } state: Shift extends a selection
+import { fieldKey, insertAt, caretAt, clampPos, editKey, replaceSel } from './textfieldmodel.js';
 
 const cps = (s) => [...(s || '')];
 
@@ -68,4 +69,20 @@ export function areaKey(value, pos, e, rows, measure) {
     return { value, pos: posAt(value, rows, measure(c.slice(r.start, at).join('')), j, measure) };
   }
   return fieldKey(value, at, e);
+}
+
+// with a selection (textfieldmodel.js): ↑ ↓ Home End move by rows here, Shift extends; Enter replaces the selection with
+// a line break; the rest as a one-line field (Ctrl/⌘+A, ← →, Backspace, Delete)
+export function areaEdit(s, e, rows, measure) {
+  const key = e && e.key;
+  const value = s.value || '';
+  const at = clampPos(value, s.pos);
+  if (key === 'Enter') return e.ctrl || e.meta || e.alt ? null : replaceSel({ ...s, value }, '\n');
+  if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End') {
+    if (e.ctrl || e.meta || e.alt) return key === 'Home' || key === 'End' ? editKey({ ...s, value }, e) : null;
+    const moved = areaKey(value, at, { key }, rows, measure);
+    if (!moved) return null;
+    return e.shift ? { value, pos: moved.pos, anchor: s.anchor != null ? s.anchor : at } : { value, pos: moved.pos, anchor: null };
+  }
+  return editKey({ ...s, value }, e);
 }

@@ -1,5 +1,5 @@
 // The rows and the caret of a TextArea without a screen (sdk/textareamodel.js). node server/tests/textarea_model_test.mjs
-import { wrapRows, rowOf, areaKey, posAt } from '../../sdk/textareamodel.js';
+import { wrapRows, rowOf, areaKey, posAt, areaEdit } from '../../sdk/textareamodel.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -37,5 +37,15 @@ eq('Backspace joins two lines', areaKey('ab\ncd', 3, k('Backspace'), wrapRows('a
 eq('left and right still move', areaKey('ab', 2, k('ArrowLeft'), wrapRows('ab', 100, m), m).pos, 1);
 eq('a click on the second line', posAt('ab\ncdef', wrapRows('ab\ncdef', 100, m), 21, 1, m), 5);
 eq('a click past the rows is on the last', posAt('ab\ncd', wrapRows('ab\ncd', 100, m), 100, 9, m), 5);
+
+// with a selection
+const T2 = 'ssh -o A=1\n-o B=2';
+const R2 = wrapRows(T2, 1000, m);
+eq('select all in the box', areaEdit({ value: T2, pos: 3, anchor: null }, k('a', { ctrl: true, base: 'a' }), R2, m), { value: T2, pos: 17, anchor: 0 });
+eq('shift+↓ selects to the next line', areaEdit({ value: T2, pos: 2, anchor: null }, k('ArrowDown', { shift: true }), R2, m), { value: T2, pos: 13, anchor: 2 });
+eq('shift+End selects to the row end', areaEdit({ value: T2, pos: 4, anchor: null }, k('End', { shift: true }), R2, m), { value: T2, pos: 10, anchor: 4 });
+eq('Enter replaces the selection', areaEdit({ value: 'ab cd', pos: 3, anchor: 2 }, k('Enter'), wrapRows('ab cd', 1000, m), m), { value: 'ab\ncd', pos: 3, anchor: null });
+eq('typing keys over two lines deletes them', areaEdit({ value: T2, pos: 17, anchor: 0 }, k('Backspace'), R2, m), { value: '', pos: 0, anchor: null });
+eq('↑ without shift drops the selection', areaEdit({ value: T2, pos: 13, anchor: 2 }, k('ArrowUp'), R2, m).anchor, null);
 
 console.log(`textarea_model_test: ${ok} checks`);
