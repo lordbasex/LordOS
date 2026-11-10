@@ -361,6 +361,10 @@ key passes through. Committed text arrives as a key that types that text, so any
 unchanged. `TextInput` shows the composition underlined in place; the terminal, over the cursor.
 The candidate window (`<ImeOverlay />`) is mounted by `startShell`: every theme has it.
 
+In a Linux app's field that speaks `zwp_text_input_v3` (in development) the composition goes to the app
+instead, which draws it in place, and the finished text arrives as text, not as keys; the candidate
+window opens at the app's caret. Password fields never compose. See `WAYLAND.md`, "Input methods".
+
 For a custom text field: `ime.attach(token, () => ({ x, y, h }), { inline })` when taking focus
 and `ime.detach(token)` when losing it; `useIme()` gives `{ preedit, candidates, selected }`.
 

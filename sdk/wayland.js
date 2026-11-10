@@ -16,6 +16,7 @@ import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
 import { osk } from './osk.js';
+import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
 import { dockIdOfWindow } from './dock.js';
 
@@ -84,6 +85,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'textinput':
       // a text field of the app took or lost focus (zwp_text_input_v3)
       osk.linuxField(id, !!d.on, d.h > 0 ? d.y : -1, d.h);
+      linuxIme(id, !!d.on);
       break;
     case 'map': {
       // X11 (Xwayland): the WM_CLASS class, or its instance when only that names a .desktop
@@ -160,6 +162,19 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     default: break;
   }
 };
+
+// LordOS's input method composes into the Linux app's field (server/src/wl/wl_textinput.c): the app
+// draws the composition itself (inline), the candidate window goes at its caret, read from the
+// compositor each time (the window can move). A window that closes with the field takes it along.
+let imeWindow = null;
+const linuxCaret = () => { try { return lord.wayland.textCaret(); } catch (e) { return null; } };
+function linuxIme(id, on) {
+  if (on) { imeWindow = id; ime.attach('linux', linuxCaret, { inline: true }); return; }
+  if (!imeWindow) return;
+  imeWindow = null;
+  ime.detach('linux');
+}
+windows.subscribe(() => { if (imeWindow && !wm.get(imeWindow)) linuxIme(null, false); });
 
 // A terminal emulator, from its .desktop: there ❖C reaches it as Ctrl+Shift+C (Ctrl+C is the signal).
 const isTerminalEmulator = (w) => String(linuxAppFor(w.args?.appId || '')?.categories || '').split(';').includes('TerminalEmulator');

@@ -43,7 +43,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
-| `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: only a hint for the on-screen keyboard; text keeps arriving on `wl_keyboard` (0.8.7, `wl_textinput.c`, see `ON-SCREEN-KEYBOARD.md`) |
+| `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (in development, `wl_textinput.c`, see "Input methods") |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -317,6 +317,37 @@ it is still the system's dialog, above every window. Not read: `x11:<id>` parent
 v1 (GTK 3 only speaks v1, so its portal dialogs still open in the middle). `build/dialog-client` (`tests/dialog_client.c`, inside a session or a headless
 lord-server) checks both protocols from two connections; `hold 20` keeps a modal dialog over its
 window to try by hand.
+
+### Input methods (`zwp_text_input_v3`, in development)
+
+LordOS's Korean, Japanese and Chinese input methods (`server/src/ime.c`) compose inside a Linux app's
+text field as they do in LordOS's own. The app enables its field with `zwp_text_input_v3` (GTK 3 and 4,
+Qt 6); while it is enabled on the window with the keyboard and an input method is on, each key goes
+through `ime.c` before the app (`ime_to_app` in `server/src/ui/js.c`), and a key the method uses never
+reaches the app, nor its release. What it composes goes to the app (`wl_textinput.c`):
+
+- `preedit_string` with the composition; the cursor (bytes) covers the focused segment of a Japanese
+  conversion, otherwise it sits at the end. The app draws it in its own font, underlined.
+- `commit_string` with the finished text, `delete_surrounding_text` clamped to the text the app sent;
+- each batch ends with `done` carrying the number of `commit` requests the app has sent on that object,
+  as the protocol counts them. A `done` goes only with something in it: answering every commit would
+  loop with an app that commits again on each `done`.
+
+The candidate list is the shell's own window (`ImeOverlay`, `sdk/ime.js`), placed at the app's
+`set_cursor_rectangle`: `lord.wayland.textCaret()` adds the window's on-screen origin to it each time it
+is drawn, so it follows a window that moves. Surface coordinates are the logical pixels the window is
+drawn at; a buffer scale only changes how many pixels the app paints. A password or PIN field, or one
+marked hidden, sensitive or Latin, never composes: the keys go straight to it. Disabling the field,
+enabling it again (another widget of the app) or the keyboard going elsewhere discards the composition,
+like a LordOS field losing focus; the "off" goes to the window that had the field.
+
+Nothing the app sends is trusted (`server/src/wl/tiutf8.c`, `build/textinput-test`): its surrounding text
+is cut to valid UTF-8 and 4000 bytes and dropped when its cursor or anchor is not a character boundary
+inside it, its cursor rectangle is clamped to ±32767 and to the window's edges, and every offset LordOS
+sends lands on a character boundary of valid UTF-8. `build/textinput-client` (`tests/textinput_client.c`,
+inside a session) checks enter, enable, that commits alone bring no `done`, garbage, a second text input
+and destroying things out of order; `type 30` gives 30 s to type with a method on and checks every
+`done` serial and offset (`type 30 password`: nothing composes).
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 
@@ -718,7 +749,7 @@ display.
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
 - Drag and drop with X11 apps (an XDND bridge in `xwm.c`); Wayland drag and drop is in development, see
-  "Drag and drop". `text-input` (LordOS input methods inside Wayland apps). (Activation,
+  "Drag and drop". (`text-input`, LordOS input methods inside Wayland apps: in development, see "Input methods". Activation,
   `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 

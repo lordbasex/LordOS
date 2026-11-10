@@ -60,6 +60,7 @@
 #include "xdgact.h"
 #include "dndgate.h"
 #include "urilist.h"
+#include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
 #include "xdg-dialog-v1-protocol.h"
 #include "xwm.h"
@@ -3737,6 +3738,24 @@ void wl_pointer_grab(int nbuttons, const int *down) {
  * clipboard panel uses it after copying something again). Control is XKB core
  * modifier 2 in all keymaps. 1 if there was an app with the keyboard. */
 int wl_has_key_focus(void) { return dpy && key_focus; }
+
+/* The field's cursor rectangle is in surface coordinates, the same logical pixels the window is drawn
+ * at (a buffer scale only changes how many pixels the app draws), so the window's origin is all it
+ * takes. A rectangle outside the window is brought to its edge; without one, the window's top left. */
+int wl_text_caret(float *x, float *y, float *w, float *h) {
+    int r[4], in[4];
+    float ox, oy;
+    if (!dpy || !key_focus) return 0;
+    int how = wl_textinput_rect(r);
+    if (!how || !origin(key_focus, &ox, &oy)) return 0;
+    if (how == 2) { r[0] = key_focus->gx; r[1] = key_focus->gy; r[2] = r[3] = 0; }
+    tiu_rect_in(r, key_focus->lw, key_focus->lh, in);
+    *x = ox + (float)in[0];
+    *y = oy + (float)in[1];
+    *w = (float)in[2];
+    *h = (float)in[3];
+    return 1;
+}
 int wl_focus_protected(void) {
     Surf *top = dpy ? toplevel_of(key_focus) : NULL;
     return top && node_protected(top->node);
@@ -4498,9 +4517,10 @@ void wl_set_focus(int id) {
         send_toplevel_configure(key_focus);
         dismiss_popups();
     }
+    wl_textinput_focus(NULL, NULL);                    /* the field's "off" goes to the window that had it */
     key_focus = s;
     xact_focus_moved(s ? s->client : NULL);           /* tokens other apps asked for stop granting */
-    wl_textinput_focus(s ? s->client : NULL, s ? s->res : NULL);
+    if (s) wl_textinput_focus(s->client, s->res);
     if (s) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);
         s->activated = 1;

@@ -5,6 +5,7 @@
 #include "js.h"
 #include "../ime.h"
 #include "../wl/wl.h"
+#include "../wl/wl_input.h"
 #include "../keyboard.h"
 #include "js_sys.h"
 #include "js_term.h"
@@ -714,6 +715,27 @@ static void ime_commit(const char *text) {
     for (int i = 2; i < 5; i++) JS_FreeValue(ctx, args[i]);
 }
 
+/* A Linux app's field composes (zwp_text_input_v3, wl/wl_textinput.c): the key goes through the input
+ * method before the app. The composition and the finished text go to the app, the candidates to the
+ * shell's window. 1 if the input method used the key: the app never sees it, nor its release. */
+static unsigned char ime_took[0x300];
+static int ime_to_app(int code, int value, const KeyInfo *k) {
+    if (code >= 0 && code < (int)sizeof ime_took && ime_took[code]) {
+        if (!value) ime_took[code] = 0;
+        return 1;
+    }
+    if (!value || !wl_textinput_composing()) return 0;
+    char commit[512];
+    int used = ime_key(k, commit, sizeof commit);
+    if (ime_changed()) {
+        const ImeState *st = ime_state();
+        wl_textinput_send(st->preedit, st->focus_begin, st->focus_end, commit);
+        ime_event();
+    } else if (commit[0]) wl_textinput_send("", 0, 0, commit);
+    if (used && code >= 0 && code < (int)sizeof ime_took) ime_took[code] = 1;
+    return used;
+}
+
 /* Key → __lordKey(code, value, key, text, base, flags). With libxkbcommon (keyboard.c)
  * C does the translation; if no layout is loaded, only code and value. If there is an
  * active input method (ime.c) and a focused text field, the key goes through it first. */
@@ -726,9 +748,11 @@ void js_key(int code, int value) {
         drain_jobs();
         return;
     }
+    if (ime_to_app(code, value, &k)) { drain_jobs(); return; }
+    int composed = value && wl_textinput_composing();           /* already through the input method */
     int to_app = wl_key(code, value, &k);                       /* the focused Wayland app */
     if (to_app == 1) { drain_jobs(); return; }
-    if (value && !to_app) {
+    if (value && !to_app && !composed) {
         char commit[512];
         int used = ime_key(&k, commit, sizeof commit);
         if (commit[0]) ime_commit(commit);
