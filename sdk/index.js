@@ -138,7 +138,7 @@ import { Layer, enableShellLayers } from './layers.js';
 export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
 } from './controls.jsx';
-export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
+export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, linuxPlayers, useLinuxPlayers, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
 export * as imageEdit from './imageeditmodel.js';   // the image editor's math (crop presets, resize, redaction; issue #30)
 export { disks, useDisks, needsDiskFormats, openDiskFormats } from './disks.js';
 export { lan } from './lan.js';                                  // Files → Network (docs/FILES.md)

@@ -2,6 +2,7 @@
 #include "hw.h"
 #include "bt.h"
 #include "jbuf.h"
+#include "mpris.h"
 #include "notifyd.h"
 #include "../sec/pwguard.h"
 #include "ppd.h"
@@ -64,6 +65,7 @@ void hw_start(const DisplayHost *h, int with_bus) {
     if (power.has_battery) power_next = hw_now_ms() + POWER_POLL_MS;
     if (uevent_open()) fprintf(stderr, "hw: no kernel uevents (hotplugged displays and batteries are not followed)\n");
     if (with_bus && notifyd_start(hw_emit)) fprintf(stderr, "hw: no notification server for Linux apps\n");
+    if (with_bus && mpris_start(hw_emit)) fprintf(stderr, "hw: no session bus for the Linux players (Now Playing)\n");
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {
         bt_start(hw_emit);
@@ -80,6 +82,7 @@ int hw_pollfds(struct pollfd *p, int max) {
     int n = 0;
     if (n < max && uevent_fd() >= 0) p[n++] = (struct pollfd){ uevent_fd(), POLLIN, 0 };
     if (n < max && notifyd_fd() >= 0) p[n++] = (struct pollfd){ notifyd_fd(), (short)(POLLIN | (notifyd_wants_write() ? POLLOUT : 0)), 0 };
+    if (n < max && mpris_fd() >= 0) p[n++] = (struct pollfd){ mpris_fd(), (short)(POLLIN | (mpris_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && sysbus_fd() >= 0) p[n++] = (struct pollfd){ sysbus_fd(), (short)(POLLIN | (sysbus_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && pwguard_fd() >= 0) p[n++] = (struct pollfd){ pwguard_fd(), (short)(POLLIN | (pwguard_wants_write() ? POLLOUT : 0)), 0 };
     n += pkagent_pollfds(p + n, max - n);
@@ -96,6 +99,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
             if (m & UEV_BACKLIGHT) display_hotplug();      /* the list carries the backlight */
         } else if (p[i].fd == sysbus_fd()) sysbus_dispatch();
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();
+        else if (p[i].fd == mpris_fd()) mpris_dispatch();
         else if (p[i].fd == pwguard_fd()) pwguard_dispatch();
     }
     pkagent_dispatch(p, n);
@@ -106,6 +110,7 @@ void hw_events(void) {
     sleeplock_tick(hw_now_ms());
     bt_flush_events();
     notifyd_tick();
+    mpris_tick();
     pwguard_tick();
     pkagent_tick();
     if (sysbus_up() && sysbus_wants_write()) dbus_flush(sysbus_conn());

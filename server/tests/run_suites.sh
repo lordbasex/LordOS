@@ -296,6 +296,9 @@ EOF
     # (0.8.8.8) the primary selection of the text fields: what a selection publishes, where a middle click pastes (sdk/primarymodel.js)
     if have node; then run "primary-model-test (sdk/primarymodel.js)" node tests/primary_model_test.mjs
     else skip "primary-model-test" "node"; fi
+    # (0.8.8.8) Now Playing and the media keys with the Linux players (MPRIS): which one the keys reach (sdk/mprismodel.js)
+    if have node; then run "mpris-model-test (sdk/mprismodel.js)" node tests/mpris_model_test.mjs
+    else skip "mpris-model-test" "node"; fi
     # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
     if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
     else skip "terminal-fwdports-test" "node"; fi

@@ -33,6 +33,7 @@ import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
 import { wm } from './windows.js';
+import { linuxPlayersChanged } from './media.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -539,6 +540,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
     case 'notify': linuxNotify(data); break;
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
+    case 'mpris': linuxPlayersChanged(data); break;
     default: break;
   }
 };
