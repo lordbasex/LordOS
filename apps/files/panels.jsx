@@ -1,6 +1,6 @@
 // panels.jsx — Quick Preview, Get Info and confirm (the context menu is the SDK's, sdk/contextmenu.jsx).
 // All are drawn inside the window, with coordinates relative to it.
-import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, useTheme, formatBytes, formatDate, formatTime, direction, typeScale, spacing, t as tr, openMarkup, imageEdit, fs } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, useTheme, formatBytes, formatDate, formatTime, direction, typeScale, spacing, t as tr, openMarkup, imageEdit, fs, ConfirmDialog } from '@lordos/sdk';
 export { ContextMenu } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
@@ -123,19 +123,9 @@ export function InfoPanel({ e, onClose, openers, extra }) {
   );
 }
 
-// destructive: the OK button is red, as the shell's ConfirmDialog (an action that can't be undone or deletes elsewhere)
+// The SDK's ConfirmDialog over the window: Escape cancels, Enter does the default, and only while this
+// window is focused. destructive (an action that can't be undone or deletes elsewhere): the OK button
+// is red and Enter cancels.
 export function Confirm({ text, detail, okLabel, onOk, onCancel, destructive }) {
-  const t = useTheme();
-  return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 340, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
-        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{text}</Text>
-        {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <Button label={tr('files.cancel')} onClick={onCancel} />
-          <Button primary label={okLabel} onClick={onOk} style={destructive ? { backgroundColor: '#e5483f', ...(t.buttonBorder ? { border: '1px solid #e5483f' } : null) } : undefined} />
-        </View>
-      </View>
-    </View>
-  );
+  return <ConfirmDialog title={text} detail={detail} okLabel={okLabel} cancelLabel={tr('files.cancel')} onOk={onOk} onCancel={onCancel} destructive={destructive} />;
 }

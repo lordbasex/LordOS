@@ -13,6 +13,7 @@ import { noteTextField } from './textfocus.js';
 import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
 import { Layer } from './layers.js';
+import { dialogStack } from './dialogkeys.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -819,13 +820,14 @@ export function FloatingWindows() {
   );
 }
 
-// Keyboard for the app whose window is in front (and with no active TextInput).
+// Keyboard for the app whose window is in front (and with no active TextInput). While a
+// ConfirmDialog has the keys (in this window or the desktop's own) the app gets none.
 export function useKeyboard(handler) {
-  const { focused: active } = useAppWindow();
+  const { id, focused: active } = useAppWindow();
   const ref = useRef(handler);
   ref.current = handler;
   useEffect(() => {
     if (!active) return undefined;
-    return addListener('keydown', (e) => { if (!hasTextFocus()) ref.current(e); });
-  }, [active]);
+    return addListener('keydown', (e) => { if (!hasTextFocus() && !dialogStack.blocks(id, e)) ref.current(e); });
+  }, [active, id]);
 }

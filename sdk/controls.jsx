@@ -4,8 +4,10 @@
 import { View, Text, addListener } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, popupBg } from './theme.js';
-import { TextInput, useAppWindow } from './components.jsx';
+import { TextInput, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
 import { wm } from './windows.js';
+import { useStore } from './store.js';
+import { dialogStack, dialogKey, defaultButton, keyOwner } from './dialogkeys.js';
 import { direction } from './i18n.js';
 import { Lumo } from './mascot.js';
 import { Overlay } from './layers.js';
@@ -265,14 +267,35 @@ export function FormRow({ label, children, labelWidth, minHeight = 36 }) {
   );
 }
 
-// A confirmation in the shell (the Dock's «Empty Trash»): a dimmed screen with a small panel,
-// never alert(). Escape cancels and Enter confirms. destructive: the button is red.
+// A confirmation in the shell (the Dock's «Empty Trash») or in a window: a dimmed area with a small
+// panel, never alert(). It takes the keys only while it is in front, that is in the focused window
+// (or the desktop's own) and the newest dialog open (sdk/dialogkeys.js): Escape cancels and Enter
+// does the default. destructive: the button is red and the default is Cancel, as in libadwaita, so
+// the action needs a click, or Tab to it and then Space.
 export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, area }) {
   const t = useTheme();
+  const { id: win, focused } = useAppWindow();
+  const token = useRef({}).current;
+  const dflt = defaultButton(destructive);
+  const [focus, setFocus] = useState(dflt);         // the button Space presses; Tab moves it
+  const owner = useStore(dialogStack, (list) => keyOwner(list) === token);
+  const latest = useRef(null);
+  latest.current = { onOk, onCancel, destructive, focus };
+  useEffect(() => {
+    dialogStack.open(token, win, focused);
+    if (dialogStack.owner() === token) clearTextFocus();   // a field under it must not go on typing
+    return () => dialogStack.close(token);
+  }, []);
+  useEffect(() => { dialogStack.setFocused(token, focused); }, [focused]);
   useEffect(() => addListener('keydown', (e) => {
-    if (e.key === 'Escape') onCancel();
-    else if (e.key === 'Enter') onOk();
-  }), [onOk, onCancel]);
+    if (dialogStack.owner() !== token || hasTextFocus()) return;
+    const p = latest.current;
+    const r = dialogKey(e, p);
+    if (r) dialogStack.take(e);
+    if (r?.focus) setFocus(r.focus);
+    else if (r?.press === 'ok') p.onOk();
+    else if (r?.press === 'cancel') p.onCancel();
+  }), []);
   const a = area || { x: 0, y: 0, w: undefined, h: undefined };
   return (
     <View onClick={onCancel} style={{ position: 'absolute', left: a.x, top: a.y, ...(a.w ? { width: a.w, height: a.h } : { right: 0, bottom: 0 }),
@@ -282,21 +305,24 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
         {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <DialogButton t={t} label={cancelLabel} onClick={onCancel} />
-          <DialogButton t={t} label={okLabel} onClick={onOk} primary destructive={destructive} />
+          <DialogButton t={t} label={cancelLabel} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
+          <DialogButton t={t} label={okLabel} onClick={onOk} primary destructive={destructive} isDefault={dflt === 'ok'} ring={owner && focus === 'ok'} />
         </View>
       </View>
     </View>
   );
 }
-function DialogButton({ t, label, onClick, primary, destructive }) {
+// isDefault: the button Enter presses, with an accent edge and a heavier label (a filled accent
+// button already reads as the default); ring: the keyboard focus, drawn while the dialog has the keys
+function DialogButton({ t, label, onClick, primary, destructive, isDefault, ring }) {
   const [hover, setHover] = useState(false);
   const bg = primary ? (destructive ? '#e5483f' : t.accent) : t.control;
+  const edge = primary ? null : isDefault ? { border: `1px solid ${t.accent}` } : t.buttonBorder ? { border: `1px solid ${t.separator}` } : null;
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: controlSize.regular, paddingHorizontal: 14, borderRadius: t.controlRadius, justifyContent: 'center', alignItems: 'center',
-        backgroundColor: bg, opacity: hover ? 0.85 : 1, ...(t.buttonBorder && !primary ? { border: `1px solid ${t.separator}` } : null) }}>
-      <Text style={{ fontSize: typeScale.body, fontWeight: 500, color: primary ? '#fff' : t.text, whiteSpace: 'nowrap' }}>{label}</Text>
+        backgroundColor: bg, opacity: hover ? 0.85 : 1, ...edge, boxShadow: ring ? `0 0 0 3px ${t.accent}66` : 'none' }}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: isDefault ? 600 : 500, color: primary ? '#fff' : t.text, whiteSpace: 'nowrap' }}>{label}</Text>
     </View>
   );
 }

@@ -438,12 +438,12 @@ export default function Files() {
   };
   // actions receive the paths to use (the context menu fixes them when it opens: the selection
   // at that moment, or the right-clicked item if it was not selected)
-  const askDelete = (paths = selPaths) => setConfirm({ text: tr('files.confirm.delete', { count: paths.length }), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.deleteNow'),
+  const askDelete = (paths = selPaths) => setConfirm({ text: tr('files.confirm.delete', { count: paths.length }), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.deleteNow'), destructive: true,
     run: () => { for (const p of paths) { try { fs.removeFromTrash(p); } catch (err) { report(err); } } bump(); } });
   const askEmpty = () => {
     const run = () => { fs.emptyTrash(); bump(); };
     if (!prefs.warnEmptyTrash) { run(); return; }
-    setConfirm({ text: tr('files.confirm.empty'), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.emptyTrash'), run });
+    setConfirm({ text: tr('files.confirm.empty'), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.emptyTrash'), destructive: true, run });
   };
   // Settings → Advanced: what has been in the Trash over 30 days goes when Files starts
   useEffect(() => {
