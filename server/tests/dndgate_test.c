@@ -2,10 +2,12 @@
  * during the release that made it. */
 #include "../src/wl/dndgate.h"
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static int fails;
@@ -51,6 +53,29 @@ int main(void) {
     CHECK(dndg_pid_sandboxed(0));
     CHECK(dndg_pid_sandboxed(-5));
     CHECK(dndg_pid_sandboxed(0x7ffffff0));
+    /* a child in its own user and mount namespaces (as a container or another sandbox) counts as sandboxed,
+     * fail closed; a plain child doesn't */
+    pid_t kid = fork();
+    if (kid == 0) { execl("/bin/sleep", "sleep", "5", (char *)NULL); _exit(127); }
+    usleep(100000);
+    if (stat("/.flatpak-info", &st) != 0) CHECK(kid > 0 && !dndg_pid_sandboxed((int)kid));
+    if (kid > 0) { kill(kid, SIGKILL); waitpid(kid, NULL, 0); }
+    if (!access("/usr/bin/unshare", X_OK)) {
+        int sync[2];
+        if (!pipe(sync)) {
+            pid_t ns = fork();
+            if (ns == 0) {
+                close(sync[0]); dup2(sync[1], 1);
+                execl("/usr/bin/unshare", "unshare", "-Urm", "sh", "-c", "echo; exec sleep 5", (char *)NULL);
+                _exit(127);
+            }
+            close(sync[1]);
+            char c;
+            if (ns > 0 && read(sync[0], &c, 1) == 1) CHECK(dndg_pid_sandboxed((int)ns));   /* skipped without user namespaces */
+            close(sync[0]);
+            if (ns > 0) { kill(ns, SIGKILL); waitpid(ns, NULL, 0); }
+        }
+    }
 
     /* the gate: claimed during its release, once */
     DropGate g = { 0 };

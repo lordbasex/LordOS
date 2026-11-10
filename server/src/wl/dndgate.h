@@ -9,8 +9,9 @@
  * as sandboxed. */
 int dndg_root_sandboxed(int rootfd);
 
-/* 1 if the process runs in a sandbox (dndg_root_sandboxed of its /proc/<pid>/root), or if it can't be looked
- * at (pid <= 0, gone, not ours). Its drags never hand files to LordOS. */
+/* 0 only on positive evidence that the process is not sandboxed: its /proc/<pid>/root has no .flatpak-info
+ * and is our own "/", and its mount, pid and user namespaces are ours. 1 for anything else, and if it can't be
+ * looked at (pid <= 0, gone, not ours). Its drags and clipboard file lists never hand files to LordOS. */
 int dndg_pid_sandboxed(int pid);
 
 /* A Linux app's drop on LordOS, and who may take it: only what runs while the UI handles the release that

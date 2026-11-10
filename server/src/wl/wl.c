@@ -3783,13 +3783,12 @@ static int client_from(struct wl_client *c) {
     snprintf(p, sizeof p, "/proc/%d/root", (int)pid);
     int root = open(p, O_PATH | O_DIRECTORY | O_CLOEXEC);
     if (root < 0) return URIL_FROM_UNKNOWN;
-    int fd = openat(root, ".flatpak-info", O_PATH | O_NOFOLLOW | O_CLOEXEC);
-    int err = fd < 0 ? errno : 0;
-    if (fd >= 0) close(fd);
+    int flatpak = dndg_root_sandboxed(root);
     close(root);
-    int from = fd >= 0 ? URIL_FROM_FLATPAK : err == ENOENT ? URIL_FROM_APP : URIL_FROM_UNKNOWN;
-    /* and what was seen when it connected (dndg_pid_sandboxed, while its pid was surely its own) must agree */
-    return from == URIL_FROM_APP && client_sandboxed(c) ? URIL_FROM_UNKNOWN : from;
+    if (flatpak) return URIL_FROM_FLATPAK;
+    /* fail closed: an app only on positive evidence now (same root and namespaces as ours, dndg_pid_sandboxed)
+     * and when it connected, while its pid was surely its own */
+    return dndg_pid_sandboxed((int)pid) || client_sandboxed(c) ? URIL_FROM_UNKNOWN : URIL_FROM_APP;
 }
 
 const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
