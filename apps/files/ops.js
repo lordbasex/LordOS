@@ -82,8 +82,10 @@ export function transfer(paths, destDir, move, known) {
   return errors;
 }
 
-export function paste(destDir, known) {
-  const c = pasteFrom(fileClipboard.get(), outside());
+// What a paste brings now (apps/files/clipfiles.js pasteFrom): files from another app are pasted only after the
+// person says yes (pasteAsk), so the window asks first and then passes the same plan to paste.
+export const pastePlan = () => pasteFrom(fileClipboard.get(), outside());
+export function paste(destDir, known, c = pastePlan()) {
   if (!c) return;
   transfer(c.paths, destDir, c.move, known);
   if (c.move) fileClipboard.set(null);

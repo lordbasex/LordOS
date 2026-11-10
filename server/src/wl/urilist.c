@@ -4,7 +4,8 @@
  * x-special/gnome-copied-files ("copy" or "cut", then the URIs, LF) and plain text; pasting in Files reads
  * the first two back from an app. What an app sends is untrusted: only file:// URIs of this machine (an
  * empty host or "localhost") are kept, decoded to an absolute path without NUL or line breaks, and the copy
- * itself goes through lord.fs and its checks like any other. No Wayland types here, so the test links it alone. */
+ * itself goes through lord.fs and its checks like any other. And only an app outside a sandbox may put files
+ * there, with a text that names the same paths (uril_accept). No Wayland types here, so the test links it alone. */
 #include "urilist.h"
 
 #include <stdlib.h>
@@ -145,4 +146,30 @@ char *uril_parse(const char *buf, size_t n, int gnome, int *cut, size_t *plist_l
     *plist_len = o;
     *count = files;
     return out;
+}
+
+int uril_text_names(const char *text, size_t n, const char *plist, size_t len) {
+    if (!text || !n || !plist || !len || plist[len - 1]) return 0;
+    if (text[n - 1] == '\n') n -= n > 1 && text[n - 2] == '\r' ? 2 : 1;     /* one line end after the last */
+    char path[URIL_PATH_MAX];
+    size_t off = 0;
+    for (size_t at = 0; at <= n;) {
+        if (off >= len) return 0;                                   /* more lines than paths */
+        const char *line = text + at, *nl = memchr(line, '\n', n - at);
+        size_t ll = nl ? (size_t)(nl - line) : n - at;
+        at += ll + 1;
+        if (ll && line[ll - 1] == '\r') ll--;
+        const char *p = plist + off;
+        size_t pn = strlen(p);
+        off += pn + 1;
+        if (ll == pn && !memcmp(line, p, pn)) continue;
+        long ul = uri_path(line, ll, path);
+        if (ul < 0 || (size_t)ul != pn || memcmp(path, p, pn)) return 0;
+    }
+    return off == len;
+}
+
+int uril_accept(int from, const char *text, size_t n, const char *plist, size_t len) {
+    if (from != URIL_FROM_APP || !plist || !len) return 0;
+    return !text || uril_text_names(text, n, plist, len);
 }

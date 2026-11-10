@@ -7,6 +7,11 @@
  *   2. only a gnome-copied-files "cut": the text becomes the paths and the cut comes back as a copy (another
  *      app's cut never moves anything in Files)
  *   3. a list with no file of this machine: no file formats offered at all
+ *   4. a list whose text names other things (another text, one path more, another order): text only, so a
+ *      paste in Files never copies files the person didn't see on the clipboard
+ *   5. a text of file:// URIs that name the same files: the list is kept
+ * (A Flatpak app's or an isolated LordOS app's list is never kept either; this client can't be one, so that
+ * decision is tested in tests/urilist_test.c, uril_accept.)
  *
  *   WAYLAND_DISPLAY=wayland-0 build/clipfiles-client      (prints ok/FAIL per check, exit 1 on a failure)
  * It replaces the session clipboard. */
@@ -222,6 +227,25 @@ int main(void) {
     check("3: no text/uri-list", offers(&seen, "text/uri-list"), 0);
     check("3: no gnome-copied-files", offers(&seen, "x-special/gnome-copied-files"), 0);
     check_str("3: asking anyway gets nothing", receive(&seen, "text/uri-list"), "");
+
+    /* 4. the text doesn't name the files: the list is dropped, the text stays */
+    Copy c4 = { { "text/plain;charset=utf-8", "text/uri-list" }, { "holiday photos", "file:///tmp/x\r\n" }, 2 };
+    copy_and_look(&c4, &seen);
+    check_str("4: the text", receive(&seen, "text/plain;charset=utf-8"), "holiday photos");
+    check("4: another text: no text/uri-list", offers(&seen, "text/uri-list"), 0);
+    check("4: another text: no gnome-copied-files", offers(&seen, "x-special/gnome-copied-files"), 0);
+    Copy c4b = { { "text/plain;charset=utf-8", "x-special/gnome-copied-files" }, { "/tmp/x", "copy\nfile:///tmp/x\nfile:///tmp/.ssh/id" }, 2 };
+    copy_and_look(&c4b, &seen);
+    check("4: a file the text doesn't name: no text/uri-list", offers(&seen, "text/uri-list"), 0);
+    Copy c4c = { { "text/plain;charset=utf-8", "text/uri-list" }, { "/tmp/y\n/tmp/x", "file:///tmp/x\r\nfile:///tmp/y\r\n" }, 2 };
+    copy_and_look(&c4c, &seen);
+    check("4: another order: no text/uri-list", offers(&seen, "text/uri-list"), 0);
+
+    /* 5. the text as URIs of the same files */
+    Copy c5 = { { "text/plain;charset=utf-8", "text/uri-list" }, { "file:///tmp/x\nfile:///tmp/y\n", "file:///tmp/x\r\nfile:///tmp/y\r\n" }, 2 };
+    copy_and_look(&c5, &seen);
+    check("5: the same files as URIs: text/uri-list", offers(&seen, "text/uri-list"), 1);
+    check_str("5: the list", receive(&seen, "text/uri-list"), "file:///tmp/x\r\nfile:///tmp/y\r\n");
 
     check("the connection is still up", wl_display_get_error(dpy), 0);
     printf("%d checks, %d failed\n", checks, fails);

@@ -179,7 +179,15 @@ There's a single one for the whole session:
   its gnome list) beside its text and keeps only this machine's files: `file://` URIs with an empty
   or `localhost` host, decoded to an absolute UTF-8 path without NUL or line breaks; a list of more
   than 65536 files, other hosts and other schemes are left out (`src/wl/urilist.c`,
-  `build/urilist-test`). Paste in Files copies them with `lord.fs.copy` and its checks; another
+  `build/urilist-test`). Because pasting them copies real files, the list is kept only from an app
+  outside a sandbox: never from an isolated LordOS app (the broker knows its pid) nor from a Flatpak
+  app (its `/proc/<pid>/root/.flatpak-info` exists; looked up with `openat` on that root, without
+  following links; a root that can't be looked at counts as sandboxed), whose list isn't even read.
+  And only when the selection has no text, or its text names exactly those paths (one per line, as
+  paths or as `file://` URIs, same order), so what the person sees as the clipboard's text is what gets
+  copied (`uril_accept`). Otherwise the copy is text only. Paste in Files then asks first, naming the
+  app (its `app_id` or window title) and the first five files, with Enter on Cancel. Files copies them
+  with `lord.fs.copy` and its checks; another
   app's cut is pasted as a copy, only Files moves its own cut. The list stays valid while the text it
   came with is the clipboard's, is offered again in both formats after that app closes, and goes to
   X11 apps too. JS only ever hands a list of paths (`lord.clipboard.setFiles`), never other data.
@@ -550,7 +558,8 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   only if it's newer than what an X app copied; when the keyboard goes to a LordOS or Wayland
   window, the window manager gives the selection up. Large pastes go in `INCR` chunks. Files copied
   in Files are also offered as `text/uri-list` and `x-special/gnome-copied-files`; files an X app
-  copies arrive as their text only (the window manager reads one text target).
+  copies arrive as their text only (the window manager reads one text target; an X client's sandbox
+  can't be told, so its file list is never read).
 - **Secrets never go to X.** What Passwords (or a password field) copies is marked sensitive and is
   not offered to X11 apps at all: in X, the pasted text is written to a window property any X client
   can read.

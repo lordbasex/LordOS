@@ -7,6 +7,7 @@ import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
+  linuxAppFor, shortAppName,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -14,7 +15,7 @@ import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
 import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
 import {
-  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, canPaste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
+  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, pastePlan, canPaste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
@@ -27,6 +28,7 @@ import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from '.
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
+import { pasteAsk } from './clipfiles.js';
 import { useCloudFiles, CloudSection, TransfersPill, footerLine, cloudMenuItems, ShareSheet, CloudInfo, OfflineDialog } from './cloud.jsx';
 import { createRemoteDirs } from './remotedirs.js';
 
@@ -556,7 +558,19 @@ export default function Files() {
       (e) => setMsg(e.message));
   };
   const duplicate = (paths = selPaths) => { if (wDir && paths.length) transfer(paths, wDir, false, knownNames(wDir)); };
-  const doPaste = () => { if (wDir) paste(wDir, knownNames(wDir)); };
+  // Files another app copied are copied for real: a sheet first says how many, from which app and which ones
+  // (Enter cancels), so a list put on the clipboard behind the person's back is never pasted unseen.
+  const doPaste = () => {
+    if (!wDir) return;
+    const c = pastePlan();
+    const ask = pasteAsk(c);
+    if (!ask) { paste(wDir, knownNames(wDir), c); return; }
+    const dir = wDir;
+    const app = shortAppName(linuxAppFor(ask.from)) || ask.from || tr('files.confirm.pasteAnotherApp');
+    const lines = [...ask.names, ...(ask.more ? [tr('files.confirm.pasteMore', { count: formatNumber(ask.more) })] : [])];
+    setConfirm({ text: tr('files.confirm.pasteFrom', { count: ask.count, app }), detail: lines.join('\n'), ok: tr('files.menu.paste'), cautious: true,
+      run: () => paste(dir, knownNames(dir), c) });
+  };
   const ctx = { navigate, linuxApps: launcherApps, t: tr, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
@@ -1177,7 +1191,7 @@ export default function Files() {
         extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}
       {sharing && cf.accountOf(sharing.path) && <ShareSheet e={sharing} cf={cf} onClose={() => setSharing(null)} />}
       {offlineAsk && <OfflineDialog e={offlineAsk} onClose={() => setOfflineAsk(null)} />}
-      {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} destructive={!!confirm.destructive} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
+      {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} destructive={!!confirm.destructive} cautious={!!confirm.cautious} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
       {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}

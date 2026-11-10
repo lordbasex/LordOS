@@ -477,7 +477,10 @@ static void sel_reply(const uint8_t *r, size_t n, uint32_t k, uint32_t stage) {
     size_t bytes = (size_t)x11_get32(r + 16) * (size_t)(format / 8);
     if (bytes > n - 32) bytes = n - 32;
     const uint8_t *v = r + 32;
-    if (stage == 1) {                                       /* TARGETS: the best text, or a PNG */
+    /* TARGETS: the best text, or a PNG. An X app's text/uri-list is never read: which X client is sandboxed (a
+     * Flatpak app with the X11 socket) can't be told, and a file list pasted in Files copies real files, so an
+     * X11 copy of files is its text only (wl.c, "Files"). */
+    if (stage == 1) {
         uint32_t best = 0;
         int rank = 0, png = 0;
         for (size_t i = 0; format == 32 && i + 4 <= bytes; i += 4) {

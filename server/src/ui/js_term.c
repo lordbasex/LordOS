@@ -916,8 +916,9 @@ static JSValue f_clip_set_files(JSContext *c, JSValueConst this_val, int argc, J
     return JS_NewBool(c, ok);
 }
 
-/* lord.clipboard.files() → { paths, cut, own, gen } or null: the files on the clipboard, copied in Files (own) or
- * in a Linux file manager (only this machine's files, checked by wl/urilist.c; cut only for Files' own). */
+/* lord.clipboard.files() → { paths, cut, own, from, gen } or null: the files on the clipboard, copied in Files (own)
+ * or in a Linux file manager outside a sandbox, whose text named those same paths (only this machine's files,
+ * checked by wl/urilist.c; cut only for Files' own). from: that app's app_id or window title ("" if unknown). */
 static JSValue f_clip_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
     size_t len;
@@ -934,6 +935,7 @@ static JSValue f_clip_files(JSContext *c, JSValueConst this_val, int argc, JSVal
     JS_SetPropertyStr(c, o, "paths", a);
     JS_SetPropertyStr(c, o, "cut", JS_NewBool(c, cut));
     JS_SetPropertyStr(c, o, "own", JS_NewBool(c, own));
+    JS_SetPropertyStr(c, o, "from", JS_NewString(c, own ? "" : wl_clip_files_from()));
     JS_SetPropertyStr(c, o, "gen", JS_NewInt64(c, term_clipboard_gen()));
     return o;
 }

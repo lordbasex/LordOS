@@ -242,6 +242,12 @@
   "confirm.noExtension": "nessuna",
   "confirm.extensionDetail": "Il file potrebbe aprirsi con un’altra app, o non aprirsi affatto.",
   "confirm.extensionOk": "Cambia",
+  "confirm.pasteFrom": {
+    "one": "Incollare {count} elemento copiato in {app}?",
+    "other": "Incollare {count} elementi copiati in {app}?"
+  },
+  "confirm.pasteAnotherApp": "un’altra app",
+  "confirm.pasteMore": "e altri {count}",
   "net.pickShare": "Scegli la cartella a cui connetterti.",
   "net.badLogin": "Utente o password non accettati.",
   "net.noGuest": "Questo computer non accetta ospiti.",

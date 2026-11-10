@@ -27,4 +27,18 @@ char *uril_encode(const char *plist, size_t len, int fmt, int cut, size_t *out_l
  * NULL if no file is left, the text is not one of those lists, or it has too many files or bytes. */
 char *uril_parse(const char *buf, size_t n, int gnome, int *cut, size_t *plist_len, int *count);
 
+/* Where an app's file list came from: an app outside any sandbox, an isolated LordOS app (lord-server --app),
+ * a Flatpak app, or one that couldn't be told apart (an X11 owner, a client whose root can't be looked at). */
+enum { URIL_FROM_APP, URIL_FROM_ISOLATED, URIL_FROM_FLATPAK, URIL_FROM_UNKNOWN };
+
+/* Whether text (n bytes) names exactly the paths of plist, in the same order: one per line (LF or CRLF, one
+ * line end after the last allowed), each the path itself or a file:// URI of this machine that decodes to it. */
+int uril_text_names(const char *text, size_t n, const char *plist, size_t len);
+
+/* Whether LordOS keeps an app's file list (pasted by Files as a real copy of those files): only from an app
+ * outside a sandbox (a sandboxed one could name files it can't read, for Files to copy where it can), and only
+ * when the selection has no text (text NULL) or its text names exactly those paths, so what the person sees
+ * as the clipboard's text is what gets copied. Otherwise the selection is text only. */
+int uril_accept(int from, const char *text, size_t n, const char *plist, size_t len);
+
 #endif

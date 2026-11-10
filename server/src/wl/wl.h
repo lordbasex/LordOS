@@ -113,6 +113,7 @@ void        wl_clip_set_html(const char *html, size_t n);
  * put them there (cut is never set for another app's). Set them right after their text (the paths). */
 const char *wl_clip_files(size_t *len, int *count, int *cut, int *own);
 char       *wl_clip_files_as(int fmt, size_t *len);      /* malloc'd, in a urilist.h format, or NULL */
+const char *wl_clip_files_from(void);                   /* the app that copied them ("" if Files, unknown or none) */
 int         wl_clip_set_files(const char *list, size_t len, int count, int cut);
 
 /* xdg-foreign-v2: the window an app exported with that handle (a portal's "wayland:<handle>" parent),

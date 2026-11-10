@@ -271,16 +271,18 @@ export function FormRow({ label, children, labelWidth, minHeight = 36 }) {
 // panel, never alert(). It takes the keys only while it is in front, that is in the focused window
 // (or the desktop's own) and the newest dialog open (sdk/dialogkeys.js): Escape cancels and Enter
 // does the default. destructive: the button is red and the default is Cancel, as in libadwaita, so
-// the action needs a click, or Tab to it and then Space.
-export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, area }) {
+// the action needs a click, or Tab to it and then Space. cautious: the default is Cancel too, with a button
+// that isn't red (an action that only needs a second look, such as pasting files another app copied).
+export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area }) {
   const t = useTheme();
   const { id: win, focused } = useAppWindow();
   const token = useRef({}).current;
-  const dflt = defaultButton(destructive);
+  const safe = !!(destructive || cautious);         // Enter presses Cancel
+  const dflt = defaultButton(safe);
   const [focus, setFocus] = useState(dflt);         // the button Space presses; Tab moves it
   const owner = useStore(dialogStack, (list) => keyOwner(list) === token);
   const latest = useRef(null);
-  latest.current = { onOk, onCancel, destructive, focus };
+  latest.current = { onOk, onCancel, destructive: safe, focus };
   useEffect(() => {
     dialogStack.open(token, win, focused);
     if (dialogStack.owner() === token) clearTextFocus();   // a field under it must not go on typing

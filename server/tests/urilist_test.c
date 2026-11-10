@@ -133,6 +133,43 @@ int main(void) {
         }
     }
 
+    /* the text a person sees must name exactly the paths that get copied */
+    {
+        static const char ab[] = "/home/u/a b\0/home/u/c";
+        size_t al = sizeof ab;
+#define NAMES(s) uril_text_names(s, strlen(s), ab, al)
+        CHECK(NAMES("/home/u/a b\n/home/u/c"));
+        CHECK(NAMES("/home/u/a b\r\n/home/u/c\r\n"));                    /* CRLF, one line end after the last */
+        CHECK(NAMES("/home/u/a b\n/home/u/c\n"));
+        CHECK(NAMES("file:///home/u/a%20b\nfile://localhost/home/u/c"));    /* the same files as URIs */
+        CHECK(NAMES("/home/u/a b\nfile:///home/u/c"));
+        CHECK(!NAMES("/home/u/c\n/home/u/a b"));                            /* another order */
+        CHECK(!NAMES("/home/u/a b"));                                       /* fewer */
+        CHECK(!NAMES("/home/u/a b\n/home/u/c\n/home/u/.ssh/id_ed25519"));  /* more */
+        CHECK(!NAMES("/home/u/a b\n/home/u/c\n\n"));                        /* a blank line more */
+        CHECK(!NAMES("/home/u/a b\n\n/home/u/c"));
+        CHECK(!NAMES("holiday photos"));                                    /* a text that isn't them */
+        CHECK(!NAMES(" /home/u/a b\n/home/u/c"));
+        CHECK(!NAMES("/home/u/a%20b\n/home/u/c"));                          /* escapes only in a URI */
+        CHECK(!NAMES("file://otherhost/home/u/a%20b\n/home/u/c"));
+        CHECK(!NAMES("") && !NAMES("\n"));
+        CHECK(!uril_text_names("/home/u/a b\0/home/u/c", sizeof ab - 1, ab, al));   /* a NUL is not a line end */
+        CHECK(!uril_text_names("/home/u/a b\n/home/u/c", 22, ab, al - 1));          /* a list without its last NUL */
+#undef NAMES
+        /* the decision: by where the list came from, and its text */
+        const char *txt = "/home/u/a b\n/home/u/c", *other = "/home/u/.ssh/id_ed25519";
+        CHECK(uril_accept(URIL_FROM_APP, txt, strlen(txt), ab, al));
+        CHECK(uril_accept(URIL_FROM_APP, NULL, 0, ab, al));                 /* files only: their text will be the paths */
+        CHECK(!uril_accept(URIL_FROM_APP, other, strlen(other), ab, al));
+        CHECK(!uril_accept(URIL_FROM_ISOLATED, txt, strlen(txt), ab, al));
+        CHECK(!uril_accept(URIL_FROM_ISOLATED, NULL, 0, ab, al));
+        CHECK(!uril_accept(URIL_FROM_FLATPAK, txt, strlen(txt), ab, al));
+        CHECK(!uril_accept(URIL_FROM_FLATPAK, NULL, 0, ab, al));
+        CHECK(!uril_accept(URIL_FROM_UNKNOWN, txt, strlen(txt), ab, al));
+        CHECK(!uril_accept(42, txt, strlen(txt), ab, al));
+        CHECK(!uril_accept(URIL_FROM_APP, txt, strlen(txt), NULL, 0));
+    }
+
     if (fails) { printf("urilist-test: %d failures\n", fails); return 1; }
     printf("urilist-test: ok\n");
     return 0;

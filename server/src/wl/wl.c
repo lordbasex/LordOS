@@ -1454,8 +1454,12 @@ static unsigned clip_html_pend_offer, clip_text_offer;
 /* Files: the paths copied in Files (lord.clipboard.setFiles; its text is the paths) or in a Linux file manager
  * (its text/uri-list or x-special/gnome-copied-files, read beside its text and checked by urilist.c), valid
  * like the HTML while the text is the one it came with. Offered again in both formats. A cut counts only
- * when Files made it: what another app cut is pasted as a copy. */
-typedef struct { char *list; size_t len; int count, cut, own; unsigned gen; } ClipFiles;   /* list: urilist.h plist */
+ * when Files made it: what another app cut is pasted as a copy. Pasting them in Files copies real files, so
+ * they are kept only from an app outside a sandbox (never an isolated LordOS app nor a Flatpak one, which could
+ * name files they can't read for Files to copy where they can), and only when the selection's text is absent
+ * or names exactly those paths (urilist.h uril_accept). Files asks before pasting them (apps/files/clipfiles.js).
+ * X11 apps' lists are never read: an X client's sandbox can't be told, so their copy is text only (xwm.c). */
+typedef struct { char *list; size_t len; int count, cut, own, src /* URIL_FROM_* */; unsigned gen; char from[256]; } ClipFiles;   /* list: urilist.h plist; from: the app's name */
 static ClipFiles clip_files, clip_files_pend;
 static unsigned clip_files_pend_offer;
 #define MIME_URIS "text/uri-list"
@@ -1465,6 +1469,8 @@ static int text_mime(const char *m) {
     return !strcmp(m, "text/plain;charset=utf-8") || !strcmp(m, "text/plain") || !strcmp(m, "UTF8_STRING") ||
            !strcmp(m, "STRING") || !strcmp(m, "TEXT");
 }
+
+static int client_from(struct wl_client *c);
 
 static void src_offer(struct wl_client *c, struct wl_resource *r, const char *mime) {
     (void)c;
@@ -1528,7 +1534,15 @@ static void files_adopt(ClipFiles *f) {
 }
 
 /* reading an app's selection into LordOS (files: 1 its text/uri-list, 2 its gnome-copied-files) */
-typedef struct { int fd, image, sensitive, primary, html, html_only, files, files_only, full /* cut short */; pid_t pid; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
+typedef struct {
+    int fd, image, sensitive, primary, html, html_only, files, files_only, full /* cut short */, from /* URIL_FROM_* */;
+    pid_t pid;
+    unsigned offer;
+    struct wl_event_source *ev;
+    char *buf;
+    size_t len, cap;
+    char origin[128], name[256];    /* name: the app's app_id or window title, for Files' question ("" if none) */
+} Reader;
 static void prim_store(const char *t, size_t n, pid_t pid);
 
 static int reader_ready(int fd, uint32_t mask, void *data) {
@@ -1589,8 +1603,10 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         f.list = rd->len && !rd->full && rd->offer == clip_offer_gen && !rd->sensitive ? uril_parse(rd->buf, rd->len, rd->files == 2, &cut, &pl, &count) : NULL;
         f.len = pl;
         f.count = count;
+        f.src = rd->from;
+        snprintf(f.from, sizeof f.from, "%s", rd->name);
         if (f.list && rd->files_only) {
-            /* an app that offers only files: its text is their paths */
+            /* an app that offers only files: its text is their paths (the files too, if the app isn't sandboxed) */
             size_t tn = 0;
             char *t = uril_encode(f.list, f.len, URIL_PLAIN, 0, &tn);
             if (t) {
@@ -1600,11 +1616,13 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
                 clip_is_image = 0;
                 clip_text_offer = rd->offer;
                 html_adopt(NULL, 0);
-                files_adopt(&f);
+                if (uril_accept(f.src, NULL, 0, f.list, f.len)) files_adopt(&f);
             }
             free(t);
-        } else if (f.list && clip_text_offer == rd->offer) files_adopt(&f);
-        else if (f.list) { free(clip_files_pend.list); clip_files_pend = f; clip_files_pend_offer = rd->offer; f.list = NULL; }
+        } else if (f.list && clip_text_offer == rd->offer) {
+            const char *t = term_clipboard();
+            if (uril_accept(f.src, t, strlen(t), f.list, f.len)) files_adopt(&f);
+        } else if (f.list) { free(clip_files_pend.list); clip_files_pend = f; clip_files_pend_offer = rd->offer; f.list = NULL; }
         free(f.list);
     } else if (rd->len && rd->image) {
         if (rd->len > 8 && !memcmp(rd->buf, "\x89PNG\r\n\x1a\n", 8)) {
@@ -1620,7 +1638,10 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         clip_text_offer = rd->offer;
         if (clip_html_pend && clip_html_pend_offer == rd->offer && !rd->sensitive) { html_adopt(clip_html_pend, clip_html_pend_len); clip_html_pend = NULL; }
         else html_adopt(NULL, 0);
-        if (clip_files_pend.list && clip_files_pend_offer == rd->offer) files_adopt(&clip_files_pend);
+        if (clip_files_pend.list && clip_files_pend_offer == rd->offer) {
+            if (uril_accept(clip_files_pend.src, rd->buf, rd->len, clip_files_pend.list, clip_files_pend.len)) files_adopt(&clip_files_pend);
+            else { free(clip_files_pend.list); memset(&clip_files_pend, 0, sizeof clip_files_pend); }
+        }
     }
     wl_event_source_remove(rd->ev);
     close(rd->fd);
@@ -1629,8 +1650,9 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
     return 0;
 }
 
-/* a second format of the same selection (files: 0 its HTML, else the kind of file list), kept with its text */
-static void read_beside(Source *s, const char *mime, int files) {
+/* a second format of the same selection (files: 0 its HTML, else the kind of file list), kept with its text;
+ * main: the reader of that text (where the selection comes from) */
+static void read_beside(Source *s, const char *mime, int files, const Reader *main) {
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
     wl_data_source_send_send(s->res, mime, p[1]);
@@ -1640,6 +1662,8 @@ static void read_beside(Source *s, const char *mime, int files) {
     rd->fd = p[0];
     rd->html = !files;
     rd->files = files;
+    rd->from = main->from;
+    snprintf(rd->name, sizeof rd->name, "%s", main->name);
     rd->offer = clip_offer_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); }
@@ -1678,6 +1702,10 @@ static void read_selection(Source *s) {
     for (int i = 0; i < MAX_SURF && !rd->origin[0]; i++)
         if (surfs[i] && surfs[i]->client == cl && surfs[i]->app_id[0]) snprintf(rd->origin, sizeof rd->origin, "%s", surfs[i]->app_id);
     if (!rd->origin[0]) snprintf(rd->origin, sizeof rd->origin, "linux");
+    snprintf(rd->name, sizeof rd->name, "%s", strcmp(rd->origin, "linux") ? rd->origin : "");
+    for (int i = 0; i < MAX_SURF && !rd->name[0]; i++)
+        if (surfs[i] && surfs[i]->client == cl && surfs[i]->title[0]) snprintf(rd->name, sizeof rd->name, "%s", surfs[i]->title);
+    rd->from = client_from(cl);
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "x-kde-passwordManagerHint")) rd->sensitive = 1;
     rd->offer = clip_offer_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
@@ -1686,8 +1714,9 @@ static void read_selection(Source *s) {
     if (image || html_only || files_only || rd->sensitive) return;
     int has_html = 0;
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "text/html")) has_html = 1;
-    if (has_html) read_beside(s, "text/html", 0);
-    if (files) read_beside(s, files, strcmp(files, MIME_URIS) ? 2 : 1);
+    if (has_html) read_beside(s, "text/html", 0, rd);
+    /* a sandboxed app's file list is not even read: its copy is text only */
+    if (files && rd->from == URIL_FROM_APP) read_beside(s, files, strcmp(files, MIME_URIS) ? 2 : 1, rd);
 }
 
 /* writing to an app, without blocking the server if the app reads slowly */
@@ -1811,6 +1840,11 @@ const char *wl_clip_files(size_t *len, int *count, int *cut, int *own) {
     *cut = ok && clip_files.own && clip_files.cut;
     *own = ok && clip_files.own;
     return ok ? clip_files.list : NULL;
+}
+const char *wl_clip_files_from(void) {
+    size_t n;
+    int count, cut, own;
+    return wl_clip_files(&n, &count, &cut, &own) && !own ? clip_files.from : "";
 }
 char *wl_clip_files_as(int fmt, size_t *len) {
     int count, cut, own;
@@ -3122,6 +3156,26 @@ static const char *app_of_client(struct wl_client *cl) {
     if (!cl) return NULL;
     wl_client_get_credentials(cl, &pid, &uid, &gid);
     return brokersrv_app_of_pid((int)pid);
+}
+
+/* Where a client's clipboard file list comes from (urilist.h URIL_FROM_*): an isolated LordOS app (the broker
+ * knows its pid), a Flatpak app (its root holds /.flatpak-info, which is how xdg-desktop-portal tells one), or
+ * an app outside a sandbox. The client's root is opened as a directory and only looked into, never following
+ * a link out of it; a client whose root can't be looked at counts as sandboxed. */
+static int client_from(struct wl_client *c) {
+    if (!c) return URIL_FROM_UNKNOWN;
+    if (app_of_client(c)) return URIL_FROM_ISOLATED;
+    pid_t pid = client_pid(c);
+    if (pid <= 0) return URIL_FROM_UNKNOWN;
+    char p[48];
+    snprintf(p, sizeof p, "/proc/%d/root", (int)pid);
+    int root = open(p, O_PATH | O_DIRECTORY | O_CLOEXEC);
+    if (root < 0) return URIL_FROM_UNKNOWN;
+    int fd = openat(root, ".flatpak-info", O_PATH | O_NOFOLLOW | O_CLOEXEC);
+    int err = fd < 0 ? errno : 0;
+    if (fd >= 0) close(fd);
+    close(root);
+    return fd >= 0 ? URIL_FROM_FLATPAK : err == ENOENT ? URIL_FROM_APP : URIL_FROM_UNKNOWN;
 }
 
 const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
