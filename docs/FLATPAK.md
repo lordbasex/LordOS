@@ -247,8 +247,12 @@ An app's `metadata` `[Context]` group declares:
   (`--call=org.freedesktop.portal.*=*` in `flatpak-run-dbus.c`). Whether `--no-talk-name` overrides
   that wildcard is **Unverified**; LordOS doesn't rely on it.
 - The Wayland side: Flatpak creates a `wp_security_context_v1` listener when the compositor
-  offers it. LordOS's compositor doesn't (checked: no reference in `server/src/wl`), so Flatpak
-  apps connect to the normal Wayland socket like any Linux app.
+  offers it, and lord-server does (0.8.8.8, in development: `server/src/wl/secctx.c`, see
+  "Security contexts" in `WAYLAND.md`). A Flatpak app then connects through a socket of its own,
+  tagged `org.flatpak` with its app id and instance id: it counts as sandboxed without looking at
+  `/.flatpak-info`, and doesn't see the globals only trusted clients get. An older Flatpak, or a
+  launcher lord-server can't tell is unsandboxed, falls back to the normal socket, where the
+  `/.flatpak-info` check still applies.
 
 ### What LordOS never grants (Design, fixed in C)
 
@@ -572,7 +576,7 @@ library.
   in FIREWALL.md).
 - Per-app Flatpak permission editor in Settings.
 - `wp_security_context_v1` in the compositor, so Wayland clients from Flatpak are known by
-  their sandbox engine and app id.
+  their sandbox engine and app id (built in 0.8.8.8, to check on the VM with a real Flatpak).
 - aarch64 / Raspberry Pi 5 (16 KB pages: some runtimes or apps may not run; **Unverified**).
 - Option B of Problem 4 (LordOS's own signed summary and appstream reader).
 

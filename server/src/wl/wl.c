@@ -20,9 +20,13 @@
  *
  * xdg_activation_v1: a window asks to come forward with a token; only one LordOS issued when it
  * launched the app, or one the app in front asked for, raises it; any other marks it as wanting
- * attention (xdgact.c holds the tokens). */
+ * attention (xdgact.c holds the tokens).
+ *
+ * wp_security_context_manager_v1 (secctx.c): a sandbox's own socket; its clients count as sandboxed and don't
+ * see the globals only trusted clients get. */
 #include "wl.h"
 #include "keygrab.h"
+#include "secctx.h"
 #include "../keylag.h"
 
 #include <errno.h>
@@ -1394,8 +1398,10 @@ static void on_client_created(struct wl_listener *l, void *data) {
     ci->gone.notify = client_destroyed;
     wl_client_add_destroy_listener(data, &ci->gone);
 }
-/* 1 if the client runs in a sandbox (Flatpak), or nothing is known of it */
+/* 1 if the client runs in a sandbox (Flatpak, or one that connected through a security context), or nothing
+ * is known of it */
 static int client_sandboxed(struct wl_client *c) {
+    if (secctx_of(c)) return 1;
     struct wl_listener *l = c ? wl_client_get_destroy_listener(c, client_destroyed) : NULL;
     if (!l) return 1;
     ClientInfo *ci = wl_container_of(l, (ClientInfo *)NULL, gone);
@@ -2262,10 +2268,15 @@ static void top_title(struct wl_client *c, struct wl_resource *r, const char *t)
     snprintf(s->title, sizeof s->title, "%s", t);
     if (s->mapped) { char e[520]; json_str(e, sizeof e, s->title); emit(s, "title", "{\"title\":\"%s\"}", e); }
 }
+/* The window's app id: the one it set, else the one the sandbox engine gave its client's security context
+ * (cut to fit; "" if neither) */
+static void set_app_id(Surf *s, struct wl_client *c, const char *a) {
+    const SecMeta *sm = a[0] ? NULL : secctx_of(c);
+    snprintf(s->app_id, sizeof s->app_id, "%.*s", (int)sizeof s->app_id - 1, sm ? sm->app_id : a);
+}
 static void top_app_id(struct wl_client *c, struct wl_resource *r, const char *a) {
-    (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (s) snprintf(s->app_id, sizeof s->app_id, "%s", a);
+    if (s) set_app_id(s, c, a);
 }
 /* The app's own bar asked for the window menu (right click on Chromium's tab strip, a GTK
  * headerbar): JS gets where, in screen coordinates, and the theme shows its window menu there. */
@@ -2423,6 +2434,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
     s->top = t;
     s->role = R_TOPLEVEL;
     s->csd = !s->kde_ssd;                   /* until it asks for server decoration */
+    if (!s->app_id[0]) set_app_id(s, c, "");
     if (wl_resource_get_version(t) >= 5) {
         struct wl_array caps;
         wl_array_init(&caps);
@@ -3775,9 +3787,16 @@ static const char *app_of_client(struct wl_client *cl) {
  * knows its pid), a Flatpak app (its root holds /.flatpak-info, which is how xdg-desktop-portal tells one), or
  * an app outside a sandbox. The client's root is opened as a directory and only looked into, never following
  * a link out of it; a client whose root can't be looked at, now or when it connected, counts as sandboxed. */
+/* Who may open a security context: only a client known to be outside any sandbox (Flatpak's launcher runs
+ * outside it); an isolated LordOS app or a sandboxed client could tag connections as another app. */
+static int may_secctx(struct wl_client *c) {
+    return !app_of_client(c) && !client_sandboxed(c);
+}
 static int client_from(struct wl_client *c) {
     if (!c) return URIL_FROM_UNKNOWN;
     if (app_of_client(c)) return URIL_FROM_ISOLATED;
+    const SecMeta *sm = secctx_of(c);       /* a sandbox's own socket: what its engine says it is */
+    if (sm) return !strcmp(sm->engine, "org.flatpak") ? URIL_FROM_FLATPAK : URIL_FROM_UNKNOWN;
     pid_t pid = client_pid(c);
     if (pid <= 0) return URIL_FROM_UNKNOWN;
     char p[48];
@@ -4730,6 +4749,7 @@ int wl_start(void) {
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
+    secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
