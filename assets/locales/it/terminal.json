@@ -491,6 +491,7 @@
   "fwd.copy": "Copia",
   "fwd.err.bad": "Indirizzo o porta non validi",
   "fwd.err.failed": "Il server l’ha rifiutato",
+  "fwd.err.inuse": "La porta {port} di questo computer è occupata (un’altra scheda con questo profilo, o un altro programma)",
   "fwd.err.nossh": "Questo ssh non si può condividere (aperto prima di LordOS 0.8.8.7, o da un altro server)",
   "fwd.err.unavailable": "Nessuna porta locale libera",
   "fwd.noSsh": "Gli inoltri richiedono un ssh connesso in questa scheda.",
@@ -504,7 +505,13 @@
   "fwd.opening": "In attesa della connessione ssh…",
   "fwd.serverPh": "8080 o host:5432",
   "fwd.sessionOnly": "Aggiunto qui, dura fino alla fine di questa connessione. Ascolta solo su 127.0.0.1.",
+  "fwd.takenBody": "Lì ascolta un’altra scheda con questo profilo, o un altro programma, quindi l’inoltro non si è aperto. Può usare una porta libera per questa sessione.",
+  "fwd.takenTitle": {
+    "one": "La porta locale {port} è già in uso",
+    "other": "Le porte locali {port} sono già in uso"
+  },
   "fwd.title": "Inoltro delle porte",
+  "fwd.useFree": "Usa una porta libera",
   "prefs.fwdAdd": "Aggiungi inoltro",
   "prefs.fwdHint": "Inoltro delle porte: quando un ssh avviato in questo profilo si connette, ogni porta del server elencata qui è raggiungibile su questo computer a 127.0.0.1, attraverso la stessa connessione ssh. Lascia vuota la porta locale perché LordOS ne scelga una libera. Si chiudono con la connessione.",
   "prefs.sec.ssh": "SSH",
