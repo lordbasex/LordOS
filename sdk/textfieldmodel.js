@@ -119,3 +119,58 @@ export function editKey(s, e, rtl = false) {
   }
   return null;
 }
+
+// ---- undo and redo (0.8.8.8): a history of { value, pos, anchor } states, the one before each step.
+//   newHistory()                     → an empty history
+//   record(h, before, after, step, now) → h after an edit (or a move) from before to after; step 'type' (a character) and
+//                                      'delete' (Backspace or Delete of one) join the step in progress while they go on
+//                                      from where it left the caret, within a second, and typing doesn't start a new
+//                                      word; anything else ('paste', 'cut', 'clear', 'external', …) is a step of its
+//                                      own, and a caret that only moved ('move') ends the step in progress
+//   undo(h, cur) / redo(h, cur)      → { h, s }: the history and the state to show, or null with nothing to undo or redo
+//   historyKey(e)                    → 'undo' (Ctrl/⌘+Z), 'redo' (Ctrl/⌘+Shift+Z, Ctrl+Y) or null
+//   lineAt(value, pos)               → [from, to) of the line at pos, without its line break (a triple click)
+const STEPS = 200;                    // the oldest steps are forgotten past this many
+const PAUSE = 1000;                   // ms without typing that end a step
+const snap = (s) => ({ value: s.value || '', pos: clampPos(s.value, s.pos), anchor: s.anchor == null ? null : s.anchor });
+export const newHistory = () => ({ done: [], undone: [], last: null });
+export const canUndo = (h) => !!h && h.done.length > 0;
+export const canRedo = (h) => !!h && h.undone.length > 0;
+
+export function record(h, before, after, step, now = 0) {
+  if ((before.value || '') === (after.value || '')) return h.last ? { ...h, last: null } : h;
+  const l = h.last;
+  const c = cps(after.value);
+  const startsWord = step === 'type' && kind(c[after.pos - 1]) === 1 && kind(c[after.pos - 2]) !== 1;
+  const joins = l && l.step === step && (step === 'type' || step === 'delete') && !selRange(before)
+    && now - l.time < PAUSE && clampPos(before.value, before.pos) === l.pos && !startsWord;
+  const last = { step, time: now, pos: clampPos(after.value, after.pos) };
+  if (joins) return { done: h.done, undone: [], last };
+  return { done: [...h.done, snap(before)].slice(-STEPS), undone: [], last };
+}
+
+export function undo(h, cur) {
+  if (!canUndo(h)) return null;
+  return { h: { done: h.done.slice(0, -1), undone: [...h.undone, snap(cur)], last: null }, s: h.done[h.done.length - 1] };
+}
+export function redo(h, cur) {
+  if (!canRedo(h)) return null;
+  return { h: { done: [...h.done, snap(cur)], undone: h.undone.slice(0, -1), last: null }, s: h.undone[h.undone.length - 1] };
+}
+
+export function historyKey(e) {
+  if (!e || !(e.ctrl || e.meta) || e.alt) return null;
+  const b = (e.base || e.key || '').toLowerCase();             // with Shift the key comes as 'Z'
+  if (b === 'z') return e.shift ? 'redo' : 'undo';
+  if (b === 'y' && e.ctrl && !e.shift) return 'redo';
+  return null;
+}
+
+export function lineAt(value, pos) {
+  const c = cps(value);
+  const at = clampPos(value, pos);
+  let a = at, b = at;
+  while (a > 0 && c[a - 1] !== '\n') a--;
+  while (b < c.length && c[b] !== '\n') b++;
+  return [a, b];
+}
