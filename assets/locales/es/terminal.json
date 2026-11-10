@@ -500,5 +500,15 @@
   "fwd.title": "Redirección de puertos",
   "prefs.fwdAdd": "Agregar redirección",
   "prefs.fwdHint": "Redirección de puertos: cuando se conecta un ssh iniciado en este perfil, cada puerto del servidor que figura acá queda disponible en esta computadora en 127.0.0.1, por la misma conexión ssh. Dejá vacío el puerto local para que LordOS elija uno libre. Se cierran con la conexión.",
-  "prefs.sec.ssh": "SSH"
+  "prefs.sec.ssh": "SSH",
+  "drop.uploading": "Subiendo al servidor",
+  "drop.done": "Subido al servidor",
+  "drop.hide": "Ocultar",
+  "drop.failed": "Falló",
+  "drop.cancelled": "Cancelado",
+  "drop.cant": "No se puede subir: {why}",
+  "drop.renamed": {
+    "one": "Ya estaba en el servidor: se guardó como “{name}”",
+    "other": "{count} nombres ya estaban en el servidor: se guardaron con nombres nuevos, como “{name}”"
+  }
 }

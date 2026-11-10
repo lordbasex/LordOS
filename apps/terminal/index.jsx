@@ -19,6 +19,7 @@ import { ProfilesWindow } from './ProfilesWindow.jsx';
 import { FilesMode } from './FilesMode.jsx';
 import { ForwardsPanel } from './ForwardsPanel.jsx';
 import { startForwards } from './forwards.js';
+import { DropHud } from './DropHud.jsx';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
 import { clipboardImage, pathsText, isClaude } from './paths.js';
@@ -469,6 +470,7 @@ function TerminalWindow() {
       )}
       {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} wid={wid} />}
       <Overlays t={t} wid={wid} w={w} sid={sid} tab={tab} />
+      {tab && <DropHud t={t} sids={leaves(tab.root)} />}
       {w.fwdPanel && <ForwardsPanel t={t} wid={wid} w={w} panel={w.fwdPanel} />}
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] }} />}
     </View>

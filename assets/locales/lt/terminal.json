@@ -508,5 +508,16 @@
   "fwd.title": "Prievadų peradresavimas",
   "prefs.fwdAdd": "Pridėti peradresavimą",
   "prefs.fwdHint": "Prievadų peradresavimas: kai prisijungia šiame profilyje paleistas ssh, kiekvienas čia nurodytas serverio prievadas tampa pasiekiamas šiame kompiuteryje adresu 127.0.0.1 per tą patį ssh ryšį. Palikite vietinį prievadą tuščią, ir LordOS parinks laisvą. Jie užsidaro kartu su ryšiu.",
-  "prefs.sec.ssh": "SSH"
+  "prefs.sec.ssh": "SSH",
+  "drop.uploading": "Įkeliama į serverį",
+  "drop.done": "Įkelta į serverį",
+  "drop.hide": "Slėpti",
+  "drop.failed": "Nepavyko",
+  "drop.cancelled": "Atšaukta",
+  "drop.cant": "Nepavyko įkelti: {why}",
+  "drop.renamed": {
+    "one": "Jau buvo serveryje: išsaugota kaip „{name}“",
+    "few": "{count} pavadinimai jau buvo serveryje: išsaugota naujais pavadinimais, pvz., „{name}“",
+    "other": "{count} pavadinimų jau buvo serveryje: išsaugota naujais pavadinimais, pvz., „{name}“"
+  }
 }

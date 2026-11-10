@@ -412,11 +412,15 @@ term.onAny((sid, type, data) => {
   const isActive = f && f.w.active === f.tab.id && f.tab.focus === sid && wm.focused() === wid;
   switch (type) {
     case 'title': patchMeta(sid, { title: data }); break;
-    case 'cwd':
+    case 'cwd': {
+      // while ssh runs, the directory is the server's (its shell reports OSC 7): kept apart, for uploads and Files mode
+      const i = term.info(sid);
+      if (i && i.busy && i.process === 'ssh') { patchMeta(sid, { remoteCwd: data }); break; }
       patchMeta(sid, { cwd: data });
       if (data) recentDirs.set((d) => [data, ...d.filter((x) => x !== data)].slice(0, 25));
       if (data) autoProfile(sid, data, wid);
       break;
+    }
     case 'run':
       patchMeta(sid, { lastCmd: data });
       commandHistory.set((h) => [{ cmd: data, time: Date.now(), sid }, ...h.filter((x) => x.cmd !== data)].slice(0, 200));

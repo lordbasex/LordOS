@@ -5,9 +5,10 @@
 // permissions and owner, information, delete, the sudo password.
 import { View, Text, TextInput, Button, ScrollView, ContextMenu, Hairline, fs, clipboard, term, useStore, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
+import { meta } from './state.js';
 import {
   request, transfer, cancel, clearFinished, transfers, closedConns, samplesOf, speedSeries,
-  permString, permBoxes, boxesPerm, octal, parseOctal, parentOf, joinPath, baseName, goodName, sortEntries, visible, size, rate, freeName,
+  permString, permBoxes, boxesPerm, octal, parseOctal, parentOf, joinPath, baseName, goodName, sortEntries, visible, size, rate, freeName, fromLocal, errCode,
 } from './sftp.js';
 
 const UP = '#ff9f0a', DOWN = '#0a84ff';
@@ -20,11 +21,9 @@ const when = (m) => {
   const now = new Date();
   return d.toDateString() === now.toDateString() ? d.toTimeString().slice(0, 5) : d.toISOString().slice(0, 10);
 };
-const errText = (e) => tr(`terminal.files.err.${['nossh', 'closed', 'nofile', 'denied', 'exists', 'root', 'busy', 'protected', 'unsupported', 'timeout'].includes(e?.code) ? e.code : 'failed'}`);
+const errText = (e) => tr(`terminal.files.err.${errCode(e)}`);
 
 // a local entry as the remote ones look (lord.fs gives the mode as octal text, "0755")
-const fromLocal = (e) => ({ name: e.name, kind: e.dir ? 'd' : e.link ? 'l' : '-', size: e.size || 0, mtime: e.mtime || 0,
-  perm: (typeof e.mode === 'string' ? parseInt(e.mode, 8) || 0 : e.mode || 0) & 0o7777, owner: e.user, group: e.group });
 
 export function FilesMode({ t, wid, sid, startLocal }) {
   const [conn, setConn] = useState(null);
@@ -77,7 +76,13 @@ export function FilesMode({ t, wid, sid, startLocal }) {
   const loadLocal = async (p = lpath) => {
     try { setLlist((await fs.listAsync(p)).map(fromLocal)); setLpath(p); } catch (e) { setMsg(tr('terminal.files.err.denied')); }
   };
-  useEffect(() => { if (conn) loadRemote('.', conn); }, [conn]);
+  // the first listing: where the remote shell is (its OSC 7, meta.remoteCwd), else the remote home; a new connection
+  // (As Root) stays in the folder shown
+  useEffect(() => {
+    if (!conn) return;
+    const start = rpath !== '.' ? rpath : meta.get()[sid]?.remoteCwd || '.';
+    request('list', { conn, path: start }).then((r) => { setRpath(r.path); setRlist(r.entries || []); }, () => loadRemote('.', conn));
+  }, [conn]);
   useEffect(() => { loadLocal(lpath); }, []);
   // refreshed by itself: the server every 5 s while shown (and after our own operations), this computer every 3 s
   useEffect(() => {

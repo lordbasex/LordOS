@@ -13,6 +13,8 @@ import { terminalSettings, getProfile, profileName } from './profiles.js';
 import { programLabel, isClaude } from './paths.js';
 import { ForwardsBadge } from './ForwardsPanel.jsx';
 import { forwards } from './forwards.js';
+import { drops } from './dropupload.js';
+import { transfers } from './sftp.js';
 import {
   sessionFile, snapshotFile, settingsFile, parseSession, parseStatus, parseSettings, isConnected, level, bar, tokens, parseScreenStatus, matchSession,
   fitSegments, LEVEL_COLORS,
@@ -205,6 +207,9 @@ export function StatusBar({ t, sid, wid }) {
   const m = useStore(meta, (x) => x[sid]) || {};
   const claude = useClaude(info, sid);
   const fwd = useStore(forwards, (x) => (x[sid]?.items || []).filter((it) => it.state === 'open').length);
+  const myJobs = useStore(drops, (x) => x[sid]?.jobs);
+  const up = (useStore(transfers) || []).filter((j) => (myJobs || []).includes(j.job) && j.state === 'run');
+  const upPct = up.length ? Math.round(100 * up.reduce((a, j) => a + (j.done || 0), 0) / Math.max(1, up.reduce((a, j) => a + (j.total || 0), 0))) : 0;
   useEffect(() => {
     setInfo(term.info(sid));
     const id = setInterval(() => setInfo(term.info(sid)), 1000);
@@ -228,6 +233,7 @@ export function StatusBar({ t, sid, wid }) {
       <View style={{ flex: 1 }} />
       {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
       {info.altScreen && <Item label={tr('terminal.status.altScreen')} />}
+      {up.length > 0 && <Item label={`↑ ${up.length} · ${upPct} %`} color="#ff9f0a" onClick={() => drops.set((d) => (d[sid] ? { ...d, [sid]: { ...d[sid], hidden: false } } : d))} />}
       {fwd > 0 && <Item label={`⇄ ${fwd}`} onClick={(e) => { const w = getWin(wid); if (w) patchWin(wid, () => ({ fwdPanel: { tabId: w.active, x: e.x } })); }} />}
       <FilesSwitch t={t} wid={wid} info={info} />
       <Item label={`${info.cols}×${info.rows}`} />

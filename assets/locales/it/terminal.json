@@ -500,5 +500,15 @@
   "fwd.title": "Inoltro delle porte",
   "prefs.fwdAdd": "Aggiungi inoltro",
   "prefs.fwdHint": "Inoltro delle porte: quando un ssh avviato in questo profilo si connette, ogni porta del server elencata qui è raggiungibile su questo computer a 127.0.0.1, attraverso la stessa connessione ssh. Lascia vuota la porta locale perché LordOS ne scelga una libera. Si chiudono con la connessione.",
-  "prefs.sec.ssh": "SSH"
+  "prefs.sec.ssh": "SSH",
+  "drop.uploading": "Caricamento sul server",
+  "drop.done": "Caricato sul server",
+  "drop.hide": "Nascondi",
+  "drop.failed": "Non riuscito",
+  "drop.cancelled": "Annullato",
+  "drop.cant": "Impossibile caricare: {why}",
+  "drop.renamed": {
+    "one": "Già presente sul server: salvato come “{name}”",
+    "other": "{count} nomi erano già sul server: salvati con nomi nuovi, come “{name}”"
+  }
 }

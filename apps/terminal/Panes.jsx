@@ -8,6 +8,7 @@ import { SecretBar } from './SecretBar.jsx';
 import { SaveBar } from './SaveBar.jsx';
 import { ClaudeBar } from './ClaudeBar.jsx';
 import { pathsText } from './paths.js';
+import { dropUpload } from './dropupload.js';
 
 export const paneNodes = new Map();     // sid → instancia del nodo (para navegar entre paneles)
 
@@ -94,7 +95,7 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
   const badge = m.badge;
   const transparent = (p.transparency || 0) > 0;
   return (
-    <View onFilesDrop={(paths) => { focusPane(wid, sid); term.paste(sid, pathsText(paths)); }}
+    <View onFilesDrop={(paths, how) => { focusPane(wid, sid); if (!how?.alt && dropUpload(wid, sid, paths)) return; term.paste(sid, pathsText(paths)); }}
       style={{ flex: 1, overflow: 'hidden', backdropFilter: transparent && p.blur ? 'blur(14px)' : undefined }}>
       <Terminal ref={(inst) => { ref.current = inst; if (inst) paneNodes.set(sid, inst); else paneNodes.delete(sid); }}
         session={sid} onMouseDown={onMouseDown}

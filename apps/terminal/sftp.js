@@ -27,6 +27,11 @@ export const parentOf = (p) => { const s = String(p || '/').replace(/\/+$/, '');
 export const joinPath = (dir, name) => `${String(dir || '/').replace(/\/+$/, '')}/${name}`;
 export const baseName = (p) => String(p || '').replace(/\/+$/, '').split('/').pop() || '/';
 // a name typed by the user for a new folder or a rename: one path segment
+// a lord.fs entry (list or stat) as a listing row: the mode comes as octal text
+export const fromLocal = (e) => ({ name: e.name, kind: e.dir ? 'd' : e.link ? 'l' : '-', size: e.size || 0, mtime: e.mtime || 0,
+  perm: (typeof e.mode === 'string' ? parseInt(e.mode, 8) || 0 : e.mode || 0) & 0o7777, owner: e.user, group: e.group });
+// the error code a message exists for (terminal.files.err.*)
+export const errCode = (e) => (['nossh', 'closed', 'nofile', 'denied', 'exists', 'root', 'busy', 'protected', 'unsupported', 'timeout'].includes(e?.code) ? e.code : 'failed');
 export const goodName = (n) => { const s = String(n || ''); return !!s.trim() && s.length <= 255 && !/[/\x00-\x1f\x7f]/.test(s) && s !== '.' && s !== '..'; };
 
 // folders first, then by name (numbers in order), hidden ones last only when shown

@@ -3,9 +3,10 @@
 // sessions connects, through that ssh's control socket (lord.sftp's forward: MUX_C_OPEN_FWD in server/src/term/sftpc.c,
 // no program run), and end with the connection. The tab's badge lists them and adds more for this connection only.
 import { createStore, term, clipboard, openUrl, notify, t as T } from '@lordos/sdk';
-import { meta } from './state.js';
+import { meta, patchMeta } from './state.js';
 import { getProfile } from './profiles.js';
 import { request } from './sftp.js';
+import { sshEnded } from './dropupload.js';
 
 // sid → { pid, items: [{ key, host, port, want, local, state: 'wait'|'opening'|'open'|'error', error, own }] }
 // pid is the connected ssh's: a new one (the user ran ssh again) starts the list again.
@@ -75,8 +76,12 @@ function tick() {
     const info = term.info(Number(sid));
     const pid = info && info.busy && info.process === 'ssh' ? info.fgPid : 0;
     const cur = all[sid];
-    if (pid && cur?.pid !== pid) connected(Number(sid), pid);
-    else if (!pid && cur) forwards.set((x) => { const n = { ...x }; delete n[sid]; return n; });   // the master took its forwards with it
+    if (pid && cur?.pid !== pid) { if (cur) sshEnded(Number(sid)); patchMeta(Number(sid), { remoteCwd: '' }); connected(Number(sid), pid); }
+    else if (!pid && cur) {                                    // the master took its forwards (and the drop connection) with it
+      forwards.set((x) => { const n = { ...x }; delete n[sid]; return n; });
+      sshEnded(Number(sid));
+      patchMeta(Number(sid), { remoteCwd: '' });
+    }
   }
   for (const sid of Object.keys(all)) if (!meta.get()[sid]) forwards.set((x) => { const n = { ...x }; delete n[sid]; return n; });
 }

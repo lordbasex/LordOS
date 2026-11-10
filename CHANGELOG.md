@@ -22,6 +22,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   when they open, with Open in Browser for a web port. Checked on a real session against a private sshd: a page
   served on the server's 18080 came through the automatic local port, a forward added from the list opened, Close
   and `exit` removed their listeners.
+- **Terminal: drop files on an ssh pane to upload them.** A file or a folder dragged from Files onto a pane that runs
+  ssh goes up to the server over the same connection, in the background: nothing is typed and the terminal is never
+  blocked. A floating notice lists each file with an orange bar, Cancel and Hide, and the footer shows `↑ n · %` while
+  it is hidden. A name already on the server is never replaced: the upload takes a free name (`notes (2).txt`) and a
+  notice says so. ⌥ while dropping pastes the paths, as before, and a pane without ssh still gets the paths.
+- **Terminal: the remote shell's directory.** While ssh runs, the directory its shell reports (OSC 7) is the
+  server's: it no longer replaces the local one (used by new tabs and the footer). Drops go there and Files mode opens
+  there instead of the remote home. Checked on a real session: a folder with a subfolder, a 3 MB file (identical
+  after the upload) and a name that was already there (kept, the copy saved as `notes (2).txt`) went to the reported
+  `~/srvdir`, and Files mode opened in it.
 
 ### Fixed
 

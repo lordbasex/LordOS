@@ -363,8 +363,9 @@ RemoteHost (user@host, for automatic profile switching) and define
 
 Status: Files mode is built (lord-sftp, term/sftpc.c, lord.sftp, apps/terminal/FilesMode.jsx and sftp.js; tested end to
 end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Port forwards are built (0.8.8.8,
-apps/terminal/forwards.js and ForwardsPanel.jsx, checked on a real session against a private sshd). Still in
-development: uploading by dropping on the terminal, downloading from `ls` output, Open With and Edit for remote files.
+apps/terminal/forwards.js and ForwardsPanel.jsx, checked on a real session against a private sshd), and so are uploads
+by dropping on the terminal (dropupload.js, DropHud.jsx) and the remote shell's directory (0.8.8.8). Still in
+development: downloading from `ls` output, Open With and Edit for remote files.
 
 Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
 **the tab's own ssh session**: one login, no second connection, no password or code asked again.
@@ -415,9 +416,14 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 
 ### In terminal mode
 
-- **Upload by dropping:** a file dropped from Files onto the terminal goes up to the remote shell's directory in the
-  background. A floating notice (it can be hidden) and the footer show the progress. Nothing is typed into the
-  terminal and it is never blocked. Dropping with ⌥ pastes the path as text, as before.
+- **Upload by dropping:** a file or folder dropped from Files onto a pane that runs ssh goes up to the remote shell's
+  directory in the background (the remote home when the remote shell doesn't report one). A floating notice (it can
+  be hidden) and the footer show the progress. Nothing is typed into the terminal and it is never blocked. A name
+  already on the server is never replaced: the copy takes a free name (`notes (2).txt`) and a notice says so. Dropping
+  with ⌥ pastes the path as text, as before, and so does a drop on a pane without ssh.
+- **The remote shell's directory:** an OSC 7 that arrives while the pane runs ssh is the server's directory. It is
+  kept apart from the local one (new tabs and the footer keep the local directory), and it is where drops go and
+  where Files mode opens. It is forgotten when the ssh ends. Servers report it only when their shell does OSC 7.
 - **Download from the output:** file names printed by `ls`/`ls -la` are underlined under the pointer. ❖ + click
   downloads to Downloads, with the same notice in blue. A right click offers Download To…, Quick Look, Open With…,
   Edit, Info, Copy Remote Path and Show in Files mode. The name is resolved against the remote directory from OSC 7.
