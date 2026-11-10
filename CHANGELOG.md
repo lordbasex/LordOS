@@ -10,6 +10,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Apps whose name starts with a lowercase letter are in their place in the Apps grid (GitHub #64).** "go-link Desk"
+  showed after every other app, below the last row, so it looked missing from the grid while Files → Applications
+  listed it. The grid, Lord Classic's start menu and Files sorted names with `localeCompare`, and in the desktop's
+  JavaScript engine that compares character codes and ignores its options (`sensitivity`, `numeric`): every name
+  starting with a capital came first. They now share `compareNames` (`sdk/collate.js`, from Cloud's account order,
+  #86): case and accents aside, numbers by value. Checked in a session and on a Raspberry Pi 5 with go-link Desk
+  1.8.0 installed from its own `.deb`. Test: `files_model_test.mjs`, with the engine's comparison swapped in.
+
 ## [0.8.8.7-beta] - 2026-11-09
 
 ### Added

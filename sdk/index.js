@@ -30,6 +30,7 @@ export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe,
 export { ime, useIme } from './ime.js';
 export { wayland } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, APP_CATEGORIES, appCategory } from './apps.js';
+export { compareNames } from './collate.js';
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
 import { startOsk } from './osk.js';

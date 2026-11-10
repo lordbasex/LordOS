@@ -14,6 +14,7 @@ import { createStore, useStore } from './store.js';
 import { locale, appName } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
+import { compareNames } from './collate.js';
 import { listApps, wm, windows, appRegistry, getApp as registryApp } from './windows.js';
 
 const DESKTOP = 'desktop:';
@@ -66,7 +67,7 @@ export function useLauncherApps() {
   useStore(locale);
   useStore(appRegistry);
   const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  return [...own, ...lin].sort((a, b) => a.name.localeCompare(b.name));
+  return [...own, ...lin].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
 }
 
 // Main freedesktop standard categories (the same as AppStream's in the Store).

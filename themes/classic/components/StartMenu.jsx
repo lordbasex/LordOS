@@ -7,7 +7,7 @@
 import {
   View, Text, ScrollView, SearchField, addListener, t as tr, tOptional, useSettings, settings, useStore,
   useLauncherApps, launchApp, dockIdOf, dock, beginDockDrag, dockDragJustEnded, session, wm, useSystemInfo, searchEverything,
-  mainDisplay, direction,
+  mainDisplay, direction, compareNames,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
@@ -109,7 +109,7 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
   const pins = startPins(s, list).map((id) => byId.get(id)).filter(Boolean);
   const recent = (s.dockRecentApps || []).map((x) => list.find((a) => dockIdOf(a) === dockIdOf(x))).filter(Boolean)
     .filter((a, i, arr) => arr.indexOf(a) === i).slice(0, 6);
-  const sorted = useMemo(() => [...list].sort((a, b) => a.name.localeCompare(b.name)), [list]);
+  const sorted = useMemo(() => [...list].sort((a, b) => compareNames(a.name, b.name)), [list]);
   const sections = useMemo(() => (query.trim() ? searchEverything.results(query, list) : []), [query, list]);
   const flat = sections.flatMap((x) => x.items.map((it) => ({ it, sec: x.id })));
 

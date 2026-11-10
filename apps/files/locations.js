@@ -1,7 +1,7 @@
 // locations.js — what each sidebar place shows and how it is sorted and grouped.
 //   { type: 'dir', path } | { type: 'recent' } | { type: 'apps' } | { type: 'trash' }
 //   | { type: 'tag', color } | { type: 'search', root, query }
-import { fs } from '@lordos/sdk';
+import { fs, compareNames } from '@lordos/sdk';
 import { kindOf } from './kinds.js';
 import { tagStore, tagsOf, commentOf } from './ops.js';
 import { archiveEntries } from './archive.js';
@@ -39,7 +39,7 @@ export function loadEntries(loc, { hidden, launcherApps }) {
   }
 }
 
-const collator = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+const collator = compareNames;   // QuickJS ignores localeCompare's options (sdk/collate.js)
 
 // statOf: what a column needs beyond the listing (views.jsx); foldersFirst: Files → Settings
 export function sortEntries(list, sort, { statOf, foldersFirst = true } = {}) {

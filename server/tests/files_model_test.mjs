@@ -2,6 +2,7 @@
 import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith, clampZoom, zoomWith, zoomOf, iconMetrics, listMetrics, iconColumns, ZOOM_MIN, ZOOM_MAX } from '../../apps/files/viewprefs.js';
 import { parseAddress, sshLine, remoteUri, hostAddress, looksDav, davOf } from '../../apps/files/connect.js';
 import { offersWay, foundHosts, connectedEntries, shareKind, netGroups, withHostName, shareParts } from '../../apps/files/netplaces.js';
+import { compareNames } from '../../sdk/collate.js';
 import { normalColumns, visible, toggleColumn, moveColumn, resize, dropBefore, totalWidth, MIN_W, MAX_W } from '../../apps/files/columns.js';
 
 let ok = 0;
@@ -121,4 +122,16 @@ for (let i = 0; i < 70; i++) names = withHostName(names, `10.0.1.${i}`, `pc${i}`
 eq('share: at most 64 names, the oldest go', [Object.keys(names).length, names['192.168.1.25'], names['10.0.1.69']], [64, undefined, 'pc69']);
 names = withHostName(names, '10.0.1.10', 'renamed');
 eq('share: a new name for an address replaces the old one', [names['10.0.1.10'], Object.keys(names).pop()], ['renamed', '10.0.1.10']);
+// #64: names in order as QuickJS sorts them. Its localeCompare compares code points and ignores the options, so it is
+// swapped in here (node's own would hide the bug): "go-link Desk" among the G's, accents and numbers by value.
+{
+  const own = String.prototype.localeCompare;
+  String.prototype.localeCompare = function (b) { const a = String(this); return a < b ? -1 : a > b ? 1 : 0; };
+  const sorted = (l) => [...l].sort(compareNames);
+  eq('collate: lowercase among the rest (#64)', sorted(['Voice Recorder', 'go-link Desk', 'Help', 'Google Chrome', 'Files']),
+    ['Files', 'go-link Desk', 'Google Chrome', 'Help', 'Voice Recorder']);
+  eq('collate: accents and case aside, numbers by value', sorted(['Drive 10', 'écran', 'Drive 2', 'Ecrire', 'abc']),
+    ['abc', 'Drive 2', 'Drive 10', 'écran', 'Ecrire']);
+  String.prototype.localeCompare = own;
+}
 console.log(`files-model-test: ${ok} ok`);
