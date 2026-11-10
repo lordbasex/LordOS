@@ -55,7 +55,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | 🟨 built, to check on the VM |
 | Global shortcuts portal | push-to-talk, OBS | M | ⬜ |
 | Drop onto isolated apps (Mail attaches, Calendar and Contacts import): the dropped files granted to that app as the file chooser grants them | Mail can't take a dragged file | M | ⛔ a new broker message and grant |
-| Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | ⬜ |
+| Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | 🟨 built, to check on the VM (both ways for Wayland apps; files an X11 app copies arrive as text) |
 
 ## Phase 4 — the SDK's keyboard and widgets
 

@@ -126,6 +126,6 @@ export function InfoPanel({ e, onClose, openers, extra }) {
 // The SDK's ConfirmDialog over the window: Escape cancels, Enter does the default, and only while this
 // window is focused. destructive (an action that can't be undone or deletes elsewhere): the OK button
 // is red and Enter cancels.
-export function Confirm({ text, detail, okLabel, onOk, onCancel, destructive }) {
-  return <ConfirmDialog title={text} detail={detail} okLabel={okLabel} cancelLabel={tr('files.cancel')} onOk={onOk} onCancel={onCancel} destructive={destructive} />;
+export function Confirm({ text, detail, okLabel, onOk, onCancel, destructive, cautious }) {
+  return <ConfirmDialog title={text} detail={detail} okLabel={okLabel} cancelLabel={tr('files.cancel')} onOk={onOk} onCancel={onCancel} destructive={destructive} cautious={cautious} />;
 }

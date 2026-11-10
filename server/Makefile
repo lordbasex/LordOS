@@ -332,7 +332,7 @@ build/xdgact-test: tests/xdgact_test.c src/wl/xdgact.c src/wl/xdgact.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xdgact_test.c src/wl/xdgact.c
 	./$@ || { rm -f $@; exit 1; }
-# file paths as text/uri-list and back, for drag and drop with Linux apps (src/wl/urilist.c)
+# file lists as text/uri-list and gnome-copied-files and back, for the clipboard and drag and drop with Linux apps (src/wl/urilist.c)
 test: build/urilist-test
 build/urilist-test: tests/urilist_test.c src/wl/urilist.c src/wl/urilist.h
 	@mkdir -p build
@@ -652,6 +652,10 @@ build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 # (tests/dnd_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dnd-client, then press twice in its window)
 build/dnd-client: tests/dnd_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dnd_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Files on the clipboard: an app's text/uri-list and gnome-copied-files, checked and offered back
+# (tests/clipfiles_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/clipfiles-client)
+build/clipfiles-client: tests/clipfiles_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/clipfiles_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 
 # Clipboard and primary-selection offers bound to their selection (tests/xwayland/clip_offers.sh, docs/WAYLAND.md)
 build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)

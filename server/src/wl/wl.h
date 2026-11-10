@@ -117,6 +117,12 @@ int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lord
 /* rich text: the HTML that goes with the clipboard's current text (NULL if none); set it right after the text */
 const char *wl_clip_html(size_t *len);
 void        wl_clip_set_html(const char *html, size_t n);
+/* files: the paths that go with the clipboard's current text (a urilist.h plist, NULL if none). own: Files
+ * put them there (cut is never set for another app's). Set them right after their text (the paths). */
+const char *wl_clip_files(size_t *len, int *count, int *cut, int *own);
+char       *wl_clip_files_as(int fmt, size_t *len);      /* malloc'd, in a urilist.h format, or NULL */
+const char *wl_clip_files_from(void);                   /* the app that copied them ("" if Files, unknown or none) */
+int         wl_clip_set_files(const char *list, size_t len, int count, int cut);
 
 /* Drag and drop from LordOS's Files (lord.wayland.dragFiles): while its drag is over a Linux window the
  * compositor offers these paths (each one already checked: absolute, existing, no NUL or newline) as

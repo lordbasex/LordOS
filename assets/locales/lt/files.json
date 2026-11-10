@@ -249,6 +249,13 @@
   "confirm.noExtension": "jokio",
   "confirm.extensionDetail": "Failas gali būti atidarytas kita programa arba visai neatsidaryti.",
   "confirm.extensionOk": "Pakeisti",
+  "confirm.pasteFrom": {
+    "one": "Įklijuoti {count} elementą iš {app}?",
+    "few": "Įklijuoti {count} elementus iš {app}?",
+    "other": "Įklijuoti {count} elementų iš {app}?"
+  },
+  "confirm.pasteAnotherApp": "kitos programos",
+  "confirm.pasteMore": "ir dar {count}",
   "net.pickShare": "Pasirinkite aplanką, prie kurio jungtis.",
   "net.badLogin": "Šis naudotojas arba slaptažodis nepriimtas.",
   "net.noGuest": "Šis kompiuteris nepriima svečių.",

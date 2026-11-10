@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon (in development, see "Drag and drop") |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon (in development, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -172,6 +172,26 @@ There's a single one for the whole session:
   apps receive from it any format it offers (up to 32).
 - **Images.** If what was copied is only an image (`image/png`), LordOS stores it: it stays
   available after the source app is closed and shows up in the history.
+- **Files.** Copy or Cut in Files puts the paths on the clipboard as `text/uri-list` (`file://`
+  URIs, percent-encoded, CRLF), `x-special/gnome-copied-files` (`copy` or `cut`, then the URIs, LF)
+  and plain text (one path per line), so a Linux file manager pastes the files and an editor the
+  paths. The other way, when a Linux app copies files, the compositor reads its `text/uri-list` (or
+  its gnome list) beside its text and keeps only this machine's files: `file://` URIs with an empty
+  or `localhost` host, decoded to an absolute UTF-8 path without NUL or line breaks; a list of more
+  than 65536 files, other hosts and other schemes are left out (`src/wl/urilist.c`,
+  `build/urilist-test`). Because pasting them copies real files, the list is kept only from an app
+  outside a sandbox: never from an isolated LordOS app (the broker knows its pid) nor from a Flatpak
+  app (its `/proc/<pid>/root/.flatpak-info` exists; looked up with `openat` on that root, without
+  following links; a root that can't be looked at counts as sandboxed), whose list isn't even read.
+  And only when the selection has no text, or its text names exactly those paths (one per line, as
+  paths or as `file://` URIs, same order), so what the person sees as the clipboard's text is what gets
+  copied (`uril_accept`). Otherwise the copy is text only. Paste in Files then asks first, naming the
+  app (its `app_id` or window title) and the first five files, with Enter on Cancel. Files copies them
+  with `lord.fs.copy` and its checks; another
+  app's cut is pasted as a copy, only Files moves its own cut. The list stays valid while the text it
+  came with is the clipboard's, is offered again in both formats after that app closes, and goes to
+  X11 apps too. JS only ever hands a list of paths (`lord.clipboard.setFiles`), never other data.
+  `build/clipfiles-client` checks it inside a session.
 - **No blocking.** Large copies (up to 16 MB) are sent in chunks, without a slow-reading app
   stalling the server.
 
@@ -231,7 +251,8 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
 - **From Files to a Linux app.** When a Files drag starts, Files hands its paths to lord-server
   (`lord.wayland.dragFiles`). Only paths are accepted: absolute, existing, without a NUL or a newline, at most
   256. While the drag is over a Linux window, the compositor is the source: it offers `text/uri-list`
-  (`file://` URIs, percent-encoded, CRLF separated) and `text/plain` (the paths, one per line), and writes
+  (`file://` URIs, percent-encoded, CRLF separated) and `text/plain` (the paths, one per line), encoded as
+  Files' copy to the clipboard is (`uril_encode`), and writes
   them itself to the app's pipe, non-blocking and from the event loop. Files' rule for the action stays: it
   moves, and ⌥ copies, unless the app prefers another. The ghost shows the + once the app agreed. Nothing is
   run or read for the app: it opens the files itself.
@@ -240,9 +261,11 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   Files claims it if a folder of its window is under the pointer (`lord.wayland.takeDrop`). Only the UI's
   handling of that very release may claim it (`DropGate` in `src/wl/dndgate.c`): right after it, a drop
   nobody claimed is cancelled and its list is never asked for. A claimed list is read (at most 1 MB,
-  non-blocking, within 5 seconds, or the drop is cancelled), its local `file://` paths (an empty host or
-  `localhost`; `%00`, newlines and other hosts are dropped) are copied into that folder, and the app gets
-  `dnd_finished`. A drop with no local path in it is cancelled too.
+  non-blocking, within 5 seconds, or the drop is cancelled; a longer list is cancelled whole, never cut
+  short) with the same reader as a file list on the clipboard (`uril_parse`): its local `file://` paths (an
+  empty host or `localhost`, decoded to an absolute UTF-8 path; `%00`, line breaks, a query or a fragment,
+  other hosts and other schemes are dropped) are copied into that folder, and the app gets `dnd_finished`.
+  A drop with no local path in it, or with more than 256, is cancelled too.
 - **Sandboxed apps hand LordOS no files.** The drag of an isolated LordOS app (`lord-server --app`) or of a
   sandboxed Linux app (Flatpak: its root, `/proc/<pid>/root` looked at once when it connects, holds
   `.flatpak-info`) may name files the app itself can't reach, so it is never offered to LordOS: over LordOS
@@ -251,7 +274,8 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
 - **Not yet:** X11 apps (Xwayland) take no drop and can't start one: that needs an XDND bridge in `xwm.c`.
   Isolated LordOS apps take no drop either: that needs a grant of its own (`DESKTOP-PARITY.md`). Touch drags
   are not supported.
-- **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry),
+- **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry,
+  shared with the clipboard's file lists),
   `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), and
   `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
@@ -589,7 +613,10 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   Terminal and the history (with the X app's class as its source) see it.
 - **LordOS → X11.** LordOS's selection is put in X **only while an X window has the keyboard** and
   only if it's newer than what an X app copied; when the keyboard goes to a LordOS or Wayland
-  window, the window manager gives the selection up. Large pastes go in `INCR` chunks.
+  window, the window manager gives the selection up. Large pastes go in `INCR` chunks. Files copied
+  in Files are also offered as `text/uri-list` and `x-special/gnome-copied-files`; files an X app
+  copies arrive as their text only (the window manager reads one text target; an X client's sandbox
+  can't be told, so its file list is never read).
 - **Secrets never go to X.** What Passwords (or a password field) copies is marked sensitive and is
   not offered to X11 apps at all: in X, the pasted text is written to a window property any X client
   can read.
