@@ -4,6 +4,7 @@
 // "user@host's password:" (ssh), "Password for 'https://user@host':" (git), "Enter passphrase for key '…'"
 // (no host). The session's own host (OSC 7 / OSC 1337, "user@host") when the prompt names none: a
 // password asked inside an ssh session is most likely that machine's.
+import { compareNames } from '../../sdk/collate.js';
 export function secretHost(prompt, sessionHost) {
   const p = String(prompt || '');
   let m = /([A-Za-z0-9._-]+)@([A-Za-z0-9.-]+)'s password/.exec(p);
@@ -40,7 +41,7 @@ export function rankEntries(entries, host) {
   return (entries || [])
     .filter((e) => e && !e.trash && LOGIN_CATS.includes(e.cat))
     .map((e) => ({ id: e.id, title: e.title || '', sub: e.sub || '', match: entryMatches(e, host) }))
-    .sort((a, b) => (b.match - a.match) || a.title.localeCompare(b.title));
+    .sort((a, b) => (b.match - a.match) || compareNames(a.title, b.title));
 }
 
 // "Save to Passwords?" (the "save" event: { token, kind, program, host, user, port }): not offered when Passwords

@@ -4,6 +4,7 @@
 // background) and stores what it read in ~/.cache/lordos/music.json (by path, size and date), so
 // next time nothing that did not change is read again.
 import { fs, media, userDirs, createStore } from '@lordos/sdk';
+import { compareNames } from '../../sdk/collate.js';
 
 export const AUDIO = /\.(mp3|ogg|oga|opus|flac|wav|m4a|aac|wma|aif|aiff|ape|mka)$/i;
 export const VIDEO = /\.(mp4|mkv|webm|avi|mov|m4v|wmv|flv|mpg|mpeg|ogv|ts|3gp)$/i;
@@ -88,8 +89,8 @@ export function albumsOf(tracks) {
     map.get(k).tracks.push(t);
   }
   const list = [...map.values()];
-  for (const a of list) a.tracks.sort((x, y) => (x.track - y.track) || x.title.localeCompare(y.title));
-  return list.sort((a, b) => a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album));
+  for (const a of list) a.tracks.sort((x, y) => (x.track - y.track) || compareNames(x.title, y.title));
+  return list.sort((a, b) => compareNames(a.artist, b.artist) || compareNames(a.album, b.album));
 }
 
 export function artistsOf(tracks) {
@@ -99,7 +100,7 @@ export function artistsOf(tracks) {
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(t);
   }
-  return [...map.entries()].map(([name, list]) => ({ name, tracks: list })).sort((a, b) => a.name.localeCompare(b.name));
+  return [...map.entries()].map(([name, list]) => ({ name, tracks: list })).sort((a, b) => compareNames(a.name, b.name));
 }
 
 // .srt subtitles: [{ start, end, text }] in ms.

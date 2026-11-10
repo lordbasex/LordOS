@@ -5,6 +5,7 @@ import { View, Image, ScrollView, ConfirmDialog, admin, cleaner, packages, t as 
 import { useMemo, useState } from 'react';
 import { Label, Glass, GlassButton, Check, Enter, PagedList, SelectAll, usePal } from './ui.jsx';
 import { allIds } from './sections.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 const pkgReady = () => { try { return lord.pkg.available(); } catch (e) { return false; } };
 
@@ -15,7 +16,7 @@ function listApps() {
     if (p.app && !p.essential && p.name !== 'lordos') out.push({ key: `deb:${p.name}`, name: p.app.name || p.name, icon: p.app.icon, detail: p.name, size: p.installedSize, pkg: p.name });
   }
   for (const a of packages.list().filter((x) => !x.packaged)) out.push({ key: `lpk:${a.id}`, name: a.name, icon: null, detail: a.id, size: 0, lpk: a.id });
-  return out.sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
+  return out.sort((a, b) => b.size - a.size || compareNames(a.name, b.name));
 }
 
 function Row({ app, onRemove, canRemove }) {

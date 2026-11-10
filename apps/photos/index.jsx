@@ -13,6 +13,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { keptPlaces, inPlaces } from './places.js';
+import { compareNames } from '../../sdk/collate.js';
 
 const APP = 'photos';
 const handledNonce = new Map();      // «Open with» already handled, per window
@@ -422,7 +423,7 @@ export default function Photos() {
     handledNonce.set(win.id, win.args.nonce);
     const out = [];
     listImages(dirOf(p), 0, out);
-    out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    out.sort((a, b) => compareNames(a.name, b.name));
     const i = Math.max(0, out.findIndex((x) => x.path === p));
     setViewer({ list: out.length ? out : [{ path: p, name: baseName(p) }], index: i });
   }, [win.args?.nonce]);

@@ -2,6 +2,7 @@
 // lists, what a path's crumbs are, and what Enter and the primary button do.
 // node server/tests/filepicker_model_test.mjs
 import { sortAccounts } from './cloudmodel.js';
+import { compareNames } from './collate.js';
 
 // a disk that goes away over the network would hold the interface: the dialog lists local disks only
 const NETWORK_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone', 'fuse.sshfs'];
@@ -51,7 +52,7 @@ export function pathCrumbs(path, home) {
 // The top bar shows the first crumb and the last ones; a null stands for what is left out.
 export const fitCrumbs = (crumbs, room = 5) => (crumbs.length <= room ? crumbs : [crumbs[0], null, ...crumbs.slice(2 - room)]);
 
-const collate = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+const collate = compareNames;
 
 // Folders first and names as Files sorts them. sort: { by: 'name' | 'date' | 'size', desc }.
 export function sortRows(list, sort) {

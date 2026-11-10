@@ -18,6 +18,7 @@ import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { openFileWithApps } from './sysopen.js';
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
+import { compareNames } from './collate.js';
 
 // the theme's own panels; a Linux window also runs under a built-in app id, but it is an app
 const isShellPanel = (w) => !!getApp(w.id)?.builtin && !String(w.id).startsWith('linux#');
@@ -97,7 +98,7 @@ export function runningApps() {
     if (!groups.has(key)) groups.set(key, { key, name: groupName(key, w), windows: [] });
     groups.get(key).windows.push(w);
   }
-  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...groups.values()].sort((a, b) => compareNames(a.name, b.name));
 }
 
 // Force Quit, without asking the app: a Linux app's or an isolated app's process gets SIGKILL from

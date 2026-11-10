@@ -8,6 +8,7 @@ import {
 } from '@lordos/sdk';
 import { useState } from 'react';
 import { GroupBox, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 // Apps that can notify: the ones that already did, LordOS apps that use notifications and packages
 // that declare the permission.
@@ -73,7 +74,7 @@ export function NotificationsSettings() {
     }
     const app = getApp(id);
     return app ? { id, name: appName(app), app } : null;
-  }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  }).filter(Boolean).sort((a, b) => compareNames(a.name, b.name));
   const fmt = (m) => { const d = new Date(); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   return (
     <Stack>

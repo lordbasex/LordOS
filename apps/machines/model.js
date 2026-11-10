@@ -5,6 +5,7 @@
 // lord-vm's states and reasons (server/src/vm/vmproto.h, VS_* and VR_*) → what the app shows. `tone`: 'run' (green),
 // 'pause' (amber), 'off' (gray), 'busy' (accent), 'bad' (red). The text key is under `machines.state.*`, and the
 // reason, when it's worth saying, under `machines.why.*`.
+import { compareNames } from '../../sdk/collate.js';
 const BAD_REASONS = ['qemu-failed', 'qemu-signal', 'out-of-memory', 'start-failed', 'guest-panic', 'supervisor-lost', 'forced', 'resume-failed'];
 export function stateView(state, reason) {
   const r = reason || 'none';
@@ -295,7 +296,7 @@ export function filterMachines(list, { query, show } = {}) {
 // in order: by name, running first, last used first (the card picture is written while it runs), or the most disk first;
 // ties by name
 export function sortMachines(list, sort) {
-  const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  const byName = (a, b) => compareNames(a.name || '', b.name || '');
   const rank = (m) => { const v = stateView(m.state, m.reason); return v.key === 'running' ? 0 : v.active ? 1 : m.suspended ? 2 : 3; };
   const key = {
     state: (a, b) => rank(a) - rank(b),
@@ -398,10 +399,10 @@ export function storageRows(st) {
     seen.add(m.id);
     const b = m.base ? bases.find((x) => x.path === m.base) : null;
     rows.push({ key: m.dir, name: m.name, level, size: m.total, frees: m.frees, machine: { ...m, savedBytes: m.state }, baseBytes: b?.bytes || 0, baseUsers: b ? b.users + b.trash : 0 });
-    for (const k of (kids.get(m.id) || []).sort((a, z) => a.name.localeCompare(z.name))) add(k, level + 1, seen);
+    for (const k of (kids.get(m.id) || []).sort((a, z) => compareNames(a.name, z.name))) add(k, level + 1, seen);
   };
   const seen = new Set();
-  for (const m of tops.sort((a, z) => a.name.localeCompare(z.name))) add(m, 0, seen);
+  for (const m of tops.sort((a, z) => compareNames(a.name, z.name))) add(m, 0, seen);
   for (const b of bases) {
     const names = ms.filter((m) => m.base === b.path).map((m) => m.name);
     rows.push({ key: b.path, base: true, path: b.path, size: b.bytes, users: b.users, trash: b.trash, names, level: 0 });

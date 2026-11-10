@@ -12,6 +12,7 @@ import { reconfigureAll } from './state.js';
 import { DEFAULT_BINDINGS, ACTION_IDS, actionLabel, bindings, comboLabel, keyCapture, hint } from './keys.js';
 import { importIterm } from './iterm.js';
 import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConfig } from './config.js';
+import { compareNames } from '../../sdk/collate.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
@@ -134,7 +135,7 @@ function ComboButton({ t, combo, onChange, width = 120 }) {
   );
 }
 
-const ACTION_OPTIONS = () => ACTION_IDS.map((a) => [a, actionLabel(a)]).sort((a, b) => a[1].localeCompare(b[1]));
+const ACTION_OPTIONS = () => ACTION_IDS.map((a) => [a, actionLabel(a)]).sort((a, b) => compareNames(a[1], b[1]));
 const KIND = () => [['text', T('terminal.prefs.sec.text')], ['escape', 'Esc+'], ['hex', 'Hex'], ['ignore', T('terminal.prefs.kind.ignore')], ['action', T('terminal.prefs.kind.action')]];
 const kindOf = (m) => (['text', 'escape', 'hex', 'ignore'].includes(m.action) ? m.action : 'action');
 

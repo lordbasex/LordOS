@@ -8,6 +8,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLOCKS } from './blocks.js';
+import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
   return (
@@ -36,7 +37,7 @@ function loadFonts(rescan) {
     g.mono ||= f.mono; g.color ||= f.color; g.user ||= isUser(f.path);
   }
   for (const g of fams.values()) g.styles.sort((a, b) => (a.italic - b.italic) || (a.weight - b.weight));
-  return [...fams.values()].sort((a, b) => a.family.localeCompare(b.family));
+  return [...fams.values()].sort((a, b) => compareNames(a.family, b.family));
 }
 
 // A sample drawn by the helper

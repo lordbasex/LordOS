@@ -19,6 +19,7 @@ import { EntryView, EntryEditor, tagColor, copyMenuItems } from './Detail.jsx';
 import { SecurityView, CodesView } from './Security.jsx';
 import { GeneratorSheet } from './Generator.jsx';
 import { SettingsSheet, ImportSheet, ExportSheet, CategorySheet, TagSheet } from './Settings.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 // ---- the app icon: a padlock with three dots, our own ----
 
@@ -80,7 +81,7 @@ function Sidebar({ sel, onSel, issues, onNewCat, onEditCat, onEditTag }) {
   const live = st.entries.filter((e) => !e.trash);
   const [open, setOpen] = useState({});
   const count = (fn) => live.filter(fn).length;
-  const tags = [...new Set(live.flatMap((e) => e.tags || []))].sort((a, b) => a.localeCompare(b));
+  const tags = [...new Set(live.flatMap((e) => e.tags || []))].sort(compareNames);
   const childrenOf = (pid) => cats.filter((c) => (c.parent || '') === pid);
   const tree = (pid, depth) => childrenOf(pid).map((c) => {
     const n = count((e) => inCat(e.cat, c.id, cats));
@@ -273,7 +274,7 @@ export default function Passwords() {
     if (sel === 'login') { const qq = q.toLowerCase(); list = list.filter((e) => `${e.title} ${e.sub} ${e.url || ''}`.toLowerCase().includes(qq)); }
     else if (hits) list = list.filter((e) => hits.has(e.id));
   }
-  list = [...list].sort(sort === 'title' ? (a, b) => String(a.title).localeCompare(String(b.title)) : (a, b) => b.modified - a.modified);
+  list = [...list].sort(sort === 'title' ? (a, b) => compareNames(a.title, b.title) : (a, b) => b.modified - a.modified);
   const title = sel === 'all' ? t('passwords.side.all') : sel === 'fav' ? t('passwords.side.fav') : sel === 'archived' ? t('passwords.side.archived')
     : sel === 'trash' ? t('passwords.side.trash') : sel === 'login' ? t('passwords.side.login') : sel.startsWith('tag:') ? `#${sel.slice(4)}`
       : sel.startsWith('cat:') ? catName(cats.find((c) => c.id === sel.slice(4)) || builtinById(sel.slice(4))) : '';

@@ -9,6 +9,7 @@
 //   legacy: 'host:port' of a device saved before 0.8.8.4, whose remembered password is still under that key.
 // Cred = { id, user, domain, label } (label: an optional display name) — the password is only in the keyring (service rdesk://<id>/), never in settings.
 
+import { compareNames } from './collate.js';
 export const DEVICE = { id: '', proto: 'rdp', host: '', port: 0, name: '', cred: '', group: '', fav: false, last: 0, shot: 0,
   reconnect: true, admin: false, swap: false, res: 'auto', full: false, scale: 100, depth: 32, sound: 'here', folders: [], legacy: '' };
 export const SOUNDS = ['here', 'there', 'none'];
@@ -119,7 +120,7 @@ export function migrate(r0) {
 // ---- the list ----
 export function sortDevices(list, by = 'name') {
   const name = (d) => titleOf(d).toLowerCase();
-  return [...list].sort((a, b) => (by === 'last' ? (b.last || 0) - (a.last || 0) : 0) || name(a).localeCompare(name(b)) || a.id.localeCompare(b.id));
+  return [...list].sort((a, b) => (by === 'last' ? (b.last || 0) - (a.last || 0) : 0) || compareNames(name(a), name(b)) || a.id.localeCompare(b.id));
 }
 export function filterDevices(list, { query = '', kind = 'all', favorites = false, creds = [] } = {}) {
   const q = String(query).trim().toLowerCase();
@@ -128,7 +129,7 @@ export function filterDevices(list, { query = '', kind = 'all', favorites = fals
 }
 // the sections of the content area, in order: the default group first, then the others by name
 export function groupDevices(list, groups = []) {
-  const names = [...new Set([...groups, ...list.map((d) => d.group || '')].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const names = [...new Set([...groups, ...list.map((d) => d.group || '')].filter(Boolean))].sort(compareNames);
   return [['', list.filter((d) => !d.group)], ...names.map((g) => [g, list.filter((d) => d.group === g)])].filter(([g, l]) => l.length || (g && groups.includes(g)));
 }
 

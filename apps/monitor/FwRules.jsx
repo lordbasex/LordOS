@@ -16,6 +16,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { RuleSheet, destKind, RED, GREEN } from './RuleSheet.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 const { sortByPrecedence, isDefaultRule } = fwRule;
 
@@ -195,7 +196,7 @@ export function FirewallRulesPrivacy() {
   }, [focus]);
   if (!firewall.available()) return null;
   const withRules = firewall.ruleApps();
-  const ids = [...new Set([...withRules, ...extra])].sort((a, b) => appLabelOf(tr, apps, a).localeCompare(appLabelOf(tr, apps, b)));
+  const ids = [...new Set([...withRules, ...extra])].sort((a, b) => compareNames(appLabelOf(tr, apps, a), appLabelOf(tr, apps, b)));
   const toggle = (id) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const foot = (text) => <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, marginHorizontal: spacing.xs, textAlign: 'start' }}>{text}</Text>;
   return (

@@ -12,6 +12,7 @@
 //   `collapsed`) hide what hangs under them; their row says so (open: false) and carries the hidden
 //   folders (`hidden`) so the sidebar can still count their unread mail.
 
+import { compareNames } from '../../sdk/collate.js';
 const ci = (s) => s.toUpperCase();
 
 function inboxPrefixed(f) {
@@ -55,7 +56,7 @@ export function folderTree(folders, maxDepth = 8, collapsed = []) {
     }
     (parent ? parent.kids : roots).push(n);
   }
-  const byName = (a, b) => (a.f.display || a.f.name).localeCompare(b.f.display || b.f.name, undefined, { sensitivity: 'base', numeric: true });
+  const byName = (a, b) => compareNames(a.f.display || a.f.name, b.f.display || b.f.name);
   // visible: selectable, or a container with something visible under it
   const visible = (n) => !n.f.noselect || n.kids.some(visible);
   const out = [];

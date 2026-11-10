@@ -19,6 +19,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starting with a capital came first. They now share `compareNames` (`sdk/collate.js`, from Cloud's account order,
   #86): case and accents aside, numbers by value. Checked in a session and on a Raspberry Pi 5 with go-link Desk
   1.8.0 installed from its own `.deb`. Test: `files_model_test.mjs`, with the engine's comparison swapped in.
+- **Every list of names is in the same order.** The same comparison now sorts the rest of the lists people read:
+  Contacts and their groups, Passwords (titles and tags), Player (artists, albums, songs), Fonts, Disks, Photos and
+  its cloud places, Calendar (events and calendar groups), Mail's folders, Machines, Databases, the Firewall's apps,
+  the Network monitor, Remote Desk, Settings (themes, notifications, Bluetooth devices, languages), Help, the file
+  dialog, Cleaner, the Terminal (tags, actions, secrets), the installer and the Imager's countries. Lists sorted by
+  internal keys (hashes, ids, dates, paths) are unchanged.
 
 ## [0.8.8.7-beta] - 2026-11-09
 

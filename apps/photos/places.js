@@ -3,6 +3,7 @@
 // left out, so browsing Photos never waits for a provider.
 
 // accounts: cloudState's accounts → [{ path, account, label }], one per kept folder, by account and then path
+import { compareNames } from '../../sdk/collate.js';
 export function keptPlaces(accounts) {
   const out = [];
   for (const a of accounts || []) {
@@ -13,7 +14,7 @@ export function keptPlaces(accounts) {
     const top = kept.filter((p) => !kept.some((q) => q !== p && p.startsWith(`${q}/`))).sort((x, y) => x.localeCompare(y));
     for (const p of top) out.push({ path: p, account: name, label: p === a.mount ? name : `${name} · ${p.slice(a.mount.length + 1)}` });
   }
-  return out.sort((x, y) => x.account.localeCompare(y.account, undefined, { sensitivity: 'base' }) || x.path.localeCompare(y.path));
+  return out.sort((x, y) => compareNames(x.account, y.account) || x.path.localeCompare(y.path));
 }
 
 // a path inside one of the places

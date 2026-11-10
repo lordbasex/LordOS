@@ -19,6 +19,7 @@
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { fromGlibc, regionFromEnv } from './regionformat.js';
+import { compareNames } from './collate.js';
 
 export const FALLBACK = 'en';
 // The three languages LordOS lists first everywhere (Settings, the login screen, the Imager); the
@@ -87,7 +88,7 @@ export function languages() {
     metas.set(l.id, m);
     if (!out.some((x) => x.id === l.id)) out.push({ id: l.id, name: m.name || l.id, english: m.english || '', plural: m.plural, region: m.region, user: l.user, partial: m.partial === true });
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
+  return out.sort((a, b) => compareNames(a.name, b.name));
 }
 
 function meta(lang) {

@@ -2,6 +2,7 @@
 // They live in the Terminal's own file, ~/.config/lordos/terminal.json or the one the user chose (config.js).
 import { t } from '@lordos/sdk';
 import { termConfig, loadTermConfig, saveTermConfig } from './config.js';
+import { compareNames } from '../../sdk/collate.js';
 
 const ansi = (s) => s.split(' ').map((h) => `#${h}`);
 
@@ -141,7 +142,7 @@ export function newProfileId() {
 // Nombre visible: el perfil de fábrica se traduce (también el de ajustes viejos, "Predeterminado").
 // The profile menus (Shell → Profiles, the Dock's): profiles without a tag first, then one submenu per tag in name order,
 // a profile under each of its tags, as iTerm2 does. item(p) makes a profile's menu item.
-const tagCmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+const tagCmp = compareNames;
 export function profileMenu(profiles, item) {
   const tagsOf = (p) => (Array.isArray(p.tags) ? p.tags.filter((x) => typeof x === 'string' && x.trim()) : []);
   const loose = profiles.filter((p) => !tagsOf(p).length).map(item);

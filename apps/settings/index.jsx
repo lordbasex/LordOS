@@ -33,6 +33,7 @@ import { DateTimeSettings } from './DateTime.jsx';
 import { DefaultAppsSettings } from './DefaultApps.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
   const dark = '#3b3e46';
@@ -134,7 +135,7 @@ function StylePicker() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const order = (id) => (id === 'default' ? 0 : id === 'classic' ? 1 : 2);
-  const list = [...themes.list()].sort((a, b) => order(a.id) - order(b.id) || a.name.localeCompare(b.name));
+  const list = [...themes.list()].sort((a, b) => order(a.id) - order(b.id) || compareNames(a.name, b.name));
   if (!list.length) return null;
   const pick = (id) => {
     wm.open('settings', { args: { section: 'appearance' } });

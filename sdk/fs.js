@@ -5,12 +5,13 @@
 import { useEffect, useState } from 'react';
 import { codeError } from './errors.js';
 import { remoteOf } from './mountmodel.js';
+import { compareNames } from './collate.js';
 
 export const home = () => lord.fs.home();
 
 export function list(path, { hidden = false } = {}) {
   const entries = lord.fs.list(path).filter((e) => hidden || !e.name.startsWith('.'));
-  return entries.sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name));
+  return entries.sort((a, b) => (b.dir - a.dir) || compareNames(a.name, b.name));
 }
 
 export const join = (...parts) => parts.filter(Boolean).join('/').replace(/\/+/g, '/');

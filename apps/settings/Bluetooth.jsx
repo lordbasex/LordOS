@@ -8,6 +8,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { GroupBox, SettingRow, PageHeader, Note, Stack } from './ui.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 // Monochrome glyphs (the usual 🎧 🖱 📱 are color emoji on the system fonts).
 const GLYPHS = [[/headset|headphones/, '♪'], [/audio/, '♪'], [/keyboard/, '⌨'], [/mouse|tablet/, '◖'], [/gaming|joystick/, '✜'],
@@ -88,7 +89,7 @@ export function BluetoothSettings() {
       </Stack>
     );
   }
-  const mine = st.devices.filter((d) => d.paired).sort((x, y) => (y.connected - x.connected) || x.name.localeCompare(y.name));
+  const mine = st.devices.filter((d) => d.paired).sort((x, y) => (y.connected - x.connected) || compareNames(x.name, y.name));
   const near = nearbyDevices(st.devices);
   const togglePower = (on) => {
     setErr('');

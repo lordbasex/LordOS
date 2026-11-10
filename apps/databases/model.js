@@ -6,6 +6,7 @@
 // ---- identifiers and values ----
 
 // `name`, with a backtick inside doubled
+import { compareNames } from '../../sdk/collate.js';
 export const quoteId = (name) => `\`${String(name ?? '').replace(/`/g, '``')}\``;
 // `db`.`table` (just `table` without a database)
 export const qualified = (db, table) => (db ? `${quoteId(db)}.${quoteId(table)}` : quoteId(table));
@@ -316,7 +317,7 @@ export function parseTables(result) {
     if (name === null || name === undefined) continue;
     (/VIEW/i.test(String(r[1] || '')) ? views : tables).push(name);
   }
-  const by = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  const by = compareNames;
   return { tables: tables.sort(by), views: views.sort(by) };
 }
 

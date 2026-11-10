@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RED, Sheet, Popover, MenuList, Layers, useLoad } from './ui.jsx';
 import { Card, Editor, blankContact } from './card.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 // ---- icon: an address-book card with a person silhouette ----
 
@@ -65,7 +66,7 @@ export default function ContactsApp() {
   const [sheet, setSheet] = useState(null);                // { group } | { newGroup } | { pick: 'vcf' } | { confirm: contact } | { notice }
 
   const people = useMemo(() => all.filter((c) => c.kind !== 'group'), [all]);
-  const groups = useMemo(() => all.filter((c) => c.kind === 'group').sort((a, b) => contactName(a).localeCompare(contactName(b))), [all]);
+  const groups = useMemo(() => all.filter((c) => c.kind === 'group').sort((a, b) => compareNames(contactName(a), contactName(b))), [all]);
   const group = src.startsWith('group:') ? groups.find((g) => keyOf(g) === src.slice(6)) : null;
   const bookId = src.startsWith('book:') ? src.slice(5) : group ? group.book : null;
 
@@ -74,7 +75,7 @@ export default function ContactsApp() {
     if (group) { const m = new Set(group.members || []); l = l.filter((c) => c.book === group.book && m.has(c.uid)); }
     else if (bookId) l = l.filter((c) => c.book === bookId);
     l = l.filter((c) => matchesQuery(c, query.trim()));
-    return [...l].sort((a, b) => sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base' }));
+    return [...l].sort((a, b) => compareNames(sortKey(a), sortKey(b)));
   }, [people, group, bookId, query]);
 
   const selected = all.find((c) => keyOf(c) === cur) || null;

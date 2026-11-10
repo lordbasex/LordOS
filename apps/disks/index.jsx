@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DisksIcon, DriveGlyph, PartGlyph, fsColor } from './icons.jsx';
 import { DiskDialog } from './dialogs.jsx';
 import { HealthCard } from './health.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size }) { return <DisksIcon size={size} />; }
 
@@ -276,7 +277,7 @@ function Details({ disk, part, onDialog, autoCheck }) {
 export default function Disks() {
   const { t: tr } = useLocale();
   const [raw, reload] = useDisks();
-  const list = useMemo(() => [...raw].sort((a, b) => a.name.localeCompare(b.name)), [raw]);
+  const list = useMemo(() => [...raw].sort((a, b) => compareNames(a.name, b.name)), [raw]);
   const [sel, setSel] = useState({ disk: null, part: null });
   // "Open in Disks" from the Monitor or a notice: that disk selected
   const { args } = useAppWindow() || {};

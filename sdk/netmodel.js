@@ -20,6 +20,7 @@
 //   lordos:<name>  in its own scope (sec/netconn.h): the kernel enforces its rules
 //   system:<name>  an essential system service: shown, never blocked
 //   lordos:vpn     the VPN tunnels (their interfaces' counters): shown, managed in Settings → Network
+import { compareNames } from './collate.js';
 export const COMPONENTS = {
   'lordos:mail': { label: 'monitor.comp.mail', icon: 'mail', hint: 'monitor.comp.mailHint' },
   'lordos:store': { label: 'monitor.comp.store', icon: 'store', hint: 'monitor.comp.storeHint', warn: 'monitor.comp.storeWarn' },
@@ -47,7 +48,7 @@ export const connAppKey = (c) => c.cgApp || (c.self ? 'lordos' : c.app || c.exe 
 
 export function machinesLabel(base, ids, names = {}) {
   const list = [...new Set([...(ids || [])].map((id) => names?.[id]).filter((s) => typeof s === 'string' && s))];
-  list.sort((a, b) => a.localeCompare(b));
+  list.sort(compareNames);
   return list.length ? `${base} · ${list.join(', ')}` : base;
 }
 
@@ -278,9 +279,9 @@ export function groupFlows(flows, group = 'app') {
 
 const total = (n) => (n.rx || 0) + (n.tx || 0);
 const cmp = {
-  name: (a, b) => String(a.label).localeCompare(String(b.label)),
-  most: (a, b) => total(b) - total(a) || b.conns - a.conns || String(a.label).localeCompare(String(b.label)),
-  least: (a, b) => total(a) - total(b) || a.conns - b.conns || String(a.label).localeCompare(String(b.label)),
+  name: (a, b) => compareNames(a.label, b.label),
+  most: (a, b) => total(b) - total(a) || b.conns - a.conns || compareNames(a.label, b.label),
+  least: (a, b) => total(a) - total(b) || a.conns - b.conns || compareNames(a.label, b.label),
   recent: (a, b) => (b.last || 0) - (a.last || 0) || total(b) - total(a),
   conns: (a, b) => b.conns - a.conns || total(b) - total(a),
 };

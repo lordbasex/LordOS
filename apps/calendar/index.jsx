@@ -11,6 +11,7 @@ import {
   useLoad, useNow,
 } from './ui.jsx';
 import { EventSheet, CalendarSheet } from './editor.jsx';
+import { compareNames } from '../../sdk/collate.js';
 
 // ---- icon: a page with a red header strip and today's day number ----
 
@@ -52,7 +53,7 @@ function eventDays(ev) {
 function byDay(events) {
   const m = new Map();
   for (const ev of events) for (const d of eventDays(ev)) { const k = ymd(d); if (!m.has(k)) m.set(k, []); m.get(k).push(ev); }
-  for (const l of m.values()) l.sort((a, b) => (b.allDay - a.allDay) || a.start - b.start || String(a.title).localeCompare(String(b.title)));
+  for (const l of m.values()) l.sort((a, b) => (b.allDay - a.allDay) || a.start - b.start || compareNames(a.title, b.title));
   return m;
 }
 
@@ -216,7 +217,7 @@ function Sidebar({ cals, cursor, days, onPick, onNew, onEdit }) {
     if (!g) { g = { key, name: key ? c.acctName || key : t('calendar.onThisComputer'), list: [] }; groups.push(g); }
     g.list.push(c);
   }
-  groups.sort((a, b) => (a.key === '' ? -1 : b.key === '' ? 1 : a.name.localeCompare(b.name)));
+  groups.sort((a, b) => (a.key === '' ? -1 : b.key === '' ? 1 : compareNames(a.name, b.name)));
   const marks = useMemo(() => new Set(days.keys()), [days]);
   return (
     <View style={{ width: 216, backgroundColor: th.sidebarBg }}>

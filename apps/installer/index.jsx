@@ -10,6 +10,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
+import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
   return (
@@ -112,7 +113,7 @@ function Language() {
   // "United Kingdom · en_GB": found by the country's name too (#53)
   const regions = locales.filter((r) => r.startsWith(`${lang}_`))
     .map((r) => { const cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : ''; return [r, name ? `${name} · ${r}` : r]; })
-    .sort((a, b) => a[1].localeCompare(b[1]));
+    .sort((a, b) => compareNames(a[1], b[1]));
   return (
     <View>
       <Field label={tr('installer.language.language')}>

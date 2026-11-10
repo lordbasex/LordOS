@@ -11,6 +11,7 @@ import { COOLERS, LANGUAGES, ACCENTS, THEMES, WALLPAPERS, profilesFor, defaultPr
 import { Field, SwitchRow, Choice, Card, Group, Notice, PickList, Press, Badge } from './kit.jsx';
 import { CoolerArt, ThemeArt } from './art.jsx';
 import countries from '../data/countries.js';
+import { compareNames } from '../../../sdk/collate.js';
 
 export const TABS = ['general', 'user', 'wifi', 'remote', 'look', 'cooling', 'more'];
 
@@ -78,7 +79,7 @@ function General({ s }) {
   const layouts = platform.layouts().flatMap((l) => [[l.id, l.name], ...l.variants.map(([id, name]) => [`${l.id}(${id})`, name])]);
   const kbId = c.keyboard ? (c.variant ? `${c.keyboard}(${c.variant})` : c.keyboard) : '';
   const pickKb = (id) => { const m = /^([a-z]+)(?:\(([\w-]+)\))?$/.exec(id); if (m) setCfg({ keyboard: m[1], variant: m[2] || '' }); };
-  const cs = Object.keys(countries).map((k) => [k, `${tOptional(`countries.${k}`) || countries[k]} (${k})`]).sort((a, b) => a[1].localeCompare(b[1]));
+  const cs = Object.keys(countries).map((k) => [k, `${tOptional(`countries.${k}`) || countries[k]} (${k})`]).sort((a, b) => compareNames(a[1], b[1]));
   return (
     <View style={{ gap: spacing.xl }}>
       <Field id="host" label={tr('imager.general.hostname')} value={c.hostname} placeholder={v.suggestHostname(c.user.fullname || c.user.name)}

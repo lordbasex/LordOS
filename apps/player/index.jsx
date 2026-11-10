@@ -10,6 +10,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { library, scan, albumsOf, artistsOf, parseSrt, AUDIO, VIDEO } from './library.js';
+import { compareNames } from '../../sdk/collate.js';
 
 const APP = 'player';
 const useWindowNonce = new Map();      // last "Open with" handled, per window
@@ -484,7 +485,7 @@ export default function Player() {
   } else if (view === 'queue') {
     content = songList(queue, (q, i) => row(tracks.find((x) => x.path === q) || { path: q, title: baseName(q), artist: '', album: '' }, i, queue.map((x) => ({ path: x }))));
   } else {
-    content = songList(tracks.slice().sort((a, b) => a.title.localeCompare(b.title)), (x, i, list) => row(x, i, list));
+    content = songList(tracks.slice().sort((a, b) => compareNames(a.title, b.title)), (x, i, list) => row(x, i, list));
   }
   const titles = { songs: tr('player.songsTitle'), artists: sel || tr('player.artists'), albums: tr('player.albums'), videos: tr('player.videos'), queue: tr('player.queue') };
   const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue');

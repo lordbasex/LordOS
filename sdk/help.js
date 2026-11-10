@@ -26,6 +26,7 @@ import { locale, t } from './i18n.js';
 import { settings } from './settings.js';
 import { wm, getApp, isLiveSystem } from './windows.js';
 import { registerSpotlightSource } from './spotlight.js';
+import { compareNames } from './collate.js';
 
 const DEFAULT_LANG = 'en';
 const has = () => typeof lord.help !== 'undefined';
@@ -53,7 +54,7 @@ function rawList(lang) {
   return list;
 }
 
-const byOrder = (a, b) => (a.order || 0) - (b.order || 0) || a.title.localeCompare(b.title);
+const byOrder = (a, b) => (a.order || 0) - (b.order || 0) || compareNames(a.title, b.title);
 
 // English articles, replaced by the translated ones where they exist, plus the articles only the
 // interface language has.
