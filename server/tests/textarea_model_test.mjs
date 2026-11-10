@@ -1,5 +1,6 @@
 // The rows and the caret of a TextArea without a screen (sdk/textareamodel.js). node server/tests/textarea_model_test.mjs
 import { wrapRows, rowOf, areaKey, posAt, areaEdit } from '../../sdk/textareamodel.js';
+import { lineAt, newHistory, record, undo, redo, replaceSel } from '../../sdk/textfieldmodel.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -47,5 +48,27 @@ eq('shift+End selects to the row end', areaEdit({ value: T2, pos: 4, anchor: nul
 eq('Enter replaces the selection', areaEdit({ value: 'ab cd', pos: 3, anchor: 2 }, k('Enter'), wrapRows('ab cd', 1000, m), m), { value: 'ab\ncd', pos: 3, anchor: null });
 eq('typing keys over two lines deletes them', areaEdit({ value: T2, pos: 17, anchor: 0 }, k('Backspace'), R2, m), { value: '', pos: 0, anchor: null });
 eq('↑ without shift drops the selection', areaEdit({ value: T2, pos: 13, anchor: 2 }, k('ArrowUp'), R2, m).anchor, null);
+
+// a triple click selects the line, up to its line breaks, also when it wraps in several rows
+eq('triple click on the first line', lineAt(T2, 3), [0, 10]);
+eq('triple click on the last line', lineAt(T2, 12), [11, 17]);
+eq('triple click at the end of a line', lineAt(T2, 10), [0, 10]);
+eq('triple click on an empty line', lineAt('a\n\nb', 2), [2, 2]);
+eq('triple click on a wrapped line takes all its rows', lineAt('abcdefghij\nk', 7), [0, 10]);
+
+// undo and redo across lines: Enter and the letters after it are steps as words are
+{
+  let s = { value: '', pos: 0, anchor: null }, h = newHistory(), t = 0;
+  const press = (e, step) => { const n = areaEdit(s, e, wrapRows(s.value, 1000, m), m) || replaceSel(s, e.char); h = record(h, s, n, step, t += 100); s = n; };
+  for (const ch of 'ls') press(k(ch, { char: ch }), 'type');
+  press(k('Enter'), 'type');
+  for (const ch of 'pwd') press(k(ch, { char: ch }), 'type');
+  eq('two lines typed', s.value, 'ls\npwd');
+  const back = [];
+  for (let r = undo(h, s); r; r = undo(h, s)) { h = r.h; s = r.s; back.push(s.value); }
+  eq('undo goes back a line at a time', back, ['ls\n', '']);
+  const r = redo(h, s);
+  eq('redo brings the first line back', r.s.value, 'ls\n');
+}
 
 console.log(`textarea_model_test: ${ok} checks`);

@@ -608,13 +608,25 @@ static int free_port(void) {
     return port;
 }
 
+/* a fixed local port something already listens on (another tab's ssh with the same profile, or another program):
+ * tried with SO_REUSEADDR as ssh binds it, so only a socket bound there counts, not connections still closing */
+static int port_taken(int port) {
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0), on = 1;
+    if (fd < 0) return 0;
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK), .sin_port = htons((uint16_t)port) };
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof on);
+    int taken = bind(fd, (struct sockaddr *)&a, sizeof a) && errno == EADDRINUSE;
+    close(fd);
+    return taken;
+}
+
 typedef struct { int req, close; char path[108]; char host[256]; int port, local; } FwdJob;
 
 static void *fwd_thread(void *arg) {
     FwdJob *j = arg;
     Mux mux;
     int local = j->local ? j->local : free_port();
-    const char *fail = local <= 0 ? "unavailable" : NULL;
+    const char *fail = local <= 0 ? "unavailable" : j->local && !j->close && port_taken(local) ? "inuse" : NULL;
     char why[160] = "";
     if (!fail) {
         if (mux_connect(&mux, j->path, 5000)) fail = "nossh";

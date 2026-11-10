@@ -1,5 +1,9 @@
 {
   "attach": "Pridėti",
+  "drop.add": "Paleiskite, kad pridėtumėte {count} failą(-us) prie užrašo",
+  "drop.addNew": "Paleiskite, kad pridėtumėte {count} failą(-us) prie naujo užrašo",
+  "drop.none": "Aplankų negalima pridėti prie užrašo",
+  "drop.skipped": "Praleista aplankų: {count}",
   "cancel": "Atšaukti",
   "close": "Uždaryti",
   "delete": "Ištrinti",

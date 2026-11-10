@@ -1,7 +1,8 @@
 /* vt_dump.c — headless test of the emulator: reads bytes from stdin, feeds them through vt.c and
  * prints the grid as text. Usage:
  *   printf 'hola\033[31m rojo' | build/vt-dump 20 5 [cols2 rows2]
- * With cols2/rows2 it resizes at the end (tests reflow). */
+ * With cols2/rows2 it resizes at the end (tests reflow). A fifth argument is searched for, or "--lines" prints
+ * vt_screen_lines (each screen line after the absolute row it starts on). */
 #include "term/term.h"
 
 #include <locale.h>
@@ -64,7 +65,11 @@ int main(int argc, char **argv) {
     while ((n = fread(buf, 1, sizeof buf, stdin)) > 0) vt_write(&t, buf, n);
     dump(&t);
     if (argc > 4) { vt_resize(&t, atoi(argv[3]), atoi(argv[4])); dump(&t); }
-    if (argc > 5) { vt_search(&t, argv[5], 0); printf("search '%s': %d matches\n", argv[5], t.nmatches); }
+    if (argc > 5 && !strcmp(argv[5], "--lines")) {
+        char *l = vt_screen_lines(&t);
+        printf("lines:\n%s", l ? l : "");
+        free(l);
+    } else if (argc > 5) { vt_search(&t, argv[5], 0); printf("search '%s': %d matches\n", argv[5], t.nmatches); }
     vt_free(&t);
     return 0;
 }

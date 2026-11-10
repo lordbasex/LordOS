@@ -6,13 +6,17 @@ import { useTheme } from './theme.js';
 import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
-import { textDirection, direction } from './i18n.js';
+import { textDirection, direction, t as tr } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
-import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt } from './textfieldmodel.js';
+import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
-import { Layer } from './layers.js';
+import { Layer, Overlay, shellLayers } from './layers.js';
+import { ContextMenu } from './contextmenu.jsx';
+import { dialogStack } from './dialogkeys.js';
+import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
+import { dropSorter, dropCount } from './filedrop.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -333,12 +337,58 @@ export function pasteIntoFocused() {
   return true;
 }
 
+// ---- what TextInput and TextArea share: undo and redo, and the right-click menu
+
+// the step of the history (textfieldmodel.js) a key that edits makes: one character deleted joins the step in progress,
+// a selection deleted or a word (Ctrl or ⌥) is a step of its own
+const stepOf = (cur, e) => (selRange(cur) || e.ctrl || e.alt || e.meta ? 'clear' : e.key === 'Enter' ? 'type' : 'delete');
+
+// Undo, Redo, Cut, Copy, Paste, Delete and Select All: each sends the field's own key (send is its key handler), so the
+// menu does exactly what the keys do. A password field cuts and copies nothing.
+function fieldMenuItems(send, { hist, sel, secure, value }) {
+  const key = (base, more) => () => send({ ctrl: true, key: base, base, char: '', fromMenu: true, ...more });
+  return [
+    { label: tr('shell.textMenu.undo'), disabled: !canUndo(hist), onClick: key('z') },
+    { label: tr('shell.textMenu.redo'), disabled: !canRedo(hist), onClick: key('z', { shift: true }) },
+    '-',
+    { label: tr('shell.textMenu.cut'), disabled: !sel || secure, onClick: key('x') },
+    { label: tr('shell.textMenu.copy'), disabled: !sel || secure, onClick: key('c') },
+    { label: tr('shell.textMenu.paste'), onClick: key('v') },
+    { label: tr('shell.textMenu.delete'), disabled: !sel, onClick: () => send({ key: 'Delete', char: '', fromMenu: true }) },
+    '-',
+    { label: tr('shell.textMenu.selectAll'), disabled: !value, onClick: key('a') },
+  ];
+}
+
+// The menu at { x, y } of the field's box (anchor), above the window (layers.js). keepFocus: choosing an item leaves the
+// field focused. It stays inside the display (or, in an isolated app, the window) the field is on.
+function FieldMenu({ anchor, at, items, onClose }) {
+  const win = useContext(AppWindowContext);
+  let bounds;
+  try {
+    const r = lord.getLayout(anchor.current.id);
+    const host = !shellLayers() && win?.overlayHost ? lord.getLayout(win.overlayHost.id) : null;
+    const d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
+    bounds = { w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
+  } catch (e) { bounds = undefined; }
+  return (
+    <Overlay anchor={anchor}>
+      <View keepFocus style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
+        <ContextMenu x={at.x} y={at.y} items={items} onClose={onClose} bounds={bounds} />
+      </View>
+    </Overlay>
+  );
+}
+
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
 // secure: password field (shows •, does not go through the input method and cannot be copied).
 // selectAll: starts with all the text selected (the first key replaces it), as when renaming in Files.
 // Editing as in any text field (textfieldmodel.js): the caret moves with ←, →, Home, End and a click; a selection is made
 // with Shift and those keys, by dragging, with a double click (a word) or Ctrl/⌘+A, and typing, a paste or Backspace
 // replace it; Ctrl/⌘+C and X copy and cut it (never from a password field); Ctrl or ⌥ with ← → and Backspace go by word.
+// A triple click selects it all. Ctrl/⌘+Z undoes and Ctrl/⌘+Shift+Z (or Ctrl+Y) redoes: typing is one step until a pause,
+// a new word or a caret moved elsewhere; a paste, a cut, a deleted selection and a value changed from outside are steps
+// of their own. A right click opens Undo, Redo, Cut, Copy, Paste, Delete and Select All, and moves no caret.
 // The text is drawn in one piece with the caret and the selection over it, so placing the caret moves no letter; a
 // value longer than the field scrolls to keep the caret in sight. A value changed from outside puts the caret at the end.
 export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, size = 13, selectAll = false }) {
@@ -351,7 +401,20 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const textBox = useRef(null);
   const len = (v) => [...(v || '')].length;
   const at = useRef({ value, pos: len(value), anchor: selectAll && value ? 0 : null });    // caret and selection, for the value they were made in
-  if (at.current.value !== value) at.current = { value, pos: len(value), anchor: null };
+  const hist = useRef(newHistory(secure));  // undo and redo (textfieldmodel.js); none for a password field
+  hist.current = historyFor(hist.current, secure);   // a password field keeps no history; a change of secure drops it
+  // a value changed from outside: the caret goes to its end, and Undo brings the old one back
+  const adopt = (v) => {
+    if (at.current.value === v) return;
+    const next = { value: v, pos: len(v), anchor: null };
+    hist.current = record(hist.current, at.current, next, 'external', lord.now());
+    at.current = next;
+  };
+  adopt(value);
+  const box = useRef(null);
+  const [menu, setMenu] = useState(null);   // the right-click menu: { x, y } in the field's box
+  const menuOpen = useRef(false);
+  menuOpen.current = !!menu;
   const scroll = useRef(0);                 // how far the text is moved toward its start edge, to keep the caret in sight
   const pressing = useRef(false);           // a drag that selects
   const [, redraw] = useState(0);
@@ -383,28 +446,32 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     carets.set(token, caretRect);
     handlers.set(token, (e) => {
       const p = latest.current;
-      if (p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
+      if (e.key === 'Escape' && menuOpen.current) return;           // it closes the menu (contextmenu.jsx)
+      if (!e.fromMenu && p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
       if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
         const i = order.indexOf(token);
         setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
         return;
       }
-      if (at.current.value !== p.value) at.current = { value: p.value, pos: len(p.value), anchor: null };
+      adopt(p.value);
       // a value and its caret, drawn at once (a caret that only moved changes no value)
-      const put = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;
-      if (mod && e.base === 'v') { put(replaceSel(cur, lord.clipboard.get().replace(/\r?\n/g, ' '))); setBlink(true); return; }
+      const h = historyKey(e);
+      if (h) { const r = (h === 'undo' ? undo : redo)(hist.current, cur); if (r) { hist.current = r.h; show(r.s); } setBlink(true); return; }
+      if (mod && e.base === 'v') { put(replaceSel(cur, lord.clipboard.get().replace(/\r?\n/g, ' ')), 'paste'); setBlink(true); return; }
       if (mod && (e.base === 'c' || e.base === 'x')) {
         const txt = secureRef.current ? '' : selectedText(cur);
-        if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, '')); }
+        if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, ''), 'cut'); }
         return;
       }
       const k = editKey(cur, e, rtlOf(p.value));
-      if (k) put(k);
+      if (k) put(k, stepOf(cur, e));
       else if (e.key === 'Enter') p.onSubmit?.(p.value);
       else if (e.key === 'Escape') p.onCancel?.();
-      else if (e.char) put(replaceSel(cur, e.char));
+      else if (e.char) put(replaceSel(cur, e.char), 'type');
       setBlink(true);
     });
     order?.push(token);
@@ -441,11 +508,12 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     focusedNow = true;
     setFocus(token);
     if (!ev) return;
-    const v = value || '';
-    if (at.current.value !== value) at.current = { value, pos: len(v), anchor: null };
+    adopt(value);
+    if (ev.button) { redraw((n) => n + 1); return; }               // a right or middle click keeps the caret and the selection
     const pos = posAtX(ev.x);
     const cur = at.current;
     at.current = ev.shift ? { value, pos, anchor: cur.anchor != null ? cur.anchor : cur.pos } : { value, pos, anchor: pos };
+    hist.current = record(hist.current, cur, at.current, 'move');
     pressing.current = true;
     redraw((n) => n + 1);
     setBlink(true);
@@ -456,6 +524,16 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
     redraw((n) => n + 1);
+  };
+  const onClick = (ev) => {
+    if (!ev || ev.detail !== 3 || !value) return;                 // a triple click: the whole value (one line)
+    at.current = { value, pos: len(value), anchor: 0 };
+    pressing.current = false;
+    redraw((n) => n + 1);
+  };
+  const onMenu = (ev) => {
+    ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
   };
 
   const shown = secure ? '•'.repeat(len(value)) : value || '';
@@ -480,7 +558,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   // as wide as its text (or placeholder) when nothing gives it a width, as it was when the text was in the row
   const basis = Math.ceil(Math.max(fullW, placeholder && !value ? measure(placeholder) : 0)) + 3;
   return (
-    <View onMouseDown={onDown} onDoubleClick={onDouble}
+    <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',
@@ -507,6 +585,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
           </>
         )}
       </View>
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
+        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value })} /> : null}
     </View>
   );
 }
@@ -514,7 +594,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
 // Several lines of text (textareamodel.js): Enter starts a new line, long lines wrap at the field's width, the caret moves
 // with the arrows (↑ ↓ keep the column), Home, End and a click, and it selects and edits as a TextInput does (Shift with
 // the keys, a drag, a double click, Ctrl/⌘+A; typing or a paste replaces the selection; Ctrl/⌘+C, X). Each row is drawn
-// in one piece with the caret and the selection over it. A paste keeps its line breaks. Grows with its rows.
+// in one piece with the caret and the selection over it. A paste keeps its line breaks. Grows with its rows. A triple
+// click selects the line (up to its line breaks, not the row); Undo, Redo and the right-click menu work as in a TextInput.
 export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3 }) {
   const t = useTheme();
   const token = useRef({}).current;
@@ -526,7 +607,17 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const latest = useRef();
   const len = (v) => [...(v || '')].length;
   const at = useRef({ value, pos: len(value), anchor: null });
-  if (at.current.value !== value) at.current = { value, pos: len(value), anchor: null };
+  const hist = useRef(newHistory());
+  const adopt = (v) => {
+    if (at.current.value === v) return;
+    const next = { value: v, pos: len(v), anchor: null };
+    hist.current = record(hist.current, at.current, next, 'external', lord.now());
+    at.current = next;
+  };
+  adopt(value);
+  const [menu, setMenu] = useState(null);
+  const menuOpen = useRef(false);
+  menuOpen.current = !!menu;
   const pressing = useRef(false);
   const [, redraw] = useState(0);
   const order = useContext(FieldOrder);
@@ -556,25 +647,29 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     carets.set(token, caretRect);
     handlers.set(token, (e) => {
       const p = latest.current;
+      if (e.key === 'Escape' && menuOpen.current) return;
       if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
         const i = order.indexOf(token);
         setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
         return;
       }
-      if (at.current.value !== p.value) at.current = { value: p.value, pos: len(p.value), anchor: null };
-      const put = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      adopt(p.value);
+      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;
-      if (mod && e.base === 'v') { put(replaceSel(cur, lord.clipboard.get().replace(/\r\n?/g, '\n'))); setBlink(true); return; }
+      const h = historyKey(e);
+      if (h) { const r = (h === 'undo' ? undo : redo)(hist.current, cur); if (r) { hist.current = r.h; show(r.s); } setBlink(true); return; }
+      if (mod && e.base === 'v') { put(replaceSel(cur, lord.clipboard.get().replace(/\r\n?/g, '\n')), 'paste'); setBlink(true); return; }
       if (mod && (e.base === 'c' || e.base === 'x')) {
         const txt = selectedText(cur);
-        if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, '')); }
+        if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, ''), 'cut'); }
         return;
       }
       const r = areaEdit(cur, e, p.rows, measure);
-      if (r) put(r);
+      if (r) put(r, stepOf(cur, e));
       else if (e.key === 'Escape') { setFocus(null); p.onCancel?.(); }
-      else if (e.char && !e.ctrl && !e.meta) put(replaceSel(cur, e.char));
+      else if (e.char && !e.ctrl && !e.meta) put(replaceSel(cur, e.char), 'type');
       setBlink(true);
     });
     order?.push(token);
@@ -605,10 +700,12 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     focusedNow = true;
     setFocus(token);
     if (!ev) return;
-    if (at.current.value !== value) at.current = { value, pos: len(value), anchor: null };
+    adopt(value);
+    if (ev.button) { redraw((n) => n + 1); return; }               // a right or middle click keeps the caret and the selection
     const pos = posAtXY(ev.x, ev.y);
     const cur = at.current;
     at.current = ev.shift ? { value, pos, anchor: cur.anchor != null ? cur.anchor : cur.pos } : { value, pos, anchor: pos };
+    hist.current = record(hist.current, cur, at.current, 'move');
     pressing.current = true;
     redraw((n) => n + 1);
     setBlink(true);
@@ -620,6 +717,17 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     pressing.current = false;
     redraw((n) => n + 1);
   };
+  const onClick = (ev) => {
+    if (!ev || ev.detail !== 3 || !value) return;                 // a triple click: the line the caret is in
+    const [a, b] = lineAt(value, at.current.pos);
+    at.current = { value, pos: b, anchor: a };
+    pressing.current = false;
+    redraw((n) => n + 1);
+  };
+  const onMenu = (ev) => {
+    ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
+  };
 
   const chars = [...(value || '')];
   const pos = isFocused ? clampPos(value, at.current.pos) : chars.length;
@@ -627,7 +735,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const caretRow = rowOf(rows, pos);
   const textStyle = { position: 'absolute', left: 0, top: 0, fontSize: size, color: t.text, whiteSpace: 'nowrap', lineHeight: lineH };
   return (
-    <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble}
+    <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       style={[{ minHeight: minRows * lineH + 2 * pad, padding: pad, borderRadius: t.controlRadius, direction: 'ltr',
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
@@ -664,6 +772,8 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
           </View>
         );
       })}
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
+        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure: false, value })} /> : null}
     </View>
   );
 }
@@ -736,6 +846,44 @@ export function useWindowState(key, initial) {
   const set = useRef(null);
   if (!set.current) set.current = (x) => setV((prev) => { const n = typeof x === 'function' ? x(prev) : x; m.set(key, n); return n; });
   return [v, set.current];
+}
+
+// Files dragged from Files onto an app's window (apps/files: a View with onFilesDrop and onFilesOver). accepts(name)
+// and folders say what the app takes (sdk/filedrop.js); onDrop({ files, folders }, how) gets only those, how.alt
+// with ⌥ held. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
+// over the window now ({ files, folders, skipped, alt }) or null.
+export function useFilesDrop({ accepts, folders = false, onDrop }) {
+  const [over, setOver] = useState(null);
+  // a folder on a network mount is not asked about (its stat can wait on the provider): it counts as a file
+  const sorter = useRef(null);
+  if (!sorter.current) sorter.current = dropSorter({ accepts, folders, isDir: (p) => !fsIsRemote(p) && !!fsStat(p)?.dir });
+  const props = {
+    onFilesOver: (paths, how) => {
+      if (!paths) { setOver(null); return; }
+      const s = sorter.current(paths), alt = !!how?.alt;
+      setOver((o) => (o && o.sorted === s && o.alt === alt ? o : { ...s, sorted: s, alt }));
+    },
+    onFilesDrop: (paths, how) => {
+      setOver(null);
+      const s = sorter.current(paths);
+      if (dropCount(s)) onDrop({ files: s.files, folders: s.folders }, how || {});
+    },
+  };
+  return { over, props };
+}
+
+// The outline over the whole window while files are dragged over it: what letting go does (title) and, below it, what
+// is left out (note). Drawn last, so it is above the panes.
+export function FilesDropHint({ over, title, note }) {
+  const t = useTheme();
+  if (!over) return null;
+  return (
+    <View style={{ position: 'absolute', left: 8, top: 8, right: 8, bottom: 8, borderRadius: 10, pointerEvents: 'none', alignItems: 'center', justifyContent: 'center',
+      gap: 6, paddingHorizontal: 16, border: `2px dashed ${t.accent}`, backgroundColor: 'rgba(10,132,255,0.10)' }}>
+      <Text style={{ fontSize: 15, fontWeight: 700, color: t.text, textAlign: 'center' }}>{title}</Text>
+      {note ? <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'center' }}>{note}</Text> : null}
+    </View>
+  );
 }
 
 // The theme uses <AppHost id focused /> inside its window frame.
@@ -819,13 +967,14 @@ export function FloatingWindows() {
   );
 }
 
-// Keyboard for the app whose window is in front (and with no active TextInput).
+// Keyboard for the app whose window is in front (and with no active TextInput). While a
+// ConfirmDialog has the keys (in this window or the desktop's own) the app gets none.
 export function useKeyboard(handler) {
-  const { focused: active } = useAppWindow();
+  const { id, focused: active } = useAppWindow();
   const ref = useRef(handler);
   ref.current = handler;
   useEffect(() => {
     if (!active) return undefined;
-    return addListener('keydown', (e) => { if (!hasTextFocus()) ref.current(e); });
-  }, [active]);
+    return addListener('keydown', (e) => { if (!hasTextFocus() && !dialogStack.blocks(id, e)) ref.current(e); });
+  }, [active, id]);
 }

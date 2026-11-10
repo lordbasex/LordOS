@@ -1863,6 +1863,33 @@ char *vt_text_range(Term *t, long long from, long long to) {
     return s.s;
 }
 
+/* The screen's lines as "ABS\tTEXT\n", ABS the absolute number of the row each one starts on: a line wrapped onto
+ * several rows is one entry, and one that starts above the screen is given whole, from its first row (Terminal
+ * triggers tell a line printed again from one that only scrolled). */
+char *vt_screen_lines(Term *t) {
+    Str s = {0};
+    long long last = vt_first_abs(t) + vt_total_lines(t) - 1, a = last - t->rows + 1;
+    for (int k = 0; k < 1000; k++) {
+        Line *up = vt_abs_line(t, a - 1);
+        if (!up || !(up->flags & LINE_WRAPPED)) break;
+        a--;
+    }
+    while (a <= last) {
+        long long end = a;
+        for (Line *l; end < last && (l = vt_abs_line(t, end)) && (l->flags & LINE_WRAPPED);) end++;
+        char num[24];
+        str_put(&s, num, (size_t)snprintf(num, sizeof num, "%lld\t", a));
+        for (long long r = a; r <= end; r++) {
+            Line *l = vt_abs_line(t, r);
+            line_text(&s, l, 0, t->cols - 1, l && (l->flags & LINE_WRAPPED));
+        }
+        str_put(&s, "\n", 1);
+        a = end + 1;
+    }
+    if (!s.s) str_put(&s, "", 0);
+    return s.s;
+}
+
 /* Selects the output of the last finished command (between OSC 133;C and the next prompt). */
 int vt_select_last_output(Term *t) {
     long long first = vt_first_abs(t), a = vt_cursor_abs(t);

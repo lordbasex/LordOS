@@ -11,7 +11,7 @@
 //
 //   <FilePicker onPick={(path) => …} onClose={() => …} filter={/\.(png|jpe?g)$/i} title={t('…')} multiple />
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Image, addListener } from '@lordos/runtime';
+import { View, Text, Image, addListener, displayFor } from '@lordos/runtime';
 import { useTheme, ThemeContext, DEFAULT_TOKENS, shellTokens } from './theme.js';
 import { t, direction } from './i18n.js';
 import { Button, ScrollView, TextInput, takeTextFocus, releaseTextFocus, hasTextFocus } from './components.jsx';
@@ -27,6 +27,8 @@ import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCe
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
   imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
 import { cloudState } from './cloud.js';
+import { windows, wm, workAreaOf, onActiveDesktop } from './windows.js';
+import { overParent } from './dialogmodel.js';
 import { CloudGlyph } from './cloudui.jsx';
 
 const ROW_H = 24;
@@ -354,12 +356,17 @@ export function PortalFilePrompt() {
   const p = useStore(portalFile);
   // the system layer is outside the theme's ThemeProvider: the dialog takes the same tokens as Files
   const tokens = useStore(shellTokens);
+  // over the app's window when it said which one (xdg-foreign-v2: lord-server gives its surface)
+  const owner = useStore(windows, (ws) => (p?.parent ? ws.find((w) => w.id === `linux#${p.parent}` && !w.minimized && onActiveDesktop(w)) || null : null));
   if (!p) return null;
   const answer = (paths) => lord.portal.chosen(p.id, paths);
+  const a = owner ? workAreaOf(displayFor(owner)) : null;
+  const box = owner ? overParent(wm.frame(owner), Math.round(Math.min(920, a.w * 0.96)), Math.round(Math.min(620, a.h * 0.94)), a) : null;
   return (
     <ThemeContext.Provider value={tokens || DEFAULT_TOKENS}>
       <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
-        <View style={{ position: 'relative', width: 920, maxWidth: '96%', height: 620, maxHeight: '94%' }}>
+        <View style={box ? { position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }
+          : { position: 'relative', width: 920, maxWidth: '96%', height: 620, maxHeight: '94%' }}>
           <FilePicker key={p.id} modal mode={p.mode} multiple={p.multiple} title={p.title} name={p.name} accept={p.accept} start={p.folder}
             filter={portalFilter(p.patterns)} onClose={() => answer(null)} onPick={(x) => answer(Array.isArray(x) ? x : [x])} />
         </View>

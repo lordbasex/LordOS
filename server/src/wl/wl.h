@@ -36,6 +36,7 @@ int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app wit
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
 const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
+int  wl_focus_pid(void);                 /* the process of the app with the keyboard, 0 if none (ui/portal.c) */
 const char *wl_focus_primary(size_t *n);    /* the text the app with the keyboard selected (primary selection), or NULL */
 const char *wl_node_app(int node);      /* the isolated app whose window that node is, or NULL */
 
@@ -109,8 +110,12 @@ int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lord
 const char *wl_clip_html(size_t *len);
 void        wl_clip_set_html(const char *html, size_t n);
 
-/* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize,
- * minimize, fullscreen, unfullscreen. data is JSON. */
+/* xdg-foreign-v2: the window an app exported with that handle (a portal's "wayland:<handle>" parent),
+ * or 0 if no live window has it */
+int  wl_foreign_surface(const char *handle);
+
+/* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize, activate, attention,
+ * minimize, fullscreen, unfullscreen, parent (the window a dialog belongs to, and whether it is modal). data is JSON. */
 typedef void (*WlEventFn)(int id, const char *type, const char *json);
 void wl_events(WlEventFn fn);
 

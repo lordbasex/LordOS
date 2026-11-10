@@ -128,8 +128,9 @@ export { useDirectory } from './fs.js';
 export { ThemeProvider, useTheme, DEFAULT_TOKENS, solidOver } from './theme.js';
 export {
   Button, Toggle, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
-  AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState,
+  AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState, useFilesDrop, FilesDropHint,
 } from './components.jsx';
+export { sortDrop, dropCount } from './filedrop.js';
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
@@ -177,7 +178,7 @@ export {
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
-import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, startHardware } from './hardware.jsx';
+import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, startHardware } from './hardware.jsx';
 // Settings → Displays: numbering, Identify (a big number on each real display) and magnetic arrangement
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
 import { DisplayIdentify } from './displaysui.jsx';
@@ -324,7 +325,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, VoiceSavePrompt, DisplayConfirm),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, VoiceSavePrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';

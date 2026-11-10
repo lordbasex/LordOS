@@ -4,6 +4,7 @@
 import { createStore, wm, term, clipboard, windows as wmWindows, workArea, t as T } from '@lordos/sdk';
 import { getProfile, terminalSettings, saveTerminalSettings, toConfig, profileName } from './profiles.js';
 import { initialKeys } from './profilefields.js';
+import { screenSnapshot, freshLines } from './triggers.js';
 
 export const meta = createStore({});      // sid → { profile, title, cwd, process, busy, badge, bell, activity, flash, lastExit }
 export const wins = createStore({});      // wid → { tabs, active, ...paneles y diálogos }
@@ -375,18 +376,23 @@ export function setSessionProfile(sid, profileId) {
 
 // ---- eventos de las sesiones ----
 
-const triggerSeen = new Map();     // sid → Set de líneas ya evaluadas
+// sid → { main, alt }: the screen at the last look of each buffer (triggers.js screenSnapshot), so a line fires once
+// per time it is printed and not again when it scrolls or a full-screen program closes
+const triggerSeen = new Map();
 
 const hexColor = (h) => (/^#?[0-9a-fA-F]{6}$/.test(h || '') ? parseInt(h.replace('#', ''), 16) : -1);
 
 function runTriggers(sid, wid) {
   const p = getProfile(meta.get()[sid]?.profile);
   if (!p.triggers?.length) return;
-  const text = term.text(sid, 'screen') || '';
-  const seen = triggerSeen.get(sid) || new Set();
-  const now = new Set(text.split('\n').filter(Boolean));
-  for (const line of now) {
-    if (seen.has(line)) continue;
+  const info = term.info(sid);
+  const buf = info?.altScreen ? 'alt' : 'main';
+  const cur = screenSnapshot(term.text(sid, 'screenLines'), info);
+  const seen = triggerSeen.get(sid) || {};
+  const lines = freshLines(seen[buf], cur);
+  // a full-screen program's screen starts empty each time it opens
+  triggerSeen.set(sid, buf === 'alt' ? { ...seen, alt: cur } : { main: cur });
+  for (const line of lines) {
     for (const tr of p.triggers) {
       if (tr.enabled === false) continue;
       let re;
@@ -409,7 +415,6 @@ function runTriggers(sid, wid) {
       else if (tr.action === 'stop') break;
     }
   }
-  triggerSeen.set(sid, now);
 }
 
 term.onAny((sid, type, data) => {

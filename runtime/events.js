@@ -2,6 +2,8 @@
 // Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
 // onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe; onMouseDownCapture runs before them, outermost first,
 // and nothing inside can stop it (a window comes forward on any press in it, even one a sheet keeps to itself).
+// onClick and onDoubleClick carry detail: how many clicks in a row on the same node (1, 2, 3; a fourth starts over),
+// so a triple click (detail 3) can select a line; onDoubleClick still fires once, on the second.
 // keepFocus on a View: a press inside it is not a click elsewhere: the global 'pointerdown' listeners
 // don't hear it, so a text field keeps the focus and an open menu stays (the on-screen keyboard).
 import { DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority } from 'react-reconciler/constants';
@@ -59,7 +61,7 @@ function makeEvent(type, target, x, y, button, extra) {
 
 let hover = [];
 let down = null;
-let lastClick = { target: null, time: 0 };
+let lastClick = { target: null, time: 0, count: 0 };
 
 function run(p, fn) {
   priority = p;
@@ -102,12 +104,11 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
     down = null;
     if (button === 2) { dispatch(common, 'onContextMenu', makeEvent('contextmenu', target, x, y, button)); return; }
     if (button !== 0) return;
-    dispatch(common, 'onClick', makeEvent('click', target, x, y, button));
     const now = lord.now();
-    if (lastClick.target === target && now - lastClick.time < 450) {
-      dispatch(common, 'onDoubleClick', makeEvent('dblclick', target, x, y, button));
-      lastClick = { target: null, time: 0 };
-    } else lastClick = { target, time: now };
+    const count = lastClick.target === target && now - lastClick.time < 450 && lastClick.count < 3 ? lastClick.count + 1 : 1;
+    lastClick = { target, time: now, count };
+    dispatch(common, 'onClick', makeEvent('click', target, x, y, button, { detail: count }));
+    if (count === 2) dispatch(common, 'onDoubleClick', makeEvent('dblclick', target, x, y, button, { detail: count }));
   });
   else if (type === 'wheel') run(ContinuousEventPriority, () => {
     dispatch(chain, 'onWheel', makeEvent('wheel', target, x, y, 0, { deltaY: -button * 48, notches: button }));

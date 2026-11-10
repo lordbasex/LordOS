@@ -17,7 +17,11 @@
  * An app the owner restricted with "no access to your files" (Settings → Privacy, firewall id
  * desktop:<id>, sec/restrict.h) starts under Landlock (sandbox_apply_files): only its own config,
  * cache and data folders, the system read-only, /tmp and the runtime dir, plus the one file or
- * folder it was opened with. A restriction set while the app runs applies at its next launch. */
+ * folder it was opened with. A restriction set while the app runs applies at its next launch.
+ *
+ * Every launch carries an xdg-activation token (XDG_ACTIVATION_TOKEN, wl/xdgact.c): the new window, or
+ * the window of the copy already running that the new process hands the link or file to (a browser),
+ * comes to the front, because the person asked for it. */
 #include "apps.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
@@ -26,6 +30,7 @@
 #include "sec/restrict.h"
 #include "sec/sandbox.h"
 #include "fw/rules.h"
+#include "wl/xdgact.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -905,6 +910,9 @@ static int launch(const char *id, const char *file, const char *action) {
         }
     }
 
+    char token[XACT_TOKEN_LEN + 1] = "";
+    const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
+    if (tk) snprintf(token, sizeof token, "%s", tk);
     pid_t pid = fork();
     if (pid == 0) {
         /* orphaned grandchild: it does not remain a child of lord-server */
@@ -933,6 +941,7 @@ static int launch(const char *id, const char *file, const char *action) {
          * other's windows, input and selections (docs/PRIVACY.md, "X11 apps"); its private /tmp has no
          * X socket either */
         if (plan) unsetenv("DISPLAY");
+        if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         if (plan && (sandbox_files_isolate(&plan->cfg) ||
                      (plan->cfg.keep_home ? sandbox_apply_scope() : sandbox_apply_files(&plan->cfg)))) {
             static const char msg[] = "apps: could not apply the no-files restriction: not launched\n";

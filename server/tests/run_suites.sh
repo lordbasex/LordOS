@@ -93,6 +93,32 @@ h +|1234567|
    |語|
    ||
 EOF
+    # (the Terminal's triggers: each screen line after the absolute row it starts on, a wrapped one whole)
+    vt "vt-dump: screen lines with their rows" 'a\r\nerror\r\nabcdefghijkl\r\nerror\r\nb\r\nc' 5 4 5 4 --lines <<'EOF'
+--- 5x4 cursor 1,3 history 4 alt 0
+h  |a|
+h  |error|
+h +|abcde|
+h +|fghij|
+   |kl|
+   |error|
+   |b|
+   |c|
+--- 5x4 cursor 1,3 history 4 alt 0
+h  |a|
+h  |error|
+h +|abcde|
+h +|fghij|
+   |kl|
+   |error|
+   |b|
+   |c|
+lines:
+2	abcdefghijkl
+5	error
+6	b
+7	c
+EOF
 
     shape "shape-test: Inter kerning (GPOS)" ../assets/fonts/Inter-Regular.ttf ui latn 0 AVATAR <<'EOF'
 2@0,0|456@1273,0|2@2546,0|411@3785,0|2@4933,0|384@6346,0
@@ -142,6 +168,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
+    run "portal-check-test" build/portal-check-test
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
@@ -221,6 +248,9 @@ EOF
     # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)
     if have node; then run "desktop-model-test (sdk/desktopmodel.js)" node tests/desktop_model_test.mjs
     else skip "desktop-model-test" "node"; fi
+    # (0.8.8.8) a Linux app's dialog kept with its window: over it, moved with it, a modal one above it (sdk/dialogmodel.js)
+    if have node; then run "dialog-model-test (sdk/dialogmodel.js)" node tests/dialog_model_test.mjs
+    else skip "dialog-model-test" "node"; fi
     # session restore's data rules (sdk/sessionmodel.js)
     if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
     else skip "session-model-test" "node"; fi
@@ -263,6 +293,18 @@ EOF
     # (0.8.8.8) the file name under the pointer in ls output, for ❖ + click downloads (apps/terminal/lsnames.js)
     if have node; then run "terminal-lsnames-test (apps/terminal/lsnames.js)" node tests/terminal_lsnames_test.mjs
     else skip "terminal-lsnames-test" "node"; fi
+    # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
+    if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
+    else skip "terminal-fwdports-test" "node"; fi
+    # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
+    if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
+    else skip "dialog-keys-test" "node"; fi
+    # (0.8.8.8) files dragged from Files onto Notes, Photos, Player and PDF Viewer: which ones each takes (sdk/filedrop.js)
+    if have node; then run "filedrop-test (sdk/filedrop.js)" node tests/filedrop_test.mjs
+    else skip "filedrop-test" "node"; fi
+    # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
+    if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
+    else skip "portal-open-model-test" "node"; fi
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi
@@ -303,6 +345,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "capture-layer-test (sdk/components.jsx, sdk/layers.js)" node tests/capture_layer_test.mjs
     else skip "capture-layer-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) text fields: a right click keeps the caret and opens Undo…Select All, Ctrl+Z/Ctrl+Shift+Z, a triple click
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
+    else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs

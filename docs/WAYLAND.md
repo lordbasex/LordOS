@@ -35,11 +35,14 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
 | `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below) |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps") |
-| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
+| `xdg_wm_dialog_v1` | 1 | a toplevel says it is a dialog and whether it is modal: a modal one holds its parent's input (0.8.8.8, see "Dialogs") |
 | `zxdg_decoration_manager_v1` | 1 | the app picks who draws the frame: server side (Qt, foot, Kitty, Alacritty: the theme's frame) or client side (Chromium with its own bar), also while it's open (0.8.4) |
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
+| `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: only a hint for the on-screen keyboard; text keeps arriving on `wl_keyboard` (0.8.7, `wl_textinput.c`, see `ON-SCREEN-KEYBOARD.md`) |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
@@ -105,6 +108,9 @@ shell. The user approved it for M7. Limits:
 
   Anything else (an unlisted group, a bad name, no `Exec`) is refused. Tested by
   `build/apps-actions-test` (in `make test`).
+- **Activation:** every launch gets `XDG_ACTIVATION_TOKEN` in its environment (see "Activation"
+  below), so the window it opens, or the window of the copy already running it hands the link to,
+  comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
   descriptors. Its output goes to `~/.cache/lordos/apps.log`, which is trimmed when it passes 1 MB.
 - A `.desktop` can't be created from JS:
@@ -126,6 +132,35 @@ Icons: the `hicolor` PNG (64, 48, 128… px) or the one in `/usr/share/pixmaps` 
 only ship SVG (FeatherPad, GTK Demo) use the 64 px PNG Debian publishes in AppStream, which the
 package engine already downloads (`/var/lib/lordos/pkg/icons/64`, see `PACKAGES.md`). If it's not
 there either, the initial is shown: LordOS doesn't draw SVG yet.
+
+## Activation (`xdg_activation_v1`)
+
+A window comes to the front only when the person asked for it; the rules are KWin's and Mutter's.
+The tokens live in `server/src/wl/xdgact.c` (no Wayland types, tested by `build/xdgact-test`); the
+protocol is in `wl.c`.
+
+- **Tokens LordOS gives.** Every launch from `apps.c` (the launcher, Open With, a link, a desktop
+  action) issues one and puts it in `XDG_ACTIVATION_TOKEN` of what it starts. A browser that is
+  already open gets the link from the new process together with the token and calls `activate`: its
+  window comes forward, on its own desktop if that one isn't showing. A click on a notification's
+  button sends the `ActivationToken` signal (Desktop Notifications 1.2) before `ActionInvoked`, so
+  the app that sent it can come forward too.
+- **Tokens an app asks for** (`get_activation_token` … `commit`; `set_app_id` is kept, `set_surface`
+  is only a hint). The token is granted when the asking app has the keyboard, or when the
+  `set_serial` it sends is a click (`wl_pointer.button`), a key (`wl_keyboard.key`) or a keyboard
+  `enter` LordOS sent that same client in the last 10 seconds. Otherwise it still gets a token (the
+  protocol always answers `done`), but an ungranted one. The token remembers the app that asked:
+  as soon as the keyboard moves to another app or to the desktop itself, or that app disconnects,
+  its tokens stop granting (KWin and Mutter do the same), so an app cannot ask while in front and
+  use the token later to steal the front. LordOS's own tokens are not revoked this way.
+- **`activate(token, surface)`.** A granted token raises and focuses the surface's window (a menu or
+  subsurface counts as its window). An ungranted, expired, unknown or reused token never takes the
+  focus: the window is marked as wanting attention, a larger dot in the accent under its Dock icon
+  (Lord Flow) or a long accent bar on its taskbar button (Lord Classic), until it comes to the front;
+  a click on the icon brings that window first. Tokens work once and last 60 s (LordOS's: a cold
+  start can be slow) or at most 10 s (an app's); 32 are kept, a new one replaces the oldest.
+- The decision on the theme side is `activationOutcome` in `sdk/desktopmodel.js`
+  (`tests/desktop_model_test.mjs`).
 
 ## Clipboard
 
@@ -175,6 +210,36 @@ Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53
 per frame, just like LordOS windows; while it lasts, the app doesn't receive the pointer. All
 Linux windows, including those with their own frame, have the theme's invisible borders for
 resizing (see `WINDOWS.md`).
+
+### Dialogs (0.8.8.8)
+
+A Linux app's dialog belongs to a window: the app says so with `xdg_toplevel.set_parent`, or another
+process (a portal, a helper of the app) with xdg-foreign-v2's `zxdg_imported_v2.set_parent_of` and the
+handle the app exported. xdg-dialog-v1 adds whether it is modal. lord-server keeps the owner and the
+flag on the surface and tells JS in `map` (`parent`, `modal`) and in a `parent` event when they change;
+`sdk/wayland.js` keeps them in the window's `args.parent` and `args.modal`, and `sdk/dialogmodel.js`
+(`server/tests/dialog_model_test.mjs`) does the rest:
+
+- the dialog opens centered over its parent, inside that display's work area, on the parent's desktop;
+- it moves by as much as its parent moves (a drag is tracked in C, so the dialog joins the parent
+  when the button is released), and it is minimized, brought back and sent to another desktop with it;
+- a **modal** dialog stays right above its parent: bringing the parent forward brings the dialog
+  above it, so the front window, the one with the keyboard, is the dialog. Minimizing a modal dialog
+  minimizes its parent too. While it is up, lord-server gives the parent no presses and no wheel
+  (releases still go, so a drag ends) and sends the parent's keyboard to the dialog (`modal_over` in
+  `wl.c`). A dialog that isn't modal may go behind its parent.
+
+A window that goes away leaves its dialogs to its own parent, as xdg-shell says; one that would make
+a loop is ignored. **Handles** are 128 random bits from `getrandom` in hex, made for each export: they
+can't be guessed, two exports of the same window get different ones, and a handle stops working when
+its export or its surface goes away (every import of it is told `destroyed`; an unknown handle is told
+so at once). The **file chooser portal** (`server/src/ui/portal.c`) reads its `parent_window`: for
+`wayland:<handle>` it asks `wl_foreign_surface` for that window and the shell's dialog
+(`PortalFilePrompt` in `sdk/filepicker.jsx`) is drawn over it instead of in the middle of the screen;
+it is still the system's dialog, above every window. Not read: `x11:<id>` parents, and xdg-foreign
+v1 (GTK 3 only speaks v1, so its portal dialogs still open in the middle). `build/dialog-client` (`tests/dialog_client.c`, inside a session or a headless
+lord-server) checks both protocols from two connections; `hold 20` keeps a modal dialog over its
+window to try by hand.
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 
@@ -283,7 +348,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   theme, so the button stays 16 px and the circle is a 13 px radial gradient inside it; measured on
   the VM: 12–13 px circles, 21 px from center to center, like LordOS's own frame.
 - **GTK 4 / libadwaita (GNOME).** They read the mode, the accent and the button order from
-  **`org.freedesktop.portal.Settings`**, and **`org.freedesktop.portal.FileChooser`** for apps with no file dialog of their own (`OpenFile`, `SaveFile`, version 2 so browsers keep theirs; the dialog is the shell's, inside the home folder, and the answer goes only to the app that asked). lord-server itself serves both (`server/src/ui/portal.c`)
+  **`org.freedesktop.portal.Settings`**, and **`org.freedesktop.portal.FileChooser`** for apps with no file dialog of their own (`OpenFile`, `SaveFile`, version 2 so browsers keep theirs; the dialog is the shell's, inside the home folder, and the answer goes only to the app that asked). It also serves **`org.freedesktop.portal.OpenURI`** (`OpenURI` for http and https, `OpenFile` and `OpenDirectory` with the file as an fd: opened the way LordOS opens files, never an executable or a launcher, and asked first when the app is not the one with the keyboard) and **`org.freedesktop.portal.Inhibit`**, plus **`org.freedesktop.ScreenSaver`**'s `Inhibit`/`UnInhibit`: a hold counts as an idle inhibitor and ends when the app lets it go or leaves the bus (docs/FLATPAK.md, "Portals"). lord-server itself serves them all (`server/src/ui/portal.c`)
   on the session bus, without xdg-desktop-portal, with Passwords' own D-Bus client
   (`server/src/vault/dbus.c`). Keys:
   - `org.freedesktop.appearance`: `color-scheme`, `accent-color`, `contrast`;
@@ -557,8 +622,8 @@ display.
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- Drag and drop, `text-input` (LordOS input methods inside Wayland apps), activation
-  (`xdg-activation`). (Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
+- Drag and drop, `text-input` (LordOS input methods inside Wayland apps). (Activation,
+  `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 
 ## Clipboard to its owner and idle-inhibit (0.8.5)

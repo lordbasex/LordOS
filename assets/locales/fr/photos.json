@@ -7,6 +7,10 @@
     "other": "{count} photos"
   },
   "empty": "Aucune image dans le dossier Images",
+  "drop.open": "Déposez pour ouvrir {count} image(s)",
+  "drop.browse": "Déposez pour afficher les photos de {name}",
+  "drop.none": "Aucun de ces éléments n'est une image",
+  "drop.skipped": "{count} élément(s) laissé(s) de côté",
   "monthYear": "{month} {year}",
   "fit": "Ajuster",
   "edit": "Modifier",

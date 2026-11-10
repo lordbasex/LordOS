@@ -215,7 +215,7 @@ function place(appId, count, frame) {
 
 const raise = (ws, id) => {
   const w = ws.find((x) => x.id === id);
-  return w ? [...ws.filter((x) => x.id !== id), { ...w, minimized: false }] : ws;
+  return w ? [...ws.filter((x) => x.id !== id), { ...w, minimized: false, attention: false }] : ws;
 };
 const raiseUnlessTop = (ws, id) => (ws[ws.length - 1]?.id === id && !ws[ws.length - 1].minimized ? ws : raise(ws, id));
 // Bringing a window forward shows its desktop, except picture-in-picture, which is on all of them.
@@ -478,6 +478,9 @@ export const wm = {
   // comes out black in screenshots, recordings and remote desktop (docs/MEDIA.md). Used, for
   // example, by a password app.
   setProtected: (id, on = true) => patch(id, { protected: !!on }),
+  // the app asked to come forward without the person asking (xdg-activation): the Dock and the taskbar
+  // mark it until it is brought to the front
+  setAttention: (id, on = true) => patch(id, { attention: !!on }),
   // Merges into a window's args (a Linux app switching between the theme's frame and its own, args.csd).
   setArgs: (id, a) => windows.set((ws) => ws.map((w) => (w.id === id ? { ...w, args: { ...(w.args || {}), ...a } } : w))),
   // The window menu at a screen point (a Linux app with its own bar asked for it,

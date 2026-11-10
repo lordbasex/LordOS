@@ -263,7 +263,8 @@ static JSValue f_select(JSContext *c, JSValueConst this_val, int argc, JSValueCo
     return JS_NewBool(c, r);
 }
 
-/* Terminal text: "selection", "screen", "all" or "lastOutput". */
+/* Terminal text: "selection", "screen", "all", "lastOutput" or "screenLines" (each screen line after the
+ * absolute row it starts on, vt_screen_lines: for triggers). */
 static JSValue f_text(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
@@ -275,6 +276,7 @@ static JSValue f_text(JSContext *c, JSValueConst this_val, int argc, JSValueCons
         if (!strcmp(w, "selection")) out = vt_selection_text(t);
         else if (!strcmp(w, "screen")) out = vt_text_range(t, last - t->rows + 1, last);
         else if (!strcmp(w, "all")) out = vt_text_range(t, first, last);
+        else if (!strcmp(w, "screenLines")) out = vt_screen_lines(t);
         else if (!strcmp(w, "lastOutput")) {
             if (vt_select_last_output(t)) { out = vt_selection_text(t); vt_select_clear(t); }
         }

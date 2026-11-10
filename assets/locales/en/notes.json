@@ -1,5 +1,9 @@
 {
   "attach": "Attach",
+  "drop.add": "Drop to add {count} file(s) to the note",
+  "drop.addNew": "Drop to add {count} file(s) to a new note",
+  "drop.none": "Folders can't be added to a note",
+  "drop.skipped": "{count} folder(s) left out",
   "cancel": "Cancel",
   "close": "Close",
   "delete": "Delete",

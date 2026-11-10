@@ -4,7 +4,8 @@
  *
  * Globals: wl_compositor 6, wl_subcompositor, wl_shm (from libwayland), wl_output 4, wl_seat 7
  * (pointer and keyboard with the XKB keymap from keyboard.c), wl_data_device_manager 3 (clipboard
- * shared with LordOS's), xdg_wm_base 6 and zxdg_decoration_manager_v1.
+ * shared with LordOS's), xdg_wm_base 6, zxdg_decoration_manager_v1, and for dialogs over their window
+ * zxdg_exporter_v2/zxdg_importer_v2 (xdg-foreign) and xdg_wm_dialog_v1.
  *
  * Each surface copies its shared-memory buffer on commit (and releases it right away):
  * the UI draws it as one more node (NODE_SURFACE) inside the theme's window frame. Windows
@@ -14,7 +15,11 @@
  *
  * X11 apps go through Xwayland (xwayland.c starts it on demand, xwm.c is the X window manager):
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
- * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps). */
+ * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps).
+ *
+ * xdg_activation_v1: a window asks to come forward with a token; only one LordOS issued when it
+ * launched the app, or one the app in front asked for, raises it; any other marks it as wanting
+ * attention (xdgact.c holds the tokens). */
 #include "wl.h"
 #include "keygrab.h"
 #include "../keylag.h"
@@ -29,6 +34,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/random.h>
 #include <limits.h>
 #include <time.h>
 #include <signal.h>
@@ -49,6 +55,10 @@
 #include "idle-inhibit-unstable-v1-protocol.h"
 #include "xdg-output-unstable-v1-protocol.h"
 #include "primary-selection-unstable-v1-protocol.h"
+#include "xdg-activation-v1-protocol.h"
+#include "xdgact.h"
+#include "xdg-foreign-unstable-v2-protocol.h"
+#include "xdg-dialog-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
 #include "../outputs.h"
@@ -95,7 +105,13 @@ struct Surf {
     int gx, gy, gw, gh, has_geom;
     char title[256], app_id[128];
     int maximized, fullscreen, activated, csd;
-    int dialog, min_w, min_h, max_w, max_h;     /* xdg_toplevel: a parent, and its size limits */
+    int min_w, min_h, max_w, max_h;             /* xdg_toplevel: its size limits */
+    /* the window it belongs to: xdg_toplevel.set_parent, or xdg-foreign's set_parent_of (owner_by =
+     * the zxdg_imported_v2 that set it); modal (xdg-dialog-v1): the owner takes no input while it is up */
+    Surf *owner;
+    void *owner_by;
+    struct wl_resource *dlg;
+    int modal;
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
     struct wl_resource *kde;
     /* popup menu */
@@ -620,6 +636,191 @@ static void unmap_popup(Surf *s) {
         }
 }
 
+/* ---- windows that belong to another: dialogs (xdg_toplevel.set_parent, xdg-foreign-v2, xdg-dialog-v1) ----
+ * JS learns each toplevel's owner and whether it is modal ("parent" event, and in "map"): the theme
+ * opens a dialog over its owner, moves it with it and keeps a modal one above it (sdk/dialogmodel.js).
+ * Here a modal dialog takes its owner's clicks, wheel and keyboard. */
+
+static void emit_owner(Surf *s) {
+    emit(s, "parent", "{\"parent\":%d,\"modal\":%s}", s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
+}
+
+/* by: the zxdg_imported_v2 that asks (NULL: the window itself, with xdg_toplevel.set_parent). A
+ * parent that would make a loop is ignored. */
+static void set_owner(Surf *s, Surf *p, void *by) {
+    for (Surf *q = p; q; q = q->owner) if (q == s) return;
+    s->owner_by = p ? by : NULL;
+    if (s->owner == p) return;
+    s->owner = p;
+    if (s->mapped) emit_owner(s);
+}
+
+static void set_modal(Surf *s, int on) {
+    if (!s || s->modal == !!on) return;
+    s->modal = !!on;
+    if (s->mapped) emit_owner(s);
+}
+
+/* The modal dialog that holds this window's input (the last of a chain of them), or NULL. */
+static Surf *modal_over(Surf *s) {
+    Surf *m = NULL;
+    for (int depth = 0; s && depth < 8; depth++) {
+        Surf *next = NULL;
+        for (int i = 0; i < MAX_SURF && !next; i++) {
+            Surf *k = surfs[i];
+            if (k && k->owner == s && k->modal && k->mapped && k->role == R_TOPLEVEL) next = k;
+        }
+        if (next) m = next;
+        s = next;
+    }
+    return m;
+}
+
+/* A window that goes away leaves its dialogs to its own owner (xdg-shell's rule for set_parent). */
+static void orphan_dialogs(Surf *s) {
+    for (int i = 0; i < MAX_SURF; i++)
+        if (surfs[i] && surfs[i] != s && surfs[i]->owner == s) set_owner(surfs[i], s->owner, NULL);
+}
+
+/* xdg-foreign-v2: an app exports its toplevel as a handle and hands it to another process (a portal's
+ * file dialog, a helper of its own), which imports it and puts its window over it. The handle is 128
+ * random bits in hex: it can't be guessed, and it stops working when the surface goes away. */
+typedef struct { struct wl_resource *res; Surf *s; char handle[33]; struct wl_list link; } Export;
+typedef struct { struct wl_resource *res; Export *e; struct wl_list link; } Import;
+static struct wl_list exports, imports;
+
+/* What an import set stops counting: its dialogs go back to having no owner. */
+static void import_unset(Import *im) {
+    for (int i = 0; i < MAX_SURF; i++)
+        if (surfs[i] && surfs[i]->owner_by == im) set_owner(surfs[i], NULL, NULL);
+}
+
+/* The exported surface or the export is gone: every import of it is told, and is inert from then on. */
+static void export_drop(Export *e) {
+    Import *im;
+    wl_list_for_each(im, &imports, link)
+        if (im->e == e) {
+            im->e = NULL;
+            import_unset(im);
+            zxdg_imported_v2_send_destroyed(im->res);
+        }
+    e->s = NULL;
+}
+
+static void foreign_surface_gone(Surf *s) {
+    Export *e;
+    wl_list_for_each(e, &exports, link) if (e->s == s) export_drop(e);
+}
+
+int wl_foreign_surface(const char *handle) {
+    if (!dpy || !handle || !handle[0]) return 0;
+    Export *e;
+    wl_list_for_each(e, &exports, link)
+        if (e->s && !strcmp(e->handle, handle)) return e->s->role == R_TOPLEVEL ? e->s->id : 0;
+    return 0;
+}
+
+static void exported_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct zxdg_exported_v2_interface exported_impl = { .destroy = exported_destroy };
+static void exported_gone(struct wl_resource *r) {
+    Export *e = wl_resource_get_user_data(r);
+    export_drop(e);
+    wl_list_remove(&e->link);
+    free(e);
+}
+static void exporter_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void exporter_export(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    if (!s || s->role != R_TOPLEVEL || !s->top) {
+        wl_resource_post_error(r, ZXDG_EXPORTER_V2_ERROR_INVALID_SURFACE, "surface is not an xdg_toplevel");
+        return;
+    }
+    unsigned char rnd[16];
+    Export *e = calloc(1, sizeof *e);
+    struct wl_resource *x = e && getrandom(rnd, sizeof rnd, 0) == (ssize_t)sizeof rnd
+        ? wl_resource_create(c, &zxdg_exported_v2_interface, wl_resource_get_version(r), id) : NULL;
+    if (!x) { free(e); wl_client_post_no_memory(c); return; }
+    for (int i = 0; i < 16; i++) snprintf(e->handle + 2 * i, 3, "%02x", rnd[i]);
+    e->res = x;
+    e->s = s;
+    wl_list_insert(&exports, &e->link);
+    wl_resource_set_implementation(x, &exported_impl, e, exported_gone);
+    zxdg_exported_v2_send_handle(x, e->handle);
+}
+static const struct zxdg_exporter_v2_interface exporter_impl = { .destroy = exporter_destroy, .export_toplevel = exporter_export };
+static void bind_exporter(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &zxdg_exporter_v2_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &exporter_impl, NULL, NULL);
+}
+
+static void imported_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void imported_parent_of(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) {
+    (void)c;
+    Import *im = wl_resource_get_user_data(r);
+    Surf *s = wl_resource_get_user_data(surface);
+    if (!s || s->role != R_TOPLEVEL || !s->top) {
+        wl_resource_post_error(r, ZXDG_IMPORTED_V2_ERROR_INVALID_SURFACE, "surface is not an xdg_toplevel");
+        return;
+    }
+    if (im->e && im->e->s) set_owner(s, im->e->s, im);
+}
+static const struct zxdg_imported_v2_interface imported_impl = { .destroy = imported_destroy, .set_parent_of = imported_parent_of };
+static void imported_gone(struct wl_resource *r) {
+    Import *im = wl_resource_get_user_data(r);
+    import_unset(im);
+    wl_list_remove(&im->link);
+    free(im);
+}
+static void importer_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void importer_import(struct wl_client *c, struct wl_resource *r, uint32_t id, const char *handle) {
+    Import *im = calloc(1, sizeof *im);
+    struct wl_resource *x = im ? wl_resource_create(c, &zxdg_imported_v2_interface, wl_resource_get_version(r), id) : NULL;
+    if (!x) { free(im); wl_client_post_no_memory(c); return; }
+    im->res = x;
+    Export *e;
+    wl_list_for_each(e, &exports, link) if (e->s && !strcmp(e->handle, handle)) { im->e = e; break; }
+    wl_list_insert(&imports, &im->link);
+    wl_resource_set_implementation(x, &imported_impl, im, imported_gone);
+    if (!im->e) zxdg_imported_v2_send_destroyed(x);    /* unknown or no longer valid: inert */
+}
+static const struct zxdg_importer_v2_interface importer_impl = { .destroy = importer_destroy, .import_toplevel = importer_import };
+static void bind_importer(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &zxdg_importer_v2_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &importer_impl, NULL, NULL);
+}
+
+/* xdg-dialog-v1: the window says it is a dialog, and whether it is modal (GTK 4 and Qt 6 do). */
+static void dlg_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void dlg_modal(struct wl_client *c, struct wl_resource *r) { (void)c; set_modal(wl_resource_get_user_data(r), 1); }
+static void dlg_unmodal(struct wl_client *c, struct wl_resource *r) { (void)c; set_modal(wl_resource_get_user_data(r), 0); }
+static const struct xdg_dialog_v1_interface dialog_impl = { .destroy = dlg_destroy, .set_modal = dlg_modal, .unset_modal = dlg_unmodal };
+static void dlg_gone(struct wl_resource *r) {
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || s->dlg != r) return;
+    s->dlg = NULL;
+    set_modal(s, 0);
+}
+static void wmd_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void wmd_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *toplevel) {
+    Surf *s = wl_resource_get_user_data(toplevel);
+    if (s && s->dlg) { wl_resource_post_error(r, XDG_WM_DIALOG_V1_ERROR_ALREADY_USED, "the toplevel already has a dialog object"); return; }
+    struct wl_resource *d = wl_resource_create(c, &xdg_dialog_v1_interface, wl_resource_get_version(r), id);
+    if (!d) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(d, &dialog_impl, s, dlg_gone);
+    if (s) s->dlg = d;
+}
+static const struct xdg_wm_dialog_v1_interface wm_dialog_impl = { .destroy = wmd_destroy, .get_xdg_dialog = wmd_get };
+static void bind_wm_dialog(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &xdg_wm_dialog_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &wm_dialog_impl, NULL, NULL);
+}
+
 static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
@@ -627,6 +828,9 @@ static void surface_gone(struct wl_resource *r) {
     if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
+    orphan_dialogs(s);
+    foreign_surface_gone(s);
+    if (s->dlg) wl_resource_set_user_data(s->dlg, NULL);
     if (s->parent) {
         Surf *p = s->parent;
         for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
@@ -1065,6 +1269,81 @@ static void bind_iim(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
     wl_resource_set_implementation(r, &iim_impl, NULL, NULL);
 }
 
+/* ---- xdg-activation: a window comes forward only with a token LordOS or the app in front gave (xdgact.c) ---- */
+typedef struct { uint32_t serial; int has_serial, committed; char app_id[128]; } ActReq;
+static void tok_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
+static void tok_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void tok_serial(struct wl_client *c, struct wl_resource *r, uint32_t serial, struct wl_resource *seat) {
+    (void)c; (void)seat;                /* one seat */
+    ActReq *q = wl_resource_get_user_data(r);
+    q->serial = serial;
+    q->has_serial = 1;
+}
+static void tok_app_id(struct wl_client *c, struct wl_resource *r, const char *app_id) {
+    (void)c;
+    ActReq *q = wl_resource_get_user_data(r);
+    snprintf(q->app_id, sizeof q->app_id, "%s", app_id);
+}
+static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) { (void)c; (void)r; (void)surface; }
+/* Granted when the asking app has the keyboard, or the serial it names is a click or key LordOS
+ * sent it a moment ago; otherwise the token exists but only asks for attention. The grant ends
+ * when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
+static void tok_commit(struct wl_client *c, struct wl_resource *r) {
+    ActReq *q = wl_resource_get_user_data(r);
+    if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
+    q->committed = 1;
+    double now = xact_now();
+    int granted = (key_focus && key_focus->client == c) || (q->has_serial && xact_serial_recent(q->serial, c, now));
+    const char *t = xact_issue_for(now, XACT_CLIENT_MS, granted, q->app_id, c);
+    xdg_activation_token_v1_send_done(r, t ? t : "none");
+}
+static const struct xdg_activation_token_v1_interface tok_impl = {
+    .set_serial = tok_serial, .set_app_id = tok_app_id, .set_surface = tok_surface, .commit = tok_commit, .destroy = tok_destroy,
+};
+static void act_get_token(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+    ActReq *q = calloc(1, sizeof *q);
+    struct wl_resource *t = q ? wl_resource_create(c, &xdg_activation_token_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!t) { free(q); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(t, &tok_impl, q, tok_gone);
+}
+static void act_activate(struct wl_client *c, struct wl_resource *r, const char *token, struct wl_resource *surface) {
+    (void)c; (void)r;
+    int res = xact_take(token, xact_now(), NULL, 0);
+    Surf *s = wl_resource_get_user_data(surface);
+    while (s && s->role != R_TOPLEVEL && s->parent) s = s->parent;     /* a menu or a subsurface: its window */
+    if (!s || s->role != R_TOPLEVEL || !s->mapped) return;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: activate %d: %s\n", s->id, res == XACT_OK ? "granted" : "attention");
+    emit(s, res == XACT_OK ? "activate" : "attention", "{}");
+}
+static void act_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct xdg_activation_v1_interface act_impl = { .destroy = act_destroy, .get_activation_token = act_get_token, .activate = act_activate };
+static void bind_activation(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &xdg_activation_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &act_impl, NULL, NULL);
+}
+/* An input serial for this client: remembered so its activation requests can name it. */
+static uint32_t input_serial(struct wl_client *c) {
+    uint32_t s = wl_display_next_serial(dpy);
+    xact_note_serial(s, c, xact_now());
+    return s;
+}
+/* A client that left: its serials stop counting (another one may get the same address). */
+static struct wl_listener client_created;
+static void client_destroyed(struct wl_listener *l, void *data) {
+    xact_client_gone(data);
+    wl_list_remove(&l->link);
+    free(l);
+}
+static void on_client_created(struct wl_listener *l, void *data) {
+    (void)l;
+    struct wl_listener *d = calloc(1, sizeof *d);
+    if (!d) return;
+    d->notify = client_destroyed;
+    wl_client_add_destroy_listener(data, d);
+}
+
 static void send_keymap(struct wl_resource *kb) {
     char *km = kb_keymap_string();
     if (!km) return;
@@ -1086,7 +1365,7 @@ static void send_keymap(struct wl_resource *kb) {
 static void send_enter_keyboard(struct wl_resource *kb, Surf *s) {
     struct wl_array keys;
     wl_array_init(&keys);
-    wl_keyboard_send_enter(kb, wl_display_next_serial(dpy), s->res, &keys);
+    wl_keyboard_send_enter(kb, input_serial(s->client), s->res, &keys);
     wl_array_release(&keys);
     uint32_t d, l, k, g;
     kb_mods(&d, &l, &k, &g);
@@ -1769,8 +2048,8 @@ static void position_popup(Surf *s, const Positioner *p) {
 static void top_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) {
     (void)c;
-    Surf *s = wl_resource_get_user_data(r);
-    if (s) s->dialog = !!p;
+    Surf *s = wl_resource_get_user_data(r), *o = p ? wl_resource_get_user_data(p) : NULL;
+    if (s) set_owner(s, o && o->role == R_TOPLEVEL ? o : NULL, NULL);
 }
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
@@ -1895,6 +2174,7 @@ static void top_gone(struct wl_resource *r) {
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
+    orphan_dialogs(s);
     if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
 }
 
@@ -2134,8 +2414,9 @@ static void emit_map(Surf *s, int w, int h) {
              t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}", t, a, w, h, s->csd ? "true" : "false",
-             s->dialog ? "true" : "false", fixed ? "true" : "false");
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s}",
+             t, a, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
     }
 }
 
@@ -2681,14 +2962,21 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
         }
     pointer_enter(target, lx, ly);
     if (!target) return fs_surf && fs_surf->content ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
+    /* a window under a modal dialog gets no presses and no wheel (releases still go: a drag ends);
+     * the theme still sees the click and brings the dialog forward (sdk/dialogmodel.js) */
+    Surf *owner = target;
+    while (owner && owner->role == R_SUB) owner = owner->parent;
+    int held = owner && owner->role == R_TOPLEVEL && modal_over(owner);
+    if (held) wheel = 0;
     unsigned t = now_ms();
     struct wl_resource *p;
     FOR_CLIENT(&pointers, target->client, p) {
         if (moved && !(constraint && constraint->active && constraint->lock))
             wl_pointer_send_motion(p, t, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
         for (int i = 0; i < nbuttons; i++) {
+            if (held && down[i]) continue;
             uint32_t b = button[i] == 0 ? BTN_LEFT : button[i] == 1 ? BTN_MIDDLE : BTN_RIGHT;
-            wl_pointer_send_button(p, wl_display_next_serial(dpy), t, b,
+            wl_pointer_send_button(p, input_serial(target->client), t, b,
                                    down[i] ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
         }
         if (wheel) wl_input_wheel(p, t, wheel);      /* axis + axis_source wheel + value120 (wl_input.c) */
@@ -2731,6 +3019,7 @@ static const char *app_of_client(struct wl_client *cl) {
 }
 
 const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
+int wl_focus_pid(void) { return dpy && key_focus ? (int)client_pid(key_focus->client) : 0; }
 
 const char *wl_node_app(int node) {
     if (!dpy || !node) return NULL;
@@ -2783,7 +3072,7 @@ static void send_key_to_focus(int code, int value) {
     if (value == 1) note_paste(code, d);
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
-        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+        wl_keyboard_send_key(kb, input_serial(key_focus->client), t, (uint32_t)code,
                              value ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
         if (d != mods_sent[0] || l != mods_sent[1] || lk != mods_sent[2] || g != mods_sent[3])
             wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
@@ -2844,7 +3133,7 @@ static void send_remapped(int code, int press) {
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
         if (press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), held, l, lk, g);
-        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+        wl_keyboard_send_key(kb, input_serial(key_focus->client), t, (uint32_t)code,
                              press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
         if (!press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
     }
@@ -3435,6 +3724,7 @@ void wl_set_focus(int id) {
     Surf *s = id ? find(id) : NULL;
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
+    if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
     if (fs_surf && fs_surf->content) s = fs_surf;      /* in fullscreen the keyboard is its own */
     if (s == key_focus) return;
     struct wl_resource *kb;
@@ -3445,6 +3735,7 @@ void wl_set_focus(int id) {
         dismiss_popups();
     }
     key_focus = s;
+    xact_focus_moved(s ? s->client : NULL);           /* tokens other apps asked for stop granting */
     wl_textinput_focus(s ? s->client : NULL, s ? s->res : NULL);
     if (s) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);
@@ -3631,6 +3922,11 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_primary_selection_device_manager_v1_interface, 1, NULL, bind_pdm);   /* middle-click paste */
     wl_global_create(dpy, &xdg_wm_base_interface, 6, NULL, bind_wm_base);
     wl_global_create(dpy, &zxdg_decoration_manager_v1_interface, 1, NULL, bind_decm);
+    wl_list_init(&exports);
+    wl_list_init(&imports);
+    wl_global_create(dpy, &zxdg_exporter_v2_interface, 1, NULL, bind_exporter);    /* a window as a handle (portal dialogs) */
+    wl_global_create(dpy, &zxdg_importer_v2_interface, 1, NULL, bind_importer);
+    wl_global_create(dpy, &xdg_wm_dialog_v1_interface, 1, NULL, bind_wm_dialog);   /* modal dialogs */
     wl_list_init(&rel_pointers);
     wl_list_init(&feedbacks);
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
@@ -3642,6 +3938,9 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
+    wl_global_create(dpy, &xdg_activation_v1_interface, 1, NULL, bind_activation);   /* a window comes forward with a token */
+    client_created.notify = on_client_created;
+    wl_display_add_client_created_listener(dpy, &client_created);
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */

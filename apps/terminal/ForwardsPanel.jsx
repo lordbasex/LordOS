@@ -1,10 +1,11 @@
 // ForwardsPanel.jsx — the tab's port forwards (forwards.js): each "server port → 127.0.0.1:port" with its state, Open
 // (in the browser), Copy and Close, and a row to add one for this connection only. Opened from the badge on the tab or
-// the footer; a click outside closes it.
+// the footer; a click outside closes it. A fixed local port that is taken says so and offers a free one (fwdports.js).
 import { View, Text, TextInput, Button, useStore, clipboard, openUrl, t as tr } from '@lordos/sdk';
 import { useState } from 'react';
 import { patchWin, leaves } from './state.js';
-import { forwards, forwardsOf, forwardLabel, localUrl, addForward, closeForward } from './forwards.js';
+import { forwards, forwardsOf, forwardLabel, localUrl, addForward, closeForward, useFreePort } from './forwards.js';
+import { badgeItem, badgeText } from './fwdports.js';
 
 const W = 340;
 
@@ -26,8 +27,6 @@ export function ForwardsPanel({ t, wid, w, panel }) {
     setBad(!ok);
     if (ok) { setHost(''); setLocal(''); }
   };
-  const stateText = (it) => (it.state === 'open' ? '' : it.state === 'error' ? tr(`terminal.fwd.err.${['failed', 'nossh', 'bad', 'unavailable'].includes(it.error) ? it.error : 'failed'}`)
-    : tr('terminal.fwd.opening'));
   return (
     <View onClick={close} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
       <View onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 34, left: Math.max(8, panel.x - W / 2), width: W, padding: 12, gap: 10,
@@ -43,6 +42,7 @@ export function ForwardsPanel({ t, wid, w, panel }) {
             </View>
             {it.state === 'open' && <Button small label={tr('terminal.fwd.open')} onClick={() => openUrl(localUrl(it))} />}
             {it.state === 'open' && <Button small label={tr('terminal.fwd.copy')} onClick={() => clipboard.set(`127.0.0.1:${it.local}`)} />}
+            {it.state === 'error' && it.error === 'inuse' && <Button small label={tr('terminal.fwd.useFree')} onClick={() => useFreePort(it.sid, it.key)} />}
             <Button small label="✕" title={tr('terminal.fwd.close')} onClick={() => closeForward(it.sid, it.key)} />
           </View>
         ))}
@@ -62,17 +62,22 @@ export function ForwardsPanel({ t, wid, w, panel }) {
   );
 }
 
+// what a forward that isn't open says under its address
+const stateText = (it) => (it.state === 'open' ? '' : it.state === 'error'
+  ? tr(`terminal.fwd.err.${['failed', 'nossh', 'bad', 'unavailable', 'inuse'].includes(it.error) ? it.error : 'failed'}`, { port: it.want })
+  : tr('terminal.fwd.opening'));
+
 // the badge on a tab: "⇄ 80 → 54321" (+ how many more), nothing without forwards
 export function ForwardsBadge({ t, wid, tab }) {
   const items = forwardsOf(useStore(forwards), leaves(tab.root));     // (a selector that builds a new array would re-render forever)
   if (!items.length) return null;
-  const first = items.find((x) => x.state === 'open') || items[0];
+  const first = badgeItem(items);
   const anyErr = items.some((x) => x.state === 'error');
   return (
     <View onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); patchWin(wid, () => ({ fwdPanel: { tabId: tab.id, x: e.x } })); }}
-      title={tr('terminal.fwd.title')}
+      title={first.state === 'error' ? stateText(first) : tr('terminal.fwd.title')}
       style={{ height: 18, paddingHorizontal: 5, borderRadius: 4, justifyContent: 'center', backgroundColor: anyErr ? 'rgba(255,69,58,0.25)' : 'rgba(50,215,75,0.22)', direction: 'ltr' }}>
-      <Text style={{ fontSize: 10, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{`⇄ ${first.port}→${first.local || '…'}${items.length > 1 ? ` +${items.length - 1}` : ''}`}</Text>
+      <Text style={{ fontSize: 10, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{badgeText(items)}</Text>
     </View>
   );
 }

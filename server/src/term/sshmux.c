@@ -225,7 +225,7 @@ int mux_connect(Mux *m, const char *path, int timeout_ms) {
     memcpy(a.sun_path, path, strlen(path) + 1);
     m->fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (m->fd < 0) return fail(m, "socket");
-    if (connect(m->fd, (struct sockaddr *)&a, sizeof a)) { mux_close(m); return fail(m, "connect"); }
+    if (connect(m->fd, (struct sockaddr *)&a, sizeof a)) { m->refused = errno == ECONNREFUSED; mux_close(m); return fail(m, "connect"); }
     struct ucred cr;
     socklen_t cl = sizeof cr;
     if (getsockopt(m->fd, SOL_SOCKET, SO_PEERCRED, &cr, &cl) || cr.uid != getuid()) { mux_close(m); return fail(m, "not ours"); }
@@ -328,21 +328,51 @@ int mux_forward(Mux *m, int open, uint32_t listen_port, const char *connect_host
     return rc;
 }
 
-int sshmux_find(const char *dir, pid_t want, char *out, size_t cap) {
+/* the shell integration's ControlPath: %C (ssh's hash of the connection, hex), '-', the shell's pid */
+int sshmux_name_ok(const char *s) {
+    size_t h = 0, d = 0;
+    for (; (*s >= '0' && *s <= '9') || (*s >= 'a' && *s <= 'f'); s++) h++;
+    if (h < 16 || h > 64 || *s++ != '-') return 0;
+    for (; *s >= '0' && *s <= '9'; s++) d++;
+    return !*s && d >= 1 && d <= 10;
+}
+
+/* a socket nobody listens on (its ssh was killed hard): removed only while it is still the entry looked at, by
+ * its name in the folder opened (no path walked again, no link followed) */
+static void drop_stale(int dfd, const char *name, const struct stat *was) {
     struct stat st;
+    if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISSOCK(st.st_mode) || st.st_uid != getuid() ||
+        st.st_dev != was->st_dev || st.st_ino != was->st_ino) return;
+    unlinkat(dfd, name, 0);
+}
+
+int sshmux_find(const char *dir, pid_t want, char *out, size_t cap) {
+    struct stat st, ds;
     if (want <= 0 || lstat(dir, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid() || (st.st_mode & 077)) return -1;
-    DIR *d = opendir(dir);
-    if (!d) return -1;
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (dfd < 0) return -1;
+    /* the folder opened is the one checked */
+    if (fstat(dfd, &ds) || ds.st_dev != st.st_dev || ds.st_ino != st.st_ino) { close(dfd); return -1; }
+    DIR *d = fdopendir(dfd);
+    if (!d) { close(dfd); return -1; }
     struct dirent *e;
-    int seen = 0, found = -1;
-    while (found < 0 && (e = readdir(d)) && seen < 32) {
+    /* asked counts the masters that took the connect (each may cost its timeout); a refused one is cheap and
+     * does not count, and the entries looked at are bounded on their own */
+    int asked = 0, looked = 0, found = -1;
+    while (found < 0 && asked < 32 && looked < 4096 && (e = readdir(d))) {
         if (e->d_name[0] == '.') continue;
-        seen++;
+        looked++;
+        if (!sshmux_name_ok(e->d_name)) continue;
         char p[sizeof ((struct sockaddr_un *)0)->sun_path];
         if ((size_t)snprintf(p, sizeof p, "%s/%s", dir, e->d_name) >= sizeof p) continue;
-        if (lstat(p, &st) || !S_ISSOCK(st.st_mode) || st.st_uid != getuid()) continue;
+        if (fstatat(dfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISSOCK(st.st_mode) || st.st_uid != getuid()) continue;
         Mux m;
-        if (mux_connect(&m, p, 1500)) continue;
+        if (mux_connect(&m, p, 1500)) {
+            if (m.refused) drop_stale(dfd, e->d_name, &st);
+            else asked++;
+            continue;
+        }
+        asked++;
         if (m.master == want && strlen(p) < cap) { memcpy(out, p, strlen(p) + 1); found = 0; }
         mux_close(&m);
     }

@@ -97,6 +97,16 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 - **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
+## Em desenvolvimento para a 0.8.8.8
+
+Ainda não lançada; o último lançamento é a 0.8.8.7.
+
+- **O Terminal trabalha pelo `ssh` da aba.** Redirecionamentos de porta a partir de um perfil (um selo na aba, Abrir no navegador, Copiar, Fechar), arquivos arrastados do Arquivos para um painel com `ssh` enviados à pasta do shell remoto, ❖ + clique num nome da saída do `ls` para baixá-lo, e Abrir, Abrir com e Editar para um arquivo do servidor no modo Arquivos, onde cada salvamento volta ao servidor. Tudo pela mesma conexão, sem um segundo login e sem executar programa nenhum.
+- **Os campos de texto selecionam como em qualquer desktop,** em todos os apps do LordOS: Ctrl/⌘+A, Shift com as setas, um arraste com o mouse, um duplo clique numa palavra, digitar sobre a seleção, copiar e recortar (nunca de um campo de senha).
+- **Arrastar arquivos.** O que você arrasta do Arquivos segue o ponteiro acima de todas as janelas e mostra um + sobre uma que aceita arquivos; o Editor de texto abre um arquivo solto numa aba e uma pasta solta como seu projeto.
+- **Cores.** Uma pasta etiquetada é desenhada com a cor da sua etiqueta no Arquivos, e um grupo de favoritos do Bancos de dados tem uma cor própria.
+- **Listas de nomes em ordem.** A grade de Apps e todas as outras listas de nomes são ordenadas do mesmo jeito, então um app cujo nome começa com minúscula não fica mais depois da última linha.
+
 ## Novo na 0.8.8.7
 
 Lançada em 9 de novembro de 2026, o último lançamento.

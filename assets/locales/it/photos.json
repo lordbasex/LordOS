@@ -7,6 +7,10 @@
     "other": "{count} foto"
   },
   "empty": "Non ci sono immagini nella cartella Immagini",
+  "drop.open": "Rilascia per aprire {count} immagine/i",
+  "drop.browse": "Rilascia per vedere le foto di {name}",
+  "drop.none": "Nessuno di questi è un'immagine",
+  "drop.skipped": "{count} elemento/i escluso/i",
   "monthYear": "{month} {year}",
   "fit": "Adatta",
   "edit": "Modifica",

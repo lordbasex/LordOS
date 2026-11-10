@@ -366,7 +366,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
     : position === 'left' ? { left: 0, top: 0, bottom: 0, width: bar } : { right: 0, top: 0, bottom: 0, width: bar };
   const place = (i) => (position === 'bottom' ? { left: iconC[i] - sizes[i] / 2, bottom: PAD }
     : position === 'left' ? { top: iconC[i] - sizes[i] / 2, left: PAD } : { top: iconC[i] - sizes[i] / 2, right: PAD });
-  const dot = (s) => (position === 'bottom' ? { left: s / 2 - 2, bottom: -7 } : position === 'left' ? { top: s / 2 - 2, left: -7 } : { top: s / 2 - 2, right: -7 });
+  const dot = (s, d = 4) => (position === 'bottom' ? { left: s / 2 - d / 2, bottom: -5 - d / 2 } : position === 'left' ? { top: s / 2 - d / 2, left: -5 - d / 2 } : { top: s / 2 - d / 2, right: -5 - d / 2 });
   const dotColor = t.mode === 'dark' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)';
   // where to open the right-click menu and the tooltip: beside the icon, on the inner side
   const anchor = (i) => (position === 'bottom' ? { x: start + iconC[i], y: AB - MARGIN - bar - 6 }
@@ -436,8 +436,10 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             onMouseDown={(e) => { if (!e.button) beginDockDrag({ id: app.id, Icon: app.Icon, x: e.x, y: e.y, source: 'dock' }); }}
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i] }}>
             <app.Icon size={sizes[i]} />
-            {running.includes(app.id) && (
-              <View style={{ position: 'absolute', ...dot(sizes[i]), width: 4, height: 4, borderRadius: 2, backgroundColor: dotColor }} />
+            {/* a window that asked for attention (xdg-activation): a larger dot in the accent */}
+            {running.includes(app.id) && (app.attention
+              ? <View style={{ position: 'absolute', ...dot(sizes[i], 6), width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent }} />
+              : <View style={{ position: 'absolute', ...dot(sizes[i]), width: 4, height: 4, borderRadius: 2, backgroundColor: dotColor }} />
             )}
           </View>
         )))}

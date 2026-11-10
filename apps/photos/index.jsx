@@ -9,7 +9,7 @@
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
-  Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud,
+  Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud, useFilesDrop, FilesDropHint, dropCount,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { keptPlaces, inPlaces } from './places.js';
@@ -416,22 +416,44 @@ export default function Photos() {
     return () => { live = false; };
   }, [folder, all, rev]);
 
-  // open what Files sent: the image and its neighbors in the same folder
-  useEffect(() => {
-    const p = win.args?.path;
-    if (!p || handledNonce.get(win.id) === win.args.nonce) return;
-    handledNonce.set(win.id, win.args.nonce);
+  // open an image with its neighbors in the same folder (what Files sent, or one image dropped on the window)
+  const openWithNeighbors = (p) => {
     const out = [];
     listImages(dirOf(p), 0, out);
     out.sort((a, b) => compareNames(a.name, b.name));
     const i = Math.max(0, out.findIndex((x) => x.path === p));
     setViewer({ list: out.length ? out : [{ path: p, name: baseName(p) }], index: i });
+  };
+  useEffect(() => {
+    const p = win.args?.path;
+    if (!p || handledNonce.get(win.id) === win.args.nonce) return;
+    handledNonce.set(win.id, win.args.nonce);
+    openWithNeighbors(p);
   }, [win.args?.nonce]);
 
+  // files dragged from Files: one image opens with its neighbors, several are the viewer's list; with no images, a
+  // folder is the one shown in the library
+  const drop = useFilesDrop({ accepts: (name) => IMAGE.test(name), folders: true, onDrop: ({ files, folders }) => {
+    if (files.length === 1) openWithNeighbors(files[0]);
+    else if (files.length) setViewer({ list: files.map((p) => ({ path: p, name: baseName(p) })), index: 0 });
+    else { setViewer(null); setFolder(folders[0]); setAll(false); }
+  } });
+  const dropTitle = drop.over && (drop.over.files.length ? tr('photos.drop.open', { count: drop.over.files.length })
+    : drop.over.folders.length ? tr('photos.drop.browse', { name: baseName(drop.over.folders[0]) }) : tr('photos.drop.none'));
+  // left out: what is not an image, and the folders that are not the one opened
+  const unused = drop.over && dropCount(drop.over) ? drop.over.skipped + drop.over.folders.length - (drop.over.files.length ? 0 : 1) : 0;
+  const dropNote = unused ? tr('photos.drop.skipped', { count: unused }) : '';
+  const dropHint = <FilesDropHint over={drop.over} title={dropTitle} note={dropNote} />;
+
   if (viewer) {
-    return <Viewer list={viewer.list} index={viewer.index} winId={win.id} mode={win.mode}
-      setIndex={(f) => setViewer((v) => ({ ...v, index: typeof f === 'function' ? f(v.index) : f }))}
-      onClose={() => { setViewer(null); wm.setTitle(win.id, null); wm.setFullscreen(win.id, false); }} />;
+    return (
+      <View {...drop.props} style={{ flex: 1 }}>
+        <Viewer list={viewer.list} index={viewer.index} winId={win.id} mode={win.mode}
+          setIndex={(f) => setViewer((v) => ({ ...v, index: typeof f === 'function' ? f(v.index) : f }))}
+          onClose={() => { setViewer(null); wm.setTitle(win.id, null); wm.setFullscreen(win.id, false); }} />
+        {dropHint}
+      </View>
+    );
   }
 
   // narrow window (close to minSize): a smaller title so it is not clipped
@@ -445,7 +467,7 @@ export default function Photos() {
     groups[groups.length - 1].list.push(e);
   }
   return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
+    <View {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         <SectionTitle>{tr('photos.library')}</SectionTitle>
@@ -491,6 +513,8 @@ export default function Photos() {
           ))}
         </ScrollView>
       </View>
+      {/* over everything else, so it is not drawn under the grid */}
+      {dropHint}
     </View>
   );
 }

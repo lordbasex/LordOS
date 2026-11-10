@@ -29,11 +29,11 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Text fields: a right-click menu (Undo, Redo, Cut, Copy, Paste, Delete, Select All) and Ctrl/⌘+Z, ⇧Z; a right click no longer moves the caret or drops the selection | the first thing tried in any field | S | ⬜ |
-| Text fields: triple click selects the line (`runtime/events.js` counts clicks) | every desktop has it | S | ⬜ |
+| Text fields: a right-click menu (Undo, Redo, Cut, Copy, Paste, Delete, Select All) and Ctrl/⌘+Z, ⇧Z; a right click no longer moves the caret or drops the selection | the first thing tried in any field | S | 🟨 |
+| Text fields: triple click selects the line (`runtime/events.js` counts clicks) | every desktop has it | S | 🟨 |
 | Drop from Files onto Notes (insert), Photos, Player, PDF Viewer (open) | the Editor and Terminal already take drops | S | ⬜ |
-| `xdg-activation-v1`: a link opened from the Terminal or a notification's click raises the browser already open; activation only with a valid token | the wrong window stays in front | S | ⬜ |
-| `xdg-foreign-v2` and `xdg-dialog-v1`: portal dialogs attached to their window | dialogs float loose | S | ⬜ |
+| `xdg-activation-v1`: a link opened from the Terminal or a notification's click raises the browser already open; activation only with a valid token | the wrong window stays in front | S | 🟨 |
+| `xdg-foreign-v2` and `xdg-dialog-v1`: portal dialogs attached to their window | dialogs float loose | S | ✅ |
 
 ## Phase 2 — the compositor's big three
 
@@ -52,7 +52,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | MPRIS client: Linux players (Spotify, browsers, mpv) in Now Playing, and the media keys reach them | music and video in the browser without global controls | S/M | ⬜ |
 | StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | ⬜ |
 | XDG autostart (`/etc/xdg/autostart`, `~/.config/autostart`) through a closed launcher, listed in Settings | sync clients, VPNs and messengers start with the session | M | ⛔ a new launch path |
-| Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | ⬜ |
+| Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | 🟨 built, to check on the VM |
 | Global shortcuts portal | push-to-talk, OBS | M | ⬜ |
 | Drop onto isolated apps (Mail attaches, Calendar and Contacts import): the dropped files granted to that app as the file chooser grants them | Mail can't take a dragged file | M | ⛔ a new broker message and grant |
 | Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | ⬜ |

@@ -208,6 +208,21 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 2.4 | Updates bring only the Recommends a new version adds | Test (`build/pkg-test`: the new Recommends come with the upgrade) | Holds in the test; the update against the signed repository not recorded here |
 | 5.1 | Four more verified Cloud providers | `assets/cloud/providers.json` (evidence per provider), `docs/CLOUD.md` §19 | Holds as recorded evidence |
 
+## 0.8.8.8 (in development, not released; the paper's edition of 2026-11-10)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 1.2, 5.1, 6.7 | Port forwards, drop uploads and `ls` downloads run no program: they use the tab's own `ssh` control socket, as Files mode does | Design (`server/src/term/sshmux.c`, `apps/terminal/forwards.js`, `dropupload.js`); Test (`build/sftpc-test`: a forward to the test server's own `sshd`, its banner read through it, a host with a space refused) | Holds in the test; checked on a real session against one private OpenSSH server per `CHANGELOG.md` |
+| 6.7 | A forward listens on 127.0.0.1 only | Design (`sshmux.c`, `docs/TERMINAL.md`) | Not automated beyond `sftpc-test` |
+| 5.1, 6.7 | The remote shell's directory (OSC 7) is kept only as an absolute path with no control characters, and no longer replaces the local one | `CHANGELOG.md`, Unreleased | Not automated here |
+| 5.1 | ❖ + click finds a name in `ls` and `ls -l` output, looked up in the reported directory, the prompt's, the title's, then the home | Test (`tests/terminal_lsnames_test.mjs`, 38 checks) | Holds |
+| 5.1, 6.7 | Uploads never follow a link and never replace a name on the server; Edit's saves are the one upload that replaces a file | `CHANGELOG.md`, Unreleased; checked on a real session (a name already there kept, the copy `notes (2).txt`) | Not automated here |
+| 5.1 | A trigger tried on a sample line says what it matches and what the action would do | Test (`tests/terminal_triggers_test.mjs`, 13) | Holds |
+| 5.1 | "Send text at start" types and sends each line, the last one too, and an old `\n` counts once | Test (`tests/terminal_profilefields_test.mjs`, 22) | Holds |
+| 5.1 | The SDK's text fields select and edit (Shift, drag, double click, by word, copy and cut never from a password field) | Test (`tests/textfield_model_test.mjs`, 43; `tests/textarea_model_test.mjs`, 32) | Holds for the models; the drawing was seen on a session |
+| 5.1 | A group of Databases favorites has a color, checked in `lord-server` like a favorite's | Test (`build/sqlc-test`, 5 more checks) | Holds |
+| 5.1 | Every list of names sorts the same way, case and accents aside, numbers by value (GitHub #64) | Test (`tests/files_model_test.mjs`, with the engine's `localeCompare` swapped in) | Holds; seen in a session and on a Raspberry Pi 5 |
+
 ## What the paper must change for 0.8.5
 
 State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26) after each item:

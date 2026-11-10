@@ -2,7 +2,7 @@
 // to add, reorder and remove, and the Trash. Every theme uses it; each one draws it its own way.
 //
 //   const entries = useDockEntries(['files', 'terminal'], { launcher: { Icon } })   // the theme's defaults
-//   // entry = { id, kind, name, Icon, windows: [window…], pinned, running, focused, locked, movable }
+//   // entry = { id, kind, name, Icon, windows: [window…], pinned, running, focused, attention, locked, movable }
 //   dockActivate(entry)        // click: opens the app or brings up its window
 //   dockMenu(entry)            // items for the context menu: [{ label, onClick, checked, submenu, header } | '-']
 //   dock.pin(id, index) · dock.move(id, index) · dock.unpin(id) · dock.reset()
@@ -202,6 +202,7 @@ export function useDockEntries(defaults = [], opts = {}) {
     id, kind: parseDockId(id)?.kind || 'linux', launcherId: launcherKey(id),
     name: (a?.kind === 'linux' ? shortAppName(a) : a?.name) || (ws[0] ? windowAppName(ws[0]) : '') || id, Icon: a?.Icon || (ws[0] ? windowIcon(ws[0], getApp) : ({ size }) => h(LetterIcon, { size, name: id })),
     windows: ws, pinned: pinned.includes(id), running: ws.length > 0, focused: ws.some((w) => w.id === focused), app: a,
+    attention: ws.some((w) => w.attention && w.id !== focused),   // a window asked to come forward (xdg-activation)
     locked: isLocked(id), movable: isMovable(id),
   });
   const out = [];
@@ -240,10 +241,13 @@ export function launchDockItem(id) {
 
 // Click on the icon: with no windows it opens the app; with windows it brings up the most recent one (if it
 // was already in front and there are several, it moves to the next, like ❖`). A window on this desktop
-// comes first; with none here it jumps to the desktop of the app's latest window.
+// comes first; with none here it jumps to the desktop of the app's latest window. A window that asked for
+// attention (xdg-activation) comes before all of them.
 export function dockActivate(e) {
   if (e.launcher) { e.onOpen?.(); return; }
   if (!e.windows.length) { if (!launchDockItem(e.id) && e.launcherId) launchApp(e.launcherId); return; }
+  const wants = e.windows.find((w) => w.attention);
+  if (wants) { wm.focus(wants.id); return; }
   const top = wm.focused();
   const here = e.windows.filter(onActiveDesktop);
   const idx = here.findIndex((w) => w.id === top);
