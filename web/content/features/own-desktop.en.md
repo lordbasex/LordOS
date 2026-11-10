@@ -97,9 +97,19 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
+## New in 0.8.8.7
+
+Released on 9 November 2026, the latest release.
+
+- **The Terminal shows a server's files.** In a tab connected with `ssh`, Files mode puts this computer on the left and the server on the right, over the same connection, with no second login. The SFTP protocol is spoken by `lord-sftp`, a sandboxed helper that gets open descriptors and never a path, and LordOS runs no program for it. The Terminal's Settings and a new Profiles window open in windows of their own, and Claude Code's footer now works inside `screen`, `tmux` and `ssh`.
+- **Databases.** A new app for MySQL and MariaDB, with each connection in its own sandboxed helper, `lord-sql`, and its own row in the firewall and the Monitor.
+- **Window buttons on either side.** Settings → Desktop & Dock → Window buttons puts them on the left or the right in both themes, and Linux apps that draw their own title bar follow.
+- **Displays stay lit across lock, logout and login.** Every lit display gets a black frame of its own before the next session takes the monitor, instead of the session's buffers being pulled from under the screen, which some cards refused and left the displays dark.
+- **Lithuanian is complete,** CDs and DVDs mount read-only in Files, and Cloud and network folders no longer freeze the desktop.
+
 ## New in 0.8.8.6
 
-Released on 8 November 2026, the latest release.
+Released on 8 November 2026.
 
 - **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
 - **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard.

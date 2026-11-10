@@ -61,6 +61,14 @@ Several methods can live side by side. The vault locks itself after 5 minutes of
 
 Both are exceptions approved in the project's rulebook (`AGENTS.md`), tested on a real pseudo-terminal (`build/term-secret-test`, `build/term-capture-test` with 28 checks, also under ASan and UBSan).
 
+## Across LordOS (0.8.8.7)
+
+- **Fill and save sign-ins in other apps.** The password fields of Settings → Cloud, Files' shared-folder sign-in and Connect to Server, Remote Desk and Databases have the 🔑 of Passwords, as Wi-Fi already did. For a server it lists only entries whose host field or site is exactly the address the password goes to, never a guess from a title and never the name a machine announces on the local network, so a device can't take a kept server's name and be offered its password. The password leaves Passwords only when you pick one.
+- **Save what a server accepted.** When a server accepts a password you typed in the form, the app asks whether to save it in Passwords; nothing is saved until you choose Save, and the password never goes to a file or a log.
+- **Copy anything, and know what became of it.** Titles and notes have a copy button too, a right click on an item copies any field or its 2FA code, and a copied password shows the seconds before it is cleared, with Keep. LordOS tells Passwords only whether its own copy is still on the clipboard, never what the clipboard holds.
+- **Paste works in the isolated apps.** Mail, Calendar, Contacts, Reminders and Passwords can read the clipboard once, within 2 seconds, after a paste you ask for in their window; any other read still needs the permission.
+- **A new icon:** a gold key on graphite.
+
 ## The skeptical reader's questions
 
 **Who can read the session keyring?** Inside LordOS, each app only its own items, unless you share one. Through the Secret Service, the access rule is the freedesktop one: any Linux app of your session that can reach the session bus can read the unlocked collection, as with other desktop keyrings. Isolated `.lpk` apps can't reach the bus.

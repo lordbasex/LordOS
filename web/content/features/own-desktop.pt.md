@@ -97,9 +97,19 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 - **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
+## Novo na 0.8.8.7
+
+Lançada em 9 de novembro de 2026, o último lançamento.
+
+- **O Terminal mostra os arquivos de um servidor.** Numa aba conectada com `ssh`, o modo Arquivos põe este computador à esquerda e o servidor à direita, pela mesma conexão, sem um segundo login. O protocolo SFTP é falado pelo `lord-sftp`, um ajudante em sandbox que recebe descritores abertos e nunca um caminho, e o LordOS não executa nenhum programa para isso. Os Ajustes do Terminal e uma nova janela de Perfis abrem em janelas próprias, e o rodapé do Claude Code agora funciona dentro do `screen`, do `tmux` e do `ssh`.
+- **Bancos de dados.** Um app novo para MySQL e MariaDB, com cada conexão no seu próprio ajudante em sandbox, `lord-sql`, e uma linha própria no firewall e no Monitor.
+- **Botões da janela em qualquer lado.** Ajustes → Mesa e Dock → Botões da janela os coloca à esquerda ou à direita nos dois temas, e os apps Linux que desenham a própria barra de título acompanham.
+- **As telas continuam acesas ao bloquear, sair e entrar.** Cada tela acesa recebe um quadro preto próprio antes que a próxima sessão assuma o monitor, em vez de os buffers da sessão serem tirados de baixo da tela, o que algumas placas recusavam e deixava as telas apagadas.
+- **O lituano está completo,** CDs e DVDs são montados só para leitura no Arquivos, e as pastas da Nuvem e de rede não congelam mais o desktop.
+
 ## Novo na 0.8.8.6
 
-Lançada em 8 de novembro de 2026, o último lançamento.
+Lançada em 8 de novembro de 2026.
 
 - **Ler em voz alta.** Fala em todo app com texto, ❖Esc para a seleção, um pequeno reprodutor com a onda da voz, Fala ao vivo e uma Voz pessoal, tudo no computador e sem internet (veja *Ler em voz alta* nos recursos).
 - **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência.

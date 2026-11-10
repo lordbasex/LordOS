@@ -61,6 +61,14 @@ Varios métodos pueden convivir. Por defecto, la bóveda se cierra sola después
 
 Las dos son excepciones aprobadas en el reglamento del proyecto (`AGENTS.md`), probadas en una pseudoterminal real (`build/term-secret-test`, `build/term-capture-test` con 28 verificaciones, también con ASan y UBSan).
 
+## En todo LordOS (0.8.8.7)
+
+- **Completar y guardar inicios de sesión en otras apps.** Los campos de contraseña de Ajustes → Nube, el inicio de sesión en carpetas compartidas de Archivos y Conectarse al servidor, Remote Desk y Bases de datos tienen la 🔑 de Contraseñas, como ya la tenía el Wi-Fi. Para un servidor solo lista las entradas cuyo campo de host o sitio es exactamente la dirección a la que va la contraseña, nunca una suposición a partir de un título ni el nombre que una máquina anuncia en la red local, así que un dispositivo no puede tomar el nombre de un servidor guardado y recibir su contraseña. La contraseña sale de Contraseñas solo cuando elegís una.
+- **Guardar lo que un servidor aceptó.** Cuando un servidor acepta una contraseña que escribiste en el formulario, la app pregunta si guardarla en Contraseñas; no se guarda nada hasta que elegís Guardar, y la contraseña nunca va a un archivo ni a un registro.
+- **Copiá cualquier cosa y sabé qué pasó con ella.** Los títulos y las notas también tienen botón de copiar, un clic derecho en un ítem copia cualquier campo o su código 2FA, y una contraseña copiada muestra los segundos que faltan para borrarla, con Mantener. LordOS le dice a Contraseñas solo si su propia copia sigue en el portapapeles, nunca lo que tiene el portapapeles.
+- **Pegar funciona en las apps aisladas.** Mail, Calendario, Contactos, Recordatorios y Contraseñas pueden leer el portapapeles una vez, dentro de 2 segundos, después de un pegado que pedís en su ventana; cualquier otra lectura sigue necesitando el permiso.
+- **Un ícono nuevo:** una llave dorada sobre grafito.
+
 ## Las preguntas del lector escéptico
 
 **¿Quién puede leer el llavero de la sesión?** Dentro de LordOS, cada app solo sus propios ítems, salvo que compartas uno. Por el Secret Service, la regla de acceso es la de freedesktop: cualquier app de Linux de tu sesión que llegue al bus de la sesión puede leer la colección desbloqueada, como con otros llaveros de escritorio. Las apps `.lpk` aisladas no llegan al bus.

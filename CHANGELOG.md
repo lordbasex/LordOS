@@ -15,7 +15,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - **Lithuanian is complete** (GitHub #45). 0.8.8.6 translated the login screen, the desktop, Files, the installer and
-  part of Settings. Now every app and message is translated, 11,904 keys, with Lithuanian plurals (one, few, other). The
+  part of Settings. Now every app and message is translated, 11,909 keys, with Lithuanian plurals (one, few, other). The
   emoji names and keywords and the country names come from CLDR 45. Settings no longer lists Lithuanian as partly
   translated.
 - **Files and Disks: CDs and DVDs show up and mount read-only (#92).** Optical drives (`sr*`) used to be left out of `lord.disks.list()` and refused by every `disk-*` action, so an inserted disc, such as the VirtualBox Guest Additions image, never appeared anywhere. A drive that holds a disc is now listed with `transport: "optical"` and `ro: true`; an empty drive is not listed. Files shows the disc in Locations, and a click mounts it at `/media/<user>/<label>`. `disk-mount` always mounts a disc read-only (`nosuid,nodev`). `disk-unmount` and `disk-eject` accept it, and eject unlocks the door and opens the tray with `CDROMEJECT`; in a VM this removes the image. Format, rename, erase, image copies, SMART and the LordOS Imager refuse an optical drive on the root side (`disk.opticalReadOnly`). Disks now offers Mount, Unmount and Eject for read-only disks too (discs, locked cards). A disc inserted during the session brings a notice whose Open mounts it and opens it in a new Files window.

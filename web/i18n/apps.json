@@ -611,7 +611,8 @@
         "Every disk in the sidebar, mounted with a click; trash and archives",
         "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view",
         "New in 0.8.8: the system file dialog now looks and works like Files",
-        "Since 0.8.8.4: Markup in Quick Preview opens a picture in the markup editor (crop, resize, redact, arrows and text)"
+        "Since 0.8.8.4: Markup in Quick Preview opens a picture in the markup editor (crop, resize, redact, arrows and text)",
+        "Since 0.8.8.7: CDs and DVDs mount read-only, and Cloud and network folders never freeze the desktop"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -621,7 +622,8 @@
         "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
         "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista",
         "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos",
-        "Desde la 0.8.8.4: Marcar en la Vista rápida abre una imagen en el editor de marcado (recortar, cambiar tamaño, tapar zonas, flechas y texto)"
+        "Desde la 0.8.8.4: Marcar en la Vista rápida abre una imagen en el editor de marcado (recortar, cambiar tamaño, tapar zonas, flechas y texto)",
+        "Desde la 0.8.8.7: los CD y DVD se montan en solo lectura, y las carpetas de la Nube y de red nunca congelan el escritorio"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -631,7 +633,8 @@
         "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
         "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização",
         "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos",
-        "Desde a 0.8.8.4: Marcar na Visualização rápida abre uma imagem no editor de marcação (recortar, redimensionar, tapar áreas, setas e texto)"
+        "Desde a 0.8.8.4: Marcar na Visualização rápida abre uma imagem no editor de marcação (recortar, redimensionar, tapar áreas, setas e texto)",
+        "Desde a 0.8.8.7: CDs e DVDs são montados só para leitura, e as pastas da Nuvem e de rede nunca congelam o desktop"
       ]
     }
   },
@@ -744,7 +747,8 @@
         "Search with regular expressions",
         "Inline images and font ligatures",
         "Sessions survive a restart; tmux integration",
-        "New in 0.8.8: ❖+click or Ctrl+click opens a web address in the default browser"
+        "New in 0.8.8: ❖+click or Ctrl+click opens a web address in the default browser",
+        "New in 0.8.8.7: Files mode shows a server's files beside this computer's over the tab's own ssh session, and Settings and Profiles open in windows of their own"
       ],
       "es": [
         "Pestañas, paneles divididos y ventana desplegable",
@@ -752,7 +756,8 @@
         "Búsqueda con expresiones regulares",
         "Imágenes en línea y ligaduras tipográficas",
         "Las sesiones sobreviven a un reinicio; integración con tmux",
-        "Nuevo en 0.8.8: ❖+clic o Ctrl+clic abre una dirección web en el navegador predeterminado"
+        "Nuevo en 0.8.8: ❖+clic o Ctrl+clic abre una dirección web en el navegador predeterminado",
+        "Nuevo en 0.8.8.7: el modo Archivos muestra los archivos de un servidor junto a los de este equipo por el mismo ssh de la pestaña, y Ajustes y Perfiles se abren en ventanas propias"
       ],
       "pt": [
         "Abas, painéis divididos e janela suspensa",
@@ -760,7 +765,8 @@
         "Busca com expressões regulares",
         "Imagens em linha e ligaduras tipográficas",
         "As sessões sobrevivem a um reinício; integração com tmux",
-        "Novo na 0.8.8: ❖+clique ou Ctrl+clique abre um endereço da web no navegador padrão"
+        "Novo na 0.8.8: ❖+clique ou Ctrl+clique abre um endereço da web no navegador padrão",
+        "Novo na 0.8.8.7: o modo Arquivos mostra os arquivos de um servidor ao lado dos deste computador pelo próprio ssh da aba, e Ajustes e Perfis abrem em janelas próprias"
       ]
     }
   },
@@ -1013,21 +1019,24 @@
         "Unlock with a password, a FIDO2 key or a key file",
         "Security report and password generator",
         "Import from KDBX and CSV files",
-        "Runs isolated; hidden from screenshots"
+        "Runs isolated; hidden from screenshots",
+        "Since 0.8.8.7: fills and saves sign-ins in Settings → Cloud, Files, Remote Desk and Databases, only for the exact address"
       ],
       "es": [
         "Accesos, códigos 2FA, Wi-Fi, tarjetas y notas seguras",
         "Desbloqueá con contraseña, llave FIDO2 o archivo llave",
         "Informe de seguridad y generador de contraseñas",
         "Importá desde archivos KDBX y CSV",
-        "Corre aislada; no sale en las capturas"
+        "Corre aislada; no sale en las capturas",
+        "Desde la 0.8.8.7: completa y guarda inicios de sesión en Ajustes → Nube, Archivos, Remote Desk y Bases de datos, solo para la dirección exacta"
       ],
       "pt": [
         "Logins, códigos 2FA, Wi-Fi, cartões e notas seguras",
         "Desbloqueie com senha, chave FIDO2 ou arquivo-chave",
         "Relatório de segurança e gerador de senhas",
         "Importe de arquivos KDBX e CSV",
-        "Roda isolado; não aparece em capturas de tela"
+        "Roda isolado; não aparece em capturas de tela",
+        "Desde a 0.8.8.7: preenche e salva logins em Ajustes → Nuvem, Arquivos, Remote Desk e Bancos de dados, só para o endereço exato"
       ]
     }
   },
@@ -1115,7 +1124,7 @@
       ]
     }
   },
-  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: apps/passwords and, since 0.8.2, apps/mail, apps/calendar, apps/contacts and apps/reminders have \"process\": \"isolated\" in their manifest (built into assets/sysapps/<id> by tools/build-theme.mjs; apps/sysprobe is isolated too but hidden, a test app of System Information). System Information (sysinfo, released in 0.8.5) and LordOS Imager (imager, 0.8.4) were added on 2026-10-26; their icons were exported with tools/web/render-icons.mjs. Machines (machines, released in 0.8.8.5) was added on 2026-11-08; its icon (AppMark in apps/machines/library.jsx) was rendered at the size and crop tools/web/render-icons.mjs uses, and it has no screenshot because the repository holds no English capture of it. No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/)..",
+  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: apps/passwords and, since 0.8.2, apps/mail, apps/calendar, apps/contacts and apps/reminders have \"process\": \"isolated\" in their manifest (built into assets/sysapps/<id> by tools/build-theme.mjs; apps/sysprobe is isolated too but hidden, a test app of System Information). System Information (sysinfo, released in 0.8.5) and LordOS Imager (imager, 0.8.4) were added on 2026-10-26; their icons were exported with tools/web/render-icons.mjs. Machines (machines, released in 0.8.8.5) was added on 2026-11-08; its icon (AppMark in apps/machines/library.jsx) was rendered at the size and crop tools/web/render-icons.mjs uses, and it has no screenshot because the repository holds no English capture of it. No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/).. Databases (databases, released in 0.8.8.7) was added on 2026-11-09; its icon was exported with tools/web/render-icons.mjs, and it has no screenshot because the repository holds no English capture of it. The Passwords icon was exported again the same day for its new look (0.8.8.7).",
   "cleaner": {
     "category": "system",
     "isolated": false,
@@ -1235,6 +1244,47 @@
         "Migre uma máquina de outro app de virtualização (.vmx, .vbox, .pvm, .ova)",
         "Área de transferência compartilhada com um agente opcional na máquina",
         "QEMU e passt são instalados na primeira vez que forem necessários"
+      ]
+    }
+  },
+  "databases": {
+    "category": "productivity",
+    "isolated": false,
+    "icon": "apps/databases/index.jsx",
+    "name": {
+      "en": "Databases",
+      "es": "Bases de datos",
+      "pt": "Bancos de dados"
+    },
+    "tagline": {
+      "en": "A MySQL and MariaDB client, each connection in its own sandbox",
+      "es": "Un cliente de MySQL y MariaDB, cada conexión en su propio sandbox",
+      "pt": "Um cliente de MySQL e MariaDB, cada conexão no seu próprio sandbox"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.8.7",
+        "Favorites in groups with colors; TCP, local socket and managed cloud connections with TLS",
+        "Structure shows every change as the ALTER TABLE before it runs",
+        "Content with filters, sorting and row editing; Query with completion, history and Explain",
+        "A safe mode asks before an UPDATE or DELETE without WHERE; production favorites open read-only",
+        "Passwords stay in Passwords; the firewall and Monitor show it as its own row"
+      ],
+      "es": [
+        "Nuevo en 0.8.8.7",
+        "Favoritos en grupos con colores; conexiones TCP, por socket local y a servicios en la nube con TLS",
+        "Estructura muestra cada cambio como el ALTER TABLE antes de ejecutarlo",
+        "Contenido con filtros, orden y edición de filas; Consulta con autocompletado, historial y Explain",
+        "Un modo seguro pregunta antes de un UPDATE o DELETE sin WHERE; los favoritos de producción se abren en solo lectura",
+        "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila"
+      ],
+      "pt": [
+        "Novo na 0.8.8.7",
+        "Favoritos em grupos com cores; conexões TCP, por socket local e a serviços na nuvem com TLS",
+        "Estrutura mostra cada mudança como o ALTER TABLE antes de rodar",
+        "Conteúdo com filtros, ordenação e edição de linhas; Consulta com autocompletar, histórico e Explain",
+        "Um modo seguro pergunta antes de um UPDATE ou DELETE sem WHERE; favoritos de produção abrem só para leitura",
+        "As senhas ficam no Senhas; o firewall e o Monitor o mostram numa linha própria"
       ]
     }
   },

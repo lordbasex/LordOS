@@ -189,6 +189,25 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 7.1 | Memory in use counted as `MemTotal − MemFree − (Buffers + Cached + SReclaimable − Shmem)` | Test (`sysreport-test`, `server/src/meminfo.h`) | Holds; the measured rows of §7.1 were not taken again |
 | 2.4 | `intel-microcode` and `amd64-microcode` are dependencies on amd64 | Package control file | Design; the update path against the signed repository not yet run |
 
+## 0.8.8.7 (released on 2026-11-09 as 0.8.8.7-beta; the paper's edition of 2026-11-09)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 1.2, 5.1, 6.7 | Files mode runs no program: `lord-server` opens channels on the tab's own `ssh` control socket with OpenSSH's mux protocol, and remote commands come from a closed list checked in C | Design (`server/src/term/sshmux.c`, `sftpc.c`, AGENTS.md); Test (`build/sftpc-test`: `tests/sftp_e2e.sh` with a private `sshd` and an `ssh` master) | Holds in the test; not checked against servers other than OpenSSH |
+| 6.7 | `lord-sftp` gets the channel and the local file as descriptors, never a path, with no `clone`, socket, `connect`, `bind` or `exec` | Test (`build/sftp-test`, also under ASan and UBSan: the mux and SFTP wire against hostile bytes, `lord-sftp` against a fake server) | Holds |
+| 2.2, 6.2, 6.7 | `lord-sql`: one process per connection, OpenSSL inside the helper only, sandbox applied before the server's first byte, no sockets or files | Test (`build/sql-proto-test`, also under ASan and UBSan; `build/sql-e2e-test` against a fake MySQL server: both sign-in methods, RSA, TLS, results) | Holds; real servers not recorded here. `AGENTS.md` still marks `lord-sql` and the `sql` connector as pending the maintainer's approval |
+| 6.6 | The `sql` connector connects only to a saved favorite's host and port, named by id | Test (`build/sqlc-test`: the favorites validator, the lookup and the socket rule) | Holds |
+| 6.10 | Passwords' 🔑 lists only entries whose host or site is exactly the address the password goes to | `CHANGELOG.md`, 0.8.8.7-beta | Not automated here |
+| 6.10 | An isolated app reads the clipboard once within 2 s of a paste `lord-server` saw reach its window | `CHANGELOG.md`, 0.8.8.7-beta (#64) | Not automated here |
+| 4.4 | Lithuanian complete: all 11,909 keys | Test (`tools/i18n-check.mjs`: every key in every language; 11,909/11,909 at the tag) | Holds |
+| 5.1 | CDs and DVDs mount read-only; destructive actions refuse an optical drive on the root side | `CHANGELOG.md`, 0.8.8.7-beta (#92) | Not automated; seen with a virtual machine's disc image per the changelog |
+| 5.1 | Asynchronous `lord.fs` calls refuse exactly what the synchronous ones refuse | Test (`build/fsasync-test`, `tests/files_remote_test.mjs`) | Holds |
+| 7.2 | 1,520 12-megapixel photos: 10 GB in 23 s (killed) → 265 MB at most, no pause over 0.4 s; 300 photos, 154 MB | Measured once (`CHANGELOG.md`, 0.8.8.7-beta, #71, #82) | Measured |
+| 3.6 | A hardware H.264 stream whose first keyframe doesn't decode falls back to x264 | Test (`build/encheck-test`, `build/lmstream-test` in `test-full`) | Holds where FFmpeg's -dev packages and, for VA-API, a render node exist |
+| 3.6 | Every lit display gets a black frame of its own mode, let go with `CLOSEFB`, at each hand-off | Design (`lord-sessiond`); `CHANGELOG.md`, 0.8.8.7-beta | Not automated; amdgpu's warning is what was seen before |
+| 2.4 | Updates bring only the Recommends a new version adds | Test (`build/pkg-test`: the new Recommends come with the upgrade) | Holds in the test; the update against the signed repository not recorded here |
+| 5.1 | Four more verified Cloud providers | `assets/cloud/providers.json` (evidence per provider), `docs/CLOUD.md` §19 | Holds as recorded evidence |
+
 ## What the paper must change for 0.8.5
 
 State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26) after each item:

@@ -61,6 +61,14 @@ Vários métodos podem conviver. Por padrão, o cofre se tranca sozinho depois d
 
 As duas são exceções aprovadas no regulamento do projeto (`AGENTS.md`), testadas num pseudoterminal real (`build/term-secret-test`, `build/term-capture-test` com 28 verificações, também com ASan e UBSan).
 
+## Em todo o LordOS (0.8.8.7)
+
+- **Preencher e salvar logins em outros apps.** Os campos de senha de Ajustes → Nuvem, o login em pastas compartilhadas do Arquivos e Conectar ao servidor, o Remote Desk e o Bancos de dados têm a 🔑 do Senhas, como o Wi-Fi já tinha. Para um servidor ele lista só as entradas cujo campo de host ou site é exatamente o endereço para onde vai a senha, nunca um palpite a partir de um título nem o nome que uma máquina anuncia na rede local, então um dispositivo não pode tomar o nome de um servidor guardado e receber a senha dele. A senha só sai do Senhas quando você escolhe uma.
+- **Salvar o que um servidor aceitou.** Quando um servidor aceita uma senha que você digitou no formulário, o app pergunta se deve salvá-la no Senhas; nada é salvo até você escolher Salvar, e a senha nunca vai para um arquivo ou um log.
+- **Copie qualquer coisa e saiba o que aconteceu com ela.** Títulos e notas também têm botão de copiar, um clique direito num item copia qualquer campo ou o código 2FA, e uma senha copiada mostra os segundos que faltam para ser apagada, com Manter. O LordOS diz ao Senhas só se a própria cópia ainda está na área de transferência, nunca o que a área de transferência contém.
+- **Colar funciona nos apps isolados.** Mail, Calendário, Contatos, Lembretes e Senhas podem ler a área de transferência uma vez, em até 2 segundos, depois de uma colagem que você pede na janela deles; qualquer outra leitura ainda precisa da permissão.
+- **Um ícone novo:** uma chave dourada sobre grafite.
+
 ## As perguntas do leitor cético
 
 **Quem pode ler o chaveiro da sessão?** Dentro do LordOS, cada app só os próprios itens, a menos que você compartilhe algum. Pelo Secret Service, a regra de acesso é a do freedesktop: qualquer app Linux da sua sessão que alcance o barramento da sessão pode ler a coleção desbloqueada, como acontece com outros chaveiros de desktop. Os apps `.lpk` isolados não alcançam o barramento.

@@ -97,9 +97,19 @@ Todo en la 0.8.7, menos los dos puntos marcados 0.8.8.
 - **Las ventanas se abren donde estaban.** Tamaño, posición, maximizada y pantalla, por app, en los dos temas, para apps de LordOS y de Linux; si una pantalla ya no está o el lugar queda fuera de la pantalla, la ventana se abre en un lugar visible. Sin probar entre dos pantallas.
 - **Restaurar la sesión.** Las apps abiertas al cerrar sesión, reiniciar o apagar vuelven con sus ventanas y su escritorio, y después de un corte de luz o un fallo LordOS pregunta primero. Se guardan solo identificadores de apps, nunca rutas de documentos. Probado en una máquina virtual, con reinicios, un apagado real y un apagado forzado.
 
+## Nuevo en la 0.8.8.7
+
+Publicada el 9 de noviembre de 2026, el último lanzamiento.
+
+- **La Terminal muestra los archivos de un servidor.** En una pestaña conectada con `ssh`, el modo Archivos pone este equipo a la izquierda y el servidor a la derecha, por la misma conexión, sin un segundo inicio de sesión. El protocolo SFTP lo habla `lord-sftp`, un ayudante aislado que recibe descriptores abiertos y nunca una ruta, y LordOS no ejecuta ningún programa para esto. Los Ajustes de la Terminal y una nueva ventana de Perfiles se abren en ventanas propias, y el pie de Claude Code ahora funciona dentro de `screen`, `tmux` y `ssh`.
+- **Bases de datos.** Una app nueva para MySQL y MariaDB, con cada conexión en su propio ayudante aislado, `lord-sql`, y su propia fila en el cortafuegos y el Monitor.
+- **Botones de ventana a cualquier lado.** Ajustes → Escritorio y Dock → Botones de ventana los pone a la izquierda o a la derecha en los dos temas, y las apps de Linux que dibujan su propia barra de título los siguen.
+- **Las pantallas siguen encendidas al bloquear, cerrar sesión e iniciarla.** Cada pantalla encendida recibe un cuadro negro propio antes de que la siguiente sesión tome el monitor, en lugar de que se le quiten los búferes de la sesión de abajo de la pantalla, cosa que algunas placas rechazaban y dejaba las pantallas a oscuras.
+- **El lituano está completo,** los CD y DVD se montan en solo lectura en Archivos, y las carpetas de la Nube y de red ya no congelan el escritorio.
+
 ## Nuevo en la 0.8.8.6
 
-Publicada el 8 de noviembre de 2026, el último lanzamiento.
+Publicada el 8 de noviembre de 2026.
 
 - **Leer en voz alta.** Voz en toda app con texto, ❖Esc para la selección, un reproductor pequeño con la onda de la voz, Voz en tiempo real y una Voz personal, todo en el equipo y sin internet (mirá *Leer en voz alta* en las funciones).
 - **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles.
