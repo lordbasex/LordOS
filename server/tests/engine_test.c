@@ -274,6 +274,55 @@ static void test_ellipsis(void) {
     CHECK(below == 0, "clamped text drew a third line (%d px)", below);
 }
 
+/* lord.text.carets (text_carets, caret.c) over real shaping: the edges add up to the measured width,
+ * Hebrew with a number has the number on the left, left to right, and emoji sequences, flags and
+ * marks keep one pair of edges per grapheme cluster. */
+static void test_carets(void) {
+    TextCarets t;
+    float w, h;
+    const char *latin = "AVATAR Wave";            /* Inter's fast path, kerned */
+    CHECK(!text_carets(latin, 400, 13, &t) && t.n == 11 && !t.rtl, "Latin carets");
+    text_measure(latin, 400, 13, 0, 0, 1, &w, &h);
+    CHECK(fabsf(t.x1[10] - t.width) < 0.01f && fabsf(ceilf(t.width) - w) < 0.01f, "Latin: right edge %.1f, width %.1f, measured %.0f", t.x1[10], t.width, w);
+    int grows = 1;
+    for (int i = 1; i < t.n; i++) if (t.x0[i] < t.x0[i - 1] || fabsf(t.x0[i] - t.x1[i - 1]) > 0.01f) grows = 0;
+    CHECK(grows, "Latin: the edges don't follow each other");
+    text_carets_free(&t);
+
+    /* "שלום 123": right to left, the digits on the left in their own order */
+    const char *heb = "\xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d 123";
+    CHECK(!text_carets(heb, 400, 13, &t) && t.n == 8 && t.rtl, "Hebrew carets");
+    text_measure(heb, 400, 13, 0, 0, 1, &w, &h);
+    CHECK(fabsf(ceilf(t.width) - w) < 0.01f, "Hebrew: width %.1f, measured %.0f", t.width, w);
+    CHECK(t.x0[5] < 0.5f && t.x0[5] < t.x0[6] && t.x0[6] < t.x0[7], "Hebrew: 1 2 3 at %.1f %.1f %.1f", t.x0[5], t.x0[6], t.x0[7]);
+    CHECK(t.x1[0] > t.width - 0.5f && t.x0[0] > t.x0[1] && t.x0[3] > t.x1[7], "Hebrew: shin at %.1f..%.1f", t.x0[0], t.x1[0]);
+    CHECK((t.lv[0] & 1) && !(t.lv[5] & 1), "Hebrew: levels %d %d", t.lv[0], t.lv[5]);
+    text_carets_free(&t);
+
+    /* emoji: a ZWJ family, a thumbs up with a skin tone and a flag are one grapheme each */
+    const char *emo = "a\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x91\xa7 \xf0\x9f\x91\x8d\xf0\x9f\x8f\xbd \xf0\x9f\x87\xa6\xf0\x9f\x87\xb7 e\xcc\x81";
+    CHECK(!text_carets(emo, 400, 13, &t) && t.n == 15, "emoji carets: %d code points", t.n);
+    int one = 1;
+    for (int i = 2; i <= 5; i++) if (t.x0[i] != t.x0[1] || t.x1[i] != t.x1[1]) one = 0;
+    CHECK(one && t.x1[1] > t.x0[1], "emoji: the family has more than one pair of edges");
+    CHECK(t.x0[7] == t.x0[8] && t.x1[7] == t.x1[8], "emoji: the skin tone split from its hand");
+    CHECK(t.x0[10] == t.x0[11] && t.x1[10] == t.x1[11] && t.x1[10] > t.x0[10], "emoji: the flag split");
+    CHECK(t.x0[13] == t.x0[14] && t.x1[13] == t.x1[14] && t.x0[13] >= t.x1[11], "emoji: e and its accent split");
+    CHECK(t.x0[1] >= t.x1[0] - 0.01f && t.x0[7] >= t.x1[5], "emoji: out of order");
+    text_carets_free(&t);
+
+    /* Arabic: لا is one glyph for two letters; each gets a half, the lam on the right */
+    const char *lam = "\xd9\x84\xd8\xa7";
+    if (!text_carets(lam, 400, 13, &t)) {
+        CHECK(t.n == 2 && t.rtl && t.x0[0] >= t.x1[1] - 0.01f && t.x1[0] > t.x0[0] && t.x1[1] > t.x0[1], "lam-alef: %.1f..%.1f %.1f..%.1f", t.x0[0], t.x1[0], t.x0[1], t.x1[1]);
+        text_carets_free(&t);
+    }
+    /* past the first line: at its end */
+    CHECK(!text_carets("ab\ncd", 400, 13, &t) && t.n == 5 && t.x0[3] == t.width && t.x0[4] == t.width, "second line");
+    text_carets_free(&t);
+    printf("carets: Latin, Hebrew with digits, emoji sequences, lam-alef\n");
+}
+
 #endif
 
 /* ---- nodes ---- */
@@ -3339,6 +3388,7 @@ int main(int argc, char **argv) {
     printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
     test_ellipsis();
+    test_carets();
     test_covered();
     test_borders();
     test_logical();

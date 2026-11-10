@@ -256,6 +256,14 @@ void  text_draw_ex(Canvas *c, const char *s, float weight, float size, float lin
  * Writes it (with the "…") to out and returns its width; returns -1 and copies s if s already fits
  * and force is 0. Shaped text is re-shaped, so Arabic letters take their final forms. */
 float text_ellipsize(const char *s, float weight, float size, float box_w, int force, char *out, int out_size);
+/* Where each code point of the first line of s is drawn, for a text field's caret and selection
+ * (caret.c): x0/x1 its left and right edges from the line's left edge (code points of one grapheme
+ * cluster share them; those past the first line sit at its end), lv its bidi level (odd = right to
+ * left), rtl the paragraph's direction. Text longer than TEXT_CARETS_MAX code points gets none. */
+#define TEXT_CARETS_MAX 8192
+typedef struct { int n, rtl; float width; uint32_t *cp; float *x0, *x1; uint8_t *lv; } TextCarets;
+int   text_carets(const char *s, float weight, float size, TextCarets *out);    /* 0, or -1 (too long, no memory) */
+void  text_carets_free(TextCarets *t);
 Otf  *text_font_otf(int font);
 float text_font_scale(int font, float size);
 int   text_font_kern_glyphs(int font, uint32_t a, uint32_t b);  /* font units */
@@ -273,6 +281,7 @@ void  text_layout_measure_ex(const char *s, int font, float size, float line_h, 
 void  text_layout_draw_n(Canvas *c, const char *s, int font, float size, float line_h,
                          float x, float y, float box_w, int align, int nowrap, int max_lines, uint32_t argb);
 int   text_layout_line_bytes(const char *s, int font, float size, float max_w, int nowrap, int *bs, int *be, int max);
+int   text_layout_carets(const char *s, int font, float size, TextCarets *out);
 int   text_ellipsis_join(char *out, int out_size, const char *s, int len);   /* prefix + "…" */
 void  text_set_language(const char *lang);                 /* picks the CJK font (ja/ko/zh) */
 const char *text_language(void);                         /* the UI language the SDK set ("" before) */

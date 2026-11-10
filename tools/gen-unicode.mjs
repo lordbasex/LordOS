@@ -8,6 +8,7 @@
 //     Myanmar ones, the Universal Shaping Engine ones (Tibetan, Sinhala, Balinese, Javanese…), marks,
 //     canonical decompositions of the complex scripts and composition exclusions
 //   - line-break classes that matter for Chinese, Japanese and Korean (UAX #14)
+//   - grapheme cluster breaks (UAX #29): what the caret steps over as one character → grapheme.c
 //
 //   node tools/gen-unicode.mjs <UCD folder>
 // The folder needs (from https://www.unicode.org/Public/<version>/ucd/):
@@ -15,9 +16,9 @@
 //   BidiBrackets.txt  Scripts.txt  PropertyValueAliases.txt  LineBreak.txt
 //   extracted/DerivedCombiningClass.txt  DerivedCoreProperties.txt
 //   IndicSyllabicCategory.txt  IndicPositionalCategory.txt  UnicodeData.txt  CompositionExclusions.txt
-//   ArabicShaping.txt, and from HarfBuzz (src/ms-use/): IndicSyllabicCategory-Additional.txt
+//   ArabicShaping.txt, auxiliary/GraphemeBreakProperty.txt, emoji/emoji-data.txt, and from HarfBuzz (src/ms-use/): IndicSyllabicCategory-Additional.txt
 //   IndicPositionalCategory-Additional.txt (Universal Shaping Engine categories)
-// (the extracted/ ones may be in the same folder).
+// (the extracted/, auxiliary/ and emoji/ ones may be in the same folder).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +27,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const ucd = process.argv[2];
 if (!ucd) { console.error('usage: gen-unicode.mjs <UCD folder>'); process.exit(1); }
 const read = (name) => {
-  for (const p of [path.join(ucd, name), path.join(ucd, 'extracted', name)])
+  for (const p of [path.join(ucd, name), path.join(ucd, 'extracted', name), path.join(ucd, 'auxiliary', name), path.join(ucd, 'emoji', name)])
     if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
   throw new Error(`missing ${name}`);
 };
@@ -137,6 +138,21 @@ const ccc = ranges(parse(read('DerivedCombiningClass.txt')), (v) => Number(v) ||
 h += `static const UniRange uni_ccc[] = {\n${ccc.map((r) => `    { ${hex(r.lo)}, ${hex(r.hi)}, ${r.v} },`).join('\n')}\n};\n\n`;
 const ign = ranges(parse(read('DerivedCoreProperties.txt'), { missing: false }).filter((e) => e.v === 'Default_Ignorable_Code_Point'), () => 1, 0);
 h += `static const UniRange uni_ignorable[] = {\n${ign.map((r) => `    { ${hex(r.lo)}, ${hex(r.hi)}, 1 },`).join('\n')}\n};\n\n`;
+
+// ---- grapheme clusters (UAX #29, extended): Grapheme_Cluster_Break, Extended_Pictographic (emoji
+// ZWJ sequences) and Indic_Conjunct_Break (conjuncts joined by a virama) → grapheme.c ----
+const GCB = ['Other', 'CR', 'LF', 'Control', 'Extend', 'ZWJ', 'RI', 'Prepend', 'SpacingMark', 'L', 'V', 'T', 'LV', 'LVT'];
+const GCB_LONG = { Regional_Indicator: 'RI' };
+const gcb = ranges(parse(read('GraphemeBreakProperty.txt'), { missing: false }), (v) => GCB.indexOf(GCB_LONG[v] || v), 0);
+enums += `enum { ${GCB.map((c) => `GCB_${c}`).join(', ')} };\n`;
+h += `static const UniRange uni_gcb[] = {\n${gcb.map((r) => `    { ${hex(r.lo)}, ${hex(r.hi)}, GCB_${GCB[r.v]} },`).join('\n')}\n};\n\n`;
+const extpict = ranges(parse(read('emoji-data.txt'), { missing: false }).filter((e) => e.v === 'Extended_Pictographic'), () => 1, 0);
+h += `static const UniRange uni_extpict[] = {\n${extpict.map((r) => `    { ${hex(r.lo)}, ${hex(r.hi)}, 1 },`).join('\n')}\n};\n\n`;
+const INCB = ['None', 'Linker', 'Consonant', 'Extend'];
+const incbR = ranges(parse(read('DerivedCoreProperties.txt'), { missing: false }).filter((e) => e.v === 'InCB').map((e) => ({ ...e, v: e.f[2] })),
+  (v) => INCB.indexOf(v), 0);
+enums += `enum { ${INCB.map((c) => `INCB_${c}`).join(', ')} };\n`;
+h += `static const UniRange uni_incb[] = {\n${incbR.map((r) => `    { ${hex(r.lo)}, ${hex(r.hi)}, INCB_${INCB[r.v]} },`).join('\n')}\n};\n\n`;
 
 
 // ---- Indic scripts (Devanagari … Malayalam): category and position, as in HarfBuzz ----
@@ -381,4 +397,4 @@ static inline uint8_t uni_lookup(const UniRange *t, int n, uint32_t cp) {
 `;
 const out = path.join(root, 'server/src/ui/unidata.h');
 fs.writeFileSync(out, h);
-console.log(`${out}: Unicode ${version}, Indic ${icR.length}/${ipR.length}/${decomp.length}, Khmer/Myanmar ${seaR.length}, USE ${useR.length} (${useConflicts} without a unique category), marks ${markR.length}, bidi ${bidi.length} ranges, ccc ${ccc.length}, invisibles ${ign.length}, joining ${join.length}, scripts ${scripts.length}/${script.length}, line break ${lb.length}, mirrors ${mirror.length}, brackets ${brackets.length}`);
+console.log(`${out}: Unicode ${version}, Indic ${icR.length}/${ipR.length}/${decomp.length}, Khmer/Myanmar ${seaR.length}, USE ${useR.length} (${useConflicts} without a unique category), marks ${markR.length}, bidi ${bidi.length} ranges, ccc ${ccc.length}, invisibles ${ign.length}, graphemes ${gcb.length}/${extpict.length}/${incbR.length}, joining ${join.length}, scripts ${scripts.length}/${script.length}, line break ${lb.length}, mirrors ${mirror.length}, brackets ${brackets.length}`);

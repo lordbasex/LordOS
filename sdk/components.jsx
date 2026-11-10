@@ -10,7 +10,7 @@ import { textDirection, direction, t as tr } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
-import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
+import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt, caretX as layCaretX, selRects, posAtX as layPosAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
 import { primaryStep, pasteAt } from './primarymodel.js';
 import { revealAfter, eyeShown, maskedText, eyeLabel, capsAfter, capsHint, capsFits } from './passwordfieldmodel.js';
@@ -456,6 +456,9 @@ function FieldMenu({ anchor, at, items, onClose }) {
 // selection where it lands, as in any Linux app (primarymodel.js; Settings → Mouse & Trackpad can turn that off).
 // The text is drawn in one piece with the caret and the selection over it, so placing the caret moves no letter; a
 // value longer than the field scrolls to keep the caret in sight. A value changed from outside puts the caret at the end.
+// Where the caret and the selection go comes from the text as drawn (lord.text.carets): in Hebrew or Arabic with numbers
+// or Latin the selection may be several boxes and ← → move on screen, and the caret never stops inside an emoji, a flag
+// or a letter with its accents.
 export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false }) {
   const t = useTheme();
   const token = useRef({}).current;
@@ -498,6 +501,17 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const order = useContext(FieldOrder);
   const measure = (str) => lord.measureText(str, size, 400);
   const rtlOf = (v) => !secureRef.current && (v ? textDirection(v) === 'rtl' : direction() === 'rtl');
+  const shownOf = (v) => (secureRef.current ? maskedText(v, shownRef.current) : v || '');
+  // where each character of the text as drawn sits (textfieldmodel.js); null on a server without it: measured prefixes
+  const layRef = useRef(null);
+  const layFor = (str) => {
+    const l = layRef.current;
+    if (l && l.text === str && l.size === size) return l.lay;
+    let lay = null;
+    try { lay = str && lord.text && lord.text.carets ? lord.text.carets(str, size, 400) : null; } catch (e) { lay = null; }
+    layRef.current = { text: str, size, lay };
+    return lay;
+  };
 
   // the position under a pointer x (screen coordinates), from the text's start edge and with the scroll
   const posAtX = (x) => {
@@ -505,7 +519,9 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     if (!textBox.current || !v) return 0;
     let lx;
     try { const [bx, , bw] = lord.getLayout(textBox.current.id); lx = rtlOf(v) ? bx + bw - x : x - bx; } catch (e) { return at.current.pos; }
-    const shown = secureRef.current ? maskedText(v, shownRef.current) : v;
+    const shown = shownOf(v), lay = layFor(shown);
+    // the text is drawn from its start edge, moved by the scroll; the layout counts from its left edge
+    if (lay) return clampPos(v, layPosAt(lay, rtlOf(v) ? lay.width - (lx + scroll.current) : lx + scroll.current));
     return clampPos(v, caretAt(shown, lx + scroll.current, measure));
   };
 
@@ -544,7 +560,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
         if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, ''), 'cut'); }
         return;
       }
-      const k = editKey(cur, e, rtlOf(p.value));
+      const k = editKey(cur, e, rtlOf(p.value), layFor(shownOf(p.value)));
       if (k) put(k, stepOf(cur, e));
       else if (e.key === 'Enter') { setRevealed((r) => revealAfter(r, 'submit')); p.onSubmit?.(p.value); }
       else if (e.key === 'Escape') p.onCancel?.();
@@ -627,7 +643,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   };
   const onDouble = () => {
     if (secure || !value) return;
-    const [a, b] = wordAt(value, at.current.pos);
+    const [a, b] = wordAt(value, at.current.pos, layFor(value));
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
     publish();
@@ -651,7 +667,12 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const edge = rtl ? 'right' : 'left';
   const pos = isFocused ? clampPos(value, at.current.pos) : chars.length;
   const sel = isFocused ? selRange(at.current) : null;
-  const caretX = measure(chars.slice(0, pos).join(''));
+  const lay = layFor(shown);
+  // x from the start edge (the right one in a right-to-left field), as the text is placed
+  const fromStart = (x, w = 0) => (rtl ? lay.width - x - w : x);
+  const caretX = lay ? fromStart(layCaretX(lay, pos)) : measure(chars.slice(0, pos).join(''));
+  const selBoxes = !sel ? [] : lay ? selRects(lay, sel[0], sel[1]).map((r) => ({ at: fromStart(r.x, r.w), w: r.w }))
+    : [{ at: measure(chars.slice(0, sel[0]).join('')), w: measure(chars.slice(sel[0], sel[1]).join('')) }];
   const fullW = shown ? measure(shown) : 0;
   let innerW = 0;
   try { innerW = textBox.current ? lord.getLayout(textBox.current.id)[2] : 0; } catch (e) { innerW = 0; }
@@ -709,8 +730,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
       {startSide ? tail : null}
       <View ref={textBox} style={{ flexGrow: 1, flexShrink: 1, flexBasis: basis, minWidth: 0, height: lineH, overflow: 'hidden' }}>
-        {sel ? <View style={{ position: 'absolute', top: 1, height: lineH - 2, [edge]: measure(chars.slice(0, sel[0]).join('')) - sx,
-          width: Math.max(1, measure(chars.slice(sel[0], sel[1]).join(''))), backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} /> : null}
+        {selBoxes.map((b, i) => <View key={`sel${i}`} style={{ position: 'absolute', top: 1, height: lineH - 2, [edge]: b.at - sx,
+          width: Math.max(1, b.w), backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} />)}
         {preedit && !secure ? (
           // while composing (Korean, Japanese, Chinese) the composition sits between the two halves, as before
           <View style={{ position: 'absolute', top: 0, height: lineH, [edge]: -sx, flexDirection: 'row', alignItems: 'center' }}>
@@ -797,6 +818,26 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const lineH = Math.round(size * 1.5);
   const pad = 7;
   const rows = wrapRows(value || '', width - 2 * pad - 4, measure);
+  // where grapheme clusters start: the caret, Backspace and Delete never split an emoji or a letter from its accents
+  const brk = useRef(null);
+  const stopsFor = (v) => {
+    if (brk.current && brk.current.text === v) return brk.current.lay;
+    let b = null;
+    try { b = lord.text && lord.text.graphemes ? lord.text.graphemes(v) : null; } catch (e) { b = null; }
+    brk.current = { text: v, lay: b ? { breaks: b } : null };
+    return brk.current.lay;
+  };
+  // each row as drawn (lord.text.carets), for its caret, its selection boxes and a click in it; null: measured prefixes
+  const rowLays = useRef(new Map());
+  const rowLay = (text) => {
+    const m = rowLays.current, key = size + ' ' + text;
+    if (m.has(key)) return m.get(key);
+    let lay = null;
+    try { lay = text && lord.text && lord.text.carets ? lord.text.carets(text, size, 400) : null; } catch (e) { lay = null; }
+    if (m.size > 400) m.clear();
+    m.set(key, lay);
+    return lay;
+  };
   latest.current = { value: value || '', onChange, onCancel, rows };
 
   // the position under a pointer (screen coordinates): its row, then the nearest place in it
@@ -805,7 +846,10 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     if (!box.current || !p.value) return 0;
     try {
       const [bx, by] = lord.getLayout(box.current.id);
-      return posAt(p.value, p.rows, x - bx - pad, Math.max(0, Math.floor((y - by - pad) / lineH)), measure);
+      const row = Math.max(0, Math.min(p.rows.length - 1, Math.floor((y - by - pad) / lineH)));
+      const r = p.rows[row], rl = r ? rowLay([...p.value].slice(r.start, r.end).join('')) : null;
+      if (rl) return r.start + layPosAt(rl, x - bx - pad);
+      return posAt(p.value, p.rows, x - bx - pad, row, measure, stopsFor(p.value));
     } catch (e) { return at.current.pos; }
   };
 
@@ -839,7 +883,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
         if (txt) { lord.clipboard.set(txt, { origin: 'lordos' }); if (e.base === 'x') put(replaceSel(cur, ''), 'cut'); }
         return;
       }
-      const r = areaEdit(cur, e, p.rows, measure);
+      const r = areaEdit(cur, e, p.rows, measure, stopsFor(p.value));
       if (r) put(r, stepOf(cur, e));
       else if (e.key === 'Escape') { setFocus(null); p.onCancel?.(); }
       else if (e.char && !e.ctrl && !e.meta) put(replaceSel(cur, e.char), 'type');
@@ -897,7 +941,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const onKeyFocus = () => { setFocus(token); setBlink(true); };   // Tab came to the field: the caret where it was
   const onDouble = () => {
     if (!value) return;
-    const [a, b] = wordAt(value, at.current.pos);
+    const [a, b] = wordAt(value, at.current.pos, stopsFor(value));
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
     publish();
@@ -949,13 +993,15 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
         // the part of the selection in this row (a selected line break shows as a little room after the row's text)
         const a = sel ? Math.max(sel[0], r.start) : 0, b = sel ? Math.min(sel[1], r.end) : 0;
         const broke = sel && sel[0] <= r.end && sel[1] > r.end;
-        const selX = sel && (b > a || broke) ? measure(chars.slice(r.start, a).join('')) : null;
-        const selW = selX != null ? measure(chars.slice(a, b).join('')) + (broke ? 6 : 0) : 0;
+        const rl = rowLay(text);
+        const boxes = !sel || b <= a ? [] : rl ? selRects(rl, a - r.start, b - r.start)
+          : [{ x: measure(chars.slice(r.start, a).join('')), w: measure(chars.slice(a, b).join('')) }];
+        if (broke) boxes.push({ x: rl ? rl.width : measure(text), w: 6 });
         return (
           <View key={i} style={{ height: lineH }}>
-            {selX != null ? <View style={{ position: 'absolute', top: 1, left: selX, width: Math.max(1, selW), height: lineH - 2, backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} /> : null}
+            {boxes.map((bx, j) => <View key={`sel${j}`} style={{ position: 'absolute', top: 1, left: bx.x, width: Math.max(1, bx.w), height: lineH - 2, backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} />)}
             {text ? <Text style={textStyle}>{text}</Text> : null}
-            {mine && <View ref={caret} style={{ position: 'absolute', top: (lineH - size - 3) / 2, left: measure(chars.slice(r.start, pos).join('')), width: 1.5, height: size + 3,
+            {mine && <View ref={caret} style={{ position: 'absolute', top: (lineH - size - 3) / 2, left: rl ? layCaretX(rl, pos - r.start) : measure(chars.slice(r.start, pos).join('')), width: 1.5, height: size + 3,
               backgroundColor: blink && !sel ? t.accent : 'transparent' }} />}
           </View>
         );

@@ -266,7 +266,7 @@ font has the composite. GPOS skips invisibles (ZWJ, ZWNJ) when looking for kerni
 HarfBuzz.
 
 The Unicode tables (bidi class, mirrors, brackets, joining type, script, combining class,
-invisibles, line break, marks, Indic, Khmer, Myanmar and USE categories) are generated with
+invisibles, line break, grapheme cluster break, marks, Indic, Khmer, Myanmar and USE categories) are generated with
 `node tools/gen-unicode.mjs <UCD>` into `server/src/ui/unidata.h` and compiled only in
 `unicode.c`. The USE categories follow HarfBuzz's `gen-use-table.py`: besides the UCD they need
 `ArabicShaping.txt` and the two Universal Shaping Engine data files shipped with HarfBuzz
@@ -322,6 +322,31 @@ repaint draws it without shaping it again.
 
 `server/tests/engine_test.c` checks it for Latin, Arabic, Hebrew, Thai, combining accents and emoji
 ZWJ sequences and flags at every box width from 8 to 400 px (`make -C server test`).
+
+### The caret and the selection in text fields
+
+`TextInput` and `TextArea` (`sdk/components.jsx`, `sdk/textfieldmodel.js`) place the caret and the selection
+from the text as it is drawn, not by measuring prefixes as if it ran left to right:
+
+- **`lord.text.carets(text, size, weight)`** (`js_sys.c`, `text_carets` in `text.c`, `caret.c`) returns, for the
+  first line as `lord.measureText` draws it, the left and right edges of every code point (from the shaper's
+  clusters after the bidi reordering), its bidi level, the grapheme breaks and the level runs in visual order. A
+  glyph that draws several graphemes (lam-alef, "fi") is split evenly between them; the code points of one
+  grapheme share their edges.
+- **The caret** at a position sits where the character after it starts or where the one before it ends; between two
+  runs, at the edge of the more deeply embedded one, so each gap on screen has its own position (in "שלום 123" the
+  end of the text is right after the 3, the place before the 1 is the left edge).
+- **The selection** is one rectangle per piece on screen: selecting "ם 1" in "שלום 123" draws two.
+- **← and →** move on screen (to the next caret place to the left or right), as on other desktops; Ctrl or ⌥ with
+  them still go by word in the text's order, and Home and End go to its start and end.
+- **Grapheme clusters** (`grapheme.c`, UAX #29 extended clusters, `lord.text.graphemes`): the arrows, Backspace,
+  Delete, a click, a drag and a double click never stop inside an emoji ZWJ sequence, a flag, a skin-tone sequence,
+  a letter with its combining marks, a Hangul syllable or an Indic conjunct.
+
+`server/tests/bidi_test.c` runs the Unicode `GraphemeBreakTest.txt` (1187 cases) and the caret cases (Hebrew and
+Arabic with numbers, Latin with Hebrew, ligatures, emoji); `engine_test.c` checks the edges over real shaping;
+`tests/textfield_cluster_test.mjs` the field model (emoji ZWJ, flags, skin tones, combining marks, Hebrew with
+numbers).
 
 ### Mirrored interface
 

@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "bidi.h"
+#include "caret.h"
 #include "fonts.h"
 #include "shape.h"
 #include "thbrk.h"
@@ -648,6 +649,46 @@ float text_layout_ellipsize(const char *s, int font, float size, float box_w, in
     }
     free(own); free(o); free(pre); free(cps);
     return width;
+}
+
+/* ---- where each character is drawn (text_carets, text.c) ---- */
+
+int text_layout_carets(const char *s, int font, float size, TextCarets *out) {
+    memset(out, 0, sizeof *out);
+    Layout *L = get(s, font, size, 0, 1);
+    if (!L || L->ncp > TEXT_CARETS_MAX) return -1;
+    int n = L->ncp;
+    out->n = n;
+    out->cp = malloc(sizeof *out->cp * (size_t)(n + 1));
+    out->x0 = malloc(sizeof *out->x0 * (size_t)(n + 1));
+    out->x1 = malloc(sizeof *out->x1 * (size_t)(n + 1));
+    out->lv = malloc((size_t)n + 1);
+    int *ord = malloc(sizeof *ord * (size_t)(n + 1));
+    const LLine *ln = L->nlines ? &L->lines[0] : NULL;
+    CaretGlyph *g = malloc(sizeof *g * (size_t)((ln ? ln->nvis : 0) + 1));
+    if (!out->cp || !out->x0 || !out->x1 || !out->lv || !ord || !g) { free(ord); free(g); text_carets_free(out); return -1; }
+    memcpy(out->cp, L->cp, sizeof *out->cp * (size_t)n);
+    memcpy(out->lv, L->lv, (size_t)n);
+    int pn = 0;                                     /* the first paragraph's direction */
+    while (pn < n && L->cp[pn] != '\n') pn++;
+    out->rtl = bidi_direction(L->cp, pn) == 1;
+    int ls = ln ? ln->start : 0, le = ln ? ln->end : 0, r = 0;
+    if (ln && le > ls) {
+        /* the levels after L1 (trailing spaces at the paragraph's), as the line was ordered */
+        bidi_line(L->cp + ls, out->lv + ls, 0, le - ls, out->rtl, ord);
+        for (int k = 0; k < ln->nvis; k++) {
+            const LGlyph *lg = &L->g[L->vis[ln->vis0 + k]];
+            g[k].cp = lg->att >= 0 ? -1 : lg->cp - ls;
+            g[k].adv = lg->att >= 0 ? 0 : lg->adv;
+        }
+        r = caret_edges(L->cp + ls, le - ls, out->lv + ls, g, ln->nvis, out->x0 + ls, out->x1 + ls);
+        out->width = ln->width;
+    }
+    for (int i = 0; i < n; i++)
+        if (i < ls || i >= le) { out->x0[i] = out->x1[i] = i < ls ? 0 : out->width; if (i >= le) out->lv[i] = (uint8_t)out->rtl; }
+    free(ord); free(g);
+    if (r) { text_carets_free(out); return -1; }
+    return 0;
 }
 
 /* Debugging and tests: the logical code point index of each glyph of the first line, in visual order. */
