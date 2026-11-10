@@ -23,6 +23,7 @@ const char *kb_layouts(void);
 const char *kb_variants(void);
 int  kb_group(void);                                      /* active layout */
 void kb_set_group(int g);
+void kb_set_locked(uint32_t locked);                       /* app mode: the locks (Caps Lock) the compositor has on */
 void kb_reload_compose(void);                             /* after changing the region */
 void kb_key(int code, int value, KeyInfo *k);
 /* For Wayland: the keymap in XKB format (malloc, NULL if none) and the

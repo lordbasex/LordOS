@@ -396,7 +396,7 @@ function FieldEditor({ f, onChange, onRemove, onGenerate, onQr }) {
       <Button small plain label={t('passwords.edit.replaceSecret')} onClick={() => set('')} style={{ marginInlineEnd: -6 }} />
     </View>;
   } else {
-    input = <TextInput value={f.v || ''} onChange={set} secure={hidden && !show} placeholder={f.t === 'totp' ? t('passwords.totp.placeholder') : f.t === 'date' ? t('passwords.edit.datePh') : ''} style={{ flex: 1, minWidth: 0 }} />;
+    input = <TextInput value={f.v || ''} onChange={set} secure={hidden && !show} eye={false} placeholder={f.t === 'totp' ? t('passwords.totp.placeholder') : f.t === 'date' ? t('passwords.edit.datePh') : ''} style={{ flex: 1, minWidth: 0 }} />;
   }
   return (
     <View style={{ gap: 6 }}>

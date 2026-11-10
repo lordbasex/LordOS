@@ -7,7 +7,7 @@ import { flatten, normalize, applyStyle } from './style.js';
 import { register, unregister, currentPriority, addListener, setKeyFilter } from './events.js';
 
 export { addListener, setKeyFilter };
-export { setLayout, getLayout, layouts, modifiers } from './keymap.js';
+export { setLayout, getLayout, layouts, modifiers, capsLock } from './keymap.js';
 export const View = 'view';
 export const Text = 'text';
 export const Image = 'image';

@@ -132,6 +132,19 @@ void kb_set_group(int g) {
     xkb_state_update_mask(state, dep, lat, lock, 0, 0, (xkb_layout_index_t)g);
 }
 
+/* The locked modifiers as the compositor has them (wl_keyboard.modifiers): a window that gets the keyboard starts
+ * from a fresh state (kb_reset_state), so without this Caps Lock turned on elsewhere would read as off here. Only
+ * the bits the keymap has; the keys held and the layout stay as they are. */
+void kb_set_locked(uint32_t locked) {
+    if (!state) return;
+    xkb_mod_index_t n = xkb_keymap_num_mods(keymap);
+    if (n < 32) locked &= (1u << n) - 1;
+    xkb_mod_mask_t dep = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_DEPRESSED);
+    xkb_mod_mask_t lat = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_LATCHED);
+    xkb_layout_index_t g = xkb_state_serialize_layout(state, XKB_STATE_LAYOUT_LOCKED);
+    xkb_state_update_mask(state, dep, lat, (xkb_mod_mask_t)locked, 0, 0, g);
+}
+
 /* ---- labels of the on-screen keyboard: a scratch state per level ---- */
 
 static struct xkb_state *level_state[4];

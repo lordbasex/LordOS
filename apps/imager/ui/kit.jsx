@@ -78,7 +78,7 @@ export function Field({ id, label, value, onChange, placeholder, secure, error, 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
         <View style={{ width: width || undefined, flex: width ? 0 : 1, borderRadius: t.controlRadius + 2,
           boxShadow: f && !platform.domFocus ? `0 0 0 2px ${t.accent}` : 'none' }}>
-          <TextInput key={f ? `f${f}` : 'n'} autoFocus={!!f} value={value} onChange={onChange} placeholder={placeholder} secure={secure}
+          <TextInput key={f ? `f${f}` : 'n'} autoFocus={!!f} value={value} onChange={onChange} placeholder={placeholder} secure={secure} eye={false}
             onSubmit={onSubmit} style={mono ? { fontFamily: 'monospace' } : undefined} {...platform.a11y({ label: label || placeholder, role: 'textbox', invalid: !!error })} />
         </View>
         {suffix ? <Text style={{ fontSize: typeScale.body, color: t.textDim }}>{suffix}</Text> : null}

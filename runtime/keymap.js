@@ -51,11 +51,13 @@ export function nativeKey(code, value, key, chr, base, flags) {
   mods.shift = !!(flags & 1); mods.ctrl = !!(flags & 2); mods.alt = !!(flags & 4);
   mods.altgr = !!(flags & 8); mods.meta = !!(flags & 16); mods.caps = !!(flags & 32);
   return { code, down, repeat: value === 2, key: key || NAMES[code] || '', char: down ? chr : '', base: down ? base : '',
-    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, mods: modifiers(), forwarded: !!(flags & 128) };
+    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, caps: mods.caps, mods: modifiers(), forwarded: !!(flags & 128) };
 }
 
 // Modifiers in use, as a mask: 1 Shift, 2 Alt, 4 Ctrl, 8 Super.
 export const modifiers = () => (mods.shift ? 1 : 0) | (mods.alt ? 2 : 0) | (mods.ctrl ? 4 : 0) | (mods.meta ? 8 : 0);
+// Caps Lock as the last key said (every key event also carries it as `caps`): a password field's hint
+export const capsLock = () => mods.caps;
 
 // Character the key produces with Shift/AltGr/Caps Lock but without Ctrl/Alt (for shortcuts
 // and so the terminal can build Ctrl+letter or Alt+letter).
@@ -81,7 +83,7 @@ export function translate(code, value) {
     default: break;
   }
   const ev = { code, down, repeat: value === 2, key: NAMES[code] || '', char: '', base: down ? baseChar(code) : '',
-    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, mods: modifiers() };
+    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, caps: mods.caps, mods: modifiers() };
   if (!down || mods.ctrl || mods.alt || mods.meta) return ev;
 
   let ch = '';

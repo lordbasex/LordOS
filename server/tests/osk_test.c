@@ -173,6 +173,37 @@ static void test_leds(void) {
     close(p[1]);
 }
 
+/* An app's window (app mode, appclient.c): it gets the keyboard with a fresh state and then the compositor's locks
+ * (wl_keyboard.modifiers), so Caps Lock turned on in another window reads as on here, for the letters and for a
+ * password field's hint; bits the keymap does not have are dropped */
+static void test_locked(void) {
+    if (kb_set("us", "")) { printf("  locks skipped: needs xkb-data\n"); return; }
+    KeyInfo k;
+    uint32_t dep, lat, lock, grp;
+    kb_key(KEY_CAPSLOCK, 1, &k);
+    kb_key(KEY_CAPSLOCK, 0, &k);
+    kb_mods(&dep, &lat, &lock, &grp);
+    CHECK(lock != 0);
+    kb_reset_state();
+    kb_key(KEY_A, 1, &k);
+    CHECK(!k.caps && !strcmp(k.chr, "a"));
+    kb_key(KEY_A, 0, &k);
+    kb_set_locked(lock);
+    kb_key(KEY_A, 1, &k);
+    CHECK(k.caps && !strcmp(k.chr, "A"));
+    kb_key(KEY_A, 0, &k);
+    CHECK(kb_leds() == 1 << LED_CAPSL);
+    kb_set_locked(0);
+    kb_key(KEY_A, 1, &k);
+    CHECK(!k.caps && !strcmp(k.chr, "a"));
+    kb_key(KEY_A, 0, &k);
+    kb_set_locked(0xffffffffu);                         /* everything: only what the keymap has */
+    kb_mods(&dep, &lat, &lock, &grp);
+    CHECK(lock != 0 && lock != 0xffffffffu);
+    kb_set_locked(0);
+    CHECK(kb_leds() == 0);
+}
+
 /* The computer's layout (#55): /etc/default/keyboard as Debian writes it; "us" without a usable one. */
 static void sysfile(const char *path, const char *text) {
     FILE *f = fopen(path, "w");
@@ -209,6 +240,7 @@ int main(void) {
     test_queue();
     test_labels();
     test_leds();
+    test_locked();
     if (fails) { printf("%d failed\n", fails); return 1; }
     printf("osk-test: ok\n");
     return 0;
