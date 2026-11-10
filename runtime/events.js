@@ -30,6 +30,13 @@ export function addListener(type, fn) {
 let keyFilter = null;
 export function setKeyFilter(fn) { keyFilter = fn; }
 
+// The keyboard focus (sdk/focus.js): { before(ev), after(ev) }. before sees each key after the shortcuts and before
+// the listeners: the control Tab moved to uses its keys there (Space on a button, an arrow on a slider), and a key it
+// takes reaches no listener. after runs once the listeners had the key, unless one of them called ev.preventDefault():
+// Tab moves the focus there, so an app that wants Tab for itself (the Terminal sends it to the shell) keeps it.
+let keyFocus = null;
+export function setKeyFocus(fn) { keyFocus = fn; }
+
 function chainOf(id) {
   const out = [];
   for (let n = instances.get(id); n; n = n.parent) out.push(n);
@@ -119,10 +126,14 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
 // XKB layout is loaded only the code and value arrive and keymap.js is used as a fallback.
 globalThis.__lordKey = (code, value, key, chr, base, flags) => {
   const ev = key === undefined ? translate(code, value) : nativeKey(code, value, key, chr, base, flags);
+  ev.defaultPrevented = false;
+  ev.preventDefault = () => { ev.defaultPrevented = true; };
   // each listener on its own: one that throws doesn't take the key from the others (a text field)
   run(DiscreteEventPriority, () => {
     if (keyFilter) { try { if (keyFilter(ev)) return; } catch (e) { console.error('key filter:', e); } }
+    if (keyFocus && ev.down) { try { if (keyFocus.before(ev)) return; } catch (e) { console.error('key focus:', e); } }
     for (const fn of listeners[ev.down ? 'keydown' : 'keyup']) { try { fn(ev); } catch (e) { console.error('key listener:', e); } }
+    if (keyFocus && ev.down && !ev.defaultPrevented) { try { keyFocus.after(ev); } catch (e) { console.error('key focus:', e); } }
   });
 };
 

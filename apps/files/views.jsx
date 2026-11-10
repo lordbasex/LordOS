@@ -1,5 +1,6 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
-// columns (Miller, with a preview) and gallery.
+// columns (Miller, with a preview) and gallery. Their scroll views are no Tab stops (focusable={false}): the arrows
+// move the selection (index.jsx), not the view.
 import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
@@ -20,7 +21,9 @@ function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {
   if (ctx.renaming?.path === e.path) {
     return (
       <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: fieldW || (center ? 110 : 240) }}>
+        {/* Tab keeps the new name, as Enter does, instead of leaving the field open without the keys (sdk/focus.js) */}
         <TextInput autoFocus selectAll value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
+          onKeyDown={(k) => { if (k.key !== 'Tab' || k.ctrl || k.alt || k.meta) return false; ctx.onRenameCommit(); return true; }}
           style={{ height: 22, paddingHorizontal: 4 }} />
       </View>
     );
@@ -59,7 +62,7 @@ export function IconView({ groups, ctx }) {
   const t = useTheme();
   const m = iconMetrics(ctx.zoom);
   return (
-    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} style={{ flex: 1 }}>
+    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} focusable={false} style={{ flex: 1 }}>
       <View style={{ padding: 12, paddingBottom: 32 }}>
         {groups.map((g) => (
           <View key={g.key}>
@@ -235,7 +238,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
     <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
       <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
         <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
-        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} style={{ flex: 1 }}>
+        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} focusable={false} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
             {groups.map((g) => (
               <View key={g.key}>
@@ -300,7 +303,7 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
         return (
           <View key={dir} dropPath={dir} style={{ width: 220, flexDirection: 'row' }}>
             <View style={{ flex: 1 }}>
-            <ScrollView style={{ flex: 1 }}>
+            <ScrollView focusable={false} style={{ flex: 1 }}>
               <View style={{ paddingHorizontal: 6, paddingVertical: 6 }}>
                 {items.map((e) => {
                   const inChain = chain[level] === e.path;

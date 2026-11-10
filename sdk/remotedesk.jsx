@@ -108,7 +108,8 @@ function Screen({ id, st, onEnd, focused, name, winId, folders, swap, extra }) {
       if (on) down.current.set(e.code, sym); else down.current.delete(e.code);
       lord.rdesk.key(id, sym, scanOf(e), on ? 1 : 0);
     };
-    const a = addListener('keydown', (e) => send(e, true)), b = addListener('keyup', (e) => send(e, false));
+    // every key goes to the remote screen, Tab too (it moves no keyboard focus here: sdk/focus.js)
+    const a = addListener('keydown', (e) => { e.preventDefault?.(); send(e, true); }), b = addListener('keyup', (e) => send(e, false));
     return () => { a(); b(); };
   }, [focused, id]);
   const at = (e) => {

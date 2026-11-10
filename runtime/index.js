@@ -4,9 +4,9 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, currentPriority, addListener, setKeyFilter } from './events.js';
+import { register, unregister, currentPriority, addListener, setKeyFilter, setKeyFocus } from './events.js';
 
-export { addListener, setKeyFilter };
+export { addListener, setKeyFilter, setKeyFocus };
 export { setLayout, getLayout, layouts, modifiers } from './keymap.js';
 export const View = 'view';
 export const Text = 'text';
@@ -120,6 +120,28 @@ function attach(parent, child) {
   child.parent = parent.isContainer ? null : parent;
 }
 
+// The tree as lord-server has it, for the keyboard focus to walk for Tab (sdk/focus.js): host is the node or container
+// a node hangs from (unlike parent, above, it reaches a layer's container, and it is cleared when React takes the node
+// out), first and last its children, prev and next its siblings. A list, so a folder of 5000 rows mounts, sorts and goes in constant time
+// per row. A child React moves (appendChild or insertBefore of one already in place) leaves its old spot first.
+function link(parent, child, before) {
+  unlink(child);
+  const after = before && before.host === parent ? before : null;
+  child.host = parent;
+  child.next = after;
+  child.prev = after ? after.prev : parent.last || null;
+  if (child.prev) child.prev.next = child; else parent.first = child;
+  if (after) after.prev = child; else parent.last = child;
+}
+function unlink(child) {
+  const p = child.host;
+  if (!p) return;
+  if (child.prev) child.prev.next = child.next; else p.first = child.next;
+  if (child.next) child.next.prev = child.prev; else p.last = child.prev;
+  child.host = child.prev = child.next = null;
+}
+const treeLinks = () => ({ host: null, first: null, last: null, prev: null, next: null });
+
 // Priority of the update in progress (React 19 sets it and queries it here).
 let updatePriority = NoEventPriority;
 
@@ -138,24 +160,25 @@ const host = {
   scheduleMicrotask: (fn) => queueMicrotask(fn),
 
   createInstance(type, props) {
-    const inst = { id: lord.createNode(type), type, props, style: {}, parent: null };
+    const inst = { id: lord.createNode(type), type, props, style: {}, parent: null, ...treeLinks() };
     register(inst);
     applyProps(inst, {}, props);
     return inst;
   },
   createTextInstance(text) {
-    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null };
+    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null, ...treeLinks() };
     lord.setText(inst.id, text);
     return inst;
   },
-  appendInitialChild(parent, child) { lord.appendChild(parent.id, child.id); attach(parent, child); },
-  appendChild(parent, child) { lord.appendChild(parent.id, child.id); attach(parent, child); },
-  appendChildToContainer(container, child) { lord.appendChild(container.id, child.id); attach(container, child); layerCount(container, 1); },
-  insertBefore(parent, child, before) { lord.insertBefore(parent.id, child.id, before.id); attach(parent, child); },
-  insertInContainerBefore(container, child, before) { lord.insertBefore(container.id, child.id, before.id); attach(container, child); layerCount(container, 1); },
-  removeChild(parent, child) { lord.removeChild(parent.id, child.id); },
-  removeChildFromContainer(container, child) { lord.removeChild(container.id, child.id); layerCount(container, -1); },
-  detachDeletedInstance(inst) { unregister(inst); lord.destroy(inst.id); },
+  appendInitialChild(parent, child) { lord.appendChild(parent.id, child.id); attach(parent, child); link(parent, child); },
+  appendChild(parent, child) { lord.appendChild(parent.id, child.id); attach(parent, child); link(parent, child); },
+  appendChildToContainer(container, child) { lord.appendChild(container.id, child.id); attach(container, child); link(container, child); layerCount(container, 1); },
+  insertBefore(parent, child, before) { lord.insertBefore(parent.id, child.id, before.id); attach(parent, child); link(parent, child, before); },
+  insertInContainerBefore(container, child, before) { lord.insertBefore(container.id, child.id, before.id); attach(container, child); link(container, child, before); layerCount(container, 1); },
+  removeChild(parent, child) { lord.removeChild(parent.id, child.id); unlink(child); },
+  removeChildFromContainer(container, child) { lord.removeChild(container.id, child.id); unlink(child); layerCount(container, -1); },
+  // the focus ring is a child of the node's own: lord.destroy takes it with the node
+  detachDeletedInstance(inst) { unregister(inst); inst.deleted = true; inst.ring = 0; lord.destroy(inst.id); },
   clearContainer() {},
 
   finalizeInitialChildren: () => false,
@@ -164,8 +187,8 @@ const host = {
   commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); },
   resetTextContent() {},
   shouldSetTextContent: () => false,
-  hideInstance(inst) { lord.setStyle(inst.id, 'display', 'none'); },
-  unhideInstance(inst) { lord.setStyle(inst.id, 'display', inst.style.display ?? 'flex'); },
+  hideInstance(inst) { inst.hidden = true; lord.setStyle(inst.id, 'display', 'none'); },
+  unhideInstance(inst) { inst.hidden = false; lord.setStyle(inst.id, 'display', inst.style.display ?? 'flex'); },
   hideTextInstance(inst) { lord.setText(inst.id, ''); },
   unhideTextInstance(inst, text) { lord.setText(inst.id, text); },
 
@@ -232,6 +255,13 @@ function layersCommitted() {
   for (const fn of keyboardWatchers) { try { fn(busy); } catch (e) { console.error(e); } }
 }
 export const shellHasKeyboard = () => keyboardBusy;
+// The layer in front that takes the keyboard (the capture, system, modal or overlay one, in that order), as long as it
+// shows something: Tab goes round its controls instead of the window's (sdk/focus.js). null when none does.
+export function keyboardLayer() {
+  let top = null;
+  for (const [z, c] of layerNodes) if (KEYBOARD_LAYERS.has(z) && c.count > 0 && (!top || z > top.layer)) top = c;
+  return top;
+}
 // After each commit, so something that follows the layout needs no polling. Layout runs later, on the
 // next frame: a watcher reads it from a timer of its own, and has to be cheap when it has nothing to do.
 const commitWatchers = new Set();
@@ -251,11 +281,30 @@ export function layerContainer(z) {
     for (const [k, v] of [['position', 'absolute'], ['left', 0], ['top', 0], ['width', screen.width], ['height', screen.height],
       ['pointerEvents', 'box-none'], ['zIndex', z]]) lord.setStyle(id, k, v);
     lord.appendChild(rootNode, id);
-    c = { id, isContainer: true, layer: z, count: 0 };
+    c = { id, isContainer: true, layer: z, count: 0, ...treeLinks() };
     layerNodes.set(z, c);
   }
   return c;
 }
+// ---- the keyboard focus ring (sdk/focus.js) ----
+// A node of its own, out of React's sight, appended to the focused one: a 2 px line of `color` 1 px outside its box,
+// with its corners rounded to follow the node's own (inside the box of a node that clips what it holds, a ScrollView).
+// It takes no clicks and moves, scrolls and goes away with the node (lord.destroy takes the children). color null
+// removes it.
+const RING_WIDTH = 2, RING_GAP = 1;
+export function setFocusRing(inst, color) {
+  if (!inst || inst.deleted) return;
+  if (inst.ring) { lord.destroy(inst.ring); inst.ring = 0; }
+  if (!color) return;
+  const out = inst.style.overflow === 'hidden' ? 0 : RING_WIDTH + RING_GAP;
+  const r = typeof inst.style.borderRadius === 'number' ? inst.style.borderRadius : 0;
+  const id = lord.createNode('view');
+  applyStyle(id, {}, normalize({ position: 'absolute', left: -out, top: -out, right: -out, bottom: -out, pointerEvents: 'none',
+    border: `${RING_WIDTH}px solid ${color}`, borderRadius: r > 0 ? r + out : 3 }));
+  lord.appendChild(inst.id, id);
+  inst.ring = id;
+}
+
 // A portal into a host node: a layer container (above), or a View instance (the window's overlay
 // host: events then bubble from the portal's content to that View and up to the window).
 export function createPortal(children, container, key = null) {
@@ -268,7 +317,7 @@ export function render(element) {
   lord.setStyle(rootId, 'width', screen.width);
   lord.setStyle(rootId, 'height', screen.height);
   lord.setRoot(rootId);
-  const container = { id: rootId, isContainer: true };
+  const container = { id: rootId, isContainer: true, ...treeLinks() };
   const report = (kind) => (e) => console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
   // React 19: uncaught errors, errors caught by a boundary, and recoverable ones, separately
   const root = reconciler.createContainer(container, ConcurrentRoot, null, false, null, 'lord',

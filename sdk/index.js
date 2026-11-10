@@ -131,6 +131,8 @@ export {
   AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState, useFilesDrop, FilesDropHint,
 } from './components.jsx';
 export { sortDrop, dropCount } from './filedrop.js';
+// Keyboard focus (sdk/focus.js): a highlighted item that skips separators, for lists that open from a focusable control
+export { menuStep } from './focusmodel.js';
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';

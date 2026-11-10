@@ -31,6 +31,7 @@ export const DEFAULT_TOKENS = {
   inputFocus: 'ring',     // TextInput: 'ring' (accent border) or 'underline' (accent line at the bottom)
   buttonBorder: false,    // Button: a 1 px border around neutral buttons
   popupBg: null,          // menus and tooltips; null = a light or dark surface for the mode
+  focusRing: null,        // the ring around the control the keyboard is on (sdk/focus.js); null = the accent
 };
 
 // The surface of menus, tooltips and popovers for a theme (popupBg, or one for the mode).

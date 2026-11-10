@@ -302,6 +302,7 @@ export function OverviewChrome() {
       const list = overview.get()?.list || [];
       if (!list.length) return;
       const i = Math.max(0, list.findIndex((w) => w.id === hoverStore.get()));
+      if (e.key === 'Tab') e.preventDefault?.();                // the overview's, not the window's behind (sdk/focus.js)
       if (e.key === 'ArrowRight' || e.key === 'Tab') hoverStore.set(list[(i + 1) % list.length].id);
       else if (e.key === 'ArrowLeft') hoverStore.set(list[(i - 1 + list.length) % list.length].id);
       else if (e.key === 'Enter' && hoverStore.get()) pick(hoverStore.get());

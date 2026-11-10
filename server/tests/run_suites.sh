@@ -299,6 +299,9 @@ EOF
     # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
     if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
     else skip "dialog-keys-test" "node"; fi
+    # (0.8.8.8) keyboard focus: the Tab order over the tree, skipping, focus-visible, the keys of sliders, menus and scroll views (sdk/focusmodel.js)
+    if have node; then run "focus-model-test (sdk/focusmodel.js)" node tests/focus_model_test.mjs
+    else skip "focus-model-test" "node"; fi
     # (0.8.8.8) files dragged from Files onto Notes, Photos, Player and PDF Viewer: which ones each takes (sdk/filedrop.js)
     if have node; then run "filedrop-test (sdk/filedrop.js)" node tests/filedrop_test.mjs
     else skip "filedrop-test" "node"; fi
@@ -349,6 +352,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
+    else skip "focus-scene-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs

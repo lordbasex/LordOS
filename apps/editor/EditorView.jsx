@@ -511,7 +511,13 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
     if (!focused) return undefined;
     // with focus, the editor receives the input method's text (Japanese, Chinese, Korean)
     ime.attach(imeToken, () => st.current.caret());
-    const off = addListener('keydown', (e) => { if (!e.down && e.down !== undefined) return; if (hasTextFocus() || st.current.overlay) return; st.current.onKey(e); });
+    // Tab indents: it moves no keyboard focus to the window's buttons (sdk/focus.js)
+    const off = addListener('keydown', (e) => {
+      if (!e.down && e.down !== undefined) return;
+      if (hasTextFocus() || st.current.overlay) return;
+      if (e.key === 'Tab') e.preventDefault?.();
+      st.current.onKey(e);
+    });
     return () => { off(); ime.detach(imeToken); };
   }, [focused]);
 

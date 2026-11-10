@@ -135,7 +135,7 @@ the accent and the title-bar button order through the settings portal (`publishT
   (`assets/wallpapers/README.md`).
 - Shape tokens for the shared controls: `controlRadius`, `controlRadiusSmall`, `groupRadius`,
   `menuRadius`, `menuItemRadius`, `menuHighlight` (`'accent'`|`'subtle'`), `selection`
-  (`'fill'`|`'indicator'`), `inputFocus` (`'ring'`|`'underline'`), `buttonBorder`, `popupBg`. They
+  (`'fill'`|`'indicator'`), `inputFocus` (`'ring'`|`'underline'`), `buttonBorder`, `popupBg`, `focusRing`. They
   restyle `Button`, `TextInput`, `GroupBox`, `SidebarItem`, menus… in every app without touching
   the apps ([DESIGN.md](DESIGN.md#theme-tokens-for-the-shared-controls)).
 - Scroll bars: `scrollThumb`, `scrollThumbHover`, `scrollRadius`, `scrollThumbBorder`.

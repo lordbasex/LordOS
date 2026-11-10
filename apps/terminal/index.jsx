@@ -359,6 +359,8 @@ function TerminalWindow() {
   useKeyboard((e) => {
     const cur = getWin(wid);
     if (!cur) return;
+    // Tab completes in the shell: it never moves the keyboard focus to the window's buttons (sdk/focus.js)
+    if (e.key === 'Tab') e.preventDefault?.();
     const s = activeSid(cur);
     const cap = keyCapture.get();
     if (cap) {
