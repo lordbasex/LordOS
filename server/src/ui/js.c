@@ -663,7 +663,10 @@ void js_pointer(const char *type, int target, float x, float y, int button) {
         JS_NewString(ctx, type), JS_NewInt32(ctx, target),
         JS_NewFloat64(ctx, x), JS_NewFloat64(ctx, y), JS_NewInt32(ctx, button),
     };
+    int middle = button == 1 && !strcmp(type, "down");     /* the press that pastes the primary selection */
+    if (middle) js_primary_gesture(1);
     JS_FreeValue(ctx, call_global("__lordEvent", 5, args));
+    if (middle) js_primary_gesture(0);
     JS_FreeValue(ctx, args[0]);
     drain_jobs();
 }

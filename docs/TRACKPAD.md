@@ -249,6 +249,7 @@ pointer image and are already open keep theirs.
 | Speed (`mouseSpeed`, 0..1) | 0.5 |
 | Natural scrolling (`mouseNatural`: the content moves against the wheel's direction) | no |
 | Primary button (`mouseLeftHanded`: Left or Right; Right swaps a mouse's left and right buttons, not a touchpad's) | Left |
+| Middle click pastes (`middlePaste`: selected text is the primary selection and a middle click pastes it, in LordOS's text fields, the Terminal and Linux apps; off, no app or field is offered it, though selecting still sets it; see `WAYLAND.md`, "Clipboard and primary selection") | yes |
 
 **Trackpad**: without a touchpad, a note says these rows apply when one is connected. Each row has a small drawing
 of the gesture that animates on mouse hover.

@@ -102,6 +102,7 @@ export function TrackpadSettings() {
           <Segmented small value={c.mouseLeftHanded ? 'right' : 'left'} onChange={(v) => setTrackpad({ mouseLeftHanded: v === 'right' })}
             options={[['left', tr('trackpad.mouse.primary.left')], ['right', tr('trackpad.mouse.primary.right')]]} />
         </SettingRow>
+        <SettingRow label={tr('trackpad.mouse.middlePaste')} hint={tr('trackpad.mouse.middlePasteHint')}>{toggle('middlePaste')}</SettingRow>
       </Section>
       <Section title={tr('trackpad.pad.title')} />
       {devices.length === 0 && <Note>{tr('trackpad.noDevice')}</Note>}

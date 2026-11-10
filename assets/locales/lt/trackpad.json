@@ -17,6 +17,8 @@
   "mouse.primaryHint": "Mygtukas, kuriuo žymima ir atidaroma. Kitu atidaromi meniu.",
   "mouse.primary.left": "Kairysis",
   "mouse.primary.right": "Dešinysis",
+  "mouse.middlePaste": "Vidurinis paspaudimas įklijuoja",
+  "mouse.middlePasteHint": "Pažymėtas tekstas nukopijuojamas, o vidurinio mygtuko paspaudimas jį įklijuoja ten, kur spustelite, LordOS ir Linux programose.",
   "pad.title": "Jutiklinė planšetė",
   "noDevice": "Šiame kompiuteryje jutiklinės planšetės nerasta. Šie nustatymai bus taikomi, kai ją prijungsite.",
   "device": "{name} · {w} × {h} mm",

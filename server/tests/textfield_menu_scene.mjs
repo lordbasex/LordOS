@@ -1,14 +1,14 @@
 // textfield_menu_scene.mjs — the scene of tests/textfield_menu_test.mjs (not run by itself): a TextInput and a TextArea
 // rendered through runtime/index.js with a stub `lord`, driven with the server's own events (__lordEvent, __lordKey):
 // a right click keeps the caret and opens the menu, its items edit as the keys do, Ctrl+Z and Ctrl+Shift+Z undo and
-// redo, and a triple click selects the line. Every character is 10 px wide and every box starts at 0, 0, so a click at
+// redo, a triple click selects the line, and what is selected is the primary selection, which a middle click pastes. Every character is 10 px wide and every box starts at 0, 0, so a click at
 // x selects position x / 10. Prints one line per check: "ok <name>" or "FAIL <name> <detail>".
 import React, { useState } from 'react';
 import * as rt from '@lordos/runtime';
 import { TextInput, TextArea } from '../../sdk/components.jsx';
 import { enableShellLayers } from '../../sdk/layers.js';
 
-const { parents, texts, removed, clip } = globalThis.__lordTest;
+const { parents, texts, removed, clip, prim } = globalThis.__lordTest;
 const h = React.createElement;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((res) => setImmediate(res)); };
 const check = (name, ok, detail = '') => console.log(ok ? `ok ${name}` : `FAIL ${name} ${detail}`);
@@ -91,4 +91,22 @@ check('and Undo brings the line back', now.area === 'one\ntwo three\nfour', JSON
 await click(area, 1, 0); await click(area, 1, 0);
 await type('ONE');
 check('a double click still selects a word', now.area === 'ONE\ntwo three\nfour', JSON.stringify(now.area));
+
+// the primary selection: a selection publishes it, a middle click pastes it where it lands
+const middle = async (id, x, y = 5) => { __lordEvent('down', id, x, y, 1); __lordEvent('up', id, x, y, 1); await flush(); };
+await click(input, 0);                                         // (a click elsewhere: the next two are a double click)
+await click(area, 11, 30); await click(area, 11, 30);
+check('a double click publishes the word', prim.text === 'two', prim.text);
+await middle(input, 0);
+check('a middle click pastes it at the click point', now.input === 'twonew', now.input);
+await key('z', '', ctrl);
+check('and Undo takes the paste back', now.input === 'new', now.input);
+prim.text = 'x\ny';
+await middle(input, 30);
+check('a one-line field pastes line breaks as spaces', now.input === 'newx y', now.input);
+await middle(area, 0, 0);
+check('a TextArea keeps them', now.area === 'x\nyONE\ntwo three\nfour', JSON.stringify(now.area));
+await click(input, 0);
+await key('a', '', ctrl);
+check('Ctrl+A publishes the whole field', prim.text === 'newx y', prim.text);
 process.exit(0);

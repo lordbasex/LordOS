@@ -17,6 +17,8 @@
   "mouse.primaryHint": "O botão que seleciona e abre. O outro abre os menus.",
   "mouse.primary.left": "Esquerdo",
   "mouse.primary.right": "Direito",
+  "mouse.middlePaste": "O clique do meio cola",
+  "mouse.middlePasteHint": "Selecionar texto o copia, e um clique com o botão do meio o cola onde você clica, no LordOS e nos apps do Linux.",
   "pad.title": "Trackpad",
   "noDevice": "Nenhum trackpad encontrado neste computador. Estes ajustes valem quando você conectar um.",
   "device": "{name} · {w} × {h} mm",

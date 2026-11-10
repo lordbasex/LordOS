@@ -17,6 +17,7 @@ export const TRACKPAD_DEFAULTS = {
   mouseSpeed: 0.5,          // a mouse's speed (0..1)
   mouseNatural: false,      // a mouse's wheel the other way
   mouseLeftHanded: false,   // a mouse's primary button is the right one
+  middlePaste: true,        // selecting copies and a middle click pastes (the primary selection, wl.c)
   pointerSize: 1,           // pointer size, times the display's (0.75..2)
   shakeToLocate: true,      // shake the pointer to find it: it grows for a moment
   scrollSpeed: 0.5,         // two-finger scroll speed (0..1)

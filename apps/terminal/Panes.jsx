@@ -101,7 +101,13 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
       const n = remoteName();
       if (n && downloadName(wid, sid, n.name, n.line)) return;
     }
-    term.mouse(sid, 'down', l.x, l.y, e.button, e.mods);
+    // a middle click the program in the pane doesn't take pastes the primary selection (lord.primary gives it only now,
+    // and nothing with middle-click paste off in Settings → Mouse & Trackpad)
+    if (term.mouse(sid, 'down', l.x, l.y, e.button, e.mods) === 4) {
+      const text = lord.primary ? lord.primary.get() : '';
+      if (text) term.paste(sid, text);
+      return;
+    }
     dragging.current = true;
   };
 

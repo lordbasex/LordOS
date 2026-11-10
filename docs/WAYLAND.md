@@ -34,7 +34,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
 | `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below) |
-| `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps") |
+| `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
 | `xdg_wm_dialog_v1` | 1 | a toplevel says it is a dialog and whether it is modal: a modal one holds its parent's input (0.8.8.8, see "Dialogs") |
@@ -542,6 +542,20 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   can read.
 - **Primary selection for Wayland apps** (`zwp_primary_selection_v1`, new in 0.8.3): what the app
   with the keyboard selects is kept and offered to the app that gets the keyboard next, and to X.
+  `set_selection` counts only from the app with the keyboard and with the serial of a click, key or
+  keyboard enter it got in the last 10 s (a made-up serial is ignored; `xdgact.c` keeps them). The
+  text is read once through a non-blocking pipe, at most 16 MB; a slower read of an older selection
+  is dropped when a newer one came. Offers list `text/plain;charset=utf-8`, `text/plain` and
+  `UTF8_STRING`; any other type gives nothing (`build/primary-client`).
+- **LordOS's own text fields and the Terminal** (0.8.8.8) share it both ways: selecting text in a
+  `TextInput`, a `TextArea` (`sdk/primarymodel.js`) or a Terminal pane (with the mouse) makes it
+  the primary selection the apps are offered (never a password field's), and a middle click in a
+  field or a pane (when the program in it doesn't take the mouse) pastes the primary selection at
+  the click point, whoever made it. `lord.primary.set(text)` publishes; `lord.primary.get()` gives
+  the text only while LordOS is handling a middle-button press, so what a Linux app selects can't
+  be read at will (isolated `.lpk` apps have no `lord.primary`). **Settings → Mouse & Trackpad →
+  Middle click pastes** (`middlePaste`, on by default) turns it off: selecting still sets it, but
+  no Wayland or X11 app is offered it and fields and the Terminal paste nothing.
 - **Offers are bound to their selection.** A `wl_data_offer` (and a primary offer) carries the
   generation it was made for and only gives data for that selection, and only to its client while
   it has the keyboard: an app can't keep an old offer to read later copies (`build/clip-offers`).

@@ -1512,6 +1512,7 @@ static void html_adopt(char *h, size_t n) {
 /* reading an app's selection into LordOS */
 typedef struct { int fd, image, sensitive, primary, html, html_only; pid_t pid; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
 static void prim_store(const char *t, size_t n, pid_t pid);
+static unsigned prim_req;           /* bumped by each new primary selection: a slower, older read is dropped */
 
 static int reader_ready(int fd, uint32_t mask, void *data) {
     Reader *rd = data;
@@ -1531,7 +1532,7 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         break;                              /* end (or error): done */
     }
     if (rd->primary) {
-        if (rd->len) prim_store(rd->buf, rd->len, rd->pid);
+        if (rd->len && rd->offer == prim_req) prim_store(rd->buf, rd->len, rd->pid);   /* a newer selection wins */
     } else if (rd->html) {
         /* the text/html beside an app's text: kept with that text (whichever of the two arrives last) */
         char *h = rd->len && rd->offer == clip_offer_gen ? malloc(rd->len) : NULL;
@@ -1825,8 +1826,12 @@ static void bind_ddm(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
 /* ---- primary selection (zwp_primary_selection_v1: select to copy, middle click to paste) ----
  * Like the clipboard, but text only and kept here: what the focused app selects is read once
  * (text/plain) and offered to the app that gets the keyboard next, and to X11 apps through
- * Xwayland's PRIMARY (xwm.c). Only the app with the keyboard may set it. */
+ * Xwayland's PRIMARY (xwm.c). Only the app with the keyboard may set it, with the serial of a
+ * recent click or key of its own. LordOS's own text fields and the Terminal set it too
+ * (wl_set_primary). With middle-click paste off (Settings → Mouse & Trackpad, wl_primary_paste)
+ * it is still kept, but offered to no app. */
 static struct wl_list prim_devices;
+static int prim_paste = 1;
 typedef struct { struct wl_resource *res; char mime[64]; int rank; } PSource;
 static PSource *prim_src;
 static char *prim_text;
@@ -1882,7 +1887,7 @@ static void psrc_gone(struct wl_resource *r) {
  * its client has the keyboard. */
 static void poffer_receive(struct wl_client *c, struct wl_resource *r, const char *mime, int32_t fd) {
     unsigned *gen = wl_resource_get_user_data(r);
-    if (gen && *gen == prim_gen && key_focus && key_focus->client == c && prim_text && prim_rank(mime)) { send_bytes(fd, prim_text, prim_len); return; }
+    if (gen && *gen == prim_gen && prim_paste && key_focus && key_focus->client == c && prim_text && prim_rank(mime)) { send_bytes(fd, prim_text, prim_len); return; }
     close(fd);
 }
 static const struct zwp_primary_selection_offer_v1_interface poffer_impl = { .receive = poffer_receive, .destroy = res_release };
@@ -1890,7 +1895,7 @@ static void poffer_gone(struct wl_resource *r) { free(wl_resource_get_user_data(
 
 static void prim_offer_to(struct wl_resource *dev) {
     struct wl_client *c = wl_resource_get_client(dev);
-    if (!prim_text || !prim_len) { zwp_primary_selection_device_v1_send_selection(dev, NULL); return; }
+    if (!prim_text || !prim_len || !prim_paste) { zwp_primary_selection_device_v1_send_selection(dev, NULL); return; }
     struct wl_resource *o = wl_resource_create(c, &zwp_primary_selection_offer_v1_interface, wl_resource_get_version(dev), 0);
     if (!o) return;
     unsigned *gen = malloc(sizeof *gen);
@@ -1905,11 +1910,13 @@ static void prim_offer_to(struct wl_resource *dev) {
 }
 
 static void pdev_set_selection(struct wl_client *c, struct wl_resource *r, struct wl_resource *src, uint32_t serial) {
-    (void)r; (void)serial;
+    (void)r;
     if (!key_focus || key_focus->client != c) return;      /* only the app with the keyboard */
+    if (!xact_serial_recent(serial, c, xact_now())) return;   /* and for a click or key it got (not a made-up serial) */
     PSource *s = src ? wl_resource_get_user_data(src) : NULL;
     if (prim_src && prim_src != s) zwp_primary_selection_source_v1_send_cancelled(prim_src->res);
     prim_src = s;
+    prim_req++;
     if (!s || !s->rank) return;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
@@ -1919,6 +1926,7 @@ static void pdev_set_selection(struct wl_client *c, struct wl_resource *r, struc
     if (!rd) { close(p[0]); return; }
     rd->fd = p[0];
     rd->primary = 1;
+    rd->offer = prim_req;
     rd->pid = client_pid(c);
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); }
@@ -4125,8 +4133,34 @@ void wlx_clip_png(const unsigned char *png, size_t n, const char *origin) {
 
 void wlx_primary_text(const char *t, size_t n) {
     if (prim_src) { zwp_primary_selection_source_v1_send_cancelled(prim_src->res); prim_src = NULL; }
+    prim_req++;
     prim_store(t, n, key_focus ? client_pid(key_focus->client) : 0);     /* an X11 app's: Xwayland has the keyboard */
 }
+
+/* LordOS's own selection (a text field, the Terminal): the app that had it is told it no longer does. Empty or
+ * over CLIP_MAX: nothing changes. */
+int wl_set_primary(const char *t, size_t n) {
+    if (!t || !n || n > CLIP_MAX) return -1;
+    if (prim_text && prim_len == n && !memcmp(prim_text, t, n) && !prim_pid) return 0;   /* the same selection again */
+    if (prim_src) { zwp_primary_selection_source_v1_send_cancelled(prim_src->res); prim_src = NULL; }
+    prim_req++;
+    prim_store(t, n, 0);
+    if (dpy) wl_display_flush_clients(dpy);
+    return 0;
+}
+
+const char *wl_primary(size_t *n) {
+    *n = prim_text ? prim_len : 0;
+    return prim_text ? prim_text : "";
+}
+
+void wl_primary_paste(int on) {
+    if (prim_paste == !!on) return;
+    prim_paste = !!on;
+    prim_offer_focus();                 /* the app with the keyboard gets the selection back, or loses it */
+    if (dpy) wl_display_flush_clients(dpy);
+}
+int wl_primary_paste_on(void) { return prim_paste; }
 
 const char *wl_focus_primary(size_t *n) {
     if (!dpy || !key_focus || !prim_text || !prim_len || !prim_pid || client_pid(key_focus->client) != prim_pid) return NULL;
@@ -4135,9 +4169,9 @@ const char *wl_focus_primary(size_t *n) {
 }
 
 const char *wlx_primary(size_t *n, unsigned *gen) {
-    *n = prim_len;
+    *n = prim_paste && prim_text ? prim_len : 0;          /* middle-click paste off: X apps get none either */
     *gen = prim_gen;
-    return prim_text ? prim_text : "";
+    return prim_text && prim_paste ? prim_text : "";
 }
 
 int wl_idle_inhibited(void) {
