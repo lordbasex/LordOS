@@ -38,6 +38,16 @@ replaces its keys there; an entry with no `label` is not listed. A held key runs
 
 ❖ pressed and released alone calls the theme's `onSuperTap`: Lord Flow's launcher, Lord Classic's start menu.
 
+F10, or the left ⌥ pressed and released alone, opens the menu bar from the keyboard: Lord Flow's bar on the
+focused window's display, Lord Classic's menu strip under the focused window's title bar. Each bar registers with
+`addMenuBarKeys({ can, run })` and the first whose `can()` says yes opens its first menu with the first row
+highlighted; the same key closes it. The Terminal keeps F10 (programs in it use it), the right ⌥ is AltGr and
+never counts, and a Linux app has its own menus and gets its keys first. In an open menu the keys follow
+`sdk/menunav.js`: ↑/↓ move and wrap, skipping separators and disabled rows, Home/End jump, Enter/Space choose,
+→ opens a submenu and ← closes it (mirrored in right-to-left languages), Escape closes one level, letters typed
+close together go to the row they start, and → on a row without a submenu or ← in a top menu move to the bar's
+next or previous menu.
+
 ## The keys kept from apps
 
 `server/src/wl/keygrab.c` holds fixed tables, one per theme, written at build time: keyboard keys only, each

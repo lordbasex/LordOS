@@ -308,6 +308,9 @@ EOF
     # what a paste in Files copies: its own cut or copy, or the files a Linux app copied (apps/files/clipfiles.js)
     if have node; then run "files-clipfiles-test (apps/files/clipfiles.js)" node tests/files_clipfiles_test.mjs
     else skip "files-clipfiles-test" "node"; fi
+    # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
+    if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
+    else skip "menu-nav-test" "node"; fi
     # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
     if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
     else skip "dialog-keys-test" "node"; fi
@@ -375,6 +378,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
     else skip "focus-scene-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
+    else skip "menu-keys-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs

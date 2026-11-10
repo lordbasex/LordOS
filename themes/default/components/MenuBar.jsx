@@ -4,8 +4,10 @@
 // <MenuBars> draws one full bar per display (0.8.8.6; Settings → Desktop & Dock → Menu Bar → "Show the menu bar on
 // every display", on by default): the app's menus are lit on the focused window's display and dimmed on the others,
 // where a click lights that bar and opens the menu there. sdk/menubarmodel.js decides which bar is lit.
-import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs } from '@lordos/sdk';
-import { useState, useRef } from 'react';
+// From the keyboard: F10, or ⌥ pressed and released alone, opens the lit bar's first menu (sdk/shortcuts.js
+// addMenuBarKeys); ← and → then move between its menus (sdk/menunav.js barIndex), and the same key closes it.
+import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex } from '@lordos/sdk';
+import { useState, useRef, useEffect } from 'react';
 import { Menu } from './Menu.jsx';
 
 // Date and time with the region's format (sdk/i18n.js),
@@ -78,6 +80,20 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
   };
   const dim = !active;
   const close = () => setOpen(null);
+  // the menus in the bar's order, for ← and → (keys: opened from the keyboard, its first row highlighted)
+  const order = ['logo', 'app', ...extra.map((m, i) => `app${i}`), 'window', 'help'];
+  const refOf = (name) => refs[name] || { current: appRefs.current[name] };
+  const step = (dir) => setOpen((o) => {
+    if (!o) return o;
+    const name = order[barIndex(order.length, order.indexOf(o.name), dir)];
+    return { name, x: anchorX(refOf(name)), keys: true };
+  });
+  const live = useRef(active);
+  live.current = active;
+  useEffect(() => addMenuBarKeys({
+    can: () => live.current,
+    run: () => setOpen((o) => (o ? null : { name: 'logo', x: anchorX(refs.logo), keys: true })),
+  }), []);
 
   const menus = {
     logo: { items: [
@@ -115,7 +131,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
   extra.forEach((m, i) => { menus[`app${i}`] = { items: m.items }; });
 
   const cur = open && menus[open.name];
-  const anchor = open && (refs[open.name] || { current: appRefs.current[open.name] });
+  const anchor = open && refOf(open.name);
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }}>
       <View style={{
@@ -149,7 +165,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         {bar.bell ? <BarItem t={t} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
         <BarItem t={t} active={clockPanel} anchorRef={refs.clock} onClick={() => onClock(itemAt(refs.clock))}><Label t={t}>{clock}</Label></BarItem>
       </View>
-      {cur && <Menu x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} />}
+      {cur && <Menu key={open.name} x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} keys={!!open.keys} onStep={step} />}
     </View>
   );
 }

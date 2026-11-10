@@ -305,6 +305,7 @@
   "shortcuts.emoji": "Emoji and symbols",
   "shortcuts.lock": "Lock the screen",
   "shortcuts.quit": "Quit the app",
+  "shortcuts.menuBar": "Open the menu bar from the keyboard",
   "shortcuts.launcher": "Apps",
   "shortcuts.startMenu": "Start menu",
   "shortcuts.showDesktop": "Show the desktop",
