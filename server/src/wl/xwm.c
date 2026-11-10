@@ -25,6 +25,9 @@
  *   - drag and drop both ways (XDND): a Files or Wayland drag over an X window, and an X app's drag over a
  *     Wayland window or Files (see "drag and drop" below);
  *   - the root window's cursor is LordOS's arrow (Render cursor);
+ *   - HiDPI (xwscale.h): X's coordinates are X pixels (logical × wlx_scale()), converted here at
+ *     every place and size that crosses to wl.c, and Xft.dpi in the root's RESOURCE_MANAGER tells the
+ *     apps how much larger to draw;
  *   - 10 s after the last X window closes, if X-Resource shows no other client, Xwayland stops.
  * X11 apps on one display can always see each other; what this guards is the border with Wayland
  * apps and LordOS (docs/PRIVACY.md, "X11 apps").
@@ -33,6 +36,7 @@
 #include "x11wire.h"
 #include "urilist.h"
 #include "dndgate.h"
+#include "xwscale.h"
 #include "wl.h"
 #include "../cursor.h"
 #include "../term/term.h"
@@ -52,7 +56,7 @@ void xwl_idle(void);                    /* xwayland.c: no X11 app left: Xwayland
 #define IDLE_MS 10000                   /* grace period after the last X11 app closes */
 
 /* predefined atoms */
-enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_STRING = 31, XA_WINDOW = 33, XA_WM_HINTS = 35, XA_WM_NAME = 39,
+enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_RESOURCE_MANAGER = 23, XA_STRING = 31, XA_WINDOW = 33, XA_WM_HINTS = 35, XA_WM_NAME = 39,
        XA_WM_NORMAL_HINTS = 40, XA_WM_CLASS = 67, XA_WM_TRANSIENT_FOR = 68 };
 
 #define ATOM_LIST(X) \
@@ -316,7 +320,8 @@ static void try_attach(XWin *w) {
         .title = w->title, .app_id = w->cls, .app_alt = w->inst,
         .csd = w->decorated == 0 || w->wtype == AT(NET_WM_WINDOW_TYPE_SPLASH),
         .popup = w->override || is_popup_type(w->wtype),
-        .x = w->x, .y = w->y, .width = w->w, .height = w->h,
+        .x = xws_from_x(w->x, wlx_scale()), .y = xws_from_x(w->y, wlx_scale()),
+        .width = xws_from_x(w->w, wlx_scale()), .height = xws_from_x(w->h, wlx_scale()),
     };
     int sid = wlx_attach(w->surface_res, w, &info);
     if (!sid) return;
@@ -1386,7 +1391,7 @@ static void on_configure_notify(const uint8_t *p) {
     w->w = x11_get16(p + 20);
     w->h = x11_get16(p + 22);
     w->override = p[26] != 0;
-    if (w->sid && (w->override || is_popup_type(w->wtype))) wlx_popup_moved(w->sid, w->x, w->y);
+    if (w->sid && (w->override || is_popup_type(w->wtype))) wlx_popup_moved(w->sid, xws_from_x(w->x, wlx_scale()), xws_from_x(w->y, wlx_scale()));
 }
 
 static void on_property(const uint8_t *p) {
@@ -1533,7 +1538,8 @@ static void pictfmt_reply(const uint8_t *r, size_t n, uint32_t a, uint32_t b) {
         if (f[4] == 1 && f[5] == 32 && x11_get16(f + 8) == 16 && x11_get16(f + 12) == 8 && x11_get16(f + 16) == 0 &&
             x11_get16(f + 20) == 24 && x11_get16(f + 22) == 0xff) { fmt = x11_get32(f); break; }
     }
-    const CursorImage *ci = cursor_image(CUR_DEFAULT, 1);
+    /* in X pixels: as large as LordOS's own pointer on the densest display */
+    const CursorImage *ci = wlx_scale() != 100 ? cursor_image_pct(CUR_DEFAULT, wlx_scale()) : cursor_image(CUR_DEFAULT, 1);
     if (!fmt || !ci || ci->w <= 0 || ci->h <= 0 || ci->w > 128 || ci->h > 128) return;
     uint32_t pix = new_id(), gc = new_id(), pic = new_id(), cur = new_id();
     req(X_CreatePixmap, 32);
@@ -1598,6 +1604,10 @@ static void init_done(void) {
     change_prop(root, AT(NET_SUPPORTED), XA_ATOM, 32, sup, (uint32_t)(sizeof sup / sizeof sup[0]));
     uint32_t none = 0;
     change_prop(root, AT(NET_ACTIVE_WINDOW), XA_WINDOW, 32, &none, 1);
+    /* HiDPI: Xft.dpi, read by Xft, Qt, Chromium and Tk when they start (before WM_S0 below lets them in) */
+    char res[64];
+    size_t nres = xws_resources(wlx_scale(), res, sizeof res);
+    if (nres) change_prop(root, XA_RESOURCE_MANAGER, XA_STRING, 8, res, (uint32_t)nres);
     update_client_list();
     if (X.xfixes_op) {
         req(X.xfixes_op, 0); xo_u32(&X.out, 5); xo_u32(&X.out, 0); xo_end(&X.out);   /* XFixesQueryVersion */
@@ -1785,6 +1795,8 @@ int xwm_is_fixed(const XWin *w) { return w->hints.min_w > 0 && w->hints.min_w ==
 
 void xwm_place(XWin *w, int x, int y) {
     if (!X.ready || !w->managed || w->minimized) return;
+    x = xws_to_x(x, wlx_scale());
+    y = xws_to_x(y, wlx_scale());
     if (w->placed && x == w->px && y == w->py) return;
     int32_t v[2] = { x, y };
     configure(w->id, XCF_X | XCF_Y, v, 2);
@@ -1795,6 +1807,8 @@ void xwm_place(XWin *w, int x, int y) {
 }
 
 void xwm_resize(XWin *w, int width, int height) {
+    width = xws_to_x(width, wlx_scale());
+    height = xws_to_x(height, wlx_scale());
     if (!X.ready || !w->managed || width < 1 || height < 1 || width > 32767 || height > 32767) return;
     if (width == w->pw && height == w->ph && width == w->w && height == w->h) return;
     int32_t v[2] = { width, height };

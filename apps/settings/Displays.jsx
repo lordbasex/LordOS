@@ -1,6 +1,6 @@
 // Settings → Displays: arrangement of several displays (extend or mirror), resolution, refresh rate,
 // rotation (and automatic rotation of the built-in screen when there is an accelerometer), scale
-// (100–300 %, sharp), the main display, brightness, Night Light and video in the browser (Video.jsx,
+// (100–300 %, sharp) and how X11 apps follow it, the main display, brightness, Night Light and video in the browser (Video.jsx,
 // docs/VIDEO.md) (docs/SETTINGS.md, "Displays", and docs/DISPLAYS.md). Changes apply live with the system's 15-second "Keep these
 // display settings?" countdown (sdk/hardware.jsx) and are saved per display (EDID identity).
 // Layout: the arrangement on top, then the selected display's
@@ -10,7 +10,7 @@ import {
   arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, typeScale, spacing,
   nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
   identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
-  scaleChoices, scaleTiles, menuBarEveryDisplay, menuBarPatch, themes,
+  scaleChoices, scaleTiles, menuBarEveryDisplay, menuBarPatch, themes, wayland, x11SelfScale, setX11Scaling,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Section, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -327,6 +327,7 @@ export function DisplaysSettings() {
   const scales = listed.map((n) => [n, n === rec ? tr('prefs.display.scaleRecommended', { n }) : tr('prefs.display.scaleN', { n })]);
   const several = act.length > 1 || outs.length > 1;
   const nums = displayNumbers(outs);
+  const x11 = !!wayland.info().x11Display;       // Xwayland is installed (docs/WAYLAND.md, "X11 apps on HiDPI displays")
   return (
     <Stack>
       <ArrangementBlock outs={outs} sel={cur.id} onSelect={setSel} mirror={d.mirror} nums={nums} t={t} tr={tr}
@@ -354,6 +355,12 @@ export function DisplaysSettings() {
             <PopUp width={210} value={scale} onChange={setScale} options={scales} />
           </SettingRow>
         ) : <ScaleTiles choices={choices} value={scale} rec={rec} onPick={setScale} t={t} tr={tr} />}
+        {x11 ? (
+          <SettingRow label={tr('prefs.display.x11')} hint={tr('prefs.display.x11Hint')}>
+            <PopUp width={210} value={x11SelfScale(s) ? 'self' : 'lordos'} onChange={setX11Scaling}
+              options={[['self', tr('prefs.display.x11Self')], ['lordos', tr('prefs.display.x11Lordos')]]} />
+          </SettingRow>
+        ) : null}
         <SettingRow label={tr('prefs.display.resolution')}>
           <PopUp width={210} value={`${curRes?.w}x${curRes?.h}`} onChange={(v) => { const [w, h] = v.split('x').map(Number); go(cur, { w, h, refresh: 0, rotation: rot, scale }); }}
             options={res.map((r) => [`${r.w}x${r.h}`, native(r) ? tr('prefs.display.native', { w: r.w, h: r.h }) : `${r.w} × ${r.h}`])} />

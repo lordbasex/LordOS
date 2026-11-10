@@ -34,6 +34,7 @@
 #include "../wl/wl.h"
 #include "../wl/keygrab.h"
 #include "../wl/xwayland.h"
+#include "../wl/xwm.h"
 #include "../wl/urilist.h"
 #include "../keyboard.h"
 #include "../fsops.h"
@@ -1568,7 +1569,19 @@ static JSValue f_wl_info(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "windows", JS_NewInt32(c, wl_count()));
     JS_SetPropertyStr(c, o, "x11Display", JS_NewString(c, xwl_display()));   /* "" without Xwayland */
     JS_SetPropertyStr(c, o, "x11Running", JS_NewBool(c, xwl_running()));
+    /* HiDPI: whether X11 apps scale themselves, and the X pixel scale of the Xwayland running (0: none) */
+    JS_SetPropertyStr(c, o, "x11SelfScale", JS_NewBool(c, xwl_self_scaling()));
+    JS_SetPropertyStr(c, o, "x11Scale", JS_NewInt32(c, xwl_running() ? wlx_scale() : 0));
     return o;
+}
+
+/* lord.wayland.x11SelfScale(on): Settings → Displays, X11 apps scale themselves (sharp) or LordOS
+ * enlarges them; from the next start of Xwayland (xwayland.h). */
+static JSValue f_wl_x11_self_scale(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsBool(argv[0])) return JS_FALSE;
+    xwl_set_self_scaling(JS_ToBool(c, argv[0]));
+    return JS_TRUE;
 }
 
 /* lord.wayland.paste(): synthetic Ctrl+V to the Linux app with keyboard focus (only to that app). */
@@ -1677,6 +1690,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
     JS_CFUNC_DEF("state", 5, f_wl_state),
     JS_CFUNC_DEF("info", 0, f_wl_info),
+    JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };
 
 /* ---- lord.apps: installed Linux apps (.desktop, apps.c) ---- */

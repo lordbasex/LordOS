@@ -18,6 +18,7 @@ import { linuxAppFor } from './apps.js';
 import { osk } from './osk.js';
 import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
+import { settings } from './settings.js';
 import { dockIdOfWindow } from './dock.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
@@ -216,6 +217,21 @@ function sync() {
 windows.subscribe(sync);
 activeDesktop.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());
+
+// X11 apps on HiDPI displays (Settings → Displays, docs/WAYLAND.md "X11 apps on HiDPI displays"): 'self', the
+// default, gives them X pixels that are device pixels and Xft.dpi to draw larger (sharp); 'lordos' enlarges
+// them (the right size, blurry). lord-server applies it the next time Xwayland starts.
+export const x11SelfScale = (s = settings.get()) => s.x11Scaling !== 'lordos';
+let x11Sent = null;
+function applyX11Scaling() {
+  const on = x11SelfScale();
+  if (on === x11Sent || typeof lord.wayland === 'undefined' || typeof lord.wayland.x11SelfScale !== 'function') return;
+  x11Sent = on;
+  lord.wayland.x11SelfScale(on);
+}
+applyX11Scaling();
+settings.subscribe(applyX11Scaling);
+export const setX11Scaling = (mode) => settings.set((s) => ({ ...s, x11Scaling: mode === 'lordos' ? 'lordos' : 'self' }));
 
 export const wayland = {
   info: () => (typeof lord.wayland !== 'undefined' ? lord.wayland.info() : { socket: '', windows: 0 }),
