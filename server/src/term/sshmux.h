@@ -57,6 +57,7 @@ typedef struct {
     int fd;               /* the control connection, -1 when closed */
     uint32_t next_id;
     pid_t master;         /* the master's pid (MUX_S_ALIVE) */
+    int refused;          /* mux_connect: nobody listens on the socket (ECONNREFUSED) */
     char why[160];        /* why the last call failed */
 } Mux;
 
@@ -76,9 +77,13 @@ int  mux_wait_exit(Mux *m, int timeout_ms);
  * as seen from the server. 0 ok. */
 int  mux_forward(Mux *m, int open, uint32_t listen_port, const char *connect_host, uint32_t connect_port, int timeout_ms);
 
+/* 1 when name is the shell integration's ControlPath in the folder: hex (ssh's %C), '-', the shell's pid. */
+int  sshmux_name_ok(const char *name);
 /* The master of a Terminal session: in dir (the session's own folder, 0700 and this user's), the
  * control socket whose master's pid is want (the pane's foreground process). The path in out.
- * 0 found, -1 none. */
+ * Only sockets named as sshmux_name_ok() says are tried. One that refuses the connect (its ssh was
+ * killed and left it) does not count against the 32 masters asked, and is removed when it is still
+ * this user's socket. 0 found, -1 none. */
 int  sshmux_find(const char *dir, pid_t want, char *out, size_t cap);
 
 #endif

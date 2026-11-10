@@ -9,12 +9,14 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -78,6 +80,125 @@ static void test_wire(void) {
     CHECK(!sf_name_entry(&r, &e) && !strcmp(e.owner, "pi") && !strcmp(e.group, "www-data") && e.kind == '-', "owner pi, group www-data");
     mxb_free(&b);
     CHECK(sf_path_ok("/srv/x") && !sf_path_ok("srv/x") && !sf_path_ok("/a\nb") && !sf_path_ok(NULL), "paths");
+
+    CHECK(sshmux_name_ok("0123456789abcdef0123456789abcdef01234567-4242"), "name: %%C-pid");
+    CHECK(!sshmux_name_ok("0123456789abcdef0123456789abcdef01234567-4242.Xb3kQ9") && !sshmux_name_ok("sock") &&
+          !sshmux_name_ok("0123456789ABCDEF-1") && !sshmux_name_ok("0123456789abcdef-") && !sshmux_name_ok("abc-1") &&
+          !sshmux_name_ok("0123456789abcdef-12345678901") && !sshmux_name_ok("0123456789abcdef/-1"), "name: others refused");
+}
+
+/* ---- sshmux_find: a fake master on a control socket ---- */
+
+typedef struct { int lfd; pid_t pid; } FakeMaster;
+
+static int fm_packet(int fd, uint8_t *buf, size_t cap, size_t *n) {
+    uint8_t h[4];
+    if (read(fd, h, 4) != 4) return -1;
+    *n = (size_t)h[0] << 24 | (size_t)h[1] << 16 | (size_t)h[2] << 8 | h[3];
+    return *n > cap || read(fd, buf, *n) != (ssize_t)*n ? -1 : 0;
+}
+
+/* answers the hello and the alive check with its pid, as ssh's master does */
+static void *fake_master(void *arg) {
+    FakeMaster *f = arg;
+    int c;
+    while ((c = accept(f->lfd, NULL, NULL)) >= 0) {
+        uint8_t buf[64];
+        size_t n;
+        uint32_t type, id;
+        MuxBuf b = { 0 };
+        for (int step = 0; step < 2 && !fm_packet(c, buf, sizeof buf, &n); step++) {
+            MuxRd r = { buf, n, 0 };
+            mxb_reset(&b);
+            if (mxr_u32(&r, &type)) break;
+            if (type == MUX_MSG_HELLO) { mxb_u32(&b, MUX_MSG_HELLO); mxb_u32(&b, 4); }
+            else if (type == MUX_C_ALIVE_CHECK && !mxr_u32(&r, &id)) { mxb_u32(&b, MUX_S_ALIVE); mxb_u32(&b, id); mxb_u32(&b, (uint32_t)f->pid); }
+            else break;
+            uint8_t len[4] = { 0, 0, 0, (uint8_t)b.n };
+            if (write(c, len, 4) != 4 || write(c, b.p, b.n) != (ssize_t)b.n) break;
+        }
+        mxb_free(&b);
+        close(c);
+    }
+    return NULL;
+}
+
+/* a socket bound at path; listening (a master) or closed at once (an ssh killed hard leaves that) */
+static int sock_at(const char *path, int listening) {
+    struct sockaddr_un a = { .sun_family = AF_UNIX };
+    snprintf(a.sun_path, sizeof a.sun_path, "%s", path);
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0 || bind(fd, (struct sockaddr *)&a, sizeof a) || (listening && listen(fd, 8))) { if (fd >= 0) close(fd); return -1; }
+    if (!listening) { close(fd); return 0; }
+    return fd;
+}
+
+static int stale_sockets(const char *dir, int n) {
+    char p[108];
+    int ok = 0;
+    for (int i = 0; i < n; i++) {
+        snprintf(p, sizeof p, "%s/ab%038d-%d", dir, i, 100 + i);
+        ok += !sock_at(p, 0);
+    }
+    return ok;
+}
+
+static int stale_left(const char *dir, int n) {
+    char p[108];
+    struct stat st;
+    int left = 0;
+    for (int i = 0; i < n; i++) {
+        snprintf(p, sizeof p, "%s/ab%038d-%d", dir, i, 100 + i);
+        left += !lstat(p, &st);
+    }
+    return left;
+}
+
+static void test_find(void) {
+    char dir[] = "/tmp/sshmux-test.XXXXXX", out_dir[] = "/tmp/sshmux-out.XXXXXX";
+    if (!mkdtemp(dir) || !mkdtemp(out_dir)) { CHECK(0, "mkdtemp"); return; }
+    char p[108], file[108], link[108], target[108], other[108], live[108], out[108];
+    struct stat st;
+    snprintf(file, sizeof file, "%s/cd%038d-1", dir, 0);          /* named as a socket, a plain file */
+    snprintf(link, sizeof link, "%s/ef%038d-1", dir, 0);          /* named as a socket, a link to a stale one */
+    snprintf(target, sizeof target, "%s/stale", out_dir);
+    snprintf(other, sizeof other, "%s/sock", dir);                 /* another name: a live master, never asked */
+    snprintf(p, sizeof p, "%s/sock-stale", dir);                   /* another name, stale: left as it is */
+    int fd = open(file, O_CREAT | O_WRONLY | O_CLOEXEC, 0600);
+    if (fd >= 0) close(fd);
+    CHECK(fd >= 0 && !sock_at(target, 0) && !symlink(target, link) && !sock_at(p, 0), "the folder's odd entries");
+    FakeMaster fo = { sock_at(other, 1), 4242 }, fl = { -1, 4343 };
+    pthread_t to, tl;
+    CHECK(fo.lfd >= 0 && !pthread_create(&to, NULL, fake_master, &fo), "a master of another name");
+
+    CHECK(stale_sockets(dir, 200) == 200, "200 stale sockets");
+    CHECK(sshmux_find(dir, 4242, out, sizeof out) == -1, "a master of another name is not asked");
+    CHECK(stale_left(dir, 200) == 0, "the stale sockets are removed: %d left", stale_left(dir, 200));
+    CHECK(!lstat(file, &st) && S_ISREG(st.st_mode), "a plain file is left");
+    CHECK(!lstat(link, &st) && S_ISLNK(st.st_mode) && !lstat(target, &st) && S_ISSOCK(st.st_mode), "a link and what it points to are left");
+    CHECK(!lstat(p, &st) && S_ISSOCK(st.st_mode), "a stale socket of another name is left");
+
+    /* more than 32 stale sockets around the live one: they do not use up the masters asked */
+    CHECK(stale_sockets(dir, 200) == 200, "200 stale sockets again");
+    snprintf(live, sizeof live, "%s/0123456789abcdef0123456789abcdef01234567-77", dir);
+    fl.lfd = sock_at(live, 1);
+    CHECK(fl.lfd >= 0 && !pthread_create(&tl, NULL, fake_master, &fl), "the live master");
+    CHECK(sshmux_find(dir, 4343, out, sizeof out) == 0 && !strcmp(out, live), "the live master is found past the stale ones");
+    CHECK(sshmux_find(dir, 999999, out, sizeof out) == -1 && stale_left(dir, 200) == 0, "no master of that pid; the stale ones gone");
+    CHECK(!lstat(live, &st) && S_ISSOCK(st.st_mode), "the live master's socket is left");
+    chmod(dir, 0755);
+    CHECK(sshmux_find(dir, 4343, out, sizeof out) == -1, "a folder others can read is refused");
+
+    shutdown(fo.lfd, SHUT_RDWR);
+    shutdown(fl.lfd, SHUT_RDWR);
+    pthread_join(to, NULL);
+    pthread_join(tl, NULL);
+    close(fo.lfd);
+    close(fl.lfd);
+    const char *rm[] = { file, link, target, other, p, live };
+    for (size_t i = 0; i < sizeof rm / sizeof *rm; i++) unlink(rm[i]);
+    rmdir(dir);
+    rmdir(out_dir);
 }
 
 /* ---- lord-sftp ---- */
@@ -305,6 +426,7 @@ static void test_hostile(const char *bin) {
 int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     test_wire();
+    test_find();
     if (argc > 1) {
         test_hostile(argv[1]);
         test_real(argv[1], "/usr/lib/openssh/sftp-server");
