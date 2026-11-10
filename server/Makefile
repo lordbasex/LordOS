@@ -78,7 +78,7 @@ HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/was
 HDR += $(wildcard src/fw/*.h)
 # Touchpad and touchscreens: our own driver (src/tp, no libinput), gestures and touches for the
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
-TP_SRC := src/tp/tp.c src/tp/tp_route.c src/wl/wl_input.c src/wl/wl_textinput.c src/ui/js_input.c
+TP_SRC := src/tp/tp.c src/tp/tp_route.c src/wl/wl_input.c src/wl/wl_textinput.c src/wl/tiutf8.c src/ui/js_input.c
 SRC += $(TP_SRC)
 # Window management: dragging in C, a layer for the window being moved and our own cursors (docs/WINDOWS.md).
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
@@ -331,6 +331,11 @@ test: build/xdgact-test
 build/xdgact-test: tests/xdgact_test.c src/wl/xdgact.c src/wl/xdgact.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xdgact_test.c src/wl/xdgact.c
+	./$@ || { rm -f $@; exit 1; }
+test: build/textinput-test
+build/textinput-test: tests/textinput_test.c src/wl/tiutf8.c src/wl/tiutf8.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/textinput_test.c src/wl/tiutf8.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/keygrab-test
 build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
@@ -615,7 +620,7 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 unstable/pointer-gestures/pointer-gestures-unstable-v1 unstable/primary-selection/primary-selection-unstable-v1 \
                 stable/viewporter/viewporter staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
                 stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
-                unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1
+                unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -636,6 +641,10 @@ build/deco-client: tests/deco_client.c $(CLIENT_GEN)
 # (tests/dialog_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dialog-client)
 build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dialog_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# LordOS's input method inside a Linux app: zwp_text_input_v3 enable, preedit, commit and done serials
+# (tests/textinput_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/textinput-client)
+build/textinput-client: tests/textinput_client.c src/wl/tiutf8.c src/wl/tiutf8.h $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/textinput_client.c src/wl/tiutf8.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 
 # Clipboard and primary-selection offers bound to their selection (tests/xwayland/clip_offers.sh, docs/WAYLAND.md)
 build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)

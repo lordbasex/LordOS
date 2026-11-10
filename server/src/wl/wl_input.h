@@ -33,6 +33,15 @@ void wl_input_get_touch(struct wl_client *c, struct wl_resource *seat, uint32_t 
 void wl_textinput_globals(struct wl_display *dpy, void (*fn)(int on, int x, int y, int w, int h));
 void wl_textinput_focus(struct wl_client *client, struct wl_resource *surface);    /* NULL: nobody */
 void wl_textinput_gone(void);           /* the surface with the keyboard is being destroyed */
+/* LordOS's input method into that field: 1 if keys compose into it now (enabled, not a password). */
+int  wl_textinput_composing(void);
+/* The composition (preedit, cursor over the focused bytes [fb, fe), or at the end) and the finished
+ * text (commit, "" if none), closed with done. Nothing is sent when nothing changes for the app. */
+void wl_textinput_send(const char *preedit, int fb, int fe, const char *commit);
+/* delete_surrounding_text, clamped to the text the app sent (nothing without one). */
+void wl_textinput_delete(uint32_t before, uint32_t after);
+/* The field's cursor rectangle in surface coordinates: 1, 2 if the app never set one, 0 if no field. */
+int  wl_textinput_rect(int out[4]);
 void wl_input_seat_caps(struct wl_resource *seat);
 /* regular mouse wheel (wl_pointer in wl.c): axis + axis_source wheel + value120 */
 void wl_input_wheel(struct wl_resource *pointer, uint32_t time, int steps);
