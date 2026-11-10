@@ -1088,14 +1088,15 @@ static void tok_app_id(struct wl_client *c, struct wl_resource *r, const char *a
 }
 static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) { (void)c; (void)r; (void)surface; }
 /* Granted when the asking app has the keyboard, or the serial it names is a click or key LordOS
- * sent it a moment ago; otherwise the token exists but only asks for attention. */
+ * sent it a moment ago; otherwise the token exists but only asks for attention. The grant ends
+ * when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
 static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     ActReq *q = wl_resource_get_user_data(r);
     if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
     q->committed = 1;
     double now = xact_now();
     int granted = (key_focus && key_focus->client == c) || (q->has_serial && xact_serial_recent(q->serial, c, now));
-    const char *t = xact_issue(now, XACT_CLIENT_MS, granted, q->app_id);
+    const char *t = xact_issue_for(now, XACT_CLIENT_MS, granted, q->app_id, c);
     xdg_activation_token_v1_send_done(r, t ? t : "none");
 }
 static const struct xdg_activation_token_v1_interface tok_impl = {
@@ -3525,6 +3526,7 @@ void wl_set_focus(int id) {
         dismiss_popups();
     }
     key_focus = s;
+    xact_focus_moved(s ? s->client : NULL);           /* tokens other apps asked for stop granting */
     wl_textinput_focus(s ? s->client : NULL, s ? s->res : NULL);
     if (s) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);

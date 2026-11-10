@@ -147,13 +147,16 @@ protocol is in `wl.c`.
   is only a hint). The token is granted when the asking app has the keyboard, or when the
   `set_serial` it sends is a click (`wl_pointer.button`), a key (`wl_keyboard.key`) or a keyboard
   `enter` LordOS sent that same client in the last 10 seconds. Otherwise it still gets a token (the
-  protocol always answers `done`), but an ungranted one.
+  protocol always answers `done`), but an ungranted one. The token remembers the app that asked:
+  as soon as the keyboard moves to another app or to the desktop itself, or that app disconnects,
+  its tokens stop granting (KWin and Mutter do the same), so an app cannot ask while in front and
+  use the token later to steal the front. LordOS's own tokens are not revoked this way.
 - **`activate(token, surface)`.** A granted token raises and focuses the surface's window (a menu or
   subsurface counts as its window). An ungranted, expired, unknown or reused token never takes the
   focus: the window is marked as wanting attention, a larger dot in the accent under its Dock icon
   (Lord Flow) or a long accent bar on its taskbar button (Lord Classic), until it comes to the front;
   a click on the icon brings that window first. Tokens work once and last 60 s (LordOS's: a cold
-  start can be slow) or 15 s (an app's); 32 are kept, a new one replaces the oldest.
+  start can be slow) or at most 10 s (an app's); 32 are kept, a new one replaces the oldest.
 - The decision on the theme side is `activationOutcome` in `sdk/desktopmodel.js`
   (`tests/desktop_model_test.mjs`).
 

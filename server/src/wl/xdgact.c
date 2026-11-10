@@ -5,7 +5,8 @@
  * or an app that had the keyboard or a recent click or key asked for one to hand to another app (a
  * link opened in the browser already running). Any other token, a stale one or one used twice only
  * marks the window as wanting attention (wl.c). The rules are KWin's and Mutter's: tokens are random,
- * short-lived and work once. No Wayland types here, so the launcher and its tests link it alone. */
+ * short-lived and work once, and one an app asked for remembers that app and stops granting as soon as
+ * the keyboard leaves it, so an app cannot ask while in front and use it later to steal the front. No Wayland types here, so the launcher and its tests link it alone. */
 #include "xdgact.h"
 
 #include <errno.h>
@@ -20,6 +21,7 @@ typedef struct {
     char token[XACT_TOKEN_LEN + 1];     /* "" = free slot */
     double expires, issued;
     int granted;
+    const void *owner;                  /* the app that asked; NULL = issued by LordOS */
     char app_id[128];
 } Tok;
 static Tok toks[XACT_MAX];
@@ -50,7 +52,8 @@ static int random_bytes(unsigned char *b, size_t n) {
     return r == (ssize_t)n ? 0 : -1;
 }
 
-const char *xact_issue(double now_ms, int ttl_ms, int granted, const char *app_id) {
+const char *xact_issue_for(double now_ms, int ttl_ms, int granted, const char *app_id, const void *client) {
+    if (client && (ttl_ms <= 0 || ttl_ms > XACT_CLIENT_MS)) ttl_ms = XACT_CLIENT_MS;
     unsigned char rnd[XACT_TOKEN_LEN / 2];
     if (random_bytes(rnd, sizeof rnd)) return NULL;
     /* a free or expired slot, else the oldest */
@@ -65,8 +68,24 @@ const char *xact_issue(double now_ms, int ttl_ms, int granted, const char *app_i
     t->issued = now_ms;
     t->expires = now_ms + (ttl_ms > 0 ? ttl_ms : 0);
     t->granted = !!granted;
+    t->owner = client;
     snprintf(t->app_id, sizeof t->app_id, "%s", app_id ? app_id : "");
     return t->token;
+}
+
+const char *xact_issue(double now_ms, int ttl_ms, int granted, const char *app_id) {
+    return xact_issue_for(now_ms, ttl_ms, granted, app_id, NULL);
+}
+
+int xact_focus_moved(const void *client) {
+    int n = 0;
+    for (int i = 0; i < XACT_MAX; i++) {
+        Tok *t = &toks[i];
+        if (!t->token[0] || !t->owner || t->owner == client) continue;
+        n += t->granted;
+        t->granted = 0;                 /* kept, so using it still marks attention and uses it up */
+    }
+    return n;
 }
 
 int xact_take(const char *token, double now_ms, char *app_id, size_t n) {
@@ -99,7 +118,10 @@ int xact_serial_recent(uint32_t serial, const void *client, double now_ms) {
 }
 
 void xact_client_gone(const void *client) {
+    if (!client) return;
     for (int i = 0; i < SERIALS; i++) if (serials[i].client == client) serials[i].client = NULL;
+    for (int i = 0; i < XACT_MAX; i++)
+        if (toks[i].token[0] && toks[i].owner == client) { toks[i].granted = 0; toks[i].owner = NULL; }
 }
 
 void xact_reset(void) {
