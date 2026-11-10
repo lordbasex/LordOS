@@ -110,6 +110,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
     let taken = new Set(llist.map((e) => e.name));
     const walk = async (rdir, ldir, list, depth) => {
       for (const e of list) {
+        if (!goodName(e.name)) continue;                   // from the server: lord-sftp drops ".", ".." and "/" already
         if (e.kind === 'd') {
           if (depth > 20) continue;
           const dest = joinPath(ldir, ldir === lpath ? freeName(e.name, taken) : e.name);

@@ -5,7 +5,7 @@
 // paths as before (Panes.jsx).
 import { createStore, fs, term, userDirs, t as T } from '@lordos/sdk';
 import { meta, toast } from './state.js';
-import { request, transfer, freeName, joinPath, baseName, fromLocal, errCode } from './sftp.js';
+import { request, transfer, freeName, joinPath, baseName, fromLocal, errCode, goodName } from './sftp.js';
 
 // sid → { pid, conn, jobs: [job], hidden }: one sftp connection per ssh, kept while it lives
 export const drops = createStore({});
@@ -102,7 +102,8 @@ async function getOne(wid, sid, name) {
     if (kind === 'd') {
       if (depth > 20) return;
       await fs.mkdirAsync(lp);
-      for (const e of (await request('list', { conn, path: rp })).entries || []) await walk(joinPath(rp, e.name), joinPath(lp, e.name), e.kind, depth + 1);
+      // names come from the server: lord-sftp already drops ".", "..", "/" and control characters; checked again here
+      for (const e of (await request('list', { conn, path: rp })).entries || []) if (goodName(e.name)) await walk(joinPath(rp, e.name), joinPath(lp, e.name), e.kind, depth + 1);
     } else if (kind === '-') {
       addJob(sid, await transfer('down', conn, { path: rp, dest: lp }, baseName(lp)));
     }
