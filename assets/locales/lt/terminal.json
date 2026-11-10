@@ -498,6 +498,7 @@
   "fwd.copy": "Kopijuoti",
   "fwd.err.bad": "Netinkamas adresas arba prievadas",
   "fwd.err.failed": "Serveris jį atmetė",
+  "fwd.err.inuse": "Šio kompiuterio prievadas {port} užimtas (kita kortelė su šiuo profiliu arba kita programa)",
   "fwd.err.nossh": "Šio ssh negalima bendrinti (atidarytas prieš LordOS 0.8.8.7 arba iš kito serverio)",
   "fwd.err.unavailable": "Nėra laisvo vietinio prievado",
   "fwd.noSsh": "Peradresavimams reikia šioje kortelėje prisijungusio ssh.",
@@ -512,7 +513,14 @@
   "fwd.opening": "Laukiama ssh ryšio…",
   "fwd.serverPh": "8080 arba host:5432",
   "fwd.sessionOnly": "Čia pridėtas veikia, kol baigsis šis ryšys. Klauso tik 127.0.0.1.",
+  "fwd.takenBody": "Ten klauso kita kortelė su šiuo profiliu arba kita programa, todėl peradresavimas neatsidarė. Šiam seansui galima naudoti laisvą prievadą.",
+  "fwd.takenTitle": {
+    "one": "Vietinis prievadas {port} jau naudojamas",
+    "few": "Vietiniai prievadai {port} jau naudojami",
+    "other": "Vietiniai prievadai {port} jau naudojami"
+  },
   "fwd.title": "Prievadų peradresavimas",
+  "fwd.useFree": "Naudoti laisvą prievadą",
   "prefs.fwdAdd": "Pridėti peradresavimą",
   "prefs.fwdHint": "Prievadų peradresavimas: kai prisijungia šiame profilyje paleistas ssh, kiekvienas čia nurodytas serverio prievadas tampa pasiekiamas šiame kompiuteryje adresu 127.0.0.1 per tą patį ssh ryšį. Palikite vietinį prievadą tuščią, ir LordOS parinks laisvą. Jie užsidaro kartu su ryšiu.",
   "prefs.sec.ssh": "SSH",

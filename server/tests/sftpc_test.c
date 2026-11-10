@@ -150,6 +150,11 @@ int main(int argc, char **argv) {
         }
         close(fd);
         CHECK(!strncmp(banner, "SSH-2.0-", 8), "the server's banner through the forward: '%.20s'", banner);
+        /* the same local port again (two tabs of one profile): told it's taken, not a refusal from the server */
+        snprintf(q, sizeof q, "{\"op\":\"forward\",\"sid\":7,\"host\":\"127.0.0.1\",\"port\":%d,\"local\":%d}", port, local);
+        a = ask(q, &t);
+        CHECK(a && t == SFTP_ERR && strstr(a, "inuse"), "a local port in use: %s", a ? a : "-");
+        free(a);
         snprintf(q, sizeof q, "{\"op\":\"forward\",\"sid\":7,\"host\":\"127.0.0.1\",\"port\":%d,\"local\":%d,\"close\":true}", port, local);
         a = ask(q, &t);
         CHECK(a && t == SFTP_OK, "forward closed: %s", a ? a : "-");

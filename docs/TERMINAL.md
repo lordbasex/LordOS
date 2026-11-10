@@ -460,6 +460,12 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - **On the tab:** a badge `⇄ 80→54321`. Clicking it lists each forward with its state and connections, with Open (in
   the browser, http/https), Copy and Close, and a field to add a forward for this session only.
 - **When connected:** a notice with the address and Open in Browser / Copy. The footer shows how many forwards are open.
+- **A fixed local port that is taken** (another tab with the same profile, or another program listening there):
+  lord-server tries the bind on 127.0.0.1 first (`sftpc.c` `port_taken`, with `SO_REUSEADDR` as ssh binds it) and
+  answers `inuse` instead of asking the master. The forward shows "Port N on this computer is taken", the badge turns
+  red with `!`, and one notice per session and port names it with **Use a Free Port**: the forward opens on an
+  automatic port, and that session's next connections use one too (apps/terminal/fwdports.js,
+  tests/terminal_fwdports_test.mjs; tests/sftpc_test.c asks for the same port twice).
 
 ## Security
 

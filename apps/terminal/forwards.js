@@ -7,10 +7,14 @@ import { meta, patchMeta } from './state.js';
 import { getProfile } from './profiles.js';
 import { request } from './sftp.js';
 import { sshEnded } from './dropupload.js';
+import { fwdKey, applyFree, takenPorts } from './fwdports.js';
 
 // sid → { pid, items: [{ key, host, port, want, local, state: 'wait'|'opening'|'open'|'error', error, own }] }
 // pid is the connected ssh's: a new one (the user ran ssh again) starts the list again.
 export const forwards = createStore({});
+// sid → the forwards moved to a free port ("Use a Free Port"), and the taken local ports already told: for the session
+const freed = new Map(), told = new Map();
+const setOf = (map, sid) => { sid = Number(sid); if (!map.has(sid)) map.set(sid, new Set()); return map.get(sid); };
 
 const HOST = /^[A-Za-z0-9._:-]{1,253}$/;
 // a forward as the profile keeps it, checked as lord-server will (sftpc.c do_forward): null when it can't be used
@@ -53,20 +57,32 @@ async function open(sid, it, tries = 0) {
   }
 }
 
-// a new connection: the profile's forwards, and one notice for those that opened
+// a new connection: the profile's forwards, one notice for those that opened and one for local ports already taken
 async function connected(sid, pid) {
-  const list = (getProfile(meta.get()[sid]?.profile).forwards || []).filter((f) => f && f.enabled !== false).map(cleanForward).filter(Boolean);
+  const list = applyFree((getProfile(meta.get()[sid]?.profile).forwards || []).filter((f) => f && f.enabled !== false).map(cleanForward).filter(Boolean), freed.get(Number(sid)));
   const items = list.map((f) => ({ ...f, key: ++seq, local: 0, state: 'wait', error: '', own: false }));
   forwards.set((all) => ({ ...all, [sid]: { pid, items } }));
   if (!items.length) return;
   const done = (await Promise.all(items.map((it) => open(sid, it)))).filter(Boolean);
-  if (!done.length || forwards.get()[sid]?.pid !== pid) return;
+  if (forwards.get()[sid]?.pid !== pid) return;
+  tellTaken(sid);
+  if (!done.length) return;
   const first = done.find((x) => webPort(x.port)) || done[0];
   notify({ app: 'terminal', title: T('terminal.fwd.opened', { count: done.length }), body: done.map(forwardLabel).join(' · '),
     actions: [
       ...(webPort(first.port) ? [{ id: 'open', label: T('terminal.fwd.openBrowser'), primary: true, run: () => openUrl(localUrl(first)) }] : []),
       { id: 'copy', label: T('terminal.fwd.copy'), run: () => clipboard.set(`127.0.0.1:${first.local}`) },
     ] });
+}
+
+// once per session and port: a fixed local port something else listens on (another tab of this profile, or a program)
+function tellTaken(sid) {
+  const ports = takenPorts(forwards.get()[sid]?.items, told.get(Number(sid)));
+  if (!ports.length) return;
+  for (const p of ports) setOf(told, sid).add(p);
+  notify({ app: 'terminal', title: T('terminal.fwd.takenTitle', { count: ports.length, port: ports.join(', ') }), body: T('terminal.fwd.takenBody'),
+    actions: [{ id: 'free', label: T('terminal.fwd.useFree'), primary: true,
+      run: () => { for (const it of forwards.get()[sid]?.items || []) if (it.error === 'inuse' && ports.includes(it.want)) useFreePort(sid, it.key); } }] });
 }
 
 // every 2 s: which sessions run a connected ssh (the pane's foreground process, as the Files switch reads it)
@@ -84,6 +100,7 @@ function tick() {
     }
   }
   for (const sid of Object.keys(all)) if (!meta.get()[sid]) forwards.set((x) => { const n = { ...x }; delete n[sid]; return n; });
+  for (const map of [freed, told]) for (const sid of map.keys()) if (!meta.get()[sid]) map.delete(sid);     // the session closed
 }
 let timer = null;
 export function startForwards() { if (!timer) timer = setInterval(tick, 2000); }
@@ -96,6 +113,14 @@ export function addForward(sid, f) {
   patch(sid, (items) => [...items, it]);
   open(sid, it);
   return true;
+}
+// a forward whose local port is taken, on an automatic one instead: now, and on this session's next connections
+export function useFreePort(sid, key) {
+  const it = forwards.get()[sid]?.items.find((x) => x.key === key);
+  if (!it || it.state !== 'error' || !it.want) return;
+  if (!it.own) setOf(freed, sid).add(fwdKey(it));
+  setItem(sid, key, { want: 0 });
+  open(sid, { ...it, want: 0 });
 }
 export function closeForward(sid, key) {
   const it = forwards.get()[sid]?.items.find((x) => x.key === key);
