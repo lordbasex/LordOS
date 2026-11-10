@@ -14,7 +14,11 @@
  *
  * X11 apps go through Xwayland (xwayland.c starts it on demand, xwm.c is the X window manager):
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
- * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps). */
+ * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps).
+ *
+ * xdg_activation_v1: a window asks to come forward with a token; only one LordOS issued when it
+ * launched the app, or one the app in front asked for, raises it; any other marks it as wanting
+ * attention (xdgact.c holds the tokens). */
 #include "wl.h"
 #include "keygrab.h"
 #include "../keylag.h"
@@ -49,6 +53,8 @@
 #include "idle-inhibit-unstable-v1-protocol.h"
 #include "xdg-output-unstable-v1-protocol.h"
 #include "primary-selection-unstable-v1-protocol.h"
+#include "xdg-activation-v1-protocol.h"
+#include "xdgact.h"
 #include "xwm.h"
 #include "xwayland.h"
 #include "../outputs.h"
@@ -1065,6 +1071,80 @@ static void bind_iim(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
     wl_resource_set_implementation(r, &iim_impl, NULL, NULL);
 }
 
+/* ---- xdg-activation: a window comes forward only with a token LordOS or the app in front gave (xdgact.c) ---- */
+typedef struct { uint32_t serial; int has_serial, committed; char app_id[128]; } ActReq;
+static void tok_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
+static void tok_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void tok_serial(struct wl_client *c, struct wl_resource *r, uint32_t serial, struct wl_resource *seat) {
+    (void)c; (void)seat;                /* one seat */
+    ActReq *q = wl_resource_get_user_data(r);
+    q->serial = serial;
+    q->has_serial = 1;
+}
+static void tok_app_id(struct wl_client *c, struct wl_resource *r, const char *app_id) {
+    (void)c;
+    ActReq *q = wl_resource_get_user_data(r);
+    snprintf(q->app_id, sizeof q->app_id, "%s", app_id);
+}
+static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) { (void)c; (void)r; (void)surface; }
+/* Granted when the asking app has the keyboard, or the serial it names is a click or key LordOS
+ * sent it a moment ago; otherwise the token exists but only asks for attention. */
+static void tok_commit(struct wl_client *c, struct wl_resource *r) {
+    ActReq *q = wl_resource_get_user_data(r);
+    if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
+    q->committed = 1;
+    double now = xact_now();
+    int granted = (key_focus && key_focus->client == c) || (q->has_serial && xact_serial_recent(q->serial, c, now));
+    const char *t = xact_issue(now, XACT_CLIENT_MS, granted, q->app_id);
+    xdg_activation_token_v1_send_done(r, t ? t : "none");
+}
+static const struct xdg_activation_token_v1_interface tok_impl = {
+    .set_serial = tok_serial, .set_app_id = tok_app_id, .set_surface = tok_surface, .commit = tok_commit, .destroy = tok_destroy,
+};
+static void act_get_token(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+    ActReq *q = calloc(1, sizeof *q);
+    struct wl_resource *t = q ? wl_resource_create(c, &xdg_activation_token_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!t) { free(q); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(t, &tok_impl, q, tok_gone);
+}
+static void act_activate(struct wl_client *c, struct wl_resource *r, const char *token, struct wl_resource *surface) {
+    (void)c; (void)r;
+    int res = xact_take(token, xact_now(), NULL, 0);
+    Surf *s = wl_resource_get_user_data(surface);
+    while (s && s->role != R_TOPLEVEL && s->parent) s = s->parent;     /* a menu or a subsurface: its window */
+    if (!s || s->role != R_TOPLEVEL || !s->mapped) return;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: activate %d: %s\n", s->id, res == XACT_OK ? "granted" : "attention");
+    emit(s, res == XACT_OK ? "activate" : "attention", "{}");
+}
+static void act_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct xdg_activation_v1_interface act_impl = { .destroy = act_destroy, .get_activation_token = act_get_token, .activate = act_activate };
+static void bind_activation(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &xdg_activation_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &act_impl, NULL, NULL);
+}
+/* An input serial for this client: remembered so its activation requests can name it. */
+static uint32_t input_serial(struct wl_client *c) {
+    uint32_t s = wl_display_next_serial(dpy);
+    xact_note_serial(s, c, xact_now());
+    return s;
+}
+/* A client that left: its serials stop counting (another one may get the same address). */
+static struct wl_listener client_created;
+static void client_destroyed(struct wl_listener *l, void *data) {
+    xact_client_gone(data);
+    wl_list_remove(&l->link);
+    free(l);
+}
+static void on_client_created(struct wl_listener *l, void *data) {
+    (void)l;
+    struct wl_listener *d = calloc(1, sizeof *d);
+    if (!d) return;
+    d->notify = client_destroyed;
+    wl_client_add_destroy_listener(data, d);
+}
+
 static void send_keymap(struct wl_resource *kb) {
     char *km = kb_keymap_string();
     if (!km) return;
@@ -1086,7 +1166,7 @@ static void send_keymap(struct wl_resource *kb) {
 static void send_enter_keyboard(struct wl_resource *kb, Surf *s) {
     struct wl_array keys;
     wl_array_init(&keys);
-    wl_keyboard_send_enter(kb, wl_display_next_serial(dpy), s->res, &keys);
+    wl_keyboard_send_enter(kb, input_serial(s->client), s->res, &keys);
     wl_array_release(&keys);
     uint32_t d, l, k, g;
     kb_mods(&d, &l, &k, &g);
@@ -2688,7 +2768,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
             wl_pointer_send_motion(p, t, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
         for (int i = 0; i < nbuttons; i++) {
             uint32_t b = button[i] == 0 ? BTN_LEFT : button[i] == 1 ? BTN_MIDDLE : BTN_RIGHT;
-            wl_pointer_send_button(p, wl_display_next_serial(dpy), t, b,
+            wl_pointer_send_button(p, input_serial(target->client), t, b,
                                    down[i] ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
         }
         if (wheel) wl_input_wheel(p, t, wheel);      /* axis + axis_source wheel + value120 (wl_input.c) */
@@ -2783,7 +2863,7 @@ static void send_key_to_focus(int code, int value) {
     if (value == 1) note_paste(code, d);
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
-        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+        wl_keyboard_send_key(kb, input_serial(key_focus->client), t, (uint32_t)code,
                              value ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
         if (d != mods_sent[0] || l != mods_sent[1] || lk != mods_sent[2] || g != mods_sent[3])
             wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
@@ -2844,7 +2924,7 @@ static void send_remapped(int code, int press) {
     struct wl_resource *kb;
     FOR_CLIENT(&keyboards, key_focus->client, kb) {
         if (press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), held, l, lk, g);
-        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+        wl_keyboard_send_key(kb, input_serial(key_focus->client), t, (uint32_t)code,
                              press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
         if (!press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
     }
@@ -3642,6 +3722,9 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
+    wl_global_create(dpy, &xdg_activation_v1_interface, 1, NULL, bind_activation);   /* a window comes forward with a token */
+    client_created.notify = on_client_created;
+    wl_display_add_client_created_listener(dpy, &client_created);
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */

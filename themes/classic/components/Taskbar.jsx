@@ -162,7 +162,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
 
   const indicator = (e) => {
     if (!e.running) return null;
-    const on = e.focused;
+    const on = e.focused || e.attention;     // a window that asked for attention (xdg-activation): long, in the accent
     const len = on ? 16 : 6;
     const at = pos === 'top' ? { top: 2, left: 20 - len / 2, width: len, height: 3 }
       : pos === 'left' ? { left: 2, top: 20 - len / 2, width: 3, height: len }

@@ -109,7 +109,7 @@ int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lord
 const char *wl_clip_html(size_t *len);
 void        wl_clip_set_html(const char *html, size_t n);
 
-/* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize,
+/* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize, activate, attention,
  * minimize, fullscreen, unfullscreen. data is JSON. */
 typedef void (*WlEventFn)(int id, const char *type, const char *json);
 void wl_events(WlEventFn fn);
