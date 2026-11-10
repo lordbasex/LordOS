@@ -2589,7 +2589,8 @@ int main(int argc, char **argv) {
             s.cursor_dirty = 1;
             if (gpu_active()) update_cursor(&s);
         }
-        if (wl_idle_inhibited()) display_activity(now_ms());   /* a video or a presentation keeps the screen on */
+        /* a video or a presentation keeps the screen on: a Wayland surface's inhibitor or a portal hold (ui/portal.c) */
+        if (wl_idle_inhibited() || portal_inhibited()) display_activity(now_ms());
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());
         if (hwd >= 0 && (delay < 0 || hwd < delay)) delay = hwd;

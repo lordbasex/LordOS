@@ -2731,6 +2731,7 @@ static const char *app_of_client(struct wl_client *cl) {
 }
 
 const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
+int wl_focus_pid(void) { return dpy && key_focus ? (int)client_pid(key_focus->client) : 0; }
 
 const char *wl_node_app(int node) {
     if (!dpy || !node) return NULL;

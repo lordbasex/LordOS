@@ -263,6 +263,9 @@ EOF
     # (0.8.8.8) the file name under the pointer in ls output, for ❖ + click downloads (apps/terminal/lsnames.js)
     if have node; then run "terminal-lsnames-test (apps/terminal/lsnames.js)" node tests/terminal_lsnames_test.mjs
     else skip "terminal-lsnames-test" "node"; fi
+    # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
+    if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
+    else skip "portal-open-model-test" "node"; fi
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi

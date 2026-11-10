@@ -308,7 +308,20 @@ way. To measure on the VM (test 9).
 
 ### Portals
 
-LordOS runs no `xdg-desktop-portal`; lord-server serves `org.freedesktop.portal.Settings` itself.
+LordOS runs no `xdg-desktop-portal`; lord-server serves these interfaces itself, on the
+`org.freedesktop.portal.Desktop` name (`server/src/ui/portal.c`, Checked against the code). Today their
+callers are Linux apps outside Flatpak; none of them identifies a Flatpak app yet (that is option B below).
+
+| Interface | Status | What it does in LordOS |
+|---|---|---|
+| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme; `SettingChanged` live |
+| `org.freedesktop.portal.FileChooser` | served (version 2) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
+| `org.freedesktop.portal.OpenURI` | served (version 3), in development | `OpenURI` (http and https to the default browser; a `file://` address like `OpenFile`), `OpenFile` and `OpenDirectory` with the file as an fd, used only for its name: it must still name the same file, inside the home folder or the user's disks, outside `fsops_protected`, and opening never takes an executable or a `.desktop` file. Opened the way LordOS opens everything else (`sdk/sysopen.js`); an app that is not the one with the keyboard (the bus's pid against the focused Wayland client's, or the same app scope) makes the person confirm it first |
+| `org.freedesktop.portal.Inhibit` | served (version 1), in development | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
+| `org.freedesktop.ScreenSaver` (own bus name) | served, in development | `Inhibit`/`UnInhibit` with a cookie, the same hold, and `GetActive`; released when the caller leaves the bus |
+| Notification | not a portal here | apps use `org.freedesktop.Notifications` (`server/src/hw/notifyd.c`) |
+| Documents, Flatpak (sub-sandboxes) | not served | see below and E5 |
+| ScreenCast, Screenshot, Camera | never offered | they would hand out the screen or the camera (see A) |
 
 **A. Install `xdg-desktop-portal` and write a LordOS backend** (`org.freedesktop.impl.portal.*`:
 FileChooser, Screenshot, ScreenCast, Camera…). The frontend identifies Flatpak apps (from
@@ -514,8 +527,10 @@ network exceptions:
 - **E7. A sandboxed parser for Flathub's appstream data** (`sandbox_apply_helper`, file as an fd,
   sealed memfd back, validated again in lord-server), whichever binary hosts it.
 
-Not requested now: **E8**, lord-server serving more `org.freedesktop.portal.*` interfaces (portal
-option B), which gets its own review in a later phase.
+Not requested now: **E8**, lord-server serving `org.freedesktop.portal.*` interfaces to Flatpak apps
+(portal option B, identity by cgroup), which gets its own review in a later phase. OpenURI and Inhibit
+are already served to Linux apps (table above), with no new privilege: no new helper, root action or
+library.
 
 ## Device restrictions, the session bus and `no-files` (Design, summary)
 
@@ -549,8 +564,8 @@ option B), which gets its own review in a later phase.
 
 **Phase 2 (0.8.7 or later):**
 
-- LordOS's portal frontends (E8): FileChooser with a document store, OpenURI, Notification,
-  Inhibit; identity by cgroup.
+- LordOS's portal frontends (E8) for Flatpak apps: FileChooser with a document store, Notification;
+  identity by cgroup. OpenURI and Inhibit are already served for Linux apps (see "Portals").
 - Sub-sandboxes (`org.freedesktop.portal.Flatpak` served by LordOS so `flatpak-spawn` children
   enter the same scope), which Chromium/Electron apps need.
 - A session-bus filter for device-restricted apps (shared with Linux apps, already the "next step"
