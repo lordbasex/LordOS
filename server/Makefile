@@ -365,9 +365,9 @@ build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
 	./$@
 # keyboard-shortcuts-inhibit: who is asked, what holds, which keys the app gets and ❖Esc (src/wl/kbinhibit.c)
 test: build/kbinhibit-test
-build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit.h src/wl/keygrab.c src/wl/keygrab.h
+build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit.h src/wl/keygrab.c src/wl/keygrab.h src/wl/dndgate.c src/wl/dndgate.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c src/wl/dndgate.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h

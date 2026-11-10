@@ -115,6 +115,10 @@ int  wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *
 void wl_set_greeter(int on);
 int  wl_shortcuts_answer(const char *app, int allow);
 void wl_shortcuts_changed(void);
+/* The name to show for a "shortcuts" decision's app (a kbinhibit key): the installed app whose .desktop entry runs
+ * that program or Flatpak app, never what a client says; hint (an app_id, or NULL) only says where to look first.
+ * out = "" when none does. */
+void wl_shortcuts_name(const char *key, const char *hint, char *out, size_t n);
 
 /* Clipboard: last image copied by a Linux app (or chosen from the history). */
 unsigned    wl_clip_image_gen(void);

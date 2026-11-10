@@ -13,6 +13,9 @@ int dndg_root_sandboxed(int rootfd);
  * and is our own "/", and its mount, pid and user namespaces are ours. 1 for anything else, and if it can't be
  * looked at (pid <= 0, gone, not ours). Its drags and clipboard file lists never hand files to LordOS. */
 int dndg_pid_sandboxed(int pid);
+/* The same, for a process's /proc/<pid> directory already open (procfd): what it says is that process's,
+ * even if its pid is someone else's by then. 1 if procfd < 0. */
+int dndg_proc_sandboxed(int procfd);
 
 /* A Linux app's drop on LordOS, and who may take it: only what runs while the UI handles the release that
  * made the drop. pending: a drop is waiting; claimable: that release is being handled; claimed: someone took it. */

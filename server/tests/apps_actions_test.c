@@ -128,6 +128,57 @@ int main(void) {
     CHECK("other schemes keep 300 characters", apps_launch_uri("lord-web", vnc) != 0);
     CHECK("an app without the scheme is refused", apps_launch_uri("lord-demo", "https://example.org/") != 0);
 
+    /* the name the keyboard shortcuts prompt shows (apps_name_of_program): only an entry whose Exec runs that very
+     * program, or that Flatpak app; the window's app_id only says where to look first */
+    char bin[600], real[4096], tru[4096], name[160];
+    snprintf(path, sizeof path, "%s/bin", home);
+    mkdir(path, 0700);
+    snprintf(bin, sizeof bin, "%s/bin/viewer", home);
+    f = fopen(bin, "w");
+    if (f) { fputs("#!/bin/sh\n", f); fclose(f); }
+    chmod(bin, 0755);
+    snprintf(path, sizeof path, "%s/.local/bin", home);
+    mkdir(path, 0700);
+    snprintf(path, sizeof path, "%s/.local/bin/flatpak", home);
+    f = fopen(path, "w");
+    if (f) { fputs("#!/bin/sh\n", f); fclose(f); }
+    chmod(path, 0755);
+    const char *entries[][2] = {
+        { "org.example.Viewer", "Name=Viewer\nExec=env FOO=1 %s --x %%u\n" },
+        { "liar", "Name=Lies\nStartupWMClass=viewer\nExec=/usr/bin/true\n" },
+        { "org.example.Flat", "Name=Flat App\nExec=flatpak run --branch=stable --command=x org.example.Flat %%U\n" },
+        { "org.example.Other", "Name=Other\nExec=flatpak run org.example.Flat.Extra\n" },
+    };
+    for (int i = 0; i < 4; i++) {
+        snprintf(path, sizeof path, "%s/.local/share/applications/%s.desktop", home, entries[i][0]);
+        f = fopen(path, "w");
+        if (!f) continue;
+        fprintf(f, "[Desktop Entry]\nType=Application\n");
+        fprintf(f, entries[i][1], bin);
+        fclose(f);
+    }
+    CHECK("the program's realpath", realpath(bin, real) != NULL && realpath("/usr/bin/true", tru) != NULL);
+    apps_name_of_program(real, NULL, "viewer", name, sizeof name);
+    CHECK("the entry that runs it (past env), by the app_id's hint", !strcmp(name, "Viewer"));
+    apps_name_of_program(real, NULL, NULL, name, sizeof name);
+    CHECK("the entry that runs it, without a hint", !strcmp(name, "Viewer"));
+    apps_name_of_program(real, NULL, "liar", name, sizeof name);
+    CHECK("a hint that points elsewhere: still the entry that runs it", !strcmp(name, "Viewer"));
+    apps_name_of_program(tru, NULL, "org.example.Viewer", name, sizeof name);
+    CHECK("another program calling itself Viewer isn't Viewer", strcmp(name, "Viewer") != 0);
+    apps_name_of_program("/nonexistent/viewer", NULL, "org.example.Viewer", name, sizeof name);
+    CHECK("a program no entry runs: no name", !name[0]);
+    apps_name_of_program(NULL, "org.example.Flat", NULL, name, sizeof name);
+    CHECK("a Flatpak app: the entry that runs it", !strcmp(name, "Flat App"));
+    apps_name_of_program(NULL, "org.example.Flat", "liar", name, sizeof name);
+    CHECK("a Flatpak app, whatever the hint", !strcmp(name, "Flat App"));
+    apps_name_of_program(NULL, "org.example.Fla", NULL, name, sizeof name);
+    CHECK("a Flatpak id is matched whole", !name[0]);
+    apps_name_of_program(NULL, "org.example.Viewer", NULL, name, sizeof name);
+    CHECK("an entry named like the Flatpak id that doesn't run it: no name", !name[0]);
+    apps_name_of_program("relative/x", NULL, "viewer", name, sizeof name);
+    CHECK("a relative program: no name", !name[0]);
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}

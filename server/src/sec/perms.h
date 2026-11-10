@@ -28,8 +28,9 @@ typedef enum {
     PERM_COUNT,
 } Perm;
 
-/* An app's id with its NUL: an .lpk id, or for "shortcuts" a Linux app's "desktop:<app_id>" or "exe:<path>" */
-#define PERM_APP_MAX 96
+/* An app's id with its NUL: an .lpk id, or for "shortcuts" a Linux app's checked identity, "flatpak:<id>" or
+ * "program:<path>" (wl/kbinhibit.h's KBI_ID_MAX) */
+#define PERM_APP_MAX 192
 
 typedef enum { PERM_ASK = 0, PERM_ALLOW = 1, PERM_DENY = 2 } PermState;
 

@@ -448,9 +448,9 @@ development) the apps run without a scope, with a warning.
 
 Permissions: `files`, `clipboard`, `notifications`, `network`, `camera`, `microphone`, `screen`,
 `listen`, `usb`, `bluetooth`, `apps`. Not for a manifest or the broker: `shortcuts` (in development), a Linux app
-(`desktop:<app_id>` or `exe:<program>`) or Machines' VM window taking ❖, ⌥Tab and the rest while in front, asked
-once and listed under Keyboard shortcuts; ❖Esc always gives them back ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts
-inhibit").
+(known by what lord-server checks it is, never by the app_id it sets: `flatpak:<app id>` or `program:<path>`) or
+Machines' VM window taking ❖, ⌥Tab and the rest while in front, asked once and listed under Keyboard shortcuts with
+that identity under its name; ❖Esc always gives them back ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts inhibit").
 
 | | |
 |---|---|

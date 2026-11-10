@@ -19,27 +19,35 @@ int dndg_root_sandboxed(int rootfd) {
 }
 
 /* 1 if the process's namespace link (ns/mnt, ns/pid, ns/user) is the same one as ours */
-static int same_ns(int pid, const char *ns) {
-    char a[48], b[32];
+static int same_ns(int procfd, const char *ns) {
+    char a[16], b[32];
     struct stat sa, sb;
-    snprintf(a, sizeof a, "/proc/%d/ns/%s", pid, ns);
+    snprintf(a, sizeof a, "ns/%s", ns);
     snprintf(b, sizeof b, "/proc/self/ns/%s", ns);
-    return stat(a, &sa) == 0 && stat(b, &sb) == 0 && sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
+    return fstatat(procfd, a, &sa, 0) == 0 && stat(b, &sb) == 0 && sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
 }
 
-int dndg_pid_sandboxed(int pid) {
-    char path[32];
-    if (pid <= 0) return 1;
-    snprintf(path, sizeof path, "/proc/%d/root", pid);
+int dndg_proc_sandboxed(int procfd) {
+    if (procfd < 0) return 1;
     /* the magic link opens the process's own root (ptrace read access: our own processes only) */
-    int fd = open(path, O_PATH | O_DIRECTORY | O_CLOEXEC);
+    int fd = openat(procfd, "root", O_PATH | O_DIRECTORY | O_CLOEXEC);
     int r = dndg_root_sandboxed(fd);
     /* fail closed: unsandboxed only on positive evidence, the same root and the same mount, pid and user
      * namespaces as lord-server (any other sandbox or container counts as one) */
     struct stat sr, sl;
     if (!r && (fstat(fd, &sr) != 0 || stat("/", &sl) != 0 || sr.st_dev != sl.st_dev || sr.st_ino != sl.st_ino)) r = 1;
-    if (!r && (!same_ns(pid, "mnt") || !same_ns(pid, "pid") || !same_ns(pid, "user"))) r = 1;
+    if (!r && (!same_ns(procfd, "mnt") || !same_ns(procfd, "pid") || !same_ns(procfd, "user"))) r = 1;
     if (fd >= 0) close(fd);
+    return r;
+}
+
+int dndg_pid_sandboxed(int pid) {
+    char path[32];
+    if (pid <= 0) return 1;
+    snprintf(path, sizeof path, "/proc/%d", pid);
+    int procfd = open(path, O_PATH | O_DIRECTORY | O_CLOEXEC);
+    int r = dndg_proc_sandboxed(procfd);
+    if (procfd >= 0) close(procfd);
     return r;
 }
 

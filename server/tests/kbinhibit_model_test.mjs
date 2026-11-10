@@ -1,7 +1,7 @@
 // node server/tests/kbinhibit_model_test.mjs — a LordOS window holding the desktop's shortcuts (sdk/kbinhibitmodel.js):
 // the same keys as kbi_route in server/src/wl/kbinhibit.c, and a release goes where its press went.
 import assert from 'node:assert/strict';
-import { routeKey, keyOutcome, SHIFT, ALT, CTRL, META } from '../../sdk/kbinhibitmodel.js';
+import { routeKey, keyOutcome, shortcutsWho, SHIFT, ALT, CTRL, META } from '../../sdk/kbinhibitmodel.js';
 
 const ESC = 1, TAB = 15, L = 38, Q = 16, A = 30, F1 = 59, F2 = 60, F4 = 62, F12 = 88, DEL = 111, SUPER = 125, VOLUP = 115, PRINT = 99;
 
@@ -45,4 +45,17 @@ assert.equal(keyOutcome(pressed, down(TAB), 'lord'), null);
 assert.equal(keyOutcome(pressed, up(TAB), null), null);                  // pressed for LordOS, released for LordOS
 assert.equal(keyOutcome(pressed, down(A), null), null);                  // no window holding them
 assert.equal(keyOutcome(pressed, up(A), 'app'), null);
+// whose decision: what lord-server checked (a Flatpak app's id, the program it runs) or a LordOS app's id;
+// the first format's names ("desktop:<app_id>", "exe:<path>") are ignored
+assert.deepEqual(shortcutsWho('flatpak:org.virt_manager.virt-viewer'), { kind: 'flatpak', id: 'org.virt_manager.virt-viewer', short: 'org.virt_manager.virt-viewer' });
+assert.deepEqual(shortcutsWho('program:/usr/bin/remote-viewer'), { kind: 'program', path: '/usr/bin/remote-viewer', short: 'remote-viewer' });
+assert.deepEqual(shortcutsWho('machines'), { kind: 'lord', id: 'machines' });
+assert.equal(shortcutsWho('desktop:org.gnome.Boxes'), null);
+assert.equal(shortcutsWho('exe:/usr/bin/remmina'), null);
+assert.equal(shortcutsWho('flatpak:../x'), null);
+assert.equal(shortcutsWho('flatpak:a/b'), null);
+assert.equal(shortcutsWho('program:rel'), null);
+assert.equal(shortcutsWho('program:/'), null);
+assert.equal(shortcutsWho(''), null);
+assert.equal(shortcutsWho(undefined), null);
 console.log('kbinhibit_model_test: ok');

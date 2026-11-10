@@ -363,10 +363,26 @@ them back" under it. The answer is the `shortcuts` permission in `~/.config/lord
 (`server/src/sec/perms.c`), which Settings → Privacy → Keyboard shortcuts lists and changes (Allow, Ask, Deny); a
 change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
 
-- **Whose decision.** `kbi_app_key` (`server/src/wl/kbinhibit.c`): `desktop:<app_id>` from the window's app_id
-  (the characters a `.desktop` id uses, at most 87), otherwise `exe:<program>` from `/proc/<pid>/exe` (absolute,
-  no `..`). Without either nothing is asked and nothing holds. `lord.perms.set` takes such a name only for
-  `shortcuts`; every other permission still needs an `.lpk` id.
+- **Whose decision.** Who the client is, as lord-server checks it itself (`kbi_identity`,
+  `server/src/wl/kbinhibit.c`), never the app_id it sets: any app can set the app_id of one the person allowed. It is
+  read once, when the client connects (`ClientInfo` in `wl.c`), from its `/proc/<pid>` directory opened through the
+  socket's pidfd (`SO_PEERPIDFD`, checked still alive after the open, `kbi_peer_proc`), so a pid reused later can't
+  answer for it. A Flatpak app (its root holds `.flatpak-info`, opened from the root's directory fd without following
+  a link, a regular file) is `flatpak:<the [Application] name>`; a process in lord-server's own root and mount, pid and
+  user namespaces is `program:<path>`, its `/proc/<pid>/exe` resolved with `realpath` and still the very file it runs
+  (same device and inode). Anything else (another sandbox or container, a damaged `.flatpak-info`, a deleted or
+  replaced program, a path with other characters or longer than 183) has no identity, and its inhibitor never holds:
+  nothing is asked. Xwayland speaks for every X11 app, so it gets none either. `lord.perms.set` takes such a name only
+  for `shortcuts`; every other permission still needs an `.lpk` id. Names of the first, never released format
+  (`desktop:<app_id>`, `exe:<path>`) are ignored: never looked up, and not listed in Settings.
+- **What the person reads.** The prompt and Settings show the identity ("Flatpak app org.example.Viewer", "Program
+  /usr/bin/viewer") under a name. The name is an installed app's only when its `.desktop` entry's Exec line runs that
+  very program (its program found as the launcher finds it, past `env` and `VAR=value`, and resolved), or is
+  `flatpak run` for that Flatpak app (`apps_name_of_program`, `server/src/apps.c`); the window's app_id only says
+  which entries to look at first. Otherwise it is the Flatpak id or the program's file name, never the window's title.
+  An unsandboxed process of the person can still run the allowed program itself (or edit `permisos.json`): this
+  stops a client from borrowing another app's decision by naming itself after it, not code already running as the
+  person outside any sandbox.
 - **Never.** An isolated LordOS app (its pid is the broker's), the login screen (`wl_set_greeter`), and an app the
   person denied. `shortcuts` can't be declared in a manifest or asked for through the broker (`BOP_PERM` refuses it).
   The lock screen is another process with the input, so no app's inhibitor reaches it.
@@ -387,7 +403,10 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
 Machines' VM window does the same in the session (`sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`): the dispatcher
 (`sdk/shortcuts.js`) asks `shortcutsKey` first, the decision is the `machines` app's `shortcuts` permission.
 
-`build/kbinhibit-test` (`make -C server test`) checks the names, the decision, the states and the keys, and
+`build/kbinhibit-test` (`make -C server test`) checks the identity (fake `/proc/<pid>` directories for a Flatpak app, a
+damaged or linked `.flatpak-info`, a program, a link on its path, a gone program, another root or namespace; a socket's
+peer, and one that left), the names, the decision, the states and the keys; `build/apps-actions-test` the names shown;
+and
 `tests/kbinhibit_model_test.mjs` the session's side. `build/kbinhibit-client` (`tests/kbinhibit_client.c`, inside a
 session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
 client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.

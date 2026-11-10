@@ -36,4 +36,18 @@ export function keyOutcome(pressed, e, route) {
   return route;
 }
 
+// Whose a "shortcuts" decision is (server/src/wl/kbinhibit.h kbi_identity): lord-server checks who a Linux app is
+// itself, so its name is "flatpak:<app id>" or "program:<resolved path>"; a LordOS window's is its app's id (no ':').
+// Names of the first, never released format ("desktop:<app_id>", "exe:<path>") are ignored: they're never looked up.
+//   shortcutsWho(key) → { kind: 'flatpak', id, short } | { kind: 'program', path, short } | { kind: 'lord', id } | null
+//     short: what to call it when no installed app's entry runs it (the app id, or the program's file name).
+export function shortcutsWho(key) {
+  const k = String(key || '');
+  const m = /^(flatpak|program):(.+)$/.exec(k);
+  if (m && m[1] === 'flatpak' && /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(m[2]) && !m[2].includes('..')) return { kind: 'flatpak', id: m[2], short: m[2] };
+  if (m && m[1] === 'program' && m[2].startsWith('/') && m[2].length > 1 && !m[2].endsWith('/')) return { kind: 'program', path: m[2], short: m[2].split('/').pop() };
+  if (/^[a-z][a-z0-9-]+$/.test(k)) return { kind: 'lord', id: k };
+  return null;
+}
+
 export { SHIFT, ALT, CTRL, META };

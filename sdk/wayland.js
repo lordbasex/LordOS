@@ -15,6 +15,7 @@ import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
+import { shortcutsWho } from './kbinhibitmodel.js';
 import { osk } from './osk.js';
 import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
@@ -157,10 +158,12 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     // (a link opened in the browser already running), 'attention' with any other (desktopmodel.js)
     // a VM, remote desktop or game asks for ❖, ⌥Tab and the rest while it's in front (keyboard-shortcuts-inhibit,
     // server/src/wl/kbinhibit.h): asked once per app, lord-server keeps the answer as its "shortcuts" permission
+    // The app is who lord-server checked it is (a Flatpak app's id or the program it runs), never the app_id or
+    // title it set; d.name is the installed app's whose .desktop entry runs that program, or ''.
     case 'shortcuts': {
-      const exe = String(d.app || '').startsWith('exe:') ? String(d.app).split('/').pop() : '';
-      const name = linuxAppFor(d.appId)?.name || win?.title || d.appId || exe || d.app;
-      promptForServer({ app: d.app, perm: 'shortcuts', name, done: (allow) => lord.wayland.shortcutsAnswer(d.app, allow) });
+      const who = shortcutsWho(d.app);
+      if (!who || who.kind === 'lord') break;
+      promptForServer({ app: d.app, perm: 'shortcuts', name: String(d.name || '') || who.short, done: (allow) => lord.wayland.shortcutsAnswer(d.app, allow) });
       break;
     }
     case 'activate': case 'attention': {

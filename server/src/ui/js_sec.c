@@ -34,7 +34,7 @@ static JSValue f_perm_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     const char *app = JS_ToCString(c, argv[0]), *pn = JS_ToCString(c, argv[1]), *st = JS_ToCString(c, argv[2]);
     int p = app && pn ? perm_from_name(pn) : -1;
     PermState ns = state_from(st);
-    /* a Linux app's "shortcuts" goes by its desktop id or program (wl/kbinhibit.h); everything else by an .lpk id */
+    /* a Linux app's "shortcuts" goes by the identity lord-server checked (wl/kbinhibit.h); everything else by an .lpk id */
     int named = app && (lpk_valid_id(app) || (p == PERM_SHORTCUTS && kbi_key_valid(app)));
     int ok = named && p >= 0 && perm_set(app, (Perm)p, ns) == 0;
     if (ok && ns != PERM_ALLOW) brokersrv_revoke(app, pn);      /* the isolated app releases the device instantly */

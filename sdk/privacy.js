@@ -18,6 +18,7 @@ import { t, locale, direction, regionData } from './i18n.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
 import { osk } from './osk.js';
+import { shortcutsWho } from './kbinhibitmodel.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.perms) || null;
 
@@ -52,6 +53,15 @@ export function requestPermission(app, perm) {
     if (up) { const was = up.resolve; up.resolve = (v) => { was(v); resolve(v); }; return; }
     queue.set((q) => [...q, { id: seq++, app, perm, resolve }]);
   });
+}
+
+// What lord-server checked a Linux app is, for the "shortcuts" prompt and Settings → Privacy: "Flatpak app
+// org.example.Viewer" or "Program /usr/bin/viewer"; '' for anything else (sdk/kbinhibitmodel.js shortcutsWho).
+export function shortcutsWhoText(key) {
+  const who = shortcutsWho(key);
+  if (who?.kind === 'flatpak') return t('privacy.who.flatpak', { id: who.id });
+  if (who?.kind === 'program') return t('privacy.who.program', { path: who.path });
+  return '';
 }
 
 // A prompt whose decision lord-server keeps itself: a Linux app that asks for the desktop's shortcuts
@@ -112,6 +122,8 @@ export function PermissionPrompt() {
   const owner = item.owner ? appName(getApp(item.owner)) || item.owner : '';
   const msg = t(`privacy.ask.${item.perm}`, { app: name, owner });
   const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote' : 'privacy.ask.where';
+  // a Linux app's "shortcuts": who lord-server checked it is, under its name (the name alone could be anyone's)
+  const who = item.done && item.perm === 'shortcuts' ? shortcutsWhoText(item.app) : '';
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100000 } },
     h(View, { style: { marginTop: 80, width: 320, borderRadius: 14, padding: 20, gap: 14, backgroundColor: '#2b2b30',
@@ -119,6 +131,7 @@ export function PermissionPrompt() {
       h(View, { style: { width: 44, height: 44, borderRadius: 10, backgroundColor: item.perm === 'camera' ? '#30d158' : item.perm === 'microphone' ? '#ff9f0a' : '#0a84ff',
         alignItems: 'center', justifyContent: 'center' } }, h(Text, { style: { fontSize: 22 } }, glyph(item.perm))),
       h(Text, { style: { fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
+      who ? h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.75)', textAlign: 'center' } }, who) : null,
       h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
       h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
         h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),

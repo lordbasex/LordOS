@@ -50,7 +50,7 @@ static void load(void) {
     if (json_parse(buf, (size_t)n, &d, NULL, 0)) { fprintf(stderr, "permisos.json is invalid: ignored\n"); return; }
     const JVal *apps = json_get(d.root, "apps");
     for (const JVal *a = apps && apps->type == J_OBJ ? apps->kid : NULL; a; a = a->next) {
-        if (a->type != J_OBJ) continue;
+        if (a->type != J_OBJ || !a->key || strlen(a->key) >= PERM_APP_MAX) continue;   /* cut short it would be another's */
         Row *r = find(a->key, 1);
         if (!r) continue;
         for (const JVal *p = a->kid; p; p = p->next) {
@@ -109,7 +109,7 @@ static int save(void) {
 }
 
 int perm_set(const char *app_id, Perm p, PermState state) {
-    if (!loaded || !app_id || p < 0 || p >= PERM_COUNT) return -1;
+    if (!loaded || !app_id || p < 0 || p >= PERM_COUNT || strlen(app_id) >= PERM_APP_MAX) return -1;
     Row *r = find(app_id, 1);
     if (!r) return -1;
     r->state[p] = (unsigned char)state;

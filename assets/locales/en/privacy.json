@@ -52,6 +52,8 @@
   "permHint.status-item": "Apps that show their own icon and menu next to the clock. The system draws them; an app can't reach anything else through them.",
   "ask.shortcuts": "“{app}” wants to use the keyboard shortcuts while it’s in front",
   "ask.shortcutsNote": "❖Esc always gives them back, and pressed again lets the app have them. You can change this later in Settings → Privacy.",
+  "who.flatpak": "Flatpak app {id}",
+  "who.program": "Program {path}",
   "perm.shortcuts": "Keyboard shortcuts",
   "permHint.shortcuts": "Apps that may take ❖, ⌥Tab and the desktop’s other shortcuts while they’re in front, such as virtual machines, remote desktops and games. ❖Esc always gives them back; locking the screen and the media keys stay the system’s."
 }

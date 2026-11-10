@@ -26,6 +26,7 @@
 #include "kbinhibit.h"
 #include "../keylag.h"
 #include "../sec/perms.h"
+#include "../apps.h"
 
 #include <errno.h>
 #include <math.h>
@@ -1380,9 +1381,9 @@ static uint32_t input_serial(struct wl_client *c) {
     return s;
 }
 /* A client that left: its serials stop counting (another one may get the same address). What is known of a
- * client from its connection: sandboxed (dndg_pid_sandboxed), looked at once, while its pid is still the one
- * that connected. */
-typedef struct { struct wl_listener gone; int sandboxed; } ClientInfo;
+ * client from its connection, looked at once, while its pid is still the one that connected: sandboxed
+ * (dndg_pid_sandboxed), and who it is for the keyboard shortcuts (kbi_identity: "" when it can't be told). */
+typedef struct { struct wl_listener gone; int sandboxed; char who[KBI_ID_MAX]; } ClientInfo;
 static struct wl_listener client_created;
 static void dnd_client_gone(struct wl_client *c);
 static pid_t client_pid(struct wl_client *c);
@@ -1397,6 +1398,10 @@ static void on_client_created(struct wl_listener *l, void *data) {
     ClientInfo *ci = calloc(1, sizeof *ci);
     if (!ci) return;
     ci->sandboxed = dndg_pid_sandboxed((int)client_pid(data));
+    /* a connection lord-server made itself (Xwayland's socketpair) names lord-server: no one */
+    int proc = client_pid(data) != getpid() ? kbi_peer_proc(wl_client_get_fd(data), (int)client_pid(data)) : -1;
+    if (proc < 0 || !kbi_identity(proc, ci->who, sizeof ci->who)) ci->who[0] = 0;
+    if (proc >= 0) close(proc);
     ci->gone.notify = client_destroyed;
     wl_client_add_destroy_listener(data, &ci->gone);
 }
@@ -1406,6 +1411,11 @@ static int client_sandboxed(struct wl_client *c) {
     if (!l) return 1;
     ClientInfo *ci = wl_container_of(l, (ClientInfo *)NULL, gone);
     return ci->sandboxed;
+}
+/* Who the client is for the keyboard shortcuts, checked when it connected ("" if it can't be told) */
+static const char *client_identity(struct wl_client *c) {
+    struct wl_listener *l = c ? wl_client_get_destroy_listener(c, client_destroyed) : NULL;
+    return l ? ((ClientInfo *)wl_container_of(l, (ClientInfo *)NULL, gone))->who : "";
 }
 
 static void send_keymap(struct wl_resource *kb) {
@@ -3974,12 +3984,16 @@ static void ksi_gone(struct wl_resource *r) {
 static void ksi_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static const struct zwp_keyboard_shortcuts_inhibitor_v1_interface ksi_impl = { .destroy = ksi_destroy };
 
-/* The program a client runs, for an app that names no app_id ("" if it can't be read). */
-static void client_exe(struct wl_client *c, char *out, size_t n) {
-    char p[48];
-    snprintf(p, sizeof p, "/proc/%d/exe", (int)client_pid(c));
-    ssize_t len = client_pid(c) > 0 ? readlink(p, out, n - 1) : -1;
-    out[len > 0 ? len : 0] = 0;
+/* A decision's name as the person reads it: the Name of the installed app whose .desktop entry runs that very
+ * program (or that Flatpak app), never anything the client says; hint (a window's app_id) only says where to look
+ * first. "" when no entry runs it: the shell shows the identity itself. */
+void wl_shortcuts_name(const char *key, const char *hint, char *out, size_t n) {
+    const char *rest = NULL;
+    int kind = kbi_key_kind(key, &rest);
+    if (!out || !n) return;
+    out[0] = 0;
+    if (kind == 'f') apps_name_of_program(NULL, rest, hint, out, n);
+    else if (kind == 'p') apps_name_of_program(rest, NULL, hint, out, n);
 }
 
 static void ksim_inhibit(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *seat) {
@@ -3995,11 +4009,13 @@ static void ksim_inhibit(struct wl_client *c, struct wl_resource *r, uint32_t id
     if (!s) { k->never = 1; return; }
     s->ksi = res;
     Surf *top = toplevel_of(s);
-    char exe[PATH_MAX];
-    client_exe(c, exe, sizeof exe);
-    int named = kbi_app_key(top->app_id, exe, k->app, sizeof k->app);
-    int how = kbi_decide(named ? (int)perm_get(k->app, PERM_SHORTCUTS) : PERM_ASK, app_of_client(c) != NULL, greeter, named);
-    k->never = !named || app_of_client(c) != NULL || greeter;
+    /* the decision goes by who the client is (checked when it connected), never by the app_id it set: any app can
+     * name itself after one the person allowed. Xwayland speaks for every X11 app, so it is no one's. */
+    snprintf(k->app, sizeof k->app, "%s", client_identity(c));
+    int named = kbi_key_valid(k->app), isolated = app_of_client(c) != NULL || c == xwl_client;
+    if (!named) k->app[0] = 0;
+    int how = kbi_decide(named ? (int)perm_get(k->app, PERM_SHORTCUTS) : PERM_ASK, isolated, greeter, named);
+    k->never = !named || isolated || greeter;
     if (how == KBI_GRANT) kbi_send(k, kbi_set_allowed(&k->st, 1));
     if (how != KBI_PROMPT) return;
     /* one prompt per app: another window of it that asks while it's up adds none (the shell keeps one per app too,
@@ -4012,9 +4028,12 @@ static void ksim_inhibit(struct wl_client *c, struct wl_resource *r, uint32_t id
         if (w == KBI_WAITING) w = next++ % KBI_WAITING;          /* full: each in turn makes room */
         snprintf(kbi_waiting[w], sizeof kbi_waiting[w], "%s", k->app);
     }
-    char a[256];                        /* escaped, cut short to fit the event */
-    json_str(a, sizeof a, top->app_id);
-    emit(top, "shortcuts", "{\"app\":\"%s\",\"appId\":\"%s\"}", k->app, a);    /* the shell asks (sdk/wayland.js) */
+    /* the shell asks (sdk/wayland.js), showing the identity and, when an installed app's entry runs that program,
+     * its name (the identity's characters need no escaping) */
+    char name[160], a[380];
+    wl_shortcuts_name(k->app, top->app_id, name, sizeof name);
+    json_str(a, sizeof a, name);
+    emit(top, "shortcuts", "{\"app\":\"%s\",\"name\":\"%s\"}", k->app, a);
 }
 static void ksim_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static const struct zwp_keyboard_shortcuts_inhibit_manager_v1_interface ksim_impl = { .destroy = ksim_destroy, .inhibit_shortcuts = ksim_inhibit };

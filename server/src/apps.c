@@ -758,6 +758,65 @@ int apps_launch_action(const char *id, const char *action) {
     return launch(id, NULL, action);
 }
 
+/* ---- which entry runs a program (a name to show, never a decision) ---- */
+
+/* Does the entry's Exec line run exe: its program (past "env" and VAR=value words), found as the launcher finds
+ * it and resolved, is exe? With flatpak_id: is it "flatpak run [--options] <flatpak_id>[/arch/branch]"? */
+static int entry_runs(const DesktopApp *a, const char *exe, const char *flatpak_id, Entry *e, char *buf) {
+    char *argv[MAX_ARGS];
+    int used = 0;
+    if (parse_desktop(a->file, cached_lang[0] ? cached_lang : "en", e) || !e->exec[0]) return 0;
+    int argc = split_exec(e->exec, e, argv, buf, 4096, NULL, &used), i = 0;
+    if (argc > 0 && (!strcmp(argv[0], "env") || !strcmp(argv[0], "/usr/bin/env")))
+        for (i = 1; i < argc && argv[i][0] != '=' && argv[i][0] != '-' && strchr(argv[i], '='); i++) {}
+    if (i >= argc) return 0;
+    char prog[PATH_MAX], real[PATH_MAX];
+    if (find_program(argv[i], a->user, prog, sizeof prog) || !realpath(prog, real)) return 0;
+    if (!flatpak_id) return !strcmp(real, exe);
+    const char *base = strrchr(real, '/');
+    if (strcmp(base ? base + 1 : real, "flatpak") || i + 1 >= argc || strcmp(argv[i + 1], "run")) return 0;
+    size_t fl = strlen(flatpak_id);
+    for (int j = i + 2; j < argc; j++) {
+        if (argv[j][0] == '-') continue;            /* flatpak run's options are --name=value */
+        return !strncmp(argv[j], flatpak_id, fl) && (argv[j][fl] == 0 || argv[j][fl] == '/');
+    }
+    return 0;
+}
+
+/* Could this entry be the one meant? The window's app_id (only a hint), the Flatpak id, or its program's name. */
+static int entry_hinted(const DesktopApp *a, const char *hint) {
+    if (!hint || !hint[0]) return 0;
+    size_t il = strlen(a->id), hl = strlen(hint);
+    return !strcasecmp(a->id, hint) || !strcasecmp(a->wmclass, hint) || (il > hl && a->id[il - hl - 1] == '.' && !strcasecmp(a->id + il - hl, hint));
+}
+
+void apps_name_of_program(const char *exe, const char *flatpak_id, const char *hint, char *out, size_t n) {
+    if (!out || !n) return;
+    out[0] = 0;
+    if (flatpak_id && !flatpak_id[0]) flatpak_id = NULL;
+    if (!flatpak_id && (!exe || exe[0] != '/')) return;
+    const DesktopApp *list;
+    int cnt = apps_list(cached_lang[0] ? cached_lang : "en", &list);
+    const char *base = exe ? strrchr(exe, '/') : NULL;
+    base = base ? base + 1 : "";
+    Entry *e = malloc(sizeof *e);
+    char *buf = malloc(4096);
+    /* first the entries the hint or the Flatpak id points at, then those whose program has the same name; at most
+     * a few files read */
+    for (int pass = 0, tried = 0; e && buf && pass < 2 && !out[0]; pass++) {
+        for (int i = 0; i < cnt && tried < 32; i++) {
+            const DesktopApp *a = &list[i];
+            int want = pass == 0 ? (entry_hinted(a, hint) || (flatpak_id && !strcmp(a->id, flatpak_id)))
+                                 : !entry_hinted(a, hint) && !flatpak_id && base[0] && !strcmp(a->bin, base);
+            if (!want) continue;
+            tried++;
+            if (entry_runs(a, exe, flatpak_id, e, buf)) { snprintf(out, n, "%s", a->name); break; }
+        }
+    }
+    free(e);
+    free(buf);
+}
+
 /* Opening a file with an app: only an app that declares MimeType (accepts files), a real
  * path inside the home folder or /media/$USER (fsops_allowed), a regular file or folder,
  * and only if its Exec has a file code: the path goes as ONE argument. */

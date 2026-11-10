@@ -64,6 +64,11 @@ int apps_actions(const char *id, const char *lang, AppAction *out, int max);
  * shell, no caller arguments), with that action's Exec line instead of the main one. The action
  * must be listed by apps_actions. 0 if the process started. */
 int apps_launch_action(const char *id, const char *action);
+/* The Name of the listed app whose .desktop entry runs this program, only to show it (the keyboard shortcuts
+ * prompt and Settings, wl/kbinhibit.h): an entry counts only if its Exec line's program, found and resolved as
+ * the launcher would, is exe (a resolved path); or, with flatpak_id, if it is "flatpak run" for that app id. hint
+ * (a window's app_id, or NULL) only says which entries to look at first. out = "" if none runs it. */
+void apps_name_of_program(const char *exe, const char *flatpak_id, const char *hint, char *out, size_t n);
 /* Why the last apps_launch/apps_launch_with refused, as an error code ("" = no specific reason). */
 const char *apps_last_error(void);
 
