@@ -20,6 +20,11 @@
  *   lord.mime.unset(mime)                       back to the automatic choice
  *   lord.timedate.refresh()                     answer as __lordHw('timedate', …)
  *   lord.notifyd.closed(id, reason) / action(id, key)   back to the Linux app that notified
+ *   lord.mpris.list()                           the Linux players on the session bus (hw/mpris.c), read-only;
+ *                                               changes also arrive as __lordHw('mpris', list)
+ *   lord.mpris.control(name, cmd, ms)           cmd 'toggle' | 'play' | 'pause' | 'next' | 'prev' | 'seek' (ms:
+ *                                               the position, clamped to the track); true if sent. Never waits
+ *   lord.mpris.refresh()                        read every player again (Position isn't signalled)
  *   lord.hwinfo.scan()                          read-only hardware facts for the Store's suggestions
  *                                               (hw/hwscan.c: DMI, device tree, PCI/USB IDs, virtio
  *                                               ports, missing firmware when the kernel log is readable)
@@ -81,6 +86,7 @@
 #include "../sec/broker.h"
 #include "lord_version.h"           /* build/gen: the version for the report */
 #include "../hw/mimeapps.h"
+#include "../hw/mpris.h"
 #include "../hw/notifyd.h"
 #include "../hw/pkagent.h"
 #include "portal.h"
@@ -489,6 +495,37 @@ static JSValue f_nd_action(JSContext *c, JSValueConst t, int argc, JSValueConst 
 
 static const JSCFunctionListEntry nd_funcs[] = { JS_CFUNC_DEF("closed", 2, f_nd_closed), JS_CFUNC_DEF("action", 2, f_nd_action) };
 
+/* ---- lord.mpris (Linux players in Now Playing and the media keys, hw/mpris.c) ---- */
+
+static JSValue f_mpris_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_or_null(c, mpris_json());
+}
+
+static JSValue f_mpris_control(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    static const char *const cmds[] = { "toggle", "play", "pause", "next", "prev", "seek" };
+    char name[256], cmd[8];
+    double ms = 0;
+    if (argc < 2 || arg_str(c, argv[0], name, sizeof name) || arg_str(c, argv[1], cmd, sizeof cmd)) return JS_FALSE;
+    if (argc > 2 && JS_ToFloat64(c, &ms, argv[2])) return JS_FALSE;
+    for (int i = 0; i < (int)(sizeof cmds / sizeof cmds[0]); i++)
+        if (!strcmp(cmd, cmds[i])) return JS_NewBool(c, mpris_control(name, MPRIS_TOGGLE + i, ms) == 0);
+    return JS_FALSE;
+}
+
+static JSValue f_mpris_refresh(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    mpris_refresh();
+    return JS_UNDEFINED;
+}
+
+static const JSCFunctionListEntry mpris_funcs[] = {
+    JS_CFUNC_DEF("list", 0, f_mpris_list),
+    JS_CFUNC_DEF("control", 3, f_mpris_control),
+    JS_CFUNC_DEF("refresh", 0, f_mpris_refresh),
+};
+
 /* ---- lord.hwinfo (the Store's "Suggested for your computer", docs/PACKAGES.md) ---- */
 
 /* LORD_HWSCAN_ROOT (development and screenshots only): read a fake tree instead of the real
@@ -801,6 +838,7 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "mime", mime_funcs, sizeof mime_funcs / sizeof mime_funcs[0]);
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);
     add(c, lord, "notifyd", nd_funcs, sizeof nd_funcs / sizeof nd_funcs[0]);
+    add(c, lord, "mpris", mpris_funcs, sizeof mpris_funcs / sizeof mpris_funcs[0]);
     add(c, lord, "hwinfo", hwinfo_funcs, sizeof hwinfo_funcs / sizeof hwinfo_funcs[0]);
     add(c, lord, "sysinfo", sysinfo_funcs, sizeof sysinfo_funcs / sizeof sysinfo_funcs[0]);
     JSValue si = JS_GetPropertyStr(c, lord, "sysinfo");

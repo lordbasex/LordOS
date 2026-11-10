@@ -357,6 +357,11 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
 
   When they change, `SettingChanged` is sent. If another program already owns the name
   `org.freedesktop.portal.Desktop`, LordOS doesn't take it over and says so in the log.
+- **Media players (MPRIS).** lord-server is an MPRIS client on the session bus (`server/src/hw/mpris.c`): the
+  players a Linux app publishes (`org.mpris.MediaPlayer2.*`) show in Control Center's Now Playing, and the media
+  keys, which the compositor keeps from the focused app, reach them when LordOS's own Player isn't playing. Every
+  call is asynchronous with a 3 s limit, the number of players and every string are bounded, and only local cover
+  art is shown (docs/MEDIA.md, "Linux players"). In development for 0.8.8.8, to check on the VM.
 - **GTK 3.** Outside Flatpak it doesn't read the portal: it reads GSettings.
   - lord-server passes `GSETTINGS_BACKEND=keyfile` to the apps and writes the same keys to
     `~/.config/glib-2.0/settings/keyfile`, without deleting what the apps store. GLib watches that

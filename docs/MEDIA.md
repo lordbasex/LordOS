@@ -248,13 +248,35 @@ Screen, microphone and camera go through the system permissions (`sec/perms.c`, 
 | ❖⇧3 or Print Screen | Capture the whole screen |
 | ❖⇧4 | Capture an area (Space: a window; Esc cancels) |
 | ❖⇧5 | Screenshots panel; if recording, stops the recording |
-| Media keys (play/pause, next, previous, stop) | Whatever is playing now (`nowPlaying`) |
+| Media keys (play/pause, next, previous, stop) | LordOS's Player while it plays; otherwise the Linux player that plays, or the one active last (see "Linux players") |
 | Player: Space, ← →, ⇧← ⇧→, ↑ ↓, F | Pause, ±5 s, ±30 s, volume, full screen |
 | Photos: ← →, + −, 0, 1, R, F, Space, ❖P | Previous/next, zoom, fit, 100 %, rotate, full screen, slideshow, print |
 | Recorder: R, Space | Record or stop, play |
 
 ❖⇧3/4/5 weren't used by anyone (see `FILES.md`, `NOTES.md`, `TERMINAL.md`). The compositor
 passes the media keys and Print Screen to LordOS even when a Wayland app has focus (`wl_key`).
+
+### Linux players (MPRIS, in development for 0.8.8.8)
+
+Browsers, video and music players publish `org.mpris.MediaPlayer2.<name>` on the session bus. lord-server
+follows them on its own connection (`server/src/hw/mpris.c`, with Passwords' D-Bus client
+`server/src/vault/dbus.c`, no new library): `NameOwnerChanged` and `ListNames` say which players exist, `GetAll`
+reads `Identity`, `PlaybackStatus`, `Metadata` (`xesam:title`, `xesam:artist`, `xesam:album`, `mpris:length`,
+`mpris:trackid`, `mpris:artUrl`), `Position` and the `Can*` properties, and `PropertiesChanged` and `Seeked` keep
+them current. Only the name's current owner is listened to.
+
+- **Never waits.** Every call is asynchronous; a reply that doesn't come within 3 s is forgotten, and the
+  controls (`PlayPause`, `Play`, `Pause`, `Next`, `Previous`, `SetPosition` or `Seek`) go without asking for one.
+- **Bounded.** At most 16 players and 48 calls in flight. Strings are cut to their field at a UTF-8 boundary with
+  control characters removed (`server/src/hw/mprismeta.c`); lengths and positions are clamped to a week; a seek is
+  clamped to the track's length. Cover art is kept only when it is a local file (`file://`, no `..`, no query):
+  remote and `data:` art is dropped, and the local picture is shown through lord-media's thumbnails like any other.
+- **Only the desktop.** `lord.mpris` (`list()`, `control(name, cmd, ms)`, `refresh()`, `server/src/ui/js_hw.c`)
+  exists in the desktop's own context; isolated apps have no broker message for it.
+- **The media keys** go to LordOS's Player while it plays; otherwise to the Linux player that plays (the one that
+  started last when several do); with nothing playing, to whichever was active last, so a paused track resumes
+  (`sdk/mprismodel.js`, `server/tests/mpris_model_test.mjs`). Control Center's Now Playing lists up to three: the
+  one the keys reach first, then the others. A click on a Linux player's bar seeks when it can.
 
 ## API
 
@@ -283,7 +305,8 @@ Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `st
 ### `@lordos/sdk`
 
 - `media` (the above with promises and permissions), `usePlayer(id)` (the state survives the app
-  being remounted), `nowPlaying`/`useNowPlaying`, `NowPlayingTile` (for a theme's Control Center),
+  being remounted), `nowPlaying`/`useNowPlaying`, `linuxPlayers`/`useLinuxPlayers` (the Linux players, read-only),
+  `NowPlayingTile` (for a theme's Control Center),
   `useThumb(path)`, `mediaFormatTime` and `userDirs()`.
 - `<MediaView media={id} />` (runtime) and the `protected` prop.
 - Windows:
@@ -354,6 +377,8 @@ something changes), 0 dropped frames.
 
 ## Tests
 
+- `make -C server build/mpris-test` (the Linux players' properties, clamps and cover art, without a bus) and
+  `node server/tests/mpris_model_test.mjs` (where the media keys go), both in `make test`.
 - `make -C server build/lord-media build/media-test` (needs FFmpeg's `-dev` packages; if they're
   missing, `make` builds everything else without `lord-media`).
 - `build/media-test probe|thumb|image|wave|export|edit|play|sandbox` launches `lord-media` the same

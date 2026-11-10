@@ -2714,7 +2714,7 @@ int main(int argc, char **argv) {
         n += nabr;
         int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes lord-media y sus streams de PipeWire */
         n += nmed;
-        int hwbase = n, nhw = hw_pollfds(pfd + n, 7);            /* uevents and the system bus (src/hw) */
+        int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
         if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
         loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */

@@ -13,7 +13,7 @@
 //
 // Camera, microphone and screen ask for permission (requestPermission, the system prompt) and the
 // server checks it again. While in use, the menu bar indicators light up.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, Image, MediaView, addListener } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { requestPermission, markDeviceUse } from './privacy.js';
@@ -24,6 +24,7 @@ import { wm } from './windows.js';
 import { canMarkup } from './imageeditmodel.js';
 import { waitFor } from './doc.js';
 import { createThumbCache } from './thumbcache.js';
+import { mergePlayers, touch, positionAt, seekTo, keyTarget, tileOrder } from './mprismodel.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.media) || null;
 const listeners = new Map();          // id → Set(fn(type, data))
@@ -243,39 +244,116 @@ export function userDirs() {
 export const nowPlaying = createStore(null);
 export const useNowPlaying = () => useStore(nowPlaying);
 
+// The Linux players on the session bus (MPRIS, server/src/hw/mpris.c): lord-server sends the list as
+// __lordHw('mpris') whenever it changes (sdk/hardware.jsx). Only the desktop has lord.mpris.
+const mpris = () => (typeof lord !== 'undefined' && lord.mpris) || null;
+export const linuxPlayers = createStore([]);
+export const useLinuxPlayers = () => useStore(linuxPlayers);
+export const linuxPlayersChanged = (list) => linuxPlayers.set(mergePlayers(linuxPlayers.get(), list, Date.now()));
+try { const m = mpris(); if (m) linuxPlayersChanged(m.list()); } catch (e) { /* no session bus */ }
+
+// When our own Player last started playing, to weigh it against the Linux players (sdk/mprismodel.js).
+let ownActive = 0, ownPlaying = false;
+nowPlaying.subscribe(() => {
+  const playing = !!nowPlaying.get()?.playing;
+  if (playing && !ownPlaying) ownActive = Date.now();
+  ownPlaying = playing;
+});
+
+// A Linux player in the shape of nowPlaying, so the tile and the keys treat both alike. A control it
+// can't do is null (its button is dimmed).
+function linuxEntry(p) {
+  const ctl = (cmd, ms) => {
+    const m = mpris();
+    if (m && m.control(p.name, cmd, ms || 0)) linuxPlayers.set(touch(linuxPlayers.get(), p.name, Date.now()));
+  };
+  const playing = p.status === 'playing';
+  return {
+    app: 'mpris', key: p.name, identity: p.identity, title: p.title, artist: p.artist, album: p.album, art: p.art,
+    playing, pos: positionAt(p, Date.now()), duration: p.length,
+    toggle: (playing ? p.canPause : p.canPlay || p.canPause) ? () => ctl('toggle') : null,
+    next: p.canNext ? () => ctl('next') : null, prev: p.canPrev ? () => ctl('prev') : null,
+    stop: p.canPause ? () => ctl('pause') : null,
+    seek: p.canSeek ? (to) => { const v = seekTo(p, to); if (v != null) ctl('seek', v); } : null,
+  };
+}
+
+function entryOf(x) {
+  if (x.kind === 'own') return nowPlaying.get();
+  const p = linuxPlayers.get().find((y) => y.name === x.name);
+  return p ? linuxEntry(p) : null;
+}
+
+// Our Player while it plays, otherwise the Linux player that plays or was active last.
+function keyEntry() {
+  const target = keyTarget(nowPlaying.get(), ownActive, linuxPlayers.get());
+  return target ? entryOf(target) : null;
+}
+
 // Media keys (evdev): they work even if the window is not in front (also with a Linux
 // app focused: the compositor doesn't pass them on).
 // What the media keys do (their entries are in sdk/shortcuts.js): nothing without something playing.
-export const hasNowPlaying = () => !!nowPlaying.get();
-export const mediaToggle = () => nowPlaying.get()?.toggle?.();
-export const mediaNext = () => nowPlaying.get()?.next?.();
-export const mediaPrev = () => nowPlaying.get()?.prev?.();
-export const mediaStop = () => nowPlaying.get()?.stop?.();
+export const hasNowPlaying = () => !!keyEntry();
+export const mediaToggle = () => keyEntry()?.toggle?.();
+export const mediaNext = () => keyEntry()?.next?.();
+export const mediaPrev = () => keyEntry()?.prev?.();
+export const mediaStop = () => keyEntry()?.stop?.();
 
 function Btn({ glyph, onClick, size = 16, color }) {
-  return h(View, { onClick, style: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' } },
+  return h(View, { onClick: onClick || undefined, style: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', opacity: onClick ? 1 : 0.35 } },
     h(Text, { style: { fontSize: size, color } }, glyph));
 }
 
-// Tile for a theme's Control Center: cover art, title, artist and controls.
-export function NowPlayingTile({ style }) {
-  const np = useNowPlaying();
+function NowPlayingRow({ np, compact }) {
   const th = useTheme();
-  if (!np) return null;
+  const bar = useRef(null);
+  const art = useThumb(np.art || null, 256);       // a Linux player's cover, through lord-media like any picture
+  const cover = np.app === 'mpris' ? art : np.cover;
   const pct = np.duration ? Math.min(1, np.pos / np.duration) : 0;
-  return h(View, { style: [{ padding: 12, borderRadius: 12, backgroundColor: th.hover, border: `1px solid ${th.separator}`, gap: 8 }, style] },
+  const size = compact ? 32 : 44;
+  // a click on the bar of a player that can seek moves it there, within the track
+  const seekAt = (e) => {
+    if (!np.seek || !bar.current) return;
+    const [lx, , w] = lord.getLayout(bar.current.id);
+    if (w > 0) np.seek(Math.max(0, Math.min(1, (e.x - lx) / w)) * np.duration);
+  };
+  const sub = [np.artist, np.app === 'mpris' ? np.identity : ''].filter(Boolean).join(' · ');
+  return h(View, { style: { gap: 8 } },
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 10 } },
-      h(View, { style: { width: 44, height: 44, borderRadius: 8, overflow: 'hidden', backgroundColor: th.control, alignItems: 'center', justifyContent: 'center' } },
-        np.cover ? h(Image, { src: np.cover, style: { width: 44, height: 44, objectFit: 'cover' } }) : h(Text, { style: { fontSize: 20 } }, '♪')),
+      h(View, { style: { width: size, height: size, borderRadius: 8, overflow: 'hidden', backgroundColor: th.control, alignItems: 'center', justifyContent: 'center' } },
+        cover ? h(Image, { src: cover, style: { width: size, height: size, objectFit: 'cover' } }) : h(Text, { style: { fontSize: compact ? 16 : 20 } }, '♪')),
       h(View, { style: { flex: 1, gap: 2, overflow: 'hidden' } },
         h(Text, { style: { fontSize: 12, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' } }, np.title || t('media.nowPlaying.unknown')),
-        h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' } }, np.artist || t('media.nowPlaying.title'))),
+        h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' } }, sub || t('media.nowPlaying.title'))),
       h(View, { style: { flexDirection: 'row', alignItems: 'center', direction: 'ltr' } },
-        h(Btn, { glyph: '⏮', onClick: () => np.prev?.(), color: th.text }),
-        h(Btn, { glyph: np.playing ? '⏸' : '▶', size: 18, onClick: () => np.toggle?.(), color: th.text }),
-        h(Btn, { glyph: '⏭', onClick: () => np.next?.(), color: th.text }))),
-    h(View, { style: { height: 3, borderRadius: 2, backgroundColor: th.control, direction: 'ltr' } },
-      h(View, { style: { width: `${Math.round(pct * 100)}%`, height: 3, borderRadius: 2, backgroundColor: th.accent } })));
+        h(Btn, { glyph: '⏮', onClick: np.prev ? () => np.prev() : null, color: th.text }),
+        h(Btn, { glyph: np.playing ? '⏸' : '▶', size: 18, onClick: np.toggle ? () => np.toggle() : null, color: th.text }),
+        h(Btn, { glyph: '⏭', onClick: np.next ? () => np.next() : null, color: th.text }))),
+    h(View, { ref: bar, onMouseDown: np.seek ? seekAt : undefined, style: { paddingTop: 3, paddingBottom: 3, marginTop: -3, marginBottom: -3, direction: 'ltr' } },
+      h(View, { style: { height: 3, borderRadius: 2, backgroundColor: th.control } },
+        h(View, { style: { width: `${Math.round(pct * 100)}%`, height: 3, borderRadius: 2, backgroundColor: th.accent } }))));
+}
+
+// Tile for a theme's Control Center: cover art, title, artist and controls, for our Player and the
+// Linux players, the one the media keys reach first (at most TILE_MAX, sdk/mprismodel.js).
+export function NowPlayingTile({ style }) {
+  const own = useNowPlaying();
+  const players = useLinuxPlayers();
+  const th = useTheme();
+  const [, tick] = useState(0);
+  // Position isn't signalled while a Linux player plays: read again when the tile opens, and the bars
+  // move on every second while one plays
+  useEffect(() => { try { mpris()?.refresh(); } catch (e) { /* no session bus */ } }, []);
+  const anyPlaying = players.some((p) => p.status === 'playing');
+  useEffect(() => {
+    if (!anyPlaying) return undefined;
+    const iv = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(iv);
+  }, [anyPlaying]);
+  const rows = tileOrder(own, ownActive, players).map(entryOf).filter(Boolean);
+  if (!rows.length) return null;
+  return h(View, { style: [{ padding: 12, borderRadius: 12, backgroundColor: th.hover, border: `1px solid ${th.separator}`, gap: 12 }, style] },
+    rows.map((np, i) => h(NowPlayingRow, { key: np.key || 'own', np, compact: i > 0 })));
 }
 
 export { MediaView };
