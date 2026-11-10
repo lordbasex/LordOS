@@ -12,7 +12,7 @@
 enum {
     X_CreateWindow = 1, X_ChangeWindowAttributes = 2, X_GetWindowAttributes = 3, X_DestroyWindow = 4,
     X_MapWindow = 8, X_UnmapWindow = 10, X_ConfigureWindow = 12, X_GetGeometry = 14, X_InternAtom = 16,
-    X_ChangeProperty = 18, X_DeleteProperty = 19, X_GetProperty = 20, X_SetSelectionOwner = 22,
+    X_GetAtomName = 17, X_ChangeProperty = 18, X_DeleteProperty = 19, X_GetProperty = 20, X_SetSelectionOwner = 22, X_GetSelectionOwner = 23,
     X_ConvertSelection = 24, X_SendEvent = 25, X_SetInputFocus = 42, X_CreatePixmap = 53, X_FreePixmap = 54,
     X_CreateGC = 55, X_FreeGC = 60, X_PutImage = 72, X_QueryExtension = 98, X_KillClient = 113,
 };
@@ -116,6 +116,65 @@ int x11_text_rank(const char *name);
 /* Do two X resource ids belong to the same client? (The bits above the server's resource mask
  * are the client.) The window manager answers a paste request only from the focused window's client. */
 static inline int x11_same_client(uint32_t a, uint32_t b, uint32_t id_mask) { return (a & ~id_mask) == (b & ~id_mask); }
+
+/* ---- drag and drop (XDND, version 5: freedesktop.org's Drag-and-Drop Protocol for the X Window System) ----
+ * The five 32-bit data fields of its client messages. What an X client sends is untrusted: every field is
+ * checked where it's read. */
+#define XDND_VERSION 5
+#define XDND_MAX_TYPES 32               /* types one drag offers at most (more are left out) */
+
+/* XdndAware's version → the one both sides speak (min of the two), 0 if it is older than 3. */
+int x11_xdnd_version(uint32_t aware);
+/* XdndEnter from the source window src: the version, bit 0 when more than three types are in its
+ * XdndTypeList property, and the first three types. */
+void x11_xdnd_enter(uint32_t d[5], uint32_t src, int version, const uint32_t *types, int n);
+/* XdndPosition: the pointer in root coordinates (clamped to 0..32767), its time and the action asked for. */
+void x11_xdnd_position(uint32_t d[5], uint32_t src, int x, int y, uint32_t time, uint32_t action);
+/* The target's reply to a position, without a rectangle (so every motion is reported to it). */
+void x11_xdnd_status(uint32_t d[5], uint32_t target, int accept, uint32_t action);
+/* The target is done: whether it took the drop and with which action (version 5). */
+void x11_xdnd_finished(uint32_t d[5], uint32_t target, int accepted, uint32_t action);
+
+typedef struct { uint32_t win; int version, more, n; uint32_t types[3]; } XdndEnter;
+/* 1 if the enter can be spoken (a window, version 3 or newer); its non-zero types in order. */
+int x11_xdnd_parse_enter(const uint32_t d[5], XdndEnter *e);
+typedef struct { uint32_t win; int accept; uint32_t action; } XdndStatus;
+void x11_xdnd_parse_status(const uint32_t d[5], XdndStatus *s);    /* XdndStatus (and XdndFinished: accept, action) */
+void x11_xdnd_xy(uint32_t v, int *x, int *y);                       /* "x << 16 | y" */
+
+/* A list of atoms in a property (XdndTypeList, TARGETS): only type ATOM, format 32, the bytes the reply holds;
+ * zeros are skipped and at most max kept. Returns how many. */
+int x11_atom_list(const uint8_t *v, size_t bytes, int format, uint32_t type, uint32_t *out, int max);
+/* An X client's type name (an atom's name, n bytes) as a Wayland MIME type in out: a name with a '/' as it is
+ * (printable ASCII only, shorter than size), UTF8_STRING as text/plain;charset=utf-8. 0 for anything else
+ * (TARGETS, MULTIPLE, Latin-1 STRING, a name with a control character). */
+int x11_dnd_mime(const uint8_t *name, size_t n, char *out, size_t size);
+
+/* X-Resource QueryClientIds reply (asked with the PID mask for every client): each client's resource base and
+ * pid. Returns how many; a malformed entry ends the list; -1 if the reply has more than max entries. */
+int x11_xres_pids(const uint8_t *r, size_t n, uint32_t *base, uint32_t *pid, int max);
+/* Whether an X drag of files may reach LordOS (Files copies them): the selection owner's client has a pid
+ * the server knows, and no client of the display is sandboxed (sandboxed(pid) != 0; it is called for every pid):
+ * on one X display any client can stand in for another's selection, so one sandboxed client is enough to
+ * refuse. 0 if owner is 0, n < 0 (too many clients) or no pid is known for the owner. */
+int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                     int (*sandboxed)(int pid));
+
+/* An X app's drag's owner as X-Resource tells it: the window that owns XdndSelection, its client's pid (0: none
+ * known) and whether its files may reach LordOS (x11_xdnd_trusted). */
+typedef struct { uint32_t win, pid; int trusted; } XdndOwner;
+void x11_xdnd_owner(XdndOwner *o, uint32_t win, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                    int (*sandboxed)(int pid));
+/* Whether the data of an X app's drag may be read now: XdndSelection is still owned (cur, GetSelectionOwner)
+ * by the very window that owned it at XdndEnter, and, when now is given (X-Resource asked again right before
+ * the read), that window's client has the same pid and the same trust answer. Another X client taking the
+ * selection, or one that connected meanwhile and got the same window id, refuses it. */
+int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *now);
+/* A SelectionNotify of an X app's drag's data (the 32-byte event): 1 if it answers the ConvertSelection we
+ * sent (requestor, selection, target and property exactly ours), 0 if it is the owner's refusal of it (the
+ * property None), -1 to ignore it: one sent with SendEvent (the code's 0x80 bit: any X client can send one),
+ * another event, or an answer to something else. */
+int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop);
 
 /* First free display number (0..63), given a test for whether :n is in use (a live lock file or
  * a socket). -1 if they are all taken. */

@@ -206,3 +206,149 @@ int x11_pick_display(int (*taken)(int n, void *ctx), void *ctx) {
     for (int n = 0; n < 64; n++) if (!taken(n, ctx)) return n;
     return -1;
 }
+
+/* ---- drag and drop (XDND) ---- */
+
+int x11_xdnd_version(uint32_t aware) {
+    if (aware < 3) return 0;
+    return aware < XDND_VERSION ? (int)aware : XDND_VERSION;
+}
+
+void x11_xdnd_enter(uint32_t d[5], uint32_t src, int version, const uint32_t *types, int n) {
+    d[0] = src;
+    d[1] = (uint32_t)version << 24 | (n > 3 ? 1u : 0u);
+    for (int i = 0; i < 3; i++) d[2 + i] = i < n ? types[i] : 0;
+}
+
+static uint32_t xy16(int x, int y) {
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x > 32767) x = 32767;
+    if (y > 32767) y = 32767;
+    return (uint32_t)x << 16 | (uint32_t)y;
+}
+
+void x11_xdnd_position(uint32_t d[5], uint32_t src, int x, int y, uint32_t time, uint32_t action) {
+    d[0] = src;
+    d[1] = 0;
+    d[2] = xy16(x, y);
+    d[3] = time;
+    d[4] = action;
+}
+
+void x11_xdnd_status(uint32_t d[5], uint32_t target, int accept, uint32_t action) {
+    d[0] = target;
+    d[1] = accept ? 1u : 0u;
+    d[2] = d[3] = 0;
+    d[4] = accept ? action : 0;
+}
+
+void x11_xdnd_finished(uint32_t d[5], uint32_t target, int accepted, uint32_t action) {
+    d[0] = target;
+    d[1] = accepted ? 1u : 0u;
+    d[2] = accepted ? action : 0;
+    d[3] = d[4] = 0;
+}
+
+int x11_xdnd_parse_enter(const uint32_t d[5], XdndEnter *e) {
+    memset(e, 0, sizeof *e);
+    e->win = d[0];
+    e->version = (int)(d[1] >> 24);
+    e->more = (int)(d[1] & 1);
+    for (int i = 0; i < 3; i++) if (d[2 + i]) e->types[e->n++] = d[2 + i];
+    if (e->version > XDND_VERSION) e->version = XDND_VERSION;
+    return e->win && e->version >= 3;
+}
+
+void x11_xdnd_parse_status(const uint32_t d[5], XdndStatus *s) {
+    s->win = d[0];
+    s->accept = (int)(d[1] & 1);
+    s->action = s->accept ? d[4] : 0;
+}
+
+void x11_xdnd_xy(uint32_t v, int *x, int *y) {
+    *x = (int)(v >> 16);
+    *y = (int)(v & 0xffff);
+}
+
+int x11_atom_list(const uint8_t *v, size_t bytes, int format, uint32_t type, uint32_t *out, int max) {
+    int n = 0;
+    if (!v || format != 32 || type != 4 /* ATOM */) return 0;
+    for (size_t i = 0; i + 4 <= bytes && n < max; i += 4) {
+        uint32_t a = x11_get32(v + i);
+        if (a) out[n++] = a;
+    }
+    return n;
+}
+
+int x11_dnd_mime(const uint8_t *name, size_t n, char *out, size_t size) {
+    static const char utf8[] = "text/plain;charset=utf-8";
+    if (!size) return 0;
+    out[0] = 0;
+    if (!name || !n || n >= size) return 0;
+    if (n == 11 && !memcmp(name, "UTF8_STRING", 11)) {
+        if (sizeof utf8 > size) return 0;
+        memcpy(out, utf8, sizeof utf8);
+        return 1;
+    }
+    int slash = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (name[i] <= 0x20 || name[i] >= 0x7f) return 0;
+        if (name[i] == '/') slash = 1;
+    }
+    if (!slash || name[0] == '/') return 0;
+    memcpy(out, name, n);
+    out[n] = 0;
+    return 1;
+}
+
+int x11_xres_pids(const uint8_t *r, size_t n, uint32_t *base, uint32_t *pid, int max) {
+    if (!r || n < 32) return 0;
+    uint32_t count = x11_get32(r + 8);
+    if (count > (uint32_t)max) return -1;                   /* more clients than can be looked at */
+    size_t off = 32;
+    int k = 0;
+    for (uint32_t i = 0; i < count; i++) {
+        if (off + 12 > n) break;
+        uint32_t client = x11_get32(r + off), mask = x11_get32(r + off + 4), len = x11_get32(r + off + 8);
+        off += 12;
+        if (len % 4 || len > n - off) break;
+        if (mask == 2 /* LocalClientPID */ && len == 4) { base[k] = client; pid[k] = x11_get32(r + off); k++; }
+        off += len;
+    }
+    return k;
+}
+
+int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                     int (*sandboxed)(int pid)) {
+    int known = 0;
+    if (!owner || n < 0) return 0;
+    for (int i = 0; i < n; i++) {
+        if (!pid[i] || pid[i] > 0x7fffffffu) continue;
+        if (sandboxed((int)pid[i])) return 0;
+        if (x11_same_client(owner, base[i], id_mask)) known = 1;
+    }
+    return known;
+}
+
+void x11_xdnd_owner(XdndOwner *o, uint32_t win, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                    int (*sandboxed)(int pid)) {
+    o->win = win;
+    o->pid = 0;
+    o->trusted = x11_xdnd_trusted(win, base, pid, n, id_mask, sandboxed);
+    for (int i = 0; win && i < n; i++)
+        if (pid[i] && pid[i] <= 0x7fffffffu && x11_same_client(win, base[i], id_mask)) { o->pid = pid[i]; break; }
+}
+
+int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *now) {
+    if (!then->win || cur != then->win) return 0;
+    if (!now) return 1;
+    return now->win == then->win && now->pid == then->pid && now->trusted == then->trusted;
+}
+
+int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop) {
+    if (ev[0] != X_SelectionNotify) return -1;              /* the 0x80 bit: sent by a client (SendEvent) */
+    if (x11_get32(ev + 8) != requestor || x11_get32(ev + 12) != selection || x11_get32(ev + 16) != target) return -1;
+    uint32_t p = x11_get32(ev + 20);
+    return p == prop ? 1 : p == 0 ? 0 : -1;
+}

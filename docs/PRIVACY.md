@@ -709,6 +709,15 @@ a Wayland app.**
   an X app in the background never reads it. What Passwords copies (marked sensitive) **never**
   enters X. In the other direction, an X app's copy is read once, when it is made, and becomes
   LordOS's.
+- **Drag and drop** (XDND, in development). A drag from Files or a Wayland app is offered to the X
+  window under the pointer only while it is there, and its data is given only to a window of that
+  window's client. An X app's drag of files reaches Files only if the X server ties its selection's
+  owner to a process that isn't sandboxed and no X client of the display is sandboxed (X-Resource
+  pids, `WAYLAND.md`, "Drag and drop"): since any X client can stand in for another's selection, a
+  sandboxed X client (a Flatpak app with the X11 socket) would otherwise hand Files paths it can't read.
+  The data is taken only from the X server's own answer to the conversion (never an event another X
+  client sent), and only while the selection is still owned by the window and client that started the
+  drag, checked again right before every read.
 - **Synthetic input.** Xwayland starts with XTEST disabled, so an X app can't type or click into
   another X app (e.g. a terminal) with synthetic events.
 - **Xwayland itself** runs in `lordos-xwayland.scope` (not lord-server's), without network (its own

@@ -15,8 +15,7 @@
  *
  * X11 apps go through Xwayland (xwayland.c starts it on demand, xwm.c is the X window manager):
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
- * (wlx_attach). Not there yet: drag and drop with X11 apps (XDND), text-input (LordOS input methods inside
- * Wayland apps).
+ * (wlx_attach), and drag and drop with them is bridged to XDND by the window manager (xwm.c).
  *
  * xdg_activation_v1: a window asks to come forward with a token; only one LordOS issued when it
  * launched the app, or one the app in front asked for, raises it; any other marks it as wanting
@@ -3169,10 +3168,11 @@ static void dismiss_popups(void) {
 
 /* The surface under the pointer, a button held or not: menus first, then fullscreen, then the window the UI's
  * hit test found. lx, ly: the point in that surface. */
-static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
+static Surf *surface_under_ex(float x, float y, Node *hit, float *lx, float *ly, int skip_xicon) {
     Surf *target = NULL;
     for (int i = npopups - 1; i >= 0 && !target; i--) {
         float ox, oy;
+        if (skip_xicon && popups[i]->xw && xwm_is_dnd_icon(popups[i]->xw)) continue;   /* an X app's drag icon */
         if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
     }
     if (!target && fs_surf && fs_surf->content) {
@@ -3185,6 +3185,8 @@ static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
     }
     return target;
 }
+/* skip_xicon: an X app's drag icon (under the pointer while it drags) is not what it is over */
+static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) { return surface_under_ex(x, y, hit, lx, ly, 0); }
 
 /* ---- drag and drop (wl_data_device.start_drag) ----
  * A Linux app starts a drag with the serial of the press it is in, on the window that got it. From then on
@@ -3201,8 +3203,16 @@ static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
  * pointer (dnd_take_files). Only the UI's handling of that release may claim it (wl_drop_claim, DropGate);
  * one nobody claimed there is cancelled at once, and a claimed list has DNDG_READ_MS to arrive. The drags of
  * an isolated LordOS app or a sandboxed (Flatpak) app never hand files to LordOS: they may name files the app
- * itself can't reach (dnd_contained). Xwayland's windows take no drop yet (no XDND bridge), and neither do
- * isolated LordOS apps (a drop there needs a grant of its own, docs/DESKTOP-PARITY.md). */
+ * itself can't reach (dnd_contained). Isolated LordOS apps take no drop (a drop there needs a grant of its own,
+ * docs/DESKTOP-PARITY.md).
+ *
+ * X11 apps (xwm.c, XDND): a drag over an Xwayland window goes to xwm, which is its XDND source (dnd_x_enter,
+ * xdt: the drag's data is written for the X window through wlx_dnd_send). An X app's drag stays its own pointer
+ * grab: the pointer keeps going to its window while a button is down; outside the X windows xwm's proxy takes
+ * its XDND (xdrag_pointer) and it runs here as a drag with no Source (drag.xsrc: its types in xsrc_mimes, what a
+ * Wayland window receives read by xwm). Its files reach LordOS only when xwm says its owner may hand them
+ * (wlx_xdrag_trust: no sandboxed X client on the display); released over LordOS it is claimed like any other
+ * (xdrag_release). */
 
 #define DND_COPY WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY
 #define DND_MOVE WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE
@@ -3214,7 +3224,7 @@ static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
 struct DOffer {
     struct wl_resource *res;
     Source *src;
-    unsigned lord;
+    unsigned lord, x;                   /* x: the X app's drag it offers (xsrc_gen), 0 none */
     uint32_t dest, pref, action;        /* the target's set_actions, and the action agreed */
     int accepted, dropped, finished, receives;
 };
@@ -3229,7 +3239,18 @@ static struct {
     DOffer *offer;                      /* the offer made for focus */
     int over_lord;                      /* over LordOS itself, told to the source as a copy of its files */
     int contained;                      /* started by an isolated or sandboxed app: no files for LordOS */
+    int xtarget;                        /* focus is an X window: the drag goes to it through XDND (xwm.c) */
+    int xsrc;                           /* an X app's drag (xwm.c): no Source, its types in xsrc_mimes */
+    uint32_t xacts;                     /* the actions that X app's drag allows */
+    int xmoved;                         /* the pointer moved since it began: focus is where it is */
 } drag;
+/* An X app's drag: its MIME types (named by xwm), and which drag they belong to */
+static char xsrc_mimes[MAX_MIMES][256];
+static int nxsrc;
+static unsigned xsrc_gen;
+/* The Wayland drag over (or dropped on) an X window, whose data xwm asks for (wlx_dnd_send): its Source, or
+ * LordOS's paths (their generation); the X window's last status. */
+static struct { int on, dropped, accept; Source *src; unsigned lord; uint32_t action; } xdt;
 static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
 static int shift_down;                  /* Shift held: a Files drag into a Linux app may move (it copies otherwise) */
 /* the press a start_drag may name: its serials (one per wl_pointer of that client) and the surface it went to */
@@ -3255,6 +3276,7 @@ static struct {
     char *buf, *paths;                  /* what the app wrote; the paths, each ended by its NUL */
     size_t len, cap;
     int npaths;
+    int x;                              /* the source is an X app's drag (xwm reads it) */
 } in_drop = { .fd = -1 };
 
 /* The drag icon, if one is shown, and where (under the pointer, moved by its attach and offset). */
@@ -3275,6 +3297,10 @@ static void dnd_icon_damage(void) {
 
 static int dnd_offers(const DOffer *o, const char *mime) {
     if (!mime) return 0;
+    if (o->x) {
+        for (int i = 0; o->x == xsrc_gen && i < nxsrc; i++) if (!strcmp(xsrc_mimes[i], mime)) return 1;
+        return 0;
+    }
     if (o->src) {
         for (int i = 0; i < o->src->nmimes; i++) if (!strcmp(o->src->mimes[i], mime)) return 1;
         return 0;
@@ -3287,6 +3313,7 @@ static int dnd_offers(const DOffer *o, const char *mime) {
  * set_actions (before version 3) copies. Files' own drag into a Linux app only copies: dropped on a file manager,
  * a move would take the file out of its folder without the person asking; with Shift held it may move. */
 static uint32_t dnd_source_actions(void) {
+    if (drag.xsrc) return drag.xacts;
     if (drag.lord) return shift_down ? DND_COPY | DND_MOVE : DND_COPY;
     return drag.src && drag.src->actions_set ? drag.src->actions : DND_COPY;
 }
@@ -3299,6 +3326,7 @@ static void dnd_choose(DOffer *o) {
     else if (both & DND_ASK) a = DND_ASK;
     if (a == o->action) return;
     o->action = a;
+    if (o->x) xwm_xdrag_status(o->accepted, a);
     if (wl_resource_get_version(o->res) >= 3) wl_data_offer_send_action(o->res, a);
     if (o->src && wl_resource_get_version(o->src->res) >= 3) wl_data_source_send_action(o->src->res, a);
 }
@@ -3309,6 +3337,7 @@ static void dnd_accept(struct wl_client *c, struct wl_resource *r, uint32_t seri
     if (!o || o != drag.offer || o->dropped) return;
     o->accepted = dnd_offers(o, mime);
     if (o->src) wl_data_source_send_target(o->src->res, o->accepted ? mime : NULL);
+    if (o->x) xwm_xdrag_status(o->accepted, o->action);
 }
 static void dnd_receive(struct wl_client *c, struct wl_resource *r, const char *mime, int32_t fd) {
     (void)c;
@@ -3316,6 +3345,7 @@ static void dnd_receive(struct wl_client *c, struct wl_resource *r, const char *
     /* only the offer under the pointer, or the dropped one until it finishes, and only for a type it offered */
     if (!o || (o != drag.offer && !o->dropped) || o->finished || !dnd_offers(o, mime) || ++o->receives > DND_RECEIVES) { close(fd); return; }
     if (o->src) { wl_data_source_send_send(o->src->res, mime, fd); close(fd); return; }
+    if (o->x) { xwm_xdrag_receive(mime, fd); return; }     /* read from the X app (xwm.c) */
     if (!strcmp(mime, "text/uri-list")) send_bytes(fd, lord_uris, lord_uris_len);
     else send_bytes(fd, lord_text, lord_text_len);
 }
@@ -3328,6 +3358,10 @@ static void dnd_finish(struct wl_client *c, struct wl_resource *r) {
         return;
     }
     o->finished = 1;
+    if (o->x) {
+        if (o->x == xsrc_gen) xwm_xdrag_finished(1, o->action);
+        o->x = 0;
+    }
     if (o->src) {
         if (wl_resource_get_version(o->src->res) >= 3) wl_data_source_send_dnd_finished(o->src->res);
         o->src->offer = NULL;
@@ -3353,6 +3387,8 @@ static void dnd_offer_gone(struct wl_resource *r) {
     DOffer *o = wl_resource_get_user_data(r);
     if (!o) return;
     if (drag.offer == o) drag.offer = NULL;
+    /* an X app's drop never finished: before version 3 it is done, a newer offer gave up */
+    if (o->x && o->x == xsrc_gen && o->dropped && !o->finished) xwm_xdrag_finished(wl_resource_get_version(r) < 3, DND_COPY);
     if (o->src) {
         /* dropped and never finished: an offer before version 3 can't finish (it is done), a newer one gave up */
         if (o->dropped && !o->finished && wl_resource_get_version(o->src->res) >= 3) {
@@ -3368,13 +3404,24 @@ static void dnd_offer_gone(struct wl_resource *r) {
  * dropped there: then it reads until it finishes). */
 static void dnd_leave(void) {
     if (drag.over_lord && drag.src) wl_data_source_send_target(drag.src->res, NULL);
+    if (drag.over_lord && drag.xsrc) xwm_xdrag_status(0, 0);
     drag.over_lord = 0;
+    if (drag.xtarget) {                 /* an X window: XdndLeave, unless it was dropped there */
+        drag.xtarget = 0;
+        if (!xdt.dropped) {
+            xwm_dnd_leave();
+            memset(&xdt, 0, sizeof xdt);
+            if (drag.src) wl_data_source_send_target(drag.src->res, NULL);
+        }
+    }
     if (drag.dev) wl_data_device_send_leave(drag.dev);
     DOffer *o = drag.offer;
     if (o && !o->dropped) {
         if (o->src && o->src->offer == o) o->src->offer = NULL;
         o->src = NULL;
         o->lord = 0;
+        if (o->x && drag.xsrc) xwm_xdrag_status(0, 0);
+        o->x = 0;
         if (drag.src) wl_data_source_send_target(drag.src->res, NULL);
     }
     drag.focus = NULL;
@@ -3392,11 +3439,38 @@ static struct wl_resource *dnd_device(struct wl_client *c) {
 /* Who may take the drag: a Wayland app's surface; a drag without a source stays inside the client that started it. */
 static int dnd_takes(Surf *t) {
     if (!t || t->client == xwl_client || app_of_client(t->client)) return 0;
-    return drag.src || drag.lord || t->client == drag.client;
+    return drag.src || drag.lord || drag.xsrc || t->client == drag.client;
+}
+/* An X window under a drag of Files or of a Wayland app: XDND (xwm.c). An X app's own drag icon never is. */
+static int dnd_x_target(Surf *t) {
+    return t && t->client == xwl_client && t->xw && !xwm_is_dnd_icon(t->xw) && (drag.src || drag.lord) && !drag.xsrc;
+}
+/* The action an X window is asked for: as into a Wayland app (Files copies, with Shift it moves), else the
+ * source's copy, move or ask in that order. */
+static uint32_t dnd_x_want(void) {
+    if (drag.lord) return shift_down ? DND_MOVE : DND_COPY;
+    uint32_t a = dnd_source_actions();
+    return a & DND_COPY ? DND_COPY : a & DND_MOVE ? DND_MOVE : a & DND_ASK ? DND_ASK : DND_COPY;
+}
+static void dnd_x_enter(Surf *t) {
+    const char *m[MAX_MIMES];
+    int n = 0;
+    if (drag.src) for (int i = 0; i < drag.src->nmimes; i++) m[n++] = drag.src->mimes[i];
+    else for (size_t i = 0; i < NLORD_MIMES; i++) m[n++] = lord_mimes[i];
+    xwm_dnd_enter(t->xw, m, n, (int)lroundf(last_x), (int)lroundf(last_y), dnd_x_want());   /* may end an older drop */
+    memset(&xdt, 0, sizeof xdt);
+    xdt.on = 1;
+    xdt.src = drag.src;
+    xdt.lord = drag.lord ? lord_gen : 0;
+    drag.xtarget = 1;
 }
 
 /* An app's drag that carries files and may copy them: LordOS itself takes it (Files, dnd_take_files). */
 static int dnd_files_in(void) {
+    if (drag.xsrc) {                    /* an X app's: only once xwm said its files may reach LordOS */
+        for (int i = 0; !drag.contained && i < nxsrc; i++) if (!strcmp(xsrc_mimes[i], "text/uri-list")) return 1;
+        return 0;
+    }
     if (!drag.src || drag.contained || !(dnd_source_actions() & DND_COPY)) return 0;
     for (int i = 0; i < drag.src->nmimes; i++) if (!strcmp(drag.src->mimes[i], "text/uri-list")) return 1;
     return 0;
@@ -3404,23 +3478,26 @@ static int dnd_files_in(void) {
 static void dnd_over_lord(void) {
     if (drag.over_lord || !dnd_files_in()) return;
     drag.over_lord = 1;
+    if (drag.xsrc) { xwm_xdrag_status(1, DND_COPY); return; }
     wl_data_source_send_target(drag.src->res, "text/uri-list");
     if (wl_resource_get_version(drag.src->res) >= 3) wl_data_source_send_action(drag.src->res, DND_COPY);
 }
 
 static void dnd_focus(Surf *t, float lx, float ly) {
-    if (t != drag.focus && t && !dnd_takes(t)) t = NULL;
+    if (t != drag.focus && t && !dnd_takes(t) && !dnd_x_target(t)) t = NULL;
     if (t == drag.focus) {
-        if (t && drag.dev) wl_data_device_send_motion(drag.dev, now_ms(), wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+        if (t && drag.xtarget) xwm_dnd_motion((int)lroundf(last_x), (int)lroundf(last_y), dnd_x_want());
+        else if (t && drag.dev) wl_data_device_send_motion(drag.dev, now_ms(), wl_fixed_from_double(lx), wl_fixed_from_double(ly));
         if (!t) dnd_over_lord();
         return;
     }
     dnd_leave();
     if (!t) { dnd_over_lord(); return; }
     drag.focus = t;
+    if (dnd_x_target(t)) { dnd_x_enter(t); return; }
     if (!(drag.dev = dnd_device(t->client))) return;
     struct wl_resource *ores = NULL;
-    if (drag.src || drag.lord) {
+    if (drag.src || drag.lord || drag.xsrc) {
         DOffer *o = calloc(1, sizeof *o);
         ores = o ? wl_resource_create(t->client, &wl_data_offer_interface, wl_resource_get_version(drag.dev), 0) : NULL;
         if (!ores) { free(o); wl_client_post_no_memory(t->client); drag.dev = NULL; return; }
@@ -3432,6 +3509,9 @@ static void dnd_focus(Surf *t, float lx, float ly) {
             o->src = drag.src;
             drag.src->offer = o;
             for (int i = 0; i < drag.src->nmimes; i++) wl_data_offer_send_offer(ores, drag.src->mimes[i]);
+        } else if (drag.xsrc) {
+            o->x = xsrc_gen;
+            for (int i = 0; i < nxsrc; i++) wl_data_offer_send_offer(ores, xsrc_mimes[i]);
         } else {
             o->lord = lord_gen;
             for (size_t i = 0; i < NLORD_MIMES; i++) wl_data_offer_send_offer(ores, lord_mimes[i]);
@@ -3472,6 +3552,7 @@ static void in_drop_close(void) {
 static void in_drop_cancel(void) {
     if (in_drop.src) wl_data_source_send_cancelled(in_drop.src->res);
     in_drop.src = NULL;
+    if (in_drop.x) { in_drop.x = 0; xwm_xdrag_finished(0, 0); }
     in_drop_close();
     dndg_reset(&in_drop.gate);
 }
@@ -3506,6 +3587,7 @@ static int in_drop_ready(int fd, uint32_t mask, void *data) {
     if (in_drop.src && ok && wl_resource_get_version(in_drop.src->res) >= 3) wl_data_source_send_dnd_finished(in_drop.src->res);
     else if (in_drop.src && !ok) wl_data_source_send_cancelled(in_drop.src->res);
     in_drop.src = NULL;
+    if (in_drop.x) { in_drop.x = 0; xwm_xdrag_finished(ok, DND_COPY); }
     in_drop_close();
     dndg_reset(&in_drop.gate);
     if (ok) emit_id(0, "filesdrop", "{}");
@@ -3527,7 +3609,7 @@ static void dnd_take_files(void) {
 }
 int wl_drop_claim(void) {
     Source *src = in_drop.src;
-    if (!src || dnd_contained(wl_resource_get_client(src->res)) || !dndg_claim(&in_drop.gate)) return 0;
+    if ((!src && !in_drop.x) || (src && dnd_contained(wl_resource_get_client(src->res))) || !dndg_claim(&in_drop.gate)) return 0;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { in_drop_cancel(); return 0; }
     in_drop.fd = p[0];
@@ -3538,6 +3620,7 @@ int wl_drop_claim(void) {
         in_drop_cancel();
         return 0;
     }
+    if (in_drop.x) { xwm_xdrag_receive("text/uri-list", p[1]); return 1; }     /* read from the X app */
     wl_data_source_send_send(src->res, "text/uri-list", p[1]);
     close(p[1]);
     if (wl_resource_get_version(src->res) >= 3) wl_data_source_send_dnd_drop_performed(src->res);
@@ -3557,6 +3640,15 @@ void wl_drop_clear(void) {
 }
 
 static void dnd_drop(void) {
+    if (drag.xtarget) {                 /* an X window: XdndDrop if its last status took it */
+        if (!xwm_dnd_drop()) { dnd_cancel(); return; }
+        xdt.dropped = 1;
+        drag.xtarget = 0;
+        if (drag.src && wl_resource_get_version(drag.src->res) >= 3) wl_data_source_send_dnd_drop_performed(drag.src->res);
+        dnd_leave();
+        dnd_end();
+        return;
+    }
     DOffer *o = drag.offer;
     int ok = drag.focus && drag.dev && (o ? o->accepted && (wl_resource_get_version(o->res) < 3 || o->action) : !drag.src && !drag.lord);
     if (!ok && drag.over_lord && drag.src) {   /* files on LordOS itself */
@@ -3599,6 +3691,31 @@ static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *dow
     return t ? 1 : 0;
 }
 
+/* An X app's drag is its own pointer grab: the pointer stays on its window while a button is down (wl_pointer).
+ * Outside the X windows xwm's proxy takes its XDND (xwm_xdrag_out), and once xwm started it here (wlx_xdrag_begin)
+ * the Wayland window under the pointer gets it; back over an X window, the X app talks to that one again. */
+static void xdrag_pointer(float x, float y, Node *hit) {
+    float lx = 0, ly = 0;
+    Surf *t = surface_under_ex(x, y, hit, &lx, &ly, 1);
+    int over_x = t && t->client == xwl_client;
+    xwm_xdrag_out(!over_x);
+    if (!drag.on || !drag.xsrc) return;
+    drag.xmoved = 1;
+    if (over_x) dnd_leave();
+    else dnd_focus(t, lx, ly);
+}
+/* Its last button is up: over a Wayland window it drops when the X app says (XdndDrop, wlx_xdrag_drop); files
+ * over LordOS itself are claimable while the UI handles this release, and read from the X app once claimed. */
+static void xdrag_release(void) {
+    xwm_xdrag_out(0);
+    if (!drag.on || !drag.xsrc || drag.focus || !drag.over_lord) return;
+    in_drop_cancel();
+    in_drop.x = 1;
+    dndg_drop(&in_drop.gate);
+    drag.over_lord = 0;
+    dnd_end();
+}
+
 static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resource *src_res, struct wl_resource *origin_res,
                      struct wl_resource *icon_res, uint32_t serial) {
     Source *src = src_res ? wl_resource_get_user_data(src_res) : NULL;
@@ -3631,6 +3748,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
 /* A source, a surface, a data device or a client that went away mid-drag. */
 static void dnd_source_gone(Source *s) {
     if (s->offer) s->offer->src = NULL;
+    if (xdt.src == s) { xdt.src = NULL; xwm_dnd_source_gone(); }
     if (in_drop.src == s) {             /* gone before its list was asked for or read: nothing to copy */
         in_drop.src = NULL;
         if (!in_drop.gate.claimed) in_drop_cancel();
@@ -3675,6 +3793,7 @@ void wl_drag_files_end(void) {
     if (drag.on && drag.lord) dnd_cancel();
 }
 int wl_drag_files_taken(void) {
+    if (drag.on && drag.lord && drag.xtarget) return xdt.accept ? (int)xdt.action : 0;
     return drag.on && drag.lord && drag.offer && drag.offer->accepted && drag.offer->action ? (int)drag.offer->action : 0;
 }
 
@@ -3682,11 +3801,12 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     if (!dpy) return 0;
     for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
     if (seat_held < 0) seat_held = 0;
-    if (drag.on) return dnd_pointer(x, y, hit, nbuttons, down);
+    if (drag.on && !drag.xsrc) return dnd_pointer(x, y, hit, nbuttons, down);
     last_x = x;
     last_y = y;
     Surf *target = NULL;
     float lx = 0, ly = 0;
+    int xheld = buttons_held && pointer_focus && pointer_focus->client == xwl_client;
     if (buttons_held && pointer_focus) {        /* drag: stays on the same surface */
         float ox, oy;
         target = pointer_focus;
@@ -3694,6 +3814,8 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     } else {
         target = surface_under(x, y, hit, &lx, &ly);
     }
+    if (xheld) xdrag_pointer(x, y, hit);       /* an X app's drag may leave the X windows */
+    if (drag.on && drag.xsrc && target && target->client != xwl_client) target = NULL;   /* until it is dropped */
     for (int i = 0; i < nbuttons; i++)          /* click outside the menus: they close */
         if (down[i] && npopups && (!target || target->role != R_POPUP)) {
             Surf *t = target;
@@ -3731,6 +3853,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     }
     if (buttons_held < 0) buttons_held = 0;
     if (!buttons_held) { npress = 0; press_surf = NULL; }
+    if (xheld && !buttons_held) xdrag_release();
     Surf *top = target;
     while (top && top->role == R_SUB) top = top->parent;
     if (fs_surf && fs_surf->content) return 2;  /* fullscreen: the UI does not see the pointer */
@@ -3943,8 +4066,9 @@ int wl_key(int code, int value, const KeyInfo *k) {
         if (drag.on && drag.lord && drag.offer && wl_resource_get_version(drag.offer->res) >= 3)
             wl_data_offer_send_source_actions(drag.offer->res, dnd_source_actions());
         if (drag.on && drag.offer) dnd_choose(drag.offer);
+        if (drag.on && drag.xtarget) xwm_dnd_motion((int)lroundf(last_x), (int)lroundf(last_y), dnd_x_want());
     }
-    if (drag.on && code == KEY_ESC) {                      /* Escape cancels a drag; LordOS still sees it for its own */
+    if (drag.on && !drag.xsrc && code == KEY_ESC) {        /* Escape cancels a drag (an X app's own takes it); LordOS still sees it for its own */
         int lord = drag.lord;
         if (value == 1) dnd_cancel();
         if (!lord) return 1;
@@ -4900,6 +5024,93 @@ void wlx_fullscreen_rect(int *x, int *y, int *w, int *h) {
     fs_rect(&fx, &fy, &fw, &fh);
     *x = (int)fx; *y = (int)fy; *w = (int)fw; *h = (int)fh;
 }
+
+/* Drag and drop with X apps (xwm.c, "drag and drop"). A Wayland drag over an X window: the data of the type
+ * the X window asked for, from the drag's own source or LordOS's paths, only while it's over that window or
+ * dropped there. */
+int wlx_dnd_send(const char *mime, int fd) {
+    if (xdt.on && xdt.lord && xdt.lord == lord_gen) {
+        for (size_t i = 0; i < NLORD_MIMES; i++) {
+            if (strcmp(lord_mimes[i], mime)) continue;
+            if (!strcmp(mime, "text/uri-list")) send_bytes(fd, lord_uris, lord_uris_len);
+            else send_bytes(fd, lord_text, lord_text_len);
+            return 0;
+        }
+    } else if (xdt.on && xdt.src) {
+        for (int i = 0; i < xdt.src->nmimes; i++)
+            if (!strcmp(xdt.src->mimes[i], mime)) { wl_data_source_send_send(xdt.src->res, mime, fd); close(fd); return 0; }
+    }
+    close(fd);
+    return -1;
+}
+void wlx_dnd_status(int accept, uint32_t action) {
+    if (!xdt.on || xdt.dropped || !drag.on) return;
+    if (accept && !(action & dnd_source_actions())) action = dnd_x_want();   /* only what the source allows */
+    xdt.accept = accept;
+    xdt.action = accept ? action : 0;
+    Source *s = xdt.src;
+    if (!s) return;
+    const char *mime = s->nmimes ? s->mimes[0] : NULL;     /* XDND doesn't say which type: a file list if it has one */
+    for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "text/uri-list")) mime = s->mimes[i];
+    wl_data_source_send_target(s->res, accept ? mime : NULL);
+    if (wl_resource_get_version(s->res) >= 3) wl_data_source_send_action(s->res, xdt.action);
+}
+void wlx_dnd_finished(int accepted, uint32_t action) {
+    Source *s = xdt.src;
+    memset(&xdt, 0, sizeof xdt);
+    if (!s) return;
+    if (!accepted) { wl_data_source_send_cancelled(s->res); return; }
+    if (wl_resource_get_version(s->res) >= 3) {
+        wl_data_source_send_action(s->res, action);
+        wl_data_source_send_dnd_finished(s->res);
+    }
+}
+
+/* An X app's drag outside the X windows: a drag with no Source while its button is still down on its window.
+ * Its files are kept from LordOS until xwm says otherwise (wlx_xdrag_trust). */
+int wlx_xdrag_begin(const char *const *mimes, int n) {
+    if (!dpy || !xwl_client || drag.on || buttons_held <= 0 || !pointer_focus || pointer_focus->client != xwl_client) return 0;
+    memset(&drag, 0, sizeof drag);
+    drag.on = drag.xsrc = 1;
+    drag.client = xwl_client;
+    drag.contained = 1;
+    drag.xacts = DND_COPY;
+    xsrc_gen++;
+    nxsrc = 0;
+    for (int i = 0; i < n && nxsrc < MAX_MIMES; i++)
+        if (strlen(mimes[i]) < sizeof xsrc_mimes[0]) snprintf(xsrc_mimes[nxsrc++], sizeof xsrc_mimes[0], "%s", mimes[i]);
+    return 1;
+}
+void wlx_xdrag_action(uint32_t actions) {
+    actions &= DND_ALL;
+    if (!drag.on || !drag.xsrc || !actions || actions == drag.xacts) return;
+    drag.xacts = actions;
+    if (drag.offer && wl_resource_get_version(drag.offer->res) >= 3) wl_data_offer_send_source_actions(drag.offer->res, actions);
+    if (drag.offer) dnd_choose(drag.offer);
+}
+void wlx_xdrag_trust(int ok) {
+    if (!drag.on || !drag.xsrc) return;
+    drag.contained = !ok;
+    if (ok && drag.xmoved && !drag.focus) dnd_over_lord();    /* over LordOS already */
+}
+int wlx_xdrag_drop(void) {
+    if (!dpy) return 0;
+    if (!drag.on || !drag.xsrc) return in_drop.x ? 2 : 0;
+    DOffer *o = drag.offer;
+    int ok = drag.focus && drag.dev && o && o->accepted && (wl_resource_get_version(o->res) < 3 || o->action);
+    if (ok) {
+        wl_data_device_send_drop(drag.dev);
+        o->dropped = 1;
+    }
+    dnd_leave();                        /* the session ends; the dropped offer still reads until it finishes */
+    dnd_end();
+    return ok;
+}
+void wlx_xdrag_end(void) {
+    if (dpy && drag.on && drag.xsrc) { dnd_leave(); dnd_end(); }
+    if (in_drop.x) in_drop_cancel();
+}
+void wlx_send_bytes(int fd, const void *data, size_t n) { send_bytes(fd, data, n); }
 
 /* What an X11 app copied: LordOS's clipboard (the next wl_flush offers it to the focused Wayland app
  * and cancels a Wayland app's selection). */

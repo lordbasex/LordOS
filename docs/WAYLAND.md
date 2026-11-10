@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon (in development, see "Drag and drop") |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (in development, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -273,11 +273,59 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   `.flatpak-info`) may name files the app itself can't reach, so it is never offered to LordOS: over LordOS
   it is told nothing, and released there it is cancelled. A client whose root can't be looked at counts as
   sandboxed. Drags between Linux windows are unchanged.
-- **Not yet:** X11 apps (Xwayland) take no drop and can't start one: that needs an XDND bridge in `xwm.c`.
-  Isolated LordOS apps take no drop either: that needs a grant of its own (`DESKTOP-PARITY.md`). Touch drags
+- **With X11 apps (XDND, version 5; built, to check on the VM).** The window manager (`xwm.c`) bridges
+  both ways:
+  - *Files or a Wayland app → an X window.* While the drag is over an X window that is `XdndAware`, the
+    window manager is the XDND source: it owns `XdndSelection` with its own window, sends `XdndEnter` with
+    the drag's types (interned first; more than three go in `XdndTypeList`, and `UTF8_STRING` is added
+    beside `text/plain;charset=utf-8`), `XdndPosition` with the pointer and the action (copy; a Files drag
+    with Shift held asks for a move, as into a Wayland app), and `XdndLeave` when the pointer leaves it or
+    Escape is pressed. The window's `XdndStatus` reaches the source (and Files' ghost shows the +).
+    Releasing sends `XdndDrop` only if its last status took the drag. The window's `ConvertSelection` of
+    `XdndSelection` is answered only for a window of that window's client: `TARGETS`, then the data of a
+    type the drag offers, read from the source (or, for Files, the same `text/uri-list` of CRLF-separated
+    `file://` URIs and `text/plain` paths, `uril_encode`) through a non-blocking pipe, at most 16 MB within
+    10 seconds, and written to the property (`INCR` for large ones). `XdndFinished` tells the source the
+    drop is done (its action, from version 5); a window that never finishes is given up after 30 seconds.
+  - *An X app → a Wayland window or Files.* An X app's drag is its own pointer grab: while a button is
+    down on an X window the pointer keeps going to it. When the pointer leaves the X windows (an X app's
+    drag icon doesn't count) and an X app owns `XdndSelection`, the window manager maps an invisible
+    `XdndAware` window above every X window, so the app's XDND talks to it. Its types (from `XdndEnter` or
+    `XdndTypeList`, each named with `GetAtomName` and kept only if it's a MIME type: printable ASCII with
+    a `/`, or `UTF8_STRING` as `text/plain;charset=utf-8`, at most 32) become a drag the Wayland window
+    under the pointer gets (`enter`, `motion`, offers, actions, `drop`); what the window receives is read
+    with `ConvertSelection` of `XdndSelection` (`INCR` too, at most 16 MB within 10 seconds) and written
+    to its fd without blocking. Its `accept` and action go back as `XdndStatus`, its `finish` as
+    `XdndFinished`. The app's messages count only from the client that owns `XdndSelection` (XFixes
+    says), and an owner that changes mid-drag ends it. The data is read only after a `SelectionNotify`
+    the X server made (one sent with `SendEvent`, the event code's 0x80 bit, is ignored, since any X
+    client can send it) whose requestor, selection, target and property are exactly the conversion's,
+    and right before each read (each `INCR` chunk too) the window manager asks again who owns
+    `XdndSelection` (`GetSelectionOwner`) and every client's pid (X-Resource): it must be the very window
+    that owned it at `XdndEnter`, with the same client pid and the same answer on files, or the drag ends
+    and its drop is refused (another X client taking the selection, or a new one that connected during
+    the drag and got the same window id). Back over an X window, the invisible window is
+    unmapped and the app talks to that window again; the app's own Escape ends its drag.
+  - *An X app's files onto Files* are taken only when the X server ties the selection's owner to a
+    process: the window manager asks X-Resource (`XResQueryClientIds`) for every X client's pid (never
+    the client's own `_NET_WM_PID`), and the files may reach LordOS only if the owner's client has a pid
+    and no client of the display is sandboxed (`dndg_pid_sandboxed`: its root, mount, pid and user
+    namespaces are lord-server's, without `.flatpak-info`), because one X client can always stand in for
+    another's selection. Until that answer comes, and whenever it says no, LordOS tells the app nothing
+    over it and a release there is refused. Released over a Files folder, it is claimed at that release
+    (`DropGate`) and read as above (`uril_parse`, at most 1 MB and 256 paths). A Flatpak app with the X11
+    socket open on the display therefore turns X drops onto Files off until it closes (drops between X
+    and Wayland windows are unchanged).
+  Not handled: `XdndProxy` (no toolkit we know of needs it for toplevel windows), `XdndActionList` and
+  `XdndActionAsk`'s menu (an ask is passed on as such), and drags from LordOS's isolated apps.
+
+  Isolated LordOS apps take no drop: that needs a grant of its own (`DESKTOP-PARITY.md`). Touch drags
   are not supported.
 - **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry,
-  shared with the clipboard's file lists),
+  shared with the clipboard's file lists), `build/xwm-test` (also in it: the XDND messages, enter with more
+  than three types and `XdndTypeList`, positions, statuses, finished, type names, the X-Resource reply,
+  who may hand files to LordOS, synthetic or mismatched `SelectionNotify` events and owners that changed
+  before the read),
   `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), and
   `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
@@ -680,9 +728,8 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
 - **Offers are bound to their selection.** A `wl_data_offer` (and a primary offer) carries the
   generation it was made for and only gives data for that selection, and only to its client while
   it has the keyboard: an app can't keep an old offer to read later copies (`build/clip-offers`).
-- **Drag and drop** between X11 and Wayland apps: not yet. Wayland drag and drop is in development (see
-  "Drag and drop"), but the XDND bridge in `xwm.c` isn't there. Inside X (X app to X app) it's X's own
-  protocol; not tested.
+- **Drag and drop** between X11 and Wayland apps (and Files) through XDND: built, to check on the VM (see
+  "Drag and drop", "With X11 apps"). Inside X (X app to X app) it's X's own protocol; not tested.
 
 ### VMware Tools (`open-vm-tools-desktop`)
 
@@ -717,7 +764,7 @@ What doesn't, and why:
   `vmware-user`. Offering it would make it readable by every X client while the agent runs (the
   requestor of a selection isn't authenticated and the data lands in a window property any X client
   can read), which also needs the maintainer's approval.
-- Drag and drop of files: not supported (see above), and not tested.
+- Drag and drop with the host: not tested (XDND inside the guest's session: see "Drag and drop").
 
 Not tested on VMware yet: the guest side was checked against `open-vm-tools-desktop`
 2:12.5.0-2+deb13u1 (Debian 13) by reading what its binaries call, not on a VMware host.
@@ -734,7 +781,8 @@ display.
 
 - `build/xwm-test` (in `make -C server test`): request encoding, the setup reply, packet framing,
   sequence numbers, `WM_CLASS`, titles (UTF-8, Latin-1, invalid), Motif hints, size hints,
-  `WM_HINTS`, `_NET_WM_MOVERESIZE`, text targets, the same-client check and the display choice.
+  `WM_HINTS`, `_NET_WM_MOVERESIZE`, text targets, the same-client check, the display choice, the XDND
+  messages (enter, more than three types, position, status, finished), type names and the X-Resource pids.
 - `tests/xwayland/selections.sh` (inside a session on a test VM, with `build/clip-offers`): X11 →
   Wayland for both selections, offers bound to their selection, and a Wayland copy not readable by
   X apps while no X window has the keyboard.
@@ -845,8 +893,7 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- Drag and drop with X11 apps (an XDND bridge in `xwm.c`); Wayland drag and drop is in development, see
-  "Drag and drop". (`text-input`, LordOS input methods inside Wayland apps: in development, see "Input methods". Activation,
+- Drag and drop (Wayland and X11 through XDND) is in development, see "Drag and drop". (`text-input`, LordOS input methods inside Wayland apps: in development, see "Input methods". Activation,
   `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 
