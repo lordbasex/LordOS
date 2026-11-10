@@ -1430,10 +1430,16 @@ static int client_sandboxed(struct wl_client *c) {
     ClientInfo *ci = wl_container_of(l, (ClientInfo *)NULL, gone);
     return ci->sandboxed;
 }
-/* Who the client is for the keyboard shortcuts, checked when it connected ("" if it can't be told) */
+/* Who the client is for the keyboard shortcuts, checked when it connected ("" if it can't be told). A client of a
+ * security context is the app its engine named (kbi_context_identity; the context is tagged after the client is
+ * created, so it is looked at here), never a "program:" one. The result is valid until the next call. */
 static const char *client_identity(struct wl_client *c) {
     struct wl_listener *l = c ? wl_client_get_destroy_listener(c, client_destroyed) : NULL;
-    return l ? ((ClientInfo *)wl_container_of(l, (ClientInfo *)NULL, gone))->who : "";
+    const char *who = l ? ((ClientInfo *)wl_container_of(l, (ClientInfo *)NULL, gone))->who : "";
+    const SecMeta *sm = secctx_of(c);
+    if (!sm) return who;
+    static char ctx[KBI_ID_MAX];
+    return kbi_context_identity(sm->engine, sm->app_id, who, ctx, sizeof ctx) ? ctx : "";
 }
 
 static void send_keymap(struct wl_resource *kb) {

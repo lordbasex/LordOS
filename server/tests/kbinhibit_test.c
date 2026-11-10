@@ -85,6 +85,20 @@ int main(void) {
     CHECK(kbi_key_kind("flatpak:org.a.B", &rest) == 'f' && !strcmp(rest, "org.a.B"));
     CHECK(kbi_key_kind("program:/usr/bin/x", &rest) == 'p' && !strcmp(rest, "/usr/bin/x"));
     CHECK(kbi_key_kind("exe:/usr/bin/x", &rest) == 0);
+    /* a security context's app id (secctx.c): Flatpak's only, a valid id, and never against the process's own */
+    char cid[KBI_ID_MAX];
+    CHECK(kbi_context_identity("org.flatpak", "org.gnome.Boxes", "", cid, sizeof cid) && !strcmp(cid, "flatpak:org.gnome.Boxes"));
+    CHECK(kbi_context_identity("org.flatpak", "org.gnome.Boxes", NULL, cid, sizeof cid) && !strcmp(cid, "flatpak:org.gnome.Boxes"));
+    CHECK(kbi_context_identity("org.flatpak", "org.gnome.Boxes", "flatpak:org.gnome.Boxes", cid, sizeof cid));
+    CHECK(!kbi_context_identity("org.flatpak", "org.gnome.Boxes", "flatpak:org.other.App", cid, sizeof cid) && !cid[0]);
+    CHECK(!kbi_context_identity("org.flatpak", "org.gnome.Boxes", "program:/usr/bin/boxes", cid, sizeof cid) && !cid[0]);
+    CHECK(!kbi_context_identity("org.other.engine", "org.gnome.Boxes", "", cid, sizeof cid) && !cid[0]);
+    CHECK(!kbi_context_identity("", "org.gnome.Boxes", "", cid, sizeof cid));
+    CHECK(!kbi_context_identity(NULL, "org.gnome.Boxes", "", cid, sizeof cid));
+    CHECK(!kbi_context_identity("org.flatpak", "", "", cid, sizeof cid));
+    CHECK(!kbi_context_identity("org.flatpak", "../x", "", cid, sizeof cid));
+    CHECK(!kbi_context_identity("org.flatpak", "a/b", "", cid, sizeof cid));
+    CHECK(!kbi_context_identity("org.flatpak", "org.gnome.Boxes", "", cid, 8));
     char longp[KBI_ID_MAX + 8] = "program:/";
     memset(longp + 9, 'a', KBI_ID_MAX - 9);
     longp[KBI_ID_MAX] = 0;

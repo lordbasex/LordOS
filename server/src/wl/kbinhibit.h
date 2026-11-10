@@ -31,6 +31,11 @@ int kbi_identity(int procfd, char *out, size_t n);
  * or if the pidfd and the pid disagree. */
 int kbi_peer_proc(int sock, int pid);
 /* .flatpak-info's text (a key file) → the name= of its [Application] group, if it is a valid app id. 1, or 0. */
+/* A client that connected through a security context (wp_security_context_v1, secctx.c): its identity is the app id
+ * the sandbox engine gave the context, a checked one, since only a client outside any sandbox may create a context.
+ * Only Flatpak's ("org.flatpak") names one: "flatpak:<app_id>". checked is what kbi_identity made of the client's
+ * process ("" if nothing): when it names another app, no one. 1 if out holds one; 0: no identity (fail closed). */
+int kbi_context_identity(const char *engine, const char *app_id, const char *checked, char *out, size_t n);
 int kbi_flatpak_name(const char *text, size_t len, char *out, size_t n);
 /* Is this a name kbi_identity could have made? (lord.perms.set takes one only for "shortcuts".) Names of the
  * first, never released format ("desktop:<app_id>", "exe:<path>") don't pass and are never looked up. */

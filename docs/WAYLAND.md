@@ -421,7 +421,10 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
   user namespaces is `program:<path>`, its `/proc/<pid>/exe` resolved with `realpath` and still the very file it runs
   (same device and inode). Anything else (another sandbox or container, a damaged `.flatpak-info`, a deleted or
   replaced program, a path with other characters or longer than 183) has no identity, and its inhibitor never holds:
-  nothing is asked. Xwayland speaks for every X11 app, so it gets none either. `lord.perms.set` takes such a name only
+  nothing is asked. A client of a security context (`wp_security_context_v1`, `secctx.c`) is the app id its engine
+  gave the context, which only a client outside any sandbox can create: `flatpak:<app id>` for Flatpak's
+  (`org.flatpak`), no identity for any other engine, and none when its own `.flatpak-info` names another app
+  (`kbi_context_identity`). Xwayland speaks for every X11 app, so it gets none either. `lord.perms.set` takes such a name only
   for `shortcuts`; every other permission still needs an `.lpk` id. Names of the first, never released format
   (`desktop:<app_id>`, `exe:<path>`) are ignored: never looked up, and not listed in Settings.
 - **What the person reads.** The prompt and Settings show the identity ("Flatpak app org.example.Viewer", "Program

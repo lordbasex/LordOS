@@ -166,6 +166,15 @@ int kbi_identity(int procfd, char *out, size_t n) {
     return ok;
 }
 
+int kbi_context_identity(const char *engine, const char *app_id, const char *checked, char *out, size_t n) {
+    if (!out || n < KBI_ID_MAX) return 0;
+    out[0] = 0;
+    if (!engine || strcmp(engine, "org.flatpak") || !id_ok(app_id, KBI_ID_MAX - 8)) return 0;
+    snprintf(out, n, FLATPAK "%s", app_id);
+    if (checked && checked[0] && strcmp(checked, out)) { out[0] = 0; return 0; }
+    return 1;
+}
+
 int kbi_decide(int state, int isolated, int greeter, int has_key) {
     if (isolated || greeter || !has_key || state == 2) return KBI_NEVER;
     return state == 1 ? KBI_GRANT : KBI_PROMPT;
