@@ -510,5 +510,10 @@
   "drop.renamed": {
     "one": "Déjà sur le serveur : enregistré sous « {name} »",
     "other": "{count} noms étaient déjà sur le serveur : enregistrés sous de nouveaux noms, comme « {name} »"
+  },
+  "drop.to": "Vers {dir}",
+  "drop.links": {
+    "one": "Un lien n’a pas été envoyé : les liens ne sont pas suivis",
+    "other": "{count} liens n’ont pas été envoyés : les liens ne sont pas suivis"
   }
 }

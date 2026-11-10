@@ -510,5 +510,10 @@
   "drop.renamed": {
     "one": "Ya estaba en el servidor: se guardó como “{name}”",
     "other": "{count} nombres ya estaban en el servidor: se guardaron con nombres nuevos, como “{name}”"
+  },
+  "drop.to": "A {dir}",
+  "drop.links": {
+    "one": "Un enlace no se subió: los enlaces no se siguen",
+    "other": "{count} enlaces no se subieron: los enlaces no se siguen"
   }
 }

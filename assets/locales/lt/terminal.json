@@ -519,5 +519,11 @@
     "one": "Jau buvo serveryje: išsaugota kaip „{name}“",
     "few": "{count} pavadinimai jau buvo serveryje: išsaugota naujais pavadinimais, pvz., „{name}“",
     "other": "{count} pavadinimų jau buvo serveryje: išsaugota naujais pavadinimais, pvz., „{name}“"
+  },
+  "drop.to": "Į {dir}",
+  "drop.links": {
+    "one": "{count} nuoroda neįkelta: nuorodomis neinama",
+    "few": "{count} nuorodos neįkeltos: nuorodomis neinama",
+    "other": "{count} nuorodų neįkelta: nuorodomis neinama"
   }
 }

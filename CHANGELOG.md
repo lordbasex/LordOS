@@ -26,9 +26,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ssh goes up to the server over the same connection, in the background: nothing is typed and the terminal is never
   blocked. A floating notice lists each file with an orange bar, Cancel and Hide, and the footer shows `↑ n · %` while
   it is hidden. A name already on the server is never replaced: the upload takes a free name (`notes (2).txt`) and a
-  notice says so. ⌥ while dropping pastes the paths, as before, and a pane without ssh still gets the paths.
+  notice says so. ⌥ while dropping pastes the paths, as before, and a pane without ssh still gets the paths. Links are
+  never followed, there or in Files mode's uploads (a link inside a dropped folder could lead to `~/.ssh`): they are
+  left out and a notice counts them. The notice shows the folder the files go to.
 - **Terminal: the remote shell's directory.** While ssh runs, the directory its shell reports (OSC 7) is the
-  server's: it no longer replaces the local one (used by new tabs and the footer). Drops go there and Files mode opens
+  server's: it no longer replaces the local one (used by new tabs and the footer). Since it is the server's output, it
+  is kept only as an absolute path without control characters. Drops go there and Files mode opens
   there instead of the remote home. Checked on a real session: a folder with a subfolder, a 3 MB file (identical
   after the upload) and a name that was already there (kept, the copy saved as `notes (2).txt`) went to the reported
   `~/srvdir`, and Files mode opened in it.

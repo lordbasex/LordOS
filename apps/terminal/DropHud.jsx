@@ -17,6 +17,7 @@ export function DropHud({ t, sids }) {
   const jobs = useStore(transfers);
   const rows = dropRows(all, jobs, sids);
   const running = rows.some((r) => r.x.state === 'run');
+  const dir = sids.map((s) => all[s]?.dir).find(Boolean) || '';
   useEffect(() => {
     if (running || !rows.length) return undefined;
     const id = setTimeout(() => { for (const sid of sids) clearDrops(sid, () => false); }, 6000);
@@ -30,6 +31,7 @@ export function DropHud({ t, sids }) {
         <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(running ? 'terminal.drop.uploading' : 'terminal.drop.done')}</Text>
         <Text onClick={() => sids.forEach(hideDrops)} style={{ fontSize: 11, color: t.accent }}>{tr('terminal.drop.hide')}</Text>
       </View>
+      {dir ? <Text style={{ fontSize: 11, fontFamily: 'monospace', color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('terminal.drop.to', { dir })}</Text> : null}
       {rows.slice(-6).map(({ x }) => {
         const pct = x.total ? Math.min(1, x.done / x.total) : x.state === 'done' ? 1 : 0;
         return (

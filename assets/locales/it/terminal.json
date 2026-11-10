@@ -510,5 +510,10 @@
   "drop.renamed": {
     "one": "Già presente sul server: salvato come “{name}”",
     "other": "{count} nomi erano già sul server: salvati con nomi nuovi, come “{name}”"
+  },
+  "drop.to": "In {dir}",
+  "drop.links": {
+    "one": "Un collegamento non è stato caricato: i collegamenti non vengono seguiti",
+    "other": "{count} collegamenti non sono stati caricati: i collegamenti non vengono seguiti"
   }
 }

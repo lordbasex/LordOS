@@ -420,10 +420,14 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
   directory in the background (the remote home when the remote shell doesn't report one). A floating notice (it can
   be hidden) and the footer show the progress. Nothing is typed into the terminal and it is never blocked. A name
   already on the server is never replaced: the copy takes a free name (`notes (2).txt`) and a notice says so. Dropping
-  with ⌥ pastes the path as text, as before, and so does a drop on a pane without ssh.
+  with ⌥ pastes the path as text, as before, and so does a drop on a pane without ssh. Links are never followed (a link
+  in a dropped folder could lead to `~/.ssh`): they are left out and counted in a notice. The notice shows the folder
+  the files go to.
 - **The remote shell's directory:** an OSC 7 that arrives while the pane runs ssh is the server's directory. It is
   kept apart from the local one (new tabs and the footer keep the local directory), and it is where drops go and
-  where Files mode opens. It is forgotten when the ssh ends. Servers report it only when their shell does OSC 7.
+  where Files mode opens. It is forgotten when the ssh ends. Servers report it only when their shell does OSC 7. It is
+  the server's output, so any program there can send one: it is kept only as an absolute path without control
+  characters, and it is shown wherever it is used (the drop notice, Files mode's path bar).
 - **Download from the output:** file names printed by `ls`/`ls -la` are underlined under the pointer. ❖ + click
   downloads to Downloads, with the same notice in blue. A right click offers Download To…, Quick Look, Open With…,
   Edit, Info, Copy Remote Path and Show in Files mode. The name is resolved against the remote directory from OSC 7.

@@ -48,10 +48,13 @@ async function run(wid, sid, paths) {
   let there = [];
   try { there = ((await request('list', { conn, path: dir })).entries || []).map((r) => r.name); } catch (e) { there = []; }
   const taken = new Set(there);
+  drops.set((d) => (d[sid] ? { ...d, [sid]: { ...d[sid], dir } } : d));     // the notice shows where they go
   const renamed = [];
   // a folder goes up whole (a new one, so nothing inside it can clash), at most 20 levels deep
+  let links = 0;
   const walk = async (src, rd, name, depth) => {
     const st = fromLocal(await fs.statAsync(src));
+    if (st.link) { links++; return; }                       // never followed: it could lead out of what was dropped
     if (st.kind === 'd') {
       if (depth > 20) return;
       await request('mkdir', { conn, path: joinPath(rd, name) });
@@ -67,4 +70,5 @@ async function run(wid, sid, paths) {
     try { await walk(p, dir, free, 0); } catch (e) { toast(wid, `${name}: ${T(`terminal.files.err.${errCode(e)}`)}`); }
   }
   if (renamed.length) toast(wid, T('terminal.drop.renamed', { name: renamed[0], count: renamed.length }));
+  if (links) toast(wid, T('terminal.drop.links', { count: links }));
 }

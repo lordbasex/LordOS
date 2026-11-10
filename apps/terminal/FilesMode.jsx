@@ -132,6 +132,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
     const walk = async (ld, rd, entries, depth, there) => {
       let taken = new Set(there);
       for (const e of entries) {
+        if (e.link) continue;                               // a link is never followed: it could lead out of what was chosen
         if (e.kind === 'd') {
           if (depth > 20) continue;
           let existed = false;

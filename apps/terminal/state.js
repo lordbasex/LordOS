@@ -415,7 +415,12 @@ term.onAny((sid, type, data) => {
     case 'cwd': {
       // while ssh runs, the directory is the server's (its shell reports OSC 7): kept apart, for uploads and Files mode
       const i = term.info(sid);
-      if (i && i.busy && i.process === 'ssh') { patchMeta(sid, { remoteCwd: data }); break; }
+      if (i && i.busy && i.process === 'ssh') {
+        // it is the server's output: kept only as an absolute path without control characters, and shown wherever it
+        // is used (the drop notice, Files mode's path)
+        if (/^\/[^\x00-\x1f\x7f]{0,4095}$/.test(String(data || ''))) patchMeta(sid, { remoteCwd: data });
+        break;
+      }
       patchMeta(sid, { cwd: data });
       if (data) recentDirs.set((d) => [data, ...d.filter((x) => x !== data)].slice(0, 25));
       if (data) autoProfile(sid, data, wid);
