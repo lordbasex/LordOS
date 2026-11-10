@@ -70,6 +70,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Databases: favorites of type SSH connect through an SSH tunnel.** They used to say the tunnel came in a later
+  version. lord-server runs `/usr/bin/ssh -W <db host>:<db port>` to the favorite's SSH server and gives lord-sql
+  ssh's stdin and stdout as the server's stream; nothing listens on this computer and the tunnel ends with the
+  connection. ssh never reads `~/.ssh/config` (`-F none`), runs in batch mode with only the favorite's key (a file
+  nobody else can read), and every argument comes from the validated favorite with `--` before the server. The
+  first connection shows the SSH server's key fingerprint to trust ("First connection to this SSH server"); the
+  accepted key is kept in the favorite (`ssh.hostKey`) and from then on only that key is accepted. ssh's errors are
+  told apart: the key refused, the key file unusable, the database's port not opened, the server key changed.
+  `server/src/sql/sshtun.c` with 41 more checks in `tests/sqlc_test.c` (the fingerprint against `ssh-keygen -l`,
+  hostile hosts, users and paths); end to end through a real sshd to MariaDB 11.8 on a VM.
 - **Text Editor: files dragged from Files open in it.** A file opens in a tab and a folder becomes the project; while
   the drag is over the window it is outlined and says so.
 - **Files: what is dragged keeps following the pointer into another app.** The dragged icon was drawn inside the Files

@@ -1819,3 +1819,11 @@ without them.
 
 Checked: `make -C server` builds both with no warnings, `make -C server test-full` passes, and in a throwaway headless
 session (`tools/vm/e2e`) ❖⇧3 saves to `~/Pictures/Screenshots` and puts the picture on the clipboard.
+
+## Step — Databases over an SSH tunnel (VM 115 `lordos-dev`, 2026-11-10)
+
+`mariadb-server` (11.8, Debian's) installed on VM 115 for the tunnel's end-to-end test. A database `tunneltest` with a
+table `hello`, a user `e2e` allowed from `localhost` and from `172.17.0.%`, and `/etc/mysql/mariadb.conf.d/90-e2e-tunnel.cnf`
+with `bind-address = 0.0.0.0` so the test's SSH server (on another machine) can reach it. To undo:
+`sudo rm /etc/mysql/mariadb.conf.d/90-e2e-tunnel.cnf && sudo apt-get purge -y mariadb-server`.
+

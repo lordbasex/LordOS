@@ -171,6 +171,7 @@ export function Connect({ onConnected }) {
       onConnected?.(s);
     } catch (e) {
       if (e.code === 'auth') setSheet({ kind: 'password', fav, error: errText(e), keep: keep !== false });
+      else if (e.code === 'hostkey_new' && store.get().hostkey?.fav === fav.id) setSheet({ kind: 'hostkey', fav, ev: store.get().hostkey, pw, keep });
       else if (e.code === 'cert') {
         const ev = e.data?.sha256 ? e.data : store.get().cert;
         setSheet(ev && ev.sha256 ? { kind: 'cert', fav, ev, pw, keep } : null);
@@ -182,7 +183,6 @@ export function Connect({ onConnected }) {
     if (!avail) { setStatus({ kind: 'bad', text: errText({ code: 'unavailable' }) }); return; }
     const fav = dirty || draft.quick ? commit() : cleanFavorite(draft);
     if (!fav) return;
-    if (fav.type === 'ssh') { setStatus({ kind: 'warn', text: tr('databases.ssh.later') }); return; }
     if (password) { connect(fav, password, false); return; }
     const kept = await sqlPasswords.get(fav);
     if (kept !== null && kept !== undefined) connect(fav, kept, false);
@@ -200,6 +200,7 @@ export function Connect({ onConnected }) {
       setStatus({ kind: 'ok', text: tr('databases.test.ok', { tls, server: r.server?.version || '', ms: r.ms }) });
     } catch (e) {
       if (e.code === 'cert' && (e.data?.sha256 || store.get().cert?.sha256)) setSheet({ kind: 'cert', fav, ev: e.data?.sha256 ? e.data : store.get().cert, test: true });
+      else if (e.code === 'hostkey_new' && store.get().hostkey?.fav === fav.id) setSheet({ kind: 'hostkey', fav, ev: store.get().hostkey, test: true });
       else setStatus({ kind: 'bad', text: errText(e) });
     } finally { setBusy(''); }
   }
@@ -215,6 +216,17 @@ export function Connect({ onConnected }) {
     const list = cur.favorites.map((x) => (x.id === sh.fav.id ? { ...x, trust: sh.ev.sha256 } : x));
     if (!save({ ...cur, favorites: list })) return;
     const fav = cleanFavorite({ ...sh.fav, trust: sh.ev.sha256 });
+    setSheet(null);
+    if (sh.test) test(); else if (sh.pw !== undefined && sh.pw !== null) connect(fav, sh.pw, sh.keep); else go();
+  }
+
+  // an SSH server's key the person accepted: kept in the favorite (ssh.hostKey); lord-server then accepts only that one
+  function trustHost(sh) {
+    const cur = readFavorites();
+    const list = cur.favorites.map((x) => (x.id === sh.fav.id ? { ...x, ssh: { ...(x.ssh || {}), hostKey: sh.ev.key } } : x));
+    if (!save({ ...cur, favorites: list })) return;
+    const fav = cleanFavorite({ ...sh.fav, ssh: { ...sh.fav.ssh, hostKey: sh.ev.key } });
+    setDraft((d) => (d && d.id === fav.id ? { ...d, ssh: { ...d.ssh, hostKey: sh.ev.key } } : d));
     setSheet(null);
     if (sh.test) test(); else if (sh.pw !== undefined && sh.pw !== null) connect(fav, sh.pw, sh.keep); else go();
   }
@@ -380,7 +392,14 @@ export function Connect({ onConnected }) {
                     </View>
                   </Field>
                   <Field label={tr('databases.f.sshPort')}><TextInput value={String(draft.ssh.port ?? '')} onChange={(v) => setIn('ssh', { port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
-                  <Field label=""><Text style={{ fontSize: 12, color: p.warn, textAlign: 'start' }}>{tr('databases.ssh.later')}</Text></Field>
+                  <Field label="">
+                    {draft.ssh.hostKey ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('databases.hostkey.known', { type: draft.ssh.hostKey.split(' ')[0] })}</Text>
+                        <Btn small link label={tr('databases.hostkey.forget')} onClick={() => setIn('ssh', { hostKey: '' })} />
+                      </View>
+                    ) : <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('databases.hostkey.firstTime')}</Text>}
+                  </Field>
                 </Box>
               ) : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 4, flexWrap: 'wrap' }}>
@@ -419,6 +438,7 @@ export function Connect({ onConnected }) {
       </ScrollView>
 
       {sheet?.kind === 'password' ? <PasswordSheet sheet={sheet} busy={busy === 'connect'} onCancel={() => setSheet(null)} onGo={(pw, keep) => connect(sheet.fav, pw, keep)} /> : null}
+      {sheet?.kind === 'hostkey' ? <HostKeySheet sheet={sheet} onCancel={() => setSheet(null)} onTrust={() => trustHost(sheet)} /> : null}
       {sheet?.kind === 'cert' ? <CertSheet sheet={sheet} onCancel={() => setSheet(null)} onTrust={() => trust(sheet)} /> : null}
       {sheet?.kind === 'import' ? <ImportSheet files={sheet.files} onCancel={() => setSheet(null)} onImport={doImport} /> : null}
       {groupMenu ? <ContextMenu x={groupMenu.x} y={groupMenu.y} onClose={() => setGroupMenu(null)} items={[
@@ -532,6 +552,25 @@ function PasswordSheet({ sheet, busy, onCancel, onGo }) {
       </View>
       <Check on={keep} onChange={setKeep} label={tr('databases.pw.keepIn')} />
       {sheet.error ? <Note kind="bad">{sheet.error}</Note> : null}
+    </Sheet>
+  );
+}
+
+// the first connection through an SSH server: its key's fingerprint, as `ssh` asks "are you sure you want to continue connecting"
+function HostKeySheet({ sheet, onCancel, onTrust }) {
+  const p = usePal();
+  const f = sheet.fav;
+  return (
+    <Sheet title={tr('databases.hostkey.title')} onCancel={onCancel} width={540}
+      actions={[<Btn key="c" label={tr('databases.cancel')} onClick={onCancel} />, <Btn key="t" primary label={tr('databases.hostkey.trust')} onClick={onTrust} />]}>
+      <Text style={{ fontSize: 12.5, color: p.text, lineHeight: 1.45, textAlign: 'start' }}>
+        {tr('databases.hostkey.detail', { server: `${f.ssh.user}@${f.ssh.host}${Number(f.ssh.port) && Number(f.ssh.port) !== 22 ? `:${f.ssh.port}` : ''}`, name: f.name })}
+      </Text>
+      <Box>
+        <Field label={tr('databases.hostkey.type')} labelWidth={90}><Text style={{ fontSize: 12, fontFamily: MONO, color: p.text, textAlign: 'start' }}>{String(sheet.ev.key || '').split(' ')[0]}</Text></Field>
+        <Field label="SHA-256" labelWidth={90}><Text style={{ fontSize: 12, fontFamily: MONO, color: p.text, direction: 'ltr', textAlign: 'start' }}>{sheet.ev.sha256}</Text></Field>
+      </Box>
+      <Text style={{ fontSize: 12, color: p.dim, lineHeight: 1.4, textAlign: 'start' }}>{tr('databases.hostkey.hint')}</Text>
     </Sheet>
   );
 }

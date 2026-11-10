@@ -25,6 +25,8 @@ export function listen() {
       if (s && !s.closed) { s.closed = ev.reason || 'closed'; s.busy = false; bump(); }
     } else if (ev.ev === 'cert') {
       store.set({ cert: { ...ev, at: Date.now() } });
+    } else if (ev.ev === 'hostkey') {
+      store.set({ hostkey: { ...ev, at: Date.now() } });           // an SSH server seen for the first time
     } else if (ev.ev === 'crash') {
       for (const s of store.get().sessions) if (!s.closed && (ev.conn === undefined || ev.conn === s.conn)) s.closed = 'crash';
       bump();

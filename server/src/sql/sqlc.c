@@ -1,6 +1,7 @@
 /* sqlc.c — see sqlc.h. */
 #include "sqlc.h"
 #include "sqlproto.h"
+#include "sshtun.h"
 #include "../doc/proto.h"
 #include "../doc/wire.h"
 #include "../fsops.h"
@@ -40,6 +41,9 @@ typedef struct {
     int closing;
     double closing_at, started;
     char fav[129];
+    pid_t ssh_pid;                  /* the tunnel's ssh (type "ssh"), 0 if none */
+    int ssh_err;                    /* its stderr, kept open while it runs */
+    char known[PATH_MAX];           /* its known_hosts file, removed at the end */
 } Slot;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
@@ -173,8 +177,10 @@ static int fav_valid(const JVal *f, char *why, size_t wn) {
         return bad(why, wn, "favorite: bad color");
     const JVal *ssh = json_get(f, "ssh");
     if (ssh && (ssh->type != J_OBJ || !host_text(json_get(ssh, "host")) || !opt_port(ssh, "port") ||
-                !opt_text(ssh, "user", 256) || !opt_text(ssh, "key", 1000)))
+                !opt_text(ssh, "user", 256) || !opt_text(ssh, "key", 1000) || !opt_text(ssh, "hostKey", SSH_KEY_MAX)))
         return bad(why, wn, "favorite: bad ssh");
+    const char *hk = ssh ? json_str(ssh, "hostKey") : NULL;
+    if (hk && hk[0] && !ssh_hostkey_ok(hk)) return bad(why, wn, "favorite: bad ssh host key");
     const JVal *tls = json_get(f, "tls");
     if (tls && (tls->type != J_OBJ || !opt_one_of(tls, "mode", modes) || !opt_text(tls, "ca", 1000) ||
                 !opt_text(tls, "cert", 1000) || !opt_text(tls, "key", 1000)))
@@ -258,6 +264,12 @@ int sql_fav_find(const char *json, size_t len, const char *id, SqlFav *f) {
         copy(f->trust, sizeof f->trust, json_str(x, "trust"));
         const JVal *c = json_get(x, "cloud");
         copy(f->iam, sizeof f->iam, c ? json_str(c, "iamProfile") : NULL);
+        const JVal *sh = json_get(x, "ssh");
+        copy(f->ssh_host, sizeof f->ssh_host, sh ? json_str(sh, "host") : NULL);
+        copy(f->ssh_user, sizeof f->ssh_user, sh ? json_str(sh, "user") : NULL);
+        copy(f->ssh_key, sizeof f->ssh_key, sh ? json_str(sh, "key") : NULL);
+        copy(f->ssh_hostkey, sizeof f->ssh_hostkey, sh ? json_str(sh, "hostKey") : NULL);
+        f->ssh_port = sh ? (int)json_num(sh, "port", 22) : 22;
         found = 0;
         break;
     }
@@ -435,6 +447,177 @@ static int open_user_file(const char *path) {
     return fd;
 }
 
+/* ---- the SSH tunnel (type "ssh", sshtun.h) ---- */
+
+/* The private key ssh reads: in home or a mounted disk like a TLS file, real, a regular file of the user's that nobody
+ * else can read (ssh refuses it otherwise anyway). 0 and its real path, or -1. */
+static int ssh_key_real(const char *path, char *real) {
+    char full[PATH_MAX * 2];
+    const char *h = getenv("HOME");
+    if (!path || !path[0]) return -1;
+    if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
+    else if (path[0] == '~' && path[1] == '/' && h) snprintf(full, sizeof full, "%s/%s", h, path + 2);
+    else if (h) snprintf(full, sizeof full, "%s/%s", h, path);
+    else return -1;
+    struct stat st;
+    if (!realpath(full, real) || !fsops_allowed(real) || stat(real, &st) || !S_ISREG(st.st_mode) ||
+        st.st_uid != getuid() || (st.st_mode & 077) || st.st_size > (off_t)(64 << 10)) return -1;
+    return 0;
+}
+
+/* $XDG_RUNTIME_DIR/lordos-sql, 0700 and the user's: where each tunnel's known_hosts file lives */
+static int ssh_dir(char *out, size_t cap) {
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    if (!rt || rt[0] != '/' || strlen(rt) > 200) return -1;
+    snprintf(out, cap, "%s/lordos-sql", rt);
+    mkdir(out, 0700);
+    struct stat st;
+    if (lstat(out, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) return -1;
+    if (st.st_mode & 077) chmod(out, 0700);
+    return 0;
+}
+
+static pid_t ssh_spawn(char **argv, int stdio, int err) {
+    posix_spawn_file_actions_t fa;
+    posix_spawn_file_actions_init(&fa);
+    if (stdio >= 0) { posix_spawn_file_actions_adddup2(&fa, stdio, 0); posix_spawn_file_actions_adddup2(&fa, stdio, 1); }
+    else {
+        posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+        posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+    }
+    posix_spawn_file_actions_adddup2(&fa, err, 2);
+    posix_spawn_file_actions_addclosefrom_np(&fa, 3);         /* nothing else of lord-server's reaches it */
+    posix_spawnattr_t at;
+    posix_spawnattr_init(&at);
+    sigset_t none, all;
+    sigemptyset(&none);
+    sigfillset(&all);
+    posix_spawnattr_setsigmask(&at, &none);
+    posix_spawnattr_setsigdefault(&at, &all);
+    posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+    /* HOME for ssh's own files, a key's passphrase only through the user's agent */
+    char home[PATH_MAX + 8], agent[PATH_MAX + 16];
+    const char *h = getenv("HOME"), *a = getenv("SSH_AUTH_SOCK");
+    char *envp[5];
+    int ne = 0;
+    envp[ne++] = "LANG=C.UTF-8";
+    envp[ne++] = "PATH=/usr/bin:/bin";
+    if (h && h[0] == '/' && strlen(h) < PATH_MAX) { snprintf(home, sizeof home, "HOME=%s", h); envp[ne++] = home; }
+    if (a && a[0] == '/' && strlen(a) < PATH_MAX) { snprintf(agent, sizeof agent, "SSH_AUTH_SOCK=%s", a); envp[ne++] = agent; }
+    envp[ne] = NULL;
+    pid_t pid = -1;
+    if (posix_spawn(&pid, SSH_BIN, &fa, &at, argv, envp)) pid = -1;
+    posix_spawn_file_actions_destroy(&fa);
+    posix_spawnattr_destroy(&at);
+    return pid;
+}
+
+static void ssh_reap(pid_t pid, int wait_ms) {
+    if (pid <= 0) return;
+    int status;
+    double t0 = now_ms();
+    while (waitpid(pid, &status, WNOHANG) == 0) {
+        if (now_ms() - t0 > wait_ms) { kill(pid, SIGKILL); waitpid(pid, &status, 0); return; }
+        struct timespec ts = { 0, 20 * 1000000 };
+        nanosleep(&ts, NULL);
+    }
+}
+
+/* what ssh wrote to its stderr so far (non-blocking) */
+static void ssh_stderr(int fd, char *out, size_t cap) {
+    size_t o = strlen(out);
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    while (o + 1 < cap) {
+        ssize_t r = read(fd, out + o, cap - 1 - o);
+        if (r <= 0) break;
+        o += (size_t)r;
+    }
+    out[o] = 0;
+}
+
+typedef struct {
+    char key[SSH_KEY_MAX + 1], sha[64];         /* a server key seen for the first time */
+    char err[1024];                             /* ssh's stderr when it failed */
+} SshOut;
+
+/* The tunnel's stream for favorite f (the fd lord-sql speaks MySQL over), or -1 with why: "hostkey_new" (o->key holds
+ * the server's key for the person to accept; nothing was authenticated), "hostkey", "sshauth", "sshkey", "sshforward",
+ * "dns", "connect", "ssh" or "unavailable". On success the ssh process, its stderr and the known_hosts file go into s. */
+static int connect_ssh(const SqlFav *f, int conn, Slot *s, SshOut *o, const char **why) {
+    char dir[PATH_MAX], kh[PATH_MAX], key[PATH_MAX], line[SSH_KEY_MAX + 300];
+    int probe = !f->ssh_hostkey[0];
+    *why = "unavailable";
+    if (ssh_dir(dir, sizeof dir)) return -1;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    if (snprintf(kh, sizeof kh, "%.200s/known-%d-%ld-%ld", dir, conn, (long)getpid(), (long)ts.tv_nsec) >= (int)sizeof kh) return -1;
+    if (!probe && ssh_key_real(f->ssh_key, key)) { *why = "sshkey"; return -1; }
+    if (!probe && ssh_known_line(f->ssh_host, f->ssh_port, f->ssh_hostkey, line, sizeof line)) { *why = "hostkey"; return -1; }
+    int kf = open(kh, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (kf < 0) return -1;
+    int wrote = probe || write(kf, line, strlen(line)) == (ssize_t)strlen(line);
+    close(kf);
+    if (!wrote) { unlink(kh); return -1; }
+    SshTun t = { f->ssh_host, f->ssh_user, f->ssh_port, f->host, f->port, probe ? NULL : key, kh, probe };
+    char buf[6144], *argv[SSH_ARGV_MAX];
+    int ep[2] = { -1, -1 }, sp[2] = { -1, -1 };
+    if (ssh_argv(&t, buf, sizeof buf, argv, SSH_ARGV_MAX) < 0) { unlink(kh); *why = "ssh"; return -1; }
+    if (pipe2(ep, O_CLOEXEC) || (!probe && socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sp))) {
+        if (ep[0] >= 0) { close(ep[0]); close(ep[1]); }
+        unlink(kh);
+        return -1;
+    }
+    pid_t pid = ssh_spawn(argv, probe ? -1 : sp[1], ep[1]);
+    close(ep[1]);
+    if (sp[1] >= 0) close(sp[1]);
+    if (pid < 0) { close(ep[0]); if (sp[0] >= 0) close(sp[0]); unlink(kh); return -1; }
+    o->err[0] = 0;
+    if (probe) {
+        /* ssh stops after the key exchange (every authentication is off): the key it wrote is the server's */
+        ssh_reap(pid, 20000);
+        ssh_stderr(ep[0], o->err, sizeof o->err);
+        close(ep[0]);
+        char got[SSH_KEY_MAX + 300] = "";
+        FILE *k = fopen(kh, "re");
+        if (k) { if (!fgets(got, sizeof got, k)) got[0] = 0; fclose(k); }
+        unlink(kh);
+        if (ssh_key_of_line(got, o->key, sizeof o->key) || ssh_fingerprint(o->key, o->sha, sizeof o->sha)) {
+            *why = ssh_err_code(o->err);
+            if (!strcmp(*why, "sshauth")) *why = "ssh";       /* refused before a key: not this probe's business */
+            return -1;
+        }
+        *why = "hostkey_new";
+        return -1;
+    }
+    /* up once the database greets through it (MySQL speaks first), or ssh ended and its stderr says why */
+    double t0 = now_ms();
+    int up = 0, ended = 0;
+    while (now_ms() - t0 < OPEN_TIMEOUT_MS) {
+        struct pollfd p = { sp[0], POLLIN, 0 };
+        int r = poll(&p, 1, 100);
+        char c;
+        if (r > 0 && (p.revents & POLLIN) && recv(sp[0], &c, 1, MSG_PEEK | MSG_DONTWAIT) == 1) { up = 1; break; }
+        int status;
+        if (waitpid(pid, &status, WNOHANG) == pid) { ended = 1; break; }
+        if (r > 0 && (p.revents & (POLLHUP | POLLERR))) break;
+    }
+    if (!up) {
+        if (!ended) { kill(pid, SIGTERM); ssh_reap(pid, 1000); }
+        ssh_stderr(ep[0], o->err, sizeof o->err);
+        close(ep[0]);
+        close(sp[0]);
+        unlink(kh);
+        *why = o->err[0] ? ssh_err_code(o->err) : "connect";
+        return -1;
+    }
+    pthread_mutex_lock(&mu);
+    s->ssh_pid = pid;
+    s->ssh_err = ep[0];
+    snprintf(s->known, sizeof s->known, "%s", kh);
+    pthread_mutex_unlock(&mu);
+    return sp[0];
+}
+
 typedef struct {
     int slot, conn, req;
     SqlFav f;
@@ -568,7 +751,10 @@ static void *conn_thread(void *arg) {
     OpenJob *j = arg;
     Slot *s = &slots[j->slot];
     const char *why = "connect";
-    int fd = !strcmp(j->f.type, "socket") ? connect_unix(j->f.socket, &why) : connect_tcp(j->f.host, j->f.port, &why);
+    SshOut *so = calloc(1, sizeof *so);
+    int fd = !strcmp(j->f.type, "socket") ? connect_unix(j->f.socket, &why)
+           : !strcmp(j->f.type, "ssh") ? (so ? connect_ssh(&j->f, j->conn, s, so, &why) : -1)
+           : connect_tcp(j->f.host, j->f.port, &why);
     int files[3] = { -1, -1, -1 }, nfiles = 0, has[3] = { 0, 0, 0 };
     const char *fail = fd < 0 ? why : NULL, *detail = NULL;
     int sv[2] = { -1, -1 };
@@ -629,9 +815,38 @@ static void *conn_thread(void *arg) {
     job_free(j);                     /* the password is gone from lord-server from here on */
     if (fail) {
         pthread_mutex_lock(&mu);
-        if (s->open_req == req) { s->open_req = 0; push_err(req, s->closing ? "closed" : fail, detail); }
+        if (s->open_req == req) {
+            s->open_req = 0;
+            if (!s->closing && so && !strcmp(fail, "hostkey_new")) {
+                /* a server key seen for the first time: the person decides (Databases keeps it in the favorite) */
+                JBuf b;
+                jb_init(&b);
+                jb_printf(&b, "{\"ev\":\"hostkey\",\"conn\":%d,\"fav\":", s->conn);
+                jb_str(&b, s->fav);
+                jb_raw(&b, ",\"key\":");
+                jb_str(&b, so->key);
+                jb_raw(&b, ",\"sha256\":");
+                jb_str(&b, so->sha);
+                jb_raw(&b, "}");
+                if (!b.oom) push_own(0, SQL_EVT, b.p, b.n); else jb_free(&b);
+            }
+            /* ssh's own words, one line, for the person (never a secret: ssh prints none) */
+            /* the first line of ssh's stderr with words in it (not its @@@ banners); none for a first key, which
+             * is not an error the person has to read */
+            char line[200] = "";
+            for (const char *q = so && strcmp(fail, "hostkey_new") ? so->err : ""; *q; ) {
+                size_t n = strcspn(q, "\r\n");
+                int words = 0;
+                for (size_t i = 0; i < n; i++) if ((q[i] >= 'a' && q[i] <= 'z') || (q[i] >= 'A' && q[i] <= 'Z')) words = 1;
+                if (words && q[0] != '@') { if (n >= sizeof line) n = sizeof line - 1; memcpy(line, q, n); line[n] = 0; break; }
+                q += n;
+                while (*q == '\r' || *q == '\n') q++;
+            }
+            push_err(req, s->closing ? "closed" : fail, detail ? detail : line[0] ? line : NULL);
+        }
         pthread_mutex_unlock(&mu);
     }
+    free(so);
     /* the helper's answers, until its channel closes */
     while (!fail) {
         struct pollfd p = { sv[0], POLLIN, 0 };
@@ -679,6 +894,16 @@ static void *conn_thread(void *arg) {
         }
     }
     pthread_mutex_lock(&mu);
+    pid_t tunnel = s->ssh_pid;
+    int tunnel_err = s->ssh_err;
+    char known[PATH_MAX];
+    snprintf(known, sizeof known, "%s", s->known);
+    s->ssh_pid = 0;
+    pthread_mutex_unlock(&mu);
+    if (tunnel > 0) { kill(tunnel, SIGTERM); ssh_reap(tunnel, 1000); }       /* the tunnel ends with the connection */
+    if (tunnel > 0 && tunnel_err > 0) close(tunnel_err);
+    if (known[0]) unlink(known);
+    pthread_mutex_lock(&mu);
     if (s->sock >= 0) close(s->sock);
     else if (sv[0] >= 0) close(sv[0]);
     s->sock = -1;
@@ -725,7 +950,7 @@ static int do_open(int id, const JVal *root) {
     }
     free(favs);
     const char *pw = pv && pv->type == J_STR ? pv->str : "";
-    if (!strcmp(j->f.type, "ssh") || (!strcmp(j->f.type, "cloud") && !pw[0] && j->f.iam[0])) {
+    if (!strcmp(j->f.type, "cloud") && !pw[0] && j->f.iam[0]) {
         job_free(j);
         push_err(id, "unsupported", NULL);
         return 0;

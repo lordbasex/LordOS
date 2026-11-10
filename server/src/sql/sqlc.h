@@ -6,7 +6,9 @@
  * written only by sql_favorites_save, which refuses anything that could hold a secret). A thread
  * per connection resolves and connects the socket, opens the favorite's CA / client certificate
  * files, starts lord-sql (fixed path next to this binary, no arguments, LANG only, channel on fd
- * 3, the socket on fd 4), hands it the password in memory and then reads its answers. The
+ * 3, the socket on fd 4), hands it the password in memory and then reads its answers. A favorite of
+ * type "ssh" reaches its server through /usr/bin/ssh -W instead of a socket (sshtun.h): ssh's stdin
+ * and stdout are fd 4, and it ends with the connection. The
  * compositor never waits: replies and events queue up and JS reads them with sql_poll()
  * (lord.sql.poll). One query per connection at a time (busy), at most SQL_MAX_CONNS connections;
  * close kills the helper. */
@@ -36,6 +38,9 @@ typedef struct {
     char ca[1024], cert[1024], key[1024];
     char trust[160];
     char iam[160];                              /* cloud.iamProfile */
+    char ssh_host[256], ssh_user[260], ssh_key[1024];   /* type "ssh": the SSH server and the private key */
+    int  ssh_port;
+    char ssh_hostkey[1024];                     /* the server key the person accepted, or "" (sshtun.h) */
 } SqlFav;
 /* Finds favorite id in a (valid) favorites file. 0 found, -1 not. Pure: used by the tests. */
 int  sql_fav_find(const char *json, size_t len, const char *id, SqlFav *f);

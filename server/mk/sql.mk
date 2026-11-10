@@ -3,8 +3,8 @@
 # that link OpenSSL (TLS starts inside the MySQL handshake; caching_sha2_password without TLS needs RSA). Built
 # when its headers are there (MAILNET, mk/mail.mk). lord-server's side (sql/sqlc.c, lord.sql in ui/js_sql.c)
 # reads the favorites, connects the socket and starts it; it links no OpenSSL.
-SQL_HDR := src/sql/sqlc.h src/sql/sqlproto.h src/sql/mysqlproto.h src/doc/wire.h src/doc/proto.h src/sec/json.h src/fsops.h
-SQLC_OBJ := build/obj/sql/sqlc.o build/obj/ui/js_sql.o
+SQL_HDR := src/sql/sshtun.h src/sql/sqlc.h src/sql/sqlproto.h src/sql/mysqlproto.h src/doc/wire.h src/doc/proto.h src/sec/json.h src/fsops.h
+SQLC_OBJ := build/obj/sql/sqlc.o build/obj/sql/sshtun.o build/obj/ui/js_sql.o
 build/lord-server: $(SQLC_OBJ)
 $(SQLC_OBJ): $(SQL_HDR) src/ui/js_sql.h
 build/obj/ui/js.o: src/ui/js_sql.h
@@ -20,7 +20,7 @@ build/lord-sql: $(LSQL_SRC) $(SQL_HDR) src/sec/sandbox.h src/sec/cgroup.h
 
 # favorites.json: the validator (no secrets, ports, hosts, sizes), the lookup and the socket rule (tests/sqlc_test.c)
 test: build/sqlc-test
-SQLC_TEST_SRC := tests/sqlc_test.c src/sql/sqlc.c src/doc/wire.c src/sec/json.c src/fsops.c $(NETCONN_SRC)
+SQLC_TEST_SRC := tests/sqlc_test.c src/sql/sqlc.c src/sql/sshtun.c src/pkg/crypto.c src/doc/wire.c src/sec/json.c src/fsops.c $(NETCONN_SRC)
 build/sqlc-test: $(SQLC_TEST_SRC) $(SQL_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(SQLC_TEST_SRC) -lpthread
@@ -39,7 +39,7 @@ build/sql-proto-test-asan: tests/sql_proto_test.c src/sql/mysqlproto.c $(SQL_HDR
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/sql_proto_test.c src/sql/mysqlproto.c $(shell pkg-config --libs openssl)
 	./$@
-SQLE2E_SRC := tests/sql_e2e_test.c src/sql/mysqlproto.c src/sql/sqlc.c src/fsops.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC)
+SQLE2E_SRC := tests/sql_e2e_test.c src/sql/mysqlproto.c src/sql/sqlc.c src/sql/sshtun.c src/pkg/crypto.c src/fsops.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC)
 build/sql-e2e-test: $(SQLE2E_SRC) $(SQL_HDR) build/lord-sql
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(SQLE2E_SRC) $(shell pkg-config --libs openssl) -lpthread

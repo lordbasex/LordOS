@@ -1,9 +1,11 @@
 /* sqlc_test.c — lord-server's side of Databases (src/sql/sqlc.c) without a server: the favorites.json validator
  * (no key that could hold a secret, anywhere; ports, hosts, ids, sizes, types), the lookup with its defaults, the
- * Unix socket rule, and saving / reading the file in a throwaway home (0600, a refused file leaves the old one).
+ * Unix socket rule, and saving / reading the file in a throwaway home (0600, a refused file leaves the old one); and the
+ * SSH tunnel's checks (sshtun.c): the kept server key, its fingerprint, the known_hosts line, ssh's argv, its errors.
  *
  *   make -C server build/sqlc-test        (also in `make test`) */
 #include "../src/sql/sqlc.h"
+#include "../src/sql/sshtun.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,12 +182,84 @@ static void test_files(void) {
     if (system(cmd)) { /* nothing */ }
 }
 
+/* ---- the SSH tunnel (sshtun.c) ---- */
+#define ED  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIELR56/bq7yBXo5+IGCiVTclE52yTok7jaoB8rrUefpd"
+#define ED_SHA "SHA256:XURXAEGf6vKKSZN36UF7OivoDBFwV9TG9bFUxcHHENw"
+
+static int has_arg(char **argv, const char *a) { for (int i = 0; argv[i]; i++) if (!strcmp(argv[i], a)) return 1; return 0; }
+static int index_of(char **argv, const char *a) { for (int i = 0; argv[i]; i++) if (!strcmp(argv[i], a)) return i; return -1; }
+
+static void test_ssh(void) {
+    char out[256], buf[6144], *argv[SSH_ARGV_MAX];
+    /* the kept key */
+    CHECK(ssh_hostkey_ok(ED), "an ed25519 key");
+    CHECK(!ssh_hostkey_ok("ssh-ed25519"), "no base64");
+    CHECK(!ssh_hostkey_ok("ssh-dss " "AAAAC3NzaC1lZDI1NTE5AAAAIELR56/bq7yBXo5+IGCiVTclE52yTok7jaoB8rrUefpd"), "a type ssh won't take");
+    CHECK(!ssh_hostkey_ok("ssh-rsa AAAAC3NzaC1lZDI1NTE5AAAAIELR56/bq7yBXo5+IGCiVTclE52yTok7jaoB8rrUefpd"), "a blob of another type");
+    CHECK(!ssh_hostkey_ok(ED " extra"), "a third field");
+    CHECK(!ssh_hostkey_ok("ssh-ed25519 AAAA*not*base64"), "not base64");
+    CHECK(!ssh_hostkey_ok("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIELR56/bq7yBXo5+IGCiVTclE52yTok7jaoB8rrUefp"), "base64 cut short");
+    /* the fingerprint, as ssh-keygen -l prints it */
+    CHECK(!ssh_fingerprint(ED, out, sizeof out) && !strcmp(out, ED_SHA), "fingerprint %s", out);
+    CHECK(ssh_fingerprint("ssh-ed25519 x", out, sizeof out) == -1, "no fingerprint for a bad key");
+    /* known_hosts lines */
+    CHECK(!ssh_known_line("54.232.3.17", 22, ED, out, sizeof out) && !strcmp(out, "54.232.3.17 " ED "\n"), "port 22");
+    CHECK(!ssh_known_line("db.example", 2222, ED, out, sizeof out) && !strcmp(out, "[db.example]:2222 " ED "\n"), "another port");
+    CHECK(ssh_known_line("-oProxyCommand=x", 22, ED, out, sizeof out) == -1, "a host that is an option");
+    CHECK(ssh_known_line("a b", 22, ED, out, sizeof out) == -1, "a host with a space");
+    CHECK(!ssh_key_of_line("[db.example]:2222 " ED "\n", out, sizeof out) && !strcmp(out, ED), "the key back from ssh's line");
+    CHECK(ssh_key_of_line("", out, sizeof out) == -1, "an empty known_hosts");
+    /* argv */
+    SshTun t = { "54.232.3.17", "root", 22, "localhost", 3306, "/home/u/.ssh/id_ed25519", "/run/user/1000/lordos-sql/known-1", 0 };
+    int n = ssh_argv(&t, buf, sizeof buf, argv, SSH_ARGV_MAX);
+    CHECK(n > 0 && !strcmp(argv[0], "ssh") && argv[n] == NULL, "argv built");
+    CHECK(n > 0 && has_arg(argv, "-F") && !strcmp(argv[index_of(argv, "-F") + 1], "none"), "never the user's config");
+    CHECK(n > 0 && has_arg(argv, "StrictHostKeyChecking=yes") && has_arg(argv, "BatchMode=yes") && has_arg(argv, "ProxyCommand=none"), "strict, batch, no proxy command");
+    CHECK(n > 0 && has_arg(argv, "-W") && !strcmp(argv[index_of(argv, "-W") + 1], "localhost:3306"), "-W host:port");
+    CHECK(n > 0 && !strcmp(argv[n - 2], "--") && !strcmp(argv[n - 1], "54.232.3.17"), "-- then the server, last");
+    CHECK(n > 0 && has_arg(argv, "IdentityFile=/home/u/.ssh/id_ed25519") && has_arg(argv, "IdentitiesOnly=yes"), "only that key");
+    SshTun v6 = t; v6.db_host = "::1";
+    n = ssh_argv(&v6, buf, sizeof buf, argv, SSH_ARGV_MAX);
+    CHECK(n > 0 && !strcmp(argv[index_of(argv, "-W") + 1], "[::1]:3306"), "an IPv6 database host");
+    SshTun pr = t; pr.probe = 1; pr.key_path = NULL;
+    n = ssh_argv(&pr, buf, sizeof buf, argv, SSH_ARGV_MAX);
+    CHECK(n > 0 && has_arg(argv, "StrictHostKeyChecking=accept-new") && has_arg(argv, "PubkeyAuthentication=no") && has_arg(argv, "PasswordAuthentication=no") &&
+          has_arg(argv, "-N") && !has_arg(argv, "-W") && index_of(argv, "IdentityFile=/home/u/.ssh/id_ed25519") < 0, "the probe authenticates nothing and forwards nothing");
+    SshTun b1 = t; b1.ssh_host = "-oProxyCommand=sh";
+    CHECK(ssh_argv(&b1, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "a server that is an option");
+    SshTun b2 = t; b2.ssh_user = "-oLocalCommand=x";
+    CHECK(ssh_argv(&b2, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "a user that is an option");
+    SshTun b3 = t; b3.key_path = "/home/u/my key";
+    CHECK(ssh_argv(&b3, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "a key path with a space");
+    SshTun b4 = t; b4.key_path = "/home/u/%h";
+    CHECK(ssh_argv(&b4, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "%s", "a key path with a %-token");
+    SshTun b5 = t; b5.db_host = "db;rm";
+    CHECK(ssh_argv(&b5, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "a database host with a ;");
+    SshTun b6 = t; b6.ssh_port = 70000;
+    CHECK(ssh_argv(&b6, buf, sizeof buf, argv, SSH_ARGV_MAX) == -1, "a port out of range");
+    CHECK(ssh_argv(&t, buf, 64, argv, SSH_ARGV_MAX) == -1, "a buffer too small");
+    /* ssh's errors */
+    CHECK(!strcmp(ssh_err_code("root@1.2.3.4: Permission denied (publickey)."), "sshauth"), "auth");
+    CHECK(!strcmp(ssh_err_code("@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@"), "hostkey"), "changed key");
+    CHECK(!strcmp(ssh_err_code("Host key verification failed."), "hostkey"), "verification");
+    CHECK(!strcmp(ssh_err_code("ssh: Could not resolve hostname x: Name or service not known"), "dns"), "dns");
+    CHECK(!strcmp(ssh_err_code("ssh: connect to host 1.2.3.4 port 22: Connection refused"), "connect"), "refused");
+    CHECK(!strcmp(ssh_err_code("channel 0: open failed: connect failed: Connection refused\nstdio forwarding failed"), "sshforward"), "forward");
+    CHECK(!strcmp(ssh_err_code("Load key \"/x\": bad permissions"), "sshkey"), "key permissions");
+    CHECK(!strcmp(ssh_err_code("something else"), "ssh"), "anything else");
+    /* the favorite keeps a valid key or none */
+    CHECK(valid_fav("\"type\":\"ssh\",\"host\":\"localhost\",\"ssh\":{\"host\":\"1.2.3.4\",\"user\":\"root\",\"key\":\"~/.ssh/k\",\"hostKey\":\"" ED "\"}"), "a favorite with its server key");
+    CHECK(!valid_fav("\"type\":\"ssh\",\"host\":\"localhost\",\"ssh\":{\"host\":\"1.2.3.4\",\"hostKey\":\"ssh-ed25519 junk\"}"), "a favorite with a bad server key");
+    CHECK(valid_fav("\"type\":\"ssh\",\"host\":\"localhost\",\"ssh\":{\"host\":\"1.2.3.4\",\"hostKey\":\"\"}"), "a favorite whose key is not known yet");
+}
+
 int main(void) {
     unsetenv("LORDOS_SESSIOND");
     test_validator();
     test_find();
     test_socket();
     test_files();
+    test_ssh();
     printf("sqlc-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

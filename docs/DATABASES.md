@@ -44,6 +44,29 @@ apps/databases  ──lord.sql.request/poll──▶  lord-server (ui/js_sql.c, 
 - **The compositor never waits**: every call is asynchronous; results are polled.
 - **Not in the broker**: isolated `.lpk` apps get no `lord.sql`.
 
+## SSH tunnel
+
+A favorite of type SSH reaches its database through `ssh -W <db host>:<db port>` to the favorite's SSH server, run by
+lord-server (`server/src/sql/sshtun.c`, `connect_ssh` in `sqlc.c`; approved 2026-11-10, see AGENTS.md). The database
+host and port are as the SSH server sees them (`localhost:3306` for a database on that same machine). ssh's stdin and
+stdout are lord-sql's socket: nothing listens on this computer, and the tunnel ends with the connection.
+
+- **Fixed and closed:** `/usr/bin/ssh -F none` (the user's `~/.ssh/config` is never read: a `ProxyCommand` there would
+  run anything), `BatchMode=yes`, no proxy, no control master, no local command, no agent or X11 forwarding, only the
+  favorite's private key (`IdentitiesOnly`). Hosts and the user are checked so none can pass for an option, and `--`
+  comes before the server. The key has to be the user's own file under home or a mount that nobody else can read
+  (`chmod 600`); a key with a passphrase works when it is loaded in the user's SSH agent.
+- **The server key:** the first connection runs ssh with every authentication off, only to learn the server's key,
+  and shows its SHA-256 fingerprint ("First connection to this SSH server"). Trust and Connect keeps the key in the
+  favorite (`ssh.hostKey`); from then on ssh accepts only that key (a known_hosts file of that one connection,
+  `StrictHostKeyChecking=yes`), and a different one is refused ("hostkey"; Forget, next to the tunnel's fields,
+  starts over).
+- **Errors** from ssh's stderr (`ssh_err_code`): `sshauth` (the key was refused), `sshkey` (the key file can't be
+  used), `sshforward` (the SSH server would not open the database's port), `hostkey`, `dns`, `connect`, `ssh`.
+- **Not yet:** a password for the SSH server (keys only) and jump hosts.
+- Tested: `tests/sqlc_test.c` (the key, its fingerprint against `ssh-keygen -l`, known_hosts lines, ssh's argv with
+  hostile hosts, users and paths, the errors), and end to end through a real sshd to MariaDB 11.8 on a VM.
+
 ## lord.sql (native)
 
 | Call | |
@@ -114,5 +137,5 @@ and offers to keep it in Passwords.
    the import, the table list, Structure (read, and field edits shown as ALTER before applying), Content
    (filter, sort, pages, edit a cell, add and delete rows), Query (run current, run all, results, messages,
    history), Table Info, Console.
-2. SSH tunnel (`ssh -W` run by lord-server), IAM tokens, Relations and Triggers editing, Users, Processes,
+2. ✅ SSH tunnel (0.8.8.8, above); IAM tokens, Relations and Triggers editing, Users, Processes,
    Export and Import, query favorites and history from Sequel Ace, Preferences.

@@ -694,7 +694,7 @@ export function newGroupId(taken) {
 export function blankFavorite(over = {}) {
   return {
     id: '', name: '', group: null, color: null, type: 'tcp', host: '', port: 3306, user: '', database: '', socket: '',
-    ssh: { host: '', port: 22, user: '', key: '' },
+    ssh: { host: '', port: 22, user: '', key: '', hostKey: '' },   // hostKey: the server key the person accepted
     tls: { mode: 'preferred', ca: '', cert: '', key: '' },
     cloud: { service: '', region: '', iamProfile: '' },
     readOnly: false, production: false, timeZone: '', trust: '', quick: false,
@@ -734,6 +734,8 @@ export function validateFavorite(f, others = []) {
     if (!validHost(String(f.ssh?.host || ''))) out.push({ field: 'sshHost', code: 'host' });
     if (!validPort(f.ssh?.port ?? 22)) out.push({ field: 'sshPort', code: 'port' });
     if (f.ssh?.key && !validPath(f.ssh.key)) out.push({ field: 'sshKey', code: 'path' });
+    if (!f.ssh?.key) out.push({ field: 'sshKey', code: 'sshKey' });
+    if (!/^[A-Za-z0-9._][A-Za-z0-9._-]{0,63}$/.test(String(f.ssh?.user || ''))) out.push({ field: 'sshUser', code: 'sshUser' });
   }
   if (!TLS_MODES.includes(f.tls?.mode || 'preferred')) out.push({ field: 'tls', code: 'tls' });
   for (const k of ['ca', 'cert', 'key']) if (f.tls?.[k] && !validPath(f.tls[k])) out.push({ field: `tls.${k}`, code: 'path' });
@@ -750,7 +752,7 @@ export function cleanFavorite(f) {
     id: n.id, name: String(n.name).trim(), group: n.group || null, color: Number.isInteger(n.color) ? n.color : null,
     type: n.type, host: String(n.host || '').trim(), port: Number(n.port) || 3306, user: String(n.user || ''), database: String(n.database || '').trim(),
     socket: String(n.socket || '').trim(),
-    ssh: { host: String(n.ssh.host || '').trim(), port: Number(n.ssh.port) || 22, user: String(n.ssh.user || ''), key: String(n.ssh.key || '') },
+    ssh: { host: String(n.ssh.host || '').trim(), port: Number(n.ssh.port) || 22, user: String(n.ssh.user || ''), key: String(n.ssh.key || ''), hostKey: String(n.ssh.hostKey || '') },
     tls: { mode: TLS_MODES.includes(n.tls.mode) ? n.tls.mode : 'preferred', ca: String(n.tls.ca || ''), cert: String(n.tls.cert || ''), key: String(n.tls.key || '') },
     cloud: { service: String(n.cloud.service || ''), region: String(n.cloud.region || ''), iamProfile: String(n.cloud.iamProfile || '') },
     readOnly: !!n.readOnly, production: !!n.production, timeZone: String(n.timeZone || ''), trust: String(n.trust || ''),
@@ -822,5 +824,6 @@ export const NUMERIC_TYPE_NAMES = new Set(['TINY', 'SHORT', 'LONG', 'LONGLONG', 
 export const isNumericColumn = (col) => !!col && NUMERIC_TYPE_NAMES.has(String(col.typeName || '').toUpperCase());
 
 // lord-sql's error codes the app knows (each has databases.err.<code>)
-export const ERROR_CODES = ['unavailable', 'notfound', 'dns', 'connect', 'tls', 'cert', 'auth', 'sql', 'closed', 'busy', 'toolarge', 'unsupported'];
+export const ERROR_CODES = ['unavailable', 'notfound', 'dns', 'connect', 'tls', 'cert', 'auth', 'sql', 'closed', 'busy', 'toolarge', 'unsupported',
+  'hostkey_new', 'hostkey', 'sshauth', 'sshkey', 'sshforward', 'ssh'];
 export const errorCode = (e) => (ERROR_CODES.includes(e?.code) ? e.code : 'other');
