@@ -19,6 +19,12 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Terminal: stale ssh mux sockets no longer count against the 32 looked at (`server/src/term/sshmux.c`) | ⬜ |
 | Paper and site for 0.8.8.8; signed amd64 and arm64 packages; apt staging, then stable; GitHub pre-release; close #64 | ⬜ |
 
+## Phase 0b — Databases over an SSH tunnel (top priority, the maintainer's daily use)
+
+| Item | Why | Size | Status |
+|---|---|---|---|
+| Databases: connect through an SSH tunnel, as `docs/DATABASES.md` phase 2 designs it: lord-server starts `/usr/bin/ssh -W <db host>:<db port>` (fixed path, every argument from the validated favorite, `--` before the destination, the key a file under the home and not readable by others, `BatchMode`, the host key confirmed by the person on first use like a certificate) and hands its stdin/stdout to lord-sql as the server's stream; the tunnel ends with the connection | most favorites imported from Sequel Ace are SSH ones and can't connect today | M | ⛔ lord-server running a program: a new AGENTS.md exception |
+
 ## Phase 1 — quick wins, nothing new to approve
 
 | Item | Why | Size | Status |
