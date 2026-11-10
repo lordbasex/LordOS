@@ -1,5 +1,5 @@
 /* apps.c — installed Linux apps: reads the .desktop files from /usr/share/applications and
- * ~/.local/share/applications (Desktop Entry Specification 1.5), finds their PNG icon and launches them.
+ * ~/.local/share/applications (Desktop Entry Specification 1.5), finds their icon (iconfind.c) and launches them.
  *
  * It is the second exception to "the server does not run commands" (approved for M7; the first
  * is the Terminal's shell). Limits:
@@ -23,6 +23,7 @@
  * the window of the copy already running that the new process hands the link or file to (a browser),
  * comes to the front, because the person asked for it. */
 #include "apps.h"
+#include "iconfind.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
 #include "fsops.h"
@@ -259,74 +260,20 @@ static int find_program(const char *prog, int user, char *out, size_t n) {
     return -1;
 }
 
-/* ---- icons: hicolor PNGs (and from the user's theme), or /usr/share/pixmaps ---- */
-
-static int is_png(const char *path) {
-    size_t n = strlen(path);
-    struct stat st;
-    return n > 4 && !strcmp(path + n - 4, ".png") && !stat(path, &st) && S_ISREG(st.st_mode);
-}
+/* ---- icons: the installed themes' PNGs, then SVG (iconfind.c) ---- */
 
 static void find_icon(const char *name, char *out, size_t n) {
-    out[0] = 0;
-    if (!name[0] || strstr(name, "..")) return;
-    if (name[0] == '/') { if (is_png(name)) snprintf(out, n, "%s", name); return; }
-    static const int sizes[] = { 64, 48, 128, 96, 256, 72, 32, 512 };
-    const char *home = getenv("HOME");
-    char roots[3][PATH_MAX];
-    int nr = 0;
-    if (home) snprintf(roots[nr++], PATH_MAX, "%s/.local/share/icons/hicolor", home);
-    snprintf(roots[nr++], PATH_MAX, "/usr/share/icons/hicolor");
-    for (int r = 0; r < nr; r++)
-        for (size_t s = 0; s < sizeof sizes / sizeof *sizes; s++) {
-            int w = snprintf(out, n, "%s/%dx%d/apps/%s.png", roots[r], sizes[s], sizes[s], name);
-            if (w > 0 && (size_t)w < n && is_png(out)) return;
-        }
-    int w = snprintf(out, n, "/usr/share/pixmaps/%s.png", name);
-    if (w > 0 && (size_t)w < n && is_png(out)) return;
-    /* last resort: the 64 px AppStream PNG downloaded by the package engine
-     * (/var/lib/lordos/pkg/icons/64/<package>_<icon>.png): useful for apps that only ship SVG */
-    out[0] = 0;
-    DIR *d = opendir("/var/lib/lordos/pkg/icons/64");
-    if (!d) return;
-    char want[300];
-    snprintf(want, sizeof want, "_%s.png", name);
-    size_t wl = strlen(want);
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        size_t l = strlen(e->d_name);
-        if (l > wl && !strcmp(e->d_name + l - wl, want)) {
-            w = snprintf(out, n, "/var/lib/lordos/pkg/icons/64/%s", e->d_name);
-            if (w > 0 && (size_t)w < n && is_png(out)) break;
-            out[0] = 0;
-        }
-    }
-    closedir(d);
+    IconRoots r;
+    iconfind_roots(&r, getenv("HOME"), "");
+    iconfind_app(&r, name, out, n);
 }
 
 /* A tray icon's IconName (ui/sni.c): a plain name, never a path, looked up in the same places at the bar's sizes,
- * in hicolor's status folders first. */
+ * in the status folders first. */
 void apps_status_icon(const char *name, char *out, size_t n) {
-    out[0] = 0;
-    size_t len = name ? strlen(name) : 0;
-    if (!len || len > 128 || name[0] == '.' || strstr(name, "..")) return;
-    for (const char *p = name; *p; p++) if (!isalnum((unsigned char)*p) && !strchr("._-+", *p)) return;
-    static const int sizes[] = { 32, 24, 22, 48, 64, 16, 128, 256 };
-    static const char *const kinds[] = { "status", "apps" };
-    const char *home = getenv("HOME");
-    char roots[2][PATH_MAX];
-    int nr = 0;
-    if (home) snprintf(roots[nr++], PATH_MAX, "%s/.local/share/icons/hicolor", home);
-    snprintf(roots[nr++], PATH_MAX, "/usr/share/icons/hicolor");
-    for (size_t k = 0; k < sizeof kinds / sizeof *kinds; k++)
-        for (int r = 0; r < nr; r++)
-            for (size_t s = 0; s < sizeof sizes / sizeof *sizes; s++) {
-                int w = snprintf(out, n, "%s/%dx%d/%s/%s.png", roots[r], sizes[s], sizes[s], kinds[k], name);
-                if (w > 0 && (size_t)w < n && is_png(out)) return;
-            }
-    int w = snprintf(out, n, "/usr/share/pixmaps/%s.png", name);
-    if (w > 0 && (size_t)w < n && is_png(out)) return;
-    out[0] = 0;
+    IconRoots r;
+    iconfind_roots(&r, getenv("HOME"), "");
+    iconfind_status(&r, name ? name : "", out, n);
 }
 
 /* ---- list ---- */

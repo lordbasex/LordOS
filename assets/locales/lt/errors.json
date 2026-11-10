@@ -442,6 +442,8 @@
   "media.noVideoEncoder": "Nėra jokio vaizdo koderio",
   "media.notAFile": "Tai ne failas",
   "media.notAnImage": "Tai ne paveikslėlis",
+  "media.svgTooLarge": "SVG failas didesnis nei 1 MB",
+  "media.svgTooComplex": "SVG paveikslėlis per sudėtingas, kad būtų nupieštas",
   "media.nothingToPlay": "Nėra garso ar vaizdo, kurį būtų galima paleisti",
   "media.outsideHome": "Netinkamas kelias arba jis už namų aplanko ribų",
   "media.queueFull": "Per daug laukiančių medijos užduočių; netrukus bandykite dar kartą",

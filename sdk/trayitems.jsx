@@ -11,6 +11,7 @@ import { ContextMenu } from './contextmenu.jsx';
 import { registerStatusItem } from './statusitems.js';
 import { t } from './i18n.js';
 import { trayShown, trayInitial, trayHeader, trayMenu, trayMenuAt, trayMenuWanted } from './traymodel.js';
+import { iconSrc } from './iconsrc.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.sni) || null;
 const items = createStore({});            // id → item
@@ -63,7 +64,7 @@ function TrayItem({ id, height }) {
   const onMouseDown = (e) => { if (e.button === 1) { try { lord.sni.activate(id, ...point(e), true); } catch (err) { /* idem */ } } };
   const px = item.icon ? null : item.pix ? pixelsOf(item) : null;
   const glyph = item.icon
-    ? h(Image, { src: item.icon, style: { width: 16, height: 16, objectFit: 'contain' } })
+    ? h(Image, { src: iconSrc(item.icon, 16, th.text), style: { width: 16, height: 16, objectFit: 'contain' } })
     : px ? h(Image, { pixels: px, style: { width: 16, height: 16, objectFit: 'contain' } })
       : h(Text, { style: { fontSize: 11, fontWeight: 700, color: th.text } }, trayInitial(item));
   return h(View, { ref: btn, onClick, onContextMenu, onMouseDown, style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },

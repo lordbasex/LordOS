@@ -2,6 +2,7 @@
  * (MW_*), with the descriptors lord-server passes. It exits on its own if a while passes without work.
  * Each reply is an MM_RESULT with the job id. */
 #include "lm.h"
+#include "lm_svg.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -124,6 +125,40 @@ static void job_image(uint32_t id, int in) {
     char json[200];
     snprintf(json, sizeof json, "{\"width\":%d,\"height\":%d,\"sourceWidth\":%d,\"sourceHeight\":%d,\"orientation\":%d,\"animated\":%s,\"alpha\":%s}",
              w, h, ow, oh, orient, frames > 1 ? "true" : "false", alpha ? "true" : "false");
+    lm_result(id, 0, json, mfd);
+    close(mfd);
+}
+
+/* An SVG icon (lm_svg.c) drawn to fit side x side, recolored when recolor >= 0: premultiplied BGRA in a sealed memfd.
+ * lord-server opened the file (a regular file of at most LM_SVG_MAX_BYTES); its size is checked again here. */
+static void job_svg(uint32_t id, int in, int side, long recolor) {
+    struct stat st;
+    if (in < 0 || fstat(in, &st) || !S_ISREG(st.st_mode)) { lm_result(id, -1, "media.notAFile", -1); return; }
+    if (st.st_size > LM_SVG_MAX_BYTES) { lm_result(id, -1, "media.svgTooLarge", -1); return; }
+    char *buf = malloc(LM_SVG_MAX_BYTES + 1);
+    if (!buf) { lm_result(id, -1, "sys.outOfMemory", -1); return; }
+    size_t len = 0;
+    for (;;) {
+        ssize_t r = pread(in, buf + len, LM_SVG_MAX_BYTES + 1 - len, (off_t)len);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        len += (size_t)r;
+        if (len > LM_SVG_MAX_BYTES) break;      /* it grew after lord-server looked */
+    }
+    uint8_t *px = NULL;
+    int w = 0, h = 0;
+    const char *err = lm_svg_raster(buf, len, side, recolor, &px, &w, &h);
+    free(buf);
+    if (err) { LM_DBG("svg %u: %s", id, err); lm_result(id, -2, err, -1); return; }
+    void *map;
+    size_t n = (size_t)w * h * 4;
+    int mfd = lm_memfd(n, &map, "lord-media-svg");
+    if (mfd < 0) { free(px); lm_result(id, -1, "sys.outOfMemory", -1); return; }
+    memcpy(map, px, n);
+    munmap(map, n);
+    free(px);
+    char json[64];
+    snprintf(json, sizeof json, "{\"width\":%d,\"height\":%d}", w, h);
     lm_result(id, 0, json, mfd);
     close(mfd);
 }
@@ -478,6 +513,7 @@ void lm_worker(void) {
         case MW_TRANSCODE: job_transcode(m.id, fds[0], fds[1], payload); break;
         case MW_WAVEFORM: job_waveform(m.id, fds[0], (int)m.v[1]); break;
         case MW_SELFTEST: job_selftest(m.id); break;
+        case MW_SVG: job_svg(m.id, fds[0], (int)m.v[1], (long)m.v[2]); break;
         default: lm_result(m.id, -1, "media.unknownJob", -1);
         }
         LM_DBG("trabajo %u (%lld) en %.1f ms", m.id, (long long)m.v[0], lm_now_ms() - t0);

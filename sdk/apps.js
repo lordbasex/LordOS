@@ -15,6 +15,7 @@ import { locale, appName } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
 import { compareNames } from './collate.js';
+import { iconSrc } from './iconsrc.js';
 import { listApps, wm, windows, appRegistry, getApp as registryApp } from './windows.js';
 
 const DESKTOP = 'desktop:';
@@ -35,10 +36,10 @@ export function LetterIcon({ size: s = 32, name = '?' }) {
   h(Text, { style: { fontSize: s * 0.5, fontWeight: 700, color: '#fff' } }, letter));
 }
 
-// Icon from a PNG (or the initial if there is none).
+// Icon from a PNG or an SVG drawn at the size shown (or the initial if there is none).
 export function iconFromFile(path, name) {
   if (!path) return ({ size }) => h(LetterIcon, { size, name });
-  return ({ size = 32 }) => h(Image, { src: path, style: { width: size, height: size, objectFit: 'contain' } });
+  return ({ size = 32 }) => h(Image, { src: iconSrc(path, size), style: { width: size, height: size, objectFit: 'contain' } });
 }
 
 const linux = createStore([]);

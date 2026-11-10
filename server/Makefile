@@ -55,11 +55,11 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
@@ -493,7 +493,7 @@ build/brokermail-test: tests/brokermail_test.c src/sec/brokermail.c src/sec/json
 	./$@ || { rm -f $@; exit 1; }
 # tests/launch_cli.c: the real Linux app launcher outside the desktop, for tests/fwlinux/files.sh
 # (built by `make test`, run by that script in the VM)
-LAUNCH_CLI_SRC := src/apps.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
+LAUNCH_CLI_SRC := src/apps.c src/iconfind.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
                   src/sec/restrict.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 test: build/launch-cli
 build/launch-cli: tests/launch_cli.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
@@ -504,6 +504,12 @@ test: build/apps-actions-test
 build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
+# tests/iconfind_test.c: where an icon name's file is (src/iconfind.c): PNG, then SVG, then symbolic, over a made-up tree
+test: build/iconfind-test
+build/iconfind-test: tests/iconfind_test.c src/iconfind.c src/iconfind.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/iconfind_test.c src/iconfind.c
 	./$@ || { rm -f $@; exit 1; }
 # tests/defaults_test.c: the default app for a MIME type (user choice, system default, first
 # declaring app) and launchWith('') over a fake XDG tree
@@ -755,6 +761,8 @@ ifeq ($(MEDIA_VA),1)
 MEDIA_PKGS += libva libva-drm
 MEDIA_CPPFLAGS := -DLM_VAAPI
 endif
+# SVG icons (helper/lm_svg.c): nanosvg, vendored unmodified; only lord-media compiles it (docs/ARCHITECTURE.md)
+MEDIA_CPPFLAGS += -isystem ../third_party/nanosvg
 LM_SRC := $(wildcard src/media/helper/*.c) src/media/proto.c src/sec/sandbox.c src/sec/cgroup.c
 build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
@@ -791,6 +799,14 @@ build/lord-media-encfail: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/p
 build/imgops-test: tests/imgops_test.c src/media/imgops.c src/media/imgops.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/imgops_test.c src/media/imgops.c -lm
+# SVG icons' limits around nanosvg (src/media/helper/lm_svg.c) without FFmpeg: valid, symbolic, malformed, huge numbers,
+# deep nesting (also hidden from a separate scan in quotes or comments), too large; build/media-test svg runs the same
+# files through lord-media in test-full
+test: build/svgrast-test
+build/svgrast-test: tests/svgrast_test.c src/media/helper/lm_svg.c src/media/helper/lm_svg.h ../third_party/nanosvg/nanosvg.h ../third_party/nanosvg/nanosvgrast.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -isystem ../third_party/nanosvg $(CFLAGS) $(WARN) -std=c11 -o $@ tests/svgrast_test.c src/media/helper/lm_svg.c -lm
+	./$@ || { rm -f $@; exit 1; }
 MEDIA_TEST_SRC := tests/media_test.c src/media/proto.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c
 build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/media/media_int.h src/media/mpulse.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(MEDIA_TEST_SRC) -lm

@@ -335,6 +335,9 @@ EOF
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
+    # (0.8.8.8) SVG icons of Linux apps: PNG as it is, SVG at the size shown, symbolic ones in the bar's color (sdk/iconsrc.js)
+    if have node; then run "iconsrc-test (sdk/iconsrc.js)" node tests/iconsrc_test.mjs
+    else skip "iconsrc-test" "node"; fi
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi
@@ -438,6 +441,34 @@ EOF
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
     else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    # (0.8.8.8) SVG icons through lord-media (MW_SVG, helper/lm_svg.c): a valid icon, a symbolic one recolored, then
+    # malformed markup, huge numbers, deep nesting (also behind a comment) and a file over 1 MB, which must be
+    # refused, not crash it
+    if [ -x build/lord-media ] && have python3; then
+        python3 -I - "$T" <<'EOF'
+import os, sys
+d = sys.argv[1]
+def put(name, text):
+    with open(os.path.join(d, name), 'w') as f: f.write(text)
+icon = ('<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">'
+        '<path d="m 7 1 l -3.2 3.6 h -1 c -1.1 0 -2 0.8 -2 2 v 2 c 0 1.1 0.9 2 2 2 h 1 l 3.2 3.6 z" fill="#2e3436"/>'
+        '<rect x="10" y="3" width="2" height="10" fill="#2e3436"/></svg>')
+put('icon.svg', icon)
+put('bad.svg', '<svg width="16" height="16"><path d="M 0 0 L 16')
+put('huge.svg', '<svg width="16" height="16"><path d="M 1e38 1e38 L -1e38 0 L 0 1e999 Z"/></svg>')
+put('deep.svg', '<svg width="16" height="16">' + '<g>' * 100000 + '<rect width="16" height="16"/></svg>')
+# the same nesting where an XML reader sees a comment: nanosvg ends the tag at the first '>' and parses it all
+put('hidden.svg', '<svg width="16" height="16"><!-- > ' + '<g>' * 100000 + ' --><rect width="16" height="16"/></svg>')
+put('big.svg', '<svg width="16" height="16"><!--' + 'x' * (1 << 20) + '--><rect width="16" height="16"/></svg>')
+EOF
+        run "media-test svg (an icon)" build/media-test svg "$T/icon.svg" 48 - ok
+        run "media-test svg (symbolic, recolored)" build/media-test svg "$T/icon.svg" 24 ff8000 ok
+        run "media-test svg (malformed)" build/media-test svg "$T/bad.svg" 32 - fail
+        run "media-test svg (huge numbers)" build/media-test svg "$T/huge.svg" 32 - fail
+        run "media-test svg (deep nesting)" build/media-test svg "$T/deep.svg" 32 - fail
+        run "media-test svg (nesting behind a comment)" build/media-test svg "$T/hidden.svg" 32 - fail
+        run "media-test svg (over 1 MB)" build/media-test svg "$T/big.svg" 32 - fail
+    else skip "media-test svg" "build/lord-media (FFmpeg -dev packages) and python3"; fi
     # the remote desktop's live encoder (#94): libx264, then VA-API with its first keyframe checked and, with a
     # build whose check always fails, the way out to libx264 (only where a card encodes H.264)
     if [ -x build/lord-media ] && [ -x build/lmstream-test ]; then
