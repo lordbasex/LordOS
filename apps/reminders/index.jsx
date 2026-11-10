@@ -9,7 +9,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   RED, COLORS, sod, addDays, ymd, parseYmd, minutesOf, atMinutes, Sheet, Field, Choice, TextArea, DateField, TimeField, ColorSwatches,
-  Popover, MenuList, Layers, useLoad, useNow,
+  Popover, MenuList, useLoad, useNow,
 } from './ui.jsx';
 
 // ---- icon: a white rounded square with three colored dots and lines ----
@@ -113,7 +113,6 @@ export default function RemindersApp() {
         )}
       </View>
       {sheet ? <ListSheet list={sheet.list} onClose={() => setSheet(null)} onCreated={(id) => setSel(`list:${id}`)} /> : null}
-      <Layers />
     </View>
   );
 }

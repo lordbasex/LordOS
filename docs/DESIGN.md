@@ -63,6 +63,14 @@ not "CONTENTS").
 | `MenuButton` | 28 | 8 | "⋯" or "⊕" button that opens a small menu (checked, disabled and destructive items) |
 | `Toggle` | 24 (20 `small`) | — | `small` = the 36 × 20 switch of grouped forms (Settings rows) |
 | `Hairline` | 1 | — | `edge="top" \| "bottom" \| "start" \| "end"`: a 1 px separator on that edge of its parent; start/end follow RTL |
+| `Dropdown` | 26 (22 `small`) | 7 | a pop-up button over `options = [[value, label]]`; a list of 24 px rows that scrolls after 12 |
+| `Checkbox` | 14 box | 4 | `checked`, `mixed` (a dash), with its label |
+| `RadioGroup` | 14 dot | 7 | `options = [[value, label, { disabled }?]]`, one under the other or in a `row` |
+| `Tabs` | 30 | — | a row of tabs, the chosen one underlined in the accent, a hairline under the row |
+| `Popover` | — | `menuRadius + 2` | a box below (or above) a control, kept inside the window; a focus scope |
+| `Tooltip` | 22 | `menuRadius − 2` | wraps any control: hover or keyboard focus, after 550 ms |
+| `ProgressBar` | 6 | 3 | `value` 0–1, or none for the indeterminate band |
+| `List`, `Table` | 26 rows | 6 / 10 | selection by the pointer and the keys (`multiple`: Shift ranges, Ctrl toggles), type-to-find; a `Table` has a header that sorts (`sort`, `onSort`) |
 
 Icons are monochrome Unicode glyphs from the fallback fonts (Inter, DejaVu Sans, Noto Sans
 Symbols 1/2), not color emoji. Verified on the VM:
@@ -287,7 +295,8 @@ shell is open (the modal, system, overlay or capture layer) they go round its co
 with the `modal` prop while it is shown. Ctrl+Tab and ⌥Tab stay the apps' and the shell's.
 
 - **Which controls:** `Button`, `ToolbarButton` (and so `MenuButton`), `Toggle`, `Segmented`, `Slider`,
-  `Stepper`, `TextInput`, `TextArea`, Settings' pop-up buttons (`PopUp`), and a `ScrollView` whose content doesn't fit.
+  `Stepper`, `TextInput`, `TextArea`, Settings' pop-up buttons (`PopUp`), `Dropdown`, `Checkbox`, `RadioGroup`,
+  `Tabs`, `List`, `Table`, and a `ScrollView` whose content doesn't fit.
   Each one takes `focusable={false}` to leave the order; a disabled one is never in it. Files' icon, list and column
   views pass `focusable={false}`: there the arrows move the selection. Any `View` becomes a stop with `focusable`,
   and `onKeyDown(e)` (return `true` when it used the key) gives it keys while it is focused.
@@ -315,11 +324,28 @@ with the `modal` prop while it is shown. Ctrl+Tab and ⌥Tab stay the apps' and 
 - **Apps that want Tab** call `e.preventDefault()` in their key handler: the Terminal (the shell completes), the Text
   Editor (it indents), a virtual machine's screen and console, the remote desktop, the Databases completion list, the
   Imager's own focus and the Overview do. Tab moves the focus only after every listener had the key.
+- **Lists and tables** (`List`, `Table` in `sdk/lists.jsx`, 0.8.8.8): one Tab stop, and a press on a row gives it
+  the keys too, without the ring (`focusOnPress`). ↑ ↓, Home, End, Page Up and Page Down choose a row; with
+  `multiple`, Shift and a move or a press extend a range from the anchor, Ctrl (⌘) and a press toggle a row, Ctrl and
+  an arrow move only the outlined lead row and Ctrl+Space toggles it, Ctrl+A selects all. Typing a name goes to the
+  next row that starts with it; Enter and a double click activate. The row the keys reach comes into sight.
+- **Choice controls** (`sdk/controls.jsx`): a `Dropdown` opens with Space, Enter, ↓ or ↑ on the current choice, then
+  ↓ ↑, Home and End move, Enter or Space chooses, Escape closes it and letters jump (also while it is closed).
+  `Tabs` and a `RadioGroup` are one stop whose arrows choose (← → swap in RTL; they go round and skip disabled ones).
+  A `Checkbox` flips with Space. A `Popover` is a focus scope: opened from the keyboard the focus moves to its first
+  control and Tab stays inside it; Escape closes the newest popup only (a `Dropdown` open inside a popover first) and
+  the focus goes back to the control that opened it. A `Tooltip` shows after a pause on hover and on keyboard focus
+  (a toolbar button's too), below its control or above it, never over the pointer. `ProgressBar` is determinate
+  (0–1, from the start edge) or, with no value, a sliding band (still with reduced motion). The wheel moves a slider
+  or a stepper by a step; a touchpad swipe only while it has the focus, so a page scrolling past it keeps scrolling.
 
 Tests: `tests/focus_model_test.mjs` (tree order, skipping, a modal node, focus-visible, the keys of sliders,
 steppers, segmented controls, menus and scroll views, RTL) and `tests/focus_scene_test.mjs` (the controls in a
 window through the runtime and the server's own events: the ring, Space and Enter, the arrows, a menu, a text field
-in the order, a press that ends the focus, a prevented Tab, a dialog in front).
+in the order, a press that ends the focus, a prevented Tab, a dialog in front); `tests/list_model_test.mjs` (ranges,
+toggles, page moves, type-to-find), `tests/control_model_test.mjs` (Tabs, radio groups and Dropdown keys, the wheel,
+tooltips, progress) and `focus_scene_test.mjs list_scene.mjs` (the List, the Table, the choice controls and a
+popover's focus through the runtime).
 
 ## Robustness checklist
 

@@ -2,7 +2,7 @@
 // next and the previous stop skipping hidden and disabled ones, a modal node keeping Tab inside, the focus-visible
 // state, and what the keys do to a slider, a stepper, a row of choices, a menu and a scroll view (right to left too).
 import {
-  isHidden, canFocus, treeOrder, within, tabArea, tabStops, nextStop, tabKey, activates, NO_FOCUS, focusAfter,
+  isHidden, canFocus, treeOrder, within, tabArea, tabStops, nextStop, tabKey, activates, NO_FOCUS, focusAfter, pressFocus,
   rangeKey, choiceKey, menuStep, scrollKey,
 } from '../../sdk/focusmodel.js';
 
@@ -106,6 +106,20 @@ eq('visible: a Tab with nowhere to go changes nothing', [st.focus, st.anchor?.na
 st = focusAfter(focusAfter(st, { type: 'tab', to: c }), { type: 'gone', anchor: row });
 eq('visible: the focused node went away', [st.focus, st.anchor?.name, st.visible], [null, 'row', false]);
 eq('visible: an unknown event', focusAfter(st, { type: 'x' }) === st, true);
+// (0.8.8.8) a press inside a List or a Table (focusOnPress) gives it the focus without the ring
+const cell = node('cell');
+const listRow = node('listRow', {}, [cell]);
+const list = node('list', { focusable: true, focusOnPress: true }, [listRow]);
+const listBox = node('listBox', {}, [list]);
+eq('pressFocus: from a row up to its list', pressFocus(cell, listBox)?.name, 'list');
+eq('pressFocus: the list itself', pressFocus(list, listBox)?.name, 'list');
+eq('pressFocus: none outside one', pressFocus(label, root), null);
+eq('pressFocus: not past the area', pressFocus(cell, list), null);
+const offCell = node('offCell');
+const offBox = node('offBox', {}, [node('offList', { focusable: true, focusOnPress: true, disabled: true }, [offCell])]);
+eq('pressFocus: a disabled list keeps none', pressFocus(offCell, offBox), null);
+st = focusAfter(NO_FOCUS, { type: 'pointer', target: cell, keep: list });
+eq('visible: a press on a list keeps its focus, no ring', [st.focus?.name, st.anchor?.name, st.visible], ['list', 'list', false]);
 
 // a slider or a stepper
 const r = { value: 50, min: 0, max: 100, step: 5, page: 10 };
