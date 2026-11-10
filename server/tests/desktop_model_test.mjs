@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../sdk/desktopmodel.js'));
 const S = await import(path.join(here, '../../sdk/sessionmodel.js'));
 const {
-  onDesktop, windowHidden, visibleOn, mountedOn, focusedOn, keyboardSurface, acceptsAppRequest, surfaceState, pickWindow, addDesktop, removeDesktop,
+  onDesktop, windowHidden, visibleOn, mountedOn, focusedOn, keyboardSurface, acceptsAppRequest, activationOutcome, surfaceState, pickWindow, addDesktop, removeDesktop,
   nextDesktop, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, gridLayout, stripLayout, hitRect, overviewPlaceholder, MAX_DESKTOPS,
   cleanName, cleanNames, namesByPosition, withName, moveDesktopTo, stripSlot, MAX_NAME,
 } = M;
@@ -73,6 +73,11 @@ eq('pip alone is not in front', focusedOn([win('p', 1, { pip: {} })], 1), null);
 eq('app request refused off this desktop', acceptsAppRequest(L(1, 2), 1), false);
 eq('app request accepted on it', acceptsAppRequest(L(1, 2), 2), true);
 eq('no window, no request', acceptsAppRequest(null, 1), false);
+// xdg-activation: only a granted token brings a window forward (a hidden desktop's too); anything else asks for attention
+eq('activation: granted focuses, on any desktop', [activationOutcome(L(1, 2), null, true), activationOutcome(L(1, 1), 'linux#1', true)], ['focus', 'focus']);
+eq('activation: refused never focuses', [activationOutcome(L(1, 2), 'linux#9', false), activationOutcome(L(1, 2, { minimized: true }), null, false)], ['attention', 'attention']);
+eq('activation: refused but already in front, nothing', activationOutcome(L(1, 1), 'linux#1', false), null);
+eq('activation: no window', activationOutcome(null, null, true), null);
 
 // the compositor's view
 eq('parked and iconic', surfaceState(L(1, 2), 1), { maximized: false, parked: true, iconic: true });

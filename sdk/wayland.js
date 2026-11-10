@@ -9,7 +9,7 @@
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop } from './windows.js';
-import { acceptsAppRequest, keyboardSurface, focusedOn, surfaceState } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
@@ -133,6 +133,13 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'deco': if (win && !!win.args?.csd !== !!d.csd) { if (win.windowMenu) wm.closeWindowMenu(id); wm.setArgs(id, { csd: !!d.csd }); } break;
     // right click on the app's own bar (xdg_toplevel.show_window_menu): the theme's window menu
     case 'menu': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); wm.showWindowMenu(id, d.x, d.y); } break;
+    // xdg_activation_v1.activate: 'activate' with a token LordOS issued or the app in front handed over
+    // (a link opened in the browser already running), 'attention' with any other (desktopmodel.js)
+    case 'activate': case 'attention': {
+      const how = activationOutcome(win, wm.focused(), type === 'activate');
+      if (how === 'focus') wm.focus(id); else if (how === 'attention' && !win.attention) wm.setAttention(id, true);
+      break;
+    }
     default: break;
   }
 };
@@ -159,6 +166,9 @@ function sync() {
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
   if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f, !!f && isTerminalEmulator(focusedOn(list, active))); }
+  // the window in front no longer wants attention, however it got there (the one above it closed)
+  const top = focusedOn(list, active);
+  if (top?.attention) setTimeout(() => wm.setAttention(top.id, false), 0);
 }
 windows.subscribe(sync);
 activeDesktop.subscribe(sync);

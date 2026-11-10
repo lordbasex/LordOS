@@ -40,6 +40,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
+| `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: only a hint for the on-screen keyboard; text keeps arriving on `wl_keyboard` (0.8.7, `wl_textinput.c`, see `ON-SCREEN-KEYBOARD.md`) |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
@@ -105,6 +106,9 @@ shell. The user approved it for M7. Limits:
 
   Anything else (an unlisted group, a bad name, no `Exec`) is refused. Tested by
   `build/apps-actions-test` (in `make test`).
+- **Activation:** every launch gets `XDG_ACTIVATION_TOKEN` in its environment (see "Activation"
+  below), so the window it opens, or the window of the copy already running it hands the link to,
+  comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
   descriptors. Its output goes to `~/.cache/lordos/apps.log`, which is trimmed when it passes 1 MB.
 - A `.desktop` can't be created from JS:
@@ -126,6 +130,35 @@ Icons: the `hicolor` PNG (64, 48, 128… px) or the one in `/usr/share/pixmaps` 
 only ship SVG (FeatherPad, GTK Demo) use the 64 px PNG Debian publishes in AppStream, which the
 package engine already downloads (`/var/lib/lordos/pkg/icons/64`, see `PACKAGES.md`). If it's not
 there either, the initial is shown: LordOS doesn't draw SVG yet.
+
+## Activation (`xdg_activation_v1`)
+
+A window comes to the front only when the person asked for it; the rules are KWin's and Mutter's.
+The tokens live in `server/src/wl/xdgact.c` (no Wayland types, tested by `build/xdgact-test`); the
+protocol is in `wl.c`.
+
+- **Tokens LordOS gives.** Every launch from `apps.c` (the launcher, Open With, a link, a desktop
+  action) issues one and puts it in `XDG_ACTIVATION_TOKEN` of what it starts. A browser that is
+  already open gets the link from the new process together with the token and calls `activate`: its
+  window comes forward, on its own desktop if that one isn't showing. A click on a notification's
+  button sends the `ActivationToken` signal (Desktop Notifications 1.2) before `ActionInvoked`, so
+  the app that sent it can come forward too.
+- **Tokens an app asks for** (`get_activation_token` … `commit`; `set_app_id` is kept, `set_surface`
+  is only a hint). The token is granted when the asking app has the keyboard, or when the
+  `set_serial` it sends is a click (`wl_pointer.button`), a key (`wl_keyboard.key`) or a keyboard
+  `enter` LordOS sent that same client in the last 10 seconds. Otherwise it still gets a token (the
+  protocol always answers `done`), but an ungranted one. The token remembers the app that asked:
+  as soon as the keyboard moves to another app or to the desktop itself, or that app disconnects,
+  its tokens stop granting (KWin and Mutter do the same), so an app cannot ask while in front and
+  use the token later to steal the front. LordOS's own tokens are not revoked this way.
+- **`activate(token, surface)`.** A granted token raises and focuses the surface's window (a menu or
+  subsurface counts as its window). An ungranted, expired, unknown or reused token never takes the
+  focus: the window is marked as wanting attention, a larger dot in the accent under its Dock icon
+  (Lord Flow) or a long accent bar on its taskbar button (Lord Classic), until it comes to the front;
+  a click on the icon brings that window first. Tokens work once and last 60 s (LordOS's: a cold
+  start can be slow) or at most 10 s (an app's); 32 are kept, a new one replaces the oldest.
+- The decision on the theme side is `activationOutcome` in `sdk/desktopmodel.js`
+  (`tests/desktop_model_test.mjs`).
 
 ## Clipboard
 
@@ -557,8 +590,8 @@ display.
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- Drag and drop, `text-input` (LordOS input methods inside Wayland apps), activation
-  (`xdg-activation`). (Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
+- Drag and drop, `text-input` (LordOS input methods inside Wayland apps). (Activation,
+  `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 
 ## Clipboard to its owner and idle-inhibit (0.8.5)

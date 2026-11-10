@@ -57,6 +57,15 @@ export function keyboardSurface(list, active, shellBusy, surfaceOf) {
 // These come from the app, so a window on a hidden desktop doesn't get to change the desktop.
 export const acceptsAppRequest = (w, active) => !!w && onDesktop(w, active);
 
+// xdg-activation (server/src/wl/xdgact.c): a granted token means the person asked (LordOS launched it,
+// or the app in front handed it over), so the window comes forward, its desktop too. Any other request
+// never takes the focus: the window only asks for attention, unless it is already in front.
+export function activationOutcome(w, focusedId, granted) {
+  if (!w) return null;
+  if (granted) return 'focus';
+  return w.id === focusedId ? null : 'attention';
+}
+
 // The compositor's view of a Linux window: parked = on a hidden desktop. It loses the keyboard and any
 // fullscreen until it comes back. X11 windows go iconic for both, so X's stacking can't catch the pointer.
 export function surfaceState(w, active) {

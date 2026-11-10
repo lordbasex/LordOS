@@ -5,6 +5,7 @@
 #include "../fw/rules.h"
 #include "../sec/appid.h"
 #include "../sec/restrict.h"
+#include "../wl/xdgact.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -221,6 +222,7 @@ static int handle(DMsg *m) {
         dw_str(&b, "<node><interface name=\"org.freedesktop.Notifications\">"
                    "<method name=\"Notify\"/><method name=\"CloseNotification\"/><method name=\"GetCapabilities\"/>"
                    "<method name=\"GetServerInformation\"/><signal name=\"NotificationClosed\"/><signal name=\"ActionInvoked\"/>"
+                   "<signal name=\"ActivationToken\"/>"
                    "</interface></node>");
         dbus_reply(&conn, m, "s", &b);
         dw_free(&b);
@@ -318,6 +320,16 @@ void notifyd_closed(uint32_t id, uint32_t reason) {
 void notifyd_action(uint32_t id, const char *key) {
     if (!up || !id || !key || strlen(key) > 128) return;
     DBuf b;
+    /* the person clicked: the app's window may come to the front (xdg-activation, wl/xdgact.c). The
+     * specification sends the token first, so the app has it when it handles the action. */
+    const char *tok = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, "");
+    if (tok) {
+        dw_init(&b);
+        dw_u32(&b, id);
+        dw_str(&b, tok);
+        dbus_signal(&conn, OBJ, BUS_NAME, "ActivationToken", "us", &b);
+        dw_free(&b);
+    }
     dw_init(&b);
     dw_u32(&b, id);
     dw_str(&b, key);
