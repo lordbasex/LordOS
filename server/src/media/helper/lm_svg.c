@@ -12,45 +12,52 @@
 #include "nanosvg.h"
 #include "nanosvgrast.h"
 
-/* the end of a construct that starts at p ("-->", "]]>", "?>"), or NULL */
-static const char *find(const char *p, const char *end, const char *what) {
-    size_t n = strlen(what);
-    for (; p + n <= end; p++) if (!memcmp(p, what, n)) return p + n;
-    return NULL;
+/* The markup as nanosvg's own tokenizer sees it. nsvg__parseXML is called with counting callbacks on a copy
+ * before the real parse: the same tokenizer that nsvgParse runs next (a tag ends at its first '>', quotes or
+ * not; "<!...", "<?..." and "</!..." are skipped up to their first '>' as well), so what passes these limits
+ * is exactly what the parser will build from. A tag nanosvg ends with "/>" calls both callbacks with the same
+ * name pointer; a start tag whose name itself ends in '/' ("<rect/>", no attributes) is self-closing too. */
+struct scan {
+    const char *open;           /* the name of the last start tag while it may still turn out self-closing */
+    int n, d, deepest;
+};
+
+/* the last start tag opened a level: no end callback of its own followed it */
+static void scan_confirm(struct scan *c) {
+    if (c->open && c->d > c->deepest) c->deepest = c->d;
+    c->open = NULL;
+}
+
+static void scan_start(void *ud, const char *el, const char **attr) {
+    (void)attr;
+    struct scan *c = ud;
+    size_t l = strlen(el);
+    scan_confirm(c);
+    c->n++;
+    if (l && el[l - 1] == '/') return;
+    c->d++;
+    c->open = el;
+}
+
+static void scan_end(void *ud, const char *el) {
+    struct scan *c = ud;
+    if (el == c->open) c->open = NULL;  /* the end of "<x .../>": the same tag, not a closing tag */
+    else { scan_confirm(c); c->n++; }
+    if (c->d > 0) c->d--;
 }
 
 int lm_svg_scan(const char *data, size_t len, int *elements, int *depth) {
-    const char *p = data, *end = data + len;
-    int n = 0, d = 0, deepest = 0;
-    while (p < end) {
-        const char *lt = memchr(p, '<', (size_t)(end - p));
-        if (!lt) break;
-        p = lt + 1;
-        if (p >= end) return -1;
-        if (end - p >= 3 && !memcmp(p, "!--", 3)) { if (!(p = find(p + 3, end, "-->"))) return -1; continue; }
-        if (end - p >= 8 && !memcmp(p, "![CDATA[", 8)) { if (!(p = find(p + 8, end, "]]>"))) return -1; continue; }
-        if (*p == '?') { if (!(p = find(p + 1, end, "?>"))) return -1; continue; }
-        int closing = *p == '/', decl = *p == '!';
-        /* the tag's end, past quoted attribute values (a '>' inside one doesn't end it) */
-        char quote = 0;
-        const char *q = p;
-        for (; q < end; q++) {
-            if (quote) { if (*q == quote) quote = 0; }
-            else if (*q == '"' || *q == '\'') quote = *q;
-            else if (*q == '>') break;
-        }
-        if (q >= end) return -1;
-        if (!decl) {
-            if (++n > LM_SVG_MAX_ELEMENTS) return -1;
-            if (closing) { if (d > 0) d--; }
-            else if (q[-1] != '/' && ++d > deepest) deepest = d;
-            if (deepest > LM_SVG_MAX_DEPTH) return -1;
-        }
-        p = q + 1;
-    }
-    if (elements) *elements = n;
-    if (depth) *depth = deepest;
-    return 0;
+    char *copy = malloc(len + 1);               /* nsvg__parseXML writes into its input */
+    if (!copy) return -1;
+    memcpy(copy, data, len);
+    copy[len] = 0;
+    struct scan c = { 0 };
+    nsvg__parseXML(copy, scan_start, scan_end, NULL, &c);
+    scan_confirm(&c);
+    free(copy);
+    if (elements) *elements = c.n;
+    if (depth) *depth = c.deepest;
+    return c.n > LM_SVG_MAX_ELEMENTS || c.deepest > LM_SVG_MAX_DEPTH ? -1 : 0;
 }
 
 static int finite_all(const float *v, int n) {

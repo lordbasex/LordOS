@@ -1,6 +1,7 @@
 /* svgrast_test.c — SVG icons in lord-media (src/media/helper/lm_svg.c), without the helper around them: a valid
  * icon, a symbolic one recolored, the aspect kept, malformed markup, huge numbers, deep nesting, too many elements
- * and a file over 1 MB. Hostile cases must come back quickly with an error code (or a picture), never crash.
+ * and a file over 1 MB, and markup built so that a scan of its own would count differently from nanosvg's
+ * tokenizer (quotes, comments, CDATA, "<?" and "<!"). Hostile cases must come back quickly with an error code (or a picture), never crash.
  * build/media-test svg runs the same kind of files through lord-media and its sandbox (test-full). */
 #include "../src/media/helper/lm_svg.h"
 
@@ -44,13 +45,18 @@ static char *repeat(const char *head, const char *s, size_t n, const char *tail,
 
 static void test_scan(void) {
     int n = 0, d = 0;
-    CHECK(lm_svg_scan(speaker, strlen(speaker), &n, &d) == 0 && n == 4 && d == 1, "speaker: %d elements, depth %d", n, d);
+    /* nanosvg ends the <rect> at the '>' inside data-x="a>b", before its "/>": for nanosvg it stays open */
+    CHECK(lm_svg_scan(speaker, strlen(speaker), &n, &d) == 0 && n == 4 && d == 2, "speaker: %d elements, depth %d", n, d);
     const char *nest = "<svg><g><g><rect/></g></g></svg>";
     CHECK(lm_svg_scan(nest, strlen(nest), &n, &d) == 0 && d == 3, "nested: depth %d", d);
+    /* a tag the markup never ends: nanosvg never parses it, so it isn't counted */
     const char *cut = "<svg><path d=\"M0 0";
-    CHECK(lm_svg_scan(cut, strlen(cut), &n, &d) == -1, "a tag that never ends");
+    CHECK(lm_svg_scan(cut, strlen(cut), &n, &d) == 0 && n == 1 && d == 1, "a tag that never ends: %d, depth %d", n, d);
     const char *cdata = "<svg><![CDATA[ <<<< ]]><rect/></svg>";
-    CHECK(lm_svg_scan(cdata, strlen(cdata), &n, &d) == 0 && n == 3, "CDATA skipped: %d elements", n);
+    CHECK(lm_svg_scan(cdata, strlen(cdata), &n, &d) == 0 && n == 3 && d == 1, "CDATA skipped: %d elements", n);
+    /* self-closing tags open no level, with attributes, without, or after a space */
+    const char *self = "<svg><g><rect/><rect x=\"1\"/><rect /><g/></g></svg>";
+    CHECK(lm_svg_scan(self, strlen(self), &n, &d) == 0 && n == 8 && d == 2, "self-closing: %d elements, depth %d", n, d);
 }
 
 static void test_valid(void) {
@@ -120,11 +126,46 @@ static void expect_survives(const char *name, const char *svg) {
     free(px);
 }
 
+/* Markup built to fool a separate pre-scan that reads quotes, comments, CDATA, "<?" or "<!" the way XML does:
+ * nanosvg ends every tag at its first '>', so each of these hides 100 000 nested <g> from such a scan while
+ * nanosvg parses them all. Counted with nanosvg's own tokenizer they're seen, and refused. */
+static void test_differential(void) {
+    static const char *const heads[][2] = {
+        { "a '>' inside a quote", "<svg width=\"16\" height=\"16\"><desc x=\"" },
+        { "a '<' inside a quote", "<svg width=\"16\" height=\"16\"><rect x='<" },
+        { "a comment", "<svg width=\"16\" height=\"16\"><!-- > " },
+        { "CDATA", "<svg width=\"16\" height=\"16\"><![CDATA[ > " },
+        { "a processing instruction", "<svg width=\"16\" height=\"16\"><?pi > " },
+        { "a declaration with a quote", "<svg width=\"16\" height=\"16\"><!DOCTYPE svg \"> " },
+        { "a closing declaration", "<svg width=\"16\" height=\"16\"></!x \"> " },
+    };
+    static const char *const tails[] = { "\"/>", "'/>", " -->", " ]]>", " ?>", "\">", "\">" };
+    for (size_t i = 0; i < sizeof heads / sizeof *heads; i++) {
+        char tail[160];
+        snprintf(tail, sizeof tail, "%s<rect width=\"16\" height=\"16\"/></svg>", tails[i]);
+        size_t len;
+        char *svg = repeat(heads[i][1], "<g>", 100000, tail, &len);
+        int n = 0, d = 0;
+        CHECK(lm_svg_scan(svg, len, &n, &d) == -1 && n > 99000 && d > 99000, "%s: %d elements, depth %d", heads[i][0], n, d);
+        expect_err(heads[i][0], svg, len, "media.svgTooComplex");
+        free(svg);
+        /* the same trick with flat elements: too many of them */
+        svg = repeat(heads[i][1], "<rect width=\"1\" height=\"1\"/>", 30000, tail, &len);
+        CHECK(lm_svg_scan(svg, len, &n, &d) == -1 && n > LM_SVG_MAX_ELEMENTS, "%s, flat: %d elements", heads[i][0], n);
+        expect_err(heads[i][0], svg, len, "media.svgTooComplex");
+        free(svg);
+    }
+    /* a quoted '>' and a comment's '>' end the tag for nanosvg: what follows is markup and counted */
+    const char *q = "<svg><rect data-x=\"a><g><g>\"/><!-- > <g> --></svg>";
+    int n = 0, d = 0;
+    CHECK(lm_svg_scan(q, strlen(q), &n, &d) == 0 && n == 6 && d == 5, "a quoted '>': %d elements, depth %d", n, d);
+}
+
 static void test_malformed(void) {
     expect_err("empty", "", 0, "media.notAnImage");
     expect_err("not markup", "hello", 5, "media.notAnImage");
     const char *cut = "<svg width=\"16\" height=\"16\"><path d=\"M 0 0 L 16";
-    expect_err("cut inside a tag", cut, strlen(cut), "media.svgTooComplex");
+    expect_err("cut inside a tag", cut, strlen(cut), "media.notAnImage");
     const char *nul = "<svg>\0<rect/></svg>";
     expect_err("a NUL byte", nul, 19, "media.notAnImage");
     const char *noshape = "<svg width=\"16\" height=\"16\"></svg>";
@@ -173,6 +214,7 @@ static void test_sizes(void) {
 
 int main(void) {
     test_scan();
+    test_differential();
     test_valid();
     test_symbolic();
     test_malformed();

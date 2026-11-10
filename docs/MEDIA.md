@@ -295,8 +295,11 @@ unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
   `MW_SVG` job to the foreground worker (`v[1]` = side, `v[2]` = `0xRRGGBB` or -1). No path or
   parameter text goes to the helper. In app mode (`--app`) nothing is asked for.
 - **What lord-media does** (`helper/lm_svg.c`, after `sandbox_apply_helper`): reads at most 1 MB from
-  the fd, scans the markup (at most 20 000 elements and 64 levels of nesting, outside comments and
-  CDATA), parses it, then checks what the rasterizer would face before it runs: at most 4 000 shapes
+  the fd, counts the markup's elements (at most 20 000) and nesting (at most 64 levels) with a dry run
+  of nanosvg's own tokenizer (`nsvg__parseXML` with counting callbacks, on a copy), so the limits apply
+  to exactly what the parser will build: a separate scan would read quotes, comments, CDATA, `<?` and
+  `<!` as XML does, while nanosvg ends every tag at its first `>`, and a file could hide 100 000 nested
+  groups from it. Then it parses it, then checks what the rasterizer would face before it runs: at most 4 000 shapes
   and 200 000 points, every number finite, every point within 128 sides of the picture, gradients with
   finite stops and a sane transform, strokes no wider than the picture and dashes no shorter than a
   quarter pixel. It answers premultiplied BGRA in a sealed memfd and `{"width","height"}`. A symbolic
@@ -309,7 +312,8 @@ unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
   a file that changes is drawn again, and idle pictures are dropped with the other idle images.
 - **Tests.** `build/svgrast-test` (`make test`): a valid icon, a symbolic one recolored, the aspect,
   malformed markup, huge and infinite numbers, a huge stroke, tiny dashes, a gradient with NaN stops,
-  deep nesting, too many elements and points, a file over 1 MB. `build/media-test svg` (`make
+  deep nesting, too many elements and points, a file over 1 MB, and nesting or elements hidden from a
+  separate scan in quotes, comments, CDATA, `<?` and `<!`. `build/media-test svg` (`make
   test-full`): the same kind of files through the real helper and its sandbox. `build/iconfind-test`:
   the lookup order. `server/tests/iconsrc_test.mjs`: the `src` the SDK builds.
 

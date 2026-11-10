@@ -429,7 +429,8 @@ EOF
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
     else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
     # (0.8.8.8) SVG icons through lord-media (MW_SVG, helper/lm_svg.c): a valid icon, a symbolic one recolored, then
-    # malformed markup, huge numbers, deep nesting and a file over 1 MB, which must be refused, not crash it
+    # malformed markup, huge numbers, deep nesting (also behind a comment) and a file over 1 MB, which must be
+    # refused, not crash it
     if [ -x build/lord-media ] && have python3; then
         python3 -I - "$T" <<'EOF'
 import os, sys
@@ -443,6 +444,8 @@ put('icon.svg', icon)
 put('bad.svg', '<svg width="16" height="16"><path d="M 0 0 L 16')
 put('huge.svg', '<svg width="16" height="16"><path d="M 1e38 1e38 L -1e38 0 L 0 1e999 Z"/></svg>')
 put('deep.svg', '<svg width="16" height="16">' + '<g>' * 100000 + '<rect width="16" height="16"/></svg>')
+# the same nesting where an XML reader sees a comment: nanosvg ends the tag at the first '>' and parses it all
+put('hidden.svg', '<svg width="16" height="16"><!-- > ' + '<g>' * 100000 + ' --><rect width="16" height="16"/></svg>')
 put('big.svg', '<svg width="16" height="16"><!--' + 'x' * (1 << 20) + '--><rect width="16" height="16"/></svg>')
 EOF
         run "media-test svg (an icon)" build/media-test svg "$T/icon.svg" 48 - ok
@@ -450,6 +453,7 @@ EOF
         run "media-test svg (malformed)" build/media-test svg "$T/bad.svg" 32 - fail
         run "media-test svg (huge numbers)" build/media-test svg "$T/huge.svg" 32 - fail
         run "media-test svg (deep nesting)" build/media-test svg "$T/deep.svg" 32 - fail
+        run "media-test svg (nesting behind a comment)" build/media-test svg "$T/hidden.svg" 32 - fail
         run "media-test svg (over 1 MB)" build/media-test svg "$T/big.svg" 32 - fail
     else skip "media-test svg" "build/lord-media (FFmpeg -dev packages) and python3"; fi
     # the remote desktop's live encoder (#94): libx264, then VA-API with its first keyframe checked and, with a

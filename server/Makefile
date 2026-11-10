@@ -760,7 +760,8 @@ build/imgops-test: tests/imgops_test.c src/media/imgops.c src/media/imgops.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/imgops_test.c src/media/imgops.c -lm
 # SVG icons' limits around nanosvg (src/media/helper/lm_svg.c) without FFmpeg: valid, symbolic, malformed, huge numbers,
-# deep nesting, too large; build/media-test svg runs the same files through lord-media in test-full
+# deep nesting (also hidden from a separate scan in quotes or comments), too large; build/media-test svg runs the same
+# files through lord-media in test-full
 test: build/svgrast-test
 build/svgrast-test: tests/svgrast_test.c src/media/helper/lm_svg.c src/media/helper/lm_svg.h ../third_party/nanosvg/nanosvg.h ../third_party/nanosvg/nanosvgrast.h
 	@mkdir -p build
