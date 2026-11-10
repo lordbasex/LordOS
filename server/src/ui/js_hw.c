@@ -91,6 +91,7 @@
 #include "../hw/pkagent.h"
 #include "portal.h"
 #include "../cast/castproto.h"
+#include "ui.h"
 #include "sni.h"
 #include "../hw/ppd.h"
 
@@ -383,7 +384,8 @@ static JSValue f_portal_still(JSContext *c, JSValueConst t, int argc, JSValueCon
 }
 
 /* A source of the ScreenCast chooser: { display: id } (lord.screen.displays) or { node, also } (wm.frameNode,
- * wm.sheetNodes). 0, or -1 for anything else. */
+ * wm.sheetNodes), each node id with the serial of the node it names now (the share follows that node, never a later
+ * one with its id). 0, or -1 for anything else or a window that isn't there. */
 static int cast_source(JSContext *c, JSValueConst v, CastSource *out) {
     memset(out, 0, sizeof *out);
     if (!JS_IsObject(v)) return -1;
@@ -396,6 +398,8 @@ static int cast_source(JSContext *c, JSValueConst v, CastSource *out) {
     } else if (JS_IsNumber(n) && arg_int(c, n, 0) > 0) {
         out->kind = CAST_SRC_WINDOW;
         out->node = arg_int(c, n, 0);
+        Node *w = node_get(out->node);
+        if (w) out->serial = w->serial;
         JSValue a = JS_GetPropertyStr(c, v, "also");
         if (JS_IsArray(c, a)) {
             uint32_t len = 0;
@@ -405,12 +409,13 @@ static int cast_source(JSContext *c, JSValueConst v, CastSource *out) {
             for (uint32_t i = 0; i < len && out->nalso < CAST_ALSO_MAX; i++) {
                 JSValue e = JS_GetPropertyUint32(c, a, i);
                 int id = JS_IsNumber(e) ? arg_int(c, e, 0) : 0;
-                if (id > 0) out->also[out->nalso++] = id;
+                Node *sh = id > 0 ? node_get(id) : NULL;
+                if (sh) { out->also[out->nalso] = id; out->also_serial[out->nalso++] = sh->serial; }
                 JS_FreeValue(c, e);
             }
         }
         JS_FreeValue(c, a);
-        r = 0;
+        r = out->serial ? 0 : -1;
     }
     JS_FreeValue(c, d);
     JS_FreeValue(c, n);

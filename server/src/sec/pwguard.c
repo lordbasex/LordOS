@@ -527,23 +527,13 @@ static void resolve(PgClient *c) {
     }
 }
 
-/* Re-arms the guard: is any restricted app of this session running? (its scope is there) */
-static void arm(void) {
-    char dir[96];
-    snprintf(dir, sizeof dir, "/sys/fs/cgroup/system.slice/lordos.service/lordos-session-%u", (unsigned)getuid());
-    DIR *d = opendir(dir);
-    int armed = 0;
-    struct dirent *e;
-    while (d && (e = readdir(d)) && !armed) {
-        char path[512], app[FW_APP_MAX];
-        if (strncmp(e->d_name, "app-lordos-", 11)) continue;
-        snprintf(path, sizeof path, "/system.slice/lordos.service/lordos-session-%u/%s", (unsigned)getuid(), e->d_name);
-        if (appid_of_cgroup(path, app, sizeof app)) continue;
-        armed = restrict_blocks(app, FW_R_NO_MIC) || restrict_blocks(app, FW_R_NO_CAMERA) || restrict_blocks(app, FW_R_NO_SCREEN);
-    }
-    if (d) closedir(d);
-    guard_armed = armed;
+static int guarded(const char *app, void *u) {
+    (void)u;
+    return restrict_blocks(app, FW_R_NO_MIC) || restrict_blocks(app, FW_R_NO_CAMERA) || restrict_blocks(app, FW_R_NO_SCREEN);
 }
+
+/* Re-arms the guard: is any restricted app of this session running? (its scope is there) */
+static void arm(void) { guard_armed = appid_running(guarded, NULL); }
 
 /* ---- events -------------------------------------------------------------------------------- */
 

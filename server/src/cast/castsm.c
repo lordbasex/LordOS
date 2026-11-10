@@ -131,3 +131,8 @@ int csm_gone(CastSm *m, const char *sender, int *ids, int max) {
         if (m->s[i].st != CS_FREE && !strcmp(m->s[i].sender, sender)) ids[n++] = m->s[i].id;
     return n;
 }
+
+int csm_gate(int identified, int restricted, int restricted_running) {
+    if (identified) return restricted ? CSM_GATE_REFUSE : CSM_GATE_APP;
+    return restricted_running ? CSM_GATE_REFUSE : CSM_GATE_UNKNOWN;
+}

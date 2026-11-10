@@ -11,5 +11,8 @@
 int appid_of_cgroup(const char *path, char *out, size_t n);
 /* From a PID. 0 ok, 1 the process is in no app's scope, -1 it can't be read (gone). */
 int appid_of_pid(unsigned pid, char *out, size_t n);
+/* Whether an app running in this session (a scope of the launcher's, as appid_of_cgroup reads it) is one match says
+ * yes to: 1 or 0 (no app runs, or there is no such session). */
+int appid_running(int (*match)(const char *app, void *u), void *u);
 
 #endif

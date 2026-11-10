@@ -14,12 +14,16 @@
 enum { CAST_ALSO_MAX = 8 };             /* PAINT_ALSO_MAX */
 
 /* What the person picked: a display (its connector id, as lord.screen.displays' id) or a window (wm.frameNode, and its
- * sheets painted over it). */
+ * sheets painted over it). A node id is reused once its node is destroyed, so each id goes with the serial of the node
+ * it named when the person picked (Node.serial, node_ref): the share follows that node only, and when it is gone the
+ * share ends (a sheet that closed is no longer painted), whatever has the id now. */
 typedef struct {
     int kind;                           /* CAST_SRC_MONITOR or CAST_SRC_WINDOW */
     uint32_t display;
     int node;
+    uint64_t serial;
     int also[CAST_ALSO_MAX], nalso;
+    uint64_t also_serial[CAST_ALSO_MAX];
 } CastSource;
 
 /* What the app is told of each stream (Start's streams): the node, where it is and its size in logical px. */

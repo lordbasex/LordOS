@@ -71,6 +71,7 @@ typedef struct {
     CastPeer peer;
     Stream st[CAST_MAX_STREAMS];
     int n, cursor, shown, told;         /* told: portal_cast_streams was called */
+    int gone;                           /* a shared window was destroyed (node_gone_hook): the share ends next tick */
     double since;
 } Run;
 
@@ -147,9 +148,10 @@ static const DisplayOut *display_of(uint32_t conn) {
     return NULL;
 }
 
-/* The window's frame node, if it is on screen: in the tree, shown, of a size worth a stream. */
-static Node *window_of(int id) {
-    Node *n = id > 0 ? node_get(id) : NULL;
+/* The window's frame node, if it is on screen: still the node that was picked (its serial: an id another node took
+ * after it was destroyed is not it), in the tree, shown, of a size worth a stream. */
+static Node *window_of(int id, uint64_t serial) {
+    Node *n = node_ref(id, serial);
     if (!n || n->w < 1 || n->h < 1) return NULL;
     int depth = 0;
     for (const Node *a = n; a; a = a->parent, depth++) {
@@ -178,7 +180,7 @@ static int geometry(Stream *s, uint32_t *pw, uint32_t *ph) {
         *ph = (uint32_t)d->v.ph & ~1u;
         return 0;
     }
-    Node *n = window_of(s->src.node);
+    Node *n = window_of(s->src.node, s->src.serial);
     if (!n) return -1;
     /* sharp on the display it is mostly on */
     double k = 1;
@@ -197,9 +199,19 @@ static int geometry(Stream *s, uint32_t *pw, uint32_t *ph) {
     return 0;
 }
 
+/* Drops the sheet at index i of a window source: it is never painted again. */
+static void also_drop(CastSource *c, int i) {
+    for (int j = i + 1; j < c->nalso; j++) { c->also[j - 1] = c->also[j]; c->also_serial[j - 1] = c->also_serial[j]; }
+    c->nalso--;
+}
+
 /* Paints r of the source into its canvas: 1, 0 the source isn't there now. */
 static int paint_source(Stream *s, Rect r) {
     if (rect_empty(r)) return 1;
+    if (s->src.kind != CAST_SRC_MONITOR) {
+        if (!node_ref(s->src.node, s->src.serial)) return 0;
+        for (int i = s->src.nalso; i-- > 0;) if (!node_ref(s->src.also[i], s->src.also_serial[i])) also_drop(&s->src, i);
+    }
     PaintView keep = paint_view;
     paint_view = (PaintView){ s->ox, s->oy, (float)s->k, (float)s->dx, (float)s->dy, -1 };
     canvas_set_clip(&s->cv, r);
@@ -309,6 +321,21 @@ static void run_free(Run *r) {
     if (!nrunning) wl_content_track(0);         /* nothing shared: nothing tracked */
 }
 
+/* node_gone_hook: a node is being destroyed. A shared window's ends its share (at the next cast_tick, out of the JS
+ * call that destroyed it); a sheet's is dropped from its window's share. */
+static void node_gone(int id, uint64_t serial) {
+    if (!nrunning) return;
+    for (int i = 0; i < MAX_RUNS; i++) {
+        Run *r = &runs[i];
+        for (int j = 0; r->id && j < r->n; j++) {
+            CastSource *c = &r->st[j].src;
+            if (c->kind == CAST_SRC_MONITOR) continue;
+            if (c->node == id && c->serial == serial) r->gone = 1;
+            for (int k = c->nalso; k-- > 0;) if (c->also[k] == id && c->also_serial[k] == serial) also_drop(c, k);
+        }
+    }
+}
+
 void cast_end(int id) {
     Run *r = run_of(id);
     if (r) run_free(r);
@@ -327,13 +354,14 @@ int cast_begin(int id, const CastSource *src, int n, int cursor_embedded) {
     Run *r = NULL;
     for (int i = 0; i < MAX_RUNS && !r; i++) if (!runs[i].id) r = &runs[i];
     if (!r) return -1;
+    node_gone_hook = node_gone;
     memset(r, 0, sizeof *r);
     r->sock = -1;
     for (int i = 0; i < CAST_MAX_STREAMS; i++) r->st[i].ring_fd = -1;
     for (int i = 0; i < n; i++) {
         uint32_t w, h;
         r->st[i].src = src[i];
-        if (src[i].nalso < 0 || src[i].nalso > CAST_ALSO_MAX || geometry(&r->st[i], &w, &h) || cast_layout(w, h, &r->st[i].lay)) return -1;
+        if (src[i].nalso < 0 || src[i].nalso > CAST_ALSO_MAX || (src[i].kind != CAST_SRC_MONITOR && !src[i].serial) || geometry(&r->st[i], &w, &h) || cast_layout(w, h, &r->st[i].lay)) return -1;
     }
     int pw = pipewire_connect();
     if (pw < 0) { fprintf(stderr, "screencast: no PipeWire of this user's to share through\n"); return -1; }
@@ -570,6 +598,7 @@ void cast_tick(void) {
     for (int i = 0; i < MAX_RUNS; i++) {
         Run *r = &runs[i];
         if (!r->id) continue;
+        if (r->gone) { fprintf(stderr, "screencast: session %d: the shared window closed; it ends\n", r->id); run_lost(r); continue; }
         if (!r->told) {
             if (t - r->since > START_MS) { fprintf(stderr, "screencast: session %d: no streams from the helper\n", r->id); run_lost(r); }
             continue;
@@ -585,6 +614,7 @@ double cast_timeout(void) {
     for (int i = 0; i < MAX_RUNS; i++) {
         const Run *r = &runs[i];
         if (!r->id) continue;
+        if (r->gone) return 0;
         if (!r->told) { double d = r->since + START_MS - t; if (d < 0) d = 0; if (best < 0 || d < best) best = d; continue; }
         for (int j = 0; r->shown && j < r->n; j++) {
             const Stream *s = &r->st[j];

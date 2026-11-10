@@ -802,16 +802,22 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   metadata isn't offered. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the
   person picks every time.
 - **The chooser** (`sdk/screencast.jsx`, `sdk/screencastmodel.js`): `Start` asks the bus which process called
-  (`GetConnectionUnixProcessID`, the socket's credentials), and the system layer shows the app's name (its launcher's,
-  from its scope, or its process name), the displays and the open windows (not minimized), each with a picture of it
+  (`GetConnectionUnixProcessID`, the socket's credentials), and the system layer shows the app's name (only an
+  identity LordOS verified: the app id of its launcher's scope, `appid_of_pid`; a process it can't tell is "An unknown
+  program" with a warning, never its `/proc/<pid>/comm`, which any process sets), the displays and the open windows
+  (not minimized), each with a picture of it
   now (`lord.portal.castThumb`, only while that chooser is up; painted in capture mode, so a protected window is
   black there too). Nothing is shared until the person picks and presses Share; Cancel answers response 1 and the app
   may `Start` again. An app with "no screen capture" (Firewall, `restrict_blocks(FW_R_NO_SCREEN)`) gets response 2
-  with no question.
+  with no question. It fails closed, as the PipeWire guard does (`csm_gate`): a sender LordOS can't identify also gets
+  response 2 while any app with "no screen capture" runs (it may be that app, out of its scope), and the chooser with
+  the warning otherwise.
 - **While it shares.** The screen-sharing API's indicator (`ShareBadge`, `sdk/share.js`) shows one more pill per
   session, "{app} can see what you chose to share", with its Stop. lord-server sends no frame until that pill is on
   screen (`lord.portal.castShown`). Stop, a lock or a user switch (`remote/mirror.c`), the shell being replaced, the
-  window being closed, the helper failing or the app leaving the bus end the session, and the app hears
+  window being closed (its node destroyed: `node_gone_hook`; a share holds each node id with its never-reused serial,
+  `Node.serial` and `node_ref`, so a later window that gets the same id is never captured), the helper failing or the
+  app leaving the bus end the session, and the app hears
   `Session.Closed` (not when it closed the session itself).
 - **The pixels** (`server/src/cast/cast.c`). Each source is painted again in capture mode, as Screenshots does: a
   display is `paint_capture` at that display's own view and scale plus a fullscreen app (`wl_paint_fullscreen`); a
@@ -855,7 +861,8 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
 - **Not yet.** dmabuf buffers (the frames are shared memory); the cursor as metadata; restoring a choice
   (`restore_token`); a window's menus (popups) in a window share; audio. Not yet checked with a browser on the VM.
 - **Tests** (`make -C server test`): `build/castsm-test` (every call in its state and refused in the others, Cancel,
-  the app's `Request.Close` of its `Start`, the limits, an app leaving the bus), `build/castproto-test` (the ring's
+  the app's `Request.Close` of its `Start`, the limits, an app leaving the bus, who gets the chooser: `csm_gate`),
+  `build/engine-test` (`test_node_ref`: a destroyed node's id taken by another, never its serial), `build/castproto-test` (the ring's
   limits and header, slots and who holds them, each side refusing what the other may not say, the rate, the channel
   over a real socketpair; with ASan and UBSan), `build/screencast-test` (`tests/screencast_test.sh`: `lord-screencast`
   against a private PipeWire daemon of its own: the node, the app's connection seeing only the stream and the one

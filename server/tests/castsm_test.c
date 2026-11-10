@@ -1,6 +1,6 @@
 /* castsm_test.c — the ScreenCast portal's sessions without a bus (src/cast/castsm.c): every call in the state it
  * belongs to and refused in the others, a session only its own app can reach, Cancel and the app's own Close of its
- * Start, the limits, and every session of an app that leaves the bus. */
+ * Start, the limits, every session of an app that leaves the bus, and who may get the chooser (csm_gate). */
 #include "cast/castsm.h"
 
 #include <stdio.h>
@@ -112,6 +112,15 @@ int main(void) {
         if (made(&m, who, "t")) made_n++;
     }
     CHECK(made_n == CSM_MAX);
+
+    /* who asked: a verified app by its restriction; one LordOS can't tell fails closed while a restricted app runs */
+    CHECK(csm_gate(1, 0, 0) == CSM_GATE_APP);
+    CHECK(csm_gate(1, 0, 1) == CSM_GATE_APP);               /* another app's restriction isn't this one's */
+    CHECK(csm_gate(1, 1, 0) == CSM_GATE_REFUSE);
+    CHECK(csm_gate(1, 1, 1) == CSM_GATE_REFUSE);
+    CHECK(csm_gate(0, 0, 0) == CSM_GATE_UNKNOWN);           /* the chooser, saying it is an unknown program */
+    CHECK(csm_gate(0, 0, 1) == CSM_GATE_REFUSE);            /* it may be the restricted app, out of its scope */
+    CHECK(csm_gate(0, 1, 1) == CSM_GATE_REFUSE);
 
     printf("castsm-test: %d/%d\n", ok, ok + bad);
     return bad ? 1 : 0;

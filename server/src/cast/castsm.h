@@ -73,4 +73,14 @@ int  csm_gone(CastSm *m, const char *sender, int *ids, int max);
 /* The session whose chooser is up, or NULL. */
 CsSess *csm_choosing(CastSm *m);
 
+/* Before the chooser: who asked decides what happens (portal.c cast_ask), failing closed like sec/pwguard.c.
+ *   identified          the sender is an app LordOS verified (its launcher's scope, appid_of_pid), never what the
+ *                       process calls itself
+ *   restricted          that app has the firewall's "no screen capture" (FW_R_NO_SCREEN)
+ *   restricted_running  some app with "no screen capture" runs in this session
+ * An app with the restriction is refused. A sender LordOS can't tell is refused while a restricted app runs (it may
+ * be that app, out of its scope); otherwise it gets the chooser, which says it is an unknown program. */
+enum { CSM_GATE_REFUSE = 0, CSM_GATE_APP = 1, CSM_GATE_UNKNOWN = 2 };
+int csm_gate(int identified, int restricted, int restricted_running);
+
 #endif

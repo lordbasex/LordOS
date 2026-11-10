@@ -96,6 +96,8 @@ typedef struct {
 
 typedef struct Node {
     int id, type;
+    uint64_t serial;            /* never reused, unlike id (a freed id goes to the next node): what holds on to a node
+                                 * across frames (cast/cast.c's shared windows) keeps id and serial (node_ref) */
     Style s;
     char *text;                 /* NODE_RAW */
     Image *img;                 /* NODE_IMAGE */
@@ -145,6 +147,7 @@ typedef struct {
     uint8_t rtl;                    /* interface direction (Arabic, Hebrew… language) */
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */
+    uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 
 extern Ui ui;
@@ -153,6 +156,12 @@ extern Ui ui;
 void  style_defaults(Style *s);
 Node *node_new(int type);
 Node *node_get(int id);
+/* The node with this id only if it is still the one that had this serial when it was looked up: NULL once that node
+ * is destroyed, even if its id now belongs to another node. */
+Node *node_ref(int id, uint64_t serial);
+static inline int node_ref_ok(const Node *n, int id, uint64_t serial) { return n && id > 0 && serial && n->id == id && n->serial == serial; }
+/* Told of every node destroyed (node_destroy, ui_reset), before it is freed: cast/cast.c ends a share of it at once. */
+extern void (*node_gone_hook)(int id, uint64_t serial);
 int   node_count(void);
 void  node_destroy(Node *n);
 void  node_append(Node *p, Node *c);

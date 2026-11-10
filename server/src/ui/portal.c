@@ -635,8 +635,9 @@ _Static_assert((int)CSM_TYPE_MONITOR == (int)CAST_SRC_MONITOR && (int)CSM_TYPE_W
 _Static_assert((int)CSM_MAX_SOURCES == CAST_MAX_STREAMS, "one stream per source");
 
 static CastSm csm;
-/* per session (the same index as csm.s): who asked, and the bus's answer we wait for */
-static struct { char who[128], comm[32]; uint32_t serial; } cast_app[CSM_MAX];
+/* per session (the same index as csm.s): who asked (the app LordOS verified, "" when it can't tell: never the name a
+ * process gives itself in /proc/<pid>/comm, which any process sets), and the bus's answer we wait for */
+static struct { char who[128]; uint32_t serial; } cast_app[CSM_MAX];
 /* OpenPipeWireRemote calls answered when the helper hands the connection back */
 typedef struct { int sess; uint32_t req, serial; char sender[256]; } RCall;
 static RCall rcalls[MAX_RCALLS];
@@ -694,8 +695,6 @@ static void casts_changed(void) {
         if (csm.s[i].st != CS_STARTED) continue;
         hb_printf(&j, "%s{\"id\":%d,\"who\":", first ? "" : ",", csm.s[i].id);
         hb_str(&j, cast_app[i].who);
-        hb_printf(&j, ",\"comm\":");
-        hb_str(&j, cast_app[i].comm);
         hb_printf(&j, "}");
         first = 0;
     }
@@ -840,22 +839,22 @@ static void sc_start(const DMsg *m) {
     if (!cast_app[cast_idx(s)].serial) { respond(m->sender, handle, 2); csm_chosen(&csm, s, NULL, 0); }
 }
 
-/* The bus said which process asked: the chooser goes up, unless the firewall keeps this app from the screen. */
+static int screen_restricted(const char *app, void *u) { (void)u; return restrict_blocks(app, FW_R_NO_SCREEN); }
+
+/* The bus said which process asked: the chooser goes up, unless the firewall keeps this app from the screen. The
+ * chooser names only an app LordOS verified (its launcher's scope); a process it can't tell is "an unknown program",
+ * never the name it gives itself, and is refused while an app with "no screen capture" runs (csm_gate). */
 static void cast_ask(CsSess *s, unsigned pid) {
     int i = cast_idx(s);
     cast_app[i].serial = 0;
-    char *who = cast_app[i].who, *comm = cast_app[i].comm;
-    who[0] = comm[0] = 0;
-    if (pid && appid_of_pid(pid, who, sizeof cast_app[i].who) != 0) who[0] = 0;
-    if (pid) {
-        char path[48];
-        snprintf(path, sizeof path, "/proc/%u/comm", pid);
-        FILE *f = fopen(path, "re");
-        if (f) { if (!fgets(comm, sizeof cast_app[i].comm, f)) comm[0] = 0; fclose(f); }
-        comm[strcspn(comm, "\n")] = 0;
-    }
-    if (who[0] && restrict_blocks(who, FW_R_NO_SCREEN)) {
-        fprintf(stderr, "portal: %s may not share the screen (its restrictions)\n", who);
+    char *who = cast_app[i].who;
+    who[0] = 0;
+    int known = pid && appid_of_pid(pid, who, sizeof cast_app[i].who) == 0 && who[0];
+    if (!known) who[0] = 0;
+    int gate = csm_gate(known, known && restrict_blocks(who, FW_R_NO_SCREEN), !known && appid_running(screen_restricted, NULL));
+    if (gate == CSM_GATE_REFUSE) {
+        if (known) fprintf(stderr, "portal: %s may not share the screen (its restrictions)\n", who);
+        else fprintf(stderr, "portal: an unknown program (pid %u) may not share the screen while an app with no screen capture runs\n", pid);
         respond(s->sender, s->req, 2);
         csm_chosen(&csm, s, NULL, 0);
         return;
@@ -864,8 +863,6 @@ static void cast_ask(CsSess *s, unsigned pid) {
     hb_printf(&j, "{\"id\":%d,\"monitor\":%s,\"window\":%s,\"multiple\":%s,\"who\":", s->id, s->types & CSM_TYPE_MONITOR ? "true" : "false",
               s->types & CSM_TYPE_WINDOW ? "true" : "false", s->multiple ? "true" : "false");
     hb_str(&j, who);
-    hb_printf(&j, ",\"comm\":");
-    hb_str(&j, comm);
     hb_printf(&j, "}");
     char *json = hb_take(&j);
     if (json) hw_emit("portal-cast", json);
@@ -990,7 +987,8 @@ void portal_cast_streams(int id, const CastStreamInfo *info, int n) {
     dw_free(&b);
     dbus_flush(&conn);
     int i = cast_idx(s);
-    fprintf(stderr, "portal: %s is sharing %d source%s\n", cast_app[i].who[0] ? cast_app[i].who : cast_app[i].comm, n, n == 1 ? "" : "s");
+    if (cast_app[i].who[0]) fprintf(stderr, "portal: %s is sharing %d source%s\n", cast_app[i].who, n, n == 1 ? "" : "s");
+    else fprintf(stderr, "portal: an unknown program is sharing %d source%s\n", n, n == 1 ? "" : "s");
     casts_changed();
 }
 

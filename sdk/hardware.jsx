@@ -401,8 +401,17 @@ function asker(p) {
   return app ? shortAppName(app) : id || p.comm || t('passwords.polkit.unknown');
 }
 
-// the ScreenCast chooser and its pill name the app the same way (sdk/screencast.jsx)
-castNames({ app: (p) => (p && (p.who || p.comm) ? asker(p) : ''), window: windowAppName });
+// the ScreenCast chooser and its pill (sdk/screencast.jsx) name only the app lord-server verified (its launcher's
+// scope), never the name a process gives itself: with none they say it is an unknown program
+function castAsker(p) {
+  const who = typeof p?.who === 'string' ? p.who : '';
+  if (who.startsWith('desktop:')) {
+    const app = linuxAppFor(who.slice(8));
+    return app ? shortAppName(app) : who.slice(8);
+  }
+  return who.startsWith('lpk:') ? who.slice(4) : who;
+}
+castNames({ app: castAsker, window: windowAppName });
 
 export function PolkitPrompt() {
   const p = useStore(polkitPrompt);

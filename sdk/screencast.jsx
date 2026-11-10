@@ -2,13 +2,15 @@
 // server/src/ui/portal.c, docs/WAYLAND.md "Sharing a screen or a window").
 //
 // The system draws the chooser, never the app: the displays and the open windows, each with a picture of it now
-// (lord.portal.castThumb, only while this chooser is up), and the name of the app asking. Nothing is shared until the
+// (lord.portal.castThumb, only while this chooser is up), and the name of the app asking: only one lord-server verified
+// (`who`, its launcher's scope), else "an unknown program" with a warning, never the name a process gives itself, which
+// any process can set (portal.c sends none). Nothing is shared until the
 // person picks and presses Share; Cancel answers the app "cancelled". What the app may be offered comes from
 // lord-server (screens, windows, one or several: sdk/screencastmodel.js). While it shares, the indicator of the
 // screen-sharing API (ShareBadge, sdk/share.js) shows it with its Stop, and lord-server sends no frame until it is on
 // screen (lord.portal.castShown).
 //
-//   useStore(castRuns)   → [{ id, who, comm, name }]: the sessions sharing now (for the indicator)
+//   useStore(castRuns)   → [{ id, who, name }]: the sessions sharing now (for the indicator)
 //   castStop(id)         the indicator's Stop
 import { createElement as h, useEffect, useState } from 'react';
 import { View, Text, MediaView, mainBox, screen } from '@lordos/runtime';
@@ -21,14 +23,15 @@ import { windows, wm } from './windows.js';
 import { castChoices, castToggle, castSources } from './screencastmodel.js';
 
 const api = () => typeof lord !== 'undefined' && lord.portal && typeof lord.portal.cast === 'function';
-const castAsk = createStore(null);      // { id, monitor, window, multiple, who, comm }
+const castAsk = createStore(null);      // { id, monitor, window, multiple, who }
 export const castRuns = createStore([]);
 
-// The names: the app's (its launcher's when lord-server knew its scope, else its process name) and a window's app.
+// The names: the app's (from its verified id, `who`; '' when lord-server couldn't tell) and a window's app.
 // sdk/hardware.jsx hands them over from sdk/apps.js, which loads the whole app registry this file has no need of.
-let names = { app: (p) => p?.comm || '', window: () => '' };
+let names = { app: () => '', window: () => '' };
 export function castNames(n) { names = { ...names, ...n }; }
-export const castAppName = (p) => names.app(p) || t('shell.cast.unknownApp');
+const verified = (p) => (typeof p?.who === 'string' && p.who ? names.app(p) : '');
+export const castAppName = (p) => verified(p) || t('shell.cast.unknownApp');
 
 // hw events from portal.c (sdk/hardware.jsx passes them on)
 export function castEvent(kind, data) {
@@ -94,7 +97,7 @@ export function ScreenCastPrompt() {
     return () => { for (const k of Object.keys(got)) if (got[k] && lord.media) lord.media.close(got[k]); };
   }, [id]);
   if (!req) return null;
-  const app = castAppName(req);
+  const app = verified(req);
   const pick = (key) => setPicked((p) => castToggle(p, key, !!req.multiple));
   const share = () => {
     const sources = castSources(picked, choices, frameOf);
@@ -111,7 +114,10 @@ export function ScreenCastPrompt() {
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start', backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
     h(View, { style: { marginTop: 70, width: 560, maxHeight: Math.max(320, mainBox().height - 140), borderRadius: 14, padding: 20, gap: 8, alignItems: 'center',
       backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
-    h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center' } }, t('shell.cast.title', { app })),
+    h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center' } },
+      app ? t('shell.cast.title', { app }) : t('shell.cast.titleUnknown')),
+    app ? null : h(Text, { style: { alignSelf: 'stretch', fontSize: 12, fontWeight: 600, color: th.mode === 'light' ? '#b25000' : '#ff9f0a', textAlign: 'center', lineHeight: 1.4 } },
+      t('shell.cast.unverified')),
     h(Text, { style: { fontSize: 12, color: th.textDim, textAlign: 'center', lineHeight: 1.4 } },
       t(req.multiple ? 'shell.cast.bodyMany' : 'shell.cast.body')),
     h(ScrollView, { style: { alignSelf: 'stretch', flexShrink: 1, maxHeight: Math.max(200, mainBox().height - 300) }, contentStyle: { gap: 4 } },
