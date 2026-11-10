@@ -21,6 +21,8 @@
 #include "../termconf.h"
 #include "ui.h"
 #include "fonts.h"
+#include "caret.h"
+#include "grapheme.h"
 #include "../admin.h"
 #include "../apps.h"
 #include "../lpk.h"
@@ -52,6 +54,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1027,6 +1030,78 @@ static JSValue f_text_covered(JSContext *c, JSValueConst this_val, int argc, JSV
     return JS_NewBool(c, ok);
 }
 
+/* lord.text.graphemes(text) → the code point positions where grapheme clusters start, and the end: [0, …, n].
+ * A text field's arrows, Backspace, Delete and double click stop only there (an emoji ZWJ sequence, a flag, a
+ * letter with its marks stay whole; sdk/textfieldmodel.js). null past 1M code points. */
+static JSValue f_text_graphemes(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    const char *s = JS_ToCString(c, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    int n = 0;
+    int *stops = grapheme_stops_utf8(s, 1 << 20, &n);
+    JS_FreeCString(c, s);
+    if (!stops) return JS_NULL;
+    JSValue a = JS_NewArray(c);
+    for (int i = 0; i < n; i++) JS_SetPropertyUint32(c, a, (uint32_t)i, JS_NewInt32(c, stops[i]));
+    free(stops);
+    return a;
+}
+
+static JSValue float_array(JSContext *c, const float *v, int n) {
+    JSValue a = JS_NewArray(c);
+    for (int i = 0; i < n; i++) JS_SetPropertyUint32(c, a, (uint32_t)i, JS_NewFloat64(c, roundf(v[i] * 100) / 100));
+    return a;
+}
+
+/* lord.text.carets(text, size, weight) → where each character of the first line is drawn, as lord.measureText
+ * draws it (shaped, in bidi order): { width, rtl (the paragraph), left[i], right[i] and levels[i] (its bidi level:
+ * odd reads right to left) per code point, breaks (as lord.text.graphemes), runs: [[start, end, rtl, x, width]] in visual
+ * order }. x from the text's left edge; a grapheme's code points share their edges. A text field draws its caret
+ * and selection rectangles from it (caret.c, sdk/textfieldmodel.js). null past TEXT_CARETS_MAX code points. */
+static JSValue f_text_carets(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *s = JS_ToCString(c, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    double size = 14, weight = 400;
+    if (argc > 1) JS_ToFloat64(c, &size, argv[1]);
+    if (argc > 2) JS_ToFloat64(c, &weight, argv[2]);
+    if (!(size > 0 && size <= 512)) size = 14;
+    if (!(weight >= 0 && weight < 4000)) weight = 400;
+    TextCarets t;
+    int r = text_carets(s, (float)weight, (float)size, &t);
+    JS_FreeCString(c, s);
+    if (r) return JS_NULL;
+    int n = t.n;
+    uint8_t *brk = malloc((size_t)n + 1);
+    CaretRun *runs = malloc(sizeof *runs * (size_t)(n + 1));
+    if (!brk || !runs) { free(brk); free(runs); text_carets_free(&t); return JS_NULL; }
+    grapheme_breaks(t.cp, n, brk);
+    int nr = caret_runs(t.lv, n, t.x0, t.x1, runs, n + 1);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "width", JS_NewFloat64(c, roundf(t.width * 100) / 100));
+    JS_SetPropertyStr(c, o, "rtl", JS_NewBool(c, t.rtl));
+    JS_SetPropertyStr(c, o, "left", float_array(c, t.x0, n));
+    JS_SetPropertyStr(c, o, "right", float_array(c, t.x1, n));
+    JSValue lv = JS_NewArray(c), br = JS_NewArray(c), ra = JS_NewArray(c);
+    for (int i = 0; i < n; i++) JS_SetPropertyUint32(c, lv, (uint32_t)i, JS_NewInt32(c, t.lv[i]));
+    for (int i = 0, k = 0; i <= n; i++) if (brk[i]) JS_SetPropertyUint32(c, br, (uint32_t)k++, JS_NewInt32(c, i));
+    for (int i = 0; i < nr; i++) {
+        JSValue e = JS_NewArray(c);
+        JS_SetPropertyUint32(c, e, 0, JS_NewInt32(c, runs[i].start));
+        JS_SetPropertyUint32(c, e, 1, JS_NewInt32(c, runs[i].end));
+        JS_SetPropertyUint32(c, e, 2, JS_NewBool(c, runs[i].rtl));
+        JS_SetPropertyUint32(c, e, 3, JS_NewFloat64(c, roundf(runs[i].x * 100) / 100));
+        JS_SetPropertyUint32(c, e, 4, JS_NewFloat64(c, roundf(runs[i].w * 100) / 100));
+        JS_SetPropertyUint32(c, ra, (uint32_t)i, e);
+    }
+    JS_SetPropertyStr(c, o, "levels", lv);
+    JS_SetPropertyStr(c, o, "breaks", br);
+    JS_SetPropertyStr(c, o, "runs", ra);
+    free(brk); free(runs);
+    text_carets_free(&t);
+    return o;
+}
+
 /* lord.image.size(path) → { width, height } of a PNG/JPEG in the home folder (or null).
  * Used by the notes' markdown to avoid enlarging small images. */
 static JSValue f_image_size(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -1055,6 +1130,8 @@ static const JSCFunctionListEntry text_funcs[] = {
     JS_CFUNC_DEF("setLanguage", 1, f_text_language),
     JS_CFUNC_DEF("setDirection", 1, f_text_set_direction),
     JS_CFUNC_DEF("direction", 1, f_text_direction),
+    JS_CFUNC_DEF("graphemes", 1, f_text_graphemes),
+    JS_CFUNC_DEF("carets", 3, f_text_carets),
 };
 
 /* ---- lord.fs: writing (see the rules at the top of the file) ---- */

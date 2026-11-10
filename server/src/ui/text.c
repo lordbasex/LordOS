@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "caret.h"
 #include "stb_truetype.h"
 #include "stb_image.h"
 
@@ -480,6 +481,44 @@ void text_draw(Canvas *c, const char *s, float weight, float size, float line_h,
     int font = font_for(weight);
     if (text_needs_layout(s, font)) { drew_inexact = 1; text_layout_draw(c, s, font, size, line_h, x, y, box_w, align, nowrap, argb); return; }
     draw_fast(c, s, font, size, line_h, x, y, box_w, align, nowrap, 0, argb);
+}
+
+/* ---- where each character is drawn (a text field's caret and selection) ---- */
+
+void text_carets_free(TextCarets *t) {
+    free(t->cp); free(t->x0); free(t->x1); free(t->lv);
+    memset(t, 0, sizeof *t);
+}
+
+int text_carets(const char *s, float weight, float size, TextCarets *out) {
+    memset(out, 0, sizeof *out);
+    int font = font_for(weight);
+    if (text_needs_layout(s, font)) return text_layout_carets(s, font, size, out);
+    /* Inter alone, left to right: the pen as draw_fast moves it, the kerning on the glyph before */
+    int n = 0;
+    for (const char *p = s; *p && n <= TEXT_CARETS_MAX; n++) utf8_next(&p);
+    if (n > TEXT_CARETS_MAX) return -1;
+    out->n = n;
+    out->cp = malloc(sizeof *out->cp * (size_t)(n + 1));
+    out->x0 = malloc(sizeof *out->x0 * (size_t)(n + 1));
+    out->x1 = malloc(sizeof *out->x1 * (size_t)(n + 1));
+    out->lv = calloc((size_t)n + 1, 1);
+    CaretGlyph *g = malloc(sizeof *g * (size_t)(n + 1));
+    if (!out->cp || !out->x0 || !out->x1 || !out->lv || !g) { free(g); text_carets_free(out); return -1; }
+    int k = 0;
+    for (const char *p = s; *p;) out->cp[k++] = utf8_next(&p);
+    int line = n;                                   /* the first line ends at its line break */
+    for (int i = 0; i < n; i++) if (out->cp[i] == '\n') { line = i; break; }
+    for (int i = 0; i < line; i++) {
+        g[i].cp = i;
+        g[i].adv = text_glyph(out->cp[i], font, size)->adv + (i + 1 < line ? kern(font, size, out->cp[i], out->cp[i + 1]) : 0);
+        out->width += g[i].adv;
+    }
+    int r = caret_edges(out->cp, line, out->lv, g, line, out->x0, out->x1);
+    free(g);
+    if (r) { text_carets_free(out); return -1; }
+    for (int i = line; i < n; i++) out->x0[i] = out->x1[i] = out->width;
+    return 0;
 }
 
 /* ---- truncation with an ellipsis ---- */

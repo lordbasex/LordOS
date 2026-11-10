@@ -22,6 +22,9 @@ int uc_indic_pos(uint32_t cp);                  /* IP_* */
 int uc_mark(uint32_t cp);                       /* general category Mn, Mc or Me */
 int uc_sea_cat(uint32_t cp);                    /* SEA_* (Khmer and Myanmar, like HarfBuzz) */
 int uc_use_cat(uint32_t cp);                    /* USE_* (Universal Shaping Engine) */
+int uc_gcb(uint32_t cp);                        /* GCB_* (Grapheme_Cluster_Break, UAX #29) */
+int uc_extpict(uint32_t cp);                    /* Extended_Pictographic (emoji and the like) */
+int uc_incb(uint32_t cp);                       /* INCB_* (Indic_Conjunct_Break) */
 /* Two-part canonical decomposition (complex scripts): 1 if it has one; excluded = not
  * recomposed. */
 int uc_decompose(uint32_t cp, uint32_t *a, uint32_t *b, int *excluded);

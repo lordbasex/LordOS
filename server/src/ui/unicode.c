@@ -37,6 +37,9 @@ int uc_indic_pos(uint32_t cp) { return uni_lookup(uni_indic_pos, UNI_N(uni_indic
 int uc_mark(uint32_t cp) { return uni_lookup(uni_mark, UNI_N(uni_mark), cp); }
 int uc_sea_cat(uint32_t cp) { return uni_lookup(uni_sea, UNI_N(uni_sea), cp); }
 int uc_use_cat(uint32_t cp) { return uni_lookup(uni_use, UNI_N(uni_use), cp); }
+int uc_gcb(uint32_t cp) { return uni_lookup(uni_gcb, UNI_N(uni_gcb), cp); }
+int uc_extpict(uint32_t cp) { return uni_lookup(uni_extpict, UNI_N(uni_extpict), cp); }
+int uc_incb(uint32_t cp) { return uni_lookup(uni_incb, UNI_N(uni_incb), cp); }
 
 int uc_decompose(uint32_t cp, uint32_t *a, uint32_t *b, int *excluded) {
     int lo = 0, hi = UNI_N(uni_decomp) - 1;

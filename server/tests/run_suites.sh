@@ -7,7 +7,8 @@
 #                                                             the sandbox and the external comparisons
 #
 # Exits with 1 if any suite fails. A suite whose tool or data isn't installed is reported as
-# "skipped: needs X" and doesn't fail the run. Optional data: BIDI_TEST=<BidiCharacterTest.txt>.
+# "skipped: needs X" and doesn't fail the run. Optional data: BIDI_TEST=<BidiCharacterTest.txt>,
+# GRAPHEME_TEST=<GraphemeBreakTest.txt>.
 cd "$(dirname "$0")/.." || exit 1
 mode=${1:-quick}
 T=$(mktemp -d "${TMPDIR:-/tmp}/lord-suites.XXXXXX") || exit 1
@@ -145,6 +146,13 @@ EOF
     done
     if [ -n "$bidi" ] && [ -r "$bidi" ]; then run "bidi-test: $(basename "$bidi")" build/bidi-test "$bidi"
     else skip "bidi-test" "BidiCharacterTest.txt (unicode-data, or BIDI_TEST=<file>)"; fi
+    # grapheme clusters (what the arrows and Backspace step over) and the caret's edges in mixed directions
+    gbt=${GRAPHEME_TEST:-}
+    for f in /usr/share/unicode/auxiliary/GraphemeBreakTest.txt /usr/share/unicode-data/auxiliary/GraphemeBreakTest.txt tests/GraphemeBreakTest.txt; do
+        [ -z "$gbt" ] && [ -r "$f" ] && gbt=$f
+    done
+    if [ -n "$gbt" ] && [ -r "$gbt" ]; then run "bidi-test: carets and $(basename "$gbt")" build/bidi-test "$gbt"
+    else run "bidi-test: carets" build/bidi-test; skip "bidi-test: graphemes" "GraphemeBreakTest.txt (unicode-data, or GRAPHEME_TEST=<file>)"; fi
 
     # Thai word breaks: the dictionary is libthai-data's; the comparison needs libthai itself
     if [ ! -r /usr/share/libthai/thbrk.tri ]; then skip "thbrk-test" "libthai-data (/usr/share/libthai/thbrk.tri)"
@@ -203,6 +211,9 @@ EOF
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
     if have node; then run "files-remote-test (apps/files/remotedirs.js)" node tests/files_remote_test.mjs; fi
     if have node; then run "textfield-model-test (sdk/textfieldmodel.js)" node tests/textfield_model_test.mjs; fi
+    # a field's caret by grapheme cluster and on screen in mixed directions (sdk/textfieldmodel.js, lord.text.carets)
+    if have node; then run "textfield-cluster-test (sdk/textfieldmodel.js)" node tests/textfield_cluster_test.mjs
+    else skip "textfield-cluster-test" "node"; fi
     # a password field's eye and its Caps Lock hint, shown and hidden (sdk/passwordfieldmodel.js)
     if have node; then run "password-field-test (sdk/passwordfieldmodel.js)" node tests/password_field_test.mjs
     else skip "password-field-test" "node"; fi

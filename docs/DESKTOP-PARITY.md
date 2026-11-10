@@ -71,7 +71,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Caret and selection drawn from the shaped text (bidi rectangles) and movement by grapheme clusters (`server/src/ui/bidi.c`, `textlayout.c`) | Arabic or Hebrew mixed with numbers; emoji split by the arrows | M | ⬜ |
+| Caret and selection drawn from the shaped text (bidi rectangles) and movement by grapheme clusters (`server/src/ui/bidi.c`, `textlayout.c`) | Arabic or Hebrew mixed with numbers; emoji split by the arrows | M | 🟨 built, to check on the VM: `lord.text.carets` and `lord.text.graphemes` (`caret.c`, `grapheme.c`), ← → move on screen (docs/LANGUAGES.md) |
 | Native primary selection (select copies, middle click pastes) over the compositor's | long-time Linux users | S | ✅ checked on VM 127 (Chromium → a LordOS field) |
 | Spell checking: hunspell in a sandboxed helper fed words over an fd; red underline and suggestions in the field's menu | Mail and Notes | M | ⛔ a new helper |
 | Screen reader: an accessibility tree from `server/src/ui` nodes exported over AT-SPI2; high contrast tokens; a font scale | blind and low-vision people can't use LordOS | L | ⛔ the D-Bus export |

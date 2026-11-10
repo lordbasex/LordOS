@@ -2,10 +2,12 @@
 // in textfieldmodel.js; a row is [start, end) of the value: a line, or a piece of a long one wrapped at the width.
 //   wrapRows(value, width, measure) → [{ start, end }]: each line cut where it no longer fits, after a space if it has one
 //   rowOf(rows, pos)                → the row the caret is drawn in (at a wrap, the start of the next row)
-//   areaKey(value, pos, e, rows, measure) → { value, pos } for a key that edits or moves, or null
-//   posAt(value, rows, x, row, measure)   → the position nearest x in that row (a click)
-//   areaEdit(s, e, rows, measure)         → as areaKey on a { value, pos, anchor } state: Shift extends a selection
-import { fieldKey, insertAt, caretAt, clampPos, editKey, replaceSel } from './textfieldmodel.js';
+//   areaKey(value, pos, e, rows, measure, lay) → { value, pos } for a key that edits or moves, or null
+//   posAt(value, rows, x, row, measure, lay)   → the position nearest x in that row (a click)
+//   areaEdit(s, e, rows, measure, lay)         → as areaKey on a { value, pos, anchor } state: Shift extends a selection
+// lay (optional) is { breaks } from lord.text.graphemes(value): the caret then stops only between grapheme clusters
+// (textfieldmodel.js), also when ↑ and ↓ land in a row.
+import { fieldKey, insertAt, caretAt, clampPos, editKey, replaceSel, stops } from './textfieldmodel.js';
 
 const cps = (s) => [...(s || '')];
 
@@ -46,13 +48,20 @@ export function rowOf(rows, pos) {
 
 const rowText = (c, r) => c.slice(r.start, r.end).join('');
 
-export function posAt(value, rows, x, row, measure) {
+// the stops of the whole value that fall in the row, counted from its start
+const rowLay = (value, r, lay) => (lay ? { breaks: stops(value, lay).filter((p) => p >= r.start && p <= r.end).map((p) => p - r.start) } : null);
+
+export function posAt(value, rows, x, row, measure, lay = null) {
   const r = rows[Math.max(0, Math.min(rows.length - 1, row))];
   if (!r) return 0;
-  return r.start + caretAt(rowText(cps(value), r), x, measure);
+  const text = rowText(cps(value), r), rl = rowLay(value, r, lay);
+  // a row cut inside a cluster (a long word wrapped at the width) gets its own ends as stops too
+  if (rl && (rl.breaks[0] !== 0 || rl.breaks[rl.breaks.length - 1] !== r.end - r.start))
+    rl.breaks = [...new Set([0, ...rl.breaks, r.end - r.start])].sort((a, b) => a - b);
+  return r.start + caretAt(text, x, measure, rl);
 }
 
-export function areaKey(value, pos, e, rows, measure) {
+export function areaKey(value, pos, e, rows, measure, lay = null) {
   const key = e && e.key;
   const at = clampPos(value, pos);
   if (key === 'Enter') return e.ctrl || e.meta || e.alt ? null : insertAt(value, at, '\n');
@@ -66,23 +75,23 @@ export function areaKey(value, pos, e, rows, measure) {
     const j = i + (key === 'ArrowUp' ? -1 : 1);
     if (j < 0) return { value, pos: 0 };
     if (j >= rows.length) return { value, pos: c.length };
-    return { value, pos: posAt(value, rows, measure(c.slice(r.start, at).join('')), j, measure) };
+    return { value, pos: posAt(value, rows, measure(c.slice(r.start, at).join('')), j, measure, lay) };
   }
-  return fieldKey(value, at, e);
+  return fieldKey(value, at, e, false, lay);
 }
 
 // with a selection (textfieldmodel.js): ↑ ↓ Home End move by rows here, Shift extends; Enter replaces the selection with
 // a line break; the rest as a one-line field (Ctrl/⌘+A, ← →, Backspace, Delete)
-export function areaEdit(s, e, rows, measure) {
+export function areaEdit(s, e, rows, measure, lay = null) {
   const key = e && e.key;
   const value = s.value || '';
   const at = clampPos(value, s.pos);
   if (key === 'Enter') return e.ctrl || e.meta || e.alt ? null : replaceSel({ ...s, value }, '\n');
   if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End') {
-    if (e.ctrl || e.meta || e.alt) return key === 'Home' || key === 'End' ? editKey({ ...s, value }, e) : null;
-    const moved = areaKey(value, at, { key }, rows, measure);
+    if (e.ctrl || e.meta || e.alt) return key === 'Home' || key === 'End' ? editKey({ ...s, value }, e, false, lay) : null;
+    const moved = areaKey(value, at, { key }, rows, measure, lay);
     if (!moved) return null;
     return e.shift ? { value, pos: moved.pos, anchor: s.anchor != null ? s.anchor : at } : { value, pos: moved.pos, anchor: null };
   }
-  return editKey({ ...s, value }, e);
+  return editKey({ ...s, value }, e, false, lay);
 }
