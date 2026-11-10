@@ -19,6 +19,7 @@ import { osk } from './osk.js';
 import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
 import { dockIdOfWindow } from './dock.js';
+import { promptForServer } from './privacy.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
 const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : linuxAppFor(appId)?.id || null);
@@ -154,6 +155,14 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'menu': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); wm.showWindowMenu(id, d.x, d.y); } break;
     // xdg_activation_v1.activate: 'activate' with a token LordOS issued or the app in front handed over
     // (a link opened in the browser already running), 'attention' with any other (desktopmodel.js)
+    // a VM, remote desktop or game asks for ❖, ⌥Tab and the rest while it's in front (keyboard-shortcuts-inhibit,
+    // server/src/wl/kbinhibit.h): asked once per app, lord-server keeps the answer as its "shortcuts" permission
+    case 'shortcuts': {
+      const exe = String(d.app || '').startsWith('exe:') ? String(d.app).split('/').pop() : '';
+      const name = linuxAppFor(d.appId)?.name || win?.title || d.appId || exe || d.app;
+      promptForServer({ app: d.app, perm: 'shortcuts', name, done: (allow) => lord.wayland.shortcutsAnswer(d.app, allow) });
+      break;
+    }
     case 'activate': case 'attention': {
       const how = activationOutcome(win, wm.focused(), type === 'activate');
       if (how === 'focus') wm.focus(id); else if (how === 'attention' && !win.attention) wm.setAttention(id, true);

@@ -1592,6 +1592,18 @@ static JSValue f_wl_grab_keys(JSContext *c, JSValueConst this_val, int argc, JSV
     JS_FreeCString(c, name);
     return JS_NewBool(c, ok);
 }
+/* lord.wayland.shortcutsAnswer(app, allow) → bool: the person's answer to the "shortcuts" prompt a Linux app's
+ * keyboard-shortcuts inhibitor started (wl/kbinhibit.h). Only for an app whose prompt is waiting; lord-server
+ * saves it in permisos.json and tells the app's inhibitors. */
+static JSValue f_wl_shortcuts_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0])) return JS_FALSE;
+    const char *app = JS_ToCString(c, argv[0]);
+    if (!app) return JS_FALSE;
+    int ok = wl_shortcuts_answer(app, JS_ToBool(c, argv[1]));
+    JS_FreeCString(c, app);
+    return JS_NewBool(c, ok);
+}
 /* lord.wayland.textCaret() → { x, y, w, h } on screen or null: the caret of the Linux app's field the
  * input method composes into, for the candidate window (sdk/wayland.js). */
 static JSValue f_wl_text_caret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -1668,6 +1680,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("takeDrop", 0, f_wl_take_drop),
     JS_CFUNC_DEF("droppedFiles", 0, f_wl_dropped_files),
     JS_CFUNC_DEF("grabKeys", 1, f_wl_grab_keys),
+    JS_CFUNC_DEF("shortcutsAnswer", 2, f_wl_shortcuts_answer),
     JS_CFUNC_DEF("fullscreen", 0, f_wl_fullscreen),
     JS_CFUNC_DEF("paste", 0, f_wl_paste),
     JS_CFUNC_DEF("hasKeyboard", 0, f_wl_has_focus),

@@ -47,8 +47,18 @@ export function requestPermission(app, perm) {
   if (st === 'allow') return Promise.resolve(true);
   if (st === 'deny') return Promise.resolve(false);
   return new Promise((resolve) => {
+    // the same question already up (a window that asks each time it comes to the front): one answer for both
+    const up = queue.get().find((x) => x.app === app && x.perm === perm && x.resolve);
+    if (up) { const was = up.resolve; up.resolve = (v) => { was(v); resolve(v); }; return; }
     queue.set((q) => [...q, { id: seq++, app, perm, resolve }]);
   });
+}
+
+// A prompt whose decision lord-server keeps itself: a Linux app that asks for the desktop's shortcuts
+// (sdk/wayland.js, server/src/wl/kbinhibit.h). name: what the person reads; done(allow) reports the answer.
+export function promptForServer({ app, perm, name, done }) {
+  if (queue.get().some((x) => x.app === app && x.perm === perm)) return;
+  queue.set((q) => [...q, { id: seq++, app, perm, name, done }]);
 }
 
 // The server (compositor) receives prompts from isolated apps through the broker: it shows the
@@ -84,6 +94,9 @@ function answer(item, allow) {
   if (item.broker != null) {
     // prompt from an isolated app: lord-server saves the decision and answers the app
     try { lord.broker.resolve(item.broker, allow); } catch (e) { /* server without broker */ }
+  } else if (item.done) {
+    // lord-server saves it (a Linux app's): Privacy redraws with the new decision
+    try { item.done(allow); } finally { permsRev.set((v) => v + 1); }
   } else {
     perms.set(item.app, item.perm, allow ? 'allow' : 'deny');
     if (item.resolve) item.resolve(allow);
@@ -95,9 +108,10 @@ export function PermissionPrompt() {
   const q = useStore(queue);
   if (!q.length) return null;
   const item = q[0];
-  const name = appName(getApp(item.app)) || item.app;
+  const name = item.name || appName(getApp(item.app)) || item.app;
   const owner = item.owner ? appName(getApp(item.owner)) || item.owner : '';
   const msg = t(`privacy.ask.${item.perm}`, { app: name, owner });
+  const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote' : 'privacy.ask.where';
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100000 } },
     h(View, { style: { marginTop: 80, width: 320, borderRadius: 14, padding: 20, gap: 14, backgroundColor: '#2b2b30',
@@ -105,7 +119,7 @@ export function PermissionPrompt() {
       h(View, { style: { width: 44, height: 44, borderRadius: 10, backgroundColor: item.perm === 'camera' ? '#30d158' : item.perm === 'microphone' ? '#ff9f0a' : '#0a84ff',
         alignItems: 'center', justifyContent: 'center' } }, h(Text, { style: { fontSize: 22 } }, glyph(item.perm))),
       h(Text, { style: { fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
-      h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(item.perm === 'keyring' ? 'privacy.ask.keyringNote' : 'privacy.ask.where')),
+      h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
       h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
         h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
         h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
@@ -117,7 +131,7 @@ function Btn({ label, primary, onClick }) {
     h(Text, { style: { fontSize: 13, fontWeight: 600, color: '#fff' } }, label));
 }
 
-const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : '●');
+const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : '●');
 
 // ---- camera/microphone indicators ----
 // Own source (isolated .lpk apps: the broker knows and reflects it here with markDeviceUse) +

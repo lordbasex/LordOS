@@ -447,7 +447,10 @@ development) the apps run without a scope, with a warning.
   restrictions apply. See [FIREWALL.md](FIREWALL.md#rules-by-app-settings-and-monitor).
 
 Permissions: `files`, `clipboard`, `notifications`, `network`, `camera`, `microphone`, `screen`,
-`listen`, `usb`, `bluetooth`, `apps`.
+`listen`, `usb`, `bluetooth`, `apps`. Not for a manifest or the broker: `shortcuts` (in development), a Linux app
+(`desktop:<app_id>` or `exe:<program>`) or Machines' VM window taking ❖, ⌥Tab and the rest while in front, asked
+once and listed under Keyboard shortcuts; ❖Esc always gives them back ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts
+inhibit").
 
 | | |
 |---|---|

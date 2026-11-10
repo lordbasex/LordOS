@@ -1,7 +1,7 @@
 // Settings → Privacy — per-app permissions («Privacy & Security»). Lists each
 // permission with the apps that requested it and lets you revoke it. The Monitor adds its own section
 // through registerPrivacySection (see sdk/privacy.js); this page does not know about the Monitor.
-import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, share, shareRev, packages, appName, getApp, spacing, typeScale } from '@lordos/sdk';
+import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, share, shareRev, packages, appName, getApp, linuxAppFor, spacing, typeScale } from '@lordos/sdk';
 import { Stack, Section, SettingRow, Badge, Note, StatusDot, tint } from './ui.jsx';
 
 // Small monochrome pictures for the permissions whose usual symbols are color emoji.
@@ -37,8 +37,16 @@ const SHOWN = [
   ['camera', CameraGlyph, '#30d158'], ['microphone', MicGlyph, '#ff9f0a'], ['screen', '▭', '#0a84ff'],
   ['files', FolderGlyph, '#30b0c7'], ['network', '⇅', '#0a84ff'], ['clipboard', '⎘', '#5e5ce6'],
   ['notifications', '◉', '#ff375f'], ['apps', '▦', '#8e8e93'], ['listen', '⇄', '#34c759'],
-  ['usb', '⇆', '#8e8e93'], ['bluetooth', 'ᛒ', '#0a84ff'], ['status-item', '◔', '#8e8e93'],
+  ['usb', '⇆', '#8e8e93'], ['bluetooth', 'ᛒ', '#0a84ff'], ['status-item', '◔', '#8e8e93'], ['shortcuts', '❖', '#5e5ce6'],
 ];
+
+// A decision's app as the person knows it: a LordOS app's name, or for "shortcuts" a Linux app's ("desktop:<id>",
+// "exe:<program>", server/src/wl/kbinhibit.h)
+function nameOf(id) {
+  if (id.startsWith('desktop:')) return linuxAppFor(id.slice(8))?.name || id.slice(8);
+  if (id.startsWith('exe:')) return id.split('/').pop();
+  return appName(getApp(id)) || id;
+}
 
 const PermBadge = ({ glyph: G, color }) => (typeof G === 'string' ? <Badge glyph={G} color={color} size={22} /> : <Badge color={color} size={22}><G /></Badge>);
 
@@ -46,7 +54,7 @@ const PermBadge = ({ glyph: G, color }) => (typeof G === 'string' ? <Badge glyph
 function appsFor(perm, decisions) {
   const set = new Map();
   for (const p of packages.list()) if ((p.permissions || []).includes(perm)) set.set(p.id, p.name);
-  for (const d of decisions) if (d.perm === perm) set.set(d.app, appName(getApp(d.app)) || d.app);
+  for (const d of decisions) if (d.perm === perm) set.set(d.app, nameOf(d.app));
   return [...set.entries()];
 }
 

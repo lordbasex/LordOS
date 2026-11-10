@@ -42,6 +42,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
+| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (in development, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (in development, `wl_textinput.c`, see "Input methods") |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
@@ -352,6 +353,44 @@ sends lands on a character boundary of valid UTF-8. `build/textinput-client` (`t
 inside a session) checks enter, enable, that commits alone bring no `done`, garbage, a second text input
 and destroying things out of order; `type 30` gives 30 s to type with a method on and checks every
 `done` serial and offset (`type 30 password`: nothing composes).
+
+### Keyboard shortcuts inhibit (`zwp_keyboard_shortcuts_inhibit_manager_v1`, in development)
+
+A virtual machine viewer, a remote desktop client or a game asks for every key, ❖ and ⌥Tab included, with
+`inhibit_shortcuts` on its window (GTK 4's `gdk_toplevel_inhibit_system_shortcuts` is that request). LordOS asks the person once per app, in
+the system's own prompt: "«App» wants to use the keyboard shortcuts while it's in front", with "❖Esc always gives
+them back" under it. The answer is the `shortcuts` permission in `~/.config/lordos/permisos.json`
+(`server/src/sec/perms.c`), which Settings → Privacy → Keyboard shortcuts lists and changes (Allow, Ask, Deny); a
+change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
+
+- **Whose decision.** `kbi_app_key` (`server/src/wl/kbinhibit.c`): `desktop:<app_id>` from the window's app_id
+  (the characters a `.desktop` id uses, at most 87), otherwise `exe:<program>` from `/proc/<pid>/exe` (absolute,
+  no `..`). Without either nothing is asked and nothing holds. `lord.perms.set` takes such a name only for
+  `shortcuts`; every other permission still needs an `.lpk` id.
+- **Never.** An isolated LordOS app (its pid is the broker's), the login screen (`wl_set_greeter`), and an app the
+  person denied. `shortcuts` can't be declared in a manifest or asked for through the broker (`BOP_PERM` refuses it).
+  The lock screen is another process with the input, so no app's inhibitor reaches it.
+- **One per surface.** A second `inhibit_shortcuts` for a surface that has one is the `already_inhibited` error.
+  `surface_gone` leaves the inhibitor without its surface, its destructor clears only a link that points at itself,
+  and the person's answer goes by the app's name, so a window closed while the prompt is up changes nothing.
+- **Events.** `active` once allowed (right away when it was already allowed), `inactive` when ❖Esc turns it off or
+  the permission is revoked. They don't follow the keyboard: the keys only go to the app while its window has it.
+- **Keys** (`kbi_route`, `wl_key`). While it holds and its window has the keyboard, every key goes to the app,
+  before the theme's table (`keygrab.c`) and the dispatcher: ❖ alone, ❖Tab, ⌥Tab, ❖Space, ⌥F4. These stay LordOS's:
+  ❖Esc, the lock (❖L, ❖⌃Q), Ctrl+Alt+F1…F12, the media, sound and light keys and Print Screen (`keygrab_system_key`),
+  and the ones `on_input` in `main.c` handles before any of this (⌃⌥⌫, ⌃⌥⇧Esc). A key's release and repeats go
+  where its press went.
+- **❖Esc** turns it off for that window (`inactive`) and with it a locked pointer and fullscreen, so everything is
+  LordOS's again; pressed again in front of the same window it holds again (`active`). ❖Esc's own press and release
+  reach nobody.
+
+Machines' VM window does the same in the session (`sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`): the dispatcher
+(`sdk/shortcuts.js`) asks `shortcutsKey` first, the decision is the `machines` app's `shortcuts` permission.
+
+`build/kbinhibit-test` (`make -C server test`) checks the names, the decision, the states and the keys, and
+`tests/kbinhibit_model_test.mjs` the session's side. `build/kbinhibit-client` (`tests/kbinhibit_client.c`, inside a
+session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
+client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 

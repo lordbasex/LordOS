@@ -24,8 +24,12 @@ typedef enum {
     PERM_BLUETOOTH,
     PERM_APPS,          /* launch other apps */
     PERM_STATUS,        /* an item by the clock (sec/statusitem.c) */
+    PERM_SHORTCUTS,     /* take ❖ and ⌥Tab while in front: a Linux app or a LordOS window, never a manifest's (wl/kbinhibit.h) */
     PERM_COUNT,
 } Perm;
+
+/* An app's id with its NUL: an .lpk id, or for "shortcuts" a Linux app's "desktop:<app_id>" or "exe:<path>" */
+#define PERM_APP_MAX 96
 
 typedef enum { PERM_ASK = 0, PERM_ALLOW = 1, PERM_DENY = 2 } PermState;
 
@@ -41,7 +45,7 @@ int perm_set(const char *app_id, Perm p, PermState state);
 void perm_forget(const char *app_id);
 
 /* For the Privacy page: walks the saved decisions. Returns the count written. */
-typedef struct { char app[48]; Perm perm; PermState state; long long when; } PermEntry;
+typedef struct { char app[PERM_APP_MAX]; Perm perm; PermState state; long long when; } PermEntry;
 int perm_list(PermEntry *out, int max);
 
 /* Loads permisos.json (once). The path is added to lord.fs's deny list. */

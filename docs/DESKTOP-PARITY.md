@@ -43,7 +43,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | XDND bridge for Xwayland apps (`server/src/wl/xwm.c`) | the same for X apps (Chrome under Xwayland, older apps) | M | ⬜ |
 | `text-input-v3` complete: preedit and commit from LordOS's input method (`server/src/ime.c`, `wl_textinput.c`) | Japanese, Chinese and Korean inside Linux apps | M | ✅ checked on VM 127 (GTK 4, Hangul) |
 | Screen sharing for apps: the xdg-desktop-portal ScreenCast interface in `server/src/ui/portal.c`, screen or window chosen in LordOS's own dialog with the consent and indicator of `remote/share.c`, frames to a PipeWire stream | share a screen or a window in Meet, Zoom, Teams, Discord, OBS | L | ⛔ the PipeWire stream: a new sandboxed helper linking libpipewire (recommended) or LordOS's own PipeWire protocol |
-| `keyboard-shortcuts-inhibit-v1`: an app may take ❖ and Alt+Tab while focused, after the person allows it once | VMs, remote desktops, games | S | ⛔ a new permission kind in `sec/perms.c` |
+| `keyboard-shortcuts-inhibit-v1`: an app may take ❖ and Alt+Tab while focused, after the person allows it once | VMs, remote desktops, games | S | 🟨 built, to check on the VM: the `shortcuts` permission (`sec/perms.c`, `wl/kbinhibit.c`), ❖Esc gives them back; Machines' VM window too (`sdk/kbinhibit.js`) |
 
 ## Phase 3 — desktop services Linux apps expect
 

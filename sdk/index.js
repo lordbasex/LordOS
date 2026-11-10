@@ -44,6 +44,7 @@ import { ShareBadge, SharePrompt, sweepShareGrants } from './share.js';
 import { linuxIds } from './apps.js';
 export { share, shareHolder, shareRev } from './share.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
+export { inhibitShortcuts } from './kbinhibit.js';
 export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PrivacyIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel } from './privacy.js';
 import { PermissionPrompt } from './privacy.js';
 import { Powerbox } from './powerbox.jsx';

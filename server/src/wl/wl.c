@@ -23,7 +23,9 @@
  * attention (xdgact.c holds the tokens). */
 #include "wl.h"
 #include "keygrab.h"
+#include "kbinhibit.h"
 #include "../keylag.h"
+#include "../sec/perms.h"
 
 #include <errno.h>
 #include <math.h>
@@ -63,6 +65,7 @@
 #include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
 #include "xdg-dialog-v1-protocol.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
 #include "../outputs.h"
@@ -161,6 +164,7 @@ struct Surf {
     /* wl_surface.set_input_region: without one the whole surface takes input */
     WlRgn input, p_input;
     int has_input, p_input_set, p_has_input;
+    struct wl_resource *ksi;        /* zwp_keyboard_shortcuts_inhibitor_v1: one per surface (kbinhibit.h) */
 };
 
 /* Shape of a surface's hole in the UI: if it changes, the UI must be repainted. */
@@ -853,6 +857,7 @@ static void bind_wm_dialog(struct wl_client *c, void *data, uint32_t ver, uint32
 }
 
 static void dnd_surface_gone(Surf *s);
+static void kbi_surface_gone(struct wl_resource *ksi);
 static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
@@ -864,6 +869,7 @@ static void surface_gone(struct wl_resource *r) {
     orphan_dialogs(s);
     foreign_surface_gone(s);
     if (s->dlg) wl_resource_set_user_data(s->dlg, NULL);
+    if (s->ksi) kbi_surface_gone(s->ksi);
     if (s->parent) {
         Surf *p = s->parent;
         for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
@@ -3914,10 +3920,135 @@ static void send_remapped(int code, int press) {
     mods_sent[0] = press ? held : d; mods_sent[1] = l; mods_sent[2] = lk; mods_sent[3] = g;
 }
 
+/* ---- zwp_keyboard_shortcuts_inhibitor_v1: VMs, remote desktops and games take LordOS's shortcuts (kbinhibit.h) ---- */
+
+/* app: whose decision it is ("" when none can be named); never: an isolated LordOS app's or the login screen's,
+ * never held whatever is saved. surf: NULL once the surface is gone (surface_gone). */
+typedef struct { struct wl_resource *res; Surf *surf; char app[KBI_ID_MAX]; int never; KbiState st; } KbInhib;
+static int greeter;
+/* apps whose prompt is up: one per app, whatever number of its windows ask */
+#define KBI_WAITING 8
+static char kbi_waiting[KBI_WAITING][KBI_ID_MAX];
+/* to_app[code]: its press went to an app holding the shortcuts, so its release does too (1), or it was the
+ * ❖Esc that turned them off or on, whose release goes nowhere (2) */
+static unsigned char to_app[KEY_SLOTS];
+
+void wl_set_greeter(int on) { greeter = !!on; }
+
+static void kbi_send(KbInhib *k, int what) {
+    if (what == KBI_ACTIVE) zwp_keyboard_shortcuts_inhibitor_v1_send_active(k->res);
+    else if (what == KBI_INACTIVE) zwp_keyboard_shortcuts_inhibitor_v1_send_inactive(k->res);
+}
+
+/* The inhibitor of the window with the keyboard, if the person allowed it (holding, or off after ❖Esc). */
+static KbInhib *focus_inhibitor(void) {
+    KbInhib *k = key_focus && key_focus->ksi ? wl_resource_get_user_data(key_focus->ksi) : NULL;
+    return k && k->st.allowed ? k : NULL;
+}
+
+static int kbi_waiting_at(const char *app) {
+    for (int i = 0; i < KBI_WAITING; i++) if (kbi_waiting[i][0] && !strcmp(kbi_waiting[i], app)) return i;
+    return -1;
+}
+
+/* Another live inhibitor of the same app (but k)? */
+static int kbi_app_alive(const KbInhib *k) {
+    for (int i = 0; i < MAX_SURF; i++) {
+        KbInhib *o = surfs[i] && surfs[i]->ksi ? wl_resource_get_user_data(surfs[i]->ksi) : NULL;
+        if (o && o != k && !strcmp(o->app, k->app)) return 1;
+    }
+    return 0;
+}
+
+static void kbi_surface_gone(struct wl_resource *ksi) {
+    KbInhib *k = wl_resource_get_user_data(ksi);
+    if (k) k->surf = NULL;
+}
+
+static void ksi_gone(struct wl_resource *r) {
+    KbInhib *k = wl_resource_get_user_data(r);
+    if (!k) return;
+    if (k->surf && k->surf->ksi == r) k->surf->ksi = NULL;
+    free(k);                            /* a prompt still up keeps its place: the answer goes by the app's name */
+}
+static void ksi_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct zwp_keyboard_shortcuts_inhibitor_v1_interface ksi_impl = { .destroy = ksi_destroy };
+
+/* The program a client runs, for an app that names no app_id ("" if it can't be read). */
+static void client_exe(struct wl_client *c, char *out, size_t n) {
+    char p[48];
+    snprintf(p, sizeof p, "/proc/%d/exe", (int)client_pid(c));
+    ssize_t len = client_pid(c) > 0 ? readlink(p, out, n - 1) : -1;
+    out[len > 0 ? len : 0] = 0;
+}
+
+static void ksim_inhibit(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *seat) {
+    (void)seat;                         /* one seat */
+    Surf *s = wl_resource_get_user_data(surface);
+    if (s && s->ksi) { wl_resource_post_error(r, ZWP_KEYBOARD_SHORTCUTS_INHIBIT_MANAGER_V1_ERROR_ALREADY_INHIBITED, "the surface already has a shortcuts inhibitor"); return; }
+    KbInhib *k = calloc(1, sizeof *k);
+    struct wl_resource *res = k ? wl_resource_create(c, &zwp_keyboard_shortcuts_inhibitor_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(k); wl_client_post_no_memory(c); return; }
+    k->res = res;
+    k->surf = s;
+    wl_resource_set_implementation(res, &ksi_impl, k, ksi_gone);
+    if (!s) { k->never = 1; return; }
+    s->ksi = res;
+    Surf *top = toplevel_of(s);
+    char exe[PATH_MAX];
+    client_exe(c, exe, sizeof exe);
+    int named = kbi_app_key(top->app_id, exe, k->app, sizeof k->app);
+    int how = kbi_decide(named ? (int)perm_get(k->app, PERM_SHORTCUTS) : PERM_ASK, app_of_client(c) != NULL, greeter, named);
+    k->never = !named || app_of_client(c) != NULL || greeter;
+    if (how == KBI_GRANT) kbi_send(k, kbi_set_allowed(&k->st, 1));
+    if (how != KBI_PROMPT) return;
+    /* one prompt per app: another window of it that asks while it's up adds none (the shell keeps one per app too,
+     * so a window that asks again after its first went away, or after a theme switch, just asks again) */
+    int w = kbi_waiting_at(k->app);
+    if (w >= 0 && kbi_app_alive(k)) return;
+    if (w < 0) {
+        static int next;
+        for (w = 0; w < KBI_WAITING && kbi_waiting[w][0]; w++) {}
+        if (w == KBI_WAITING) w = next++ % KBI_WAITING;          /* full: each in turn makes room */
+        snprintf(kbi_waiting[w], sizeof kbi_waiting[w], "%s", k->app);
+    }
+    char a[256];                        /* escaped, cut short to fit the event */
+    json_str(a, sizeof a, top->app_id);
+    emit(top, "shortcuts", "{\"app\":\"%s\",\"appId\":\"%s\"}", k->app, a);    /* the shell asks (sdk/wayland.js) */
+}
+static void ksim_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct zwp_keyboard_shortcuts_inhibit_manager_v1_interface ksim_impl = { .destroy = ksim_destroy, .inhibit_shortcuts = ksim_inhibit };
+static void bind_ksim(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &ksim_impl, NULL, NULL);
+}
+
+void wl_shortcuts_changed(void) {
+    if (!dpy) return;
+    for (int i = 0; i < MAX_SURF; i++) {
+        KbInhib *k = surfs[i] && surfs[i]->ksi ? wl_resource_get_user_data(surfs[i]->ksi) : NULL;
+        if (!k || k->never) continue;
+        kbi_send(k, kbi_set_allowed(&k->st, perm_get(k->app, PERM_SHORTCUTS) == PERM_ALLOW));
+    }
+    wl_display_flush_clients(dpy);
+}
+
+int wl_shortcuts_answer(const char *app, int allow) {
+    int w = dpy && app ? kbi_waiting_at(app) : -1;
+    if (w < 0) return 0;
+    kbi_waiting[w][0] = 0;
+    perm_set(app, PERM_SHORTCUTS, allow ? PERM_ALLOW : PERM_DENY);
+    wl_shortcuts_changed();
+    return 1;
+}
+
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
     unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
     unsigned char *was_remapped = code >= 0 && code < KEY_SLOTS ? &remapped[code] : NULL;
+    unsigned char *was_to_app = code >= 0 && code < KEY_SLOTS ? &to_app[code] : NULL;
     unsigned mods = (k->shift ? KG_SHIFT : 0u) | (k->ctrl ? KG_CTRL : 0u) | (k->alt ? KG_ALT : 0u) | (k->meta ? KG_META : 0u);
     if (code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT) { /* a Files drag over a Linux window: Shift moves */
         shift_down = value != 0;
@@ -3940,6 +4071,13 @@ int wl_key(int code, int value, const KeyInfo *k) {
         if (key_focus) send_remapped(code, 0);
         return 1;
     }
+    if (was_to_app && *was_to_app) {
+        if (value) return 1;                    /* apps repeat on their own (repeat_info) */
+        int app = *was_to_app == 1;
+        *was_to_app = 0;
+        if (app && key_focus) send_key_to_focus(code, 0);
+        return 1;
+    }
     if (grab_hold) {
         if (!(mods & grab_hold)) grab_hold = 0;
         if (is_modifier_key(code)) { if (key_focus && value != 2) send_key_to_focus(code, value); }
@@ -3947,13 +4085,32 @@ int wl_key(int code, int value, const KeyInfo *k) {
         else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
         return 0;
     }
+    if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
+    /* An app holding the shortcuts gets every key but the few kbi_route keeps; ❖Esc turns that off, and with it
+     * a locked pointer and fullscreen, so everything is LordOS's again; pressed again it holds again. */
+    KbInhib *ki = value == 1 && was_to_app ? focus_inhibitor() : NULL;
+    if (ki) {
+        int to = kbi_route(code, keygrab_letter(code, k->base), mods, ki->st.active);
+        if (to == KBI_KEY_TOGGLE) {
+            int what = kbi_toggle(&ki->st);
+            kbi_send(ki, what);
+            if (what == KBI_INACTIVE && wl_pointer_locked()) constraint_escape();
+            if (what == KBI_INACTIVE && fs_surf) leave_fullscreen(fs_surf);
+            *was_to_app = 2;
+            return 2;
+        }
+        if (to == KBI_KEY_APP) {
+            *was_to_app = 1;
+            send_key_to_focus(code, 1);
+            return 1;
+        }
+    }
     if (k->meta && code == KEY_ESC && !k->alt && (fs_surf || wl_pointer_locked())) {   /* ❖Esc exits; the shell learns ❖ was not alone */
         if (value != 1) return 1;
         if (wl_pointer_locked()) constraint_escape();
         if (fs_surf) leave_fullscreen(fs_surf);
         return 2;
     }
-    if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     if (!key_focus) return 0;
     if (value == 1 && was_grabbed) {
         char letter = keygrab_letter(code, k->base);
@@ -4724,6 +4881,7 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
+    wl_global_create(dpy, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1, NULL, bind_ksim);   /* VMs take ❖ and ⌥Tab, once allowed */
     wl_global_create(dpy, &xdg_activation_v1_interface, 1, NULL, bind_activation);   /* a window comes forward with a token */
     client_created.notify = on_client_created;
     wl_display_add_client_created_listener(dpy, &client_created);

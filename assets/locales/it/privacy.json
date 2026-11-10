@@ -49,5 +49,9 @@
   "permHint.remote-input": "App che possono permettere a quelle persone di usare il tuo mouse, la tua tastiera e i tuoi appunti.",
   "ask.status-item": "«{app}» vuole un elemento accanto all’orologio",
   "perm.status-item": "Elemento accanto all’orologio",
-  "permHint.status-item": "App che mostrano la propria icona e il proprio menu accanto all’orologio. È il sistema a disegnarli; un’app non può raggiungere nient’altro attraverso di essi."
+  "permHint.status-item": "App che mostrano la propria icona e il proprio menu accanto all’orologio. È il sistema a disegnarli; un’app non può raggiungere nient’altro attraverso di essi.",
+  "ask.shortcuts": "«{app}» vuole usare le scorciatoie da tastiera mentre è in primo piano",
+  "ask.shortcutsNote": "❖Esc te le restituisce sempre, e premuto di nuovo le ridà all’app. Puoi cambiarlo in seguito in Impostazioni → Privacy.",
+  "perm.shortcuts": "Scorciatoie da tastiera",
+  "permHint.shortcuts": "App che possono prendere ❖, ⌥Tab e le altre scorciatoie della scrivania mentre sono in primo piano, come macchine virtuali, desktop remoti e giochi. ❖Esc te le restituisce sempre; il blocco dello schermo e i tasti multimediali restano al sistema."
 }

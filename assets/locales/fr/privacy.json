@@ -49,5 +49,9 @@
   "permHint.remote-input": "Apps pouvant laisser ces personnes utiliser votre souris, votre clavier et votre presse-papiers.",
   "ask.status-item": "« {app} » souhaite un élément à côté de l’horloge",
   "perm.status-item": "Élément près de l’horloge",
-  "permHint.status-item": "Apps qui affichent leur propre icône et leur propre menu à côté de l’horloge. Le système les dessine ; une app ne peut rien atteindre d’autre par ce biais."
+  "permHint.status-item": "Apps qui affichent leur propre icône et leur propre menu à côté de l’horloge. Le système les dessine ; une app ne peut rien atteindre d’autre par ce biais.",
+  "ask.shortcuts": "« {app} » souhaite utiliser les raccourcis clavier lorsqu’elle est au premier plan",
+  "ask.shortcutsNote": "❖Esc vous les rend toujours, et une nouvelle pression les redonne à l’app. Vous pourrez changer cela plus tard dans Réglages → Confidentialité.",
+  "perm.shortcuts": "Raccourcis clavier",
+  "permHint.shortcuts": "Apps qui peuvent prendre ❖, ⌥Tab et les autres raccourcis du bureau lorsqu’elles sont au premier plan, comme les machines virtuelles, les bureaux à distance et les jeux. ❖Esc vous les rend toujours ; le verrouillage de l’écran et les touches multimédias restent au système."
 }

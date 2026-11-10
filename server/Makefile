@@ -31,7 +31,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
            unstable/primary-selection/primary-selection-unstable-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
-           unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1
+           unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 \
+           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -57,7 +58,7 @@ MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/cap
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
@@ -362,6 +363,12 @@ build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/keygrab_test.c src/wl/keygrab.c
 	./$@
+# keyboard-shortcuts-inhibit: who is asked, what holds, which keys the app gets and ❖Esc (src/wl/kbinhibit.c)
+test: build/kbinhibit-test
+build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit.h src/wl/keygrab.c src/wl/keygrab.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build
@@ -647,7 +654,8 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 unstable/pointer-gestures/pointer-gestures-unstable-v1 unstable/primary-selection/primary-selection-unstable-v1 \
                 stable/viewporter/viewporter staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
                 stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
-                unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3
+                unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3 \
+                unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -688,6 +696,10 @@ build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)
 # is cancelled (tests/primary_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/primary-client)
 build/primary-client: tests/primary_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/primary_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Keyboard shortcuts inhibitors: one per surface (a second is a protocol error), one on a destroyed surface's
+# successor, active once allowed (tests/kbinhibit_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/kbinhibit-client)
+build/kbinhibit-client: tests/kbinhibit_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/kbinhibit_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # off/on-monitor cycles against one session (tests/gpu_cycle.sh, docs/GPU.md); a test tool, never installed
 build/seat-cycle: tests/seat_cycle.c
 	@mkdir -p build

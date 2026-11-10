@@ -2385,6 +2385,7 @@ int main(int argc, char **argv) {
 
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
     js_sys_set_greeter(s.greeter);
+    wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */
     if (text_init(fonts)) return 1;
     {   /* assets/ = la carpeta de las fuentes, un nivel arriba */
         char a[1024];
