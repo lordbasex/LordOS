@@ -223,6 +223,7 @@ int   vt_match_at(const Term *t, long long line, int col);   /* 0 no, 1 yes, 2 c
 int   vt_jump_mark(Term *t, int dir);
 void  vt_set_mark(Term *t);
 char *vt_url_at(Term *t, long long line, int col);
+int   vt_line_at(Term *t, long long line, int col, char **before, char **after);
 char *vt_words(Term *t, const char *prefix, int max);
 char *vt_cursor_word(Term *t);
 char *vt_logical_text(Term *t);

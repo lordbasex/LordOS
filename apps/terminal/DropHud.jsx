@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { transfers, cancel, size } from './sftp.js';
 import { drops, hideDrops, clearDrops } from './dropupload.js';
 
-const UP = '#ff9f0a';
+const UP = '#ff9f0a', DOWN = '#0a84ff';      // as in Files mode
 
 // the rows of these sessions: [{ sid, x (the transfer) }], those still shown
 export const dropRows = (all, jobs, sids) => sids.flatMap((sid) => (all[sid] && !all[sid].hidden ? all[sid].jobs : [])
@@ -28,7 +28,9 @@ export function DropHud({ t, sids }) {
     <View style={{ position: 'absolute', right: 14, top: 44, width: 300, padding: 10, gap: 8, borderRadius: 10, backgroundColor: t.windowBg,
       border: `1px solid ${t.separator}`, boxShadow: '0 10px 28px rgba(0,0,0,0.4)', direction: 'ltr' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(running ? 'terminal.drop.uploading' : 'terminal.drop.done')}</Text>
+        <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>
+          {tr(rows.every((r) => r.x.kind === 'down') ? (running ? 'terminal.drop.downloading' : 'terminal.drop.downloaded') : running ? 'terminal.drop.uploading' : 'terminal.drop.done')}
+        </Text>
         <Text onClick={() => sids.forEach(hideDrops)} style={{ fontSize: 11, color: t.accent }}>{tr('terminal.drop.hide')}</Text>
       </View>
       {dir ? <Text style={{ fontSize: 11, fontFamily: 'monospace', color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('terminal.drop.to', { dir })}</Text> : null}
@@ -37,7 +39,7 @@ export function DropHud({ t, sids }) {
         return (
           <View key={x.job} style={{ gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: 11, color: UP }}>↑</Text>
+              <Text style={{ fontSize: 11, color: x.kind === 'down' ? DOWN : UP }}>{x.kind === 'down' ? '↓' : '↑'}</Text>
               <Text style={{ flex: 1, fontSize: 12, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{x.name}</Text>
               <Text style={{ fontSize: 11, color: x.state === 'error' ? '#ff453a' : t.textDim }}>
                 {x.state === 'done' ? `✓ ${size(x.total)}` : x.state === 'error' ? tr('terminal.drop.failed') : x.state === 'cancelled' ? tr('terminal.drop.cancelled') : `${Math.round(pct * 100)} %`}
@@ -45,7 +47,7 @@ export function DropHud({ t, sids }) {
               {x.state === 'run' && <Text onClick={() => cancel(x.job)} style={{ fontSize: 11, color: t.textDim }}>✕</Text>}
             </View>
             <View style={{ height: 3, borderRadius: 2, backgroundColor: t.control }}>
-              <View style={{ width: `${Math.round(pct * 100)}%`, height: 3, borderRadius: 2, backgroundColor: x.state === 'error' ? '#ff453a' : UP }} />
+              <View style={{ width: `${Math.round(pct * 100)}%`, height: 3, borderRadius: 2, backgroundColor: x.state === 'error' ? '#ff453a' : x.kind === 'down' ? DOWN : UP }} />
             </View>
           </View>
         );

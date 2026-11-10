@@ -8,7 +8,8 @@ import { SecretBar } from './SecretBar.jsx';
 import { SaveBar } from './SaveBar.jsx';
 import { ClaudeBar } from './ClaudeBar.jsx';
 import { pathsText } from './paths.js';
-import { dropUpload } from './dropupload.js';
+import { dropUpload, downloadName } from './dropupload.js';
+import { nameAt } from './lsnames.js';
 
 export const paneNodes = new Map();     // sid → instancia del nodo (para navegar entre paneles)
 
@@ -83,10 +84,14 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
     focusPane(wid, sid);
     if (m.gateway) tmuxFocus(sid);
     const l = e.local(ref.current);
-    if (e.button === 2) { onContextMenu?.(e, sid); return; }
+    // a file name of `ls` output in a pane that runs ssh (lsnames.js): ❖ + click downloads it, the menu offers it
+    const remoteName = () => { const i = term.info(sid); if (!i || !i.busy || i.process !== 'ssh') return null; const a = term.lineAt(sid, l.x, l.y); return a ? nameAt(a.before, a.after) : null; };
+    if (e.button === 2) { onContextMenu?.(e, sid, remoteName()); return; }
     if (e.button === 0 && (e.meta || e.ctrl)) {
       const url = term.urlAt(sid, l.x, l.y);
       if (url) { openLink(wid, sid, url); return; }
+      const n = remoteName();
+      if (n && downloadName(wid, sid, n.name)) return;
     }
     term.mouse(sid, 'down', l.x, l.y, e.button, e.mods);
     dragging.current = true;

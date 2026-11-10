@@ -515,5 +515,12 @@
   "drop.links": {
     "one": "A link was not uploaded: links are not followed",
     "other": "{count} links were not uploaded: links are not followed"
-  }
+  },
+  "ls.download": "Download “{name}”",
+  "ls.copyPath": "Copy Remote Path",
+  "ls.notFound": "“{name}” isn't in the server's folder shown by the shell",
+  "ls.notFoundHome": "“{name}” isn't in the remote home folder (the server's shell doesn't report its folder)",
+  "ls.renamed": "Already in Downloads: saved as “{name}”",
+  "drop.downloading": "Downloading from the server",
+  "drop.downloaded": "Downloaded to this computer"
 }

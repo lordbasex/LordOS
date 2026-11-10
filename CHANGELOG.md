@@ -35,9 +35,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   there instead of the remote home. Checked on a real session: a folder with a subfolder, a 3 MB file (identical
   after the upload) and a name that was already there (kept, the copy saved as `notes (2).txt`) went to the reported
   `~/srvdir`, and Files mode opened in it.
+- **Terminal: ❖ + click on a name in `ls` output downloads it.** In a pane that runs ssh, a file name printed by `ls` or
+  `ls -l` (quoted names, long-iso dates, links and devices included) comes down to Downloads over the same connection,
+  resolved against the remote shell's directory; a folder comes down whole, links are not followed and a name already
+  in Downloads gets a free one. The notice shows the downloads in blue. A right click on a name offers Download and
+  Copy Remote Path. New: `term.lineAt(sid, x, y)` (the line under the pointer, split at its cell) and
+  `apps/terminal/lsnames.js` with `terminal_lsnames_test.mjs` (21 checks). Checked on a real session: a file and a
+  folder with a subfolder.
 
 ### Fixed
 
+- **Releasing ❖ after a ❖ + click no longer opens the app launcher.** The shell took any press and release of ❖ with no
+  key between as a tap, and a click in between didn't count, so ❖ + click on a link or a file name in the Terminal also
+  opened Apps. A click while ❖ is held now cancels the tap (`sdk/shortcuts.js`).
 - **Apps whose name starts with a lowercase letter are in their place in the Apps grid (GitHub #64).** "go-link Desk"
   showed after every other app, below the last row, so it looked missing from the grid while Files → Applications
   listed it. The grid, Lord Classic's start menu and Files sorted names with `localeCompare`, and in the desktop's

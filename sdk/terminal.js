@@ -27,7 +27,7 @@ export const term = {
   configure: pass('configure'), write: pass('write'), key: pass('key'), paste: pass('paste'),
   mouse: pass('mouse'), wheel: pass('wheel'), focus: pass('focus'), scroll: pass('scroll'),
   select: pass('select'), text: pass('text'), copy: pass('copy'), clear: pass('clear'),
-  search: pass('search'), searchMove: pass('searchMove'), mark: pass('mark'), urlAt: pass('urlAt'),
+  search: pass('search'), searchMove: pass('searchMove'), mark: pass('mark'), urlAt: pass('urlAt'), lineAt: pass('lineAt'),
   words: pass('words'), cursorWord: pass('cursorWord'), info: pass('info'),
   logicalText: pass('logicalText'), setMatches: pass('setMatches'), copyMode: pass('copyMode'), copyKey: pass('copyKey'),
   replay: pass('replay'), log: pass('log'), export: pass('export'), highlight: pass('highlight'),

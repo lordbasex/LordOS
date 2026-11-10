@@ -20,6 +20,7 @@ import { FilesMode } from './FilesMode.jsx';
 import { ForwardsPanel } from './ForwardsPanel.jsx';
 import { startForwards } from './forwards.js';
 import { DropHud } from './DropHud.jsx';
+import { downloadName } from './dropupload.js';
 import { tmuxAction, isGateway, detach } from './tmux.js';
 import { actionOf, hint, keyMappingOf, mappingBytes, keyCapture, comboOf, actionLabel } from './keys.js';
 import { clipboardImage, pathsText, isClaude } from './paths.js';
@@ -431,10 +432,16 @@ function TerminalWindow() {
     ] });
   };
 
-  const onContextMenu = (e, s) => {
+  const onContextMenu = (e, s, remote) => {
     const [rx, ry] = lord.getLayout(root.current.id);
     const info = term.info(s);
+    const rdir = meta.get()[s]?.remoteCwd || '';
     setCtx({ x: e.x - rx, y: e.y - ry, items: [
+      ...(remote ? [
+        { label: tr('terminal.ls.download', { name: remote.name }), hint: '❖ click', onClick: () => downloadName(wid, s, remote.name) },
+        { label: tr('terminal.ls.copyPath'), onClick: () => clipboard.set(rdir ? `${rdir.replace(/\/+$/, '')}/${remote.name}` : remote.name) },
+        '-',
+      ] : []),
       { label: actionLabel('copy'), hint: hint('copy'), disabled: !info?.hasSelection, onClick: () => run(wid, 'copy') },
       { label: actionLabel('paste'), hint: hint('paste'), onClick: () => run(wid, 'paste') },
       speechMenu(() => term.text(s, 'selection')),

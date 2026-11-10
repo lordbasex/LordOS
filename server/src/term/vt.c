@@ -2220,6 +2220,22 @@ char *vt_url_at(Term *t, long long line, int col) {
     return s.s;
 }
 
+/* The line under a cell, split there: the text before the cell and from it on (the Terminal finds the file name under
+ * the pointer in `ls` output; apps/terminal/lsnames.js). Both are malloc'd. */
+int vt_line_at(Term *t, long long line, int col, char **before, char **after) {
+    *before = *after = NULL;
+    Line *l = vt_abs_line(t, line);
+    if (!l || col < 0 || col >= l->len) return -1;
+    Str a = {0}, b = {0};
+    if (col > 0) line_text(&a, l, 0, col - 1, 1);
+    line_text(&b, l, col, l->len - 1, 0);
+    if (!a.s) str_put(&a, "", 0);
+    if (!b.s) str_put(&b, "", 0);
+    *before = a.s;
+    *after = b.s;
+    return 0;
+}
+
 static int token_char(uint32_t cp) { return cp && (iswalnum((wint_t)cp) || (cp < 128 && strchr("-_./~:@", (int)cp))); }
 
 char *vt_cursor_word(Term *t) {

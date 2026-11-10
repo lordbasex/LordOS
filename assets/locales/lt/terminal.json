@@ -525,5 +525,12 @@
     "one": "{count} nuoroda neįkelta: nuorodomis neinama",
     "few": "{count} nuorodos neįkeltos: nuorodomis neinama",
     "other": "{count} nuorodų neįkelta: nuorodomis neinama"
-  }
+  },
+  "ls.download": "Atsisiųsti „{name}“",
+  "ls.copyPath": "Kopijuoti nuotolinį kelią",
+  "ls.notFound": "„{name}“ nėra serverio aplanke, kurį nurodo apvalkalas",
+  "ls.notFoundHome": "„{name}“ nėra nuotoliniame namų aplanke (serverio apvalkalas nenurodo savo aplanko)",
+  "ls.renamed": "Jau buvo atsisiuntimuose: išsaugota kaip „{name}“",
+  "drop.downloading": "Atsisiunčiama iš serverio",
+  "drop.downloaded": "Atsisiųsta į šį kompiuterį"
 }

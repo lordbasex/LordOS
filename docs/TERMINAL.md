@@ -364,8 +364,8 @@ RemoteHost (user@host, for automatic profile switching) and define
 Status: Files mode is built (lord-sftp, term/sftpc.c, lord.sftp, apps/terminal/FilesMode.jsx and sftp.js; tested end to
 end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Port forwards are built (0.8.8.8,
 apps/terminal/forwards.js and ForwardsPanel.jsx, checked on a real session against a private sshd), and so are uploads
-by dropping on the terminal (dropupload.js, DropHud.jsx) and the remote shell's directory (0.8.8.8). Still in
-development: downloading from `ls` output, Open With and Edit for remote files.
+by dropping on the terminal (dropupload.js, DropHud.jsx), the remote shell's directory and downloads from `ls`
+output (lsnames.js, term.lineAt) (0.8.8.8). Still in development: Open With and Edit for remote files.
 
 Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
 **the tab's own ssh session**: one login, no second connection, no password or code asked again.
@@ -428,9 +428,14 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
   where Files mode opens. It is forgotten when the ssh ends. Servers report it only when their shell does OSC 7. It is
   the server's output, so any program there can send one: it is kept only as an absolute path without control
   characters, and it is shown wherever it is used (the drop notice, Files mode's path bar).
-- **Download from the output:** file names printed by `ls`/`ls -la` are underlined under the pointer. ❖ + click
-  downloads to Downloads, with the same notice in blue. A right click offers Download To…, Quick Look, Open With…,
-  Edit, Info, Copy Remote Path and Show in Files mode. The name is resolved against the remote directory from OSC 7.
+- **Download from the output:** in a pane that runs ssh, ❖ + click on a file name printed by `ls` or `ls -l` downloads
+  it to Downloads (a folder comes down whole, links are not followed, a name already there gets a free one), with the
+  same notice in blue. A right click on a name offers Download and Copy Remote Path. The name is resolved against the
+  remote directory from OSC 7, else the remote home. `term.lineAt(sid, x, y)` gives the line under the pointer split at
+  its cell, and `lsnames.js` finds the name: `ls -l` lines by their columns (permissions to date, also long-iso and
+  device numbers; "name -> target" for a link), otherwise the column under the pointer, with ls's quoting
+  (`'notes (2).txt'`, `'it'\''s'`). Planned: underlining names under the pointer, and Download To…, Quick Look,
+  Open With…, Edit, Info and Show in Files mode in the menu.
 
 ### Port forwards
 

@@ -515,5 +515,12 @@
   "drop.links": {
     "one": "Um link não foi enviado: links não são seguidos",
     "other": "{count} links não foram enviados: links não são seguidos"
-  }
+  },
+  "ls.download": "Baixar “{name}”",
+  "ls.copyPath": "Copiar caminho remoto",
+  "ls.notFound": "“{name}” não está na pasta do servidor informada pela shell",
+  "ls.notFoundHome": "“{name}” não está na pasta pessoal remota (a shell do servidor não informa sua pasta)",
+  "ls.renamed": "Já estava em Downloads: salvo como “{name}”",
+  "drop.downloading": "Baixando do servidor",
+  "drop.downloaded": "Baixado para este computador"
 }

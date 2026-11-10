@@ -425,6 +425,27 @@ static JSValue f_mark(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     return JS_NewBool(c, r);
 }
 
+/* term.lineAt(sid, x, y): { before, after }, the line under the point split at its cell (or null) */
+static JSValue f_line_at(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    Session *s = arg_session(c, argv[0]);
+    double x = 0, y = 0;
+    JS_ToFloat64(c, &x, argv[1]);
+    JS_ToFloat64(c, &y, argv[2]);
+    if (!s) return JS_NULL;
+    long long line;
+    int col;
+    char *a, *b;
+    term_cell_at(s, (float)x, (float)y, &line, &col);
+    if (vt_line_at(&s->t, line, col, &a, &b)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "before", JS_NewString(c, a));
+    JS_SetPropertyStr(c, o, "after", JS_NewString(c, b));
+    free(a);
+    free(b);
+    return o;
+}
+
 static JSValue f_url_at(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
@@ -742,6 +763,7 @@ static const JSCFunctionListEntry term_funcs[] = {
     JS_CFUNC_DEF("searchMove", 2, f_search_move),
     JS_CFUNC_DEF("mark", 2, f_mark),
     JS_CFUNC_DEF("urlAt", 3, f_url_at),
+    JS_CFUNC_DEF("lineAt", 3, f_line_at),
     JS_CFUNC_DEF("words", 2, f_words),
     JS_CFUNC_DEF("cursorWord", 1, f_cursor_word),
     JS_CFUNC_DEF("info", 1, f_info),

@@ -515,5 +515,12 @@
   "drop.links": {
     "one": "Un collegamento non è stato caricato: i collegamenti non vengono seguiti",
     "other": "{count} collegamenti non sono stati caricati: i collegamenti non vengono seguiti"
-  }
+  },
+  "ls.download": "Scarica “{name}”",
+  "ls.copyPath": "Copia percorso remoto",
+  "ls.notFound": "“{name}” non è nella cartella del server indicata dalla shell",
+  "ls.notFoundHome": "“{name}” non è nella cartella home remota (la shell del server non indica la sua cartella)",
+  "ls.renamed": "Già in Download: salvato come “{name}”",
+  "drop.downloading": "Download dal server",
+  "drop.downloaded": "Scaricato su questo computer"
 }

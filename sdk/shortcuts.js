@@ -20,7 +20,7 @@
 // keeps it out of the list while it returns false.
 // Letters follow the keyboard layout; other keys their position, in every layout.
 import { useEffect, useRef } from 'react';
-import { setKeyFilter } from '@lordos/runtime';
+import { setKeyFilter, addListener } from '@lordos/runtime';
 import { createStore } from './store.js';
 import { t } from './i18n.js';
 import { keyboard } from './keyboard.js';
@@ -140,6 +140,8 @@ export function shortcutTaken(combo) {
 const taken = new Set();      // keys whose press was taken: their repeats and release are too
 const repeating = new Set();  // the same, for an entry that runs again while held
 let superAlone = false;
+// a click while ❖ is held is ❖ + click (the Terminal's links and file names, a window's move): its release isn't a tap
+addListener('pointerdown', () => { superAlone = false; });
 
 function filter(e) {
   if (!e.code) return false;                       // text an input method committed
