@@ -740,6 +740,48 @@ display.
   frame, close, the Dock icons, Xwayland stopping 10 s after the last app and starting again, the
   firewall restriction on XTerm, and the protected-window checks in `PRIVACY.md`.
 
+## Tray icons (StatusNotifierItem, 0.8.8.8, in development)
+
+Sync clients, messengers, game launchers and VPNs put an icon in the desktop's tray with the
+StatusNotifierItem protocol (Qt, KDE, Ayatana's AppIndicator, Chromium and Electron). lord-server
+serves it itself on the session bus (`server/src/ui/sni.c`), with Passwords' own D-Bus client, and
+the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`).
+
+- **The watcher.** lord-server owns `org.kde.StatusNotifierWatcher` (`/StatusNotifierWatcher`) and is
+  its host: `RegisterStatusNotifierItem` in both forms (an object path on the caller's connection, or
+  a bus name with the item at `/StatusNotifierItem`; a unique name only the caller's own),
+  `RegisterStatusNotifierHost`, the `StatusNotifierItemRegistered`/`Unregistered` and
+  `StatusNotifierHostRegistered`/`Unregistered` signals, and the `RegisteredStatusNotifierItems`,
+  `IsStatusNotifierHostRegistered` (always true) and `ProtocolVersion` properties. At most 32 items,
+  4 per connection. If another program already owns the name, LordOS leaves it and says so in the log.
+- **An item.** Its properties are read with `GetAll` and again on each `New*` signal (`NewIcon`,
+  `NewStatus`, `NewTitle`, `NewToolTip`, …; one read at a time). It shows `Title` (or `Id`), the
+  `ToolTip`'s title as the menu's header, and `Status`: `Passive` hides it, `NeedsAttention` shows
+  `AttentionIconName` (or its pixmap). It leaves when its connection or the name it registered
+  leaves the bus, or when its first `GetAll` fails.
+- **The icon.** `IconName` is looked up as a plain name (never a path) in hicolor's `status` and
+  `apps` folders at the bar's sizes, the user's and the system's, then `/usr/share/pixmaps`
+  (`apps_status_icon` in `server/src/apps.c`, PNG only); otherwise `IconPixmap` is used: network-order
+  ARGB32, the size nearest 22–32 px, each entry at most 256 × 256 with exactly w × h × 4 bytes, at most
+  16 entries and 2 MiB in all. `IconThemePath` (a folder the app names) is not read.
+- **Clicks.** A click sends `Activate(x, y)`, the middle button `SecondaryActivate`; an item that is
+  only a menu (`ItemIsMenu`), or whose app answers `Activate` with an error, opens its menu instead. A
+  right click shows its `com.canonical.dbusmenu` menu (`AboutToShow`, then `GetLayout`) with the SDK's
+  menu: labels without their mnemonic, separators, check marks and radios, disabled and hidden
+  entries, submenus up to 4 levels (the SDK opens one; deeper ones are laid out under a header) and
+  256 entries. A choice sends `Event(id, "clicked")`, only for an entry of the menu just shown. An item
+  with no menu gets `ContextMenu(x, y)` and draws its own. A menu that comes more than 5 s after the
+  click opens nothing.
+- **Never waiting.** Every call is sent and its answer handled when it comes in the main loop: an app
+  that hangs only loses its own icon or menu. The texts are cleaned (`server/src/ui/snimodel.c`: valid
+  UTF-8, no control or bidi formatting characters, 128 bytes).
+- **The JS.** `lord.sni` (`list`, `pixels`, `activate`, `menu`, `clicked`) and the `sni`, `sni-gone`
+  and `sni-menu` events exist only in the desktop's own context, never in an isolated app.
+- **Tests.** `build/sni-test` (in `make -C server test`): the two registration forms, pixmap picking
+  and validation, texts, and dbusmenu layouts within the depth and item caps, over messages built and
+  validated by our own D-Bus code. `server/tests/tray_model_test.mjs`: which items show, the layout as
+  the SDK's menu, where it opens. Not yet checked on the VM with real apps.
+
 ## Pending
 
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):

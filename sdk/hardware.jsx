@@ -34,6 +34,7 @@ import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
 import { wm } from './windows.js';
 import { linuxPlayersChanged } from './media.js';
+import { trayEvent } from './trayitems.jsx';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -539,6 +540,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-open': portalOpen(data); break;
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
     case 'notify': linuxNotify(data); break;
+    case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     case 'mpris': linuxPlayersChanged(data); break;
     default: break;

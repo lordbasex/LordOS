@@ -85,6 +85,8 @@ SRC += $(TP_SRC)
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
 # Passwords (src/vault/dbus.c, docs/PASSWORDS.md).
 WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/vault/dbus.c
+# the tray of Linux apps: org.kde.StatusNotifierWatcher and dbusmenu (src/ui/sni.c, docs/WAYLAND.md "Tray icons")
+WM_SRC += src/ui/sni.c src/ui/snimodel.c
 SRC += $(WM_SRC)
 # Clock and Help (docs/SYSTEM.md): time zones with our own TZif reader, and the help articles
 CLOCK_SRC := src/ui/tzif.c src/ui/js_help.c
@@ -589,6 +591,13 @@ drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c
 build/canvas-test: tests/canvas_test.c src/canvas.c src/canvas.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DLORD_CANVAS_TEST -o $@ tests/canvas_test.c src/canvas.c -lm
+# the tray host's readers without a bus (src/ui/snimodel.c): the registered service, IconPixmap at the bar's size, texts,
+# a dbusmenu layout within its depth and item caps
+test: build/sni-test
+build/sni-test: tests/sni_test.c src/ui/snimodel.c src/ui/snimodel.h src/vault/dbus.c src/vault/dbus.h src/hw/jbuf.c src/hw/jbuf.h src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sni_test.c src/ui/snimodel.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 # the OpenURI portal's checks without a bus (src/ui/portalcheck.c): web addresses, local files, a file swapped after the check
 build/portal-check-test: tests/portal_check_test.c src/ui/portalcheck.c src/ui/portalcheck.h src/fsops.c src/fsops.h
 	@mkdir -p build

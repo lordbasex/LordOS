@@ -59,6 +59,7 @@
 #include "ui/grab.h"
 #include "ui/js_wm.h"
 #include "ui/portal.h"
+#include "ui/sni.h"
 #include "ui/js_logs.h"
 #include "hw/hw.h"
 #include "hw/pkagent.h"
@@ -2479,6 +2480,7 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && getenv("HOME") && session_user && js_cloud_start(getenv("HOME"))) fprintf(stderr, "lord-server: no Cloud\n");
     if (ok && snd_start()) fprintf(stderr, "lord-server: no PipeWire for now (sound); it retries on its own\n");
     if (ok && !s.greeter) portal_start();   /* dark mode, accent and buttons for GTK/GNOME/Qt (ui/portal.c) */
+    if (ok && !s.greeter) sni_start();      /* the tray icons of Linux apps (ui/sni.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
     if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "multi")) paint_multi_damage = 1;   /* several damaged rectangles (paint.c; off by default) */
@@ -2673,7 +2675,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[136 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[137 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -2701,6 +2703,8 @@ int main(int argc, char **argv) {
         if (sbase >= 0) pfd[n++] = (struct pollfd){ snd_fd(), POLLIN, 0 };
         int pbase = portal_fd() >= 0 ? n : -1;
         if (pbase >= 0) pfd[n++] = (struct pollfd){ portal_fd(), (short)(POLLIN | (portal_wants_write() ? POLLOUT : 0)), 0 };
+        int snbase = sni_fd() >= 0 ? n : -1;
+        if (snbase >= 0) pfd[n++] = (struct pollfd){ sni_fd(), (short)(POLLIN | (sni_wants_write() ? POLLOUT : 0)), 0 };
         int lgbase = logs_fd() >= 0 ? n : -1;                    /* app Registros: consultas e inotify */
         if (lgbase >= 0) pfd[n++] = (struct pollfd){ logs_fd(), POLLIN, 0 };
         int lbibase = lbi_fd() >= 0 ? n : -1;                    /* LordBench's synthetic pointer, like a device */
@@ -2771,6 +2775,7 @@ int main(int argc, char **argv) {
         if (dkbase >= 0 && pfd[dkbase].revents && disk_watch_dispatch()) js_disk_event("change");
         if (sbase >= 0 && pfd[sbase].revents) snd_dispatch();
         if (pbase >= 0 && pfd[pbase].revents) portal_dispatch();
+        if (snbase >= 0 && pfd[snbase].revents) sni_dispatch();
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
         if (fabase >= 0 && pfd[fabase].revents) js_fs_dispatch();

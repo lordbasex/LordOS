@@ -90,6 +90,7 @@
 #include "../hw/notifyd.h"
 #include "../hw/pkagent.h"
 #include "portal.h"
+#include "sni.h"
 #include "../hw/ppd.h"
 
 #include <fcntl.h>
@@ -384,6 +385,60 @@ static const JSCFunctionListEntry portal_funcs[] = {
     JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
     JS_CFUNC_DEF("opened", 2, f_portal_opened),
     JS_CFUNC_DEF("still", 1, f_portal_still),
+};
+
+/* lord.sni: the tray icons of Linux apps (ui/sni.c). Only the desktop's own context has it, never an isolated app. */
+static JSValue f_sni_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    HBuf b = { 0 };
+    sni_list(&b);
+    char *j = hb_take(&b);
+    JSValue v = j ? JS_ParseJSON(c, j, strlen(j), "<sni>") : JS_NewArray(c);
+    free(j);
+    return v;
+}
+
+/* lord.sni.pixels(id): { width, height, data } (straight RGBA) for <Image pixels>, or null */
+static JSValue f_sni_pixels(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int w = 0, h = 0;
+    const uint8_t *px = argc >= 1 ? sni_pixels(arg_int(c, argv[0], 0), &w, &h) : NULL;
+    if (!px) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "width", JS_NewInt32(c, w));
+    JS_SetPropertyStr(c, o, "height", JS_NewInt32(c, h));
+    JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, px, (size_t)w * h * 4));
+    return o;
+}
+
+/* lord.sni.activate(id, x, y, secondary) */
+static JSValue f_sni_activate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3) return JS_FALSE;
+    int secondary = argc > 3 && JS_ToBool(c, argv[3]) > 0;
+    return JS_NewBool(c, !sni_activate(arg_int(c, argv[0], 0), arg_int(c, argv[1], 0), arg_int(c, argv[2], 0), secondary));
+}
+
+/* lord.sni.menu(id, x, y): 1 its menu comes as the "sni-menu" event, 0 the app shows its own, -1 none */
+static JSValue f_sni_menu(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3) return JS_NewInt32(c, -1);
+    return JS_NewInt32(c, sni_menu(arg_int(c, argv[0], 0), arg_int(c, argv[1], 0), arg_int(c, argv[2], 0)));
+}
+
+/* lord.sni.clicked(id, entry): an entry of that menu was chosen */
+static JSValue f_sni_clicked(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2) return JS_FALSE;
+    return JS_NewBool(c, !sni_menu_clicked(arg_int(c, argv[0], 0), arg_int(c, argv[1], -1)));
+}
+
+static const JSCFunctionListEntry sni_funcs[] = {
+    JS_CFUNC_DEF("list", 0, f_sni_list),
+    JS_CFUNC_DEF("pixels", 1, f_sni_pixels),
+    JS_CFUNC_DEF("activate", 4, f_sni_activate),
+    JS_CFUNC_DEF("menu", 3, f_sni_menu),
+    JS_CFUNC_DEF("clicked", 2, f_sni_clicked),
 };
 
 static const JSCFunctionListEntry bt_funcs[] = {
@@ -835,6 +890,7 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "bt", bt_funcs, sizeof bt_funcs / sizeof bt_funcs[0]);
     add(c, lord, "polkit", polkit_funcs, sizeof polkit_funcs / sizeof polkit_funcs[0]);
     add(c, lord, "portal", portal_funcs, sizeof portal_funcs / sizeof portal_funcs[0]);
+    add(c, lord, "sni", sni_funcs, sizeof sni_funcs / sizeof sni_funcs[0]);
     add(c, lord, "mime", mime_funcs, sizeof mime_funcs / sizeof mime_funcs[0]);
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);
     add(c, lord, "notifyd", nd_funcs, sizeof nd_funcs / sizeof nd_funcs[0]);
