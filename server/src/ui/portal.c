@@ -10,6 +10,7 @@
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../vault/dbus.h"
+#include "../wl/wl.h"
 
 #include <fnmatch.h>
 #include <stdio.h>
@@ -185,7 +186,10 @@ static void file_chooser(const DMsg *m, const char *mode) {
     if (npicks >= MAX_PICKS) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "too many requests"); return; }
     DRd r;
     dr_init(&r, m);
-    dr_str(&r, NULL);                       /* the parent window: the dialog is the system's, over everything */
+    /* the parent window: the dialog is the system's, over everything, and goes over that window when it
+     * is a Wayland one the app exported (xdg-foreign-v2, "wayland:<handle>") */
+    const char *parent = dr_str(&r, NULL);
+    int over = parent && !strncmp(parent, "wayland:", 8) ? wl_foreign_surface(parent + 8) : 0;
     const char *title = dr_str(&r, NULL), *name = "", *token = "", *accept = "";
     char folder[1024] = "";
     int multiple = 0, directory = 0, every = 0, npat = 0;
@@ -234,8 +238,8 @@ static void file_chooser(const DMsg *m, const char *mode) {
     if (!t) snprintf(tok, sizeof tok, "lordos%d", p->id);
     snprintf(p->handle, sizeof p->handle, "%s/request/%s/%s", OBJ_PATH, who, tok);
     HBuf j = { 0 };
-    hb_printf(&j, "{\"id\":%d,\"mode\":\"%s\",\"multiple\":%s,\"title\":", p->id,
-              directory ? "folder" : mode, multiple ? "true" : "false");
+    hb_printf(&j, "{\"id\":%d,\"mode\":\"%s\",\"multiple\":%s,\"parent\":%d,\"title\":", p->id,
+              directory ? "folder" : mode, multiple ? "true" : "false", over);
     hb_str(&j, title ? title : "");
     hb_printf(&j, ",\"name\":");   hb_str(&j, name);
     hb_printf(&j, ",\"accept\":"); hb_str(&j, accept);

@@ -27,7 +27,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Text fields: triple click selects the line (`runtime/events.js` counts clicks) | every desktop has it | S | ⬜ |
 | Drop from Files onto Notes (insert), Photos, Player, PDF Viewer (open) | the Editor and Terminal already take drops | S | ⬜ |
 | `xdg-activation-v1`: a link opened from the Terminal or a notification's click raises the browser already open; activation only with a valid token | the wrong window stays in front | S | ⬜ |
-| `xdg-foreign-v2` and `xdg-dialog-v1`: portal dialogs attached to their window | dialogs float loose | S | ⬜ |
+| `xdg-foreign-v2` and `xdg-dialog-v1`: portal dialogs attached to their window | dialogs float loose | S | ✅ |
 
 ## Phase 2 — the compositor's big three
 

@@ -7,8 +7,9 @@
 // draws only the content. The app may switch while open ('deco'). Moving, resizing and the window
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
-import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop } from './windows.js';
+import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, workAreaOf } from './windows.js';
+import { followParents, overParent } from './dialogmodel.js';
 import { acceptsAppRequest, keyboardSurface, focusedOn, surfaceState } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
@@ -84,16 +85,20 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // cascaded, but always inside the work area (never under the Dock)
       const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
       const args = { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) };
-      const saved = placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
+      // a dialog over the window it belongs to (sdk/dialogmodel.js), on that window's desktop
+      const owner = d.parent ? wm.get(idOf(d.parent)) : null;
+      const saved = owner ? null : placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
       // a dialog goes where its app asks and isn't remembered; a fixed window keeps its size
       if (d.dialog) args.dialog = true;
       if (d.fixed) args.fixedLinux = true;
+      if (d.parent) { args.parent = idOf(d.parent); args.modal = !!d.modal; }
       const kept = saved || d.dialog ? null : rememberedFrame(dockIdOfWindow({ id, args }), { fixed: !!d.fixed, size: [w, hh] });
       wm.open('linux', {
         instance: String(sid),
-        frame: saved?.frame || (kept ? { x: kept.x, y: kept.y, w: kept.w, h: kept.h } : { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) }),
+        frame: owner ? overParent(wm.frame(owner), w, hh, workAreaOf(displayFor(owner)))
+          : saved?.frame || (kept ? { x: kept.x, y: kept.y, w: kept.w, h: kept.h } : { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) }),
         args,
-        desktop: saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
+        desktop: owner ? owner.desktop : saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
       saved?.then(id);
       if (kept?.maximized) wm.toggleMaximize(id);
@@ -106,6 +111,8 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       break;
     }
     case 'unmap': if (win) wm.close(id, true); break;
+    // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
+    case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id
       if (!win) break;
       const pkg = win.args?.pkg ? getApp(win.args.appId) : null;
@@ -139,6 +146,17 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
 
 // A terminal emulator, from its .desktop: there ❖C reaches it as Ctrl+Shift+C (Ctrl+C is the signal).
 const isTerminalEmulator = (w) => String(linuxAppFor(w.args?.appId || '')?.categories || '').split(';').includes('TerminalEmulator');
+
+// Dialogs stay with their window: moved, minimized and sent to another desktop with it, a modal one
+// right above it (sdk/dialogmodel.js). Each change is compared with the list before it, until it settles;
+// it runs before sync below, which then sees the settled list.
+let seen = windows.get();
+windows.subscribe(() => {
+  const prev = seen, next = windows.get();
+  seen = next;
+  const kept = followParents(prev, next);
+  if (kept !== next) windows.set(kept);
+});
 
 // The keyboard goes to the Linux app in front of the showing desktop, never to a window of a hidden
 // one (a security rule: desktopmodel.js keyboardSurface, docs/DESKTOPS.md). Parking comes first: it

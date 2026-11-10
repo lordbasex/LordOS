@@ -109,8 +109,12 @@ int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lord
 const char *wl_clip_html(size_t *len);
 void        wl_clip_set_html(const char *html, size_t n);
 
+/* xdg-foreign-v2: the window an app exported with that handle (a portal's "wayland:<handle>" parent),
+ * or 0 if no live window has it */
+int  wl_foreign_surface(const char *handle);
+
 /* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize,
- * minimize, fullscreen, unfullscreen. data is JSON. */
+ * minimize, fullscreen, unfullscreen, parent (the window a dialog belongs to, and whether it is modal). data is JSON. */
 typedef void (*WlEventFn)(int id, const char *type, const char *json);
 void wl_events(WlEventFn fn);
 

@@ -35,7 +35,9 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
 | `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below) |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps") |
-| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
+| `xdg_wm_dialog_v1` | 1 | a toplevel says it is a dialog and whether it is modal: a modal one holds its parent's input (0.8.8.8, see "Dialogs") |
 | `zxdg_decoration_manager_v1` | 1 | the app picks who draws the frame: server side (Qt, foot, Kitty, Alacritty: the theme's frame) or client side (Chromium with its own bar), also while it's open (0.8.4) |
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
@@ -175,6 +177,36 @@ Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53
 per frame, just like LordOS windows; while it lasts, the app doesn't receive the pointer. All
 Linux windows, including those with their own frame, have the theme's invisible borders for
 resizing (see `WINDOWS.md`).
+
+### Dialogs (0.8.8.8)
+
+A Linux app's dialog belongs to a window: the app says so with `xdg_toplevel.set_parent`, or another
+process (a portal, a helper of the app) with xdg-foreign-v2's `zxdg_imported_v2.set_parent_of` and the
+handle the app exported. xdg-dialog-v1 adds whether it is modal. lord-server keeps the owner and the
+flag on the surface and tells JS in `map` (`parent`, `modal`) and in a `parent` event when they change;
+`sdk/wayland.js` keeps them in the window's `args.parent` and `args.modal`, and `sdk/dialogmodel.js`
+(`server/tests/dialog_model_test.mjs`) does the rest:
+
+- the dialog opens centered over its parent, inside that display's work area, on the parent's desktop;
+- it moves by as much as its parent moves (a drag is tracked in C, so the dialog joins the parent
+  when the button is released), and it is minimized, brought back and sent to another desktop with it;
+- a **modal** dialog stays right above its parent: bringing the parent forward brings the dialog
+  above it, so the front window, the one with the keyboard, is the dialog. Minimizing a modal dialog
+  minimizes its parent too. While it is up, lord-server gives the parent no presses and no wheel
+  (releases still go, so a drag ends) and sends the parent's keyboard to the dialog (`modal_over` in
+  `wl.c`). A dialog that isn't modal may go behind its parent.
+
+A window that goes away leaves its dialogs to its own parent, as xdg-shell says; one that would make
+a loop is ignored. **Handles** are 128 random bits from `getrandom` in hex, made for each export: they
+can't be guessed, two exports of the same window get different ones, and a handle stops working when
+its export or its surface goes away (every import of it is told `destroyed`; an unknown handle is told
+so at once). The **file chooser portal** (`server/src/ui/portal.c`) reads its `parent_window`: for
+`wayland:<handle>` it asks `wl_foreign_surface` for that window and the shell's dialog
+(`PortalFilePrompt` in `sdk/filepicker.jsx`) is drawn over it instead of in the middle of the screen;
+it is still the system's dialog, above every window. Not read: `x11:<id>` parents, and xdg-foreign
+v1 (GTK 3 only speaks v1, so its portal dialogs still open in the middle). `build/dialog-client` (`tests/dialog_client.c`, inside a session or a headless
+lord-server) checks both protocols from two connections; `hold 20` keeps a modal dialog over its
+window to try by hand.
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 
