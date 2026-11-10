@@ -38,10 +38,14 @@ typedef struct {
     const char *title, *app_id, *app_alt;      /* WM_CLASS class and instance */
     int csd;                                   /* draws its own frame (Motif hints): no theme frame */
     int popup;                                 /* menu, tooltip, override-redirect: drawn above everything */
-    int x, y, width, height;
+    int x, y, width, height;                   /* logical pixels (xwm.c converts X's, xwscale.h) */
 } XWinInfo;
 struct wl_client *wlx_client(void);            /* Xwayland's connection (NULL if not running) */
 void wlx_set_client(struct wl_client *c);
+/* HiDPI (xwscale.h): before Xwayland connects, the scale its X pixels get (the largest display's when
+ * self is set, the apps scale themselves; otherwise 100) for this run; wlx_scale() gives it. */
+int  wlx_begin_scale(int self);
+int  wlx_scale(void);
 /* Gives the X window's wl_surface its role. Returns the surface id, 0 if that surface doesn't exist
  * (yet) or isn't Xwayland's. */
 int  wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *info);

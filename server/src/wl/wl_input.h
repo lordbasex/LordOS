@@ -53,5 +53,6 @@ struct wl_display  *wl__display(void);
 struct wl_resource *wl__pointer_focus(void);          /* wl_surface under the pointer, or NULL */
 struct wl_list     *wl__pointers(void);
 struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly);
+float               wl__client_scale(struct wl_client *c);   /* Xwayland's X pixels per logical one, 1 for others */
 
 #endif

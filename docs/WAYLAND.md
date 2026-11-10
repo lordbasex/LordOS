@@ -643,6 +643,40 @@ asynchronously, so lord-server never waits on Xwayland while Xwayland waits on t
 - **Java.** AWT guesses the insets of a reparenting window manager; ours doesn't reparent, so
   `_JAVA_AWT_WM_NONREPARENTING=1` is set for the session's apps (without it Swing windows are blank).
 
+### X11 apps on HiDPI displays (in development, 0.8.8.8)
+
+On a display above 100 % an X11 app used to be drawn at its logical size and enlarged by LordOS: the right
+size, but blurry. Now, as in KWin's "apps scale themselves", **the X11 apps scale themselves** by default
+(`server/src/wl/xwscale.c`, the pure part, tested by `build/xwscale-test` in `make -C server test`):
+
+- **One scale per run.** When Xwayland starts, it gets the largest display scale (`wlx_begin_scale` in
+  `wl.c`, 100–300 %) for as long as it runs. X's coordinates are LordOS's logical pixels times it: on the
+  densest display one X pixel is one device pixel. Xwayland's `-hidpi` option is for rootful mode only,
+  so this is done in the compositor, for Xwayland's connection alone (a per-client scale, like KWin's).
+- **What wl.c converts** for Xwayland's surfaces: their logical size is the buffer's divided by the scale
+  (so LordOS copies them 1:1 on that display instead of enlarging them), the input region, the pointer
+  (`enter`, `motion`), relative motion, touches (`wl_input.c`) and a text field's caret. Its `wl_output`s
+  and `zxdg_output_v1`s carry the position and size in X pixels and scale 1.
+- **What xwm.c converts**: every place and size it gives X (`xwm_place`, `xwm_resize`, fullscreen) and
+  every one it reads back (a new window, a menu or tooltip moved). Both directions round to the nearest
+  and give the same value back for every scale of 100 % or more. The root window's arrow is made at
+  that scale.
+- **The apps are told** with `Xft.dpi` (96 × scale, 192 at 200 %) in the root window's
+  `RESOURCE_MANAGER`, set before the window manager lets the first app in. Xft text (xterm with
+  `-fa`), Qt, Chromium and Electron, and Tk read it. LordOS serves no XSETTINGS and sets no `GDK_SCALE` or
+  `QT_SCALE_FACTOR` (neither KWin nor GNOME does; they would change Wayland apps too), so an app that
+  reads neither (core-font xterm, Java/Swing, GTK 3 on X11) looks small.
+- **Settings → Displays → X11 apps**: «Scale themselves (sharp)», the default, or «Scaled by LordOS
+  (blurry)», the old behaviour (`settings.x11Scaling`, `'self'` | `'lordos'`; `sdk/wayland.js` sends it with
+  `lord.wayland.x11SelfScale(on)`). The row shows only where Xwayland is installed. A change of the
+  setting or of a display's scale applies the next time Xwayland starts, when no X11 app is open (10 s
+  after the last one closes). `lord.wayland.info()` gives `x11SelfScale` and `x11Scale` (the running
+  one's scale, 0 when it isn't running), and lord-server's log says the scale it started with
+  (`xwayland: started ... X pixels at 200 %`).
+- **Not done:** the scale doesn't follow a display change while X11 apps are open; an X app's cursor
+  follows `XCURSOR_SIZE`, which LordOS sets in logical pixels, so it can look small at 200 %; scroll and
+  gesture deltas are not converted.
+
 ### Clipboard and primary selection
 
 Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to paste):

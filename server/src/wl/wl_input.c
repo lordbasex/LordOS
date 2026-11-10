@@ -238,14 +238,16 @@ int wl_input_touch(int phase, int id, double x, double y) {
         tch[id].client = c;
         tch[id].ox = x - lx;
         tch[id].oy = y - ly;
-        FOR_CLIENT(&touches, c, r) wl_touch_send_down(r, serial(), t, s, id, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+        float k = wl__client_scale(c);          /* an X11 app's surface is in X pixels */
+        FOR_CLIENT(&touches, c, r) wl_touch_send_down(r, serial(), t, s, id, wl_fixed_from_double(lx * k), wl_fixed_from_double(ly * k));
         mark_frame(c);
         return 1;
     }
     if (!tch[id].on) return 0;
     struct wl_client *c = tch[id].client;
     if (phase == TP_UPDATE) {
-        FOR_CLIENT(&touches, c, r) wl_touch_send_motion(r, t, id, wl_fixed_from_double(x - tch[id].ox), wl_fixed_from_double(y - tch[id].oy));
+        double k = wl__client_scale(c);
+        FOR_CLIENT(&touches, c, r) wl_touch_send_motion(r, t, id, wl_fixed_from_double((x - tch[id].ox) * k), wl_fixed_from_double((y - tch[id].oy) * k));
     } else {
         FOR_CLIENT(&touches, c, r) {
             if (phase == TP_CANCEL) wl_touch_send_cancel(r);

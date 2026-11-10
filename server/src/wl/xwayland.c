@@ -13,7 +13,10 @@
  * can't type into another one. Xwayland runs in its own scope (lordos-xwayland.scope) and its own
  * network namespace (no network at all), with no_new_privs, a minimal environment and its log in
  * ~/.cache/lordos/xwayland.log. 10 s after the last X11 app closes, the window manager stops it
- * (xwl_idle); the socket stays in lord-server, so the next X11 app starts it again. */
+ * (xwl_idle); the socket stays in lord-server, so the next X11 app starts it again.
+ *
+ * HiDPI (xwscale.h): when it starts, X gets its pixel size for that run, the largest display's scale
+ * unless Settings → Displays says X11 apps are scaled by LordOS (xwl_set_self_scaling). */
 #include "xwayland.h"
 #include "xwm.h"
 #include "x11wire.h"
@@ -53,7 +56,8 @@ static struct {
     struct wl_listener gone;
     time_t started, disabled_until;
     int quick_fails;
-} XW = { .disp = -1, .lfd = -1, .pidfd = -1 };
+    int self_scale;                     /* X11 apps scale themselves (sharp); 0: LordOS enlarges them */
+} XW = { .disp = -1, .lfd = -1, .pidfd = -1, .self_scale = 1 };
 
 static int on_connect(int fd, uint32_t mask, void *data);
 
@@ -224,6 +228,7 @@ static void spawn(void) {
     char *argv[] = { "Xwayland", disp, "-rootless", "-listenfd", "3", "-wm", "5",
                      "-nolisten", "tcp", "-extension", "XTEST", NULL };
     int managed = getenv("LORDOS_SESSIOND") != NULL;
+    int pct = wlx_begin_scale(XW.self_scale);              /* before it binds the outputs */
     pid_t pid = fork();
     if (pid == 0) {
         setsid();
@@ -286,7 +291,7 @@ static void spawn(void) {
     }
     XW.pidfd = (int)syscall(SYS_pidfd_open, pid, 0);
     if (XW.pidfd >= 0) XW.pev = wl_event_loop_add_fd(XW.loop, XW.pidfd, WL_EVENT_READABLE, on_pidfd, NULL);
-    fprintf(stderr, "xwayland: started (pid %d) for an X11 app on %s\n", (int)pid, XW.display);
+    fprintf(stderr, "xwayland: started (pid %d) for an X11 app on %s, X pixels at %d %%\n", (int)pid, XW.display, pct);
 }
 
 static int on_connect(int fd, uint32_t mask, void *data) {
@@ -319,3 +324,5 @@ void xwl_stop(void) {
 const char *xwl_display(void) { return XW.display; }
 const char *xwl_socket_path(void) { return XW.lfd >= 0 ? XW.sock : ""; }
 int xwl_running(void) { return XW.pid > 0; }
+void xwl_set_self_scaling(int on) { XW.self_scale = !!on; }
+int xwl_self_scaling(void) { return XW.self_scale; }

@@ -65,6 +65,7 @@
 #include "xdg-dialog-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
+#include "xwscale.h"
 #include "../outputs.h"
 #include "../cursor.h"
 #include "ptrlock.h"
@@ -175,6 +176,10 @@ static int next_id = 1;
 
 static struct wl_display *dpy;
 static struct wl_client *xwl_client;    /* Xwayland (X11 apps), or NULL */
+/* X pixels per 100 logical ones while Xwayland runs (xwscale.h): its surfaces, its pointer and its
+ * outputs are in X pixels, everything else here in logical ones */
+static int xw_pct = 100;
+static int xw_scaled(struct wl_client *c) { return c && c == xwl_client && xw_pct != 100; }
 static struct wl_event_loop *loop;
 static char socket_name[64];
 
@@ -540,6 +545,7 @@ static void apply_viewport(Surf *s) {
     if (s->viewport && s->vdw > 0 && s->vdh > 0) { s->lw = s->vdw; s->lh = s->vdh; }
     else if (s->viewport && s->vsw > 0 && s->vsh > 0) { s->lw = (int)s->vsw; s->lh = (int)s->vsh; }
     else { int b = s->bscale > 0 ? s->bscale : 1; s->lw = s->w / b; s->lh = s->h / b; }
+    if (xw_scaled(s->client)) { s->lw = xws_from_x(s->lw, xw_pct); s->lh = xws_from_x(s->lh, xw_pct); }   /* an X window */
 }
 
 /* ---- wl_surface ---- */
@@ -1039,16 +1045,23 @@ static OutSlot *slot_of(struct wl_resource *r) {
 
 static void send_output(struct wl_resource *r, const WlOutput *o) {
     int ver = wl_resource_get_version(r);
-    wl_output_send_geometry(r, o->x, o->y, o->mm_w, o->mm_h, WL_OUTPUT_SUBPIXEL_UNKNOWN, "LordOS", o->desc[0] ? o->desc : "lord-server",
+    /* Xwayland sees the displays in X pixels, one per device pixel on the densest one: scale 1 */
+    int xs = xw_scaled(wl_resource_get_client(r));
+    wl_output_send_geometry(r, xs ? xws_to_x(o->x, xw_pct) : o->x, xs ? xws_to_x(o->y, xw_pct) : o->y, o->mm_w, o->mm_h, WL_OUTPUT_SUBPIXEL_UNKNOWN, "LordOS", o->desc[0] ? o->desc : "lord-server",
                             WL_OUTPUT_TRANSFORM_NORMAL);
     wl_output_send_mode(r, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, o->pw, o->ph, o->refresh > 0 ? o->refresh : 60000);
-    if (ver >= 2) wl_output_send_scale(r, int_scale(o->scale));
+    if (ver >= 2) wl_output_send_scale(r, xs ? 1 : int_scale(o->scale));
     if (ver >= 4) { wl_output_send_name(r, o->name); wl_output_send_description(r, o->desc[0] ? o->desc : o->name); }
 }
 
 static void send_xdg_output(struct wl_resource *x, const WlOutput *o) {
-    zxdg_output_v1_send_logical_position(x, o->x, o->y);
-    zxdg_output_v1_send_logical_size(x, o->w, o->h);
+    if (xw_scaled(wl_resource_get_client(x))) {
+        zxdg_output_v1_send_logical_position(x, xws_to_x(o->x, xw_pct), xws_to_x(o->y, xw_pct));
+        zxdg_output_v1_send_logical_size(x, xws_to_x(o->w, xw_pct), xws_to_x(o->h, xw_pct));
+    } else {
+        zxdg_output_v1_send_logical_position(x, o->x, o->y);
+        zxdg_output_v1_send_logical_size(x, o->w, o->h);
+    }
     int ver = wl_resource_get_version(x);
     if (ver >= 2 && ver < 3) { zxdg_output_v1_send_name(x, o->name); zxdg_output_v1_send_description(x, o->desc[0] ? o->desc : o->name); }
     if (ver < 3) zxdg_output_v1_send_done(x);
@@ -3124,7 +3137,9 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
         Surf *hit = surface_at(k, lx - k->sx, ly - k->sy, ox, oy);
         if (hit) return hit;
     }
-    if (s->content && lx >= 0 && ly >= 0 && lx < s->lw && ly < s->lh && (!s->has_input || wlrgn_has(&s->input, lx, ly))) {
+    float rx = lx, ry = ly;                     /* the input region is in the surface's own pixels */
+    if (xw_scaled(s->client)) { rx = (float)xws_to_xf(lx, xw_pct); ry = (float)xws_to_xf(ly, xw_pct); }
+    if (s->content && lx >= 0 && ly >= 0 && lx < s->lw && ly < s->lh && (!s->has_input || wlrgn_has(&s->input, rx, ry))) {
         *ox = lx; *oy = ly;
         return s;
     }
@@ -3143,6 +3158,7 @@ static void pointer_enter(Surf *s, float lx, float ly) {
     }
     pointer_focus = s;
     if (s) {
+        if (xw_scaled(s->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
         FOR_CLIENT(&pointers, s->client, p) {
             wl_pointer_send_enter(p, wl_display_next_serial(dpy), s->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
             if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
@@ -3700,6 +3716,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
         if (down[i] && !held) { npress = 0; press_surf = target; }
     unsigned t = now_ms();
     struct wl_resource *p;
+    if (xw_scaled(target->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
     FOR_CLIENT(&pointers, target->client, p) {
         if (moved && !(constraint && constraint->active && constraint->lock))
             wl_pointer_send_motion(p, t, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
@@ -3750,6 +3767,7 @@ int wl_text_caret(float *x, float *y, float *w, float *h) {
     int how = wl_textinput_rect(r);
     if (!how || !origin(key_focus, &ox, &oy)) return 0;
     if (how == 2) { r[0] = key_focus->gx; r[1] = key_focus->gy; r[2] = r[3] = 0; }
+    else if (xw_scaled(key_focus->client)) for (int i = 0; i < 4; i++) r[i] = xws_from_x(r[i], xw_pct);
     tiu_rect_in(r, key_focus->lw, key_focus->lh, in);
     *x = ox + (float)in[0];
     *y = oy + (float)in[1];
@@ -4373,6 +4391,7 @@ static void bind_relm(struct wl_client *c, void *data, uint32_t ver, uint32_t id
 /* Relative motion (no acceleration or edges): main.c sends it with every motion. */
 void wl_pointer_relative(double dx, double dy) {
     if (!dpy || !pointer_focus || (dx == 0 && dy == 0)) return;
+    if (xw_scaled(pointer_focus->client)) { dx = xws_to_xf(dx, xw_pct); dy = xws_to_xf(dy, xw_pct); }   /* X pixels, like its motion */
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     uint64_t us = (uint64_t)t.tv_sec * 1000000ull + (uint64_t)t.tv_nsec / 1000;
@@ -4809,6 +4828,15 @@ struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly) {
 
 struct wl_client *wlx_client(void) { return xwl_client; }
 void wlx_set_client(struct wl_client *c) { xwl_client = c; }
+
+int wlx_begin_scale(int self) {
+    int pct[OUT_MAX], n = 0;
+    for (int i = 0; i < OUT_MAX; i++) if (oslots[i].used) pct[n++] = oslots[i].o.scale;
+    xw_pct = xws_pick(pct, n, self);
+    return xw_pct;
+}
+int wlx_scale(void) { return xw_pct; }
+float wl__client_scale(struct wl_client *c) { return xw_scaled(c) ? xw_pct / 100.0f : 1.0f; }
 
 int wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *in) {
     if (!dpy || !xwl_client) return 0;

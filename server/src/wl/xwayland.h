@@ -15,5 +15,10 @@ void xwl_stop(void);                    /* stops Xwayland and removes the socket
 const char *xwl_display(void);          /* ":1", or "" */
 const char *xwl_socket_path(void);      /* "/tmp/.X11-unix/X1", or "" (apps.c: restricted apps' view) */
 int  xwl_running(void);                 /* is Xwayland running now? */
+/* Settings → Displays: X11 apps scale themselves (1, the default: X pixels are device pixels on the
+ * densest display and Xft.dpi says how much larger to draw) or LordOS enlarges them (0). It applies the
+ * next time Xwayland starts (no X11 app open); wlx_scale() (xwm.h) is what the running one has. */
+void xwl_set_self_scaling(int on);
+int  xwl_self_scaling(void);
 
 #endif
