@@ -4,7 +4,8 @@
 // middle click pastes. Bundles tests/textfield_menu_scene.mjs
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
-// An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint).
+// An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint),
+// tests/screencast_scene.mjs (the ScreenCast chooser).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';

@@ -379,5 +379,8 @@ void  paint_capture(Canvas *c, Node *root);
  * issue #58), which are painted after every window and would otherwise be left out. */
 enum { PAINT_ALSO_MAX = 8 };
 int   paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n);
+/* Only that window (node, a window's frame) and its sheets (also), each only if it is in root's tree and shown: what is
+ * below it and above it is left out (sharing a window, cast/cast.c). 1 if it was painted. */
+int   paint_capture_node(Canvas *c, Node *root, int node, const int *also, int n);
 
 #endif

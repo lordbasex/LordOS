@@ -615,6 +615,21 @@ sudo apt-get install -y libtesseract-dev tesseract-ocr-eng tesseract-ocr-spa tes
 
 Without `libtesseract-dev`, `make -C server` skips `build/lord-ocr` (`OCRHELPER=0`).
 
+**To build `lord-screencast`** (a screen or a window shared with a Linux app, the ScreenCast portal, since 0.8.8.8;
+docs/WAYLAND.md "Sharing a screen or a window"). Already on the main machine (1.4.2, it came with PipeWire's own
+development packages); not installed on the VMs yet:
+
+```sh
+sudo apt-get install -y libpipewire-0.3-dev
+```
+
+| Package | Version | What for |
+|---|---|---|
+| `libpipewire-0.3-dev` (brings `libspa-0.2-dev`) | 1.4.2 | `lord-screencast`; `tests/screencast_test.sh` also runs `pipewire` itself, a private daemon |
+
+Without `libpipewire-0.3-dev`, `make -C server` skips `build/lord-screencast` (`SCREENCAST=0`) and the portal offers no
+source types.
+
 **To build `lord-tts`** (text to speech, `say`, since 0.8.8.6; docs/VOICE.md; installed on the main machine on
 2026-11-07):
 

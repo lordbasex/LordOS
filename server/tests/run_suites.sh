@@ -323,6 +323,9 @@ EOF
     # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
     if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
     else skip "portal-open-model-test" "node"; fi
+    # (0.8.8.8) a Linux app's ScreenCast chooser: what is offered, one or several, what lord-server gets (sdk/screencastmodel.js)
+    if have node; then run "screencast-model-test (sdk/screencastmodel.js)" node tests/screencast_model_test.mjs
+    else skip "screencast-model-test" "node"; fi
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
@@ -374,6 +377,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) the ScreenCast chooser: the app's name, the pictures, Share only with a pick, Cancel, the app closing it (sdk/screencast.jsx)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs
+    else skip "screencast-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs

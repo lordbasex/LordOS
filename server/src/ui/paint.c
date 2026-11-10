@@ -2127,6 +2127,20 @@ int paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n)
     return reached;
 }
 
+int paint_capture_node(Canvas *c, Node *root, int node, const int *also, int n) {
+    Node *w = node > 0 ? node_get(node) : NULL;
+    if (!root || !w || !in_tree(w, root)) return 0;
+    for (const Node *a = w; a; a = a->parent) if (a->s.display_none) return 0;   /* minimized, or on another desktop */
+    paint_capture_mode = 1;
+    paint_node(c, w, 1);
+    for (int i = 0; also && i < n && i < PAINT_ALSO_MAX; i++) {
+        Node *s = also[i] > 0 && also[i] != node ? node_get(also[i]) : NULL;
+        if (s && s != root && in_tree(s, root)) paint_node(c, s, 1);
+    }
+    paint_capture_mode = 0;
+    return 1;
+}
+
 static Node *hit(Node *n, float x, float y) {
     if (n->type == NODE_RAW || n->s.display_none || n->s.pointer_none == POINTER_NONE) return NULL;
     float lx = x, ly = y;              /* through the transforms: the box as it is painted */

@@ -285,9 +285,36 @@ static Surf *find(int id) {
     return NULL;
 }
 
+/* what cast.c asked to be told of (wl_content_track) */
+static int content_on;
+static Box content_box;
+
+static void content_note(Box b) {
+    if (b.x1 <= b.x0 || b.y1 <= b.y0) return;
+    if (content_box.x1 <= content_box.x0 || content_box.y1 <= content_box.y0) { content_box = b; return; }
+    if (b.x0 < content_box.x0) content_box.x0 = b.x0;
+    if (b.y0 < content_box.y0) content_box.y0 = b.y0;
+    if (b.x1 > content_box.x1) content_box.x1 = b.x1;
+    if (b.y1 > content_box.y1) content_box.y1 = b.y1;
+}
+
+void wl_content_track(int on) { content_on = on; content_box = (Box){ 0, 0, 0, 0 }; }
+
+int wl_content_take(float *x0, float *y0, float *x1, float *y1) {
+    if (content_box.x1 <= content_box.x0 || content_box.y1 <= content_box.y0) return 0;
+    *x0 = content_box.x0; *y0 = content_box.y0; *x1 = content_box.x1; *y1 = content_box.y1;
+    content_box = (Box){ 0, 0, 0, 0 };
+    return 1;
+}
+
 static void damage_node(Surf *s) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
+    if (content_on) {               /* a menu or a fullscreen app may be anywhere: all of it */
+        Node *tn = top->node ? node_get(top->node) : NULL;
+        if (top->role == R_POPUP || top == fs_surf || !tn) content_note((Box){ 0, 0, ui.width, ui.height });
+        else content_note(tn->prev_box);
+    }
     /* GPU path: if only the content changed, presenting again is enough */
     if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { need_frame = 1; return; }
     Node *n = top->node ? node_get(top->node) : NULL;

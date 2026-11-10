@@ -329,7 +329,8 @@ A single sandbox for all of LordOS, no copies: the helpers that decode untrusted
 (`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
 `lord-maild`, `lord-vault`, since 0.8.7 the network reader `lord-lan`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
 engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `lord-bench`, and since 0.8.7 Cleaner's
-scanner `lord-clean` and Remote Desk's `lord-rdesk`) use
+scanner `lord-clean` and Remote Desk's `lord-rdesk`, and since 0.8.8.8 `lord-screencast`, the PipeWire stream of a screen or a
+window shared with a Linux app, which gets its PipeWire connections already connected and adds only the `timerfd_*` calls) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
 
 ```c

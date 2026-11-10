@@ -284,7 +284,7 @@ adds it as well, as defence in depth (the kernel path is the boundary, not bubbl
 | no USB | `cgroup/dev` | `--nodevice=usb` |
 | no Bluetooth | `cgroup/lsm_socket_create` | `--disallow=bluetooth` |
 | no microphone | `cgroup/dev` (ALSA capture nodes) + PipeWire guard | — (`--nosocket=pulseaudio` would also take the sound output) |
-| no screen capture | no capture protocol, no screen-cast portal, `/dev/fb*` denied | — |
+| no screen capture | no capture protocol; the ScreenCast portal refuses the app and the PipeWire guard hides every shared screen from it; `/dev/fb*` denied | — |
 | no notifications | `hw/notifyd.c`: the caller's pid is the app's `xdg-dbus-proxy`, which `flatpak run` starts inside the scope, so its cgroup is the app's | — |
 | no access to your files | LordOS's view (home is a tmpfs with only `~/.var/app/<id>`), see Problem 1 | `--nofilesystem=home --nofilesystem=host` |
 
@@ -320,8 +320,9 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 | `org.freedesktop.portal.Inhibit` | served (version 1), in development | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
 | `org.freedesktop.ScreenSaver` (own bus name) | served, in development | `Inhibit`/`UnInhibit` with a cookie, the same hold, and `GetActive`; released when the caller leaves the bus |
 | Notification | not a portal here | apps use `org.freedesktop.Notifications` (`server/src/hw/notifyd.c`) |
+| `org.freedesktop.portal.ScreenCast` | served (version 4), in development (0.8.8.8) | `CreateSession`, `SelectSources` (monitor and window, one or several, the pointer hidden or drawn into the picture; the cursor as metadata isn't offered), `Start` and `OpenPipeWireRemote`, and the `Session` object (`Close`, `Closed`). `Start` shows LordOS's own chooser: the displays and the open windows with a picture of each and the name of the app asking; nothing is shared until the person picks, Cancel answers 1, and an app with "no screen capture" is answered 2 without a question. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the person picks every time. The streams come from the sandboxed `lord-screencast` (`server/src/cast/`); the fd `OpenPipeWireRemote` returns is a PipeWire connection that can see only the session's streams. While it runs, the sharing indicator shows it with a Stop; Stop, a lock, the app's `Close` or the app leaving the bus end it. See `WAYLAND.md`, "Sharing a screen or a window" |
 | Documents, Flatpak (sub-sandboxes) | not served | see below and E5 |
-| ScreenCast, Screenshot, Camera | never offered | they would hand out the screen or the camera (see A) |
+| Screenshot, Camera | never offered | they would hand out the screen or the camera (see A) |
 
 **A. Install `xdg-desktop-portal` and write a LordOS backend** (`org.freedesktop.impl.portal.*`:
 FileChooser, Screenshot, ScreenCast, Camera…). The frontend identifies Flatpak apps (from

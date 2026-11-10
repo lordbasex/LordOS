@@ -1,7 +1,10 @@
-/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI and Inhibit, and
+/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit and ScreenCast, and
  * org.freedesktop.ScreenSaver, on the session bus (see portal.c). */
 #ifndef LORD_PORTAL_H
 #define LORD_PORTAL_H
+
+#include <stdint.h>
+#include "../cast/cast.h"
 
 int  portal_start(void);                /* after dropping privileges; 0 if it owns the name */
 int  portal_fd(void);                   /* for poll; -1 if absent */
@@ -16,6 +19,18 @@ void portal_open_done(int id, int code);
 int  portal_open_still(int id);
 /* An app holds idle or sleep off (Inhibit portal, ScreenSaver.Inhibit): counts as wl_idle_inhibited. */
 int  portal_inhibited(void);
+/* ScreenCast. From the shell: the person's picks in the chooser (n = 0: Cancel), the indicator on screen, its Stop, and a
+ * picture of a source for the chooser while it is up (a media id, 0 none). */
+void portal_cast_chosen(int id, const CastSource *src, int n);
+void portal_cast_shown(int id);
+void portal_cast_stop(int id);
+int  portal_cast_thumb(int id, const CastSource *src);
+/* From cast.c: the streams are there, they couldn't be made, a running session ended (the source went, the helper
+ * failed, a lock), and the app's restricted connection (fd, or -1; the portal closes it). */
+void portal_cast_streams(int id, const CastStreamInfo *info, int n);
+void portal_cast_failed(int id);
+void portal_cast_lost(int id);
+void portal_cast_remote(int id, uint32_t req, int fd);
 /* From JS (lord.portal.set): mode, accent (0..1), GNOME accent name and GTK button order. */
 void portal_set(int dark, const double rgb[3], const char *accent_name, const char *button_layout);
 

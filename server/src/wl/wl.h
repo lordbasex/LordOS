@@ -95,6 +95,11 @@ int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
+/* Sharing a screen or a window (cast/cast.c): while on, the boxes of the windows and menus whose content changed are
+ * kept (logical px), also on the GPU path, where an app's new frame is only a texture and no UI damage. take: their
+ * box since the last take, 0 if none. */
+void wl_content_track(int on);
+int  wl_content_take(float *x0, float *y0, float *x1, float *y1);
 void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
 int  wl_wants_frame(void);                  /* an app changed its content */

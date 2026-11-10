@@ -54,6 +54,14 @@ int main(void) {
     CHECK(pwguard_stream_flag("Stream/Input/Audio") == FW_R_NO_MIC);
     CHECK(pwguard_stream_flag("Stream/Input/Video") == FW_R_NO_CAMERA);
     CHECK(pwguard_stream_flag("Stream/Output/Audio") == 0);
+    /* a shared screen or window (lord-screencast) is hidden from no-screen apps, not from no-camera ones */
+    CHECK(pwguard_node_flag("Video/Source", "Screen", "lordos-screencast-0") == FW_R_NO_SCREEN);
+    CHECK(pwguard_node_flag("Video/Source", NULL, "lordos-screencast-1") == FW_R_NO_SCREEN);
+    CHECK(pwguard_node_flag("Video/Source", "Screen", NULL) == FW_R_NO_SCREEN);
+    CHECK(pwguard_node_flag("Video/Source", "Camera", "v4l2_input.pci") == FW_R_NO_CAMERA);
+    CHECK(pwguard_node_flag("Video/Source", NULL, NULL) == FW_R_NO_CAMERA);
+    CHECK(pwguard_node_flag("Audio/Source", "Screen", "lordos-screencast-0") == FW_R_NO_MIC);   /* only a video source is a screen */
+    CHECK(pwguard_node_flag("Audio/Sink", NULL, NULL) == 0);
     printf("pwguard-test: %d/%d passed\n", total - fails, total);
     return fails ? 1 : 0;
 }
