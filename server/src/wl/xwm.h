@@ -4,7 +4,7 @@
  * mapped top-level X window a wl_surface. The window manager is a second X client (on the fd
  * Xwayland gets with -wm) that decides what those windows are: a LordOS window with the theme's
  * frame, a menu or tooltip drawn above everything (override-redirect), their title and app
- * (WM_CLASS), focus, stacking, close, fullscreen, and the clipboard bridge. See docs/WAYLAND.md,
+ * (WM_CLASS), focus, stacking, close, fullscreen, the clipboard bridge and drag and drop (XDND). See docs/WAYLAND.md,
  * "X11 apps (Xwayland)", and docs/PRIVACY.md, "X11 apps". */
 #ifndef LORD_XWM_H
 #define LORD_XWM_H
@@ -32,6 +32,21 @@ void xwm_set_state(XWin *w, int maximized, int fullscreen, int minimized);
 void xwm_focus(XWin *w);                       /* NULL: a LordOS or Wayland window has the keyboard */
 void xwm_close(XWin *w);
 void xwm_tick(void);                           /* once per loop (wl_flush): clipboard changes, output */
+/* Drag and drop with X apps (XDND, see xwm.c). Actions are wl_data_device_manager's bits (1 copy, 2 move, 4 ask).
+ * A drag of LordOS's Files or of a Wayland app over an X window: xwm is its XDND source. mimes: its types;
+ * x, y: the pointer (logical, the X root's coordinates); want: the action asked for. */
+void xwm_dnd_enter(XWin *w, const char *const *mimes, int n, int x, int y, uint32_t want);
+void xwm_dnd_motion(int x, int y, uint32_t want);
+void xwm_dnd_leave(void);
+int  xwm_dnd_drop(void);                       /* 1 if the window took it (XdndDrop sent), 0: refused (call leave) */
+void xwm_dnd_source_gone(void);                /* the Wayland source went away: nothing more is read from it */
+/* An X app's drag: while a button is down on an X window and the pointer is outside the X windows, xwm's
+ * proxy is mapped (out 1) so the app's XDND talks to it; the Wayland side answers with these. */
+int  xwm_is_dnd_icon(const XWin *w);           /* an X app's drag icon (never the window under the pointer) */
+void xwm_xdrag_out(int out);
+void xwm_xdrag_status(int accept, uint32_t action);    /* what the window under the pointer takes now */
+void xwm_xdrag_receive(const char *mime, int fd);      /* read that type from the X app into fd (takes it) */
+void xwm_xdrag_finished(int accepted, uint32_t action);
 
 /* ---- wl.c, called by xwm.c ---- */
 typedef struct {
@@ -57,5 +72,19 @@ void wlx_clip_png(const unsigned char *png, size_t n, const char *origin);
 void wlx_primary_text(const char *text, size_t n);
 /* The PRIMARY selection of Wayland apps (middle-click paste), for X: text and a generation. */
 const char *wlx_primary(size_t *n, unsigned *gen);
+/* Drag and drop (xwm.c, "drag and drop"). A Wayland drag over an X window: its data for the X window that
+ * asked (written into fd, which it takes; -1 if nothing is sent), the window's status, and its end. */
+int  wlx_dnd_send(const char *mime, int fd);
+void wlx_dnd_status(int accept, uint32_t action);
+void wlx_dnd_finished(int accepted, uint32_t action);
+/* An X app's drag outside the X windows, as a Wayland drag: begin (1 if it started; its MIME types), the
+ * action its source asks for, whether its files may reach LordOS (x11_xdnd_trusted), the drop (1 on a
+ * Wayland window, 2 on LordOS while Files reads it, 0 refused), and its end (left, or the X app gave up). */
+int  wlx_xdrag_begin(const char *const *mimes, int n);
+void wlx_xdrag_action(uint32_t actions);
+void wlx_xdrag_trust(int ok);
+int  wlx_xdrag_drop(void);
+void wlx_xdrag_end(void);
+void wlx_send_bytes(int fd, const void *data, size_t n);    /* writes it without blocking, then closes fd */
 
 #endif

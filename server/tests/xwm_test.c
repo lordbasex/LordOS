@@ -158,6 +158,118 @@ static void test_display(void) {
     CHECK(x11_pick_display(taken, NULL) == -1);
 }
 
+static int sandboxed_pid;
+static int fake_sandboxed(int pid) { return pid == sandboxed_pid; }
+
+static void test_xdnd(void) {
+    uint32_t d[5];
+    /* versions: ours is 5, an older target's is used, one older than 3 is not spoken */
+    CHECK(x11_xdnd_version(5) == 5 && x11_xdnd_version(9) == 5 && x11_xdnd_version(4) == 4 && x11_xdnd_version(3) == 3);
+    CHECK(x11_xdnd_version(2) == 0 && x11_xdnd_version(0) == 0);
+    /* XdndEnter: up to three types in the message, more in XdndTypeList */
+    uint32_t types[5] = { 101, 102, 103, 104, 105 };
+    x11_xdnd_enter(d, 0x200001, 5, types, 2);
+    CHECK(d[0] == 0x200001 && d[1] == (5u << 24) && d[2] == 101 && d[3] == 102 && d[4] == 0);
+    x11_xdnd_enter(d, 0x200001, 5, types, 5);
+    CHECK(d[1] == (5u << 24 | 1) && d[2] == 101 && d[3] == 102 && d[4] == 103);
+    XdndEnter e;
+    CHECK(x11_xdnd_parse_enter(d, &e) && e.win == 0x200001 && e.version == 5 && e.more && e.n == 3 && e.types[2] == 103);
+    uint32_t holes[5] = { 0x400002, 4u << 24, 0, 77, 0 };
+    CHECK(x11_xdnd_parse_enter(holes, &e) && e.version == 4 && !e.more && e.n == 1 && e.types[0] == 77);
+    uint32_t old[5] = { 0x400002, 2u << 24, 77, 0, 0 }, nowin[5] = { 0, 5u << 24, 77, 0, 0 }, future[5] = { 0x400002, 200u << 24, 0, 0, 0 };
+    CHECK(!x11_xdnd_parse_enter(old, &e) && !x11_xdnd_parse_enter(nowin, &e));
+    CHECK(x11_xdnd_parse_enter(future, &e) && e.version == 5 && e.n == 0);
+    /* XdndPosition: root coordinates packed, clamped */
+    x11_xdnd_position(d, 0x200001, 640, 360, 1234, 55);
+    CHECK(d[0] == 0x200001 && d[1] == 0 && d[2] == (640u << 16 | 360) && d[3] == 1234 && d[4] == 55);
+    int x, y;
+    x11_xdnd_xy(d[2], &x, &y);
+    CHECK(x == 640 && y == 360);
+    x11_xdnd_position(d, 1, -5, 99999, 0, 0);
+    x11_xdnd_xy(d[2], &x, &y);
+    CHECK(x == 0 && y == 32767);
+    /* XdndStatus both ways: an empty rectangle (every motion is reported), no action when refused */
+    x11_xdnd_status(d, 0x600003, 1, 55);
+    CHECK(d[0] == 0x600003 && d[1] == 1 && d[2] == 0 && d[3] == 0 && d[4] == 55);
+    x11_xdnd_status(d, 0x600003, 0, 55);
+    CHECK(d[1] == 0 && d[4] == 0);
+    uint32_t st[5] = { 0x600003, 3, 0x00100010, 0x00200020, 56 };
+    XdndStatus s;
+    x11_xdnd_parse_status(st, &s);
+    CHECK(s.win == 0x600003 && s.accept && s.action == 56);
+    st[1] = 2;
+    x11_xdnd_parse_status(st, &s);
+    CHECK(!s.accept && s.action == 0);
+    x11_xdnd_finished(d, 0x600003, 1, 55);
+    CHECK(d[0] == 0x600003 && d[1] == 1 && d[2] == 55 && d[3] == 0);
+    x11_xdnd_finished(d, 0x600003, 0, 55);
+    CHECK(d[1] == 0 && d[2] == 0);
+    /* XdndTypeList: ATOM, format 32, bounded by the bytes and the room, zeros skipped */
+    uint8_t list[40];
+    for (int i = 0; i < 10; i++) put32(list + 4 * i, i == 3 ? 0 : 200u + (uint32_t)i);
+    uint32_t out[XDND_MAX_TYPES];
+    CHECK(x11_atom_list(list, 40, 32, 4, out, XDND_MAX_TYPES) == 9 && out[0] == 200 && out[3] == 204);
+    CHECK(x11_atom_list(list, 40, 32, 4, out, 4) == 4);
+    CHECK(x11_atom_list(list, 6, 32, 4, out, XDND_MAX_TYPES) == 1);         /* a cut-off atom is not read */
+    CHECK(x11_atom_list(list, 40, 8, 4, out, XDND_MAX_TYPES) == 0);          /* wrong format */
+    CHECK(x11_atom_list(list, 40, 32, 31, out, XDND_MAX_TYPES) == 0);        /* STRING, not ATOM */
+    CHECK(x11_atom_list(NULL, 40, 32, 4, out, XDND_MAX_TYPES) == 0);
+    /* type names → Wayland MIME types */
+    char m[256];
+    CHECK(x11_dnd_mime((const uint8_t *)"text/uri-list", 13, m, sizeof m) && !strcmp(m, "text/uri-list"));
+    CHECK(x11_dnd_mime((const uint8_t *)"UTF8_STRING", 11, m, sizeof m) && !strcmp(m, "text/plain;charset=utf-8"));
+    CHECK(!x11_dnd_mime((const uint8_t *)"TARGETS", 7, m, sizeof m) && !m[0]);
+    CHECK(!x11_dnd_mime((const uint8_t *)"STRING", 6, m, sizeof m));
+    CHECK(!x11_dnd_mime((const uint8_t *)"text/pl\nain", 11, m, sizeof m));   /* a control character */
+    CHECK(!x11_dnd_mime((const uint8_t *)"text/a b", 8, m, sizeof m));
+    CHECK(!x11_dnd_mime((const uint8_t *)"/etc/passwd", 11, m, sizeof m));
+    CHECK(!x11_dnd_mime((const uint8_t *)"image/png", 9, m, 9));               /* no room for its NUL */
+    CHECK(x11_dnd_mime((const uint8_t *)"image/png", 9, m, 10) && !strcmp(m, "image/png"));
+    uint8_t hi[] = { 't', '/', 0xc3, 0xa9 };
+    CHECK(!x11_dnd_mime(hi, sizeof hi, m, sizeof m));
+}
+
+/* X-Resource QueryClientIds reply: n entries of { client, mask, length, value } */
+static size_t xres_reply(uint8_t *r, const uint32_t (*ent)[4], int n, int count) {
+    memset(r, 0, 32);
+    r[0] = X_Reply;
+    put32(r + 8, (uint32_t)count);
+    size_t off = 32;
+    for (int i = 0; i < n; i++) {
+        put32(r + off, ent[i][0]); put32(r + off + 4, ent[i][1]); put32(r + off + 8, ent[i][2]);
+        off += 12;
+        if (ent[i][2] == 4) { put32(r + off, ent[i][3]); off += 4; }
+    }
+    put32(r + 4, (uint32_t)(off - 32) / 4);
+    return off;
+}
+
+static void test_xres(void) {
+    uint8_t r[512];
+    uint32_t base[8], pid[8], mask = 0x1fffff;
+    const uint32_t ents[3][4] = { { 0x200000, 2, 4, 1000 }, { 0x400000, 2, 4, 1001 }, { 0x600000, 2, 0, 0 } };
+    size_t n = xres_reply(r, ents, 3, 3);
+    CHECK(x11_xres_pids(r, n, base, pid, 8) == 2 && base[1] == 0x400000 && pid[1] == 1001);
+    CHECK(x11_xres_pids(r, n, base, pid, 2) == -1);                         /* more clients than room: refused */
+    CHECK(x11_xres_pids(r, n - 4, base, pid, 8) == 2);                      /* cut short: what is whole */
+    CHECK(x11_xres_pids(r, 40, base, pid, 8) == 0);
+    const uint32_t bad[1][4] = { { 0x200000, 2, 0x7ffffff0u, 0 } };         /* a length past the reply */
+    n = xres_reply(r, bad, 1, 1);
+    CHECK(x11_xres_pids(r, n, base, pid, 8) == 0);
+    CHECK(x11_xres_pids(NULL, 0, base, pid, 8) == 0);
+    /* the owner's client has a pid, and no client of the display is sandboxed */
+    uint32_t b[3] = { 0x200000, 0x400000, 0x600000 }, p[3] = { 1000, 1001, 1002 };
+    sandboxed_pid = 0;
+    CHECK(x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
+    CHECK(!x11_xdnd_trusted(0x800005, b, p, 3, mask, fake_sandboxed));      /* no pid known for it */
+    CHECK(!x11_xdnd_trusted(0, b, p, 3, mask, fake_sandboxed));
+    CHECK(!x11_xdnd_trusted(0x400005, b, p, -1, mask, fake_sandboxed));
+    sandboxed_pid = 1002;                                                   /* another client is sandboxed */
+    CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
+    sandboxed_pid = 1001;                                                   /* the owner is */
+    CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
+}
+
 int main(void) {
     test_requests();
     test_setup();
@@ -165,6 +277,8 @@ int main(void) {
     test_props();
     test_policy();
     test_display();
+    test_xdnd();
+    test_xres();
     printf("xwm-test: %d/%d\n", checks - fails, checks);
     return fails ? 1 : 0;
 }

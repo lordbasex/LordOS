@@ -150,6 +150,11 @@ The view (Design) for a Flatpak app:
 | Landlock | scoping only (`sandbox_apply_scope`: abstract sockets, signals) | scoping only | scoping only, **not** the file rules (see below) |
 | X display | only if the app declares `x11`/`fallback-x11` and isn't restricted | none | none |
 
+While a Flatpak app is connected to the X display, no X app's drag of files reaches Files: the window
+manager checks every X client's pid (X-Resource) before an X drag may hand LordOS paths, and one sandboxed
+client is enough to refuse, since any X client can stand in for another's selection (`WAYLAND.md`, "Drag
+and drop"). Drags between X and Wayland windows are unchanged.
+
 Giving the session bus to an unrestricted app's `flatpak run` is safe only because the app itself
 reaches it through Flatpak's filtering proxy (`xdg-dbus-proxy`), never directly: LordOS always adds
 `--nosocket=session-bus` (see "Never granted"). A restricted app has no bus, so `flatpak run` starts

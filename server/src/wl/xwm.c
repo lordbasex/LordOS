@@ -22,6 +22,8 @@
  *     read once and becomes LordOS's; LordOS's is offered to X only while an X window has the
  *     keyboard, so a background X app can't read what was copied elsewhere, and a secret copied in
  *     Passwords never is);
+ *   - drag and drop both ways (XDND): a Files or Wayland drag over an X window, and an X app's drag over a
+ *     Wayland window or Files (see "drag and drop" below);
  *   - the root window's cursor is LordOS's arrow (Render cursor);
  *   - 10 s after the last X window closes, if X-Resource shows no other client, Xwayland stops.
  * X11 apps on one display can always see each other; what this guards is the border with Wayland
@@ -30,11 +32,13 @@
 #include "xwm.h"
 #include "x11wire.h"
 #include "urilist.h"
+#include "dndgate.h"
 #include "wl.h"
 #include "../cursor.h"
 #include "../term/term.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,7 +73,11 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_STRING = 31, XA_WINDOW =
     X(WL_SURFACE_ID, "WL_SURFACE_ID") X(CLIPBOARD, "CLIPBOARD") X(TARGETS, "TARGETS") X(TIMESTAMP, "TIMESTAMP") X(INCR, "INCR") \
     X(TEXT, "TEXT") X(MIME_UTF8, "text/plain;charset=utf-8") X(MIME_TEXT, "text/plain") X(MIME_PNG, "image/png") X(MIME_HTML, "text/html") \
     X(MIME_URIS, "text/uri-list") X(GNOME_FILES, "x-special/gnome-copied-files") \
-    X(LORD_SEL_CLIPBOARD, "_LORD_SEL_CLIPBOARD") X(LORD_SEL_PRIMARY, "_LORD_SEL_PRIMARY")
+    X(LORD_SEL_CLIPBOARD, "_LORD_SEL_CLIPBOARD") X(LORD_SEL_PRIMARY, "_LORD_SEL_PRIMARY") X(LORD_SEL_XDND, "_LORD_SEL_XDND") \
+    X(XdndAware, "XdndAware") X(XdndSelection, "XdndSelection") X(XdndTypeList, "XdndTypeList") X(XdndEnter, "XdndEnter") \
+    X(XdndPosition, "XdndPosition") X(XdndStatus, "XdndStatus") X(XdndLeave, "XdndLeave") X(XdndDrop, "XdndDrop") \
+    X(XdndFinished, "XdndFinished") X(XdndActionCopy, "XdndActionCopy") X(XdndActionMove, "XdndActionMove") \
+    X(XdndActionAsk, "XdndActionAsk")
 
 #define AE(id, name) A_##id,
 enum { ATOM_LIST(AE) A_COUNT };
@@ -94,6 +102,7 @@ struct XWin {
     int fullscreen, maximized, minimized, focused;
     int px, py, pw, ph, placed;         /* last position/size we configured */
     unsigned state_sig;
+    uint32_t xdnd_aware;                /* XdndAware: the XDND version it takes drops with (0: none) */
 };
 
 typedef void (*ReplyFn)(const uint8_t *r, size_t n, uint32_t a, uint32_t b);
@@ -130,7 +139,7 @@ static struct {
     size_t in_n, in_cap;
     int setup_done, init_left, ready, debug;
     XSetup su;
-    uint32_t seq, id_next, wmwin, cursor;
+    uint32_t seq, id_next, wmwin, dndwin, cursor;     /* dndwin: the drop proxy for X apps' drags (XDND) */
     uint8_t xfixes_op, xfixes_ev, render_op, composite_op, xres_op;
     struct wl_event_source *idle;       /* fires IDLE_MS after the last X window is gone */
     Pend pend[NPEND];
@@ -369,11 +378,14 @@ static void prop_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t prop) {
         w->decorated = x11_motif_decorated(nl ? longs : NULL, nl);
     } else if (prop == AT(NET_WM_STATE)) {
         for (size_t i = 0; i < nl; i++) if (longs[i] == AT(NET_WM_STATE_FULLSCREEN) && !w->sid) w->want_fs = 1;
+    } else if (prop == AT(XdndAware)) {
+        w->xdnd_aware = type == XA_ATOM && nl ? longs[0] : 0;
     }
 }
 
 static const int watched[] = { XA_WM_CLASS, XA_WM_NAME, -1 /* _NET_WM_NAME */, -2 /* WM_PROTOCOLS */, XA_WM_HINTS,
-                               XA_WM_NORMAL_HINTS, -3 /* window type */, XA_WM_TRANSIENT_FOR, -4 /* Motif */, -5 /* state */ };
+                               XA_WM_NORMAL_HINTS, -3 /* window type */, XA_WM_TRANSIENT_FOR, -4 /* Motif */, -5 /* state */,
+                               -6 /* XdndAware */ };
 static uint32_t watched_atom(int i) {
     switch (watched[i]) {
     case -1: return AT(NET_WM_NAME);
@@ -381,6 +393,7 @@ static uint32_t watched_atom(int i) {
     case -3: return AT(NET_WM_WINDOW_TYPE);
     case -4: return AT(MOTIF_WM_HINTS);
     case -5: return AT(NET_WM_STATE);
+    case -6: return AT(XdndAware);
     default: return (uint32_t)watched[i];
     }
 }
@@ -511,8 +524,10 @@ static void sel_start(int k, uint32_t owner) {
     convert(sel_atom(k), AT(TARGETS), sel_prop(k), 0);
 }
 
+static void dnd_owner(uint32_t owner);
 static void sel_owner_changed(const uint8_t *p) {
     uint32_t owner = x11_get32(p + 8), selection = x11_get32(p + 12);
+    if (selection == AT(XdndSelection)) { dnd_owner(owner); return; }
     int k = sel_index(selection);
     if (k < 0 || owner == X.wmwin) return;
     Sel *s = &X.sel[k];
@@ -522,8 +537,10 @@ static void sel_owner_changed(const uint8_t *p) {
     sel_start(k, owner);
 }
 
+static void xi_notify(uint32_t prop);
 static void sel_notify_event(const uint8_t *p) {
     uint32_t requestor = x11_get32(p + 8), selection = x11_get32(p + 12), target = x11_get32(p + 16), prop = x11_get32(p + 20);
+    if (selection == AT(XdndSelection)) { if (requestor == X.wmwin) xi_notify(prop); return; }
     int k = sel_index(selection);
     if (k < 0 || requestor != X.wmwin) return;
     Sel *s = &X.sel[k];
@@ -586,11 +603,13 @@ static int xfer_step(uint32_t win, uint32_t prop) {
     return 0;
 }
 
+static void do_sel_request(uint32_t time_, uint32_t owner, uint32_t requestor, uint32_t target, uint32_t prop);
 static void sel_request(const uint8_t *p) {
     uint32_t time_ = x11_get32(p + 4), owner = x11_get32(p + 8), requestor = x11_get32(p + 12), selection = x11_get32(p + 16),
              target = x11_get32(p + 20), prop = x11_get32(p + 24);
     int k = sel_index(selection);
     if (!prop) prop = target;                               /* obsolete clients */
+    if (selection == AT(XdndSelection)) { do_sel_request(time_, owner, requestor, target, prop); return; }
     /* LordOS's selection is in X only while an X window has the keyboard (clip_sync). Asking from
      * a window of the focused client is a hint, not a boundary: the requestor id isn't
      * authenticated in X11 and X apps on one display can read each other's selections anyway
@@ -659,11 +678,556 @@ static void sel_request(const uint8_t *p) {
     notify_requestor(time_, requestor, selection, target, prop);
 }
 
+/* ---- drag and drop (XDND) ----
+ * Both ways between X and Wayland, with XDND version 5 (the messages are encoded in x11wire.c):
+ *   - LordOS's (Files) or a Wayland app's drag over an X window (wl.c → xwm_dnd_*): the window manager is the
+ *     XDND source. It owns XdndSelection with its own window and sends XdndEnter (the types, interned first,
+ *     more than three in XdndTypeList), XdndPosition with the action wl.c asks for, and XdndDrop or XdndLeave;
+ *     the target's XdndStatus goes back to wl.c. Its ConvertSelection of XdndSelection is answered only for a
+ *     window of the target's client, from the drag's data: wl.c writes it into a pipe (wlx_dnd_send) read here
+ *     without blocking, at most CLIP_MAX, within DND_READ_S. XdndFinished ends it.
+ *   - An X app's drag leaving the X windows (a button down, the pointer over a Wayland window or LordOS:
+ *     xwm_xdrag_out): an XdndAware window of ours covering the screen is mapped above every X window, so the
+ *     app's XDND talks to it. Its types (from XdndEnter or XdndTypeList, named with GetAtomName and kept only
+ *     as MIME types, x11_dnd_mime) become a Wayland drag (wlx_xdrag_begin) for the window under the pointer;
+ *     what that window receives is read with ConvertSelection of XdndSelection (INCR too, at most CLIP_MAX)
+ *     and written to its fd without blocking. Its file list reaches Files only when the X server ties the
+ *     selection's owner to a process that is not sandboxed and no client of the display is sandboxed
+ *     (x11_xdnd_trusted, with the pids X-Resource gives, never the client's own _NET_WM_PID): one X client can
+ *     always stand in for another's selection.
+ * The X app's messages count only from the client that owns XdndSelection (XFixes tells), and an owner that
+ * changes mid-drag ends it. Actions here are wl_data_device_manager's bits (1 copy, 2 move, 4 ask). */
+
+#define DND_READ_S 10                   /* how long the data of one conversion may take */
+#define DND_FINISH_S 30                 /* how long a dropped drag may take to finish */
+#define DND_PULLS 8                     /* conversions of a Wayland drag being read at once */
+#define DND_FETCHES 16                  /* receives of a Wayland window waiting on an X drag */
+
+static uint32_t act_atom(uint32_t a) { return a == 2 ? AT(XdndActionMove) : a == 4 ? AT(XdndActionAsk) : AT(XdndActionCopy); }
+static uint32_t act_bits(uint32_t a) {        /* copy, private and unknown actions copy */
+    return a == AT(XdndActionMove) ? 2 : a == AT(XdndActionAsk) ? 4 : 1;
+}
+static unsigned dnd_gen;                /* bumped on every enter: replies for an older one are dropped */
+
+/* An X window reading a Wayland drag's data: the pipe wl.c writes it into, then the property. */
+typedef struct Pull {
+    int fd, failed;
+    struct wl_event_source *ev;
+    uint8_t *buf;
+    size_t len, cap;
+    uint32_t requestor, prop, target, time;
+    time_t t0;
+    struct Pull *next;
+} Pull;
+static Pull *pulls;
+
+/* A Wayland drag over an X window: the window manager is its XDND source. */
+static struct {
+    int on, entered, dropped, src_gone;
+    uint32_t target;                    /* the X window it is over */
+    int version, n, waiting;            /* its types, and how many atoms are still being interned */
+    char names[XDND_MAX_TYPES][256];    /* each type's X name */
+    char mimes[XDND_MAX_TYPES][256];    /* and the Wayland type asked for it */
+    uint32_t atoms[XDND_MAX_TYPES];
+    unsigned gen;
+    int x, y;
+    uint32_t want;                      /* the action wl.c asks for */
+    int accept;                         /* the target's last XdndStatus */
+    uint32_t action;
+    int pos_wait, pos_dirty;            /* a position waits for its status; another one came meanwhile */
+    time_t t_pos, t_drop;
+} DO;
+
+/* An X app's drag over a Wayland window or LordOS: the window manager's proxy is its XDND target. */
+typedef struct { uint32_t atom; int fd; } Fetch;
+static struct {
+    uint32_t owner;                     /* XdndSelection's owner, when an X app's (XFixes) */
+    int out;                            /* the proxy is mapped */
+    uint32_t src;                       /* the source window that entered the proxy (0: none) */
+    int version, naming;                /* atoms being named */
+    unsigned gen;
+    int n;
+    uint32_t atoms[XDND_MAX_TYPES];     /* its types that have a Wayland name */
+    char mimes[XDND_MAX_TYPES][256];
+    int started, dropped;               /* wl.c runs it as a drag; XdndDrop came */
+    int result;                         /* the Wayland side's answer before XdndDrop (-1: none yet) */
+    uint32_t result_action;
+    int accept;                         /* what the Wayland side takes now (XdndStatus) */
+    uint32_t action;
+    time_t t_drop, t_fetch;
+    Fetch q[DND_FETCHES];               /* receives waiting, the first one being read */
+    int nq, stage;                      /* 0 idle, 1 SelectionNotify, 2 data, 3 INCR chunks */
+    uint8_t *buf;
+    size_t len, cap;
+} XI = { .result = -1 };
+
+/* -- a Wayland drag over an X window -- */
+
+static void do_position(void) {
+    uint32_t d[5];
+    x11_xdnd_position(d, X.wmwin, DO.x, DO.y, 0, act_atom(DO.want));
+    client_message(DO.target, AT(XdndPosition), d);
+    DO.pos_wait = 1;
+    DO.pos_dirty = 0;
+    DO.t_pos = time(NULL);
+}
+
+static void do_end(int accepted, uint32_t action) {
+    if (X.debug) fprintf(stderr, "xwm: drop on 0x%x %s\n", DO.target, accepted ? "taken" : "refused");
+    DO.on = DO.entered = DO.dropped = 0;
+    DO.target = 0;
+    wlx_dnd_finished(accepted, action);
+}
+
+static void do_atom_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t i) {
+    if (gen != DO.gen || !DO.on) return;
+    if (r && n >= 12 && i < (uint32_t)DO.n) DO.atoms[i] = x11_get32(r + 8);
+    if (--DO.waiting > 0) return;
+    int k = 0;
+    for (int j = 0; j < DO.n; j++) {
+        if (!DO.atoms[j]) continue;
+        if (j != k) { DO.atoms[k] = DO.atoms[j]; memcpy(DO.names[k], DO.names[j], 256); memcpy(DO.mimes[k], DO.mimes[j], 256); }
+        k++;
+    }
+    DO.n = k;
+    if (!DO.n) return;
+    set_owner(X.wmwin, AT(XdndSelection));
+    if (DO.n > 3) change_prop(X.wmwin, AT(XdndTypeList), XA_ATOM, 32, DO.atoms, (uint32_t)DO.n);
+    uint32_t d[5];
+    x11_xdnd_enter(d, X.wmwin, DO.version, DO.atoms, DO.n);
+    client_message(DO.target, AT(XdndEnter), d);
+    DO.entered = 1;
+    do_position();
+    if (X.debug) fprintf(stderr, "xwm: drag enters 0x%x (XDND %d, %d types)\n", DO.target, DO.version, DO.n);
+}
+
+static void do_add_type(const char *name, const char *mime) {
+    if (DO.n >= XDND_MAX_TYPES || strlen(name) >= 256 || strlen(mime) >= 256) return;
+    for (int i = 0; i < DO.n; i++) if (!strcmp(DO.names[i], name)) return;
+    snprintf(DO.names[DO.n], 256, "%s", name);
+    snprintf(DO.mimes[DO.n], 256, "%s", mime);
+    DO.n++;
+}
+
+void xwm_dnd_enter(XWin *w, const char *const *mimes, int n, int x, int y, uint32_t want) {
+    if (!X.ready || !w) return;
+    xwm_dnd_leave();
+    if (DO.dropped) do_end(DO.accept, DO.action);   /* the last drop never said it finished: as its status said */
+    memset(&DO, 0, sizeof DO);
+    DO.on = 1;
+    DO.target = w->id;
+    DO.gen = ++dnd_gen;
+    DO.x = x;
+    DO.y = y;
+    DO.want = want;
+    DO.version = x11_xdnd_version(w->xdnd_aware);
+    if (!DO.version) return;                        /* it takes no XDND drop: nothing is sent */
+    int utf8 = 0;
+    for (int i = 0; i < n; i++) {
+        do_add_type(mimes[i], mimes[i]);
+        if (!strcmp(mimes[i], "text/plain;charset=utf-8")) utf8 = 1;
+    }
+    if (utf8) do_add_type("UTF8_STRING", "text/plain;charset=utf-8");   /* what X apps ask for text first */
+    for (int i = 0; i < DO.n; i++) {
+        size_t len = strlen(DO.names[i]);
+        req(X_InternAtom, 0);
+        xo_u16(&X.out, (uint16_t)len); xo_u16(&X.out, 0);
+        xo_bytes(&X.out, DO.names[i], len);
+        xo_end(&X.out);
+        expect(do_atom_reply, DO.gen, (uint32_t)i);
+    }
+    DO.waiting = DO.n;
+    flush();
+}
+
+void xwm_dnd_motion(int x, int y, uint32_t want) {
+    if (!DO.on || DO.dropped) return;
+    DO.x = x;
+    DO.y = y;
+    DO.want = want;
+    if (!DO.entered) return;
+    /* one position at a time: the next waits for the target's status (or a second without one) */
+    if (DO.pos_wait && time(NULL) - DO.t_pos < 1) { DO.pos_dirty = 1; return; }
+    do_position();
+    flush();
+}
+
+void xwm_dnd_leave(void) {
+    if (!DO.on || DO.dropped) return;
+    if (DO.entered) {
+        uint32_t d[5] = { X.wmwin, 0, 0, 0, 0 };
+        client_message(DO.target, AT(XdndLeave), d);
+        flush();
+    }
+    DO.on = DO.entered = 0;
+    DO.target = 0;
+}
+
+int xwm_dnd_drop(void) {
+    if (!DO.on || !DO.entered || DO.dropped || !DO.accept) return 0;
+    if (DO.pos_dirty) do_position();                /* where it really was released */
+    uint32_t d[5] = { X.wmwin, 0, 0, 0, 0 };        /* time: CurrentTime */
+    client_message(DO.target, AT(XdndDrop), d);
+    DO.dropped = 1;
+    DO.t_drop = time(NULL);
+    flush();
+    return 1;
+}
+
+void xwm_dnd_source_gone(void) {
+    for (Pull *p = pulls; p; p = p->next) p->failed = 1;    /* what it wrote may be cut short */
+    DO.src_gone = 1;
+    xwm_dnd_leave();
+}
+
+static void do_status(const uint32_t d[5]) {
+    XdndStatus s;
+    x11_xdnd_parse_status(d, &s);
+    if (!DO.entered || DO.dropped || s.win != DO.target) return;
+    uint32_t action = s.accept ? act_bits(s.action) : 0;
+    if (s.accept != DO.accept || action != DO.action) {
+        DO.accept = s.accept;
+        DO.action = action;
+        wlx_dnd_status(DO.accept, DO.action);
+    }
+    DO.pos_wait = 0;
+    if (DO.pos_dirty) do_position();
+}
+
+static void do_finished(const uint32_t d[5]) {
+    if (!DO.dropped || d[0] != DO.target) return;
+    /* before version 5 the target doesn't say: what its last status agreed to */
+    int accepted = DO.version >= 5 ? (int)(d[1] & 1) : DO.accept;
+    do_end(accepted, accepted ? (DO.version >= 5 ? act_bits(d[2]) : DO.action) : 0);
+}
+
+static void pull_end(Pull *p, int ok) {
+    for (Pull **pp = &pulls; *pp; pp = &(*pp)->next) if (*pp == p) { *pp = p->next; break; }
+    if (X.fd >= 0) {
+        if (ok) write_data(p->requestor, p->prop, p->target, p->buf ? p->buf : (const uint8_t *)"", p->len);
+        notify_requestor(p->time, p->requestor, AT(XdndSelection), p->target, ok ? p->prop : 0);
+        flush();
+    }
+    if (p->ev) wl_event_source_remove(p->ev);
+    close(p->fd);
+    free(p->buf);
+    free(p);
+}
+
+static int pull_ready(int fd, uint32_t mask, void *data) {
+    Pull *p = data;
+    (void)mask;
+    for (;;) {
+        if (p->len + 4096 > p->cap) {
+            size_t cap = p->cap ? p->cap * 2 : 16384;
+            uint8_t *nb = cap <= CLIP_MAX ? realloc(p->buf, cap) : NULL;
+            if (!nb) { pull_end(p, 0); return 0; }  /* too long: refused whole, never cut short */
+            p->buf = nb;
+            p->cap = cap;
+        }
+        ssize_t n = read(fd, p->buf + p->len, p->cap - p->len);
+        if (n > 0) { p->len += (size_t)n; continue; }
+        if (n < 0 && (errno == EAGAIN || errno == EINTR)) return 0;
+        pull_end(p, n == 0 && !p->failed);
+        return 0;
+    }
+}
+
+/* An X window asks for the drag's data (ConvertSelection of XdndSelection). */
+static void do_sel_request(uint32_t time_, uint32_t owner, uint32_t requestor, uint32_t target, uint32_t prop) {
+    /* only the window the drag is over or was dropped on, or another of its client's (a toolkit's own) */
+    int ok = owner == X.wmwin && DO.entered && !DO.src_gone && same_client(requestor, DO.target);
+    if (ok && target == AT(TARGETS)) {
+        uint32_t list[XDND_MAX_TYPES + 2];
+        uint32_t nl = 0;
+        list[nl++] = AT(TARGETS);
+        list[nl++] = AT(TIMESTAMP);
+        for (int i = 0; i < DO.n; i++) list[nl++] = DO.atoms[i];
+        change_prop(requestor, prop, XA_ATOM, 32, list, nl);
+        notify_requestor(time_, requestor, AT(XdndSelection), target, prop);
+        return;
+    }
+    if (ok && target == AT(TIMESTAMP)) {
+        uint32_t t = 0;
+        change_prop(requestor, prop, XA_CARDINAL, 32, &t, 1);
+        notify_requestor(time_, requestor, AT(XdndSelection), target, prop);
+        return;
+    }
+    int i = -1, busy = 0;
+    for (int k = 0; ok && k < DO.n; k++) if (DO.atoms[k] == target) i = k;
+    for (Pull *p = pulls; p; p = p->next) busy++;
+    Pull *p = ok && i >= 0 && busy < DND_PULLS ? calloc(1, sizeof *p) : NULL;
+    int fds[2];
+    if (!p || pipe2(fds, O_CLOEXEC | O_NONBLOCK)) {
+        free(p);
+        notify_requestor(time_, requestor, AT(XdndSelection), target, 0);
+        return;
+    }
+    p->fd = fds[0];
+    p->requestor = requestor;
+    p->prop = prop;
+    p->target = target;
+    p->time = time_;
+    p->t0 = time(NULL);
+    p->next = pulls;
+    pulls = p;
+    p->ev = wl_event_loop_add_fd(X.loop, fds[0], WL_EVENT_READABLE, pull_ready, p);
+    if (!p->ev) { close(fds[1]); pull_end(p, 0); return; }
+    if (wlx_dnd_send(DO.mimes[i], fds[1]) < 0) pull_end(p, 0);     /* it takes the write end either way */
+}
+
+/* -- an X app's drag over a Wayland window or LordOS -- */
+
+/* Ends it; tell: wl.c is told (its drag ends). Receives still waiting get nothing. */
+static void xi_reset(int tell) {
+    int started = XI.started;
+    for (int i = 0; i < XI.nq; i++) close(XI.q[i].fd);
+    free(XI.buf);
+    uint32_t owner = XI.owner;
+    int out = XI.out;
+    memset(&XI, 0, sizeof XI);
+    XI.owner = owner;
+    XI.out = out;
+    XI.result = -1;
+    if (tell && started) wlx_xdrag_end();
+}
+
+static void xi_status(void) {
+    uint32_t d[5];
+    x11_xdnd_status(d, X.dndwin, XI.accept, act_atom(XI.action));
+    client_message(XI.src, AT(XdndStatus), d);
+}
+
+static void xi_finish(int accepted, uint32_t action) {
+    uint32_t d[5];
+    x11_xdnd_finished(d, X.dndwin, accepted, act_atom(action));
+    client_message(XI.src, AT(XdndFinished), d);
+    if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x %s\n", XI.src, accepted ? "dropped" : "refused");
+    xi_reset(0);
+}
+
+static void xi_trust_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
+    (void)b;
+    if (gen != XI.gen || !XI.started) return;
+    uint32_t base[256], pid[256];
+    int k = r ? x11_xres_pids(r, n, base, pid, 256) : -1;
+    int ok = x11_xdnd_trusted(XI.owner, base, pid, k, X.su.id_mask, dndg_pid_sandboxed);
+    if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x: its files %s\n", XI.src, ok ? "may reach LordOS" : "don't reach LordOS");
+    wlx_xdrag_trust(ok);
+}
+
+static void xi_begin(void) {
+    if (!XI.n) return;
+    const char *list[XDND_MAX_TYPES];
+    for (int i = 0; i < XI.n; i++) list[i] = XI.mimes[i];
+    XI.started = wlx_xdrag_begin(list, XI.n);
+    if (!XI.started || !X.xres_op) return;           /* without X-Resource its files never reach LordOS */
+    req(X.xres_op, 4);                              /* XResQueryClientIds: every client's pid */
+    xo_u32(&X.out, 1); xo_u32(&X.out, 0); xo_u32(&X.out, 2);
+    xo_end(&X.out);
+    expect(xi_trust_reply, XI.gen, 0);
+}
+
+static void xi_name_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t type) {
+    if (gen != XI.gen || !XI.src) return;
+    char m[256];
+    if (r && n >= 32) {
+        size_t len = x11_get16(r + 8);
+        if (len > n - 32) len = n - 32;
+        int dup = 0;
+        if (x11_dnd_mime(r + 32, len, m, sizeof m)) {
+            for (int i = 0; i < XI.n; i++) if (!strcmp(XI.mimes[i], m)) dup = 1;
+            if (!dup && XI.n < XDND_MAX_TYPES) { XI.atoms[XI.n] = type; memcpy(XI.mimes[XI.n], m, sizeof m); XI.n++; }
+        }
+    }
+    if (--XI.naming == 0) xi_begin();
+}
+
+static void xi_name(const uint32_t *types, int n) {
+    for (int i = 0; i < n; i++) {
+        req(X_GetAtomName, 0);
+        xo_u32(&X.out, types[i]);
+        xo_end(&X.out);
+        expect(xi_name_reply, XI.gen, types[i]);
+    }
+    XI.naming = n;
+}
+
+static void xi_typelist_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
+    (void)b;
+    if (gen != XI.gen || !XI.src || !r || n < 32) return;
+    size_t bytes = (size_t)x11_get32(r + 16) * 4;
+    if (bytes > n - 32) bytes = n - 32;
+    uint32_t types[XDND_MAX_TYPES];
+    xi_name(types, x11_atom_list(r + 32, bytes, r[1], x11_get32(r + 8), types, XDND_MAX_TYPES));
+}
+
+static void xi_fetch_next(void) {
+    if (!XI.nq || XI.stage) return;
+    XI.stage = 1;
+    XI.len = 0;
+    XI.t_fetch = time(NULL);
+    convert(AT(XdndSelection), XI.q[0].atom, AT(LORD_SEL_XDND), 0);
+}
+
+static void xi_fetch_done(int ok) {
+    if (!XI.nq) return;
+    Fetch f = XI.q[0];
+    memmove(XI.q, XI.q + 1, (size_t)(XI.nq - 1) * sizeof *XI.q);
+    XI.nq--;
+    XI.stage = 0;
+    if (ok) wlx_send_bytes(f.fd, XI.buf, XI.len);
+    else close(f.fd);
+    free(XI.buf);
+    XI.buf = NULL;
+    XI.len = XI.cap = 0;
+    xi_fetch_next();
+}
+
+static void xi_data_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t stage) {
+    if (gen != XI.gen || XI.stage != (int)stage) return;
+    if (!r || n < 32) { xi_fetch_done(0); return; }
+    int format = r[1];
+    uint32_t type = x11_get32(r + 8);
+    size_t bytes = (size_t)x11_get32(r + 16) * (size_t)(format / 8);
+    if (bytes > n - 32) bytes = n - 32;
+    if (stage == 2 && type == AT(INCR)) { XI.stage = 3; return; }  /* chunks follow (PropertyNotify) */
+    if (bytes) {
+        if (XI.len + bytes > CLIP_MAX) { xi_fetch_done(0); return; }
+        if (XI.len + bytes > XI.cap) {
+            size_t cap = XI.cap ? XI.cap : 4096;
+            while (cap < XI.len + bytes) cap *= 2;
+            uint8_t *nb = realloc(XI.buf, cap);
+            if (!nb) { xi_fetch_done(0); return; }
+            XI.buf = nb;
+            XI.cap = cap;
+        }
+        memcpy(XI.buf + XI.len, r + 32, bytes);
+        XI.len += bytes;
+    }
+    if (stage == 2 || !bytes) xi_fetch_done(1);
+}
+
+static void xi_notify(uint32_t prop) {
+    if (XI.stage != 1) return;
+    if (!prop) { xi_fetch_done(0); return; }                       /* the owner refused that type */
+    XI.stage = 2;
+    get_prop(X.wmwin, AT(LORD_SEL_XDND), 1, CLIP_MAX / 4, xi_data_reply, XI.gen, 2);
+}
+
+/* XdndSelection's owner changed (XFixes). */
+static void dnd_owner(uint32_t owner) {
+    if (owner == X.wmwin) { XI.owner = 0; return; }
+    if (XI.src && !(owner && same_client(owner, XI.owner))) xi_reset(1);   /* another client took it mid-drag */
+    XI.owner = owner;
+}
+
+/* The XDND messages to our windows: as a source (X.wmwin) and as the proxy target (X.dndwin). */
+static void dnd_message(uint32_t win, uint32_t type, const uint32_t d[5]) {
+    if (win == X.wmwin) {
+        if (type == AT(XdndStatus)) do_status(d);
+        else if (type == AT(XdndFinished)) do_finished(d);
+        return;
+    }
+    if (type == AT(XdndEnter)) {
+        XdndEnter e;
+        if (!XI.out || !XI.owner || !x11_xdnd_parse_enter(d, &e) || !same_client(e.win, XI.owner)) return;
+        xi_reset(1);
+        XI.src = e.win;
+        XI.version = e.version;
+        XI.gen = ++dnd_gen;
+        if (e.more) get_prop(e.win, AT(XdndTypeList), 0, XDND_MAX_TYPES, xi_typelist_reply, XI.gen, 0);
+        else xi_name(e.types, e.n);
+        return;
+    }
+    if (!XI.src || d[0] != XI.src) return;
+    if (type == AT(XdndPosition)) {
+        if (XI.dropped) return;
+        if (XI.started) wlx_xdrag_action(act_bits(d[4]) | 1);  /* what it asks, or a copy */
+        xi_status();
+    } else if (type == AT(XdndLeave)) {
+        xi_reset(1);
+    } else if (type == AT(XdndDrop) && !XI.dropped) {
+        XI.dropped = 1;
+        XI.t_drop = time(NULL);
+        int r = XI.started ? wlx_xdrag_drop() : 0;   /* 1 dropped on a Wayland window, 2 Files reads it */
+        XI.started = 0;
+        if (!r) xi_finish(0, 0);
+        else if (XI.result >= 0) xi_finish(XI.result, XI.result_action);
+    }
+}
+
+int xwm_is_dnd_icon(const XWin *w) { return w && w->wtype && w->wtype == AT(NET_WM_WINDOW_TYPE_DND); }
+
+void xwm_xdrag_out(int out) {
+    if (!X.ready || !X.dndwin || (out && !XI.owner) || out == XI.out) return;
+    XI.out = out;
+    req(out ? X_MapWindow : X_UnmapWindow, 0);
+    xo_u32(&X.out, X.dndwin);
+    xo_end(&X.out);
+    if (out) {                                      /* above every X window, so the app's drag finds it */
+        int32_t v[1] = { X_Above };
+        configure(X.dndwin, XCF_StackMode, v, 1);
+    }
+    flush();
+}
+
+void xwm_xdrag_status(int accept, uint32_t action) {
+    if (!XI.src || XI.dropped) return;
+    accept = accept && action;
+    if (accept == XI.accept && action == XI.action) return;
+    XI.accept = accept;
+    XI.action = accept ? action : 0;
+    xi_status();
+    flush();
+}
+
+void xwm_xdrag_receive(const char *mime, int fd) {
+    int i = -1;
+    for (int k = 0; XI.src && mime && k < XI.n; k++) if (!strcmp(XI.mimes[k], mime)) i = k;
+    if (i < 0 || XI.nq >= DND_FETCHES) { close(fd); return; }
+    XI.q[XI.nq++] = (Fetch){ XI.atoms[i], fd };
+    xi_fetch_next();
+    flush();
+}
+
+void xwm_xdrag_finished(int accepted, uint32_t action) {
+    if (!XI.src) return;
+    if (XI.dropped) { xi_finish(accepted, action); flush(); return; }
+    XI.result = accepted;
+    XI.result_action = action;
+}
+
+/* Drags that take too long: data never written, a drop never finished. */
+static void dnd_tick(time_t now) {
+    for (Pull *p = pulls, *nx; p; p = nx) { nx = p->next; if (now - p->t0 > DND_READ_S) pull_end(p, 0); }
+    if (DO.dropped && now - DO.t_drop > DND_FINISH_S) do_end(0, 0);
+    if (XI.stage && now - XI.t_fetch > DND_READ_S) xi_fetch_done(0);
+    if (XI.src && XI.dropped && now - XI.t_drop > DND_FINISH_S) xi_finish(0, 0);
+}
+
+static void dnd_stop(void) {
+    int dropped = DO.dropped;
+    while (pulls) {
+        Pull *p = pulls;
+        pulls = p->next;
+        if (p->ev) wl_event_source_remove(p->ev);
+        close(p->fd);
+        free(p->buf);
+        free(p);
+    }
+    xi_reset(1);
+    memset(&XI, 0, sizeof XI);
+    XI.result = -1;
+    memset(&DO, 0, sizeof DO);
+    if (dropped) wlx_dnd_finished(0, 0);
+}
+
 /* ---- events ---- */
 
 static void on_create(const uint8_t *p) {
     uint32_t parent = x11_get32(p + 4), id = x11_get32(p + 8);
-    if (parent != X.su.root || id == X.wmwin) return;
+    if (parent != X.su.root || id == X.wmwin || id == X.dndwin) return;
     XWin *w = add_win(id);
     if (!w) return;
     idle_arm();
@@ -767,6 +1331,8 @@ static void on_property(const uint8_t *p) {
         for (int k = 0; k < NSEL; k++)
             if (a == sel_prop(k) && !deleted && X.sel[k].stage == 3)
                 get_prop(X.wmwin, a, 1, CLIP_MAX / 4, sel_reply, (uint32_t)k, 3);
+        if (a == AT(LORD_SEL_XDND) && !deleted && XI.stage == 3)     /* the next chunk of an X app's drag */
+            get_prop(X.wmwin, a, 1, CLIP_MAX / 4, xi_data_reply, XI.gen, 3);
         return;
     }
     if (deleted && xfer_step(id, a)) return;                /* a paste in chunks asks for more */
@@ -780,6 +1346,10 @@ static void on_client_message(const uint8_t *p) {
     uint32_t id = x11_get32(p + 4), type = x11_get32(p + 8);
     uint32_t d[5];
     for (int i = 0; i < 5; i++) d[i] = x11_get32(p + 12 + 4 * i);
+    if (id && (id == X.wmwin || id == X.dndwin)) {          /* XDND: its messages have 32-bit fields */
+        if (p[1] == 32) dnd_message(id, type, d);
+        return;
+    }
     XWin *w = find(id);
     if (!w) return;
     if (type == AT(WL_SURFACE_ID)) {
@@ -942,6 +1512,18 @@ static void init_done(void) {
     change_prop(X.wmwin, AT(NET_SUPPORTING_WM_CHECK), XA_WINDOW, 32, &X.wmwin, 1);
     change_prop(root, AT(NET_SUPPORTING_WM_CHECK), XA_WINDOW, 32, &X.wmwin, 1);
     change_prop(X.wmwin, AT(NET_WM_NAME), AT(UTF8_STRING), 8, "LordOS", 6);
+    /* the drop proxy (XDND): mapped above the X windows while an X app's drag is outside them (xwm_xdrag_out) */
+    X.dndwin = new_id();
+    req(X_CreateWindow, 0);
+    xo_u32(&X.out, X.dndwin); xo_u32(&X.out, root);
+    xo_u16(&X.out, 0); xo_u16(&X.out, 0); xo_u16(&X.out, 32767); xo_u16(&X.out, 32767);
+    xo_u16(&X.out, 0); xo_u16(&X.out, 2);                   /* InputOnly */
+    xo_u32(&X.out, 0);
+    xo_u32(&X.out, XCW_OverrideRedirect);
+    xo_u32(&X.out, 1);
+    xo_end(&X.out);
+    uint32_t xdnd = XDND_VERSION;
+    change_prop(X.dndwin, AT(XdndAware), XA_ATOM, 32, &xdnd, 1);
     uint32_t sup[] = { AT(NET_WM_STATE), AT(NET_WM_STATE_FULLSCREEN), AT(NET_WM_STATE_MAXIMIZED_VERT), AT(NET_WM_STATE_MAXIMIZED_HORZ),
                        AT(NET_WM_STATE_HIDDEN), AT(NET_WM_STATE_FOCUSED), AT(NET_ACTIVE_WINDOW), AT(NET_WM_MOVERESIZE),
                        AT(NET_CLIENT_LIST), AT(NET_SUPPORTING_WM_CHECK), AT(NET_WM_NAME), AT(NET_FRAME_EXTENTS),
@@ -960,6 +1542,9 @@ static void init_done(void) {
             xo_u32(&X.out, X.wmwin); xo_u32(&X.out, sel_atom(k)); xo_u32(&X.out, 7);
             xo_end(&X.out);
         }
+        req(X.xfixes_op, 2);                                /* an X app's drag owns XdndSelection */
+        xo_u32(&X.out, X.wmwin); xo_u32(&X.out, AT(XdndSelection)); xo_u32(&X.out, 7);
+        xo_end(&X.out);
     } else fprintf(stderr, "xwm: no XFIXES: the clipboard is not shared with X11 apps\n");
     if (X.render_op) {
         req(X.render_op, 0); xo_u32(&X.out, 0); xo_u32(&X.out, 11); xo_end(&X.out);   /* RenderQueryVersion */
@@ -1094,6 +1679,7 @@ int xwm_start(int fd, struct wl_event_loop *loop) {
 }
 
 void xwm_stop(void) {
+    dnd_stop();
     while (X.wins) free_win(X.wins);
     while (X.xfers) xfer_free(X.xfers);
     for (int k = 0; k < NSEL; k++) sel_reset(&X.sel[k]);
@@ -1211,5 +1797,6 @@ void xwm_tick(void) {
     clip_sync();
     time_t now = time(NULL);
     for (Xfer *t = X.xfers, *nx; t; t = nx) { nx = t->next; if (now - t->t0 > 30) xfer_free(t); }   /* a paste nobody reads */
+    dnd_tick(now);
     flush();
 }
