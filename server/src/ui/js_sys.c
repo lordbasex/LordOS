@@ -34,6 +34,7 @@
 #include "../wl/wl.h"
 #include "../wl/keygrab.h"
 #include "../wl/xwayland.h"
+#include "../wl/urilist.h"
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
@@ -1596,7 +1597,62 @@ static JSValue f_wl_fullscreen(JSContext *c, JSValueConst this_val, int argc, JS
     return JS_NewBool(c, wl_fullscreen_active());
 }
 
+/* lord.wayland.dragFiles(paths) → bool: the paths Files is dragging, offered to the Linux window under the
+ * pointer while the drag is over one (wl_drag_files); dragFiles(null) ends a drag still running. Only paths:
+ * absolute, existing, without a NUL or a newline, at most URIL_MAX_PATHS; one that is not refuses them all.
+ * Nothing runs and nothing is read here: the app that takes the drop opens the files itself. */
+static JSValue f_wl_drag_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsArray(c, argv[0])) { wl_drag_files_end(); return JS_FALSE; }
+    int64_t n = 0;
+    JSValue lv = JS_GetPropertyStr(c, argv[0], "length");
+    JS_ToInt64(c, &n, lv);
+    JS_FreeValue(c, lv);
+    if (n < 1 || n > URIL_MAX_PATHS) return JS_FALSE;
+    const char *paths[URIL_MAX_PATHS];
+    int got = 0, ok = 1;
+    for (int64_t i = 0; i < n && ok; i++) {
+        JSValue v = JS_GetPropertyUint32(c, argv[0], (uint32_t)i);
+        size_t len = 0;
+        const char *p = JS_IsString(v) ? JS_ToCStringLen(c, &len, v) : NULL;
+        JS_FreeValue(c, v);
+        struct stat st;
+        ok = p && uril_path_ok(p, len) && lstat(p, &st) == 0;
+        if (p) paths[got++] = p;
+    }
+    ok = ok && wl_drag_files(paths, got);
+    for (int i = 0; i < got; i++) JS_FreeCString(c, paths[i]);
+    return JS_NewBool(c, ok);
+}
+/* lord.wayland.dragTaken() → '' | 'copy' | 'move': what the Linux window under Files' drag agreed to (the ghost's +) */
+static JSValue f_wl_drag_taken(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    int a = wl_drag_files_taken();
+    return JS_NewString(c, a == 1 ? "copy" : a == 2 ? "move" : "");
+}
+
+/* lord.wayland.takeDrop() → bool: Files claims a Linux app's drag of files just released over it (wl_drop_claim):
+ * only from its "pointerup" for that release; later, or for a drop of an isolated or sandboxed app, it is false;
+ * lord.wayland.droppedFiles() → [path]: its local paths once read (after the "filesdrop" event), given once. */
+static JSValue f_wl_take_drop(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, wl_drop_claim());
+}
+static JSValue f_wl_dropped_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    int n = 0;
+    const char *p = wl_drop_paths(&n);
+    JSValue arr = JS_NewArray(c);
+    for (int i = 0; p && i < n; i++, p += strlen(p) + 1) JS_SetPropertyUint32(c, arr, (uint32_t)i, JS_NewString(c, p));
+    wl_drop_clear();
+    return arr;
+}
+
 static const JSCFunctionListEntry wayland_funcs[] = {
+    JS_CFUNC_DEF("dragFiles", 1, f_wl_drag_files),
+    JS_CFUNC_DEF("dragTaken", 0, f_wl_drag_taken),
+    JS_CFUNC_DEF("takeDrop", 0, f_wl_take_drop),
+    JS_CFUNC_DEF("droppedFiles", 0, f_wl_dropped_files),
     JS_CFUNC_DEF("grabKeys", 1, f_wl_grab_keys),
     JS_CFUNC_DEF("fullscreen", 0, f_wl_fullscreen),
     JS_CFUNC_DEF("paste", 0, f_wl_paste),

@@ -498,6 +498,7 @@ static void dispatch_pointer(Server *s) {
     if (s->moved && !grabbing) js_pointer("move", id, x, y, 0);
     for (int i = 0; i < s->nbuttons; i++)          /* sobre un menú, solo los "up" (terminan arrastres) */
         if (over != 2 || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
+    wl_drop_release_done();                 /* a Linux app's files dropped at this release: claimed by now, or cancelled */
     if (s->wheel && over != 2) js_pointer("wheel", id, x, y, s->wheel);
     if (dstat.held && s->moved) {
         if (!dstat.active) { dstat.active = 1; dstat.t0 = dstat.last = t0; }

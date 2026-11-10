@@ -67,7 +67,17 @@ addListener('pointermove', (e) => {
 });
 addListener('pointerup', () => { drag = null; });
 
+// a Linux app's drag of files released over LordOS: who claimed it at the release (wayland.takeDrop) gets the
+// paths once lord-server has read them ('filesdrop' on window 0)
+let dropTaker = null;
 globalThis.__lordWayland = (sid, type, d = {}) => {
+  if (sid === 0 && type === 'filesdrop') {
+    const fn = dropTaker;
+    dropTaker = null;
+    const paths = typeof lord.wayland.droppedFiles === 'function' ? lord.wayland.droppedFiles() : [];
+    if (fn && paths.length) { try { fn(paths); } catch (e) { console.warn('files drop:', e); } }
+    return;
+  }
   const id = idOf(sid);
   const win = wm.get(id);
   switch (type) {
@@ -195,6 +205,19 @@ if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());
 export const wayland = {
   info: () => (typeof lord.wayland !== 'undefined' ? lord.wayland.info() : { socket: '', windows: 0 }),
   isLinuxWindow: (id) => surfaceOf(id) > 0,
+  // Files' drag over a Linux window (docs/WAYLAND.md, "Drag and drop"): lord-server offers the paths as
+  // text/uri-list while the button is down; dragTaken says what the window under the pointer agreed to
+  // ('copy', 'move' or ''), endDrag cancels one still running. Only the paths of the drag, checked in C.
+  dragFiles: (paths) => typeof lord.wayland !== 'undefined' && typeof lord.wayland.dragFiles === 'function' && lord.wayland.dragFiles(paths),
+  dragTaken: () => (typeof lord.wayland !== 'undefined' && typeof lord.wayland.dragTaken === 'function' ? lord.wayland.dragTaken() : ''),
+  endDrag: () => { if (typeof lord.wayland !== 'undefined' && typeof lord.wayland.dragFiles === 'function') lord.wayland.dragFiles(null); },
+  // the other way: called on the release, true if a Linux app's drag of files was just dropped here and this
+  // caller is the first to take it; fn(paths) runs once they are read (a drop nobody takes is cancelled)
+  takeDrop: (fn) => {
+    if (typeof lord.wayland === 'undefined' || typeof lord.wayland.takeDrop !== 'function' || !lord.wayland.takeDrop()) return false;
+    dropTaker = fn;
+    return true;
+  },
 };
 
 // Apps .lpk aisladas: su título es el nombre del paquete en el idioma actual; al cambiar de idioma

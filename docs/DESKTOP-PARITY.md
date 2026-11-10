@@ -39,7 +39,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Wayland drag and drop (`wl_data_device.start_drag`, offers, actions, the drag icon) and the bridge from Files to Linux apps (`text/uri-list`) | drop a file on Chrome or Firefox, drag tabs out, drag attachments | L | ⬜ |
+| Wayland drag and drop (`wl_data_device.start_drag`, offers, actions, the drag icon) and the bridge from Files to Linux apps (`text/uri-list`) | drop a file on Chrome or Firefox, drag tabs out, drag attachments | L | 🟨 built, to check on the VM: between Wayland apps, Files → Linux app and Linux app → Files (`docs/WAYLAND.md`, "Drag and drop"); XDND for X11 apps still to do |
 | XDND bridge for Xwayland apps (`server/src/wl/xwm.c`) | the same for X apps (Chrome under Xwayland, older apps) | M | ⬜ |
 | `text-input-v3` complete: preedit and commit from LordOS's input method (`server/src/ime.c`, `wl_textinput.c`) | Japanese, Chinese and Korean inside Linux apps | M | ⬜ |
 | Screen sharing for apps: the xdg-desktop-portal ScreenCast interface in `server/src/ui/portal.c`, screen or window chosen in LordOS's own dialog with the consent and indicator of `remote/share.c`, frames to a PipeWire stream | share a screen or a window in Meet, Zoom, Teams, Discord, OBS | L | ⛔ the PipeWire stream: a new sandboxed helper linking libpipewire (recommended) or LordOS's own PipeWire protocol |
