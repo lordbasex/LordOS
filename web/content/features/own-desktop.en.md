@@ -106,6 +106,10 @@ Not released yet; the latest release is 0.8.8.7.
 - **Dragging files.** What you drag from Files follows the pointer above every window and shows a + over one that takes files; the Text Editor opens a dropped file in a tab and a dropped folder as its project.
 - **Colors.** A tagged folder is drawn in its tag's color in Files, and a group of favorites in Databases has a color of its own.
 - **Lists of names in order.** The Apps grid and every other list of names sort the same way, so an app whose name starts with a lowercase letter is no longer left after the last row.
+- **The keyboard reaches everything.** Tab and Shift+Tab move between the controls of every LordOS app, with a focus ring that shows only once you use the keyboard; Space and Enter press, the arrows move sliders and selectors, and the menus of both themes work with the arrows, typed letters and Escape. F10, or the left ⌥ on its own, opens the menu bar.
+- **Password fields** have an eye to show what you typed, hidden again when you leave the field, and tell you when Caps Lock is on.
+- **Middle click pastes** what you selected, in LordOS's own text fields and the Terminal as in Linux apps; Settings → Mouse & Trackpad turns it off.
+- **Linux apps fit in.** Drag and drop and copied files between Files and Linux apps, LordOS's input methods inside them, their tray icons and their players in Now Playing (see *Your Linux apps too*). X11 apps don't take drags yet, and a tray icon that exists only as SVG shows a letter.
 
 ## New in 0.8.8.7
 
@@ -141,8 +145,8 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
-- **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
-- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech; a screen reader, zoom and high contrast are on the roadmap.
+- **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. In 0.8.8.7, the latest release, drag and drop with Linux apps and LordOS input methods inside them are missing; both are in development for 0.8.8.8, where X11 apps don't take drags yet (`docs/WAYLAND.md`).
+- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and keyboard navigation with a focus ring is in development for 0.8.8.8; a screen reader, zoom and high contrast are on the roadmap.
 
 ## Read the source
 

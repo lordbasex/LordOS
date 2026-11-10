@@ -106,6 +106,10 @@ Ainda não lançada; o último lançamento é a 0.8.8.7.
 - **Arrastar arquivos.** O que você arrasta do Arquivos segue o ponteiro acima de todas as janelas e mostra um + sobre uma que aceita arquivos; o Editor de texto abre um arquivo solto numa aba e uma pasta solta como seu projeto.
 - **Cores.** Uma pasta etiquetada é desenhada com a cor da sua etiqueta no Arquivos, e um grupo de favoritos do Bancos de dados tem uma cor própria.
 - **Listas de nomes em ordem.** A grade de Apps e todas as outras listas de nomes são ordenadas do mesmo jeito, então um app cujo nome começa com minúscula não fica mais depois da última linha.
+- **O teclado chega a tudo.** Tab e Shift+Tab passam de um controle a outro em todos os apps do LordOS, com um anel de foco que só aparece quando você usa o teclado; Espaço e Enter pressionam, as setas movem controles deslizantes e seletores, e os menus dos dois temas funcionam com as setas, letras digitadas e Escape. F10, ou o ⌥ esquerdo sozinho, abre a barra de menus.
+- **Os campos de senha** têm um olho para ver o que você digitou, que volta a ficar oculto quando você sai do campo, e avisam quando o Caps Lock está ativado.
+- **O clique do meio cola** o que você selecionou, nos campos de texto do próprio LordOS e no Terminal assim como nos apps Linux; Ajustes → Mouse e trackpad desliga isso.
+- **Os apps Linux se integram.** Arrastar e soltar e arquivos copiados entre o Arquivos e os apps Linux, os métodos de entrada do LordOS dentro deles, os ícones de bandeja e os players na Central de Controle (veja *Seus apps Linux também*). Apps X11 ainda não aceitam arrastes, e um ícone de bandeja que só existe em SVG mostra uma letra.
 
 ## Novo na 0.8.8.7
 
@@ -141,8 +145,8 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 - **No Raspberry Pi 5 um app ocupado ainda reduz pela metade os quadros por segundo do desktop:** cerca de 31 em vez de 60 no teste de desktop do LordBench enquanto todos os núcleos estão ocupados. Com essa carga o chip gráfico leva 14–16 ms por quadro em vez de 1,5, sem reduzir a frequência nem por temperatura; na 0.8.7, uma medição apontou a causa na memória: 28 ms por quadro com quatro núcleos lendo memória, 1,4 ms com quatro núcleos só girando. Quanto disso o compositor pode evitar continua em aberto (`docs/GPU.md`).
 - **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para uma versão futura. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
 - **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
-- **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Arrastar e soltar entre apps Linux e os métodos de entrada do LordOS dentro de apps Linux estão pendentes (`docs/WAYLAND.md`).
-- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo; leitor de tela, zoom e alto contraste estão no roadmap.
+- **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Na 0.8.8.7, a última versão lançada, faltam arrastar e soltar com os apps Linux e os métodos de entrada do LordOS dentro deles; os dois estão em desenvolvimento para a 0.8.8.8, onde os apps X11 ainda não aceitam arrastes (`docs/WAYLAND.md`).
+- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e a navegação pelo teclado com um anel de foco está em desenvolvimento para a 0.8.8.8; leitor de tela, zoom e alto contraste estão no roadmap.
 
 ## Leia o código
 

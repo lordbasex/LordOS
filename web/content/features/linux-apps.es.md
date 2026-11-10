@@ -35,7 +35,7 @@ El JavaScript de LordOS no puede escribir archivos `.desktop`, así que la inter
 - **Permisos de administrador con el aviso de LordOS** (desde la 0.8.8): una app que los pide con `pkexec`, como un lanzador que se actualiza solo, recibe el aviso de administrador de LordOS, que nombra la app y el comando, en lugar de frenar con el error 127. Los programas que le piden a polkit por D-Bus todavía no encuentran agente.
 - **Los clics llegan a la superficie correcta** (desde la 0.8.8): el compositor ahora respeta la región de entrada que fija una app, así que las pestañas, la barra y las páginas de Firefox vuelven a responder al mouse.
 - **Un solo portapapeles.** El texto que copiás en una app de Linux se pega en LordOS y al revés; las imágenes siguen disponibles después de cerrar la app de origen y aparecen en el historial del portapapeles (❖V).
-- **Seleccionar para copiar, clic del medio para pegar.** Desde 0.8.3 la selección primaria funciona entre apps Wayland, y entre ellas y las apps X11. Desde 0.8.5 la app que copió también ve su propia copia en el portapapeles, como dice el protocolo Wayland.
+- **Seleccionar para copiar, clic del medio para pegar.** Desde 0.8.3 la selección primaria funciona entre apps Wayland, y entre ellas y las apps X11. Desde 0.8.5 la app que copió también ve su propia copia en el portapapeles, como dice el protocolo Wayland. En la 0.8.8.8 (en desarrollo) también participan los campos de texto propios de LordOS y la Terminal.
 - **Los videos mantienen la pantalla encendida** (desde 0.8.5): un reproductor de video de Linux puede pedir que la pantalla no se oscurezca ni se bloquee mientras reproduce (`zwp_idle_inhibit_manager_v1`), y los temporizadores de inactividad esperan mientras su ventana está a la vista.
 - **Nítidas en cualquier escala.** Cada pantalla es un `wl_output` aparte, y la escala fraccionaria permite que GTK 4, Qt 6 y Chromium se dibujen nítidos al 125–175 %.
 - **Gestos del touchpad.** El driver de touchpad propio de LordOS les pasa a las apps de Linux los gestos de pellizcar, deslizar y mantener, así que el zoom con pellizco funciona en los navegadores.
@@ -49,9 +49,20 @@ El JavaScript de LordOS no puede escribir archivos `.desktop`, así que la inter
 
 [[shot:3]]
 
+## En desarrollo para la 0.8.8.8
+
+Todavía sin publicar; la última versión publicada es la 0.8.8.7.
+
+- **Arrastrar y soltar.** Arrastrá archivos desde Archivos a una app de Linux (recibe una copia; apretá Shift para moverlos), desde una app de Linux a una carpeta de Archivos, o entre apps de Linux. Solo las apps que no están en una caja de arena pueden pasarle archivos a LordOS. Las apps X11 (por Xwayland) todavía no aceptan arrastres.
+- **Archivos copiados.** Copiá en Archivos y pegá en un gestor de archivos de Linux, o al revés. Los archivos copiados en otra app se pegan solo después de que Archivos te pregunte, con Cancelar como opción predeterminada.
+- **Tu método de entrada dentro de las apps de Linux.** Los métodos de entrada de coreano, japonés y chino de LordOS ahora escriben en las apps GTK y Qt, con la lista de candidatos en el cursor, y nunca en campos de contraseña.
+- **Íconos de bandeja.** Las apps de Linux que ponen un ícono en la bandeja lo muestran junto a los ítems de estado de LordOS, con su menú. Una app cuyo ícono existe solo en SVG muestra en cambio su primera letra, porque LordOS dibuja solo íconos PNG.
+- **Lo que suena y las teclas multimedia.** Los navegadores y los reproductores de video y de música aparecen en el reproductor del Centro de control con su título, su carátula y sus controles, y las teclas de reproducir/pausar, siguiente y anterior les llegan.
+- **Diálogos y enlaces.** El diálogo de una app de Linux se abre encima de su ventana y se mueve con ella, y un enlace abierto desde LordOS trae al frente el navegador que ya está abierto. Una ventana no puede tomar el foco por su cuenta.
+
 ## Qué protocolos Wayland hay
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (uno por pantalla), `xdg_wm_base` con menús emergentes, `wl_seat` (puntero, teclado, táctil), `wl_data_device_manager` (portapapeles), `zxdg_decoration_manager_v1`, el protocolo de decoración del servidor de KDE, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (desde 0.8.3) y `zwp_idle_inhibit_manager_v1` (desde 0.8.5) y, en la 0.8.7, `zwp_text_input_manager_v3`, para el teclado en pantalla.
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (uno por pantalla), `xdg_wm_base` con menús emergentes, `wl_seat` (puntero, teclado, táctil), `wl_data_device_manager` (portapapeles), `zxdg_decoration_manager_v1`, el protocolo de decoración del servidor de KDE, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (desde 0.8.3) y `zwp_idle_inhibit_manager_v1` (desde 0.8.5) y, en la 0.8.7, `zwp_text_input_manager_v3`, para el teclado en pantalla (en la 0.8.8.8, en desarrollo, también para los métodos de entrada de LordOS). En la 0.8.8.8 (en desarrollo) el compositor también ofrece `xdg_activation_v1`, `zxdg_exporter_v2` y `zxdg_importer_v2`, y `xdg_wm_dialog_v1`, y `wl_data_device` suma arrastrar y soltar.
 
 **Comprobalo desde afuera** (desde 0.8.5): el **Banco de pruebas** (`lordos-testbench`) es una ventana con una carta de ajuste que revisa el servidor gráfico como lo ve cualquier app: los tiempos de los cuadros y cuándo llegan de verdad a la pantalla, cada tecla del teclado, el mouse y la rueda, y los protocolos Wayland que ofrece el sistema.
 
@@ -78,8 +89,8 @@ Ausente a propósito: cualquier protocolo que le permita a una app capturar la p
 ## Límites honestos
 
 - **Las apps X11 se ven entre sí,** como en cualquier escritorio X11; se ven nítidas solo al 100 % de escala.
-- **Todavía no:** arrastrar y soltar entre apps, los métodos de entrada de LordOS (coreano, japonés, chino) dentro de las apps de Linux, y los pedidos de activación de apps.
-- **Íconos solo en SVG:** LordOS todavía no dibuja SVG. Usa los íconos PNG que publica Debian para la mayoría de las apps, o la inicial.
+- **No están en la 0.8.8.7, la última versión publicada:** arrastrar y soltar entre apps, los métodos de entrada de LordOS (coreano, japonés, chino) dentro de las apps de Linux, y los pedidos de activación de apps. Los tres están en desarrollo para la 0.8.8.8 (más arriba), donde las apps X11 todavía no aceptan arrastres.
+- **Íconos solo en SVG:** LordOS todavía no dibuja SVG. Usa los íconos PNG que publica Debian para la mayoría de las apps, o la inicial; en la 0.8.8.8 (en desarrollo) pasa lo mismo con los íconos de bandeja.
 - **Las apps de terminal** con archivo `.desktop` no aparecen en el lanzador de apps; arrancalas desde la Terminal.
 - **Las apps GTK 3 mantienen su propio acento azul;** la lectura del esquema de colores desde el portal en Qt 6 no se probó.
 

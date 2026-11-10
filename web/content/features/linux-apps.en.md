@@ -35,7 +35,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **Administrator rights through LordOS's prompt** (since 0.8.8): an app that asks with `pkexec`, such as a launcher updating itself, gets LordOS's administrator prompt, which names the app and the command, instead of stopping with error 127. Programs that ask polkit over D-Bus still find no agent.
 - **Clicks reach the right surface** (since 0.8.8): the compositor now honours the input region an app sets, so Firefox's tabs, toolbar and pages answer the mouse again.
 - **One clipboard.** Text copied in a Linux app pastes in LordOS and the other way round; images stay available after the source app closes and appear in the clipboard history (❖V).
-- **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says.
+- **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says. In 0.8.8.8 (in development) LordOS's own text fields and the Terminal take part too.
 - **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
 - **Sharp at any scale.** Each display is a separate `wl_output`, and fractional scaling lets GTK 4, Qt 6 and Chromium render sharp at 125–175 %.
 - **Touchpad gestures.** LordOS's own touchpad driver passes pinch, swipe and hold gestures to Linux apps, so pinch-to-zoom works in browsers.
@@ -49,9 +49,20 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 
 [[shot:3]]
 
+## In development for 0.8.8.8
+
+Not released yet; the latest release is 0.8.8.7.
+
+- **Drag and drop.** Drag files from Files into a Linux app (it gets a copy; hold Shift to move them), from a Linux app into a Files folder, or between Linux apps. Only apps that are not in a sandbox can hand files to LordOS. X11 apps (through Xwayland) don't take drags yet.
+- **Copied files.** Copy in Files and paste in a Linux file manager, or the other way round. Files copied in another app are pasted only after Files asks you, with Cancel as the default.
+- **Your input method inside Linux apps.** LordOS's Korean, Japanese and Chinese input methods now type in GTK and Qt apps, with the candidate list at the caret, and never in password fields.
+- **Tray icons.** Linux apps that put an icon in the tray show it next to LordOS's status items, with its menu. An app whose icon exists only as SVG shows its first letter instead, since LordOS draws PNG icons only.
+- **Now Playing and the media keys.** Browsers, video and music players appear in Control Center's Now Playing with their title, cover and controls, and the play/pause, next and previous keys reach them.
+- **Dialogs and links.** A Linux app's dialog opens over its window and moves with it, and a link opened from LordOS brings forward the browser that is already open. A window can't take the focus by itself.
+
 ## Which Wayland protocols are there
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard.
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard (in 0.8.8.8, in development, also for LordOS's input methods). In 0.8.8.8 (in development) the compositor also offers `xdg_activation_v1`, `zxdg_exporter_v2` and `zxdg_importer_v2`, and `xdg_wm_dialog_v1`, and `wl_data_device` gains drag and drop.
 
 **Check it from the outside** (since 0.8.5): the **Test Bench** (`lordos-testbench`) is a test-pattern window that checks the display server as any app sees it: frame timing and when frames really reach the screen, every key of the keyboard, the mouse and wheel, and the Wayland protocols the system offers.
 
@@ -78,8 +89,8 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 ## Honest limits
 
 - **X11 apps can see each other,** as on any X11 desktop; they are sharp only at 100 % scale.
-- **Not yet:** drag and drop between apps, LordOS input methods (Korean, Japanese, Chinese) inside Linux apps, and app activation requests.
-- **SVG-only icons:** LordOS doesn't draw SVG yet. It uses the PNG icons Debian publishes for most apps, or the initial.
+- **Not in 0.8.8.7, the latest release:** drag and drop between apps, LordOS input methods (Korean, Japanese, Chinese) inside Linux apps, and app activation requests. All three are in development for 0.8.8.8 (above), where X11 apps don't take drags yet.
+- **SVG-only icons:** LordOS doesn't draw SVG yet. It uses the PNG icons Debian publishes for most apps, or the initial; in 0.8.8.8 (in development) the same goes for tray icons.
 - **Terminal apps** with a `.desktop` file aren't shown in the app launcher; start them from the Terminal.
 - **GTK 3 apps keep their own blue accent;** Qt 6's reading of the colour scheme from the portal hasn't been tested.
 

@@ -106,6 +106,10 @@ Todavía no se publicó; el último lanzamiento es la 0.8.8.7.
 - **Arrastrar archivos.** Lo que arrastrás desde Archivos sigue al puntero encima de todas las ventanas y muestra un + sobre una que acepta archivos; el Editor de texto abre un archivo soltado en una pestaña y una carpeta soltada como su proyecto.
 - **Colores.** Una carpeta etiquetada se dibuja con el color de su etiqueta en Archivos, y un grupo de favoritos de Bases de datos tiene un color propio.
 - **Listas de nombres en orden.** La grilla de Apps y todas las demás listas de nombres se ordenan igual, así que una app cuyo nombre empieza con minúscula ya no queda después de la última fila.
+- **El teclado llega a todo.** Tab y Shift+Tab pasan de un control a otro en todas las apps de LordOS, con un anillo de foco que aparece solo cuando usás el teclado; Espacio y Enter presionan, las flechas mueven deslizadores y selectores, y los menús de los dos temas funcionan con las flechas, letras tipeadas y Escape. F10, o el ⌥ izquierdo solo, abre la barra de menús.
+- **Los campos de contraseña** tienen un ojo para ver lo que escribiste, que se vuelve a ocultar cuando salís del campo, y te avisan cuando Bloq Mayús está activado.
+- **El clic del medio pega** lo que seleccionaste, en los campos de texto propios de LordOS y en la Terminal igual que en las apps de Linux; Ajustes → Mouse y trackpad lo desactiva.
+- **Las apps de Linux se integran.** Arrastrar y soltar y archivos copiados entre Archivos y las apps de Linux, los métodos de entrada de LordOS dentro de ellas, sus íconos de bandeja y sus reproductores en el Centro de control (mirá *También tus apps de Linux*). Las apps X11 todavía no aceptan arrastres, y un ícono de bandeja que existe solo en SVG muestra una letra.
 
 ## Nuevo en la 0.8.8.7
 
@@ -141,8 +145,8 @@ El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja
 - **En la Raspberry Pi 5 una app ocupada todavía reduce a la mitad los cuadros por segundo del escritorio:** unos 31 en vez de 60 en la prueba de escritorio de LordBench mientras todos los núcleos están ocupados. Con esa carga el chip gráfico tarda 14–16 ms por cuadro en vez de 1,5, sin bajar su frecuencia ni por temperatura; en la 0.8.7, una medición puso la causa en la memoria: 28 ms por cuadro con cuatro núcleos leyendo memoria, 1,4 ms con cuatro núcleos solo girando. Cuánto de eso puede evitar el compositor sigue abierto (`docs/GPU.md`).
 - **Los fondos en movimiento copian cada cuadro en su camino a la pantalla.** En la Raspberry Pi 5, en la pantalla de inicio de sesión, a 1080p y 60 cuadros por segundo, `lord-media` usó el 41 % de un núcleo y `lord-server` el 147 %; un camino sin esa copia está planeado para una versión posterior. El decodificador por hardware de la Pi 5 maneja solo HEVC, así que los clips H.264, VP9 y AV1 no se reproducen ahí.
 - **Cambiar de tema cierra y vuelve a abrir las ventanas de LordOS,** y el texto sin guardar se pierde, sin aviso.
-- **Las apps X11 funcionan con Xwayland desde 0.8.3,** nítidas solo al 100 % de escala y pudiendo verse entre sí, como en cualquier escritorio X11. Arrastrar y soltar entre apps de Linux y los métodos de entrada de LordOS dentro de apps de Linux están pendientes (`docs/WAYLAND.md`).
-- **La accesibilidad está mayormente por delante:** hoy hay un ajuste de "reducir movimiento", un teclado en pantalla y, desde la 0.8.8.6, leer en voz alta y Voz en tiempo real; un lector de pantalla, el zoom y el alto contraste están en la hoja de ruta.
+- **Las apps X11 funcionan con Xwayland desde 0.8.3,** nítidas solo al 100 % de escala y pudiendo verse entre sí, como en cualquier escritorio X11. En la 0.8.8.7, la última versión publicada, faltan arrastrar y soltar con las apps de Linux y los métodos de entrada de LordOS dentro de ellas; los dos están en desarrollo para la 0.8.8.8, donde las apps X11 todavía no aceptan arrastres (`docs/WAYLAND.md`).
+- **La accesibilidad está mayormente por delante:** hoy hay un ajuste de "reducir movimiento", un teclado en pantalla y, desde la 0.8.8.6, leer en voz alta y Voz en tiempo real, y la navegación con el teclado con un anillo de foco está en desarrollo para la 0.8.8.8; un lector de pantalla, el zoom y el alto contraste están en la hoja de ruta.
 
 ## Leé el código
 
