@@ -44,6 +44,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (in development, `wl_textinput.c`, see "Input methods") |
+| `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (in development, `secctx.c`, see "Security contexts") |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -743,6 +744,51 @@ display.
   Neverball with `SDL_VIDEODRIVER=x11` (windowed and fullscreen), menus, move and resize from the
   frame, close, the Dock icons, Xwayland stopping 10 s after the last app and starting again, the
   firewall restriction on XTerm, and the protected-window checks in `PRIVACY.md`.
+
+## Security contexts (`wp_security_context_v1`, 0.8.8.8, in development)
+
+A sandbox engine tells lord-server which connections come from inside it. Flatpak 1.15 and later
+does it when the compositor offers `wp_security_context_manager_v1`: `flatpak run` makes a listening
+socket for the app, sends it with `create_listener(listen_fd, close_fd)`, names itself with
+`set_sandbox_engine("org.flatpak")`, `set_app_id` and `set_instance_id`, commits, and mounts that
+socket in the sandbox instead of the normal one (`server/src/wl/secctx.c`).
+
+- **The context.** `listen_fd` must be a listening `AF_UNIX` stream socket (else `invalid_listen_fd`);
+  lord-server makes it non-blocking and, after `commit`, accepts on it from its event loop, at most 16
+  connections per wakeup, until `close_fd` hangs up. That goes on after the launcher destroys the
+  object or disconnects, as the protocol asks. Each field is set once (`already_set`), is 1 to 255
+  bytes of printable ASCII without spaces (`invalid_metadata`), and nothing but `destroy` comes after
+  `commit` (`already_used`). At most 64 contexts are alive at once.
+- **Who may make one.** The manager is offered only to a client lord-server knows is outside any
+  sandbox (not an isolated LordOS app, and the same root and mount, pid and user namespaces as
+  lord-server when it connected): Flatpak's launcher runs outside the sandbox, and a sandboxed app
+  must not open connections tagged as another app. A client that connected through a context never
+  sees the manager, and asking for one from inside a context is the `nested` error.
+- **Its clients.** Every client that connects through the socket carries the metadata. It counts as
+  sandboxed everywhere: its drags and its clipboard file lists never hand files to LordOS
+  (`client_from` answers Flatpak for `org.flatpak`, unknown for another engine). Its windows take the
+  context's app id (cut to 127 bytes) until they set one of their own, so the Dock groups them.
+- **What it doesn't see.** Like KWin and wlroots, the display's global filter hides from such a client
+  the interfaces that only make sense for a trusted one (`secctx_hidden`): other windows
+  (`ext_foreign_toplevel_list_v1`, `zwlr_foreign_toplevel_manager_v1`, `ext_workspace_manager_v1`), the
+  screen and the outputs (`ext_image_copy_capture_manager_v1` and its capture sources,
+  `zwlr_screencopy_manager_v1`, `zwlr_export_dmabuf_manager_v1`, `zwlr_gamma_control_manager_v1`,
+  `zwlr_output_manager_v1`, `zwlr_output_power_manager_v1`, `wp_drm_lease_device_v1`), the clipboard
+  without focus (`ext_data_control_manager_v1`, `zwlr_data_control_manager_v1`), made-up or snooped
+  input (`zwp_virtual_keyboard_manager_v1`, `zwlr_virtual_pointer_manager_v1`, the input-method
+  interfaces, `ext_transient_seat_manager_v1`), surfaces over everything (`zwlr_layer_shell_v1`,
+  `ext_session_lock_manager_v1`), `xwayland_shell_v1`, and the manager itself. lord-server offers none
+  of them today but the manager; they are listed so one added later is hidden from the start. Every
+  global lord-server has now (surfaces, the seat, the clipboard with focus, dmabuf, activation, the
+  pointer for games, text input…) is one an app in a window needs. `zwp_keyboard_shortcuts_inhibit_manager_v1`
+  is left out on purpose: games and virtual machines in a sandbox need it, so the person's permission gates it instead.
+- **Tests.** `build/secctx-test` (in `make -C server test`): the string bounds and fields set once,
+  the hidden list, which `listen_fd` is taken, and the protocol end to end: a server in the test and a
+  forked client over socketpairs make a context on a listening socket, the launcher disconnects, an
+  app connects through it, is tagged with the metadata, sees neither the manager nor a trusted-only
+  global and can't bind the manager by name; a client not known to be unsandboxed gets no manager;
+  `close_fd` hanging up stops the listener; and each protocol error. Not yet checked on the VM with a
+  real Flatpak.
 
 ## Tray icons (StatusNotifierItem, 0.8.8.8, in development)
 
