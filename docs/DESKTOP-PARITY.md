@@ -23,7 +23,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Databases: connect through an SSH tunnel, as `docs/DATABASES.md` phase 2 designs it: lord-server starts `/usr/bin/ssh -W <db host>:<db port>` (fixed path, every argument from the validated favorite, `--` before the destination, the key a file under the home and not readable by others, `BatchMode`, the host key confirmed by the person on first use like a certificate) and hands its stdin/stdout to lord-sql as the server's stream; the tunnel ends with the connection | most favorites imported from Sequel Ace are SSH ones and can't connect today | M | 🟨 approved 2026-11-10 and done (sshtun.c, tested end to end through a real sshd to MariaDB on a VM); the maintainer's own favorite still to check |
+| Databases: connect through an SSH tunnel, as `docs/DATABASES.md` phase 2 designs it: lord-server starts `/usr/bin/ssh -W <db host>:<db port>` (fixed path, every argument from the validated favorite, `--` before the destination, the key a file under the home and not readable by others, `BatchMode`, the host key confirmed by the person on first use like a certificate) and hands its stdin/stdout to lord-sql as the server's stream; the tunnel ends with the connection | most favorites imported from Sequel Ace are SSH ones and can't connect today | M | ✅ checked on VM 115 (the maintainer's own server still to try) |
 
 ## Phase 1 — quick wins, nothing new to approve
 
@@ -39,9 +39,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Wayland drag and drop (`wl_data_device.start_drag`, offers, actions, the drag icon) and the bridge from Files to Linux apps (`text/uri-list`) | drop a file on Chrome or Firefox, drag tabs out, drag attachments | L | 🟨 built, to check on the VM: between Wayland apps, Files → Linux app and Linux app → Files (`docs/WAYLAND.md`, "Drag and drop"); XDND for X11 apps still to do |
+| Wayland drag and drop (`wl_data_device.start_drag`, offers, actions, the drag icon) and the bridge from Files to Linux apps (`text/uri-list`) | drop a file on Chrome or Firefox, drag tabs out, drag attachments | L | ✅ Wayland side checked on VM 127 (Files → Chromium, GTK 4 copy and Shift-move); XDND for X11 apps still ⬜ |
 | XDND bridge for Xwayland apps (`server/src/wl/xwm.c`) | the same for X apps (Chrome under Xwayland, older apps) | M | ⬜ |
-| `text-input-v3` complete: preedit and commit from LordOS's input method (`server/src/ime.c`, `wl_textinput.c`) | Japanese, Chinese and Korean inside Linux apps | M | 🟨 built, to check on the VM (`build/textinput-client type 30`, then GNOME Text Editor) |
+| `text-input-v3` complete: preedit and commit from LordOS's input method (`server/src/ime.c`, `wl_textinput.c`) | Japanese, Chinese and Korean inside Linux apps | M | ✅ checked on VM 127 (GTK 4, Hangul) |
 | Screen sharing for apps: the xdg-desktop-portal ScreenCast interface in `server/src/ui/portal.c`, screen or window chosen in LordOS's own dialog with the consent and indicator of `remote/share.c`, frames to a PipeWire stream | share a screen or a window in Meet, Zoom, Teams, Discord, OBS | L | ⛔ the PipeWire stream: a new sandboxed helper linking libpipewire (recommended) or LordOS's own PipeWire protocol |
 | `keyboard-shortcuts-inhibit-v1`: an app may take ❖ and Alt+Tab while focused, after the person allows it once | VMs, remote desktops, games | S | ⛔ a new permission kind in `sec/perms.c` |
 
@@ -49,20 +49,20 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| MPRIS client: Linux players (Spotify, browsers, mpv) in Now Playing, and the media keys reach them | music and video in the browser without global controls | S/M | 🟨 built, to check on the VM (`server/src/hw/mpris.c`, `sdk/mprismodel.js`) |
-| StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | 🟨 built, to check on the VM (`server/src/ui/sni.c`, `sdk/trayitems.jsx`, docs/WAYLAND.md "Tray icons") |
+| MPRIS client: Linux players (Spotify, browsers, mpv) in Now Playing, and the media keys reach them | music and video in the browser without global controls | S/M | ✅ checked on VM 127 (mpv) |
+| StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | 🟨 registers and shows; SVG-only icons show a letter (needs an SVG rasterizer: ⛔) |
 | XDG autostart (`/etc/xdg/autostart`, `~/.config/autostart`) through a closed launcher, listed in Settings | sync clients, VPNs and messengers start with the session | M | ⛔ a new launch path |
 | Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | 🟨 built, to check on the VM |
 | Global shortcuts portal | push-to-talk, OBS | M | ⬜ |
 | Drop onto isolated apps (Mail attaches, Calendar and Contacts import): the dropped files granted to that app as the file chooser grants them | Mail can't take a dragged file | M | ⛔ a new broker message and grant |
-| Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | 🟨 built, to check on the VM (both ways for Wayland apps; files an X11 app copies arrive as text) |
+| Files puts `text/uri-list` and `x-special/gnome-copied-files` on the clipboard when copying files | copy in Files, paste in a GTK or Qt app | S | ✅ checked on VM 127 |
 
 ## Phase 4 — the SDK's keyboard and widgets
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| A keyboard focus model in the runtime: `focusable`, Tab and ⇧Tab between controls, a focus ring shown only when the keyboard is used, Space and Enter activate | everything is mouse-only today except text fields | L | 🟨 built, to check on the VM (`sdk/focus.js`, `sdk/focusmodel.js`; DESIGN.md "Keyboard focus") |
-| Menus with arrows, Enter, type-ahead, delayed submenus, opening left in RTL | keyboard use | M | 🟨 built, to check on the VM (`sdk/menunav.js`, F10 or ⌥ alone opens the menu bar) |
+| A keyboard focus model in the runtime: `focusable`, Tab and ⇧Tab between controls, a focus ring shown only when the keyboard is used, Space and Enter activate | everything is mouse-only today except text fields | L | ✅ checked on VM 127 (Settings) |
+| Menus with arrows, Enter, type-ahead, delayed submenus, opening left in RTL | keyboard use | M | ✅ checked on VM 127 (F10, arrows) |
 | SDK components with keyboard support built in: List/Table with Shift/Ctrl range selection and type-to-find, Dropdown, Checkbox, Radio, Tabs, Popover, Tooltip, ProgressBar | each app has its own today (three `Popover`s, two tables…) | M | ⬜ |
 | Sliders and steppers with arrows and the wheel; ScrollView with Page Up/Down, Home, End and horizontal scrolling | keyboard use | S | 🟨 the keys and `horizontal` ScrollView built with the focus model, to check on the VM; the wheel on sliders not yet |
 | Destructive dialogs start on Cancel; a dialog takes keys only when in front | Enter emptied the Trash | S | ⬜ |
@@ -72,10 +72,10 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Item | Why | Size | Status |
 |---|---|---|---|
 | Caret and selection drawn from the shaped text (bidi rectangles) and movement by grapheme clusters (`server/src/ui/bidi.c`, `textlayout.c`) | Arabic or Hebrew mixed with numbers; emoji split by the arrows | M | ⬜ |
-| Native primary selection (select copies, middle click pastes) over the compositor's | long-time Linux users | S | 🟨 built, to check on the VM |
+| Native primary selection (select copies, middle click pastes) over the compositor's | long-time Linux users | S | ✅ checked on VM 127 (Chromium → a LordOS field) |
 | Spell checking: hunspell in a sandboxed helper fed words over an fd; red underline and suggestions in the field's menu | Mail and Notes | M | ⛔ a new helper |
 | Screen reader: an accessibility tree from `server/src/ui` nodes exported over AT-SPI2; high contrast tokens; a font scale | blind and low-vision people can't use LordOS | L | ⛔ the D-Bus export |
-| Show password (eye) and a Caps Lock warning in password fields | login, Wi-Fi, the vault | S | 🟨 built, to check on the VM (once in the SDK's TextInput `secure`: every password field has it; `sdk/passwordfieldmodel.js`) |
+| Show password (eye) and a Caps Lock warning in password fields | login, Wi-Fi, the vault | S | ✅ checked on VM 127 (Settings → Users) |
 
 ## Phase 6 — hardware that needs its own test bench
 
