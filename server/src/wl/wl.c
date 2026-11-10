@@ -58,6 +58,7 @@
 #include "primary-selection-unstable-v1-protocol.h"
 #include "xdg-activation-v1-protocol.h"
 #include "xdgact.h"
+#include "dndgate.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
 #include "xdg-dialog-v1-protocol.h"
 #include "xwm.h"
@@ -1370,21 +1371,33 @@ static uint32_t input_serial(struct wl_client *c) {
     xact_note_serial(s, c, xact_now());
     return s;
 }
-/* A client that left: its serials stop counting (another one may get the same address). */
+/* A client that left: its serials stop counting (another one may get the same address). What is known of a
+ * client from its connection: sandboxed (dndg_pid_sandboxed), looked at once, while its pid is still the one
+ * that connected. */
+typedef struct { struct wl_listener gone; int sandboxed; } ClientInfo;
 static struct wl_listener client_created;
 static void dnd_client_gone(struct wl_client *c);
+static pid_t client_pid(struct wl_client *c);
 static void client_destroyed(struct wl_listener *l, void *data) {
     xact_client_gone(data);
     dnd_client_gone(data);
     wl_list_remove(&l->link);
-    free(l);
+    free(wl_container_of(l, (ClientInfo *)NULL, gone));
 }
 static void on_client_created(struct wl_listener *l, void *data) {
     (void)l;
-    struct wl_listener *d = calloc(1, sizeof *d);
-    if (!d) return;
-    d->notify = client_destroyed;
-    wl_client_add_destroy_listener(data, d);
+    ClientInfo *ci = calloc(1, sizeof *ci);
+    if (!ci) return;
+    ci->sandboxed = dndg_pid_sandboxed((int)client_pid(data));
+    ci->gone.notify = client_destroyed;
+    wl_client_add_destroy_listener(data, &ci->gone);
+}
+/* 1 if the client runs in a sandbox (Flatpak), or nothing is known of it */
+static int client_sandboxed(struct wl_client *c) {
+    struct wl_listener *l = c ? wl_client_get_destroy_listener(c, client_destroyed) : NULL;
+    if (!l) return 1;
+    ClientInfo *ci = wl_container_of(l, (ClientInfo *)NULL, gone);
+    return ci->sandboxed;
 }
 
 static void send_keymap(struct wl_resource *kb) {
@@ -3039,8 +3052,11 @@ static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) {
  * window the compositor offers the paths as text/uri-list and text/plain and writes them itself, from the event
  * loop and without blocking (send_bytes). And a target: an app's drag of files (text/uri-list) released over
  * LordOS itself is read by the compositor and handed to JS, where Files copies them into the folder under the
- * pointer (dnd_take_files). Xwayland's windows take no drop yet (no XDND bridge), and neither do isolated
- * LordOS apps (a drop there needs a grant of its own, docs/DESKTOP-PARITY.md). */
+ * pointer (dnd_take_files). Only the UI's handling of that release may claim it (wl_drop_claim, DropGate);
+ * one nobody claimed there is cancelled at once, and a claimed list has DNDG_READ_MS to arrive. The drags of
+ * an isolated LordOS app or a sandboxed (Flatpak) app never hand files to LordOS: they may name files the app
+ * itself can't reach (dnd_contained). Xwayland's windows take no drop yet (no XDND bridge), and neither do
+ * isolated LordOS apps (a drop there needs a grant of its own, docs/DESKTOP-PARITY.md). */
 
 #define DND_COPY WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY
 #define DND_MOVE WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE
@@ -3066,6 +3082,7 @@ static struct {
     struct wl_resource *dev;            /* the data device that got enter */
     DOffer *offer;                      /* the offer made for focus */
     int over_lord;                      /* over LordOS itself, told to the source as a copy of its files */
+    int contained;                      /* started by an isolated or sandboxed app: no files for LordOS */
 } drag;
 static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
 static int alt_down;                    /* Alt held: a Files drag copies instead of moving, as inside LordOS */
@@ -3082,11 +3099,13 @@ static const char *const lord_mimes[] = { "text/uri-list", "text/plain;charset=u
 
 static const char *app_of_client(struct wl_client *cl);
 
-/* An app's files dropped on LordOS (dnd_take_files): read from its source, then its local paths for JS. */
+/* An app's files dropped on LordOS (dnd_take_files): claimed at the release, read from its source, then its
+ * local paths for JS. */
 static struct {
-    Source *src;                        /* the source being read, while it lives */
-    int fd, claimed;                    /* claimed: Files took it at the release (wl_drop_claim) */
-    struct wl_event_source *ev;
+    Source *src;                        /* the source dropped (then being read), while it lives */
+    DropGate gate;                      /* who may claim it: only the release that dropped it (wl_drop_claim) */
+    int fd;
+    struct wl_event_source *ev, *timer; /* the list's pipe, and how long it may take (DNDG_READ_MS) */
     char *buf, *paths;                  /* what the app wrote; the paths, each ended by its NUL */
     size_t len, cap;
     int npaths;
@@ -3231,7 +3250,7 @@ static int dnd_takes(Surf *t) {
 
 /* An app's drag that carries files and may copy them: LordOS itself takes it (Files, dnd_take_files). */
 static int dnd_files_in(void) {
-    if (!drag.src || !(dnd_source_actions() & DND_COPY)) return 0;
+    if (!drag.src || drag.contained || !(dnd_source_actions() & DND_COPY)) return 0;
     for (int i = 0; i < drag.src->nmimes; i++) if (!strcmp(drag.src->mimes[i], "text/uri-list")) return 1;
     return 0;
 }
@@ -3288,17 +3307,31 @@ static void dnd_cancel(void) {
     dnd_end();
 }
 
-/* The app's files dropped on LordOS: its list is read (at most URIL_MAX_BYTES, from the event loop), then the
- * local paths go to JS ("filesdrop" on window 0) if Files claimed the drop at the release; otherwise, or if the
- * list had none, the source is told cancelled. */
+/* The app's files dropped on LordOS: Files claims the drop while the UI handles that release (wl_drop_claim);
+ * only then is its list asked for and read (at most URIL_MAX_BYTES, from the event loop, within DNDG_READ_MS),
+ * and the local paths go to JS ("filesdrop" on window 0). A drop not claimed at its release, a list that takes
+ * too long or has no local path, is cancelled to its source. */
 static void in_drop_close(void) {
     if (in_drop.ev) wl_event_source_remove(in_drop.ev);
+    if (in_drop.timer) wl_event_source_remove(in_drop.timer);
     if (in_drop.fd >= 0) close(in_drop.fd);
     free(in_drop.buf);
-    in_drop.ev = NULL;
+    in_drop.ev = in_drop.timer = NULL;
     in_drop.fd = -1;
     in_drop.buf = NULL;
     in_drop.len = in_drop.cap = 0;
+}
+/* the drop ends without files: its source (if it lives) is told cancelled */
+static void in_drop_cancel(void) {
+    if (in_drop.src) wl_data_source_send_cancelled(in_drop.src->res);
+    in_drop.src = NULL;
+    in_drop_close();
+    dndg_reset(&in_drop.gate);
+}
+/* An isolated LordOS app or a sandboxed client: its drags may name files it can't reach, so they never hand
+ * files to LordOS. Nothing known of the client counts as contained. */
+static int dnd_contained(struct wl_client *c) {
+    return !c || app_of_client(c) || client_sandboxed(c);
 }
 static int in_drop_ready(int fd, uint32_t mask, void *data) {
     (void)mask; (void)data;
@@ -3319,35 +3352,49 @@ static int in_drop_ready(int fd, uint32_t mask, void *data) {
     in_drop.paths = in_drop.len ? malloc(in_drop.len + 1) : NULL;
     in_drop.npaths = in_drop.paths ? uril_decode(in_drop.buf, in_drop.len, in_drop.paths, in_drop.len + 1, URIL_MAX_PATHS) : 0;
     if (in_drop.npaths < 0) in_drop.npaths = 0;
-    int ok = in_drop.claimed && in_drop.npaths > 0;
+    int ok = in_drop.gate.claimed && in_drop.npaths > 0;
     if (in_drop.src && ok && wl_resource_get_version(in_drop.src->res) >= 3) wl_data_source_send_dnd_finished(in_drop.src->res);
     else if (in_drop.src && !ok) wl_data_source_send_cancelled(in_drop.src->res);
     in_drop.src = NULL;
     in_drop_close();
+    dndg_reset(&in_drop.gate);
     if (ok) emit_id(0, "filesdrop", "{}");
     else { free(in_drop.paths); in_drop.paths = NULL; in_drop.npaths = 0; }
     return 0;
 }
+static int in_drop_timeout(void *data) {
+    (void)data;
+    in_drop_cancel();                       /* the list never ended: nothing is copied */
+    return 0;
+}
+/* The release dropped files on LordOS: claimable while the UI handles it (wl_drop_release_done right after). */
 static void dnd_take_files(void) {
     Source *src = drag.src;
+    in_drop_cancel();                       /* one still pending or being read gives way */
+    if (drag.contained || dnd_contained(wl_resource_get_client(src->res))) { wl_data_source_send_cancelled(src->res); return; }
+    in_drop.src = src;
+    dndg_drop(&in_drop.gate);
+}
+int wl_drop_claim(void) {
+    Source *src = in_drop.src;
+    if (!src || dnd_contained(wl_resource_get_client(src->res)) || !dndg_claim(&in_drop.gate)) return 0;
     int p[2];
-    if (in_drop.src) wl_data_source_send_cancelled(in_drop.src->res);     /* one still being read gives way */
-    in_drop.src = NULL;
-    in_drop_close();
-    in_drop.claimed = 0;
-    if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { wl_data_source_send_cancelled(src->res); return; }
+    if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { in_drop_cancel(); return 0; }
+    in_drop.fd = p[0];
+    in_drop.ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, in_drop_ready, NULL);
+    in_drop.timer = wl_event_loop_add_timer(loop, in_drop_timeout, NULL);
+    if (!in_drop.ev || !in_drop.timer || wl_event_source_timer_update(in_drop.timer, DNDG_READ_MS) < 0) {
+        close(p[1]);
+        in_drop_cancel();
+        return 0;
+    }
     wl_data_source_send_send(src->res, "text/uri-list", p[1]);
     close(p[1]);
     if (wl_resource_get_version(src->res) >= 3) wl_data_source_send_dnd_drop_performed(src->res);
-    in_drop.fd = p[0];
-    in_drop.ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, in_drop_ready, NULL);
-    if (!in_drop.ev) { in_drop_close(); wl_data_source_send_cancelled(src->res); return; }
-    in_drop.src = src;
-}
-int wl_drop_claim(void) {
-    if (!in_drop.src || in_drop.claimed) return 0;
-    in_drop.claimed = 1;
     return 1;
+}
+void wl_drop_release_done(void) {
+    if (dpy && dndg_release_done(&in_drop.gate)) in_drop_cancel();    /* nobody took it at its release */
 }
 const char *wl_drop_paths(int *n) {
     *n = in_drop.paths ? in_drop.npaths : 0;
@@ -3425,6 +3472,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     drag.client = c;
     drag.src = src;
     drag.icon = icon;
+    drag.contained = dnd_contained(c);
     float ox, oy;
     if (under && origin(under, &ox, &oy)) dnd_focus(under, last_x - ox, last_y - oy);
     dnd_icon_damage();
@@ -3433,7 +3481,10 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
 /* A source, a surface, a data device or a client that went away mid-drag. */
 static void dnd_source_gone(Source *s) {
     if (s->offer) s->offer->src = NULL;
-    if (in_drop.src == s) in_drop.src = NULL;
+    if (in_drop.src == s) {             /* gone before its list was asked for or read: nothing to copy */
+        in_drop.src = NULL;
+        if (!in_drop.gate.claimed) in_drop_cancel();
+    }
     if (drag.src == s) { drag.src = NULL; dnd_cancel(); }
 }
 static void dnd_surface_gone(Surf *s) {

@@ -12,6 +12,11 @@
  *   text/uri-list is received through the offer; the release drops: drop, dnd_drop_performed, and after finish,
  *   dnd_finished.
  *   Press 2: a drag whose source is destroyed mid-drag: the window gets leave and the compositor stays up.
+ *   Press 3 (drag out of the window onto the desktop, not onto a Files folder, and release there): over LordOS
+ *   the source is told text/uri-list; nobody claims the drop at its release, so it is cancelled at once and the
+ *   list is never asked for.
+ *   Press 4 (drag onto a folder of a Files window and release there): Files claims it and the list is asked
+ *   for, but the source never writes nor closes it: after DNDG_READ_MS (5 s) it is cancelled, never finished.
  *
  *   make -C server build/dnd-client
  *   WAYLAND_DISPLAY=wayland-0 build/dnd-client            (prints ok/FAIL per check, exit 1 on a failure)
@@ -85,11 +90,17 @@ static void p_axis_discrete(void *d, struct wl_pointer *p, uint32_t a, int32_t v
 static const struct wl_pointer_listener ptr_l = { p_enter, p_leave, p_motion, p_button, p_axis, p_frame, p_axis_source, p_axis_stop, p_axis_discrete, NULL, NULL };
 
 /* a source: what the compositor told it */
-typedef struct { int cancelled, sends, performed, finished, target_ok; uint32_t action; } Src;
-static void s_target(void *d, struct wl_data_source *s, const char *mime) { (void)s; ((Src *)d)->target_ok = mime && !strcmp(mime, "text/uri-list"); }
+/* uri_targets: how many times it was told text/uri-list; hold: keep the send fd open, unwritten (held) */
+typedef struct { int cancelled, sends, performed, finished, target_ok, uri_targets, hold, held; uint32_t action; } Src;
+static void s_target(void *d, struct wl_data_source *s, const char *mime) {
+    (void)s;
+    ((Src *)d)->target_ok = mime && !strcmp(mime, "text/uri-list");
+    if (((Src *)d)->target_ok) ((Src *)d)->uri_targets++;
+}
 static void s_send(void *d, struct wl_data_source *s, const char *mime, int32_t fd) {
     (void)s;
     ((Src *)d)->sends++;
+    if (((Src *)d)->hold) { if (((Src *)d)->held >= 0) close(((Src *)d)->held); ((Src *)d)->held = fd; return; }
     if (!strcmp(mime, "text/uri-list") && write(fd, URI, strlen(URI)) < 0) perror("write");
     close(fd);
 }
@@ -101,6 +112,7 @@ static const struct wl_data_source_listener src_l = { s_target, s_send, s_cancel
 
 static struct wl_data_source *new_source(Src *st) {
     memset(st, 0, sizeof *st);
+    st->held = -1;
     struct wl_data_source *s = wl_data_device_manager_create_data_source(ddm);
     wl_data_source_add_listener(s, &src_l, st);
     wl_data_source_offer(s, "text/uri-list");
@@ -231,7 +243,7 @@ int main(int argc, char **argv) {
     xdg_surface_add_listener(xs, &xs_l, NULL);
     struct xdg_toplevel *top = xdg_surface_get_toplevel(xs);
     xdg_toplevel_add_listener(top, &top_l, NULL);
-    xdg_toplevel_set_title(top, "dnd-client: press here, hold a moment, release (twice)");
+    xdg_toplevel_set_title(top, "dnd-client: press here, hold a moment, release (follow the prompts)");
     xdg_toplevel_set_app_id(top, "dnd-client");
     wl_surface_commit(win);
     while (!configured && wl_display_dispatch(dpy) >= 0) {}
@@ -337,6 +349,43 @@ int main(int argc, char **argv) {
     wl_display_roundtrip(dpy);
     check("its source destroyed: the window gets leave", leaves, leaves0 + 1);
     check("and the compositor is still up", wl_display_get_error(dpy), 0);
+    if (cur_offer) { wl_data_offer_destroy(cur_offer); cur_offer = NULL; }
+
+    /* press 3: dropped on LordOS where nothing takes files: nobody claims it at the release */
+    printf("press in the red window again, drag out of it onto the desktop (not a Files folder), release there\n");
+    if (!wait_until(&presses, 3, 60)) { printf("FAIL no third press in 60 s\n"); return 1; }
+    Src st4;
+    struct wl_data_source *s4 = new_source(&st4);
+    wl_data_device_start_drag(dev, s4, win, NULL, press_serial);
+    wl_display_roundtrip(dpy);
+    check("the third drag starts", st4.cancelled, 0);
+    wait_until(&st4.uri_targets, 1, 60);
+    check("over LordOS the source is told text/uri-list", st4.uri_targets >= 1, 1);
+    wait_until(&st4.cancelled, 1, 60);
+    check("an unclaimed drop on LordOS is cancelled", st4.cancelled, 1);
+    wl_display_roundtrip(dpy);
+    check("and its list is never asked for", st4.sends, 0);
+    check("nor is it told dnd_drop_performed", st4.performed, 0);
+    wl_data_source_destroy(s4);
+    if (cur_offer) { wl_data_offer_destroy(cur_offer); cur_offer = NULL; }
+
+    /* press 4: claimed by a Files folder, but the list never ends: cancelled after DNDG_READ_MS */
+    printf("press in the red window again, drag onto a folder of a Files window, release there\n");
+    if (!wait_until(&presses, 4, 60)) { printf("FAIL no fourth press in 60 s\n"); return 1; }
+    Src st5;
+    struct wl_data_source *s5 = new_source(&st5);
+    st5.hold = 1;
+    wl_data_device_start_drag(dev, s5, win, NULL, press_serial);
+    wl_display_roundtrip(dpy);
+    wait_until(&st5.sends, 1, 60);
+    check("Files claims the drop: the list is asked for", st5.sends, 1);
+    double t0 = now();
+    wait_until(&st5.cancelled, 1, 10);
+    check("a list that never ends is cancelled", st5.cancelled, 1);
+    check("after about 5 s", now() - t0 > 3.5 && now() - t0 < 8, 1);
+    check("and never finished", st5.finished, 0);
+    if (st5.held >= 0) close(st5.held);
+    wl_data_source_destroy(s5);
     if (cur_offer) { wl_data_offer_destroy(cur_offer); cur_offer = NULL; }
     printf("%d checks, %d failed\n", checks, fails);
     wl_display_disconnect(dpy);

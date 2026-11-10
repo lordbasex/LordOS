@@ -118,11 +118,13 @@ void        wl_clip_set_html(const char *html, size_t n);
 int  wl_drag_files(const char *const *paths, int n);
 void wl_drag_files_end(void);
 int  wl_drag_files_taken(void);
-/* And the other way: a Linux app's drag of files released over LordOS itself. Files claims it at the release
- * (wl_drop_claim: 1 for the first caller while its list is being read); once read, the "filesdrop" event (window
- * 0) says the local paths are ready: wl_drop_paths gives them (n paths, each ended by its NUL), wl_drop_clear
- * forgets them. A drop nobody claimed is cancelled. */
+/* And the other way: a Linux app's drag of files released over LordOS itself (never an isolated LordOS app's
+ * or a sandboxed app's). Files claims it while the UI handles that release (wl_drop_claim: 1 for the first
+ * caller, and only then); wl_drop_release_done, right after the release went to JS, cancels a drop nobody
+ * claimed. Once its list is read (within DNDG_READ_MS), the "filesdrop" event (window 0) says the local paths
+ * are ready: wl_drop_paths gives them (n paths, each ended by its NUL), wl_drop_clear forgets them. */
 int  wl_drop_claim(void);
+void wl_drop_release_done(void);
 const char *wl_drop_paths(int *n);
 void wl_drop_clear(void);
 

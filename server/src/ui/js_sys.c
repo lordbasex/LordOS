@@ -1631,7 +1631,8 @@ static JSValue f_wl_drag_taken(JSContext *c, JSValueConst this_val, int argc, JS
     return JS_NewString(c, a == 1 ? "copy" : a == 2 ? "move" : "");
 }
 
-/* lord.wayland.takeDrop() → bool: Files claims a Linux app's drag of files just released over it (wl_drop_claim);
+/* lord.wayland.takeDrop() → bool: Files claims a Linux app's drag of files just released over it (wl_drop_claim):
+ * only from its "pointerup" for that release; later, or for a drop of an isolated or sandboxed app, it is false;
  * lord.wayland.droppedFiles() → [path]: its local paths once read (after the "filesdrop" event), given once. */
 static JSValue f_wl_take_drop(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;

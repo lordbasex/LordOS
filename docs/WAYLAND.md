@@ -237,17 +237,27 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   run or read for the app: it opens the files itself.
 - **From a Linux app to Files.** A drag that offers `text/uri-list` and may copy, released over LordOS
   itself, is taken by the compositor. The app is told "copy" while the pointer is over LordOS. At the release,
-  Files claims it if a folder of its window is under the pointer (`lord.wayland.takeDrop`). The list is read
-  (at most 1 MB, non-blocking), its local `file://` paths (an empty host or `localhost`; `%00`, newlines and
-  other hosts are dropped) are copied into that folder, and the app gets `dnd_finished`. A drop no Files
-  window claimed, or with no local path in it, is cancelled.
+  Files claims it if a folder of its window is under the pointer (`lord.wayland.takeDrop`). Only the UI's
+  handling of that very release may claim it (`DropGate` in `src/wl/dndgate.c`): right after it, a drop
+  nobody claimed is cancelled and its list is never asked for. A claimed list is read (at most 1 MB,
+  non-blocking, within 5 seconds, or the drop is cancelled), its local `file://` paths (an empty host or
+  `localhost`; `%00`, newlines and other hosts are dropped) are copied into that folder, and the app gets
+  `dnd_finished`. A drop with no local path in it is cancelled too.
+- **Sandboxed apps hand LordOS no files.** The drag of an isolated LordOS app (`lord-server --app`) or of a
+  sandboxed Linux app (Flatpak: its root, `/proc/<pid>/root` looked at once when it connects, holds
+  `.flatpak-info`) may name files the app itself can't reach, so it is never offered to LordOS: over LordOS
+  it is told nothing, and released there it is cancelled. A client whose root can't be looked at counts as
+  sandboxed. Drags between Linux windows are unchanged.
 - **Not yet:** X11 apps (Xwayland) take no drop and can't start one: that needs an XDND bridge in `xwm.c`.
   Isolated LordOS apps take no drop either: that needs a grant of its own (`DESKTOP-PARITY.md`). Touch drags
   are not supported.
 - **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry),
-  and `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
+  `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), and
+  `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
-  actions, a second drag, the icon and the source destroyed mid-drag, receive, drop and finish.
+  actions, a second drag, the icon and the source destroyed mid-drag, receive, drop and finish; a third,
+  released on the desktop, checks that an unclaimed drop is cancelled without its list being asked for; a
+  fourth, released on a Files folder with a list that never ends, that it is cancelled after 5 seconds.
 
 **Moving and resizing** (`xdg_toplevel.move`/`resize`) is tracked by lord-server in C, with no JS
 per frame, just like LordOS windows; while it lasts, the app doesn't receive the pointer. All
