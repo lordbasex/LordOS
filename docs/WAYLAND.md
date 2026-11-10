@@ -319,13 +319,16 @@ v1 (GTK 3 only speaks v1, so its portal dialogs still open in the middle). `buil
 lord-server) checks both protocols from two connections; `hold 20` keeps a modal dialog over its
 window to try by hand.
 
-### Input methods (`zwp_text_input_v3`, in development)
+### Input methods (`zwp_text_input_v3`)
 
 LordOS's Korean, Japanese and Chinese input methods (`server/src/ime.c`) compose inside a Linux app's
 text field as they do in LordOS's own. The app enables its field with `zwp_text_input_v3` (GTK 3 and 4,
 Qt 6); while it is enabled on the window with the keyboard and an input method is on, each key goes
 through `ime.c` before the app (`ime_to_app` in `server/src/ui/js.c`), and a key the method uses never
-reaches the app, nor its release. What it composes goes to the app (`wl_textinput.c`):
+reaches the app, nor its release. GTK 4.18 doesn't choose its text-input module by itself when no input-method
+framework runs, so lord-server sets `GTK_IM_MODULE=wayland` for what it starts, unless the person set another
+(an IBus or Fcitx user keeps theirs). Checked on VM 127: a GTK 4 field got the Hangul composition (ㅎ as preedit)
+and then 한글. What it composes goes to the app (`wl_textinput.c`):
 
 - `preedit_string` with the composition; the cursor (bytes) covers the focused segment of a Japanese
   conversion, otherwise it sits at the end. The app draws it in its own font, underlined.

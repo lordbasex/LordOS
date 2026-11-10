@@ -4740,6 +4740,10 @@ int wl_start(void) {
     setenv("GDK_BACKEND", "wayland,x11", 1);
     setenv("QT_QPA_PLATFORM", "wayland", 1);
     setenv("MOZ_ENABLE_WAYLAND", "1", 1);
+    /* GTK 4.18 doesn't pick its text-input-v3 module by itself here (no input-method framework running), and the
+     * keys then reach the app raw: LordOS's input methods compose only through it. Not overwritten when the person
+     * set another one (an IBus or Fcitx user) */
+    setenv("GTK_IM_MODULE", "wayland", 0);
     clip_seen = term_clipboard_gen();
     fprintf(stderr, "wayland: %s/%s\n", getenv("XDG_RUNTIME_DIR"), socket_name);
     return 0;
