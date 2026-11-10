@@ -11,6 +11,8 @@ import { dialogStack, dialogKey, defaultButton, keyOwner } from './dialogkeys.js
 import { direction } from './i18n.js';
 import { Lumo } from './mascot.js';
 import { Overlay } from './layers.js';
+import { menuStep } from './focusmodel.js';
+import { focusRingColor } from './focus.js';
 
 // Design tokens (docs/DESIGN.md): an 8 px grid, desktop-standard type sizes and control heights.
 export const spacing = { xxs: 2, xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 };
@@ -68,7 +70,8 @@ function TooltipBubble({ text, end, top }) {
 // Toolbar item: an icon (a glyph, or an element such as a drawn shape) and/or a short label,
 // borderless until hovered.
 // title: tooltip text (required for icon-only buttons). active: a toggled-on state.
-export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style }) {
+// A Tab stop unless disabled (sdk/focus.js): Space and Enter press it. onKeyDown (optional) sees its keys first.
+export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const ref = useRef(null);
@@ -77,7 +80,7 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
   const h = small ? controlSize.small : controlSize.regular;
   const fg = disabled ? t.textDim : active ? t.accent : color || t.text;
   return (
-    <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }}
+    <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }} focusable={focusable && !disabled} onKeyDown={onKeyDown}
       onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
         alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1, zIndex: tip ? 1000 : 0,
@@ -135,10 +138,40 @@ export function ToolbarDivider() {
 // Optional (0.8.8.4): detail (a second, dimmer line under an item's label), onOpenChange(open) (a card that shows the
 // button only on hover keeps it while its menu is open) and trigger(open) (draws the button itself: a pop-up field in a
 // form) with minWidth for the menu.
+// From the keyboard (sdk/focus.js): Space, Enter or ↓ on the button opens it; while it is open ↓ and ↑ go through its
+// items, Enter or Space chooses one, Escape and Tab close it.
 export function MenuButton({ icon = '⋯', label, title, items, small, onOpenChange, trigger, minWidth = 200 }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const [open, setOpen] = useState(false);
+  const [lit, setLit] = useState(-1);            // the item the keyboard is on
+  useEffect(() => { if (!open) setLit(-1); }, [open]);
+  const skip = (i) => !items[i] || items[i] === '-' || items[i].disabled;
+  const keys = useRef(null);
+  keys.current = (e) => {
+    if (e.ctrl || e.meta || e.alt) return false;
+    if (!open) {
+      if (e.key !== 'ArrowDown') return false;
+      setOpen(true); setLit(menuStep(items.length, -1, 1, skip));
+      return true;
+    }
+    if (e.key === 'Escape') { setOpen(false); return true; }
+    if (e.key === 'Tab') { setOpen(false); return false; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { setLit((i) => menuStep(items.length, i, e.key === 'ArrowDown' ? 1 : -1, skip)); return true; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      const it = lit >= 0 && !skip(lit) ? items[lit] : null;
+      setOpen(false);
+      it?.onClick?.();
+      return true;
+    }
+    return false;
+  };
+  const onKey = (e) => keys.current(e);
+  // opened with the pointer: the keys reach it as a listener (with the keyboard focus on the button they come first)
+  useEffect(() => {
+    if (!open) return undefined;
+    return addListener('keydown', (e) => { if (keys.current(e)) e.preventDefault?.(); });
+  }, [open]);
   const was = useRef(false);
   useEffect(() => { if (was.current !== open) { was.current = open; onOpenChange?.(open); } }, [open]);
   const btn = useRef(null), menu = useRef(null);
@@ -155,15 +188,15 @@ export function MenuButton({ icon = '⋯', label, title, items, small, onOpenCha
   // comes after the button, and not clipped by a scrolling parent
   return (
     <View ref={btn}>
-      {trigger ? <View onClick={() => setOpen((o) => !o)}>{trigger(open)}</View>
-        : <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />}
+      {trigger ? <View onClick={() => setOpen((o) => !o)} focusable onKeyDown={onKey}>{trigger(open)}</View>
+        : <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} onKeyDown={onKey} />}
       {open && (
         <Overlay anchor={btn}>
           <View ref={menu} style={{ position: 'absolute', [up ? 'bottom' : 'top']: (trigger ? lord.getLayout(btn.current.id)[3] : small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,
             minWidth, paddingVertical: 5, paddingHorizontal: 5, borderRadius: t.menuRadius, backgroundColor: popupBg(t),
             border: `1px solid ${t.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
             {items.map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: t.separator }} />
-              : <MenuRow key={it.label} it={it} onDone={() => setOpen(false)} />))}
+              : <MenuRow key={it.label} it={it} lit={lit === i} onHover={() => setLit(-1)} onDone={() => setOpen(false)} />))}
           </View>
         </Overlay>
       )}
@@ -171,13 +204,14 @@ export function MenuButton({ icon = '⋯', label, title, items, small, onOpenCha
   );
 }
 
-function MenuRow({ it, onDone }) {
+// lit: the keyboard is on it (as a hover); onHover: the pointer came onto it
+function MenuRow({ it, onDone, lit: keyed, onHover }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
-  const lit = hover && !it.disabled;
+  const lit = (hover || keyed) && !it.disabled;
   const on = lit && t.menuHighlight !== 'subtle';     // 'subtle' (a theme token): a light fill, the text keeps its color
   return (
-    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
       style={{ height: it.detail ? 40 : 24, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: on ? t.accent : lit ? t.hover : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
@@ -315,7 +349,8 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
   );
 }
 // isDefault: the button Enter presses, with an accent edge and a heavier label (a filled accent
-// button already reads as the default); ring: the keyboard focus, drawn while the dialog has the keys
+// button already reads as the default); ring: the keyboard focus, drawn while the dialog has the keys, as the
+// focus ring of the other controls (sdk/focus.js: 2 px, 1 px outside the button, the theme's focusRing color)
 function DialogButton({ t, label, onClick, primary, destructive, isDefault, ring }) {
   const [hover, setHover] = useState(false);
   const bg = primary ? (destructive ? '#e5483f' : t.accent) : t.control;
@@ -323,8 +358,10 @@ function DialogButton({ t, label, onClick, primary, destructive, isDefault, ring
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: controlSize.regular, paddingHorizontal: 14, borderRadius: t.controlRadius, justifyContent: 'center', alignItems: 'center',
-        backgroundColor: bg, opacity: hover ? 0.85 : 1, ...edge, boxShadow: ring ? `0 0 0 3px ${t.accent}66` : 'none' }}>
+        backgroundColor: bg, opacity: hover ? 0.85 : 1, ...edge }}>
       <Text style={{ fontSize: typeScale.body, fontWeight: isDefault ? 600 : 500, color: primary ? '#fff' : t.text, whiteSpace: 'nowrap' }}>{label}</Text>
+      {ring ? <View style={{ position: 'absolute', left: -3, top: -3, right: -3, bottom: -3, borderRadius: t.controlRadius + 3, pointerEvents: 'none',
+        border: `2px solid ${focusRingColor(t)}` }} /> : null}
     </View>
   );
 }

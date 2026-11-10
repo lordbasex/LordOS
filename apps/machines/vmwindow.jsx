@@ -410,6 +410,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const key = e.key && e.key.length > 1 ? e.key : '';
       const base = e.ctrl || e.alt ? e.base || '' : '';
       if (!key && !e.char && !base) return;
+      e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
       term.key(id, key, e.char || '', base, e.mods & 7);
     });
   }, [shell, shellKeys, focused, st?.console]);
@@ -420,6 +421,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const ka = addListener('keydown', (e) => {
       if (!(e.code > 0)) return;
       if (menus.open > 0 || kept.has(e.code)) { kept.add(e.code); return; }
+      e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
       lord.vm.key(sid, e.code, 1);
     });
     const kb = addListener('keyup', (e) => {

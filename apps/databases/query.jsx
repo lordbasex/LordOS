@@ -110,7 +110,7 @@ export function Query({ s, db, tables }) {
       if (c) {
         if (e.key === 'ArrowDown') { setComp({ ...c, i: (c.i + 1) % c.items.length }); return; }
         if (e.key === 'ArrowUp') { setComp({ ...c, i: (c.i + c.items.length - 1) % c.items.length }); return; }
-        if (e.key === 'Enter' || e.key === 'Tab') { accept(c.items[c.i]); return; }
+        if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault?.(); accept(c.items[c.i]); return; }
         if (e.key === 'Escape') { setComp(null); return; }
         if (e.key === 'Backspace') {
           const k = head(doc.cursors[0]);

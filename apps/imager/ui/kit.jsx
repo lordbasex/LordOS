@@ -34,6 +34,7 @@ export function useFocusKeys({ onEscape } = {}) {
   useKeyboard((e) => {
     if (platform.domFocus) return;
     if (e.key === 'Tab') {
+      e.preventDefault?.();                    // its own order, not the SDK's (sdk/focus.js)
       const ids = order.filter((x) => actions.has(x));
       if (!ids.length) return;
       const cur = ids.indexOf(focus.get().id);

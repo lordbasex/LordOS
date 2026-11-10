@@ -1,7 +1,7 @@
 // ui.jsx — the building blocks of every Settings page, on top of the SDK's GroupBox (docs/DESIGN.md,
 // "Settings"): a page column, titled sections (inset grouped boxes with hairlines between rows),
 // rows with the control or the value at the trailing edge, form rows, a pop-up button, a page header, badges and notes.
-import { View, Text, useTheme, addListener, GroupBox as InsetBox, spacing, typeScale, createStore, useStore, screen, ScrollView, Overlay } from '@lordos/sdk';
+import { View, Text, useTheme, addListener, GroupBox as InsetBox, spacing, typeScale, createStore, useStore, screen, ScrollView, Overlay, menuStep } from '@lordos/sdk';
 import { createElement as h, useEffect, useRef, useState } from 'react';
 
 
@@ -156,10 +156,12 @@ export function Stack({ children, gap = 20 }) {
   );
 }
 
-const popup = createStore(null);       // { node, options, value, onChange, width }
+const popup = createStore(null);       // { node, options, value, onChange, width, lit, keys }
 
 // Pop-up button: shows the current value with ▲▼ and opens the list of options below it (or above,
 // near the bottom of the screen). options = [[value, label]]; a value of '-' is a separator.
+// A Tab stop (sdk/focus.js): Space, Enter, ↓ or ↑ open the list on the current value; while it is open ↓ and ↑ go
+// through the options (lit), Enter or Space chooses one, Escape and Tab close it.
 export function PopUp({ value, options, onChange, width = 190, disabled }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
@@ -167,9 +169,32 @@ export function PopUp({ value, options, onChange, width = 190, disabled }) {
   const open = useStore(popup, (p) => !!p && p.node === btn.current);
   useEffect(() => () => { if (popup.get()?.node === btn.current) popup.set(null); }, []);
   const cur = options.find(([v]) => v === value);
-  const toggle = () => { if (disabled) return; popup.set(open ? null : { node: btn.current, options, value, onChange, width }); };
+  const keys = useRef(null);
+  const show = () => popup.set({ node: btn.current, options, value, onChange, width, lit: options.findIndex(([v]) => v === value), keys });
+  const toggle = () => { if (disabled) return; if (open) popup.set(null); else show(); };
+  keys.current = (e) => {
+    if (e.ctrl || e.meta || e.alt) return false;
+    const p = popup.get();
+    const skip = (i) => options[i][0] === '-';
+    if (!p || p.node !== btn.current) {
+      if (disabled || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return false;
+      show();
+      return true;
+    }
+    if (e.key === 'Escape') { popup.set(null); return true; }
+    if (e.key === 'Tab') { popup.set(null); return false; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { popup.set({ lit: menuStep(options.length, p.lit, e.key === 'ArrowDown' ? 1 : -1, skip) }); return true; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      const o = p.lit >= 0 && !skip(p.lit) ? options[p.lit] : null;
+      popup.set(null);
+      if (o && o[0] !== value) onChange(o[0]);
+      return true;
+    }
+    return false;
+  };
   return (
     <View ref={btn} onClick={toggle} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      focusable={!disabled} onKeyDown={(e) => keys.current(e)}
       style={{ width, height: 24, paddingHorizontal: 9, borderRadius: t.controlRadiusSmall, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: t.control, opacity: disabled ? 0.45 : hover || open ? 0.88 : 1, boxShadow: '0 1px 1px rgba(0,0,0,0.12)',
         ...(t.buttonBorder ? { border: `1px solid ${t.separator}` } : null) }}>
@@ -199,6 +224,11 @@ function PopUpLayer() {
       if (!inside(menu.current) && !inside(p.node)) popup.set(null);
     });
   }, [p]);
+  // opened with the pointer, the keys reach the list as a listener (with the keyboard focus on the button they come first)
+  useEffect(() => {
+    if (!p) return undefined;
+    return addListener('keydown', (e) => { if (p.keys?.current(e)) e.preventDefault?.(); });
+  }, [p]);
   if (!p || !p.node) return null;
   const [, by, bw, bh] = lord.getLayout(p.node.id);
   const rows = p.options.length;
@@ -213,19 +243,22 @@ function PopUpLayer() {
         backgroundColor: t.popupBg || (t.mode === 'dark' ? '#2c2c31' : '#ffffff'), border: `1px solid ${t.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
         <ScrollView style={{ flex: 1 }}>
           {p.options.map(([v, label], i) => (v === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: t.separator }} />
-            : <PopRow key={String(v)} label={label} Icon={p.options[i][2]} checked={v === p.value} onClick={() => { popup.set(null); if (v !== p.value) p.onChange(v); }} />))}
+            : <PopRow key={String(v)} label={label} Icon={p.options[i][2]} checked={v === p.value} lit={i === p.lit} onHover={() => { if (p.lit !== -1) popup.set({ lit: -1 }); }}
+              onClick={() => { popup.set(null); if (v !== p.value) p.onChange(v); }} />))}
         </ScrollView>
       </View>
     </Overlay>
   );
 }
 
-function PopRow({ label, checked, onClick, Icon }) {
+// keyed: the keyboard is on the row (as a hover); onHover: the pointer came onto it
+function PopRow({ label, checked, onClick, Icon, lit: keyed, onHover }) {
   const t = useTheme();
-  const [lit, setHover] = useState(false);
+  const [over, setHover] = useState(false);
+  const lit = over || keyed;
   const hover = lit && t.menuHighlight !== 'subtle';
   return (
-    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View onClick={onClick} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
       style={{ height: 24, paddingHorizontal: 6, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: hover ? t.accent : lit ? t.hover : 'transparent' }}>
       <Text style={{ width: 14, fontSize: 11, color: hover ? '#fff' : checked && !hover && t.menuHighlight === 'subtle' ? t.accent : t.text }}>{checked ? '✓' : ''}</Text>

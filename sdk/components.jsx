@@ -19,10 +19,14 @@ import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
 import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
 import { dropSorter, dropCount } from './filedrop.js';
+import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
+import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
-export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon }) {
+// The shared controls are Tab stops (sdk/focus.js) unless disabled or focusable={false}: Space and Enter press a
+// button or flip a Toggle, the arrows move a Slider, a Stepper or a Segmented control.
+export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
   const fg = primary ? '#fff' : destructive ? '#ff453a' : t.text;
@@ -30,6 +34,7 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
   const border = t.buttonBorder && !plain ? { border: `1px solid ${primary ? t.accent : t.separator}` } : null;
   return (
     <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
         opacity: disabled ? 0.4 : hover && !plain ? 0.85 : 1 }, style]}>
@@ -41,11 +46,11 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
 
 // small: the 36 × 20 switch of grouped forms (Settings rows) instead of 42 × 24. The knob moves
 // physically (direction: 'ltr'), also in right-to-left languages.
-export function Toggle({ on, onChange, small }) {
+export function Toggle({ on, onChange, small, focusable = true }) {
   const t = useTheme();
   const w = small ? 36 : 42, h = small ? 20 : 24, k = h - 4;
   return (
-    <View onClick={() => onChange(!on)} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
+    <View onClick={() => onChange(!on)} focusable={focusable} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
       backgroundColor: on ? t.accent : t.control }}>
       <View style={{ position: 'absolute', top: 2, left: on ? w - k - 2 : 2, width: k, height: k, borderRadius: k / 2,
         backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)' }} />
@@ -56,12 +61,19 @@ export function Toggle({ on, onChange, small }) {
 // appearance: 'accent' (default: the selected segment is filled with the accent) or 'neutral'
 // (view switcher: a raised neutral segment). small: 22 px high instead of 28. fill: the
 // segments share the full width of the control.
-export function Segmented({ options, value, onChange, appearance = 'accent', small, fill, style }) {
+// One Tab stop: ← → (Home, End) choose the segment, in the row's order (swapped in right to left).
+export function Segmented({ options, value, onChange, appearance = 'accent', small, fill, style, focusable = true }) {
   const t = useTheme();
   const neutral = appearance === 'neutral';
   const raised = t.mode === 'dark' ? 'rgba(255,255,255,0.18)' : '#ffffff';
+  const onKey = (e) => {
+    const i = choiceKey(e, { index: options.findIndex(([v]) => v === value), count: options.length, rtl: direction() === 'rtl' });
+    if (i == null) return false;
+    if (options[i][0] !== value) onChange(options[i][0]);
+    return true;
+  };
   return (
-    <View style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
+    <View focusable={focusable && options.length > 0} onKeyDown={onKey} style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
       {options.map(([v, label]) => {
         const on = value === v;
         return (
@@ -119,12 +131,18 @@ export function SectionTitle({ children }) {
 //   (a growing log, a list that refreshes) and the position should stay.
 // onWheel (0.8.8.4, optional): sees each wheel event first; if it calls e.stopPropagation() the view
 //   doesn't scroll (Files zooms with Ctrl + wheel).
+// focusable (0.8.8.8, optional): a Tab stop while its content doesn't fit (sdk/focus.js); focused, or with a control
+//   inside it focused, ↓ ↑, Page Down and Page Up (Space and Shift+Space), Home and End scroll it. false where the
+//   arrows belong to the view's own content (Files' icons and rows). A control Tab moves to comes into sight.
+// horizontal (0.8.8.8, optional): scrolls along the row instead (its content is laid out in one row): with a
+//   sideways swipe or tilt of the wheel, Shift and the wheel, and ← → (swapped in right to left, where it starts at
+//   the right); the bar runs along the bottom edge.
 export const SCROLL_GUTTER = 11;
 // A TextInput asks the ScrollView it is in to show its caret: on focus, on typing, and when the view
 // changes height, as a window does when it shrinks for the on-screen keyboard. A wheel scroll with a
 // field focused doesn't ask.
 const ScrollReveal = createContext(null);
-export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey, onScroll, onWheel }) {
+export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey, onScroll, onWheel, focusable, horizontal = false }) {
   const t = useTheme();
   const mode = scrollbarMode(t.scrollBars);
   const reduce = !!t.reduceMotion;
@@ -139,9 +157,13 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
   const st = useRef(null);
   if (!st.current) st.current = { lastScroll: null, hideTimer: 0, fadeTimer: 0, grab: 0, ui };
   st.current.ui = ui; st.current.mode = mode; st.current.reduce = reduce; st.current.metrics = metrics;
+  // the length along the axis it scrolls: the height of a layout box, or its width for a horizontal view
+  const len = horizontal ? 2 : 3;
+  // a point's distance from the view's start edge along that axis (the right edge of a horizontal view in RTL)
+  const along = (x, y, box) => (horizontal ? (rtl ? box[0] + box[2] - x : x - box[0]) : y - box[1]);
   const measure = () => {
     if (!outer.current || !inner.current) return null;
-    const view = lord.getLayout(outer.current.id)[3], content = lord.getLayout(inner.current.id)[3];
+    const view = lord.getLayout(outer.current.id)[len], content = lord.getLayout(inner.current.id)[len];
     const m = st.current.metrics;
     if (view !== m.view || content !== m.content) { st.current.metrics = { view, content }; setMetrics({ view, content }); }
     return { view, content };
@@ -193,9 +215,8 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
     const a = addListener('pointermove', (e) => {
       const s = st.current;
       if (!s.ui.dragging || !outer.current) return;
-      const [, oy] = lord.getLayout(outer.current.id);
       const m = s.metrics;
-      setOffset(offsetForThumb(m.view, m.content, e.y - oy - s.grab));
+      setOffset(offsetForThumb(m.view, m.content, s.along(e.x, e.y, lord.getLayout(outer.current.id)) - s.grab));
       s.lastScroll = lord.now();
     });
     const b = addListener('pointerup', () => {
@@ -208,6 +229,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
     });
     return () => { a(); b(); };
   }, []);
+  st.current.along = along;
 
   const jump = (v) => {
     const m = measure() || metrics;
@@ -220,24 +242,40 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
   const scrolledTo = useRef(onScroll);
   scrolledTo.current = onScroll;
   useEffect(() => { scrolledTo.current?.(y, metrics.view); }, [y, metrics.view]);
+  // c: { x, y, w, h } on the screen (a caret has no width)
   const latestReveal = useRef(null);
   latestReveal.current = (c, always) => {
     if (!outer.current) return;
-    const [, oy, , h] = lord.getLayout(outer.current.id);
-    const resized = st.current.fieldView !== h;
-    st.current.fieldView = h;
+    const box = lord.getLayout(outer.current.id);
+    const resized = st.current.fieldView !== box[len];
+    st.current.fieldView = box[len];
     if (!always && !resized) return;
-    const below = c.y + c.h + 12 - (oy + h), above = oy + 4 - c.y;
-    if (below > 0) jump(y + below); else if (above > 0) jump(y - above);
+    // how far c starts and ends from the view's start edge along the axis
+    const a = horizontal ? (rtl ? box[0] + box[2] - (c.x + (c.w || 0)) : c.x - box[0]) : c.y - box[1];
+    const b = a + (horizontal ? c.w || 0 : c.h);
+    const past = b + 12 - box[len], before = 4 - a;
+    if (past > 0) jump(y + past); else if (before > 0) jump(y - before);
   };
   const reveal = useRef((c, always) => latestReveal.current?.(c, always)).current;
+
+  // the keys of the view (focused, or a control inside it focused): sdk/focus.js
+  const onKey = (e) => {
+    const m = measure() || metrics;
+    const v = scrollKey(e, { offset: y, view: m.view, content: m.content, horizontal, rtl });
+    if (v == null) return false;
+    jump(v);
+    return true;
+  };
 
   const onMove = (e) => {
     if (!outer.current) return;
     if (!geom) measure();                       // content that grew by itself has told nobody
-    const [ox, oy, ow] = lord.getLayout(outer.current.id);
-    const near = !!geom && nearEdge(e.x - ox, ow, rtl);
-    const hover = !!geom && st.current.ui.shown && hitThumb(e.x - ox, e.y - oy, ow, geom, rtl);
+    const box = lord.getLayout(outer.current.id);
+    const [ox, oy, ow, oh] = box;
+    // a vertical view's bar is at the end edge; a horizontal one's along the bottom edge
+    const near = !!geom && (horizontal ? nearEdge(e.y - oy, oh, false) : nearEdge(e.x - ox, ow, rtl));
+    const hover = !!geom && st.current.ui.shown && (horizontal ? hitThumb(e.y - oy, along(e.x, e.y, box), oh, geom, false)
+      : hitThumb(e.x - ox, e.y - oy, ow, geom, rtl));
     const u = st.current.ui;
     if (near === u.near && hover === u.hover) return;
     if (mode === 'auto' && near && !u.near) show({ near, hover });
@@ -248,28 +286,35 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
   const thumbColor = wide ? (t.scrollThumbHover || (t.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)'))
     : (t.scrollThumb || (t.mode === 'dark' ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.3)'));
   const w = barWidth(ui);
-  const pad = gutter && mode === 'always' ? { paddingInlineEnd: SCROLL_GUTTER } : null;
+  const pad = gutter && mode === 'always' ? (horizontal ? { paddingBottom: SCROLL_GUTTER } : { paddingInlineEnd: SCROLL_GUTTER }) : null;
+  // the bar's strip and thumb: at the end edge, or along the bottom edge from the start edge of a horizontal view
+  const strip = horizontal ? { bottom: 0, [rtl ? 'right' : 'left']: geom?.top, height: SCROLLBAR.hit, width: geom?.size }
+    : { end: 0, top: geom?.top, width: SCROLLBAR.hit, height: geom?.size };
+  const bar = horizontal ? { bottom: SCROLLBAR.inset, left: 0, width: geom?.size, height: w } : { end: SCROLLBAR.inset, top: 0, height: geom?.size, width: w };
   return (
     <View ref={outer} onWheel={(e) => {
       if (onWheel) { onWheel(e); if (e.stopped) return; }
+      // sideways: a swipe or a tilted wheel (deltaX), or Shift and the wheel; in RTL the view starts at the right
+      const d = horizontal ? (e.deltaX ? (rtl ? -e.deltaX : e.deltaX) : e.shift ? e.deltaY || 0 : 0) : e.deltaY;
       const m = measure() || metrics;
       const mx = Math.max(0, m.content - m.view);
-      if (mx > 0 && e.deltaY) scrolled();
-      setOffset((o) => Math.max(0, Math.min(mx, Math.min(o, max) + e.deltaY)));
+      if (mx > 0 && d) scrolled();
+      setOffset((o) => Math.max(0, Math.min(mx, Math.min(o, max) + (d || 0))));
     }} onMouseMove={onMove} onMouseLeave={() => { st.current.ui = { ...st.current.ui, near: false, hover: false }; update({ near: false, hover: false }); schedule(); }}
-      style={[{ overflow: 'hidden', flex: 1 }, style]}>
-      <View ref={inner} style={[{ translateY: -y }, pad, contentStyle]}><ScrollReveal.Provider value={reveal}>{children}</ScrollReveal.Provider></View>
+      focusable={focusable ?? max > 0} onKeyDown={onKey} onRevealFocus={(r) => reveal(r, true)}
+      style={[{ overflow: 'hidden', flex: 1 }, horizontal ? { flexDirection: 'row' } : null, style]}>
+      <View ref={inner} style={[horizontal ? { translateX: rtl ? y : -y, flexShrink: 0, flexDirection: 'row' } : { translateY: -y }, pad, contentStyle]}>
+        <ScrollReveal.Provider value={reveal}>{children}</ScrollReveal.Provider>
+      </View>
       {geom && (
         <View onMouseDown={(e) => {
           if (!outer.current) return;
-          const [, oy] = lord.getLayout(outer.current.id);
           e.stopPropagation();
-          st.current.grab = e.y - oy - geom.top;
+          st.current.grab = along(e.x, e.y, lord.getLayout(outer.current.id)) - geom.top;
           st.current.ui = { ...st.current.ui, dragging: true };
           show({ dragging: true });
-        }} style={{ position: 'absolute', end: 0, top: geom.top, width: SCROLLBAR.hit, height: geom.size,
-          pointerEvents: shown || ui.near ? 'auto' : 'none' }}>
-          <View ref={thumb} style={{ position: 'absolute', end: SCROLLBAR.inset, top: 0, height: geom.size, width: w,
+        }} style={{ position: 'absolute', ...strip, pointerEvents: shown || ui.near ? 'auto' : 'none' }}>
+          <View ref={thumb} style={{ position: 'absolute', ...bar,
             borderRadius: t.scrollRadius != null ? Math.min(t.scrollRadius, w / 2) : w / 2, backgroundColor: thumbColor,
             ...(t.scrollThumbBorder ? { border: `1px solid ${t.scrollThumbBorder}` } : null), opacity: shown ? 1 : 0 }} />
         </View>
@@ -283,7 +328,8 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
 let focused = null;          // token of the active TextInput
 let focusedNow = false;      // it got focus during the mouse event in progress
 const handlers = new Map();
-// A form: Tab and Shift+Tab go round its text fields, in the order they mounted. Without one, Tab does nothing.
+// A form: Tab and Shift+Tab go round its text fields, in the order they mounted. Without one, Tab goes on to the next
+// control of the window (sdk/focus.js).
 const FieldOrder = createContext(null);
 export function FormFields({ children }) {
   const order = useRef([]).current;
@@ -301,6 +347,11 @@ addListener('pointerdown', () => { if (!focusedNow) setFocus(null); focusedNow =
 addListener('keydown', (e) => { if (focused && handlers.has(focused)) handlers.get(focused)(e); });
 
 export const hasTextFocus = () => focused !== null;
+
+// The box of each TextInput and TextArea: Tab goes on from the one with the keys to the next control (sdk/focus.js).
+// A field of an app's own (takeTextFocus: Notes, Mail's body) has none and keeps Tab.
+const boxes = new Map();     // token → its box (a ref)
+setTextFocusBridge({ owner: () => (focused === null ? null : boxes.get(focused)?.current || false), blur: () => clearTextFocus() });
 
 // A field out of sight must not keep the keys: its window stays mounted (desktopmodel.js), so when the
 // window that was in front is minimized or leaves the desktop in view, the text focus goes with it.
@@ -471,9 +522,11 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     handlers.set(token, (e) => {
       const p = latest.current;
       if (e.key === 'Escape' && menuOpen.current) return;           // it closes the menu (contextmenu.jsx)
-      if (!e.fromMenu && p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
+      // a key the app took (Tab completing an address) moves no focus
+      if (!e.fromMenu && p.onKeyDown && p.onKeyDown(e)) { e.preventDefault?.(); setBlink(true); return; }
       if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
         const i = order.indexOf(token);
+        e.preventDefault?.();
         setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
         return;
       }
@@ -499,6 +552,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       setBlink(true);
     });
     order?.push(token);
+    boxes.set(token, box);
     if (autoFocus) setFocus(token);
     // a drag that started in the field selects, also past its edges
     const offMove = addListener('pointermove', (e) => {
@@ -507,7 +561,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       if (pos !== at.current.pos) { at.current = { ...at.current, pos }; redraw((n) => n + 1); }
     });
     const offUp = addListener('pointerup', () => { if (pressing.current) { pressing.current = false; publish(); } });
-    return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+    return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); boxes.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   // Caps Lock comes with every key (runtime/keymap.js); a password field with focus follows it for its hint
   useEffect(() => {
@@ -560,6 +614,14 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     at.current = ev.shift ? { value, pos, anchor: cur.anchor != null ? cur.anchor : cur.pos } : { value, pos, anchor: pos };
     hist.current = record(hist.current, cur, at.current, 'move');
     pressing.current = true;
+    redraw((n) => n + 1);
+    setBlink(true);
+  };
+  // Tab came to the field: the keys are its own, with all of its text selected (the first key replaces it)
+  const onKeyFocus = () => {
+    adopt(value);
+    at.current = { value, pos: len(value), anchor: value ? 0 : null };
+    setFocus(token);
     redraw((n) => n + 1);
     setBlink(true);
   };
@@ -638,6 +700,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   ) : null;
   return (
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
+      focusable focusRing={false} onFocus={onKeyFocus}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',
@@ -759,6 +822,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
       if (e.key === 'Escape' && menuOpen.current) return;
       if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
         const i = order.indexOf(token);
+        e.preventDefault?.();
         setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
         return;
       }
@@ -782,13 +846,14 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
       setBlink(true);
     });
     order?.push(token);
+    boxes.set(token, box);
     const offMove = addListener('pointermove', (e) => {
       if (!pressing.current || focused !== token) return;
       const pos = posAtXY(e.x, e.y);
       if (pos !== at.current.pos) { at.current = { ...at.current, pos }; redraw((n) => n + 1); }
     });
     const offUp = addListener('pointerup', () => { if (pressing.current) { pressing.current = false; publish(); } });
-    return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+    return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); boxes.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   // the width the rows wrap at, once the layout has given the field one
   useEffect(() => {
@@ -829,6 +894,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     redraw((n) => n + 1);
     setBlink(true);
   };
+  const onKeyFocus = () => { setFocus(token); setBlink(true); };   // Tab came to the field: the caret where it was
   const onDouble = () => {
     if (!value) return;
     const [a, b] = wordAt(value, at.current.pos);
@@ -857,6 +923,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const textStyle = { position: 'absolute', left: 0, top: 0, fontSize: size, color: t.text, whiteSpace: 'nowrap', lineHeight: lineH };
   return (
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
+      focusable focusRing={false} onFocus={onKeyFocus}
       style={[{ minHeight: minRows * lineH + 2 * pad, padding: pad, borderRadius: t.controlRadius, direction: 'ltr',
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
@@ -899,17 +966,24 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   );
 }
 
-// Number with − and + buttons (e.g. font size).
-export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step = 1, format = (v) => String(v), width = 56 }) {
+// Number with − and + buttons (e.g. font size). One Tab stop: ↑ and → (← in right to left) add a step, ↓ and ← take one,
+// Page Up and Page Down ten, Home and End go to min and max.
+export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step = 1, format = (v) => String(v), width = 56, focusable = true }) {
   const t = useTheme();
   const set = (v) => onChange(Math.max(min, Math.min(max, Math.round(v / step) * step)));
+  const onKey = (e) => {
+    const v = rangeKey(e, { value, min, max, step, rtl: direction() === 'rtl' });
+    if (v == null) return false;
+    if (v !== value) set(v);
+    return true;
+  };
   const Btn = ({ label, d }) => (
     <View onClick={() => set(value + d)} style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{label}</Text>
     </View>
   );
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.control, borderRadius: t.controlRadius, height: 26 }}>
+    <View focusable={focusable} onKeyDown={onKey} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.control, borderRadius: t.controlRadius, height: 26 }}>
       <Btn label="−" d={-step} />
       <Text style={{ width, textAlign: 'center', fontSize: 12, fontWeight: 600, color: t.text }}>{format(value)}</Text>
       <Btn label="+" d={step} />
@@ -917,17 +991,27 @@ export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step
   );
 }
 
-// Horizontal slider (drag or click on the bar).
-export function Slider({ value, onChange, min = 0, max = 1, width = 160 }) {
+// Horizontal slider (drag or click on the bar). It runs from the start edge: min is on the right in right to left.
+// A Tab stop: ← → (swapped in right to left) and ↓ ↑ move it by step (a twentieth of the range unless given), Page Down
+// and Page Up by a tenth, Home and End to the ends.
+export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true }) {
   const t = useTheme();
+  const rtl = direction() === 'rtl';
   const ref = useRef(null);
   const drag = useRef(false);
-  const latest = useRef(onChange);
-  latest.current = onChange;
+  const latest = useRef(null);
+  latest.current = { onChange, rtl };
   const at = (x) => {
     const [lx, , w] = lord.getLayout(ref.current.id);
     const f = Math.max(0, Math.min(1, (x - lx) / w));
-    latest.current(min + f * (max - min));
+    latest.current.onChange(min + (latest.current.rtl ? 1 - f : f) * (max - min));
+  };
+  const onKey = (e) => {
+    const range = max - min;
+    const v = rangeKey(e, { value, min, max, step: step || range / 20, page: Math.max(step || 0, range / 10), rtl });
+    if (v == null) return false;
+    if (v !== value) onChange(v);
+    return true;
   };
   useEffect(() => {
     const a = addListener('pointermove', (e) => { if (drag.current) at(e.x); });
@@ -936,11 +1020,12 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160 }) {
   }, []);
   const f = (value - min) / (max - min || 1);
   return (
-    <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} style={{ width, height: 20, justifyContent: 'center', direction: 'ltr' }}>
+    <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} focusable={focusable} onKeyDown={onKey}
+      style={{ width, height: 20, borderRadius: 10, justifyContent: 'center', direction: 'ltr' }}>
       <View style={{ height: 4, borderRadius: 2, backgroundColor: t.control }}>
-        <View style={{ width: Math.max(0, f * width), height: 4, borderRadius: 2, backgroundColor: t.accent }} />
+        <View style={{ width: Math.max(0, f * width), height: 4, borderRadius: 2, backgroundColor: t.accent, ...(rtl ? { marginLeft: Math.max(0, (1 - f) * width) } : null) }} />
       </View>
-      <View style={{ position: 'absolute', left: f * (width - 16), top: 2, width: 16, height: 16, borderRadius: 8,
+      <View style={{ position: 'absolute', left: (rtl ? 1 - f : f) * (width - 16), top: 2, width: 16, height: 16, borderRadius: 8,
         backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
     </View>
   );
@@ -1016,6 +1101,8 @@ export function AppHost({ id, focused }) {
   // the window's overlay host (sdk/layers.js): lists and popovers of an isolated app's process go
   // here, above all of the window's content; in the desktop's process they go to the shell layers
   const [overlayHost, setOverlayHost] = useState(null);
+  // the window's content is the area Tab goes round while it is focused (sdk/focus.js)
+  const area = useFocusArea(id, focused, focusRingColor(useTheme()));
   useEffect(() => {                       // developer timing: open → first commit of this window
     const t0 = openedAt.get(id);
     if (t0 != null && app && !app.isolated) { openedAt.delete(id); console.log(`timing: ${app.id} window committed ${(lord.now() - t0).toFixed(1)} ms after wm.open`); }
@@ -1025,7 +1112,7 @@ export function AppHost({ id, focused }) {
   // the content goes in its own node: `protected` paints it black in screenshots (wm.setProtected)
   return (
     <AppWindowContext.Provider value={{ id, focused, args, mode, protected: prot, overlayHost }}>
-      <View protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
+      <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
         <C />
         <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
       </View>

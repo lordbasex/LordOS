@@ -85,7 +85,8 @@ tokens of its own.
 Optional shape tokens restyle the SDK's shared controls in every app (see `docs/DESIGN.md`, "Theme
 tokens for the shared controls"): `controlRadius`, `controlRadiusSmall`, `groupRadius`, `menuRadius`,
 `menuItemRadius`, `menuHighlight` (`'accent'` | `'subtle'`), `selection` (`'fill'` | `'indicator'`),
-`inputFocus` (`'ring'` | `'underline'`), `buttonBorder` and `popupBg`. Without them a theme gets Lord
+`inputFocus` (`'ring'` | `'underline'`), `buttonBorder`, `popupBg` and `focusRing` (the keyboard focus ring's color,
+the accent by default). Without them a theme gets Lord
 Default's shapes.
 
 Two switches a taskbar theme usually wants: `configureWindows({ snap: true })` turns on window

@@ -170,6 +170,7 @@ the theme's look without changes, and isolated apps receive the same tokens thro
 | `inputFocus` | `'ring'` | `'underline'` | the focused `TextInput`: an accent border, or a 2 px accent line along its bottom |
 | `buttonBorder` | `false` | `true` | a 1 px border around neutral buttons and pop-up buttons |
 | `popupBg` | `null` (by mode) | its own | the surface of menus, lists and tooltips |
+| `focusRing` | `null` (the accent) | `null` (the accent) | the color of the keyboard focus ring ([Keyboard focus](#keyboard-focus)) |
 
 Control heights, spacing and the type scale stay the same in both themes, so layouts don't move
 when the user switches.
@@ -263,6 +264,9 @@ Every scrolling area uses the SDK's `ScrollView`, which draws an **overlay scrol
   leave a short page scrolled past its end. Views whose content just updates (a log, a refreshing
   list) leave it out and keep their position. The Store also returns to where a list was when you
   go back from an app's page.
+- **Keyboard and sideways (0.8.8.8):** a `ScrollView` whose content doesn't fit is a Tab stop and scrolls with
+  the keys ([Keyboard focus](#keyboard-focus)); with `horizontal` it scrolls along its row, its bar along the bottom
+  edge.
 - The Terminal's history bar (drawn in C, `term_paint.c`) uses the same size and inset and shows
   only while you look at the history.
 
@@ -273,6 +277,49 @@ the faded opacity, RTL). Screenshots: `scrollbars-network-{light,dark}-{hidden,s
 `scrollbars-settings-{light,dark}.png`.
 
 ![Monitor → Network while scrolling](scrollbars-network-light-scrolling.png)
+
+## Keyboard focus
+
+Every shared control can be reached and used without a mouse (`sdk/focus.js`, the pure model in
+`sdk/focusmodel.js`). **Tab** and **⇧Tab** go round the focusable controls of the window in front in tree order,
+skipping the hidden (`display: 'none'`) and the disabled ones, and wrap at the ends; while a sheet or prompt of the
+shell is open (the modal, system, overlay or capture layer) they go round its controls instead, and inside a View
+with the `modal` prop while it is shown. Ctrl+Tab and ⌥Tab stay the apps' and the shell's.
+
+- **Which controls:** `Button`, `ToolbarButton` (and so `MenuButton`), `Toggle`, `Segmented`, `Slider`,
+  `Stepper`, `TextInput`, `TextArea`, Settings' pop-up buttons (`PopUp`), and a `ScrollView` whose content doesn't fit.
+  Each one takes `focusable={false}` to leave the order; a disabled one is never in it. Files' icon, list and column
+  views pass `focusable={false}`: there the arrows move the selection. Any `View` becomes a stop with `focusable`,
+  and `onKeyDown(e)` (return `true` when it used the key) gives it keys while it is focused.
+- **What the keys do:** Space and Enter press a button (its `onClick`, as a click would) or flip a toggle; ← →
+  and ↓ ↑ move a slider (a twentieth of its range, or `step`) and a stepper, Page Up and Page Down a tenth (ten
+  steps), Home and End to the ends; ← → choose a `Segmented` segment; ↓, Space or Enter open a `MenuButton` or a
+  pop-up button, ↓ ↑ go through its items, Enter chooses and Escape or Tab close it. A focused scroll view (or one
+  with a control inside it focused) scrolls with ↓ ↑, Page Up and Page Down, Space and ⇧Space, Home and End; a
+  `horizontal` one with ← → too, and with Shift and the wheel or a sideways swipe. A control Tab moves to inside a
+  scroll view comes into sight. A key a control used reaches no `useKeyboard` handler: Space on a toolbar button in
+  Files presses it and opens no Quick Look.
+- **Right to left:** the order is the tree's, so it follows the layout's start and end. ← and → swap for sliders,
+  steppers, segmented controls and horizontal scroll views (a slider runs from the start edge, so its minimum is on
+  the right in RTL); ↑ and ↓ never swap.
+- **The ring** (as `:focus-visible`): a 2 px line in the theme's `focusRing` token (the accent without one), 1 px
+  outside the control and following its corners (inside the box of a scroll view, which clips). It appears only after
+  the keyboard moved the focus; a press of the pointer ends the focus and hides it, and the next Tab goes on from
+  where it pressed. Text fields keep their own accent border and get no ring. A confirmation dialog in front hides
+  it and keeps Escape, Enter and Tab for its two buttons (`sdk/dialogkeys.js`);
+  the ring comes back when it closes.
+- **Text fields:** a `TextInput` reached with Tab has its text selected (the first key replaces it), a `TextArea`
+  keeps its caret; both take every key while they have them and let Tab go to the next control, unless they are in
+  a `FormFields` (Tab then goes round its fields, as before) or the field's own `onKeyDown` used Tab (completing an
+  address). An app's own text field (`takeTextFocus`: Notes, Mail's body) keeps Tab.
+- **Apps that want Tab** call `e.preventDefault()` in their key handler: the Terminal (the shell completes), the Text
+  Editor (it indents), a virtual machine's screen and console, the remote desktop, the Databases completion list, the
+  Imager's own focus and the Overview do. Tab moves the focus only after every listener had the key.
+
+Tests: `tests/focus_model_test.mjs` (tree order, skipping, a modal node, focus-visible, the keys of sliders,
+steppers, segmented controls, menus and scroll views, RTL) and `tests/focus_scene_test.mjs` (the controls in a
+window through the runtime and the server's own events: the ring, Space and Enter, the arrows, a menu, a text field
+in the order, a press that ends the focus, a prevented Tab, a dialog in front).
 
 ## Robustness checklist
 
