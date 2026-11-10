@@ -101,7 +101,8 @@ window with `inhibitShortcuts(win, app)` (`sdk/kbinhibit.js`). The person allows
 Keyboard shortcuts keeps the decision. While it holds and that window has the keyboard, keys go to it before the theme's
 table and the dispatcher. Always LordOS's: ❖Esc, which turns it off for that window (a locked pointer and fullscreen
 too) and, pressed again, back on; the lock, ❖L and ❖⌃Q; Ctrl+Alt+F1…F12; the media, sound and light keys and Print
-Screen; ⌃⌥⌫ and ⌃⌥⇧Esc. A key's release goes where its press went. The rule is one in C (`kbi_route`,
+Screen; ⌃⌥⌫ and ⌃⌥⇧Esc. Linux apps' global shortcuts (below) don't fire on the keys it gets. A key's release goes where
+its press went. The rule is one in C (`kbi_route`,
 `server/src/wl/kbinhibit.c`) and its twin in the session (`routeKey`, `sdk/kbinhibitmodel.js`), each with a test.
 Not for isolated LordOS apps, which keep the ❖ keys `system_meta_key` lists.
 
@@ -155,7 +156,9 @@ A call app's push-to-talk or a recorder's hotkeys work while another app is in f
   Repeats are taken without a signal, and the release counts even when a modifier was let go first. Signals go only to
   the connection that opened the session and only while that session is bound. A session closed with `Session.Close`, or
   whose connection left the bus, gets nothing more. A key LordOS has since started keeping (another theme) is no longer
-  delivered. Letters match what the layout types and other keys their position, as for LordOS's own shortcuts.
+  delivered. Letters match what the layout types and other keys their position, as for LordOS's own shortcuts. While a
+  window that holds the shortcuts (a VM, a remote desktop; "Apps that take the shortcuts" above) has the keyboard, a press
+  it gets (`wl_key_to_inhibitor`) fires no global shortcut; after ❖Esc they work again.
 - **A session's states** (`gs_step`): new, asking (one sheet at a time), bound. `BindShortcuts` is accepted once per
   session: when cancelled, the app may ask again. Afterwards changes come from Settings and reach the app as
   `ShortcutsChanged`. `ListShortcuts` answers with the bound ones.

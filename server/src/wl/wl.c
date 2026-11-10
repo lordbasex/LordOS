@@ -4149,6 +4149,11 @@ static KbInhib *focus_inhibitor(void) {
     return k && k->st.allowed ? k : NULL;
 }
 
+int wl_key_to_inhibitor(int code, char letter, unsigned mods) {
+    KbInhib *k = dpy ? focus_inhibitor() : NULL;
+    return k && kbi_route(code, letter, mods, k->st.active) != KBI_KEY_LORD;
+}
+
 static int kbi_waiting_at(const char *app) {
     for (int i = 0; i < KBI_WAITING; i++) if (kbi_waiting[i][0] && !strcmp(kbi_waiting[i], app)) return i;
     return -1;

@@ -746,7 +746,9 @@ void js_key(int code, int value) {
     KeyInfo k;
     kb_key(code, value, &k);
     unsigned mods = (k.shift ? KG_SHIFT : 0u) | (k.ctrl ? KG_CTRL : 0u) | (k.alt ? KG_ALT : 0u) | (k.meta ? KG_META : 0u);
-    if (portal_shortcut_key(code, value, keygrab_letter(code, k.base), mods)) { drain_jobs(); return; }
+    char letter = keygrab_letter(code, k.base);
+    /* a window holding the shortcuts (a VM, a remote desktop) gets the press first; a held one's release still ends it */
+    if ((value != 1 || !wl_key_to_inhibitor(code, letter, mods)) && portal_shortcut_key(code, value, letter, mods)) { drain_jobs(); return; }
     if (!kb_ready()) {
         JSValueConst args[2] = { JS_NewInt32(ctx, code), JS_NewInt32(ctx, value) };
         JS_FreeValue(ctx, call_global("__lordKey", 2, args));

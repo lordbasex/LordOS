@@ -120,6 +120,9 @@ int  wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *
 void wl_set_greeter(int on);
 int  wl_shortcuts_answer(const char *app, int allow);
 void wl_shortcuts_changed(void);
+/* 1 if this key press goes to the window with the keyboard because its inhibitor holds (kbi_route: KBI_KEY_APP, or
+ * ❖Esc), so no Linux app's global shortcut (ui/portal.c) may take it first. letter: keygrab_letter; mods: KG_*. */
+int  wl_key_to_inhibitor(int code, char letter, unsigned mods);
 /* The name to show for a "shortcuts" decision's app (a kbinhibit key): the installed app whose .desktop entry runs
  * that program or Flatpak app, never what a client says; hint (an app_id, or NULL) only says where to look first.
  * out = "" when none does. */
