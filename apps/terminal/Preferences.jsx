@@ -14,6 +14,7 @@ import { importIterm } from './iterm.js';
 import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConfig } from './config.js';
 import { compareNames } from '../../sdk/collate.js';
 import { cleanForward } from './forwards.js';
+import { TRIGGER_ACTIONS, triggerPreview, previewLine } from './triggers.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
@@ -232,6 +233,50 @@ function typesInto(p) {
   return out;
 }
 
+const actionName = (id) => T(id === 'bell' ? 'terminal.prefs.bell' : `terminal.prefs.tr.${id}`);
+
+// A trigger in a sheet: the expression, what it does, its parameter (with what \\1… stand for), and a line to try it
+// on, with what it would match and do (triggers.js, as runTriggers in state.js).
+function TriggerSheet({ t, sheet, onCancel, onSave }) {
+  const [d, setD] = useState(sheet.draft);
+  const [sample, setSample] = useState('');
+  const upd = (patch) => setD((x) => ({ ...x, ...patch }));
+  const act = TRIGGER_ACTIONS.find((a) => a.id === d.action) || TRIGGER_ACTIONS[0];
+  const p = triggerPreview(d.regex, d.param, sample);
+  const line = previewLine(d.action, p, sample);
+  const bad = !d.regex || triggerPreview(d.regex, '', '').error;
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <View style={{ width: 520, maxWidth: '92%', padding: spacing.xl, gap: spacing.m, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{T(sheet.index < 0 ? 'terminal.prefs.tr.newTitle' : 'terminal.prefs.tr.editTitle')}</Text>
+        <Field t={t} label={T('terminal.prefs.tr.regex')} note={T('terminal.prefs.tr.regexNote')}>
+          <TextInput value={d.regex} placeholder="error|failed" onChange={(v) => upd({ regex: v })} style={{ width: 280, fontFamily: 'monospace', direction: 'ltr' }} />
+        </Field>
+        <Field t={t} label={T('terminal.prefs.tr.action')}>
+          <Picker t={t} width={200} value={d.action} onChange={(v) => upd({ action: v })} options={TRIGGER_ACTIONS.map((a) => [a.id, actionName(a.id)])} />
+        </Field>
+        {act.param && (
+          <Field t={t} label={T('terminal.prefs.tr.param')} note={T(`terminal.prefs.tr.paramNote.${act.param}`)}>
+            <TextInput value={d.param || ''} onChange={(v) => upd({ param: v })} style={{ width: 280, fontFamily: act.param === 'text' ? undefined : 'monospace', direction: 'ltr' }} />
+          </Field>
+        )}
+        <Field t={t} label={T('terminal.prefs.tr.enabled')}><Toggle small on={d.enabled !== false} onChange={(v) => upd({ enabled: v })} /></Field>
+        <Field t={t} label={T('terminal.prefs.tr.try')}>
+          <TextInput value={sample} placeholder={T('terminal.prefs.tr.tryPh')} onChange={setSample} style={{ width: 280, fontFamily: 'monospace', direction: 'ltr' }} />
+        </Field>
+        <Text style={{ fontSize: 12, lineHeight: 1.4, textAlign: 'start', color: p.error && d.regex ? '#ff453a' : p.match == null || p.error ? t.textDim : '#32d74b' }}>
+          {!d.regex ? T('terminal.prefs.tr.regexFirst') : p.error ? T('terminal.prefs.tr.invalid') : !sample ? T('terminal.prefs.tr.tryHint') : p.match == null ? T('terminal.prefs.tr.noMatch')
+            : `${T('terminal.prefs.tr.matched', { text: p.match })}${line && line.text ? ` → ${T(`terminal.prefs.tr.would.${line.kind}`, { text: line.text })}` : ''}`}
+        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+          <Button label={T('terminal.dialog.cancel')} onClick={onCancel} />
+          <Button primary disabled={bad} label={T('terminal.prefs.tr.save')} onClick={() => onSave(d)} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function ImportPanel({ t, onClose, onDone }) {
   const [path, setPath] = useState('');
   const [result, setResult] = useState(null);
@@ -426,6 +471,7 @@ export function Preferences({ wid, onClose }) {
   const [sel, setSel] = useState(cfg.defaultProfile);
   const [section, setSection] = useState('general');
   const [importing, setImporting] = useState(false);
+  const [trSheet, setTrSheet] = useState(null);      // { index (-1: a new one), draft }: the trigger's sheet
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState({});          // tag → folded in the list
   const [notice, setNotice] = useState(null);
@@ -680,24 +726,18 @@ export function Preferences({ wid, onClose }) {
         <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.triggersHint')}</Text>
         {(p.triggers || []).length > 0 && (
         <GroupBox style={{ marginBottom: spacing.s }}>
-        {(p.triggers || []).map((tr, i) => {
-          const upd = (patch) => set({ triggers: p.triggers.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-          return (
-            <View key={i} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.s }}>
-              <Toggle small on={tr.enabled !== false} onChange={(v) => upd({ enabled: v })} />
-              <TextInput value={tr.regex} placeholder="regex" onChange={(v) => upd({ regex: v })} style={{ width: 150 }} />
-              <Picker t={t} width={130} value={tr.action} onChange={(v) => upd({ action: v })}
-                options={[['notify', T('terminal.prefs.tr.notify')], ['bell', T('terminal.prefs.bell')], ['attention', T('terminal.prefs.tr.attention')], ['send', T('terminal.prefs.tr.send')], ['capture', T('terminal.prefs.tr.capture')],
-                  ['highlight', T('terminal.prefs.tr.highlight')], ['mark', T('terminal.prefs.tr.mark')], ['title', T('terminal.prefs.tr.title')], ['stop', T('terminal.prefs.tr.stop')]]} />
-              <TextInput value={tr.param || ''} placeholder={T('terminal.prefs.param')} onChange={(v) => upd({ param: v })} style={{ width: 130 }} />
-              <View style={{ flex: 1 }} />
-              <Button small label="−" onClick={() => set({ triggers: p.triggers.filter((_, j) => j !== i) })} />
-            </View>
-          );
-        })}
+        {(p.triggers || []).map((tr, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.s, direction: 'ltr' }}>
+            <Toggle small on={tr.enabled !== false} onChange={(v) => set({ triggers: p.triggers.map((x, j) => (j === i ? { ...x, enabled: v } : x)) })} />
+            <Text onClick={() => setTrSheet({ index: i, draft: { ...tr } })} style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: 'monospace', color: tr.enabled === false ? t.textDim : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{tr.regex || '—'}</Text>
+            <Text style={{ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap' }}>{actionName(tr.action)}{tr.param ? ` · ${tr.param.length > 18 ? `${tr.param.slice(0, 17)}…` : tr.param}` : ''}</Text>
+            <Button small label={T('terminal.prefs.tr.edit')} onClick={() => setTrSheet({ index: i, draft: { ...tr } })} />
+            <Button small label="−" onClick={() => set({ triggers: p.triggers.filter((_, j) => j !== i) })} />
+          </View>
+        ))}
         </GroupBox>
         )}
-        <Button small label={T('terminal.prefs.tr.add')} onClick={() => set({ triggers: [...(p.triggers || []), { regex: 'error', action: 'notify', param: '', enabled: true }] })} style={{ alignSelf: 'flex-start' }} />
+        <Button small label={T('terminal.prefs.tr.add')} onClick={() => setTrSheet({ index: -1, draft: { regex: '', action: 'notify', param: '', enabled: true } })} style={{ alignSelf: 'flex-start' }} />
       </>
     ),
   };
@@ -774,6 +814,10 @@ export function Preferences({ wid, onClose }) {
           <Button primary label={T('terminal.prefs.done')} onClick={onClose} />
         </View>
       </View>
+      {trSheet && (
+        <TriggerSheet t={t} sheet={trSheet} onCancel={() => setTrSheet(null)}
+          onSave={(d) => { const list = p.triggers || []; set({ triggers: trSheet.index < 0 ? [...list, d] : list.map((x, j) => (j === trSheet.index ? d : x)) }); setTrSheet(null); }} />
+      )}
       {importing && (
         <ImportPanel t={t} onClose={() => setImporting(false)}
           onDone={(msg, first) => { setImporting(false); setNotice(msg); if (first) setSel(cfg.profiles.find((x) => x.id === first) ? first : terminalSettings().profiles.find((x) => x.id === first)?.id || sel); }} />

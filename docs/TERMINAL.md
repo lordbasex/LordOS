@@ -148,7 +148,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Bright bold, bold/italic font, blinking text, minimum contrast | ✅ | |
 | Initial directory (home, previous, other), badge, tab color | ✅ | |
 | Configurable history, mouse reporting, wheel on the alternate screen, bell, word characters, Alt as Esc+ | ✅ | |
-| Triggers (notice, bell, attention, send text, capture, highlight, mark, title, stop) | ✅ | can be disabled one by one |
+| Triggers (notice, bell, attention, send text, capture, highlight, mark, title, stop) | ✅ | can be disabled one by one; edited in a sheet that tries them on a sample line (0.8.8.8) |
 | Automatic profile switching by directory and by user@host | ✅ | user@host is reported by the shell integration (OSC 1337 RemoteHost) |
 | Configurable keyboard shortcuts | ✅ | Preferences → Keys |
 | Per-profile and global keys (send text, Esc+, hex, ignore, action) | ✅ | the profile's win over the global ones and the shortcuts |

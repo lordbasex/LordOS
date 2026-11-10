@@ -47,6 +47,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `~/.cache/lordos/terminal-remote` and open it. Edit opens it in the Text Editor and sends each save back up to the
   same path, while Files mode is open; it is the only upload that replaces a file without asking, since that file is
   the one chosen for editing. Checked on a real session: an edit saved with ❖S reached the server's file.
+- **Terminal: triggers in a sheet.** Settings → Triggers lists each trigger on one line (its switch, expression,
+  action and parameter) with Edit… and −. Edit… and Add Trigger open a sheet with the expression, the action, the
+  parameter with what it means for that action (`\0` the match, `\1…\9` its groups, `\n` Enter, `#text,#background`),
+  the switch, and a line to try it on: it says whether the expression is valid, what it matches and what the action
+  would do (a notice with this text, this title, types this…). `apps/terminal/triggers.js`, as the triggers run, with
+  `terminal_triggers_test.mjs` (13 checks).
 
 ### Fixed
 
