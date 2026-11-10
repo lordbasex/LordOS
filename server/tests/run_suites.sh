@@ -176,6 +176,7 @@ EOF
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
     if have node; then run "files-remote-test (apps/files/remotedirs.js)" node tests/files_remote_test.mjs; fi
     if have node; then run "textfield-model-test (sdk/textfieldmodel.js)" node tests/textfield_model_test.mjs; fi
+    if have node; then run "textarea-model-test (sdk/textareamodel.js)" node tests/textarea_model_test.mjs; fi
     if have node; then run "filekinds-test (sdk/filekinds.js)" node tests/filekinds_test.mjs; fi
     if have node; then run "thumb-cache-test (sdk/thumbcache.js)" node tests/thumb_cache_test.mjs; fi
     # Cloud without a screen: status glyphs, space, providers, menus, sidebar, menu bar, notifications, the mock's shape (sdk/cloudmodel.js)
@@ -265,6 +266,9 @@ EOF
     # (0.8.8.8) a trigger tried on a sample line, for its sheet in Settings (apps/terminal/triggers.js)
     if have node; then run "terminal-triggers-test (apps/terminal/triggers.js)" node tests/terminal_triggers_test.mjs
     else skip "terminal-triggers-test" "node"; fi
+    # (0.8.8.8) "Send text at start" runs its last line too; the tags as one field (apps/terminal/profilefields.js)
+    if have node; then run "terminal-profilefields-test (apps/terminal/profilefields.js)" node tests/terminal_profilefields_test.mjs
+    else skip "terminal-profilefields-test" "node"; fi
     # (0.8.8.6) Monitor → Memory: the processes grouped by app (apps/monitor/memtop.js)
     if have node; then run "monitor-memtop-test (apps/monitor/memtop.js)" node tests/monitor_memtop_test.mjs
     else skip "monitor-memtop-test" "node"; fi

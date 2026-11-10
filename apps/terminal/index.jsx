@@ -7,14 +7,14 @@ import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, pointerW
 import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
-  selectTab, focusPane, zoom, toggleZoom, toggleTimestamps, leaves, tabTitle, busyIn, toggleHotkeyWindow, toast,
+  selectTab, focusPane, zoom, toggleZoom, toggleTimestamps, leaves, windowTitle, busyIn, toggleHotkeyWindow, toast,
   undoClose, paneToTab, equalize, moveTab, saveArrangement, restoreArrangement, toggleAlert, meta as metaStore, noteTermFocus,
 } from './state.js';
 import { PaneTree, paneNodes } from './Panes.jsx';
 import {
   TabBar, TAB_COLORS, StatusBar, FindBar, Toolbelt, Overlays, ReplayBar, popupKey, openAutocomplete, openPasteHistory, openCommandHistory,
 } from './Chrome.jsx';
-import { Preferences } from './Preferences.jsx';
+import { Preferences, escapeLayer } from './Preferences.jsx';
 import { ProfilesWindow } from './ProfilesWindow.jsx';
 import { FilesMode } from './FilesMode.jsx';
 import { ForwardsPanel } from './ForwardsPanel.jsx';
@@ -245,7 +245,7 @@ function menus(wid, w) {
       item('filesMode', { checked: !!tab?.files }),
     ] },
     { label: tr('terminal.menu.profiles'), items: [
-      ...profileMenu(profiles, (p) => ({ label: tr('terminal.menu.newTabWith', { name: profileName(p) }), onClick: () => addTab(wid, p.id) })), '-',
+      ...profileMenu(profiles, (p) => ({ label: profileName(p), onClick: () => addTab(wid, p.id) })), '-',   // a profile opens a new tab
       item('openProfiles'), item('preferences'),
     ] },
   ];
@@ -272,7 +272,7 @@ function PrefsWindow() {
       if (e.key !== 'Escape' || e.meta || e.ctrl || e.alt || e.shift) { const c = comboOf(e); if (c) cap.onCombo(c); }
       return;
     }
-    if (e.key === 'Escape') wm.close(wid);
+    if (e.key === 'Escape' && !escapeLayer()) wm.close(wid);
   });
   return <Preferences wid={wid} onClose={() => wm.close(wid)} />;
 }
@@ -318,7 +318,7 @@ function TerminalWindow() {
   const profile = getProfile(allMeta[sid]?.profile);
 
   // título de la ventana = el de la pestaña activa
-  useEffect(() => { if (tab) wm.setTitle(wid, tabTitle(tab)); });
+  useEffect(() => { if (tab) wm.setTitle(wid, windowTitle(tab)); });
   useEffect(() => { if (focused) noteTermFocus(wid); }, [focused]);
   useEffect(() => { startForwards(); }, []);      // the profiles' port forwards follow each tab's ssh (forwards.js)
 

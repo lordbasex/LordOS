@@ -152,7 +152,8 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Automatic profile switching by directory and by user@host | ✅ | user@host is reported by the shell integration (OSC 1337 RemoteHost) |
 | Configurable keyboard shortcuts | ✅ | Preferences → Keys |
 | Per-profile and global keys (send text, Esc+, hex, ignore, action) | ✅ | the profile's win over the global ones and the shortcuts |
-| Send text on open, size of new windows in columns × rows | ✅ | |
+| Send text on open, size of new windows in columns × rows | ✅ | several lines, each run with Enter, the last one too (0.8.8.8, `profilefields.js`) |
+| Profile tags (menu groups) and tab names | ✅ | tags edited in General; a tab opened with a profile other than the default is named after it (0.8.8.8) |
 | Import profiles from other terminal emulators | ✅ | see below |
 
 ### Not applicable or pending by design

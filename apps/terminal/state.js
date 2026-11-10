@@ -3,6 +3,7 @@
 // contenido) no pierda pestañas ni shells; al cerrar la ventana se cierran sus sesiones.
 import { createStore, wm, term, clipboard, windows as wmWindows, workArea, t as T } from '@lordos/sdk';
 import { getProfile, terminalSettings, saveTerminalSettings, toConfig, profileName } from './profiles.js';
+import { initialKeys } from './profilefields.js';
 
 export const meta = createStore({});      // sid → { profile, title, cwd, process, busy, badge, bell, activity, flash, lastExit }
 export const wins = createStore({});      // wid → { tabs, active, ...paneles y diálogos }
@@ -60,9 +61,15 @@ export function sessionTitle(sid) {
   return m.busy && m.process ? `${base} — ${m.process}` : base;
 }
 
+// a tab opened with a profile other than the default one is named after it (until it is given a title of its own); the
+// window's title keeps the session's (windowTitle)
 export function tabTitle(tab) {
-  return tab.title || sessionTitle(tab.focus);
+  if (tab.title) return tab.title;
+  const id = (meta.get()[tab.focus] || {}).profile;
+  if (id && id !== terminalSettings().defaultProfile) { const p = getProfile(id); if (p && p.id === id) return profileName(p); }
+  return sessionTitle(tab.focus);
 }
+export const windowTitle = (tab) => tab.title || sessionTitle(tab.focus);
 
 // ---- sesiones ----
 
@@ -85,7 +92,7 @@ export function createSession(profileId, reuseFrom, cwd) {
   const p = getProfile(profileId);
   const sid = term.create({ cwd: cwd || startDir(p, reuseFrom), scrollback: p.scrollback });
   patchMeta(sid, { profile: p.id, title: '', cwd: '', badge: p.badge || '', bell: false, activity: false,
-    pendingText: p.initialText || '' });
+    pendingText: initialKeys(p.initialText) });
   return sid;
 }
 
@@ -154,8 +161,7 @@ export function addTab(wid, profileId) {
   const cur = activeSid(w);
   const prof = profileId || terminalSettings().defaultProfile;
   const tab = newTab(prof, cur);
-  const idx = w.tabs.findIndex((t) => t.id === w.active);
-  patchWin(wid, (x) => ({ tabs: [...x.tabs.slice(0, idx + 1), tab, ...x.tabs.slice(idx + 1)], active: tab.id }));
+  patchWin(wid, (x) => ({ tabs: [...x.tabs, tab], active: tab.id }));      // a new tab goes last, as the + button is
   configureSession(tab.focus);
 }
 
@@ -454,9 +460,9 @@ term.onAny((sid, type, data) => {
     case 'output': {
       const m = meta.get()[sid] || {};
       if (m.pendingText) {
-        // "Enviar texto al abrir": cuando el shell ya mostró algo (su prompt)
+        // "Send text at start" (initialKeys, with its Enter) or an ssh to finish typing: once the shell showed its prompt
         patchMeta(sid, { pendingText: '' });
-        term.write(sid, m.pendingText.replace(/\\n/g, '\r').replace(/\n/g, '\r'));
+        term.write(sid, m.pendingText);
       }
       if (!isActive) patchMeta(sid, { activity: true });
       runTriggers(sid, wid);

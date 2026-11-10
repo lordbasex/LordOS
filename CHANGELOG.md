@@ -53,9 +53,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the switch, and a line to try it on: it says whether the expression is valid, what it matches and what the action
   would do (a notice with this text, this title, types this…). `apps/terminal/triggers.js`, as the triggers run, with
   `terminal_triggers_test.mjs` (13 checks).
+- **Terminal: "Send text at start" is a box of several lines, and each line runs.** Settings → General edits the text in
+  a field of several lines (long lines wrap, ↑ ↓ keep the column, Home, End and a click place the caret, a paste keeps
+  its line breaks). Each line is typed and sent with Enter, the last one too, so a command runs without a `\n` at its
+  end; a `\n` written in a profile saved before (or imported) still counts as one line break, and a `\n` at the end
+  is not sent twice. `initialKeys` in `apps/terminal/profilefields.js` (`terminal_profilefields_test.mjs`, 22 checks).
+  The field is the SDK's new `TextArea` (`sdk/textareamodel.js`, `textarea_model_test.mjs`, 26 checks).
+- **Terminal: a profile's tags are edited in Settings → General.** One field, separated by commas; the Profiles menu and
+  the lists regroup at once. Tags imported from another emulator (shown next to the name) can now be renamed or removed.
+- **Terminal: a tab opened with a profile is named after it.** A tab whose profile is not the default one shows the
+  profile's name until it is given a title of its own; the window's title keeps the session's (user@host, directory).
 
 ### Fixed
 
+- **Terminal: Profiles → a profile's item is its name.** It read "New Tab: name" in every item of the submenus.
+- **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
+- **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
+  section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Terminal Settings: drop-down lists (font, non-ASCII font, a trigger's action) float over the form.** They pushed
+  the rest of the section down while open. A click outside or Escape closes them.
+- **Terminal Settings: a new port forward shows no error before its port is typed**, and the scrollback sizes are
+  written as numbers are in the interface's language (1,000 in English, 1.000 in Spanish).
+- **Terminal: a tab title next to a port forward badge is shortened from its start with "…"**, not cut on both sides.
+- **Terminal Settings: Escape closes what is open, not the whole window.** With a list, the trigger sheet, Import or
+  the file chooser open, Escape closed Settings; it now closes the newest of them, and the window only when none is.
 - **Releasing ❖ after a ❖ + click no longer opens the app launcher.** The shell took any press and release of ❖ with no
   key between as a tap, and a click in between didn't count, so ❖ + click on a link or a file name in the Terminal also
   opened Apps. A click while ❖ is held now cancels the tap (`sdk/shortcuts.js`).

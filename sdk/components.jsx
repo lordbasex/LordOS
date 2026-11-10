@@ -11,6 +11,7 @@ import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitT
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
 import { fieldKey, insertAt, caretAt, clampPos } from './textfieldmodel.js';
+import { wrapRows, rowOf, areaKey, posAt } from './textareamodel.js';
 import { Layer } from './layers.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
@@ -448,6 +449,108 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
         {after ? <Text style={textStyle}>{after}</Text> : null}
       </View>
       {!value && !preedit && <Text style={{ fontSize: size, color: t.textDim, whiteSpace: 'nowrap' }}>{placeholder || ''}</Text>}
+    </View>
+  );
+}
+
+// Several lines of text (textareamodel.js): Enter starts a new line, long lines wrap at the field's width, and the caret
+// moves with the arrows (↑ ↓ keep the column), Home, End and a click. A paste keeps its line breaks. Grows with its rows.
+export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3 }) {
+  const t = useTheme();
+  const token = useRef({}).current;
+  const [isFocused, setIsFocused] = useState(false);
+  const [blink, setBlink] = useState(true);
+  const [width, setWidth] = useState(0);
+  const box = useRef(null);
+  const caret = useRef(null);
+  const latest = useRef();
+  const at = useRef({ value, pos: [...(value || '')].length });
+  if (at.current.value !== value) at.current = { value, pos: [...(value || '')].length };
+  const [, redraw] = useState(0);
+  const order = useContext(FieldOrder);
+  const measure = (s) => lord.measureText(s, size, 400);
+  const lineH = Math.round(size * 1.5);
+  const pad = 7;
+  const rows = wrapRows(value || '', width - 2 * pad - 4, measure);
+  latest.current = { value: value || '', onChange, onCancel, rows };
+
+  useEffect(() => {
+    const caretRect = () => { if (!caret.current) return null; const [x, y, , h] = lord.getLayout(caret.current.id); return { x, y, h }; };
+    const sync = () => {
+      setIsFocused(focused === token);
+      if (focused === token) ime.attach(token, caretRect, { inline: true }); else ime.detach(token);
+    };
+    focusSubs.add(sync);
+    carets.set(token, caretRect);
+    handlers.set(token, (e) => {
+      const p = latest.current;
+      if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
+        const i = order.indexOf(token);
+        setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
+        return;
+      }
+      if (at.current.value !== p.value) at.current = { value: p.value, pos: [...p.value].length };
+      const put = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const cur = at.current;
+      if ((e.ctrl || e.meta) && e.base === 'v') { put(insertAt(cur.value, cur.pos, lord.clipboard.get().replace(/\r\n?/g, '\n'))); setBlink(true); return; }
+      const r = areaKey(cur.value, cur.pos, e, p.rows, measure);
+      if (r) put(r);
+      else if (e.key === 'Escape') { setFocus(null); p.onCancel?.(); }
+      else if (e.char && !e.ctrl && !e.meta) put(insertAt(cur.value, cur.pos, e.char));
+      setBlink(true);
+    });
+    order?.push(token);
+    return () => { if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+  }, []);
+  // the width the rows wrap at, once the layout has given the field one
+  useEffect(() => {
+    const look = () => { try { const w = box.current ? lord.getLayout(box.current.id)[2] : 0; if (w && Math.abs(w - width) > 0.5) setWidth(w); } catch (e) { /* not laid out yet */ } };
+    const id = setTimeout(look, 0);
+    const off = onCommit(look), offScreen = onScreenChange(look);
+    return () => { clearTimeout(id); off(); offScreen(); };
+  }, [width]);
+  useEffect(() => {
+    if (!isFocused) return undefined;
+    const id = setInterval(() => setBlink((b) => !b), 530);
+    return () => clearInterval(id);
+  }, [isFocused]);
+  const imeSt = useIme();
+  const preedit = isFocused ? imeSt.preedit : '';
+
+  const chars = [...(value || '')];
+  const pos = isFocused ? clampPos(value, at.current.pos) : chars.length;
+  const caretRow = rowOf(rows, pos);
+  const placeCaret = (ev) => {
+    if (!box.current || !ev || typeof ev.local !== 'function') return;
+    let lx, ly;
+    try { const l = ev.local(box.current); lx = l.x - pad; ly = l.y - pad; } catch (e) { return; }
+    at.current = { value, pos: posAt(value || '', rows, lx, Math.floor(ly / lineH), measure) };
+    redraw((n) => n + 1);
+    setBlink(true);
+  };
+  const textStyle = { fontSize: size, color: t.text, whiteSpace: 'nowrap', lineHeight: lineH };
+  return (
+    <View ref={box} onMouseDown={(ev) => { focusedNow = true; setFocus(token); placeCaret(ev); }}
+      style={[{ minHeight: minRows * lineH + 2 * pad, padding: pad, borderRadius: t.controlRadius, direction: 'ltr',
+        backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
+      {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
+      {!value && !preedit ? (
+        <View style={{ flexDirection: 'row', height: lineH, alignItems: 'center' }}>
+          {isFocused && <View ref={caret} style={{ width: 1.5, height: size + 3, backgroundColor: blink ? t.accent : 'transparent' }} />}
+          <Text style={{ fontSize: size, color: t.textDim, whiteSpace: 'nowrap' }}>{placeholder || ''}</Text>
+        </View>
+      ) : rows.map((r, i) => {
+        const mine = isFocused && i === caretRow;
+        const before = chars.slice(r.start, mine ? pos : r.end).join(''), after = mine ? chars.slice(pos, r.end).join('') : '';
+        return (
+          <View key={i} style={{ flexDirection: 'row', height: lineH, alignItems: 'center' }}>
+            {before ? <Text style={textStyle}>{before}</Text> : null}
+            {mine && preedit ? <Preedit st={imeSt} size={size} color={t.text} accent={t.accent} /> : null}
+            {mine && <View ref={caret} style={{ width: 1.5, height: size + 3, marginLeft: 1, backgroundColor: blink ? t.accent : 'transparent' }} />}
+            {after ? <Text style={textStyle}>{after}</Text> : null}
+          </View>
+        );
+      })}
     </View>
   );
 }

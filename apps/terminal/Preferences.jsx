@@ -3,8 +3,8 @@
 // beside it: a sidebar with the profiles grouped by tag and a search, and the profile's sections as tabs centred above a
 // form with a right-aligned label column that stacks the labels above the controls when the window is narrow.
 import {
-  View, Text, TextInput, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, Hairline, GroupBox, ToolbarButton, ToolbarGroup, SearchField,
-  useStore, useTheme, fs, spacing, typeScale, direction, FilePicker, revealPath, errorText, t as T,
+  View, Text, TextInput, TextArea, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, Hairline, GroupBox, ToolbarButton, ToolbarGroup, SearchField, Overlay,
+  useStore, useTheme, fs, spacing, typeScale, direction, FilePicker, revealPath, errorText, formatNumber, t as T,
 } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName, profileGroups } from './profiles.js';
@@ -15,6 +15,7 @@ import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConf
 import { compareNames } from '../../sdk/collate.js';
 import { cleanForward } from './forwards.js';
 import { TRIGGER_ACTIONS, triggerPreview, previewLine } from './triggers.js';
+import { parseTags, tagsText } from './profilefields.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
@@ -31,6 +32,35 @@ const LABEL_W = 170;
 
 // A form row: the label right-aligned in its column, the control after it and an optional note
 // (11 px, dim) under the control.
+// What is open over the form (a list, a sheet, the import panel, the file chooser), newest last: Escape in the window
+// closes the newest (escapeLayer) and closes the window only when none is open (PrefsWindow in index.jsx).
+const layers = [];
+function useLayer(open, close) {
+  const ref = useRef(close);
+  ref.current = close;
+  useEffect(() => {
+    if (!open) return undefined;
+    const me = () => ref.current?.();
+    layers.push(me);
+    return () => { const i = layers.indexOf(me); if (i >= 0) layers.splice(i, 1); };
+  }, [open]);
+}
+export function escapeLayer() {
+  const top = layers[layers.length - 1];
+  if (!top) return false;
+  top();
+  return true;
+}
+
+// The tags as one field: what is typed stays as it is while it has commas in progress, and the profile gets the list
+function TagsField({ tags, onChange, style }) {
+  const [draft, setDraft] = useState(() => tagsText(tags));
+  const mine = useRef(tagsText(tags));
+  if (tagsText(tags) !== mine.current) { mine.current = tagsText(tags); if (tagsText(parseTags(draft)) !== mine.current) setDraft(mine.current); }
+  return <TextInput value={draft} placeholder={T('terminal.prefs.tagsPh')} style={style}
+    onChange={(v) => { setDraft(v); const list = parseTags(v); mine.current = tagsText(list); onChange(list); }} />;
+}
+
 function Field({ t, label, children, note }) {
   const narrow = useContext(Narrow);
   return (
@@ -92,12 +122,15 @@ function SchemeCard({ t, id, scheme, selected, onClick }) {
   );
 }
 
-// Inline drop-down list (it pushes the content down; Preferences has no floating layers).
+// Drop-down list: it floats over the form (an Overlay against the button), scrolls past ten rows, and a click outside or
+// Escape closes it.
 function Picker({ t, value, options, onChange, width = 240, placeholder = '—' }) {
   const [open, setOpen] = useState(false);
+  const btn = useRef(null);
+  useLayer(open, () => setOpen(false));
   const cur = options.find(([v]) => v === value);
   return (
-    <View style={{ width, maxWidth: '100%' }}>
+    <View ref={btn} style={{ width, maxWidth: '100%' }}>
       <View onClick={() => setOpen(!open)} style={{ height: 24, borderRadius: 6, paddingLeft: 9, paddingRight: 4, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: t.control, boxShadow: '0 1px 1px rgba(0,0,0,0.12)' }}>
         <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{cur ? cur[1] : placeholder}</Text>
@@ -107,7 +140,8 @@ function Picker({ t, value, options, onChange, width = 240, placeholder = '—' 
         </View>
       </View>
       {open && (
-        <View style={{ height: Math.min(200, options.length * 24 + 10), marginTop: 4, borderRadius: 8, border: `1px solid ${t.separator}`,
+        <Overlay anchor={btn} onClose={() => setOpen(false)}>
+        <View style={{ position: 'absolute', top: 28, left: 0, right: 0, height: Math.min(250, options.length * 24 + 10), borderRadius: 8, border: `1px solid ${t.separator}`,
           backgroundColor: t.mode === 'dark' ? '#2c2c31' : '#ffffff', boxShadow: '0 6px 18px rgba(0,0,0,0.25)' }}>
           <ScrollView style={{ padding: 4 }}>
             {options.map(([v, label]) => (
@@ -118,6 +152,7 @@ function Picker({ t, value, options, onChange, width = 240, placeholder = '—' 
             ))}
           </ScrollView>
         </View>
+        </Overlay>
       )}
     </View>
   );
@@ -238,6 +273,7 @@ const actionName = (id) => T(id === 'bell' ? 'terminal.prefs.bell' : `terminal.p
 // A trigger in a sheet: the expression, what it does, its parameter (with what \\1… stand for), and a line to try it
 // on, with what it would match and do (triggers.js, as runTriggers in state.js).
 function TriggerSheet({ t, sheet, onCancel, onSave }) {
+  useLayer(true, onCancel);
   const [d, setD] = useState(sheet.draft);
   const [sample, setSample] = useState('');
   const upd = (patch) => setD((x) => ({ ...x, ...patch }));
@@ -278,6 +314,7 @@ function TriggerSheet({ t, sheet, onCancel, onSave }) {
 }
 
 function ImportPanel({ t, onClose, onDone }) {
+  useLayer(true, onClose);
   const [path, setPath] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -395,9 +432,8 @@ const shortPath = (p) => { const h = fs.home(); return p && p.startsWith(`${h}/`
 
 // Where the file is, a different place, back to the default one, import and export; and what happens when the
 // chosen place isn't there (read-only from the last good copy, Retry, Choose Another).
-function ConfigFileSection({ t, onImport, onNotice }) {
+function ConfigFileSection({ t, onImport, onNotice, pick }) {
   const st = useStore(termConfig);
-  const [picking, setPicking] = useState(null);      // 'location' | 'export'
   const [ask, setAsk] = useState(null);              // { path, exists }
   const [error, setError] = useState(null);
   const move = (path, how) => {
@@ -407,7 +443,6 @@ function ConfigFileSection({ t, onImport, onNotice }) {
   };
   const picked = (raw) => {
     const path = homePath(raw);
-    setPicking(null);
     if (!/\.json$/i.test(path)) { setError(T('terminal.prefs.file.mustJson')); return; }
     if (path === st.path) return;
     let exists = false;
@@ -415,7 +450,6 @@ function ConfigFileSection({ t, onImport, onNotice }) {
     setAsk({ path, exists });
   };
   const exportTo = (raw) => {
-    setPicking(null);
     try { lord.termconf.exportTo(homePath(raw), serializeConfig(st.data || {})); setError(null); onNotice(T('terminal.prefs.file.exported', { path: shortPath(homePath(raw)) })); }
     catch (e) { setError(errorText(e)); }
   };
@@ -436,13 +470,13 @@ function ConfigFileSection({ t, onImport, onNotice }) {
         <Button small label={T('terminal.prefs.file.show')} onClick={() => revealPath(st.readOnly ? st.cache : st.path)} />
       </Field>
       <Field t={t} label="">
-        <Button small label={T('terminal.prefs.file.choose')} onClick={() => setPicking('location')} />
+        <Button small label={T('terminal.prefs.file.choose')} onClick={() => pick('location', picked)} />
         {st.custom && <Button small label={T('terminal.prefs.file.reset')} onClick={() => move('', 'move')} />}
         {st.readOnly && <Button small label={T('terminal.prefs.file.retry')} onClick={() => { if (retryTermConfig()) { setError(null); reconfigureAll(); onNotice(T('terminal.prefs.file.back')); } }} />}
       </Field>
       <Field t={t} label={T('terminal.prefs.file.profiles')} note={T('terminal.prefs.file.backupsNote')}>
         <Button small label={T('terminal.prefs.file.import')} onClick={onImport} />
-        <Button small label={T('terminal.prefs.file.export')} onClick={() => setPicking('export')} />
+        <Button small label={T('terminal.prefs.file.export')} onClick={() => pick('export', exportTo)} />
       </Field>
       {ask && (
         <View style={{ marginTop: spacing.m, padding: spacing.m, borderRadius: 10, gap: spacing.s, borderWidth: 1, borderColor: t.separator }}>
@@ -455,9 +489,6 @@ function ConfigFileSection({ t, onImport, onNotice }) {
           </View>
         </View>
       )}
-      {picking && <FilePicker mode="save" modal askReplace={picking === 'export'} name={picking === 'export' ? 'terminal-profiles.json' : 'terminal.json'}
-        title={T(picking === 'export' ? 'terminal.prefs.file.exportTitle' : 'terminal.prefs.file.chooseTitle')}
-        onClose={() => setPicking(null)} onPick={(p) => (picking === 'export' ? exportTo(p) : picked(p))} />}
     </>
   );
 }
@@ -471,6 +502,8 @@ export function Preferences({ wid, onClose }) {
   const [sel, setSel] = useState(cfg.defaultProfile);
   const [section, setSection] = useState('general');
   const [importing, setImporting] = useState(false);
+  const [filePick, setFilePick] = useState(null);    // { kind: 'location' | 'export', then }: drawn over the whole window
+  useLayer(!!filePick, () => setFilePick(null));
   const [trSheet, setTrSheet] = useState(null);      // { index (-1: a new one), draft }: the trigger's sheet
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState({});          // tag → folded in the list
@@ -529,6 +562,9 @@ export function Preferences({ wid, onClose }) {
     general: (
       <>
         <Field t={t} label={T('terminal.prefs.name')}><TextInput value={p.name} onChange={(v) => set({ name: v })} style={{ width: 240 }} /></Field>
+        <Field t={t} label={T('terminal.prefs.tags')} note={T('terminal.prefs.tagsNote')}>
+          <TagsField key={p.id} tags={p.tags} onChange={(tags) => set({ tags })} style={{ width: 240 }} />
+        </Field>
         <Field t={t} label={T('terminal.prefs.defaultProfile')}>
           {cfg.defaultProfile === p.id ? <Text style={{ fontSize: 12, color: t.textDim }}>{T('terminal.prefs.isDefault')}</Text>
             : <Button label={T('terminal.prefs.useDefault')} onClick={() => save(cfg.profiles, { defaultProfile: p.id })} />}
@@ -540,8 +576,9 @@ export function Preferences({ wid, onClose }) {
         {p.workingDir === 'custom' && (
           <Field t={t} label={T('terminal.prefs.folder')}><TextInput value={p.customDir} placeholder="~/proyectos" onChange={(v) => set({ customDir: v })} style={{ width: 240 }} /></Field>
         )}
-        <Field t={t} label={T('terminal.prefs.initialText')} note="\n = Enter">
-          <TextInput value={p.initialText || ''} placeholder={T('terminal.prefs.initialTextPh')} onChange={(v) => set({ initialText: v })} style={{ width: 240 }} />
+        <Field t={t} label={T('terminal.prefs.initialText')} note={T('terminal.prefs.initialTextNote')}>
+          <TextArea key={p.id} value={String(p.initialText || '').replace(/\\n/g, '\n')} placeholder={T('terminal.prefs.initialTextPh')}
+            onChange={(v) => set({ initialText: v })} minRows={3} style={{ flex: 1, minWidth: 240, maxWidth: 460 }} />
         </Field>
         <Field t={t} label={T('terminal.prefs.badge')} note={T('terminal.prefs.badgeNote')}>
           <TextInput value={p.badge} placeholder={T('terminal.prefs.badgePh')} onChange={(v) => set({ badge: v })} style={{ width: 200 }} />
@@ -656,7 +693,7 @@ export function Preferences({ wid, onClose }) {
       <>
         <Field t={t} label={T('terminal.prefs.scrollback')} note={T('terminal.prefs.scrollbackNote')}>
           <Segmented small value={p.scrollback} onChange={(v) => set({ scrollback: v })}
-            options={[[1000, '1.000'], [10000, '10.000'], [100000, '100.000'], [1000000, T('terminal.prefs.million')]]} />
+            options={[[1000, formatNumber(1000)], [10000, formatNumber(10000)], [100000, formatNumber(100000)], [1000000, T('terminal.prefs.million')]]} />
         </Field>
         <Field t={t} label={T('terminal.prefs.mouseReporting')} note={T('terminal.prefs.mouseNote')}><Toggle small on={p.mouseReporting} onChange={(v) => set({ mouseReporting: v })} /></Field>
         <Field t={t} label={T('terminal.prefs.copyOnSelect')}><Toggle small on={p.copyOnSelect} onChange={(v) => set({ copyOnSelect: v })} /></Field>
@@ -693,7 +730,7 @@ export function Preferences({ wid, onClose }) {
         </GroupBox>
       </>
     ),
-    file: <ConfigFileSection t={t} onImport={() => setImporting(true)} onNotice={setNotice} />,
+    file: <ConfigFileSection t={t} onImport={() => setImporting(true)} onNotice={setNotice} pick={(kind, then) => setFilePick({ kind, then })} />,
     ssh: (
       <>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.fwdHint')}</Text>
@@ -701,7 +738,7 @@ export function Preferences({ wid, onClose }) {
         <GroupBox style={{ marginBottom: spacing.s }}>
         {(p.forwards || []).map((f, i) => {
           const upd = (patch) => set({ forwards: p.forwards.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-          const ok = !!cleanForward(f);
+          const ok = !!cleanForward(f) || f.port === '';     // a row still without its port says nothing yet
           return (
             <View key={i} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.s, direction: 'ltr' }}>
               <Toggle small on={f.enabled !== false} onChange={(v) => upd({ enabled: v })} />
@@ -817,6 +854,11 @@ export function Preferences({ wid, onClose }) {
       {trSheet && (
         <TriggerSheet t={t} sheet={trSheet} onCancel={() => setTrSheet(null)}
           onSave={(d) => { const list = p.triggers || []; set({ triggers: trSheet.index < 0 ? [...list, d] : list.map((x, j) => (j === trSheet.index ? d : x)) }); setTrSheet(null); }} />
+      )}
+      {filePick && (
+        <FilePicker mode="save" modal askReplace={filePick.kind === 'export'} name={filePick.kind === 'export' ? 'terminal-profiles.json' : 'terminal.json'}
+          title={T(filePick.kind === 'export' ? 'terminal.prefs.file.exportTitle' : 'terminal.prefs.file.chooseTitle')}
+          onClose={() => setFilePick(null)} onPick={(x) => { const { then } = filePick; setFilePick(null); then(x); }} />
       )}
       {importing && (
         <ImportPanel t={t} onClose={() => setImporting(false)}

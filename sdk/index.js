@@ -127,7 +127,7 @@ export * as fs from './fs.js';
 export { useDirectory } from './fs.js';
 export { ThemeProvider, useTheme, DEFAULT_TOKENS, solidOver } from './theme.js';
 export {
-  Button, Toggle, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
+  Button, Toggle, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
   AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState,
 } from './components.jsx';
 import { FloatingWindows } from './components.jsx';

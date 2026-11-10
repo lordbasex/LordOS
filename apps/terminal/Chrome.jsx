@@ -12,7 +12,7 @@ import {
 import { terminalSettings, getProfile, profileName } from './profiles.js';
 import { programLabel, isClaude } from './paths.js';
 import { ForwardsBadge } from './ForwardsPanel.jsx';
-import { forwards } from './forwards.js';
+import { forwards, forwardsOf } from './forwards.js';
 import { drops } from './dropupload.js';
 import { transfers } from './sftp.js';
 import {
@@ -39,6 +39,8 @@ function Tab({ t, wid, tab, active, index, maxChars, onMenu }) {
   const anyBell = useStore(meta, (x) => leaves(tab.root).some((s) => x[s]?.bell));
   const anyActivity = useStore(meta, (x) => leaves(tab.root).some((s) => x[s]?.activity));
   const title = tabTitle(tab);
+  // the forwards badge takes about 17 characters of the title's room
+  const room = Math.max(6, maxChars - (forwardsOf(useStore(forwards), leaves(tab.root)).length ? 17 : 0));
   const color = tab.color || getProfile(m.profile).tabColor;     // the tab's own (its menu), else the profile's
   return (
     <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -58,7 +60,7 @@ function Tab({ t, wid, tab, active, index, maxChars, onMenu }) {
       {m.lastExit > 0 && !anyBell && <Text style={{ fontSize: 10, color: '#ff453a' }}>●</Text>}
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <Text style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: active ? t.text : t.textDim, whiteSpace: 'nowrap',
-          textAlign: 'center' }}>{title.length > maxChars ? `…${title.slice(title.length - maxChars + 1)}` : title}</Text>
+          textAlign: 'center' }}>{title.length > room ? `…${title.slice(title.length - room + 1)}` : title}</Text>
       </View>
       <ForwardsBadge t={t} wid={wid} tab={tab} />
       <Text style={small(t, { fontSize: 11, opacity: active || hover ? 1 : 0.7 })}>{index < 9 ? `❖${index + 1}` : ''}</Text>
