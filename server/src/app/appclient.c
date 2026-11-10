@@ -426,8 +426,9 @@ static void k_key(void *d, struct wl_keyboard *k, uint32_t s, uint32_t t, uint32
     js_key((int)key, st == WL_KEYBOARD_KEY_STATE_PRESSED ? 1 : 0);
 }
 static void k_mods(void *d, struct wl_keyboard *k, uint32_t s, uint32_t dep, uint32_t lat, uint32_t lock, uint32_t grp) {
-    (void)d; (void)k; (void)s; (void)dep; (void)lat; (void)lock;   /* modifiers come from the keys themselves */
-    kb_set_group((int)grp);                                         /* the active layout follows the compositor */
+    (void)d; (void)k; (void)s; (void)dep; (void)lat;   /* held modifiers come from the keys themselves */
+    kb_set_locked(lock);                                /* the locks (Caps Lock) and the layout follow the compositor */
+    kb_set_group((int)grp);
 }
 static void k_repeat(void *d, struct wl_keyboard *k, int32_t rate, int32_t delay) { (void)d; (void)k; (void)rate; (void)delay; }
 static const struct wl_keyboard_listener k_listener = { k_keymap, k_enter, k_leave, k_key, k_mods, k_repeat };

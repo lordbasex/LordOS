@@ -75,7 +75,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Native primary selection (select copies, middle click pastes) over the compositor's | long-time Linux users | S | 🟨 built, to check on the VM |
 | Spell checking: hunspell in a sandboxed helper fed words over an fd; red underline and suggestions in the field's menu | Mail and Notes | M | ⛔ a new helper |
 | Screen reader: an accessibility tree from `server/src/ui` nodes exported over AT-SPI2; high contrast tokens; a font scale | blind and low-vision people can't use LordOS | L | ⛔ the D-Bus export |
-| Show password (eye) and a Caps Lock warning in password fields | login, Wi-Fi, the vault | S | ⬜ |
+| Show password (eye) and a Caps Lock warning in password fields | login, Wi-Fi, the vault | S | 🟨 built, to check on the VM (once in the SDK's TextInput `secure`: every password field has it; `sdk/passwordfieldmodel.js`) |
 
 ## Phase 6 — hardware that needs its own test bench
 

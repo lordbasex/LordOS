@@ -4,6 +4,7 @@
 // middle click pastes. Bundles tests/textfield_menu_scene.mjs
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
+// An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
@@ -48,11 +49,12 @@ const MOCK = `globalThis.__lordTest = (() => {
   return { styles, parents, texts, removed, clip, prim };
 })();`;
 
+const scene = process.argv[2] || 'textfield_menu_scene.mjs';
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-textfield-menu-'));
 let bad = 0, n = 0;
 try {
   const out = await esbuild.build({
-    entryPoints: [path.join(here, 'textfield_menu_scene.mjs')], bundle: true, write: false, format: 'esm',
+    entryPoints: [path.join(here, path.basename(scene))], bundle: true, write: false, format: 'esm',
     platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
     alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js') }, define: { 'process.env.NODE_ENV': '"production"' },
     banner: { js: MOCK },
@@ -65,7 +67,7 @@ try {
     if (!line.startsWith('ok ')) { bad++; console.log(`✗ ${line}`); }
   }
   if (r.status !== 0 || !n) { bad++; console.log(`✗ the scene failed (${r.status}): ${r.stderr.slice(0, 2000)}`); }
-  console.log(`textfield-menu: ${n} checks, ${bad} failures`);
+  console.log(`${path.basename(scene, '.mjs')}: ${n} checks, ${bad} failures`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

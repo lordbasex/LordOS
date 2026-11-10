@@ -53,7 +53,7 @@ not "CONTENTS").
 | Control | Height | Radius | Notes |
 |---|---|---|---|
 | `Button` | 28 (regular), 22 (`small`) | 7 / 6 | `primary` = the one accent action of the view; `plain` = borderless; `destructive` |
-| `TextInput` | 28 (13 px text) | 7 | grows with `size` |
+| `TextInput` | 28 (13 px text) | 7 | grows with `size`; `secure` = a password field: an eye at the trailing edge shows the text until the field loses focus (`eye={false}` when the view has its own Show), and ⇪ "Caps Lock is on" before it while it has focus with Caps Lock on |
 | `SearchField` | 28 | 7 | magnifier at the leading edge, clear button at the trailing edge |
 | `Segmented` | 28 (22 `small`) | 8 | `appearance="neutral"` for view switchers (Read/Edit, Sample/Characters/Info); `fill` to share the width |
 | `ToolbarButton` | 28 (22 `small`) | 6 | icon-only items **must** have a `title` (tooltip); `active` = toggled on |

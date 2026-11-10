@@ -1,6 +1,6 @@
 // components.jsx — base controls for apps. They take colors from useTheme(), so they
 // adapt to any theme.
-import { View, Text, addListener, displayFor, onCommit, onScreenChange } from '@lordos/runtime';
+import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
 import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
@@ -13,6 +13,7 @@ import { noteTextField } from './textfocus.js';
 import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
 import { primaryStep, pasteAt } from './primarymodel.js';
+import { revealAfter, eyeShown, maskedText, eyeLabel, capsAfter, capsHint, capsFits } from './passwordfieldmodel.js';
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
@@ -389,7 +390,10 @@ function FieldMenu({ anchor, at, items, onClose }) {
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
-// secure: password field (shows •, does not go through the input method and cannot be copied).
+// secure: password field (shows •, does not go through the input method and cannot be copied). An eye at its end shows the
+// text until the field loses focus (passwordfieldmodel.js); it stays a password field meanwhile: no history, no input
+// method, nothing copied. eye: false leaves the eye out (an app with its own Show). While it has focus with Caps Lock
+// on, ⇪ and "Caps Lock is on" (only ⇪ when the words do not fit) sit before the eye.
 // selectAll: starts with all the text selected (the first key replaces it), as when renaming in Files.
 // Editing as in any text field (textfieldmodel.js): the caret moves with ←, →, Home, End and a click; a selection is made
 // with Shift and those keys, by dragging, with a double click (a word) or Ctrl/⌘+A, and typing, a paste or Backspace
@@ -401,7 +405,7 @@ function FieldMenu({ anchor, at, items, onClose }) {
 // selection where it lands, as in any Linux app (primarymodel.js; Settings → Mouse & Trackpad can turn that off).
 // The text is drawn in one piece with the caret and the selection over it, so placing the caret moves no letter; a
 // value longer than the field scrolls to keep the caret in sight. A value changed from outside puts the caret at the end.
-export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, size = 13, selectAll = false }) {
+export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false }) {
   const t = useTheme();
   const token = useRef({}).current;
   const [isFocused, setIsFocused] = useState(false);
@@ -431,6 +435,12 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const [, redraw] = useState(0);
   const secureRef = useRef(secure);
   secureRef.current = secure;
+  const [revealed, setRevealed] = useState(false);     // the eye: the password shown for now
+  const shownRef = useRef(false);
+  shownRef.current = !!secure && revealed;
+  const [caps, setCaps] = useState(capsLock);          // Caps Lock, for a password field's hint
+  const [eyeTip, setEyeTip] = useState(false);
+  const eyeRef = useRef(null);
   latest.current = { value, onChange, onSubmit, onCancel, onKeyDown };
   // what is selected becomes the primary selection (never a password field's)
   const publish = () => { const r = primaryStep(prim.current, at.current, secureRef.current); prim.current = r.last; publishPrimary(r.text); };
@@ -444,7 +454,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     if (!textBox.current || !v) return 0;
     let lx;
     try { const [bx, , bw] = lord.getLayout(textBox.current.id); lx = rtlOf(v) ? bx + bw - x : x - bx; } catch (e) { return at.current.pos; }
-    const shown = secureRef.current ? '•'.repeat(len(v)) : v;
+    const shown = secureRef.current ? maskedText(v, shownRef.current) : v;
     return clampPos(v, caretAt(shown, lx + scroll.current, measure));
   };
 
@@ -453,6 +463,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     const caretRect = () => { if (!caret.current) return null; const [x, y, , h] = lord.getLayout(caret.current.id); return { x, y, h }; };
     const sync = () => {
       setIsFocused(focused === token);
+      if (focused !== token) setRevealed((r) => revealAfter(r, 'blur'));    // the eye closes with the focus
       if (focused === token && !secureRef.current) ime.attach(token, caretRect, { inline: true }); else ime.detach(token);
     };
     focusSubs.add(sync);
@@ -482,7 +493,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       }
       const k = editKey(cur, e, rtlOf(p.value));
       if (k) put(k, stepOf(cur, e));
-      else if (e.key === 'Enter') p.onSubmit?.(p.value);
+      else if (e.key === 'Enter') { setRevealed((r) => revealAfter(r, 'submit')); p.onSubmit?.(p.value); }
       else if (e.key === 'Escape') p.onCancel?.();
       else if (e.char) put(replaceSel(cur, e.char), 'type');
       setBlink(true);
@@ -498,6 +509,15 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     const offUp = addListener('pointerup', () => { if (pressing.current) { pressing.current = false; publish(); } });
     return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
+  // Caps Lock comes with every key (runtime/keymap.js); a password field with focus follows it for its hint
+  useEffect(() => {
+    if (!secure || !isFocused) return undefined;
+    setCaps(capsLock());
+    const follow = (e) => setCaps((c) => capsAfter(c, e));
+    const offDown = addListener('keydown', follow), offUp = addListener('keyup', follow);
+    return () => { offDown(); offUp(); };
+  }, [secure, isFocused]);
+  useEffect(() => { if (!secure) setRevealed((r) => revealAfter(r, 'unsecure')); }, [secure]);
   const imeSt = useIme();
   const preedit = isFocused ? imeSt.preedit : '';
   const reveal = useContext(ScrollReveal);
@@ -563,7 +583,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
   };
 
-  const shown = secure ? '•'.repeat(len(value)) : value || '';
+  const shown = secure ? maskedText(value, shownRef.current) : value || '';
   const chars = [...shown];
   const rtl = rtlOf(value);
   const edge = rtl ? 'right' : 'left';
@@ -584,6 +604,38 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const lineH = size + 6;
   // as wide as its text (or placeholder) when nothing gives it a width, as it was when the text was in the row
   const basis = Math.ceil(Math.max(fullW, placeholder && !value ? measure(placeholder) : 0)) + 3;
+  const hasEye = eyeShown({ secure, eye });
+  const hint = capsHint({ secure, focused: isFocused, caps });
+  const hintText = hint ? tr('shell.password.capsLock') : '';
+  let room = 0;
+  if (hint) try { room = lord.getLayout(box.current.id)[2] - 20 - (hasEye ? 24 : 0) - 16; } catch (e) { room = 0; }
+  const hintWords = hint && capsFits(room, fullW, lord.measureText(hintText, 11, 400));
+  // a press on the eye keeps the field's focus and its caret; a click flips it
+  const eyeDown = (ev) => { ev?.stopPropagation(); focusedNow = true; if (focused !== token) setFocus(token); };
+  const eyeClick = (ev) => { ev?.stopPropagation(); setEyeTip(false); setRevealed((r) => revealAfter(r, 'toggle')); setBlink(true); };
+  // a password field is laid out left to right (the caret's sums), so in a right-to-left UI the eye and the hint go first
+  const startSide = secure && direction() === 'rtl';
+  const capsGlyph = <Text key="g" style={{ fontSize: size, fontWeight: 700, color: t.textDim }}>⇪</Text>;
+  const capsWords = hintWords ? <Text key="w" style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap' }}>{hintText}</Text> : null;
+  const capsBit = hint ? (
+    <View key="caps" style={{ flexDirection: 'row', alignItems: 'center', gap: 3, pointerEvents: 'none' }}>
+      {startSide ? [capsWords, capsGlyph] : [capsGlyph, capsWords]}
+    </View>
+  ) : null;
+  const eyeBit = hasEye ? (
+    <View key="eye" ref={eyeRef} onMouseDown={eyeDown} onClick={eyeClick} onDoubleClick={(ev) => ev?.stopPropagation()} onContextMenu={(ev) => ev?.stopPropagation()}
+      onMouseEnter={() => setEyeTip(true)} onMouseLeave={() => setEyeTip(false)}
+      style={{ width: 20, height: 20, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: eyeTip ? t.hover : 'transparent' }}>
+      <EyeGlyph off={shownRef.current} color={t.textDim} />
+      {eyeTip && shellLayers() ? <Overlay anchor={eyeRef} layer="tooltip"><FieldTip text={tr(eyeLabel(shownRef.current))} /></Overlay> : null}
+    </View>
+  ) : null;
+  const tail = hint || hasEye ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0, gap: 4,
+      [startSide ? 'marginRight' : 'marginLeft']: 6, [startSide ? 'marginLeft' : 'marginRight']: hasEye ? -4 : 0 }}>
+      {startSide ? [eyeBit, capsBit] : [capsBit, eyeBit]}
+    </View>
+  ) : null;
   return (
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
@@ -592,6 +644,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {/* inputFocus 'underline' (a theme token): an accent line along the bottom edge */}
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
+      {startSide ? tail : null}
       <View ref={textBox} style={{ flexGrow: 1, flexShrink: 1, flexBasis: basis, minWidth: 0, height: lineH, overflow: 'hidden' }}>
         {sel ? <View style={{ position: 'absolute', top: 1, height: lineH - 2, [edge]: measure(chars.slice(0, sel[0]).join('')) - sx,
           width: Math.max(1, measure(chars.slice(sel[0], sel[1]).join(''))), backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} /> : null}
@@ -612,8 +665,34 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
           </>
         )}
       </View>
+      {startSide ? null : tail}
       {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
         items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value })} /> : null}
+    </View>
+  );
+}
+
+// The eye of a password field, drawn: an outline with a pupil, struck through while the text is shown (a click hides it)
+function EyeGlyph({ off, color, s = 14 }) {
+  const w = 1.5;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+      <View style={{ width: s, height: s * 0.62, borderRadius: s * 0.31, border: `${w}px solid ${color}`, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: s * 0.28, height: s * 0.28, borderRadius: s * 0.14, backgroundColor: color }} />
+      </View>
+      {off ? <View style={{ position: 'absolute', width: s * 1.05, height: w, backgroundColor: color, transform: 'rotate(-40deg)' }} /> : null}
+    </View>
+  );
+}
+
+// What the eye does, under it after a hover (the tooltip layer)
+function FieldTip({ text }) {
+  const t = useTheme();
+  return (
+    <View style={{ position: 'absolute', top: 26, end: 0, paddingHorizontal: 8, height: 22, justifyContent: 'center', pointerEvents: 'none',
+      borderRadius: Math.max(2, t.menuRadius - 2), backgroundColor: t.popupBg || (t.mode === 'dark' ? '#3a3a40' : '#fbfbfd'),
+      border: `1px solid ${t.separator}`, boxShadow: '0 4px 12px rgba(0,0,0,0.25)' }}>
+      <Text style={{ fontSize: 11, color: t.text, whiteSpace: 'nowrap' }}>{text}</Text>
     </View>
   );
 }
