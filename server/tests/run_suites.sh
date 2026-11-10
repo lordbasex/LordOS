@@ -93,6 +93,32 @@ h +|1234567|
    |語|
    ||
 EOF
+    # (the Terminal's triggers: each screen line after the absolute row it starts on, a wrapped one whole)
+    vt "vt-dump: screen lines with their rows" 'a\r\nerror\r\nabcdefghijkl\r\nerror\r\nb\r\nc' 5 4 5 4 --lines <<'EOF'
+--- 5x4 cursor 1,3 history 4 alt 0
+h  |a|
+h  |error|
+h +|abcde|
+h +|fghij|
+   |kl|
+   |error|
+   |b|
+   |c|
+--- 5x4 cursor 1,3 history 4 alt 0
+h  |a|
+h  |error|
+h +|abcde|
+h +|fghij|
+   |kl|
+   |error|
+   |b|
+   |c|
+lines:
+2	abcdefghijkl
+5	error
+6	b
+7	c
+EOF
 
     shape "shape-test: Inter kerning (GPOS)" ../assets/fonts/Inter-Regular.ttf ui latn 0 AVATAR <<'EOF'
 2@0,0|456@1273,0|2@2546,0|411@3785,0|2@4933,0|384@6346,0
