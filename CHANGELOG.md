@@ -70,6 +70,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Files: what is dragged keeps following the pointer into another app.** The dragged icon was drawn inside the Files
+  window and vanished at its edge; it is now in the desktop's drag layer, above every window, and shows a green + over a
+  window that takes files (the Terminal, for one).
 - **Text fields select and edit as in any desktop (every LordOS app).** The SDK's TextInput and TextArea had a caret but
   no selection: Ctrl/⌘+A, Shift with ← → ↑ ↓ Home End, a drag with the mouse (also past the field's edges), a double
   click on a word, typing or pasting over the selection, Backspace and Delete on it, Ctrl/⌘+C and X (never from a

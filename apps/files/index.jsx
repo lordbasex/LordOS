@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
+  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -665,7 +665,8 @@ export default function Files() {
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
       p.moved = true;
       const target = dropOf(e.target);
-      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly });
+      // over another app's window that takes files: the ghost says so (a +)
+      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly, takes: !target && !p.favOnly && !!filesDropOf(e.target) });
       tellOver(!target && !p.favOnly ? filesOverOf(e.target) : null, p.paths, { alt: !!e.alt });
       setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
@@ -1151,18 +1152,26 @@ export default function Files() {
         </View>
       </View>
 
-      {/* what is being dragged */}
-      {dragLocal && (
-        <View style={{ position: 'absolute', left: dragLocal.x - 20, top: dragLocal.y - 20, pointerEvents: 'none', opacity: 0.85 }}>
+      {/* what is being dragged: in the desktop's drag layer, above every window, so it follows the pointer into another
+          app (a window that takes files shows a +); in its own window only when there are no desktop layers */}
+      {drag && (shellLayers() || dragLocal) && (() => {
+        const ghost = (
+        <View style={{ position: 'absolute', left: (shellLayers() ? drag.x : dragLocal.x) - 20, top: (shellLayers() ? drag.y : dragLocal.y) - 20, pointerEvents: 'none', opacity: 0.85 }}>
           {drag.favOnly || dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
           {drag.paths.length > 1 && (
             <View style={{ position: 'absolute', right: -6, top: -6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{drag.paths.length}</Text>
             </View>
           )}
-          {drag.alt && <Text style={{ position: 'absolute', left: 32, top: 26, fontSize: 15, fontWeight: 700, color: '#30d158' }}>+</Text>}
+          {(drag.alt || drag.takes) && (
+            <View style={{ position: 'absolute', left: 28, top: 26, width: 18, height: 18, borderRadius: 9, backgroundColor: '#30d158', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 13 }}>+</Text>
+            </View>
+          )}
         </View>
-      )}
+        );
+        return shellLayers() ? <Layer name="drag">{ghost}</Layer> : ghost;
+      })()}
       {quickEntry && <QuickLook e={quickEntry} index={flat.indexOf(quickEntry)} count={flat.length} onClose={() => setQuick(false)} />}
       {infoEntry && <InfoPanel e={infoEntry} onClose={() => setInfo(false)} openers={infoEntry.dir || infoEntry.app ? [] : openersFor(infoEntry, launcherApps, tr)}
         extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}
