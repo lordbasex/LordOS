@@ -373,11 +373,14 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 ### How the session is reused
 
 - An `ssh` started by the Terminal (a profile whose command is SSH, or `ssh` typed in a shell with the integration
-  loaded) gets `-o ControlMaster=auto -o ControlPath=$XDG_RUNTIME_DIR/lordos-term/ssh/%C -o ControlPersist=no`. The
-  folder is the user's and 0700. The integration adds these options to the ssh it runs, as a shell function. The user's
-  `~/.ssh/config` is never changed, and an `ssh` that already sets `ControlPath` or `ControlMaster` is left as it is.
-- `lord-server` knows which tab owns which control socket: the ssh is the tab's foreground process, and the socket is
-  named by `%C`, which is computed from that process's own command line.
+  loaded) gets `-o ControlMaster=auto -o ControlPath=$XDG_RUNTIME_DIR/lordos-term/ssh/%C-<shell pid> -o
+  ControlPersist=no`. The folder is the user's and 0700. The integration adds these options to the ssh it runs, as a
+  shell function (bash, zsh and fish; tested with bash 5.2, zsh 5.9 and fish 4.0.2: Files mode and a forward over each).
+  The user's `~/.ssh/config` is never changed, an `ssh` that already sets `ControlPath`, `ControlMaster`, `-S`, `-O` or
+  `-M` is left as it is, and `LORD_SSH_MUX=0` turns it off.
+- `lord-server` knows which tab owns which control socket: the ssh is the tab's foreground process, and the master
+  behind each socket in the folder says its pid (`MUX_C_ALIVE_CHECK`); the one whose pid is the foreground process is
+  the tab's.
 - To list, copy, download or forward, `lord-server` opens a **new channel** through the control socket with the
   OpenSSH multiplexing protocol (`MUX_C_NEW_SESSION` with the `sftp` subsystem and fd passing, `MUX_C_OPEN_FWD` for a
   forward). **It runs no program**: no `ssh`, `sftp` or `scp` is executed.
