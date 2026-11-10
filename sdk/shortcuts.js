@@ -11,6 +11,7 @@
 //                             belongs to the apps
 //   addShortcuts(entries)     a module's own (Screenshots, the Terminal's drop-down window);
 //                             runShortcut(id) runs one from elsewhere
+//   addMenuBarKeys({ can, run })  a menu bar that F10, or ⌥ pressed and released alone, opens from the keyboard
 //   shortcutList()            what is active now, for Settings → Keyboard
 //
 // An entry: { id, keys: ['Meta+Shift+V', …], run, label?, group?, when?, repeat? }. `run` is always a
@@ -37,7 +38,7 @@ import { liveSpeech } from './livespeech.jsx';
 
 const MOD_BITS = { Shift: 1, Alt: 2, Ctrl: 4, Meta: 8 };
 const NAMED = {
-  1: 'Escape', 15: 'Tab', 41: '`', 51: ',', 52: '.', 57: 'Space', 62: 'F4', 87: 'F11', 88: 'F12', 99: 'PrintScreen',
+  1: 'Escape', 15: 'Tab', 41: '`', 51: ',', 52: '.', 57: 'Space', 62: 'F4', 68: 'F10', 87: 'F11', 88: 'F12', 99: 'PrintScreen',
   103: 'ArrowUp', 105: 'ArrowLeft', 106: 'ArrowRight', 108: 'ArrowDown',
   163: 'MediaNext', 164: 'MediaPlayPause', 165: 'MediaPrev', 166: 'MediaStop', 200: 'MediaPlay', 201: 'MediaPause',
   113: 'VolumeMute', 114: 'VolumeDown', 115: 'VolumeUp', 224: 'BrightnessDown', 225: 'BrightnessUp', 229: 'KeyLightDown', 230: 'KeyLightUp',
@@ -46,6 +47,7 @@ for (let d = 1; d <= 9; d++) NAMED[d + 1] = String(d);
 const LETTERS = { 16: 'q', 17: 'w', 18: 'e', 19: 'r', 20: 't', 21: 'y', 22: 'u', 23: 'i', 24: 'o', 25: 'p', 30: 'a', 31: 's', 32: 'd',
   33: 'f', 34: 'g', 35: 'h', 36: 'j', 37: 'k', 38: 'l', 44: 'z', 45: 'x', 46: 'c', 47: 'v', 48: 'b', 49: 'n', 50: 'm' };
 const SUPER = (code) => code === 125 || code === 126;
+const LEFT_ALT = 56;          // the right one is AltGr on most layouts: it types, it never opens the bar
 
 // As keygrab_letter in server/src/wl/keygrab.c: the layout's letter, or the position's on a layout
 // without Latin letters.
@@ -76,6 +78,21 @@ const fullClipboard = () => toggleClipboardPanel('full');
 // Ctrl+Space stays with the program in the Terminal (in emacs it marks the start of a selection).
 const notInTerminal = () => spotlightOpen.get() || String(wm.focused() || '').split('#')[0] !== 'terminal';
 
+// F10, or ⌥ alone, opens the menu bar of the window in front from the keyboard (Lord Flow's bar on the focused
+// window's display, Lord Classic's strip under the focused window's title): the first bar whose can() says yes.
+// The Terminal keeps F10 (programs in it use it) and a Linux app has its own menus and gets its keys first (wl.c).
+let menuBars = [];
+export function addMenuBarKeys(bar) {
+  menuBars = [...menuBars, bar];
+  return () => { menuBars = menuBars.filter((x) => x !== bar); };
+}
+const frontBar = () => {
+  const id = String(wm.focused() || '');
+  if (id.split('#')[0] === 'terminal' || id.startsWith('linux#')) return null;
+  return [...menuBars].reverse().find((b) => b.can()) || null;
+};
+const openMenuBar = () => frontBar()?.run();
+
 // With `appsPaste` (Lord Flow) ❖V is paste in a LordOS app inside the session, as it is in a Linux app:
 // the key goes to the app, and ❖⇧V is the clipboard. An isolated app never receives ❖V (wl.c).
 let appsPaste = false;
@@ -93,6 +110,7 @@ export const BASE = [
   { id: 'emoji', keys: ['Meta+.', 'Meta+Ctrl+Space'], run: toggleEmojiPanel, label: 'shell.shortcuts.emoji', group: 'system' },
   { id: 'lock', keys: ['Meta+L', 'Meta+Ctrl+Q'], run: lockScreen, when: canLock, label: 'shell.shortcuts.lock', group: 'system' },
   { id: 'quit', keys: ['Meta+Q'], run: quitFrontApp, label: 'shell.shortcuts.quit', group: 'apps' },
+  { id: 'menuBar', keys: ['F10'], show: ['F10', '⌥'], run: openMenuBar, when: frontBar, label: 'shell.shortcuts.menuBar', group: 'apps' },
   // ❖Esc reads the selection aloud, or stops reading (⌥Esc on a Mac); a full-screen app or a locked pointer keeps it (wl.c)
   { id: 'speakSelection', keys: ['Meta+Escape'], run: speakSelection, label: 'shell.shortcuts.speakSelection', group: 'system' },
   { id: 'liveSpeech', keys: ['Meta+Shift+Escape'], run: liveSpeech.toggle, label: 'shell.shortcuts.liveSpeech', group: 'system' },
@@ -140,8 +158,9 @@ export function shortcutTaken(combo) {
 const taken = new Set();      // keys whose press was taken: their repeats and release are too
 const repeating = new Set();  // the same, for an entry that runs again while held
 let superAlone = false;
+let altAlone = false;         // the same for ⌥ (the menu bar)
 // a click while ❖ is held is ❖ + click (the Terminal's links and file names, a window's move): its release isn't a tap
-addListener('pointerdown', () => { superAlone = false; });
+addListener('pointerdown', () => { superAlone = false; altAlone = false; });
 
 function filter(e) {
   if (!e.code) return false;                       // text an input method committed
@@ -150,10 +169,15 @@ function filter(e) {
     const tap = SUPER(e.code) && superAlone;
     if (SUPER(e.code)) superAlone = false;
     if (tap) onSuperTap?.();
+    const altTap = e.code === LEFT_ALT && altAlone;
+    if (e.code === LEFT_ALT) altAlone = false;
+    if (altTap) openMenuBar();
     return taken.delete(e.code) || !!repeating.delete(e.code);
   }
-  if (SUPER(e.code)) { if (!e.repeat) superAlone = true; return false; }
+  if (SUPER(e.code)) { altAlone = false; if (!e.repeat) superAlone = true; return false; }
   superAlone = false;
+  if (e.code === LEFT_ALT) { if (!e.repeat) altAlone = !e.ctrl && !e.shift && !e.meta; return false; }
+  altAlone = false;
   if (e.forwarded) return true;                    // a Linux app got it as Ctrl
   // The repeats of a key held down. A new press of a key still marked lost its release: pressed with no
   // Linux app in front, released with one (the key that switched to its desktop), it went to the app.

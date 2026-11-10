@@ -1,13 +1,17 @@
 // A small menu at a point of the screen, in the popover layer (docs/LAYERS.md): the taskbar's jump
 // lists, the Trash, the desktop, a window's title bar and the start menu's right click.
 // items: [{ label, onClick, disabled, checked, destructive, hint } | '-']; submenus are flattened.
-// Keyboard: ↑/↓, Enter, Escape. `above`: the menu ends at y (a bottom taskbar) instead of starting there.
+// Keyboard (sdk/menunav.js): ↑/↓ move and wrap, skipping separators and disabled rows, Home/End jump, Enter/Space
+// choose, Escape closes, and typing the first letters of a row goes to it. `keys`: opened from the keyboard, so its
+// first row starts highlighted; `onStep(dir)`: → (+1) and ← (-1) move to the next or previous menu of the strip
+// that opened it (mirrored in Arabic/Hebrew). `above`: the menu ends at y (a bottom taskbar) instead of starting there.
 // `boxRef`: receives the menu's node. The menu is a portal into the popover layer, so its rows are not
 // inside the panel that opened it: a panel that closes on a click outside itself must also treat a
 // click in its menu as inside (the start menu), or it unmounts the menu before the row's click lands.
 // The menu stays inside the display of the point it opens at (a jump list near the edge of one taskbar must not
 // spill onto the next display).
-import { View, Text, Layer, ScrollView, addListener, takeTextFocus, releaseTextFocus, direction, displayAt } from '@lordos/sdk';
+import { View, Text, Layer, ScrollView, addListener, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner, direction, displayAt,
+  selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 const ROW = 30, SEP = 9;
@@ -23,28 +27,40 @@ export function flatten(items) {
   return out.filter((it, i) => !(it === '-' && out[i - 1] === '-'));
 }
 
-export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef }) {
+export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef, keys = false, onStep }) {
   const items = flatten(raw);
   const ref = useRef(null);
-  const [active, setActive] = useState(-1);
+  const [active, setActive] = useState(() => (keys ? edgeIndex(items) : -1));
   const st = useRef({});
-  st.current = { items, active };
-  const ok = (it) => it && it !== '-' && !it.disabled;
+  st.current = { items, active, onClose, onStep };
+  const ok = selectable;
+  const typed = useRef(null);
+  const holder = useRef(null);                     // { tok, onKey }
+  // a press in the menu is not a press elsewhere: the menu keeps the keyboard (sdk/components.jsx drops it otherwise)
+  const keep = () => { const k = holder.current; if (k && textFocusOwner() === k.tok) takeTextFocus(k.tok, k.onKey); };
   useEffect(() => {
     const offPtr = addListener('pointerdown', (e) => {
       for (let n = e.target; n; n = n.parent) if (n === ref.current) return;
-      onClose();
+      st.current.onClose();
     });
+    const prev = focusToken();
     const tok = {};
-    takeTextFocus(tok, (e) => {
-      const { items: list, active: a } = st.current;
-      const step = (d) => { for (let k = 1; k <= list.length; k++) { const i = ((a < 0 && d < 0 ? 0 : a) + d * k + list.length * 2) % list.length; if (ok(list[i])) { setActive(i); return; } } };
-      if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowDown') step(1);
-      else if (e.key === 'ArrowUp') step(-1);
-      else if ((e.key === 'Enter' || e.key === ' ') && ok(list[a])) { onClose(); list[a].onClick?.(); }
-    });
-    return () => { offPtr(); releaseTextFocus(tok); };
+    const onKey = (e) => {
+      const { items: list, active: a, onClose: close, onStep: step } = st.current;
+      const act = menuAction(e, direction() === 'rtl');
+      const go = (i) => { if (i >= 0) setActive(i); };
+      if (act !== 'type') typed.current = null;
+      if (act === 'close') close();
+      else if (act === 'next' || act === 'prev') go(stepIndex(list, a, act === 'next' ? 1 : -1));
+      else if (act === 'first' || act === 'last') go(edgeIndex(list, act === 'last'));
+      else if (act === 'activate' && ok(list[a])) { close(); list[a].onClick?.(); }
+      else if ((act === 'open' || act === 'back') && step) step(act === 'open' ? 1 : -1);
+      else if (act === 'type') { typed.current = typeAhead(typed.current, e.char, Date.now()); go(matchIndex(list, a, typed.current.buf)); }
+    };
+    holder.current = { tok, onKey };
+    takeTextFocus(tok, onKey);
+    // the field that had the keys gets them back, unless the click that closed the menu gave them to another one
+    return () => { offPtr(); const mine = textFocusOwner() === tok; releaseTextFocus(tok); if (mine) restoreFocus(prev); };
   }, []);
   const H = items.reduce((h, it) => h + (it === '-' ? SEP : ROW), 10);
   const d = displayAt(x, y);
@@ -69,7 +85,7 @@ export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef 
     )));
   return (
     <Layer name="popover">
-      <View ref={(n) => { ref.current = n; if (boxRef) boxRef.current = n; }} style={{ position: 'absolute', left, top, width, padding: 5, borderRadius: t.menuRadius,
+      <View ref={(n) => { ref.current = n; if (boxRef) boxRef.current = n; }} onMouseDown={keep} style={{ position: 'absolute', left, top, width, padding: 5, borderRadius: t.menuRadius,
         backgroundColor: t.panelBg, backdropFilter: t.blur ? `blur(${t.blur}px)` : undefined, border: `1px solid ${t.windowBorder}`, boxShadow: t.shadow }}>
         {H > maxH ? <ScrollView style={{ height: maxH - 10 }}>{rows}</ScrollView> : rows}
       </View>

@@ -296,6 +296,9 @@ EOF
     # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
     if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
     else skip "terminal-fwdports-test" "node"; fi
+    # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
+    if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
+    else skip "menu-nav-test" "node"; fi
     # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
     if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
     else skip "dialog-keys-test" "node"; fi
@@ -349,6 +352,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
+    else skip "menu-keys-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs

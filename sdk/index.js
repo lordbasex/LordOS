@@ -13,7 +13,7 @@ export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPref
 export { keyboard } from './keyboard.js';
 export { regionOf, localeOf, regionCountry } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
-export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
+export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
 export { liveSpeech } from './livespeech.jsx';
 export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS, previewVoice, tryVoice } from './voice.js';
@@ -111,6 +111,7 @@ export { notify, dismissNotification, useNotifications, notifications, notifyHis
 export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
 export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor } from './menubarmodel.js';   // what the bar shows (issue #58)
 export { menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from './menubarmodel.js';   // a bar on every display
+export { SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex } from './menunav.js';   // menus from the keyboard
 export { sharedTicker, idleStore } from './ticker.js';
 export { companion, statusItem, companionEvent, statusItemEvent } from './companion.js';
 export { clockAlarms, clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextAlarm, nextFire } from './alarms.js';

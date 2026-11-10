@@ -9,7 +9,7 @@
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
 // icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -19,9 +19,11 @@ export const MENU_H = 26;
 const BTN_W = 44;
 
 // The window's menu strip: the app's menus, then Window and Help. One menu open at a time, under its
-// item; hovering another item while one is open moves to it, as menu bars do.
+// item; hovering another item while one is open moves to it, as menu bars do. From the keyboard: F10, or ⌥ pressed
+// and released alone, opens the focused window's first menu (sdk/shortcuts.js addMenuBarKeys), and ← and → move
+// between them (sdk/menunav.js barIndex).
 function MenuStrip({ t, win, focused, menus }) {
-  const [open, setOpen] = useState(null);           // { i, x, y }
+  const [open, setOpen] = useState(null);           // { i, x, y, keys }
   const refs = useRef([]);
   const all = [
     ...menus,
@@ -38,6 +40,15 @@ function MenuStrip({ t, win, focused, menus }) {
     const [x, y, , h] = lord.getLayout(n.id);
     return { i, x, y: y + h + 2 };
   };
+  const count = useRef(0);
+  count.current = all.length;
+  const live = useRef(focused);
+  live.current = focused;
+  const step = (dir) => setOpen((o) => (o ? { ...at(barIndex(count.current, o.i, dir)), keys: true } : o));
+  useEffect(() => addMenuBarKeys({
+    can: () => live.current,
+    run: () => setOpen((o) => (o ? null : { ...at(0), keys: true })),
+  }), []);
   return (
     <View onMouseDown={(e) => e.stopPropagation()}
       style={{ height: MENU_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2,
@@ -51,7 +62,7 @@ function MenuStrip({ t, win, focused, menus }) {
           <Text style={{ fontSize: 12, color: focused ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{m.label}</Text>
         </View>
       ))}
-      {open && all[open.i] && <Menu t={t} x={open.x} y={open.y} items={all[open.i].items} onClose={() => setOpen(null)} width={250} />}
+      {open && all[open.i] && <Menu key={open.i} t={t} x={open.x} y={open.y} items={all[open.i].items} onClose={() => setOpen(null)} width={250} keys={!!open.keys} onStep={step} />}
     </View>
   );
 }

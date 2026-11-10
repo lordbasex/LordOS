@@ -19,7 +19,7 @@ import { Window } from './components/Window.jsx';
 import { Launchpad } from './components/Launchpad.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
 import { NotificationCenter } from './components/NotificationCenter.jsx';
-import { Menu } from './components/Menu.jsx';
+import { Menu, menuHasKeys } from './components/Menu.jsx';
 
 const MENU_H = 28;
 // The defaults: Files first and the app launcher after it; the Trash is always last (sdk/dockmodel.js).
@@ -151,7 +151,7 @@ function App() {
   // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
   const toggleLauncher = () => { closeOverview(); setLaunchpad((v) => !v); };
   useShortcuts({ grabs: switcherGrabs(flowGrabs()), table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
-  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setClockPanel(null); setContext(null); } }), []);
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape' && !menuHasKeys()) { setControl(null); setClockPanel(null); setContext(null); } }), []);
 
   // Trackpad: a 3-finger swipe up opens the app launcher (4 fingers: the overview) and down closes
   // them; left/right switch desktops, or windows with only one desktop. See docs/TRACKPAD.md.

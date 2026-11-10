@@ -1,7 +1,7 @@
 // textfield_menu_scene.mjs — the scene of tests/textfield_menu_test.mjs (not run by itself): a TextInput and a TextArea
 // rendered through runtime/index.js with a stub `lord`, driven with the server's own events (__lordEvent, __lordKey):
 // a right click keeps the caret and opens the menu, its items edit as the keys do, Ctrl+Z and Ctrl+Shift+Z undo and
-// redo, and a triple click selects the line. Every character is 10 px wide and every box starts at 0, 0, so a click at
+// redo, the open menu takes the keys (arrows, letters, Enter, Escape), and a triple click selects the line. Every character is 10 px wide and every box starts at 0, 0, so a click at
 // x selects position x / 10. Prints one line per check: "ok <name>" or "FAIL <name> <detail>".
 import React, { useState } from 'react';
 import * as rt from '@lordos/runtime';
@@ -47,9 +47,11 @@ check('a click puts the caret', now.input === 'heXllo world', now.input);
 await click(input, 81, 5, 2);
 check('the menu opens on a right click', !!item('Undo') && !!item('Select All'));
 await type('Y');
-check('a right click moves no caret', now.input === 'heXYllo world', now.input);
+check('the open menu keeps the keys', now.input === 'heXllo world' && !!item('Undo'), now.input);
 await key('Escape');
 check('Escape closes the menu', !item('Undo'));
+await type('Y');
+check('a right click moves no caret', now.input === 'heXYllo world', now.input);
 __lordEvent('down', input, 91, 5, 1); __lordEvent('up', input, 91, 5, 1); await flush();
 await type('Z');
 check('a middle click moves no caret either', now.input === 'heXYZllo world', now.input);
@@ -77,6 +79,23 @@ await click(item('Paste'), 0);
 check('Paste from the menu keeps the focus and the caret', now.input === 'hello worldhello world', now.input);
 await key('z', '', ctrl);
 check('a paste is a step of its own', now.input === 'hello world', now.input);
+
+// the menu from the keyboard (sdk/menunav.js): a letter goes to the row it starts, Enter chooses it, and the field
+// has the keys again
+await click(input, 0, 5, 2);
+await type('s');
+await key('Enter');
+check('type-ahead and Enter choose Select All', !item('Undo'));
+await type('k');
+check('the field has the keys back', now.input === 'k', now.input);
+await key('z', '', ctrl);
+await click(input, 0, 5, 2);
+// ↑ from nothing is the last row (Select All), ↓ wraps to the first and ↑ back past the disabled rows
+await key('ArrowUp'); await key('ArrowDown'); await key('ArrowUp');
+await key('Enter');
+await type('q');
+check('the arrows wrap', now.input === 'q', now.input);
+await key('z', '', ctrl);
 
 // a triple click: the whole field; in the TextArea, the line (not the row)
 await click(input, 30); await click(input, 30); await click(input, 30);
