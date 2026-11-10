@@ -214,6 +214,7 @@ void  vt_select_clear(Term *t);
 int   vt_selected(const Term *t, long long line, int col);
 char *vt_selection_text(Term *t);
 char *vt_text_range(Term *t, long long from, long long to);
+char *vt_screen_lines(Term *t);
 int   vt_select_last_output(Term *t);
 /* search and marks */
 int   vt_search(Term *t, const char *query, int case_sensitive);
