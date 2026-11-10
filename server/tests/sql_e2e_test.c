@@ -650,9 +650,11 @@ static void test_sqlc(void) {
     socklen_t al = sizeof a;
     getsockname(lfd, (struct sockaddr *)&a, &al);
     listen(lfd, 4);
-    char favs[1024];
+    char favs[1536];
     snprintf(favs, sizeof favs, "{\"version\":1,\"groups\":[],\"favorites\":[{\"id\":\"local\",\"type\":\"tcp\",\"host\":\"127.0.0.1\",\"port\":%d,"
              "\"user\":\"shop\",\"database\":\"shop\",\"tls\":{\"mode\":\"off\"}},{\"id\":\"tunnel\",\"type\":\"ssh\",\"host\":\"h\"},"
+             "{\"id\":\"tunnel2\",\"type\":\"ssh\",\"host\":\"h\",\"ssh\":{\"host\":\"127.0.0.1\",\"user\":\"u\",\"key\":\"no-such-key\","
+             "\"hostKey\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIELR56/bq7yBXo5+IGCiVTclE52yTok7jaoB8rrUefpd\"}},"
              "{\"id\":\"closed\",\"type\":\"tcp\",\"host\":\"127.0.0.1\",\"port\":1},"
              "{\"id\":\"tlsv\",\"host\":\"127.0.0.1\",\"port\":%d,\"user\":\"shop\",\"database\":\"shop\",\"tls\":{\"mode\":\"verify\"}}]}",
              ntohs(a.sin_port), ntohs(a.sin_port));
@@ -661,8 +663,13 @@ static void test_sqlc(void) {
     int id = sql_request("{\"op\":\"open\",\"fav\":\"nope\"}", 26);
     CHECK(wait_for(id, &d, 2000) == SQL_ERR && has(d, "notfound"), "unknown favorite: %s", d);
     free(d);
+    /* an SSH favorite without its server is refused before ssh runs (sshtun.c checks every argument) */
     id = sql_request("{\"op\":\"open\",\"fav\":\"tunnel\",\"password\":\"x\"}", 43);
-    CHECK(wait_for(id, &d, 2000) == SQL_ERR && has(d, "unsupported"), "ssh: %s", d);
+    CHECK(wait_for(id, &d, 5000) == SQL_ERR && has(d, "\"ssh\""), "ssh without a server: %s", d);
+    free(d);
+    /* with the server's key kept but no key file of the user's, it stops at the key (no connection is made) */
+    id = sql_request("{\"op\":\"open\",\"fav\":\"tunnel2\",\"password\":\"x\"}", 44);
+    CHECK(wait_for(id, &d, 5000) == SQL_ERR && has(d, "sshkey"), "ssh without a usable key: %s", d);
     free(d);
     id = sql_request("{\"op\":\"open\",\"fav\":\"closed\",\"password\":\"x\"}", 43);
     CHECK(wait_for(id, &d, 15000) == SQL_ERR && has(d, "\"connect\""), "nothing listening: %s", d);

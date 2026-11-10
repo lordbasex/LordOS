@@ -1827,3 +1827,9 @@ table `hello`, a user `e2e` allowed from `localhost` and from `172.17.0.%`, and 
 with `bind-address = 0.0.0.0` so the test's SSH server (on another machine) can reach it. To undo:
 `sudo rm /etc/mysql/mariadb.conf.d/90-e2e-tunnel.cnf && sudo apt-get purge -y mariadb-server`.
 
+
+## Step — the 0.8.8.8 ISO on VM 116 `lordos-gpu` (2026-11-10)
+
+The ISO's helper check refused a package without `lord-ocr` and `lord-tts`: installed `libtesseract-dev` (lord-ocr) and
+`cmake glslc libvulkan-dev spirv-headers` (lord-tts's Vulkan build, as on the Raspberry Pi for 0.8.8.7), then
+`sh tools/tts/fetch-audiocpp.sh`, `make -C server RELEASE=1` and `sudo tools/iso/build.sh /var/tmp/lordos-iso-0888`.
