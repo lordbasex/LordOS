@@ -1,5 +1,9 @@
 {
   "attach": "Adjuntar",
+  "drop.add": "Soltá para agregar {count} archivo(s) a la nota",
+  "drop.addNew": "Soltá para agregar {count} archivo(s) a una nota nueva",
+  "drop.none": "Las carpetas no se pueden agregar a una nota",
+  "drop.skipped": "Se dejan afuera {count} carpeta(s)",
   "cancel": "Cancelar",
   "close": "Cerrar",
   "delete": "Borrar",

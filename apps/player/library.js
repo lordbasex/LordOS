@@ -24,6 +24,13 @@ function walk(dir, re, out, depth = 0) {
 
 const baseName = (p) => String(p).split('/').pop().replace(/\.[^.]+$/, '');
 
+// The music and videos in a folder dropped on the window (and its folders), in name order.
+export function mediaIn(dir) {
+  const out = [];
+  walk(dir, { test: (name) => AUDIO.test(name) || VIDEO.test(name) }, out);
+  return out.sort((a, b) => compareNames(a.path, b.path)).map((f) => f.path);
+}
+
 // Track from the probe result (or the file name if there are no tags).
 export function trackFrom(f, info) {
   const tags = (info && info.tags) || {};

@@ -7,6 +7,10 @@
     "other": "{count} photos"
   },
   "empty": "There are no images in the Pictures folder",
+  "drop.open": "Drop to open {count} image(s)",
+  "drop.browse": "Drop to show the photos in {name}",
+  "drop.none": "None of these is an image",
+  "drop.skipped": "{count} item(s) left out",
   "monthYear": "{month} {year}",
   "fit": "Fit",
   "edit": "Edit",

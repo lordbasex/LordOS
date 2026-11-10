@@ -1,5 +1,9 @@
 {
   "attach": "Joindre",
+  "drop.add": "Déposez pour ajouter {count} fichier(s) à la note",
+  "drop.addNew": "Déposez pour ajouter {count} fichier(s) à une nouvelle note",
+  "drop.none": "Les dossiers ne peuvent pas être ajoutés à une note",
+  "drop.skipped": "{count} dossier(s) laissé(s) de côté",
   "cancel": "Annuler",
   "close": "Fermer",
   "delete": "Supprimer",

@@ -5,7 +5,7 @@
 // Poppler runs in the confined lord-doc helper (see docs/DOCUMENTS.md); this app only asks.
 import {
   View, Text, TextInput, Button, useTheme, useAppWindow, useKeyboard, addListener, wm, fs, clipboard, pdf, print, DocImage, releaseImage,
-  formatNumber, direction, t as tr, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, SearchField, EmptyState,
+  formatNumber, direction, t as tr, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, SearchField, EmptyState, useFilesDrop, FilesDropHint,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageCache } from './cache.js';
@@ -125,6 +125,11 @@ export default function PdfViewer() {
   useEffect(() => () => { if (!wm.get(wid)) winStates.delete(wid); }, []);
   useEffect(() => { const p = argPath(args); if (p && args?.nonce) setPath(p); }, [args?.nonce]);
   useEffect(() => { if (!msg) return undefined; const id = setTimeout(() => setMsg(null), 3500); return () => clearTimeout(id); }, [msg]);
+  // PDFs dragged from Files: the first opens here, the others each in a window of its own
+  const drop = useFilesDrop({ accepts: (name) => /\.pdf$/i.test(name), onDrop: ({ files }) => {
+    setPath(files[0]);
+    for (const p of files.slice(1)) wm.open('pdf', { new: true, args: { path: p } });
+  } });
 
   // ---- open ----
   useEffect(() => {
@@ -578,7 +583,7 @@ export default function PdfViewer() {
   const winW = view.w + (side && doc ? 184 : 0);
   const pageLabel = n ? tr('pdf.pageOf', { page: page + 1, count: n }) : '';
   return (
-    <View style={{ flex: 1 }}>
+    <View {...drop.props} style={{ flex: 1 }}>
       {/* toolbar: icon-only items with tooltips, as in Preview; the narrow window drops what is also in the menus */}
       <Toolbar style={{ gap: 6 }}>
         <ToolbarButton icon="◫" title={tr('pdf.tool.sidebar')} active={!!side} onClick={() => setSide((s) => (s ? null : 'thumbs'))} />
@@ -655,6 +660,9 @@ export default function PdfViewer() {
         {annotated.length || edited.current ? <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{tr('pdf.unsaved')}</Text> : null}
         <Text style={{ fontSize: 11, color: th.textDim }}>{mode === 'single' ? tr('pdf.view.single') : tr('pdf.view.continuous')}</Text>
       </View>
+      {/* over everything else, so it is not drawn under the pages */}
+      <FilesDropHint over={drop.over} title={drop.over && (drop.over.files.length ? tr('pdf.drop.open', { count: drop.over.files.length }) : tr('pdf.drop.none'))}
+        note={drop.over?.skipped && drop.over.files.length ? tr('pdf.drop.skipped', { count: drop.over.skipped }) : ''} />
     </View>
   );
 }

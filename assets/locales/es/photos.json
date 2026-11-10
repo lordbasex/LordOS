@@ -7,6 +7,10 @@
     "other": "{count} fotos"
   },
   "empty": "No hay imágenes en la carpeta Imágenes",
+  "drop.open": "Soltá para abrir {count} imagen(es)",
+  "drop.browse": "Soltá para ver las fotos de {name}",
+  "drop.none": "Ninguno de estos es una imagen",
+  "drop.skipped": "Se dejan afuera {count} elemento(s)",
   "monthYear": "{month} de {year}",
   "fit": "Encajar",
   "edit": "Editar",
