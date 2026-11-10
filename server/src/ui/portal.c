@@ -673,6 +673,8 @@ typedef struct {
     GsShortcut sc[GS_MAX_SC];
 } GSess;
 static GSess gsess[MAX_GSESS];
+static int sc_has_path(const char *path);   /* a screen cast's session has that object path (below) */
+static int gs_has_path(const char *path);
 static int ngsess, gsess_seq, gs_paused;
 static GsStore gstore;
 /* the keys whose press went to an app: their repeats are taken and their release is Deactivated */
@@ -909,8 +911,8 @@ static void gs_create(const DMsg *m) {
     s->id = ++gsess_seq;
     snprintf(s->sender, sizeof s->sender, "%s", m->sender);
     object_path("session", m->sender, stoken, s->id, s->path, sizeof s->path);
-    for (int i = 0; i < ngsess; i++)
-        if (!strcmp(gsess[i].path, s->path)) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "session exists"); return; }
+    /* one object can't be two sessions: neither another shortcuts session nor a screen cast's (the same form) */
+    if (gs_has_path(s->path) || sc_has_path(s->path)) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "session exists"); return; }
     s->state = gs_step(GSS_NONE, GSO_CREATE);
     ngsess++;
     char handle[400];
@@ -1048,14 +1050,21 @@ static void gs_list(const DMsg *m) {
 }
 
 /* Session.Close on the session's own object, only from the connection that opened it */
-static void gs_close(const DMsg *m) {
+/* Session.Close of a shortcuts session: 1 if it was the sender's and is gone; 0 when it isn't one (a screen cast's
+ * session shares the path form: sc_session_call answers it) */
+static int gs_close(const DMsg *m) {
     for (int i = 0; m->sender && i < ngsess; i++)
         if (!strcmp(gsess[i].path, m->path) && !strcmp(gsess[i].sender, m->sender)) {
             gsess_drop(i);
             dbus_reply(&conn, m, NULL, NULL);
-            return;
+            return 1;
         }
-    dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such session");
+    return 0;
+}
+/* 1 if a shortcuts session has that object path (a screen cast's may not take it) */
+static int gs_has_path(const char *path) {
+    for (int i = 0; path && i < ngsess; i++) if (!strcmp(gsess[i].path, path)) return 1;
+    return 0;
 }
 
 static int gs_session_path(const char *p) {
@@ -1199,6 +1208,11 @@ static uint32_t rcall_seq;
 
 static int cast_idx(const CsSess *s) { return (int)(s - csm.s); }
 
+static int sc_has_path(const char *path) {
+    for (int i = 0; path && i < CSM_MAX; i++) if (csm.s[i].st != CS_FREE && !strcmp(csm.s[i].path, path)) return 1;
+    return 0;
+}
+
 static void cast_error(const DMsg *m, int e) {
     const char *name = e == CSM_E_ARGS ? "org.freedesktop.DBus.Error.InvalidArgs" : e == CSM_E_NOTFOUND ? "org.freedesktop.portal.Error.NotFound"
                      : "org.freedesktop.portal.Error.Failed";
@@ -1321,6 +1335,7 @@ static void sc_create(const DMsg *m) {
     CsSess *s = NULL;
     int e = csm_create(&csm, m->sender, o.session_token, &s);
     if (e) { cast_error(m, e); return; }
+    if (gs_has_path(s->path)) { csm_end(s); cast_error(m, CSM_E_ARGS); return; }    /* a shortcuts session's object */
     memset(&cast_app[cast_idx(s)], 0, sizeof cast_app[0]);
     char handle[400];
     request_path(m->sender, o.token, s->id, handle, sizeof handle);
@@ -1691,7 +1706,7 @@ static void handle(const DMsg *m) {
         return;
     }
     if (!strcmp(iface, REQ_IFACE) && !strcmp(mem, "Close") && m->path) { request_close(m); return; }
-    if (!strcmp(iface, SES_IFACE) && !strcmp(mem, "Close") && gs_session_path(m->path)) { gs_close(m); return; }
+    if (!strcmp(iface, SES_IFACE) && !strcmp(mem, "Close") && gs_session_path(m->path) && gs_close(m)) return;
     if (screensaver_path(m->path)) { screensaver(m); return; }
     if (is_session_path(m->path)) { sc_session_call(m); return; }
     if (!m->path || strcmp(m->path, OBJ_PATH)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no existe"); return; }

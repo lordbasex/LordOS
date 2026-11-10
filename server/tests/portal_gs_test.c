@@ -155,6 +155,22 @@ static void create(char *session, const char *stoken) {
     snprintf(session, 400, "%s", g ? g->s1 : "");
 }
 
+/* CreateSession on iface with that session token: the session's path from the Response, "" and err when refused */
+static void create_on(const char *iface, char *session, const char *stoken, char *err) {
+    DBuf b; dw_init(&b);
+    size_t a = dw_arr_begin(&b, 8);
+    opt_s(&b, "handle_token", "c9");
+    opt_s(&b, "session_handle_token", stoken);
+    dw_arr_end(&b, a);
+    char req[400];
+    ngot = 0;
+    call("/org/freedesktop/portal/desktop", iface, "CreateSession", "a{sv}", &b, req, err);
+    dw_free(&b);
+    pump(150);
+    Got *g = err[0] ? NULL : find("Response");
+    snprintf(session, 400, "%s", g ? g->s1 : "");
+}
+
 static void bind(const char *session, char *err, int n, const char *const *ids, const char *const *trig) {
     DBuf b; dw_init(&b);
     dw_str(&b, session);
@@ -331,6 +347,27 @@ int main(void) {
     free(list);
     CHECK(portal_shortcut_key(KEY_N, 1, 'n', KG_CTRL | KG_ALT) == 1);
     CHECK(portal_shortcut_key(KEY_N, 0, 'n', KG_CTRL | KG_ALT) == 1);
+
+    /* a ScreenCast session has the same path form: one object is never both, and Session.Close reaches the right one */
+    {
+        char sc[400], gs[400], e2[128];
+        create_on("org.freedesktop.portal.ScreenCast", sc, "s5", err);
+        CHECK(!err[0] && strstr(sc, "/session/") && strstr(sc, "/s5"));
+        create_on("org.freedesktop.portal.GlobalShortcuts", gs, "s5", err);
+        CHECK(err[0] && !gs[0]);
+        DBuf b; dw_init(&b);
+        call(sc, "org.freedesktop.portal.Session", "Close", NULL, &b, NULL, err);
+        CHECK(!err[0]);
+        call(sc, "org.freedesktop.portal.Session", "Close", NULL, &b, NULL, err);
+        CHECK(err[0]);                                          /* gone */
+        create_on("org.freedesktop.portal.GlobalShortcuts", gs, "s6", err);
+        CHECK(!err[0] && strstr(gs, "/s6"));
+        create_on("org.freedesktop.portal.ScreenCast", sc, "s6", e2);
+        CHECK(e2[0] && !sc[0]);
+        call(gs, "org.freedesktop.portal.Session", "Close", NULL, &b, NULL, err);
+        CHECK(!err[0]);
+        dw_free(&b);
+    }
 
     /* the app leaves the bus: nothing more for it */
     dbus_close(&app);
