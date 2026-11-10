@@ -6,10 +6,10 @@
 // and the media keys (nowPlaying).
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Hairline, EmptyState, ToolbarButton, useTheme, useAppWindow, useKeyboard,
-  useStore, useWindowState, wm, typeScale, t as tr, errorText, media, usePlayer, nowPlaying, mediaFormatTime, useThumb, fs, addListener, direction,
+  useStore, useWindowState, wm, typeScale, t as tr, errorText, media, usePlayer, nowPlaying, mediaFormatTime, useThumb, fs, addListener, direction, useFilesDrop, FilesDropHint, dropCount,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { library, scan, albumsOf, artistsOf, parseSrt, AUDIO, VIDEO } from './library.js';
+import { library, scan, albumsOf, artistsOf, parseSrt, mediaIn, AUDIO, VIDEO } from './library.js';
 import { compareNames } from '../../sdk/collate.js';
 
 const APP = 'player';
@@ -302,6 +302,21 @@ export default function Player() {
 
   const playList = (paths, i) => { setQueue(paths); setIndex(i); setShowVideo(isVideo(paths[i])); };
 
+  // files dragged from Files: they play now (a folder, the music and videos in it); with ⌥ they go to the end of the queue
+  const drop = useFilesDrop({ accepts: (name) => isAudio(name) || isVideo(name), folders: true, onDrop: ({ files, folders }, how) => {
+    const paths = [...files, ...folders.flatMap(mediaIn)];
+    if (!paths.length) return;
+    const { queue: q, index: i } = state.current;
+    if (how.alt && q[i]) setQueue([...q, ...paths.filter((x) => !q.includes(x))]);
+    else playList(paths, 0);
+  } });
+  const dropN = dropCount(drop.over);
+  const dropHint = (
+    <FilesDropHint over={drop.over}
+      title={drop.over && (!dropN ? tr('player.drop.none') : tr(drop.over.alt && current ? 'player.drop.queue' : 'player.drop.play', { count: dropN }))}
+      note={!dropN ? '' : drop.over.skipped ? tr('player.drop.skipped', { count: drop.over.skipped }) : current && !drop.over.alt ? tr('player.drop.altHint') : ''} />
+  );
+
   // subtitles visible now
   const pos = seekPreview != null ? seekPreview : p.pos;
   const subs = subTrack >= 0 ? p.subs : extSubs;
@@ -365,7 +380,7 @@ export default function Player() {
   if (current && (showVideo || win.mode !== 'window') && isVideo(current)) {
     const small = win.mode === 'pip';
     return (
-      <View style={{ flex: 1, backgroundColor: '#000' }} onMouseMove={poke} onMouseDown={() => setMenu(null)}>
+      <View {...drop.props} style={{ flex: 1, backgroundColor: '#000' }} onMouseMove={poke} onMouseDown={() => setMenu(null)}>
         <MediaView media={id} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
         {p.error && <View style={{ position: 'absolute', left: 0, right: 0, top: '45%', alignItems: 'center' }}>
           <Text style={{ fontSize: 13, color: '#ff9f9f' }}>{p.error === 'crash' ? tr('player.crashed') : tr('player.error', { error: errorText(p.error) })}</Text>
@@ -400,6 +415,7 @@ export default function Player() {
         ]} />}
         {menu === 'audio' && <Popup onClose={() => setMenu(null)} items={audioStreams.map((s, i) => ({
           label: `${label(s, i)} (${s.codec}, ${s.channels} ch)`, checked: p.info?.audio === s.index, onClick: () => media.control(id, 'audioTrack', s.index) }))} />}
+        {dropHint}
       </View>
     );
   }
@@ -491,7 +507,7 @@ export default function Player() {
   const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue');
 
   return (
-    <View ref={root} style={{ flex: 1 }} onMouseDown={() => setMenu(null)}>
+    <View ref={root} {...drop.props} style={{ flex: 1 }} onMouseDown={() => setMenu(null)}>
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ width: 200, backgroundColor: th.sidebarBg, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>
           <Hairline edge="end" />
@@ -540,6 +556,8 @@ export default function Player() {
           {!narrow && <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>{volumeCtl(false, th.text)}</View>}
         </View>
       )}
+      {/* over everything else, so it is not drawn under the list */}
+      {dropHint}
     </View>
   );
 }

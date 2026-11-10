@@ -7,6 +7,10 @@
     "other": "{count} fotos"
   },
   "empty": "Não há imagens na pasta Imagens",
+  "drop.open": "Solte para abrir {count} imagem(ns)",
+  "drop.browse": "Solte para ver as fotos de {name}",
+  "drop.none": "Nenhum destes é uma imagem",
+  "drop.skipped": "{count} item(ns) ficam de fora",
   "monthYear": "{month} de {year}",
   "fit": "Ajustar",
   "edit": "Editar",

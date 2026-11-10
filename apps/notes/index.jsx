@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
-  Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker,
+  Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
@@ -275,6 +275,15 @@ export default function Notes() {
     else updateNote(note.slug, { body: `${note.body.replace(/\s*$/, '')}\n\n${md}\n` });
   };
   const newNote = () => { const s = createNote({ body: `# ${tr('notes.newTitle')}\n\n` }); setSel(s); setMode('edit'); };
+  // files dragged from Files: copied into the open note (or a new one) as its images and attachments, like ⊕ does
+  const drop = useFilesDrop({ onDrop: ({ files }) => {
+    const slug = note ? note.slug : createNote({ body: `# ${tr('notes.newTitle')}\n\n` });
+    const md = slug ? files.map((p) => attachFile(slug, p)).filter(Boolean) : [];
+    if (!md.length) { if (slug) setSel(slug); return; }
+    if (note) { insert(md.join('\n'), true); return; }
+    setSel(slug);
+    updateNote(slug, { body: `${noteBy(slug).body.replace(/\s*$/, '')}\n\n${md.join('\n')}\n` });
+  } });
   const cmd = {
     new: newNote,
     duplicate: () => note && setSel(duplicateNote(note.slug)),
@@ -326,7 +335,7 @@ export default function Notes() {
   const compact = winW - sideW < 470;
   const colorItems = note ? COLORS.map((c) => ({ label: tr(`notes.color.${c}`), checked: c === note.color, onClick: () => updateNote(note.slug, { color: c }, { touch: false }) })) : [];
   return (
-    <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
+    <View ref={root} {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ width: sideW, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -403,6 +412,9 @@ export default function Notes() {
         <EmptyState icon={<Icon size={56} />} title={tr('notes.none')} hint={tr('notes.noneHint')}
           action={<Button primary label={tr('notes.new')} onClick={newNote} />} />
       )}
+      {/* over everything else, so it is not drawn under the note */}
+      <FilesDropHint over={drop.over} title={drop.over && (drop.over.files.length ? tr(note ? 'notes.drop.add' : 'notes.drop.addNew', { count: drop.over.files.length }) : tr('notes.drop.none'))}
+        note={drop.over?.skipped && drop.over.files.length ? tr('notes.drop.skipped', { count: drop.over.skipped }) : ''} />
     </View>
   );
 }

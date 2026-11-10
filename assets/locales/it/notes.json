@@ -1,5 +1,9 @@
 {
   "attach": "Allega",
+  "drop.add": "Rilascia per aggiungere {count} file alla nota",
+  "drop.addNew": "Rilascia per aggiungere {count} file a una nuova nota",
+  "drop.none": "Le cartelle non si possono aggiungere a una nota",
+  "drop.skipped": "{count} cartella/e esclusa/e",
   "cancel": "Annulla",
   "close": "Chiudi",
   "delete": "Elimina",

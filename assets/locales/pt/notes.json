@@ -1,5 +1,9 @@
 {
   "attach": "Anexar",
+  "drop.add": "Solte para adicionar {count} arquivo(s) à nota",
+  "drop.addNew": "Solte para adicionar {count} arquivo(s) a uma nova nota",
+  "drop.none": "Pastas não podem ser adicionadas a uma nota",
+  "drop.skipped": "{count} pasta(s) ficam de fora",
   "cancel": "Cancelar",
   "close": "Fechar",
   "delete": "Apagar",

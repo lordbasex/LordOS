@@ -8,6 +8,10 @@
     "other": "{count} nuotraukų"
   },
   "empty": "Aplanke „Paveikslai“ nėra vaizdų",
+  "drop.open": "Paleiskite, kad atvertumėte {count} vaizd.",
+  "drop.browse": "Paleiskite, kad matytumėte nuotraukas aplanke {name}",
+  "drop.none": "Nė vienas iš jų nėra vaizdas",
+  "drop.skipped": "Praleista elementų: {count}",
   "monthYear": "{month} {year}",
   "fit": "Pritaikyti",
   "edit": "Redaguoti",

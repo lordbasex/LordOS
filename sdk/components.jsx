@@ -15,6 +15,8 @@ import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
+import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
+import { dropSorter, dropCount } from './filedrop.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -844,6 +846,44 @@ export function useWindowState(key, initial) {
   const set = useRef(null);
   if (!set.current) set.current = (x) => setV((prev) => { const n = typeof x === 'function' ? x(prev) : x; m.set(key, n); return n; });
   return [v, set.current];
+}
+
+// Files dragged from Files onto an app's window (apps/files: a View with onFilesDrop and onFilesOver). accepts(name)
+// and folders say what the app takes (sdk/filedrop.js); onDrop({ files, folders }, how) gets only those, how.alt
+// with ⌥ held. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
+// over the window now ({ files, folders, skipped, alt }) or null.
+export function useFilesDrop({ accepts, folders = false, onDrop }) {
+  const [over, setOver] = useState(null);
+  // a folder on a network mount is not asked about (its stat can wait on the provider): it counts as a file
+  const sorter = useRef(null);
+  if (!sorter.current) sorter.current = dropSorter({ accepts, folders, isDir: (p) => !fsIsRemote(p) && !!fsStat(p)?.dir });
+  const props = {
+    onFilesOver: (paths, how) => {
+      if (!paths) { setOver(null); return; }
+      const s = sorter.current(paths), alt = !!how?.alt;
+      setOver((o) => (o && o.sorted === s && o.alt === alt ? o : { ...s, sorted: s, alt }));
+    },
+    onFilesDrop: (paths, how) => {
+      setOver(null);
+      const s = sorter.current(paths);
+      if (dropCount(s)) onDrop({ files: s.files, folders: s.folders }, how || {});
+    },
+  };
+  return { over, props };
+}
+
+// The outline over the whole window while files are dragged over it: what letting go does (title) and, below it, what
+// is left out (note). Drawn last, so it is above the panes.
+export function FilesDropHint({ over, title, note }) {
+  const t = useTheme();
+  if (!over) return null;
+  return (
+    <View style={{ position: 'absolute', left: 8, top: 8, right: 8, bottom: 8, borderRadius: 10, pointerEvents: 'none', alignItems: 'center', justifyContent: 'center',
+      gap: 6, paddingHorizontal: 16, border: `2px dashed ${t.accent}`, backgroundColor: 'rgba(10,132,255,0.10)' }}>
+      <Text style={{ fontSize: 15, fontWeight: 700, color: t.text, textAlign: 'center' }}>{title}</Text>
+      {note ? <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'center' }}>{note}</Text> : null}
+    </View>
+  );
 }
 
 // The theme uses <AppHost id focused /> inside its window frame.
