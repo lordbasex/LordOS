@@ -33,6 +33,7 @@ import { hasNowPlaying, mediaToggle, mediaNext, mediaPrev, mediaStop } from './m
 import { volumeUp, volumeDown, volumeMute, brightnessUp, brightnessDown, keyLightUp, keyLightDown } from './hwkeys.js';
 import { wm } from './windows.js';
 import { switcherOpen, switcherKey } from './appswitcher.jsx';
+import { shortcutsKey } from './kbinhibit.js';
 import { speakSelection } from './voice.js';
 import { liveSpeech } from './livespeech.jsx';
 
@@ -165,6 +166,10 @@ addListener('pointerdown', () => { superAlone = false; altAlone = false; });
 function filter(e) {
   if (!e.code) return false;                       // text an input method committed
   if (switcherOpen()) { if (e.down) taken.add(e.code); else taken.delete(e.code); return switcherKey(e); }
+  // a window holding the shortcuts (Machines' VM, sdk/kbinhibit.js) gets them; its ❖Esc is nobody's
+  const held = shortcutsKey(e, keyName(e));
+  if (held === 'app') return false;
+  if (held === 'taken') { superAlone = false; altAlone = false; return true; }
   if (!e.down) {
     const tap = SUPER(e.code) && superAlone;
     if (SUPER(e.code)) superAlone = false;

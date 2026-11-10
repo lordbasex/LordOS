@@ -9,6 +9,8 @@
 #include "../lpk.h"
 #include "../sec/broker.h"
 #include "../sec/codesig.h"
+#include "../wl/wl.h"
+#include "../wl/kbinhibit.h"
 
 #include <string.h>
 
@@ -32,8 +34,11 @@ static JSValue f_perm_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     const char *app = JS_ToCString(c, argv[0]), *pn = JS_ToCString(c, argv[1]), *st = JS_ToCString(c, argv[2]);
     int p = app && pn ? perm_from_name(pn) : -1;
     PermState ns = state_from(st);
-    int ok = app && lpk_valid_id(app) && p >= 0 && perm_set(app, (Perm)p, ns) == 0;
+    /* a Linux app's "shortcuts" goes by the identity lord-server checked (wl/kbinhibit.h); everything else by an .lpk id */
+    int named = app && (lpk_valid_id(app) || (p == PERM_SHORTCUTS && kbi_key_valid(app)));
+    int ok = named && p >= 0 && perm_set(app, (Perm)p, ns) == 0;
     if (ok && ns != PERM_ALLOW) brokersrv_revoke(app, pn);      /* the isolated app releases the device instantly */
+    if (ok && p == PERM_SHORTCUTS) wl_shortcuts_changed();      /* a window that holds them is told now */
     if (app) JS_FreeCString(c, app);
     if (pn) JS_FreeCString(c, pn);
     if (st) JS_FreeCString(c, st);

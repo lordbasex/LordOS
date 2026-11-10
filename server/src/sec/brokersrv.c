@@ -608,7 +608,7 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
     }
     case BOP_PERM: {
         int p = perm_from_name(payload);
-        if (p < 0) { send_reply(fd, h->reqid, BST_DENIED, NULL, 0); break; }
+        if (p < 0 || p == PERM_SHORTCUTS) { send_reply(fd, h->reqid, BST_DENIED, NULL, 0); break; }   /* never an isolated app's */
         uint32_t rf = restrict_flag_of((Perm)p);
         if (rf && restrict_blocks_pkg(a->id, rf)) {
             /* restricted: "no", without a prompt; the code line follows the "0" */

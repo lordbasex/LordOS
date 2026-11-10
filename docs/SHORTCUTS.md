@@ -93,6 +93,18 @@ leaving out apps with everything minimized, numbers, the windows row, size, a lo
 in C, before any JavaScript, so it works with the shell hung. Only a physical key gets there: what the API, the remote desktop or the
 on-screen keyboard injects takes another path and can't press it. With no share running the key goes on as usual.
 
+## Apps that take the shortcuts (in development)
+
+A VM, a remote desktop or a game can ask for ❖, ⌥Tab and the rest while it's in front: a Linux app with
+`zwp_keyboard_shortcuts_inhibit_manager_v1` ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts inhibit"), Machines' VM
+window with `inhibitShortcuts(win, app)` (`sdk/kbinhibit.js`). The person allows it once per app; Settings → Privacy →
+Keyboard shortcuts keeps the decision. While it holds and that window has the keyboard, keys go to it before the theme's
+table and the dispatcher. Always LordOS's: ❖Esc, which turns it off for that window (a locked pointer and fullscreen
+too) and, pressed again, back on; the lock, ❖L and ❖⌃Q; Ctrl+Alt+F1…F12; the media, sound and light keys and Print
+Screen; ⌃⌥⌫ and ⌃⌥⇧Esc. A key's release goes where its press went. The rule is one in C (`kbi_route`,
+`server/src/wl/kbinhibit.c`) and its twin in the session (`routeKey`, `sdk/kbinhibitmodel.js`), each with a test.
+Not for isolated LordOS apps, which keep the ❖ keys `system_meta_key` lists.
+
 ## ❖ as Ctrl in Linux apps (Lord Flow)
 
 With the `flow` table, ❖C, V, X, A, Z, F, T, W, N, L, R, P and S with no other modifier reach the focused Linux

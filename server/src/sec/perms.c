@@ -13,15 +13,15 @@
 
 static const char *const names[PERM_COUNT] = {
     "files", "clipboard", "notifications", "network", "camera", "microphone",
-    "screen", "listen", "usb", "bluetooth", "apps", "status-item",
+    "screen", "listen", "usb", "bluetooth", "apps", "status-item", "shortcuts",
 };
 
 const char *perm_name(Perm p) { return (p >= 0 && p < PERM_COUNT) ? names[p] : "?"; }
 int perm_from_name(const char *s) { for (int i = 0; i < PERM_COUNT; i++) if (!strcmp(names[i], s)) return i; return -1; }
-int perm_declarable(const char *s) { return perm_from_name(s) >= 0; }
+int perm_declarable(const char *s) { int p = perm_from_name(s); return p >= 0 && p != PERM_SHORTCUTS; }
 
 #define MAX_ENTRIES 512
-typedef struct { char app[48]; unsigned char state[PERM_COUNT]; long long when[PERM_COUNT]; int used; } Row;
+typedef struct { char app[PERM_APP_MAX]; unsigned char state[PERM_COUNT]; long long when[PERM_COUNT]; int used; } Row;
 static Row rows[MAX_ENTRIES];
 static int nrows;
 static char file_path[PATH_MAX];
@@ -50,7 +50,7 @@ static void load(void) {
     if (json_parse(buf, (size_t)n, &d, NULL, 0)) { fprintf(stderr, "permisos.json is invalid: ignored\n"); return; }
     const JVal *apps = json_get(d.root, "apps");
     for (const JVal *a = apps && apps->type == J_OBJ ? apps->kid : NULL; a; a = a->next) {
-        if (a->type != J_OBJ) continue;
+        if (a->type != J_OBJ || !a->key || strlen(a->key) >= PERM_APP_MAX) continue;   /* cut short it would be another's */
         Row *r = find(a->key, 1);
         if (!r) continue;
         for (const JVal *p = a->kid; p; p = p->next) {
@@ -82,7 +82,7 @@ static int save(void) {
     if (!f) return -1;
     fprintf(f, "{\n  \"version\": 1,\n  \"apps\": {\n");
     int firstApp = 1;
-    char q[200];
+    char q[PERM_APP_MAX * 6 + 3];
     for (int i = 0; i < nrows; i++) {
         Row *r = &rows[i];
         if (!r->used) continue;
@@ -109,7 +109,7 @@ static int save(void) {
 }
 
 int perm_set(const char *app_id, Perm p, PermState state) {
-    if (!loaded || !app_id || p < 0 || p >= PERM_COUNT) return -1;
+    if (!loaded || !app_id || p < 0 || p >= PERM_COUNT || strlen(app_id) >= PERM_APP_MAX) return -1;
     Row *r = find(app_id, 1);
     if (!r) return -1;
     r->state[p] = (unsigned char)state;
@@ -128,7 +128,7 @@ int perm_list(PermEntry *out, int max) {
         if (!rows[i].used) continue;
         for (int p = 0; p < PERM_COUNT && n < max; p++) {
             if (rows[i].state[p] == PERM_ASK) continue;
-            snprintf(out[n].app, sizeof out[n].app, "%.47s", rows[i].app);
+            memcpy(out[n].app, rows[i].app, sizeof out[n].app);     /* the same size, NUL included */
             out[n].perm = (Perm)p;
             out[n].state = (PermState)rows[i].state[p];
             out[n].when = rows[i].when[p];

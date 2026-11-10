@@ -42,6 +42,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
+| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (in development, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (in development, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (in development, `secctx.c`, see "Security contexts") |
@@ -401,6 +402,63 @@ sends lands on a character boundary of valid UTF-8. `build/textinput-client` (`t
 inside a session) checks enter, enable, that commits alone bring no `done`, garbage, a second text input
 and destroying things out of order; `type 30` gives 30 s to type with a method on and checks every
 `done` serial and offset (`type 30 password`: nothing composes).
+
+### Keyboard shortcuts inhibit (`zwp_keyboard_shortcuts_inhibit_manager_v1`, in development)
+
+A virtual machine viewer, a remote desktop client or a game asks for every key, ❖ and ⌥Tab included, with
+`inhibit_shortcuts` on its window (GTK 4's `gdk_toplevel_inhibit_system_shortcuts` is that request). LordOS asks the person once per app, in
+the system's own prompt: "«App» wants to use the keyboard shortcuts while it's in front", with "❖Esc always gives
+them back" under it. The answer is the `shortcuts` permission in `~/.config/lordos/permisos.json`
+(`server/src/sec/perms.c`), which Settings → Privacy → Keyboard shortcuts lists and changes (Allow, Ask, Deny); a
+change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
+
+- **Whose decision.** Who the client is, as lord-server checks it itself (`kbi_identity`,
+  `server/src/wl/kbinhibit.c`), never the app_id it sets: any app can set the app_id of one the person allowed. It is
+  read once, when the client connects (`ClientInfo` in `wl.c`), from its `/proc/<pid>` directory opened through the
+  socket's pidfd (`SO_PEERPIDFD`, checked still alive after the open, `kbi_peer_proc`), so a pid reused later can't
+  answer for it. A Flatpak app (its root holds `.flatpak-info`, opened from the root's directory fd without following
+  a link, a regular file) is `flatpak:<the [Application] name>`; a process in lord-server's own root and mount, pid and
+  user namespaces is `program:<path>`, its `/proc/<pid>/exe` resolved with `realpath` and still the very file it runs
+  (same device and inode). Anything else (another sandbox or container, a damaged `.flatpak-info`, a deleted or
+  replaced program, a path with other characters or longer than 183) has no identity, and its inhibitor never holds:
+  nothing is asked. Xwayland speaks for every X11 app, so it gets none either. `lord.perms.set` takes such a name only
+  for `shortcuts`; every other permission still needs an `.lpk` id. Names of the first, never released format
+  (`desktop:<app_id>`, `exe:<path>`) are ignored: never looked up, and not listed in Settings.
+- **What the person reads.** The prompt and Settings show the identity ("Flatpak app org.example.Viewer", "Program
+  /usr/bin/viewer") under a name. The name is an installed app's only when its `.desktop` entry's Exec line runs that
+  very program (its program found as the launcher finds it, past `env` and `VAR=value`, and resolved), or is
+  `flatpak run` for that Flatpak app (`apps_name_of_program`, `server/src/apps.c`); the window's app_id only says
+  which entries to look at first. Otherwise it is the Flatpak id or the program's file name, never the window's title.
+  An unsandboxed process of the person can still run the allowed program itself (or edit `permisos.json`): this
+  stops a client from borrowing another app's decision by naming itself after it, not code already running as the
+  person outside any sandbox.
+- **Never.** An isolated LordOS app (its pid is the broker's), the login screen (`wl_set_greeter`), and an app the
+  person denied. `shortcuts` can't be declared in a manifest or asked for through the broker (`BOP_PERM` refuses it).
+  The lock screen is another process with the input, so no app's inhibitor reaches it.
+- **One per surface.** A second `inhibit_shortcuts` for a surface that has one is the `already_inhibited` error.
+  `surface_gone` leaves the inhibitor without its surface, its destructor clears only a link that points at itself,
+  and the person's answer goes by the app's name, so a window closed while the prompt is up changes nothing.
+- **Events.** `active` once allowed (right away when it was already allowed), `inactive` when ❖Esc turns it off or
+  the permission is revoked. They don't follow the keyboard: the keys only go to the app while its window has it.
+- **Keys** (`kbi_route`, `wl_key`). While it holds and its window has the keyboard, every key goes to the app,
+  before the theme's table (`keygrab.c`) and the dispatcher: ❖ alone, ❖Tab, ⌥Tab, ❖Space, ⌥F4. These stay LordOS's:
+  ❖Esc, the lock (❖L, ❖⌃Q), Ctrl+Alt+F1…F12, the media, sound and light keys and Print Screen (`keygrab_system_key`),
+  and the ones `on_input` in `main.c` handles before any of this (⌃⌥⌫, ⌃⌥⇧Esc). A key's release and repeats go
+  where its press went.
+- **❖Esc** turns it off for that window (`inactive`) and with it a locked pointer and fullscreen, so everything is
+  LordOS's again; pressed again in front of the same window it holds again (`active`). ❖Esc's own press and release
+  reach nobody.
+
+Machines' VM window does the same in the session (`sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`): the dispatcher
+(`sdk/shortcuts.js`) asks `shortcutsKey` first, the decision is the `machines` app's `shortcuts` permission.
+
+`build/kbinhibit-test` (`make -C server test`) checks the identity (fake `/proc/<pid>` directories for a Flatpak app, a
+damaged or linked `.flatpak-info`, a program, a link on its path, a gone program, another root or namespace; a socket's
+peer, and one that left), the names, the decision, the states and the keys; `build/apps-actions-test` the names shown;
+and
+`tests/kbinhibit_model_test.mjs` the session's side. `build/kbinhibit-client` (`tests/kbinhibit_client.c`, inside a
+session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
+client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 

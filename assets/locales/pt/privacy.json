@@ -49,5 +49,11 @@
   "permHint.remote-input": "Apps que podem deixar essas pessoas usar seu mouse, teclado e área de transferência.",
   "ask.status-item": "«{app}» quer um item ao lado do relógio",
   "perm.status-item": "Item ao lado do relógio",
-  "permHint.status-item": "Apps que mostram seu próprio ícone e menu ao lado do relógio. O sistema os desenha; um app não alcança mais nada por meio deles."
+  "permHint.status-item": "Apps que mostram seu próprio ícone e menu ao lado do relógio. O sistema os desenha; um app não alcança mais nada por meio deles.",
+  "ask.shortcuts": "«{app}» quer usar os atalhos de teclado enquanto estiver na frente",
+  "ask.shortcutsNote": "❖Esc sempre os devolve, e pressionado de novo os entrega outra vez ao app. Você pode mudar isso depois em Ajustes → Privacidade.",
+  "who.flatpak": "App Flatpak {id}",
+  "who.program": "Programa {path}",
+  "perm.shortcuts": "Atalhos de teclado",
+  "permHint.shortcuts": "Apps que podem tomar ❖, ⌥Tab e os outros atalhos da área de trabalho enquanto estão na frente, como máquinas virtuais, áreas de trabalho remotas e jogos. ❖Esc sempre os devolve; bloquear a tela e as teclas de mídia continuam com o sistema."
 }

@@ -5,7 +5,7 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
-  t as tr,
+  inhibitShortcuts, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
@@ -432,6 +432,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [live, focused, sid]);
+  // ❖, ⌥Tab and the desktop's other shortcuts go to the machine too, once the person allowed it (asked the first
+  // time); ❖Esc gives them back and takes them again (sdk/kbinhibit.js)
+  useEffect(() => (live && focused ? inhibitShortcuts(winId, 'machines') : undefined), [live, focused, winId]);
 
   const at = (e) => (box.current && st?.w ? toPicture(e.x, e.y, lord.getLayout(box.current.id), st.w, st.h) : null);
   const move = (e) => { const q = live && at(e); if (q) lord.vm.motion(sid, q[0], q[1]); };

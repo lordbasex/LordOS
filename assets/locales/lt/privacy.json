@@ -49,5 +49,11 @@
   "permHint.remote-input": "Programos, kurios gali leisti tiems žmonėms naudoti jūsų pelę, klaviatūrą ir iškarpinę.",
   "ask.status-item": "„{app}“ nori elemento šalia laikrodžio",
   "perm.status-item": "Elementas prie laikrodžio",
-  "permHint.status-item": "Programos, rodančios savo piktogramą ir meniu šalia laikrodžio. Juos piešia sistema; per juos programa negali pasiekti nieko kito."
+  "permHint.status-item": "Programos, rodančios savo piktogramą ir meniu šalia laikrodžio. Juos piešia sistema; per juos programa negali pasiekti nieko kito.",
+  "ask.shortcuts": "„{app}“ nori naudoti sparčiuosius klavišus, kol yra priekyje",
+  "ask.shortcutsNote": "❖Esc visada juos grąžina, o paspaudus dar kartą vėl atiduoda programai. Tai galėsite pakeisti vėliau: Nustatymai → Privatumas.",
+  "who.flatpak": "Flatpak programa {id}",
+  "who.program": "Programa {path}",
+  "perm.shortcuts": "Spartieji klavišai",
+  "permHint.shortcuts": "Programos, kurios gali perimti ❖, ⌥Tab ir kitus darbalaukio sparčiuosius klavišus, kol yra priekyje, pavyzdžiui, virtualios mašinos, nuotoliniai darbalaukiai ir žaidimai. ❖Esc visada juos grąžina; ekrano užrakinimas ir medijos klavišai lieka sistemos."
 }

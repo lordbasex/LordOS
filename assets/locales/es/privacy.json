@@ -49,5 +49,11 @@
   "permHint.remote-input": "Apps que pueden dejar que esas personas usen tu mouse, teclado y portapapeles.",
   "ask.status-item": "«{app}» quiere un elemento junto al reloj",
   "perm.status-item": "Elemento junto al reloj",
-  "permHint.status-item": "Apps que muestran su propio icono y menú junto al reloj. Los dibuja el sistema; una app no alcanza nada más a través de ellos."
+  "permHint.status-item": "Apps que muestran su propio icono y menú junto al reloj. Los dibuja el sistema; una app no alcanza nada más a través de ellos.",
+  "ask.shortcuts": "«{app}» quiere usar los atajos de teclado mientras está al frente",
+  "ask.shortcutsNote": "❖Esc siempre te los devuelve, y apretado de nuevo se los vuelve a dar a la app. Podés cambiarlo después en Ajustes → Privacidad.",
+  "who.flatpak": "App Flatpak {id}",
+  "who.program": "Programa {path}",
+  "perm.shortcuts": "Atajos de teclado",
+  "permHint.shortcuts": "Apps que pueden tomar ❖, ⌥Tab y los demás atajos del escritorio mientras están al frente, como máquinas virtuales, escritorios remotos y juegos. ❖Esc siempre te los devuelve; bloquear la pantalla y las teclas multimedia siguen siendo del sistema."
 }
