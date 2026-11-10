@@ -2,7 +2,8 @@
 // server/src/ui/sni.c). Tested by server/tests/tray_model_test.mjs.
 //
 // An item is what lord-server sends: { id, title, tooltip, status, icon, pix, pw, ph, menu, isMenu }. `icon` is a PNG
-// of the installed icon themes ('' when the app only sent pixels) and `pix` goes up with each new pixmap (0: none).
+// or an SVG of the installed icon themes ('' when the app only sent pixels; sdk/iconsrc.js draws an SVG, a symbolic one
+// in the bar's text color) and `pix` goes up with each new pixmap (0: none).
 
 // A Passive item is one the app says needs no place in the bar (a sync client that is idle, for one).
 export const trayShown = (item) => !!item && item.status !== 'Passive';

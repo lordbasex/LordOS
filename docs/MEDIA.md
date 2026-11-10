@@ -278,6 +278,41 @@ them current. Only the name's current owner is listened to.
   (`sdk/mprismodel.js`, `server/tests/mpris_model_test.mjs`). Control Center's Now Playing lists up to three: the
   one the keys reach first, then the others. A click on a Linux player's bar seeks when it can.
 
+### SVG icons (0.8.8.8, in development)
+
+Many icons of Linux apps exist only as SVG: the tray's symbolic icons (`audio-volume-high`, which the
+volume applet asks for, lives only in `Adwaita/symbolic/status/audio-volume-high-symbolic.svg`) and
+apps that ship no PNG. lord-media draws them with **nanosvg** (`third_party/nanosvg`, vendored
+unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
+
+- **Where icons come from.** `server/src/iconfind.c` finds an icon name's file: PNG first, as before,
+  then SVG, then symbolic SVG (`WAYLAND.md`, "Tray icons" and the launcher's icons). An `<Image>` whose
+  `src` is an `.svg` file, or `svg:<px>:<rrggbb|->:<absolute path>` (`sdk/iconsrc.js`: the size it's
+  shown at times 2, 16–256 px, and for a symbolic icon the color), goes to `server/src/media/svgicon.c`.
+- **What lord-server does.** It checks the path after `realpath` (`iconfind_svg_allowed`: a `.svg`
+  under `/usr/share`, `/usr/local/share`, `/opt`, the Flatpak exports or the user's icon folders),
+  opens it with `O_NOFOLLOW`, checks it's a regular file of at most 1 MB and sends the fd in a
+  `MW_SVG` job to the foreground worker (`v[1]` = side, `v[2]` = `0xRRGGBB` or -1). No path or
+  parameter text goes to the helper. In app mode (`--app`) nothing is asked for.
+- **What lord-media does** (`helper/lm_svg.c`, after `sandbox_apply_helper`): reads at most 1 MB from
+  the fd, scans the markup (at most 20 000 elements and 64 levels of nesting, outside comments and
+  CDATA), parses it, then checks what the rasterizer would face before it runs: at most 4 000 shapes
+  and 200 000 points, every number finite, every point within 128 sides of the picture, gradients with
+  finite stops and a sane transform, strokes no wider than the picture and dashes no shorter than a
+  quarter pixel. It answers premultiplied BGRA in a sealed memfd and `{"width","height"}`. A symbolic
+  icon keeps each pixel's coverage and takes the color, as other desktops do for `-symbolic` icons.
+  Errors are codes (`media.svgTooLarge`, `media.svgTooComplex`, `media.notAnImage`).
+- **Time.** A `MW_SVG` job has 3 s (`SVG_JOB_MS` in `media.c`): past that the worker is killed, the
+  icon stays empty, and the next job starts a new worker. A real icon takes a few milliseconds.
+- **The cache.** The pictures live in lord-server's image cache (`image_get_ext`, `ui/image.c`) under
+  path, modification time, size, side and color: the Dock and the bar showing one icon draw it once,
+  a file that changes is drawn again, and idle pictures are dropped with the other idle images.
+- **Tests.** `build/svgrast-test` (`make test`): a valid icon, a symbolic one recolored, the aspect,
+  malformed markup, huge and infinite numbers, a huge stroke, tiny dashes, a gradient with NaN stops,
+  deep nesting, too many elements and points, a file over 1 MB. `build/media-test svg` (`make
+  test-full`): the same kind of files through the real helper and its sandbox. `build/iconfind-test`:
+  the lookup order. `server/tests/iconsrc_test.mjs`: the `src` the SDK builds.
+
 ## API
 
 ### `lord.media` (`server/src/ui/js_media.c`)
@@ -381,7 +416,7 @@ something changes), 0 dropped frames.
   `node server/tests/mpris_model_test.mjs` (where the media keys go), both in `make test`.
 - `make -C server build/lord-media build/media-test` (needs FFmpeg's `-dev` packages; if they're
   missing, `make` builds everything else without `lord-media`).
-- `build/media-test probe|thumb|image|wave|export|edit|play|sandbox` launches `lord-media` the same
+- `build/media-test probe|thumb|image|wave|export|edit|play|sandbox|svg` launches `lord-media` the same
   way lord-server does, with no arguments and with fds:
   - `play` measures frames, drops, A/V offset and CPU, with audio through `maudio.c` as in the
     session;

@@ -50,7 +50,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Item | Why | Size | Status |
 |---|---|---|---|
 | MPRIS client: Linux players (Spotify, browsers, mpv) in Now Playing, and the media keys reach them | music and video in the browser without global controls | S/M | ✅ checked on VM 127 (mpv) |
-| StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | 🟨 registers and shows; SVG-only icons show a letter (needs an SVG rasterizer: ⛔) |
+| StatusNotifierItem host (`org.kde.StatusNotifierWatcher`, dbusmenu) shown with LordOS's status items | Nextcloud, Telegram, Discord, Steam, VPNs lose their icon | M | 🟨 registers and shows; SVG-only icons (the Adwaita/hicolor symbolic ones) drawn by lord-media with nanosvg, recolored to the bar's text color: built, to check on the VM |
 | XDG autostart (`/etc/xdg/autostart`, `~/.config/autostart`) through a closed launcher, listed in Settings | sync clients, VPNs and messengers start with the session | M | ⛔ a new launch path |
 | Portals OpenURI and Inhibit; `org.freedesktop.ScreenSaver` Inhibit tied to `wl_idle_inhibited()` | links from Flatpaks; video players that keep the screen on | S | 🟨 built, to check on the VM |
 | Global shortcuts portal | push-to-talk, OBS | M | ⬜ |

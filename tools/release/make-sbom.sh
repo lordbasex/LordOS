@@ -145,6 +145,8 @@ bundled = [
      "JavaScript engine of the interface, compiled into lord-server (third_party/quickjs)"),
     ("Monocypher", read(os.path.join(tp, "monocypher/VERSION"), "NOASSERTION"), "CC0-1.0 OR BSD-2-Clause", "https://monocypher.org",
      "Cryptography of the password vault and keyring, compiled into lord-vault (third_party/monocypher)"),
+    ("nanosvg", "239e102ec2c691f2902e20ace2ed36ee4a35cfe6", "Zlib", "https://github.com/memononen/nanosvg",
+     "SVG icons of Linux apps, compiled into lord-media only (third_party/nanosvg)"),
     ("stb_image", header_version(os.path.join(tp, "stb/stb_image.h"), r"v(\d+\.\d+)"), "MIT OR Unlicense", "https://github.com/nothings/stb",
      "Image decoding (third_party/stb)"),
     ("stb_image_write", header_version(os.path.join(tp, "stb/stb_image_write.h"), r"v(\d+\.\d+)"), "MIT OR Unlicense", "https://github.com/nothings/stb",

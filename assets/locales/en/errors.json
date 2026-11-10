@@ -442,6 +442,8 @@
   "media.noVideoEncoder": "No video encoder available",
   "media.notAFile": "Not a file",
   "media.notAnImage": "Not an image",
+  "media.svgTooLarge": "The SVG file is larger than 1 MB",
+  "media.svgTooComplex": "The SVG picture is too complex to draw",
   "media.nothingToPlay": "There is no audio or video that can be played",
   "media.outsideHome": "Invalid path or outside the home folder",
   "media.queueFull": "Too many pending media tasks; try again in a moment",

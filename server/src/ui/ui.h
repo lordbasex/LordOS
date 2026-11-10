@@ -284,6 +284,10 @@ int    image_async_fd(void);                 /* readable when thumbnails are rea
 int    image_async_dispatch(void);           /* puts them in; repaints their nodes; how many */
 void   image_thumb_size(int w, int h, int max, int *tw, int *th);
 void   image_cache_stats(int *count, int *idle, size_t *bytes);
+/* an image another part of lord-server makes (an SVG icon, media/svgicon.c): cached under key, empty until
+ * image_ext_done (argb NULL: failed); *created says it was just made and its pixels must be asked for */
+Image *image_get_ext(const char *key, int *created);
+void   image_ext_done(const char *key, int w, int h, const uint32_t *argb);
 void   image_size(const Image *img, int *w, int *h);
 Image *image_pixels(Image *img, int w, int h, const uint8_t *rgba);
 Image *image_argb(Image *img, int w, int h, const uint32_t *argb);   /* premultiplied ARGB (doc/doc.c) */

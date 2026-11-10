@@ -30,6 +30,7 @@
 #include "js_vm.h"
 #include "js_broker.h"
 #include "js_wasm.h"
+#include "../media/svgicon.h"
 #include "js_net.h"
 #include "js_media.h"
 #include "js_wm.h"
@@ -192,12 +193,17 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
              * fit px x px (image.c): a folder of photos never holds full-size pictures or waits on a slow disk */
             const char *num = !strncmp(src, "thumb:", 6) ? src + 6 : NULL;
             size_t nl = num ? strspn(num, "0123456789") : 0;
-            if (num) {
+            /* "svg:<px>:<rrggbb|->:<absolute path>" (sdk/iconsrc.js) and any .svg file: drawn by lord-media, never
+             * parsed here (media/svgicon.c); empty until it answers */
+            int svg = !num && !strncmp(src, "svg:", 4);
+            size_t sl = strlen(src);
+            if (svg) n->img = svgicon_get_spec(src);
+            else if (num) {
                 if (nl && nl <= 5 && num[nl] == ':' && num[nl + 1] == '/') n->img = image_get_thumb(num + nl + 1, atoi(num));
             } else if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
             else if (!strncmp(src, "asset:", 6) && !strstr(src, "..")) snprintf(path, sizeof path, "%s/%s", js_sys_assets(), src + 6);
             else snprintf(path, sizeof path, "%s/%s", ui.theme_dir, src);
-            if (!num) n->img = image_get(path);
+            if (!num && !svg) n->img = sl > 4 && !strcmp(src + sl - 4, ".svg") ? svgicon_get(path, SVGICON_DEFAULT_SIDE, -1) : image_get(path);
             JS_FreeCString(c, src);
         }
         node_invalidate(n);

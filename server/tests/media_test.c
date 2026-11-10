@@ -11,12 +11,16 @@
  *        plays the way the Player would (with PipeWire if present) and counts frames
  *   build/media-test sandbox file
  *        the helper tries to open ~/.ssh and create a socket: it must fail
+ *   build/media-test svg     file side (rrggbb|-) (ok|fail)
+ *        an SVG icon (MW_SVG): it must be drawn (ok: side x side at most, painted pixels, all of that color when
+ *        one is given) or refused with an error code (fail), and the helper must answer either way
  */
 #include "../src/media/proto.h"
 #include "../src/media/media_int.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -176,6 +180,47 @@ static int play(const char *in, double secs, int w, int h, int hw, int audio) {
     return 0;
 }
 
+/* An SVG icon through the helper, as media/svgicon.c asks for it: the file opened here, never a path. */
+static int svg(const char *in, int side, const char *color, const char *want) {
+    pid_t pid;
+    int s = spawn(&pid);
+    int fd = open_in(in);
+    if (fd < 0) return 1;
+    long rgb = strcmp(color, "-") ? strtol(color, NULL, 16) : -1;
+    int64_t hello[6] = { MK_WORKER };
+    mp_send(s, MM_JOB, 0, hello, NULL, 0, NULL, 0);
+    int64_t v[6] = { MW_SVG, side, rgb };
+    double t0 = now_ms();
+    mp_send(s, MM_JOB, 9, v, NULL, 0, &fd, 1);
+    MediaMsg m;
+    int rf[MP_MAX_FDS];
+    int r = wait_msg(s, &m, rf, 10000);
+    double dt = now_ms() - t0;
+    mp_send(s, MM_STOP, 0, NULL, NULL, 0, NULL, 0);
+    waitpid(pid, NULL, 0);
+    if (r != 1 || m.type != MM_RESULT) { printf("no reply (did the helper crash?)\n"); return 1; }
+    printf("result %lld in %.1f ms: %s\n", (long long)m.v[0], dt, payload);
+    if (!strcmp(want, "fail")) return m.v[0] < 0 && rf[0] < 0 ? 0 : 1;
+    int w = 0, h = 0;
+    sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
+    if (m.v[0] != 0 || rf[0] < 0 || w < 1 || h < 1 || w > side || h > side) { printf("not drawn\n"); return 1; }
+    int seals = fcntl(rf[0], F_GET_SEALS);
+    if (!(seals & F_SEAL_SHRINK)) { printf("memfd not sealed\n"); return 1; }
+    const uint8_t *px = mmap(NULL, (size_t)w * h * 4, PROT_READ, MAP_SHARED, rf[0], 0);
+    if (px == MAP_FAILED) { printf("memfd too small\n"); return 1; }
+    int painted = 0, other = 0;
+    for (int i = 0; i < w * h; i++) {
+        const uint8_t *p = px + i * 4;
+        if (p[3] < 64) continue;
+        painted++;
+        double a = p[3] / 255.0;
+        if (rgb >= 0 && (fabs(p[2] / a - ((rgb >> 16) & 255)) > 3 || fabs(p[1] / a - ((rgb >> 8) & 255)) > 3 || fabs(p[0] / a - (rgb & 255)) > 3)) other++;
+    }
+    munmap((void *)px, (size_t)w * h * 4);
+    printf("%dx%d, %d painted, %d of another color\n", w, h, painted, other);
+    return painted > 0 && !other ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
     if (getenv("LORD_MEDIA")) helper = getenv("LORD_MEDIA");
     if (argc < 3) { fprintf(stderr, "usage: see the comment in tests/media_test.c\n"); return 2; }
@@ -184,6 +229,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "probe")) return job(MW_PROBE, in, NULL, 0, 0, NULL);
     if (!strcmp(cmd, "thumb") && argc >= 4) return job(MW_THUMB, in, argv[3], argc > 4 ? atoi(argv[4]) : 256, 0, NULL);
     if (!strcmp(cmd, "image")) return job(MW_IMAGE, in, NULL, 0, 0, NULL);
+    if (!strcmp(cmd, "svg") && argc >= 6) return svg(in, atoi(argv[3]), argv[4], argv[5]);
     if (!strcmp(cmd, "wave")) return job(MW_WAVEFORM, in, NULL, argc > 3 ? atoi(argv[3]) : 100, 0, NULL);
     if (!strcmp(cmd, "edit") && argc >= 5) {
         char p[512]; size_t o = 0;

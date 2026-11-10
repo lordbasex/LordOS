@@ -287,6 +287,48 @@ Image *image_get_thumb(const char *path, int max) {
     return img;
 }
 
+/* ---- images another part of lord-server makes (SVG icons from lord-media, media/svgicon.c) ---- */
+
+/* An image cached under key, empty until image_ext_done brings its pixels; max = -1 keeps it apart from the file
+ * images and the thumbnails. *created: 1 when it was just made, and the caller has to ask for its pixels. */
+Image *image_get_ext(const char *key, int *created) {
+    *created = 0;
+    for (Image *i = images; i; i = i->next)
+        if (i->max == -1 && !strcmp(i->path, key)) { i->refs++; return i; }
+    Image *img = calloc(1, sizeof *img);
+    if (!img || !(img->path = strdup(key))) { free(img); return NULL; }
+    img->max = -1;
+    img->refs = 1;
+    img->opaque = 1;
+    img->state = IMG_PENDING;
+    img->next = images;
+    images = img;
+    *created = 1;
+    trim();
+    return img;
+}
+
+/* The pixels of the image waiting under key (w x h premultiplied ARGB, copied), or argb NULL: it failed and stays
+ * empty (asked again only once it's dropped). Nothing if nobody waits for it any more. */
+void image_ext_done(const char *key, int w, int h, const uint32_t *argb) {
+    Image *img = NULL;
+    for (Image *i = images; i; i = i->next) if (i->max == -1 && i->state == IMG_PENDING && !strcmp(i->path, key)) { img = i; break; }
+    if (!img) return;
+    img->state = IMG_FAILED;
+    if (!argb || w <= 0 || h <= 0 || (long long)w * h > IMG_MAX_PIXELS || !(img->px = malloc((size_t)w * h * 4))) return;
+    memcpy(img->px, argb, (size_t)w * h * 4);
+    img->state = IMG_READY;
+    img->w = w;
+    img->h = h;
+    img->opaque = 1;
+    for (size_t i = 0; i < (size_t)w * h; i++) if ((argb[i] >> 24) != 255) { img->opaque = 0; break; }
+    for (int k = 0; k < ui.cap; k++) {
+        Node *nd = ui.nodes[k];
+        if (nd && nd->img == img) node_invalidate(nd);
+    }
+    ui.dirty = 1;
+}
+
 int image_async_fd(void) { return efd; }
 
 int image_async_dispatch(void) {
@@ -389,7 +431,7 @@ void image_release(Image *img) {
     img->refs = 0;
     img->used = ++tick;
     if (img->state == IMG_PENDING) {
-        cancel(img->job);
+        if (img->max > 0) cancel(img->job);     /* an image made elsewhere (max -1): its answer finds nobody */
         for (Image **pp = &images; *pp; pp = &(*pp)->next) if (*pp == img) { *pp = img->next; break; }
         img_free(img);
         return;

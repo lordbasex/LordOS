@@ -128,10 +128,13 @@ shell. The user approved it for M7. Limits:
   owns that surface, a process of the same user, never `lord-server`; X11 windows are only asked to
   close (`WINDOWS.md`, "The Window menu, the app menu and Force Quit").
 
-Icons: the `hicolor` PNG (64, 48, 128… px) or the one in `/usr/share/pixmaps` is used. Apps that
-only ship SVG (FeatherPad, GTK Demo) use the 64 px PNG Debian publishes in AppStream, which the
-package engine already downloads (`/var/lib/lordos/pkg/icons/64`, see `PACKAGES.md`). If it's not
-there either, the initial is shown: LordOS doesn't draw SVG yet.
+Icons (`server/src/iconfind.c`, `build/iconfind-test`): the `hicolor` PNG (64, 48, 128… px, the
+user's theme before the system's) or the one in `/usr/share/pixmaps`. Then (0.8.8.8, in development)
+SVG, which lord-media draws (`MEDIA.md`, "SVG icons"): `scalable/apps` of hicolor and Adwaita,
+`/usr/share/pixmaps`; then the 64 px PNG Debian publishes in AppStream, which the package engine
+already downloads (`/var/lib/lordos/pkg/icons/64`, see `PACKAGES.md`); and last a symbolic icon
+(`symbolic/apps/<name>-symbolic.svg`). An absolute `Icon=` may name a PNG or an SVG. With none of
+them, the initial is shown.
 
 ## Activation (`xdg_activation_v1`)
 
@@ -765,7 +768,11 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
   leaves the bus, or when its first `GetAll` fails.
 - **The icon.** `IconName` is looked up as a plain name (never a path) in hicolor's `status` and
   `apps` folders at the bar's sizes, the user's and the system's, then `/usr/share/pixmaps`
-  (`apps_status_icon` in `server/src/apps.c`, PNG only); otherwise `IconPixmap` is used: network-order
+  (`apps_status_icon` in `server/src/apps.c`, `server/src/iconfind.c`). Then SVG (0.8.8.8): the
+  `scalable/` folders of hicolor and Adwaita, `/usr/share/pixmaps`, and last the symbolic icons
+  (`symbolic/status/<name>-symbolic.svg`, where the themes keep `audio-volume-high`,
+  `network-wireless-*` and the like), drawn by lord-media at the bar's size and recolored to the
+  bar's text color (`sdk/iconsrc.js`; `MEDIA.md`, "SVG icons"). Otherwise `IconPixmap` is used: network-order
   ARGB32, the size nearest 22–32 px, each entry at most 256 × 256 with exactly w × h × 4 bytes, at most
   16 entries and 2 MiB in all. `IconThemePath` (a folder the app names) is not read.
 - **Clicks.** A click sends `Activate(x, y)`, the middle button `SecondaryActivate`; an item that is
@@ -793,7 +800,7 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
   `WAYLAND_DEBUG`) and the keyboard works, but buttons, menus and pages don't react; the same with
   the build installed before (October 18) and with the LordOS frame, so it isn't the frame. To
   investigate (two `wl_seat` bindings from the same client get the events twice).
-- SVG app icons (most modern GTK/Qt apps only ship SVG).
+- SVG app icons: built in 0.8.8.8 (lord-media draws them, `MEDIA.md`, "SVG icons"), to check on the VM.
 - Terminal apps (`Terminal=true`: neither listed nor launched). (Opening files with a Linux app,
   `%f`/`%u`, and `.desktop` actions: done, see "The launcher" above; actions since 0.8.1.)
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct

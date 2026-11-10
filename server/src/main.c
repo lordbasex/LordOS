@@ -51,6 +51,7 @@
 #include "wl/wl_input.h"
 #include "wl/xwayland.h"
 #include "media/media.h"
+#include "media/svgicon.h"
 #include "app/app.h"
 #include "app/apphost_bc.h"
 #include "sec/broker.h"
@@ -2496,6 +2497,7 @@ int main(int argc, char **argv) {
                                           share_point_protected, share_restricted };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
     char current[sizeof ui.theme_request];
+    svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
     if (ok) ok = start_theme(theme, s.greeter, current, sizeof current) == 0;
     if (ok && !s.greeter) {                  /* the app host as bytecode for isolated apps (app/apphost_bc.c) */
         char host[1200];

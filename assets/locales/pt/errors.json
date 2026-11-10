@@ -442,6 +442,8 @@
   "media.noVideoEncoder": "Nenhum codificador de vídeo disponível",
   "media.notAFile": "Não é um arquivo",
   "media.notAnImage": "Não é uma imagem",
+  "media.svgTooLarge": "O arquivo SVG tem mais de 1 MB",
+  "media.svgTooComplex": "O desenho SVG é complexo demais para ser exibido",
   "media.nothingToPlay": "Não há áudio nem vídeo que possa ser reproduzido",
   "media.outsideHome": "Caminho inválido ou fora da pasta pessoal",
   "media.queueFull": "Há tarefas de mídia pendentes demais; tente novamente em instantes",

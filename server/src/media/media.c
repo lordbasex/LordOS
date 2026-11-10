@@ -14,6 +14,7 @@
  *     SIGBUS by truncating it. */
 #include "media_int.h"
 #include "hwdec.h"
+#include "svgicon.h"
 #include "../fsops.h"
 #include "../pkg/crypto.h"
 #include "../ui/ui.h"
@@ -198,11 +199,6 @@ static void reap(void) {
     }
     nzombies = k;
 }
-
-/* Called on every pass of the main loop: with no source left media_pollfds has nothing and media_dispatch
- * doesn't run, so a helper that was just stopped would stay a zombie until the next video or song. */
-void media_reap(void) { if (nzombies) reap(); }
-double media_reap_timeout(void) { return nzombies ? 100 : -1; }
 
 /* ---- descriptors that are passed ---- */
 
@@ -583,8 +579,12 @@ typedef struct Job {
     struct Job *next;
 } Job;
 
-typedef struct { int sock; pid_t pid; Job *cur; double idle_since; } Worker;
-static Worker workers[2] = { { -1, 0, NULL, 0 }, { -1, 0, NULL, 0 } };
+/* deadline: when the job being done must have ended (SVG icons, SVG_JOB_MS), 0 for none */
+typedef struct { int sock; pid_t pid; Job *cur; double idle_since, deadline; } Worker;
+static Worker workers[2] = { { -1, 0, NULL, 0, 0 }, { -1, 0, NULL, 0, 0 } };
+/* An SVG icon that takes longer than this is a hostile file (helper/lm_svg.h): the worker is killed, the icon stays
+ * empty and the next job starts a new one. A real icon takes a few milliseconds. */
+#define SVG_JOB_MS 3000
 static Job *queue[2], *queue_tail[2];
 static int queued[2];
 static int next_job = 1;
@@ -656,6 +656,14 @@ static void job_finish(Job *j, int status, int fd) {
         }
         break;
     }
+    case JP_SVG: {
+        int w = 0, h = 0;
+        sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
+        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 256 && h <= 256) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+        svgicon_done(j->params, w, h, (const uint32_t *)map);      /* premultiplied BGRA is the images' ARGB */
+        if (map) munmap(map, (size_t)w * h * 4);
+        break;
+    }
     case JP_PIXELS: {
         int w = 0, h = 0;
         sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
@@ -720,8 +728,9 @@ static void worker_kick(int bg) {
     if (!queue[bg]) queue_tail[bg] = NULL;
     queued[bg]--;
     int64_t v[6] = { j->kind, j->a, j->b, 0, 0, 0 };
-    if (mp_send(wk->sock, MM_JOB, (uint32_t)j->id, v, j->params && j->purpose != JP_THUMB ? j->params : NULL,
-                j->params && j->purpose != JP_THUMB ? strlen(j->params) : 0, j->fds, j->nfds)) {
+    int send_params = j->params && j->purpose != JP_THUMB && j->purpose != JP_SVG;     /* those carry lord-server's own key */
+    if (mp_send(wk->sock, MM_JOB, (uint32_t)j->id, v, send_params ? j->params : NULL, send_params ? strlen(j->params) : 0,
+                j->fds, j->nfds)) {
         snprintf(payload, sizeof payload, "media.helperNotResponding");
         job_finish(j, -1, -1);
         job_free(j);
@@ -730,6 +739,46 @@ static void worker_kick(int bg) {
     /* the helper already has the fds */
     for (int i = 0; i < j->nfds; i++) if (j->fds[i] >= 0) { close(j->fds[i]); j->fds[i] = -1; }
     wk->cur = j;
+    wk->deadline = j->purpose == JP_SVG ? now_ms() + SVG_JOB_MS : 0;
+}
+
+/* A job past its deadline: the worker is killed (its job fails) and the queue goes on with a new one. */
+static void worker_overdue(double t) {
+    for (int bg = 0; bg < 2; bg++) {
+        Worker *wk = &workers[bg];
+        if (!wk->cur || !wk->deadline || t < wk->deadline || wk->sock < 0) continue;
+        fprintf(stderr, "media: lord-media took more than %d ms on a job (%d); killed\n", SVG_JOB_MS, wk->cur->kind);
+        close(wk->sock);
+        wk->sock = -1;
+        if (wk->pid > 0) kill(wk->pid, SIGKILL);
+        bury(wk->pid, 500);
+        wk->pid = 0;
+        wk->deadline = 0;
+        Job *j = wk->cur;
+        wk->cur = NULL;
+        snprintf(payload, sizeof payload, "media.helperNotResponding");
+        job_finish(j, -1, -1);
+        job_free(j);
+        worker_kick(bg);
+    }
+}
+
+/* Called on every pass of the main loop: with no source left media_pollfds has nothing and media_dispatch
+ * doesn't run, so a helper that was just stopped would stay a zombie until the next video or song; a worker past
+ * its deadline is killed here too. media_reap_timeout: ms until the next look, -1 with nothing pending. */
+void media_reap(void) {
+    if (workers[0].deadline || workers[1].deadline) worker_overdue(now_ms());
+    if (nzombies) reap();
+}
+double media_reap_timeout(void) {
+    double d = nzombies ? 100 : -1, t = now_ms();
+    for (int bg = 0; bg < 2; bg++)
+        if (workers[bg].cur && workers[bg].deadline) {
+            double left = workers[bg].deadline - t;
+            if (left < 0) left = 0;
+            if (d < 0 || left < d) d = left;
+        }
+    return d;
 }
 
 int media_job(int bg, int kind, int purpose, const int *fds, int nfds, int64_t a, int64_t b, const char *params,
@@ -770,6 +819,7 @@ static void worker_dispatch(int bg) {
             wk->sock = -1;
             bury(wk->pid, 500);
             wk->pid = 0;
+            wk->deadline = 0;
             if (wk->cur) {
                 fprintf(stderr, "media: lord-media crashed during a job (%d); moving on to the next\n", wk->cur->kind);
                 snprintf(payload, sizeof payload, "media.helperCrashed");
@@ -782,6 +832,7 @@ static void worker_dispatch(int bg) {
         if (m.type == MM_RESULT && wk->cur && m.id == (uint32_t)wk->cur->id) {
             Job *j = wk->cur;
             wk->cur = NULL;
+            wk->deadline = 0;
             job_finish(j, (int)m.v[0], fds[0]);
             job_free(j);
             wk->idle_since = now_ms();
@@ -922,6 +973,7 @@ void media_shutdown(void) {
         queue_tail[b] = NULL;
         queued[b] = 0;
         if (workers[b].cur) { if (workers[b].cur->tmp) unlink(workers[b].cur->tmp); job_free(workers[b].cur); workers[b].cur = NULL; }
+        workers[b].deadline = 0;
         if (workers[b].sock >= 0) { close(workers[b].sock); workers[b].sock = -1; bury(workers[b].pid, 1000); }
     }
     thumb_n = 0;

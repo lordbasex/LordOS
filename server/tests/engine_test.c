@@ -2902,6 +2902,47 @@ static int wait_thumbs(int want) {
     return got;
 }
 
+/* images another part of lord-server makes (SVG icons, media/svgicon.c): shared under their key, empty until their
+ * pixels come, the nodes that show them repainted; a failure stays empty; an answer for a dropped one finds nobody */
+static void test_image_ext(void) {
+    ui_reset();
+    int made = 0, again = 0;
+    Node *a = node_new(NODE_IMAGE), *b = node_new(NODE_IMAGE);
+    a->img = image_get_ext("svg:32:-:1.0:10:/x/icon.svg", &made);
+    b->img = image_get_ext("svg:32:-:1.0:10:/x/icon.svg", &again);
+    CHECK(a->img && a->img == b->img && made == 1 && again == 0, "one key, one image, asked for once");
+    int w = -1, h = -1;
+    if (a->img) image_size(a->img, &w, &h);
+    CHECK(w == 0 && h == 0, "empty until its pixels come: %dx%d", w, h);
+    uint32_t px[4] = { 0xff102030, 0xff102030, 0x80000000, 0 };
+    a->paint_dirty = b->paint_dirty = 0;
+    image_ext_done("svg:32:-:1.0:10:/x/icon.svg", 2, 2, px);
+    if (a->img) image_size(a->img, &w, &h);
+    CHECK(w == 2 && h == 2 && a->paint_dirty && b->paint_dirty, "its pixels in, both nodes painted again: %dx%d", w, h);
+    image_ext_done("svg:32:-:1.0:10:/x/icon.svg", 1, 1, px);
+    if (a->img) image_size(a->img, &w, &h);
+    CHECK(w == 2, "a second answer changes nothing");
+    Node *c = node_new(NODE_IMAGE);
+    c->img = image_get_ext("svg:32:ffffff:1.0:10:/x/icon.svg", &made);
+    CHECK(made == 1 && c->img != a->img, "another color is another image");
+    image_ext_done("svg:32:ffffff:1.0:10:/x/icon.svg", 0, 0, NULL);
+    if (c->img) image_size(c->img, &w, &h);
+    CHECK(w == 0 && h == 0, "a failed one stays empty");
+    Image *again_img = image_get_ext("svg:32:ffffff:1.0:10:/x/icon.svg", &made);
+    CHECK(again_img == c->img && made == 0, "a failed one held by a node isn't asked for again");
+    image_release(again_img);
+    /* a pending one nobody shows any more is dropped; its answer finds nobody */
+    Image *gone = image_get_ext("svg:16:-:1.0:10:/x/gone.svg", &made);
+    image_release(gone);
+    image_ext_done("svg:16:-:1.0:10:/x/gone.svg", 2, 2, px);
+    Image *back = image_get_ext("svg:16:-:1.0:10:/x/gone.svg", &made);
+    CHECK(made == 1, "dropped while pending: asked for again when shown again");
+    image_release(back);
+    node_destroy(a);
+    node_destroy(b);
+    node_destroy(c);
+}
+
 static void test_image_cache(void) {
     ui_reset();
     const char *wall = "../assets/wallpapers/lumo/lordos-lumo-aurora.jpg";     /* 1672 x 941 */
@@ -3290,6 +3331,7 @@ int main(int argc, char **argv) {
     test_overlay_scrollbar();
     test_transform_restyle();
     test_image_cache();
+    test_image_ext();
     printf("engine-test: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 #endif

@@ -51,6 +51,8 @@ enum {
     MW_TRANSCODE,       /* fds = file, output; params: format (opus|mp3|wav), from, to */
     MW_WAVEFORM,        /* fds = file; v[1] = number of bars → JSON with peaks 0..1000 */
     MW_SELFTEST,        /* tests the sandbox (open, network, processes): everything has to fail */
+    MW_SVG,             /* an SVG icon (helper/lm_svg.h): fds = file (at most 1 MB); v[1] = side 16..256, v[2] = 0xRRGGBB
+                           to recolor (a -symbolic icon) or -1 → premultiplied BGRA memfd, JSON {"width","height"} */
 };
 
 enum {
