@@ -304,6 +304,31 @@ static void find_icon(const char *name, char *out, size_t n) {
     closedir(d);
 }
 
+/* A tray icon's IconName (ui/sni.c): a plain name, never a path, looked up in the same places at the bar's sizes,
+ * in hicolor's status folders first. */
+void apps_status_icon(const char *name, char *out, size_t n) {
+    out[0] = 0;
+    size_t len = name ? strlen(name) : 0;
+    if (!len || len > 128 || name[0] == '.' || strstr(name, "..")) return;
+    for (const char *p = name; *p; p++) if (!isalnum((unsigned char)*p) && !strchr("._-+", *p)) return;
+    static const int sizes[] = { 32, 24, 22, 48, 64, 16, 128, 256 };
+    static const char *const kinds[] = { "status", "apps" };
+    const char *home = getenv("HOME");
+    char roots[2][PATH_MAX];
+    int nr = 0;
+    if (home) snprintf(roots[nr++], PATH_MAX, "%s/.local/share/icons/hicolor", home);
+    snprintf(roots[nr++], PATH_MAX, "/usr/share/icons/hicolor");
+    for (size_t k = 0; k < sizeof kinds / sizeof *kinds; k++)
+        for (int r = 0; r < nr; r++)
+            for (size_t s = 0; s < sizeof sizes / sizeof *sizes; s++) {
+                int w = snprintf(out, n, "%s/%dx%d/%s/%s.png", roots[r], sizes[s], sizes[s], kinds[k], name);
+                if (w > 0 && (size_t)w < n && is_png(out)) return;
+            }
+    int w = snprintf(out, n, "/usr/share/pixmaps/%s.png", name);
+    if (w > 0 && (size_t)w < n && is_png(out)) return;
+    out[0] = 0;
+}
+
 /* ---- list ---- */
 
 /* A desktop id the launcher can run: it must also make a valid app scope name

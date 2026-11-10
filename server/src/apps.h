@@ -22,6 +22,11 @@ typedef struct {
  * Returns the count; *out is an internal array valid until the next call. */
 int apps_list(const char *lang, const DesktopApp **out);
 
+/* The PNG for a tray icon's name (IconName of a StatusNotifierItem): hicolor's status and apps folders, the user's
+ * and the system's, at the bar's sizes first, then /usr/share/pixmaps. A name with a '/' or "..", or other characters
+ * than [A-Za-z0-9._+-], finds nothing. out = "" when there is none. */
+void apps_status_icon(const char *name, char *out, size_t n);
+
 /* Launches the app with that id: only one from the list above, with its Exec line, without arguments
  * from the caller and without a shell. 0 if the process started. */
 int apps_launch(const char *id);

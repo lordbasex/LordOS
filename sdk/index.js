@@ -179,6 +179,7 @@ export {
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
 import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, startHardware } from './hardware.jsx';
+import { startTray } from './trayitems.jsx';
 // Settings → Displays: numbering, Identify (a big number on each real display) and magnetic arrangement
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
 import { DisplayIdentify } from './displaysui.jsx';
@@ -258,6 +259,7 @@ export function startShell(element) {
   startReminders();                     // calendar and reminder alarms, with the apps closed
   maybeStartTour();                     // "Welcome to LordOS", the first time
   startHardware();                      // Night Light, idle timers, battery in the menu bar (hardware.jsx)
+  startTray();                          // the tray icons of Linux apps next to the status items (trayitems.jsx)
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
   startVideo();                         // browser video without hardware decoding (video.js, docs/VIDEO.md)
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
