@@ -12,6 +12,8 @@
 //   polkit        a Linux app's request for administrator rights (<PolkitPrompt />)
 //   portal open   a Linux app asks to open a link or a file (OpenURI): opened like everything else, and asked
 //                 first when the app is not the one in front (<PortalOpenPrompt />, portalopenmodel.js)
+//   portal keys   a Linux app asks for global shortcuts: the person gives each one a key or none
+//                 (<GlobalShortcutsPrompt />, globalshortcuts.jsx)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -35,6 +37,7 @@ import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
 import { wm } from './windows.js';
 import { linuxPlayersChanged } from './media.js';
 import { trayEvent } from './trayitems.jsx';
+import { globalShortcutsEvent } from './globalshortcuts.jsx';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -221,7 +224,7 @@ export function setCaptureAllDisplays(on) { return has('display') && lord.displa
 export function setAutoRotateDisplays(on) { return has('display') && lord.display.setAutoRotate ? lord.display.setAutoRotate(on) : false; }
 
 // System dialogs are drawn outside the theme's provider: light or dark from the user's setting.
-function useSystemTokens() {
+export function useSystemTokens() {
   const th = useTheme();
   const mode = useStore(settings, (s) => s.mode);
   return mode === 'light' ? { ...th, mode: 'light', windowBg: '#f6f6f8', text: '#1d1d1f', textDim: 'rgba(60,60,67,0.62)',
@@ -257,7 +260,7 @@ export function DisplayGlyph({ size = 40, color = '#0a84ff' }) {
     h(View, { style: { width: size * 0.42, height: Math.max(2, size / 18), borderRadius: 2, backgroundColor: color } }));
 }
 
-function DialogButton({ label, onClick, primary, th, dark = th.mode !== 'light' }) {
+export function DialogButton({ label, onClick, primary, th, dark = th.mode !== 'light' }) {
   const [hover, setHover] = useState(false);
   return h(View, { onClick, onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
     style: { flex: 1, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
@@ -539,6 +542,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-file': portalFile.set(data); break;
     case 'portal-open': portalOpen(data); break;
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
+    case 'portal-shortcuts': case 'portal-shortcuts-gone': case 'portal-shortcuts-changed': globalShortcutsEvent(kind, data); break;
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

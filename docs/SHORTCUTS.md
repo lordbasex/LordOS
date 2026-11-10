@@ -128,7 +128,51 @@ entries stop applying and leave Settings → Keyboard's list (`listed`), and `us
 A key pressed with no Linux app in front and released with one (the key that switched to its desktop) has its
 release delivered to that app, and the dispatcher never sees it: a new press of a key still marked counts as a press.
 
+## Linux apps' global shortcuts
+
+A call app's push-to-talk or a recorder's hotkeys work while another app is in front through the
+`org.freedesktop.portal.GlobalShortcuts` interface (version 1), which lord-server serves itself
+(`server/src/ui/portal.c`, the rules in `server/src/ui/gshort.c`; see [FLATPAK.md](FLATPAK.md), "Portals").
+
+- **Asking.** The app opens a session (`CreateSession`) and proposes its shortcuts with `BindShortcuts`: an id, a
+  description and a `preferred_trigger` in the spec's text (`CTRL+SHIFT+a`, `LOGO+space`, `ALT+F9`). LordOS's own sheet
+  (`sdk/globalshortcuts.jsx`, rows from `sdk/globalshortcutsmodel.js`) lists them under the app's name. Each row starts
+  on the proposed key when it is free, and otherwise on none, saying why. Clicking a key field records a new combination
+  (Esc stops, Backspace leaves it unassigned). Nothing is bound until the person presses Save, and Cancel answers the app
+  "cancelled". While a field records, no app's shortcut fires (`lord.portal.pauseShortcuts`) and no shell shortcut runs
+  (`captureKeys` in `sdk/shortcuts.js`).
+- **What an app can never get** (`gs_kept`): any ❖ combination, which is the desktop's (the lock screen, search, the
+  launcher); the media row and Print Screen (`keygrab_system_key`); Tab and Esc with any modifier (the switcher, menus,
+  ending a share); ⌃⌥ with F1…F12, Backspace or Delete; a key with neither ⌃ nor ⌥ unless it is F1…F24, Pause or Scroll
+  Lock, so a binding never takes a key used to type or move; whatever the theme's table keeps (`keygrab_match`); and,
+  checked by the shell, any combination of `BASE`, a theme's table or a module (`shortcutReserved`, whatever its `when`
+  says), such as ⌃Space and F10. A combination one app has is refused for another, and for a second shortcut of the same
+  app. lord-server checks the answer again and leaves anything refused unassigned.
+- **Delivery.** `js_key` (`server/src/ui/js.c`) asks `portal_shortcut_key` before the input method, the focused Wayland
+  app and the shell. A bound key goes to the app that holds it and to nothing else: like GNOME and KDE, the binding
+  consumes the key, so the focused app doesn't get it as well. The press sends `Activated` and the release sends
+  `Deactivated`, each with the session's handle, the shortcut's id and a time in milliseconds, so push-to-talk works.
+  Repeats are taken without a signal, and the release counts even when a modifier was let go first. Signals go only to
+  the connection that opened the session and only while that session is bound. A session closed with `Session.Close`, or
+  whose connection left the bus, gets nothing more. A key LordOS has since started keeping (another theme) is no longer
+  delivered. Letters match what the layout types and other keys their position, as for LordOS's own shortcuts.
+- **A session's states** (`gs_step`): new, asking (one sheet at a time), bound. `BindShortcuts` is accepted once per
+  session: when cancelled, the app may ask again. Afterwards changes come from Settings and reach the app as
+  `ShortcutsChanged`. `ListShortcuts` answers with the bound ones.
+- **Remembered.** The decisions are kept per app, by the app's scope (`desktop:<id>`, `sec/appid.h`), in
+  `~/.config/lordos/global-shortcuts.json`, which `lord.fs` can't write (`fsops_protected`). A later session of the
+  same app that proposes only shortcuts already decided gets them without a sheet, and an unassigned one stays
+  unassigned. An app started outside a scope of its own (from a terminal) is asked every time and nothing of it is kept.
+- **Settings → Keyboard** lists every app with its shortcuts below LordOS's own (`apps/settings/GlobalShortcuts.jsx`).
+  A key can be changed or cleared there, and Forget removes every decision for the app: its open sessions lose their
+  keys at once (`ShortcutsChanged` with none) and its next session asks again.
+
 ## Testing
 
-`build/keygrab-test` (`make -C server test`) checks the tables. Keys were tried on a VM with real key events
-over a Linux app (Mousepad, foot), an app inside the session (Terminal) and an isolated app (Calendar).
+`build/keygrab-test` (`make -C server test`) checks the tables. `build/gshort-test` checks the global shortcuts'
+triggers (valid and invalid ones), the combinations LordOS keeps, a session's states and the store;
+`tests/global_shortcuts_model_test.mjs` checks the sheet's rows and the combination a key press names, and
+`build/portal-gs-test` runs the portal on a private session bus with a second connection as the app (the sheet, press
+and release, Settings' changes, a closed session, an app that left the bus). Keys were
+tried on a VM with real key events over a Linux app (Mousepad, foot), an app inside the session (Terminal) and an
+isolated app (Calendar).

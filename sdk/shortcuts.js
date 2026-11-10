@@ -13,6 +13,9 @@
 //                             runShortcut(id) runs one from elsewhere
 //   addMenuBarKeys({ can, run })  a menu bar that F10, or ⌥ pressed and released alone, opens from the keyboard
 //   shortcutList()            what is active now, for Settings → Keyboard
+//   shortcutReserved(combo)   is it one of the shell's at all (whatever `when` says now): a Linux app's
+//                             global shortcut never gets one (sdk/globalshortcuts.jsx)
+//   captureKeys(fn)           while a field records a combination, every key goes to it and runs nothing
 //
 // An entry: { id, keys: ['Meta+Shift+V', …], run, label?, group?, when?, repeat? }. `run` is always a
 // function, called with the key event, and `when(e)` says whether the entry applies now: when it
@@ -155,6 +158,19 @@ export function shortcutTaken(combo) {
   lookup = lookup || index();
   return (lookup.get(parseCombo(combo)) || []).some((e) => !e.when || e.when());
 }
+export function shortcutReserved(combo) {
+  lookup = lookup || index();
+  return (lookup.get(parseCombo(combo)) || []).length > 0;
+}
+
+// A field recording a new combination (an app's global shortcut) gets every press that is not a modifier, and
+// no key runs anything meanwhile: fn(e) with the key event. The returned function ends it.
+const MODIFIER_CODES = new Set([29, 97, 42, 54, 56, 100, 125, 126]);
+let capture = null;
+export function captureKeys(fn) {
+  capture = fn;
+  return () => { if (capture === fn) capture = null; };
+}
 
 const taken = new Set();      // keys whose press was taken: their repeats and release are too
 const repeating = new Set();  // the same, for an entry that runs again while held
@@ -165,6 +181,12 @@ addListener('pointerdown', () => { superAlone = false; altAlone = false; });
 
 function filter(e) {
   if (!e.code) return false;                       // text an input method committed
+  if (capture) {
+    if (e.down) taken.add(e.code); else taken.delete(e.code);
+    if (e.down && !e.repeat && !MODIFIER_CODES.has(e.code)) capture(e);
+    superAlone = altAlone = false;
+    return true;
+  }
   if (switcherOpen()) { if (e.down) taken.add(e.code); else taken.delete(e.code); return switcherKey(e); }
   // a window holding the shortcuts (Machines' VM, sdk/kbinhibit.js) gets them; its ❖Esc is nobody's
   const held = shortcutsKey(e, keyName(e));
@@ -235,7 +257,7 @@ export function addShortcuts(entries) {
 
 const SYMBOLS = { Meta: '❖', Ctrl: '⌃', Alt: '⌥', Shift: '⇧' };
 const KEY_LABELS = { Escape: 'Esc', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
-function comboLabel(combo) {
+export function comboLabel(combo) {
   const parts = combo.split('+');
   const key = parts.pop();
   const name = key === 'Space' ? t('shell.shortcuts.space') : key === 'PrintScreen' ? t('shell.shortcuts.printScreen') : KEY_LABELS[key] || key;

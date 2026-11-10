@@ -1,7 +1,9 @@
-/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI and Inhibit, and
- * org.freedesktop.ScreenSaver, on the session bus (see portal.c). */
+/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit and GlobalShortcuts,
+ * and org.freedesktop.ScreenSaver, on the session bus (see portal.c). */
 #ifndef LORD_PORTAL_H
 #define LORD_PORTAL_H
+
+#include <stddef.h>
 
 int  portal_start(void);                /* after dropping privileges; 0 if it owns the name */
 int  portal_fd(void);                   /* for poll; -1 if absent */
@@ -16,6 +18,25 @@ void portal_open_done(int id, int code);
 int  portal_open_still(int id);
 /* An app holds idle or sleep off (Inhibit portal, ScreenSaver.Inhibit): counts as wl_idle_inhibited. */
 int  portal_inhibited(void);
+/* A key before anything else gets it (js_key): 1 when it is an app's global shortcut and went to that app
+ * (Activated on press, Deactivated on release; repeats taken), so nothing else may have it. letter:
+ * keygrab_letter; mods: KG_* (wl/keygrab.h). */
+int  portal_shortcut_key(int code, int value, char letter, unsigned mods);
+/* While the shell records a new combination (the sheet, Settings) no global shortcut fires. */
+void portal_shortcuts_pause(int on);
+/* The person's answer to session id's sheet (lord.portal.shortcutsChosen): n shortcut ids with a trigger
+ * each ("" unassigned), or n < 0 cancelled. A trigger LordOS keeps or someone else has is left unassigned. */
+void portal_shortcuts_chosen(int id, const char *const *ids, const char *const *triggers, int n);
+/* Every kept decision as JSON, [{app, id, description, trigger}] (malloc, or NULL) */
+char *portal_shortcuts_list(void);
+/* What a trigger would be for app's (or session's) shortcut id: the formatted form in out, why LordOS
+ * keeps it (GS_* of gshort.h) in kept and who else has it in owner. 0, or -1 when it is not a trigger. */
+int  portal_shortcut_check(const char *trigger, int session, const char *app, const char *id, char *out, size_t n,
+                           int *kept, char *owner, size_t on);
+/* Settings: app's shortcut id gets trigger ("" leaves it unassigned). 0, or -1 when refused. */
+int  portal_shortcut_set(const char *app, const char *id, const char *trigger);
+/* Settings: every decision for app forgotten, its live sessions unbound. How many there were. */
+int  portal_shortcuts_forget(const char *app);
 /* From JS (lord.portal.set): mode, accent (0..1), GNOME accent name and GTK button order. */
 void portal_set(int dark, const double rgb[3], const char *accent_name, const char *button_layout);
 

@@ -381,10 +381,107 @@ static JSValue f_portal_still(JSContext *c, JSValueConst t, int argc, JSValueCon
     return JS_NewBool(c, argc >= 1 && portal_open_still(arg_int(c, argv[0], -1)));
 }
 
+/* lord.portal.shortcutsChosen(id, [{ id, trigger }] | null): the person's answer to an app's global
+ * shortcuts sheet (ui/portal.c); lord-server checks every trigger again. */
+#define PORTAL_MAX_SHORTCUTS 32
+static JSValue f_portal_shortcuts_chosen(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_UNDEFINED;
+    int id = arg_int(c, argv[0], -1);
+    if (argc < 2 || !JS_IsArray(c, argv[1])) { portal_shortcuts_chosen(id, NULL, NULL, -1); return JS_UNDEFINED; }
+    static char ids[PORTAL_MAX_SHORTCUTS][64], trig[PORTAL_MAX_SHORTCUTS][64];
+    const char *idp[PORTAL_MAX_SHORTCUTS], *tp[PORTAL_MAX_SHORTCUTS];
+    uint32_t len = 0;
+    JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+    JS_ToUint32(c, &len, lv);
+    JS_FreeValue(c, lv);
+    int n = 0;
+    for (uint32_t i = 0; i < len && n < PORTAL_MAX_SHORTCUTS; i++) {
+        JSValue e = JS_GetPropertyUint32(c, argv[1], i);
+        JSValue a = JS_GetPropertyStr(c, e, "id"), b = JS_GetPropertyStr(c, e, "trigger");
+        if (JS_IsString(a) && JS_IsString(b) && !arg_str(c, a, ids[n], sizeof ids[n]) && !arg_str(c, b, trig[n], sizeof trig[n])) {
+            idp[n] = ids[n];
+            tp[n] = trig[n];
+            n++;
+        }
+        JS_FreeValue(c, a);
+        JS_FreeValue(c, b);
+        JS_FreeValue(c, e);
+    }
+    portal_shortcuts_chosen(id, idp, tp, n);
+    return JS_UNDEFINED;
+}
+
+/* lord.portal.shortcuts(): every kept decision, [{ app, id, description, trigger }] (Settings → Keyboard) */
+static JSValue f_portal_shortcuts(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char *j = portal_shortcuts_list();
+    JSValue v = j ? JS_ParseJSON(c, j, strlen(j), "<shortcuts>") : JS_NewArray(c);
+    free(j);
+    return v;
+}
+
+/* lord.portal.shortcutCheck(trigger, { session, app, id }): { trigger, kept, owner } as lord-server would
+ * decide it, or null when it is not a trigger */
+static JSValue f_portal_shortcut_check(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char trigger[64], app[128] = "", id[64] = "", out[64], owner[256];
+    if (argc < 1 || arg_str(c, argv[0], trigger, sizeof trigger)) return JS_NULL;
+    int session = 0;
+    if (argc > 1 && JS_IsObject(argv[1])) {
+        JSValue v = JS_GetPropertyStr(c, argv[1], "session");
+        session = arg_int(c, v, 0);
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[1], "app");
+        if (JS_IsString(v) && arg_str(c, v, app, sizeof app)) app[0] = 0;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[1], "id");
+        if (JS_IsString(v) && arg_str(c, v, id, sizeof id)) id[0] = 0;
+        JS_FreeValue(c, v);
+    }
+    int kept = 0;
+    if (portal_shortcut_check(trigger, session, app, id, out, sizeof out, &kept, owner, sizeof owner)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "trigger", JS_NewString(c, out));
+    JS_SetPropertyStr(c, o, "kept", JS_NewInt32(c, kept));
+    JS_SetPropertyStr(c, o, "owner", JS_NewString(c, owner));
+    return o;
+}
+
+/* lord.portal.setShortcut(app, id, trigger | ''): Settings changes a kept decision; false when refused */
+static JSValue f_portal_set_shortcut(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char app[128], id[64], trigger[64];
+    if (argc < 3 || arg_str(c, argv[0], app, sizeof app) || arg_str(c, argv[1], id, sizeof id) || arg_str(c, argv[2], trigger, sizeof trigger))
+        return JS_FALSE;
+    return JS_NewBool(c, portal_shortcut_set(app, id, trigger) == 0);
+}
+
+/* lord.portal.forgetShortcuts(app): Settings forgets every decision for an app */
+static JSValue f_portal_forget_shortcuts(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char app[128];
+    if (argc < 1 || arg_str(c, argv[0], app, sizeof app)) return JS_NewInt32(c, 0);
+    return JS_NewInt32(c, portal_shortcuts_forget(app));
+}
+
+/* lord.portal.pauseShortcuts(on): while the shell records a combination, no app's shortcut fires */
+static JSValue f_portal_pause_shortcuts(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    portal_shortcuts_pause(argc >= 1 && JS_ToBool(c, argv[0]) > 0);
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry portal_funcs[] = {
     JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
     JS_CFUNC_DEF("opened", 2, f_portal_opened),
     JS_CFUNC_DEF("still", 1, f_portal_still),
+    JS_CFUNC_DEF("shortcutsChosen", 2, f_portal_shortcuts_chosen),
+    JS_CFUNC_DEF("shortcuts", 0, f_portal_shortcuts),
+    JS_CFUNC_DEF("shortcutCheck", 2, f_portal_shortcut_check),
+    JS_CFUNC_DEF("setShortcut", 3, f_portal_set_shortcut),
+    JS_CFUNC_DEF("forgetShortcuts", 1, f_portal_forget_shortcuts),
+    JS_CFUNC_DEF("pauseShortcuts", 1, f_portal_pause_shortcuts),
 };
 
 /* lord.sni: the tray icons of Linux apps (ui/sni.c). Only the desktop's own context has it, never an isolated app. */
@@ -889,7 +986,11 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "power", power_funcs, sizeof power_funcs / sizeof power_funcs[0]);
     add(c, lord, "bt", bt_funcs, sizeof bt_funcs / sizeof bt_funcs[0]);
     add(c, lord, "polkit", polkit_funcs, sizeof polkit_funcs / sizeof polkit_funcs[0]);
-    add(c, lord, "portal", portal_funcs, sizeof portal_funcs / sizeof portal_funcs[0]);
+    /* lord.portal already holds set (js_wm.c): these go on the same object */
+    JSValue po = JS_GetPropertyStr(c, lord, "portal");
+    if (JS_IsObject(po)) JS_SetPropertyFunctionList(c, po, portal_funcs, sizeof portal_funcs / sizeof portal_funcs[0]);
+    else add(c, lord, "portal", portal_funcs, sizeof portal_funcs / sizeof portal_funcs[0]);
+    JS_FreeValue(c, po);
     add(c, lord, "sni", sni_funcs, sizeof sni_funcs / sizeof sni_funcs[0]);
     add(c, lord, "mime", mime_funcs, sizeof mime_funcs / sizeof mime_funcs[0]);
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);

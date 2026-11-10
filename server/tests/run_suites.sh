@@ -169,6 +169,8 @@ EOF
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "portal-check-test" build/portal-check-test
+    if have dbus-run-session; then run "portal-gs-test (GlobalShortcuts over a private bus)" dbus-run-session -- build/portal-gs-test
+    else skip "portal-gs-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
@@ -324,6 +326,9 @@ EOF
     # (0.8.8.8) a Linux app's OpenURI request: web addresses, files, and asking when the app is not in front (sdk/portalopenmodel.js)
     if have node; then run "portal-open-model-test (sdk/portalopenmodel.js)" node tests/portal_open_model_test.mjs
     else skip "portal-open-model-test" "node"; fi
+    # (0.8.8.8) a Linux app's global shortcuts: the sheet's rows, the combination a key names, what is refused (sdk/globalshortcutsmodel.js)
+    if have node; then run "global-shortcuts-model-test (sdk/globalshortcutsmodel.js)" node tests/global_shortcuts_model_test.mjs
+    else skip "global-shortcuts-model-test" "node"; fi
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi

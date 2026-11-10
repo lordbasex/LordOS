@@ -86,7 +86,7 @@ SRC += $(TP_SRC)
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
 # Passwords (src/vault/dbus.c, docs/PASSWORDS.md).
-WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/vault/dbus.c
+WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/ui/gshort.c src/vault/dbus.c
 # the tray of Linux apps: org.kde.StatusNotifierWatcher and dbusmenu (src/ui/sni.c, docs/WAYLAND.md "Tray icons")
 WM_SRC += src/ui/sni.c src/ui/snimodel.c
 SRC += $(WM_SRC)
@@ -385,6 +385,17 @@ build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c src/wl/dndgate.c
 	./$@ || { rm -f $@; exit 1; }
+# the global shortcuts portal's rules without a bus (src/ui/gshort.c): triggers, the kept combinations, a session's states, the store
+test: build/gshort-test
+build/gshort-test: tests/gshort_test.c src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/wl/keygrab.h src/hw/jbuf.c src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/gshort_test.c src/ui/gshort.c src/wl/keygrab.c src/hw/jbuf.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
+# the same portal over a private session bus, a second connection as the app (tests/run_suites.sh, needs dbus-run-session)
+test: build/portal-gs-test
+build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c -lpthread
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build

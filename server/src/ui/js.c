@@ -40,6 +40,8 @@
 #include "js_help.h"
 #include "js_voice.h"
 #include "js_hw.h"
+#include "portal.h"
+#include "../wl/keygrab.h"
 #include "../media/media.h"
 #include "../sec/codesig.h"
 #include "ui.h"
@@ -737,11 +739,14 @@ static int ime_to_app(int code, int value, const KeyInfo *k) {
 }
 
 /* Key → __lordKey(code, value, key, text, base, flags). With libxkbcommon (keyboard.c)
- * C does the translation; if no layout is loaded, only code and value. If there is an
+ * C does the translation; if no layout is loaded, only code and value. A Linux app's global shortcut
+ * (portal.c) goes to that app before anything else, and then to nothing else. If there is an
  * active input method (ime.c) and a focused text field, the key goes through it first. */
 void js_key(int code, int value) {
     KeyInfo k;
     kb_key(code, value, &k);
+    unsigned mods = (k.shift ? KG_SHIFT : 0u) | (k.ctrl ? KG_CTRL : 0u) | (k.alt ? KG_ALT : 0u) | (k.meta ? KG_META : 0u);
+    if (portal_shortcut_key(code, value, keygrab_letter(code, k.base), mods)) { drain_jobs(); return; }
     if (!kb_ready()) {
         JSValueConst args[2] = { JS_NewInt32(ctx, code), JS_NewInt32(ctx, value) };
         JS_FreeValue(ctx, call_global("__lordKey", 2, args));

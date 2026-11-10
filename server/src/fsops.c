@@ -89,6 +89,8 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
                                            "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
                                            "/.config/lordos/databases",     /* Databases favorites (hosts, trusted certificates): only lord.sql.saveFavorites (docs/DATABASES.md) */
+                                           "/.config/lordos/global-shortcuts.json",     /* the keys each Linux app may have: only the person, through the portal's sheet or Settings (docs/SHORTCUTS.md) */
+                                           "/.config/lordos/global-shortcuts.json.tmp", /* and the file it is written to first */
                                            NULL };
 
 static char pfile[FSOPS_PF_COUNT][PATH_MAX];
