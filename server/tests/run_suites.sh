@@ -296,6 +296,9 @@ EOF
     # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
     if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
     else skip "terminal-fwdports-test" "node"; fi
+    # what a paste in Files copies: its own cut or copy, or the files a Linux app copied (apps/files/clipfiles.js)
+    if have node; then run "files-clipfiles-test (apps/files/clipfiles.js)" node tests/files_clipfiles_test.mjs
+    else skip "files-clipfiles-test" "node"; fi
     # which confirmation dialog takes the keys; Enter never presses a destructive button (sdk/dialogkeys.js)
     if have node; then run "dialog-keys-test (sdk/dialogkeys.js)" node tests/dialog_keys_test.mjs
     else skip "dialog-keys-test" "node"; fi

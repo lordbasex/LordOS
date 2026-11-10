@@ -4,6 +4,7 @@
  * user already running the session (see term/pty.c). It accepts no commands or arguments. */
 #include "js_term.h"
 #include "../wl/wl.h"
+#include "../wl/urilist.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../term/termfill.h"
@@ -865,6 +866,78 @@ static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc
     return JS_NewBool(c, ok && home && unlink(path) == 0);
 }
 
+/* lord.clipboard.setFiles(paths, { cut }): Files copied (or cut) these files. Only a list of absolute paths,
+ * no other data: the clipboard's text becomes the paths, one per line, and Linux apps also get them as
+ * text/uri-list and x-special/gnome-copied-files (wl.c, wl/urilist.c). false if a path isn't one (relative,
+ * a NUL or a line break, not UTF-8) or there are too many; the clipboard is then left as it was. */
+static JSValue f_clip_set_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (!JS_IsArray(c, argv[0])) return JS_FALSE;
+    JSValue lv = JS_GetPropertyStr(c, argv[0], "length");
+    int64_t n = 0;
+    if (JS_ToInt64(c, &n, lv)) n = 0;
+    JS_FreeValue(c, lv);
+    if (n <= 0 || n > URIL_MAX_FILES) return JS_FALSE;
+    size_t cap = 0, len = 0;
+    char *list = NULL;
+    int ok = 1;
+    for (uint32_t i = 0; ok && i < (uint32_t)n; i++) {
+        JSValue e = JS_GetPropertyUint32(c, argv[0], i);
+        size_t pn = 0;
+        const char *p = JS_IsString(e) ? JS_ToCStringLen(c, &pn, e) : NULL;
+        JS_FreeValue(c, e);
+        ok = p && uril_path_ok(p, pn) && len + pn + 1 <= URIL_MAX_BYTES;
+        if (ok && len + pn + 1 > cap) {
+            size_t nc = cap ? cap : 4096;
+            while (nc < len + pn + 1) nc *= 2;
+            char *nl = realloc(list, nc);
+            if (nl) { list = nl; cap = nc; } else ok = 0;
+        }
+        if (ok) { memcpy(list + len, p, pn + 1); len += pn + 1; }
+        if (p) JS_FreeCString(c, p);
+    }
+    int cut = 0;
+    if (argc > 1 && JS_IsObject(argv[1])) {
+        JSValue v = JS_GetPropertyStr(c, argv[1], "cut");
+        cut = JS_ToBool(c, v);
+        JS_FreeValue(c, v);
+    }
+    size_t tn = 0;
+    char *text = ok ? uril_encode(list, len, URIL_PLAIN, 0, &tn) : NULL;
+    unsigned g = term_clipboard_gen();
+    if (text) term_set_clipboard(text, tn);
+    ok = text && term_clipboard_gen() != g;
+    if (ok) {
+        term_clipboard_mark("files", 0);
+        ok = wl_clip_set_files(list, len, (int)n, cut) == 0;
+    }
+    free(text);
+    free(list);
+    return JS_NewBool(c, ok);
+}
+
+/* lord.clipboard.files() → { paths, cut, own, gen } or null: the files on the clipboard, copied in Files (own) or
+ * in a Linux file manager (only this machine's files, checked by wl/urilist.c; cut only for Files' own). */
+static JSValue f_clip_files(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    size_t len;
+    int count, cut, own;
+    const char *list = wl_clip_files(&len, &count, &cut, &own);
+    if (!list) return JS_NULL;
+    JSValue o = JS_NewObject(c), a = JS_NewArray(c);
+    uint32_t i = 0;
+    for (size_t off = 0; off < len; i++) {
+        size_t k = strlen(list + off);
+        JS_SetPropertyUint32(c, a, i, JS_NewStringLen(c, list + off, k));
+        off += k + 1;
+    }
+    JS_SetPropertyStr(c, o, "paths", a);
+    JS_SetPropertyStr(c, o, "cut", JS_NewBool(c, cut));
+    JS_SetPropertyStr(c, o, "own", JS_NewBool(c, own));
+    JS_SetPropertyStr(c, o, "gen", JS_NewInt64(c, term_clipboard_gen()));
+    return o;
+}
+
 static const JSCFunctionListEntry clip_funcs[] = {
     JS_CFUNC_DEF("get", 0, f_clip_get),
     JS_CFUNC_DEF("set", 1, f_clip_set),
@@ -873,6 +946,8 @@ static const JSCFunctionListEntry clip_funcs[] = {
     JS_CFUNC_DEF("useImage", 1, f_clip_use_image),
     JS_CFUNC_DEF("saveImage", 1, f_clip_save_image),
     JS_CFUNC_DEF("deleteSaved", 1, f_clip_delete_saved),
+    JS_CFUNC_DEF("setFiles", 2, f_clip_set_files),
+    JS_CFUNC_DEF("files", 0, f_clip_files),
 };
 
 /* Files mode (term/sftpc.c): a session's foreground process group, to find its ssh master by pid */

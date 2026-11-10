@@ -11,6 +11,7 @@
 // managers do) and what comes from apps the user excluded.
 //
 //   clipboard.get() / clipboard.set(text, { secure, origin })
+//   clipboard.setFiles(paths, { cut }) / clipboard.files() → { paths, cut, own } | null   (Files)
 //   useStore(clipboardHistory) → [{ id, kind: 'text'|'image', type, text?, image?, origin, time, pinned }]
 //   <ClipboardPanel /> (❖V quick, ❖⇧V full) is mounted by startShell: every theme has it.
 import { createElement as h, useEffect, useRef, useState } from 'react';
@@ -153,6 +154,14 @@ export const clipboard = {
     if (!secure) remember(s, origin);
     else skipNext = true;
   },
+  // Files: copied (or cut) files, as Linux apps read them too (text/uri-list, gnome-copied-files; the text is
+  // the paths). Only absolute paths; false if one isn't (the clipboard stays as it was).
+  setFiles(paths, { cut = false } = {}) {
+    if (!lord.clipboard.setFiles || !Array.isArray(paths)) return false;
+    return lord.clipboard.setFiles(paths.map(String), { cut: !!cut });
+  },
+  // the files on the clipboard: { paths, cut, own } (own: copied in Files; cut is only ever set for those) or null
+  files: () => (lord.clipboard.files ? lord.clipboard.files() : null),
   // re-copies a history entry (and moves it to the top)
   use(item) {
     if (item.image) { skipNext = true; lord.clipboard.useImage(item.image); }

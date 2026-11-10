@@ -1,16 +1,33 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
-import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText } from '@lordos/sdk';
+import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage } from './kinds.js';
+import { pasteFrom, offerable } from './clipfiles.js';
 
 // Changes every time something changed on disk (a copy finished, the trash…): the views reload.
 export const fsVersion = createStore(0);
 export const bump = () => fsVersion.set((v) => v + 1);
 
-// ---- file clipboard (separate from the text one) ----
+// ---- file clipboard ----
+// Files keeps its own (a cut is a move only between its windows) and also puts the paths on the session clipboard,
+// where Linux apps read them as files (text/uri-list, gnome-copied-files) and text editors as the paths.
 export const fileClipboard = createStore(null);          // { mode: 'copy' | 'cut', paths: [] }
-export const copyFiles = (paths) => fileClipboard.set({ mode: 'copy', paths });
-export const cutFiles = (paths) => fileClipboard.set({ mode: 'cut', paths });
+const sessionFiles = () => { try { return clipboard.files(); } catch (e) { return null; } };
+// The session clipboard's files older than Files' own copy: one Files couldn't offer (a place without local paths)
+// leaves them there, and they mustn't win over it.
+let olderGen = -1;
+function offer(paths, cut) {
+  const list = offerable(paths);
+  let ok = false;
+  if (list) { try { ok = clipboard.setFiles(list, { cut }); } catch (e) { /* the session clipboard keeps what it had */ } }
+  const f = ok ? null : sessionFiles();
+  olderGen = f ? f.gen : -1;
+}
+export const copyFiles = (paths) => { fileClipboard.set({ mode: 'copy', paths }); offer(paths, false); };
+export const cutFiles = (paths) => { fileClipboard.set({ mode: 'cut', paths }); offer(paths, true); };
+// What a paste would bring: Files' own copy or cut, or the files a Linux file manager copied (apps/files/clipfiles.js).
+const outside = () => { const f = sessionFiles(); return f && f.gen === olderGen ? null : f; };
+export const canPaste = (inside) => !!pasteFrom(inside, outside());
 
 // Free name in a folder: "photo.png" → "photo 2.png", "photo 3.png"…
 export function freeName(dir, name, existing) {
@@ -66,10 +83,10 @@ export function transfer(paths, destDir, move, known) {
 }
 
 export function paste(destDir, known) {
-  const c = fileClipboard.get();
-  if (!c || !c.paths.length) return;
-  transfer(c.paths, destDir, c.mode === 'cut', known);
-  if (c.mode === 'cut') fileClipboard.set(null);
+  const c = pasteFrom(fileClipboard.get(), outside());
+  if (!c) return;
+  transfer(c.paths, destDir, c.move, known);
+  if (c.move) fileClipboard.set(null);
 }
 
 // ---- tags (~/.local/share/lordos/tags.json: path → [colors]) ----

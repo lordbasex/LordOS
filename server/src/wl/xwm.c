@@ -29,6 +29,7 @@
  * See docs/WAYLAND.md, "X11 apps (Xwayland)". */
 #include "xwm.h"
 #include "x11wire.h"
+#include "urilist.h"
 #include "wl.h"
 #include "../cursor.h"
 #include "../term/term.h"
@@ -67,6 +68,7 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_STRING = 31, XA_WINDOW =
     X(NET_CLIENT_LIST, "_NET_CLIENT_LIST") X(NET_FRAME_EXTENTS, "_NET_FRAME_EXTENTS") X(MOTIF_WM_HINTS, "_MOTIF_WM_HINTS") \
     X(WL_SURFACE_ID, "WL_SURFACE_ID") X(CLIPBOARD, "CLIPBOARD") X(TARGETS, "TARGETS") X(TIMESTAMP, "TIMESTAMP") X(INCR, "INCR") \
     X(TEXT, "TEXT") X(MIME_UTF8, "text/plain;charset=utf-8") X(MIME_TEXT, "text/plain") X(MIME_PNG, "image/png") X(MIME_HTML, "text/html") \
+    X(MIME_URIS, "text/uri-list") X(GNOME_FILES, "x-special/gnome-copied-files") \
     X(LORD_SEL_CLIPBOARD, "_LORD_SEL_CLIPBOARD") X(LORD_SEL_PRIMARY, "_LORD_SEL_PRIMARY")
 
 #define AE(id, name) A_##id,
@@ -602,6 +604,10 @@ static void sel_request(const uint8_t *p) {
     else if (!image) { text = term_clipboard(); tlen = strlen(text); }
     size_t hlen = 0;
     const char *html = k == SEL_CLIP && !image ? wl_clip_html(&hlen) : NULL;
+    /* files copied in Files: also as the file lists X file managers read (wl.c, urilist.c) */
+    size_t flen = 0;
+    int fcount, fcut, fown;
+    int files = k == SEL_CLIP && !image && wl_clip_files(&flen, &fcount, &fcut, &fown);
     if (target == AT(TARGETS)) {
         uint32_t list[12];
         uint32_t nl = 0;
@@ -610,12 +616,18 @@ static void sel_request(const uint8_t *p) {
         if (image) list[nl++] = AT(MIME_PNG);
         else { list[nl++] = AT(UTF8_STRING); list[nl++] = AT(MIME_UTF8); list[nl++] = AT(MIME_TEXT); list[nl++] = XA_STRING; list[nl++] = AT(TEXT); }
         if (html) list[nl++] = AT(MIME_HTML);
+        if (files) { list[nl++] = AT(MIME_URIS); list[nl++] = AT(GNOME_FILES); }
         change_prop(requestor, prop, XA_ATOM, 32, list, nl);
     } else if (target == AT(TIMESTAMP)) {
         uint32_t t = 0;
         change_prop(requestor, prop, XA_CARDINAL, 32, &t, 1);
     } else if (html && target == AT(MIME_HTML)) {
         write_data(requestor, prop, target, (const uint8_t *)html, hlen);
+    } else if (files && (target == AT(MIME_URIS) || target == AT(GNOME_FILES))) {
+        char *f = wl_clip_files_as(target == AT(GNOME_FILES) ? URIL_GNOME : URIL_URI_LIST, &flen);
+        if (!f) { notify_requestor(time_, requestor, selection, target, 0); return; }
+        write_data(requestor, prop, target, (const uint8_t *)f, flen);
+        free(f);
     } else if (image && target == AT(MIME_PNG)) {
         size_t n = 0;
         const unsigned char *png = wl_clip_png(&n);

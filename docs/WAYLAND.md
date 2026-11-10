@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions (see below) |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below) |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps") |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -172,6 +172,18 @@ There's a single one for the whole session:
   apps receive from it any format it offers (up to 32).
 - **Images.** If what was copied is only an image (`image/png`), LordOS stores it: it stays
   available after the source app is closed and shows up in the history.
+- **Files.** Copy or Cut in Files puts the paths on the clipboard as `text/uri-list` (`file://`
+  URIs, percent-encoded, CRLF), `x-special/gnome-copied-files` (`copy` or `cut`, then the URIs, LF)
+  and plain text (one path per line), so a Linux file manager pastes the files and an editor the
+  paths. The other way, when a Linux app copies files, the compositor reads its `text/uri-list` (or
+  its gnome list) beside its text and keeps only this machine's files: `file://` URIs with an empty
+  or `localhost` host, decoded to an absolute UTF-8 path without NUL or line breaks; a list of more
+  than 65536 files, other hosts and other schemes are left out (`src/wl/urilist.c`,
+  `build/urilist-test`). Paste in Files copies them with `lord.fs.copy` and its checks; another
+  app's cut is pasted as a copy, only Files moves its own cut. The list stays valid while the text it
+  came with is the clipboard's, is offered again in both formats after that app closes, and goes to
+  X11 apps too. JS only ever hands a list of paths (`lord.clipboard.setFiles`), never other data.
+  `build/clipfiles-client` checks it inside a session.
 - **No blocking.** Large copies (up to 16 MB) are sent in chunks, without a slow-reading app
   stalling the server.
 
@@ -536,7 +548,9 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   Terminal and the history (with the X app's class as its source) see it.
 - **LordOS → X11.** LordOS's selection is put in X **only while an X window has the keyboard** and
   only if it's newer than what an X app copied; when the keyboard goes to a LordOS or Wayland
-  window, the window manager gives the selection up. Large pastes go in `INCR` chunks.
+  window, the window manager gives the selection up. Large pastes go in `INCR` chunks. Files copied
+  in Files are also offered as `text/uri-list` and `x-special/gnome-copied-files`; files an X app
+  copies arrive as their text only (the window manager reads one text target).
 - **Secrets never go to X.** What Passwords (or a password field) copies is marked sensitive and is
   not offered to X11 apps at all: in X, the pasted text is written to a window property any X client
   can read.

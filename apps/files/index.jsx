@@ -14,7 +14,7 @@ import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
 import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
 import {
-  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
+  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, canPaste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
@@ -748,7 +748,7 @@ export default function Files() {
     }
     if (loc.type === 'trash') return [{ label: tr('files.menu.emptyTrash'), danger: true, onClick: askEmpty, disabled: !entries.length }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
     return [
-      ...(wDir ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !clip }, '-'] : []),
+      ...(wDir ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) }, '-'] : []),
       { label: tr('files.menu.view'), submenu: viewItems },
       { label: tr('files.menu.sortBy'), submenu: sortItems },
       { label: tr('files.menu.groupBy'), submenu: groupItems },
@@ -876,7 +876,7 @@ export default function Files() {
       { label: tr('files.menu.edit'), items: [
         { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(selPaths), disabled: !sel.length },
         { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutFiles(selPaths), disabled: !sel.length || readOnly },
-        { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !clip || !wDir },
+        { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) || !wDir },
         { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => setSelected(new Set(flat.map((x) => x.path))) },
       ] },
       { label: tr('files.menu.view'), items: [

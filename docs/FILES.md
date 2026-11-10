@@ -68,7 +68,11 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 - **Selection:** click, ❖/Ctrl+click, ⇧+click (range), ❖A, and typing the start of a name.
 - **Rename in place** (Enter): the name is selected and what you type replaces it
   (`TextInput selectAll`, new in the SDK). Tags follow the file.
-- **Copy, cut and paste files:** it is a clipboard of its own, separate from the text one.
+- **Copy, cut and paste files:** Files keeps its own list (a cut moves only between Files windows) and
+  also puts the paths on the session clipboard as Linux file managers do (`text/uri-list`,
+  `x-special/gnome-copied-files`, the paths as text), so they paste in a Linux file manager, a chat or an
+  editor. Files copied in a Linux file manager paste in Files as a copy, only this machine's files
+  (`docs/WAYLAND.md`, "Clipboard"; `apps/files/clipfiles.js`).
   Copying into the same place duplicates with a free name («notas 2.txt»).
 - **Copy and move in the background** (server threads): with progress in the status bar and a
   button to cancel. If something fails, no half-made copies are left.
