@@ -1,18 +1,23 @@
 // controls.jsx — shared building blocks for the layout of LordOS apps: toolbar buttons
 // with tooltips, toolbars, a "more" menu button, a search field, empty states and grouped
-// ("inset") forms. The spacing and type scale they follow is in docs/DESIGN.md.
+// ("inset") forms; and (0.8.8.8) the choice controls with their keys built in: Dropdown, Checkbox,
+// RadioGroup, Tabs, Popover, Tooltip and ProgressBar (their rules are in sdk/controlmodel.js; List
+// and Table are in sdk/lists.jsx). The spacing and type scale they follow is in docs/DESIGN.md.
 import { View, Text, addListener } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, popupBg } from './theme.js';
-import { TextInput, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
+import { TextInput, ScrollView, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
 import { wm } from './windows.js';
 import { useStore } from './store.js';
 import { dialogStack, dialogKey, defaultButton, keyOwner } from './dialogkeys.js';
-import { direction } from './i18n.js';
+import { direction, t as tr } from './i18n.js';
 import { Lumo } from './mascot.js';
-import { Overlay } from './layers.js';
-import { menuStep } from './focusmodel.js';
-import { focusRingColor } from './focus.js';
+import { Overlay, shellLayers } from './layers.js';
+import { menuStep, within } from './focusmodel.js';
+import { focusRingColor, useFocusScope, keyFocused, onFocusMove } from './focus.js';
+import { groupKey, dropdownKey, tipSide, progressSpan } from './controlmodel.js';
+import { typeAhead, matchIndex, TYPE_MS } from './menunav.js';
+import { findChar } from './listmodel.js';
 
 // Design tokens (docs/DESIGN.md): an 8 px grid, desktop-standard type sizes and control heights.
 export const spacing = { xxs: 2, xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 };
@@ -46,7 +51,7 @@ function nearBottom(winId, node, items) {
   } catch (e) { return false; }
 }
 
-// Hover tooltip (shown after a short delay), for icon-only toolbar items.
+// Hover tooltip (shown after a short delay), for icon-only toolbar items; the keyboard focus shows it too.
 function useTooltip(title) {
   const [show, setShow] = useState(false);
   const timer = useRef(0);
@@ -56,10 +61,11 @@ function useTooltip(title) {
   return [show, enter, leave];
 }
 
-function TooltipBubble({ text, end, top }) {
+// top (below the anchor) or bottom (above it): the distance from the anchor's top or bottom edge
+function TooltipBubble({ text, end, top, bottom }) {
   const t = useTheme();
   return (
-    <View style={{ position: 'absolute', top, [end ? 'right' : 'left']: 0, zIndex: 1000, pointerEvents: 'none',
+    <View style={{ position: 'absolute', ...(bottom != null ? { bottom } : { top }), [end ? 'right' : 'left']: 0, zIndex: 1000, pointerEvents: 'none',
       paddingHorizontal: 8, height: 22, borderRadius: Math.max(2, t.menuRadius - 2), justifyContent: 'center',
       backgroundColor: t.popupBg || (t.mode === 'dark' ? '#3a3a40' : '#fbfbfd'), border: `1px solid ${t.separator}`, boxShadow: '0 4px 12px rgba(0,0,0,0.25)' }}>
       <Text style={{ fontSize: 11, color: t.text, whiteSpace: 'nowrap' }}>{text}</Text>
@@ -81,7 +87,7 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
   const fg = disabled ? t.textDim : active ? t.accent : color || t.text;
   return (
     <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }} focusable={focusable && !disabled} onKeyDown={onKeyDown}
-      onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
+      onFocus={tipEnter} onBlur={tipLeave} onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
         alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1, zIndex: tip ? 1000 : 0,
         backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover && !disabled ? t.hover : 'transparent' }, style]}>
@@ -362,6 +368,324 @@ function DialogButton({ t, label, onClick, primary, destructive, isDefault, ring
       <Text style={{ fontSize: typeScale.body, fontWeight: isDefault ? 600 : 500, color: primary ? '#fff' : t.text, whiteSpace: 'nowrap' }}>{label}</Text>
       {ring ? <View style={{ position: 'absolute', left: -3, top: -3, right: -3, bottom: -3, borderRadius: t.controlRadius + 3, pointerEvents: 'none',
         border: `2px solid ${focusRingColor(t)}` }} /> : null}
+    </View>
+  );
+}
+
+// ---- choice controls with their keys built in (0.8.8.8, docs/DESKTOP-PARITY.md) ----
+
+const boxOf = (n) => { try { const [x, y, w, h] = lord.getLayout(n.id); return { x, y, w, h }; } catch (e) { return null; } };
+const refNode = (r) => (r && typeof r === 'object' && 'current' in r ? r.current : r);
+// The area a popup stays inside: the window's frame (the window's own surface in an isolated app's process), or the
+// screen when there is none.
+function areaOf(win) {
+  const f = shellLayers() ? wm.get(win?.id) : win?.overlayHost ? boxOf(win.overlayHost) : null;
+  if (f && f.w > 0 && f.h > 0) return { x: f.x, y: f.y, w: f.w, h: f.h };
+  const sc = typeof lord !== 'undefined' && lord.screen ? lord.screen : { width: 1280, height: 800 };
+  return { x: 0, y: 0, w: sc.width, h: sc.height };
+}
+
+// The pointer's last place on the screen, for a tooltip shown by the keyboard focus (it must not cover it).
+let pointerAt = null;
+let pointerWatch = null;
+const watchPointer = () => { if (!pointerWatch) pointerWatch = addListener('pointermove', (e) => { pointerAt = { x: e.x, y: e.y }; }); };
+
+// The popups open (a Popover, a Dropdown's list), oldest first. A press outside one closes it, unless it lands in one
+// opened after it (a Dropdown or a date picker inside a Popover) or on that one's anchor; Escape closes only the
+// newest, so a list open inside a popover closes first.
+const popups = [];
+const hitIn = (n, e) => { const r = n && boxOf(n); return !!r && e.x >= r.x && e.x < r.x + r.w && e.y >= r.y && e.y < r.y + r.h; };
+function usePopup(open, box, anchor, onClose) {
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return undefined;
+    const me = { box, anchor };
+    popups.push(me);
+    const offPtr = addListener('pointerdown', (e) => {
+      const i = popups.indexOf(me);
+      if (i < 0) return;
+      for (const p of popups.slice(i)) if (hitIn(p.box.current, e) || hitIn(refNode(p.anchor), e)) return;
+      close.current?.();
+    });
+    const offKey = addListener('keydown', (e) => { if (e.key === 'Escape' && popups[popups.length - 1] === me) close.current?.(); });
+    return () => { offPtr(); offKey(); const i = popups.indexOf(me); if (i >= 0) popups.splice(i, 1); };
+  }, [open]);
+}
+
+// A popover opened from a control: anchor (a ref to it), onClose (a press outside it, or Escape), width (240),
+// padding (6). Below the anchor at its start edge, above it when there is no room below in the window, and moved
+// sideways to stay inside the window; drawn in the popover layer (sdk/layers.js) above the whole window. A focus
+// scope (sdk/focus.js): opened from the keyboard the focus moves to its first control and Tab goes round its own;
+// Escape closes it and the focus goes back to the control it was opened from.
+export function Popover({ anchor, onClose, width = 240, padding = 6, children, style }) {
+  const t = useTheme();
+  const win = useAppWindow();
+  const box = useRef(null);
+  const [up, setUp] = useState(false);
+  const [, force] = useState(0);
+  useFocusScope(box);
+  usePopup(true, box, anchor, onClose);
+  const a = boxOf(refNode(anchor));
+  const area = areaOf(win);
+  useEffect(() => {
+    if (!a) { const id = setTimeout(() => force((v) => v + 1), 16); return () => clearTimeout(id); }
+    const b = box.current && boxOf(box.current);
+    if (b) { const want = opensUp(a, area, b.h + 4); if (want !== up) setUp(want); }
+    return undefined;
+  });
+  if (!a) return null;
+  const w = Math.max(0, Math.min(width, area.w - 16));
+  const rtl = direction() === 'rtl';
+  const x = Math.max(area.x + 8, Math.min(area.x + area.w - w - 8, rtl ? a.x + a.w - w : a.x));
+  return (
+    <Overlay anchor={anchor}>
+      <View ref={box} style={[{ position: 'absolute', left: x - a.x, [up ? 'bottom' : 'top']: a.h + 4, width: w, padding,
+        borderRadius: t.menuRadius + 2, backgroundColor: popupBg(t), border: `1px solid ${t.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.32)' }, style]}>
+        {children}
+      </View>
+    </Overlay>
+  );
+}
+
+// A tooltip for any control: text, shown after delay ms while the pointer is over children or the keyboard focus is
+// on a control inside them. It never covers the pointer: below the control, or above it near the window's bottom
+// edge or where the pointer is (sdk/controlmodel.js tipSide). In the tooltip layer, it takes no clicks.
+export function Tooltip({ text, children, delay = 550, style }) {
+  const win = useAppWindow();
+  const ref = useRef(null);
+  const timer = useRef(0);
+  const why = useRef({ hover: false, focus: false });
+  const [show, setShow] = useState(false);
+  const update = () => {
+    clearTimeout(timer.current);
+    if (!text || !(why.current.hover || why.current.focus)) { setShow(false); return; }
+    timer.current = setTimeout(() => setShow(true), delay);
+  };
+  useEffect(() => {
+    watchPointer();
+    const off = onFocusMove(() => {
+      const n = keyFocused();
+      const f = !!n && !!ref.current && within(n, ref.current);
+      if (f !== why.current.focus) { why.current.focus = f; update(); }
+    });
+    return () => { off(); clearTimeout(timer.current); };
+  }, []);
+  useEffect(() => { if (!text) setShow(false); }, [text]);
+  let place = null;
+  if (show && ref.current) {
+    const a = boxOf(ref.current);
+    if (a) {
+      const size = { w: (typeof lord !== 'undefined' && lord.measureText ? lord.measureText(String(text), 11, 400) : String(text).length * 6) + 18, h: 22 };
+      place = { side: tipSide(a, size, areaOf(win), why.current.hover ? null : pointerAt), end: nearEnd(win.id, ref.current), h: a.h };
+    }
+  }
+  return (
+    <View ref={ref} style={style} onMouseEnter={() => { why.current.hover = true; update(); }}
+      onMouseLeave={() => { why.current.hover = false; update(); }} onMouseDown={() => { why.current.hover = false; update(); }}>
+      {children}
+      {place ? (
+        <Overlay anchor={ref} layer="tooltip">
+          <TooltipBubble text={text} end={place.end} {...(place.side === 'above' ? { bottom: place.h + 6 } : { top: place.h + 6 })} />
+        </Overlay>
+      ) : null}
+    </View>
+  );
+}
+
+// The rows of a Dropdown's list: 24 px each, up to 12 before it scrolls.
+const DROP_ROW = 24, DROP_ROWS = 12;
+
+// A drop-down choice (a pop-up button): value, options = [[value, label]], onChange(value). width (180), placeholder
+// (shown when no option has the value), small, disabled. A Tab stop: Space, Enter, ↓ and ↑ open it on the current
+// choice; then ↓ ↑, Home and End move, Enter or Space chooses, Escape closes it and Tab closes it and goes on.
+// Typing a name (closed or open) goes to the next choice that starts with it.
+export function Dropdown({ value, options, onChange, width = 180, placeholder, small, disabled, focusable = true }) {
+  const t = useTheme();
+  const { id: winId } = useAppWindow();
+  const btn = useRef(null), list = useRef(null), scroll = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [lit, setLit] = useState(-1);
+  const typed = useRef(null);
+  const current = options.findIndex((o) => o[0] === value);
+  const latest = useRef(null);
+  latest.current = { open, lit, current, options, onChange, value };
+  const choose = (i) => {
+    const L = latest.current, o = L.options[i];
+    setOpen(false);
+    if (o && o[0] !== L.value) L.onChange(o[0]);
+  };
+  const keys = (e) => {
+    const L = latest.current;
+    const now = Date.now();
+    const searching = !!typed.current && now - typed.current.at < TYPE_MS;
+    const ch = findChar(e, searching);
+    if (ch) {
+      typed.current = typeAhead(searching ? typed.current : null, ch, now);
+      const i = matchIndex(L.options.map((o) => ({ label: String(o[1] ?? '') })), L.open ? L.lit : L.current, typed.current.buf);
+      if (i >= 0) { if (L.open) setLit(i); else choose(i); }
+      return true;
+    }
+    const r = dropdownKey(e, { open: L.open, lit: L.lit, current: L.current, count: L.options.length });
+    if (!r) return false;
+    typed.current = null;
+    if (r.choose != null) { choose(r.choose); return true; }
+    setOpen(r.open);
+    if (r.lit != null) setLit(r.lit);
+    return !r.pass;
+  };
+  // opened with the pointer: the keys reach it as a listener (with the keyboard focus on it they come first)
+  useEffect(() => {
+    if (!open) { setLit(-1); return undefined; }
+    return addListener('keydown', (e) => { if (keys(e)) e.preventDefault?.(); });
+  }, [open]);
+  usePopup(open, list, btn, () => setOpen(false));
+  // the lit row comes into sight in a long list
+  useEffect(() => {
+    if (open && lit >= 0 && options.length > DROP_ROWS) scroll.current?.scrollTo(Math.max(0, (lit - DROP_ROWS + 3) * DROP_ROW));
+  }, [open, lit]);
+  const h = small ? controlSize.small : controlSize.regular - 2;
+  const cur = current >= 0 ? options[current][1] : placeholder ?? tr('shell.control.choose');
+  const end = open && nearEnd(winId, btn.current);
+  const rows = options.map(([v, label], i) => {
+    const on = lit === i;
+    const fill = on && t.menuHighlight !== 'subtle';
+    return (
+      <View key={String(v)} onClick={() => choose(i)} onMouseEnter={() => setLit(i)}
+        style={{ height: DROP_ROW, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
+          backgroundColor: fill ? t.accent : on ? t.hover : 'transparent' }}>
+        <Text style={{ width: 12, fontSize: 11, color: fill ? '#fff' : t.text }}>{v === value ? '✓' : ''}</Text>
+        <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: fill ? '#fff' : t.text, textAlign: 'start' }}>{label}</Text>
+      </View>
+    );
+  });
+  return (
+    <View ref={btn} style={{ width }}>
+      <View onClick={disabled ? undefined : () => setOpen((o) => !o)} focusable={focusable && !disabled} onKeyDown={keys}
+        style={{ height: h, paddingHorizontal: 9, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
+          backgroundColor: t.control, opacity: disabled ? 0.45 : 1, ...(t.buttonBorder ? { border: `1px solid ${t.separator}` } : null) }}>
+        <Text style={{ flex: 1, fontSize: small ? 12 : 13, color: current >= 0 ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{cur}</Text>
+        <Text style={{ fontSize: 9, color: t.textDim }}>▼</Text>
+      </View>
+      {open && (
+        <Overlay anchor={btn}>
+          <View ref={list} style={{ position: 'absolute', top: h + 4, [end ? 'right' : 'left']: 0, minWidth: Math.max(width, 160), padding: 5, borderRadius: t.menuRadius,
+            backgroundColor: popupBg(t), border: `1px solid ${t.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
+            {options.length > DROP_ROWS
+              ? <View style={{ height: DROP_ROWS * DROP_ROW }}><ScrollView scrollRef={scroll} focusable={false} style={{ flex: 1 }}>{rows}</ScrollView></View>
+              : rows}
+          </View>
+        </Overlay>
+      )}
+    </View>
+  );
+}
+
+// A check box with its label: checked, onChange(checked), label, disabled, mixed (some of what it stands for: a dash).
+// A Tab stop: Space (and Enter) flips it, as a click on the box or the label.
+export function Checkbox({ checked, onChange, label, disabled, mixed, focusable = true }) {
+  const t = useTheme();
+  const on = !!checked || !!mixed;
+  return (
+    <View onClick={disabled ? undefined : () => onChange?.(!checked)} focusable={focusable && !disabled}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: disabled ? 0.45 : 1, borderRadius: 4 }}>
+      <View style={{ width: 14, height: 14, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
+        border: `1px solid ${on ? t.accent : t.separator}` }}>
+        {on ? <Text style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginTop: -1 }}>{mixed ? '–' : '✓'}</Text> : null}
+      </View>
+      {label != null && label !== '' ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text> : null}
+    </View>
+  );
+}
+
+// A group of radio buttons: value, options = [[value, label, { disabled }?]], onChange(value); row: side by side
+// instead of one under the other. One Tab stop: the arrows (← → swapped in right to left) choose the next or the
+// previous one, going round and skipping the disabled ones, Home and End the first and the last; Space chooses the
+// first when none is chosen yet.
+export function RadioGroup({ value, options, onChange, row = false, disabled, focusable = true, style }) {
+  const t = useTheme();
+  const skip = (i) => !!disabled || !!options[i]?.[2]?.disabled;
+  const index = options.findIndex((o) => o[0] === value);
+  const onKey = (e) => {
+    if (e.key === ' ' && !e.ctrl && !e.meta && !e.alt) {
+      if (index < 0) { const i = options.findIndex((o, k) => !skip(k)); if (i >= 0) onChange(options[i][0]); }
+      return true;
+    }
+    const i = groupKey(e, { index, count: options.length, rtl: direction() === 'rtl', vertical: true, skip });
+    if (i == null) return false;
+    if (i !== index) onChange(options[i][0]);
+    return true;
+  };
+  return (
+    <View focusable={focusable && !disabled && options.length > 0} onKeyDown={onKey}
+      style={[{ flexDirection: row ? 'row' : 'column', gap: row ? spacing.l : spacing.s, borderRadius: 4 }, style]}>
+      {options.map(([v, label], i) => {
+        const on = v === value, off = skip(i);
+        return (
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: off ? 0.45 : 1 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
+              border: `1px solid ${on ? t.accent : t.separator}` }}>
+              {on ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} /> : null}
+            </View>
+            <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// A row of tabs over a pane: value, tabs = [[value, label, { disabled }?]], onChange(value). The chosen one is
+// underlined in the accent. One Tab stop: ← → choose the next or the previous tab (swapped in right to left, where
+// the first one is on the right), going round; Home and End the first and the last.
+export function Tabs({ value, tabs, onChange, focusable = true, style }) {
+  const t = useTheme();
+  const skip = (i) => !!tabs[i]?.[2]?.disabled;
+  const index = tabs.findIndex((o) => o[0] === value);
+  const onKey = (e) => {
+    const i = groupKey(e, { index, count: tabs.length, rtl: direction() === 'rtl', skip });
+    if (i == null) return false;
+    if (i !== index) onChange(tabs[i][0]);
+    return true;
+  };
+  return (
+    <View focusable={focusable && tabs.length > 0} onKeyDown={onKey}
+      style={[{ flexDirection: 'row', gap: spacing.xs, borderRadius: t.controlRadiusSmall }, style]}>
+      <Hairline edge="bottom" />
+      {tabs.map(([v, label], i) => {
+        const on = v === value, off = skip(i);
+        return (
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)}
+            style={{ height: 30, paddingHorizontal: spacing.m, justifyContent: 'center', opacity: off ? 0.45 : 1 }}>
+            <Text style={{ fontSize: typeScale.body, fontWeight: on ? 600 : 500, color: on ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{label}</Text>
+            {on ? <View style={{ position: 'absolute', left: spacing.s, right: spacing.s, bottom: 0, height: 2, borderRadius: 1, backgroundColor: t.accent }} /> : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// A progress bar: value from 0 to 1, or null (left out) while how much is left is not known, when a band slides
+// across it (still, over the whole bar, with reduced motion). It fills from the start edge (the right in right to
+// left). width (a number or a percentage; the parent's by default), height (6).
+export function ProgressBar({ value, width, height = 6, style }) {
+  const t = useTheme();
+  const known = value != null && Number.isFinite(value);
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    if (known || t.reduceMotion) return undefined;
+    const t0 = Date.now();
+    const id = setInterval(() => setMs(Date.now() - t0), 40);
+    return () => clearInterval(id);
+  }, [known, !!t.reduceMotion]);
+  const span = progressSpan(known ? value : null, ms, { reduceMotion: !!t.reduceMotion });
+  const part = (f) => ({ flexGrow: f, flexShrink: 1, flexBasis: 0 });
+  return (
+    <View style={[{ width, height, borderRadius: height / 2, backgroundColor: t.control, overflow: 'hidden', flexDirection: 'row' }, style]}>
+      <View style={part(span.from)} />
+      <View style={{ ...part(span.to - span.from), borderRadius: height / 2, backgroundColor: t.accent, opacity: span.still ? 0.45 : 1 }} />
+      <View style={part(1 - span.to)} />
     </View>
   );
 }

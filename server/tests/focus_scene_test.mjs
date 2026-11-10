@@ -3,6 +3,8 @@
 // that ends the focus, a listener that keeps Tab and a confirmation dialog that keeps its keys. Bundles
 // tests/focus_scene.mjs with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its styles and
 // texts, runs it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
+// Another scene over the same stub: `node tests/focus_scene_test.mjs list_scene.mjs` (the List, the Table and the
+// choice controls, 0.8.8.8).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -46,11 +48,12 @@ const MOCK = `globalThis.__lordTest = (() => {
   return { styles, parents, texts, removed };
 })();`;
 
+const scene = process.argv[2] || 'focus_scene.mjs';
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-focus-scene-'));
 let bad = 0, n = 0;
 try {
   const out = await esbuild.build({
-    entryPoints: [path.join(here, 'focus_scene.mjs')], bundle: true, write: false, format: 'esm',
+    entryPoints: [path.join(here, path.basename(scene))], bundle: true, write: false, format: 'esm',
     platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
     alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js') }, define: { 'process.env.NODE_ENV': '"production"' },
     banner: { js: MOCK },
@@ -63,7 +66,7 @@ try {
     if (!line.startsWith('ok ')) { bad++; console.log(`✗ ${line}`); }
   }
   if (r.status !== 0 || !n) { bad++; console.log(`✗ the scene failed (${r.status}): ${r.stderr.slice(0, 2000)}`); }
-  console.log(`focus-scene: ${n} checks, ${bad} failures`);
+  console.log(`${path.basename(scene, '.mjs').replace(/_/g, '-')}: ${n} checks, ${bad} failures`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

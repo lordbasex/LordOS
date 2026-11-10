@@ -14,6 +14,13 @@ export const isHidden = (n) => !!n && (!!n.hidden || n.style?.display === 'none'
 // A Tab stop: a node with the focusable prop that is not disabled and still mounted.
 export const canFocus = (n) => !!n?.props?.focusable && !n.props.disabled && !n.deleted;
 
+// The node a press on n gives the focus to without the ring: the nearest one from n up to root (n's own ones too)
+// with the focusOnPress prop that can take the focus. null when there is none.
+export function pressFocus(n, root) {
+  for (let x = n; x && x !== root; x = x.host) if (x.props?.focusOnPress && canFocus(x)) return x;
+  return null;
+}
+
 // The nodes under root in tree order (depth first, a node before its children), leaving out hidden subtrees.
 export function treeOrder(root) {
   const out = [];
@@ -73,12 +80,14 @@ export const activates = (e) => plain(e) && (e.key === ' ' || e.key === 'Enter')
 // focus, or where the pointer pressed last) and whether the ring is drawn. As :focus-visible in a browser, only the
 // keyboard moves the focus and shows the ring; a press of the pointer ends the focus and hides it, and the next Tab
 // goes on from where it pressed. When the focused node goes away the next Tab starts from the nearest node still there.
+// A press inside a node with the focusOnPress prop (a List, a Table) gives it the focus without the ring (keep), so
+// its keys go on working after a click on a row, as in a desktop's lists.
 export const NO_FOCUS = Object.freeze({ focus: null, anchor: null, visible: false });
 
 export function focusAfter(s, ev) {
   switch (ev.type) {
     case 'tab': return ev.to ? { focus: ev.to, anchor: ev.to, visible: true } : s;
-    case 'pointer': return { focus: null, anchor: ev.target || null, visible: false };
+    case 'pointer': return ev.keep ? { focus: ev.keep, anchor: ev.keep, visible: false } : { focus: null, anchor: ev.target || null, visible: false };
     case 'gone': return { focus: null, anchor: ev.anchor || null, visible: false };
     default: return s;
   }

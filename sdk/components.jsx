@@ -21,6 +21,7 @@ import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
 import { dropSorter, dropCount } from './filedrop.js';
 import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
 import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
+import { wheelValue } from './controlmodel.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -1012,11 +1013,27 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   );
 }
 
+// The wheel over a Slider or a Stepper (sdk/controlmodel.js wheelValue): a notch up adds a step and down takes one; a
+// touchpad's swipe only while the control has the keyboard focus. focused tells it (onFocus and onBlur of its node).
+function useWheelStep() {
+  const focused = useRef(false);
+  return {
+    focused, onFocus: () => { focused.current = true; }, onBlur: () => { focused.current = false; },
+    wheel: (e, o, set) => {
+      const v = wheelValue(e, { ...o, focused: focused.current });
+      if (v == null) return;
+      e.stopPropagation();               // the wheel moves the control, not the page it is in
+      if (v !== o.value) set(v);
+    },
+  };
+}
+
 // Number with − and + buttons (e.g. font size). One Tab stop: ↑ and → (← in right to left) add a step, ↓ and ← take one,
-// Page Up and Page Down ten, Home and End go to min and max.
+// Page Up and Page Down ten, Home and End go to min and max. The wheel over it adds or takes a step.
 export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step = 1, format = (v) => String(v), width = 56, focusable = true }) {
   const t = useTheme();
   const set = (v) => onChange(Math.max(min, Math.min(max, Math.round(v / step) * step)));
+  const w = useWheelStep();
   const onKey = (e) => {
     const v = rangeKey(e, { value, min, max, step, rtl: direction() === 'rtl' });
     if (v == null) return false;
@@ -1029,7 +1046,8 @@ export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step
     </View>
   );
   return (
-    <View focusable={focusable} onKeyDown={onKey} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.control, borderRadius: t.controlRadius, height: 26 }}>
+    <View focusable={focusable} onKeyDown={onKey} onFocus={w.onFocus} onBlur={w.onBlur} onWheel={(e) => w.wheel(e, { value, min, max, step }, set)}
+      style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.control, borderRadius: t.controlRadius, height: 26 }}>
       <Btn label="−" d={-step} />
       <Text style={{ width, textAlign: 'center', fontSize: 12, fontWeight: 600, color: t.text }}>{format(value)}</Text>
       <Btn label="+" d={step} />
@@ -1039,10 +1057,11 @@ export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step
 
 // Horizontal slider (drag or click on the bar). It runs from the start edge: min is on the right in right to left.
 // A Tab stop: ← → (swapped in right to left) and ↓ ↑ move it by step (a twentieth of the range unless given), Page Down
-// and Page Up by a tenth, Home and End to the ends.
+// and Page Up by a tenth, Home and End to the ends. The wheel over it moves it by step too.
 export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true }) {
   const t = useTheme();
   const rtl = direction() === 'rtl';
+  const w = useWheelStep();
   const ref = useRef(null);
   const drag = useRef(false);
   const latest = useRef(null);
@@ -1067,6 +1086,7 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, f
   const f = (value - min) / (max - min || 1);
   return (
     <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} focusable={focusable} onKeyDown={onKey}
+      onFocus={w.onFocus} onBlur={w.onBlur} onWheel={(e) => w.wheel(e, { value, min, max, step: step || (max - min) / 20 }, onChange)}
       style={{ width, height: 20, borderRadius: 10, justifyContent: 'center', direction: 'ltr' }}>
       <View style={{ height: 4, borderRadius: 2, backgroundColor: t.control }}>
         <View style={{ width: Math.max(0, f * width), height: 4, borderRadius: 2, backgroundColor: t.accent, ...(rtl ? { marginLeft: Math.max(0, (1 - f) * width) } : null) }} />

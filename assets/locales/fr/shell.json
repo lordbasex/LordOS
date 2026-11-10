@@ -113,6 +113,7 @@
   "password.show": "Afficher le mot de passe",
   "password.hide": "Masquer le mot de passe",
   "password.capsLock": "Verr. Maj. est activé",
+  "control.choose": "Choisir…",
   "code.details": "Détails",
   "code.modifiedBody": "Il ne correspond plus à la copie signée de LordOS : {list}. Réinstallez LordOS pour le réparer.",
   "code.modifiedTitle": "Ce composant de LordOS a été modifié et n’a pas été chargé",

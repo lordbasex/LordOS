@@ -113,6 +113,7 @@
   "password.show": "Mostrar senha",
   "password.hide": "Ocultar senha",
   "password.capsLock": "Caps Lock está ativado",
+  "control.choose": "Escolher…",
   "code.details": "Detalhes",
   "code.modifiedBody": "Ele não corresponde mais à cópia assinada do LordOS: {list}. Reinstale o LordOS para repará-lo.",
   "code.modifiedTitle": "Este componente do LordOS foi modificado e não foi carregado",

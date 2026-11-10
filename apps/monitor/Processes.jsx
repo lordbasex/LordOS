@@ -11,10 +11,10 @@
 import {
   View, Text, ScrollView, Segmented, SearchField, ToolbarButton, Button, GroupBox, FormRow, typeScale, spacing, useTheme, useLocale,
   useStore, useSettings, useKeyboard, createStore, monitor, monitorProcesses, monitorDetail, firewall, firewallState, formatNumber,
-  formatDate, formatTime, addListener, appName,
+  formatDate, formatTime, addListener, appName, Table,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fmt, AppGlyph, Table, Cell, isolatedAppOf } from './index.jsx';
+import { fmt, AppGlyph, isolatedAppOf } from './index.jsx';
 
 const RED = '#ff453a';
 
@@ -72,9 +72,9 @@ export function ProcessesTab() {
     { key: 'name', label: tr('monitor.process'), flex: 1, sort: true },
     { key: 'cpu', label: tr('monitor.cpuPct'), width: 80, num: true, sort: true },
     { key: 'rss', label: tr('monitor.memory'), width: 96, num: true, sort: true },
-    { key: 'threads', label: tr('monitor.threads'), width: 64, num: true, sort: true },
-    { key: 'pid', label: tr('monitor.pid'), width: 72, num: true, sort: true },
-    { key: 'user', label: tr('monitor.user'), width: 96, sort: true },
+    { key: 'threads', label: tr('monitor.threads'), width: 64, num: true, sort: true, dim: true },
+    { key: 'pid', label: tr('monitor.pid'), width: 72, num: true, sort: true, dim: true },
+    { key: 'user', label: tr('monitor.user'), width: 96, sort: true, dim: true },
   ];
   const needle = q.trim().toLowerCase();
   const list = useMemo(() => {
@@ -129,23 +129,28 @@ export function ProcessesTab() {
         <Segmented value={mine} onChange={setMine} options={[['mine', tr('monitor.mine')], ['all', tr('monitor.all')]]} />
         <SearchField value={q} onChange={setQ} placeholder={tr('monitor.search')} width={200} />
       </View>
-      <Table cols={cols} sort={sort} onSort={(key) => setSort((s0) => ({ key, dir: s0.key === key ? -s0.dir : key === 'name' || key === 'user' || key === 'pid' ? 1 : -1 }))}
-        rows={shown.map((p, i) => {
-          const on = keyOf(p) === keyOf(selected);
-          const fg = on ? '#fff' : null, dim = on ? 'rgba(255,255,255,0.82)' : t.textDim;
-          return (
-            <View key={p.pid} onMouseDown={() => put({ sel: { pid: p.pid, st: p.st } })} onDoubleClick={() => openInfo(p)} onContextMenu={(ev) => onContext(p, ev)}
-              style={{ flexDirection: 'row', height: 26, alignItems: 'center', paddingHorizontal: 10, backgroundColor: on ? t.accent : i % 2 ? t.hover : 'transparent' }}>
-              <Cell col={cols[0]}><AppGlyph item={p} /><Text style={{ fontSize: 12, color: fg || t.text, whiteSpace: 'nowrap' }}>{procLabel(tr, p)}</Text>
-                {p.appName && p.appName !== p.name ? <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap' }}>{p.appName}</Text> : null}</Cell>
-              <Cell col={cols[1]} color={fg} bold={p.cpu > 0.5}>{formatNumber(p.cpu * 100, 1)}</Cell>
-              <Cell col={cols[2]} color={fg}>{fmt.mem(p.rss)}</Cell>
-              <Cell col={cols[3]} color={dim}>{formatNumber(p.threads, 0)}</Cell>
-              <Cell col={cols[4]} color={dim}>{String(p.pid)}</Cell>
-              <Cell col={cols[5]} color={dim}>{p.user}</Cell>
-            </View>
-          );
-        })} />
+      {/* the SDK's table (0.8.8.8): a press or the keys choose a row (↑ ↓, Home, End, Page Up and Page Down, typing a
+          name), Enter and a double click open Get Info */}
+      <Table columns={cols} rows={shown} rowKey={keyOf} sort={sort}
+        onSort={(key) => setSort((s0) => ({ key, dir: s0.key === key ? -s0.dir : key === 'name' || key === 'user' || key === 'pid' ? 1 : -1 }))}
+        selection={selected ? [keyOf(selected)] : []} textOf={(p) => procLabel(tr, p)} onActivate={openInfo} onContextMenu={onContext}
+        onSelectionChange={(keys) => { const p = shown.find((x) => keyOf(x) === keys[0]); put({ sel: p ? { pid: p.pid, st: p.st } : null }); }}
+        renderCell={(p, c, { color, dim }) => {
+          switch (c.key) {
+            case 'name': return (
+              <>
+                <AppGlyph item={p} />
+                <Text style={{ fontSize: 12, color, whiteSpace: 'nowrap' }}>{procLabel(tr, p)}</Text>
+                {p.appName && p.appName !== p.name ? <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap' }}>{p.appName}</Text> : null}
+              </>
+            );
+            case 'cpu': return <Text style={{ fontSize: 12, color, fontWeight: p.cpu > 0.5 ? 600 : 400, whiteSpace: 'nowrap', textAlign: 'end' }}>{formatNumber(p.cpu * 100, 1)}</Text>;
+            case 'rss': return fmt.mem(p.rss);
+            case 'threads': return formatNumber(p.threads, 0);
+            case 'pid': return String(p.pid);
+            default: return p.user;
+          }
+        }} />
       <Text style={{ fontSize: 11, color: t.textDim }}>{tr('monitor.procFoot', { shown: shown.length, count: list.length, cpu: formatNumber(totalCpu * 100, 0) })}</Text>
     </>
   );

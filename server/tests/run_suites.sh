@@ -331,6 +331,12 @@ EOF
     # (0.8.8.8) keyboard focus: the Tab order over the tree, skipping, focus-visible, the keys of sliders, menus and scroll views (sdk/focusmodel.js)
     if have node; then run "focus-model-test (sdk/focusmodel.js)" node tests/focus_model_test.mjs
     else skip "focus-model-test" "node"; fi
+    # (0.8.8.8) List and Table selection: Shift ranges, Ctrl toggles, the page keys, Ctrl+A and type-to-find (sdk/listmodel.js)
+    if have node; then run "list-model-test (sdk/listmodel.js)" node tests/list_model_test.mjs
+    else skip "list-model-test" "node"; fi
+    # (0.8.8.8) the keys of Tabs, radio groups and a Dropdown, the wheel on sliders, tooltips and progress (sdk/controlmodel.js)
+    if have node; then run "control-model-test (sdk/controlmodel.js)" node tests/control_model_test.mjs
+    else skip "control-model-test" "node"; fi
     # (0.8.8.8) files dragged from Files onto Notes, Photos, Player and PDF Viewer: which ones each takes (sdk/filedrop.js)
     if have node; then run "filedrop-test (sdk/filedrop.js)" node tests/filedrop_test.mjs
     else skip "filedrop-test" "node"; fi
@@ -405,6 +411,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
     else skip "focus-scene-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) the List, the Table, Tabs, Dropdown, RadioGroup, a Popover's focus and the wheel on a Slider, from the keys
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "list-scene (sdk/lists.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs list_scene.mjs
+    else skip "list-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs

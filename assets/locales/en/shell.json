@@ -113,6 +113,7 @@
   "password.show": "Show Password",
   "password.hide": "Hide Password",
   "password.capsLock": "Caps Lock is on",
+  "control.choose": "Choose…",
   "code.details": "Details",
   "code.modifiedBody": "It no longer matches the signed copy of LordOS: {list}. Reinstall LordOS to repair it.",
   "code.modifiedTitle": "This LordOS component was modified and was not loaded",

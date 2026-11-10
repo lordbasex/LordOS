@@ -1,8 +1,8 @@
 // ui.jsx — small widgets shared by Calendar, Contacts and Reminders (each app keeps its own copy,
-// since apps only import from '@lordos/sdk'): popovers drawn above the window, sheets, drop-down
-// choices, a multi-line field, date and time fields with a month picker, and color swatches.
+// since apps only import from '@lordos/sdk'): sheets, drop-down choices, a multi-line field, date
+// and time fields with a month picker, and color swatches. Reminders' popovers are the SDK's (0.8.8.8).
 import {
-  View, Text, useTheme, useStore, createStore, useAppWindow, direction, ScrollView, Button, Hairline, takeTextFocus, releaseTextFocus,
+  View, Text, useTheme, direction, ScrollView, Button, Hairline, takeTextFocus, releaseTextFocus, Popover,
   weekdayName, formatTime, formatDate, t,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -26,71 +26,10 @@ export const atMinutes = (day, min) => { const x = sod(day); x.setHours(Math.flo
 export const monthName = (m) => t(`calendar.month.${m}`);
 export const monthYear = (d) => t('calendar.monthYear', { month: monthName(d.getMonth()), year: d.getFullYear() });
 
-// ---- popovers: drawn by <Layers /> (the last child of the app) above everything ----
+// ---- popovers: the SDK's (in the popover layer above the window, with the keys built in: the focus moves in
+// when it opens from the keyboard, Escape closes it and the focus goes back) ----
 
-const layers = createStore([]);            // [{ key, win, node }]
-let seq = 0;
-
-export function Popover(props) {
-  const { id: win } = useAppWindow();
-  const key = useRef(null);
-  if (!key.current) key.current = `p${++seq}`;
-  useEffect(() => {
-    const node = <PopBox {...props} />;
-    layers.set((l) => (l.some((x) => x.key === key.current) ? l.map((x) => (x.key === key.current ? { ...x, node } : x)) : [...l, { key: key.current, win, node }]));
-  });
-  useEffect(() => () => layers.set((l) => l.filter((x) => x.key !== key.current)), []);
-  return null;
-}
-
-let origin = null;                          // the Layers box: [x, y, w, h]
-
-export function Layers() {
-  const { id } = useAppWindow();
-  const all = useStore(layers);
-  const root = useRef(null);
-  const mine = all.filter((x) => x.win === id);
-  if (root.current) { try { origin = lord.getLayout(root.current.id); } catch (e) { /* not laid out yet */ } }
-  return (
-    <>
-      <View ref={root} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'none' }} />
-      {mine.map((x) => <View key={x.key} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 200 }}>{x.node}</View>)}
-    </>
-  );
-}
-
-function PopBox({ anchor, onClose, width = 240, children, padding = 6 }) {
-  const th = useTheme();
-  const box = useRef(null);
-  const [flip, setFlip] = useState(false);
-  const [, force] = useState(0);
-  const o = origin || [0, 0, 800, 600];
-  let a = null;
-  try { a = anchor?.current ? lord.getLayout(anchor.current.id) : null; } catch (e) { a = null; }
-  useEffect(() => {
-    if (!a) { const id = setTimeout(() => force((v) => v + 1), 16); return () => clearTimeout(id); }
-    if (!box.current) return undefined;
-    const h = lord.getLayout(box.current.id)[3];
-    const below = a[1] - o[1] + a[3] + 4;
-    const want = below + h > o[3] - 6 && a[1] - o[1] - h - 4 > 6;
-    if (want !== flip) setFlip(want);
-    return undefined;
-  });
-  if (!a) return null;
-  const rtl = direction() === 'rtl';
-  const w = Math.min(width, o[2] - 16);
-  let left = rtl ? a[0] - o[0] + a[2] - w : a[0] - o[0];
-  left = Math.max(8, Math.min(o[2] - w - 8, left));
-  const style = { position: 'absolute', left, width: w, padding, borderRadius: 10, backgroundColor: th.mode === 'dark' ? '#2c2c31' : '#ffffff',
-    border: `1px solid ${th.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.32)' };
-  if (flip) style.bottom = o[3] - (a[1] - o[1]) + 4; else style.top = a[1] - o[1] + a[3] + 4;
-  return (
-    <>
-      <View onMouseDown={() => onClose?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
-      <View ref={box} style={style}>{children}</View>
-    </>
-  );
-}
+export { Popover };
 
 // A menu inside a popover: items = [{ label, onClick, checked, destructive, color, disabled } | '-']
 export function MenuList({ items, onDone }) {

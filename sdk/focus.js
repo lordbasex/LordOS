@@ -11,12 +11,18 @@
 // screen keep it. A text field keeps the keys while it has them (sdk/components.jsx) and lets Tab go to the next
 // control; a confirmation dialog in front (sdk/dialogkeys.js) keeps Escape, Enter and Tab for its own buttons.
 //
-// Host props on a <View>: focusable (a Tab stop), disabled (skipped), modal (Tab stays inside it while it is shown),
-// onKeyDown(e) → true when used, onFocus() and onBlur() (the keyboard focus came and went), focusRing={false} (the node
-// draws its own, as a TextInput does), onRevealFocus(rect) (a ScrollView brings a focused node inside it into sight).
+// Host props on a <View>: focusable (a Tab stop), focusOnPress (a press inside it gives it the focus, without the
+// ring: a List or a Table keeps its keys after a click on a row), disabled (skipped), modal (Tab stays inside it
+// while it is shown), onKeyDown(e) → true when used, onFocus() and onBlur() (the keyboard focus came and went),
+// focusRing={false} (the node draws its own, as a TextInput does), onRevealFocus(rect) (a ScrollView brings a focused
+// node inside it into sight).
+//
+// A popover drawn in a layer above the window (sdk/controls.jsx Popover) is a focus scope of its own (useFocusScope):
+// while it is open over the area that had the keys, Tab goes round its controls; opened from the keyboard, the focus
+// moves to its first control, and when it closes the focus goes back to the control it was opened from.
 import { useEffect, useRef } from 'react';
 import { setKeyFocus, addListener, setFocusRing, keyboardLayer, onCommit, onShellKeyboard, modifiers } from '@lordos/runtime';
-import { NO_FOCUS, focusAfter, nextStop, tabKey, activates, within, canFocus, isHidden } from './focusmodel.js';
+import { NO_FOCUS, focusAfter, nextStop, tabKey, activates, within, canFocus, isHidden, pressFocus } from './focusmodel.js';
 import { dialogStack } from './dialogkeys.js';
 import { windows, wm } from './windows.js';
 import { shellTokens } from './theme.js';
@@ -32,8 +38,15 @@ export function setTextFocusBridge(b) { text = b; }
 
 const ringOf = (t) => t?.focusRing || t?.accent || '#0a84ff';
 
-// The area with the keys: the shell's layer in front (search, a sheet, a prompt), else the focused window.
+// The area with the keys: the shell's layer in front (search, a sheet, a prompt), else the focused window; and in
+// it the newest popover opened over it, if any (a popover can open another one over itself).
+const scopes = [];            // { root, parent, opener, ring } in the order they opened
 function area() {
+  let a = baseArea();
+  for (const sc of scopes) if (a && sc.root && !sc.root.deleted && sc.parent === a.root) a = { root: sc.root, ring: a.ring };
+  return a;
+}
+function baseArea() {
   const layer = keyboardLayer();
   if (layer) return { root: layer, ring: ringOf(shellTokens.get()) };
   const id = wm.focused();
@@ -62,6 +75,7 @@ function paint() {
   if (want) setFocusRing(want, color);
 }
 
+const movers = new Set();     // onFocusMove watchers (a Tooltip around a control)
 function setState(root, next) {
   const old = stateOf(root);
   states.set(root, next);
@@ -70,7 +84,17 @@ function setState(root, next) {
     try { next.focus?.props?.onFocus?.(); } catch (e) { console.error('focus:', e); }
   }
   paint();
+  if (old.focus !== next.focus || old.visible !== next.visible) for (const fn of movers) { try { fn(); } catch (e) { console.error('focus:', e); } }
 }
+
+// The node the keyboard focus is on, while its ring shows (null when the pointer pressed last or nothing has it).
+export function keyFocused() {
+  const a = area();
+  const s = a ? stateOf(a.root) : NO_FOCUS;
+  return s.visible ? s.focus : null;
+}
+// fn() after each move of the keyboard focus; returns the function that stops it.
+export function onFocusMove(fn) { movers.add(fn); return () => movers.delete(fn); }
 
 // A ScrollView the node is in scrolls it into sight (the nearest one).
 function reveal(n, root) {
@@ -80,6 +104,8 @@ function reveal(n, root) {
     if (typeof p.props?.onRevealFocus === 'function') { p.props.onRevealFocus(r); return; }
   }
 }
+// A row the keys moved to inside a focused List or Table: brought into sight as a focused control is.
+export const revealNode = (n) => { if (n && !n.deleted) reveal(n, null); };
 
 // Space or Enter on a focused button: its onClick, and its ancestors' as a click bubbles, at the middle of its box.
 function press(n) {
@@ -130,13 +156,18 @@ function after(e) {
 setKeyFocus({ before, after });
 
 // A press of the pointer ends the keyboard focus everywhere; Tab then goes on from where it pressed.
+// A press inside a List or a Table (focusOnPress) gives it the focus without the ring, so its keys go on working.
 addListener('pointerdown', (e) => {
   for (const [root, s] of [...states]) {
-    const anchor = e.target && within(e.target, root) ? e.target : s.focus || s.anchor;
-    if (s.focus || s.visible || s.anchor !== anchor) setState(root, focusAfter(s, { type: 'pointer', target: anchor }));
+    const inside = e.target && within(e.target, root);
+    const anchor = inside ? e.target : s.focus || s.anchor;
+    const keep = inside ? pressFocus(e.target, root) : null;
+    if (s.focus !== keep || s.visible || s.anchor !== (keep || anchor)) setState(root, focusAfter(s, { type: 'pointer', target: anchor, keep }));
   }
   const a = area();
-  if (a && e.target && within(e.target, a.root) && !states.has(a.root)) states.set(a.root, focusAfter(NO_FOCUS, { type: 'pointer', target: e.target }));
+  if (a && e.target && within(e.target, a.root) && !states.has(a.root)) {
+    setState(a.root, focusAfter(NO_FOCUS, { type: 'pointer', target: e.target, keep: pressFocus(e.target, a.root) }));
+  }
 });
 
 // After each commit: a focused node that went away, got hidden or disabled loses the focus (the next Tab starts from
@@ -167,3 +198,42 @@ export function useFocusArea(id, focused, ring) {
   return ref;
 }
 export { ringOf as focusRingColor };
+
+// A popover's box (a ref) as a focus scope over the area that has the keys when it opens (see the top of this file).
+// The focus moves in when the keyboard had it (the ring showed); opened with the pointer, the next Tab goes to its
+// first control. When the scope goes away the focus goes back to where it was opened from, with the ring if the
+// keyboard was in the scope last (a popover of plain rows opened from the keyboard and closed with Escape too).
+export function useFocusScope(ref) {
+  const sc = useRef(null);
+  useEffect(() => {
+    const a = area();
+    const ps = a ? stateOf(a.root) : NO_FOCUS;
+    const enter = ps.visible && !!ps.focus;
+    sc.current = { root: null, parent: a?.root || null, opener: ps.focus || ps.anchor, ring: a?.ring, enter };
+    scopes.push(sc.current);
+    const attach = () => {
+      const root = ref.current;
+      if (!root || root === sc.current.root) return;
+      if (sc.current.root) states.delete(sc.current.root);
+      sc.current.root = root;
+      const to = enter ? nextStop(root, null, false) : null;
+      if (to) { setState(root, focusAfter(NO_FOCUS, { type: 'tab', to })); reveal(to, root); } else { states.set(root, NO_FOCUS); paint(); }
+    };
+    attach();
+    const off = onCommit(attach);        // drawn in its layer from the frame after it opened
+    return () => {
+      off();
+      const me = sc.current;
+      const i = scopes.indexOf(me);
+      if (i >= 0) scopes.splice(i, 1);
+      const last = me.root ? stateOf(me.root) : NO_FOCUS;
+      if (me.root) states.delete(me.root);
+      const back = me.opener;
+      if (me.parent && !me.parent.deleted && back && !back.deleted && within(back, me.parent) && canFocus(back)) {
+        // the ring comes back if the keyboard was there last: on a control inside, or opened from it and never pressed
+        if (last.visible || (me.enter && !last.anchor)) setState(me.parent, focusAfter(stateOf(me.parent), { type: 'tab', to: back }));
+        else setState(me.parent, { ...stateOf(me.parent), anchor: back });
+      } else paint();
+    };
+  }, []);
+}

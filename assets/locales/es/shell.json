@@ -113,6 +113,7 @@
   "password.show": "Mostrar contraseña",
   "password.hide": "Ocultar contraseña",
   "password.capsLock": "Bloq Mayús está activado",
+  "control.choose": "Elegí…",
   "code.details": "Detalles",
   "code.modifiedBody": "Ya no coincide con la copia firmada de LordOS: {list}. Reinstalá LordOS para repararlo.",
   "code.modifiedTitle": "Este componente de LordOS fue modificado y no se cargó",

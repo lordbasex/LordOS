@@ -142,7 +142,10 @@ export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
 import { Layer, enableShellLayers } from './layers.js';
 export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
+  Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar,
 } from './controls.jsx';
+// (0.8.8.8) lists whose rows are chosen with the pointer and the keys: Shift ranges, Ctrl toggles, type-to-find
+export { List, Table } from './lists.jsx';
 export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, linuxPlayers, useLinuxPlayers, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
 export * as imageEdit from './imageeditmodel.js';   // the image editor's math (crop presets, resize, redaction; issue #30)
 export { disks, useDisks, needsDiskFormats, openDiskFormats } from './disks.js';

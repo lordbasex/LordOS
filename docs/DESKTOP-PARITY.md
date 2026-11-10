@@ -63,8 +63,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 |---|---|---|---|
 | A keyboard focus model in the runtime: `focusable`, Tab and ⇧Tab between controls, a focus ring shown only when the keyboard is used, Space and Enter activate | everything is mouse-only today except text fields | L | ✅ checked on VM 127 (Settings) |
 | Menus with arrows, Enter, type-ahead, delayed submenus, opening left in RTL | keyboard use | M | ✅ checked on VM 127 (F10, arrows) |
-| SDK components with keyboard support built in: List/Table with Shift/Ctrl range selection and type-to-find, Dropdown, Checkbox, Radio, Tabs, Popover, Tooltip, ProgressBar | each app has its own today (three `Popover`s, two tables…) | M | ⬜ |
-| Sliders and steppers with arrows and the wheel; ScrollView with Page Up/Down, Home, End and horizontal scrolling | keyboard use | S | 🟨 the keys and `horizontal` ScrollView built with the focus model, to check on the VM; the wheel on sliders not yet |
+| SDK components with keyboard support built in: List/Table with Shift/Ctrl range selection and type-to-find, Dropdown, Checkbox, Radio, Tabs, Popover, Tooltip, ProgressBar | each app has its own today (three `Popover`s, two tables…) | M | 🟨 built, to check on the VM: `List` and `Table` (`sdk/lists.jsx`, `sdk/listmodel.js`), `Dropdown`, `Checkbox`, `RadioGroup`, `Tabs`, `Popover` (a focus scope), `Tooltip`, `ProgressBar` (`sdk/controls.jsx`, `sdk/controlmodel.js`); Reminders' popovers and Monitor's process table moved to them, the copies in Calendar and Contacts, Monitor's disk table and the Imager's progress bar not yet |
+| Sliders and steppers with arrows and the wheel; ScrollView with Page Up/Down, Home, End and horizontal scrolling | keyboard use | S | 🟨 built, to check on the VM: the keys, `horizontal` ScrollView and the wheel on sliders and steppers (a touchpad swipe only while it has the focus) |
 | Destructive dialogs start on Cancel; a dialog takes keys only when in front | Enter emptied the Trash | S | ⬜ |
 
 ## Phase 5 — text, language and accessibility

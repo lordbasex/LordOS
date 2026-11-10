@@ -79,9 +79,10 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
   apps and the system apps with `"process": "isolated"`: Passwords and, since 0.8.2, Mail, Calendar,
   Contacts and Reminders) it goes to the window's own overlay host, above all
   of the window's content (the app's surface is the window, so it can't leave it).
-- Used today by: the shell's menus, the SDK's `MenuButton`, the «fill from Passwords» button
-  (`AutofillButton`), Settings' pop-up buttons and Passwords' pop-up menus. Calendar, Contacts and
-  Reminders keep their own per-window popover host; the Terminal's preferences use an inline list.
+- Used today by: the shell's menus, the SDK's `MenuButton`, `Dropdown`, `Popover` and `Tooltip` (0.8.8.8), the
+  «fill from Passwords» button (`AutofillButton`), Settings' pop-up buttons and Passwords' pop-up menus. Reminders'
+  popovers are the SDK's `Popover` since 0.8.8.8; Calendar and Contacts keep their own per-window popover host; the
+  Terminal's preferences use an inline list.
 - **The keyboard (0.8.2).** While anything shows in the `overlay`, `modal`, `system` or `capture` layers (search,
   the launcher, sheets, system prompts, the screenshot selection), no Linux app (Wayland or X11) gets the keys: `runtime/index.js` counts each
   layer's children after every commit and `sdk/wayland.js` gives the compositor keyboard focus 0
