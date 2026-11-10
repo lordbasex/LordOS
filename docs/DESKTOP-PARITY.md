@@ -23,7 +23,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Databases: connect through an SSH tunnel, as `docs/DATABASES.md` phase 2 designs it: lord-server starts `/usr/bin/ssh -W <db host>:<db port>` (fixed path, every argument from the validated favorite, `--` before the destination, the key a file under the home and not readable by others, `BatchMode`, the host key confirmed by the person on first use like a certificate) and hands its stdin/stdout to lord-sql as the server's stream; the tunnel ends with the connection | most favorites imported from Sequel Ace are SSH ones and can't connect today | M | ✅ checked on VM 115 (the maintainer's own server still to try) |
+| Databases: connect through an SSH tunnel, as `docs/DATABASES.md` phase 2 designs it: lord-server starts `/usr/bin/ssh -W <db host>:<db port>` (fixed path, every argument from the validated favorite, `--` before the destination, the key a file under the home and not readable by others, `BatchMode`, the host key confirmed by the person on first use like a certificate) and hands its stdin/stdout to lord-sql as the server's stream; the tunnel ends with the connection | most favorites imported from Sequel Ace are SSH ones and can't connect today | M | ✅ checked on VM 115 and by the maintainer on their own server |
 
 ## Phase 1 — quick wins, nothing new to approve
 
