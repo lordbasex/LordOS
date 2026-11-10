@@ -69,3 +69,87 @@ import('../../sdk/textfieldmodel.js').then(({ editKey, replaceSel, selRange, sel
   eq('an anchor at the caret is no selection', selRange(S('ab', 1, 1)), null);
   console.log(`textfield-model selection: ${ok} checks`);
 });
+
+// ---- undo and redo (0.8.8.8): typing is one step until a pause, a new word or a caret moved elsewhere
+import('../../sdk/textfieldmodel.js').then(({ newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, replaceSel, editKey, lineAt }) => {
+  const S = (value, pos, anchor = null) => ({ value, pos, anchor });
+  // types text one character at a time, ms apart, from state s; returns [state, history]
+  const typeIn = (s, h, text, t0 = 0, ms = 100) => {
+    let t = t0;
+    for (const ch of text) { const n = replaceSel(s, ch); h = record(h, s, n, 'type', t); s = n; t += ms; }
+    return [s, h];
+  };
+  // every value Undo goes back through, to the start
+  const undoAll = (s, h) => { const seen = []; for (let r = undo(h, s); r; r = undo(h, s)) { h = r.h; s = r.s; seen.push(s.value); } return seen; };
+
+  let [s, h] = typeIn(S('', 0), newHistory(), 'abc');
+  eq('a run of letters is one step', h.done.length, 1);
+  const r = undo(h, s);
+  eq('undo the run', r.s, S('', 0));
+  eq('redo it back', redo(r.h, r.s).s, S('abc', 3));
+  eq('nothing to redo after a new edit', canRedo(record(r.h, r.s, S('x', 1), 'type', 0)), false);
+
+  [s, h] = typeIn(S('', 0), newHistory(), 'ssh pi');
+  eq('a new word is a new step', undoAll(s, h), ['ssh ', '']);
+  [s, h] = typeIn(S('', 0), newHistory(), 'ab', 0, 1500);
+  eq('a pause ends the step', undoAll(s, h), ['a', '']);
+
+  // a caret moved elsewhere (a click, an arrow) ends it too
+  [s, h] = typeIn(S('', 0), newHistory(), 'ab');
+  const moved = S('ab', 0);
+  h = record(h, s, moved, 'move', 300);
+  [s, h] = typeIn(moved, h, 'x', 400);
+  eq('typing after a caret jump is a new step', undoAll(s, h), ['ab', '']);
+  eq('only a move records no step', record(newHistory(), S('ab', 1), S('ab', 0), 'move', 0).done.length, 0);
+
+  // Backspace held down: one step; a paste, a cut and a deleted selection each one of their own
+  h = newHistory(); s = S('hello', 5);
+  for (let i = 0; i < 3; i++) { const n = editKey(s, { key: 'Backspace' }); h = record(h, s, n, 'delete', i * 50); s = n; }
+  eq('backspaces join', [s.value, h.done.length, undo(h, s).s.value], ['he', 1, 'hello']);
+  h = newHistory(); s = S('ab', 2);
+  let n = replaceSel(s, 'XY'); h = record(h, s, n, 'paste', 0); s = n;
+  n = replaceSel(s, 'Z'); h = record(h, s, n, 'paste', 10); s = n;
+  eq('two pastes are two steps', undoAll(s, h), ['abXY', 'ab']);
+  h = newHistory(); s = S('abcd', 3, 1);
+  n = editKey(s, { key: 'Delete' }); h = record(h, s, n, 'clear', 0); s = n;
+  n = editKey(s, { key: 'Backspace' }); h = record(h, s, n, 'delete', 10); s = n;
+  const once = undo(h, s);
+  eq('a deleted selection is its own step, and comes back selected', [once.s.value, undo(once.h, once.s).s], ['ad', S('abcd', 3, 1)]);
+  h = newHistory(); s = S('ab cd', 5);
+  n = editKey(s, { key: 'Backspace', ctrl: true }); h = record(h, s, n, 'clear', 0); s = n;
+  n = editKey(s, { key: 'Backspace', ctrl: true }); h = record(h, s, n, 'clear', 10); s = n;
+  eq('each word deleted is a step', undoAll(s, h), ['ab ', 'ab cd']);
+  [s, h] = typeIn(S('abcd', 4, 0), newHistory(), 'xy');
+  eq('typing over a selection, then on: one step back to the selection', [undoAll(s, h), undo(h, s).s], [['abcd'], S('abcd', 4, 0)]);
+  h = record(newHistory(), S('draft', 5), S('', 0), 'external', 0);
+  eq('a value changed from outside can be undone', undo(h, S('', 0)).s.value, 'draft');
+  h = newHistory();
+  for (let i = 0; i < 250; i++) h = record(h, S(String(i), 1), S(String(i + 1), 1), 'paste', i);
+  eq('the history keeps the last 200 steps', [h.done.length, h.done[0].value], [200, '50']);
+  eq('empty history', [undo(newHistory(), S('', 0)), redo(newHistory(), S('', 0)), canUndo(newHistory())], [null, null, false]);
+
+  // a password field (secure) keeps no history: an old password never comes back with Undo or Redo
+  [s, h] = typeIn(S('', 0), newHistory(true), 'hunter2');
+  h = record(h, s, S('', 0), 'external', 5000);            // the app clears the field after a login
+  eq('a secure field records nothing', [h.done.length, h.undone.length, canUndo(h), canRedo(h)], [0, 0, false, false]);
+  eq('a secure field has nothing to undo or redo', [undo(h, S('', 0)), redo(h, S('', 0))], [null, null]);
+  const forged = { done: [S('old', 3)], undone: [S('older', 5)], last: null, secure: true };
+  eq('a secure history never undoes or redoes, whatever it holds', [canUndo(forged), canRedo(forged), undo(forged, S('', 0)), redo(forged, S('', 0))], [false, false, null, null]);
+  [s, h] = typeIn(S('', 0), newHistory(), 'secret');
+  const hs = historyFor(h, true);
+  eq('turning secure on drops the history', [hs.done.length, canUndo(hs), hs.secure], [0, false, true]);
+  const back = historyFor(hs, false);
+  eq('turning secure off starts an empty history', [back.done.length, back.undone.length, back.secure, canUndo(back)], [0, 0, false, false]);
+  const u = undo(h, s);
+  eq('any change of secure drops redo steps too', canRedo(historyFor(historyFor(u.h, true), false)), false);
+  eq('the same secure keeps the history', [historyFor(h, false) === h, historyFor(hs, true) === hs], [true, true]);
+  eq('an undo and a redo keep a plain history plain', [u.h.secure, redo(u.h, u.s).h.secure], [false, false]);
+
+  eq('the history keys', [historyKey({ ctrl: true, base: 'z' }), historyKey({ meta: true, base: 'z' }), historyKey({ ctrl: true, shift: true, base: 'z' }),
+    historyKey({ meta: true, shift: true, base: 'z' }), historyKey({ ctrl: true, base: 'y' }), historyKey({ base: 'z', key: 'z' }),
+    historyKey({ ctrl: true, alt: true, base: 'z' }), historyKey({ meta: true, base: 'y' }), historyKey({ ctrl: true, shift: true, base: 'Z', key: 'Z' })],
+  ['undo', 'undo', 'redo', 'redo', 'redo', null, null, null, 'redo']);
+  eq('a triple click in one line: all of it', lineAt('ssh pi', 2), [0, 6]);
+  eq('a triple click in an empty field', lineAt('', 0), [0, 0]);
+  console.log(`textfield-model history: ${ok} checks`);
+});
