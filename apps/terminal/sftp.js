@@ -26,6 +26,15 @@ export function parseOctal(s) {
 export const parentOf = (p) => { const s = String(p || '/').replace(/\/+$/, ''); const i = s.lastIndexOf('/'); return i <= 0 ? '/' : s.slice(0, i); };
 export const joinPath = (dir, name) => `${String(dir || '/').replace(/\/+$/, '')}/${name}`;
 export const baseName = (p) => String(p || '').replace(/\/+$/, '').split('/').pop() || '/';
+// a transfer's two ends for the transfers list: { from, to }, the local side with ~ for the home, the server's after its
+// "user@host:" when known, and the destination as its folder (with a "/" at the end)
+export function transferRoute(j, home = '', host = '') {
+  const tilde = (p) => (home && (p === home || String(p).startsWith(`${home.replace(/\/+$/, '')}/`)) ? `~${String(p).slice(home.replace(/\/+$/, '').length)}` : String(p || ''));
+  const remote = (p) => `${host ? `${host}:` : ''}${p || ''}`;
+  const dir = (p) => `${parentOf(p).replace(/\/+$/, '')}/`;
+  const a = j?.args || {};
+  return j?.kind === 'up' ? { from: tilde(a.src), to: remote(dir(a.path)) } : { from: remote(a.path), to: tilde(dir(a.dest)) };
+}
 // a name typed by the user for a new folder or a rename: one path segment
 // a lord.fs entry (list or stat) as a listing row: the mode comes as octal text
 export const fromLocal = (e) => ({ name: e.name, kind: e.dir ? 'd' : e.link ? 'l' : '-', size: e.size || 0, mtime: e.mtime || 0,

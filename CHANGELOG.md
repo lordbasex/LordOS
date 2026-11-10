@@ -70,6 +70,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal: a new tab goes last.** It was placed right after the tab in front, in the middle of the others.
 - **Terminal: "Choose Location…" in Settings → Config File shows the whole file chooser.** It was drawn inside the
   section's box, with no room for the folder list; it now covers the Settings window, as Import does.
+- **Terminal: files dropped on an ssh pane go to the remote shell's directory**, found as for a download from `ls` (the
+  reported one, the prompt's, the title's, then the home), not always to the home on a server without the LordOS
+  integration.
+- **Terminal Files mode in a narrow window keeps the names readable**: below about 1100 px Permissions is hidden, below
+  820 px Modified too, and the transfers' speed graph narrows; before, the fixed columns left the Name column empty.
 - **Databases: choosing a favorite's color shows which one is chosen, and it is kept at once.** The ring around the
   chosen dot was drawn with two shadows and a spread, which the interface engine doesn't draw, so nothing seemed to
   happen; it is a border now. The color is also written at once (the dot in the list changes) without Save Changes.
@@ -89,6 +94,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   there is no file opens the folder's menu on either side: New Folder, Upload or Download the other side's selection
   here, Refresh, Hidden, Enclosing Folder, Copy Path, and Show in Files or Open Terminal Here (cd). The server side
   starts in the directory the remote shell's title names when the shell reports none. Its menus stay inside the view.
+- **Terminal: files dragged from Files onto an ssh pane say where they will go before you let go.** While the drag is over
+  the pane it is outlined and reads "Drop to upload N item(s) to user@host:~/dir" (with ⌥, that the paths are pasted
+  instead). Files tells a window under the drag through a new optional `onFilesOver(paths, how)` prop next to
+  `onFilesDrop` (null when the drag leaves or drops).
+- **Terminal Files mode: each transfer shows where it comes from and where it goes**, on a line under its name and
+  progress bar ("~/notes.txt → user@host:/srv/www/", "user@host:/var/log/app.log → ~/Downloads/"). `transferRoute` in
+  `apps/terminal/sftp.js` (4 more checks in `terminal_sftp_test.mjs`).
 - **Databases: a group of favorites has a color too.** Its folder is drawn in it; it is chosen in the group's sheet (New
   Group, Rename Group…) or from the group's menu (Color › Red … Gray, None). Kept in `favorites.json` as the group's
   `color` (0–6, as a favorite's), which lord-server now checks like a favorite's (`sqlc_test.c`, 5 more checks).

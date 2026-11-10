@@ -58,6 +58,7 @@ eq('a line not on the screen: the last prompt', promptDir(PI, 'gone'), '/etc');
 eq('root and an absolute path', promptDir(['root@srv:/var/log# ls', 'syslog'], 'syslog'), '/var/log');
 eq('a virtualenv before the prompt', promptDir(['(venv) ana@box:~/src$ ls', 'a.py'], 'a.py'), '~/src');
 eq('a directory with spaces', promptDir(['ana@box:~/My Files$ ls', 'a.txt'], 'a.txt'), '~/My Files');
+eq('no line: the current prompt at the bottom, past blank lines', promptDir(['a@b:~/old$ ls', '', 'x', '', 'a@b:~/now$ '], null), '~/now');
 eq('no prompt on the screen', promptDir(['a.txt', 'b.txt'], 'a.txt'), '');
 eq('trailing spaces on the screen lines', promptDir(['ana@box:~/x$ ls   ', 'a.txt   '], 'a.txt'), '~/x');
 eq('Debian\'s title', titleDir('lordbasex@lordos-pi: ~/Downloads'), '~/Downloads');

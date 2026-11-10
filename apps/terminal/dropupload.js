@@ -6,7 +6,7 @@
 import { createStore, fs, term, userDirs, clipboard, t as T } from '@lordos/sdk';
 import { meta, toast } from './state.js';
 import { request, transfer, freeName, joinPath, baseName, fromLocal, errCode, goodName } from './sftp.js';
-import { promptDir, titleDir, expandHome } from './lsnames.js';
+import { promptDir, titleDir, titleHost, expandHome } from './lsnames.js';
 
 // sid → { pid, conn, jobs: [job], hidden }: one sftp connection per ssh, kept while it lives
 export const drops = createStore({});
@@ -44,8 +44,7 @@ export const clearDrops = (sid, keep) => drops.set((d) => (d[sid] ? { ...d, [sid
 async function run(wid, sid, paths) {
   let conn;
   try { conn = await connOf(sid); } catch (e) { toast(wid, T('terminal.drop.cant', { why: T(`terminal.files.err.${errCode(e)}`) })); return; }
-  let dir = meta.get()[sid]?.remoteCwd || '';
-  if (!dir) { try { dir = (await request('list', { conn, path: '.' })).path || '.'; } catch (e) { dir = '.'; } }
+  const dir = (await remoteDirs(conn, sid))[0] || '.';
   let there = [];
   try { there = ((await request('list', { conn, path: dir })).entries || []).map((r) => r.name); } catch (e) { there = []; }
   const taken = new Set(there);
@@ -84,14 +83,31 @@ export function downloadName(wid, sid, name, line = '') {
   return true;
 }
 
-// the name's place on the server: { path, st } for the first candidate directory that has it, or null
-async function locate(conn, sid, name, line) {
+// where the remote shell is, most certain first: the directory it reports (OSC 7), the one the prompt shows (the nearest
+// above line, or the last on the screen), the one in the title, and the home
+async function remoteDirs(conn, sid, line = null) {
   const m = meta.get()[sid] || {};
   let home = '';
   try { home = (await request('list', { conn, path: '.' })).path || ''; } catch (e) { home = ''; }
   let screen = [];
   try { screen = (term.text(sid, 'screen') || '').split('\n'); } catch (e) { screen = []; }
-  const dirs = [...new Set([m.remoteCwd || '', expandHome(promptDir(screen, line), home), expandHome(titleDir(m.title), home), home].filter(Boolean))];
+  return [...new Set([m.remoteCwd || '', expandHome(promptDir(screen, line), home), expandHome(titleDir(m.title), home), home].filter(Boolean))];
+}
+
+// the drop's destination as the person reads it, before anything is sent: "user@host:~/Downloads" (the same order as
+// remoteDirs, without asking the server: "~" stays "~")
+export function dropTarget(sid) {
+  const m = meta.get()[sid] || {};
+  let screen = [];
+  try { screen = (term.text(sid, 'screen') || '').split('\n'); } catch (e) { screen = []; }
+  const dir = m.remoteCwd || promptDir(screen, null) || titleDir(m.title) || '~';
+  const host = titleHost(m.title);
+  return host ? `${host}:${dir}` : dir;
+}
+
+// the name's place on the server: { path, st } for the first candidate directory that has it, or null
+async function locate(conn, sid, name, line) {
+  const dirs = await remoteDirs(conn, sid, line);
   for (const d of dirs) {
     const path = joinPath(d, name);
     try { return { path, st: await request('stat', { conn, path }) }; } catch (e) { /* the next one */ }

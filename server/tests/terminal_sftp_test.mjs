@@ -24,6 +24,12 @@ eq('octal', [m.octal(0o644), m.octal(0o4755), m.octal(0)], ['0644', '04755', '00
 eq('parse octal', [m.parseOctal('644'), m.parseOctal('0755'), m.parseOctal('4755'), m.parseOctal('9'), m.parseOctal('rwx')], [0o644, 0o755, 0o4755, null, null]);
 eq('parent', [m.parentOf('/var/www/html'), m.parentOf('/var'), m.parentOf('/'), m.parentOf('/var/www/')], ['/var/www', '/', '/', '/var']);
 eq('join', [m.joinPath('/var/www', 'a'), m.joinPath('/', 'etc'), m.joinPath('/x/', 'y')], ['/var/www/a', '/etc', '/x/y']);
+eq('route of an upload', m.transferRoute({ kind: 'up', args: { src: '/home/ana/Descargas/a.iso', path: '/home/pi/Downloads/a.iso' } }, '/home/ana', 'pi@lordos-pi'),
+  { from: '~/Descargas/a.iso', to: 'pi@lordos-pi:/home/pi/Downloads/' });
+eq('route of a download', m.transferRoute({ kind: 'down', args: { path: '/srv/x.log', dest: '/home/ana/Descargas/x.log' } }, '/home/ana/', ''),
+  { from: '/srv/x.log', to: '~/Descargas/' });
+eq('route outside the home', m.transferRoute({ kind: 'down', args: { path: '/a', dest: '/mnt/disk/a' } }, '/home/ana', 'h'), { from: 'h:/a', to: '/mnt/disk/' });
+eq('route of a home look-alike', m.transferRoute({ kind: 'up', args: { src: '/home/anabel/f', path: '/f' } }, '/home/ana', '').from, '/home/anabel/f');
 eq('good names', ['a.txt', 'a b', '', '.', '..', 'a/b', 'x\ny', 'x'.repeat(256)].map(m.goodName), [true, true, false, false, false, false, false, false]);
 const list = [{ name: 'b.txt', kind: '-', size: 3 }, { name: 'a10', kind: 'd' }, { name: 'a2', kind: 'd' }, { name: '.env', kind: '-', size: 9 }, { name: 'A.txt', kind: '-', size: 1 }];
 eq('sorted: folders first, numbers in order', m.sortEntries(list).map((e) => e.name), ['a2', 'a10', '.env', 'A.txt', 'b.txt']);

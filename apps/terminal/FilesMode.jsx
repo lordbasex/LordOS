@@ -9,7 +9,7 @@ import { meta } from './state.js';
 import { titleHost, titleDir, expandHome } from './lsnames.js';
 import { fetchRemote, openersFor, watchEdit } from './remoteopen.js';
 import {
-  request, transfer, cancel, clearFinished, transfers, closedConns, samplesOf, speedSeries,
+  request, transfer, cancel, clearFinished, transfers, closedConns, samplesOf, speedSeries, transferRoute,
   permString, permBoxes, boxesPerm, octal, parseOctal, parentOf, joinPath, baseName, goodName, sortEntries, visible, size, rate, freeName, fromLocal, errCode,
 } from './sftp.js';
 
@@ -289,6 +289,9 @@ export function FilesMode({ t, wid, sid, startLocal }) {
   const toggleRoot = () => { if (root) open(false); else open(true); };
 
   // ---- drawing ----
+  // a narrow window keeps room for the names: Permissions goes first, then Modified (each side gets about half the width)
+  const viewW = (() => { try { return box.current ? lord.getLayout(box.current.id)[2] : 1200; } catch (e) { return 1200; } })();
+  const cols = viewW >= 1100 ? 3 : viewW >= 820 ? 2 : 1;
   const pane = (side) => {
     const remote = side === 'remote';
     const list = sortEntries(visible(remote ? rlist : llist, hidden, filter));
@@ -311,8 +314,8 @@ export function FilesMode({ t, wid, sid, startLocal }) {
         <View style={{ flexDirection: 'row', height: 22, alignItems: 'center', paddingHorizontal: 12, direction: 'ltr' }}>
           <Text style={{ flex: 1, fontSize: 10.5, color: t.textDim }}>{tr('terminal.files.name')}</Text>
           <Text style={{ width: 70, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.size')}</Text>
-          <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.modified')}</Text>
-          <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.perms')}</Text>
+          {cols > 1 && <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.modified')}</Text>}
+          {cols > 2 && <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.perms')}</Text>}
         </View>
         <View style={{ flex: 1, minHeight: 0 }} onClick={() => setSel({ side, names: [] })} onContextMenu={(ev) => paneMenu(ev, side)}>
         <ScrollView style={{ flex: 1 }}>
@@ -327,8 +330,8 @@ export function FilesMode({ t, wid, sid, startLocal }) {
                   <Text style={{ width: 16, fontSize: 11, color: on ? '#fff' : e.kind === 'd' ? '#64b5ff' : t.textDim }}>{e.kind === 'd' ? '▸' : e.kind === 'l' ? '↪' : '·'}</Text>
                   <Text style={{ flex: 1, minWidth: 0, fontFamily: MONO, fontSize: 12.5, color: on ? '#fff' : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{e.name}</Text>
                   <Text style={{ width: 70, fontFamily: MONO, fontSize: 11.5, color: on ? '#fff' : t.textDim, textAlign: 'end' }}>{e.kind === 'd' ? '' : size(e.size)}</Text>
-                  <Text style={{ width: 92, fontFamily: MONO, fontSize: 11.5, color: on ? '#fff' : t.textDim, textAlign: 'end' }}>{when(e.mtime)}</Text>
-                  <Text style={{ width: 92, fontFamily: MONO, fontSize: 11.5, color: on ? '#fff' : t.textDim, textAlign: 'end' }}>{permString(e.perm, e.kind)}</Text>
+                  {cols > 1 && <Text style={{ width: 92, fontFamily: MONO, fontSize: 11.5, color: on ? '#fff' : t.textDim, textAlign: 'end' }}>{when(e.mtime)}</Text>}
+                  {cols > 2 && <Text style={{ width: 92, fontFamily: MONO, fontSize: 11.5, color: on ? '#fff' : t.textDim, textAlign: 'end' }}>{permString(e.perm, e.kind)}</Text>}
                 </View>
               );
             })}
@@ -388,7 +391,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
         {pane('remote')}
       </View>
       {/* transfers */}
-      <View style={{ height: jobs.length ? 168 : 0, flexDirection: 'row', overflow: 'hidden' }}>
+      <View style={{ height: jobs.length ? 196 : 0, flexDirection: 'row', overflow: 'hidden' }}>
         <Hairline edge="top" />
         <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -400,23 +403,28 @@ export function FilesMode({ t, wid, sid, startLocal }) {
             {[...jobs].reverse().map((j) => {
               const pct = j.total ? Math.min(100, Math.round((j.done / j.total) * 100)) : j.state === 'done' ? 100 : 0;
               const col = j.kind === 'up' ? UP : DOWN;
+              const route = transferRoute(j, homeDir(), host);
               return (
-                <View key={j.job} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 22, direction: 'ltr' }}>
-                  <Text style={{ width: 14, fontSize: 12, fontWeight: 700, color: col }}>{j.kind === 'up' ? '↑' : '↓'}</Text>
-                  <Text style={{ width: 200, fontFamily: MONO, fontSize: 11.5, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{j.name}</Text>
-                  <View style={{ flex: 1, height: 7, borderRadius: 4, backgroundColor: t.control, overflow: 'hidden' }}>
-                    <View style={{ width: `${pct}%`, height: 7, borderRadius: 4, backgroundColor: j.state === 'error' ? '#ff453a' : col }} />
+                <View key={j.job} style={{ paddingVertical: 3, direction: 'ltr' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 18 }}>
+                    <Text style={{ width: 14, fontSize: 12, fontWeight: 700, color: col }}>{j.kind === 'up' ? '↑' : '↓'}</Text>
+                    <Text style={{ flex: 1, minWidth: 0, maxWidth: 360, fontFamily: MONO, fontSize: 11.5, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{j.name}</Text>
+                    <View style={{ flex: 1, minWidth: 60, height: 7, borderRadius: 4, backgroundColor: t.control, overflow: 'hidden' }}>
+                      <View style={{ width: `${pct}%`, height: 7, borderRadius: 4, backgroundColor: j.state === 'error' ? '#ff453a' : col }} />
+                    </View>
+                    <Text style={{ width: 110, fontSize: 11, color: j.state === 'error' ? '#ff6961' : t.textDim, textAlign: 'end', whiteSpace: 'nowrap' }}>
+                      {j.state === 'run' ? `${size(j.done)} / ${size(j.total)}` : j.state === 'done' ? tr('terminal.files.done') : j.state === 'cancelled' ? tr('terminal.files.cancelled') : errText({ code: j.error })}
+                    </Text>
+                    <Text onClick={j.state === 'run' ? () => cancel(j.job) : undefined} style={{ width: 16, fontSize: 12, color: j.state === 'run' ? t.textDim : 'transparent' }}>✕</Text>
                   </View>
-                  <Text style={{ width: 120, fontSize: 11, color: j.state === 'error' ? '#ff6961' : t.textDim, textAlign: 'end', whiteSpace: 'nowrap' }}>
-                    {j.state === 'run' ? `${size(j.done)} / ${size(j.total)}` : j.state === 'done' ? tr('terminal.files.done') : j.state === 'cancelled' ? tr('terminal.files.cancelled') : errText({ code: j.error })}
-                  </Text>
-                  <Text onClick={j.state === 'run' ? () => cancel(j.job) : undefined} style={{ width: 16, fontSize: 12, color: j.state === 'run' ? t.textDim : 'transparent' }}>✕</Text>
+                  {/* where it comes from and goes to, on the whole width under it */}
+                  <Text style={{ marginLeft: 22, fontFamily: MONO, fontSize: 10.5, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{`${route.from}  →  ${route.to}`}</Text>
                 </View>
               );
             })}
           </ScrollView>
         </View>
-        <View style={{ width: 280, padding: 10, gap: 6 }}>
+        <View style={{ width: viewW < 900 ? 150 : 280, padding: 10, gap: 6 }}>
           <Hairline edge="start" />
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Text style={{ fontSize: 11.5, color: UP }}>{`↑ ${rate(nowUp)}`}</Text>

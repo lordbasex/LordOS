@@ -8,7 +8,7 @@ import { SecretBar } from './SecretBar.jsx';
 import { SaveBar } from './SaveBar.jsx';
 import { ClaudeBar } from './ClaudeBar.jsx';
 import { pathsText } from './paths.js';
-import { dropUpload, downloadName } from './dropupload.js';
+import { dropUpload, downloadName, dropTarget } from './dropupload.js';
 import { nameAt } from './lsnames.js';
 
 export const paneNodes = new Map();     // sid → instancia del nodo (para navegar entre paneles)
@@ -39,6 +39,14 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
   const m = useStore(meta, (x) => x[sid]) || {};
   const p = getProfile(m.profile);
   const [flash, setFlash] = useState(false);
+  // files dragged from Files over the pane: what letting go does, shown before it happens
+  const [over, setOver] = useState(null);       // { count, upload, dest }
+  const onFilesOver = (paths, how) => {
+    if (!paths) { setOver(null); return; }
+    const i = term.info(sid);
+    const upload = !how?.alt && !!(i && i.busy && i.process === 'ssh');
+    setOver({ count: paths.length, upload, dest: upload ? dropTarget(sid) : '' });
+  };
 
   useEffect(() => { term.focus(sid, active && windowFocused); }, [sid, active, windowFocused]);
 
@@ -100,7 +108,7 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
   const badge = m.badge;
   const transparent = (p.transparency || 0) > 0;
   return (
-    <View onFilesDrop={(paths, how) => { focusPane(wid, sid); if (!how?.alt && dropUpload(wid, sid, paths)) return; term.paste(sid, pathsText(paths)); }}
+    <View onFilesOver={onFilesOver} onFilesDrop={(paths, how) => { setOver(null); focusPane(wid, sid); if (!how?.alt && dropUpload(wid, sid, paths)) return; term.paste(sid, pathsText(paths)); }}
       style={{ flex: 1, overflow: 'hidden', backdropFilter: transparent && p.blur ? 'blur(14px)' : undefined }}>
       <Terminal ref={(inst) => { ref.current = inst; if (inst) paneNodes.set(sid, inst); else paneNodes.delete(sid); }}
         session={sid} onMouseDown={onMouseDown}
@@ -123,6 +131,14 @@ export function TermPane({ wid, sid, active, windowFocused, multi, onContextMenu
         <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.28)', pointerEvents: 'none' }} />
       )}
       {flash && <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.14)', pointerEvents: 'none' }} />}
+      {over ? (
+        <View style={{ position: 'absolute', left: 8, top: 8, right: 8, bottom: 8, borderRadius: 10, pointerEvents: 'none', alignItems: 'center', justifyContent: 'center', gap: 6,
+          border: `2px dashed ${over.upload ? '#ff9f0a' : 'rgba(255,255,255,0.45)'}`, backgroundColor: over.upload ? 'rgba(255,159,10,0.12)' : 'rgba(255,255,255,0.06)' }}>
+          <Text style={{ fontSize: 15, fontWeight: 700, color: '#fff', textAlign: 'center' }}>{over.upload ? T('terminal.drop.overUpload', { count: over.count }) : T('terminal.drop.overPaste', { count: over.count })}</Text>
+          {over.upload ? <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)', textAlign: 'center', direction: 'ltr' }}>{over.dest}</Text> : null}
+          {over.upload ? <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>{T('terminal.drop.overAlt')}</Text> : null}
+        </View>
+      ) : null}
       {m.secret && m.secretDismissed !== m.secret ? <SecretBar sid={sid} wid={wid} prompt={m.secret} /> : null}
       {m.saveOffer && !m.secret ? <SaveBar sid={sid} wid={wid} offer={m.saveOffer} /> : null}
       {m.claudeConnect && !m.secret && !m.saveOffer ? <ClaudeBar sid={sid} wid={wid} /> : null}

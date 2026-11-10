@@ -649,6 +649,15 @@ export default function Files() {
   const dropOf = (inst) => { for (let n = inst; n; n = n.parent) { if (n.props?.dropPath) return n.props.dropPath; if (n.props?.dropTrash) return 'trash:'; } return null; };
   // another app's window under the pointer that takes files (an onFilesDrop prop, e.g. the Terminal: their paths)
   const filesDropOf = (inst) => { for (let n = inst; n; n = n.parent) if (typeof n.props?.onFilesDrop === 'function') return n.props.onFilesDrop; return null; };
+  // and its onFilesOver(paths, how), if it has one: told while the drag is over it, and with null once it leaves or drops
+  // (the Terminal says where the files will go)
+  const filesOverOf = (inst) => { for (let n = inst; n; n = n.parent) if (typeof n.props?.onFilesDrop === 'function') return typeof n.props.onFilesOver === 'function' ? n.props.onFilesOver : null; return null; };
+  const overNow = useRef(null);
+  const tellOver = (fn, paths, how) => {
+    if (overNow.current && overNow.current !== fn) { try { overNow.current(null); } catch (e) { /* its app is gone */ } }
+    overNow.current = fn;
+    if (fn) { try { fn(paths, how); } catch (e) { overNow.current = null; } }
+  };
   useEffect(() => {
     const mv = addListener('pointermove', (e) => {
       const p = press.current;
@@ -657,6 +666,7 @@ export default function Files() {
       p.moved = true;
       const target = dropOf(e.target);
       setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly });
+      tellOver(!target && !p.favOnly ? filesOverOf(e.target) : null, p.paths, { alt: !!e.alt });
       setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
@@ -665,6 +675,7 @@ export default function Files() {
       if (!p || !p.moved) return;
       const target = dropOf(e.target);
       setDrag(null); setDropTarget(null);
+      tellOver(null);
       const other = !target && !p.favOnly ? filesDropOf(e.target) : null;
       if (other) { try { other(p.paths, { alt: !!e.alt }); } catch (err) { console.warn('files drop:', err); } return; }
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }

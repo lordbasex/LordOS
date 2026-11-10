@@ -50,7 +50,7 @@ const cleanDir = (d) => (d && d.length <= 4096 && !/[\x00-\x1f\x7f]/.test(d) && 
 
 export function promptDir(lines, line) {
   const all = (lines || []).map((l) => String(l).replace(/\s+$/, ''));
-  const at = all.lastIndexOf(String(line || '').replace(/\s+$/, ''));
+  const at = line ? all.lastIndexOf(String(line).replace(/\s+$/, '')) : -1;      // no line: from the bottom
   for (let i = (at < 0 ? all.length : at) - 1; i >= 0; i--) {
     const m = PROMPT.exec(all[i]);
     if (m) return cleanDir(m[1]);
