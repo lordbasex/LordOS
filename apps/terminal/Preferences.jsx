@@ -13,12 +13,13 @@ import { DEFAULT_BINDINGS, ACTION_IDS, actionLabel, bindings, comboLabel, keyCap
 import { importIterm } from './iterm.js';
 import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConfig } from './config.js';
 import { compareNames } from '../../sdk/collate.js';
+import { cleanForward } from './forwards.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
   ['general', T('terminal.prefs.sec.general')], ['colors', T('terminal.prefs.sec.colors')], ['text', T('terminal.prefs.sec.text')], ['window', T('terminal.prefs.sec.window')],
   ['terminal', T('terminal.prefs.sec.terminal')], ['keys', T('terminal.prefs.sec.keys')], ['triggers', T('terminal.prefs.sec.triggers')],
-  ['file', T('terminal.prefs.sec.file')],
+  ['ssh', T('terminal.prefs.sec.ssh')], ['file', T('terminal.prefs.sec.file')],
 ];
 
 const ANSI_NAMES = () => ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'].map((c) => T(`terminal.prefs.ansi.${c}`));
@@ -647,6 +648,33 @@ export function Preferences({ wid, onClose }) {
       </>
     ),
     file: <ConfigFileSection t={t} onImport={() => setImporting(true)} onNotice={setNotice} />,
+    ssh: (
+      <>
+        <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.fwdHint')}</Text>
+        {(p.forwards || []).length > 0 && (
+        <GroupBox style={{ marginBottom: spacing.s }}>
+        {(p.forwards || []).map((f, i) => {
+          const upd = (patch) => set({ forwards: p.forwards.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+          const ok = !!cleanForward(f);
+          return (
+            <View key={i} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, paddingVertical: spacing.s, direction: 'ltr' }}>
+              <Toggle small on={f.enabled !== false} onChange={(v) => upd({ enabled: v })} />
+              <TextInput value={f.host || ''} placeholder="localhost" onChange={(v) => upd({ host: v.trim() })} style={{ width: 130 }} />
+              <Text style={{ fontSize: 12, color: t.textDim }}>:</Text>
+              <TextInput value={f.port == null ? '' : String(f.port)} placeholder="80" onChange={(v) => upd({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 60 }} />
+              <Text style={{ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap' }}>→ 127.0.0.1:</Text>
+              <TextInput value={f.local == null ? '' : String(f.local)} placeholder={T('terminal.fwd.auto')} onChange={(v) => upd({ local: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 70 }} />
+              {!ok && <Text style={{ fontSize: 11, color: '#ff453a' }}>{T('terminal.fwd.badInput')}</Text>}
+              <View style={{ flex: 1 }} />
+              <Button small label="−" onClick={() => set({ forwards: p.forwards.filter((_, j) => j !== i) })} />
+            </View>
+          );
+        })}
+        </GroupBox>
+        )}
+        <Button small label={T('terminal.prefs.fwdAdd')} onClick={() => set({ forwards: [...(p.forwards || []), { host: 'localhost', port: '', local: '', enabled: true }] })} style={{ alignSelf: 'flex-start' }} />
+      </>
+    ),
     triggers: (
       <>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginBottom: spacing.m, lineHeight: 1.45, textAlign: 'start' }}>{T('terminal.prefs.triggersHint')}</Text>

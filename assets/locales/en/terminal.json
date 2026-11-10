@@ -476,5 +476,29 @@
   "files.conflictHint": "“{name}” and {count} item(s) in all are already there. What should the upload do with them?",
   "files.conflict.replace": "Replace",
   "files.conflict.keep": "Keep Both",
-  "files.conflict.skip": "Skip"
+  "files.conflict.skip": "Skip",
+  "fwd.add": "Add",
+  "fwd.auto": "auto",
+  "fwd.badInput": "Use a port (1–65535) or host:port; a local port is 1024–65535",
+  "fwd.close": "Close this forward",
+  "fwd.copy": "Copy",
+  "fwd.err.bad": "Not a valid address or port",
+  "fwd.err.failed": "The server refused it",
+  "fwd.err.nossh": "This ssh can't be shared (started before LordOS 0.8.8.7, or from another server)",
+  "fwd.err.unavailable": "No free local port",
+  "fwd.noSsh": "Forwards need an ssh connected in this tab.",
+  "fwd.none": "No forwards on this connection. Add one below, or list them in the profile (Settings → SSH).",
+  "fwd.open": "Open",
+  "fwd.openBrowser": "Open in Browser",
+  "fwd.opened": {
+    "one": "A port forward is open",
+    "other": "{count} port forwards are open"
+  },
+  "fwd.opening": "Waiting for the ssh connection…",
+  "fwd.serverPh": "8080 or host:5432",
+  "fwd.sessionOnly": "Added here, it lasts until this connection ends. Listens on 127.0.0.1 only.",
+  "fwd.title": "Port forwards",
+  "prefs.fwdAdd": "Add Forward",
+  "prefs.fwdHint": "Port forwards: when an ssh started in this profile connects, each server port listed here is reachable on this computer at 127.0.0.1, through the same ssh connection. Leave the local port empty to let LordOS pick a free one. They close with the connection.",
+  "prefs.sec.ssh": "SSH"
 }

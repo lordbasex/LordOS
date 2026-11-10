@@ -10,6 +10,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Terminal: port forwards over the tab's own ssh.** Profile → SSH lists forwards, each "server host:port →
+  127.0.0.1:port", with the local port automatic (a free one) or fixed (1024–65535) and an on/off switch. When an ssh
+  started in that profile's session connects, they open through its own control socket (`MUX_C_OPEN_FWD`, the
+  connection sharing Files mode uses): no second login, no program run, listening on 127.0.0.1 only. A forward waits
+  for the control socket while ssh is still signing in, and they all end with the connection. The tab shows a badge,
+  `⇄ 18080→36169` (and `+n` for more), and the footer how many are open; a click opens their list with Open (in the
+  browser), Copy and Close, and a field to add one for this connection only (`8080` or `host:5432`). A notice says
+  when they open, with Open in Browser for a web port. Checked on a real session against a private sshd: a page
+  served on the server's 18080 came through the automatic local port, a forward added from the list opened, Close
+  and `exit` removed their listeners.
+
 ### Fixed
 
 - **Apps whose name starts with a lowercase letter are in their place in the Apps grid (GitHub #64).** "go-link Desk"

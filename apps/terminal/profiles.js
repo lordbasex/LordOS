@@ -85,6 +85,7 @@ export const DEFAULT_PROFILE = {
   columns: 0, rows: 0,       // tamaño de ventanas nuevas (0 = el de la app)
   itermGuid: '',
   tags: [],                  // iTerm2's profile tags: the profile menus group by them
+  forwards: [],              // [{ host, port, local ('' = automatic), enabled }]: opened when this profile's ssh connects (forwards.js)
 };
 
 const DEFAULTS = { profiles: [DEFAULT_PROFILE], defaultProfile: 'default', hotkey: 'F12', schemes: {}, shortcuts: {}, keyMap: [] };

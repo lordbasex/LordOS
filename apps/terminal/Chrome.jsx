@@ -11,6 +11,8 @@ import {
 } from './state.js';
 import { terminalSettings, getProfile, profileName } from './profiles.js';
 import { programLabel, isClaude } from './paths.js';
+import { ForwardsBadge } from './ForwardsPanel.jsx';
+import { forwards } from './forwards.js';
 import {
   sessionFile, snapshotFile, settingsFile, parseSession, parseStatus, parseSettings, isConnected, level, bar, tokens, parseScreenStatus, matchSession,
   fitSegments, LEVEL_COLORS,
@@ -56,6 +58,7 @@ function Tab({ t, wid, tab, active, index, maxChars, onMenu }) {
         <Text style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: active ? t.text : t.textDim, whiteSpace: 'nowrap',
           textAlign: 'center' }}>{title.length > maxChars ? `…${title.slice(title.length - maxChars + 1)}` : title}</Text>
       </View>
+      <ForwardsBadge t={t} wid={wid} tab={tab} />
       <Text style={small(t, { fontSize: 11, opacity: active || hover ? 1 : 0.7 })}>{index < 9 ? `❖${index + 1}` : ''}</Text>
       {color ? <View style={{ position: 'absolute', left: 8, right: 8, bottom: 1, height: 3, borderRadius: 2, backgroundColor: color }} /> : null}
     </View>
@@ -201,6 +204,7 @@ export function StatusBar({ t, sid, wid }) {
   const clock = useClock((d) => formatTime(d), 1000);
   const m = useStore(meta, (x) => x[sid]) || {};
   const claude = useClaude(info, sid);
+  const fwd = useStore(forwards, (x) => (x[sid]?.items || []).filter((it) => it.state === 'open').length);
   useEffect(() => {
     setInfo(term.info(sid));
     const id = setInterval(() => setInfo(term.info(sid)), 1000);
@@ -224,6 +228,7 @@ export function StatusBar({ t, sid, wid }) {
       <View style={{ flex: 1 }} />
       {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
       {info.altScreen && <Item label={tr('terminal.status.altScreen')} />}
+      {fwd > 0 && <Item label={`⇄ ${fwd}`} onClick={(e) => { const w = getWin(wid); if (w) patchWin(wid, () => ({ fwdPanel: { tabId: w.active, x: e.x } })); }} />}
       <FilesSwitch t={t} wid={wid} info={info} />
       <Item label={`${info.cols}×${info.rows}`} />
       <Item label={clock} />

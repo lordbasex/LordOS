@@ -483,5 +483,30 @@
   "files.conflictHint": "„{name}“ ir iš viso elementų: {count} jau yra ten. Ką daryti įkeliant?",
   "files.conflict.replace": "Pakeisti",
   "files.conflict.keep": "Palikti abu",
-  "files.conflict.skip": "Praleisti"
+  "files.conflict.skip": "Praleisti",
+  "fwd.add": "Pridėti",
+  "fwd.auto": "auto",
+  "fwd.badInput": "Nurodykite prievadą (1–65535) arba host:prievadas; vietinis prievadas – nuo 1024 iki 65535",
+  "fwd.close": "Uždaryti šį peradresavimą",
+  "fwd.copy": "Kopijuoti",
+  "fwd.err.bad": "Netinkamas adresas arba prievadas",
+  "fwd.err.failed": "Serveris jį atmetė",
+  "fwd.err.nossh": "Šio ssh negalima bendrinti (atidarytas prieš LordOS 0.8.8.7 arba iš kito serverio)",
+  "fwd.err.unavailable": "Nėra laisvo vietinio prievado",
+  "fwd.noSsh": "Peradresavimams reikia šioje kortelėje prisijungusio ssh.",
+  "fwd.none": "Šiame ryšyje peradresavimų nėra. Pridėkite žemiau arba nurodykite juos profilyje (Nustatymai → SSH).",
+  "fwd.open": "Atidaryti",
+  "fwd.openBrowser": "Atidaryti naršyklėje",
+  "fwd.opened": {
+    "one": "Atidarytas {count} prievado peradresavimas",
+    "few": "Atidaryti {count} prievadų peradresavimai",
+    "other": "Atidaryta {count} prievadų peradresavimų"
+  },
+  "fwd.opening": "Laukiama ssh ryšio…",
+  "fwd.serverPh": "8080 arba host:5432",
+  "fwd.sessionOnly": "Čia pridėtas veikia, kol baigsis šis ryšys. Klauso tik 127.0.0.1.",
+  "fwd.title": "Prievadų peradresavimas",
+  "prefs.fwdAdd": "Pridėti peradresavimą",
+  "prefs.fwdHint": "Prievadų peradresavimas: kai prisijungia šiame profilyje paleistas ssh, kiekvienas čia nurodytas serverio prievadas tampa pasiekiamas šiame kompiuteryje adresu 127.0.0.1 per tą patį ssh ryšį. Palikite vietinį prievadą tuščią, ir LordOS parinks laisvą. Jie užsidaro kartu su ryšiu.",
+  "prefs.sec.ssh": "SSH"
 }

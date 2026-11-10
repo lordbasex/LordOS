@@ -476,5 +476,29 @@
   "files.conflictHint": "«{name}» y {count} elemento(s) en total ya están ahí. ¿Qué hace la subida con ellos?",
   "files.conflict.replace": "Reemplazar",
   "files.conflict.keep": "Mantener ambos",
-  "files.conflict.skip": "Saltar"
+  "files.conflict.skip": "Saltar",
+  "fwd.add": "Agregar",
+  "fwd.auto": "auto",
+  "fwd.badInput": "Usá un puerto (1–65535) o host:puerto; el puerto local va de 1024 a 65535",
+  "fwd.close": "Cerrar esta redirección",
+  "fwd.copy": "Copiar",
+  "fwd.err.bad": "La dirección o el puerto no son válidos",
+  "fwd.err.failed": "El servidor la rechazó",
+  "fwd.err.nossh": "Este ssh no se puede compartir (se abrió antes de LordOS 0.8.8.7, o desde otro servidor)",
+  "fwd.err.unavailable": "No hay un puerto local libre",
+  "fwd.noSsh": "Las redirecciones necesitan un ssh conectado en esta pestaña.",
+  "fwd.none": "No hay redirecciones en esta conexión. Agregá una abajo o ponelas en el perfil (Ajustes → SSH).",
+  "fwd.open": "Abrir",
+  "fwd.openBrowser": "Abrir en el navegador",
+  "fwd.opened": {
+    "one": "Hay una redirección de puerto abierta",
+    "other": "Hay {count} redirecciones de puertos abiertas"
+  },
+  "fwd.opening": "Esperando la conexión ssh…",
+  "fwd.serverPh": "8080 o host:5432",
+  "fwd.sessionOnly": "Lo que agregues acá dura hasta que termine esta conexión. Escucha solo en 127.0.0.1.",
+  "fwd.title": "Redirección de puertos",
+  "prefs.fwdAdd": "Agregar redirección",
+  "prefs.fwdHint": "Redirección de puertos: cuando se conecta un ssh iniciado en este perfil, cada puerto del servidor que figura acá queda disponible en esta computadora en 127.0.0.1, por la misma conexión ssh. Dejá vacío el puerto local para que LordOS elija uno libre. Se cierran con la conexión.",
+  "prefs.sec.ssh": "SSH"
 }

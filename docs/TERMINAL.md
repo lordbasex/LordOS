@@ -362,9 +362,9 @@ RemoteHost (user@host, for automatic profile switching) and define
 ## Files mode, transfers and port forwards (0.8.8.7)
 
 Status: Files mode is built (lord-sftp, term/sftpc.c, lord.sftp, apps/terminal/FilesMode.jsx and sftp.js; tested end to
-end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Still in development: uploading by
-dropping on the terminal, downloading from `ls` output, the profile's port forwards and their tab badge (the server's
-side of forwards, lord.sftp's `forward`, is built and tested), Open With and Edit for remote files.
+end against OpenSSH by tests/sftp_test.c, tests/sftp_e2e.sh and on a real session). Port forwards are built (0.8.8.8,
+apps/terminal/forwards.js and ForwardsPanel.jsx, checked on a real session against a private sshd). Still in
+development: uploading by dropping on the terminal, downloading from `ls` output, Open With and Edit for remote files.
 
 Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design canvas, boards 4 to 8). Everything uses
 **the tab's own ssh session**: one login, no second connection, no password or code asked again.
@@ -427,8 +427,11 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - **In the profile, tab SSH:** a list of forwards, each "server host:port → 127.0.0.1:port". The server side can be
   `localhost:80`, or another machine the server reaches. The local port is **automatic** (LordOS picks a free one) or
   fixed. It listens on **127.0.0.1 only**.
-- They open when that profile's ssh connects, through the same control socket (`MUX_C_OPEN_FWD`), and close with the
-  session.
+- They open when an ssh started in a session of that profile connects (the pane's foreground process is `ssh`; a new
+  ssh process starts the list again), through the same control socket (`MUX_C_OPEN_FWD`), and close with the
+  connection. Until ssh has signed in there is no control socket yet: each forward waits for it (up to 3 minutes, for
+  a password or a code), then opens. Profile → SSH edits the list: host (localhost by default), server port, local
+  port (empty = automatic, else 1024–65535) and an on/off switch; the same checks as lord-server's.
 - **On the tab:** a badge `⇄ 80→54321`. Clicking it lists each forward with its state and connections, with Open (in
   the browser, http/https), Copy and Close, and a field to add a forward for this session only.
 - **When connected:** a notice with the address and Open in Browser / Copy. The footer shows how many forwards are open.

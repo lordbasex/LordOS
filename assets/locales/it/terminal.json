@@ -476,5 +476,29 @@
   "files.conflictHint": "«{name}» e {count} elemento/i in tutto ci sono già. Cosa deve fare il caricamento?",
   "files.conflict.replace": "Sostituisci",
   "files.conflict.keep": "Mantieni entrambi",
-  "files.conflict.skip": "Salta"
+  "files.conflict.skip": "Salta",
+  "fwd.add": "Aggiungi",
+  "fwd.auto": "auto",
+  "fwd.badInput": "Usa una porta (1–65535) o host:porta; una porta locale va da 1024 a 65535",
+  "fwd.close": "Chiudi questo inoltro",
+  "fwd.copy": "Copia",
+  "fwd.err.bad": "Indirizzo o porta non validi",
+  "fwd.err.failed": "Il server l’ha rifiutato",
+  "fwd.err.nossh": "Questo ssh non si può condividere (aperto prima di LordOS 0.8.8.7, o da un altro server)",
+  "fwd.err.unavailable": "Nessuna porta locale libera",
+  "fwd.noSsh": "Gli inoltri richiedono un ssh connesso in questa scheda.",
+  "fwd.none": "Nessun inoltro su questa connessione. Aggiungine uno qui sotto o elencali nel profilo (Impostazioni → SSH).",
+  "fwd.open": "Apri",
+  "fwd.openBrowser": "Apri nel browser",
+  "fwd.opened": {
+    "one": "Un inoltro di porta è aperto",
+    "other": "{count} inoltri di porte sono aperti"
+  },
+  "fwd.opening": "In attesa della connessione ssh…",
+  "fwd.serverPh": "8080 o host:5432",
+  "fwd.sessionOnly": "Aggiunto qui, dura fino alla fine di questa connessione. Ascolta solo su 127.0.0.1.",
+  "fwd.title": "Inoltro delle porte",
+  "prefs.fwdAdd": "Aggiungi inoltro",
+  "prefs.fwdHint": "Inoltro delle porte: quando un ssh avviato in questo profilo si connette, ogni porta del server elencata qui è raggiungibile su questo computer a 127.0.0.1, attraverso la stessa connessione ssh. Lascia vuota la porta locale perché LordOS ne scelga una libera. Si chiudono con la connessione.",
+  "prefs.sec.ssh": "SSH"
 }
