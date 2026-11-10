@@ -75,6 +75,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Terminal Settings: a new port forward shows no error before its port is typed**, and the scrollback sizes are
   written as numbers are in the interface's language (1,000 in English, 1.000 in Spanish).
 - **Terminal: a tab title next to a port forward badge is shortened from its start with "…"**, not cut on both sides.
+- **Terminal: ❖ + click (or the menu's Download) on a name in `ls` output finds the file on a server without the LordOS
+  shell integration.** With no directory reported (OSC 7), the name was looked up in the remote home only, so a file
+  listed in `~/Downloads` on a Raspberry Pi was "not in the remote home". It is now looked up, in order, in the reported
+  directory, the one the nearest prompt above the clicked line shows (`user@host:~/dir$`), the one in the title (Debian
+  and Ubuntu put `user@host: dir` there), and the home; the first that has it wins. Copy Remote Path takes the same one.
+  `promptDir`, `titleDir`, `expandHome` in `apps/terminal/lsnames.js` (16 more checks in `terminal_lsnames_test.mjs`).
+- **Terminal Files mode: which side is which, and a menu on the whole list.** A click anywhere in a side makes it the
+  one in use, marked in the accent color; the headings read "This Computer" and "Server · user@host". A right click where
+  there is no file opens the folder's menu on either side: New Folder, Upload or Download the other side's selection
+  here, Refresh, Hidden, Enclosing Folder, Copy Path, and Show in Files or Open Terminal Here (cd). The server side
+  starts in the directory the remote shell's title names when the shell reports none. Its menus stay inside the view.
 - **Terminal Settings: Escape closes what is open, not the whole window.** With a list, the trigger sheet, Import or
   the file chooser open, Escape closed Settings; it now closes the newest of them, and the window only when none is.
 - **Releasing ❖ after a ❖ + click no longer opens the app launcher.** The shell took any press and release of ❖ with no

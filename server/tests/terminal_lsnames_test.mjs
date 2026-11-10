@@ -1,5 +1,5 @@
 // terminal_lsnames_test.mjs — the file name under the pointer in `ls` output (apps/terminal/lsnames.js).
-import { nameAt } from '../../apps/terminal/lsnames.js';
+import { nameAt, promptDir, titleDir, expandHome } from '../../apps/terminal/lsnames.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -41,6 +41,33 @@ eq('empty line', nameAt('', ''), null);
 eq('past the end', nameAt('abc', ''), null);
 eq('dot entries are not names', at('drwxr-xr-x  3 a b 4096 Nov  9 22:07 ..', '..'), null);
 eq('a quote escape', at("x  'it'\\''s'", 'it'), { name: "it's", dir: false });
+
+// where that ls ran, on a server without the LordOS integration (the Pi's case: ~/Downloads, the file not in ~)
+const PI = [
+  'lordbasex@lordos-pi:~$ cd Downloads',
+  'lordbasex@lordos-pi:~/Downloads$ ls -la',
+  'total 720184',
+  'drwxr-xr-x  2 lordbasex lordbasex      4096 nov 10 07:18 .',
+  '-rw-rw-r--  1 lordbasex lordbasex 737456128 ago  9  2025 debian-13.0.0-arm64-netinst.iso',
+  'lordbasex@lordos-pi:~/Downloads$ cd /etc',
+  'lordbasex@lordos-pi:/etc$ ',
+];
+eq('the prompt above the clicked line', promptDir(PI, PI[4]), '~/Downloads');
+eq('not the current prompt below it', promptDir(PI, PI[4]) !== '/etc', true);
+eq('a line not on the screen: the last prompt', promptDir(PI, 'gone'), '/etc');
+eq('root and an absolute path', promptDir(['root@srv:/var/log# ls', 'syslog'], 'syslog'), '/var/log');
+eq('a virtualenv before the prompt', promptDir(['(venv) ana@box:~/src$ ls', 'a.py'], 'a.py'), '~/src');
+eq('a directory with spaces', promptDir(['ana@box:~/My Files$ ls', 'a.txt'], 'a.txt'), '~/My Files');
+eq('no prompt on the screen', promptDir(['a.txt', 'b.txt'], 'a.txt'), '');
+eq('trailing spaces on the screen lines', promptDir(['ana@box:~/x$ ls   ', 'a.txt   '], 'a.txt'), '~/x');
+eq('Debian\'s title', titleDir('lordbasex@lordos-pi: ~/Downloads'), '~/Downloads');
+eq('a title with an absolute path', titleDir('root@srv: /etc'), '/etc');
+eq('a title that is not a directory', titleDir('vim notes.txt'), '');
+eq('a title with a control character', titleDir('a@b: /x\x07y'), '');
+eq('~ is the home', expandHome('~', '/home/ana'), '/home/ana');
+eq('~/ under the home', expandHome('~/Downloads', '/home/ana/'), '/home/ana/Downloads');
+eq('no home known', expandHome('~/x', ''), '');
+eq('an absolute path stays', expandHome('/etc', '/home/ana'), '/etc');
 
 console.log(`terminal_lsnames_test: ${ok}/${ok + bad} checks`);
 if (bad) process.exit(1);

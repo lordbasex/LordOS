@@ -3,9 +3,10 @@
 // shell stays alive behind it. A toolbar (up, new folder, refresh, hidden, filter, as root), right-click menus, the
 // transfers queue with its speed graph (uploads orange, downloads blue) and the sheets: new folder, rename,
 // permissions and owner, information, delete, the sudo password.
-import { View, Text, TextInput, Button, ScrollView, ContextMenu, Hairline, fs, clipboard, term, useStore, useLauncherApps, wm, getApp, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ScrollView, ContextMenu, Hairline, fs, clipboard, term, useStore, useLauncherApps, wm, getApp, revealPath, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { meta } from './state.js';
+import { titleHost, titleDir, expandHome } from './lsnames.js';
 import { fetchRemote, openersFor, watchEdit } from './remoteopen.js';
 import {
   request, transfer, cancel, clearFinished, transfers, closedConns, samplesOf, speedSeries,
@@ -15,6 +16,8 @@ import {
 const UP = '#ff9f0a', DOWN = '#0a84ff';
 const MONO = 'monospace';
 const homeDir = () => { try { return lord.fs.home(); } catch (e) { return '/'; } };
+// a color at some opacity, for the side in use
+const tint = (c, a) => { const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c || ''); return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : 'transparent'; };
 const shQuote = (p) => `'${String(p).replace(/'/g, "'\\''")}'`;
 const when = (m) => {
   if (!m) return '';
@@ -47,6 +50,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
   const edits = useRef(new Map());              // remote path → stop() of its Edit (remoteopen.js)
   useEffect(() => () => { for (const stop of edits.current.values()) stop(); edits.current.clear(); }, [conn]);
   const jobs = useStore(transfers);
+  const host = titleHost(useStore(meta, (x) => x[sid]?.title));
 
   const open = async (asRoot = false, password) => {
     setState('opening');
@@ -80,12 +84,21 @@ export function FilesMode({ t, wid, sid, startLocal }) {
   const loadLocal = async (p = lpath) => {
     try { setLlist((await fs.listAsync(p)).map(fromLocal)); setLpath(p); } catch (e) { setMsg(tr('terminal.files.err.denied')); }
   };
-  // the first listing: where the remote shell is (its OSC 7, meta.remoteCwd), else the remote home; a new connection
-  // (As Root) stays in the folder shown
+  // the first listing: where the remote shell is (its OSC 7, meta.remoteCwd), else the directory in its title (Debian's
+  // "user@host: ~/dir", "~" made absolute with the remote home: lord.sftp takes absolute paths only), else the remote
+  // home; a new connection (As Root) stays in the folder shown
   useEffect(() => {
     if (!conn) return;
-    const start = rpath !== '.' ? rpath : meta.get()[sid]?.remoteCwd || '.';
-    request('list', { conn, path: start }).then((r) => { setRpath(r.path); setRlist(r.entries || []); }, () => loadRemote('.', conn));
+    const m = meta.get()[sid] || {};
+    const pick = async () => {
+      if (rpath !== '.') return rpath;
+      if (m.remoteCwd) return m.remoteCwd;
+      const d = titleDir(m.title);
+      if (!d) return '.';
+      if (d.startsWith('/')) return d;
+      try { return expandHome(d, (await request('list', { conn, path: '.' })).path) || '.'; } catch (e) { return '.'; }
+    };
+    pick().then((start) => request('list', { conn, path: start })).then((r) => { setRpath(r.path); setRlist(r.entries || []); }, () => loadRemote('.', conn));
   }, [conn]);
   useEffect(() => { loadLocal(lpath); }, []);
   // refreshed by itself: the server every 5 s while shown (and after our own operations), this computer every 3 s
@@ -222,6 +235,25 @@ export function FilesMode({ t, wid, sid, startLocal }) {
       { label: tr('terminal.files.toTrash'), destructive: true, onClick: () => run(async () => { for (const n of names) await fs.trashAsync(joinPath(lpath, n)); }) },
     ] });
   };
+  // a right click where there is no file: what can be done in that folder
+  const paneMenu = (e, side) => {
+    const remote = side === 'remote';
+    const path = remote ? rpath : lpath;
+    const other = remote ? chosen('local') : chosen('remote');
+    setSel({ side, names: [] });
+    setMenu({ x: e.x, y: e.y, items: [
+      { label: tr('terminal.files.newFolder'), onClick: () => setSheet({ kind: 'mkdir', side, value: '' }) },
+      ...(other.length ? [{ label: tr(remote ? 'terminal.files.uploadHere' : 'terminal.files.downloadHere', { count: other.length }), onClick: () => (remote ? upload(other) : download(other)) }] : []),
+      '-',
+      { label: tr('terminal.files.refresh'), onClick: () => (remote ? loadRemote() : loadLocal()) },
+      { label: tr('terminal.files.hidden'), checked: hidden, onClick: () => setHidden((h) => !h) },
+      { label: tr('terminal.files.up'), disabled: parentOf(path) === path, onClick: () => (remote ? loadRemote(parentOf(path)) : loadLocal(parentOf(path))) },
+      '-',
+      { label: tr('terminal.files.copyPath'), onClick: () => clipboard.set(path) },
+      remote ? { label: tr('terminal.files.cdHere'), disabled: state !== 'ready' || /['\\\x00-\x1f\x7f]/.test(path), onClick: () => { term.paste(sid, `cd -- ${shQuote(path)}\n`); } }
+        : { label: tr('terminal.files.showInFiles'), onClick: () => revealPath(path) },
+    ] });
+  };
   const showInfo = async (path, it) => {
     setSheet({ kind: 'info', path, entry: it, file: '…', sha: null });
     try { const r = await request('info', { conn, path, what: 'file' }); setSheet((s) => s && s.kind === 'info' ? { ...s, file: r.text.trim() } : s); }
@@ -262,11 +294,17 @@ export function FilesMode({ t, wid, sid, startLocal }) {
     const list = sortEntries(visible(remote ? rlist : llist, hidden, filter));
     const path = remote ? rpath : lpath;
     const go = (p) => (remote ? loadRemote(p) : loadLocal(p));
+    // the side in use (a click anywhere in it, or a selection there) is marked in the accent color
+    const active = sel.side === side;
+    const label = remote ? `${tr(root ? 'terminal.files.serverRoot' : 'terminal.files.server')}${host ? ` · ${host}` : ''}` : tr('terminal.files.local');
     return (
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 10, backgroundColor: active ? tint(t.accent, 0.16) : 'transparent' }}
+          onMouseDown={() => { if (!active) setSel({ side, names: [] }); }}>
+          {active && <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: t.accent }} />}
           <Hairline edge="bottom" />
-          <Text style={{ fontSize: 10.5, fontWeight: 700, color: t.textDim }}>{tr(remote ? (root ? 'terminal.files.serverRoot' : 'terminal.files.server') : 'terminal.files.local').toUpperCase()}</Text>
+          <Text style={{ fontSize: 12, color: active ? t.accent : t.textDim }}>{remote ? '⇅' : '⌂'}</Text>
+          <Text style={{ fontSize: 10.5, fontWeight: 700, color: active ? t.accent : t.textDim, whiteSpace: 'nowrap' }}>{label.toUpperCase()}</Text>
           <Text onClick={() => go(parentOf(path))} style={{ fontSize: 13, color: t.accent, paddingHorizontal: 4 }}>↑</Text>
           <Text style={{ flex: 1, minWidth: 0, fontFamily: MONO, fontSize: 12, color: remote ? '#30d158' : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', direction: 'ltr', textAlign: 'start' }}>{path}</Text>
         </View>
@@ -276,14 +314,15 @@ export function FilesMode({ t, wid, sid, startLocal }) {
           <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.modified')}</Text>
           <Text style={{ width: 92, fontSize: 10.5, color: t.textDim, textAlign: 'end' }}>{tr('terminal.files.perms')}</Text>
         </View>
+        <View style={{ flex: 1, minHeight: 0 }} onClick={() => setSel({ side, names: [] })} onContextMenu={(ev) => paneMenu(ev, side)}>
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 4, paddingBottom: 6 }}>
             {list.map((e) => {
               const on = sel.side === side && sel.names.includes(e.name);
               return (
-                <View key={e.name} onClick={(ev) => pick(side, e.name, ev)}
+                <View key={e.name} onClick={(ev) => { ev.stopPropagation?.(); pick(side, e.name, ev); }}
                   onDoubleClick={() => (e.kind === 'd' ? go(joinPath(path, e.name)) : remote ? download([e.name]) : upload([e.name]))}
-                  onContextMenu={(ev) => (remote ? remoteMenu(ev, e.name) : localMenu(ev, e.name))}
+                  onContextMenu={(ev) => { ev.stopPropagation?.(); if (remote) remoteMenu(ev, e.name); else localMenu(ev, e.name); }}
                   style={{ flexDirection: 'row', alignItems: 'center', height: 24, paddingHorizontal: 8, borderRadius: 5, backgroundColor: on ? t.accent : 'transparent', direction: 'ltr' }}>
                   <Text style={{ width: 16, fontSize: 11, color: on ? '#fff' : e.kind === 'd' ? '#64b5ff' : t.textDim }}>{e.kind === 'd' ? '▸' : e.kind === 'l' ? '↪' : '·'}</Text>
                   <Text style={{ flex: 1, minWidth: 0, fontFamily: MONO, fontSize: 12.5, color: on ? '#fff' : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{e.name}</Text>
@@ -296,6 +335,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
             {!list.length && <Text style={{ padding: 12, fontSize: 12, color: t.textDim, textAlign: 'start' }}>{tr('terminal.files.empty')}</Text>}
           </View>
         </ScrollView>
+        </View>
       </View>
     );
   };
@@ -393,7 +433,8 @@ export function FilesMode({ t, wid, sid, startLocal }) {
           <Text style={{ fontSize: 10.5, color: t.textDim }}>{tr('terminal.files.lastMinute')}</Text>
         </View>
       </View>
-      {menu && <ContextMenu x={menu.x - (box.current ? lord.getLayout(box.current.id)[0] : 0)} y={menu.y - (box.current ? lord.getLayout(box.current.id)[1] : 0)} items={menu.items} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu x={menu.x - (box.current ? lord.getLayout(box.current.id)[0] : 0)} y={menu.y - (box.current ? lord.getLayout(box.current.id)[1] : 0)} items={menu.items} onClose={() => setMenu(null)}
+        bounds={box.current ? { w: lord.getLayout(box.current.id)[2], h: lord.getLayout(box.current.id)[3] } : undefined} />}
       {sheet && <Sheet t={t} sheet={sheet} setSheet={setSheet} onApply={applySheet} onSha={sha} />}
     </View>
   );

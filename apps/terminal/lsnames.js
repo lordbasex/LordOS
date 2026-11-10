@@ -41,4 +41,35 @@ export function nameAt(before, after) {
   return name && goodName(name) ? { name, dir: false } : null;
 }
 
+// Where that `ls` ran, for a server whose shell doesn't report its directory (no OSC 7: no LordOS integration there).
+// The usual prompt says it, "user@host:~/dir$ " or "root@host:/etc# " (a "(venv) " before it is allowed): the nearest
+// prompt above the clicked line in the screen's lines. Debian's and Ubuntu's .bashrc also put "user@host: dir" in the
+// title. Either gives "~", "~/…" or an absolute path, or '' when none is there.
+const PROMPT = /^(?:\([^)]{0,64}\)\s*)?[A-Za-z0-9._-]{1,64}@[A-Za-z0-9._-]{1,255}:(~|~\/[^\x00-\x1f]*?|\/[^\x00-\x1f]*?)[$#](?:\s|$)/;
+const cleanDir = (d) => (d && d.length <= 4096 && !/[\x00-\x1f\x7f]/.test(d) && (d === '~' || d.startsWith('~/') || d.startsWith('/')) ? d : '');
+
+export function promptDir(lines, line) {
+  const all = (lines || []).map((l) => String(l).replace(/\s+$/, ''));
+  const at = all.lastIndexOf(String(line || '').replace(/\s+$/, ''));
+  for (let i = (at < 0 ? all.length : at) - 1; i >= 0; i--) {
+    const m = PROMPT.exec(all[i]);
+    if (m) return cleanDir(m[1]);
+  }
+  return '';
+}
+
+export function titleDir(title) {
+  const m = /^[A-Za-z0-9._-]{1,64}@[A-Za-z0-9._-]{1,255}:\s?(~(?:\/[^\x00-\x1f]*)?|\/[^\x00-\x1f]*)$/.exec(String(title || '').trim());
+  return m ? cleanDir(m[1]) : '';
+}
+
+// "user@host" from such a title, for the server side's heading in Files mode; '' when the title isn't one
+export function titleHost(title) {
+  const m = /^([A-Za-z0-9._-]{1,64}@[A-Za-z0-9._-]{1,255}):/.exec(String(title || '').trim());
+  return m ? m[1] : '';
+}
+
+// "~" and "~/…" against the remote home
+export const expandHome = (d, home) => (d === '~' ? home || '' : d.startsWith('~/') ? (home ? `${home.replace(/\/+$/, '')}/${d.slice(2)}` : '') : d);
+
 const goodName = (n) => !!n && n.length <= 255 && n !== '.' && n !== '..' && !/[/\x00-\x1f\x7f]/.test(n);
