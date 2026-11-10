@@ -659,7 +659,7 @@ export default function Files() {
     try { if (fs.stat(f.path).dir) { navigate(dirLoc(f.path)); return; } } catch (e) { /* below */ }
     setMsg(tr('files.fav.gone', { name: f.name }));
   };
-  // ---- drag and drop (⌥ copies; otherwise it moves) ----
+  // ---- drag and drop (⌥ copies; otherwise it moves. Into a Linux app it copies, Shift moves: wl.c) ----
   const dropOf = (inst) => { for (let n = inst; n; n = n.parent) { if (n.props?.dropPath) return n.props.dropPath; if (n.props?.dropTrash) return 'trash:'; } return null; };
   // another app's window under the pointer that takes files (an onFilesDrop prop, e.g. the Terminal: their paths)
   const filesDropOf = (inst) => { for (let n = inst; n; n = n.parent) if (typeof n.props?.onFilesDrop === 'function') return n.props.onFilesDrop; return null; };

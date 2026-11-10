@@ -3219,7 +3219,7 @@ static struct {
     int contained;                      /* started by an isolated or sandboxed app: no files for LordOS */
 } drag;
 static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
-static int alt_down;                    /* Alt held: a Files drag copies instead of moving, as inside LordOS */
+static int shift_down;                  /* Shift held: a Files drag into a Linux app may move (it copies otherwise) */
 /* the press a start_drag may name: its serials (one per wl_pointer of that client) and the surface it went to */
 static uint32_t press_serials[4];
 static int npress;
@@ -3271,14 +3271,15 @@ static int dnd_offers(const DOffer *o, const char *mime) {
     return 0;
 }
 
-/* The action both sides take: the target's preferred one, else (Files) move or copy as inside LordOS, else
- * copy, move, ask in that order. A source without set_actions (before version 3) copies. */
+/* The action both sides take: the target's preferred one, else copy, move, ask in that order. A source without
+ * set_actions (before version 3) copies. Files' own drag into a Linux app only copies: dropped on a file manager,
+ * a move would take the file out of its folder without the person asking; with Shift held it may move. */
 static uint32_t dnd_source_actions(void) {
-    if (drag.lord) return DND_COPY | DND_MOVE;
+    if (drag.lord) return shift_down ? DND_COPY | DND_MOVE : DND_COPY;
     return drag.src && drag.src->actions_set ? drag.src->actions : DND_COPY;
 }
 static void dnd_choose(DOffer *o) {
-    uint32_t both = dnd_source_actions() & o->dest, want = drag.lord ? (alt_down ? DND_COPY : DND_MOVE) : 0, a = 0;
+    uint32_t both = dnd_source_actions() & o->dest, want = drag.lord ? (shift_down ? DND_MOVE : DND_COPY) : 0, a = 0;
     if (o->pref & both) a = o->pref;
     else if (want & both) a = want;
     else if (both & DND_COPY) a = DND_COPY;
@@ -3918,8 +3919,10 @@ int wl_key(int code, int value, const KeyInfo *k) {
     unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
     unsigned char *was_remapped = code >= 0 && code < KEY_SLOTS ? &remapped[code] : NULL;
     unsigned mods = (k->shift ? KG_SHIFT : 0u) | (k->ctrl ? KG_CTRL : 0u) | (k->alt ? KG_ALT : 0u) | (k->meta ? KG_META : 0u);
-    if (code == KEY_LEFTALT || code == KEY_RIGHTALT) {     /* a Files drag over a Linux window: ⌥ copies */
-        alt_down = value != 0;
+    if (code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT) { /* a Files drag over a Linux window: Shift moves */
+        shift_down = value != 0;
+        if (drag.on && drag.lord && drag.offer && wl_resource_get_version(drag.offer->res) >= 3)
+            wl_data_offer_send_source_actions(drag.offer->res, dnd_source_actions());
         if (drag.on && drag.offer) dnd_choose(drag.offer);
     }
     if (drag.on && code == KEY_ESC) {                      /* Escape cancels a drag; LordOS still sees it for its own */

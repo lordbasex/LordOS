@@ -253,8 +253,9 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   256. While the drag is over a Linux window, the compositor is the source: it offers `text/uri-list`
   (`file://` URIs, percent-encoded, CRLF separated) and `text/plain` (the paths, one per line), encoded as
   Files' copy to the clipboard is (`uril_encode`), and writes
-  them itself to the app's pipe, non-blocking and from the event loop. Files' rule for the action stays: it
-  moves, and ⌥ copies, unless the app prefers another. The ghost shows the + once the app agreed. Nothing is
+  them itself to the app's pipe, non-blocking and from the event loop. Into a Linux app Files only copies
+  (dropped on a file manager, a move would take the file out of its folder unasked); with Shift held it may move,
+  if the app takes a move. The ghost shows the + once the app agreed. Nothing is
   run or read for the app: it opens the files itself.
 - **From a Linux app to Files.** A drag that offers `text/uri-list` and may copy, released over LordOS
   itself, is taken by the compositor. The app is told "copy" while the pointer is over LordOS. At the release,
