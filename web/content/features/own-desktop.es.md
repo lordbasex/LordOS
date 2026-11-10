@@ -97,6 +97,16 @@ Todo en la 0.8.7, menos los dos puntos marcados 0.8.8.
 - **Las ventanas se abren donde estaban.** Tamaño, posición, maximizada y pantalla, por app, en los dos temas, para apps de LordOS y de Linux; si una pantalla ya no está o el lugar queda fuera de la pantalla, la ventana se abre en un lugar visible. Sin probar entre dos pantallas.
 - **Restaurar la sesión.** Las apps abiertas al cerrar sesión, reiniciar o apagar vuelven con sus ventanas y su escritorio, y después de un corte de luz o un fallo LordOS pregunta primero. Se guardan solo identificadores de apps, nunca rutas de documentos. Probado en una máquina virtual, con reinicios, un apagado real y un apagado forzado.
 
+## En desarrollo para la 0.8.8.8
+
+Todavía no se publicó; el último lanzamiento es la 0.8.8.7.
+
+- **La Terminal trabaja sobre el `ssh` de la pestaña.** Reenvíos de puertos desde un perfil (una insignia en la pestaña, Abrir en el navegador, Copiar, Cerrar), archivos arrastrados desde Archivos sobre un panel con `ssh` que suben a la carpeta del shell remoto, ❖ + clic en un nombre de la salida de `ls` para descargarlo, y Abrir, Abrir con y Editar para un archivo del servidor en el modo Archivos, donde cada guardado vuelve al servidor. Todo por la misma conexión, sin un segundo inicio de sesión y sin ejecutar ningún programa.
+- **Los campos de texto seleccionan como en cualquier escritorio,** en todas las apps de LordOS: Ctrl/⌘+A, Mayúsculas con las flechas, un arrastre con el mouse, un doble clic en una palabra, escribir sobre la selección, copiar y cortar (nunca desde un campo de contraseña).
+- **Arrastrar archivos.** Lo que arrastrás desde Archivos sigue al puntero encima de todas las ventanas y muestra un + sobre una que acepta archivos; el Editor de texto abre un archivo soltado en una pestaña y una carpeta soltada como su proyecto.
+- **Colores.** Una carpeta etiquetada se dibuja con el color de su etiqueta en Archivos, y un grupo de favoritos de Bases de datos tiene un color propio.
+- **Listas de nombres en orden.** La grilla de Apps y todas las demás listas de nombres se ordenan igual, así que una app cuyo nombre empieza con minúscula ya no queda después de la última fila.
+
 ## Nuevo en la 0.8.8.7
 
 Publicada el 9 de noviembre de 2026, el último lanzamiento.

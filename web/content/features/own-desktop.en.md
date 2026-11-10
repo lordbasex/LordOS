@@ -97,6 +97,16 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
+## In development for 0.8.8.8
+
+Not released yet; the latest release is 0.8.8.7.
+
+- **The Terminal works over the tab's `ssh`.** Port forwards from a profile (a badge on the tab, Open in the browser, Copy, Close), files dragged from Files onto an `ssh` pane uploaded to the remote shell's folder, ❖ + click on a name in `ls` output to download it, and Open, Open With and Edit for a server's file in Files mode, where each save goes back to the server. All over the same connection, with no second login and no program run.
+- **Text fields select as on any desktop,** in every LordOS app: Ctrl/⌘+A, Shift with the arrows, a mouse drag, a double click on a word, typing over the selection, copy and cut (never from a password field).
+- **Dragging files.** What you drag from Files follows the pointer above every window and shows a + over one that takes files; the Text Editor opens a dropped file in a tab and a dropped folder as its project.
+- **Colors.** A tagged folder is drawn in its tag's color in Files, and a group of favorites in Databases has a color of its own.
+- **Lists of names in order.** The Apps grid and every other list of names sort the same way, so an app whose name starts with a lowercase letter is no longer left after the last row.
+
 ## New in 0.8.8.7
 
 Released on 9 November 2026, the latest release.
