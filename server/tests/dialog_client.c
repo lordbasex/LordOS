@@ -192,6 +192,28 @@ int main(int argc, char **argv) {
     zxdg_exported_v2_destroy(e1);
     wl_display_roundtrip(b.dpy);
     check("still up after the cleanup", wl_display_get_error(b.dpy), 0);
+
+    /* a wl_surface destroyed before its xdg_toplevel (out of order, but a client may): the toplevel must not keep the
+     * freed window, so making it a parent or a dialog afterwards changes nothing and the compositor stays up */
+    Conn c;
+    if (!connect_to(&c) && c.dialogs) {
+        Win *gone_win = new_window(&c, "dialog-client: gone first");
+        draw(&c, gone_win, 200, 120, 0xff808080u);
+        Win *child = new_window(&c, "dialog-client: its child");
+        draw(&c, child, 200, 120, 0xff606060u);
+        wl_surface_destroy(gone_win->surf);
+        wl_display_roundtrip(c.dpy);
+        xdg_toplevel_set_parent(child->top, gone_win->top);
+        struct xdg_dialog_v1 *d2 = xdg_wm_dialog_v1_get_xdg_dialog(c.dialogs, gone_win->top);
+        xdg_dialog_v1_set_modal(d2);
+        wl_display_roundtrip(c.dpy);
+        check("a parent whose surface is gone changes nothing", wl_display_get_error(c.dpy), 0);
+        /* the compositor still answers another client */
+        wl_display_roundtrip(a.dpy);
+        check("the compositor is still up", wl_display_get_error(a.dpy), 0);
+        xdg_dialog_v1_destroy(d2);
+        wl_display_disconnect(c.dpy);
+    }
     printf("%d checks, %d failed\n", checks, fails);
     wl_display_disconnect(b.dpy);
     wl_display_disconnect(a.dpy);

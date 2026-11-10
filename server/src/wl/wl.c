@@ -852,6 +852,11 @@ static void surface_gone(struct wl_resource *r) {
     if (s->frac) wl_resource_set_user_data(s->frac, NULL);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
+    /* a client may destroy the wl_surface before its role objects: they must not keep the freed Surf, or set_parent,
+     * get_xdg_dialog and the rest would read and write it (every handler takes a NULL as "gone") */
+    if (s->top) wl_resource_set_user_data(s->top, NULL);
+    if (s->popup) wl_resource_set_user_data(s->popup, NULL);
+    if (s->xdg) wl_resource_set_user_data(s->xdg, NULL);
     if (s->node) damage_node(s);
     if (fs_surf == s) { fs_surf = NULL; ui.dirty = 1; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (cursor_surf == s) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
@@ -2049,7 +2054,7 @@ static void top_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; w
 static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r), *o = p ? wl_resource_get_user_data(p) : NULL;
-    if (s) set_owner(s, o && o->role == R_TOPLEVEL ? o : NULL, NULL);
+    if (s) set_owner(s, o && o->role == R_TOPLEVEL && o->top ? o : NULL, NULL);     /* only a live toplevel parents */
 }
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
@@ -2211,6 +2216,7 @@ static void pop_gone(struct wl_resource *r) {
 static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     struct wl_resource *t = wl_resource_create(c, &xdg_toplevel_interface, wl_resource_get_version(r), id);
     if (!t) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(t, &toplevel_impl, s, top_gone);
@@ -2229,6 +2235,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
 }
 static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) {
     Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     struct wl_resource *p = wl_resource_create(c, &xdg_popup_interface, wl_resource_get_version(r), id);
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &popup_impl, s, pop_gone);
@@ -2240,6 +2247,7 @@ static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, st
 static void xs_geometry(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
+    if (!s) return;
     s->p_gx = x; s->p_gy = y; s->p_gw = w; s->p_gh = h;
     s->p_geom = 1;
 }
