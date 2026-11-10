@@ -10,7 +10,7 @@ import { textDirection, direction, t as tr } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
-import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
+import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
@@ -398,7 +398,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const textBox = useRef(null);
   const len = (v) => [...(v || '')].length;
   const at = useRef({ value, pos: len(value), anchor: selectAll && value ? 0 : null });    // caret and selection, for the value they were made in
-  const hist = useRef(newHistory());        // undo and redo (textfieldmodel.js)
+  const hist = useRef(newHistory(secure));  // undo and redo (textfieldmodel.js); none for a password field
+  hist.current = historyFor(hist.current, secure);   // a password field keeps no history; a change of secure drops it
   // a value changed from outside: the caret goes to its end, and Undo brings the old one back
   const adopt = (v) => {
     if (at.current.value === v) return;

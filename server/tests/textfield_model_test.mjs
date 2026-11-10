@@ -71,7 +71,7 @@ import('../../sdk/textfieldmodel.js').then(({ editKey, replaceSel, selRange, sel
 });
 
 // ---- undo and redo (0.8.8.8): typing is one step until a pause, a new word or a caret moved elsewhere
-import('../../sdk/textfieldmodel.js').then(({ newHistory, record, undo, redo, canUndo, canRedo, historyKey, replaceSel, editKey, lineAt }) => {
+import('../../sdk/textfieldmodel.js').then(({ newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, replaceSel, editKey, lineAt }) => {
   const S = (value, pos, anchor = null) => ({ value, pos, anchor });
   // types text one character at a time, ms apart, from state s; returns [state, history]
   const typeIn = (s, h, text, t0 = 0, ms = 100) => {
@@ -127,6 +127,23 @@ import('../../sdk/textfieldmodel.js').then(({ newHistory, record, undo, redo, ca
   for (let i = 0; i < 250; i++) h = record(h, S(String(i), 1), S(String(i + 1), 1), 'paste', i);
   eq('the history keeps the last 200 steps', [h.done.length, h.done[0].value], [200, '50']);
   eq('empty history', [undo(newHistory(), S('', 0)), redo(newHistory(), S('', 0)), canUndo(newHistory())], [null, null, false]);
+
+  // a password field (secure) keeps no history: an old password never comes back with Undo or Redo
+  [s, h] = typeIn(S('', 0), newHistory(true), 'hunter2');
+  h = record(h, s, S('', 0), 'external', 5000);            // the app clears the field after a login
+  eq('a secure field records nothing', [h.done.length, h.undone.length, canUndo(h), canRedo(h)], [0, 0, false, false]);
+  eq('a secure field has nothing to undo or redo', [undo(h, S('', 0)), redo(h, S('', 0))], [null, null]);
+  const forged = { done: [S('old', 3)], undone: [S('older', 5)], last: null, secure: true };
+  eq('a secure history never undoes or redoes, whatever it holds', [canUndo(forged), canRedo(forged), undo(forged, S('', 0)), redo(forged, S('', 0))], [false, false, null, null]);
+  [s, h] = typeIn(S('', 0), newHistory(), 'secret');
+  const hs = historyFor(h, true);
+  eq('turning secure on drops the history', [hs.done.length, canUndo(hs), hs.secure], [0, false, true]);
+  const back = historyFor(hs, false);
+  eq('turning secure off starts an empty history', [back.done.length, back.undone.length, back.secure, canUndo(back)], [0, 0, false, false]);
+  const u = undo(h, s);
+  eq('any change of secure drops redo steps too', canRedo(historyFor(historyFor(u.h, true), false)), false);
+  eq('the same secure keeps the history', [historyFor(h, false) === h, historyFor(hs, true) === hs], [true, true]);
+  eq('an undo and a redo keep a plain history plain', [u.h.secure, redo(u.h, u.s).h.secure], [false, false]);
 
   eq('the history keys', [historyKey({ ctrl: true, base: 'z' }), historyKey({ meta: true, base: 'z' }), historyKey({ ctrl: true, shift: true, base: 'z' }),
     historyKey({ meta: true, shift: true, base: 'z' }), historyKey({ ctrl: true, base: 'y' }), historyKey({ base: 'z', key: 'z' }),

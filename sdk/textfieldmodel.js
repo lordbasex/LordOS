@@ -121,7 +121,9 @@ export function editKey(s, e, rtl = false) {
 }
 
 // ---- undo and redo (0.8.8.8): a history of { value, pos, anchor } states, the one before each step.
-//   newHistory()                     → an empty history
+//   newHistory(secure)               → an empty history; a secure one (a password field) never records anything, so an
+//                                      old password can't come back with Undo or Redo
+//   historyFor(h, secure)            → h, or a new empty history when the field's secure prop changed (the old steps go)
 //   record(h, before, after, step, now) → h after an edit (or a move) from before to after; step 'type' (a character) and
 //                                      'delete' (Backspace or Delete of one) join the step in progress while they go on
 //                                      from where it left the caret, within a second, and typing doesn't start a new
@@ -133,11 +135,13 @@ export function editKey(s, e, rtl = false) {
 const STEPS = 200;                    // the oldest steps are forgotten past this many
 const PAUSE = 1000;                   // ms without typing that end a step
 const snap = (s) => ({ value: s.value || '', pos: clampPos(s.value, s.pos), anchor: s.anchor == null ? null : s.anchor });
-export const newHistory = () => ({ done: [], undone: [], last: null });
-export const canUndo = (h) => !!h && h.done.length > 0;
-export const canRedo = (h) => !!h && h.undone.length > 0;
+export const newHistory = (secure = false) => ({ done: [], undone: [], last: null, secure: !!secure });
+export const historyFor = (h, secure) => (h && !!h.secure === !!secure ? h : newHistory(secure));
+export const canUndo = (h) => !!h && !h.secure && h.done.length > 0;
+export const canRedo = (h) => !!h && !h.secure && h.undone.length > 0;
 
 export function record(h, before, after, step, now = 0) {
+  if (h.secure) return h;
   if ((before.value || '') === (after.value || '')) return h.last ? { ...h, last: null } : h;
   const l = h.last;
   const c = cps(after.value);
@@ -145,17 +149,17 @@ export function record(h, before, after, step, now = 0) {
   const joins = l && l.step === step && (step === 'type' || step === 'delete') && !selRange(before)
     && now - l.time < PAUSE && clampPos(before.value, before.pos) === l.pos && !startsWord;
   const last = { step, time: now, pos: clampPos(after.value, after.pos) };
-  if (joins) return { done: h.done, undone: [], last };
-  return { done: [...h.done, snap(before)].slice(-STEPS), undone: [], last };
+  if (joins) return { done: h.done, undone: [], last, secure: false };
+  return { done: [...h.done, snap(before)].slice(-STEPS), undone: [], last, secure: false };
 }
 
 export function undo(h, cur) {
   if (!canUndo(h)) return null;
-  return { h: { done: h.done.slice(0, -1), undone: [...h.undone, snap(cur)], last: null }, s: h.done[h.done.length - 1] };
+  return { h: { done: h.done.slice(0, -1), undone: [...h.undone, snap(cur)], last: null, secure: false }, s: h.done[h.done.length - 1] };
 }
 export function redo(h, cur) {
   if (!canRedo(h)) return null;
-  return { h: { done: [...h.done, snap(cur)], undone: h.undone.slice(0, -1), last: null }, s: h.undone[h.undone.length - 1] };
+  return { h: { done: [...h.done, snap(cur)], undone: h.undone.slice(0, -1), last: null, secure: false }, s: h.undone[h.undone.length - 1] };
 }
 
 export function historyKey(e) {
