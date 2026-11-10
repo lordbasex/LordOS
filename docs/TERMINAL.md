@@ -381,7 +381,9 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
   `-M` is left as it is, and `LORD_SSH_MUX=0` turns it off.
 - `lord-server` knows which tab owns which control socket: the ssh is the tab's foreground process, and the master
   behind each socket in the folder says its pid (`MUX_C_ALIVE_CHECK`); the one whose pid is the foreground process is
-  the tab's.
+  the tab's. Only names of that form (`<hex>-<pid>`) are asked. A socket that refuses the connect (its ssh was
+  killed and left it) does not count against the 32 masters asked and is removed, by its name in the folder opened
+  with no link followed, when it is still the user's socket; anything else in the folder is left as it is.
 - To list, copy, download or forward, `lord-server` opens a **new channel** through the control socket with the
   OpenSSH multiplexing protocol (`MUX_C_NEW_SESSION` with the `sftp` subsystem and fd passing, `MUX_C_OPEN_FWD` for a
   forward). **It runs no program**: no `ssh`, `sftp` or `scp` is executed.
