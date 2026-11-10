@@ -17,6 +17,8 @@
   "mouse.primaryHint": "Il pulsante che seleziona e apre. L'altro apre i menu.",
   "mouse.primary.left": "Sinistro",
   "mouse.primary.right": "Destro",
+  "mouse.middlePaste": "Il clic centrale incolla",
+  "mouse.middlePasteHint": "Selezionare del testo lo copia, e un clic con il tasto centrale lo incolla dove fai clic, in LordOS e nelle app Linux.",
   "pad.title": "Trackpad",
   "noDevice": "Nessun trackpad trovato su questo computer. Queste impostazioni si applicano quando ne colleghi uno.",
   "device": "{name} · {w} × {h} mm",

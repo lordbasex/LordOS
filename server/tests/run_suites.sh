@@ -293,6 +293,9 @@ EOF
     # (0.8.8.8) the file name under the pointer in ls output, for ❖ + click downloads (apps/terminal/lsnames.js)
     if have node; then run "terminal-lsnames-test (apps/terminal/lsnames.js)" node tests/terminal_lsnames_test.mjs
     else skip "terminal-lsnames-test" "node"; fi
+    # (0.8.8.8) the primary selection of the text fields: what a selection publishes, where a middle click pastes (sdk/primarymodel.js)
+    if have node; then run "primary-model-test (sdk/primarymodel.js)" node tests/primary_model_test.mjs
+    else skip "primary-model-test" "node"; fi
     # (0.8.8.8) a forward whose fixed local port is taken: told once, moved to a free port (apps/terminal/fwdports.js)
     if have node; then run "terminal-fwdports-test (apps/terminal/fwdports.js)" node tests/terminal_fwdports_test.mjs
     else skip "terminal-fwdports-test" "node"; fi

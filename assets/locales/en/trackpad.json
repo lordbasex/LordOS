@@ -17,6 +17,8 @@
   "mouse.primaryHint": "The button that selects and opens. The other one opens menus.",
   "mouse.primary.left": "Left",
   "mouse.primary.right": "Right",
+  "mouse.middlePaste": "Middle click pastes",
+  "mouse.middlePasteHint": "Selecting text copies it, and a middle click pastes it where you click, in LordOS and in Linux apps.",
   "pad.title": "Trackpad",
   "noDevice": "No trackpad found on this computer. These settings apply when you connect one.",
   "device": "{name} · {w} × {h} mm",

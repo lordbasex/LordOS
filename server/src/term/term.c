@@ -1133,7 +1133,8 @@ static int reporting(const Session *s, int mods) {
 }
 
 /* type: "down" | "up" | "move". Returns 1 if the terminal app used it, 2 if the
- * selection changed, 3 if it was also copied to the clipboard. */
+ * selection changed, 3 if it was also copied to the clipboard, 4 for a middle click the terminal app
+ * didn't take (the caller pastes the primary selection, if middle-click paste is on). */
 int term_mouse(Session *s, const char *type, float lx, float ly, int button, int mods) {
     Term *t = &s->t;
     long long line;
@@ -1158,7 +1159,7 @@ int term_mouse(Session *s, const char *type, float lx, float ly, int button, int
         return 1;
     }
     if (!strcmp(type, "down")) {
-        if (button == 1) { term_paste(s, term_clipboard()); return 1; }
+        if (button == 1) return 4;
         if (button != 0) return 0;
         double now = now_ms();
         s->clicks = now - s->last_click < 400 && line == s->click_line && abs(col - s->click_col) <= 1 ? s->clicks % 4 + 1 : 1;

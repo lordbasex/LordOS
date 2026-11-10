@@ -123,7 +123,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Feature | Status | Notes |
 |---|---|---|
 | Selection by dragging, double click (word), triple (line), quadruple (smart: URL/path), rectangular (Alt) | ✅ | |
-| Copy on select, middle click pastes, Shift extends | ✅ | |
+| Copy on select, middle click pastes, Shift extends | ✅ | A mouse selection is also the primary selection, and a middle click pastes the primary selection (not the clipboard) unless the program takes the mouse; off with Settings → Mouse & Trackpad → Middle click pastes (0.8.8.8) |
 | Keyboard copy mode (vi style) | ✅ | ❖⇧C |
 | Search with highlighting, case sensitivity and regular expressions | ✅ | |
 | Autocomplete with words on screen | ✅ | ❖; |

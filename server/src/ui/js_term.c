@@ -1,4 +1,4 @@
-/* js_term.c — lord.term.* and lord.clipboard for the Terminal app.
+/* js_term.c — lord.term.* and lord.clipboard for the Terminal app, and lord.primary.
  *
  * lord.term.create() is the only API that starts a process: always the login shell of the
  * user already running the session (see term/pty.c). It accepts no commands or arguments. */
@@ -201,6 +201,12 @@ static JSValue f_mouse(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     JS_ToInt32(c, &button, argv[4]);
     JS_ToInt32(c, &mods, argv[5]);
     int r = s && type ? term_mouse(s, type, (float)x, (float)y, button, mods) : 0;
+    /* a selection made with the mouse is the primary selection (middle click pastes it elsewhere) */
+    if ((r == 2 || r == 3) && !strcmp(type, "up") && s->t.sel_active) {
+        char *txt = vt_selection_text(&s->t);
+        if (txt) wl_set_primary(txt, strlen(txt));
+        free(txt);
+    }
     if (type) JS_FreeCString(c, type);
     return JS_NewInt32(c, r);
 }
@@ -875,6 +881,40 @@ static const JSCFunctionListEntry clip_funcs[] = {
     JS_CFUNC_DEF("deleteSaved", 1, f_clip_delete_saved),
 };
 
+/* ---- lord.primary: the primary selection (select to copy, middle click to paste; wl.c) ----
+ *
+ *   lord.primary.set(text) → true: LordOS's text fields and the Terminal publish what is selected (never a
+ *                            password field's); empty or over 16 MB changes nothing (false)
+ *   lord.primary.get()     → the selection, but only while a middle-button press is being handled (the
+ *                            field or Terminal under it pastes it there) and with middle-click paste on;
+ *                            "" any other time, so what a Linux app selects isn't readable at will */
+static int prim_gesture;
+
+void js_primary_gesture(int on) { prim_gesture = on; }
+
+static JSValue f_prim_set(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsString(argv[0])) return JS_FALSE;
+    size_t n = 0;
+    const char *s = JS_ToCStringLen(c, &n, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    int ok = wl_set_primary(s, n) == 0;
+    JS_FreeCString(c, s);
+    return JS_NewBool(c, ok);
+}
+
+static JSValue f_prim_get(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    size_t n = 0;
+    const char *t = prim_gesture && wl_primary_paste_on() ? wl_primary(&n) : "";
+    return JS_NewStringLen(c, t, n);
+}
+
+static const JSCFunctionListEntry prim_funcs[] = {
+    JS_CFUNC_DEF("get", 0, f_prim_get),
+    JS_CFUNC_DEF("set", 1, f_prim_set),
+};
+
 /* Files mode (term/sftpc.c): a session's foreground process group, to find its ssh master by pid */
 static pid_t fg_of_session(int sid) {
     Session *s = term_get(sid);
@@ -892,4 +932,7 @@ void js_term_register(JSContext *c, JSValue lord) {
     JSValue k = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, k, clip_funcs, sizeof clip_funcs / sizeof clip_funcs[0]);
     JS_SetPropertyStr(c, lord, "clipboard", k);
+    JSValue pr = JS_NewObject(c);
+    JS_SetPropertyFunctionList(c, pr, prim_funcs, sizeof prim_funcs / sizeof prim_funcs[0]);
+    JS_SetPropertyStr(c, lord, "primary", pr);
 }

@@ -6,7 +6,7 @@
  *   lord.input.config()       → { speed, mouseSpeed, mouseNatural, mouseLeftHanded, scrollSpeed,
  *                                 sensitivity: 'low'|'medium'|'high', pointerSize, tap, tapDrag,
  *                                 natural, secondary, threeDrag, dwt, scroll, kinetic, pinch,
- *                                 swipe3, swipe4 }
+ *                                 swipe3, swipe4, middlePaste }
  *   lord.input.configure(obj) → applies the valid fields (the rest stay as they are); true
  *
  * The on-screen keyboard (docs/ON-SCREEN-KEYBOARD.md). The theme's and the login screen's context
@@ -27,6 +27,7 @@
 #include "../osk.h"
 #include "../tp/tp.h"
 #include "../cursor.h"
+#include "../wl/wl.h"
 
 #include <linux/input.h>
 
@@ -87,6 +88,7 @@ static JSValue f_config(JSContext *c, JSValueConst this, int argc, JSValueConst 
     for (size_t i = 0; i < sizeof flags / sizeof flags[0]; i++)
         JS_SetPropertyStr(c, o, flags[i].name, JS_NewBool(c, *(const int *)((const char *)k + flags[i].off)));
     JS_SetPropertyStr(c, o, "secondary", JS_NewString(c, secondary[k->secondary]));
+    JS_SetPropertyStr(c, o, "middlePaste", JS_NewBool(c, wl_primary_paste_on()));
     return o;
 }
 
@@ -106,6 +108,11 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     str_field(c, argv[0], "secondary", secondary, 3, &k.secondary);
     str_field(c, argv[0], "sensitivity", sensitivity, 3, &k.sensitivity);
     tp_set_config(&k);
+    {   /* a middle click pastes the primary selection (wl.c): off, no app or field is offered it */
+        JSValue v = JS_GetPropertyStr(c, argv[0], "middlePaste");
+        if (JS_IsBool(v)) wl_primary_paste(JS_ToBool(c, v));
+        JS_FreeValue(c, v);
+    }
     {   /* shake the pointer to find it (shake.h) */
         JSValue v = JS_GetPropertyStr(c, argv[0], "shakeToLocate");
         if (JS_IsBool(v)) cursor_set_shake(JS_ToBool(c, v));

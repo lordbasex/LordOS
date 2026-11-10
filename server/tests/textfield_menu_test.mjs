@@ -1,6 +1,7 @@
 // textfield_menu_test.mjs — (0.8.8.8) the SDK's text fields with the mouse and the history: a right or middle click
 // moves no caret, the right-click menu (Undo, Redo, Cut, Copy, Paste, Delete, Select All) edits as the keys do,
-// Ctrl+Z and Ctrl+Shift+Z undo and redo, and a triple click selects the line. Bundles tests/textfield_menu_scene.mjs
+// Ctrl+Z and Ctrl+Shift+Z undo and redo, a triple click selects the line, and a selection is the primary selection a
+// middle click pastes. Bundles tests/textfield_menu_scene.mjs
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
 import { createRequire } from 'node:module';
@@ -17,11 +18,11 @@ let esbuild = null;
 for (const p of nodePaths) { try { esbuild = createRequire(path.join(p, 'x.js'))('esbuild'); break; } catch (e) { /* next */ } }
 if (!esbuild) { console.log('needs node_modules (esbuild)'); process.exit(1); }
 
-// A stub lord: nodes, their parents and texts (and which were taken out of the tree), a clipboard, the English shell catalog, every character 10 px wide; any
+// A stub lord: nodes, their parents and texts (and which were taken out of the tree), a clipboard and a primary selection, the English shell catalog, every character 10 px wide; any
 // other native call is a no-op.
 const shellEn = readFileSync(path.join(root, 'assets', 'locales', 'en', 'shell.json'), 'utf8');
 const MOCK = `globalThis.__lordTest = (() => {
-  const styles = new Map(), parents = new Map(), texts = new Map(), removed = new Set(), clip = { text: '' };
+  const styles = new Map(), parents = new Map(), texts = new Map(), removed = new Set(), clip = { text: '' }, prim = { text: '' };
   let nextId = 1;
   const noop = () => undefined;
   const base = {
@@ -37,13 +38,14 @@ const MOCK = `globalThis.__lordTest = (() => {
     removeChild: (p, c) => { if (parents.get(c) === p) { parents.delete(c); removed.add(c); } },
     destroy: (id) => { removed.add(id); },
     clipboard: { get: () => clip.text, set: (s) => { clip.text = s; } },
+    primary: { get: () => prim.text, set: (s) => { prim.text = s; return true; } },
     ime: new Proxy({}, { get: () => noop }),
     text: { direction: () => 'ltr' },
     locale: { languages: () => ['en'], get: () => 'en', catalog: (lang, ns) => (lang === 'en' && ns === 'shell' ? ${JSON.stringify(shellEn)} : null) },
     settings: { load: () => '{}' },
   };
   globalThis.lord = new Proxy(base, { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? noop : undefined) });
-  return { styles, parents, texts, removed, clip };
+  return { styles, parents, texts, removed, clip, prim };
 })();`;
 
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-textfield-menu-'));

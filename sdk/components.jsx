@@ -12,6 +12,7 @@ import { ime, useIme, Preedit } from './ime.js';
 import { noteTextField } from './textfocus.js';
 import { caretAt, clampPos, editKey, replaceSel, selRange, selectedText, wordAt, newHistory, historyFor, record, undo, redo, canUndo, canRedo, historyKey, lineAt } from './textfieldmodel.js';
 import { wrapRows, rowOf, posAt, areaEdit } from './textareamodel.js';
+import { primaryStep, pasteAt } from './primarymodel.js';
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
@@ -339,6 +340,13 @@ export function pasteIntoFocused() {
 
 // ---- what TextInput and TextArea share: undo and redo, and the right-click menu
 
+// the primary selection (primarymodel.js): lord.primary is lord-server's (an isolated app has none: nothing is published
+// and a middle click pastes nothing); get() gives text only while a middle-button press is handled, with middle-click
+// paste on (Settings → Mouse & Trackpad)
+const hasPrimary = () => typeof lord !== 'undefined' && lord.primary && typeof lord.primary.set === 'function';
+const publishPrimary = (text) => { if (text && hasPrimary()) { try { lord.primary.set(text); } catch (e) { /* too long */ } } };
+const readPrimary = () => { try { return (hasPrimary() && lord.primary.get()) || ''; } catch (e) { return ''; } };
+
 // the step of the history (textfieldmodel.js) a key that edits makes: one character deleted joins the step in progress,
 // a selection deleted or a word (Ctrl or ⌥) is a step of its own
 const stepOf = (cur, e) => (selRange(cur) || e.ctrl || e.alt || e.meta ? 'clear' : e.key === 'Enter' ? 'type' : 'delete');
@@ -389,6 +397,8 @@ function FieldMenu({ anchor, at, items, onClose }) {
 // A triple click selects it all. Ctrl/⌘+Z undoes and Ctrl/⌘+Shift+Z (or Ctrl+Y) redoes: typing is one step until a pause,
 // a new word or a caret moved elsewhere; a paste, a cut, a deleted selection and a value changed from outside are steps
 // of their own. A right click opens Undo, Redo, Cut, Copy, Paste, Delete and Select All, and moves no caret.
+// What is selected becomes the primary selection (never in a password field), and a middle click pastes the primary
+// selection where it lands, as in any Linux app (primarymodel.js; Settings → Mouse & Trackpad can turn that off).
 // The text is drawn in one piece with the caret and the selection over it, so placing the caret moves no letter; a
 // value longer than the field scrolls to keep the caret in sight. A value changed from outside puts the caret at the end.
 export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, size = 13, selectAll = false }) {
@@ -403,6 +413,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const at = useRef({ value, pos: len(value), anchor: selectAll && value ? 0 : null });    // caret and selection, for the value they were made in
   const hist = useRef(newHistory(secure));  // undo and redo (textfieldmodel.js); none for a password field
   hist.current = historyFor(hist.current, secure);   // a password field keeps no history; a change of secure drops it
+  const prim = useRef(null);                // the selection last published as the primary selection (primarymodel.js)
   // a value changed from outside: the caret goes to its end, and Undo brings the old one back
   const adopt = (v) => {
     if (at.current.value === v) return;
@@ -421,6 +432,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const secureRef = useRef(secure);
   secureRef.current = secure;
   latest.current = { value, onChange, onSubmit, onCancel, onKeyDown };
+  // what is selected becomes the primary selection (never a password field's)
+  const publish = () => { const r = primaryStep(prim.current, at.current, secureRef.current); prim.current = r.last; publishPrimary(r.text); };
   const order = useContext(FieldOrder);
   const measure = (str) => lord.measureText(str, size, 400);
   const rtlOf = (v) => !secureRef.current && (v ? textDirection(v) === 'rtl' : direction() === 'rtl');
@@ -455,7 +468,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       }
       adopt(p.value);
       // a value and its caret, drawn at once (a caret that only moved changes no value)
-      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); publish(); redraw((n) => n + 1); };
       const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;
@@ -482,7 +495,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       const pos = posAtX(e.x);
       if (pos !== at.current.pos) { at.current = { ...at.current, pos }; redraw((n) => n + 1); }
     });
-    const offUp = addListener('pointerup', () => { pressing.current = false; });
+    const offUp = addListener('pointerup', () => { if (pressing.current) { pressing.current = false; publish(); } });
     return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   const imeSt = useIme();
@@ -509,7 +522,19 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     setFocus(token);
     if (!ev) return;
     adopt(value);
-    if (ev.button) { redraw((n) => n + 1); return; }               // a right or middle click keeps the caret and the selection
+    // a middle click pastes the primary selection where it lands; without one (or with middle-click paste off), and on a
+    // right click, the caret and the selection stay
+    const pasted = ev.button === 1 ? readPrimary() : '';
+    if (pasted) {
+      const cur = at.current, r = pasteAt(cur, posAtX(ev.x), pasted, true);
+      hist.current = record(hist.current, cur, r, 'paste', lord.now());
+      at.current = r;
+      if (r.value !== value) latest.current.onChange(r.value);
+      redraw((n) => n + 1);
+      setBlink(true);
+      return;
+    }
+    if (ev.button) { redraw((n) => n + 1); return; }
     const pos = posAtX(ev.x);
     const cur = at.current;
     at.current = ev.shift ? { value, pos, anchor: cur.anchor != null ? cur.anchor : cur.pos } : { value, pos, anchor: pos };
@@ -523,12 +548,14 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     const [a, b] = wordAt(value, at.current.pos);
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
+    publish();
     redraw((n) => n + 1);
   };
   const onClick = (ev) => {
     if (!ev || ev.detail !== 3 || !value) return;                 // a triple click: the whole value (one line)
     at.current = { value, pos: len(value), anchor: 0 };
     pressing.current = false;
+    publish();
     redraw((n) => n + 1);
   };
   const onMenu = (ev) => {
@@ -595,7 +622,8 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
 // with the arrows (↑ ↓ keep the column), Home, End and a click, and it selects and edits as a TextInput does (Shift with
 // the keys, a drag, a double click, Ctrl/⌘+A; typing or a paste replaces the selection; Ctrl/⌘+C, X). Each row is drawn
 // in one piece with the caret and the selection over it. A paste keeps its line breaks. Grows with its rows. A triple
-// click selects the line (up to its line breaks, not the row); Undo, Redo and the right-click menu work as in a TextInput.
+// click selects the line (up to its line breaks, not the row); Undo, Redo, the right-click menu and the primary selection
+// (select to copy, middle click to paste) work as in a TextInput.
 export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3 }) {
   const t = useTheme();
   const token = useRef({}).current;
@@ -608,6 +636,8 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   const len = (v) => [...(v || '')].length;
   const at = useRef({ value, pos: len(value), anchor: null });
   const hist = useRef(newHistory());
+  const prim = useRef(null);
+  const publish = () => { const r = primaryStep(prim.current, at.current); prim.current = r.last; publishPrimary(r.text); };
   const adopt = (v) => {
     if (at.current.value === v) return;
     const next = { value: v, pos: len(v), anchor: null };
@@ -654,7 +684,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
         return;
       }
       adopt(p.value);
-      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); redraw((n) => n + 1); };
+      const show = (r) => { at.current = r; if (r.value !== p.value) p.onChange(r.value); publish(); redraw((n) => n + 1); };
       const put = (r, step) => { hist.current = record(hist.current, at.current, r, step, lord.now()); show(r); };
       const cur = at.current;
       const mod = (e.ctrl || e.meta) && !e.alt;
@@ -678,7 +708,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
       const pos = posAtXY(e.x, e.y);
       if (pos !== at.current.pos) { at.current = { ...at.current, pos }; redraw((n) => n + 1); }
     });
-    const offUp = addListener('pointerup', () => { pressing.current = false; });
+    const offUp = addListener('pointerup', () => { if (pressing.current) { pressing.current = false; publish(); } });
     return () => { offMove(); offUp(); if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   // the width the rows wrap at, once the layout has given the field one
@@ -701,7 +731,17 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     setFocus(token);
     if (!ev) return;
     adopt(value);
-    if (ev.button) { redraw((n) => n + 1); return; }               // a right or middle click keeps the caret and the selection
+    const pasted = ev.button === 1 ? readPrimary() : '';           // a middle click pastes the primary selection there
+    if (pasted) {
+      const cur = at.current, r = pasteAt(cur, posAtXY(ev.x, ev.y), pasted);
+      hist.current = record(hist.current, cur, r, 'paste', lord.now());
+      at.current = r;
+      if (r.value !== (value || '')) latest.current.onChange(r.value);
+      redraw((n) => n + 1);
+      setBlink(true);
+      return;
+    }
+    if (ev.button) { redraw((n) => n + 1); return; }               // a right click keeps the caret and the selection
     const pos = posAtXY(ev.x, ev.y);
     const cur = at.current;
     at.current = ev.shift ? { value, pos, anchor: cur.anchor != null ? cur.anchor : cur.pos } : { value, pos, anchor: pos };
@@ -715,6 +755,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     const [a, b] = wordAt(value, at.current.pos);
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
+    publish();
     redraw((n) => n + 1);
   };
   const onClick = (ev) => {
@@ -722,6 +763,7 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
     const [a, b] = lineAt(value, at.current.pos);
     at.current = { value, pos: b, anchor: a };
     pressing.current = false;
+    publish();
     redraw((n) => n + 1);
   };
   const onMenu = (ev) => {

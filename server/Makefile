@@ -640,6 +640,10 @@ build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 # Clipboard and primary-selection offers bound to their selection (tests/xwayland/clip_offers.sh, docs/WAYLAND.md)
 build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/clip_offers.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# The primary selection: set_selection needs a serial of the app's own, the offer gives the text, a replaced source
+# is cancelled (tests/primary_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/primary-client)
+build/primary-client: tests/primary_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/primary_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # off/on-monitor cycles against one session (tests/gpu_cycle.sh, docs/GPU.md); a test tool, never installed
 build/seat-cycle: tests/seat_cycle.c
 	@mkdir -p build
