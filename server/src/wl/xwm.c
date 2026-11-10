@@ -537,10 +537,10 @@ static void sel_owner_changed(const uint8_t *p) {
     sel_start(k, owner);
 }
 
-static void xi_notify(uint32_t prop);
+static void xi_notify(const uint8_t *p);
 static void sel_notify_event(const uint8_t *p) {
     uint32_t requestor = x11_get32(p + 8), selection = x11_get32(p + 12), target = x11_get32(p + 16), prop = x11_get32(p + 20);
-    if (selection == AT(XdndSelection)) { if (requestor == X.wmwin) xi_notify(prop); return; }
+    if (selection == AT(XdndSelection)) { xi_notify(p); return; }
     int k = sel_index(selection);
     if (k < 0 || requestor != X.wmwin) return;
     Sel *s = &X.sel[k];
@@ -696,7 +696,11 @@ static void sel_request(const uint8_t *p) {
  *     (x11_xdnd_trusted, with the pids X-Resource gives, never the client's own _NET_WM_PID): one X client can
  *     always stand in for another's selection.
  * The X app's messages count only from the client that owns XdndSelection (XFixes tells), and an owner that
- * changes mid-drag ends it. Actions here are wl_data_device_manager's bits (1 copy, 2 move, 4 ask). */
+ * changes mid-drag ends it. Its data is read only from a SelectionNotify the X server made (never one sent
+ * with SendEvent) that answers exactly our ConvertSelection, and right before each read (GetProperty, INCR
+ * chunks too) XdndSelection must still be owned by the window that owned it at XdndEnter, with the same
+ * client pid and trust answer (GetSelectionOwner and X-Resource asked again, x11_xdnd_same_owner): if not,
+ * the drop is refused. Actions here are wl_data_device_manager's bits (1 copy, 2 move, 4 ask). */
 
 #define DND_READ_S 10                   /* how long the data of one conversion may take */
 #define DND_FINISH_S 30                 /* how long a dropped drag may take to finish */
@@ -742,6 +746,11 @@ static struct {
 typedef struct { uint32_t atom; int fd; } Fetch;
 static struct {
     uint32_t owner;                     /* XdndSelection's owner, when an X app's (XFixes) */
+    XdndOwner enter;                    /* the owner at XdndEnter (its pid and trust: X-Resource) */
+    int known;                          /* X-Resource answered for it */
+    uint32_t cur;                       /* XdndSelection's owner right before the last read (GetSelectionOwner) */
+    XdndOwner now;                      /* and its pid and trust then */
+    int now_ok;                         /* X-Resource answered for that read */
     int out;                            /* the proxy is mapped */
     uint32_t src;                       /* the source window that entered the proxy (0: none) */
     int version, naming;                /* atoms being named */
@@ -1006,14 +1015,28 @@ static void xi_finish(int accepted, uint32_t action) {
     xi_reset(0);
 }
 
-static void xi_trust_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
-    (void)b;
-    if (gen != XI.gen || !XI.started) return;
+/* XResQueryClientIds: every client's pid. */
+static void xres_pids(ReplyFn fn, uint32_t a) {
+    req(X.xres_op, 4);
+    xo_u32(&X.out, 1); xo_u32(&X.out, 0); xo_u32(&X.out, 2);
+    xo_end(&X.out);
+    expect(fn, a, 0);
+}
+
+static void xi_owner_of(XdndOwner *o, uint32_t win, const uint8_t *r, size_t n) {
     uint32_t base[256], pid[256];
     int k = r ? x11_xres_pids(r, n, base, pid, 256) : -1;
-    int ok = x11_xdnd_trusted(XI.owner, base, pid, k, X.su.id_mask, dndg_pid_sandboxed);
-    if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x: its files %s\n", XI.src, ok ? "may reach LordOS" : "don't reach LordOS");
-    wlx_xdrag_trust(ok);
+    x11_xdnd_owner(o, win, base, pid, k, X.su.id_mask, dndg_pid_sandboxed);
+}
+
+static void xi_trust_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
+    (void)b;
+    if (gen != XI.gen) return;
+    xi_owner_of(&XI.enter, XI.enter.win, r, n);
+    XI.known = r != NULL;
+    if (!XI.started) return;
+    if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x: its files %s\n", XI.src, XI.enter.trusted ? "may reach LordOS" : "don't reach LordOS");
+    wlx_xdrag_trust(XI.enter.trusted);
 }
 
 static void xi_begin(void) {
@@ -1022,10 +1045,7 @@ static void xi_begin(void) {
     for (int i = 0; i < XI.n; i++) list[i] = XI.mimes[i];
     XI.started = wlx_xdrag_begin(list, XI.n);
     if (!XI.started || !X.xres_op) return;           /* without X-Resource its files never reach LordOS */
-    req(X.xres_op, 4);                              /* XResQueryClientIds: every client's pid */
-    xo_u32(&X.out, 1); xo_u32(&X.out, 0); xo_u32(&X.out, 2);
-    xo_end(&X.out);
-    expect(xi_trust_reply, XI.gen, 0);
+    xres_pids(xi_trust_reply, XI.gen);
 }
 
 static void xi_name_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t type) {
@@ -1084,8 +1104,21 @@ static void xi_fetch_done(int ok) {
     xi_fetch_next();
 }
 
+/* The owner changed between XdndEnter and a read (another X client took XdndSelection, or one that connected
+ * meanwhile has its window id, or the trust answer changed): the drag ends, and a drop is refused. */
+static void xi_refuse(void) {
+    if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x: XdndSelection's owner changed, refused\n", XI.src);
+    if (XI.dropped) xi_finish(0, 0);
+    else xi_reset(1);
+}
+
 static void xi_data_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t stage) {
     if (gen != XI.gen || XI.stage != (int)stage) return;
+    /* the checks asked right before this read have answered (replies come in order) */
+    if (!x11_xdnd_same_owner(&XI.enter, XI.cur, X.xres_op ? &XI.now : NULL) || (X.xres_op && (!XI.known || !XI.now_ok))) {
+        xi_refuse();
+        return;
+    }
     if (!r || n < 32) { xi_fetch_done(0); return; }
     int format = r[1];
     uint32_t type = x11_get32(r + 8);
@@ -1108,11 +1141,42 @@ static void xi_data_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t sta
     if (stage == 2 || !bytes) xi_fetch_done(1);
 }
 
-static void xi_notify(uint32_t prop) {
-    if (XI.stage != 1) return;
-    if (!prop) { xi_fetch_done(0); return; }                       /* the owner refused that type */
+static void xi_cur_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
+    (void)b;
+    if (gen == XI.gen) XI.cur = r && n >= 12 ? x11_get32(r + 8) : 0;
+}
+
+static void xi_now_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
+    (void)b;
+    if (gen != XI.gen) return;
+    xi_owner_of(&XI.now, XI.cur, r, n);
+    XI.now_ok = r != NULL;
+}
+
+/* Reads the drag's data (stage 2) or its next INCR chunk (3), asking first who owns XdndSelection now and, with
+ * X-Resource, every client's pid again: their replies come before the data's, which is taken only if the owner
+ * is the one of XdndEnter (xi_data_reply). */
+static void xi_read(int stage) {
+    XI.cur = 0;
+    XI.now_ok = 0;
+    req(X_GetSelectionOwner, 0);
+    xo_u32(&X.out, AT(XdndSelection));
+    xo_end(&X.out);
+    expect(xi_cur_reply, XI.gen, 0);
+    if (X.xres_op) xres_pids(xi_now_reply, XI.gen);
+    get_prop(X.wmwin, AT(LORD_SEL_XDND), 1, CLIP_MAX / 4, xi_data_reply, XI.gen, (uint32_t)stage);
+}
+
+static void xi_notify(const uint8_t *p) {
+    if (XI.stage != 1 || !XI.nq) return;
+    int r = x11_xdnd_notify(p, X.wmwin, AT(XdndSelection), XI.q[0].atom, AT(LORD_SEL_XDND));
+    if (r < 0) {                                                    /* forged (SendEvent) or not ours */
+        if (X.debug) fprintf(stderr, "xwm: X drag: a SelectionNotify ignored (%s)\n", p[0] & 0x80 ? "synthetic" : "not ours");
+        return;
+    }
+    if (!r) { xi_fetch_done(0); return; }                           /* the owner refused that type */
     XI.stage = 2;
-    get_prop(X.wmwin, AT(LORD_SEL_XDND), 1, CLIP_MAX / 4, xi_data_reply, XI.gen, 2);
+    xi_read(2);
 }
 
 /* XdndSelection's owner changed (XFixes). */
@@ -1134,6 +1198,7 @@ static void dnd_message(uint32_t win, uint32_t type, const uint32_t d[5]) {
         if (!XI.out || !XI.owner || !x11_xdnd_parse_enter(d, &e) || !same_client(e.win, XI.owner)) return;
         xi_reset(1);
         XI.src = e.win;
+        XI.enter.win = XI.owner;                    /* the one window its data may come from */
         XI.version = e.version;
         XI.gen = ++dnd_gen;
         if (e.more) get_prop(e.win, AT(XdndTypeList), 0, XDND_MAX_TYPES, xi_typelist_reply, XI.gen, 0);
@@ -1332,7 +1397,7 @@ static void on_property(const uint8_t *p) {
             if (a == sel_prop(k) && !deleted && X.sel[k].stage == 3)
                 get_prop(X.wmwin, a, 1, CLIP_MAX / 4, sel_reply, (uint32_t)k, 3);
         if (a == AT(LORD_SEL_XDND) && !deleted && XI.stage == 3)     /* the next chunk of an X app's drag */
-            get_prop(X.wmwin, a, 1, CLIP_MAX / 4, xi_data_reply, XI.gen, 3);
+            xi_read(3);
         return;
     }
     if (deleted && xfer_step(id, a)) return;                /* a paste in chunks asks for more */

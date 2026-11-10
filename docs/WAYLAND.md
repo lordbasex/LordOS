@@ -296,7 +296,14 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
     with `ConvertSelection` of `XdndSelection` (`INCR` too, at most 16 MB within 10 seconds) and written
     to its fd without blocking. Its `accept` and action go back as `XdndStatus`, its `finish` as
     `XdndFinished`. The app's messages count only from the client that owns `XdndSelection` (XFixes
-    says), and an owner that changes mid-drag ends it. Back over an X window, the invisible window is
+    says), and an owner that changes mid-drag ends it. The data is read only after a `SelectionNotify`
+    the X server made (one sent with `SendEvent`, the event code's 0x80 bit, is ignored, since any X
+    client can send it) whose requestor, selection, target and property are exactly the conversion's,
+    and right before each read (each `INCR` chunk too) the window manager asks again who owns
+    `XdndSelection` (`GetSelectionOwner`) and every client's pid (X-Resource): it must be the very window
+    that owned it at `XdndEnter`, with the same client pid and the same answer on files, or the drag ends
+    and its drop is refused (another X client taking the selection, or a new one that connected during
+    the drag and got the same window id). Back over an X window, the invisible window is
     unmapped and the app talks to that window again; the app's own Escape ends its drag.
   - *An X app's files onto Files* are taken only when the X server ties the selection's owner to a
     process: the window manager asks X-Resource (`XResQueryClientIds`) for every X client's pid (never
@@ -315,8 +322,9 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   are not supported.
 - **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry,
   shared with the clipboard's file lists), `build/xwm-test` (also in it: the XDND messages, enter with more
-  than three types and `XdndTypeList`, positions, statuses, finished, type names, the X-Resource reply and
-  who may hand files to LordOS),
+  than three types and `XdndTypeList`, positions, statuses, finished, type names, the X-Resource reply,
+  who may hand files to LordOS, synthetic or mismatched `SelectionNotify` events and owners that changed
+  before the read),
   `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), and
   `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the

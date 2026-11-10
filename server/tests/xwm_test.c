@@ -270,6 +270,72 @@ static void test_xres(void) {
     CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
 }
 
+static void notify_ev(uint8_t ev[32], int code, uint32_t req, uint32_t sel, uint32_t target, uint32_t prop) {
+    memset(ev, 0, 32);
+    ev[0] = (uint8_t)code;
+    put32(ev + 8, req);
+    put32(ev + 12, sel);
+    put32(ev + 16, target);
+    put32(ev + 20, prop);
+}
+
+/* An X app's drag's data: only a real SelectionNotify for our conversion, and only from the owner of XdndEnter. */
+static void test_xdnd_owner(void) {
+    uint8_t ev[32];
+    const uint32_t me = 0xa00001, sel = 300, tgt = 301, prop = 302;
+    notify_ev(ev, 31, me, sel, tgt, prop);
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 1);
+    notify_ev(ev, 31, me, sel, tgt, 0);
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 0);                    /* the owner refused it */
+    notify_ev(ev, 31 | 0x80, me, sel, tgt, prop);                           /* SendEvent by any X client */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 31 | 0x80, me, sel, tgt, 0);                              /* a forged refusal, too */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 31, 0xa00002, sel, tgt, prop);                            /* another requestor */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 31, me, 299, tgt, prop);                                  /* another selection */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 31, me, sel, 303, prop);                                  /* a type not asked for */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 31, me, sel, tgt, 304);                                   /* another property */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+    notify_ev(ev, 30, me, sel, tgt, prop);                                  /* not a SelectionNotify */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
+
+    uint32_t mask = 0x1fffff, b[3] = { 0x200000, 0x400000, 0x600000 }, p[3] = { 1000, 1001, 1002 };
+    XdndOwner then, now;
+    sandboxed_pid = 0;
+    x11_xdnd_owner(&then, 0x400005, b, p, 3, mask, fake_sandboxed);
+    CHECK(then.win == 0x400005 && then.pid == 1001 && then.trusted);
+    now = then;
+    CHECK(x11_xdnd_same_owner(&then, 0x400005, &now));
+    CHECK(x11_xdnd_same_owner(&then, 0x400005, NULL));                      /* without X-Resource: the window */
+    CHECK(!x11_xdnd_same_owner(&then, 0x400006, &now));                     /* another window, even its client's */
+    CHECK(!x11_xdnd_same_owner(&then, 0x600001, NULL));                     /* another X client took it */
+    CHECK(!x11_xdnd_same_owner(&then, 0, NULL));                            /* nobody owns it now */
+    XdndOwner none = { 0, 0, 0 };
+    CHECK(!x11_xdnd_same_owner(&none, 0, NULL));                            /* no owner at XdndEnter */
+    p[1] = 2000;                                                            /* a new client with the same id */
+    x11_xdnd_owner(&now, 0x400005, b, p, 3, mask, fake_sandboxed);
+    CHECK(now.pid == 2000 && !x11_xdnd_same_owner(&then, 0x400005, &now));
+    p[1] = 1001;
+    sandboxed_pid = 1002;                                                   /* a sandboxed client connected */
+    x11_xdnd_owner(&now, 0x400005, b, p, 3, mask, fake_sandboxed);
+    CHECK(now.pid == 1001 && !now.trusted && !x11_xdnd_same_owner(&then, 0x400005, &now));
+    sandboxed_pid = 0;
+    uint32_t b2[2] = { 0x200000, 0x600000 }, p2[2] = { 1000, 1002 };       /* its client is gone */
+    x11_xdnd_owner(&now, 0x400005, b2, p2, 2, mask, fake_sandboxed);
+    CHECK(!now.pid && !now.trusted && !x11_xdnd_same_owner(&then, 0x400005, &now));
+    x11_xdnd_owner(&now, 0x400005, b, p, -1, mask, fake_sandboxed);        /* too many clients to tell */
+    CHECK(!now.pid && !now.trusted && !x11_xdnd_same_owner(&then, 0x400005, &now));
+    /* never trusted (contained to Wayland windows) but the same client both times: still read */
+    sandboxed_pid = 1000;
+    x11_xdnd_owner(&then, 0x400005, b, p, 3, mask, fake_sandboxed);
+    x11_xdnd_owner(&now, 0x400005, b, p, 3, mask, fake_sandboxed);
+    CHECK(!then.trusted && then.pid == 1001 && x11_xdnd_same_owner(&then, 0x400005, &now));
+    sandboxed_pid = 0;
+}
+
 int main(void) {
     test_requests();
     test_setup();
@@ -279,6 +345,7 @@ int main(void) {
     test_display();
     test_xdnd();
     test_xres();
+    test_xdnd_owner();
     printf("xwm-test: %d/%d\n", checks - fails, checks);
     return fails ? 1 : 0;
 }

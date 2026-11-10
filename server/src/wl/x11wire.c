@@ -330,3 +330,25 @@ int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, 
     }
     return known;
 }
+
+void x11_xdnd_owner(XdndOwner *o, uint32_t win, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                    int (*sandboxed)(int pid)) {
+    o->win = win;
+    o->pid = 0;
+    o->trusted = x11_xdnd_trusted(win, base, pid, n, id_mask, sandboxed);
+    for (int i = 0; win && i < n; i++)
+        if (pid[i] && pid[i] <= 0x7fffffffu && x11_same_client(win, base[i], id_mask)) { o->pid = pid[i]; break; }
+}
+
+int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *now) {
+    if (!then->win || cur != then->win) return 0;
+    if (!now) return 1;
+    return now->win == then->win && now->pid == then->pid && now->trusted == then->trusted;
+}
+
+int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop) {
+    if (ev[0] != X_SelectionNotify) return -1;              /* the 0x80 bit: sent by a client (SendEvent) */
+    if (x11_get32(ev + 8) != requestor || x11_get32(ev + 12) != selection || x11_get32(ev + 16) != target) return -1;
+    uint32_t p = x11_get32(ev + 20);
+    return p == prop ? 1 : p == 0 ? 0 : -1;
+}

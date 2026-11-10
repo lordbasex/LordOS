@@ -160,6 +160,22 @@ int x11_xres_pids(const uint8_t *r, size_t n, uint32_t *base, uint32_t *pid, int
 int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
                      int (*sandboxed)(int pid));
 
+/* An X app's drag's owner as X-Resource tells it: the window that owns XdndSelection, its client's pid (0: none
+ * known) and whether its files may reach LordOS (x11_xdnd_trusted). */
+typedef struct { uint32_t win, pid; int trusted; } XdndOwner;
+void x11_xdnd_owner(XdndOwner *o, uint32_t win, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
+                    int (*sandboxed)(int pid));
+/* Whether the data of an X app's drag may be read now: XdndSelection is still owned (cur, GetSelectionOwner)
+ * by the very window that owned it at XdndEnter, and, when now is given (X-Resource asked again right before
+ * the read), that window's client has the same pid and the same trust answer. Another X client taking the
+ * selection, or one that connected meanwhile and got the same window id, refuses it. */
+int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *now);
+/* A SelectionNotify of an X app's drag's data (the 32-byte event): 1 if it answers the ConvertSelection we
+ * sent (requestor, selection, target and property exactly ours), 0 if it is the owner's refusal of it (the
+ * property None), -1 to ignore it: one sent with SendEvent (the code's 0x80 bit: any X client can send one),
+ * another event, or an answer to something else. */
+int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop);
+
 /* First free display number (0..63), given a test for whether :n is in use (a live lock file or
  * a socket). -1 if they are all taken. */
 int x11_pick_display(int (*taken)(int n, void *ctx), void *ctx);
