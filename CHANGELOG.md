@@ -318,6 +318,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Web apps said their notifications were off after every start (a messaging web app showed "notifications are
+  disabled, turn on") although LordOS allowed them: WebKit wasn't told the app's choice, so each new web process
+  started at "default". lord-web now hands WebKit the allowed or denied origin before the page loads
+  (`webkit_web_context_initialize_notification_permissions`); "ask" still lets the page ask.
 - Settings → Web apps showed "Data: none yet" for a profile added during the visit even after it was in use. Its size is
   now measured again when a profile is added or starts, and every 30 s.
 - The Dock menu's "New window: <profile>" showed a check mark as if it were a selected option, and the second profile's
