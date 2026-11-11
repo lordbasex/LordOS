@@ -78,7 +78,20 @@ static void reply_info(const DMsg *m) {
     dw_free(&b);
 }
 
-static void on_notify(const DMsg *m) {
+static int (*web_owner)(uint32_t pid, char *app, char *profile);
+void notifyd_set_web_owner(int (*fn)(uint32_t pid, char *app, char *profile)) { web_owner = fn; }
+
+/* "desktop-entry" lordos-web.<app>.<profile> puts the notification under that web app (its name and icon): only the
+ * lord-web lord-server started for that app and profile may say so; anyone else's entry is dropped */
+static int web_entry_ok(const char *desktop, uint32_t pid) {
+    if (strncmp(desktop, "lordos-web.", 11)) return 1;
+    char app[48] = "", profile[48] = "", want[112];
+    if (!web_owner || !pid || web_owner(pid, app, profile)) return 0;
+    snprintf(want, sizeof want, "lordos-web.%s.%s", app, profile);
+    return !strcmp(desktop, want);
+}
+
+static void on_notify(const DMsg *m, uint32_t pid) {
     DRd r;
     dr_init(&r, m);
     const char *app = dr_str(&r, NULL);
@@ -102,7 +115,7 @@ static void on_notify(const DMsg *m) {
         hb_printf(&j, "]");
     }
     char desktop[160] = "";
-    int urgency = 1;
+    int urgency = 1, quiet = 0;
     end = dr_arr(&r, 8);
     while (!r.err && dr_more(&r, end)) {
         dr_struct(&r);
@@ -110,6 +123,7 @@ static void on_notify(const DMsg *m) {
         if (r.err || !k || !sig) break;
         if (!strcmp(k, "desktop-entry") && !strcmp(sig, "s")) { const char *v = dr_str(&r, NULL); snprintf(desktop, sizeof desktop, "%s", v ? v : ""); }
         else if (!strcmp(k, "urgency") && !strcmp(sig, "y")) urgency = dr_u8(&r);
+        else if (!strcmp(k, "suppress-sound") && !strcmp(sig, "b")) quiet = dr_bool(&r);
         else dr_skip(&r, sig);
     }
     int32_t timeout = dr_i32(&r);
@@ -118,9 +132,11 @@ static void on_notify(const DMsg *m) {
         dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "Notify(susssasa{sv}i)");
         return;
     }
+    if (!web_entry_ok(desktop, pid)) desktop[0] = 0;
     uint32_t id = replaces ? replaces : next_id++;
     if (!next_id) next_id = 1;
-    hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":%d,\"app\":", id, replaces ? "true" : "false", urgency, timeout);
+    hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":%d,\"suppressSound\":%s,\"app\":", id, replaces ? "true" : "false", urgency, timeout,
+              quiet ? "true" : "false");
     notifyd_plain(app, plain, 128);
     hb_str(&j, plain);
     hb_printf(&j, ",\"desktop\":");
@@ -206,7 +222,7 @@ static void on_sender(const DMsg *m) {
         uint32_t pid = 0;
         if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
         if (pid_blocked(pid)) drop_notify(&call);
-        else on_notify(&call);
+        else on_notify(&call, pid);
         dbus_msg_free(&call);
         return;
     }

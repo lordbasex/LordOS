@@ -36,6 +36,9 @@ void notifyd_action(uint32_t id, const char *key);
 /* Tests only: replaces the PID → firewall id lookup (/proc/<pid>/cgroup). fn returns 0 with the
  * id, 1 if the PID is in no app's scope, -1 if it can't tell. */
 void notifyd_set_app_of_pid(int (*fn)(uint32_t pid, char *out, size_t n));
+/* Who may name a web app's "desktop-entry" (lordos-web.<app>.<profile>): fn gives the app and profile of the lord-web
+ * a PID belongs to (lord-server's webmgr_owner), 0, or -1 if none. Unset, no notification may name one. */
+void notifyd_set_web_owner(int (*fn)(uint32_t pid, char *app, char *profile));
 /* Strips markup (<b>, <i>, <a href>, <img>...) and decodes &amp; &lt; &gt; &quot; &apos;. */
 void notifyd_plain(const char *in, char *out, size_t n);
 

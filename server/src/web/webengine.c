@@ -10,12 +10,20 @@
  *     a new window outside it, open through the OpenURI portal in the person's browser. A redirect or a script that
  *     takes the page outside (a sign-in on another site) stays, and the title then starts with that site's host;
  *   - permissions: answered from the registry, asking lord-server when it says "ask" (webbus.c);
- *   - downloads: only to the XDG Downloads folder, under a unique, cleaned name (webdl.c), with a notification. */
+ *   - downloads: only to the XDG Downloads folder, under a unique, cleaned name (webdl.c), with a notification;
+ *   - the user agent is a Linux one with WebKit's own Safari tokens and LordOS's (webpage_user_agent). WebKit's
+ *     site-specific quirks are off on the app's own pages, because one of them hands some sites a Mac user agent
+ *     (a messaging web app then offers its Mac download), and on for any other site in the window (a sign-in);
+ *   - the unread count in the page's title goes to lord-server (SetBadge) when it changes;
+ *   - when the page starts playing audio, for the notification sound (webbus.c, webpage_sound_suppress). */
 #include "web.h"
 #include "webdl.h"
 #include "webwin.h"
 #include "weburl.h"
+#include "lord_version.h"           /* build/gen: LordOS's version, for the user agent */
 
+#include <sys/utsname.h>
+#include <time.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -45,7 +53,12 @@ WebKitWebContext *web_context_new(void) {
 }
 
 WebKitSettings *web_settings_new(void) {
+    struct utsname u;
+    char ua[256];
+    if (uname(&u)) u.machine[0] = 0;
+    if (webpage_user_agent(u.machine, LORD_VERSION, ua, sizeof ua)) ua[0] = 0;
     return webkit_settings_new_with_settings(
+        "user-agent", ua[0] ? ua : NULL,
         "enable-developer-extras", FALSE,
         "enable-write-console-messages-to-stdout", FALSE,
         "javascript-can-open-windows-automatically", FALSE,
@@ -102,9 +115,38 @@ void web_show(Web *w, const char *token) {
     if (w->win) webwin_show(w->win, token);
 }
 
+/* in the background (with or without its tray icon) the window only hides: the Dock and the launcher bring it back
+ * through Show (webmain.c) */
 void web_close_requested(Web *w) {
-    if (w->app.background && w->tray && w->win) { webwin_hide(w->win); return; }
+    if (w->app.background && w->win) { webwin_hide(w->win); return; }
     web_quit(w, 0);
+}
+
+double web_now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+}
+
+void web_state_save(Web *w) {
+    char path[PATH_MAX + 16], text[128];
+    size_t n = webpage_state_write(&w->state, text, sizeof text);
+    if (snprintf(path, sizeof path, "%s/state.json", w->profile_dir) >= (int)sizeof path || !n) return;
+    if (webreg_write_file(path, text, n)) fprintf(stderr, "lord-web: %s: %s\n", path, strerror(errno));
+}
+
+/* ---- the notification sound: the page started audio ---- */
+
+static void on_audio(WebKitWebView *v, GParamSpec *ps, gpointer d) {
+    (void)ps;
+    Web *w = d;
+    if (!webkit_web_view_is_playing_audio(v)) return;
+    w->audio_ms = web_now_ms();
+    /* right after a notification sent with LordOS's sound: the page has its own; the next ones go without ours */
+    if (!w->state.own_sound && webpage_sound_learns(w->app.notify_sound, w->note_ms, w->audio_ms)) {
+        w->state.own_sound = 1;
+        web_state_save(w);
+    }
 }
 
 /* ---- title ---- */
@@ -121,13 +163,21 @@ static void update_title(Web *w) {
     } else webwin_set_title(w->win, t);
 }
 
-static void on_title(WebKitWebView *v, GParamSpec *ps, gpointer d) { (void)v; (void)ps; update_title(d); }
+static void on_title(WebKitWebView *v, GParamSpec *ps, gpointer d) {
+    (void)ps;
+    Web *w = d;
+    update_title(w);
+    /* the unread count only from the app's own pages: another site's title says nothing about it */
+    int count = w->outside ? w->badge : webpage_title_badge(webkit_web_view_get_title(v));
+    if (count != w->badge) { w->badge = count; webbus_set_badge(w, (unsigned)count); }
+}
 
 static void on_uri(WebKitWebView *v, GParamSpec *ps, gpointer d) {
     (void)ps;
     Web *w = d;
     const char *uri = webkit_web_view_get_uri(v);
     w->outside = uri && strncmp(uri, "about:", 6) && !weburl_in_scope(uri, w->app.scope);
+    webkit_settings_set_enable_site_specific_quirks(webkit_web_view_get_settings(v), w->outside);
     update_title(w);
 }
 
@@ -346,6 +396,7 @@ int web_engine_start(Web *w) {
     w->session = web_session_new(w);
     if (!w->session) return -1;
     WebKitSettings *settings = web_settings_new();
+    webkit_settings_set_enable_site_specific_quirks(settings, FALSE);      /* the start address is the app's own */
     WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), NULL, NULL);
     w->view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", w->context, "network-session", w->session, "settings", settings, NULL);
     g_object_unref(settings);
@@ -361,6 +412,8 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "notify::uri", G_CALLBACK(on_uri), w);
     g_signal_connect(w->view, "close", G_CALLBACK(on_close), w);
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
+    g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
+    webxfer_init(w);
     g_signal_connect(w->session, "download-started", G_CALLBACK(on_download), w);
     webkit_web_view_load_uri(w->view, w->app.start_url);
     return 0;

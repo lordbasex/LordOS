@@ -47,6 +47,7 @@ static void on_event(const char *kind, const char *json) {
     const char *a = strstr(json, "\"actions\":[[\"default\",\"Activate\"],[\"settings\",\"Settings\"]]");
     if (d && write(shown_fd, "|desktop", 8) < 0) {}
     if (a && write(shown_fd, "|actions", 8) < 0) {}
+    if (strstr(json, "\"suppressSound\":true") && write(shown_fd, "|quiet", 6) < 0) {}
     if (write(shown_fd, "\n", 1) < 0) {}
 }
 static int fake_app_of_pid(uint32_t pid, char *out, size_t n) {
@@ -328,7 +329,7 @@ int main(void) {
     char shown[512] = "";
     ssize_t r = read(pipefd[0], shown, sizeof shown - 1);
     shown[r > 0 ? r : 0] = 0;
-    check(!strcmp(shown, "good\nchrome|desktop|actions\n"), "only the unrestricted notifications were shown, Chrome's with its entry and actions");
+    check(!strcmp(shown, "good\nchrome|desktop|actions|quiet\n"), "only the unrestricted notifications were shown, Chrome's with its entry, actions and suppress-sound");
     if (strcmp(shown, "good\nchrome|desktop|actions\n")) printf("  shown: %s\n", shown);
     unlink(sock);
     rmdir(path);

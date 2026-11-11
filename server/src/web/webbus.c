@@ -1,6 +1,11 @@
 /* webbus.c — what lord-web asks of the session bus (see web.h), like any Linux app:
- *   - notifications: org.freedesktop.Notifications, with the app's name and icon; a click opens the app's window and
- *     tells the page (WebKit's notification "clicked");
+ *   - notifications: org.freedesktop.Notifications, with the app's name and icon (app_icon and "image-path": the
+ *     registry's icon file) and "desktop-entry" lordos-web.<app>.<profile>, so LordOS shows it under the app; a click
+ *     tells the page first (WebKit's notification "clicked": the page's own onclick runs, a messaging app opens that
+ *     chat), then brings the window forward with the activation token LordOS sent. "suppress-sound" when LordOS
+ *     shouldn't play its own sound (webpage_sound_suppress: the page plays one, or the registry's "notifySound");
+ *   - the page's unread count: org.lordos.WebApps1.SetBadge(app, profile, count) on lord-server, only when it changes
+ *     (0: none), not waiting for an answer;
  *   - links outside the app's scope: the OpenURI portal, so they open in the person's browser;
  *   - the page's file chooser: the FileChooser portal;
  *   - a permission the registry says to ask about: org.lordos.WebApps1.Ask(app, profile, kind) on lord-server, which
@@ -50,8 +55,12 @@ static void on_notify_signal(GDBusConnection *c, const char *sender, const char 
         g_variant_get(p, "(u&s)", &id, &action);
         Note *nt = note_by_id(id);
         if (!nt) return;
-        web_show(web, nt->token);
-        webkit_notification_clicked(nt->n);
+        char token[sizeof nt->token];
+        snprintf(token, sizeof token, "%s", nt->token);
+        WebKitNotification *n = g_object_ref(nt->n);
+        webkit_notification_clicked(n);             /* the page may close it (note_drop): token and n are ours */
+        g_object_unref(n);
+        web_show(web, token);
     } else if (!strcmp(sig, "NotificationClosed") && g_variant_is_of_type(p, G_VARIANT_TYPE("(uu)"))) {
         guint32 reason = 0;
         g_variant_get(p, "(uu)", &id, &reason);
@@ -104,7 +113,7 @@ static void on_notified(GObject *src, GAsyncResult *res, gpointer d) {
     g_free(call);
 }
 
-static void send_notify(Web *w, const char *summary, const char *body, WebKitNotification *n, guint32 replaces) {
+static void send_notify(Web *w, const char *summary, const char *body, WebKitNotification *n, guint32 replaces, int quiet) {
     if (!w->bus) return;
     GVariantBuilder actions, hints;
     g_variant_builder_init(&actions, G_VARIANT_TYPE("as"));
@@ -112,6 +121,7 @@ static void send_notify(Web *w, const char *summary, const char *body, WebKitNot
     g_variant_builder_init(&hints, G_VARIANT_TYPE("a{sv}"));
     if (w->icon_path[0]) g_variant_builder_add(&hints, "{sv}", "image-path", g_variant_new_string(w->icon_path));
     g_variant_builder_add(&hints, "{sv}", "desktop-entry", g_variant_new_string(w->window_id));
+    if (quiet) g_variant_builder_add(&hints, "{sv}", "suppress-sound", g_variant_new_boolean(TRUE));
     NotifyCall *call = g_new0(NotifyCall, 1);
     call->n = n ? g_object_ref(n) : NULL;
     char name[2 * WEBREG_NAME_MAX + 8];
@@ -130,10 +140,24 @@ void webbus_notify(Web *w, WebKitNotification *n) {
         const char *t = notes[i].n ? webkit_notification_get_tag(notes[i].n) : NULL;
         if (t && !strcmp(t, tag)) { replaces = notes[i].id; note_drop(&notes[i]); break; }
     }
-    send_notify(w, webkit_notification_get_title(n), webkit_notification_get_body(n), n, replaces);
+    /* WebKit 2.48 doesn't tell a notification's "silent" option: 0 */
+    double now = web_now_ms();
+    int quiet = webpage_sound_suppress(w->app.notify_sound, w->state.own_sound, 0, w->audio_ms, now);
+    if (!w->state.own_sound && webpage_sound_learns(w->app.notify_sound, now, w->audio_ms)) {
+        w->state.own_sound = 1;                     /* the page started its sound just before: it has its own */
+        web_state_save(w);
+    }
+    w->note_ms = quiet ? -1 : now;                  /* audio right after this one teaches the same (webengine.c) */
+    send_notify(w, webkit_notification_get_title(n), webkit_notification_get_body(n), n, replaces, quiet);
 }
 
-void webbus_notify_text(Web *w, const char *summary, const char *body) { send_notify(w, summary, body, NULL, 0); }
+void webbus_notify_text(Web *w, const char *summary, const char *body) { send_notify(w, summary, body, NULL, 0, 0); }
+
+void webbus_set_badge(Web *w, unsigned count) {
+    if (!w->bus || !w->profile) return;
+    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "SetBadge", g_variant_new("(ssu)", w->app.id, w->profile->id, count),
+                           NULL, G_DBUS_CALL_FLAGS_NO_AUTO_START, -1, NULL, NULL, NULL);
+}
 
 /* ---- OpenURI ---- */
 

@@ -14,6 +14,8 @@
  *     "scheme://host[:port]" (no default port); scope has no query or fragment and is a prefix of startUrl
  *   - icon: "icons/<id>.png" or "icons/<id>.svg"; themeColor "#rrggbb"
  *   - a permission is allow, ask or deny; source is catalog or url; background a boolean
+ *   - optional: tray, a boolean (false when missing: the tray icon of an app in the background); notifySound, one of
+ *     auto (when missing), app, system or none (LordOS's sound for the page's notifications, webpage.h)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
 #ifndef LORD_WEB_WEBREG_H
@@ -36,6 +38,8 @@ enum { WEBREG_PERM_NOTIFICATIONS, WEBREG_PERM_CAMERA, WEBREG_PERM_MICROPHONE, WE
 enum { WEBREG_ALLOW, WEBREG_ASK, WEBREG_DENY };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
+/* "notifySound" */
+enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NONE, WEBREG_SOUND_N };
 
 typedef struct {
     char id[WEBREG_ID_MAX + 1];
@@ -50,6 +54,8 @@ typedef struct {
     char theme_color[8];                  /* "#rrggbb", or "" */
     int  source;                          /* WEBREG_SRC_* */
     int  background;
+    int  tray;                            /* the tray icon while in the background (written only when true) */
+    int  notify_sound;                    /* WEBREG_SOUND_* (written only when not auto) */
     int  nprofiles;
     WebProfile profiles[WEBREG_PROFILES_MAX];
     int  perms[WEBREG_PERM_N];            /* WEBREG_ALLOW / WEBREG_ASK / WEBREG_DENY */
@@ -70,6 +76,8 @@ const char *webreg_perm_name(int kind);        /* "notifications" … ; NULL out
 int  webreg_perm_kind(const char *name);       /* -1 if unknown */
 const char *webreg_perm_value_name(int v);     /* "allow" / "ask" / "deny" */
 int  webreg_perm_value(const char *name);      /* -1 if unknown */
+const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "none"; NULL out of range */
+int  webreg_sound_value(const char *name);     /* -1 if unknown */
 
 /* ---- the file ---- */
 /* Parses and checks one registry file. 0 ok; -1 refused (a zeroed), with why (optional) saying what is wrong. */
