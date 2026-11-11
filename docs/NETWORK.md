@@ -233,7 +233,7 @@ replies carry only data (a count, a public key).
 | `net-config` | `if\nmethod=dhcp\|static\|off\naddress=ip/n\n…gateway=ip\ndns=ip…` | admin | Saves and applies. Rejects system interfaces. |
 | `net-manage` / `net-unmanage` | `if` | admin | Writes and deletes `/etc/systemd/network/00-lordos-<if>.network` (`Unmanaged=yes`) and runs `networkctl reload`. |
 | `net-wifi-scan` | `if` | anyone | One `LOG` per network with `{ ssid, bssid, freq, signal, security: open\|wep\|wpa\|wpa2\|wpa2/wpa3\|wpa3\|enterprise, known }`, then `OK <n>` (≈3–10 s) |
-| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. |
+| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. An empty password for a network saved with a password or a derived key joins it with the saved one and leaves its files as they are (a click on a saved network in Settings). |
 | `net-wifi-disconnect` | `if` | anyone | |
 | `net-wifi-forget` | `ssid` | admin | |
 | `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK vpn.imported`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR vpn.missingProgram type=<type> package=<package>` |

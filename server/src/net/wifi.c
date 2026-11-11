@@ -167,6 +167,38 @@ static int load_network_psk(const char *ifname, const char *ssid, const char *pa
 
 static int load_network(const char *ifname, const char *ssid, const char *pass) { return load_network_psk(ifname, ssid, pass, NULL); }
 
+/* What a saved <ssid in hex>.key holds: WIFI_SAVED_PASS (a password), WIFI_SAVED_PSK (a derived
+ * key) or WIFI_SAVED_OPEN (nothing usable: an open network, or a file that isn't valid). */
+int wifi_saved_kind(const char *keytext) {
+    if (!keytext) return WIFI_SAVED_OPEN;
+    char pass[160], psk[80] = "";
+    pass[0] = 0;
+    kv_get(keytext, "pass", 0, pass, sizeof pass);
+    kv_get(keytext, "psk", 0, psk, sizeof psk);
+    int k = psk[0] ? (is_psk_hex(psk) ? WIFI_SAVED_PSK : WIFI_SAVED_OPEN) : pass[0] && valid_pass(pass) ? WIFI_SAVED_PASS : WIFI_SAVED_OPEN;
+    memset(pass, 0, sizeof pass);
+    memset(psk, 0, sizeof psk);
+    return k;
+}
+
+/* Loads one saved network from its .key file (path) into wpa_supplicant. Returns the id or -1. */
+static int load_saved(const char *ifname, const char *ssid, const char *path) {
+    char *t = read_file(path, 1024, NULL);
+    if (!t) return -1;
+    char pass[160], psk[80] = "";
+    pass[0] = 0;
+    kv_get(t, "pass", 0, pass, sizeof pass);
+    kv_get(t, "psk", 0, psk, sizeof psk);
+    int id = -1;
+    if (psk[0]) { if (is_psk_hex(psk)) id = load_network_psk(ifname, ssid, "", psk); }
+    else if (valid_pass(pass)) id = load_network(ifname, ssid, pass);
+    memset(pass, 0, sizeof pass);
+    memset(psk, 0, sizeof psk);
+    memset(t, 0, strlen(t));
+    free(t);
+    return id;
+}
+
 static void load_known(const char *ifname) {
     DIR *d = opendir(NET_WIFI_DIR);
     struct dirent *e;
@@ -179,18 +211,9 @@ static void load_known(const char *ifname) {
         size_t n = 0;
         for (size_t i = 0; i + 1 < l - 4 && n < 32; i += 2) { unsigned v; if (sscanf(sh + i, "%2x", &v) != 1) break; ssid[n++] = (char)v; }
         ssid[n] = 0;
+        if (!valid_ssid(ssid)) continue;
         snprintf(path, sizeof path, NET_WIFI_DIR "/%s", e->d_name);
-        char *t = read_file(path, 1024, NULL);
-        if (!t || !valid_ssid(ssid)) { free(t); continue; }
-        char pass[160], psk[80] = "";
-        pass[0] = 0;
-        kv_get(t, "pass", 0, pass, sizeof pass);
-        kv_get(t, "psk", 0, psk, sizeof psk);
-        if (psk[0]) { if (is_psk_hex(psk)) load_network_psk(ifname, ssid, "", psk); }
-        else if (valid_pass(pass)) load_network(ifname, ssid, pass);
-        memset(psk, 0, sizeof psk);
-        memset(t, 0, strlen(t));
-        free(t);
+        load_saved(ifname, ssid, path);
     }
     if (d) closedir(d);
 }
@@ -340,27 +363,34 @@ void wifi_act_scan(const char *ifname) {
 void wifi_act_connect(const char *ifname, const char *ssid, const char *pass) {
     if (!valid_ssid(ssid)) { admin_err("wifi.invalidSsid", NULL); return; }
     if (!valid_pass(pass) || (pass[0] && strlen(pass) < 8)) { admin_err("wifi.invalidPassword", NULL); return; }
-    char sh[72], path[160];
+    char sh[72], path[160], keyp[160];
     hex((const uint8_t *)ssid, strlen(ssid), sh);
-    /* it's saved: public part (ssid, security) and secret part (password) */
-    Buf meta = {0};
-    buf_printf(&meta, "{\"ssid\":");
-    buf_json_str(&meta, ssid);
-    buf_printf(&meta, ",\"security\":\"%s\"}\n", pass[0] ? "psk" : "open");
-    snprintf(path, sizeof path, NET_WIFI_DIR "/%s.json", sh);
-    int ok = meta.p && write_file_atomic(path, meta.p, meta.len, 0644) == 0;
-    buf_free(&meta);
-    char sec[200];
-    int sl = snprintf(sec, sizeof sec, "pass=%s\n", pass);
-    snprintf(path, sizeof path, NET_WIFI_DIR "/%s.key", sh);
-    ok = ok && write_file_atomic(path, sec, (size_t)sl, 0600) == 0;
-    memset(sec, 0, sizeof sec);
-    if (!ok) { admin_err("wifi.saveFailed", NULL); return; }
+    snprintf(keyp, sizeof keyp, NET_WIFI_DIR "/%s.key", sh);
+    /* No password for a network saved with one (a click on a saved network, GitHub #124): join it
+     * with what is saved. Saving it again would turn it into an open network and lose its key. */
+    char *saved = pass[0] ? NULL : read_file(keyp, 1024, NULL);
+    int keep = saved && wifi_saved_kind(saved) != WIFI_SAVED_OPEN;
+    if (saved) { memset(saved, 0, strlen(saved)); free(saved); }
+    if (!keep) {
+        /* it's saved: public part (ssid, security) and secret part (password) */
+        Buf meta = {0};
+        buf_printf(&meta, "{\"ssid\":");
+        buf_json_str(&meta, ssid);
+        buf_printf(&meta, ",\"security\":\"%s\"}\n", pass[0] ? "psk" : "open");
+        snprintf(path, sizeof path, NET_WIFI_DIR "/%s.json", sh);
+        int ok = meta.p && write_file_atomic(path, meta.p, meta.len, 0644) == 0;
+        buf_free(&meta);
+        char sec[200];
+        int sl = snprintf(sec, sizeof sec, "pass=%s\n", pass);
+        ok = ok && write_file_atomic(keyp, sec, (size_t)sl, 0600) == 0;
+        memset(sec, 0, sizeof sec);
+        if (!ok) { admin_err("wifi.saveFailed", NULL); return; }
+    }
     char wname[40];
     snprintf(wname, sizeof wname, "wpa:%s", ifname);
     int fresh = !admin_daemon_running(wname);
     if (wifi_start(ifname)) { admin_err("wifi.startFailed", "name", ifname, NULL); return; }
-    int id = fresh ? find_network(ifname, sh) : load_network(ifname, ssid, pass);
+    int id = fresh ? find_network(ifname, sh) : keep ? load_saved(ifname, ssid, keyp) : load_network(ifname, ssid, pass);
     if (id < 0) { admin_err("wifi.rejected", NULL); return; }
     char cmd[48];
     snprintf(cmd, sizeof cmd, "SELECT_NETWORK %d", id);
