@@ -153,6 +153,11 @@ int x11_dnd_mime(const uint8_t *name, size_t n, char *out, size_t size);
 /* X-Resource QueryClientIds reply (asked with the PID mask for every client): each client's resource base and
  * pid. Returns how many; a malformed entry ends the list; -1 if the reply has more than max entries. */
 int x11_xres_pids(const uint8_t *r, size_t n, uint32_t *base, uint32_t *pid, int max);
+/* Whether two X resources (windows) belong to clients of one process, as X-Resource tells it: both clients have a
+ * known pid and it is the same. A toolkit's clipboard code that opens its own X connection (arboard, used by Rust
+ * apps, has a helper window on a second connection) is still that app. 0 if n < 0 (too many clients), either has
+ * no pid known, or a pid is out of range. */
+int x11_same_process(uint32_t a, uint32_t b, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask);
 /* Whether an X drag of files may reach LordOS (Files copies them): the selection owner's client has a pid
  * the server knows, and no client of the display is sandboxed (sandboxed(pid) != 0; it is called for every pid):
  * on one X display any client can stand in for another's selection, so one sandboxed client is enough to

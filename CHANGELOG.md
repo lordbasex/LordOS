@@ -492,6 +492,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   A right click in the editor offers Cut, Copy, Paste and Select All before Speech, and on a desktop note it no
   longer drops the note back to reading while the menu is open. Ctrl/⌘+Shift+C copied instead of making a code
   block as its Format row says; it now makes the code block. Test: `notes-editor-scene` (GitHub #117).
+- X11 apps: pasting text copied in LordOS, a Wayland app or a web app into an X11 app whose clipboard library
+  opens its own X connection (Rust apps using arboard) said "Clipboard empty". The window manager
+  answered a paste request only from a window of the focused window's X client, and that library asks from a helper
+  window on a second connection. It now also answers when the X server's X-Resource extension ties the requestor's
+  client and the focused window's client to the same process (the pid Xwayland reads from the socket, never a
+  property the client sets), checked again when the answer comes back: the focus must not have moved, and the
+  selection must still be LordOS's and not a secret. Any other requestor, a client without a known pid, or a server
+  without X-Resource is still refused, so only the app with the keyboard gets the clipboard (`x11_same_process`,
+  `build/xwm-test`; docs/WAYLAND.md "Clipboard and primary selection", docs/PRIVACY.md "X11 apps") (GitHub #125).
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title

@@ -689,8 +689,10 @@ window titles and properties, the X keyboard state while an X window has the key
 polling `XQueryKeymap` sees what is typed into xterm), and the X selections (any X client can ask
 for the CLIPBOARD and PRIMARY while they are in X, and read the property they are pasted into).
 The window manager refuses paste requests that come from a window of a client other than the
-focused one, but that is only a hint: X11 doesn't authenticate who sends a request, so it is not a
-boundary between X apps. **If two programs must not see each other, at least one of them should be
+focused one, unless the X server's X-Resource extension says both clients are one process (the pid
+it takes from the socket's credentials, never a property the client sets: some toolkits open a
+second X connection just for the clipboard). That is only a hint: X11 doesn't authenticate who sends
+a request, so it is not a boundary between X apps. **If two programs must not see each other, at least one of them should be
 a Wayland app.**
 
 **What LordOS controls: the border between X11 and the rest.**
