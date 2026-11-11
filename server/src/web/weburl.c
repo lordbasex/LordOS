@@ -234,6 +234,12 @@ int weburl_probe_final_ok(const char *typed, const char *final) {
     return 1;
 }
 
+int weburl_probe_step(int *seen_public, int cls) {
+    if (*seen_public && cls != WEBURL_PUBLIC) return 0;
+    if (cls != WEBURL_PRIVATE) *seen_public = 1;
+    return 1;
+}
+
 int weburl_perm_allowed(const char *view_uri, const char *asker, const char *scope, const char *app_origin) {
     if (!view_uri || !scope || !app_origin || !weburl_app_ok(view_uri)) return 0;
     if (!weburl_in_scope(view_uri, scope) || !weburl_same_origin(view_uri, app_origin)) return 0;

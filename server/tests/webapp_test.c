@@ -106,6 +106,22 @@ static void test_probe_hops(void) {
     }
     CHECK(weburl_addrs_class(NULL, 0) == WEBURL_PRIVATE && weburl_addrs_class(all_pub, 0) == WEBURL_PRIVATE, "nothing resolved: refused");
 
+    /* every hop, by what it resolved to: once a hop was public, every next one must be public */
+    struct { int start; int hops[4]; int n, want; const char *what; } seq[] = {
+        { 1, { WEBURL_PUBLIC, WEBURL_PUBLIC }, 2, 1, "public, public" },
+        { 1, { WEBURL_PUBLIC, WEBURL_PRIVATE }, 2, 0, "public, then private" },
+        { 1, { -1 }, 1, 0, "public, then a name that doesn't resolve" },
+        { 0, { WEBURL_PRIVATE, WEBURL_PRIVATE }, 2, 1, "local, local" },
+        { 0, { WEBURL_PRIVATE, WEBURL_PUBLIC, WEBURL_PRIVATE }, 3, 0, "local, public, then private" },
+        { 0, { WEBURL_PUBLIC, WEBURL_PUBLIC }, 2, 1, "local, then public ones" },
+        { 0, { -1, WEBURL_PRIVATE }, 2, 0, "local, an unknown name, then private" },
+    };
+    for (size_t i = 0; i < sizeof seq / sizeof seq[0]; i++) {
+        int seen = seq[i].start, ok = 1;
+        for (int k = 0; k < seq[i].n && ok; k++) ok = weburl_probe_step(&seen, seq[i].hops[k]);
+        CHECK(ok == seq[i].want, "hops: %s", seq[i].what);
+    }
+
     CHECK(weburl_probe_hop_ok("https://a.example/", "https://b.example/x"), "public to public");
     CHECK(!weburl_probe_hop_ok("https://a.example/", "http://a.example/"), "https to http");
     CHECK(!weburl_probe_hop_ok("https://a.example/", "http://localhost:8080/"), "https to http on this computer");

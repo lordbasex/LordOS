@@ -56,6 +56,10 @@ int weburl_probe_hop_ok(const char *from, const char *to);
 /* 1 when the address the probe ended on may be read for the address it was asked for: https (or http on this
  * computer, for an http request on it), and private only when the request was private too. */
 int weburl_probe_final_ok(const char *typed, const char *final);
+/* One hop of the probe, by the class its address resolved to (WEBURL_PUBLIC, WEBURL_PRIVATE, or -1 when it did not
+ * resolve). *seen_public says a hop so far was public; then this one must be public too. 1 allowed (and *seen_public
+ * updated: a public or unknown hop sets it), 0 refused. */
+int weburl_probe_step(int *seen_public, int cls);
 /* 1 when a page may use the app's permissions (docs/WEBAPPS.md, "Permissions"): the window shows view_uri, an address
  * inside scope and of app_origin, and the origin that asks (asker, "https://host[:port]"; NULL when WebKit's API doesn't
  * say, as for a permission request) is app_origin too. Anything else (another site in the window after a redirect or a

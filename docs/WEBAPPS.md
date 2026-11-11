@@ -141,11 +141,17 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   the request (`weburl_probe_hop_ok`, `weburl_probe_final_ok`). lord-server never sends a public page's local icon to
   `--probe-icon`. Names count too: a single label (`router`) and the local networks' suffixes (`.lan`, `.home`,
   `.home.arpa`, `.internal`, `.intranet`, `.localdomain`, `.corp`) are private, and lord-web resolves every other name
-  itself (3 s at most) and classifies every address it gets (`weburl_addrs_class`): one private address makes the name
-  private, and a name that doesn't resolve is refused. A request whose own name is private (the person typed a local
-  address) may stay there. This narrows DNS rebinding but cannot close it: WebKit resolves the name again for its own
-  connection, after our check. The probe still runs in WebKit's sandbox, in an ephemeral session with none of the
-  person's cookies or credentials.
+  itself (3 s at most, again at every check: nothing is cached) and classifies every address it gets
+  (`weburl_addrs_class`): one private address makes the name private, and a name that doesn't resolve is refused. The
+  rule holds for every hop (`weburl_probe_step`): a request whose own name is private (the person typed a local
+  address) may stay there, but once any hop was public (the request, a redirect, a navigation, a frame), every next one
+  and the address the page or icon ended on must resolve to public addresses only, so local → public → local is
+  refused too.
+- **What is not closed:** DNS rebinding between our check and WebKit's own connection. WebKit resolves the name again
+  when it connects, and a name can answer a public address to us and a private one to it. This remains possible for
+  the probe only (an installed app never goes through it), which runs in WebKit's sandbox, in an empty ephemeral
+  session with none of the person's cookies or credentials, and reads only a manifest and an icon. Pinning the
+  address at connect time (a proxy of lord-web's own for the probe's network session) is not done yet.
 - **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
   answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
   signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is

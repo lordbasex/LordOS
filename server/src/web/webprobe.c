@@ -82,7 +82,7 @@ static int write_all(int fd, const void *p, size_t n) {
 static int answered;
 /* the address asked for, and the last main-frame address allowed on the way (redirects and navigations) */
 static char typed[WEBARGS_LINE_MAX + 1], current[WEBURL_MAX + 1];
-static int typed_public = 1;            /* what the request was: until shown otherwise, public (the strict side) */
+static int seen_public = 1;             /* a hop so far was public (or unknown): every next one must be public */
 
 /* ---- where a name leads: resolved here and every address classified (weburl_addrs_class) ---- */
 
@@ -126,13 +126,11 @@ static void *lookup_thread(void *d) {
 /* Where url's host leads: 0 and *cls, or -1 when it could not be resolved within RESOLVE_MS. An address is its own
  * class; a name the static rules call private is private without asking. */
 static int resolve_class(const char *url, int *cls) {
-    static struct { char host[WEBURL_HOST_MAX + 1]; int cls; } cache[16];
-    static int next;
     WebUrl u;
     if (weburl_parse(url, &u)) return -1;
     *cls = weburl_host_class(&u);
     if (*cls == WEBURL_PRIVATE || weburl_host_is_literal(&u)) return 0;
-    for (int i = 0; i < 16; i++) if (cache[i].host[0] && !strcmp(cache[i].host, u.host)) { *cls = cache[i].cls; return 0; }
+    /* resolved again at every check, never cached: a name may change its answer between two hops */
     Lookup *l = calloc(1, sizeof *l);
     if (!l) return -1;
     pthread_mutex_init(&l->mu, NULL);
@@ -156,24 +154,22 @@ static int resolve_class(const char *url, int *cls) {
     lookup_unref(l);                    /* a lookup still running frees itself when it ends */
     if (!done || !ok) return -1;
     *cls = weburl_addrs_class(a, n);
-    snprintf(cache[next].host, sizeof cache[next].host, "%s", u.host);
-    cache[next].cls = *cls;
-    next = (next + 1) % 16;
     return 0;
 }
 
-/* a typed public address may not lead to a private one: to must resolve, and only to public addresses */
+/* every hop (the request, each redirect and navigation, the address the page or icon ended on): once one was public,
+ * the next must resolve, and only to public addresses (weburl_probe_step), so neither a typed public address nor a
+ * public hop after a local one leads to this computer or a local network */
 static int place_ok(const char *to) {
-    if (!typed_public) return 1;
     int c;
-    return !resolve_class(to, &c) && c == WEBURL_PUBLIC;
+    return weburl_probe_step(&seen_public, resolve_class(to, &c) ? -1 : c);
 }
 
-/* what the request itself is (failing to resolve it keeps it public: the strict side) */
+/* the request itself: a local one may stay local (failing to resolve it counts as public, the strict side) */
 static void typed_set(const char *url) {
     snprintf(typed, sizeof typed, "%s", url);
     int c;
-    typed_public = resolve_class(url, &c) || c == WEBURL_PUBLIC;
+    seen_public = resolve_class(url, &c) || c == WEBURL_PUBLIC;
 }
 
 static void answer_line(Web *w, const char *line) {
