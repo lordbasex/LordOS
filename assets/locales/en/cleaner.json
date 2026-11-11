@@ -296,7 +296,7 @@
   "panel.word.update": "A LordOS update is waiting",
   "panel.disk": "Disk",
   "panel.memory": "Memory",
-  "panel.memoryValue": "{size} available",
+  "panel.usedOf": "{used} of {total} used",
   "panel.cpu": "Processor",
   "panel.network": "Network",
   "panel.devices": {
