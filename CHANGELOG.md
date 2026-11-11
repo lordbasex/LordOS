@@ -484,6 +484,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `sdk/memfigure.js`). The Cleaner panel by the clock showed memory "available" and disk "free" with no total; both
   cards now read "used of total", like the bars under them and the rest of the system. Monitor → Memory keeps its
   breakdown (in use, cache and free add up to the total). New test `mem_figure_test.mjs`. (GitHub #118)
+- Notes: there was no way to copy or paste except the keys, which only work while a note is being edited; the menu
+  bar had no Edit menu, the Format menu's rows were always off and a right click in the editor offered only Speech.
+  Notes now has an Edit menu (Undo, Redo, Cut, Copy, Paste, Select All) and its Format rows work while editing; each
+  row sends the editor's own key, so it does exactly what the key does (`apps/notes/editmenu.js`). From the reading
+  view, Paste and Select All open the editor first (pasting at the end of the note, or selecting all of it to copy).
+  A right click in the editor offers Cut, Copy, Paste and Select All before Speech, and on a desktop note it no
+  longer drops the note back to reading while the menu is open. Ctrl/⌘+Shift+C copied instead of making a code
+  block as its Format row says; it now makes the code block. Test: `notes-editor-scene` (GitHub #117).
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
