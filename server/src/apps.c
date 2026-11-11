@@ -8,7 +8,13 @@
  *   - the command is that file's Exec line; the caller adds no arguments or
  *     files (the %f %u… codes are removed) and it does not go through a shell: argv is built per the
  *     specification and run with execv;
- *   - terminal apps (Terminal=true) are neither listed nor launched;
+ *   - terminal apps (Terminal=true, approved 2026-11-10) are listed with terminal = 1 when their
+ *     program is found in the fixed PATH, but never run here: apps_launch_terminal parses their Exec
+ *     line the same way (no caller arguments, no file) and keeps that argv in a one-shot slot
+ *     (term/termapp.c: random 128-bit token, 10 s, single use, at most 4 pending). The Terminal passes
+ *     only that token to lord.term.create({ app }), whose tab starts the user's login shell as always
+ *     and has lord-server type the line, each argument single-quoted in C, into it once. An app with
+ *     restrictions (Settings → Privacy) is refused: in a Terminal tab it would run without them;
  *   - JS cannot create .desktop files: lord.fs is read-only and LordOS app packages are installed
  *     in another folder (~/.local/share/lordos/apps), so a command cannot be
  *     invented from the UI.
@@ -32,6 +38,7 @@
 #include "sec/sandbox.h"
 #include "fw/rules.h"
 #include "wl/xdgact.h"
+#include "term/termapp.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -306,6 +313,8 @@ static int seen(const char *id, char (*ids)[160], int n) {
     return 0;
 }
 
+static int terminal_program_ok(const Entry *e, int user);
+
 int apps_list(const char *lang, const DesktopApp **out) {
     char dirs[2][PATH_MAX];
     app_dirs(dirs);
@@ -335,15 +344,18 @@ int apps_list(const char *lang, const DesktopApp **out) {
             char file[PATH_MAX * 2];
             int flen = snprintf(file, sizeof file, "%s/%s", dirs[d], de->d_name);
             if (flen < 0 || flen >= PATH_MAX || parse_desktop(file, lang, e)) continue;
-            if (!e->is_app || e->hidden || e->nodisplay || e->terminal || !e->has_name || !e->exec[0]) continue;
+            if (!e->is_app || e->hidden || e->nodisplay || !e->has_name || !e->exec[0]) continue;
             if (e->only[0] && !list_has(e->only, "LordOS")) continue;
             if (e->not_[0] && list_has(e->not_, "LordOS")) continue;
             char prog[PATH_MAX];
             if (e->tryexec[0] && find_program(e->tryexec, d == 0, prog, sizeof prog)) continue;
+            /* a terminal app is typed into a shell: its program must be one the launcher would find */
+            if (e->terminal && !terminal_program_ok(e, d == 0)) continue;
             DesktopApp *a = &list[n++];
             *a = e->a;
             snprintf(a->id, sizeof a->id, "%s", id);
             a->user = d == 0;
+            a->terminal = e->terminal;
             find_icon(e->icon_name, a->icon, sizeof a->icon);
             exec_bin(e->exec, a->bin, sizeof a->bin);
         }
@@ -431,6 +443,17 @@ static int split_exec(const char *exec, const Entry *e, char **argv, char *buf, 
     }
     argv[argc] = NULL;
     return argc;
+}
+
+/* A terminal app's Exec line as argv (no file, field codes removed) whose program is found in the
+ * fixed PATH (plus ~/.local/bin for the user's own .desktop files). */
+static int terminal_program_ok(const Entry *e, int user) {
+    char *buf = malloc(TERMAPP_ARGV_MAX);
+    char *argv[MAX_ARGS], prog[PATH_MAX];
+    int used = 0;
+    int ok = buf && split_exec(e->exec, e, argv, buf, TERMAPP_ARGV_MAX, NULL, &used) > 0 && !find_program(argv[0], user, prog, sizeof prog);
+    free(buf);
+    return ok;
 }
 
 static void open_log(void) {
@@ -669,7 +692,7 @@ static const DesktopApp *find_app(const char *id) {
 
 int apps_actions(const char *id, const char *lang, AppAction *out, int max) {
     const DesktopApp *a = find_app(id);
-    if (!a || max <= 0) return 0;
+    if (!a || a->terminal || max <= 0) return 0;        /* a terminal app's actions would need a shell too */
     Entry *e = malloc(sizeof *e);
     if (!e) return 0;
     int n = 0;
@@ -697,6 +720,42 @@ int apps_actions(const char *id, const char *lang, AppAction *out, int max) {
     }
     free(e);
     return n;
+}
+
+/* A terminal app: its Exec line, parsed as launch() parses it (the file is read again: what counts is
+ * what it says now), goes to a one-shot slot; nothing runs here. */
+int apps_is_terminal(const char *id) {
+    const DesktopApp *a = find_app(id);
+    return a && a->terminal;
+}
+
+int apps_launch_terminal(const char *id, char *token, size_t n) {
+    last_error[0] = 0;
+    if (!token || n < TERMAPP_TOKEN_HEX + 1) return -1;
+    token[0] = 0;
+    const DesktopApp *a = find_app(id);
+    if (!a || !a->terminal) return -1;
+    char fwid[FW_APP_MAX];
+    snprintf(fwid, sizeof fwid, "desktop:%s", id);
+    if (restrict_blocks(fwid, FW_R_ALL)) {
+        /* fail closed: in the Terminal's shell it would have the Terminal's scope, firewall rules and access */
+        snprintf(last_error, sizeof last_error, "apps.restrictTerminal");
+        return -1;
+    }
+    Entry *e = malloc(sizeof *e);
+    char *buf = malloc(TERMAPP_ARGV_MAX);
+    char *argv[MAX_ARGS], prog[PATH_MAX];
+    int used = 0, argc = -1;
+    int ok = e && buf && !parse_desktop(a->file, cached_lang, e) && e->is_app && e->terminal && !e->hidden &&
+             (argc = split_exec(e->exec, e, argv, buf, TERMAPP_ARGV_MAX, NULL, &used)) > 0 &&
+             !find_program(argv[0], a->user, prog, sizeof prog);
+    char tk[TERMAPP_TOKEN_HEX + 1];
+    if (ok) ok = !termapp_put(argv, argc, termapp_now(), tk);
+    free(e);
+    free(buf);
+    if (!ok) return -1;
+    snprintf(token, n, "%s", tk);
+    return 0;
 }
 
 int apps_launch_action(const char *id, const char *action) {

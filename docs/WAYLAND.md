@@ -87,7 +87,8 @@ shell. The user approved it for M7. Limits:
   - no `NoDisplay` or `Hidden`;
   - `OnlyShowIn`/`NotShowIn` with `LordOS`;
   - the `TryExec` exists;
-  - it isn't a terminal app.
+  - a terminal app (`Terminal=true`) is listed with `terminal: true` only if its `Exec` program is also found in
+    the fixed PATH below.
 - The command is that file's `Exec` line, re-read at launch time:
   - `argv` is built according to the specification (quotes and escapes);
   - file codes (`%f %u %F %U`) are removed and no caller arguments are passed;
@@ -96,6 +97,7 @@ shell. The user approved it for M7. Limits:
     `MimeType` in its `.desktop`; the path is resolved with realpath and must be in the home
     folder or on a disk mounted by the user (`/media/$USER`, `/run/media/$USER`);
   - it's run with `execve`, without a shell;
+  - a terminal app is never run here: see **Terminal apps** below;
   - the program is looked up in a fixed PATH (`/usr/local/bin`, `/usr/bin`, `/bin`, games, and
     `~/.local/bin` only for the user's `.desktop` files).
 - **Desktop actions (0.8.1):** the Dock's right-click menu lists the `Actions=` of an app's
@@ -110,6 +112,15 @@ shell. The user approved it for M7. Limits:
 
   Anything else (an unlisted group, a bad name, no `Exec`) is refused. Tested by
   `build/apps-actions-test` (in `make test`).
+- **Terminal apps (0.8.8.8, in development; approved 2026-11-10):** htop, mc, ranger, vim's entry. The launcher and
+  search show them with the Terminal's icon small in a corner. `lord.apps.launch(id)` doesn't exec them: it parses
+  the `Exec` line the same way (no caller arguments, no file), keeps the argv in a one-shot slot
+  (`src/term/termapp.c`: random 128-bit token, 10 s, single use, at most 4 pending) and answers `{ terminal: token }`.
+  The SDK's `launchApp` opens a new Terminal window with `{ app: token, title: <the app's name> }`; its tab starts the
+  user's login shell as always and lord-server types the argv into it once, single-quoted in C, with the profile's
+  exit rule (`docs/TERMINAL.md`, Security). The app runs as part of the Terminal (its scope and firewall app), so an
+  app with restrictions in Settings → Privacy is refused. Its desktop actions are neither listed nor launched.
+  Tested by `build/apps-term-test`.
 - **Activation:** every launch gets `XDG_ACTIVATION_TOKEN` in its environment (see "Activation"
   below), so the window it opens, or the window of the copy already running it hands the link to,
   comes to the front.
@@ -1077,9 +1088,9 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   `WAYLAND_DEBUG`) and the keyboard works, but buttons, menus and pages don't react; the same with
   the build installed before (October 18) and with the LordOS frame, so it isn't the frame. To
   investigate (two `wl_seat` bindings from the same client get the events twice).
-- SVG app icons: built in 0.8.8.8 (lord-media draws them, `MEDIA.md`, "SVG icons"), to check on the VM.
-- Terminal apps (`Terminal=true`: neither listed nor launched). (Opening files with a Linux app,
-  `%f`/`%u`, and `.desktop` actions: done, see "The launcher" above; actions since 0.8.1.)
+- SVG app icons: built in 0.8.8.8 (lord-media draws them, `MEDIA.md`, "SVG icons"); the tray's checked on VM 127.
+- (Opening files with a Linux app, `%f`/`%u`, `.desktop` actions and terminal apps: done, see "The launcher" above;
+  actions since 0.8.1, terminal apps in 0.8.8.8.)
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).

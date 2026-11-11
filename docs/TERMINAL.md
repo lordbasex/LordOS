@@ -476,6 +476,28 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - `lord.term.create()` is the only LordOS API that starts a process. It only launches the login
   shell of the user already running the session, with no arguments chosen by JS (apart from the
   initial directory).
+- (0.8.8.8, in development; approved by the maintainer on 2026-11-10) **Terminal apps** (`.desktop` files with
+  `Terminal=true`: htop, mc, ranger, vim's entry) open in a Terminal tab, and the command never passes through JS:
+  - `lord.apps.launch(id)` of such an entry runs nothing. `apps.c` parses its `Exec` line as for any other app (field
+    codes removed, no caller arguments, no file; the program must be found in the launcher's fixed PATH) and keeps
+    the argv in a one-shot slot (`src/term/termapp.c`): a random 128-bit token (`getrandom`), valid for 10 s, used
+    once, at most 4 pending (a fifth drops the oldest). It answers `{ terminal: token }`.
+  - The Terminal opens a new window and passes that token, and only that token, as
+    `lord.term.create({ app: token, programExit })`. The slot is taken and spent before anything starts; an unknown,
+    used or expired token throws `term.createFailed` and nothing is typed (the window then opens a plain shell and
+    says so).
+  - The tab starts the **same** login shell (`pty.c`, same scope, no capabilities). lord-server types the line into
+    it once, followed by Enter, when the shell integration reports its first prompt (OSC 133;B) or after 2.5 s if it
+    reports none.
+  - The line is built in C: each argv element single-quoted (POSIX: `'` becomes `'\''`; for fish, whose single quotes
+    also take `\\`, every backslash is doubled), elements with a control character (C0, DEL, C1, U+2028/2029) or
+    invalid UTF-8 refuse the launch, then one of three fixed endings from the profile's **programExit** ("When a
+    program opened from the launcher exits"): `close` → `; exit` (the default), `closeIfOk` → ` && exit`, `keep` →
+    nothing. Any other value is `close`.
+  - An app with restrictions in Settings → Privacy (`desktop:<id>`) is refused (`apps.restrictTerminal`): in a
+    Terminal tab it would run as the Terminal (`lordos-net-terminal.scope`) with neither its rules nor its sandbox.
+  - Tested by `build/apps-term-test` (listing, Exec → argv → quoted line, tokens with a fake clock) and
+    `tests/terminal_profilefields_test.mjs` (`programExit`).
 - The child doesn't inherit capabilities (cleared with `capset`), blocked signals, server
   descriptors or the `SUDO_*` variables.
 - OSC 52 can only **write** the clipboard; reading it from a program isn't allowed.

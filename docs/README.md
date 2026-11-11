@@ -39,6 +39,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor |
+| [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8, in development) |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |

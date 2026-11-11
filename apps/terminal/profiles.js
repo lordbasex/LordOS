@@ -72,6 +72,7 @@ export const DEFAULT_PROFILE = {
   customDir: '',
   badge: '',
   confirmClose: true,
+  programExit: 'close',      // a program opened from the launcher (htop, mc…) exits: 'close' | 'closeIfOk' (only if it succeeded) | 'keep'
   bell: 'visual',            // 'visual' | 'none'
   triggers: [],              // [{ regex, action: 'notify' | 'bell' | 'send' | 'attention' | 'capture', param }]
   tabColor: '',

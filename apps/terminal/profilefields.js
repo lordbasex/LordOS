@@ -22,3 +22,9 @@ export function parseTags(text) {
 }
 
 export const tagsText = (tags) => (Array.isArray(tags) ? tags.filter((x) => typeof x === 'string' && x.trim()).join(', ') : '');
+
+// programExit: what a program opened from the launcher (a terminal app: htop, mc…) does to its tab when it exits. lord-server
+// turns it into the end of the line it types ('close' "; exit", 'closeIfOk' " && exit", 'keep' nothing); any other value is
+// the default, 'close'.
+export const PROGRAM_EXIT = ['close', 'closeIfOk', 'keep'];
+export const programExitOf = (p) => (PROGRAM_EXIT.includes(p?.programExit) ? p.programExit : 'close');

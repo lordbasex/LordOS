@@ -248,6 +248,26 @@ Session *term_create(const char *cwd, int scrollback) {
     return s;
 }
 
+/* How long a terminal app's line waits for a prompt from a shell without the integration (OSC 133). */
+#define APP_LINE_WAIT_MS 2500
+
+int term_set_app_line(Session *s, const char *line) {
+    if (!s || !s->used || !s->alive || s->pid <= 0 || s->app_line || !line || !line[0]) return -1;
+    s->app_line = strdup(line);
+    if (!s->app_line) return -1;
+    s->app_deadline = now_ms() + APP_LINE_WAIT_MS;
+    return 0;
+}
+
+/* Types the terminal app's line once: what goes out is lord-server's, not the user's typing (s->typing stays 0). */
+static void type_app_line(Session *s) {
+    char *l = s->app_line;
+    s->app_line = NULL;
+    if (!l) return;
+    if (s->alive) { term_input(s, l, strlen(l)); term_input(s, "\r", 1); }
+    free(l);
+}
+
 Session *term_create_fd(int fd, int scrollback) {
     Session *s = NULL;
     for (int i = 0; i < TERM_MAX && !s; i++) if (!sessions[i].used) s = &sessions[i];
@@ -312,6 +332,7 @@ void term_close(Session *s) {
     free(s->out);
     free(s->tlines);
     free(s->pend);
+    free(s->app_line);
     for (int i = 0; i < s->nframes; i++) free(s->frames[(s->frame_head + i) % REPLAY_FRAMES].cells);
     free(s->frames);
     if (s->log) fclose(s->log);
@@ -526,6 +547,7 @@ void term_dispatch(int id, short revents) {
         child_exited(s);     /* EIO or EOF: the shell exited */
         break;
     }
+    if (s->app_line && s->t.prompts > 0) type_app_line(s);        /* the shell's first prompt is up */
     if (total) {
         term_size_sync(s, 1);       /* the program draws: for the size the grid has (at most once a second) */
         check_secret(s);
@@ -897,6 +919,10 @@ double term_timeout(double now) {
             double d = s->t.sync_until - now;
             if (best < 0 || d < best) best = d;
         }
+        if (s->app_line) {
+            double d = s->app_deadline > now ? s->app_deadline - now : 0;
+            if (best < 0 || d < best) best = d;
+        }
         if (!s->node || !s->t.focused || !(cursor_blinks(s) || s->prof.blink_text)) continue;
         double d = BLINK_MS - fmod(now - fmax(s->last_output, s->last_input), BLINK_MS);
         if (best < 0 || d < best) best = d;
@@ -926,6 +952,7 @@ void term_tick(double now) {
         /* Last activity notice of a burst (notices go out at most once per second). */
         if (s->last_output > s->last_event && now - s->last_event >= 1000) { s->t.events |= EV_OUTPUT; s->last_event = now; }
         if (s->secret && now - s->secret_checked >= 300) check_secret(s);   /* echo back on without output */
+        if (s->app_line && now >= s->app_deadline) type_app_line(s);        /* no prompt reported: type it anyway */
         if (!(cursor_blinks(s) || s->prof.blink_text)) { s->blink_on = 1; continue; }
         /* While output arrives the cursor stays on; afterwards it blinks. */
         int on = ((long)((now - fmax(s->last_output, s->last_input)) / BLINK_MS) % 2) == 0;

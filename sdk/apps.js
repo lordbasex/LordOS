@@ -8,6 +8,8 @@
 //
 // Linux apps are launched with lord.apps.launch(id): the server only accepts the id of an
 // installed .desktop and runs its Exec line with no arguments and no shell (see server/src/apps.c).
+// A terminal app (Terminal=true: htop, mc…) is not run by it: the server keeps its command and answers
+// { terminal: token }, a one-shot token that opens it in a Terminal tab (lord.term.create({ app: token })).
 import { createElement as h, useEffect } from 'react';
 import { View, Text, Image } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -42,20 +44,33 @@ export function iconFromFile(path, name) {
   return ({ size = 32 }) => h(Image, { src: iconSrc(path, size), style: { width: size, height: size, objectFit: 'contain' } });
 }
 
+// A terminal app's icon: its own, with the Terminal's icon small in the corner (it opens in a Terminal tab).
+export function withTerminalMark(Icon) {
+  return ({ size = 32 }) => {
+    const Mark = registryApp('terminal')?.Icon;
+    const m = Math.max(10, Math.round(size * 0.42));
+    return h(View, { style: { width: size, height: size } },
+      h(Icon, { size }),
+      Mark ? h(View, { style: { position: 'absolute', right: -Math.round(m * 0.15), bottom: -Math.round(m * 0.15), width: m, height: m } }, h(Mark, { size: m })) : null);
+  };
+}
+
 const linux = createStore([]);
 
 function readLinux() {
   if (typeof lord.apps === 'undefined' || typeof lord.apps.linux !== 'function') return [];   // not in app mode
-  return lord.apps.linux(locale.get().lang).map((a) => ({
-    ...a, id: DESKTOP + a.id, desktopId: a.id, kind: 'linux', Icon: iconFromFile(a.icon, a.name),
-  }));
+  return lord.apps.linux(locale.get().lang).map((a) => {
+    const Icon = iconFromFile(a.icon, a.name);
+    return { ...a, id: DESKTOP + a.id, desktopId: a.id, kind: 'linux', terminal: !!a.terminal, Icon: a.terminal ? withTerminalMark(Icon) : Icon };
+  });
 }
 
 // Re-reads the .desktop files (after installing or removing packages; it's cheap: the server
 // only re-reads if the folders changed).
 export function refreshApps() {
   const next = readLinux(), now = linux.get();
-  if (next.length === now.length && next.every((a, i) => a.id === now[i].id && a.name === now[i].name && a.icon === now[i].icon)) return;
+  if (next.length === now.length && next.every((a, i) => a.id === now[i].id && a.name === now[i].name && a.icon === now[i].icon &&
+    a.terminal === now[i].terminal)) return;
   linux.set(next);
 }
 // The installed Linux apps' ids, or null if the list can't be read or came back empty.
@@ -86,11 +101,17 @@ export function appCategory(a) {
 
 export function launchApp(id) {
   if (isLinuxApp(id)) {
-    const ok = lord.apps.launch(String(id).slice(DESKTOP.length));
+    const desktopId = String(id).slice(DESKTOP.length);
+    const ok = lord.apps.launch(desktopId);
+    // a terminal app: a new Terminal window whose tab runs it (the token is all the Terminal gets), named after it
+    if (ok && typeof ok === 'object' && typeof ok.terminal === 'string') {
+      const app = linux.get().find((a) => a.desktopId === desktopId);
+      return wm.open('terminal', { new: true, args: { app: ok.terminal, title: app ? app.name : desktopId } }) != null;
+    }
     // refused for a reason the user can act on (e.g. its restrictions need a newer kernel)
     const code = !ok && typeof lord.apps.lastError === 'function' ? lord.apps.lastError() : '';
     if (code) notify({ app: 'settings', title: errorText(code) });
-    return ok;
+    return ok === true;
   }
   // An installed .lpk app runs as its own isolated process (lord-server --app <id>), if the
   // server supports it; it reaches the desktop as a Wayland window with app_id = its id. Otherwise it

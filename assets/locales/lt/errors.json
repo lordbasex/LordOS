@@ -20,6 +20,7 @@
   "app.readFailed": "Nepavyko perskaityti failo",
   "app.writeFailed": "Nepavyko įrašyti failo",
   "apps.restrictKernel": "Šios programos apribojimams reikia naujesnio branduolio: ji nepaleista",
+  "apps.restrictTerminal": "Terminalo programa veikia kaip Terminalo dalis ir negali išlaikyti savo apribojimų: pašalinkite juos (Privatumas → Programų tinklo prieiga), kad ją atidarytumėte",
   "cloud.unavailable": "Debesiui reikia paketo lordos-rclone",
   "cloud.badId": "Tokios debesies paskyros nėra",
   "cloud.hostKeyChanged": "Šio serverio raktas pasikeitė, todėl ryšys atmestas: tai gali būti ataka.",

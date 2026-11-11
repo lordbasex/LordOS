@@ -32,7 +32,8 @@ export function openCalendarApp(at) {
   try { def = defaultFor('calendar'); } catch (e) { def = null; }
   const native = nativeOf(def);
   if (def && !native) {
-    try { if (lord.apps.launch(def.replace(/\.desktop$/, ''))) return true; } catch (e) { /* not installed any more */ }
+    // true only when it started (a terminal app answers with a Terminal token instead, which isn't opened from here)
+    try { if (lord.apps.launch(def.replace(/\.desktop$/, '')) === true) return true; } catch (e) { /* not installed any more */ }
   }
   if (!getApp('calendar')) return false;
   wm.open('calendar', at ? { args: { at } } : undefined);

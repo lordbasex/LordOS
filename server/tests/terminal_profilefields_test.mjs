@@ -1,5 +1,5 @@
-// terminal_profilefields_test.mjs — "Send text at start" and the tags field (apps/terminal/profilefields.js).
-import { initialKeys, parseTags, tagsText } from '../../apps/terminal/profilefields.js';
+// terminal_profilefields_test.mjs — "Send text at start", the tags field and programExit (apps/terminal/profilefields.js).
+import { initialKeys, parseTags, tagsText, programExitOf, PROGRAM_EXIT } from '../../apps/terminal/profilefields.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -28,6 +28,13 @@ eq('control characters dropped', parseTags('a\tb,\x07c'), ['ab', 'c']);
 eq('a long tag cut', parseTags('x'.repeat(300))[0].length, 100);
 eq('the field shows the list', tagsText(['ATAM - VIVELIBRE', 'Pi']), 'ATAM - VIVELIBRE, Pi');
 eq('the field skips what is not a tag', tagsText(['a', '', 3, ' ']), 'a');
+
+eq('programExit: three values', PROGRAM_EXIT, ['close', 'closeIfOk', 'keep']);
+eq('programExit: a profile without it closes', programExitOf({}), 'close');
+eq('programExit: no profile closes', programExitOf(null), 'close');
+eq('programExit: closeIfOk kept', programExitOf({ programExit: 'closeIfOk' }), 'closeIfOk');
+eq('programExit: keep kept', programExitOf({ programExit: 'keep' }), 'keep');
+eq('programExit: anything else is close', programExitOf({ programExit: '; rm -rf ~' }), 'close');
 eq('no list', tagsText(undefined), '');
 eq('round trip', parseTags(tagsText(['a', 'b c'])), ['a', 'b c']);
 

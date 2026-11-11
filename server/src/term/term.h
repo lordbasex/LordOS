@@ -151,6 +151,7 @@ typedef struct Term {
     long long cmd_prompt;       /* prompt line of the running command (OSC 133;C) */
     long long cmd_line;         /* where the prompt ended (OSC 133;B): the command starts there */
     int cmd_col;
+    int prompts;                /* prompts shown (OSC 133;B, the prompt's end): a terminal app's line waits for one */
     char run_cmd[1024];         /* text of the last executed command */
 
     /* copy mode: own cursor moved with the keyboard (vi style) */
@@ -297,10 +298,17 @@ typedef struct {
     int typing;                 /* inside term_key/term_paste: the user's own input (tcapture.c captures only that) */
     char save_offer[512];       /* "Save to Passwords?" (tcapture.c): the target as JSON, never the value */
     char save_result[24];       /* how saving it ended (termfill.c) */
+    /* a terminal app's command line (term/termapp.c), built in C: typed once into the login shell when its first
+     * prompt shows (OSC 133;B), or at app_deadline if the shell reports none */
+    char *app_line;
+    double app_deadline;
 } Session;
 
 void     term_init(const char *fonts_dir, const char *shell_dir);
 Session *term_create(const char *cwd, int scrollback);
+/* Gives a new session the command line of a terminal app (termapp_take's, never JS's): it is typed into the
+ * shell once, followed by Enter, at its first prompt or after a short bounded wait. 0, or -1 (no memory). */
+int      term_set_app_line(Session *s, const char *line);
 /* A session on a stream someone else holds the other end of (a Machines guest's serial console): what arrives is
  * drawn, what's typed is written to it. No process, no PTY, no holder; the descriptor is the session's (closed with
  * it). NULL when there's no room. */

@@ -20,6 +20,7 @@
   "app.readFailed": "No se pudo leer el archivo",
   "app.writeFailed": "No se pudo escribir el archivo",
   "apps.restrictKernel": "Las restricciones de esta app necesitan un kernel más nuevo: no se abrió",
+  "apps.restrictTerminal": "Una app de terminal corre como parte de la Terminal y no puede mantener sus restricciones: sacalas (Privacidad → Red de las apps) para abrirla",
   "cloud.unavailable": "Nube necesita el paquete lordos-rclone",
   "cloud.badId": "Esa cuenta en la nube no existe",
   "cloud.hostKeyChanged": "La clave de este servidor cambió, así que se rechazó la conexión: puede ser un ataque.",

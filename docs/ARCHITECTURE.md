@@ -357,7 +357,10 @@ other bundle; settings persist on disk.
   `lord.term.create()`, which launches the user's own login shell (the one in `/etc/passwd`)
   with no capabilities and no `SUDO_*` variables, just like any terminal emulator;
   `lord.apps.launch(id)` and its variants, which run only the `Exec` line of an installed `.desktop`
-  without a shell (`WAYLAND.md`); and `lord.apps.launchPackage(id)`, which starts an installed `.lpk`
+  without a shell (`WAYLAND.md`), except a `Terminal=true` entry, which they never run: its parsed
+  `Exec` waits in a one-shot slot (random 128-bit token, 10 s, single use, at most 4 pending), and
+  `lord.term.create({ app: token })` types it, shell-quoted in C, into a new tab's login shell
+  (`TERMINAL.md`, Security; JS never sees or chooses the command); and `lord.apps.launchPackage(id)`, which starts an installed `.lpk`
   as an isolated process (`PRIVACY.md`).
 - The clipboard belongs to the session (in memory). Terminal programs can write it
   (OSC 52) but not read it.
