@@ -181,6 +181,44 @@ int main(void) {
     unlink(path);
     rm_app(1, "user-browser");
 
+    /* 3b. a MimeType longer than a fixed line buffer (VLC's is 2.4 KB, GitHub #123): the types at its
+     * end still count, and the rest of a long line is never read as a key of its own */
+    {
+        size_t cap = 24000, o = 0;
+        char *big = malloc(cap);
+        o += (size_t)snprintf(big + o, cap - o, "[Desktop Entry]\nType=Application\nName=long-player\nExec=/bin/cp %%f %s/opened-long-player\nComment=", home);
+        for (int i = 0; i < 2100; i++) big[o++] = 'c';
+        o += (size_t)snprintf(big + o, cap - o, "NoDisplay=true\nMimeType=");
+        for (int i = 0; i < 120; i++) o += (size_t)snprintf(big + o, cap - o, "application/x-lord-filler-%03d;", i);
+        o += (size_t)snprintf(big + o, cap - o, "video/mp4;video/webm;\n");
+        tick();
+        snprintf(path, sizeof path, "%s/long-player.desktop", sysapps);
+        put(path, big);
+        CHECK("a type after 2 KB of MimeType", is("video/mp4", "long-player.desktop", APPS_DEFAULT_DECLARED));
+        CHECK("the last type of a long MimeType", is("video/webm", "long-player.desktop", APPS_DEFAULT_DECLARED));
+        /* longer than the field: only whole types are kept */
+        o = (size_t)snprintf(big, cap, "[Desktop Entry]\nType=Application\nName=huge-player\nExec=/bin/cp %%f /tmp/x\nMimeType=");
+        for (int i = 0; i < 700; i++) o += (size_t)snprintf(big + o, cap - o, "video/x-lord-%04d;", i);
+        snprintf(big + o, cap - o, "\n");
+        tick();
+        snprintf(path, sizeof path, "%s/huge-player.desktop", sysapps);
+        put(path, big);
+        const DesktopApp *list;
+        int na = apps_list("en", &list), found = 0;
+        for (int i = 0; i < na; i++) {
+            if (!strcmp(list[i].id, "huge-player")) {
+                const char *last = strrchr(list[i].mime, ';');
+                last = last ? last + 1 : list[i].mime;
+                found = !strncmp(list[i].mime, "video/x-lord-0000;", 18) && strlen(last) == 17 && !strncmp(last, "video/x-lord-", 13);
+            }
+        }
+        CHECK("a MimeType longer than the field keeps whole types", found);
+        CHECK("its first types still count", is("video/x-lord-0001", "huge-player.desktop", APPS_DEFAULT_DECLARED));
+        free(big);
+        rm_app(0, "huge-player");
+        rm_app(0, "long-player");
+    }
+
     /* 4. what the system marks as default */
     sysfile("/usr/share/applications/defaults.list", "[Default Applications]\ntext/html=beta-browser.desktop;\n");
     CHECK("defaults.list", is("text/html", "beta-browser.desktop", APPS_DEFAULT_LISTED));
