@@ -81,15 +81,19 @@ export function surfaceState(w, active) {
 // picture-in-picture does: above the windows, on every desktop, never the front window (the keyboard
 // stays where it was), in the top corner of the work area. A real window has an app id or a title; one
 // that gets a title later goes back to being a normal window (sdk/wayland.js).
-export const isNoticeWindow = (d) => !!d && !d.x11 && !d.appId && !d.title && !d.parent && !d.dialog && !d.modal;
+// Only notification-sized: a nameless window bigger than this is a normal window, so no app can float a large
+// surface above everything (to cover the screen and take its clicks) by leaving its name empty.
+export const NOTICE_MAX_W = 480, NOTICE_MAX_H = 300;
+export const isNoticeWindow = (d) => !!d && !d.x11 && !d.appId && !d.title && !d.parent && !d.dialog && !d.modal &&
+  (Math.round(d.width) || 0) <= NOTICE_MAX_W && (Math.round(d.height) || 0) <= NOTICE_MAX_H;
 
 // Where a notice popup goes: the top corner of the work area at the end of the reading direction (right,
 // or left in right-to-left languages), below the ones already there (others: their frames) while it fits,
 // else back at the top. Never larger than the area.
 export const NOTICE_MARGIN = 12;
 export function noticeFrame(area, others, width, height, rtl = false) {
-  const w = Math.max(1, Math.min(Math.round(width) || 1, area.w - 2 * NOTICE_MARGIN));
-  const h = Math.max(1, Math.min(Math.round(height) || 1, area.h - 2 * NOTICE_MARGIN));
+  const w = Math.max(1, Math.min(Math.round(width) || 1, NOTICE_MAX_W, area.w - 2 * NOTICE_MARGIN));
+  const h = Math.max(1, Math.min(Math.round(height) || 1, NOTICE_MAX_H, area.h - 2 * NOTICE_MARGIN));
   const x = rtl ? area.x + NOTICE_MARGIN : area.x + area.w - NOTICE_MARGIN - w;
   let y = area.y + NOTICE_MARGIN;
   for (const o of others || []) {

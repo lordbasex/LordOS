@@ -10,7 +10,7 @@ import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, workAreaOf } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
-import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, isNoticeWindow, noticeFrame } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
@@ -151,7 +151,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     }
     case 'geometry': {                     // la app cambió su tamaño por su cuenta
       if (!win || win.maximized) break;
-      if (win.args?.notice && win.pip) { wm.setPip(id, { ...win.pip, w: d.width, h: d.height }); break; }   // a notice popup grew
+      // a notice popup grew: never past a notification's size (sdk/desktopmodel.js NOTICE_MAX_*), so it can't come to cover
+      // the screen; what doesn't fit is cut off
+      if (win.args?.notice && win.pip) { wm.setPip(id, { ...win.pip, w: Math.max(1, Math.min(Math.round(d.width) || 1, NOTICE_MAX_W)), h: Math.max(1, Math.min(Math.round(d.height) || 1, NOTICE_MAX_H)) }); break; }
       const c = win.args?.csd ? { w: 0, h: 0 } : windowChrome();
       if (Math.abs(win.w - (d.width + c.w)) > 1 || Math.abs(win.h - (d.height + c.h)) > 1) wm.resize(id, d.width + c.w, d.height + c.h);
       break;

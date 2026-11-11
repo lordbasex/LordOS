@@ -237,6 +237,10 @@ eq('placeholder: minimized Linux window, in the overview', [overviewPlaceholder(
 // A browser's own notification popup (Chrome without a notification service: an xdg toplevel with no app id,
 // title or parent) floats and never has the keyboard; a real window, a dialog or an X11 window doesn't.
 eq('notice: Chrome\'s popup', isNoticeWindow({ appId: '', title: '', width: 360, height: 102, csd: true, dialog: false, fixed: false, parent: 0, modal: false }), true);
+// a nameless window bigger than a notification is a normal window: it can't float over everything
+eq('notice: a big nameless window is not one', isNoticeWindow({ appId: '', title: '', width: 1280, height: 800 }), false);
+eq('notice: just over the height is not one', isNoticeWindow({ appId: '', title: '', width: 360, height: 301 }), false);
+eq('notice: the frame never passes the cap', JSON.stringify((({ w, h }) => [w, h])(noticeFrame({ x: 0, y: 0, w: 1920, h: 1080 }, [], 2000, 2000))), '[480,300]');
 eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   isNoticeWindow({ appId: 'google-chrome', title: '' }), isNoticeWindow({ appId: '', title: 'Picture in picture' }),
   isNoticeWindow({ appId: '', title: '', parent: 4 }), isNoticeWindow({ appId: '', title: '', dialog: true }),
