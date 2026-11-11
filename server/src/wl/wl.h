@@ -64,6 +64,7 @@ const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (sa
 void wl_set_state(int id, int maximized, int fullscreen);
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
+void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */
 int  wl_count(void);
 int  wl_idle_inhibited(void);             /* idle-inhibit: a shown surface asks the screen to stay on */
 void wl_output_resized(void);               /* headless: one display of ui.width × ui.height */

@@ -241,8 +241,11 @@ the home folder and survives reboots. Image previews are first stored in
 
 ### Hidden windows (0.8.8.8, in development)
 
-A window that is minimized or on a hidden desktop (`wl_set_minimized`, `wl_set_parked`: what the shell's
-`surfaceState` says) can't be seen, so lord-server stops pacing it at the display's rate:
+A window that is minimized, on a hidden desktop (`wl_set_minimized`, `wl_set_parked`: what the shell's
+`surfaceState` says) or wholly covered (`wl_set_covered`: inside an opaque window above it on the showing desktop, a
+LordOS window whose app isn't transparent or a web app's window, never in the overview; `sdk/desktopmodel.js`
+`coveredIds`) can't be seen, so lord-server stops pacing it at the display's rate. A covered window keeps its keyboard
+and pointer rules and its X11 state; only its frames slow down:
 
 - **`suspended`:** its `xdg_toplevel` configure carries the `suspended` state (xdg-shell 6), sent again as soon as it
   is minimized, parked or brought back. An app that knows the state stops drawing on its own: lord-web (the web

@@ -73,6 +73,26 @@ export function surfaceState(w, active) {
   return { maximized: !!w.maximized, parked, iconic: !!w.minimized || parked };
 }
 
+// The Linux windows nothing of which is on screen though they are on the showing desktop: each wholly inside an
+// opaque window above it (list is in stacking order). lord-server then paces them once a second and tells them
+// "suspended" (wl_set_covered), so a web app behind another window stops drawing. frameOf(w) is the window's rect as
+// drawn (a maximized one fills its work area); opaqueOf(w) says it hides what is under it: a LordOS window whose app
+// isn't transparent, or a web app's window. Any other Linux window may draw with transparency, so it never covers.
+// Nothing is covered in the overview, which shows every window.
+export function coveredIds(list, active, overview, frameOf, opaqueOf) {
+  const out = new Set();
+  if (overview) return out;
+  const vis = visibleOn(list, active);
+  const inside = (a, b) => !!a && !!b && b.w > 0 && b.h > 0 && a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
+  for (let i = 0; i < vis.length - 1; i++) {
+    const w = vis[i];
+    if (!w.args?.surface) continue;
+    const r = frameOf(w);
+    for (let j = i + 1; j < vis.length; j++) if (opaqueOf(vis[j]) && inside(frameOf(vis[j]), r)) { out.add(w.id); break; }
+  }
+  return out;
+}
+
 // A Linux app's own notification popup (docs/WAYLAND.md, "Notifications of Linux apps"). Chromium and
 // Electron draw their notifications themselves when they find no notification service on the session bus
 // (none there, no bus at all, or the feature turned off), each one an xdg toplevel with no app id, no

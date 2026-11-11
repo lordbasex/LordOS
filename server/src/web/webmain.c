@@ -9,7 +9,7 @@
  *   - takes the profile's lock (one process per app and profile: a second start asks the first to show its window
  *     over the session bus, org.lordos.WebApp1.Show, and exits);
  *   - enters its own scope, app-lordos-lordos-web-<app>.scope (the firewall's and Monitor's row for the app; the probe's
- *     is lordos-webprobe), with memory and CPU limits that WebKit's processes share, since they are its children;
+ *     is lordos-webprobe), with memory and CPU limits that all the app's profiles and WebKit's processes share (webpage_scope_limits);
  *   - restricts itself with Landlock's scoping (no abstract unix socket and no signal outside its own processes) and
  *     no_new_privs. Landlock's file rules are not used: a process under them can't mount, and WebKit's bubblewrap
  *     sandbox, which keeps the web content and network processes off the files, mounts for every child it starts. */
@@ -19,6 +19,7 @@
 #include "../sec/sandbox.h"
 
 #include <errno.h>
+#include <execinfo.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -28,9 +29,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define WEB_MEM_HIGH_MB 2048            /* the app's scope: reclaim from here */
-#define WEB_MEM_MAX_MB  4096            /* and never past this */
-#define WEB_CPU_PERCENT 200             /* two cores */
 #define SHOW_IFACE WEBREG_SHOW_IFACE
 #define SHOW_PATH  WEBREG_SHOW_PATH
 
@@ -86,7 +84,11 @@ static int isolate(const char *scope_id) {
     size_t sl = strlen(self), nl = strlen(name);
     int inside = sl > nl && self[sl - nl - 1] == '/' && !strcmp(self + sl - nl, name);
     if (!inside) {
-        CgroupLimits lim = { .mem_high_mb = WEB_MEM_HIGH_MB, .mem_max_mb = WEB_MEM_MAX_MB, .cpu_percent = WEB_CPU_PERCENT };
+        /* the app's scope, shared by its profiles' lord-web and WebKit processes (webpage_scope_limits) */
+        long pages = sysconf(_SC_PHYS_PAGES), psz = sysconf(_SC_PAGESIZE), ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+        long ram_mb = pages > 0 && psz > 0 ? (long)((unsigned long long)pages * (unsigned long long)psz >> 20) : 0;
+        WebScopeLimits sl = webpage_scope_limits(ram_mb, ncpu > 0 ? (int)ncpu : 1);
+        CgroupLimits lim = { .mem_high_mb = sl.mem_high_mb, .mem_max_mb = sl.mem_max_mb, .cpu_percent = sl.cpu_percent };
         if (!cgroup_scope_name_ok(name) || (cgroup_enter(name, &lim) && managed)) {
             fprintf(stderr, "lord-web: could not enter %s: not started\n", name);
             return -1;
@@ -228,8 +230,35 @@ static int run_app(Web *w) {
     return w->exit_code;
 }
 
+/* A crash of lord-web itself (the WebKit UI process lives in it: a C++ exception nobody catches ends in abort) leaves
+ * its stack in web.log, for addr2line: libstdc++ prints "terminate called after throwing ..." first, and the stack at
+ * the abort still holds the frame that threw. Then the signal's own default (a core, the exit status lord-server
+ * sees). */
+static void crash_log(int sig) {
+    static const char head[] = "lord-web: crashed, stack:\n";
+    void *pcs[64];
+    if (write(2, head, sizeof head - 1)) {}
+    int n = backtrace(pcs, 64);
+    backtrace_symbols_fd(pcs, n, 2);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void crash_hooks(void) {
+    static char alt[64 * 1024];
+    stack_t st = { .ss_sp = alt, .ss_size = sizeof alt };
+    sigaltstack(&st, NULL);
+    void *warm[1];
+    backtrace(warm, 1);                 /* loads libgcc's unwinder now, not inside the handler */
+    struct sigaction sa = { .sa_handler = crash_log, .sa_flags = SA_ONSTACK | SA_RESETHAND };
+    sigemptyset(&sa.sa_mask);
+    static const int sigs[] = { SIGABRT, SIGSEGV, SIGBUS, SIGFPE, SIGILL };
+    for (size_t i = 0; i < sizeof sigs / sizeof sigs[0]; i++) sigaction(sigs[i], &sa, NULL);
+}
+
 int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
+    crash_hooks();
     static Web web;
     Web *w = &web;
     if (webargs_parse(argc, argv, &w->args) == WEBARGS_BAD) { usage(); return 2; }

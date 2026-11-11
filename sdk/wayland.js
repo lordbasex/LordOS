@@ -8,9 +8,9 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, workAreaOf } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
-import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
@@ -230,12 +230,16 @@ const lastState = new Map();
 function sync() {
   if (typeof lord.wayland === 'undefined') return;
   const list = windows.get(), active = activeDesktop.get();
+  // wholly under an opaque window: lord-server paces it once a second (desktopmodel.js coveredIds)
+  const covered = coveredIds(list, active, overviewShowing.get(), (w) => wm.frame(w),
+    (w) => !!w.args?.web || (!w.args?.surface && !getApp(w.id)?.transparent));
   for (const w of list) {
     const s = surfaceOf(w.id);
     if (!s) continue;
     const st = surfaceState(w, active);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked); }
+    const cov = covered.has(w.id);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov); }
   }
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
@@ -246,6 +250,7 @@ function sync() {
 }
 windows.subscribe(sync);
 activeDesktop.subscribe(sync);
+overviewShowing.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());
 
 // X11 apps on HiDPI displays (Settings → Displays, docs/WAYLAND.md "X11 apps on HiDPI displays"): 'self', the

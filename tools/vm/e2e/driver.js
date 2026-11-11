@@ -13,6 +13,7 @@ const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const wm = {
   windows: () => windows.get().map((w) => ({ id: w.id, app: w.appId || w.app, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h, minimized: w.minimized, desktop: w.desktop })),
   minimize: (id) => shellWm.minimize(id),
+  toggleMaximize: (id) => shellWm.toggleMaximize(id),
   focus: (id) => shellWm.focus(id),
   moveToDesktop: (id, d) => shellWm.moveToDesktop(id, d),
   createDesktop: () => createDesktop(),

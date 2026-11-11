@@ -53,6 +53,7 @@
 #include "vault/dbus.h"
 #include "media/media.h"
 #include "media/svgicon.h"
+#include "web/webmgr.h"
 #include "app/app.h"
 #include "app/apphost_bc.h"
 #include "sec/broker.h"
@@ -2628,6 +2629,7 @@ int main(int argc, char **argv) {
         double mrd = mirror_timeout();
         if (mrd >= 0 && (delay < 0 || mrd < delay)) delay = mrd;
         media_reap();                       /* a stopped lord-media: not left a zombie */
+        webmgr_reap();                      /* nor a lord-web that ended */
         double zd = media_reap_timeout();
         if (zd >= 0 && (delay < 0 || zd < delay)) delay = zd;
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */

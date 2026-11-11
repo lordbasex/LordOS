@@ -32,15 +32,24 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define WEB_MEMORY_LIMIT_MB 1536         /* a web process past this frees its caches (conservative), then more (strict) */
+/* A web process's memory pressure (WebKit's MemoryPressureHandler, polled every 30 s): past a third of the limit it
+ * drops its rebuildable caches (fonts, glyphs, line layout, selectors, style sheets) at every poll, past half it also
+ * drops decoded images and compiled code and collects. 0.8.8.7 had a 1.5 GB limit polled every 10 s: a messaging web
+ * app's ~600 MB, all of it live, sat above the first mark, so every 10 s it threw away what its next click needed
+ * and rebuilt it then (docs/WEBAPPS.md "Performance"). Now WebKit's own: the computer's memory up to 3 GB, so ~1 GB
+ * and ~1.5 GB, and the app's cgroup (memory.high 2 GB) still bounds the whole. */
+#define WEB_MEMORY_LIMIT_MAX_MB 3072
+#define WEB_MEMORY_POLL_S 30
 #define CRASH_WINDOW_US (30 * G_USEC_PER_SEC)
 
 WebKitWebContext *web_context_new(void) {
     WebKitMemoryPressureSettings *mp = webkit_memory_pressure_settings_new();
-    webkit_memory_pressure_settings_set_memory_limit(mp, WEB_MEMORY_LIMIT_MB);
+    long pages = sysconf(_SC_PHYS_PAGES), psz = sysconf(_SC_PAGESIZE);
+    unsigned long long ram_mb = pages > 0 && psz > 0 ? (unsigned long long)pages * (unsigned long long)psz >> 20 : WEB_MEMORY_LIMIT_MAX_MB;
+    webkit_memory_pressure_settings_set_memory_limit(mp, (guint)(ram_mb < WEB_MEMORY_LIMIT_MAX_MB ? ram_mb : WEB_MEMORY_LIMIT_MAX_MB));
     webkit_memory_pressure_settings_set_conservative_threshold(mp, 0.33);
     webkit_memory_pressure_settings_set_strict_threshold(mp, 0.5);
-    webkit_memory_pressure_settings_set_poll_interval(mp, 10);
+    webkit_memory_pressure_settings_set_poll_interval(mp, WEB_MEMORY_POLL_S);
     /* the network process: the same settings, set once before any session exists */
     webkit_network_session_set_memory_pressure_settings(mp);
     /* One app, one page: the document browser model keeps smaller caches than a browser's. It is set before the
