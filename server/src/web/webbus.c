@@ -12,7 +12,8 @@
  *     shows the dialog and stores the answer. Anything but "allow", "deny" or "once", an error or no lord-server is
  *     "deny";
  *   - the shell's Edit menu: org.lordos.WebApp1.Edit(command) from lord-server (webmain.c serves it), run only when
- *     the bus says the caller's pid is the lord-server that started this lord-web;
+ *     the bus says the caller's pid is the lord-server that started this lord-web; the desktop's light or dark mode,
+ *     org.lordos.WebApp1.SetColorScheme("light" | "dark"), with the same check (webscheme.h);
  *   - the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows LordOS's own
  *     menu with those items (names from webedit.h, never the page's text) and answers the one chosen.
  * Every call is asynchronous: nothing here waits for another program. */
@@ -290,27 +291,33 @@ void webbus_ask(Web *w, int kind, WebAskDone cb, void *data) {
 
 /* ---- editing: the shell's Edit menu and the page's context menu ---- */
 
-typedef struct { Web *w; int cmd; } EditCall;
+typedef struct { Web *w; int cmd, scheme; } EditCall;           /* cmd >= 0: Edit; else SetColorScheme(scheme) */
 
 static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
     EditCall *ec = d;
     GVariant *r = g_dbus_connection_call_finish(G_DBUS_CONNECTION(src), res, NULL);
     guint32 pid = 0;
     if (r) { g_variant_get(r, "(u)", &pid); g_variant_unref(r); }
-    if (pid && ec->w->server_pid > 1 && (pid_t)pid == ec->w->server_pid) web_edit(ec->w, ec->cmd);
-    else fprintf(stderr, "lord-web: an Edit call from a process that is not lord-server: refused\n");
+    if (pid && ec->w->server_pid > 1 && (pid_t)pid == ec->w->server_pid) {
+        if (ec->cmd >= 0) web_edit(ec->w, ec->cmd);
+        else web_set_scheme(ec->w, ec->scheme);
+    } else fprintf(stderr, "lord-web: %s call from a process that is not lord-server: refused\n", ec->cmd >= 0 ? "an Edit" : "a SetColorScheme");
     g_free(ec);
 }
 
-void webbus_edit(Web *w, const char *sender, int cmd) {
+/* the bus answers from the caller's socket credentials, never from the caller */
+static void check_caller(Web *w, const char *sender, int cmd, int scheme) {
     if (!w->bus || !sender) return;
     EditCall *ec = g_new0(EditCall, 1);
     ec->w = w;
     ec->cmd = cmd;
-    /* the bus answers from the caller's socket credentials, never from the caller */
+    ec->scheme = scheme;
     g_dbus_connection_call(w->bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetConnectionUnixProcessID",
                            g_variant_new("(s)", sender), G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, on_edit_pid, ec);
 }
+
+void webbus_edit(Web *w, const char *sender, int cmd) { if (cmd >= 0) check_caller(w, sender, cmd, 0); }
+void webbus_scheme(Web *w, const char *sender, int scheme) { if (webscheme_name(scheme)) check_caller(w, sender, -1, scheme); }
 
 typedef struct { Web *w; int items[WEBMENU_N], n; char *link, *image; } MenuCall;
 

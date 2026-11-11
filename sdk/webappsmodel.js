@@ -206,7 +206,7 @@ export function engineSizes(plan) {
 //   verified         "YYYY-MM-DD": the day LordOS last checked it works (docs/WEBAPPS.md)
 //   typicalMemoryMB  what one profile took when LordOS measured it (Pss of lord-web and WebKit's processes)
 //   limitations      keys of what doesn't work in LordOS's engine (webapps.limit.<key>)
-export const LIMITATIONS = ['drm', 'calls', 'push'];
+export const LIMITATIONS = ['drm', 'calls', 'push', 'theme'];
 export function validDate(s) {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);

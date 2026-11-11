@@ -4,6 +4,7 @@
 #include "../hw/hw.h"
 #include "../web/webmgr.h"
 #include "../web/webedit.h"
+#include "../web/webscheme.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -268,6 +269,31 @@ int webask_edit(const char *app, const char *profile, const char *command) {
     dw_free(&b);
     if (serial) dbus_flush(bus);
     return serial ? 0 : -1;
+}
+
+/* one running lord-web: SetColorScheme(scheme), no reply wanted */
+static int send_scheme(const char *app, const char *profile, const char *word) {
+    char name[160];
+    if (!bus || webreg_bus_name(app, profile, name, sizeof name)) return -1;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, word);
+    DHdr h = { .type = DBUS_CALL, .flags = DBUS_NO_REPLY | DBUS_NO_AUTOSTART, .path = WEBREG_SHOW_PATH, .iface = WEBREG_SHOW_IFACE,
+               .member = "SetColorScheme", .dest = name, .sig = "s" };
+    uint32_t serial = dbus_send(bus, &h, &b);
+    dw_free(&b);
+    return serial ? 0 : -1;
+}
+
+void webask_scheme(int dark) {
+    int s = dark ? WEBSCHEME_DARK : WEBSCHEME_LIGHT;
+    if (webmgr_scheme() == s) return;
+    webmgr_set_scheme(s);
+    if (!bus) return;
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING), sent = 0;
+    for (int i = 0; i < n; i++) if (!send_scheme(r[i].app, r[i].profile, webscheme_name(s))) sent++;
+    if (sent) dbus_flush(bus);
 }
 
 int webask_show(const char *app, const char *profile, const char *token) {

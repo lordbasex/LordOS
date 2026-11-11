@@ -1,5 +1,6 @@
 /* webmgr.c — see webmgr.h. */
 #include "webmgr.h"
+#include "webscheme.h"
 #include "../sec/json.h"
 
 #include <dirent.h>
@@ -102,7 +103,11 @@ int webmgr_available(void) {
 }
 
 /* The session's environment for lord-web (docs/WEBAPPS.md, "Starting an app"), built before fork. */
-typedef struct { char buf[5][PATH_MAX + 32]; char *envp[9]; char log[PATH_MAX]; char home[PATH_MAX]; } Env;
+typedef struct { char buf[5][PATH_MAX + 32]; char *envp[10]; char log[PATH_MAX]; char home[PATH_MAX]; } Env;
+
+static int scheme = -1;                         /* the desktop's, from the theme (webmgr_set_scheme), -1 not told yet */
+void webmgr_set_scheme(int s) { scheme = s == WEBSCHEME_DARK ? WEBSCHEME_DARK : s == WEBSCHEME_LIGHT ? WEBSCHEME_LIGHT : -1; }
+int webmgr_scheme(void) { return scheme; }
 
 static void env_build(Env *e) {
     static const char *const keep[5] = { "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "HOME", "LANG" };
@@ -117,6 +122,9 @@ static void env_build(Env *e) {
     /* under lord-sessiond, lord-web is strict: no scope or no Landlock means it does not start (webmain.c) */
     if (getenv("LORDOS_SESSIOND")) e->envp[n++] = "LORDOS_SESSIOND=1";
     e->envp[n++] = "LORDOS_WEB=1";
+    /* the desktop's light or dark mode, the page's prefers-color-scheme (webscheme.h) */
+    if (scheme == WEBSCHEME_DARK) e->envp[n++] = WEBSCHEME_ENV "=dark";
+    else if (scheme == WEBSCHEME_LIGHT) e->envp[n++] = WEBSCHEME_ENV "=light";
     e->envp[n] = NULL;
     const char *h = home();
     e->log[0] = e->home[0] = 0;

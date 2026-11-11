@@ -411,6 +411,8 @@ static void on_target(WebKitWebView *v, WebKitHitTestResult *h, guint mods, gpoi
 
 static void on_close(WebKitWebView *v, gpointer d) { (void)v; web_close_requested(d); }
 
+static void on_load(WebKitWebView *v, WebKitLoadEvent ev, gpointer d) { (void)v; webdark_load(d, ev); }
+
 static void on_crash(WebKitWebView *v, WebKitWebProcessTerminationReason why, gpointer d) {
     Web *w = d;
     static gint64 last;
@@ -515,8 +517,10 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "close", G_CALLBACK(on_close), w);
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
     g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
+    g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
     webxfer_init(w);
     webselect_init(w);
+    webdark_init(w);
     g_signal_connect(w->session, "download-started", G_CALLBACK(on_download), w);
     webkit_web_view_load_uri(w->view, w->app.start_url);
     return 0;

@@ -164,6 +164,7 @@
   "limit.drm": "Música e vídeo protegidos (DRM) não podem ser reproduzidos no motor web do LordOS.",
   "limit.calls": "Chamadas de voz e vídeo podem ainda não funcionar.",
   "limit.push": "As notificações chegam só enquanto o app está rodando: deixe-o em segundo plano para recebê-las.",
+  "limit.theme": "Se o site continuar claro com a área de trabalho no modo escuro, escolha Escuro nas Configurações do próprio site → Tema.",
   "settings.noColor": "Sem cor",
   "settings.sizeSoon": "medindo",
   "settings.unread": "{count} não lidas",
