@@ -80,6 +80,32 @@ static void test_probe_hops(void) {
                           "https://10.example/" };
     for (size_t i = 0; i < sizeof pub / sizeof pub[0]; i++) CHECK(cls(pub[i]) == WEBURL_PUBLIC, "public: %s", pub[i]);
 
+    /* names of a local network, and single labels */
+    const char *lan[] = { "https://router/", "https://nas./", "https://printer.lan/", "https://box.home/", "https://x.home.arpa/", "https://db.internal/",
+                          "https://wiki.intranet/", "https://h.localdomain/", "https://mail.corp/", "https://lan/", "https://internal/" };
+    for (size_t i = 0; i < sizeof lan / sizeof lan[0]; i++) CHECK(cls(lan[i]) == WEBURL_PRIVATE, "a local network's name: %s", lan[i]);
+    const char *names[] = { "https://lan.example.com/", "https://home.example/", "https://corporate.example/", "https://intranet.example.org/" };
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) CHECK(cls(names[i]) == WEBURL_PUBLIC, "a public name: %s", names[i]);
+    WebUrl lu;
+    CHECK(!weburl_parse("https://127.1./", &lu) && weburl_host_is_literal(&lu) && !weburl_parse("https://[::1]/", &lu) && weburl_host_is_literal(&lu) &&
+          !weburl_parse("https://a.example/", &lu) && !weburl_host_is_literal(&lu), "addresses and names");
+
+    /* every address a name resolved to (the probe feeds what getaddrinfo said) */
+    WebAddr pub4 = { 4, { 93, 184, 216, 34 } }, lo4 = { 4, { 127, 0, 0, 1 } }, ten = { 4, { 10, 0, 0, 7 } }, cgnat = { 4, { 100, 100, 1, 1 } },
+            link4 = { 4, { 169, 254, 169, 254 } }, pub6 = { 6, { 0x20, 0x01, 0x0d, 0xb8, [15] = 1 } }, lo6 = { 6, { [15] = 1 } },
+            ula = { 6, { 0xfd, 0x00, [15] = 1 } }, ll6 = { 6, { 0xfe, 0x80, [15] = 1 } }, map = { 6, { [10] = 0xff, [11] = 0xff, [12] = 192, [13] = 168, [14] = 0, [15] = 1 } },
+            odd = { 9, { 0 } };
+    WebAddr all_pub[] = { pub4, pub6 };
+    CHECK(weburl_addrs_class(all_pub, 2) == WEBURL_PUBLIC, "only public addresses");
+    WebAddr one[2];
+    const WebAddr bad[] = { lo4, ten, cgnat, link4, lo6, ula, ll6, map, odd };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        one[0] = pub4;
+        one[1] = bad[i];
+        CHECK(weburl_addrs_class(one, 2) == WEBURL_PRIVATE, "one private address among public ones (%zu)", i);
+    }
+    CHECK(weburl_addrs_class(NULL, 0) == WEBURL_PRIVATE && weburl_addrs_class(all_pub, 0) == WEBURL_PRIVATE, "nothing resolved: refused");
+
     CHECK(weburl_probe_hop_ok("https://a.example/", "https://b.example/x"), "public to public");
     CHECK(!weburl_probe_hop_ok("https://a.example/", "http://a.example/"), "https to http");
     CHECK(!weburl_probe_hop_ok("https://a.example/", "http://localhost:8080/"), "https to http on this computer");

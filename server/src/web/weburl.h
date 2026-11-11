@@ -37,9 +37,19 @@ int weburl_in_scope(const char *url, const char *scope);
 /* Where a host is: WEBURL_PUBLIC, or WEBURL_PRIVATE for this computer and the local networks: localhost and *.localhost,
  * *.local, 127.0.0.0/8, 0.0.0.0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, ::, ::1, fc00::/7, fe80::/10, and
  * an IPv4-mapped IPv6 address of those. An IPv4 address is read the way browsers do (shortened, hex or octal parts:
- * "127.1", "0x7f.1"). A name that only resolves to such an address is not seen here (no DNS lookups). */
+ * "127.1", "0x7f.1"). Names: localhost, a single label ("router") and the local networks' suffixes (.localhost, .local,
+ * .lan, .home, .home.arpa, .internal, .intranet, .localdomain, .corp). What a name resolves to is not seen here (no DNS
+ * lookups: weburl_addrs_class, fed by the probe). */
 enum { WEBURL_PUBLIC, WEBURL_PRIVATE };
 int weburl_host_class(const WebUrl *u);
+/* 1 when the host is an address (IPv6 in brackets, or IPv4 the way browsers read one), not a name to resolve */
+int weburl_host_is_literal(const WebUrl *u);
+/* The addresses a name resolved to (family 4 or 6, network order): WEBURL_PRIVATE when any of them is private by the
+ * rules above, or when there are none; WEBURL_PUBLIC only when all of them are public. The probe resolves a name
+ * itself (webprobe.c) and classifies every address, so a public-looking name that leads here (/etc/hosts, a LAN name,
+ * DNS rebinding) is private too. */
+typedef struct { int family; unsigned char a[16]; } WebAddr;
+int weburl_addrs_class(const WebAddr *a, int n);
 /* The probe (webprobe.c): 1 when a redirect or main-frame navigation from `from` to `to` keeps the request's scheme and
  * place: never https to http, never from a public host to a private one. */
 int weburl_probe_hop_ok(const char *from, const char *to);

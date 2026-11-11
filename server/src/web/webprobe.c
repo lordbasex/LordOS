@@ -19,6 +19,11 @@
 #include "weburl.h"
 
 #include <errno.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <time.h>
+#include <netinet/in.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
@@ -77,6 +82,99 @@ static int write_all(int fd, const void *p, size_t n) {
 static int answered;
 /* the address asked for, and the last main-frame address allowed on the way (redirects and navigations) */
 static char typed[WEBARGS_LINE_MAX + 1], current[WEBURL_MAX + 1];
+static int typed_public = 1;            /* what the request was: until shown otherwise, public (the strict side) */
+
+/* ---- where a name leads: resolved here and every address classified (weburl_addrs_class) ---- */
+
+#define RESOLVE_MS 3000
+#define RESOLVE_ADDRS 32
+
+typedef struct {
+    pthread_mutex_t mu;
+    pthread_cond_t cv;
+    int refs, done, ok, n;
+    char host[WEBURL_HOST_MAX + 1];
+    WebAddr a[RESOLVE_ADDRS];
+} Lookup;
+
+static void lookup_unref(Lookup *l) {
+    pthread_mutex_lock(&l->mu);
+    int last = --l->refs == 0;
+    pthread_mutex_unlock(&l->mu);
+    if (last) { pthread_mutex_destroy(&l->mu); pthread_cond_destroy(&l->cv); free(l); }
+}
+
+static void *lookup_thread(void *d) {
+    Lookup *l = d;
+    struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM }, *res = NULL;
+    int ok = !getaddrinfo(l->host, NULL, &hints, &res), n = 0;
+    for (struct addrinfo *r = ok ? res : NULL; r && n < RESOLVE_ADDRS; r = r->ai_next) {
+        if (r->ai_family == AF_INET) { l->a[n].family = 4; memcpy(l->a[n].a, &((struct sockaddr_in *)r->ai_addr)->sin_addr, 4); n++; }
+        else if (r->ai_family == AF_INET6) { l->a[n].family = 6; memcpy(l->a[n].a, &((struct sockaddr_in6 *)r->ai_addr)->sin6_addr, 16); n++; }
+    }
+    if (res) freeaddrinfo(res);
+    pthread_mutex_lock(&l->mu);
+    l->ok = ok;
+    l->n = n;
+    l->done = 1;
+    pthread_cond_signal(&l->cv);
+    pthread_mutex_unlock(&l->mu);
+    lookup_unref(l);
+    return NULL;
+}
+
+/* Where url's host leads: 0 and *cls, or -1 when it could not be resolved within RESOLVE_MS. An address is its own
+ * class; a name the static rules call private is private without asking. */
+static int resolve_class(const char *url, int *cls) {
+    static struct { char host[WEBURL_HOST_MAX + 1]; int cls; } cache[16];
+    static int next;
+    WebUrl u;
+    if (weburl_parse(url, &u)) return -1;
+    *cls = weburl_host_class(&u);
+    if (*cls == WEBURL_PRIVATE || weburl_host_is_literal(&u)) return 0;
+    for (int i = 0; i < 16; i++) if (cache[i].host[0] && !strcmp(cache[i].host, u.host)) { *cls = cache[i].cls; return 0; }
+    Lookup *l = calloc(1, sizeof *l);
+    if (!l) return -1;
+    pthread_mutex_init(&l->mu, NULL);
+    pthread_cond_init(&l->cv, NULL);
+    l->refs = 2;
+    snprintf(l->host, sizeof l->host, "%s", u.host);
+    size_t hn = strlen(l->host);
+    if (hn && l->host[hn - 1] == '.') l->host[hn - 1] = 0;
+    pthread_t th;
+    if (pthread_create(&th, NULL, lookup_thread, l)) { l->refs = 1; lookup_unref(l); return -1; }
+    pthread_detach(th);
+    struct timespec until;
+    clock_gettime(CLOCK_REALTIME, &until);
+    until.tv_sec += RESOLVE_MS / 1000;
+    pthread_mutex_lock(&l->mu);
+    while (!l->done) if (pthread_cond_timedwait(&l->cv, &l->mu, &until)) break;
+    int done = l->done, ok = l->ok, n = l->n;
+    WebAddr a[RESOLVE_ADDRS];
+    memcpy(a, l->a, sizeof a);
+    pthread_mutex_unlock(&l->mu);
+    lookup_unref(l);                    /* a lookup still running frees itself when it ends */
+    if (!done || !ok) return -1;
+    *cls = weburl_addrs_class(a, n);
+    snprintf(cache[next].host, sizeof cache[next].host, "%s", u.host);
+    cache[next].cls = *cls;
+    next = (next + 1) % 16;
+    return 0;
+}
+
+/* a typed public address may not lead to a private one: to must resolve, and only to public addresses */
+static int place_ok(const char *to) {
+    if (!typed_public) return 1;
+    int c;
+    return !resolve_class(to, &c) && c == WEBURL_PUBLIC;
+}
+
+/* what the request itself is (failing to resolve it keeps it public: the strict side) */
+static void typed_set(const char *url) {
+    snprintf(typed, sizeof typed, "%s", url);
+    int c;
+    typed_public = resolve_class(url, &c) || c == WEBURL_PUBLIC;
+}
 
 static void answer_line(Web *w, const char *line) {
     if (answered) return;
@@ -122,6 +220,7 @@ static void on_js(GObject *src, GAsyncResult *res, gpointer d) {
     const char *uri = webkit_web_view_get_uri(w->view);
     /* https (or http on this computer, asked for as such), and this computer or a local network only when asked for */
     if (!uri || !weburl_probe_final_ok(typed, uri)) { g_free(page); answer_error(w, "web.probe.notHttps"); return; }
+    if (!place_ok(uri)) { g_free(page); answer_error(w, "web.probe.load"); return; }
     char *line = g_malloc(WEBMANIFEST_LINE_MAX);
     if (page && !webmanifest_answer(uri, page, strlen(page), line, WEBMANIFEST_LINE_MAX)) answer_line(w, line);
     else answer_error(w, "web.probe.page");
@@ -164,7 +263,7 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
         WebKitNavigationAction *a = webkit_navigation_policy_decision_get_navigation_action(WEBKIT_NAVIGATION_POLICY_DECISION(dec));
         const char *uri = webkit_uri_request_get_uri(webkit_navigation_action_get_request(a));
         if (!uri || !strncmp(uri, "about:", 6)) return FALSE;
-        if (!weburl_probe_hop_ok(current, uri) || !weburl_probe_hop_ok(typed, uri)) {
+        if (!weburl_probe_hop_ok(current, uri) || !weburl_probe_hop_ok(typed, uri) || !place_ok(uri)) {
             webkit_policy_decision_ignore(dec);
             WebUrl f, t;
             answer_error(d, !weburl_parse(current, &f) && !weburl_parse(uri, &t) && f.https && !t.https ? "web.probe.notHttps" : "web.probe.load");
@@ -205,7 +304,7 @@ int webprobe_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
     w->loop = g_main_loop_new(NULL, FALSE);
     if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
-    snprintf(typed, sizeof typed, "%s", url);
+    typed_set(url);
     snprintf(current, sizeof current, "%s", url);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     if (!wpe_fdo_initialize_shm()) { answer_error(w, "web.probe.load"); return 1; }
@@ -275,6 +374,7 @@ static void icon_done(WebKitDownload *dl, gpointer d) {
     WebKitURIResponse *resp = webkit_download_get_response(dl);
     const char *final = resp ? webkit_uri_response_get_uri(resp) : NULL;
     if (!final || !weburl_probe_final_ok(typed, final)) { answer_error(w, "web.probe.notHttps"); return; }
+    if (!place_ok(final)) { answer_error(w, "web.probe.load"); return; }
     char p[PATH_MAX + 16];
     snprintf(p, sizeof p, "%s/icon", tmpdir);
     int fd = open(p, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
@@ -305,7 +405,7 @@ int webprobe_icon_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
     w->loop = g_main_loop_new(NULL, FALSE);
     if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
-    snprintf(typed, sizeof typed, "%s", url);
+    typed_set(url);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     snprintf(tmpdir, sizeof tmpdir, "%s/lordos-web-icon.XXXXXX", rt && rt[0] == '/' ? rt : "/tmp");
     if (!mkdtemp(tmpdir)) { tmpdir[0] = 0; answer_error(w, "web.probe.load"); return 1; }

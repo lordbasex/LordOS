@@ -139,7 +139,13 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   the short, hex or octal way browsers accept), is refused (`web.probe.notHttps` for the scheme, `web.probe.load` for
   the place), and the page and the icon are read only when the address they ended on passes the same rule against
   the request (`weburl_probe_hop_ok`, `weburl_probe_final_ok`). lord-server never sends a public page's local icon to
-  `--probe-icon`. A public name that only resolves to a private address is not caught (no DNS lookups of our own).
+  `--probe-icon`. Names count too: a single label (`router`) and the local networks' suffixes (`.lan`, `.home`,
+  `.home.arpa`, `.internal`, `.intranet`, `.localdomain`, `.corp`) are private, and lord-web resolves every other name
+  itself (3 s at most) and classifies every address it gets (`weburl_addrs_class`): one private address makes the name
+  private, and a name that doesn't resolve is refused. A request whose own name is private (the person typed a local
+  address) may stay there. This narrows DNS rebinding but cannot close it: WebKit resolves the name again for its own
+  connection, after our check. The probe still runs in WebKit's sandbox, in an ephemeral session with none of the
+  person's cookies or credentials.
 - **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
   answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
   signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is

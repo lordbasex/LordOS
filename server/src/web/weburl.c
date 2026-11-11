@@ -161,6 +161,39 @@ static int ends_with(const char *s, const char *tail) {
     return n >= t && !strcmp(s + n - t, tail);
 }
 
+static int private6(const unsigned char b[16]) {
+    static const unsigned char zero[16];
+    static const unsigned char mapped[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
+    if (!memcmp(b, zero, 15) && (b[15] == 0 || b[15] == 1)) return 1;                  /* :: and ::1 */
+    if ((b[0] & 0xfe) == 0xfc || (b[0] == 0xfe && (b[1] & 0xc0) == 0x80)) return 1;   /* fc00::/7, fe80::/10 */
+    if (!memcmp(b, mapped, 12) || !memcmp(b, zero, 12))                               /* ::ffff:a.b.c.d, ::a.b.c.d */
+        return private4((uint32_t)b[12] << 24 | (uint32_t)b[13] << 16 | (uint32_t)b[14] << 8 | b[15]);
+    return 0;
+}
+
+int weburl_addrs_class(const WebAddr *a, int n) {
+    if (!a || n <= 0) return WEBURL_PRIVATE;                                           /* nothing resolved: refused */
+    for (int i = 0; i < n; i++) {
+        if (a[i].family == 4) { if (private4((uint32_t)a[i].a[0] << 24 | (uint32_t)a[i].a[1] << 16 | (uint32_t)a[i].a[2] << 8 | a[i].a[3])) return WEBURL_PRIVATE; }
+        else if (a[i].family == 6) { if (private6(a[i].a)) return WEBURL_PRIVATE; }
+        else return WEBURL_PRIVATE;
+    }
+    return WEBURL_PUBLIC;
+}
+
+/* names that only mean something on a local network (or this computer) */
+static const char *const LAN_SUFFIX[] = { ".localhost", ".local", ".lan", ".home", ".home.arpa", ".internal", ".intranet", ".localdomain", ".corp", NULL };
+
+int weburl_host_is_literal(const WebUrl *u) {
+    const char *h = u->host;
+    if (h[0] == '[') return 1;
+    size_t n = strlen(h);
+    if (n && h[n - 1] == '.') n--;                       /* "a.b." */
+    size_t i = n;
+    while (i > 0 && h[i - 1] != '.') i--;
+    return i < n && h[i] >= '0' && h[i] <= '9';          /* a last label that is a number: browsers read an IPv4 address */
+}
+
 int weburl_host_class(const WebUrl *u) {
     const char *h = u->host;
     if (h[0] == '[') {
@@ -171,25 +204,17 @@ int weburl_host_class(const WebUrl *u) {
         memcpy(a, h + 1, n - 2);
         a[n - 2] = 0;
         if (inet_pton(AF_INET6, a, b) != 1) return WEBURL_PRIVATE;
-        static const unsigned char zero[16];
-        if (!memcmp(b, zero, 15) && (b[15] == 0 || b[15] == 1)) return WEBURL_PRIVATE;      /* :: and ::1 */
-        if ((b[0] & 0xfe) == 0xfc || (b[0] == 0xfe && (b[1] & 0xc0) == 0x80)) return WEBURL_PRIVATE;
-        static const unsigned char mapped[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
-        if (!memcmp(b, mapped, 12) || !memcmp(b, zero, 12))                             /* ::ffff:a.b.c.d, ::a.b.c.d */
-            return private4((uint32_t)b[12] << 24 | (uint32_t)b[13] << 16 | (uint32_t)b[14] << 8 | b[15]) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
-        return WEBURL_PUBLIC;
+        return private6(b) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
     }
     char name[WEBURL_HOST_MAX + 1];
     snprintf(name, sizeof name, "%s", h);
     size_t n = strlen(name);
     if (n && name[n - 1] == '.') name[n - 1] = 0;
-    if (!strcmp(name, "localhost") || ends_with(name, ".localhost") || ends_with(name, ".local")) return WEBURL_PRIVATE;
+    if (!strcmp(name, "localhost")) return WEBURL_PRIVATE;
+    for (int i = 0; LAN_SUFFIX[i]; i++) if (ends_with(name, LAN_SUFFIX[i]) || !strcmp(name, LAN_SUFFIX[i] + 1)) return WEBURL_PRIVATE;
     uint32_t ip;
-    /* browsers read a host whose last label is a number as an IPv4 address */
-    const char *last = strrchr(name, '.');
-    last = last ? last + 1 : name;
-    int numeric = last[0] >= '0' && last[0] <= '9';
-    if (numeric) return ipv4_of(name, &ip) || private4(ip) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
+    if (weburl_host_is_literal(u)) return ipv4_of(name, &ip) || private4(ip) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
+    if (!strchr(name, '.')) return WEBURL_PRIVATE;        /* a single label: a name of the local network ("router", "nas") */
     return WEBURL_PUBLIC;
 }
 
