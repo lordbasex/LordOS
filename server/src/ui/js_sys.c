@@ -23,6 +23,7 @@
 #include "fonts.h"
 #include "../admin.h"
 #include "../apps.h"
+#include "../term/termapp.h"
 #include "../lpk.h"
 #include "../sec/sign.h"
 #include "../sec/pkgapp.h"
@@ -1681,7 +1682,8 @@ static const JSCFunctionListEntry wayland_funcs[] = {
 
 /* ---- lord.apps: installed Linux apps (.desktop, apps.c) ---- */
 
-/* lord.apps.linux(language) → [{ id, name, genericName, comment, keywords, categories, wmClass, icon, user }] */
+/* lord.apps.linux(language) → [{ id, name, genericName, comment, keywords, categories, wmClass, icon, user, terminal }]
+ * (terminal: a Terminal=true entry, which opens in a Terminal tab) */
 static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     const char *lang = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
@@ -1707,17 +1709,31 @@ static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, o, "mimeTypes", JS_NewString(c, a->mime));
         JS_SetPropertyStr(c, o, "icon", JS_NewString(c, a->icon));
         JS_SetPropertyStr(c, o, "user", JS_NewBool(c, a->user));
+        JS_SetPropertyStr(c, o, "terminal", JS_NewBool(c, a->terminal));
         JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
     }
     return arr;
 }
 
-/* lord.apps.launch(id): only the id of a .desktop from the list (see apps.c); no arguments. */
+/* lord.apps.launch(id): only the id of a .desktop from the list (see apps.c); no arguments. → true if it
+ * started. A terminal app (terminal: true in the list) is not run: → { terminal: token }, the one-shot
+ * token (term/termapp.c) the Terminal passes to lord.term.create({ app: token }); the command stays in C. */
 static JSValue f_apps_launch(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *id = JS_ToCString(c, argv[0]);
-    int ok = id && apps_launch(id) == 0;
-    if (id) JS_FreeCString(c, id);
+    if (!id) return JS_FALSE;
+    if (apps_is_terminal(id)) {
+        char token[TERMAPP_TOKEN_HEX + 1];
+        int r = apps_launch_terminal(id, token, sizeof token);
+        JS_FreeCString(c, id);
+        if (r) return JS_FALSE;
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "terminal", JS_NewString(c, token));
+        explicit_bzero(token, sizeof token);
+        return o;
+    }
+    int ok = apps_launch(id) == 0;
+    JS_FreeCString(c, id);
     return JS_NewBool(c, ok);
 }
 

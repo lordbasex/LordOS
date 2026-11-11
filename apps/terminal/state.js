@@ -1,9 +1,9 @@
 // state.js — estado de la Terminal fuera de React: ventanas → pestañas → árbol de paneles
 // → sesiones. Vive a nivel de módulo para que minimizar una ventana (que desmonta su
 // contenido) no pierda pestañas ni shells; al cerrar la ventana se cierran sus sesiones.
-import { createStore, wm, term, clipboard, windows as wmWindows, workArea, t as T } from '@lordos/sdk';
+import { createStore, wm, term, clipboard, windows as wmWindows, workArea, errorText, t as T } from '@lordos/sdk';
 import { getProfile, terminalSettings, saveTerminalSettings, toConfig, profileName } from './profiles.js';
-import { initialKeys } from './profilefields.js';
+import { initialKeys, programExitOf } from './profilefields.js';
 import { screenSnapshot, freshLines } from './triggers.js';
 
 export const meta = createStore({});      // sid → { profile, title, cwd, process, busy, badge, bell, activity, flash, lastExit }
@@ -89,11 +89,16 @@ function startDir(p, reuseFrom) {
   return info?.cwd || undefined;
 }
 
-export function createSession(profileId, reuseFrom, cwd) {
+// app: the one-shot token of a terminal app from the launcher (sdk/apps.js launchApp). lord-server keeps its command
+// and types it into this session's shell, with the profile's programExit rule; JS only passes the token along.
+// An unknown, used or expired token throws (term.createFailed).
+export function createSession(profileId, reuseFrom, cwd, app) {
   const p = getProfile(profileId);
-  const sid = term.create({ cwd: cwd || startDir(p, reuseFrom), scrollback: p.scrollback });
+  const opts = { cwd: cwd || startDir(p, reuseFrom), scrollback: p.scrollback };
+  if (app) Object.assign(opts, { app, programExit: programExitOf(p) });
+  const sid = term.create(opts);
   patchMeta(sid, { profile: p.id, title: '', cwd: '', badge: p.badge || '', bell: false, activity: false,
-    pendingText: initialKeys(p.initialText) });
+    pendingText: app ? '' : initialKeys(p.initialText) });
   return sid;
 }
 
@@ -113,7 +118,19 @@ function buildTree(n) {
   return { type: 'split', id: nextId('s'), dir: n.dir, ratio: n.ratio, a: buildTree(n.a), b: buildTree(n.b) };
 }
 
-// args from another app: { cwd } starts the shell there, { typed } leaves a line typed and not run
+// A terminal app opened in a new window: its tab, named after the app. A token that no longer works (used, or older
+// than 10 s) opens a plain shell and says why.
+function appTab(args) {
+  let sid = null;
+  try { sid = createSession(null, null, undefined, String(args.app)); } catch (e) { sid = null; }
+  if (sid == null) return { tab: newTab(null, null), failed: true };
+  const tab = newTab(null, null, sid);
+  const title = typeof args.title === 'string' ? args.title.slice(0, 120) : '';
+  return { tab: title ? { ...tab, title } : tab, failed: false };
+}
+
+// args from another app: { cwd } starts the shell there, { typed } leaves a line typed and not run,
+// { app, title } runs a terminal app from the launcher (appTab)
 export function ensureWin(wid, args) {
   if (getWin(wid)) return;
   let tabs;
@@ -126,6 +143,10 @@ export function ensureWin(wid, args) {
   } else if (pendingTabs.has(wid)) {
     tabs = pendingTabs.get(wid);
     pendingTabs.delete(wid);
+  } else if (typeof args?.app === 'string') {
+    const r = appTab(args);
+    tabs = [r.tab];
+    if (r.failed) setTimeout(() => toast(wid, errorText('term.createFailed')), 0);
   } else {
     const sid = args?.cwd || args?.typed ? createSession(null, null, typeof args.cwd === 'string' ? args.cwd : undefined) : null;
     if (sid != null && /^(ssh|sftp)( -[pP] \d{1,5})? [A-Za-z0-9_][A-Za-z0-9._@-]{0,300}$/.test(String(args.typed || ''))) patchMeta(sid, { pendingText: args.typed });

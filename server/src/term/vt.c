@@ -1225,7 +1225,7 @@ static void osc(Term *t) {
     case 133: {
         Line *l = L(t, t->cy);
         if (s[0] == 'A') { l->flags |= LINE_PROMPT; l->flags &= (uint8_t)~(LINE_OK | LINE_FAIL); vt_mark_dirty(t, t->cy); }
-        else if (s[0] == 'B') { t->cmd_line = vt_cursor_abs(t); t->cmd_col = t->cx; }
+        else if (s[0] == 'B') { t->cmd_line = vt_cursor_abs(t); t->cmd_col = t->cx; if (t->prompts < 1000000) t->prompts++; }
         else if (s[0] == 'C') {
             /* The command is what was typed between the end of the prompt and the start of the output. */
             long long end = vt_cursor_abs(t) - (t->cx == 0 ? 1 : 0);

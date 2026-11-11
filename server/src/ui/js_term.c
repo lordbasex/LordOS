@@ -1,7 +1,12 @@
 /* js_term.c — lord.term.* and lord.clipboard for the Terminal app, and lord.primary.
  *
  * lord.term.create() is the only API that starts a process: always the login shell of the
- * user already running the session (see term/pty.c). It accepts no commands or arguments. */
+ * user already running the session (see term/pty.c). It accepts no commands or arguments.
+ * (approved 2026-11-10) Terminal apps: lord.term.create({ app: token }) takes the one-shot slot that
+ * lord.apps.launch(id) of a Terminal=true .desktop stored (term/termapp.c, apps.c). The tab still starts
+ * only the login shell, the same way; lord-server then types the slot's argv into it once, quoted in C,
+ * followed by one of three fixed exit rules (programExit: 'close' | 'closeIfOk' | 'keep'). JS never sees
+ * or chooses the command: an unknown, used or expired token throws term.createFailed and nothing starts. */
 #include "js_term.h"
 #include "../wl/wl.h"
 #include "../wl/urilist.h"
@@ -10,11 +15,13 @@
 #include "../term/termfill.h"
 #include "../term/tcapture.h"
 #include "../term/sftpc.h"
+#include "../term/termapp.h"
 #include "js_sys.h"
 #include "js_err.h"
 
 #include <fcntl.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,15 +65,37 @@ static JSValue str_or_null(JSContext *c, char *s) {
 
 /* ---- lifecycle ---- */
 
+/* Is the user's login shell fish? (its single quotes also take \\ as an escape: termapp_quote) */
+static int shell_is_fish(void) {
+    struct passwd *pw = getpwuid(getuid());
+    const char *sh = pw && pw->pw_shell ? pw->pw_shell : "";
+    const char *base = strrchr(sh, '/');
+    return !strcmp(base ? base + 1 : sh, "fish");
+}
+
 static JSValue f_create(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
-    char cwd[PATH_MAX] = "";
-    int scrollback = 0;
+    char cwd[PATH_MAX] = "", token[TERMAPP_TOKEN_HEX + 2] = "", rule[16] = "";
+    int scrollback = 0, app = 0;
     if (argc > 0 && JS_IsObject(argv[0])) {
         str(c, argv[0], "cwd", cwd, sizeof cwd);
         scrollback = (int)num(c, argv[0], "scrollback", 0);
+        app = has(c, argv[0], "app");
+        if (app) str(c, argv[0], "app", token, sizeof token);
+        str(c, argv[0], "programExit", rule, sizeof rule);
+    }
+    /* a terminal app: the slot is taken (and spent) before anything starts; its line never reaches JS */
+    char *line = NULL;
+    if (app) {
+        line = malloc(TERMAPP_LINE_MAX);
+        if (!line || termapp_take(token, termapp_now(), shell_is_fish(), rule, line, TERMAPP_LINE_MAX)) {
+            free(line);
+            return js_throw_code(c, "term.createFailed", NULL);
+        }
     }
     Session *s = term_create(cwd[0] ? cwd : NULL, scrollback);
+    if (s && line && term_set_app_line(s, line)) { term_close(s); s = NULL; }
+    if (line) { explicit_bzero(line, TERMAPP_LINE_MAX); free(line); }
     if (!s) return js_throw_code(c, "term.createFailed", NULL);
     return JS_NewInt32(c, s->id);
 }

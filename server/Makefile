@@ -61,7 +61,7 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
-       src/term/vt.c src/term/pty.c src/term/term.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
+       src/term/vt.c src/term/pty.c src/term/term.c src/term/termapp.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
        src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/forti.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/net/ifwatch.c src/net/wake.c \
        src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
        $(SEC_SRC) $(APP_SRC) $(MON_SRC) $(MEDIA_SRC)
@@ -459,7 +459,7 @@ build/brokermail-test: tests/brokermail_test.c src/sec/brokermail.c src/sec/json
 	./$@ || { rm -f $@; exit 1; }
 # tests/launch_cli.c: the real Linux app launcher outside the desktop, for tests/fwlinux/files.sh
 # (built by `make test`, run by that script in the VM)
-LAUNCH_CLI_SRC := src/apps.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
+LAUNCH_CLI_SRC := src/apps.c src/term/termapp.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
                   src/sec/restrict.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 test: build/launch-cli
 build/launch-cli: tests/launch_cli.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
@@ -470,6 +470,12 @@ test: build/apps-actions-test
 build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_actions_test.c $(LAUNCH_CLI_SRC)
+	./$@ || { rm -f $@; exit 1; }
+# tests/apps_term_test.c: terminal apps (Terminal=true) in the launcher and their one-shot slots (term/termapp.c)
+test: build/apps-term-test
+build/apps-term-test: tests/apps_term_test.c $(LAUNCH_CLI_SRC) src/apps.h src/term/termapp.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/apps_term_test.c $(LAUNCH_CLI_SRC)
 	./$@ || { rm -f $@; exit 1; }
 # tests/defaults_test.c: the default app for a MIME type (user choice, system default, first
 # declaring app) and launchWith('') over a fake XDG tree

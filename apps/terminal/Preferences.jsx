@@ -15,7 +15,7 @@ import { termConfig, chooseLocation, retryTermConfig, parseConfig, serializeConf
 import { compareNames } from '../../sdk/collate.js';
 import { cleanForward } from './forwards.js';
 import { TRIGGER_ACTIONS, triggerPreview, previewLine } from './triggers.js';
-import { parseTags, tagsText } from './profilefields.js';
+import { parseTags, tagsText, programExitOf, PROGRAM_EXIT } from './profilefields.js';
 
 // Functions (not constants): the texts depend on the language in force when drawing.
 const SECTIONS = () => [
@@ -601,6 +601,10 @@ export function Preferences({ wid, onClose }) {
             onChange={(v) => set({ rules: v.split(/\s*;\s*/).join('\n') })} />
         </Field>
         <Field t={t} label={T('terminal.prefs.confirmClose')}><Toggle small on={p.confirmClose} onChange={(v) => set({ confirmClose: v })} /></Field>
+        <Field t={t} label={T('terminal.prefs.programExit')}>
+          <Segmented small value={programExitOf(p)} onChange={(v) => set({ programExit: v })}
+            options={PROGRAM_EXIT.map((k) => [k, T(`terminal.prefs.programExit.${k}`)])} />
+        </Field>
         <Field t={t} label={T('terminal.prefs.hotkey')}>
           <Segmented small value={cfg.hotkey} onChange={(v) => save(cfg.profiles, { hotkey: v })} options={[['F12', 'F12'], ['Super+`', '❖`'], ['off', T('terminal.prefs.off')]]} />
         </Field>

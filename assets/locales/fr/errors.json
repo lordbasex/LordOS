@@ -20,6 +20,7 @@
   "app.readFailed": "Impossible de lire le fichier",
   "app.writeFailed": "Impossible d’écrire le fichier",
   "apps.restrictKernel": "Les restrictions de cette app nécessitent un noyau plus récent : elle n’a pas été lancée",
+  "apps.restrictTerminal": "Une app de terminal s’exécute dans le Terminal et ne peut pas garder ses restrictions : retirez-les (Confidentialité → Accès réseau des apps) pour l’ouvrir",
   "cloud.unavailable": "Nuage a besoin du paquet lordos-rclone",
   "cloud.badId": "Ce compte en ligne n’existe pas",
   "cloud.hostKeyChanged": "La clé de ce serveur a changé, la connexion a donc été refusée : il peut s’agir d’une attaque.",

@@ -15,10 +15,12 @@ typedef struct {
     char file[PATH_MAX];                /* the .desktop file */
     char bin[128];                      /* program name from Exec (for the Monitor: process → app) */
     int user;                           /* from ~/.local/share/applications */
+    int terminal;                       /* Terminal=true: it runs in a Terminal tab (apps_launch_terminal) */
 } DesktopApp;
 
 /* Lists the apps visible to LordOS (Type=Application, no NoDisplay/Hidden, OnlyShowIn and
- * NotShowIn, TryExec present, not terminal apps). lang = "es-AR": translated names.
+ * NotShowIn, TryExec present). Terminal apps (Terminal=true) are listed with terminal = 1 only if
+ * their Exec line's program is also found in the launcher's fixed PATH. lang = "es-AR": translated names.
  * Returns the count; *out is an internal array valid until the next call. */
 int apps_list(const char *lang, const DesktopApp **out);
 
@@ -28,8 +30,17 @@ int apps_list(const char *lang, const DesktopApp **out);
 void apps_status_icon(const char *name, char *out, size_t n);
 
 /* Launches the app with that id: only one from the list above, with its Exec line, without arguments
- * from the caller and without a shell. 0 if the process started. */
+ * from the caller and without a shell. 0 if the process started. A terminal app is refused here. */
 int apps_launch(const char *id);
+/* A terminal app (terminal = 1 in the list): nothing is run. Its Exec line is parsed as apps_launch
+ * does (field codes removed, no caller arguments, no file) and kept in a one-shot slot
+ * (term/termapp.h); token (at least TERMAPP_TOKEN_HEX + 1 bytes) gets the slot's token, which the
+ * Terminal passes to lord.term.create({ app }). 0 if stored; -1 for any other app, an app with
+ * restrictions (Settings → Privacy: it would run as part of the Terminal, without them), or an argv
+ * with a control character. */
+int apps_launch_terminal(const char *id, char *token, size_t n);
+/* 1 if the listed app with that id is a terminal app. */
+int apps_is_terminal(const char *id);
 /* Same, but opening a file or folder (see apps.c: only apps with MimeType and paths in the
  * home folder or the user's mounts, as a single argument). */
 int apps_launch_with(const char *id, const char *path);
