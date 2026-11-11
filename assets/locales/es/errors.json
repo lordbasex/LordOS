@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "La sesión no tiene una carpeta privada de ejecución para el servicio de nube",
   "cloud.notFound": "Esa cuenta no existe",
   "cloud.notReady": "La lista de proveedores todavía se está cargando. Probá de nuevo en un momento",
+  "cloud.settingUp": "Esta cuenta todavía se está configurando. Probá de nuevo en un momento",
   "cloud.notRunning": "El servicio de nube no está funcionando",
   "cloud.offline": "No se puede llegar a la nube",
   "cloud.renameFailed": "No se pudo cambiar el nombre de la carpeta de la cuenta",

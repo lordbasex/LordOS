@@ -7,6 +7,8 @@
 //   cloud.openSignInPage(id) / cloud.cancelSignIn(id)
 //   cloud.add(kind, name, fields) → { id } | { question } | { error, field? }   cloud.answer(state, value) → Promise, the same (17.2)
 //   cloud.remove(id, { discardPending }) → { ok } | { error: 'pending', files }
+//   cloud.setEnabled(id, on, { how: 'ask' | 'wait' | 'force' }) → { ok, waiting? } | { error: 'busy', files, open, moving }
+//     off keeps the account's settings and sign-in: on again mounts it without a new sign-in
 //   cloud.rename(id, name) / refreshAbout(id) / websiteUrl(id)
 //   cloud.status(paths) → { [path]: { st, pct?, error? } }       cloud.keep(paths) / unkeep(paths)
 //   cloud.browse(path): a folder Files shows (7.3), nothing waited for
@@ -83,6 +85,8 @@ export const cloud = {
   search: (path, needle) => (has() ? later(lord.cloud.search(String(path), String(needle))) : Promise.resolve({ error: 'cloud.unavailable' })),
   delete: (p) => maybe('delete', paths(p)),
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
+  setEnabled: (id, on, { how = 'ask' } = {}) => (has() && typeof lord.cloud.setEnabled === 'function'
+    ? lord.cloud.setEnabled(String(id), !!on, { how: ['ask', 'wait', 'force'].includes(how) ? how : 'ask' }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),
   refreshAbout: (id) => has() && lord.cloud.refreshAbout(String(id)),
   // accounts not connected (keyring was locked, offline) try again: call it after unlocking the keyring; null: all

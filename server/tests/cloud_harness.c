@@ -5,9 +5,11 @@
  * One command per line on stdin, one line of JSON per command on stdout:
  *   lock | unlock (the keyring stand-in) | retry ID|all | state | providers | add KIND NAME FIELDS-JSON | answer STATE VALUE | trash ID | measure ID | delete PATH | remove ID [discard] | rename ID NAME | status PATH | free PATH
  *   browse PATH | keep PATH | unkeep PATH | link PATH EXPIRE | unlink PATH | links ID | pause ID|all | resume ID|all | restart
+ *   on ID | off ID [wait|force] (cloud_set_enabled)
  *   about ID | website ID | options JSON | secret ID | wait SUBSTRING SECONDS | sleep MS | quit
  *   signin KIND NAME (a browser sign-in; tests/cloud_signin_fake.sh, #87) */
 #include "../src/cloud/cloud.h"
+#include "../src/cloud/cloud_pure.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -128,6 +130,8 @@ int main(void) {
         else if (!strcmp(cmd, "delete") && a1) { int req = 0; const char *p[] = { a1 }; char *r = cloud_delete(p, 1, &req); later(r, req); }
         else if (!strcmp(cmd, "pause") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "resume") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 0); out(strdup("{\"ok\":true}")); }
+        else if (!strcmp(cmd, "on") && a1) out(cloud_set_enabled(a1, 1, CS_ASK));
+        else if (!strcmp(cmd, "off") && a1) out(cloud_set_enabled(a1, 0, !rest ? CS_ASK : !strcmp(rest, "wait") ? CS_WAIT_IDLE : !strcmp(rest, "force") ? CS_FORCE : CS_ASK));
         else if (!strcmp(cmd, "restart")) { cloud_restart(); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "retry") && a1) { cloud_retry(strcmp(a1, "all") ? a1 : NULL); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "lock") || !strcmp(cmd, "unlock")) {

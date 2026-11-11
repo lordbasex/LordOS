@@ -27,10 +27,11 @@ export function cloudRoot(path, home) {
   return name ? `${c}${name}` : null;
 }
 
-// The dialog's Cloud places: every account's folder, by name as in Files (#86), but a locked keyring's (nothing to list).
+// The dialog's Cloud places: every account's folder, by name as in Files (#86), but a locked keyring's (nothing to list)
+// and one turned off.
 // accounts: cloud.state().accounts; hidden: the ids taken out of Files (settings.cloudHidden).
 export const cloudPlaces = (accounts, home, hidden = []) => sortAccounts(accounts)
-  .filter((a) => a && a.mount && cloudRoot(a.mount, home) === a.mount && a.state !== 'locked' && !hidden.includes(a.id))
+  .filter((a) => a && a.mount && cloudRoot(a.mount, home) === a.mount && a.state !== 'locked' && !a.disabled && a.state !== 'off' && !hidden.includes(a.id))
   .map((a) => ({ id: a.id, name: a.name, path: a.mount }));
 
 // Crumbs of a folder, from the place it belongs to: the home folder, a Cloud account, a disk or a connected server.

@@ -220,4 +220,25 @@ const char *cloud_skip_name(int why);                      /* "open" | "pending"
 /* the automatic pass: the least recently used that may go, oldest first, until need bytes; their indexes in pick */
 int  cloud_evict_lru(const CloudCand *c, int n, long long need, int *pick);
 
+/* ---- on and off ----
+ * An account turned off ("Desactivada") is not given to rclone at all: not configured, not mounted, no token check, no
+ * sign-in asked, nothing in Files or the menu bar. Its record (accounts.json, rclone.conf) and its secrets in the keyring
+ * stay as they were, so turning it on mounts it again without a new sign-in. */
+enum { CS_NOTHING, CS_ON, CS_OFF, CS_BUSY, CS_WAIT };   /* what cloud_switch decides */
+enum { CS_ASK, CS_WAIT_IDLE, CS_FORCE };                /* how an account is turned off while it is busy */
+/* busy: files open in its folder, changes waiting to go up, or transfers running */
+int  cloud_busy(int queued, int open, int moving);
+/* disabled: it is off; waiting: it turns off once it isn't busy. on: what the person asked. */
+int  cloud_switch(int disabled, int waiting, int on, int how, int busy);
+/* a waiting account turns off now */
+int  cloud_off_due(int waiting, int busy);
+/* The reason an account turned itself off (what accounts.json keeps, JS words it), or NULL: an account of rclone's
+ * iclouddrive backend that needs a new sign-in (err cloud.signInAgain) before its first mount of this session
+ * (starting): rclone asks for a new code after each restart (rclone issues 9966 and 9658), so it waits, off, for the
+ * person instead of asking at every start. */
+#define CLOUD_OFF_SIGNIN "signinAtStart"
+const char *cloud_auto_off(const char *type, const char *err, int starting);
+/* a reason read back from accounts.json: one of ours, else "" */
+const char *cloud_off_reason(const char *saved);
+
 #endif

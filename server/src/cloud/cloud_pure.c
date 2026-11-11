@@ -848,3 +848,26 @@ void cloud_session_summary(const char *trust, const char *cookies, char *out, si
     }
     if (!names && o < n) snprintf(out + o, n - o, " none");
 }
+
+/* ---- on and off ---- */
+
+int cloud_busy(int queued, int open, int moving) { return queued > 0 || open > 0 || moving > 0; }
+
+int cloud_switch(int disabled, int waiting, int on, int how, int busy) {
+    if (on) return disabled || waiting ? CS_ON : CS_NOTHING;          /* on also cancels a wait to turn off */
+    if (disabled) return CS_NOTHING;
+    if (!busy || how == CS_FORCE) return CS_OFF;
+    if (how == CS_WAIT_IDLE) return waiting ? CS_NOTHING : CS_WAIT;
+    return CS_BUSY;
+}
+
+int cloud_off_due(int waiting, int busy) { return waiting && !busy; }
+
+const char *cloud_auto_off(const char *type, const char *err, int starting) {
+    if (!starting || !type || !err || strcmp(type, "iclouddrive") || strcmp(err, "cloud.signInAgain")) return NULL;
+    return CLOUD_OFF_SIGNIN;
+}
+
+const char *cloud_off_reason(const char *saved) {
+    return saved && !strcmp(saved, CLOUD_OFF_SIGNIN) ? CLOUD_OFF_SIGNIN : "";
+}

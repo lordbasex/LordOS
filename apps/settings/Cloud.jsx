@@ -158,6 +158,73 @@ function UnlockRow({ a, small }) {
   );
 }
 
+// ---- on and off ----
+
+// An account's switch: off lets rclone and the mount go (nothing of it in Files, the menu bar or the notifications) and
+// keeps its settings and sign-in, so on again needs no new sign-in. Busy (changes waiting to go up, files open, transfers),
+// the Turn Off sheet asks to wait or turn it off now.
+function switchAccount(a, on) {
+  const r = cloud.setEnabled(a.id, on);
+  if (r && r.error === 'busy') { setView({ sheet: { kind: 'turnOff', id: a.id, busy: r } }); return; }
+  if (r && r.error) toast.set(errorMessage(r, a));
+}
+function OnSwitch({ a }) {
+  const { t: tr } = useLocale();
+  // waiting to turn off shows as off: switching it on again cancels the wait
+  return (
+    <View aria-label={tr('cloud.off.switch', { name: a.name })} onClick={(e) => e.stopPropagation?.()}>
+      <Toggle small on={!M.isOff(a) && !a.offWaiting} onChange={(v) => switchAccount(a, v)} />
+    </View>
+  );
+}
+
+// The page of an account turned off: what that means, why when it turned itself off, and the way back.
+function OffCard({ a }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const why = M.offLine(a);
+  const k = why ? M.knownIssue(a.kind) : null;
+  return (
+    <View aria-label={tr('cloud.state.off')} style={[box(t), { paddingHorizontal: 16, paddingVertical: 14, gap: 8, border: `1px solid ${why ? tint.warn : t.separator}` }]}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.state.off')}</Text>
+      {why ? <Text style={{ fontSize: typeScale.callout, color: tint.warn, textAlign: 'start', lineHeight: 1.4 }}>{tr(why.key, why.vars)}</Text> : null}
+      <Dim t={t}>{tr('cloud.off.body')}</Dim>
+      <Actions start>
+        <Button small primary label={tr('cloud.off.turnOn')} onClick={() => switchAccount(a, true)} />
+        {k ? <Button small label={tr('cloud.known.open')} onClick={() => openUrl(k.url)} /> : null}
+      </Actions>
+    </View>
+  );
+}
+
+function TurnOffSheet({ st, sheet }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const a = (st.accounts || []).find((x) => x.id === sheet.id);
+  const close = () => setView({ sheet: null });
+  if (!a) return null;
+  const line = M.busyLine(sheet.busy) || { key: 'cloud.off.busyMoving', vars: {} };
+  const go = (how) => {
+    const r = cloud.setEnabled(a.id, false, { how });
+    if (r && r.error && r.error !== 'busy') toast.set(errorMessage(r, a));
+    close();
+  };
+  return (
+    <Sheet width={420} onClose={close} label={tr('cloud.off.sheetTitle', { name: a.name })}>
+      <View style={{ padding: spacing.xl, gap: spacing.s }}>
+        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.off.sheetTitle', { name: a.name })}</Text>
+        <Dim t={t} style={{ fontSize: typeScale.body, color: t.text }}>{tr(line.key, line.vars)}</Dim>
+        <Dim t={t}>{tr('cloud.off.busyHint')}</Dim>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: spacing.s, marginTop: spacing.m }}>
+          <Button label={tr('cloud.cancel')} onClick={close} />
+          <Button label={tr('cloud.off.now')} onClick={() => go('force')} />
+          <Button primary label={tr('cloud.off.wait')} onClick={() => go('wait')} />
+        </View>
+      </View>
+    </Sheet>
+  );
+}
+
 // ---- the overview (mock Main) ----
 
 function AllAccounts({ st }) {
@@ -190,10 +257,11 @@ function AccountRow({ a, accounts, last }) {
   const u = M.usage(a.about);
   const line = M.stateLine(a, (cloudState.get() || {}).service);
   const color = M.accountColor(accounts, a.id);
+  const off = M.isOff(a);
   return (
     <BoxRow t={t} last={last} onClick={() => setView({ page: a.id, sheet: null })}>
-      <AccountBadge color={color} size={32} />
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <View style={{ opacity: off ? 0.45 : 1 }}><AccountBadge color={color} size={32} /></View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: off ? 0.7 : 1 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{a.name}</Text>
         <View style={{ flexDirection: 'row', minWidth: 0 }}>
           <Text style={{ flexShrink: 1, minWidth: 0, maxWidth: '55%', fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{M.providerName(a, providerCache.get())}</Text>
@@ -201,14 +269,15 @@ function AccountRow({ a, accounts, last }) {
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: toneColor(t, line.tone === 'warn' ? 'warn' : 'dim'), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr(line.key, line.vars)}</Text>
         </View>
       </View>
-      {M.needsUnlock(a) ? <View onClick={(e) => e.stopPropagation?.()}><Button small label={tr('cloud.unlock')} onClick={unlockKeyring} /></View> : null}
-      <View style={{ width: 190, gap: 5 }}>
+      {M.needsUnlock(a) && !off ? <View onClick={(e) => e.stopPropagation?.()}><Button small label={tr('cloud.unlock')} onClick={unlockKeyring} /></View> : null}
+      <View style={{ width: 190, gap: 5, opacity: off ? 0.45 : 1 }}>
         <SpaceBar parts={u ? [{ frac: u.pct != null ? u.pct : 0.02, color }] : []} />
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{(() => {
           const m = M.measuredLine(a.about, formatBytes, (d) => formatDate(d, 'short'));
           return m ? tr(m.key, m.vars) : fmtSpace(a.about, tr);
         })()}</Text>
       </View>
+      <OnSwitch a={a} />
       <Chevron t={t} />
     </BoxRow>
   );
@@ -223,7 +292,7 @@ function Overview({ st }) {
   const cache = accs.reduce((s, a) => s + (a.cacheBytes || 0), 0), kept = accs.reduce((s, a) => s + (a.keptBytes || 0), 0);
   const [msg, setMsg] = useState(null);
   const freeAll = () => {
-    const r = cloud.free(accs.map((a) => a.mount));
+    const r = cloud.free(M.liveAccounts(accs).map((a) => a.mount));
     setMsg({ ok: true, text: tr('cloud.freed', { size: formatBytes(r?.freed || 0) }) });
   };
   const svcLine = svc.running
@@ -239,7 +308,7 @@ function Overview({ st }) {
           <Button primary label={tr('cloud.addAccount')} onClick={() => setView({ sheet: { kind: 'add' } })} />
         </View>
       ) : null}
-      {svc.running === false && accs.length ? (
+      {svc.running === false && M.liveAccounts(accs).length ? (
         <View style={[box(t), { padding: 16, gap: 8, border: `1px solid ${tint.warn}` }]}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.serviceDown.title')}</Text>
           <Dim t={t}>{svc.error ? errorText(svc.error) : tr('cloud.serviceDown.body')}</Dim>
@@ -530,6 +599,7 @@ function Options({ a, accounts }) {
   );
   return (
     <View aria-label={tr('cloud.options')} style={box(t)}>
+      {row(tr('cloud.opt.on'), a.offWaiting ? tr('cloud.state.offWaiting') : tr('cloud.opt.onHint'), <OnSwitch a={a} />)}
       {row(tr('cloud.opt.folder'), `~/Cloud/${a.name}`, <NameField a={a} accounts={accounts} />)}
       <View style={{ paddingHorizontal: 14, paddingVertical: 11, gap: 8, borderBottomWidth: 1, borderBottomColor: t.separator }}>
         <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.use.title')}</Text>
@@ -833,6 +903,34 @@ function AccountPage({ a, st }) {
   const errText = a.error && !M.needsUnlock(a) ? errorText(M.explainError(a.error, st, a)) : '';
   // two balanced columns once the window is wide enough, one column otherwise
   const wide = (wm.frame(wm.get(win.id) || {}).w || 880) >= 900;
+  const back = (
+    <View aria-label={tr('cloud.back')} onClick={() => setView({ page: null, sheet: null })} style={{ width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: t.control }}>
+      <Text style={{ fontSize: 16, color: t.text }}>{direction() === 'rtl' ? '›' : '‹'}</Text>
+    </View>
+  );
+  // turned off: nothing of it is reachable (no space, files, links or check): what off means, the way back, Remove
+  if (M.isOff(a)) {
+    return (
+      <Stack gap={16}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {back}
+          <Text style={{ flex: 1, fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'start' }}>{a.name}</Text>
+          <OnSwitch a={a} />
+        </View>
+        <OffCard a={a} />
+        <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 4 }]}>
+          <Text style={{ fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{M.providerName(a, providerCache.get())}</Text>
+          <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ flex: 1, height: 28, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>
+            <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#fff' }}>{tr('cloud.remove')}</Text>
+          </View>
+        </View>
+        <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.removeHint')}</Dim>
+      </Stack>
+    );
+  }
   const left = (
     <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
       <KnownIssue a={a} />
@@ -871,9 +969,7 @@ function AccountPage({ a, st }) {
   return (
     <Stack gap={16}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View aria-label={tr('cloud.back')} onClick={() => setView({ page: null, sheet: null })} style={{ width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: t.control }}>
-          <Text style={{ fontSize: 16, color: t.text }}>{direction() === 'rtl' ? '›' : '‹'}</Text>
-        </View>
+        {back}
         <Text style={{ flex: 1, fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'start' }}>{a.name}</Text>
         {website ? <Button label={tr('cloud.openWebsite')} onClick={() => openUrl(website)} /> : null}
         <Button label={tr('cloud.showInFiles')} onClick={() => wm.open('files', { new: true, args: { path: a.mount, nonce: Date.now() } })} />
@@ -1519,6 +1615,7 @@ export function CloudSheets() {
       {sh.kind === 'add' ? <AddSheet st={st} /> : null}
       {sh.kind === 'cred' ? <CredSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
+      {sh.kind === 'turnOff' ? <TurnOffSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'again' ? <AgainSheet st={st} sheet={sh} /> : null}
       {sh.kind === 'question' ? <QuestionSheet sheet={sh} /> : null}
       {sh.kind === 'ready' ? <ReadySheet st={st} sheet={sh} /> : null}

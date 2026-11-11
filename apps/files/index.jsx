@@ -241,7 +241,7 @@ export default function Files() {
   const [netState, searchLan] = useLan(baseLoc.type === 'network', (m) => setMsg(m));
   // a search inside a cloud account goes to cloud.search, off the interface's thread (docs/CLOUD.md 17.2 item 31)
   const cloudSt = useCloud();
-  const searchAcc = loc.type === 'search' ? cloudModel.accountOf(loc.root, cloudSt && cloudSt.accounts) : null;
+  const searchAcc = loc.type === 'search' ? cloudModel.accountOf(loc.root, cloudModel.liveAccounts(cloudSt && cloudSt.accounts)) : null;
   const [cs, setCs] = useState(null);            // { key, busy, hits, complete, error }
   const csKey = useRef('');
   const searchKey = searchAcc && loc.query ? `${loc.root}|${loc.query}` : '';
@@ -258,7 +258,7 @@ export default function Files() {
   // the background (cloud.browse), and listed again here when that one changed (the account's `listed`) or once a minute,
   // not on the 4-second volumes tick that local folders get: every listing of a mount is a call to rclone per file, and
   // one that falls on an expired folder waits for the provider
-  const listAcc = loc.type === 'dir' ? cloudModel.accountOf(loc.path, cloudSt && cloudSt.accounts) : null;
+  const listAcc = loc.type === 'dir' ? cloudModel.accountOf(loc.path, cloudModel.liveAccounts(cloudSt && cloudSt.accounts)) : null;
   const [cloudTick, setCloudTick] = useState(0);
   useEffect(() => {
     if (!listAcc) return undefined;

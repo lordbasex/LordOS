@@ -1,6 +1,8 @@
 /* cloud.c — see cloud.h and docs/CLOUD.md. The accounts, the rclone daemon and the thread that drives both.
  *
- *   ~/.config/lordos/cloud/accounts.json   id, name, kind, created, paused; the options (bandwidth, battery, space)
+ *   ~/.config/lordos/cloud/accounts.json   id, name, kind, created, paused, disabled (and why); the options (bandwidth,
+ *                                          battery, space). An account turned off keeps its entry here, its section in
+ *                                          rclone.conf and its keyring item: only rclone and the mount let go of it.
  *   ~/.config/lordos/cloud/rclone.conf     each account's type and non-secret options (0600, no secret in it)
  *   ~/.config/lordos/cloud/keep.json       Keep on This Computer, per account
  *   ~/.config/lordos/cloud/links.json      the links made from LordOS (rclone can't list them)
@@ -99,7 +101,7 @@ static long long seen_done;          /* newest completed_at already in recent */
 typedef struct Link { struct Link *next; char id[16]; char *rel, *url; long long expires, made; } Link;
 static Link *links;
 
-enum { J_RETRY = 100, J_ADDLATE };
+enum { J_RETRY = 100, J_ADDLATE, J_OFF };
 enum { J_PROVIDERS = 1, J_ADD, J_REMOVE, J_RENAME, J_ABOUT, J_LINK, J_UNLINK, J_RESTART, J_OPTIONS, J_PAUSE, J_SIGNIN, J_STOP,
        J_ANSWER, J_TRASH, J_MEASURE, J_CANCEL_MEASURE };
 typedef struct Job { struct Job *next; int type, req, flag; char id[16]; char *a, *b, *c, *d; } Job;
@@ -206,6 +208,8 @@ Acc *cl_find_name(const char *name) {
     return NULL;
 }
 static int naccounts(void) { int n = 0; for (int i = 0; i < ACC_MAX; i++) n += cl_acc[i].used; return n; }
+/* the accounts rclone serves: those turned on */
+static int nlive(void) { int n = 0; for (int i = 0; i < ACC_MAX; i++) n += cl_acc[i].used && !cl_acc[i].disabled; return n; }
 
 static void wake(int fd) { if (fd >= 0) { uint64_t one = 1; ssize_t r = write(fd, &one, sizeof one); (void)r; } }
 void cl_changed(void) { wake(efd_job); }
@@ -283,8 +287,12 @@ static void save_accounts(void) {
         jb_str(&b, a->k->group);
         jb_raw(&b, ",\"provider\":");
         jb_str(&b, a->k->label);
-        jb_printf(&b, ",\"created\":%lld,\"paused\":%s,\"ownClient\":%s,\"measuredBytes\":%lld,\"measuredCount\":%lld,\"measuredAt\":%lld}",
+        jb_printf(&b, ",\"created\":%lld,\"paused\":%s,\"ownClient\":%s,\"measuredBytes\":%lld,\"measuredCount\":%lld,\"measuredAt\":%lld",
                   a->created, a->paused ? "true" : "false", a->own_client ? "true" : "false", a->measured_bytes, a->measured_count, a->measured_at);
+        /* new in 0.8.8.8, read as "on" when missing: no migration */
+        jb_printf(&b, ",\"disabled\":%s,\"offReason\":", a->disabled ? "true" : "false");
+        jb_str(&b, a->off_reason);
+        jb_raw(&b, "}");
     }
     jb_raw(&b, "]}\n");
     char p[PATH_MAX];
@@ -404,6 +412,9 @@ static void load_all(void) {
             a->k = ck;
             a->created = (long long)json_num(x, "created", 0);
             a->paused = json_bool(x, "paused", 0);
+            a->disabled = json_bool(x, "disabled", 0);
+            cpy(a->off_reason, sizeof a->off_reason, a->disabled ? cloud_off_reason(json_str(x, "offReason")) : "");
+            a->starting = 1;
             a->own_client = json_bool(x, "ownClient", 0);
             a->trash_supported = -1;
             a->measured_bytes = (long long)json_num(x, "measuredBytes", 0);
@@ -1253,6 +1264,9 @@ static void about_acc(Acc *a) {
  * signs in again on that error; without them it signs in with the password and the trust token, which asks for no code
  * while the token lasts (about 30 days), and saves a new session. So once per run, the cookies are dropped (the trust
  * token kept) and the mount is tried again. 1 if the account was updated. */
+static void acc_off(Acc *a, const char *reason, int keep_session);
+static void post_reply(int req, char *json);
+static char *err_json(const char *code);
 static int drop_session(Acc *a, const char *msg) {
     if (a->fresh_tried || strcmp(a->k->type, "iclouddrive") || !strstr(msg, "requestPCS")) return 0;
     a->fresh_tried = 1;
@@ -1286,13 +1300,17 @@ static int mount_acc(Acc *a) {
     jb_raw(&b, "}");
     int st = b.oom ? -1 : rcs(RCM_MOUNT, b.p, msg, sizeof msg, RC_SHORT);
     jb_free(&b);
+    const char *off = NULL;
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; }
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; }   /* starting: until its first listing answers (check_acc) */
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
-        cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
-        set_message(a, msg);
+        const char *code = !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed";
+        /* rclone issues 9966 and 9658: an account that would ask for a new code at every start of the session turns
+         * itself off instead (cloud_auto_off). Its error isn't shown meanwhile, so nothing announces a sign-in. */
+        off = cloud_auto_off(a->k->type, code, a->starting);
+        if (!off) { cpy(a->err, sizeof a->err, code); set_message(a, msg); }
         /* refused credentials don't come back by themselves: a refused password is tried again in 30 minutes, not every
          * 30 seconds, which some providers answer by locking the account; an account that needs a new sign-in is not
          * tried again by itself at all (each try can send a code to the person's devices) until Sign In Again, Retry
@@ -1303,6 +1321,7 @@ static int mount_acc(Acc *a) {
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
     else if (drop_session(a, msg)) { token_check(a); return mount_acc(a); }   /* once: fresh_tried */
+    else if (off) acc_off(a, off, 0);
     cl_changed();
     return st == 200 ? 0 : -1;
 }
@@ -1320,6 +1339,7 @@ static void bring_up_config(Acc *a) {
 
 /* brings an account up in this rclone: secrets from the keyring, config/create, mount */
 static void bring_up(Acc *a) {
+    if (a->disabled) return;                    /* turned off: rclone never hears of it */
     a->retry_at = time(NULL) + 30;
     if (!cl_running || a->configured) { if (a->configured && !a->mounted) mount_acc(a); return; }
     char *sec = NULL;
@@ -1363,6 +1383,61 @@ static void token_check(Acc *a) {
     pthread_mutex_lock(&cl_mu);
     save_accounts();
     pthread_mutex_unlock(&cl_mu);
+}
+
+/* Turns an account off (the worker thread): a session rclone changed is saved first when asked (keep_session: the person
+ * turned it off; a session the provider just refused is not), the folder unmounted (lazily if a file is still open: it
+ * keeps working until it is closed), the remote dropped from rclone's memory only (config/delete: rclone keeps no file,
+ * --config ""). Its entry in accounts.json, its section in rclone.conf, its keyring item, what it keeps on this computer
+ * and its changes waiting in the cache all stay: turned on, it is given to rclone and mounted as at a start, and what
+ * waited goes up. */
+static void acc_off(Acc *a, const char *reason, int keep_session) {
+    if (reason && reason[0]) fprintf(stderr, "cloud: %s: the provider asks for a new sign-in at the start of the session: turned off, its settings and sign-in kept\n", a->id);
+    else fprintf(stderr, "cloud: %s: turned off, its settings and sign-in kept\n", a->id);
+    if (keep_session && a->configured && a->mounted) token_check(a);
+    pthread_mutex_lock(&cl_mu);
+    char job = a->rcjob_kind;
+    long long jid = a->rcjob_id;
+    int jreq = a->rcjob_req;
+    a->rcjob_kind = 0;
+    pthread_mutex_unlock(&cl_mu);
+    if (job) {
+        char b[64];
+        cl_pf(b, sizeof b, "{\"jobid\":%lld}", jid);
+        rcs(RCM_JOB_STOP, b, NULL, 0, RC_SHORT);
+        post_reply(jreq, err_json("cloud.cancelled"));
+    }
+    if (a->mounted) unmount_acc(a);
+    if (a->configured) {
+        char body[64];
+        cl_pf(body, sizeof body, "{\"name\":\"%s\"}", a->id);
+        rcs(RCM_DELETE, body, NULL, 0, RC_SHORT);
+    }
+    char d[PATH_MAX];
+    mount_dir(a, d, sizeof d);
+    rmdir(d);                                   /* only if empty: Files no longer lists it in ~/Cloud */
+    pthread_mutex_lock(&cl_mu);
+    a->disabled = 1;
+    a->off_wait = 0;
+    a->configured = a->mounted = a->held = a->in_use = a->locked = 0;
+    a->err[0] = a->message[0] = a->fp_old[0] = a->fp_new[0] = 0;
+    a->retry_at = 0;
+    acc_free_live(a);
+    cpy(a->off_reason, sizeof a->off_reason, reason ? reason : "");
+    save_accounts();
+    pthread_mutex_unlock(&cl_mu);
+    cf_kick();
+    cl_changed();
+}
+
+/* on again, with cl_mu held: as a first start, but the person asked for it, so a provider that wants a new sign-in says so */
+static void turn_on(Acc *a) {
+    if (!a->disabled && !a->off_wait) return;
+    a->disabled = a->off_wait = 0;
+    a->off_reason[0] = a->err[0] = a->message[0] = 0;
+    a->starting = a->fresh_tried = 0;
+    a->retry_at = 0;
+    save_accounts();
 }
 
 static int ensure_daemon(void) {
@@ -1512,6 +1587,10 @@ static void check_acc(Acc *a) {
     a->keeper_wait = 0;
     /* offline: listed every 30 s, so it comes back as soon as the server does */
     a->check_at = time(NULL) + (!bad ? 600 : c && !strcmp(c, "cloud.unreachable") ? 30 : 120);
+    /* the provider may take the mount and refuse the first listing: the same rule as a refused mount (cloud_auto_off) */
+    const char *off = bad ? cloud_auto_off(a->k->type, c ? c : "", a->starting) : NULL;
+    if (!bad) a->starting = 0;
+    if (off) { a->keeper_wait = 0; pthread_mutex_unlock(&cl_mu); acc_off(a, off, 0); return; }
     if (bad) {
         cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
         if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
@@ -1944,6 +2023,7 @@ static void signin_again(const char *tok, const char *opts) {
     Acc *a = cl_find(si.update);
     if (!a) { signin_end("failed", "cloud.notFound"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
     if (si.cid[0]) { kv_set(&a->p, "client_id", si.cid); a->own_client = 1; }
+    turn_on(a);                                 /* signed in again while off: the person wants it back */
     JBuf s;
     jb_init(&s);
     jb_raw(&s, "{\"token\":");
@@ -2445,7 +2525,7 @@ static void check_daemon(void) {
     if (recent_n >= RESTARTS_PER_MIN) { cpy(dmn.error, sizeof dmn.error, "cloud.crashed"); cl_changed(); return; }
     memmove(dmn.crash + 1, dmn.crash, sizeof dmn.crash[0] * (RESTARTS_PER_MIN - 1));
     dmn.crash[0] = now;
-    if (naccounts() && !daemon_start()) {
+    if (nlive() && !daemon_start()) {
         dmn.restarts++;
         for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) bring_up(&cl_acc[i]);
     }
@@ -2488,7 +2568,8 @@ static char *state_json(int light) {
         }
         /* U7: with the service down every account says so (error cloud.notRunning or the service's own error) */
         int down = !cl_running && (dmn.error[0] || dmn.started);
-        const char *st = a->locked ? "locked" : down ? "error" : !strcmp(a->err, "cloud.signInAgain") ? "signin"
+        if (a->disabled) down = 0;
+        const char *st = a->disabled ? "off" : a->locked ? "locked" : down ? "error" : !strcmp(a->err, "cloud.signInAgain") ? "signin"
                        : !strcmp(a->err, "cloud.offline") || !strcmp(a->err, "cloud.unreachable") ? "offline"
                        : a->err[0] ? "error" : cl_paused(a) ? "paused" : (a->nq || nd) ? "syncing" : !a->mounted ? "syncing" : "ok";
         jb_raw(&b, first ? "{\"id\":" : ",{\"id\":");
@@ -2505,7 +2586,9 @@ static char *state_json(int light) {
         jb_raw(&b, ",\"mount\":");
         jb_str(&b, dir);
         jb_printf(&b, ",\"mounted\":%s,\"state\":\"%s\"", a->mounted ? "true" : "false", st);
-        if (a->locked) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked"); }
+        jb_printf(&b, ",\"disabled\":%s,\"offWaiting\":%s", a->disabled ? "true" : "false", a->off_wait ? "true" : "false");
+        if (a->disabled) { jb_raw(&b, ",\"offReason\":"); jb_str(&b, a->off_reason); }
+        else if (a->locked) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked"); }
         else if (down) { jb_raw(&b, ",\"error\":"); jb_str(&b, dmn.error[0] ? dmn.error : "cloud.notRunning"); }
         else if (a->err[0]) {
             jb_raw(&b, ",\"error\":");
@@ -2691,10 +2774,10 @@ static void do_job(Job *j) {
         break;
     }
     case J_RETRY:
-        if (!naccounts() || ensure_daemon()) break;
+        if (!nlive() || ensure_daemon()) break;
         for (int i = 0; i < ACC_MAX; i++) {
             Acc *a = &cl_acc[i];
-            if (!a->used || (j->id[0] && strcmp(a->id, j->id))) continue;
+            if (!a->used || a->disabled || (j->id[0] && strcmp(a->id, j->id))) continue;
             if (a->reconnect) {
                 /* made again from its options and secrets, then mounted: rclone takes the new known_hosts */
                 a->reconnect = 0;
@@ -2728,6 +2811,16 @@ static void do_job(Job *j) {
         break;
     }
     case J_REMOVE: job_remove(j); break;
+    case J_OFF: {
+        /* still off: turned on again before this ran leaves it alone */
+        Acc *a;
+        pthread_mutex_lock(&cl_mu);
+        a = cl_find(j->id);
+        int go = a && a->disabled;
+        pthread_mutex_unlock(&cl_mu);
+        if (go) acc_off(a, "", 1);
+        break;
+    }
     case J_RENAME: job_rename(j); break;
     case J_ABOUT: { Acc *a; pthread_mutex_lock(&cl_mu); a = cl_find(j->id); pthread_mutex_unlock(&cl_mu); if (a && cl_running && a->configured) about_acc(a); break; }
     case J_LINK: job_link(j, 0); break;
@@ -2736,7 +2829,7 @@ static void do_job(Job *j) {
         daemon_stop();
         dmn.error[0] = 0;
         memset(dmn.crash, 0, sizeof dmn.crash);
-        if (naccounts() && !daemon_start()) { dmn.restarts++; for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) bring_up(&cl_acc[i]); }
+        if (nlive() && !daemon_start()) { dmn.restarts++; for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) bring_up(&cl_acc[i]); }
         cl_changed();
         break;
     case J_OPTIONS: {
@@ -2752,7 +2845,7 @@ static void do_job(Job *j) {
 
 static void *worker(void *arg) {
     (void)arg;
-    if (naccounts() && !ensure_daemon()) {
+    if (nlive() && !ensure_daemon()) {
         free(load_providers());
         for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) bring_up(&cl_acc[i]);
     }
@@ -2809,8 +2902,15 @@ static void *worker(void *arg) {
                 for (int i = 0; i < ACC_MAX; i++) {
                     Acc *a = &cl_acc[i];
                     if (!a->used) continue;
-                    if (a->mounted) { anymount = 1; poll_acc(a); }
                     time_t t = time(NULL);
+                    /* turned off while busy, with Wait: once nothing is open, waiting or moving */
+                    if (a->off_wait && cloud_off_due(1, cloud_busy(a->nq, a->in_use, a->nt + !!a->rcjob_kind))) { a->disabled = 1; acc_off(a, "", 1); }
+                    if (a->disabled) {
+                        /* off: nothing of rclone's; a sign-in that waits for the keyring is still saved */
+                        if (a->pending_secret && t >= a->retry_at) { char *s = strdup(a->pending_secret); a->retry_at = t + 30; if (s) store_secret(a, s); }
+                        continue;
+                    }
+                    if (a->mounted) { anymount = 1; poll_acc(a); }
                     if ((!a->configured || !a->mounted) && t >= a->retry_at && strcmp(a->err, "cloud.addFailed")) bring_up(a);
                     if (a->pending_secret && t >= a->retry_at) {
                         char *s = strdup(a->pending_secret);
@@ -2843,7 +2943,7 @@ static void *worker(void *arg) {
                 if (ticks % 5 == 0) cf_kick();
             }
             /* nothing to serve: rclone goes away until it's needed */
-            if (cl_running && !naccounts() && !si.on && time(NULL) - dmn.idle_since > IDLE_STOP_S) daemon_stop();
+            if (cl_running && !nlive() && !si.on && time(NULL) - dmn.idle_since > IDLE_STOP_S) daemon_stop();
             next_tick = now + (anymount ? 1000 : 3000);
         }
         long long again = maybe_push();
@@ -3139,6 +3239,7 @@ static char *add_impl(const char *kind, const char *name, const char *fields, co
     if (why[0]) { res = err_json(why); goto out; }
     if (!upd && !name_free(name, NULL)) { res = err_json("cloud.nameTaken"); goto out; }
     a = upd;
+    if (upd) turn_on(upd);                      /* signing in again to an account turned off: the person wants it back */
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
     if (!a) { res = err_json("cloud.tooMany"); goto out; }
     for (const JVal *x = d.root->kid; x; x = x->next) {
@@ -3398,6 +3499,32 @@ char *cloud_set_options(const char *json) {
     if (j) push_job(j);
     cl_changed();
     return res;
+}
+
+char *cloud_set_enabled(const char *id, int on, int how) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    if (!a) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.notFound"); }
+    /* an account still being added or answering a question: its setup ends first */
+    if (a->pending_req || a->new_acc) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.settingUp"); }
+    int busy = a->mounted && cloud_busy(a->nq, a->in_use, a->nt + !!a->rcjob_kind);
+    int r = cloud_switch(a->disabled, a->off_wait, on, how, busy);
+    char *res = NULL;
+    if (r == CS_ON) turn_on(a);
+    else if (r == CS_OFF) {
+        a->disabled = 1;                        /* the thread leaves it alone from now; J_OFF lets rclone go of it */
+        a->off_wait = 0;
+    } else if (r == CS_WAIT) a->off_wait = 1;
+    else if (r == CS_BUSY) {
+        char b[96];
+        cl_pf(b, sizeof b, "{\"error\":\"busy\",\"files\":%d,\"open\":%d,\"moving\":%d}", a->nq, a->in_use, a->nt + !!a->rcjob_kind);
+        res = strdup(b);
+    }
+    pthread_mutex_unlock(&cl_mu);
+    if (r == CS_ON) cloud_retry(id);
+    else if (r == CS_OFF) { Job *j = new_job(J_OFF, id, NULL, NULL); if (j) push_job(j); }
+    cl_changed();
+    return res ? res : strdup(r == CS_WAIT ? "{\"ok\":true,\"waiting\":true}" : "{\"ok\":true}");
 }
 
 void cloud_restart(void) { Job *j = new_job(J_RESTART, "", NULL, NULL); if (j) push_job(j); }

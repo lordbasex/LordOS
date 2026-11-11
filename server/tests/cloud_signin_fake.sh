@@ -10,6 +10,9 @@
 #    the next drive, the account is made with it;
 # 3. no drive at all: the sign-in fails with cloud.signinNoDrive and rclone's words, and the half-made remote is deleted;
 # 4. a password account's session (iCloud's cookies) changed in rclone survives a restart of rclone.
+# 5. a saved session refused once: dropped, the trust token kept;
+# 6. an account turned off and on keeps its settings and sign-in; busy, it asks, waits or is forced;
+# 7. a password provider that asks for a new code at the start of the session turns itself off (rclone 9966, 9658).
 set -u
 B=${1:?build dir}
 case $B in /*) ;; *) B=$(pwd)/$B ;; esac
@@ -43,6 +46,10 @@ run() {
     rm -rf "$H" "$R"; mkdir -p "$H" "$R"; chmod 700 "$R"
     : >"$T/rc-$drives.log"
     printf '{"drives":"%s","log":"%s"}\n' "$drives" "$T/rc-$drives.log" >"$H/.fake-rclone.json"
+    start
+}
+# the harness again on the same home: a new session (a logout, a reboot)
+start() {
     rm -f "$T/in" "$T/out"; mkfifo "$T/in" "$T/out"
     env -i HOME="$H" XDG_RUNTIME_DIR="$R" PATH=/usr/bin:/bin LORDOS_CLOUD_RCLONE="$FAKE" LORDOS_CLOUD_FAKE_AUTHORIZE=1 \
         LORDOS_ASSETS="$ASSETS" "$B/cloud-harness" <"$T/in" >"$T/out" 2>>"$T/harness-$drives.log" &
@@ -119,6 +126,75 @@ cmd wait '"name":"iCloud"' 10 >/dev/null; cmd sleep 2500 >/dev/null
 check "refused session: the cookies are dropped once" sh -c '[ "$(grep -c "^config/update iclouddrive cookies=.." "$1")" = 1 ]' x "$T/rc-refused.log"
 check "  then the mount goes on with a new session" sh -c 'grep -q "^mount/mount iclouddrive cookies=cookie-" "$1"' x "$T/rc-refused.log"
 check "  the log says why" sh -c 'grep -q "refused its saved session" "$1"' x "$T/harness-refused.log"
+stop
+
+# 6. turned off and on by the person: rclone lets go of it, its record and sign-in stay, and on again it is given back to
+#    rclone and mounted without a new sign-in; busy (a change waiting to go up), it asks, waits or is forced
+run onoff
+sed -i 's/}$/,"mounts":true}/' "$H/.fake-rclone.json"
+r=$(cmd add iclouddrive Drive '{"apple_id":"someone@example.test","password":"pw-not-real"}')
+id=$(printf '%s' "$r" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+cmd wait '"mounted":true' 10 >/dev/null
+check "on/off: the account is mounted" has "$(cmd state)" '"mounted":true'
+: >"$H/.fake-queue"; cmd sleep 2500 >/dev/null
+r=$(cmd off "$id")
+check "  busy: turning it off asks first" has "$r" '"error":"busy","files":1'
+r=$(cmd off "$id" wait)
+check "  Wait: it waits" has "$r" '"waiting":true'
+check "  and stays on meanwhile" has "$(cmd state)" '"offWaiting":true'
+rm -f "$H/.fake-queue"
+cmd wait '"state":"off"' 10 >/dev/null; r=$(cmd state)
+check "  once nothing waits, it is off" has "$r" '"state":"off","disabled":true,"offWaiting":false,"offReason":""'
+check "  not mounted" has "$r" '"mounted":false'
+check "  rclone let go of it" sh -c 'grep -q "^config/delete" "$1"' x "$T/rc-onoff.log"
+check "  its sign-in is kept in the keyring" sh -c '[ -n "$1" ] && [ "$1" != null ]' x "$(cmd secret "$id")"
+check "  its section stays in rclone.conf" grep -q "^\[$id\]" "$H/.config/lordos/cloud/rclone.conf"
+check "  accounts.json says it is off" grep -q '"disabled":true' "$H/.config/lordos/cloud/accounts.json"
+check "  its folder is gone from ~/Cloud" sh -c '[ ! -e "$1" ]' x "$H/Cloud/Drive"
+stop
+start
+cmd sleep 2000 >/dev/null; r=$(cmd state)
+check "  a new session: still off" has "$r" '"state":"off"'
+check "  rclone never hears of it" sh -c '[ "$(grep -c "^config/create iclouddrive" "$1")" = 1 ]' x "$T/rc-onoff.log"
+r=$(cmd on "$id")
+check "  on again" has "$r" '"ok":true'
+cmd wait '"mounted":true' 10 >/dev/null; r=$(cmd state)
+check "  mounted again without a new sign-in" has "$r" '"mounted":true'
+check "  with the sign-in it kept" sh -c 'grep "^config/create iclouddrive" "$1" | tail -1 | grep -q "cookies=cookie-"' x "$T/rc-onoff.log"
+check "  not off" hasnt "$r" '"disabled":true'
+r=$(cmd off "$id" force)
+cmd wait '"state":"off"' 10 >/dev/null
+check "  idle, off at once" has "$(cmd state)" '"state":"off"'
+stop
+
+# 7. rclone issues 9966 and 9658: a password provider that asks for a new code at the start of the session turns itself
+#    off with its reason, without a sign-in prompt, its settings and sign-in kept; turned on by the person, it asks
+run needcode
+r=$(cmd add iclouddrive Phone '{"apple_id":"someone@example.test","password":"pw-not-real"}')
+id=$(printf '%s' "$r" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+cmd wait '"name":"Phone"' 10 >/dev/null; cmd sleep 2500 >/dev/null
+stop
+before=$(cat "$H/.harness-keyring/$id" 2>/dev/null)
+sed -i 's/}$/,"session":"needcode"}/' "$H/.fake-rclone.json"
+start
+cmd wait '"state":"off"' 15 >/dev/null; r=$(cmd state)
+check "code asked at the start: the account turns itself off" has "$r" '"state":"off","disabled":true'
+check "  with its reason" has "$r" '"offReason":"signinAtStart"'
+check "  no sign-in is asked for" hasnt "$r" '"state":"signin"'
+check "  the trust token was tried once" sh -c 'grep -q "^config/update iclouddrive code asked" "$1"' x "$T/rc-needcode.log"
+check "  its sign-in in the keyring is untouched" sh -c '[ -n "$1" ] && [ "$1" = "$2" ]' x "$before" "$(cat "$H/.harness-keyring/$id" 2>/dev/null)"
+check "  its section stays in rclone.conf" grep -q "^\[$id\]" "$H/.config/lordos/cloud/rclone.conf"
+check "  the reason is kept" grep -q '"offReason":"signinAtStart"' "$H/.config/lordos/cloud/accounts.json"
+check "  the log says why" sh -c 'grep -q "asks for a new sign-in at the start of the session" "$1"' x "$T/harness-needcode.log"
+n=$(grep -c "^mount/mount iclouddrive" "$T/rc-needcode.log")
+stop
+start
+cmd sleep 2000 >/dev/null
+check "  the next session leaves it off: no mount tried" sh -c '[ "$(grep -c "^mount/mount iclouddrive" "$1")" = "$2" ]' x "$T/rc-needcode.log" "$n"
+cmd on "$id" >/dev/null
+cmd wait '"state":"signin"' 15 >/dev/null; r=$(cmd state)
+check "  turned on by the person: the sign-in is asked for" has "$r" '"state":"signin"'
+check "  and it stays on" hasnt "$r" '"disabled":true'
 stop
 
 echo "cloud-signin-fake: $pass passed, $fail failed"

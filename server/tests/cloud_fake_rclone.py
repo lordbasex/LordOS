@@ -127,6 +127,10 @@ class Handler(BaseHTTPRequestHandler):
         if m == 'config/update' and (req.get('name') or '') in SESSIONS:
             s = SESSIONS[req.get('name')]
             params = req.get('parameters') or {}
+            if params.get('cookies') == '' and CFG.get('session') == 'needcode':
+                # rclone issues 9966 and 9658: even the trust token isn't taken, a new code is asked for
+                log(m, 'iclouddrive', 'code asked')
+                return self.answer(200, {'State': '*2fa', 'Option': {'Name': 'config_2fa', 'Help': 'Two-factor code', 'Required': True}, 'Error': ''})
             if params.get('cookies') == '':
                 s['cookies'] = 'signed-in-again'      # a sign-in with the password and the trust token
             log(m, 'iclouddrive', 'cookies=' + repr(params.get('cookies')))
@@ -136,11 +140,14 @@ class Handler(BaseHTTPRequestHandler):
             if name in SESSIONS:
                 s = SESSIONS[name]
                 # "refused": a provider that refuses a saved session (rclone issue 9658), not one from a sign-in
-                if CFG.get('session') == 'refused' and s['cookies'] != 'signed-in-again':
+                if CFG.get('session') in ('refused', 'needcode') and s['cookies'] != 'signed-in-again':
                     log(m, 'iclouddrive', 'refused')
                     return self.answer(500, {'error': 'requestPCS(iclouddrive): HTTP error 500 (500 Internal Server Error) returned body: "{\\"success\\":false,\\"error\\":\\"Missing X-APPLE-WEBAUTH-TOKEN cookie\\"}"', 'status': 500})
                 s['cookies'] = next_cookie()
                 log(m, 'iclouddrive', 'cookies=' + s['cookies'])
+                if CFG.get('mounts'):
+                    # "mounts": the mount is taken (no FUSE here: nothing is mounted for real)
+                    return self.answer(200, {})
         if m in ('config/create', 'config/update'):
             st, res = opt.get('state', ''), opt.get('result', '')
             if m == 'config/create':
@@ -161,6 +168,11 @@ class Handler(BaseHTTPRequestHandler):
                 {'Name': 'trust_token', 'Type': 'string', 'Sensitive': True, 'Hide': 3}, {'Name': 'cookies', 'Type': 'string', 'Sensitive': True, 'Hide': 3}]}]})
         if m == 'config/get':
             return self.answer(200, dict(CONFIG))
+        if m == 'config/delete':
+            SESSIONS.pop(req.get('name') or '', None)
+        if m == 'vfs/queue' and os.path.exists(os.path.join(os.environ.get('HOME', '/nonexistent'), '.fake-queue')):
+            # a change waiting to go up (the file is there): turning the account off asks first
+            return self.answer(200, {'queue': [{'name': 'notes.txt', 'size': 5, 'expiry': 0, 'uploading': False, 'tries': 0, 'id': 1}]})
         if m == 'mount/mount':
             return self.answer(500, {'error': 'fake: no mounts here', 'status': 500})
         if m == 'core/quit':

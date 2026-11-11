@@ -14,7 +14,7 @@ import { EntryIcon } from './glyphs.jsx';
 // when they change and on each pushed state (at most twice a second).
 export function useCloudFiles(paths) {
   const st = useCloud();
-  const accounts = (st && st.accounts) || [];
+  const accounts = M.liveAccounts(st && st.accounts);     // one turned off isn't mounted: nothing of it in Files
   const [status, setStatus] = useState({});
   const key = paths.join('\n');
   useEffect(() => {

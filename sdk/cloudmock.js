@@ -240,6 +240,19 @@ export function installCloudMock(home, scenario = '') {
       push();
       return { ok: true };
     },
+    // off keeps the account (lord-server keeps its settings and sign-in); busy with changes waiting, it asks first
+    setEnabled(id, on, o = {}) {
+      const a = find(id);
+      if (!a) return { error: 'cloud.badId' };
+      if (on) { a.disabled = false; a.offReason = ''; a.offWaiting = false; a.state = a.prevOn || 'ok'; a.mounted = true; push(); return { ok: true }; }
+      if (a.disabled) return { ok: true };
+      if (a.up.files && o.how !== 'force') {
+        if (o.how !== 'wait') return { error: 'busy', files: a.up.files, open: 0, moving: 0 };
+        a.offWaiting = true; push(); return { ok: true, waiting: true };
+      }
+      a.prevOn = a.state; a.disabled = true; a.offWaiting = false; a.state = 'off'; a.mounted = false; push();
+      return { ok: true };
+    },
     rename(id, name) { const a = find(id); if (!a) return { error: 'cloud.badId' }; a.name = name; push(); return { ok: true }; },
     refreshAbout: () => push(),
     websiteUrl: (id) => (find(id) && find(id).kind !== 's3' ? 'https://www.example.test/' : null),

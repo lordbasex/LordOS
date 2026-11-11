@@ -44,7 +44,7 @@ export function connectedEntries({ volumes = [], pins = [], accounts = [], hidde
     out.push({ name: p.name, path: `place:${p.path}`, dir: false, size: 0, mtime: 0, netPlace: { kind: 'pin', path: p.path, pin: p } });
   }
   for (const a of sortAccounts(accounts)) {           // by name, as in the sidebar (#86)
-    if (!a || !a.mount || (hiddenAccounts || []).includes(a.id) || seen.has(a.mount)) continue;
+    if (!a || !a.mount || a.disabled || a.state === 'off' || (hiddenAccounts || []).includes(a.id) || seen.has(a.mount)) continue;   // turned off: not a place
     seen.add(a.mount);
     out.push({ name: a.name, path: `place:${a.mount}`, dir: false, size: 0, mtime: 0, netPlace: { kind: 'cloud', path: a.mount, id: a.id, state: a.state } });
   }

@@ -244,6 +244,34 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('home crumbs unchanged', pathCrumbs(`${H}/Documents/a`, H).map((c) => c.label), ['ana', 'Documents', 'a']);
 }
 
+// ---- on and off: an account turned off is out of Files, the dialogs, the menu bar and the notifications ----
+{
+  const mk = (id, name, o = {}) => ({ id, name, mount: `/home/u/Cloud/${name}`, state: 'ok', up: { files: 0 }, down: { files: 0 }, about: null, kept: [`/home/u/Cloud/${name}`], ...o });
+  const on = mk('1', 'Work'), off = mk('2', 'Phone', { state: 'off', disabled: true, offReason: 'signinAtStart', provider: 'Drive X', mounted: false });
+  const offUser = mk('3', 'Old', { state: 'off', disabled: true, offReason: '' });
+  eq('off: isOff', [M.isOff(on), M.isOff(off), M.isOff({ state: 'off' }), M.isOff(null)], [false, true, true, false]);
+  eq('off: liveAccounts keeps the ones on', M.liveAccounts([on, off, offUser, null]).map((a) => a.id), ['1']);
+  eq('off: not in Files\' sidebar', M.cloudSideItems([on, off]).map((x) => x.id), ['1']);
+  eq('off: no Cloud section when every account is off', M.sideSections([off, offUser]).includes('cloud'), false);
+  eq('off: not in the file dialogs', cloudPlaces([on, off], '/home/u').map((x) => x.id), ['1']);
+  eq('off: no badge for one that turned itself off', M.menuGlyph({ accounts: [on, off] }), { arrow: null, badge: null });
+  eq('off: Pause All looks at the accounts on only', M.allPaused({ accounts: [mk('1', 'A', { state: 'paused', paused: true }), off] }), true);
+  eq('off: no panel button', M.panelAction(off), null);
+  // turning itself off from a sign-in, or from any state: no notification; on again and asking: the notification
+  eq('off: turning off is quiet', M.transitions({ accounts: [mk('2', 'Phone')] }, { accounts: [off] }), []);
+  eq('off: from a sign-in, quiet', M.transitions({ accounts: [mk('2', 'Phone', { state: 'signin' })] }, { accounts: [off] }), []);
+  eq('off: on and asking again: told', M.transitions({ accounts: [off] }, { accounts: [mk('2', 'Phone', { state: 'signin' })] }), [{ type: 'signin', id: '2', name: 'Phone' }]);
+  eq('off: its line', M.stateLine(off, { running: true }).key, 'cloud.state.off');
+  eq('off: its line even with the service stopped (rclone may stop when nothing is on)', M.stateLine(off, { running: false }).key, 'cloud.state.off');
+  eq('off: waiting to turn off', M.stateLine(mk('1', 'A', { offWaiting: true, state: 'syncing' }), {}).key, 'cloud.state.offWaiting');
+  eq('off: the reason, with the provider\'s name as data', M.offLine(off), { key: 'cloud.off.reasonSignin', vars: { provider: 'Drive X' } });
+  eq('off: turned off by the person: no reason line', [M.offLine(offUser), M.offLine(on)], [null, null]);
+  eq('off: busy, changes waiting', M.busyLine({ error: 'busy', files: 3, open: 1, moving: 0 }), { key: 'cloud.off.busyWaiting', vars: { count: 3 } });
+  eq('off: busy, files open', M.busyLine({ error: 'busy', files: 0, open: 2, moving: 0 }), { key: 'cloud.off.busyOpen', vars: { count: 2 } });
+  eq('off: busy, transfers', M.busyLine({ error: 'busy', files: 0, open: 0, moving: 1 }), { key: 'cloud.off.busyMoving', vars: {} });
+  eq('off: not busy', [M.busyLine({ ok: true }), M.busyLine(null)], [null, null]);
+}
+
 // ---- the dev mock answers the shape of section 17 ----
 {
   const files = new Map();

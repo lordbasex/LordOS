@@ -18,7 +18,7 @@ import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { notify } from './notify.js';
 import { openUrl } from './sysopen.js';
 import { cloud, cloudState } from './cloud.js';
-import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, sortAccounts, liveOnly, toggleOnly, panelAction, transitions as transitionsOf } from './cloudmodel.js';
+import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, sortAccounts, liveOnly, toggleOnly, panelAction, liveAccounts, transitions as transitionsOf } from './cloudmodel.js';
 import { CloudGlyph, AccountBadge } from './cloudui.jsx';
 import { installCloudMock } from './cloudmock.js';
 import { askKeyringUnlock } from './vault.js';
@@ -50,7 +50,7 @@ function RowBtn({ label, title, primary, onClick }) {
 // the session runs, so the panel opens again as it was left)
 function Panel({ st, onClose, only, setOnly }) {
   const th = useTheme();
-  const accs = st.accounts || [];
+  const accs = liveAccounts(st.accounts);       // an account turned off isn't in the menu bar
   const tr = transfers(accs);
   const head = [tr.up ? t('cloud.goingUp', { count: tr.up }) : '', tr.down ? t('cloud.comingDown', { count: tr.down }) : ''].filter(Boolean).join(' · ');
   const sel = liveOnly(only, accs);
@@ -116,7 +116,7 @@ function CloudItem({ height, color }) {
       if (!inside(panel.current) && !inside(btn.current)) setOpen(false);
     });
   }, [open]);
-  if (!st || !(st.accounts || []).length) return null;
+  if (!st || !liveAccounts(st.accounts).length) return null;
   const g = menuGlyph(st);
   const label = g.badge === '!' ? t('cloud.menu.attention') : g.arrow ? t('cloud.menu.syncing') : t('cloud.menu.idle');
   return h(View, { ref: btn, title: label, onClick: () => setOpen((o) => !o), style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },

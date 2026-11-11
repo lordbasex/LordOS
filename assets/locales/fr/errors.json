@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "La session n’a pas de dossier d’exécution privé pour le service de nuage",
   "cloud.notFound": "Ce compte n’existe pas",
   "cloud.notReady": "La liste des fournisseurs est encore en cours de chargement. Réessayez dans un instant",
+  "cloud.settingUp": "Ce compte est encore en cours de configuration. Réessayez dans un instant",
   "cloud.notRunning": "Le service de nuage ne fonctionne pas",
   "cloud.offline": "Le nuage est injoignable",
   "cloud.renameFailed": "Impossible de renommer le dossier du compte",

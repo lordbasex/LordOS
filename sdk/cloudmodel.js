@@ -138,12 +138,37 @@ export function spaceLine(about, fmt) {
   return { key: 'cloud.space.usedOf', vars: { used: fmt(u.used), total: fmt(u.total) } };
 }
 
+// ---- on and off ----
+
+// An account turned off (lord-server's `disabled`, state 'off'): not mounted, nothing in Files, the file dialogs, the menu
+// bar, its panel or the notifications; only Settings → Cloud lists it, with its switch. Its settings and sign-in are kept,
+// so turning it on needs no new sign-in.
+export const isOff = (acc) => !!acc && (acc.disabled === true || acc.state === 'off');
+export const liveAccounts = (accounts) => (accounts || []).filter((a) => a && !isOff(a));
+// Why it is off, in words: { key, vars } or null when the person turned it off. provider: the account's provider name,
+// as rclone gives it (data, never in the locale files)
+export function offLine(acc) {
+  if (!isOff(acc)) return null;
+  if (acc.offReason === 'signinAtStart') return { key: 'cloud.off.reasonSignin', vars: { provider: acc.provider || acc.kind || '' } };
+  return null;
+}
+// The answer of cloud.setEnabled(id, false) for a busy account → the sheet's words: { key, vars } (changes waiting to go
+// up first, else files open, else transfers), or null when it turned off
+export function busyLine(r) {
+  if (!r || r.error !== 'busy') return null;
+  if (r.files > 0) return { key: 'cloud.off.busyWaiting', vars: { count: r.files } };
+  if (r.open > 0) return { key: 'cloud.off.busyOpen', vars: { count: r.open } };
+  return { key: 'cloud.off.busyMoving', vars: {} };
+}
+
 // ---- the account's state line (Settings rows, the menu bar panel) ----
 
 const pctOf = (x) => (x && x.bytes > 0 ? Math.round(Math.min(1, (x.done || 0) / x.bytes) * 100) : null);
 // service: state.service; while it isn't running every account is shown as not connected (its own state is stale)
 export function stateLine(acc, service) {
+  if (isOff(acc)) return { key: 'cloud.state.off', vars: {}, tone: 'dim' };
   if (service && service.running === false) return { key: 'cloud.state.serviceDown', vars: {}, tone: 'warn' };
+  if (acc.offWaiting) return { key: 'cloud.state.offWaiting', vars: {}, tone: 'busy' };
   const up = acc.up || {}, down = acc.down || {};
   switch (acc.state) {
     case 'syncing':
@@ -297,11 +322,11 @@ export function cloudMenu(sel, { single = false, linksSupported = false, shared 
 // ---- Files' sidebar ----
 
 export const SIDE_SECTIONS = ['favorites', 'cloud', 'locations', 'tags'];
-export const sideSections = (accounts) => SIDE_SECTIONS.filter((s) => s !== 'cloud' || (accounts || []).length > 0);
+export const sideSections = (accounts) => SIDE_SECTIONS.filter((s) => s !== 'cloud' || liveAccounts(accounts).length > 0);
 // the Cloud section's rows: the accounts by name (#86); hidden: ids the person took out of Files
 export function cloudSideItems(accounts, hidden = [], service = null) {
   const down = !!service && service.running === false;
-  return sortAccounts(accounts).filter((a) => !hidden.includes(a.id)).map((a) => {
+  return sortAccounts(liveAccounts(accounts)).filter((a) => !hidden.includes(a.id)).map((a) => {
     const u = usage(a.about);
     return { id: a.id, name: a.name, path: a.mount, color: accountColor(accounts, a.id), pct: u && u.pct != null ? u.pct : null,
       alert: down || NEEDS_YOU.includes(a.state), dim: down || DIM_STATES.includes(a.state) };
@@ -313,7 +338,7 @@ export function cloudSideItems(accounts, hidden = [], service = null) {
 // { arrow: 'up' | 'down' | null, badge: '!' | count | null }: an arrow while files move, "!" when an account needs
 // the person, else how many changes wait (offline or paused).
 export function menuGlyph(state) {
-  const accs = (state && state.accounts) || [];
+  const accs = liveAccounts(state && state.accounts);
   const t = transfers(accs.filter((a) => a.state === 'syncing'));
   const arrow = t.up > 0 ? 'up' : t.down > 0 ? 'down' : null;
   if (accs.some((a) => NEEDS_YOU.includes(a.state) || isFull(a.about) && a.up && a.up.files > 0)) return { arrow, badge: '!' };
@@ -323,7 +348,7 @@ export function menuGlyph(state) {
 // Pause All took (#71): lord-server's own pauseAll, or every account paused. An account's state shows an error or a
 // sign-in before "paused", so the states alone kept the button on Pause All while it had worked.
 export const allPaused = (state) => {
-  const a = (state && state.accounts) || [];
+  const a = liveAccounts(state && state.accounts);
   return a.length > 0 && (!!(state.options && state.options.pauseAll) || a.every((x) => x.state === 'paused' || x.paused === true));
 };
 
@@ -355,7 +380,7 @@ export const liveOnly = (only, accounts) => (only || []).filter((id) => (account
 // its own pause: resume; paused by Pause All, the battery or a metered network: none (Resume All, or nothing to do);
 // otherwise pause.
 export function panelAction(acc) {
-  if (!acc) return null;
+  if (!acc || isOff(acc)) return null;
   if (acc.error === 'cloud.keyringLocked' || acc.state === 'locked') return 'unlock';
   if (acc.state === 'signin') return 'signin';
   if (acc.paused === true) return 'resume';
@@ -374,7 +399,7 @@ export function transitions(prev, next) {
   const before = new Map((prev.accounts || []).map((a) => [a.id, a]));
   for (const a of next.accounts || []) {
     const b = before.get(a.id);
-    if (!b) continue;
+    if (!b || isOff(a)) continue;                       // turned off (or by itself): nothing to hear about
     if (a.state === 'signin' && b.state !== 'signin') out.push({ type: 'signin', id: a.id, name: a.name });
     const waiting = (a.up && a.up.files) || 0;
     if (isFull(a.about) && waiting > 0 && !(isFull(b.about) && ((b.up && b.up.files) || 0) > 0)) out.push({ type: 'full', id: a.id, name: a.name, waiting });

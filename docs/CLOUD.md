@@ -244,6 +244,34 @@ table per provider; S3 and WebDAV open the endpoint's address only if it is http
 folders, **Pause** syncing, **Sign In Again** (expired token), **Remove Account** (unmounts, deletes the cache after uploads
 finish or after the person confirms discarding them, removes the keyring item; never deletes anything in the cloud).
 
+### 6.4 Turning an account off (0.8.8.8)
+
+Each account has an on/off switch, on its row in Settings → Cloud and on its page (`cloud.setEnabled(id, on, { how })`,
+`cloud_set_enabled`). An account turned off ("Turned off", state `off`, `disabled: true`):
+
+- is not given to rclone at all: no `config/create`, no mount, no listing, no token check, no sign-in asked at login. If
+  every account is off, rclone isn't started (`nlive()`);
+- is not in Files' sidebar or Network page, the file dialogs, Photos' places, the menu bar item or its panel, and sends no
+  notifications (`M.liveAccounts`); its empty folder in `~/Cloud` is removed;
+- keeps everything else: its entry in `accounts.json` (`"disabled": true`, `"offReason"`), its section in `rclone.conf`,
+  its keyring item, its kept folders and the changes waiting in its cache. Turning it on gives it to rclone and mounts
+  it as at a start, without a new sign-in, and what waited goes up.
+
+Turning it off saves the session rclone holds first (`token_check`), unmounts it (lazily if a file is still open) and
+drops the remote from rclone's memory (`config/delete`; rclone keeps no file, `--config ""`). While files are open,
+changes wait to go up or transfers run, the switch answers `{ error: 'busy', files, open, moving }` and Settings asks:
+**Wait** (it turns off as soon as nothing is open, waiting or moving; switching it on again cancels that) or **Turn Off
+Now**. The pure rules are `cloud_switch`, `cloud_busy` and `cloud_off_due` (tests/cloud_test.c); the end-to-end run is
+`tests/cloud_signin_fake.sh`, parts 6 and 7. `accounts.json` only gained two fields, read as "on" when missing, so no
+migration is needed.
+
+**Turned off by itself.** An `iclouddrive` account that needs a new sign-in before its first good mount and listing of
+the session (`starting`, `cloud_auto_off`) turns itself off with the reason `signinAtStart` instead of announcing a
+sign-in at every start (rclone issues 9966 and 9658, section 19.5). The sign-in error isn't shown meanwhile, so no
+notification goes out; its keyring item is left as it was. Settings shows the reason ("… asked to sign in again; turned
+off so it doesn't ask at every start"), with the provider's name as data, and **See the Problem in rclone**. Once it
+was mounted in the session, or when the person turns it on, a sign-in is asked for as before.
+
 ## 7. Files on demand
 
 ### 7.1 What the person sees

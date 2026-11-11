@@ -30,6 +30,10 @@ typedef struct {
     const CloudKind *k;
     long long created;
     int paused, own_client;
+    int disabled;                   /* turned off: not given to rclone at all; its record and secrets stay (cloud_switch) */
+    char off_reason[24];            /* why it turned itself off (CLOUD_OFF_SIGNIN), "" when the person did */
+    int off_wait;                   /* turns off once nothing is open, waiting or moving */
+    int starting;                   /* not mounted yet in this session nor turned on by the person (cloud_auto_off) */
     Params p;                       /* non-secret options (what ~/.config/lordos/cloud/rclone.conf has) */
     /* this run of rclone */
     int configured, mounted, held;  /* held: Pause is holding its uploads back */
