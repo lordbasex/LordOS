@@ -59,13 +59,16 @@
 #   ~/.config/lordos-release/apt-gnupg   (a GnuPG home, mode 0700; LORDOS_APT_GNUPGHOME overrides)
 # Never copy it to a VM, a server or the repository. The public key is
 # packaging/keys/lordos-archive-keyring.gpg (shipped in the lordos package) and the script refuses to
-# sign with any other key. Uploads use only the AWS profile "lordos" (tools/web/deploy.sh's).
+# sign with any other key. Uploads use only tools/web/deploy.sh's AWS profile, from
+# ~/.aws/.lordos-deploy-env (tools/web/aws-env.sh).
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-PROFILE=lordos
-BUCKET=lordos.org
-DISTRIBUTION=E35DXDFJ83X7Z8
+. "$ROOT/tools/web/aws-env.sh"
+lordos_aws_env LORDOS_AWS_PROFILE LORDOS_S3_BUCKET LORDOS_CF_DISTRIBUTION
+PROFILE=$LORDOS_AWS_PROFILE
+BUCKET=$LORDOS_S3_BUCKET
+DISTRIBUTION=$LORDOS_CF_DISTRIBUTION
 SUITE=stable
 ARCHES="amd64 arm64"
 KEYRING=$ROOT/packaging/keys/lordos-archive-keyring.gpg

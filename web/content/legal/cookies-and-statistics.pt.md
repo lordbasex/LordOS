@@ -4,12 +4,31 @@
 
 O lordos.org **não usa cookies**: nem de sessão, nem de análise, nem de publicidade, nem de rastreamento, e nenhum de terceiros. Por isso o site não mostra um aviso de cookies.
 
-## Sem análise nem estatísticas
+## Sem serviços de análise
 
-Não coletamos estatísticas de nenhum tipo:
+Nada roda no seu navegador para medir você:
 
-- **No site:** nenhum serviço de análise, nenhum contador, nenhum pixel de rastreamento, nenhuma impressão digital do navegador, nenhum widget de redes sociais e nenhuma fonte ou script carregado de outros servidores.
+- **No site:** nenhum serviço de análise, nenhum pixel de rastreamento, nenhuma impressão digital do navegador, nenhum widget de redes sociais e nenhuma fonte ou script carregado de outros servidores.
 - **Na distribuição LordOS:** sem telemetria, sem estatísticas de uso, sem relatórios de falhas e sem identificadores do aparelho. As conexões de rede que o LordOS faz estão listadas na [Política de privacidade](/legal/privacy/).
+
+## Estatísticas de visitas
+
+Para saber como o projeto está crescendo, contamos as visitas a partir dos registros padrão de requisições da CDN do site (Amazon CloudFront). São as requisições que o seu navegador envia de qualquer forma para receber cada página: não acrescentamos nenhum código, cookie ou identificador para obtê-las.
+
+De cada requisição guardamos:
+
+- a página ou o arquivo pedido, e o horário;
+- **o seu endereço IP**, para contar visitantes distintos;
+- o país, que o CloudFront calcula por conta própria a partir do IP;
+- a página de onde você veio (o referenciador), quando o seu navegador a envia;
+- o agente de usuário do navegador, para saber o sistema (Windows, macOS, Linux, Android, iOS) e o tipo de aparelho (computador, celular, tablet) e para deixar os robôs fora das contagens;
+- dados técnicos da resposta: o código de status, o tamanho, quanto tempo levou e qual local do CloudFront a entregou.
+
+Não usamos esses registros para descobrir quem você é, não os cruzamos com outros dados e não os vendemos nem compartilhamos.
+
+- **Quem as vê:** só a equipe do LordOS, num painel privado da AWS: visitas por dia, semana, mês e ano, as páginas mais vistas, as visitas por país e por sistema e aparelho. Não publicamos essas estatísticas nem as compartilhamos com ninguém.
+- **O que não contamos:** as requisições que o LordOS faz a `lordos.org/apt` quando procura atualizações. O CloudFront as grava nos mesmos registros, com os mesmos dados, porque não consegue separá-las; nós as deixamos fora de todas as contagens e elas são apagadas junto com o resto.
+- **Por quanto tempo:** esses registros são guardados por 13 meses e depois apagados.
 
 ## O que o site guarda no seu navegador
 
@@ -24,7 +43,7 @@ Elas nunca são enviadas a um servidor, não identificam você e não são compa
 
 ## Registros do servidor
 
-O site é servido por uma rede de distribuição de conteúdo (CDN). Para entregar cada página, o seu navegador envia o seu endereço IP e os dados habituais da requisição (a página pedida, o horário, o agente de usuário do navegador). O nosso provedor de hospedagem pode guardar os registros padrão de requisições da CDN por segurança, por um tempo limitado. Não os usamos para contar, identificar nem traçar o perfil de ninguém.
+O site é servido por uma rede de distribuição de conteúdo (CDN). Para entregar cada página, o seu navegador envia o seu endereço IP e os dados habituais da requisição (a página pedida, o horário, o agente de usuário do navegador). O nosso provedor de hospedagem pode guardar os registros padrão de requisições da CDN por segurança, por um tempo limitado. Esses registros do provedor, com endereços IP, são separados das estatísticas acima, e não os usamos para identificar nem traçar o perfil de ninguém.
 
 ## Contagem de downloads
 

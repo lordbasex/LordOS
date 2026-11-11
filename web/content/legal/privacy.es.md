@@ -1,4 +1,4 @@
-LordOS no tiene cuentas, ni publicidad, ni rastreo, ni en el sitio ni en la distribución. Nadie vende, comparte ni guarda tus datos, porque nunca los recolectamos. Esta política tiene dos partes: el **sitio lordos.org** y la **distribución LordOS** que instalás en tu computadora.
+LordOS no tiene cuentas, ni publicidad, ni rastreo, ni en el sitio ni en la distribución. Nadie vende ni comparte tus datos. El único dato personal que guardamos es la dirección IP en los registros de solicitudes del sitio, que usamos para estadísticas de visitas que solo ve el equipo de LordOS. Esta política tiene dos partes: el **sitio lordos.org** y la **distribución LordOS** que instalás en tu computadora.
 
 ## Parte 1: el sitio
 
@@ -13,13 +13,13 @@ El sitio es un conjunto de páginas estáticas. **No usa cookies** y guarda solo
 
 Nunca salen de tu navegador y nosotros no podemos leerlos. Podés borrarlos cuando quieras desde la configuración de datos de sitios de tu navegador. Mirá el [Cookies y estadísticas](/legal/cookies-and-statistics/).
 
-### Sin estadísticas, sin publicidad, sin código de terceros
+### Sin servicios de analítica, sin publicidad, sin código de terceros
 
-El sitio no carga estadísticas de visitas, ni publicidad, ni widgets de redes sociales, ni fuentes o scripts de otros servidores: todo lo que necesita se sirve desde lordos.org.
+El sitio no carga ningún servicio de analítica, ni publicidad, ni widgets de redes sociales, ni fuentes o scripts de otros servidores: todo lo que necesita se sirve desde lordos.org.
 
 ### Registros del servidor
 
-El sitio está alojado en Amazon Web Services (S3 y CloudFront). Como en cualquier sitio, tu navegador envía tu dirección IP y los datos habituales de la solicitud (la página pedida, la hora, el agente de usuario del navegador) para recibir la página. Nuestro proveedor de alojamiento puede guardar registros estándar de solicitudes de la CDN por seguridad, durante un tiempo limitado. No los usamos para identificar ni perfilar a quienes nos visitan.
+El sitio está alojado en Amazon Web Services (S3 y CloudFront). Como en cualquier sitio, tu navegador envía tu dirección IP y los datos habituales de la solicitud (la página pedida, la hora, el agente de usuario del navegador) para recibir la página. Nuestro proveedor de alojamiento puede guardar registros estándar de solicitudes de la CDN por seguridad, durante un tiempo limitado. A partir de estos registros contamos las visitas para saber cómo crece el proyecto: páginas vistas, visitantes, países, sistemas (Windows, macOS, Linux…) y dispositivos, que solo ve el equipo de LordOS, con registros que incluyen tu dirección IP y se borran a los 13 meses. No los usamos para identificar ni perfilar a quienes nos visitan. Los detalles están en [Cookies y estadísticas](/legal/cookies-and-statistics/).
 
 ### Descargas en GitHub
 
@@ -55,7 +55,7 @@ La zona horaria nunca se deduce a partir de la red. Nada de esta tabla llega al 
 
 Estas conexiones se hacen solo después de una acción tuya:
 
-- **Tienda y actualizaciones:** las listas de paquetes y los paquetes vienen de los servidores espejo de Debian que tengas en tus fuentes de apt (`deb.debian.org` y `security.debian.org` por defecto; en la Raspberry Pi, el kernel y el firmware vienen de `archive.raspberrypi.com`). La Tienda los actualiza solo cuando tocás **Buscar actualizaciones** (en la Tienda o en Ajustes → Actualizaciones) o instalás algo, y verifica cada lista con las firmas de Debian. Las actualizaciones de LordOS vienen de su repositorio firmado en `lordos.org/apt`, que se consulta al mismo tiempo. Desde 0.8.5 ese repositorio también trae el banner destacado de la Tienda (solo se toma de una fuente cuyo índice firmado dice que es de LordOS, y se controla contra sus hashes) y la lista de apps de Tienda → Inteligencia Artificial; las fuentes `https://` se descargan por HTTPS. Las apps `.lpk` propias de LordOS se instalan desde archivos que vos elegís; no hay un catálogo de apps `.lpk` en línea.
+- **Tienda y actualizaciones:** las listas de paquetes y los paquetes vienen de los servidores espejo de Debian que tengas en tus fuentes de apt (`deb.debian.org` y `security.debian.org` por defecto; en la Raspberry Pi, el kernel y el firmware vienen de `archive.raspberrypi.com`). La Tienda los actualiza solo cuando tocás **Buscar actualizaciones** (en la Tienda o en Ajustes → Actualizaciones) o instalás algo, y verifica cada lista con las firmas de Debian. Las actualizaciones de LordOS vienen de su repositorio firmado en `lordos.org/apt`, que se consulta al mismo tiempo. Desde 0.8.5 ese repositorio también trae el banner destacado de la Tienda (solo se toma de una fuente cuyo índice firmado dice que es de LordOS, y se controla contra sus hashes) y la lista de apps de Tienda → Inteligencia Artificial; las fuentes `https://` se descargan por HTTPS. Las apps `.lpk` propias de LordOS se instalan desde archivos que vos elegís; no hay un catálogo de apps `.lpk` en línea. La CDN del sitio registra estas solicitudes como cualquier otra, con tu dirección IP, durante 13 meses; no se usan para estadísticas (mirá [Cookies y estadísticas](/legal/cookies-and-statistics/)).
 - **Apps desde los repositorios de sus fabricantes** (desde 0.8.5): instalar una app de Tienda → Inteligencia Artificial o Tienda → Comerciales cuyo fabricante tiene su propio repositorio primero te dice de quién es el repositorio que agrega y la huella de su clave, y después lo agrega, así que desde ese momento la Tienda y apt también descargan las listas de paquetes de ese fabricante. Quitar la app quita ese repositorio, salvo que lo use otra app instalada. A qué se conecta la app misma depende de su fabricante.
 - **Paquetes de idioma:** agregar un idioma en Ajustes puede instalar sus diccionarios y fuentes desde los mismos servidores espejo de Debian.
 - **Impresoras y escáneres:** Ajustes → Impresoras y escáneres le pregunta a la red local (mDNS) qué impresoras y escáneres hay, y habla solo con direcciones locales.
@@ -80,7 +80,7 @@ Estas conexiones se hacen solo después de una acción tuya:
 
 ### Tus derechos
 
-Como no recolectamos datos personales a través del sitio ni de la distribución, normalmente no tenemos nada tuyo para que consultes, corrijas o borres. Sobre lo que sí tengamos (un email que nos mandaste, el registro de una donación), podés pedir verlo, corregirlo o borrarlo, salvo los registros que debamos conservar por ley. Si estás en Argentina, la Ley 25.326 de Protección de Datos Personales te da estos derechos, y podés presentar un reclamo ante la Agencia de Acceso a la Información Pública (AAIP). Si estás en la Unión Europea, en Brasil o en otro país con leyes similares (RGPD, LGPD), tenés los derechos que te dan esas leyes.
+La distribución no recolecta datos personales. El sitio guarda las direcciones IP en sus registros de solicitudes durante 13 meses, como se explica arriba. Sobre lo que tengamos (esos registros, un email que nos mandaste, el registro de una donación), podés pedir verlo, corregirlo o borrarlo, salvo los registros que debamos conservar por ley. Si estás en Argentina, la Ley 25.326 de Protección de Datos Personales te da estos derechos, y podés presentar un reclamo ante la Agencia de Acceso a la Información Pública (AAIP). Si estás en la Unión Europea, en Brasil o en otro país con leyes similares (RGPD, LGPD), tenés los derechos que te dan esas leyes.
 
 ### Contacto
 

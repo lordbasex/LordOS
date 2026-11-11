@@ -5,16 +5,19 @@
 #
 #   node web/build.mjs && tools/web/deploy.sh
 #
-# Uses only the AWS profile `lordos`: a deploy user that can write to this bucket and invalidate
-# this distribution, nothing else. Security headers (CSP, HSTS) live in the CloudFront response
+# The profile, bucket and distribution come from ~/.aws/.lordos-deploy-env (tools/web/aws-env.sh).
+# The profile is a deploy user that can write to this bucket and invalidate this distribution, nothing
+# else. Security headers (CSP, HSTS) live in the CloudFront response
 # headers policy, not here.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DIST="${1:-$ROOT/web/dist}"
-PROFILE=lordos
-BUCKET=lordos.org
-DISTRIBUTION=E35DXDFJ83X7Z8
+. "$ROOT/tools/web/aws-env.sh"
+lordos_aws_env LORDOS_AWS_PROFILE LORDOS_S3_BUCKET LORDOS_CF_DISTRIBUTION
+PROFILE=$LORDOS_AWS_PROFILE
+BUCKET=$LORDOS_S3_BUCKET
+DISTRIBUTION=$LORDOS_CF_DISTRIBUTION
 
 [ -f "$DIST/index.html" ] || { echo "no build in $DIST: run node web/build.mjs" >&2; exit 1; }
 [ -f "$DIST/install.sh" ] || { echo "missing $DIST/install.sh" >&2; exit 1; }

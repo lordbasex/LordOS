@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-18",
+  "updated": "2026-11-11",
   "pages": [
     {
       "slug": "terms",
@@ -17,7 +17,7 @@
         "es": "Política de privacidad",
         "pt": "Política de privacidade"
       },
-      "updated": "2026-11-01"
+      "updated": "2026-11-11"
     },
     {
       "slug": "cookies-and-statistics",
@@ -26,7 +26,7 @@
         "es": "Cookies y estadísticas",
         "pt": "Cookies e estatísticas"
       },
-      "updated": "2026-10-18"
+      "updated": "2026-11-11"
     },
     {
       "slug": "donations",
