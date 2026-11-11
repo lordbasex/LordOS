@@ -222,7 +222,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
       if (b === 'z' && !e.shift) return undo();
       if ((b === 'z' && e.shift) || b === 'y') return redo();
       if (b === 'a') return setSel({ a: 0, b: text.length });
-      if (b === 'c') { if (hi > lo) clipboard.set(text.slice(lo, hi)); return undefined; }
+      if (b === 'c' && !e.shift) { if (hi > lo) clipboard.set(text.slice(lo, hi)); return undefined; }
       if (b === 'x') { if (hi > lo) { clipboard.set(text.slice(lo, hi)); replace(lo, hi, '', 'edit'); } return undefined; }
       if (b === 'v') {
         const st2 = lord.clipboard.state ? lord.clipboard.state() : { kind: 'text' };
@@ -288,7 +288,9 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     return { x: ax + padding + xOf(sel.b), y: ay + padding + rowOf(sel.b) * LH - scroll, h: LH };
   };
   st.current.caret = caretRect;
-  if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take(), selection: () => text.slice(lo, hi) };
+  // send: a key from the Edit and Format menus (editmenu.js), handled as if it were typed
+  if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take(), selection: () => text.slice(lo, hi),
+    send: (e) => { take(); st.current.onKey(e); } };
   const take = () => {
     if (textFocusOwner() === token) return;
     takeTextFocus(token, (e) => st.current.onKey(e), () => setFocusState(textFocusOwner() === token));

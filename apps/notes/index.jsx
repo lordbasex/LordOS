@@ -8,6 +8,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
+import { editKey, editItems, formatItems, contextItems, fromReading } from './editmenu.js';
 import { CATEGORIES, EMOJIS, emojiFor, searchEmoji } from './emoji.js';
 import {
   notesStore, loadNotes, updateNote, createNote, duplicateNote, deleteNote, flushAll, attachFile, pasteClipboardImage,
@@ -117,17 +118,24 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
     const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (Math.abs(nw - w) > 1) setW(nw); } }, 400);
     return () => clearInterval(id);
   });
-  // right click while editing: Speech, for the selection or the whole note
+  // right click while editing: Cut, Copy, Paste, Select All and Speech (for the selection or the whole note)
   const [ctx, setCtx] = useState(null);
+  // the open menu takes the keyboard for a while: that is not leaving the desktop note's editor
+  const menuOpen = useRef(false);
+  menuOpen.current = !!ctx;
   const speechText = () => editorApi.current?.selection?.() || note.body || '';
   if (mode === 'edit') {
     return (
       <View ref={box} style={{ flex: 1 }}>
         <NoteEditor value={note.body} onChange={(body) => updateNote(note.slug, { body })} size={size} colors={ink} autoFocus
           apiRef={editorApi} emojiSearch={searchEmoji} padding={compact ? 8 : 14}
-          onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => onMode('read') : undefined}
+          onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current) onMode('read'); } : undefined}
           onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}
-          onContextMenu={(e) => { const items = speechItems(speechText).filter((x) => x !== '-'); if (items.length) setCtx({ ...(box.current ? e.local(box.current) : e), items }); }} />
+          onContextMenu={(e) => {
+            const items = contextItems(t, { selected: !!editorApi.current?.selection?.(), empty: !note.body }, (a) => editorApi.current?.send?.(editKey(a)),
+              speechItems(speechText).filter((x) => x !== '-'));
+            setCtx({ ...(box.current ? e.local(box.current) : e), items });
+          }} />
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} />}
       </View>
     );
@@ -274,6 +282,20 @@ export default function Notes() {
     if (mode === 'edit' && api.current) api.current.insert(block ? `\n${md}\n` : md);
     else updateNote(note.slug, { body: `${note.body.replace(/\s*$/, '')}\n\n${md}\n` });
   };
+  // Edit and Format menus (editmenu.js): the editor's own keys; Paste and Select All from the reading view open the
+  // editor first and run once it is there
+  const pendingEdit = useRef(null);
+  const runEdit = (action) => {
+    if (mode === 'edit' && api.current) { api.current.send(editKey(action)); return; }
+    if (!note || !fromReading(action)) return;
+    pendingEdit.current = action;
+    setMode('edit');
+  };
+  useEffect(() => {
+    const a = pendingEdit.current;
+    pendingEdit.current = null;
+    if (a && mode === 'edit' && api.current) api.current.send(editKey(a));
+  }, [mode]);
   const newNote = () => { const s = createNote({ body: `# ${tr('notes.newTitle')}\n\n` }); setSel(s); setMode('edit'); };
   // files dragged from Files: copied into the open note (or a new one) as its images and attachments, like ⊕ does
   const drop = useFilesDrop({ onDrop: ({ files }) => {
@@ -309,13 +331,8 @@ export default function Notes() {
         { label: tr('notes.print'), onClick: () => note && print.open({ title: note.title || tr('notes.untitled'), text: note.body }), disabled: !note }, '-',
         { label: tr('notes.delete'), onClick: cmd.del, disabled: !note },
       ] },
-      { label: tr('notes.menu.format'), items: [
-        { label: tr('notes.fmt.bold'), hint: '❖B', disabled: true }, { label: tr('notes.fmt.italic'), hint: '❖I', disabled: true },
-        { label: tr('notes.fmt.link'), hint: '❖K', disabled: true }, '-',
-        { label: tr('notes.fmt.h1'), hint: '❖1', disabled: true }, { label: tr('notes.fmt.h2'), hint: '❖2', disabled: true },
-        { label: tr('notes.fmt.bullets'), hint: '❖⇧8', disabled: true }, { label: tr('notes.fmt.numbers'), hint: '❖⇧7', disabled: true },
-        { label: tr('notes.fmt.task'), hint: '❖⇧9', disabled: true }, { label: tr('notes.fmt.code'), hint: '❖⇧C', disabled: true },
-      ] },
+      { label: tr('notes.menu.edit'), items: editItems(tr, { editing: mode === 'edit' && !!note, empty: !note?.body, none: !note }, runEdit) },
+      { label: tr('notes.menu.format'), items: formatItems(tr, { editing: mode === 'edit' && !!note }, runEdit) },
       { label: tr('notes.menu.view'), items: [
         { label: mode === 'edit' ? tr('notes.read') : tr('notes.edit'), hint: '❖E', onClick: cmd.toggle },
         { label: tr('notes.toc'), checked: toc, onClick: cmd.toc },
