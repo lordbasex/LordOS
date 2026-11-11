@@ -7,6 +7,7 @@
  *   net-test errors                  config errors are code lines (errcode.h), never prose
  *   net-test ifwatch                 an interface gets its saved state once, whenever it appears
  *   net-test wake                    Wi-Fi after waking from sleep: checked, re-associated, turned off and on
+ *   net-test wifi-saved              a saved network's key file: what a join without a password keeps
  *   sudo net-test health <if>        the after-sleep check of one Wi-Fi interface (needs its wpa_supplicant)
  *   sudo net-test arp <if> <src> <ip> does ip answer an ARP request from src (the after-sleep gateway check)
  *   sudo net-test dhcp <if>          the DHCP client in the foreground (SIGUSR2: confirm the lease, as after sleep)
@@ -406,12 +407,34 @@ static int test_wake(void) {
     return bad;
 }
 
+/* GitHub #124: a click on a saved network joins it without a password, and that join must keep the
+ * saved key (a password, or the derived key the first-run file leaves) instead of saving the network
+ * again as an open one. wifi_act_connect keeps the saved file whenever this says it holds a key. */
+static int test_wifi_saved(void) {
+    int bad = 0;
+#define WS(x) do { if (!(x)) { printf("FAIL wifi-saved:%d: %s\n", __LINE__, #x); bad++; } } while (0)
+    WS(wifi_saved_kind(NULL) == WIFI_SAVED_OPEN);                           /* nothing saved */
+    WS(wifi_saved_kind("pass=\n") == WIFI_SAVED_OPEN);                      /* a saved open network */
+    WS(wifi_saved_kind("") == WIFI_SAVED_OPEN);
+    WS(wifi_saved_kind("pass=hunter22\n") == WIFI_SAVED_PASS);
+    WS(wifi_saved_kind("pass=a password with spaces\n") == WIFI_SAVED_PASS);
+    WS(wifi_saved_kind("psk=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n") == WIFI_SAVED_PSK);
+    /* a broken file isn't a key: joining it as before is all that can be done */
+    WS(wifi_saved_kind("psk=0123\n") == WIFI_SAVED_OPEN);
+    WS(wifi_saved_kind("psk=0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef\n") == WIFI_SAVED_OPEN);
+    WS(wifi_saved_kind("pass=bad\x01key\n") == WIFI_SAVED_OPEN);
+#undef WS
+    printf("wifi-saved: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: net-test crypto | errors | state | monitor <s> | act <action> <arg> | daemons\n"); return 2; }
     if (!strcmp(argv[1], "crypto")) return test_crypto() ? 1 : 0;
     if (!strcmp(argv[1], "errors")) return test_errors() ? 1 : 0;
     if (!strcmp(argv[1], "ifwatch")) return test_ifwatch() ? 1 : 0;
     if (!strcmp(argv[1], "wake")) return test_wake() ? 1 : 0;
+    if (!strcmp(argv[1], "wifi-saved")) return test_wifi_saved() ? 1 : 0;
     if (!strcmp(argv[1], "dhcp") && argc > 2) { dhcp_run(argv[2], 0); return 0; }
     if (!strcmp(argv[1], "arp") && argc > 4) {
         int fam;

@@ -443,6 +443,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
+  with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
+  a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
+  `.key` lost the password (or the derived key a first-run file leaves), and with wpa_supplicant running the network
+  was reloaded with `key_mgmt NONE`, which never associates with a WPA network. A join without a password for a
+  network saved with a key now joins it with the saved key and leaves its files as they are (`server/src/net/wifi.c`);
+  a new password still replaces the saved one. A network an earlier version already overwrote can't be repaired by
+  an update (the key is gone, and a real open network looks the same), so Settings now asks for the password when a
+  network saved as open is secured in the scan, and joining with it saves it again. Checked on VM 127 with a
+  simulated radio (`mac80211_hwsim`, a WPA2 access point from wpa_supplicant in AP mode) through `net-test act`:
+  joined with the password, disconnected, joined again with no password; the build before saved it as `open` and
+  stayed `SCANNING`, this one reached `COMPLETED` with the key kept. New `net-test wifi-saved`. (GitHub #124)
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.
