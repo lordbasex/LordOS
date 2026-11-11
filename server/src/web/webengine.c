@@ -421,8 +421,23 @@ static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *a, gpo
     return NULL;
 }
 
+/* What the person chose for the app's notifications, told to WebKit before the page loads: without it every new web
+ * process starts at "default" (Notification.permission), so a page that checks it at load says notifications are off
+ * until it asks again, even though LordOS allows them. "ask" stays unknown: the page asks and on_permission decides. */
+static void notification_permissions(Web *w) {
+    int p = w->app.perms[WEBREG_PERM_NOTIFICATIONS];
+    if (p != WEBREG_ALLOW && p != WEBREG_DENY) return;
+    WebKitSecurityOrigin *o = webkit_security_origin_new_for_uri(w->app.origin);
+    if (!o) return;
+    GList *one = g_list_append(NULL, o);
+    webkit_web_context_initialize_notification_permissions(w->context, p == WEBREG_ALLOW ? one : NULL, p == WEBREG_DENY ? one : NULL);
+    g_list_free(one);
+    webkit_security_origin_unref(o);
+}
+
 int web_engine_start(Web *w) {
     w->context = web_context_new();
+    notification_permissions(w);
     w->session = web_session_new(w);
     if (!w->session) return -1;
     WebKitSettings *settings = web_settings_new();

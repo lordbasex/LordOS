@@ -81,10 +81,14 @@ function settingTokens() {
   return { scrollBars: s.scrollBars || 'auto', reduceMotion: !!s.reduceMotion };
 }
 
+// Only the outermost provider, the theme's, speaks for the desktop: a nested one (Notes' light paper inside a dark
+// desktop) changes the colors of its own subtree, never what Linux apps and isolated apps are told. Otherwise the
+// portal's color scheme went light and back to dark on every render, and an app that follows it (Chrome's profile
+// picker) flickered between the two.
 export function ThemeProvider({ tokens, children }) {
   const value = { ...DEFAULT_TOKENS, ...settingTokens(), ...tokens };
   const outermost = useContext(ThemeContext) === DEFAULT_TOKENS;
-  useEffect(() => { publishTokens(value); syncPortal(value); if (outermost) shellTokens.set(value); });
+  useEffect(() => { if (!outermost) return; publishTokens(value); syncPortal(value); shellTokens.set(value); });
   return createElement(ThemeContext.Provider, { value }, children);
 }
 
