@@ -89,6 +89,8 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
                                            "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
                                            "/.config/lordos/databases",     /* Databases favorites (hosts, trusted certificates): only lord.sql.saveFavorites (docs/DATABASES.md) */
+                                           "/.config/lordos/web",           /* Web apps' registry (what lord-web starts, its permissions, the icons): only lord.webapps (docs/WEBAPPS.md) */
+                                           "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
                                            NULL };
 
 static char pfile[FSOPS_PF_COUNT][PATH_MAX];

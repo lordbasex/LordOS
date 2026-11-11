@@ -1,0 +1,9 @@
+{
+  "tray.open": "Atidaryti",
+  "tray.quit": "Išeiti",
+  "notify.open": "Atidaryti",
+  "download.done": "Atsisiuntimas baigtas",
+  "download.failed": "Nepavyko atsisiųsti",
+  "chooser.open": "Pasirinkite failą",
+  "chooser.openMany": "Pasirinkite failus"
+}

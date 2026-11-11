@@ -114,6 +114,7 @@ static void t_review(void) {
     CHECK(!rconnect_answer("SHA256:a", "SHA256:b", 1) && !rconnect_answer("", "", 1));
     /* a .desktop can't take a helper's firewall identity; HFS+ never mounts for writing */
     CHECK(app_scope_reserved("lordos-rclone") && app_scope_reserved("lordos-cloud") && app_scope_reserved("lordos-rdesk") && !app_scope_reserved("rclone-browser") && !app_scope_reserved("firefox"));
+    CHECK(app_scope_reserved("lordos-web-chat") && app_scope_reserved("lordos-webprobe") && !app_scope_reserved("lordos-welcome"));
     int ro = 0, seen = 0;
     for (size_t i = 0; i < sizeof DISK_KINDS / sizeof *DISK_KINDS; i++) if (!strcmp(DISK_KINDS[i].udev, "hfsplus") || !strcmp(DISK_KINDS[i].udev, "apfs")) { seen++; ro += DISK_KINDS[i].ro; }
     CHECK(seen == 2 && ro == 2);

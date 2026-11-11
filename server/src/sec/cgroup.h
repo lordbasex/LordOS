@@ -29,8 +29,9 @@ int cgroup_enter(const char *name, const CgroupLimits *lim);
 int app_scope_enter(const char *id);   /* 0 placed; -1 not (invalid scope name, refused or no answer) */
 
 /* Scopes of LordOS's own helpers (desktop:<id> in the firewall): a .desktop with that id must not inherit their rules.
- * "lpk-<x>": its scope would read as the package <x>, lpk:<x>, with that package's rules and grants. */
-static inline int app_scope_reserved(const char *id) { return !strcmp(id, "lordos-rclone") || !strcmp(id, "lordos-cloud") || !strcmp(id, "lordos-rdesk") || !strncmp(id, "lpk-", 4) || !strncmp(id, "lordos-vm", 9); }
+ * "lpk-<x>": its scope would read as the package <x>, lpk:<x>, with that package's rules and grants. "lordos-web-<app>":
+ * a web app's lord-web (docs/WEBAPPS.md); lordos-webprobe, its probe. */
+static inline int app_scope_reserved(const char *id) { return !strcmp(id, "lordos-rclone") || !strcmp(id, "lordos-cloud") || !strcmp(id, "lordos-rdesk") || !strncmp(id, "lpk-", 4) || !strncmp(id, "lordos-vm", 9) || !strncmp(id, "lordos-web", 10); }
 
 /* The cgroup v2 path of the current process, relative to /sys/fs/cgroup (e.g. ".../app.slice/..."),
  * so the monitor knows which scope it's in. "" if it couldn't be read. */
