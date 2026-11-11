@@ -1877,6 +1877,8 @@ sudo apt-get install -y chromium gtk-4-examples foot mpv xterm python3-gi gir1.2
 sudo apt-get install -y gdb        # 2026-11-11: backtraces of lord-web (the pasteboard crash, docs/WEBAPPS.md "Editing")
 sudo apt-get install -y logrotate  # 2026-11-11: /etc/logrotate.d/lordos (docs/SYSTEM.md "Log files"); a Recommends since 0.8.8.8,
                                    # missing from this install because the ISO predates it
+sudo apt-get install -y --no-install-recommends picard   # 2026-11-11: a Qt 5 app for GitHub #96 (QT_QPA_PLATFORM's
+                                   # xcb fallback, docs/WAYLAND.md "How to open an app")
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The

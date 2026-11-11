@@ -65,6 +65,7 @@
 #include "xdg-activation-v1-protocol.h"
 #include "xdgact.h"
 #include "dndgate.h"
+#include "toolkitenv.h"
 #include "urilist.h"
 #include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
@@ -5189,16 +5190,7 @@ int wl_start(void) {
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
     setenv("XDG_CURRENT_DESKTOP", "LordOS", 1);
-    /* Wayland first; x11 only for a GTK program that allows nothing else (gdk_set_allowed_backends:
-     * VMware's vmware-user agent). With "wayland" alone GTK skips x11 and such a program can't open
-     * any display (docs/WAYLAND.md, "VMware Tools") */
-    setenv("GDK_BACKEND", "wayland,x11", 1);
-    setenv("QT_QPA_PLATFORM", "wayland", 1);
-    setenv("MOZ_ENABLE_WAYLAND", "1", 1);
-    /* GTK 4.18 doesn't pick its text-input-v3 module by itself here (no input-method framework running), and the
-     * keys then reach the app raw: LordOS's input methods compose only through it. Not overwritten when the person
-     * set another one (an IBus or Fcitx user) */
-    setenv("GTK_IM_MODULE", "wayland", 0);
+    toolkit_env();                      /* GDK_BACKEND, QT_QPA_PLATFORM, …: Wayland first, X11 as the fallback (toolkitenv.h) */
     clip_seen = term_clipboard_gen();
     fprintf(stderr, "wayland: %s/%s\n", getenv("XDG_RUNTIME_DIR"), socket_name);
     return 0;

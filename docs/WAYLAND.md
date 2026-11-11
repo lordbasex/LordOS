@@ -59,8 +59,13 @@ app; ❖ combinations still belong to LordOS.
 ## How to open an app
 
 From the LordOS Terminal: every new tab has `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
-`GDK_BACKEND=wayland,x11` and `QT_QPA_PLATFORM=wayland`, so `featherpad &`, `gtk4-demo &` or
-`foot &` is enough. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
+`GDK_BACKEND=wayland,x11` and `QT_QPA_PLATFORM=wayland;xcb`, so `featherpad &`, `gtk4-demo &` or
+`foot &` is enough. Both toolkits try Wayland first and fall back to X11 (Xwayland): GTK for a program that
+allows only X11 (see "VMware Tools"), Qt for an app whose Wayland platform plugin is not installed
+(Debian's `qtwayland5` or `qt6-wayland`, which no Qt app depends on). Until 0.8.8.7 Qt got `wayland` alone, and
+such an app (MusicBrainz Picard from the Store) stopped at start with "Could not find the Qt platform plugin
+\"wayland\"" (GitHub #96). The values are set in `server/src/wl/toolkitenv.h` and checked by
+`tests/toolkitenv_test.c`. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
 They also appear in the **app launcher**, in the Lord Classic theme's start menu and in the Store (see

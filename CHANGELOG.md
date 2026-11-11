@@ -453,6 +453,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   3.0 `.desktop`: before, `video/mp4` had no app; now VLC is the declared app for MP4, Matroska, WebM and QuickTime.
   Dragging a file from Files onto a Linux app's window is new in this version (Added, Wayland drag and drop)
   (GitHub #123).
+- Linux apps: a Qt app whose Qt Wayland platform plugin isn't installed (Debian's `qtwayland5` or `qt6-wayland`, which
+  no Qt app depends on) didn't open at all: MusicBrainz Picard from the Store stopped at start with "Could not find the
+  Qt platform plugin "wayland"". The session set `QT_QPA_PLATFORM=wayland`, which leaves Qt no other platform. It now
+  sets `wayland;xcb` (Qt tries them in order), as GTK already got `wayland,x11`: Qt apps still open on Wayland, and
+  those without the plugin open through Xwayland. The toolkit variables moved to `server/src/wl/toolkitenv.h`, checked
+  by the new `tests/toolkitenv_test.c`. Checked on VM 127 with Picard (Qt 5) and Qt 5's Wayland plugins hidden in a
+  private mount namespace: `wayland` alone aborted with the reporter's message, `wayland;xcb` opened Picard's window
+  through Xwayland, and with the plugins present Qt still chose Wayland (GitHub #96).
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.

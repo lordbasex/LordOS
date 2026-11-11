@@ -227,6 +227,12 @@ ALL += build/lord-fand
 build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c
+# the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
+test: build/toolkitenv-test
+build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/toolkitenv_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/ptrlock-test
 build/ptrlock-test: tests/ptrlock_test.c src/wl/ptrlock.h src/testbench/lockkey.h
 	@mkdir -p build
