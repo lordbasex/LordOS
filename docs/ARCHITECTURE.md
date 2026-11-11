@@ -107,6 +107,7 @@ Besides the kernel and libc, only these are allowed:
 | FFmpeg (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`) and `libva` (+ `libva-drm`) | Decoding and encoding video, audio and images; VA-API for hardware decoding (M9, approved by the user). **Only `lord-media` links them**, the sandboxed helper; the player, synchronization and interface are our own. Never `lord-server` (`MEDIA.md`) | system |
 | audio.cpp (`libaudiocpp`, Apache-2.0) and its ggml (MIT) | Text to speech (0.8.8.6, `say`; Pocket TTS, Kyutai, weights CC-BY-4.0; approved by the user). **Only `lord-tts` links them**, the sandboxed helper (`server/src/doc/h_tts.c`); audio.cpp at the commit `tools/tts/fetch-audiocpp.sh` pins, built with Pocket TTS only, ggml's CPU kernels for every x86-64 generation and Vulkan, in `/usr/lib/lordos/lib/tts`. No voice model ships with LordOS. Never `lord-server` (`VOICE.md`) | pinned source |
 | Tesseract (`libtesseract`) | Text recognition (0.8.8.6, Screenshots' "copy the text", approved by the user). **Only `lord-ocr` links it**, the sandboxed helper (`server/src/doc/h_ocr.c`); it brings Leptonica, libarchive, libcurl and libgomp. The language data is Debian's (`tesseract-ocr-eng` as a dependency, Spanish, Portuguese, French and Italian recommended). Never `lord-server` or `lord-doc` | system |
+| WPE WebKit (`libwpewebkit-2.0`, `libwpe`, `wpebackend-fdo`) | Web apps (0.8.8.8 in development, `WEBAPPS.md`, approved by the maintainer). **Only `lord-web` links it**, one process per web app and profile, in the optional package `lordos-web`; it brings GLib/GIO, GStreamer and libsoup, and `lord-web` also uses GIO (the session bus), EGL (the dmabuf path) and `libwayland-client`. WebKit's own sandbox (bubblewrap, `xdg-dbus-proxy`) runs its web and network processes and is never turned off. Never `lord-server` | system |
 | Poppler (`libpoppler-glib`) and libarchive | PDF and archives (M9, approved by the user). **Only `lord-doc` links them**, the sandboxed helper; Poppler brings cairo, FreeType and fontconfig, which `lord-doc` also uses for font samples and for building PDFs. Never `lord-server` (`DOCUMENTS.md`) | system |
 | `clang` (build time only) | the BPF programs of `lord-netperm` (`np.bpf.c`, `clang -target bpf`); they are embedded in the binary. Without clang (`BPF=0`) the service runs without BPF. Neither libbpf nor bcc is used | build machine |
 | Monocypher 4.0.2 | XChaCha20-Poly1305, Argon2id/Argon2d, BLAKE2b, ChaCha20 for the Passwords vault and the KeePass importer (approved by the user; CC0/BSD-2, one C file). **Only `lord-vault` links it**; its official test vectors run in `make test` (`PASSWORDS.md`) | vendored |
@@ -279,7 +280,9 @@ libpipewire, libcups, avahi-client and SANE are not used. `curl` is used only by
 
 Forbidden: X11/Xorg (Xwayland is a separate program started on demand, see above), wlroots, libdrm, libinput, Mesa as a requirement (only as the optional GPU path), WebKit/Chromium,
 GTK/Qt inside LordOS; bubblewrap, flatpak, firejail or libseccomp for isolation (it is
-our own code using Landlock and seccomp-bpf directly). Vendored = copied as source code into `third_party/`.
+our own code using Landlock and seccomp-bpf directly). The one exception is `lord-web`, the optional web app runtime
+(above): a separate program that links WPE WebKit, whose own web and network processes run under WebKit's bubblewrap
+sandbox. Vendored = copied as source code into `third_party/`.
 
 ## Platforms
 

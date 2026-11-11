@@ -406,6 +406,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ]; then
         run "keyboard-default-test (sdk/keyboard.js, sdk/settings.js)" node tests/keyboard_default_test.mjs
     else skip "keyboard-default-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) web apps (docs/WEBAPPS.md): lord-web's probe on a page served by the test itself, headless, with
+    # WebKit's sandbox; the answer, the icon step and a throwaway profile that leaves nothing
+    if [ -x build/lord-web ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "web-probe-test (lord-web --probe)" python3 -I tests/web_probe_test.py build/lord-web
+    else skip "web-probe-test" "wpe-webkit-2.0 (build/lord-web), bubblewrap, xdg-dbus-proxy and python3"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs
