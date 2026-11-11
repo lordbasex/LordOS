@@ -71,6 +71,7 @@ struct DmaBuf {
     int waiting;                        /* the newest frame: show it once created */
     int busy;                           /* attached, not released yet */
     int gone;                           /* its resource is destroyed: free on release */
+    int pending;                        /* its params create is unanswered: the reply still points here */
     DmaBuf *next;
 };
 
@@ -411,7 +412,7 @@ static void dma_gone(void *d) {
     DmaBuf *b = d;
     b->gone = 1;
     b->res = NULL;
-    if (!b->busy) dma_free(b);
+    if (!b->busy && !b->pending) dma_free(b);      /* else params_created/failed or dma_release frees it */
 }
 
 static void dma_show(DmaBuf *b) {
@@ -428,6 +429,7 @@ static void dma_show(DmaBuf *b) {
 static void params_created(void *d, struct zwp_linux_buffer_params_v1 *p, struct wl_buffer *buf) {
     DmaBuf *b = d;
     zwp_linux_buffer_params_v1_destroy(p);
+    b->pending = 0;
     b->buf = buf;
     wl_buffer_add_listener(buf, &dma_buf_listener, b);
     if (b->gone) { dma_free(b); return; }
@@ -436,10 +438,15 @@ static void params_created(void *d, struct zwp_linux_buffer_params_v1 *p, struct
 static void params_failed(void *d, struct zwp_linux_buffer_params_v1 *p) {
     DmaBuf *b = d;
     zwp_linux_buffer_params_v1_destroy(p);
-    fall_back_to_shm(b->win, "the compositor could not import a frame");
-    if (!b->gone && b->win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_release_buffer(b->win->w->exportable, b->res);
-    g_idle_add(complete_later, b->win);
-    b->waiting = 0;
+    b->pending = 0;
+    WebWin *win = b->win;
+    if (b->gone) { dma_free(b); b = NULL; }        /* its resource went while we waited: nothing to release */
+    else {
+        if (win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_release_buffer(win->w->exportable, b->res);
+        b->waiting = 0;
+    }
+    g_idle_add(complete_later, win);
+    fall_back_to_shm(win, "the compositor could not import a frame");
 }
 static const struct zwp_linux_buffer_params_v1_listener params_listener = { params_created, params_failed };
 
@@ -457,6 +464,7 @@ static void export_dmabuf(void *d, struct wpe_view_backend_exportable_fdo_dmabuf
     b->w = (int)r->width;
     b->h = (int)r->height;
     b->waiting = 1;
+    b->pending = 1;
     b->next = win->dmabufs;
     win->dmabufs = b;
     webshm_on_destroy(r->buffer_resource, dma_gone, b);
