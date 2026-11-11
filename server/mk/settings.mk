@@ -2,7 +2,7 @@
 # Bluetooth (BlueZ over our own D-Bus client), battery and power, date and time, default apps.
 # Objects are added to lord-server as extra prerequisites ($^ in its link rule takes them).
 HW_SRC := src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/jbuf.c src/hw/display.c src/hw/accel.c \
-          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/ui/js_hw.c \
+          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/ui/js_hw.c \
           src/sysreport/sysreport.c src/sysreport/sysreport_out.c src/sysreport/periph.c src/sysreport/ids.c src/sysreport/smbios.c src/sysreport/facts.c src/sysreport/hwsnap.c src/hw/rpifw.c \
           src/ui/js_fan.c src/fan/fancurve.c
 HW_HDR := $(wildcard src/hw/*.h) src/apps.h $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
@@ -37,6 +37,15 @@ SLEEPLOCK_TEST_SRC := tests/sleeplock_test.c src/hw/sleeplock.c src/vault/dbus.c
 build/sleeplock-test: $(SLEEPLOCK_TEST_SRC) $(HW_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(SLEEPLOCK_TEST_SRC)
+	./$@ || { rm -f $@; exit 1; }
+# logind's Lock and LockedHint (hw/lockstate.c, the rules; hw/logindlock.c, the bus side): the own
+# session or any of the user's, Unlock refused, the hint following the lock, with the bus and the theme
+# replaced by the test (tests/logindlock_test.c)
+test: build/logindlock-test
+LOGINDLOCK_TEST_SRC := tests/logindlock_test.c src/hw/lockstate.c src/hw/logindlock.c src/vault/dbus.c
+build/logindlock-test: $(LOGINDLOCK_TEST_SRC) $(HW_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LOGINDLOCK_TEST_SRC)
 	./$@ || { rm -f $@; exit 1; }
 # hardware facts for the Store's suggestions (hwscan.c) over fake sysfs/DMI/PCI/USB/kmsg trees;
 # `build/hwscan-test dump [root]` prints the facts JSON of a tree (or of this machine)

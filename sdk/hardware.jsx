@@ -291,6 +291,7 @@ let sleepHeld = null;
 function onIdle(data) {
   const stage = data?.stage;
   if (stage === 'wake' && sleepHeld) { clearInterval(sleepHeld); sleepHeld = null; }
+  // the lock deadline, or logind's Lock (loginctl lock-session, lock-sessions: hw/logindlock.c, from:'logind')
   if (stage === 'lock' && managed()) lord.session.lock();
   // the computer is going to sleep (the lid, the power button, a sleep timer) or woke up: the display was
   // off, so "Require password after the display turns off" applies (issue #36, sdk/idlemodel.js).

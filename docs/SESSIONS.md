@@ -259,6 +259,28 @@ after the screen went dark`.
   2. The monitor shows the login screen with that user.
   3. Browsers connected to that session are also cut off and go back to the login
      (`/?e=3`).
+- **Lock from logind (0.8.8.8, in development):** `loginctl lock-session`, `loginctl lock-sessions` and
+  any program or admin that calls logind's `LockSession` make logind emit `Lock` on the session's
+  `org.freedesktop.login1.Session` object; logind allows that only to root, the session's owner or
+  whoever its polkit rules let through. The session hears it on the system bus (`hw/logindlock.c`,
+  believed only from the connection that owns `org.freedesktop.login1`) and locks as ❖L does (idle
+  `{stage:"lock"}` for the theme). Which `Lock` counts (`hw/lockstate.c`, tested by
+  `build/logindlock-test`):
+  - the desktop's own logind session (`GetSessionByPID` of `lord-server`): only a `Lock` of that path,
+    and its `LockedHint` follows the lock (`SetLockedHint`, which logind allows the session's owner):
+    true once a lock is sent from the monitor, false when the monitor shows the session again, so
+    `loginctl show-session -p LockedHint` tells;
+  - in none, which is the case today (`lord-sessiond`'s sessions are not logind sessions, see "Users"
+    below): a `Lock` of any session of the same user (its `User` property, asked with
+    `Properties.Get`), so `loginctl lock-sessions` and `loginctl lock-session <id>` of one of the user's
+    sessions (an SSH login, the user manager's) lock the desktop. There is no session to put
+    `LockedHint` on;
+  - **`Unlock` is never obeyed.** Only the password on the login screen gives the monitor back
+    (`lord-sessiond`, root). Unlocking from logind would be a new way for root to hand the screen
+    over, so it waits for the maintainer's review; the session only logs it.
+
+  Before sleep, logind's `PrepareForSleep(true)` with "require password" set to Immediately already
+  locks first under a delay inhibitor (`hw/sleeplock.c`, above).
 - **Switch User…**: `{"a":"switch"}`. Shows the login screen with another user selected. The
   previous session stays alive in the background and you return to it by logging in again.
 
