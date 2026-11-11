@@ -443,6 +443,63 @@ static void probe_icon_file(Probe *pr) {
     if (!webreg_write_file(path, pr->icon, pr->icon_len)) snprintf(pr->icon_path, sizeof pr->icon_path, "%s", path);
 }
 
+/* One step of the probe: lord-web <mode> with url as one line on its fd 3 (docs/WEBAPPS.md: at most 2 KB, nothing
+ * after the newline). Its pid, with our end of the channel in *fd; -1 if it could not start. */
+static pid_t start_step(const char *mode, const char *url, int *fd) {
+    int sv[2];
+    char line[WEBREG_URL_MAX + 2];
+    int n = snprintf(line, sizeof line, "%s\n", url);
+    if (n <= 1 || n >= (int)sizeof line || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) return -1;
+    char m[16];
+    snprintf(m, sizeof m, "%s", mode);
+    char *const argv[] = { "lord-web", m, NULL };
+    pid_t pid = spawn(argv, sv[1]);
+    close(sv[1]);
+    if (pid < 0) { close(sv[0]); return -1; }
+    /* small: it fits the socket's buffer, the write never waits */
+    if (write(sv[0], line, (size_t)n) != n) { kill(-pid, SIGKILL); waitpid(pid, NULL, 0); close(sv[0]); return -1; }
+    shutdown(sv[0], SHUT_WR);
+    *fd = sv[0];
+    return pid;
+}
+
+/* It has said everything (or failed): a moment to exit by itself, then it and its WebKit processes are ended. */
+static void end_step(pid_t pid, int fd, int grace_ms) {
+    if (fd >= 0) close(fd);
+    int st;
+    double t0 = now_ms();
+    while (waitpid(pid, &st, WNOHANG) == 0) {
+        if (now_ms() - t0 > grace_ms) { kill(-pid, SIGKILL); waitpid(pid, &st, 0); break; }
+        struct timespec ts = { 0, 20 * 1000000 };
+        nanosleep(&ts, NULL);
+    }
+}
+
+/* The second step: lord-web --probe-icon with the icon the first one chose; its header line
+ * {"ok":true,"type","size"} and then exactly size bytes. A bad or missing icon only means no icon. */
+static void probe_icon(Probe *pr, Rd *r, char *line) {
+    int fd = -1;
+    pid_t pid = start_step("--probe-icon", pr->p.icon_url, &fd);
+    if (pid < 0) return;
+    r->fd = fd;
+    r->n = 0;
+    r->deadline = now_ms() + WEB_PROBE_MS;
+    size_t size = 0;
+    int svg = 0, ok = 0;
+    char why[48];
+    int l = rd_line(r, line, 4096);
+    int h = l >= 0 ? webreg_icon_header(line, (size_t)l, &size, &svg, why, sizeof why) : -1;
+    if (h == 1 && (pr->icon = malloc(size))) {
+        if (!rd_bytes(r, pr->icon, size) && webreg_icon_kind(pr->icon, size) == (svg ? 2 : 1)) {
+            pr->icon_kind = svg ? 2 : 1;
+            pr->icon_len = size;
+            probe_icon_file(pr);
+            ok = 1;
+        } else { free(pr->icon); pr->icon = NULL; }
+    } else if (h == 0) fprintf(stderr, "webapps: no icon from %s: %s\n", pr->p.icon_url, why[0] ? why : "refused");
+    end_step(pid, fd, ok ? 1000 : 0);
+}
+
 static void *probe_thread(void *arg) {
     Probe *slot = arg;
     pthread_mutex_lock(&pmu);
@@ -457,32 +514,14 @@ static void *probe_thread(void *arg) {
         r->deadline = pr.started + WEB_PROBE_MS;
         int l = rd_line(r, line, WEBREG_FILE_MAX);
         if (l < 0) err = now_ms() >= r->deadline ? "webapps.probeTimeout" : "webapps.probeFailed";
-        else if (webreg_probe_parse(line, (size_t)l, &pr.p)) err = "webapps.probeFailed";
-        else {
-            err = NULL;
-            /* the icon step: optional, and a bad icon only means no icon */
-            size_t size = 0;
-            int svg = 0;
-            l = rd_line(r, line, 4096);
-            if (l >= 0 && webreg_icon_header(line, (size_t)l, &size, &svg, NULL, 0) == 1 && (pr.icon = malloc(size))) {
-                if (!rd_bytes(r, pr.icon, size) && (pr.icon_kind = webreg_icon_kind(pr.icon, size)) == (svg ? 2 : 1)) {
-                    pr.icon_len = size;
-                    probe_icon_file(&pr);
-                } else { free(pr.icon); pr.icon = NULL; pr.icon_kind = 0; }
-            }
-        }
+        else if (webreg_probe_parse(line, (size_t)l, &pr.p)) err = pr.p.error[0] ? pr.p.error : "webapps.probeFailed";
+        else err = NULL;
     }
+    end_step(pr.pid, pr.fd, err ? 0 : 1000);
+    pr.fd = -1;
+    if (!err && r && line && pr.p.icon_url[0]) probe_icon(&pr, r, line);
     free(line);
     free(r);
-    close(pr.fd);
-    /* it has said everything: a moment to exit by itself, then it and its WebKit processes are ended */
-    int st;
-    double t0 = now_ms();
-    while (waitpid(pr.pid, &st, WNOHANG) == 0) {
-        if (now_ms() - t0 > (err ? 0 : 1000)) { kill(-pr.pid, SIGKILL); waitpid(pr.pid, &st, 0); break; }
-        struct timespec ts = { 0, 20 * 1000000 };
-        nanosleep(&ts, NULL);
-    }
     char *json = answer_json(&pr, err);
     pthread_mutex_lock(&pmu);
     *slot = pr;
@@ -516,20 +555,12 @@ int webmgr_probe(const char *url, const char **err) {
     slot->id = next_probe++;
     pthread_mutex_unlock(&pmu);
 
-    int sv[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) goto fail;
-    char *const argv[] = { "lord-web", "--probe", NULL };
-    pid_t pid = spawn(argv, sv[1]);
-    close(sv[1]);
-    if (pid < 0) { close(sv[0]); goto fail; }
-    /* the address, one line (small: it fits the socket's buffer, the write never waits) */
-    char line[2050];
-    int n = snprintf(line, sizeof line, "%s\n", url);
-    if (write(sv[0], line, (size_t)n) != n) { kill(-pid, SIGKILL); waitpid(pid, NULL, 0); close(sv[0]); goto fail; }
-    shutdown(sv[0], SHUT_WR);
+    int fd = -1;
+    pid_t pid = start_step("--probe", url, &fd);
+    if (pid < 0) goto fail;
     pthread_mutex_lock(&pmu);
     slot->pid = pid;
-    slot->fd = sv[0];
+    slot->fd = fd;
     slot->started = now_ms();
     int id = slot->id;
     pthread_mutex_unlock(&pmu);
@@ -539,12 +570,7 @@ int webmgr_probe(const char *url, const char **err) {
     pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
     int r = pthread_create(&th, &at, probe_thread, slot);
     pthread_attr_destroy(&at);
-    if (r) {
-        kill(-pid, SIGKILL);
-        waitpid(pid, NULL, 0);
-        close(sv[0]);
-        goto fail;
-    }
+    if (r) { end_step(pid, fd, 0); goto fail; }
     return id;
 fail:
     pthread_mutex_lock(&pmu);

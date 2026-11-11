@@ -113,7 +113,9 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 
 Nothing is installed by a probe. The person sees the real origin and confirms. Then lord-server writes the registry
 file and saves the icon, chosen and fetched by `lord-web --probe-icon` as a second step, into the registry folder,
-after checking it is a PNG or an SVG of at most 1 MB.
+after checking it is a PNG or an SVG of at most 1 MB. lord-server chooses it from the answer's `icons`: the largest PNG
+up to 512 px, else the smallest one above, else an SVG (`https:` only). The second step starts right after the first
+(the sheet then shows the icon), and has its own 20 s.
 
 How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `webargs.c`):
 

@@ -345,19 +345,31 @@ static char *read_text(const char *path) {
 
 static const char FAKE[] =
     "#!/bin/sh\n"
-    "# a stand-in lord-web: the probe protocol, or a process that stays\n"
+    "# a stand-in lord-web: the runtime's two probe steps (docs/WEBAPPS.md), or a process that stays\n"
     "if [ \"$1\" = --probe ]; then\n"
     "  read -r url <&3\n"
     "  echo \"$url\" > \"$HOME/probed\"\n"
     "  printf '{\"ok\":true,\"name\":\"Notes Online\",\"startUrl\":\"https://notes.example/app/\",\"scope\":\"https://notes.example/app/\","
-    "\"origin\":\"https://notes.example\",\"manifest\":true}\\n' >&3\n"
-    "  printf '{\"icon\":{\"type\":\"image/png\",\"size\":33}}\\n' >&3\n"
+    "\"origin\":\"https://notes.example\",\"themeColor\":null,\"icons\":[{\"src\":\"https://notes.example/i/64.png\",\"sizes\":\"64x64\",\"type\":\"image/png\"},"
+    "{\"src\":\"https://cdn.example/i/192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}],\"manifest\":true}\\n' >&3\n"
+    "  exit 0\n"
+    "fi\n"
+    "if [ \"$1\" = --probe-icon ]; then\n"
+    "  read -r url <&3\n"
+    "  echo \"$url\" > \"$HOME/probed-icon\"\n"
+    "  printf '{\"ok\":true,\"type\":\"image/png\",\"size\":33}\\n' >&3\n"
     "  printf '\\211PNG\\r\\n\\032\\n\\000\\000\\000\\rIHDR\\000\\000\\000\\020\\000\\000\\000\\020\\010\\006\\000\\000\\000\\037\\363\\377a' >&3\n"
     "  exit 0\n"
     "fi\n"
     "echo \"$@\" > \"$HOME/args-$2-$4\"\n"
     "/usr/bin/env > \"$HOME/env-$2-$4\"\n"
     "exec /bin/sleep 30\n";
+
+/* a stand-in whose page step fails the way the runtime says it does */
+static const char FAKE_TLS[] =
+    "#!/bin/sh\n"
+    "read -r url <&3\n"
+    "printf '{\"ok\":false,\"error\":\"web.probe.tls\"}\\n' >&3\n";
 
 static char *wait_probe(int id) {
     for (int i = 0; i < 500; i++) {
@@ -412,6 +424,21 @@ static void test_manager(void) {
     char *probed = read_text(p);
     CHECK(probed && !strcmp(probed, "https://notes.example/\n"), "the address went on fd 3: %s", probed ? probed : "");
     free(probed);
+    snprintf(p, sizeof p, "%s/probed-icon", root);
+    probed = read_text(p);
+    CHECK(probed && !strcmp(probed, "https://cdn.example/i/192.png\n"), "the chosen icon went to --probe-icon on fd 3: %s", probed ? probed : "");
+    free(probed);
+
+    /* the runtime's own error code reaches JS (errors.json has its text) */
+    snprintf(p, sizeof p, "%s/lord-web-tls", root);
+    write_text(p, FAKE_TLS, 0755);
+    webmgr_set_helper(p);
+    int tid = webmgr_probe("https://tls.example/", &err);
+    char *tj = tid > 0 ? wait_probe(tid) : NULL;
+    CHECK(tj && strstr(tj, "\"ok\":false") && strstr(tj, "\"error\":\"web.probe.tls\""), "a TLS failure: %s", tj ? tj : "(none)");
+    free(tj);
+    snprintf(p, sizeof p, "%s/lord-web", root);
+    webmgr_set_helper(p);
 
     /* installing from it */
     char app[WEBREG_ID_MAX + 1] = "";

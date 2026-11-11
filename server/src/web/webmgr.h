@@ -12,8 +12,11 @@
  *     and only the session's WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, HOME and LANG plus
  *     LORDOS_WEB=1. One process per app and profile; a second launch only says it is running (the shell
  *     raises its window).
- *   - The probe: "lord-web --probe", the address as one line on fd 3 (https: only, under 2 KB), one JSON line
- *     back, then the icon step (a header line and the icon's bytes, or {"icon":null}); killed after 20 s.
+ *   - The probe, the runtime's two steps (docs/WEBAPPS.md): "lord-web --probe", the address as one line on fd 3
+ *     (https: only, under 2 KB), one JSON line back ({"ok":false,"error":"web.probe.…"} passes its code on to JS);
+ *     then, when the page listed one, "lord-web --probe-icon" with the icon webreg_probe_parse chose, which answers
+ *     {"ok":true,"type","size"} and the bytes (a refused or bad icon only means no icon). Each step is killed
+ *     after 20 s (WEB_PROBE_MS).
  *
  * Every call returns NULL on success or an error code for js_throw_code ("webapps.notInstalled", …). */
 #ifndef LORD_WEB_WEBMGR_H

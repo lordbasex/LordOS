@@ -76,7 +76,7 @@ export function probeWebApp(url, onStart) {
     const timer = setInterval(() => {
       let r = null;
       try { r = lord.webapps.probeResult(id); } catch (e) { r = { ok: false, error: 'webapps.probeFailed' }; }
-      if (!r && Date.now() - t0 < 25000) return;
+      if (!r && Date.now() - t0 < 45000) return;   // two steps (page, icon) of at most 20 s each
       clearInterval(timer);
       resolve({ ...(r || { ok: false, error: 'webapps.probeTimeout' }), id });
     }, 250);
