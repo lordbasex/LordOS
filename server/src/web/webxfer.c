@@ -5,10 +5,11 @@
  *   - a drop (webwin.c reads the drag's list, webdrop.c opens its local files) and an image pasted from the session's
  *     clipboard: lord-web reads the bytes itself and passes them, in 1 MB pieces, to a script in an isolated world of
  *     its own (the page's scripts can't see or change it), which makes them File objects and blob: addresses. A
- *     script in the page's world then turns those into a DataTransfer and dispatches dragenter, dragover and drop at
- *     the drop point (or paste on the focused element), the way a browser would: it has to run there, because a
- *     DataTransfer's "types" (which pages check for "Files") is empty in WebKit 2.48 for one made by a script and
- *     only the page's world can mend it. The blob: addresses are revoked right after. The page only ever gets the
+ *     script in the page's world then turns those into a DataTransfer and dispatches drop at the drop point (or paste
+ *     on the focused element), the way a browser would; dragenter, dragover and dragleave reach the page while the
+ *     drag moves, before the drop (JS_DRAG), so a drop area the page draws after dragenter is there by then. It has
+ *     to run in the page's world, because a DataTransfer's "types" (which pages check for "Files") is empty in
+ *     WebKit 2.48 for one made by a script and only the page's world can mend it. The blob: addresses are revoked right after. The page only ever gets the
  *     files the person dropped on it; lord-web never reads anything else.
  *   - the page's copies: WPE 2.48 has no Async Clipboard API (navigator.clipboard is undefined), so a script at
  *     document start gives the page navigator.clipboard.write and writeText (and ClipboardItem) when they are
@@ -130,7 +131,7 @@ static char *committed;                 /* the main frame's document, as last co
 
 /* 1 while the document that sent a copy is the app's own: the address it says it has (from the isolated world), the
  * main frame's committed document and the view's current address are all inside the scope */
-static int clip_in_scope(Web *w, const char *href) {
+int webxfer_in_scope(Web *w, const char *href) {
     const char *now = webkit_web_view_get_uri(w->view);
     return !w->outside && href && committed && now && weburl_in_scope(href, w->app.scope) &&
            weburl_in_scope(committed, w->app.scope) && weburl_in_scope(now, w->app.scope);
@@ -140,7 +141,7 @@ static int clip_in_scope(Web *w, const char *href) {
 static const char *clip_take(Web *w, JSCValue *v) {
     if (!w->win || !jsc_value_is_object(v)) return "NotAllowedError: nothing to write";
     char *href = prop_str(v, "href");
-    int mine = clip_in_scope(w, href);
+    int mine = webxfer_in_scope(w, href);
     g_free(href);
     if (!mine) return "NotAllowedError: not this app's page";
     if (!webwin_user_active(w->win)) return "NotAllowedError: the clipboard needs a key or a click in the window first";
@@ -167,7 +168,7 @@ static const char *clip_take(Web *w, JSCValue *v) {
 static gboolean on_clip(WebKitUserContentManager *m, JSCValue *v, WebKitScriptMessageReply *reply, gpointer d) {
     (void)m;
     const char *why = clip_take(d, v);
-    if (why) webkit_script_message_reply_return_error_message(reply, why);
+    if (why) { web_note("page copy refused (clipboard API): %s", why); webkit_script_message_reply_return_error_message(reply, why); }
     else {
         JSCValue *t = jsc_value_new_boolean(jsc_value_get_context(v), TRUE);
         webkit_script_message_reply_return_value(reply, t);
@@ -221,7 +222,38 @@ static const char JS_DONE[] =
     "if (x) for (const u of x.urls) URL.revokeObjectURL(u);\n"
     "delete globalThis.__lordosXfer;\n"
     "return true;";
-/* in the page's world */
+/* in the page's world: the drag before the drop. A page's drop area is often drawn only after dragenter (a render
+ * a frame later), with the only drop listener on it, so dragenter, dragover and dragleave follow the pointer as in a
+ * browser: dragenter on the element that comes under it (then dragleave on the one it left), dragover on it at each
+ * move. Their DataTransfer has the drag's types ("Files" for files) and no data, as a browser's has before the drop.
+ * The state lives in the page's world (JS_DISPATCH ends it); it holds nothing but that element and that DataTransfer. */
+static const char JS_DRAG[] =
+    "const g = globalThis, key = '__lordosDrag';\n"
+    "let s = g[key];\n"
+    "const fire = (t, type, dt, rel) => t.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: type !== 'dragleave', composed: true,\n"
+    "  clientX: x, clientY: y, relatedTarget: rel || null, dataTransfer: dt }));\n"
+    "if (leave) {\n"
+    "  if (s && s.el && s.el.isConnected) fire(s.el, 'dragleave', s.dt, null);\n"
+    "  delete g[key];\n"
+    "  return '';\n"
+    "}\n"
+    "if (!s) {\n"
+    "  const dt = new DataTransfer(), kinds = Object.freeze(files ? ['Files'] : ['text/plain']);\n"
+    "  try { Object.defineProperty(dt, 'types', { get: () => kinds, configurable: true }); } catch (e) { }\n"
+    "  try { dt.effectAllowed = 'copy'; dt.dropEffect = 'copy'; } catch (e) { }\n"
+    "  s = { dt, el: null };\n"
+    "  Object.defineProperty(g, key, { value: s, configurable: true, enumerable: false, writable: true });\n"
+    "}\n"
+    "const t = document.elementFromPoint(x, y) || document.body;\n"
+    "if (!t) return '';\n"
+    "const was = s.el && s.el.isConnected ? s.el : null;\n"
+    "if (t !== s.el) { const first = !s.el; s.el = t; fire(t, 'dragenter', s.dt, was); if (was) fire(was, 'dragleave', s.dt, t); if (first) return 'enter ' + t.tagName; }\n"
+    "fire(t, 'dragover', s.dt, null);\n"
+    "return '';";
+
+/* in the page's world: the drop (or a pasted image). After a frame or two, so a drop area the drag's dragenter asked
+ * for is there, the element under the drop point gets dragenter (when the drag hadn't reached it), dragover and drop
+ * with the files. It answers the element's tag and whether a listener took the drop (its default prevented). */
 static const char JS_DISPATCH[] =
     "const { urls, names, types, mtimes } = JSON.parse(meta);\n"
     "const dt = new DataTransfer();\n"
@@ -237,14 +269,22 @@ static const char JS_DISPATCH[] =
     "if (paste) {\n"
     "  let t = document.activeElement;\n"
     "  if (!t || t === document.documentElement) t = document.body;\n"
-    "  return t ? t.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, composed: true, clipboardData: dt })) : false;\n"
+    "  if (!t) return '';\n"
+    "  return t.tagName + (t.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, composed: true, clipboardData: dt })) ? ' not taken' : ' taken');\n"
     "}\n"
+    "const s = globalThis.__lordosDrag;\n"
+    "delete globalThis.__lordosDrag;\n"
+    "await Promise.race([new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))), new Promise((ok) => setTimeout(ok, 150))]);\n"
     "const t = document.elementFromPoint(x, y) || document.body;\n"
-    "if (!t) return false;\n"
+    "if (!t) return '';\n"
     "const init = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, dataTransfer: dt };\n"
-    "t.dispatchEvent(new DragEvent('dragenter', init));\n"
+    "const was = s && s.el && s.el.isConnected ? s.el : null;\n"
+    "if (t !== was) {\n"
+    "  t.dispatchEvent(new DragEvent('dragenter', Object.assign({ relatedTarget: was }, init)));\n"
+    "  if (was) was.dispatchEvent(new DragEvent('dragleave', Object.assign({ relatedTarget: t }, init, { cancelable: false })));\n"
+    "}\n"
     "t.dispatchEvent(new DragEvent('dragover', init));\n"
-    "return t.dispatchEvent(new DragEvent('drop', init));";
+    "return t.tagName + (t.dispatchEvent(new DragEvent('drop', init)) ? ' not taken' : ' taken');";
 
 typedef struct {
     Web *w;
@@ -298,7 +338,27 @@ static void cleanup(Xfer *x) {
     else xfer_free(x);
 }
 
-static void on_dispatched(GObject *src, GAsyncResult *res, gpointer d) { finished(src, res, NULL); cleanup(d); }
+/* an element's tag as the log may show it: letters, digits and '-', at most 32 */
+static void tag_of(const char *s, char *out, size_t n) {
+    size_t o = 0;
+    for (; s && *s && *s != ' ' && o + 1 < n && o < 32; s++)
+        out[o++] = (g_ascii_isalnum(*s) || *s == '-') ? *s : '?';
+    out[o] = 0;
+}
+
+static void on_dispatched(GObject *src, GAsyncResult *res, gpointer d) {
+    Xfer *x = d;
+    char *r = NULL;
+    if (!finished(src, res, &r) && r && r[0]) {
+        char tag[40];
+        tag_of(r, tag, sizeof tag);
+        const char *sp = strchr(r, ' ');
+        web_note("%s dispatched (%d files, target %s, %s)", x->paste ? "paste" : "drop", x->n, tag[0] ? tag : "?",
+                 sp && !strcmp(sp + 1, "taken") ? "a listener took it" : "no listener took it");
+    }
+    g_free(r);
+    cleanup(x);
+}
 
 /* one JSON string value, quoted, appended to g */
 static void add_quoted(GString *g, const char *v) {
@@ -414,9 +474,62 @@ static char *type_of(const char *name) {
     return mime;
 }
 
+/* ---- the drag before the drop: one call at a time, the latest position kept while one runs ---- */
+
+static struct { Web *w; int busy, pending, leave, files; double x, y; } drag;
+
+static void drag_send(void);
+
+static void on_drag(GObject *src, GAsyncResult *res, gpointer d) {
+    (void)d;
+    char *r = NULL;
+    if (!finished(src, res, &r) && r && !strncmp(r, "enter ", 6)) {
+        char tag[40];
+        tag_of(r + 6, tag, sizeof tag);
+        web_note("drag over the page (%s, first target %s)", drag.files ? "files" : "text", tag[0] ? tag : "?");
+    }
+    g_free(r);
+    drag.busy = 0;
+    if (drag.pending) drag_send();
+}
+
+static void drag_send(void) {
+    Web *w = drag.w;
+    drag.pending = 0;
+    if (!w || !w->view || w->outside) return;
+    double z = webkit_web_view_get_zoom_level(w->view);
+    if (!(z > 0)) z = 1;
+    GVariantDict args;
+    g_variant_dict_init(&args, NULL);
+    g_variant_dict_insert_value(&args, "x", g_variant_new_double(drag.x / z));
+    g_variant_dict_insert_value(&args, "y", g_variant_new_double(drag.y / z));
+    g_variant_dict_insert_value(&args, "files", g_variant_new_double(drag.files));
+    g_variant_dict_insert_value(&args, "leave", g_variant_new_double(drag.leave));
+    drag.busy = 1;
+    webkit_web_view_call_async_javascript_function(w->view, JS_DRAG, -1, g_variant_dict_end(&args), NULL, NULL, NULL, on_drag, NULL);
+}
+
+void webxfer_drag(Web *w, double x, double y, int files) {
+    drag.w = w;
+    drag.x = x;
+    drag.y = y;
+    drag.files = files != 0;
+    drag.leave = 0;
+    drag.pending = 1;
+    if (!drag.busy) drag_send();
+}
+
+void webxfer_drag_leave(Web *w) {
+    drag.w = w;
+    drag.leave = 1;
+    drag.pending = 1;
+    if (!drag.busy) drag_send();
+}
+
 void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const char *uris, const char *text) {
+    drag.pending = 0;                   /* a move not sent yet: the drop comes after the ones sent */
     Xfer *t = xfer_new(w);
-    if (!t) { webdrop_close(files, n); return; }
+    if (!t) { webdrop_close(files, n); web_note("drop refused: %s", running ? "another drop is still being handed over" : "the page is not the app's own"); webxfer_drag_leave(w); return; }
     double z = webkit_web_view_get_zoom_level(w->view);
     if (!(z > 0)) z = 1;
     t->x = x / z;
@@ -429,7 +542,7 @@ void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const c
     for (int i = t->n; i < n; i++) webdrop_close(&files[i], 1);
     t->uris = uris && uris[0] ? g_strdup(uris) : NULL;
     t->text = text && text[0] ? g_strdup(text) : NULL;
-    if (!t->n && !t->text && !t->uris) { xfer_free(t); return; }
+    if (!t->n && !t->text && !t->uris) { xfer_free(t); webxfer_drag_leave(w); return; }
     start(t);
 }
 
