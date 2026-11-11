@@ -57,6 +57,10 @@ int  webask_edit(const char *app, const char *profile, const char *command);
 /* The desktop's mode, from the theme (lord.portal.set): kept for the next lord-web's environment and, when it
  * changed, told to every running one (SetColorScheme, no reply wanted). */
 void webask_scheme(int dark);
+/* A well-known name got an owner (NameOwnerChanged): when it is the bus name of a running lord-web and the mode is
+ * known, that lord-web gets SetColorScheme with it. A mode change between its start (the environment) and the
+ * moment it took its name would otherwise be lost: the call before went to a name nobody owned. */
+void webask_appeared(const char *name);
 /* The counts shown now, as a JSON array [{ app, profile, count }] (malloc'd), for a new JS context. */
 char *webask_badges(void);
 /* The questions waiting for the person, as a JSON array (malloc'd), for a new JS context. */

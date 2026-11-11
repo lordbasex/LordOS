@@ -64,9 +64,9 @@ Not released yet; the latest release is 0.8.8.7.
 - **Global shortcuts.** A call app's push-to-talk or a recorder's hotkeys work while another app is in front. You choose the keys in LordOS's sheet, and change or forget them in Settings → Keyboard.
 - **X11 apps.** They take part in drag and drop, and look sharp on HiDPI displays because they scale themselves (Settings → Displays brings back the old, blurry way).
 - **Terminal apps.** Programs such as htop open in a Terminal tab from the app launcher.
-- **Web apps.** The Store's Web apps section installs web apps, each in a window and process of its own with its own accounts, through the optional `lordos-web` package. Not yet tried on our test machine.
+- **Web apps.** The Store's Web apps section installs web apps, each in a window and process of its own with its own accounts, through the optional `lordos-web` package. Web apps follow the desktop's light or dark mode, live, through the page's `matchMedia`; a page that picks its colors only through CSS media queries stays light (choose Dark in its own settings). Tried on our test machine, in light and in dark.
 
-Global shortcuts, drags with X11 apps, sharp X11 apps, Terminal apps and web apps are built and tested, but not yet checked on our test machine.
+Global shortcuts, drags with X11 apps, sharp X11 apps and Terminal apps are built and tested, but not yet checked on our test machine.
 
 ## Which Wayland protocols are there
 

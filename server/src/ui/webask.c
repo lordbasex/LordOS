@@ -296,6 +296,19 @@ void webask_scheme(int dark) {
     if (sent) dbus_flush(bus);
 }
 
+void webask_appeared(const char *name) {
+    int s = webmgr_scheme();
+    if (!bus || !name || !webscheme_name(s) || strncmp(name, "org.lordos.WebApp.", 18)) return;
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING);
+    for (int i = 0; i < n; i++) {
+        char own[160];
+        if (webreg_bus_name(r[i].app, r[i].profile, own, sizeof own) || strcmp(own, name)) continue;
+        if (!send_scheme(r[i].app, r[i].profile, webscheme_name(s))) dbus_flush(bus);
+        return;
+    }
+}
+
 int webask_show(const char *app, const char *profile, const char *token) {
     char name[160];
     if (!bus || webreg_bus_name(app, profile, name, sizeof name)) return -1;

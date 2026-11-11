@@ -72,16 +72,31 @@
       last = m;
       dispatch.call(list, makeEvent(media, m));
     }
+    function forget(id) {
+      if (!keys.delete(id)) return;
+      if (id.once) removeL.call(list, 'change', id.done, false);
+      if (id.sig) removeL.call(id.sig, 'abort', id.done, false);
+      if (!keys.size) { removeL.call(current(), 'change', onInner); live.delete(fire); }
+    }
+    // after the browser's addEventListener/removeEventListener: keys mirrors the page's 'change' listeners, and a
+    // listener the browser drops by itself ({ once: true } after it ran, { signal } once aborted) is forgotten too,
+    // so the list leaves `live` as soon as it has none
     function track(add, type, l, opts) {
       if (String(type) !== 'change' || l == null) return;
-      var k = (typeof opts === 'boolean' ? opts : !!(opts && opts.capture));
+      var obj = opts !== null && typeof opts === 'object';
+      var k = (typeof opts === 'boolean' ? opts : !!(obj && opts.capture));
       var id = keys.size ? Array.from(keys).find(function (x) { return x.l === l && x.c === k; }) : undefined;
       if (add && !id) {
-        keys.add({ l: l, c: k });
+        var once = obj && !!opts.once, sig = obj ? opts.signal : undefined;
+        if (sig != null && sig.aborted) return;          // the browser did not add it
+        id = { l: l, c: k, once: once, sig: sig != null ? sig : null, done: null };
+        id.done = function () { forget(id); };
+        keys.add(id);
         if (keys.size === 1) { last = !!current().matches; addL.call(current(), 'change', onInner); live.add(fire); }
+        if (once) addL.call(list, 'change', id.done, false);        // runs after it, in the same dispatch
+        if (id.sig) addL.call(id.sig, 'abort', id.done, false);
       } else if (!add && id) {
-        keys.delete(id);
-        if (!keys.size) { removeL.call(current(), 'change', onInner); live.delete(fire); }
+        forget(id);
       }
     }
     Object.defineProperty(list, 'matches', { get: function () { return !!current().matches; }, enumerable: false, configurable: true });

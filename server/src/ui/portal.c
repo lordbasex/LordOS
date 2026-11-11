@@ -1623,7 +1623,8 @@ static void on_reply(const DMsg *m) {
 }
 
 /* NameOwnerChanged(name, old, new) with no new owner: that connection is gone, and so are its holds,
- * its open requests, its file dialogs, its shortcut sessions and its screen casts */
+ * its open requests, its file dialogs, its shortcut sessions and its screen casts. A well-known name with a new
+ * owner may be a lord-web that just took its name: it gets the desktop's mode (webask_appeared) */
 static void on_signal(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus") || !m->member || strcmp(m->member, "NameOwnerChanged")
         || !m->sig || strcmp(m->sig, "sss")) return;
@@ -1632,7 +1633,9 @@ static void on_signal(const DMsg *m) {
     const char *name = dr_str(&r, NULL);
     dr_str(&r, NULL);
     const char *now = dr_str(&r, NULL);
-    if (r.err || name[0] != ':' || now[0]) return;
+    if (r.err) return;
+    if (name[0] != ':') { if (now[0]) webask_appeared(name); return; }
+    if (now[0]) return;
     for (int i = nholds; i-- > 0;) if (!strcmp(holds[i].sender, name)) hold_drop(i);
     for (int i = nopens; i-- > 0;) if (!strcmp(opens[i].sender, name)) open_drop(i, 1);
     for (int i = npicks; i-- > 0;) if (!strcmp(picks[i].sender, name)) pick_drop(i);

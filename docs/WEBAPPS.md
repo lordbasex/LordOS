@@ -192,7 +192,10 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     (missing or anything else is light) and, when the mode changes, sends `org.lordos.WebApp1.SetColorScheme(s
     scheme)` to each running lord-web's bus name (no reply). The word is `light` or `dark` only, refused otherwise
     (`InvalidArgs`); lord-web asks the bus for the caller's pid and applies it only when it is the lord-server that
-    started it, as for `Edit`.
+    started it, as for `Edit`. A mode change between a lord-web's start and the moment it takes its bus name would
+    reach a name nobody owns yet, so lord-server watches `NameOwnerChanged`: when the name of one of the lord-web it
+    started gets an owner, that lord-web gets `SetColorScheme` with the mode now (lord-web ignores a mode it already
+    has).
   - **matchMedia:** a script of lord-web's (`webscheme.js`) runs at document start in every frame, in the page's own
     world (the page's scripts must see its answers). A query that names `prefers-color-scheme` is rewritten so the real
     `matchMedia` answers it as the desktop would: when WebKit's answer and the desktop's differ, every
@@ -201,7 +204,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     (`instanceof MediaQueryList`, an `EventTarget`) with `matches`, the original query's `media`, `onchange`,
     `addEventListener`/`removeEventListener` and `addListener`/`removeListener`; it sends `change` when the desktop's
     mode flips (only when its answer changes) and when the real list changes (a width). Any other query gets WebKit's
-    own list untouched. A new mode replaces the script for the next loads and calls its hook (a random name per
+    own list untouched. A list is kept alive only while the page has `change` listeners on it, as in a browser: a
+    `{ once: true }` listener that ran and a `{ signal }` listener whose signal aborted are let go. A new mode replaces the script for the next loads and calls its hook (a random name per
     process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
     load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
     itself, and nothing goes from the page to lord-web or lord-server.
@@ -222,10 +226,14 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     light (the limit above); a `SetColorScheme` sent with `busctl` from an ssh shell was refused ("not lord-server")
     and a word other than `light` or `dark` got `InvalidArgs`. The messaging app's sign-in page (QR code) stays light
     in dark mode; whether its "System default" theme follows after signing in was not tested (it needs a phone).
+    After the review fixes: the app launched in dark with the mode switched to light right away got `SetColorScheme
+    ("dark")` from lord-server one millisecond after its name appeared (seen with `dbus-monitor`), then `"light"`, and
+    showed light; a later switch to dark flipped the page live with one `change`, the frame following.
   - **Tests:** `tests/webapp_test.c` (the two words, the environment's value, the script's and the hook's text, bad
     keys refused), `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`: plain, negated, combined
     and listed queries, `media`, listeners and `onchange`, no event when the answer stays, frames, an engine that
-    already answers dark).
+    already answers dark, `once` and `signal` listeners let go) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent
+    until the theme tells the mode, `dark` and `light` after it, absent again for any other value).
 - **User agent** (`webpage_user_agent`): `Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
   Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own (frozen) AppleWebKit and Safari tokens, and
   LordOS's version. WebKit's site-specific quirks are off on the app's own pages and on for any other site in the

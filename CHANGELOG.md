@@ -42,12 +42,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   window color while a page loads, so no white flashes before the page paints. Checked on the test VM with a page
   that prints `matchMedia('(prefers-color-scheme: dark)').matches`: true when started in dark, false when started in
   light, and switching the mode in Control Center flips it at once (one `change` event each way, the same-origin frame
-  too), and a call from another process is refused. Limit: a page that picks its colors only with CSS
+  too), and a call from another process is refused. A lord-web that takes its bus name after the mode changed (the
+  change came between its start and that moment, so the call went to a name nobody owned) gets the mode when its name
+  appears: lord-server watches `NameOwnerChanged` and sends `SetColorScheme` to the running lord-web whose name it is.
+  A page's `{ once: true }` listener that ran and a `{ signal }` listener whose signal aborted are released, so a page
+  that keeps making such lists does not keep them all alive. Limit: a page that picks its colors only with CSS
   `@media (prefers-color-scheme)` rules stays light until a newer WebKit (rewriting those rules was weighed and left
   out: style sheets from other origins can't be read); a site with its own theme setting can be set by hand, and the
   Store's page of the messaging app now says so under Known limitations (new limitation key `theme`, in every
   language). Tests: `tests/webapp_test.c` (the two words, the environment's value, the script's and the hook's text,
-  bad keys refused) and `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`). See
+  bad keys refused), `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`, with `once` and `signal`
+  listeners released) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent until the theme tells the mode, `dark`
+  and `light` after, absent again for any other value). See
   `docs/WEBAPPS.md`, "Light and dark".
 - **Web apps: hidden windows stop working for nothing.** A window that is minimized, on another desktop, closed into
   the background or wholly covered by an opaque window now tells its page it is hidden: the page stops painting, its

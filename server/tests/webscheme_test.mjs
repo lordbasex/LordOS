@@ -78,7 +78,7 @@ function makeEngine({ engineDark = false } = {}) {
     }
   }
   const win = { matchMedia, MediaQueryList, MediaQueryListEvent, EventTarget, Event, frames: [] };
-  return { win, setWidth, isReal: (x) => brand.has(x) };
+  return { win, setWidth, isReal: (x) => brand.has(x), made: () => lists.size };
 }
 
 function inject(win, dark) {
@@ -177,6 +177,63 @@ function inject(win, dark) {
   process.removeAllListeners('uncaughtException');
   for (const q of quiet) process.on('uncaughtException', q);
   eq('a throwing page listener stops nothing', s5, [1]);
+}
+
+// ---- listeners the browser drops by itself: { once } and { signal } ----
+{
+  const { win, made } = makeEngine();
+  inject(win, false);
+  // a list still tracked makes a new real list at each flip (its inner one is for the other scheme); a released one
+  // makes none
+  const flipCost = (d) => { const before = made(); win[KEY](d); return made() - before; };
+  const l = win.matchMedia('(prefers-color-scheme: dark)');
+  const s = [];
+  l.addEventListener('change', (e) => s.push(['once', e.matches]), { once: true });
+  eq('a once listener: tracked', flipCost(true), 1);
+  eq('a once listener: ran once', s, [['once', true]]);
+  eq('a once listener: released after it ran', flipCost(false), 0);
+  eq('a once listener: not again', s, [['once', true]]);
+
+  const ac = new AbortController();
+  const g = [];
+  const m = win.matchMedia('(prefers-color-scheme: dark)');
+  m.addEventListener('change', (e) => g.push(e.matches), { signal: ac.signal });
+  eq('a signal listener: tracked', flipCost(true), 1);
+  ac.abort();
+  eq('a signal listener: released once aborted', flipCost(false), 0);
+  eq('a signal listener: ran only before', g, [true]);
+
+  const dead = AbortSignal.abort();
+  const z = win.matchMedia('(prefers-color-scheme: dark)');
+  z.addEventListener('change', () => g.push('dead'), { signal: dead });
+  eq('an already aborted signal: never tracked', flipCost(true), 0);
+
+  // a once listener the page removes before it runs; then added again: still tracked, still runs once
+  const r = win.matchMedia('(prefers-color-scheme: light)');
+  const h = [];
+  const f = (e) => h.push(e.matches);
+  r.addEventListener('change', f, { once: true });
+  r.removeEventListener('change', f);
+  eq('a once listener removed by the page: released', flipCost(false), 0);
+  r.addEventListener('change', f, { once: true });
+  r.addEventListener('change', f);                      // the same listener and capture: the browser ignores it
+  eq('added again: tracked', flipCost(true), 1);
+  eq('added again: ran once', h, [false]);
+  eq('added again: released', flipCost(false), 0);
+
+  // a once listener next to a plain one: the plain one keeps the list
+  const k = win.matchMedia('(prefers-color-scheme: dark)');
+  const t = [];
+  k.addEventListener('change', () => t.push('o'), { once: true });
+  k.addEventListener('change', () => t.push('p'));
+  flipCost(true);
+  eq('once and plain: the plain one keeps it tracked', flipCost(false), 1);
+  eq('once and plain: what ran', t, ['o', 'p', 'p']);
+
+  // many lists with once listeners (a re-rendering page) leave nothing behind once they ran
+  for (let i = 0; i < 50; i++) win.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {}, { once: true });
+  flipCost(true);
+  eq('fifty once lists: released after one flip', flipCost(false), 1);   // only k's
 }
 
 // ---- an engine that already answers dark: nothing is swapped ----
