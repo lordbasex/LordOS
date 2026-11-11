@@ -7,12 +7,14 @@
 #
 #   tools/web/cdn-apt-behaviors.sh <aws-profile-that-can-update-the-distribution>
 #
-# The deploy profile ("lordos") cannot change the distribution; run this with the account's
+# The deploy profile cannot change the distribution; run this with the account's
 # administrator profile. Idempotent: running it again replaces the two behaviors with fresh copies.
 # Then check with: tools/release/apt-repo.sh verify staging
 set -eu
 PROFILE=${1:?usage: cdn-apt-behaviors.sh <aws-profile>}
-DISTRIBUTION=E35DXDFJ83X7Z8
+. "$(cd "$(dirname "$0")" && pwd)/aws-env.sh"
+lordos_aws_env LORDOS_CF_DISTRIBUTION
+DISTRIBUTION=$LORDOS_CF_DISTRIBUTION
 t=$(mktemp -d)
 trap 'rm -rf "$t"' EXIT
 aws --profile "$PROFILE" cloudfront get-distribution-config --id "$DISTRIBUTION" > "$t/current.json"

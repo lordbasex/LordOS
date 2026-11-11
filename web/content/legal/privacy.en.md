@@ -1,4 +1,4 @@
-LordOS has no accounts, no advertising and no tracking, on the website or in the distribution. Nobody sells, shares or keeps your data, because we never collect it. This policy has two parts: the **lordos.org website**, and the **LordOS distribution** you install on your computer.
+LordOS has no accounts, no advertising and no tracking, on the website or in the distribution. Nobody sells or shares your data. The only personal data we keep is the IP address in the website's request logs, used for visit statistics that only the LordOS team sees. This policy has two parts: the **lordos.org website**, and the **LordOS distribution** you install on your computer.
 
 ## Part 1: the website
 
@@ -13,13 +13,13 @@ The website is a set of static pages. It sets **no cookies** and keeps only two 
 
 They never leave your browser and we can't read them. Clear them at any time from your browser's site data settings. See the [Cookies and statistics](/legal/cookies-and-statistics/).
 
-### No analytics, no ads, no third-party code
+### No analytics services, no ads, no third-party code
 
-The website loads no analytics, no advertising, no social media widgets and no fonts or scripts from other servers: everything it needs is served from lordos.org.
+The website loads no analytics service, no advertising, no social media widgets and no fonts or scripts from other servers: everything it needs is served from lordos.org.
 
 ### Server logs
 
-The website is hosted on Amazon Web Services (S3 and CloudFront). As with any website, your browser sends your IP address and the usual request data (the page asked for, the time, the browser's user agent) to deliver the page. Standard CDN request logs may be kept by our hosting provider for security, retained for a limited time. We don't use them to identify or profile visitors.
+The website is hosted on Amazon Web Services (S3 and CloudFront). As with any website, your browser sends your IP address and the usual request data (the page asked for, the time, the browser's user agent) to deliver the page. Standard CDN request logs may be kept by our hosting provider for security, retained for a limited time. We count visits from these logs to know how the project grows: page views, visitors, countries, systems (Windows, macOS, Linux…) and devices, seen only by the LordOS team, from logs that include your IP address and are deleted after 13 months. We don't use them to identify or profile visitors. The details are in [Cookies and statistics](/legal/cookies-and-statistics/).
 
 ### Downloads on GitHub
 
@@ -55,7 +55,7 @@ The time zone is never guessed from the network. Nothing in this table goes to t
 
 These connections happen only after an action of yours:
 
-- **Store and updates:** the package lists and packages come from the Debian mirrors in your apt sources (`deb.debian.org` and `security.debian.org` by default; on the Raspberry Pi, the kernel and firmware come from `archive.raspberrypi.com`). The Store refreshes them only when you press **Check for updates** (in the Store or in Settings → Updates) or install something, and checks every list with Debian's signatures. LordOS's own updates come from LordOS's signed repository at `lordos.org/apt`, fetched at the same time. Since 0.8.5 that repository also carries the Store's featured banner (taken only from a source whose signed index says it is LordOS's, and checked against its hashes) and the list of apps on Store → Artificial Intelligence; `https://` sources are downloaded over HTTPS. LordOS's own `.lpk` apps are installed from files you choose; there is no online catalog of `.lpk` apps.
+- **Store and updates:** the package lists and packages come from the Debian mirrors in your apt sources (`deb.debian.org` and `security.debian.org` by default; on the Raspberry Pi, the kernel and firmware come from `archive.raspberrypi.com`). The Store refreshes them only when you press **Check for updates** (in the Store or in Settings → Updates) or install something, and checks every list with Debian's signatures. LordOS's own updates come from LordOS's signed repository at `lordos.org/apt`, fetched at the same time. Since 0.8.5 that repository also carries the Store's featured banner (taken only from a source whose signed index says it is LordOS's, and checked against its hashes) and the list of apps on Store → Artificial Intelligence; `https://` sources are downloaded over HTTPS. LordOS's own `.lpk` apps are installed from files you choose; there is no online catalog of `.lpk` apps. The website's CDN logs these requests like any other, with your IP address, for 13 months; they are not used for statistics (see [Cookies and statistics](/legal/cookies-and-statistics/)).
 - **Apps from their makers' repositories** (since 0.8.5): installing an app from Store → Artificial Intelligence or Store → Commercial whose maker has its own repository first tells you whose repository it adds and its key fingerprint, then adds it, so from then on the Store and apt also fetch that maker's package lists. Removing the app removes that repository unless another installed app uses it. What the app itself connects to is up to its maker.
 - **Language packages:** adding a language in Settings can install its dictionaries and fonts from the same Debian mirrors.
 - **Printers and scanners:** Settings → Printers & Scanners asks the local network (mDNS) which printers and scanners are there, and talks only to local addresses.
@@ -80,7 +80,7 @@ These connections happen only after an action of yours:
 
 ### Your rights
 
-Because we don't collect personal data through the website or the distribution, there is usually nothing about you for us to access, correct or delete. For anything we do hold (an email you sent us, a donation record), you can ask to see it, correct it or delete it, subject to the records we must keep by law. If you are in Argentina, Law 25.326 on personal data protection gives you these rights, and you can complain to the Agency of Access to Public Information (AAIP). If you are in the European Union, Brazil or another country with similar laws (GDPR, LGPD), you have the rights those laws give you.
+The distribution collects no personal data. The website keeps IP addresses in its request logs for 13 months, as described above. For anything we hold (those logs, an email you sent us, a donation record), you can ask to see it, correct it or delete it, subject to the records we must keep by law. If you are in Argentina, Law 25.326 on personal data protection gives you these rights, and you can complain to the Agency of Access to Public Information (AAIP). If you are in the European Union, Brazil or another country with similar laws (GDPR, LGPD), you have the rights those laws give you.
 
 ### Contact
 
