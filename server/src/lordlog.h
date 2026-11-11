@@ -6,7 +6,8 @@
  *       users/                                root-owned, 0711: nobody can list the user names
  *           <user>/                           the user's own, 0700, made by lord-sessiond at login
  *               compositor.log  shell.log     lord-server's own lines and the shell's (React/QuickJS) ones;
- *                                             the previous session's are kept as <name>.log.prev
+ *                                             the previous session's are kept as <name>.log.prev,
+ *                                             what a cap moved aside this session as <name>.log.old
  *               xwayland.log  cloud.log
  *               apps/<app>.log                each isolated native app and each Linux app
  *               web/<app>-<profile>.log       each web app (lord-web)
@@ -20,9 +21,12 @@
  * crash loses nothing that was already written. Output of other programs (a Linux app, Xwayland,
  * rclone, WebKit) is theirs, written as is, between stamped start lines.
  *
- * Rotation: /etc/logrotate.d/lordos (daily or 10 MB, 7 copies, compressed, copytruncate), and here a
- * fallback cap of LORDLOG_CAP per file: above it the file is copied to <name>.prev and emptied, so the
- * disk never fills even without logrotate. libc only. */
+ * Rotation: /etc/logrotate.d/lordos rotates only the root daemons' files directly in /var/log/lordos
+ * (daily, 7 copies, compressed, copytruncate). Root never rotates inside users/<user>: logrotate works
+ * on path strings, and a user could swap apps/ or web/ for a symlink while it runs. A user's files are
+ * kept small by their own writers instead, running as that user: a cap of LORDLOG_CAP per file, above
+ * which the newest part is copied to <name>.old and the file emptied, so the disk never fills even
+ * without logrotate. libc only. */
 #ifndef LORDLOG_H
 #define LORDLOG_H
 
@@ -67,8 +71,8 @@ int lordlog_path(const char *sub, const char *name, char *out, size_t n);
 /* Opens a log for appending (O_APPEND|O_NOFOLLOW, 0600), capping it first; -1 if it isn't a
  * regular file. Only open() and the cap's read/write/ftruncate: fine after fork. */
 int lordlog_open(const char *path);
-/* If path is a regular file bigger than cap: its newest part (cap bytes) goes to <path>.prev (replaced) and the file is
- * emptied in place, so writers holding it with O_APPEND go on at its start. 1 if it did, 0 if it
+/* If path is a regular file bigger than cap: its newest part (cap bytes) goes to <path>.old (replaced; never
+ * .prev, which is the previous session's) and the file is emptied in place, so writers holding it with O_APPEND go on at its start. 1 if it did, 0 if it
  * didn't need to, -1 on error. */
 int lordlog_cap(const char *path, off_t cap);
 /* At a session's start: <path> becomes <path>.prev if it has anything (the previous session). */
@@ -101,5 +105,12 @@ int lordlog_system_start(const char *name);
 /* The original stderr kept by lordlog_system_start (close-on-exec), or -1: a child that has its own
  * log points its stderr back there, so its lines don't reach this daemon's file too. */
 int lordlog_journal_fd(void);
+
+/* In an isolated app's process (lord-server --app), before its sandbox and before any of its code
+ * runs: when its stderr is <dir>/<sub>/<name>.log, a lord-log child takes that file over and the
+ * app's stdout and stderr become a pipe to it. The child copies the bytes as is (never parsing
+ * them) and checks the cap after every MB, so an app writing in a loop can't grow the file past
+ * about LORDLOG_CAP + 1 MB between the minute's scans. 0, or -1 (nothing changed). */
+int lordlog_app_start(const char *sub, const char *name);
 
 #endif

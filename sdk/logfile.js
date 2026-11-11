@@ -4,7 +4,8 @@
 //   parseLordLog(text, file) → [{ t, line, p, id, u, pid, uid, k, b, m }]   rows like the journal's (t in µs, p a syslog priority)
 //   fileGroup(name)          → 'session' | 'apps' | 'web' | 'old'           where the Logs sidebar lists a file
 //   fileLabel(name)          → the name shown: "compositor", "compositor (previous)" is done by the app with t()
-//   isPrevious(name)         → true for "<name>.log.prev" (the previous session's)
+//   isPrevious(name)         → true for "<name>.log.prev" (the previous session's, kept at login)
+//   isOlder(name)            → true for "<name>.log.old" (the older part the 16 MB cap moved aside)
 //
 // A line written by LordOS is "2026-11-11T12:43:56.123-03:00 INFO  xwayland: message" (local time with its
 // offset, ERROR|WARN|INFO|DEBUG, the subsystem). Anything else (a Linux app's own output, or a log from an
@@ -26,7 +27,7 @@ function guessLevel(low) {
 }
 
 export function fileBase(file) {
-  return String(file || '').replace(/^.*\//, '').replace(/\.log(\.prev)?$/, '');
+  return String(file || '').replace(/^.*\//, '').replace(/\.log(\.prev|\.old)?$/, '');
 }
 
 export function parseLordLog(text, file) {
@@ -59,11 +60,13 @@ export function fileGroup(name) {
 }
 
 export const isPrevious = (name) => /\.log\.prev$/.test(String(name || ''));
+export const isOlder = (name) => /\.log\.old$/.test(String(name || ''));
+const kind = (name) => (isOlder(name) ? 1 : isPrevious(name) ? 2 : 0);
 
 export function fileLabel(name) { return fileBase(name); }
 
 // The sidebar's order: the session's files first (compositor, shell, then the rest by name; each previous
-// one right after its current one), then apps, web apps and the old place, each by name.
+// one right after its current one, after its older part), then apps, web apps and the old place, each by name.
 export function sortFiles(files) {
   const rank = { session: 0, apps: 1, web: 2, old: 3 };
   const first = { compositor: 0, shell: 1 };
@@ -74,6 +77,6 @@ export function sortFiles(files) {
     const fa = first[ba] ?? 9, fb = first[bb] ?? 9;
     if (ga === 'session' && fa !== fb) return fa - fb;
     if (ba !== bb) return ba < bb ? -1 : 1;
-    return (isPrevious(a.name) ? 1 : 0) - (isPrevious(b.name) ? 1 : 0);
+    return kind(a.name) - kind(b.name);
   });
 }

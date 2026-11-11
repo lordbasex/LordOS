@@ -1,30 +1,17 @@
-# LordOS's logs (server/src/lordlog.h, docs/SYSTEM.md "Log files"): the root daemons' files in
-# /var/log/lordos and each user's in /var/log/lordos/users/<user> (their session, apps and web apps).
-# Daily, or at the first run after one passes 10 MB; 7 compressed copies. Between runs, the writers
-# themselves cap every file at 16 MB, so the disk never fills even without logrotate.
+# LordOS's logs (server/src/lordlog.h, docs/SYSTEM.md "Log files"): the root daemons' files directly in
+# /var/log/lordos (lord-sessiond, lord-netd, lord-fand, admin). Daily, 7 compressed copies. Between runs
+# the stamping child caps each at 16 MB (the older part goes to <name>.log.old).
 #
-# copytruncate, not a reopen signal: most writers are other programs holding the file as their
-# stdout/stderr (Linux apps, Xwayland, lord-web and WebKit, rclone), opened with O_APPEND, which
-# can't be told to reopen it; after the truncation they simply go on at the start. The price is that
-# lines written between the copy and the truncation are lost, which is fine for these logs.
+# copytruncate, not a reopen signal: the writer is a small lord-log child holding the file with
+# O_APPEND for its daemon's whole life; after the truncation it simply goes on at the start. The price
+# is that lines written between the copy and the truncation are lost, which is fine for these logs.
 #
-# The users' folders are theirs (0700): logrotate opens their files without following symlinks
-# and skips anything that is not a regular file, and users/ itself is root's, so a user can't point
-# a rotation anywhere else. A <name>.log.prev there is the previous session's, kept at login (or
-# the part a writer's cap moved aside); logrotate's own copies are <name>.log.N.gz.
+# Nothing here for /var/log/lordos/users/<user>: those folders (and their apps/ and web/) are the
+# user's, and logrotate works on path strings, so a user could swap a subfolder for a symlink while it
+# runs and make root create its copies elsewhere. Their files are capped by their own writers, running
+# as that user (lordlog_cap), and the previous session's are kept as <name>.log.prev at login.
 /var/log/lordos/*.log {
     daily
-    maxsize 10M
-    rotate 7
-    compress
-    missingok
-    notifempty
-    copytruncate
-}
-
-/var/log/lordos/users/*/*.log /var/log/lordos/users/*/apps/*.log /var/log/lordos/users/*/web/*.log {
-    daily
-    maxsize 10M
     rotate 7
     compress
     missingok

@@ -27,6 +27,7 @@
   "src.kernel": "Kernel",
   "noFiles": "No logs yet",
   "previous": "{name} (previous session)",
+  "older": "{name} (older part)",
   "hint.user": "Your journal: your apps and services. Read with your permissions.",
   "hint.lordos": "Logs of your LordOS session and apps, in {dir}. Only you can read them.",
   "hint.systemDirect": "The system journal: your group lets you read it.",

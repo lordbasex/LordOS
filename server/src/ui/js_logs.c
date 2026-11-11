@@ -12,8 +12,8 @@
  *                              __lordLogs('result', id) arrives; fetch the result with take(id)
  *   take(id)                   [{ t, s, p, pid, uid, k, id, u, b, m }] (t in µs) or null
  *   dir()                      { dir, system }: the user's log folder, and whether it is under /var/log/lordos
- *   files()                    [{ name, size, mtime }]: "<name>.log" and "<name>.log.prev" (the previous
- *                              session) in it, "apps/<app>.log", "web/<app>-<profile>.log", and when it is
+ *   files()                    [{ name, size, mtime }]: "<name>.log", "<name>.log.prev" (the previous
+ *                              session) and "<name>.log.old" (what the 16 MB cap moved aside) in it, "apps/<app>.log", "web/<app>-<profile>.log", and when it is
  *                              /var/log/lordos the logs left in ~/.cache/lordos by older versions as "cache/<name>.log"
  *   tail(name, bytes)          the end of one of those files (max. 1 MB), from a line start
  *   follow(on)                 inotify on the journal folders and those folders:
@@ -73,11 +73,12 @@ static int sub_dir(int i, char *out, size_t n) {
     return (size_t)snprintf(out, n, i ? "%s/%s" : "%s", d, subs[i]) < n ? 0 : -1;
 }
 
-/* a log file's own name: <safe name>.log or <safe name>.log.prev */
+/* a log file's own name: <safe name>.log, <safe name>.log.prev or <safe name>.log.old */
 static int file_ok(const char *n) {
     size_t l = strlen(n);
     if (!lordlog_name_ok(n) || l < 5) return 0;
-    return !strcmp(n + l - 4, ".log") || (l >= 10 && !strcmp(n + l - 9, ".log.prev"));
+    return !strcmp(n + l - 4, ".log") || (l >= 10 && !strcmp(n + l - 9, ".log.prev")) ||
+           (l >= 9 && !strcmp(n + l - 8, ".log.old"));
 }
 
 /* "name", "apps/name", "web/name" or "cache/name" → its folder's index and the file's name; -1 if not one */

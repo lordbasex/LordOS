@@ -148,14 +148,19 @@ int lordlog_path(const char *sub, const char *name, char *out, size_t n) {
 
 /* ---- opening, the cap, rotation ---- */
 
-/* "<path>.prev" without stdio (used after fork); not ".1", which is logrotate's */
-static int dot1(const char *path, char *out, size_t n) {
-    size_t l = strlen(path);
-    if (l + 6 > n) return -1;
+/* "<path><ext>" without stdio (used after fork). Two names, never ".1" (logrotate's):
+ *   .prev  the previous session's file, only from lordlog_rotate at a session's start;
+ *   .old   the older part a cap moved aside during this session, so a long or noisy session
+ *          never overwrites the previous one's (the crash evidence). */
+static int with_ext(const char *path, const char *ext, char *out, size_t n) {
+    size_t l = strlen(path), e = strlen(ext);
+    if (l + e + 1 > n) return -1;
     memcpy(out, path, l);
-    memcpy(out + l, ".prev", 6);
+    memcpy(out + l, ext, e + 1);
     return 0;
 }
+#define PREV(p, o, n) with_ext(p, ".prev", o, n)
+#define OLD(p, o, n)  with_ext(p, ".old", o, n)
 
 int lordlog_cap(const char *path, off_t cap) {
     int fd = open(path, O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
@@ -165,7 +170,7 @@ int lordlog_cap(const char *path, off_t cap) {
     if (st.st_size <= cap) { close(fd); return 0; }
     char old[PATH_MAX];
     int r = -1;
-    if (!dot1(path, old, sizeof old)) {
+    if (!OLD(path, old, sizeof old)) {
         unlink(old);
         int o = open(old, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NOCTTY | O_CLOEXEC, 0600);
         if (o >= 0) {
@@ -210,7 +215,7 @@ int lordlog_open(const char *path) {
 void lordlog_rotate(const char *path) {
     struct stat st;
     char old[PATH_MAX];
-    if (!lstat(path, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && !dot1(path, old, sizeof old)) rename(path, old);
+    if (!lstat(path, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && !PREV(path, old, sizeof old)) rename(path, old);
 }
 
 /* ---- the line format ---- */
@@ -308,7 +313,7 @@ static void out_reopen_if_big(Out *o) {
     struct stat st;
     if (fstat(o->fd, &st) || st.st_size <= LORDLOG_CAP) return;
     char old[PATH_MAX];
-    if (dot1(o->path, old, sizeof old) || rename(o->path, old)) { if (ftruncate(o->fd, 0)) {} return; }
+    if (OLD(o->path, old, sizeof old) || rename(o->path, old)) { if (ftruncate(o->fd, 0)) {} return; }
     int fd = open(o->path, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_NOCTTY | O_CLOEXEC, 0600);
     if (fd < 0) return;
     if (dup2(fd, o->fd) >= 0) close(fd); else { close(o->fd); o->fd = fd; }
@@ -400,8 +405,22 @@ static void stamper(int in, int raw, Out *outs, int nout, const char *scan_dir) 
     }
 }
 
-/* Forks the child; in the parent, stdout (if also_stdout) and stderr become the pipe. */
-static int start(Out *outs, int nout, int raw, const char *scan_dir, int also_stdout) {
+/* An isolated app's output: copied as is, never parsed (it is untrusted), only counted for the cap */
+static void copier(int in, Out *o) {
+    static char buf[65536];
+    for (;;) {
+        ssize_t k = read(in, buf, sizeof buf);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        if (write(o->fd, buf, (size_t)k) < 0) { /* full disk: dropped */ }
+        o->since_check += (off_t)k;
+        if (o->since_check > (1 << 20)) { o->since_check = 0; out_reopen_if_big(o); }
+    }
+}
+
+/* Forks the child; in the parent, stdout (if also_stdout) and stderr become the pipe. copy: the
+ * child copies bytes into outs[0] instead of stamping lines. */
+static int start(Out *outs, int nout, int raw, const char *scan_dir, int also_stdout, int copy) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
     tzset();
@@ -427,7 +446,8 @@ static int start(Out *outs, int nout, int raw, const char *scan_dir, int also_st
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         prctl(PR_SET_NAME, "lord-log");
-        stamper(3, raw >= 0 ? 3 + nout + 1 : -1, outs, nout, scan_dir);
+        if (copy) copier(3, &outs[0]);
+        else stamper(3, raw >= 0 ? 3 + nout + 1 : -1, outs, nout, scan_dir);
         _exit(0);
     }
     close(p[0]);
@@ -452,7 +472,7 @@ int lordlog_session_start(void) {
         lordlog_rotate(outs[i].path);
         outs[i].fd = lordlog_open(outs[i].path);
     }
-    int r = outs[0].fd >= 0 && outs[1].fd >= 0 ? start(outs, 2, -1, d, 1) : -1;
+    int r = outs[0].fd >= 0 && outs[1].fd >= 0 ? start(outs, 2, -1, d, 1, 0) : -1;
     for (int i = 0; i < 2; i++) if (outs[i].fd >= 0) close(outs[i].fd);
     return r;
 }
@@ -476,9 +496,21 @@ int lordlog_system_start(const char *name) {
     if (out.fd < 0) return -1;
     if (fstat(out.fd, &st) || !S_ISREG(st.st_mode) || st.st_nlink != 1) { close(out.fd); return -1; }
     int j = fcntl(2, F_DUPFD_CLOEXEC, 3);
-    int rc = j >= 0 ? start(&out, 1, j, NULL, 0) : -1;
+    int rc = j >= 0 ? start(&out, 1, j, NULL, 0, 0) : -1;
     close(out.fd);
     if (rc) { if (j >= 0) close(j); return -1; }
     journal = j;
     return 0;
+}
+
+int lordlog_app_start(const char *sub, const char *name) {
+    static Out out;
+    out = (Out){ .fd = -1, .dflt = "app" };
+    if (lordlog_path(sub, name, out.path, sizeof out.path)) return -1;
+    struct stat a, b;
+    /* only when stderr is that very file (app_spawn opened it): then it is the only writer's way in */
+    if (fstat(2, &a) || lstat(out.path, &b) || !S_ISREG(a.st_mode) || !S_ISREG(b.st_mode) ||
+        a.st_dev != b.st_dev || a.st_ino != b.st_ino) return -1;
+    out.fd = 2;
+    return start(&out, 1, -1, NULL, 1, 1);
 }

@@ -27,6 +27,7 @@
   "src.kernel": "Noyau",
   "noFiles": "Aucun journal pour l’instant",
   "previous": "{name} (session précédente)",
+  "older": "{name} (partie précédente)",
   "hint.user": "Votre journal : vos apps et services. Lecture avec vos autorisations.",
   "hint.lordos": "Journaux de votre session LordOS et de vos apps, dans {dir}. Vous seul pouvez les lire.",
   "hint.systemDirect": "Le journal système : votre groupe vous permet de le lire.",

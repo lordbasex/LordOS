@@ -27,6 +27,7 @@
   "src.kernel": "Branduolys",
   "noFiles": "Žurnalų dar nėra",
   "previous": "{name} (ankstesnis seansas)",
+  "older": "{name} (ankstesnė dalis)",
   "hint.user": "Jūsų žurnalas: jūsų programos ir tarnybos. Skaitoma su jūsų teisėmis.",
   "hint.lordos": "Jūsų LordOS seanso ir programų žurnalai, {dir}. Juos galite skaityti tik jūs.",
   "hint.systemDirect": "Sistemos žurnalas: jūsų grupė leidžia jį skaityti.",

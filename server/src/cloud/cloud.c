@@ -663,7 +663,7 @@ static int daemon_start(void) {
     mkdirs(cache, 0700);
     if (lordlog_dir_is_system()) cl_pf(log_path, sizeof log_path, "%s/" LOG_NAME, lordlog_dir());
     else cl_pf(log_path, sizeof log_path, "%s/.cache/lordos/" LOG_NAME, cl_home);
-    lordlog_cap(log_path, LOG_MAX);                         /* the older part goes to cloud.log.prev */
+    lordlog_cap(log_path, LOG_MAX);                         /* the older part goes to cloud.log.old */
     char *argv[] = { "rclone", "rcd", "--rc-addr", addr, "--rc-htpasswd", "/proc/self/fd/3", "--config", "", "--cache-dir", cache,
                      "--log-file", log_path, "--log-level", "NOTICE", "--use-mmap", "--buffer-size", "16M", "--transfers", "4",
                      /* B10: a server that doesn't answer fails a cold read in about 8 s, not minutes (measured: 8.6 s

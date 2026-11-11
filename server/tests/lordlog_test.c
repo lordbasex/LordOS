@@ -45,6 +45,18 @@ static char *slurp(const char *p) {
     return buf;
 }
 
+/* the last 64 KB of a file */
+static char *slurp_tail(const char *p) {
+    int fd = open(p, O_RDONLY);
+    if (fd < 0) return NULL;
+    static char buf[1 << 16];
+    off_t end = lseek(fd, 0, SEEK_END), at = end > (off_t)sizeof buf - 1 ? end - (off_t)sizeof buf + 1 : 0;
+    ssize_t n = pread(fd, buf, sizeof buf - 1, at);
+    close(fd);
+    buf[n > 0 ? n : 0] = 0;
+    return buf;
+}
+
 static off_t size_of(const char *p) { struct stat st; return stat(p, &st) ? -1 : st.st_size; }
 
 static void test_names(void) {
@@ -188,9 +200,10 @@ static void test_user_dir(void) {
 }
 
 static void test_cap_rotate(void) {
-    char p[PATH_MAX], p1[PATH_MAX + 8];
+    char p[PATH_MAX], p1[PATH_MAX + 8], pp[PATH_MAX + 8];
     snprintf(p, sizeof p, "%s/cap.log", T);
-    snprintf(p1, sizeof p1, "%s.prev", p);
+    snprintf(p1, sizeof p1, "%s.old", p);
+    snprintf(pp, sizeof pp, "%s.prev", p);
     CHECK(lordlog_cap(p, 100) == 0, "missing: nothing to do");
     int fd = lordlog_open(p);
     CHECK(fd >= 0 && mode_of(p) == 0600, "opened 0600: %o", mode_of(p));
@@ -205,7 +218,7 @@ static void test_cap_rotate(void) {
     CHECK(size_of(p) == 0, "emptied: %lld", (long long)size_of(p));
     char *old = slurp(p1);
     CHECK(old && strlen(old) <= 1000 && strlen(old) >= 980 && !strncmp(old, "line 05", 7) && strstr(old, "line 099"),
-          ".prev has the newest part from a line start: %.20s (%zu)", old ? old : "", old ? strlen(old) : 0);
+          ".old has the newest part from a line start: %.20s (%zu)", old ? old : "", old ? strlen(old) : 0);
     /* a writer holding it with O_APPEND goes on at the start */
     if (write(fd, "after\n", 6) != 6) {}
     CHECK(size_of(p) == 6, "append after cap: %lld", (long long)size_of(p));
@@ -216,6 +229,19 @@ static void test_cap_rotate(void) {
     for (int i = 0; i < 1100; i++) if (write(fd, "0123456789abcde\n", 16) < 0) break;  /* 17.6 KB */
     close(fd);
     CHECK(lordlog_cap(p, 16 * 1024) == 1 && size_of(p) == 0, "cap at 16 KB");
+    CHECK(access(pp, F_OK), "the cap never writes .prev");
+    /* the previous session's .prev survives a cap of this session's file */
+    put(p, "the previous session\n");
+    lordlog_rotate(p);
+    put(p, "");
+    fd = open(p, O_WRONLY | O_APPEND);
+    for (int i = 0; i < 200; i++) if (write(fd, "this session xx\n", 16) < 0) break;
+    close(fd);
+    CHECK(lordlog_cap(p, 1000) == 1, "capped again");
+    char *pv = slurp(pp);
+    CHECK(pv && !strcmp(pv, "the previous session\n"), "the previous session is kept: %.30s", pv ? pv : "");
+    char *od = slurp(p1);
+    CHECK(od && strstr(od, "this session xx\n") && !strstr(od, "previous"), "the older part in .old");
     /* symlinks are never followed */
     char target[PATH_MAX], lp[PATH_MAX];
     snprintf(target, sizeof target, "%s/cap-target", T);
@@ -278,7 +304,7 @@ static void test_format(void) {
 }
 
 /* lord-server's session start in a child: its stderr through the lord-log child into the files */
-static void session_once(const char *home, const char *a, const char *b) {
+static void session_once(const char *home, const char *a, const char *b, int flood_mb) {
     fflush(stdout);
     pid_t pid = fork();
     if (pid == 0) {
@@ -296,6 +322,8 @@ static void session_once(const char *home, const char *a, const char *b) {
         memset(big, 'z', sizeof big - 1);
         big[sizeof big - 1] = 0;
         fprintf(stderr, "%s\n", big);
+        /* a noisy session: past the 16 MB cap, through the lord-log child */
+        for (long i = 0; i < (long)flood_mb * 16384; i++) fprintf(stderr, "flood: %060ld\n", i);
         fprintf(stderr, "no newline at the end");
         fflush(stderr);                             /* _exit does not flush a line-buffered stderr */
         _exit(0);
@@ -306,8 +334,8 @@ static void session_once(const char *home, const char *a, const char *b) {
 }
 
 static int wait_for(const char *p, const char *text) {
-    for (int i = 0; i < 200; i++) {
-        char *s = slurp(p);
+    for (int i = 0; i < 500; i++) {
+        char *s = slurp_tail(p);
         if (s && strstr(s, text)) return 1;
         struct timespec ts = { 0, 10 * 1000 * 1000 };
         nanosleep(&ts, NULL);
@@ -322,7 +350,7 @@ static void test_session(void) {
     snprintf(comp, sizeof comp, "%s/.cache/lordos/compositor.log", home);
     snprintf(shell, sizeof shell, "%s/.cache/lordos/shell.log", home);
     snprintf(comp1, sizeof comp1, "%s.prev", comp);
-    session_once(home, "first session", "one");
+    session_once(home, "first session", "one", 0);
     CHECK(wait_for(comp, "no newline at the end"), "first written");
     char *c = slurp(comp);
     CHECK(c && strstr(c, " INFO  lord-server: first session\n"), "stamped with its subsystem:\n%s", c ? c : "");
@@ -335,12 +363,21 @@ static void test_session(void) {
     CHECK(s && strstr(s, " js: TypeError: one\n") && strstr(s, " js:     at f (theme.js:1)\n"), "shell with its stack:\n%s", s ? s : "");
     CHECK(mode_of(comp) == 0600 && mode_of(shell) == 0600, "0600");
     /* the next session keeps this one as .prev */
-    session_once(home, "second session", "two");
+    session_once(home, "second session", "two", 0);
     CHECK(wait_for(comp, "second session"), "second written");
     c = slurp(comp);
     CHECK(c && !strstr(c, "first session"), "new file");
     char *c1 = slurp(comp1);
     CHECK(c1 && strstr(c1, "first session"), "previous session kept as .prev");
+    /* a third, noisy one (18 MB of lines): its older part goes to .old, the second session stays in .prev */
+    char comp_old[PATH_MAX * 2 + 8];
+    snprintf(comp_old, sizeof comp_old, "%s.old", comp);
+    session_once(home, "third session", "three", 18);
+    CHECK(wait_for(comp, "no newline at the end"), "third written");
+    c1 = slurp(comp1);
+    CHECK(c1 && strstr(c1, "second session") && !strstr(c1, "flood"), "a noisy session keeps the previous one in .prev");
+    CHECK(size_of(comp_old) > 0 && size_of(comp) < LORDLOG_CAP, "its overflow in .old: %lld, %lld",
+          (long long)size_of(comp_old), (long long)size_of(comp));
     /* lordlog_path: apps/ and web/ under the same folder, names sanitized */
     fflush(stdout);
     pid_t pid = fork();
@@ -363,6 +400,46 @@ static void test_session(void) {
     CHECK(mode_of(app) == 0700, "apps/ 0700: %o", mode_of(app));
 }
 
+/* an isolated app's output: copied as is through lord-log and capped while it writes */
+static void test_app(void) {
+    char home[PATH_MAX], log[PATH_MAX * 2], old[PATH_MAX * 2 + 8];
+    snprintf(home, sizeof home, "%s/app-home", T);
+    mkdir(home, 0700);
+    snprintf(log, sizeof log, "%s/.cache/lordos/apps/t.app.log", home);
+    snprintf(old, sizeof old, "%s.old", log);
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid == 0) {
+        setenv("HOME", home, 1);
+        char root[PATH_MAX];
+        snprintf(root, sizeof root, "%s/no-such-root", T);
+        lordlog_root = root;
+        char p[PATH_MAX];
+        if (lordlog_path("apps", "t.app", p, sizeof p)) _exit(2);
+        if (!lordlog_app_start("apps", "t.app")) _exit(3);          /* stderr is not that file: nothing */
+        int fd = lordlog_open(p);
+        if (fd < 0 || dup2(fd, 2) < 0) _exit(4);
+        close(fd);
+        if (lordlog_app_start("apps", "t.app")) _exit(5);
+        struct stat a, b;
+        if (fstat(2, &a) || stat(p, &b) || S_ISREG(a.st_mode)) _exit(6);   /* stderr is now the pipe */
+        char line[100];
+        memset(line, 'q', sizeof line - 1);
+        line[sizeof line - 1] = '\n';
+        for (int i = 0; i < 19 * 10486; i++) if (write(2, line, sizeof line) < 0) _exit(7);   /* about 19 MB */
+        if (write(2, "raw: last line\n", 15) != 15) _exit(8);
+        _exit(0);
+    }
+    int st = 0;
+    waitpid(pid, &st, 0);
+    CHECK(WIFEXITED(st) && !WEXITSTATUS(st), "app child: %d", WEXITSTATUS(st));
+    CHECK(wait_for(log, "raw: last line\n"), "the app's lines copied as is");
+    char *t = slurp_tail(log);
+    CHECK(t && !strstr(t, " INFO ") && !strstr(t, "app: raw"), "not stamped");
+    CHECK(size_of(log) < LORDLOG_CAP && size_of(old) > LORDLOG_CAP - (1 << 20) && size_of(old) <= LORDLOG_CAP + (2 << 20),
+          "capped while it writes: %lld, .old %lld", (long long)size_of(log), (long long)size_of(old));
+}
+
 int main(void) {
     snprintf(T, sizeof T, "%s/lordlog-test.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
     if (!mkdtemp(T)) { perror("mkdtemp"); return 1; }
@@ -371,6 +448,7 @@ int main(void) {
     test_prepare();
     test_user_dir();
     test_cap_rotate();
+    test_app();
     test_format();
     test_session();
     if (!getenv("LORDLOG_TEST_KEEP")) sh("rm -rf '%s'", T);

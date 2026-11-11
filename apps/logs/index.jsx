@@ -12,7 +12,7 @@
 // filtered view to Documents. The list draws only the visible rows.
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
-  logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious,
+  logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -317,7 +317,8 @@ export default function Registros() {
           if (!list.length) return null;
           return [
             g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
-            ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
+            ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
+              : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
           ];
         })}
         <View style={{ flex: 1 }} />

@@ -78,7 +78,7 @@ last account goes, and ends with the session.
 `rclone mount` (`server/src/cloud/cloud.c`, `daemon_start`): fixed argv and a fixed environment (HOME, PATH, LANG,
 XDG_RUNTIME_DIR, USER), umask 077, `nice 10`, idle I/O, `PR_SET_PDEATHSIG` (rclone unmounts and ends if `lord-server` dies),
 scope through lord-sessiond with `memory.high` 512 MB. Its log is `cloud.log` in the user's log folder
-(`/var/log/lordos/users/<user>`, docs/SYSTEM.md "Log files"; NOTICE level; over 4 MB its newest part becomes `cloud.log.prev` at
+(`/var/log/lordos/users/<user>`, docs/SYSTEM.md "Log files"; NOTICE level; over 4 MB its newest part becomes `cloud.log.old` at
 the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
 there: the scope and the socket are the boundary.
 

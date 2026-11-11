@@ -11,6 +11,7 @@
  * Lo lanza lord-server (tercera excepción acotada a «el servidor no ejecuta comandos», ver
  * AGENTS.md): el único argumento es un id validado de un paquete instalado. */
 #include "app.h"
+#include "../lordlog.h"
 #include "../sec/codesig.h"
 #include "../ui/ui.h"
 #include "../ui/js.h"
@@ -477,6 +478,9 @@ static int manifest_pair(const char *dir, const char *key, int *w, int *h) {
 int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     t_start = now_ms();
     if (!lpk_valid_id(id)) { fprintf(stderr, "lord-server --app: invalid id\n"); return 2; }
+    /* apps/<id>.log (app_spawn opened it as our stderr) goes through a lord-log child that copies and
+     * caps it, so this app's output can't fill /var between the session's checks (lordlog.h) */
+    lordlog_app_start("apps", id);
     /* the process name is the app's id ("mail"), not "exe" (it was started through /proc/self/exe):
      * ps, top and the Monitor's process list show which app it is */
     prctl(PR_SET_NAME, id, 0, 0, 0);

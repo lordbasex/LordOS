@@ -536,7 +536,8 @@ LordOS's log viewer.
     action `logs-system`; anyone else is told it needs an administrator;
   - **Kernel:** the kernel's messages (`_TRANSPORT=kernel`) from the readable journal;
   - **LordOS:** the user's LordOS log files (see "Log files" below): the session's (`compositor`,
-    `shell`, `xwayland`, `cloud`, each with its previous session's `.prev`), then **Apps** (`apps/<app>.log`),
+    `shell`, each with its previous session's `.prev`, then `xwayland`, `cloud`; a file's `.old`, the
+    older part its 16 MB cap moved aside, is shown as "(older part)"), then **Apps** (`apps/<app>.log`),
     **Web apps** (`web/<app>-<profile>.log`) and **Older logs** (`cache/<name>.log`: what an older version
     left in `~/.cache/lordos`). Stamped lines show their time, level and subsystem; other lines (a
     Linux app's own output) get a level from their words (`sdk/logfile.js`).
@@ -561,7 +562,7 @@ user's ones:
 | `/var/log/lordos/lord-sessiond.log` | lord-sessiond (root; 0640) |
 | `/var/log/lordos/lord-netd.log` | lord-netd (root; 0640) |
 | `/var/log/lordos/lord-fand.log` | lord-fand (root; 0640; `LogsDirectory=` makes it writable under `ProtectSystem=strict`) |
-| `/var/log/lordos/admin.log` | the administration helper (root; refusals, never arguments) |
+| `/var/log/lordos/admin.log` | the administration helper (root; its refusals, by action name, never arguments, and the output of the programs it runs: dpkg, wpa_supplicant, openvpn, pppd) |
 | `users/<user>/compositor.log` | lord-server (the compositor) |
 | `users/<user>/shell.log` | the shell: React/QuickJS (`js: …` lines and their stacks) |
 | `users/<user>/xwayland.log` | Xwayland |
@@ -576,7 +577,8 @@ user's ones:
   and the user's folder is fixed with `fchown`/`fchmod` on its own fd to the user, 0700. A `users/<user>`
   that is a symlink, not a folder, or another uid's folder (an account removed and made again with
   the same name) is refused and left as it is, and the session falls back to `~/.cache/lordos`. Root
-  never touches anything inside. Migration `007-0.8.8.8-logs.sh` makes the first two folders too.
+  never touches anything inside, and root's logrotate has no rule for it (see "Rotation").
+  Migration `007-0.8.8.8-logs.sh` makes the first two folders too.
 - **Which folder.** lord-server uses `users/<user>` only under lord-sessiond (`LORDOS_SESSIOND`), with
   `$HOME` the account's own home, and when that folder is a real folder of its uid with no group or
   other access; otherwise (a nested or development lord-server, a test with another `$HOME`)
@@ -591,15 +593,24 @@ user's ones:
   to the journal as they were. A child with a log of its own (Linux apps, Xwayland, lord-web, rclone)
   writes its own output as is, after a stamped "starting …" line from lord-server.
 - **The previous session.** At login `compositor.log` and `shell.log` become `.prev` (they used to be
-  truncated, losing the crash that ended the session).
-- **Rotation.** `/etc/logrotate.d/lordos` (`packaging/logrotate/lordos`; logrotate is a Recommends):
-  daily, or at the first run after a file passes 10 MB, 7 copies, compressed, `copytruncate`, because
-  most writers are other programs holding the file with `O_APPEND` that can't be told to reopen it.
-  logrotate opens the users' files without following symlinks (checked on VM 127 with a symlink to a
-  root-only file planted as `<name>.log.1` and as `<name>.log`: refused, nothing read). As a fallback
-  the writers cap every file at 16 MB themselves (the newest part goes to `<name>.prev`, the file is
-  emptied in place), checked when a log is opened and every minute by the session's `lord-log`
-  child, so the disk never fills even without logrotate.
+  truncated, losing the crash that ended the session). Only this does: `.prev` always means "the
+  previous session", never the overflow of the current one (that is `.old`, below).
+- **Rotation.** `/etc/logrotate.d/lordos` (`packaging/logrotate/lordos`; logrotate is a Recommends)
+  rotates only the root daemons' files directly in `/var/log/lordos`: daily, 7 copies, compressed,
+  `copytruncate` (the writer is the daemon's `lord-log` child holding the file with `O_APPEND`). Root's
+  logrotate never works inside `users/<user>`: those folders and their `apps/` and `web/` are the
+  user's, logrotate works on path strings, and a user could swap a subfolder for a symlink while it
+  runs and have root create its copies anywhere.
+- **The cap.** Every file, the users' and the daemons', is capped at 16 MB by its own writers, as the
+  user who owns it: above that its newest part goes to `<name>.log.old` (replaced each time) and the
+  file is emptied in place, so programs holding it with `O_APPEND` go on at its start. It is checked
+  when a log is opened, after every MB that a `lord-log` child writes, and every minute by the session's
+  `lord-log` child for the other files (`apps/`, `web/`, `xwayland.log`, `cloud.log`). An isolated app
+  (`lord-server --app`) writes to a pipe, not to its file: before its sandbox and before any of its
+  code runs, a `lord-log` child takes the file over and copies the app's bytes as is (never parsing
+  them), checking the cap after every MB, so an app writing in a loop can't fill `/var` between the
+  minute's checks. A user's folder therefore holds at most about 32 MB per log name, plus the previous
+  session's `compositor.log.prev` and `shell.log.prev`.
 - **Tests.** `make -C server build/lordlog-test` (names, folders against symlink tricks, the cap,
   rotation, the format and `lord-log` end to end, in a temporary folder) and
   `node server/tests/logfile_test.mjs` (the Logs app's parser).
@@ -635,7 +646,7 @@ lord-server.
   - the paths don't come from the user: `/var/log/journal/<machine-id>/system*.journal*`;
   - it runs no program; it streams one JSON `LOG` line per entry and `OK <n>`.
 - `lord.logs.files()`/`tail(name)` only read the user's own log folder (and the old `~/.cache/lordos`): a
-  name is `[<apps|web|cache>/]<safe name>.log[.1]`, a safe name is `[A-Za-z0-9._+-]` not starting with `.` or
+  name is `[<apps|web|cache>/]<safe name>.log[.prev|.old]`, a safe name is `[A-Za-z0-9._+-]` not starting with `.` or
   `-`, and each file is opened with `openat` and `O_NOFOLLOW` from its folder, opened with `O_NOFOLLOW` too.
   `lord.logs.dir()` says which folder that is.
 

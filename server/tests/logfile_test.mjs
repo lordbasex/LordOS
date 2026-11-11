@@ -1,6 +1,6 @@
 // LordOS's own log files in the Logs app (sdk/logfile.js): the stamped lines lord-log writes
 // (server/src/lordlog.c), old unstamped ones, and the sidebar's order. node server/tests/logfile_test.mjs
-import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious } from '../../sdk/logfile.js';
+import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } from '../../sdk/logfile.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -33,7 +33,11 @@ eq('not a stamp', parseLordLog('2026-11-11 12:00 INFO x: y', 'a.log')[0].t, 0);
 
 eq('groups', ['compositor.log', 'apps/a.log', 'web/b-c.log', 'cache/session.log'].map(fileGroup), ['session', 'apps', 'web', 'old']);
 eq('labels', ['compositor.log', 'compositor.log.prev', 'apps/org.x.log', 'web/gmail-default.log'].map(fileLabel), ['compositor', 'compositor', 'org.x', 'gmail-default']);
-eq('previous', ['compositor.log.prev', 'compositor.log'].map(isPrevious), [true, false]);
+eq('previous', ['compositor.log.prev', 'compositor.log', 'compositor.log.old'].map(isPrevious), [true, false, false]);
+eq('older part', ['compositor.log.old', 'compositor.log', 'compositor.log.prev', 'apps/a.log.old'].map(isOlder), [true, false, false, true]);
+eq('older label', fileLabel('apps/org.x.log.old'), 'org.x');
+eq('order with the older part', sortFiles(['compositor.log.prev', 'compositor.log.old', 'compositor.log', 'apps/a.log.old', 'apps/a.log'].map((name) => ({ name }))).map((f) => f.name),
+  ['compositor.log', 'compositor.log.old', 'compositor.log.prev', 'apps/a.log', 'apps/a.log.old']);
 const names = ['web/b.log', 'xwayland.log', 'apps/z.log', 'shell.log.prev', 'cache/session.log', 'compositor.log.prev', 'apps/a.log', 'cloud.log', 'shell.log', 'compositor.log'];
 eq('order', sortFiles(names.map((name) => ({ name }))).map((f) => f.name),
   ['compositor.log', 'compositor.log.prev', 'shell.log', 'shell.log.prev', 'cloud.log', 'xwayland.log', 'apps/a.log', 'apps/z.log', 'web/b.log', 'cache/session.log']);

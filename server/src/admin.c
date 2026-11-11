@@ -761,7 +761,7 @@ static void helper_request(int id, const char *action, char *arg, size_t len, vo
     h->req->id = id;
     size_t a = find_action(action);
     int fw = 1;
-    /* admin.log (lordlog.h): refusals and the long actions, never their arguments */
+    /* admin.log (lordlog.h): refusals, by action name, never their arguments */
     if (a == N_ACTIONS) { fprintf(stderr, "admin: %s asked for an unknown action: refused\n", h->user); admin_err("admin.unknownAction", NULL); }
     else if (strlen(arg) != len) admin_err("admin.invalidArgument", NULL);
     else if (!h->allowed && !(actions[a].flags & A_ANYONE)) {
@@ -778,7 +778,9 @@ static void helper(int fd, const char *user) {
     prctl(PR_SET_NAME, "lord-admin");
     prctl(PR_SET_PDEATHSIG, SIGTERM);       /* if lord-server dies, the helper does too */
     signal(SIGPIPE, SIG_IGN);
-    /* its stderr (lord-server's, /dev/null under lord-sessiond) is stamped into /var/log/lordos/admin.log */
+    /* its stderr (lord-server's, /dev/null under lord-sessiond) is stamped into /var/log/lordos/admin.log;
+     * the programs it runs (dpkg, wpa_supplicant, openvpn, pppd, …) inherit it, so their output lands
+     * there too, stamped as "admin" (root's, 0640, and rotated by /etc/logrotate.d/lordos) */
     lordlog_system_start("admin");
     umask(022);
     struct passwd *pw = getpwnam(user);

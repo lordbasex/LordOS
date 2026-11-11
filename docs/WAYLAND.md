@@ -126,7 +126,7 @@ shell. The user approved it for M7. Limits:
   comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
   descriptors. Its output goes to its own `apps/<id>.log` in the user's log folder (`/var/log/lordos/users/<user>`,
-  docs/SYSTEM.md "Log files"), after a stamped "starting" line; rotated by logrotate and capped at 16 MB.
+  docs/SYSTEM.md "Log files"), after a stamped "starting" line; capped at 16 MB by its writers (the older part in `xwayland.log.old`).
 - A `.desktop` can't be created from JS:
   - `lord.fs.write` rejects `~/.local/share/applications` and `~/.config/autostart`, also
     through a symlink (see `EDITOR.md`);

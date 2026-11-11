@@ -27,6 +27,7 @@
   "src.kernel": "Kernel",
   "noFiles": "Sin registros todavía",
   "previous": "{name} (sesión anterior)",
+  "older": "{name} (parte anterior)",
   "hint.user": "Tu journal: tus apps y servicios. Se lee con tus permisos.",
   "hint.lordos": "Registros de tu sesión de LordOS y de tus apps, en {dir}. Solo vos podés leerlos.",
   "hint.systemDirect": "El journal del sistema: tu grupo te deja leerlo.",

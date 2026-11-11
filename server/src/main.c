@@ -2455,7 +2455,7 @@ int main(int argc, char **argv) {
     if (ok) lordlog_dir();
     if (ok && s.headless && getenv("HOME")) {
         /* no terminal: stderr is stamped into compositor.log and shell.log there, the previous
-         * session's kept as .1 (a small lord-log child; it outlives a crash, so nothing written is lost) */
+         * session's kept as .prev (a small lord-log child; it outlives a crash, so nothing written is lost) */
         if (lordlog_session_start()) fprintf(stderr, "lord-server: no session log\n");
     }
     /* the CPU path's pixel loops on a pool (par.h): blur, blits, gradients, the remote desktop's

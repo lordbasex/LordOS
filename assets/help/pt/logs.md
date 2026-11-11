@@ -17,8 +17,8 @@ algo falha.
   assistente de administração, assim como quem estiver no grupo de leitura do journal.
 - **LordOS:** os registros da sua sessão (`compositor`, `shell`, `xwayland`…; "sessão anterior" é a de
   antes deste login), e abaixo o registro de cada **app** e de cada **app web**. Ficam em
-  `/var/log/lordos/users/<você>`, que só você pode ler, e os antigos são comprimidos e apagados depois de
-  uma semana. **Registros antigos** são os que versões anteriores deixaram em `~/.cache/lordos`.
+  `/var/log/lordos/users/<você>`, que só você pode ler. Cada um fica em 16 MB: ao passar disso, a sua
+  parte anterior vira "<nome> (parte anterior)". **Registros antigos** são os que versões anteriores deixaram em `~/.cache/lordos`.
 
 ## Filtrar
 
