@@ -12,6 +12,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Web apps: the catalog grows from 6 to 37 apps.** Every new one passed `lord-web --probe` on 2026-11-11 and starts at
+  the service's own address (its mail, calendar, documents or player, never its marketing or sign-in page): team chat
+  and video meetings, social networks, mail and calendars, cloud files, documents and spreadsheets, notes and task
+  lists, office suites, AI assistants, video and music streaming, photos, design tools, a whiteboard, an image editor
+  and ride hailing. Only one chat app is marked tested (checked on LordOS with two accounts, `verified` 2026-11-11); the
+  rest say "not tested yet". Two sites were left out: one answers "unsupported browser" to WPE WebKit and one no longer
+  loads. Each app has a generic description in all six languages, its publisher, a LordOS letter tile as its icon
+  (128×128, a color close to the service's) and its known limitations: protected music (`drm`) for two music services,
+  calls (`calls`) for five chat and meeting apps, notifications only while running (`push`). Two apps on one origin keep
+  to their own path (`docs.google.com/document/` and `/spreadsheets/`), and `tests/webapps_model_test.mjs` now checks that
+  no app starts inside another's scope, that no two share one and that every icon is used. The mail web app moved to its
+  work-and-personal address (`outlook.office.com/mail/`). docs/WEBAPPS.md has a new "The catalog" section.
 - **Store → Installed: remove any Linux app a Debian package brought, and deactivate the LordOS apps you don't use.**
   A read-only `lord.pkg.ownerOfApp(desktopId)` finds an app's package from dpkg's own lists (`dpkg_owner` in
   `server/src/pkg/status.c`; only the id comes from JS, `/usr/share/applications` only), so a `.deb` installed from a file
