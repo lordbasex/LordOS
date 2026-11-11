@@ -12,6 +12,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Web apps: hidden windows stop working for nothing.** A window that is minimized, on another desktop, closed into
+  the background or wholly covered by an opaque window now tells its page it is hidden: the page stops painting, its
+  animations pause and its timers run at most once a second, while its network, audio and notifications go on. Measured
+  on the dev VM: a busy page went from 115 % CPU to 0.4 %, and the compositor from 5 % to 0.3 %, while minimized. It
+  paints again at once when shown (frame gate `server/src/wl/framegate.h`, `coveredIds` in `sdk/desktopmodel.js`).
+- **Linux apps: a window wholly covered by an opaque window** is paced once a second and told "suspended", like a
+  minimized one.
+- **Web apps use less memory.** The lighter cache model now takes effect (it is set before the web context exists), so
+  no idle ~130 MB web process is kept per profile. A page above about 600 MB no longer throws away its caches every
+  10 seconds: WebKit's memory pressure now starts from the computer's memory (up to 3 GB) and checks every 30 s.
+- **Web apps: the memory and CPU limits shared by an app's profiles are sized to the computer.** They used to be 2 GB
+  (memory.high) and two cores, which kept two profiles of a messaging app throttled and made them freeze for moments.
+  Now memory.max is ¾ of the RAM (1 to 16 GB), memory.high ⅛ below it and the CPU half the cores, at least two
+  (`webpage_scope_limits`).
+- **Web apps: crash stacks.** If lord-web crashes (an abort, an uncaught C++ exception, a bad access), its stack is
+  written to the web apps' log, and lord-server reaps an ended lord-web instead of leaving it as a zombie.
+- **Monitor: memory counted once.** The memory view counts processes by proportional memory (PSS) and doesn't count
+  sandbox wrappers as processes: a web app showed "28 processes, 2.3 GB" for ~1.5 GB across 4 processes.
 - **Web apps: the site's own icon.** With lordos-web installed, LordOS fetches each app's icon from the site itself with
   the same probe as "Add from an address" (PNG or SVG up to 1 MB, kept only when the probe ended on the app's own
   origin). The icon is cached as `~/.cache/lordos/web/icons/<app>.png|svg` (a protected folder, named by app id only) and
