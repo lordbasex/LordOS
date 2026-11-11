@@ -99,6 +99,13 @@ int main(void) {
     CHECK(!fsops_readable("relative/path"));
     path(a, ".local/share/applications/x.desktop");
     CHECK(fsops_protected(a));
+    /* web apps: the registry lord-web starts from, and each profile's data (docs/WEBAPPS.md) */
+    path(a, ".config/lordos/web/apps/chat.json");
+    CHECK(fsops_protected(a));
+    path(a, ".local/share/lordos/web/chat/personal/cookies.sqlite");
+    CHECK(fsops_protected(a));
+    path(a, ".config/lordos/webcam.json");
+    CHECK(!fsops_protected(a));
     path(a, "Documentos/x.txt");
     CHECK(!fsops_protected(a));
     path(a, ".config/lordos/global-shortcuts.json");     /* the global shortcuts portal's decisions */

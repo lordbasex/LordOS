@@ -8,7 +8,8 @@ In development for 0.8.8.8.
 
 - **`lord-web`** (`server/src/web/`, C): one process per app and profile. It is the only binary that links WPE WebKit:
   Debian 13's `libwpewebkit-2.0` 2.48, `libwpe` 1.16 and `wpebackend-fdo` 1.16, which bring GStreamer and libsoup. It
-  ships in the optional package `lordos-web`. Without that package the rest of LordOS works unchanged and the web app
+  ships in the optional package `lordos-web` (`tools/iso/mkdeb-web.sh`, which depends on WebKit, GStreamer's good and
+  bad plugins, `bubblewrap` and `xdg-dbus-proxy`; built only when `pkg-config` finds WPE, `WEB=0` skips it). Without that package the rest of LordOS works unchanged and the web app
   features say how to get it.
 - **The manager** lives in what LordOS already has:
   - `lord.webapps` in lord-server (`server/src/ui/js_webapps.c`) keeps the registry and starts `lord-web`;
@@ -62,14 +63,46 @@ Only lord-server starts `lord-web`:
 - **Path:** fixed, next to the lord-server binary (`<lord-server dir>/lord-web`).
 - **argv:** exactly `lord-web --app <app> --profile <profile>`, both checked against the registry first.
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
-  `LANG`) plus `LORDOS_WEB=1`.
+  `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
+  its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on).
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
-running app and profile raises its window instead (xdg-activation token from lord-server).
+running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
+xdg-activation token and calls `Show(token)` on that lord-web (below); lord-web activates its window with it, or maps it
+again when it was hidden behind its tray icon. The shell does not focus it on its own.
 
 The window's `xdg_toplevel` app id is `lordos-web.<app>.<profile>`. lord-server maps that prefix to the registry
 entry, so the Dock and the window switcher show the app's name, its icon and the profile name. The title is the page's
 title. The frame is LordOS's (server-side decoration).
+
+How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
+
+- **One process per app and profile:** the profile folder holds a `lock` (flock). A second start finds it taken, calls
+  `Show(token)` on `org.lordos.WebApp1` (`/org/lordos/WebApp1`) at the bus name
+  `org.lordos.WebApp.app_<app>.profile_<profile>` (`-` as `_`) with its `XDG_ACTIVATION_TOKEN`, and exits with 0.
+- **Frames:** WebKit's web process draws into wpebackend-fdo's exportable view backend. When the compositor offers
+  `zwp_linux_dmabuf_v1` and EGL works on its display, a dmabuf frame becomes a `wl_buffer` of the window (no copy); a
+  frame the compositor can't import restarts lord-web once on the shared memory path. Otherwise (`LORD_GPU=0`, no GPU,
+  VM 127) every frame is copied into one of three `wl_shm` buffers. WebKit's next frame is released only after the
+  compositor's frame callback. Scale: `wp_fractional_scale_v1` with `wp_viewport`, or the outputs' integer scale.
+- **Input:** the compositor's keymap (xkbcommon) and key repeat, the pointer (side buttons go back and forward), the
+  wheel in lines for a mouse and in pixels for a touchpad, touch (up to 10 points). Ctrl+R/F5 reload, Alt+Left/Right go
+  back and forward, Ctrl+plus/minus/0 zoom. text-input-v3 is WebKit's input method context (preedit, commit, the
+  cursor rectangle and the surrounding text).
+- **Clipboard:** text, both ways, through `wl_data_device`: the session's selection is copied into WebKit's pasteboard
+  while the window has the keyboard; what the page copies is offered to the session as plain text (and HTML when the
+  page gave it). Dragging into the page is not passed on yet.
+- **Navigation:** an address inside `scope` stays; a link clicked to an address outside it, a new window outside it
+  and `mailto:` or `tel:` go to OpenURI; a new window inside it loads in the same window. A redirect outside (a sign-in
+  on another site) stays, and the title then starts with that site's host. No context menu, no developer extras, no
+  windows opened without a click, no page cache, TLS errors fail.
+- **Engine:** the profile's own `WebKitNetworkSession` (`data/`, `cache/`, `cookies.sqlite`, no credential storage of
+  WebKit's own), memory pressure settings (a web process past 1.5 GB frees its caches), the document cache model.
+  WebKit 2.48 has no switch for its sandbox: it is always on, and lord-web refuses the variable that turns it off.
+- **Closing:** without `background`, closing the window quits. With it the window is hidden (WebKit is told it is not
+  visible and throttles) and a StatusNotifierItem with the app's icon offers Open and Quit; a click on the icon or on
+  a notification shows the window again. When the web process crashes it reloads once; a second crash within 30 s
+  quits.
 
 ## Adding an app from an address ("probe")
 
@@ -82,8 +115,53 @@ title. The frame is LordOS's (server-side decoration).
 - It is given 20 s; lord-server kills it after that.
 
 Nothing is installed by a probe. The person sees the real origin and confirms. Then lord-server writes the registry
-file and saves the icon, chosen and fetched by `lord-web --probe` as a second step, into the registry folder, after
-checking it is a PNG or an SVG of at most 1 MB.
+file and saves the icon, chosen and fetched by `lord-web --probe-icon` as a second step, into the registry folder,
+after checking it is a PNG or an SVG of at most 1 MB. lord-server chooses it from the answer's `icons`: the largest PNG
+up to 512 px, else the smallest one above, else an SVG (`https:` only). The second step starts right after the first
+(the sheet then shows the icon), and has its own 20 s.
+
+How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `webargs.c`):
+
+- **The request** on fd 3 is one line of at most 2 KB ending in a newline, nothing after it, an `https:` address (or
+  `http:` on `localhost`, `127.0.0.1` or `[::1]`, for tests). Anything else is answered `web.probe.request` without
+  loading anything. lord-web closes every other inherited fd and none of WebKit's children get fd 3.
+- **`--probe`** loads the page in an ephemeral network session (nothing written to disk) with WebKit's sandbox, no
+  window (its frames are given back at once), no permission, no new window, no download. 1.2 s after the load it runs a
+  script in an isolated world (the page's scripts can't see or change it) that reads the `<link rel="manifest">`, the
+  `theme-color` meta, the title and the `<link rel="icon">`s, and fetches the manifest with the page's credentials
+  rules. lord-web then checks it all against the address WebKit really loaded (after redirects): the origin is the
+  loaded page's, a `start_url` on another origin becomes the page itself, a `scope` that doesn't hold the start address
+  becomes the start address's folder, the name is cleaned (no control characters, spaces folded, at most 128 bytes),
+  colors become `#rrggbb`, at most 16 icons with `https:` addresses. Without a manifest the icons are the page's.
+- **Where it may go:** the probe keeps the request's scheme and place. A redirect or a navigation of the page from
+  `https:` to `http:`, or from a public host to this computer or a local network (localhost and `*.localhost`,
+  `*.local`, 127/8, 0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, `::1`, fc00::/7, fe80::/10, IPv4 written
+  the short, hex or octal way browsers accept), is refused (`web.probe.notHttps` for the scheme, `web.probe.load` for
+  the place), and the page and the icon are read only when the address they ended on passes the same rule against
+  the request (`weburl_probe_hop_ok`, `weburl_probe_final_ok`). lord-server never sends a public page's local icon to
+  `--probe-icon`. Names count too: a single label (`router`) and the local networks' suffixes (`.lan`, `.home`,
+  `.home.arpa`, `.internal`, `.intranet`, `.localdomain`, `.corp`) are private, and lord-web resolves every other name
+  itself (3 s at most, again at every check: nothing is cached) and classifies every address it gets
+  (`weburl_addrs_class`): one private address makes the name private, and a name that doesn't resolve is refused. The
+  rule holds for every hop (`weburl_probe_step`): a request whose own name is private (the person typed a local
+  address) may stay there, but once any hop was public (the request, a redirect, a navigation, a frame), every next one
+  and the address the page or icon ended on must resolve to public addresses only, so local → public → local is
+  refused too.
+- **What is not closed:** DNS rebinding between our check and WebKit's own connection. WebKit resolves the name again
+  when it connects, and a name can answer a public address to us and a private one to it. This remains possible for
+  the probe only (an installed app never goes through it), which runs in WebKit's sandbox, in an empty ephemeral
+  session with none of the person's cookies or credentials, and reads only a manifest and an icon. Pinning the
+  address at connect time (a proxy of lord-web's own for the probe's network session) is not done yet.
+- **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
+  answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
+  signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is
+  `web.probe.iconType`; over 1 MB, `web.probe.iconTooBig` (the download is stopped there).
+- **Errors** are `{"ok":false,"error":"<code>"}`: `web.probe.request`, `web.probe.load`, `web.probe.tls`,
+  `web.probe.notHttps` (the page ended on an address that isn't), `web.probe.page`, `web.probe.timeout` (lord-web
+  gives up at 18 s, before lord-server's 20), `web.probe.iconType`, `web.probe.iconTooBig`. Each probe runs in the
+  scope `lordos-webprobe`.
+- **Memory** (2026-11-10, the main machine, `tests/web_probe_test.py --pss` on a small local page): 224 MB PSS at the
+  peak for lord-web and its WebKit processes together, about 11 s for the test's nine probes.
 
 ## Permissions (asked once per app, revocable in Settings → Web apps)
 
@@ -96,6 +174,19 @@ permission requests. If the registry says `allow` or `deny`, `lord-web` answers 
 
 lord-server checks that the caller's pid is the `lord-web` it started for that app and profile. A page never gets an
 answer from anything else.
+
+The registry's words count only for the app's own pages: a request is answered from it only while the window shows an
+address inside `scope` (WebKit gives no origin for a request, so it is the main frame's), and a `navigator.permissions`
+query only when the origin that asks is `origin` too. A page outside the scope (a sign-in on another site, a redirect,
+a navigation inside the window) or a frame of another origin is denied everything, and lord-server is never asked for
+it; the check is made again before each question and before the answer (`weburl_perm_allowed`).
+
+`lord-web` reads its registry file again before each request, so an answer lord-server stored since the app started
+counts. No answer (no lord-server, an error, anything but the three words) is `deny`. A camera and microphone request
+asks both kinds and needs both. The page's `navigator.permissions` queries get the registry's word (`allow` granted,
+`ask` prompt, `deny` denied); the names of cameras and microphones only when one of them is allowed. Storage access,
+media keys and anything else are denied. Notifications carry the app's name (with the profile's when it has more than
+one) and icon, and a notification with the same tag replaces the one before it.
 
 ## What `lord-web` uses of the session (like any Linux app)
 
@@ -112,10 +203,22 @@ answer from anything else.
 - **WebKit's sandbox:** the web content and network processes run under bubblewrap and seccomp, and are never turned
   off.
 - **The `lord-web` process:**
-  - its own firewall scope `lordos-web-<app>`, a row in Monitor with the app's name;
-  - a cgroup with memory and CPU limits;
-  - Landlock limited to its profile folder, the registry file read-only, the Downloads folder, and the system paths
-    WebKit, GStreamer and fonts need.
+  - its own firewall scope `lordos-web-<app>` (`app-lordos-lordos-web-<app>.scope`, placed by lord-sessiond like any
+    launched app; `lordos-web…` is reserved, so no `.desktop` can take that identity), a row in Monitor with the app's
+    name. Inside a LordOS session it refuses to start when it can't be placed;
+  - a cgroup with memory and CPU limits (memory.high 2 GB, memory.max 4 GB, two cores), shared with WebKit's processes,
+    which are its children;
+  - Landlock's scoping (no abstract unix socket and no signal outside its own processes) and `no_new_privs`, again
+    refusing to start inside a session when they fail. **Not Landlock's file rules:** a process under them can't mount,
+    and bubblewrap mounts for every WebKit process it starts (checked 2026-11-10 on kernel 6.12: with only
+    `LANDLOCK_ACCESS_FS_WRITE_FILE` handled, `bwrap` fails with "Failed to make / slave: Operation not permitted"). The
+    files of the web content are kept by WebKit's sandbox instead; `lord-web` itself is LordOS's own code and only
+    opens its registry file (read-only, no link followed), its profile folder and the Downloads folder;
+  - it refuses to start on any mismatch: argv other than the three forms, a registry file that is a link, over 64 KB,
+    with an unknown key, a wrong type, a bad id or address, a scope that isn't a prefix of `startUrl` or not on
+    `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
+    `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
+    point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…).
 - **What a page never gets:** no `lord.*`, no broker, no script injected with privileges.
 - **What a crash or hang affects:** only that window. lord-server sees the process end and the Dock shows the app as
   closed.

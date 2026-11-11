@@ -1,0 +1,9 @@
+{
+  "tray.open": "Ouvrir",
+  "tray.quit": "Quitter",
+  "notify.open": "Ouvrir",
+  "download.done": "Téléchargement terminé",
+  "download.failed": "Échec du téléchargement",
+  "chooser.open": "Choisir un fichier",
+  "chooser.openMany": "Choisir des fichiers"
+}

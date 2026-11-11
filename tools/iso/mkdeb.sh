@@ -202,7 +202,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"

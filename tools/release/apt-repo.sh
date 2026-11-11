@@ -49,6 +49,9 @@
 # lordos-disk-formats (0.8.7, docs/FILES.md): the Store's Disk Formats item, from tools/iso/mkdeb-diskformats.sh, one
 # package per architecture, added like any .deb with the release. Its entry in apt/catalog.json has "section": "commercial".
 #
+# lordos-web (0.8.8.8, docs/WEBAPPS.md): the LordOS Web Runtime, lord-web with WPE WebKit, from tools/iso/mkdeb-web.sh,
+# one package per architecture built with that release's lordos (it depends on that exact version), added like any .deb.
+#
 # --notes VERSION=SECTION takes the notes of lordos VERSION from CHANGELOG.md section SECTION (for
 # example 0.8.1~staging1=Unreleased). By default the section is "VERSION" or "VERSION-<suffix>".
 #

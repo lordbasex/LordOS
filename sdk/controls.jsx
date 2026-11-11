@@ -313,7 +313,8 @@ export function FormRow({ label, children, labelWidth, minHeight = 36 }) {
 // does the default. destructive: the button is red and the default is Cancel, as in libadwaita, so
 // the action needs a click, or Tab to it and then Space. cautious: the default is Cancel too, with a button
 // that isn't red (an action that only needs a second look, such as pasting files another app copied).
-export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area }) {
+// children: an option shown under the detail (Settings → Web apps' "Delete its data" toggle).
+export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area, children }) {
   const t = useTheme();
   const { id: win, focused } = useAppWindow();
   const token = useRef({}).current;
@@ -346,6 +347,7 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
         border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
         {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
+        {children || null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
           <DialogButton t={t} label={cancelLabel} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
           <DialogButton t={t} label={okLabel} onClick={onOk} primary destructive={destructive} isDefault={dflt === 'ok'} ring={owner && focus === 'ok'} />

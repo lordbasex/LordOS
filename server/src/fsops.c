@@ -91,6 +91,8 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.config/lordos/databases",     /* Databases favorites (hosts, trusted certificates): only lord.sql.saveFavorites (docs/DATABASES.md) */
                                            "/.config/lordos/global-shortcuts.json",     /* the keys each Linux app may have: only the person, through the portal's sheet or Settings (docs/SHORTCUTS.md) */
                                            "/.config/lordos/global-shortcuts.json.tmp", /* and the file it is written to first */
+                                           "/.config/lordos/web",           /* Web apps' registry (what lord-web starts, its permissions, the icons): only lord.webapps (docs/WEBAPPS.md) */
+                                           "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
                                            NULL };
 
 static char pfile[FSOPS_PF_COUNT][PATH_MAX];

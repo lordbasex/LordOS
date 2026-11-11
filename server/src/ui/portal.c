@@ -12,6 +12,7 @@
 #include "portal.h"
 #include "portalcheck.h"
 #include "gshort.h"
+#include "webask.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
@@ -43,6 +44,7 @@
 
 static DConn conn;
 static int up;
+static int only_web;                        /* another program serves the portal: only org.lordos.WebApps1 here */
 
 /* valores actuales */
 static int dark = 1;
@@ -1596,6 +1598,7 @@ int portal_cast_thumb(int id, const CastSource *src) {
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
+    if (webask_reply(&conn, m)) return;
     for (int i = 0; i < ngsess; i++) {
         if (gsess[i].known || gsess[i].serial != m->reply_serial) continue;
         uint32_t pid = 0;
@@ -1636,6 +1639,7 @@ static void on_signal(const DMsg *m) {
     for (int i = ngsess; i-- > 0;) if (!strcmp(gsess[i].sender, name)) gsess_drop(i);
     int ids[CSM_MAX], n = csm_gone(&csm, name, ids, CSM_MAX);
     for (int i = 0; i < n; i++) { CsSess *s = csm_by_id(&csm, ids[i]); if (s) cast_close(s, 0); }
+    webask_gone(name);
 }
 
 /* Request.Close: the app no longer wants it (a dialog, an open, a hold, a shortcuts sheet or a screen cast's
@@ -1696,6 +1700,9 @@ static void handle(const DMsg *m) {
         }
         return;
     }
+    /* web apps' permission questions (webask.c) */
+    if (m->path && !strcmp(m->path, WEBASK_PATH)) { webask_call(&conn, m); return; }
+    if (only_web) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
     if (!strcmp(mem, "Introspect")) {
         DBuf b;
         dw_init(&b);
@@ -1786,12 +1793,13 @@ int portal_start(void) {
     int fd = dbus_connect_session();
     /* with fds: OpenFile and OpenDirectory hand the file over as one */
     if (fd < 0 || dbus_open_fds(&conn, fd, 2000)) { if (fd >= 0) dbus_close(&conn); return -1; }
+    int web = own_name(WEBASK_NAME);
     if (!own_name(BUS_NAME)) {
         fprintf(stderr, "portal: %s is already served by another program (xdg-desktop-portal); not serving Settings\n", BUS_NAME);
-        dbus_close(&conn);
-        return -1;
+        if (!web) { dbus_close(&conn); return -1; }
+        only_web = 1;                       /* web apps still ask their questions here */
     }
-    int ss = own_name(SS_NAME);
+    int ss = !only_web && own_name(SS_NAME);
     gs_load();
     /* the connections that leave the bus: their holds and requests go with them */
     DBuf b;
@@ -1803,8 +1811,11 @@ int portal_start(void) {
     dw_free(&b);
     up = 1;
     csm_init(&csm);
-    fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and ScreenCast on the session bus%s\n",
-            ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
+    webask_attach(&conn);                   /* lord-server's own calls to web apps (Show) */
+    if (!only_web)
+        fprintf(stderr, "portal: Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and ScreenCast on the session bus%s\n",
+                ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
+    if (!web) fprintf(stderr, "portal: %s is another program's: web apps can't ask for permissions\n", WEBASK_NAME);
     return 0;
 }
 
@@ -1821,6 +1832,7 @@ void portal_dispatch(void) {
         dbus_close(&conn);
         up = 0;
         nholds = 0;                         /* nobody can let them go any more */
+        webask_lost();
         while (nopens) open_drop(nopens - 1, 1);
         while (ngsess) gsess_drop(ngsess - 1);  /* no app can get a shortcut any more */
         nheld = 0;

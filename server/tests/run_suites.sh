@@ -256,6 +256,10 @@ EOF
     if have node; then run "gtk-defaults-test (assets/gtk, #52)" node tests/gtk_defaults_test.mjs; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # (0.8.8.8) web apps: the window's app id and its process, the Dock's profiles menu, the Store's address sheet,
+    # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
+    if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs
+    else skip "webapps-model-test" "node"; fi
     # glibc region names: what the installer and Settings send for every UTF-8 region (sdk/localename.js)
     if have node; then run "localename-test (sdk/localename.js)" node tests/localename_test.mjs
     else skip "localename-test" "node"; fi
@@ -407,6 +411,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs
     else skip "screencast-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) the Store's "Add from an address" sheet: https only, the origin lord-web read, Install sends no URL
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-sheet-scene (apps/store/addweb.js)" node tests/textfield_menu_test.mjs webapps_sheet_scene.mjs
+    else skip "webapps-sheet-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
@@ -443,6 +451,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ]; then
         run "keyboard-default-test (sdk/keyboard.js, sdk/settings.js)" node tests/keyboard_default_test.mjs
     else skip "keyboard-default-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) web apps (docs/WEBAPPS.md): lord-web's probe on a page served by the test itself, headless, with
+    # WebKit's sandbox; the answer, the icon step and a throwaway profile that leaves nothing
+    if [ -x build/lord-web ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "web-probe-test (lord-web --probe)" python3 -I tests/web_probe_test.py build/lord-web
+    else skip "web-probe-test" "wpe-webkit-2.0 (build/lord-web), bubblewrap, xdg-dbus-proxy and python3"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs

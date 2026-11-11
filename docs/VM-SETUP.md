@@ -630,6 +630,22 @@ sudo apt-get install -y libpipewire-0.3-dev
 Without `libpipewire-0.3-dev`, `make -C server` skips `build/lord-screencast` (`SCREENCAST=0`) and the portal offers no
 source types.
 
+**To build `lord-web`** (the Web Runtime, web apps, 0.8.8.8 in development; docs/WEBAPPS.md; already installed on the
+main machine on 2026-11-10, nothing new installed for it):
+
+```sh
+sudo apt-get install -y libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev libegl-dev bubblewrap xdg-dbus-proxy
+```
+
+| Package | Version | What for |
+|---|---|---|
+| `libwpewebkit-2.0-dev` (brings `libwpewebkit-2.0-1`, `libwpe-1.0-dev`, GLib and libsoup's `-dev`) | 2.48.3 | `lord-web` |
+| `libwpebackend-fdo-1.0-dev` | 1.16.0 | `lord-web`: the frames WebKit draws, as dmabuf or shared memory |
+| `bubblewrap`, `xdg-dbus-proxy` | 0.12.0, 0.1.6 | WebKit's sandbox, which `lord-web` never turns off (`tests/web_probe_test.py` needs both) |
+
+Without them `make -C server` builds everything else and skips `build/lord-web` with a message (`WEB=0` skips it on
+purpose). `tools/iso/mkdeb-web.sh <folder>` packages it as `lordos-web`.
+
 **To build `lord-tts`** (text to speech, `say`, since 0.8.8.6; docs/VOICE.md; installed on the main machine on
 2026-11-07):
 
