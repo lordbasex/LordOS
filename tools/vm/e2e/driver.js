@@ -3,13 +3,22 @@
 // interface uses, with no new channel into lord-server (the Cloud bench's approach): it writes ~/.e2e/cmd-<n>.js, the
 // body of an async function; this polls for it with lord.fs, runs it with { lord, wm, admin, launchApp, sleep, log }
 // and writes ~/.e2e/out-<n>.json: { ok, value } or { ok: false, error }.
-import { windows } from '../../../sdk/windows.js';
+import { windows, wm as shellWm, createDesktop, setActiveDesktop } from '../../../sdk/windows.js';
 import { launchApp } from '../../../sdk/apps.js';
 import { admin } from '../../../sdk/admin.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
-const wm = { windows: () => windows.get().map((w) => ({ id: w.id, app: w.appId || w.app, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h, minimized: w.minimized })) };
+// the shell's own calls for a window (minimize, focus, another desktop), as the person's clicks make them
+const wm = {
+  windows: () => windows.get().map((w) => ({ id: w.id, app: w.appId || w.app, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h, minimized: w.minimized, desktop: w.desktop })),
+  minimize: (id) => shellWm.minimize(id),
+  toggleMaximize: (id) => shellWm.toggleMaximize(id),
+  focus: (id) => shellWm.focus(id),
+  moveToDesktop: (id, d) => shellWm.moveToDesktop(id, d),
+  createDesktop: () => createDesktop(),
+  setActiveDesktop: (d) => setActiveDesktop(d),
+};
 
 function start() {
   if (typeof lord === 'undefined' || !lord.fs) return;

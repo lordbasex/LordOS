@@ -60,7 +60,7 @@
     "few": "{count} procesai",
     "other": "{count} procesų"
   },
-  "memTopHint": "Kiekvienos programos procesai sudėti. Procesų bendrai naudojama atmintis įskaičiuojama kiekviename iš jų, todėl suma gali viršyti „Programos“.",
+  "memTopHint": "Kiekvienos programos procesai sudėti. Bendra atmintis padalijama tarp ją naudojančių procesų (jūsų didesnių procesų); kitų procesų ji įskaičiuojama kiekviename, todėl suma gali viršyti „Programos“.",
   "swap": "Mainų sritis",
   "swapValue": "{used} iš {total}",
   "last60": "Paskutinės 60 sekundžių",

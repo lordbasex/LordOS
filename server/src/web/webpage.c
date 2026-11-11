@@ -60,3 +60,25 @@ size_t webpage_state_write(const WebPageState *s, char *out, size_t n) {
     int k = snprintf(out, n, "{ \"ownSound\": %s }\n", s->own_sound ? "true" : "false");
     return k < 0 || (size_t)k >= n ? 0 : (size_t)k;
 }
+
+int webpage_view_visible(int shown, int configured, int suspended) { return shown && configured && !suspended; }
+
+int webpage_toplevel_suspended(const unsigned *states, size_t n) {
+    for (size_t i = 0; states && i < n; i++) if (states[i] == 9) return 1;
+    return 0;
+}
+
+WebScopeLimits webpage_scope_limits(long ram_mb, int ncpu) {
+    WebScopeLimits l;
+    if (ram_mb <= 0) ram_mb = 4096;
+    long max = ram_mb / 4 * 3;
+    if (max < 1024) max = 1024;
+    if (max > 16384) max = 16384;
+    l.mem_max_mb = max;
+    l.mem_high_mb = max - max / 8;
+    int cpu = (ncpu > 0 ? ncpu : 1) * 50;
+    if (cpu < 200) cpu = 200;
+    if (cpu > 6400) cpu = 6400;
+    l.cpu_percent = cpu;
+    return l;
+}

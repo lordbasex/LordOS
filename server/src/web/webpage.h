@@ -38,4 +38,19 @@ typedef struct { int own_sound; } WebPageState;
 void   webpage_state_parse(const char *json, size_t len, WebPageState *s);
 size_t webpage_state_write(const WebPageState *s, char *out, size_t n);
 
+/* The window as WebKit should see it: visible (painting, requestAnimationFrame, CSS animations, timers at full rate)
+ * only while it is mapped, configured and not suspended. */
+int  webpage_view_visible(int shown, int configured, int suspended);
+/* 1 when xdg_toplevel's configure states hold "suspended" (9, xdg-shell 6: lord-server sends it for a minimized
+ * window and one on a hidden desktop) */
+int  webpage_toplevel_suspended(const unsigned *states, size_t n);
+
+/* The limits of an app's scope (app-lordos-lordos-web-<app>.scope), which all its profiles' lord-web and WebKit
+ * processes share. memory.high is where the kernel starts reclaiming and throttling the whole scope, and the page cache
+ * of its files counts: 0.8.8.7's 2 GB held two profiles of a messaging app (~800 MB each, plus their network
+ * processes and caches) at it all the time, and both froze in turns. Now three quarters of the memory (1 to 16 GB) as
+ * the most, high an eighth below it, and half the cores (at least two). */
+typedef struct { long mem_high_mb, mem_max_mb; int cpu_percent; } WebScopeLimits;
+WebScopeLimits webpage_scope_limits(long ram_mb, int ncpu);
+
 #endif

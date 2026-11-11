@@ -73,6 +73,7 @@
 #include "xwm.h"
 #include "xwayland.h"
 #include "xwscale.h"
+#include "framegate.h"
 #include "../outputs.h"
 #include "../cursor.h"
 #include "ptrlock.h"
@@ -154,6 +155,9 @@ struct Surf {
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
+    int covered;                    /* wholly under an opaque window of its desktop (wl_set_covered) */
+    FrameGate fgate;                /* its frame callbacks while it can't be seen (framegate.h) */
+    int sent_suspended;             /* the last configure said "suspended" */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
      * enter/leave, bit = output slot) and the scale it should render at (fractional-scale-v1,
      * preferred_buffer_scale) */
@@ -406,6 +410,9 @@ static void send_toplevel_configure(Surf *s) {
     if (s->maximized && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_MAXIMIZED;
     if (s->fullscreen && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_FULLSCREEN;
     if (s->activated && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_ACTIVATED;
+    /* minimized, on a hidden desktop or covered: the app may stop drawing (framegate.h) */
+    s->sent_suspended = (s->xmin || s->parked || s->covered) && wl_resource_get_version(s->top) >= XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION;
+    if (s->sent_suspended && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_SUSPENDED;
     if (s->maximized && wl_resource_get_version(s->top) >= 2) {
         static const uint32_t tiled[] = { XDG_TOPLEVEL_STATE_TILED_LEFT, XDG_TOPLEVEL_STATE_TILED_RIGHT,
                                           XDG_TOPLEVEL_STATE_TILED_TOP, XDG_TOPLEVEL_STATE_TILED_BOTTOM };
@@ -3148,6 +3155,12 @@ int wl_try_scanout(int cursor_free) {
     return 1;
 }
 
+/* minimized, on a hidden desktop or covered: nothing of it is on screen (its menus and subsurfaces go with it) */
+static int surf_hidden(Surf *s) {
+    Surf *top = toplevel_of(s);
+    return top && (top->xmin || top->parked || top->covered);
+}
+
 void wl_frame_done(unsigned t) {
     if (!dpy) return;
     need_frame = 0;
@@ -3161,6 +3174,10 @@ void wl_frame_done(unsigned t) {
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
         if (!s) continue;
+        int hidden = surf_hidden(s);
+        if (hidden && wl_list_empty(&s->frames)) continue;
+        if (!framegate_due(&s->fgate, hidden, t)) continue;    /* minimized, a hidden desktop: once a second */
+        if (hidden) framegate_sent(&s->fgate, t);
         struct wl_resource *cb, *tmp;
         wl_resource_for_each_safe(cb, tmp, &s->frames) {
             wl_callback_send_done(cb, t);
@@ -3171,6 +3188,33 @@ void wl_frame_done(unsigned t) {
     }
     wl_display_flush_clients(dpy);
     if (keylag_enabled) keylag_flushed();
+}
+
+/* The hidden windows' own tick (framegate.h): their waiting callbacks, once a second, when no frame of
+ * lord-server's sent them; nothing of them was shown, so their presentation feedback is discarded. */
+static int hidden_due(Surf *s, unsigned t, unsigned *wait) {
+    if (!surf_hidden(s) || wl_list_empty(&s->frames)) return 0;
+    unsigned w = framegate_wait(&s->fgate, t);
+    if (w && wait && w < *wait) *wait = w;
+    return !w;
+}
+
+double wl_frame_hidden(unsigned t) {
+    if (!dpy) return -1;
+    unsigned wait = ~0u;
+    int sent = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !hidden_due(s, t, &wait)) continue;
+        framegate_sent(&s->fgate, t);
+        struct wl_resource *r, *tmp;
+        wl_resource_for_each_safe(r, tmp, &s->frames) { wl_callback_send_done(r, t); wl_resource_destroy(r); }
+        wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); }
+        sent = 1;
+        if (wait > FRAMEGATE_HIDDEN_MS) wait = FRAMEGATE_HIDDEN_MS;
+    }
+    if (sent) wl_display_flush_clients(dpy);
+    return wait == ~0u ? -1 : (double)wait;
 }
 
 int wl_frame_unseen(unsigned t) {
@@ -4989,6 +5033,12 @@ void wl_set_state(int id, int maximized, int fullscreen) {
  * pointer there) and is marked iconic. Wayland apps aren't told (xdg-shell has no such event).
  * Fullscreen is presented above everything, so it would stay on screen with the keyboard: it stops
  * here and comes back with the window, as on a hidden desktop (wl_set_parked). */
+/* minimized, parked or covered changed: a Wayland window that knows "suspended" hears it at once */
+static void suspended_changed(Surf *s) {
+    int want = (s->xmin || s->parked || s->covered) && s->top && wl_resource_get_version(s->top) >= XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION;
+    if (s->top && s->xdg && s->sent_configure && want != s->sent_suspended) send_toplevel_configure(s);
+}
+
 void wl_set_minimized(int id, int minimized) {
     Surf *s = find(id);
     if (!s) return;
@@ -5001,6 +5051,7 @@ void wl_set_minimized(int id, int minimized) {
         enter_fullscreen(s);
     }
     if (s->xw) xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized);
+    else suspended_changed(s);
 }
 
 /* On a hidden desktop (sdk/desktopmodel.js surfaceState; C knows nothing else about desktops). The window
@@ -5022,6 +5073,19 @@ void wl_set_parked(int id, int parked) {
         s->fs_resume = 0;
         enter_fullscreen(s);
     }
+    if (!s->xw) suspended_changed(s);
+    if (dpy) wl_display_flush_clients(dpy);
+}
+
+/* Wholly covered by an opaque window above it on the showing desktop (sdk/desktopmodel.js coveredIds): it stays
+ * where it is, with its keyboard and pointer rules unchanged, but nothing of it is on screen, so its frame callbacks
+ * go out once a second and a Wayland window hears "suspended" (framegate.h). An X11 window is only paced: X has no
+ * state for it, and iconic would change its stacking. */
+void wl_set_covered(int id, int covered) {
+    Surf *s = find(id);
+    if (!s || (!s->top && !s->xw) || s->covered == !!covered) return;
+    s->covered = !!covered;
+    if (!s->xw) suspended_changed(s);
     if (dpy) wl_display_flush_clients(dpy);
 }
 

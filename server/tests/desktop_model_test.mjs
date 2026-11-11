@@ -261,5 +261,27 @@ eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   eq('notice: shown on every desktop', onDesktop(ws[1], 2), true);
 }
 
+// covered windows (0.8.8.8): a Linux window wholly inside an opaque window above it, on the showing desktop
+{
+  const S = (id, x, y, w, h, more = {}) => ({ id, x, y, w, h, desktop: 1, args: { surface: id.length }, ...more });
+  const N = (id, x, y, w, h, more = {}) => ({ id, x, y, w, h, desktop: 1, ...more });
+  const frame = (w) => (w.maximized ? { x: 0, y: 30, w: 1280, h: 700 } : w);
+  const opaque = (w) => !!w.args?.web || (!w.args?.surface && !w.transparent);
+  const ids = (list, ov = false) => [...M.coveredIds(list, 1, ov, frame, opaque)].sort();
+  const wa = S('linux#1', 100, 100, 600, 400);
+  eq('covered: under a larger LordOS window', ids([wa, N('files#1', 50, 50, 800, 600)]), ['linux#1']);
+  eq('covered: not when it sticks out', ids([wa, N('files#1', 150, 50, 800, 600)]), []);
+  eq('covered: not by a window below it', ids([N('files#1', 50, 50, 800, 600), wa]), []);
+  eq('covered: not by a transparent LordOS app', ids([wa, N('term#1', 0, 0, 1280, 800, { transparent: true })]), []);
+  eq('covered: not by another Linux window (it may be translucent)', ids([wa, S('linux#22', 0, 0, 1280, 800)]), []);
+  eq('covered: by a web app window', ids([wa, S('linux#33', 0, 0, 1280, 800, { args: { surface: 3, web: true } })]), ['linux#1']);
+  eq('covered: by a maximized window', ids([wa, N('files#1', 0, 0, 10, 10, { maximized: true })]), ['linux#1']);
+  eq('covered: a maximized one under another maximized', ids([S('linux#1', 0, 0, 10, 10, { maximized: true }), N('files#1', 0, 0, 10, 10, { maximized: true })]), ['linux#1']);
+  eq('covered: not by a minimized window', ids([wa, N('files#1', 0, 0, 1280, 800, { minimized: true })]), []);
+  eq('covered: not by one on another desktop', ids([wa, N('files#1', 0, 0, 1280, 800, { desktop: 2 })]), []);
+  eq('covered: never in the overview', ids([wa, N('files#1', 0, 0, 1280, 800)], true), []);
+  eq('covered: LordOS windows are never listed', ids([N('notes#1', 100, 100, 10, 10), N('files#1', 0, 0, 1280, 800)]), []);
+}
+
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

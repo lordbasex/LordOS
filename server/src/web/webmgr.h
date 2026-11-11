@@ -33,6 +33,7 @@
 
 /* The folder LordOS's assets are in (the catalog and its icons). Called once, before anything else. */
 void webmgr_init(const char *assets_dir);
+void webmgr_reap(void);                         /* wait for the lord-web processes that ended (main loop) */
 int  webmgr_available(void);                    /* 1 when lord-web is installed next to lord-server and safe to run */
 
 /* Each valid installed app, sorted by id: fn gets the checked struct, its file's text and the icon's

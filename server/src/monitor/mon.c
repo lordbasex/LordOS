@@ -529,6 +529,19 @@ static const char *user_name(unsigned uid) {
 
 static int cmp_pid(const void *a, const void *b) { return ((const ProcPrev *)a)->pid - ((const ProcPrev *)b)->pid; }
 
+/* The proportional set size (a page shared by n processes counts 1/n in each), in bytes, or 0 when unreadable:
+ * what an app's processes really use together, where resident memory counts the shared libraries in each one
+ * (a web app's WebKit processes: 2.3 GB resident against 1.5 GB proportional). Read only for the person's own
+ * processes of at least PSS_MIN_RSS resident, so a scan stays cheap. */
+#define PSS_MIN_RSS (8ull << 20)
+static unsigned long long proc_pss(int pid) {
+    char p[64], txt[1024];
+    snprintf(p, sizeof p, "/proc/%d/smaps_rollup", pid);
+    if (mon_read_small(p, txt, sizeof txt) <= 0) return 0;
+    const char *l = strstr(txt, "\nPss:");
+    return l ? strtoull(l + 5, NULL, 10) * 1024ull : 0;
+}
+
 static void procs_scan(Buf *b) {
     if (!pprev) pprev = calloc(MAX_PROC, sizeof *pprev);
     if (!pcur) pcur = calloc(MAX_PROC, sizeof *pcur);
@@ -597,6 +610,8 @@ static void procs_scan(Buf *b) {
                    isalpha((unsigned char)state) ? state : '?', v[16], cpu, v[20] * (unsigned long long)page,
                    (double)start / (double)hz, start, pid == self ? "true" : "false");
         if (prot) mon_buf_str(b, prot); else mon_buf_printf(b, "null");
+        unsigned long long rss = v[20] * (unsigned long long)page, pss = uid == me && rss >= PSS_MIN_RSS ? proc_pss(pid) : 0;
+        if (pss) mon_buf_printf(b, ",\"pss\":%llu", pss);
         mon_buf_printf(b, "}");
     }
     closedir(d);

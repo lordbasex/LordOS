@@ -239,6 +239,28 @@ the home folder and survives reboots. Image previews are first stored in
 5. After each frame is presented, the apps' `frame` callbacks are answered (so they don't draw
    faster than the screen).
 
+### Hidden windows (0.8.8.8, in development)
+
+A window that is minimized, on a hidden desktop (`wl_set_minimized`, `wl_set_parked`: what the shell's
+`surfaceState` says) or wholly covered (`wl_set_covered`: inside an opaque window above it on the showing desktop, a
+LordOS window whose app isn't transparent or a web app's window, never in the overview; `sdk/desktopmodel.js`
+`coveredIds`) can't be seen, so lord-server stops pacing it at the display's rate. A covered window keeps its keyboard
+and pointer rules and its X11 state; only its frames slow down:
+
+- **`suspended`:** its `xdg_toplevel` configure carries the `suspended` state (xdg-shell 6), sent again as soon as it
+  is minimized, parked or brought back. An app that knows the state stops drawing on its own: lord-web (the web
+  apps, `docs/WEBAPPS.md` "Performance"), GTK 4, the browsers.
+- **Frame callbacks once a second** (`server/src/wl/framegate.h`): its `frame` callbacks are answered at most once a
+  second, by a frame of lord-server's or, when lord-server draws nothing, by its own tick in `main.c`
+  (`wl_frame_hidden`), with its presentation feedback discarded. An app that waits for one (`eglSwapBuffers`) never
+  stalls for good, and one that keeps drawing (a page's animation, a game) draws one frame a second. Its menus and
+  subsurfaces go with it. X11 windows are throttled the same way (Xwayland is the client); they are told through
+  `WM_STATE` iconic instead.
+
+Measured 2026-11-11 on VM 127 (a page with a CSS animation and a `requestAnimationFrame` loop in a web app, the
+session watched so it draws at 60 Hz): minimized, the web app went from 112 % CPU to 0.3 % and lord-server from
+4.9 % to 0.4 %; on another desktop the same. `tests/framegate_test.c`.
+
 Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53 MB of RSS
 (each window keeps a copy of its buffer).
 

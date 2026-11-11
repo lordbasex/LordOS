@@ -168,6 +168,10 @@ static void reap(void) {
     }
 }
 
+/* lord-server's main loop: a lord-web that ended (quit, crashed) is waited for at once, never left a zombie until the
+ * next call here */
+void webmgr_reap(void) { reap(); }
+
 static Kid *kid_of(const char *app, const char *profile) {
     for (int i = 0; i < WEB_MAX_RUNNING; i++)
         if (kids[i].used && !strcmp(kids[i].app, app) && !strcmp(kids[i].profile, profile)) return &kids[i];

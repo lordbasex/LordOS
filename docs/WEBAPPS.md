@@ -344,8 +344,17 @@ silently.
   - its own firewall scope `lordos-web-<app>` (`app-lordos-lordos-web-<app>.scope`, placed by lord-sessiond like any
     launched app; `lordos-web…` is reserved, so no `.desktop` can take that identity), a row in Monitor with the app's
     name. Inside a LordOS session it refuses to start when it can't be placed;
-  - a cgroup with memory and CPU limits (memory.high 2 GB, memory.max 4 GB, two cores), shared with WebKit's processes,
-    which are its children;
+  - a cgroup with memory and CPU limits shared by all the app's profiles and their WebKit processes, which are its
+    children (`webpage_scope_limits`): memory.max three quarters of the computer's memory (1 to 16 GB), memory.high an
+    eighth below it, half the cores (at least two). Until 0.8.8.7 it was 2 GB high, 4 GB max and two cores: two
+    profiles of a messaging app (~800 MB each, plus network processes and the page cache of their files, which counts)
+    sat at memory.high, the kernel throttled the whole scope (the maintainer's `memory.events`: `high 25107`), and the
+    app froze for moments when switching views. One scope per profile would need the firewall's identity
+    (`fw_app_canon`, `desktop:lordos-web-<app>`) to change, so it stays per app;
+  - a crash of `lord-web` itself (a fatal signal, or a C++ exception nobody caught in WebKit's UI process, which ends in
+    `abort`) writes `lord-web: crashed, stack:` and the stack (`backtrace_symbols_fd`, addresses for `addr2line`) to
+    `~/.cache/lordos/web.log` before the signal's default. lord-server waits for an ended `lord-web` from its main loop
+    (`webmgr_reap`), so none is left a zombie;
   - Landlock's scoping (no abstract unix socket and no signal outside its own processes) and `no_new_privs`, again
     refusing to start inside a session when they fail. **Not Landlock's file rules:** a process under them can't mount,
     and bubblewrap mounts for every WebKit process it starts (checked 2026-11-10 on kernel 6.12: with only
@@ -363,6 +372,45 @@ silently.
   person dropped on the window, read by lord-web, never by the page.
 - **What a crash or hang affects:** only that window. lord-server sees the process end and the Dock shows the app as
   closed.
+
+## Performance (0.8.8.8, in development)
+
+- **Out of sight, WebKit throttles.** WebKit is told the view is visible only while the window is mapped, configured
+  and not `suspended` (`webpage_view_visible`). lord-server sends xdg_toplevel's `suspended` (xdg-shell 6) for a window
+  that is minimized, on a hidden desktop, or wholly covered: inside an opaque window above it on the showing desktop (a
+  LordOS window whose app isn't transparent, or another web app's window; any other Linux window may be translucent,
+  so it never covers; never in the overview: `sdk/desktopmodel.js` `coveredIds`, `wl_set_covered`). Closed into the
+  background it is not visible either. Then the page stops painting and its `requestAnimationFrame`, its CSS
+  animations pause (`HiddenPageCSSAnimationSuspension`) and its timers run at most once a second
+  (`HiddenPageDOMTimerThrottling`, both off by default in WPE 2.48). Its network (a chat's WebSocket), its audio and its
+  notifications go on. Shown again, it paints at once. lord-server also answers a hidden window's frame callbacks once
+  a second (`docs/WAYLAND.md`, "Hidden windows").
+- **Memory:** the document browser cache model, set before the web context exists (in WPE 2.48 the model is
+  process-wide and the web process cache sizes itself once, when the context is made: set after, the web process a page
+  leaves at its first navigation, which any site with Cross-Origin-Opener-Policy causes, stayed cached, ~130 MB PSS per
+  profile). Memory pressure (`webengine.c`): the computer's memory up to 3 GB as the base, a third of it (~1 GB) to drop
+  rebuildable caches, half (~1.5 GB) to drop decoded images and compiled code too, polled every 30 s. 0.8.8.7's 1.5 GB
+  base polled every 10 s put a ~600 MB messaging page above the first mark, so it dropped its font, glyph, line layout
+  and style caches every 10 s.
+- **Input to screen:** `LORD_WEB_TRACE=1` logs, for each click or key, the time to the frame WebKit exports after it,
+  to its commit and to the compositor's frame callback.
+- **Measured** 2026-11-11 on VM 127 (4 cores, no GPU, frames by shared memory), a private headless session watched at
+  60 Hz, a page with a CSS animation, a `requestAnimationFrame` canvas and a 50 ms timer, 15 to 30 s each:
+
+  | | before (main 9b86e8fe) | now |
+  |---|---|---|
+  | visible: WebKit processes / lord-server | 116 % / 73 % | 115 % / 74 % |
+  | minimized | 115 % / 5 % | 0.4 % / 0.3 % |
+  | wholly covered by Settings | (not detected) | 0.3 % / 0.7 % |
+  | another desktop | | 0.3 % / 0.3 % |
+  | closed into the background | | 0.4 % / 0.3 % |
+  | context switches per second, minimized | 3400 | ~30 |
+
+  Shown again, the page went back to 60 frames a second within a second each time. A click to the next frame on
+  screen (a menu shown on mousedown): 33 to 54 ms on a still page, 29 to 85 ms on a page with a 3 million object heap,
+  1500 contacts with SVG icons and 3000 messages (688 MB of WebKit's footprint, above 0.8.8.7's first mark); the
+  memory pressure change made no measurable difference there (29 to 62 ms), so the ~hundreds of ms seen in a real
+  messaging app are not explained by it yet.
 
 ## The desktop's side: icons, unread counts, sounds and profiles
 

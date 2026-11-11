@@ -368,6 +368,33 @@ static void test_badge(void) {
         CHECK(webpage_title_badge(c[i].t) == c[i].want, "badge of %s: %d (want %d)", c[i].t ? c[i].t : "(null)", webpage_title_badge(c[i].t), c[i].want);
 }
 
+/* WebKit sees the window as visible only while it is mapped, configured and not suspended (minimized, a hidden
+ * desktop: lord-server's xdg_toplevel "suspended", 9) */
+static void test_visibility(void) {
+    CHECK(webpage_view_visible(1, 1, 0), "a shown, configured window is visible");
+    CHECK(!webpage_view_visible(1, 1, 1), "a suspended window is not");
+    CHECK(!webpage_view_visible(1, 0, 0), "not before its first configure");
+    CHECK(!webpage_view_visible(0, 1, 0), "nor hidden in the background");
+    unsigned st[] = { 4, 9, 1 }, act[] = { 4, 1 };
+    CHECK(webpage_toplevel_suspended(st, 3), "suspended among the states");
+    CHECK(!webpage_toplevel_suspended(act, 2), "activated and maximized are not suspended");
+    CHECK(!webpage_toplevel_suspended(NULL, 0) && !webpage_toplevel_suspended(st, 1), "no states, or only the first");
+}
+
+/* an app's scope: three quarters of the memory (1..16 GB), high an eighth below, half the cores (at least two) */
+static void test_scope_limits(void) {
+    WebScopeLimits l = webpage_scope_limits(32768, 20);
+    CHECK(l.mem_max_mb == 16384 && l.mem_high_mb == 14336 && l.cpu_percent == 1000, "32 GB, 20 cores: %ld %ld %d", l.mem_max_mb, l.mem_high_mb, l.cpu_percent);
+    l = webpage_scope_limits(8192, 4);
+    CHECK(l.mem_max_mb == 6144 && l.mem_high_mb == 5376 && l.cpu_percent == 200, "8 GB, 4 cores: %ld %ld %d", l.mem_max_mb, l.mem_high_mb, l.cpu_percent);
+    l = webpage_scope_limits(1024, 1);
+    CHECK(l.mem_max_mb == 1024 && l.mem_high_mb == 896 && l.cpu_percent == 200, "1 GB: at least 1 GB, two cores");
+    l = webpage_scope_limits(0, 0);
+    CHECK(l.mem_max_mb == 3072 && l.cpu_percent == 200, "unknown memory: as with 4 GB");
+    l = webpage_scope_limits(1L << 20, 256);
+    CHECK(l.mem_max_mb == 16384 && l.cpu_percent == 6400, "capped");
+}
+
 static void test_user_agent(void) {
     char ua[256];
     CHECK(!webpage_user_agent("x86_64", "0.8.8.8", ua, sizeof ua) &&
@@ -536,6 +563,8 @@ static void test_registry_options(void) {
 int main(void) {
     test_axis();
     test_badge();
+    test_visibility();
+    test_scope_limits();
     test_user_agent();
     test_sound();
     test_drop();

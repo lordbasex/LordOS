@@ -20,6 +20,9 @@ void wl_frame_done(unsigned time_ms);   /* after presenting a frame */
  * still waiting for a frame callback get it and their presentation feedback is discarded, so
  * none stalls. 1 if some app was waiting. */
 int  wl_frame_unseen(unsigned time_ms);
+/* The frame callbacks of minimized windows and windows on a hidden desktop (wl/framegate.h): sent
+ * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
+double wl_frame_hidden(unsigned time_ms);
 
 /* Input (main.c). hit = node under the pointer; down[i]/button[i] = buttons of this event
  * (0 left, 1 middle, 2 right). Returns 1 if the pointer is over a Wayland app and 2 if
@@ -61,6 +64,7 @@ const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (sa
 void wl_set_state(int id, int maximized, int fullscreen);
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
+void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */
 int  wl_count(void);
 int  wl_idle_inhibited(void);             /* idle-inhibit: a shown surface asks the screen to stay on */
 void wl_output_resized(void);               /* headless: one display of ui.width × ui.height */

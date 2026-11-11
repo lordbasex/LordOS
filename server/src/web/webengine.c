@@ -32,24 +32,52 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define WEB_MEMORY_LIMIT_MB 1536         /* a web process past this frees its caches (conservative), then more (strict) */
+/* A web process's memory pressure (WebKit's MemoryPressureHandler, polled every 30 s): past a third of the limit it
+ * drops its rebuildable caches (fonts, glyphs, line layout, selectors, style sheets) at every poll, past half it also
+ * drops decoded images and compiled code and collects. 0.8.8.7 had a 1.5 GB limit polled every 10 s: a messaging web
+ * app's ~600 MB, all of it live, sat above the first mark, so every 10 s it threw away what its next click needed
+ * and rebuilt it then (docs/WEBAPPS.md "Performance"). Now WebKit's own: the computer's memory up to 3 GB, so ~1 GB
+ * and ~1.5 GB, and the app's cgroup (memory.high 2 GB) still bounds the whole. */
+#define WEB_MEMORY_LIMIT_MAX_MB 3072
+#define WEB_MEMORY_POLL_S 30
 #define CRASH_WINDOW_US (30 * G_USEC_PER_SEC)
 
 WebKitWebContext *web_context_new(void) {
     WebKitMemoryPressureSettings *mp = webkit_memory_pressure_settings_new();
-    webkit_memory_pressure_settings_set_memory_limit(mp, WEB_MEMORY_LIMIT_MB);
+    long pages = sysconf(_SC_PHYS_PAGES), psz = sysconf(_SC_PAGESIZE);
+    unsigned long long ram_mb = pages > 0 && psz > 0 ? (unsigned long long)pages * (unsigned long long)psz >> 20 : WEB_MEMORY_LIMIT_MAX_MB;
+    webkit_memory_pressure_settings_set_memory_limit(mp, (guint)(ram_mb < WEB_MEMORY_LIMIT_MAX_MB ? ram_mb : WEB_MEMORY_LIMIT_MAX_MB));
     webkit_memory_pressure_settings_set_conservative_threshold(mp, 0.33);
     webkit_memory_pressure_settings_set_strict_threshold(mp, 0.5);
-    webkit_memory_pressure_settings_set_poll_interval(mp, 10);
+    webkit_memory_pressure_settings_set_poll_interval(mp, WEB_MEMORY_POLL_S);
     /* the network process: the same settings, set once before any session exists */
     webkit_network_session_set_memory_pressure_settings(mp);
+    /* One app, one page: the document browser model keeps smaller caches than a browser's. It is set before the
+     * context exists because in WPE 2.48 the model is process-wide (the call ignores its context) and the web process
+     * cache sizes itself from it once, when the context is made: set after, as before 0.8.8.8, the cache kept room
+     * for 30 processes, and the web process a page left at its first navigation (any site sending
+     * Cross-Origin-Opener-Policy, a messaging web app's own included, is loaded in a second one) stayed cached,
+     * about 130 MB PSS of each profile doing nothing. With the document browser model that cache is off. */
+    webkit_web_context_set_cache_model(NULL, WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
     WebKitWebContext *c = g_object_new(WEBKIT_TYPE_WEB_CONTEXT, "memory-pressure-settings", mp, NULL);
     webkit_memory_pressure_settings_free(mp);
-    /* one app, one page: the document browser model keeps smaller caches than a browser's, and with no
-     * back-forward cache WebKit has no reason to keep a second, prewarmed web process */
     webkit_web_context_set_cache_model(c, WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
     webkit_web_context_set_spell_checking_enabled(c, FALSE);
     return c;
+}
+
+/* WebKit's own throttling of a page that isn't visible (the window minimized, on another desktop or in the
+ * background), off by default in WPE 2.48: its timers are aligned to a second and its CSS animations stop. Its
+ * requestAnimationFrame and painting already stop then; its network, audio and notifications go on. */
+static void hidden_page_throttling(WebKitSettings *st) {
+    static const char *const on[] = { "HiddenPageDOMTimerThrottling", "HiddenPageCSSAnimationSuspension" };
+    WebKitFeatureList *all = webkit_settings_get_all_features();
+    for (gsize i = 0; all && i < webkit_feature_list_get_length(all); i++) {
+        WebKitFeature *f = webkit_feature_list_get(all, i);
+        for (size_t k = 0; k < G_N_ELEMENTS(on); k++)
+            if (!g_strcmp0(webkit_feature_get_identifier(f), on[k])) webkit_settings_set_feature_enabled(st, f, TRUE);
+    }
+    if (all) webkit_feature_list_unref(all);
 }
 
 WebKitSettings *web_settings_new(void) {
@@ -57,7 +85,7 @@ WebKitSettings *web_settings_new(void) {
     char ua[256];
     if (uname(&u)) u.machine[0] = 0;
     if (webpage_user_agent(u.machine, LORD_VERSION, ua, sizeof ua)) ua[0] = 0;
-    return webkit_settings_new_with_settings(
+    WebKitSettings *st = webkit_settings_new_with_settings(
         "user-agent", ua[0] ? ua : NULL,
         "enable-developer-extras", FALSE,
         "enable-write-console-messages-to-stdout", FALSE,
@@ -75,6 +103,8 @@ WebKitSettings *web_settings_new(void) {
         "enable-html5-database", TRUE,
         "enable-site-specific-quirks", TRUE,
         NULL);
+    hidden_page_throttling(st);
+    return st;
 }
 
 static int mkdirs(const char *path, mode_t mode) {
