@@ -346,6 +346,8 @@ export const wm = {
   //       (e.g. wm.open('files', { args: { path: '/home/lord/Documentos' } }));
   //       { desktop: n } a new window on that desktop, not the showing one (session restore: it
   //       doesn't take the front or the keyboard from the desktop in view).
+  //       { pip: { x, y, w, h } } a new window that opens floating (wm.setPip): it never takes the front
+  //       or the keyboard (a Linux app's own notification popup, sdk/wayland.js).
   // Returns the window id.
   open(appId, opts = {}) {
     if (!registry.has(appId)) {
@@ -365,7 +367,7 @@ export const wm = {
     showDesktopOf(id);                                 // already open: its desktop comes into view
     windows.set((ws) => (ws.some((w) => w.id === id)
       ? raise(ws, id).map((w) => (w.id === id && args ? { ...w, args } : w))
-      : [...ws, { id, app: appId, title: null, args, desktop, ...place(appId, ws.length, opts.frame) }]));
+      : [...ws, { id, app: appId, title: null, args, desktop, ...place(appId, ws.length, opts.frame), ...(opts.pip ? { pip: { ...opts.pip } } : null) }]));
     return id;
   },
   // Closes the window; if the app set a guard and it returns false, it doesn't close.

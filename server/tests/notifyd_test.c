@@ -5,7 +5,11 @@
  *     ignored; the bus's own answer decides;
  *   - an error reply, a PID that can't be resolved, and no reply at all (3 s) drop it.
  * The test is the bus (a unix socket in /tmp); notifyd runs in a child with the PID → app lookup
- * replaced (100 = desktop:bad, restricted; 200 = desktop:good; anything else unknown). */
+ * replaced (100 = desktop:bad, restricted; 200 = desktop:good; anything else unknown).
+ * Also what Chromium checks before it uses the service instead of drawing its own popups
+ * (GetCapabilities with "body" and "actions", GetServerInformation with spec 1.2), a Notify the way
+ * Chrome sends it (actions, image-data, image-path, desktop-entry, suppress-sound hints), and
+ * dbus_session_export, which gives the session's apps the bus address (docs/WAYLAND.md). */
 #include "hw/notifyd.h"
 #include "fw/rules.h"
 #include "sec/broker.h"
@@ -39,6 +43,10 @@ static void on_event(const char *kind, const char *json) {
     t += 9;
     const char *e = strchr(t, '"');
     if (e && write(shown_fd, t, (size_t)(e - t)) < 0) {}
+    const char *d = strstr(json, "\"desktop\":\"google-chrome\"");
+    const char *a = strstr(json, "\"actions\":[[\"default\",\"Activate\"],[\"settings\",\"Settings\"]]");
+    if (d && write(shown_fd, "|desktop", 8) < 0) {}
+    if (a && write(shown_fd, "|actions", 8) < 0) {}
     if (write(shown_fd, "\n", 1) < 0) {}
 }
 static int fake_app_of_pid(uint32_t pid, char *out, size_t n) {
@@ -111,6 +119,66 @@ static uint32_t notify(const char *title) {
     return bserial;
 }
 
+/* a Notify as Google Chrome sends it (notification_platform_bridge_linux.cc): two actions and the hints
+ * it sets, an image as image-data (iiibiiay) and its icon as a file */
+static uint32_t notify_chrome(const char *title) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, "Google Chrome"); dw_u32(&b, 0); dw_str(&b, ""); dw_str(&b, title); dw_str(&b, "web.example.org<br>hi &amp; bye");
+    size_t a = dw_arr_begin(&b, 4);
+    dw_str(&b, "default"); dw_str(&b, "Activate"); dw_str(&b, "settings"); dw_str(&b, "Settings");
+    dw_arr_end(&b, a);
+    a = dw_arr_begin(&b, 8);
+    dw_struct(&b); dw_str(&b, "image-data"); dw_variant(&b, "(iiibiiay)");
+    { static const uint8_t px[2 * 2 * 4] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+      dw_struct(&b); dw_i32(&b, 2); dw_i32(&b, 2); dw_i32(&b, 8); dw_bool(&b, 1); dw_i32(&b, 8); dw_i32(&b, 4); dw_bytes(&b, px, sizeof px); }
+    dw_struct(&b); dw_str(&b, "image-path"); dw_variant(&b, "s"); dw_str(&b, "/tmp/.org.chromium.Chromium.XXXX");
+    dw_struct(&b); dw_str(&b, "desktop-entry"); dw_variant(&b, "s"); dw_str(&b, "google-chrome");
+    dw_struct(&b); dw_str(&b, "suppress-sound"); dw_variant(&b, "b"); dw_bool(&b, 1);
+    dw_struct(&b); dw_str(&b, "x-kde-origin-name"); dw_variant(&b, "s"); dw_str(&b, "web.example.org");
+    dw_struct(&b); dw_str(&b, "urgency"); dw_variant(&b, "y"); dw_u8(&b, 1);
+    dw_arr_end(&b, a);
+    dw_i32(&b, -1);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/Notifications", .iface = "org.freedesktop.Notifications",
+               .member = "Notify", .dest = ":1.1", .sig = "susssasa{sv}i", .sender = ":1.9" };
+    bus_send(&h, &b);
+    dw_free(&b);
+    return bserial;
+}
+
+/* calls a method without arguments and waits for its answer (1 with it in *out) */
+static int call_and_wait(const char *member, DMsg *out) {
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/Notifications", .iface = "org.freedesktop.Notifications",
+               .member = member, .dest = ":1.1", .sender = ":1.9" };
+    bus_send(&h, NULL);
+    uint32_t serial = bserial;
+    while (next(out, 2000)) {
+        if ((out->type == DBUS_RETURN || out->type == DBUS_ERROR) && out->reply_serial == serial) return 1;
+        dbus_msg_free(out);
+    }
+    return 0;
+}
+
+/* dbus_session_export: dir has a socket "bus" of ours */
+static void test_export(const char *dir, const char *expect) {
+    char got[256];
+    unsetenv("DBUS_SESSION_BUS_ADDRESS");
+    setenv("XDG_RUNTIME_DIR", dir, 1);
+    check(dbus_session_export() == 1, "export: set when unset and $XDG_RUNTIME_DIR/bus is our socket");
+    snprintf(got, sizeof got, "%s", getenv("DBUS_SESSION_BUS_ADDRESS") ? getenv("DBUS_SESSION_BUS_ADDRESS") : "");
+    check(!strcmp(got, expect), "export: unix:path= with the address escaping");
+    if (strcmp(got, expect)) printf("  got %s, want %s\n", got, expect);
+    setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/elsewhere", 1);
+    check(dbus_session_export() == 0 && !strcmp(getenv("DBUS_SESSION_BUS_ADDRESS"), "unix:path=/elsewhere"), "export: an address already set is kept");
+    unsetenv("DBUS_SESSION_BUS_ADDRESS");
+    setenv("XDG_RUNTIME_DIR", "/nonexistent-lordos-test", 1);
+    check(dbus_session_export() == 0 && !getenv("DBUS_SESSION_BUS_ADDRESS"), "export: no socket there, nothing set");
+    setenv("XDG_RUNTIME_DIR", "relative/dir", 1);
+    check(dbus_session_export() == 0 && !getenv("DBUS_SESSION_BUS_ADDRESS"), "export: a relative runtime dir is ignored");
+    unsetenv("XDG_RUNTIME_DIR");
+    check(dbus_session_export() == 0 && !getenv("DBUS_SESSION_BUS_ADDRESS"), "export: no runtime dir, nothing set");
+}
+
 /* waits for notifyd's GetConnectionUnixProcessID; returns its serial (0 if none) */
 static uint32_t pid_question(void) {
     DMsg m;
@@ -147,15 +215,20 @@ static uint32_t notify_answer(uint32_t serial, int ms) {
 
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
-    char path[] = "/tmp/notifyd-test-XXXXXX";
+    char path[] = "/tmp/notifyd test,=-XXXXXX";       /* a space, a comma and '=' get escaped in the address */
     if (!mkdtemp(path)) return 2;
-    char sock[100], addr[120];
+    char sock[100], addr[200];
     snprintf(sock, sizeof sock, "%s/bus", path);
-    snprintf(addr, sizeof addr, "unix:path=%s", sock);
     int l = socket(AF_UNIX, SOCK_STREAM, 0);
     struct sockaddr_un sa = { .sun_family = AF_UNIX };
     snprintf(sa.sun_path, sizeof sa.sun_path, "%s", sock);
     if (l < 0 || bind(l, (struct sockaddr *)&sa, sizeof sa) || listen(l, 1)) return 2;
+    {
+        char want[200];
+        snprintf(want, sizeof want, "unix:path=/tmp/notifyd%%20test%%2c%%3d-%s/bus", path + strlen("/tmp/notifyd test,=-"));
+        test_export(path, want);
+        snprintf(addr, sizeof addr, "%s", want);   /* notifyd reads the escaped form back */
+    }
     int pipefd[2];
     if (pipe(pipefd)) return 2;
     setenv("DBUS_SESSION_BUS_ADDRESS", addr, 1);
@@ -182,11 +255,46 @@ int main(void) {
 
     usleep(300 * 1000);                             /* notifyd_start's wait for RequestName is over */
 
+    /* 0. what Chromium checks before using the service: "body" and "actions" (else it draws its own
+     *    popups), and a specification version of at least 1.1 */
+    {
+        DMsg m;
+        int body = 0, actions = 0, markup = 0;
+        if (call_and_wait("GetCapabilities", &m)) {
+            check(m.type == DBUS_RETURN && m.sig && !strcmp(m.sig, "as"), "0: GetCapabilities answers as");
+            DRd r;
+            dr_init(&r, &m);
+            size_t end = dr_arr(&r, 4);
+            while (!r.err && dr_more(&r, end)) {
+                const char *c = dr_str(&r, NULL);
+                if (!c) break;
+                body |= !strcmp(c, "body"); actions |= !strcmp(c, "actions"); markup |= !strcmp(c, "body-markup");
+            }
+            dbus_msg_free(&m);
+        }
+        check(body && actions && markup, "0: capabilities body, actions and body-markup");
+        if (call_and_wait("GetServerInformation", &m)) {
+            check(m.type == DBUS_RETURN && m.sig && !strcmp(m.sig, "ssss"), "0: GetServerInformation answers ssss");
+            DRd r;
+            dr_init(&r, &m);
+            const char *name = dr_str(&r, NULL), *vendor = dr_str(&r, NULL), *version = dr_str(&r, NULL), *spec = dr_str(&r, NULL);
+            check(!r.err && name && name[0] && vendor && version && spec && !strcmp(spec, "1.2"), "0: name set and spec_version 1.2");
+            dbus_msg_free(&m);
+        } else check(0, "0: GetServerInformation answered");
+    }
+
     /* 1. unrestricted: shown */
     uint32_t n = notify("good"), q = pid_question();
     check(q != 0, "1: notifyd asks the bus for the sender's PID");
     pid_answer(q, 200, "org.freedesktop.DBus");
     check(notify_answer(n, 2000) > 0, "1: Notify answered with an id");
+
+    /* 1b. Chrome's Notify (actions and every hint it sets, an image among them): shown, with its
+     *     .desktop entry and both actions */
+    n = notify_chrome("chrome"); q = pid_question();
+    check(q != 0, "1b: Chrome's Notify parsed and the PID asked");
+    pid_answer(q, 200, "org.freedesktop.DBus");
+    check(notify_answer(n, 2000) > 0, "1b: Chrome's Notify answered with an id");
 
     /* 2. restricted: answered, not shown */
     n = notify("bad"); q = pid_question();
@@ -220,8 +328,8 @@ int main(void) {
     char shown[512] = "";
     ssize_t r = read(pipefd[0], shown, sizeof shown - 1);
     shown[r > 0 ? r : 0] = 0;
-    check(!strcmp(shown, "good\n"), "only the unrestricted notification was shown");
-    if (strcmp(shown, "good\n")) printf("  shown: %s\n", shown);
+    check(!strcmp(shown, "good\nchrome|desktop|actions\n"), "only the unrestricted notifications were shown, Chrome's with its entry and actions");
+    if (strcmp(shown, "good\nchrome|desktop|actions\n")) printf("  shown: %s\n", shown);
     unlink(sock);
     rmdir(path);
     printf("notifyd-test: %d/%d passed\n", total - fails, total);

@@ -10,10 +10,10 @@ import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, workAreaOf } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
-import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, isNoticeWindow, noticeFrame } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
-import { locale, appName } from './i18n.js';
+import { locale, appName, direction } from './i18n.js';
 import { linuxAppFor } from './apps.js';
 import { shortcutsWho } from './kbinhibitmodel.js';
 import { webOwnerOf } from './webapps.js';
@@ -96,6 +96,15 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       if (d.x11 && d.appAlt && !linuxAppFor(d.appId) && linuxAppFor(d.appAlt)) d = { ...d, appId: d.appAlt };
       const c = d.csd ? { w: 0, h: 0 } : windowChrome();
       const area = openingArea(launcherKeyFor(d.appId));   // its assigned display, or under the pointer (docs/DISPLAYS.md)
+      // a browser's own notification popup (no app id, title or parent): floating in the top corner, never
+      // the front window, so it doesn't take the keyboard (sdk/desktopmodel.js isNoticeWindow)
+      if (isNoticeWindow(d)) {
+        const others = windows.get().filter((x) => x.args?.notice && x.pip).map((x) => x.pip);
+        const pip = noticeFrame(area, others, d.width, d.height, direction() === 'rtl');
+        wm.open('linux', { instance: String(sid), frame: { ...pip }, pip, args: { surface: sid, csd: true, appId: '', notice: true } });
+        wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });
+        break;
+      }
       const w = Math.min(area.w, d.width + c.w), hh = Math.min(area.h, d.height + c.h);
       const n = windows.get().length;
       // cascaded, but always inside the work area (never under the Dock)
@@ -134,12 +143,15 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id
       if (!win) break;
+      // a window taken for a notification popup that names itself is a normal window after all
+      if (win.args?.notice && d.title) { wm.setArgs(id, { notice: false }); wm.setPip(id, null); }
       const pkg = win.args?.pkg ? getApp(win.args.appId) : null;
       wm.setTitle(id, pkg && (!d.title || d.title === win.args.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || null));
       break;
     }
     case 'geometry': {                     // la app cambió su tamaño por su cuenta
       if (!win || win.maximized) break;
+      if (win.args?.notice && win.pip) { wm.setPip(id, { ...win.pip, w: d.width, h: d.height }); break; }   // a notice popup grew
       const c = win.args?.csd ? { w: 0, h: 0 } : windowChrome();
       if (Math.abs(win.w - (d.width + c.w)) > 1 || Math.abs(win.h - (d.height + c.h)) > 1) wm.resize(id, d.width + c.w, d.height + c.h);
       break;

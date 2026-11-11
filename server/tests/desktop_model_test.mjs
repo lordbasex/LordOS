@@ -11,7 +11,7 @@ const S = await import(path.join(here, '../../sdk/sessionmodel.js'));
 const {
   onDesktop, windowHidden, visibleOn, mountedOn, focusedOn, keyboardSurface, acceptsAppRequest, activationOutcome, surfaceState, pickWindow, addDesktop, removeDesktop,
   nextDesktop, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, gridLayout, stripLayout, hitRect, overviewPlaceholder, MAX_DESKTOPS,
-  cleanName, cleanNames, namesByPosition, withName, moveDesktopTo, stripSlot, MAX_NAME,
+  cleanName, cleanNames, namesByPosition, withName, moveDesktopTo, stripSlot, MAX_NAME, isNoticeWindow, noticeFrame, NOTICE_MARGIN,
 } = M;
 
 let n = 0, bad = 0;
@@ -233,6 +233,29 @@ eq('index clamped', [moveDesktopTo([1, 2, 3], 1, 99), moveDesktopTo([1, 2, 3], 3
 // a minimized Linux window has a placeholder behind its body in the overview, and only there; a LordOS app's body would show it through
 const lin = { minimized: true, args: { surface: 5 } };
 eq('placeholder: minimized Linux window, in the overview', [overviewPlaceholder(lin, true), overviewPlaceholder(lin, false), overviewPlaceholder({ args: { surface: 5 } }, true), overviewPlaceholder({ minimized: true }, true)], [true, false, false, false]);
+
+// A browser's own notification popup (Chrome without a notification service: an xdg toplevel with no app id,
+// title or parent) floats and never has the keyboard; a real window, a dialog or an X11 window doesn't.
+eq('notice: Chrome\'s popup', isNoticeWindow({ appId: '', title: '', width: 360, height: 102, csd: true, dialog: false, fixed: false, parent: 0, modal: false }), true);
+eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
+  isNoticeWindow({ appId: 'google-chrome', title: '' }), isNoticeWindow({ appId: '', title: 'Picture in picture' }),
+  isNoticeWindow({ appId: '', title: '', parent: 4 }), isNoticeWindow({ appId: '', title: '', dialog: true }),
+  isNoticeWindow({ appId: '', title: '', x11: true }), isNoticeWindow(null)], [false, false, false, false, false, false]);
+{
+  const A = { x: 0, y: 30, w: 1280, h: 700 }, M = NOTICE_MARGIN;
+  const f1 = noticeFrame(A, [], 360, 102);
+  eq('notice: top right of the work area', f1, { x: 1280 - M - 360, y: 30 + M, w: 360, h: 102 });
+  eq('notice: right to left: top left', noticeFrame(A, [], 360, 102, true).x, M);
+  const f2 = noticeFrame(A, [f1], 360, 128);
+  eq('notice: the next one goes below', f2.y, f1.y + f1.h + M / 2);
+  eq('notice: back at the top when the column is full', noticeFrame(A, [{ x: f1.x, y: 600, w: 360, h: 100 }], 360, 102).y, 30 + M);
+  eq('notice: one on another display is not counted', noticeFrame(A, [{ x: 2000, y: 42, w: 360, h: 102 }], 360, 102).y, 30 + M);
+  eq('notice: never larger than the area', noticeFrame({ x: 0, y: 0, w: 300, h: 200 }, [], 4000, 4000), { x: M, y: M, w: 300 - 2 * M, h: 200 - 2 * M });
+  // as picture-in-picture: in front, yet never the front window, so the keyboard stays with the browser
+  const ws = [L(3, 1), L(7, 1, { pip: f1, args: { surface: 7, notice: true } })];
+  eq('notice: the keyboard stays with the window below', keyboardSurface(ws, 1, false, surf), 3);
+  eq('notice: shown on every desktop', onDesktop(ws[1], 2), true);
+}
 
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

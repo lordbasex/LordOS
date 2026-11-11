@@ -50,6 +50,7 @@
 #include "tp/tp_route.h"
 #include "wl/wl_input.h"
 #include "wl/xwayland.h"
+#include "vault/dbus.h"
 #include "media/media.h"
 #include "media/svgicon.h"
 #include "app/app.h"
@@ -2479,6 +2480,9 @@ int main(int argc, char **argv) {
     if (ok && wl_start()) fprintf(stderr, "lord-server: no Wayland (Linux apps will not be able to open)\n");
     /* X11 apps: an X socket now, Xwayland only when one connects (wl/xwayland.c); not on the login screen */
     else if (ok && !s.greeter && session_user) xwl_init();
+    /* the session bus's address for every app the session starts (a terminal, the launcher, session
+     * restore): without it Google Chrome has no bus, so no LordOS notifications, tray or portal */
+    if (ok && !s.greeter && dbus_session_export()) fprintf(stderr, "lord-server: DBUS_SESSION_BUS_ADDRESS=%s\n", getenv("DBUS_SESSION_BUS_ADDRESS"));
     publish_displays(&s);                   /* one wl_output per display */
     if (ok && net_open()) fprintf(stderr, "lord-server: no network notifications (rtnetlink)\n");
     /* Backups: a thread running as the user, nice 19 and idle I/O (backup/backup.c) */
