@@ -130,9 +130,9 @@ export function PermissionPrompt() {
       border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', alignItems: 'center' } },
       h(View, { style: { width: 44, height: 44, borderRadius: 10, backgroundColor: item.perm === 'camera' ? '#30d158' : item.perm === 'microphone' ? '#ff9f0a' : '#0a84ff',
         alignItems: 'center', justifyContent: 'center' } }, h(Text, { style: { fontSize: 22 } }, glyph(item.perm))),
-      h(Text, { style: { fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
-      who ? h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.75)', textAlign: 'center' } }, who) : null,
-      h(Text, { style: { fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
+      h(Text, { style: { alignSelf: 'stretch', fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
+      who ? h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.75)', textAlign: 'center' } }, who) : null,
+      h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
       h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
         h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
         h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
