@@ -12,6 +12,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Web apps: the site's own icon.** With lordos-web installed, LordOS fetches each app's icon from the site itself with
+  the same probe as "Add from an address" (PNG or SVG up to 1 MB, kept only when the probe ended on the app's own
+  origin). The icon is cached as `~/.cache/lordos/web/icons/<app>.png|svg` (a protected folder, named by app id only) and
+  used by the Dock, launcher, switcher, Store and Settings. The Store asks for icons lazily, one probe at a time, and an
+  installed catalog app gets its icon on its next launch without blocking it. Settings → Web apps → Refresh icon fetches
+  it again. The repository still ships only LordOS's letter tiles. New `lord.webapps.fetchIcon`, `iconResult` and
+  `icons`; `list()`/`get()` give the cached icon as `iconPath`.
+- **Web apps: unread count on the Dock.** lord-server serves `org.lordos.WebApps1.SetBadge(app, profile, count)`,
+  accepted only from the lord-web it started for that app and profile (the same pid check as Ask; tested in
+  `webdock-test`). The count is clamped to 0..9999, sent to the shell as `webapps-badge`, and reset to 0 when that
+  lord-web leaves the bus. The Dock and Lord Classic's taskbar draw a red badge with the sum of the app's profiles ("99+"
+  over 99), and the Dock's window list shows each profile's own count. Settings → Web apps → "Show unread count on the
+  Dock" (on by default).
+- **Web apps, Settings: "Show in the menu bar" and "Notification sound".** "Show in the menu bar" is registry `tray`
+  (`lord.webapps.setTray`). "Notification sound" offers Automatic (LordOS's sound only when the page plays none of its
+  own), The app's, LordOS's and None (registry `notifySound`, `lord.webapps.setNotifySound`). Settings → Notifications
+  shows the same choice for each web app.
+- **Notifications: a sound per app.** Default, None, Pop, Chime, Ping or Drop (new sounds synthesized in `snd.c`), heard
+  when chosen. Stored values stay `true`/`false` or the sound's name, so no migration is needed. For a lord-web that
+  lord-server verified from the sender's pid, notifyd adds the app, profile and `app_icon`, never trusting the
+  desktop-entry a process wrote. A web app's banner is filed under `lordos-web.<app>`, shows the app's name, and shows its
+  icon with the profile's dot. An `app_icon` path is shown only when it is exactly one of that app's icon files.
+- **Web app profiles told apart by color.** Each profile has a color from the tag colors of Files and Databases (registry
+  `color`; `lord.webapps.setProfileColor`; a new profile gets none for the first, then orange, purple, blue…), chosen
+  with color dots in Settings → Web apps. With more than one profile, the frame and the switcher read
+  "<app> — <profile>" and the frame has a thin strip in the profile's color. The Dock's window list reads
+  "<title> — <profile>" with a colored dot. Icons get a dot with the profile's initial. lord-server writes each colored
+  profile's icon as `~/.config/lordos/web/icons/<app>.<profile>.png` for lord-web's tray icon. Optional "Each profile has
+  its own Dock icon".
 - **Web apps: files dragged onto a web app's window reach the page as a real drop.** WPE WebKit 2.48 cannot take an
   external drop, so lord-web is the drop target: it reads the drag's text/uri-list, keeps only local regular files (at
   most 64 MB each, 20 files), reads them itself and gives them to the page through a script in an isolated world. The
@@ -287,6 +316,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Settings → Web apps showed "Data: none yet" for a profile added during the visit even after it was in use. Its size is
+  now measured again when a profile is added or starts, and every 30 s.
+- The Dock menu's "New window: <profile>" showed a check mark as if it were a selected option, and the second profile's
+  window showed only the page title.
 - **Notifications from Chromium-based browsers are LordOS banners, and their own popups no longer take the keyboard.**
   The session started without `DBUS_SESSION_BUS_ADDRESS`, and those browsers don't look for `$XDG_RUNTIME_DIR/bus`
   themselves: they had no session bus at all, so no notification service (they drew their own windows), no tray icon and
