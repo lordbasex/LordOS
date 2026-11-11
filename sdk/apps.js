@@ -1,7 +1,9 @@
 // apps.js — every app that can be opened, for the app launcher, the start menu and the Store:
 //   - the LordOS apps bundled with the theme (apps/),
 //   - the LordOS apps installed as a package (.lpk, see docs/NATIVE-APPS.md),
-//   - the installed Linux apps (.desktop files; they open as Wayland windows).
+//   - the installed Linux apps (.desktop files; they open as Wayland windows),
+//   - the installed web apps (lord.webapps, docs/WEBAPPS.md; kind 'web', id "web:<app>"): each one opens
+//     with its first profile, through lord.webapps.launch.
 //
 //   const list = useLauncherApps();      // [{ id, name, Icon, kind, comment, categories }]
 //   launchApp(list[0].id);
@@ -11,11 +13,13 @@
 import { createElement as h, useEffect } from 'react';
 import { View, Text, Image } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
-import { locale, appName } from './i18n.js';
+import { locale, appName, t } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
 import { compareNames } from './collate.js';
 import { listApps, wm, windows, appRegistry, getApp as registryApp } from './windows.js';
+import { webApps, refreshWebApps, launchWebApp, webAppOfWindow } from './webapps.js';
+import { launcherItem, webAppOfKey, windowLabel } from './webappsmodel.js';
 
 const DESKTOP = 'desktop:';
 export const isLinuxApp = (id) => String(id).startsWith(DESKTOP);
@@ -40,6 +44,17 @@ export function iconFromFile(path, name) {
   if (!path) return ({ size }) => h(LetterIcon, { size, name });
   return ({ size = 32 }) => h(Image, { src: path, style: { width: size, height: size, objectFit: 'contain' } });
 }
+
+// A web app's icon: its PNG in the registry folder, else its initial (an SVG icon is drawn as the initial too).
+// One component per app and file, so a list that renders again keeps its pictures.
+const webIcons = new Map();
+export function webAppIcon(entry) {
+  const path = entry && String(entry.iconPath || '').endsWith('.png') ? entry.iconPath : '';
+  const key = `${entry?.id}|${path}|${entry?.name}`;
+  if (!webIcons.has(key)) webIcons.set(key, iconFromFile(path, entry?.name || '?'));
+  return webIcons.get(key);
+}
+const webItems = (list) => list.map((e) => { const it = launcherItem(e); return it && { ...it, Icon: webAppIcon(e) }; }).filter(Boolean);
 
 const linux = createStore([]);
 
@@ -66,8 +81,10 @@ export function useLauncherApps() {
   useEffect(refreshApps, []);    // an app installed outside the Store (a terminal, another app's installer) shows the next time a list opens
   useStore(locale);
   useStore(appRegistry);
+  const web = useStore(webApps);
+  useEffect(refreshWebApps, []);
   const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  return [...own, ...lin].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  return [...own, ...lin, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
 }
 
 // Main freedesktop standard categories (the same as AppStream's in the Store).
@@ -84,6 +101,11 @@ export function appCategory(a) {
 }
 
 export function launchApp(id) {
+  const web = webAppOfKey(id);
+  if (web) {
+    // a web app: its first profile (the Dock's menu offers the others)
+    try { return launchWebApp(web); } catch (e) { notify({ app: 'settings', title: errorText(e) }); return false; }
+  }
   if (isLinuxApp(id)) {
     const ok = lord.apps.launch(String(id).slice(DESKTOP.length));
     // refused for a reason the user can act on (e.g. its restrictions need a newer kernel)
@@ -148,6 +170,11 @@ function prettyAppId(appId) {
 export function windowAppName(w) {
   if (!w) return '';
   if (!String(w.id).startsWith('linux#')) return appName(registryApp(w.id));
+  const web = webAppOfWindow(w);
+  if (web) {
+    const l = windowLabel(web.entry, web.profile);
+    return l.profile ? t('webapps.windowName', { app: l.name, profile: l.profile }) : l.name;
+  }
   const appId = w.args?.appId || '';
   const pkg = appId ? registryApp(appId) : null;
   if (pkg && (pkg.package || pkg.isolated)) return pkg.isolated ? appName(pkg) : pkg.name;
@@ -158,6 +185,8 @@ export function windowAppName(w) {
 export function windowIcon(w, getApp) {
   const appId = w?.args?.appId;
   if (String(w?.id).startsWith('linux#')) {
+    const web = webAppOfWindow(w);
+    if (web) return webAppIcon(web.entry);
     // an isolated .lpk app (lord-server --app) arrives as a Wayland window with app_id = its id
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;

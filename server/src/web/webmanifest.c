@@ -39,12 +39,12 @@ int webmanifest_color(const char *s, char out[8]) {
 }
 
 /* a name as the Dock shows it: control characters and invalid UTF-8 dropped, spaces folded and trimmed, at most
- * WEBREG_NAME_MAX bytes cut on a character boundary */
+ * WEBMANIFEST_NAME_MAX bytes cut on a character boundary */
 static void clean_name(const char *s, char *out, size_t n) {
     size_t o = 0;
     int space = 0;
     const unsigned char *p = (const unsigned char *)(s ? s : "");
-    while (*p && o + 1 < n && o < WEBREG_NAME_MAX) {
+    while (*p && o + 1 < n && o < WEBMANIFEST_NAME_MAX) {
         unsigned c = *p;
         int k = c < 0x80 ? 0 : c >= 0xc2 && c < 0xe0 ? 1 : c >= 0xe0 && c < 0xf0 ? 2 : c >= 0xf0 && c <= 0xf4 ? 3 : -1;
         int ok = k >= 0;
@@ -53,11 +53,11 @@ static void clean_name(const char *s, char *out, size_t n) {
         if (k == 0 && (c < 0x20 || c == 0x7f || c == ' ')) { space = o > 0; p++; continue; }
         if (k == 1 && c == 0xc2 && p[1] < 0xa0) { p += 2; continue; }       /* C1 controls */
         if (space) {
-            if (o + 2 >= n || o + 1 > WEBREG_NAME_MAX) break;
+            if (o + 2 >= n || o + 1 > WEBMANIFEST_NAME_MAX) break;
             out[o++] = ' ';
             space = 0;
         }
-        if (o + (size_t)k + 1 >= n || o + (size_t)k + 1 > WEBREG_NAME_MAX) break;
+        if (o + (size_t)k + 1 >= n || o + (size_t)k + 1 > WEBMANIFEST_NAME_MAX) break;
         memcpy(out + o, p, (size_t)k + 1);
         o += (size_t)k + 1;
         p += k + 1;
@@ -131,7 +131,7 @@ int webmanifest_answer(const char *doc_url, const char *page, size_t len, char *
     if (sc && weburl_app_ok(sc) && !strchr(sc, '?') && !strchr(sc, '#') && strlen(sc) <= WEBURL_MAX && weburl_in_scope(start, sc)) snprintf(scope, sizeof scope, "%s", sc);
     else if (weburl_dir(start, scope, sizeof scope)) { json_free(&d); return -1; }
 
-    char name[WEBREG_NAME_MAX + 1] = "";
+    char name[WEBMANIFEST_NAME_MAX + 1] = "";
     const char *names[] = { m ? json_str(m, "name") : NULL, m ? json_str(m, "short_name") : NULL, json_str(root, "title") };
     for (int i = 0; i < 3 && !name[0]; i++) clean_name(names[i], name, sizeof name);
     if (!name[0]) clean_name(doc.host, name, sizeof name);
@@ -161,27 +161,8 @@ int webmanifest_answer(const char *doc_url, const char *page, size_t len, char *
 
 const char *webicon_type(int kind) { return kind == WEBICON_PNG ? "image/png" : kind == WEBICON_SVG ? "image/svg+xml" : NULL; }
 
+/* the registry's own check (webreg.c), so lord-web never sends an icon lord-server would refuse */
 int webicon_kind(const unsigned char *b, size_t n) {
-    if (!b || !n || n > WEBICON_MAX) return WEBICON_NONE;
-    static const unsigned char png[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
-    if (n >= 24 && !memcmp(b, png, 8)) return !memcmp(b + 12, "IHDR", 4) ? WEBICON_PNG : WEBICON_NONE;
-    /* text: an optional UTF-8 byte order mark, then markup up to the first element, within the first 4 KB */
-    size_t i = n >= 3 && b[0] == 0xef && b[1] == 0xbb && b[2] == 0xbf ? 3 : 0, lim = n < 4096 ? n : 4096;
-    while (i < lim) {
-        while (i < lim && (b[i] == ' ' || b[i] == '\t' || b[i] == '\r' || b[i] == '\n')) i++;
-        if (i >= lim || b[i] != '<') return WEBICON_NONE;
-        const char *end = NULL;
-        if (i + 4 <= lim && !memcmp(b + i, "<!--", 4)) end = "-->";
-        else if (i + 2 <= lim && (!memcmp(b + i, "<?", 2) || !memcmp(b + i, "<!", 2))) end = ">";
-        if (!end) {
-            if (i + 5 <= lim && !memcmp(b + i, "<svg", 4) && (b[i + 4] == ' ' || b[i + 4] == '>' || b[i + 4] == '\n' || b[i + 4] == '\t' || b[i + 4] == '\r'))
-                return WEBICON_SVG;
-            return WEBICON_NONE;
-        }
-        size_t el = strlen(end), j = i + 2;
-        while (j + el <= lim && memcmp(b + j, end, el)) j++;
-        if (j + el > lim) return WEBICON_NONE;
-        i = j + el;
-    }
-    return WEBICON_NONE;
+    int k = webreg_icon_kind(b, n);
+    return k == 1 ? WEBICON_PNG : k == 2 ? WEBICON_SVG : WEBICON_NONE;
 }

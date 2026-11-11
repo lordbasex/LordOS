@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "note": "The web apps the Store offers (docs/WEBAPPS.md). Data, not text of LordOS: each entry is installed exactly as written here, by lord-server (server/src/web/webmgr.c reads this file from /usr/lib/lordos/assets/webapps/catalog.json; the Store bundles it to show it). 'icon' is a file in icons/ (LordOS's own letter tile, not the service's logo); 'description' is a key in assets/locales/<lang>/webapps.json; 'tested' is true only for an app checked on LordOS (docs/WEBAPPS.md, 'First check'). Checked by server/tests/webapps_model_test.mjs.",
+  "apps": [
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp",
+      "startUrl": "https://web.whatsapp.com/",
+      "scope": "https://web.whatsapp.com/",
+      "origin": "https://web.whatsapp.com",
+      "icon": "whatsapp.png",
+      "themeColor": "#25d366",
+      "background": true,
+      "category": "Network",
+      "description": "webapps.desc.chat",
+      "keywords": ["chat", "messages", "whatsapp"],
+      "tested": true
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "startUrl": "https://web.telegram.org/a/",
+      "scope": "https://web.telegram.org/",
+      "origin": "https://web.telegram.org",
+      "icon": "telegram.png",
+      "themeColor": "#2aabee",
+      "background": true,
+      "category": "Network",
+      "description": "webapps.desc.chat",
+      "keywords": ["chat", "messages", "telegram"],
+      "tested": false
+    },
+    {
+      "id": "element",
+      "name": "Element",
+      "startUrl": "https://app.element.io/",
+      "scope": "https://app.element.io/",
+      "origin": "https://app.element.io",
+      "icon": "element.png",
+      "themeColor": "#0dbd8b",
+      "background": true,
+      "category": "Network",
+      "description": "webapps.desc.chat",
+      "keywords": ["chat", "matrix", "element"],
+      "tested": false
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "startUrl": "https://discord.com/app",
+      "scope": "https://discord.com/",
+      "origin": "https://discord.com",
+      "icon": "discord.png",
+      "themeColor": "#5865f2",
+      "background": true,
+      "category": "Network",
+      "description": "webapps.desc.community",
+      "keywords": ["chat", "voice", "discord"],
+      "tested": false
+    },
+    {
+      "id": "outlook",
+      "name": "Outlook",
+      "startUrl": "https://outlook.live.com/mail/",
+      "scope": "https://outlook.live.com/",
+      "origin": "https://outlook.live.com",
+      "icon": "outlook.png",
+      "themeColor": "#0078d4",
+      "background": true,
+      "category": "Office",
+      "description": "webapps.desc.mail",
+      "keywords": ["mail", "calendar", "outlook"],
+      "tested": false
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "startUrl": "https://www.notion.so/",
+      "scope": "https://www.notion.so/",
+      "origin": "https://www.notion.so",
+      "icon": "notion.png",
+      "themeColor": "#191919",
+      "background": false,
+      "category": "Office",
+      "description": "webapps.desc.notes",
+      "keywords": ["notes", "wiki", "notion"],
+      "tested": false
+    }
+  ]
+}

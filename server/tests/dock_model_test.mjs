@@ -23,9 +23,12 @@ eq('parse desktop', parseDockId('desktop:org.mozilla.firefox'), { kind: 'desktop
 eq('parse desktop underscore', parseDockId('desktop:chromium_browser'), { kind: 'desktop', key: 'chromium_browser' });
 for (const bad of ['files', 'app:', ':files', 'app:Files', 'app:-x', 'lpk:a', 'lpk:Up', 'lpk:a_b', 'desktop:..x', 'desktop:a..b',
   'desktop:.hidden', 'desktop:-x', 'desktop:lpk-notes', 'desktop:a/b', 'desktop:a b', 'desktop:' + 'x'.repeat(63), 'linux:foot',
-  'web:x', 'app:files:x', 'APP:files', null, 42, undefined, {}]) eq(`parse rejects ${JSON.stringify(bad)}`, parseDockId(bad), null);
+  'web:X', 'web:-x', 'web:a_b', 'web:a.b', 'web:' + 'x'.repeat(41), 'www:x', 'app:files:x', 'APP:files', null, 42, undefined, {}]) eq(`parse rejects ${JSON.stringify(bad)}`, parseDockId(bad), null);
 eq('dockId ok', dockId('lpk', 'notes'), 'lpk:notes');
-eq('dockId bad kind', dockId('web', 'x'), null);
+// a web app (docs/WEBAPPS.md): the registry's id rule
+eq('parse web', parseDockId('web:notes-online'), { kind: 'web', key: 'notes-online' });
+eq('dockId web', dockId('web', '0chat'), 'web:0chat');
+eq('dockId bad kind', dockId('www', 'x'), null);
 eq('dockId bad key', dockId('desktop', '../x'), null);
 eq('desktop 62 chars ok', parseDockId('desktop:' + 'x'.repeat(62))?.kind, 'desktop');
 

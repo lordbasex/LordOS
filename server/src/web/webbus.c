@@ -239,7 +239,7 @@ static void on_ask(GObject *src, GAsyncResult *res, gpointer d) {
         g_variant_get(r, "(&s)", &s);
         if (s && (!strcmp(s, "allow") || !strcmp(s, "once"))) answer = s;
     } else {
-        fprintf(stderr, "lord-web: %s not asked (%s): denied\n", webreg_kind_name(a->kind), e ? e->message : "?");
+        fprintf(stderr, "lord-web: %s not asked (%s): denied\n", webreg_perm_name(a->kind), e ? e->message : "?");
         g_clear_error(&e);
     }
     a->cb(a->w, a->kind, answer, a->data);
@@ -249,13 +249,13 @@ static void on_ask(GObject *src, GAsyncResult *res, gpointer d) {
 
 void webbus_ask(Web *w, int kind, WebAskDone cb, void *data) {
     web_registry_refresh(w);                        /* an answer stored since the app started counts */
-    WebPerm p = kind >= 0 && kind < WK_COUNT ? w->app.perms[kind] : WP_DENY;
-    if (p != WP_ASK || !w->bus) { cb(w, kind, p == WP_ALLOW ? "allow" : "deny", data); return; }
+    int p = kind >= 0 && kind < WEBREG_PERM_N ? w->app.perms[kind] : WEBREG_DENY;
+    if (p != WEBREG_ASK || !w->bus) { cb(w, kind, p == WEBREG_ALLOW ? "allow" : "deny", data); return; }
     Ask *a = g_new0(Ask, 1);
     a->w = w;
     a->kind = kind;
     a->cb = cb;
     a->data = data;
-    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Ask", g_variant_new("(sss)", w->app.id, w->profile->id, webreg_kind_name(kind)),
+    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Ask", g_variant_new("(sss)", w->app.id, w->profile->id, webreg_perm_name(kind)),
                            G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_ask, a);
 }

@@ -4,10 +4,12 @@
 // middle click pastes. Bundles tests/textfield_menu_scene.mjs
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
-// An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint).
+// An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint),
+// tests/webapps_sheet_scene.mjs (the Store's "Add from an address" sheet). A scene with a tests/<scene>_sdk.js next to
+// it gets that file as '@lordos/sdk': the few SDK modules it needs, not the whole desktop.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,13 +52,14 @@ const MOCK = `globalThis.__lordTest = (() => {
 })();`;
 
 const scene = process.argv[2] || 'textfield_menu_scene.mjs';
+const sdkShim = path.join(here, `${path.basename(scene, '.mjs')}_sdk.js`);
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-textfield-menu-'));
 let bad = 0, n = 0;
 try {
   const out = await esbuild.build({
     entryPoints: [path.join(here, path.basename(scene))], bundle: true, write: false, format: 'esm',
     platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
-    alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js') }, define: { 'process.env.NODE_ENV': '"production"' },
+    alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), ...(existsSync(sdkShim) ? { '@lordos/sdk': sdkShim } : {}) }, define: { 'process.env.NODE_ENV': '"production"' },
     banner: { js: MOCK },
   });
   const file = path.join(dir, 'scene.mjs');

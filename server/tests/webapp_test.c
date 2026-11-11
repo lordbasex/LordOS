@@ -1,7 +1,7 @@
 /* webapp_test.c — lord-web's pure parts (src/web, docs/WEBAPPS.md) without WebKit: the addresses (weburl.c: what is
- * an app address, origins, the scope prefix), the registry file (webreg.c: ids, URLs, scope, size, unknown keys, the
- * argv/registry match, reading it from a throwaway home), argv and the probe's request line (webargs.c), the probe's
- * answer and the icon check (webmanifest.c), and the download names (webdl.c).
+ * an app address, origins, the scope prefix), argv and the probe's request line (webargs.c), the probe's
+ * answer and the icon check (webmanifest.c), and the download names (webdl.c). The registry file itself (webreg.c,
+ * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
 #include "../src/web/webargs.h"
@@ -60,113 +60,6 @@ static void test_url(void) {
 
     CHECK(!weburl_dir("https://a.example/b/c?d/e", o, sizeof o) && !strcmp(o, "https://a.example/b/"), "dir %s", o);
     CHECK(!weburl_dir("https://a.example", o, sizeof o) && !strcmp(o, "https://a.example/"), "dir of root %s", o);
-}
-
-static const char GOOD[] =
-    "{\n  \"schema\": 1,\n  \"id\": \"chat\",\n  \"name\": \"Chat\",\n"
-    "  \"startUrl\": \"https://web.example.com/\",\n  \"scope\": \"https://web.example.com/\",\n"
-    "  \"origin\": \"https://web.example.com\",\n  \"icon\": \"icons/chat.png\",\n  \"themeColor\": \"#25d366\",\n"
-    "  \"source\": \"catalog\",\n  \"background\": true,\n"
-    "  \"profiles\": [ { \"id\": \"personal\", \"name\": \"Personal\" }, { \"id\": \"work\", \"name\": \"Trabajo \xc3\xa9\" } ],\n"
-    "  \"permissions\": { \"notifications\": \"ask\", \"camera\": \"allow\", \"microphone\": \"ask\", \"screen\": \"ask\", \"location\": \"deny\" }\n}\n";
-
-/* GOOD with the first occurrence of from replaced by to */
-static int parse_with(const char *from, const char *to, char *err, size_t n) {
-    char buf[8192];
-    const char *at = strstr(GOOD, from);
-    if (!at) { printf("FAIL: %s not in the sample\n", from); fails++; return 0; }
-    snprintf(buf, sizeof buf, "%.*s%s%s", (int)(at - GOOD), GOOD, to, at + strlen(from));
-    WebApp a;
-    return webreg_parse(buf, strlen(buf), &a, err, n);
-}
-
-static void test_registry(void) {
-    CHECK(webreg_id_ok("chat") && webreg_id_ok("0a-b") && webreg_id_ok("a234567890123456789012345678901234567890" + 1), "ids");
-    CHECK(!webreg_id_ok("") && !webreg_id_ok("-a") && !webreg_id_ok("Chat") && !webreg_id_ok("a_b") && !webreg_id_ok("a.b") && !webreg_id_ok("a/b"), "bad ids");
-    CHECK(!webreg_id_ok("a2345678901234567890123456789012345678901"), "41 bytes");
-    CHECK(webreg_text_ok("Caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80", 128), "utf-8");
-    CHECK(!webreg_text_ok("a\nb", 128) && !webreg_text_ok("\xc3", 128) && !webreg_text_ok("\xc0\xaf", 128) && !webreg_text_ok("\xed\xa0\x80", 128) && !webreg_text_ok("\xc2\x85", 128), "bad text");
-
-    WebApp a;
-    char err[160];
-    CHECK(!webreg_parse(GOOD, strlen(GOOD), &a, err, sizeof err), "good: %s", err);
-    CHECK(!strcmp(a.id, "chat") && !strcmp(a.name, "Chat") && a.catalog && a.background && a.nprofiles == 2, "fields");
-    CHECK(!strcmp(a.icon, "icons/chat.png") && !strcmp(a.theme_color, "#25d366"), "icon and color");
-    CHECK(a.perms[WK_NOTIFICATIONS] == WP_ASK && a.perms[WK_CAMERA] == WP_ALLOW && a.perms[WK_LOCATION] == WP_DENY, "permissions");
-    CHECK(webreg_profile(&a, "work") && !strcmp(webreg_profile(&a, "work")->name, "Trabajo \xc3\xa9") && !webreg_profile(&a, "other"), "profiles");
-    CHECK(!webreg_check_launch(&a, "chat", "work", err, sizeof err), "launch: %s", err);
-    CHECK(webreg_check_launch(&a, "mail", "work", err, sizeof err), "another app's file");
-    CHECK(webreg_check_launch(&a, "chat", "home", err, sizeof err), "a profile it doesn't have");
-    CHECK(webreg_check_launch(&a, "chat", "../x", err, sizeof err), "a bad profile id");
-
-    /* the argv/registry mismatches and every malformed field */
-    struct { const char *from, *to, *why; } cases[] = {
-        { "\"schema\": 1", "\"schema\": 2", "schema" },
-        { "\"schema\": 1,\n", "", "no schema" },
-        { "\"id\": \"chat\"", "\"id\": \"Chat\"", "id" },
-        { "\"name\": \"Chat\"", "\"name\": \"\"", "empty name" },
-        { "\"name\": \"Chat\"", "\"name\": 5", "name type" },
-        { "\"startUrl\": \"https://web.example.com/\"", "\"startUrl\": \"http://web.example.com/\"", "plain http" },
-        { "\"startUrl\": \"https://web.example.com/\"", "\"startUrl\": \"https://other.example.com/\"", "startUrl on another origin" },
-        { "\"scope\": \"https://web.example.com/\"", "\"scope\": \"https://web.example.com/app/\"", "scope not a prefix" },
-        { "\"scope\": \"https://web.example.com/\"", "\"scope\": \"https://web.example.com/?a\"", "scope with a query" },
-        { "\"origin\": \"https://web.example.com\"", "\"origin\": \"https://web.example.com/\"", "origin with a path" },
-        { "\"origin\": \"https://web.example.com\"", "\"origin\": \"https://Web.example.com\"", "origin not lower case" },
-        { "\"icon\": \"icons/chat.png\"", "\"icon\": \"../chat.png\"", "icon climbs" },
-        { "\"icon\": \"icons/chat.png\"", "\"icon\": \"icons/a/chat.png\"", "icon in a subfolder" },
-        { "\"icon\": \"icons/chat.png\"", "\"icon\": \"icons/chat.exe\"", "icon type" },
-        { "\"icon\": \"icons/chat.png\"", "\"icon\": \"/etc/passwd.png\"", "absolute icon" },
-        { "\"themeColor\": \"#25d366\"", "\"themeColor\": \"green\"", "color" },
-        { "\"source\": \"catalog\"", "\"source\": \"store\"", "source" },
-        { "\"background\": true", "\"background\": 1", "background type" },
-        { "\"profiles\": [ { \"id\": \"personal\", \"name\": \"Personal\" }, ", "\"profiles\": [ ", "still good (one profile)" },
-        { "\"camera\": \"allow\"", "\"camera\": \"yes\"", "permission word" },
-        { "\"camera\": \"allow\"", "\"clipboard\": \"allow\"", "unknown permission" },
-        { "\"background\": true", "\"background\": true, \"inject\": \"x\"", "unknown key" },
-        { "\"background\": true", "\"background\": true, \"background\": false", "duplicate key" },
-        { "{ \"id\": \"personal\", \"name\": \"Personal\" }", "{ \"id\": \"work\", \"name\": \"Personal\" }", "profile twice" },
-        { "{ \"id\": \"personal\", \"name\": \"Personal\" }", "{ \"id\": \"personal\" }", "profile without a name" },
-        { "{ \"id\": \"personal\", \"name\": \"Personal\" }", "{ \"id\": \"personal\", \"name\": \"P\", \"x\": 1 }", "profile unknown key" },
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
-        int r = parse_with(cases[i].from, cases[i].to, err, sizeof err);
-        if (!strncmp(cases[i].why, "still good", 10)) CHECK(!r, "%s: %s", cases[i].why, err);
-        else CHECK(r && err[0], "refused: %s", cases[i].why);
-    }
-    char none[] = "{\"schema\":1,\"id\":\"a\",\"name\":\"A\",\"startUrl\":\"https://a.example/\",\"scope\":\"https://a.example/\",\"origin\":\"https://a.example\",\"profiles\":[]}";
-    CHECK(webreg_parse(none, strlen(none), &a, err, sizeof err), "no profiles");
-    char loc[] = "{\"schema\":1,\"id\":\"a\",\"name\":\"A\",\"startUrl\":\"http://localhost:8000/x\",\"scope\":\"http://localhost:8000/\",\"origin\":\"http://localhost:8000\",\"profiles\":[{\"id\":\"p\",\"name\":\"P\"}]}";
-    CHECK(!webreg_parse(loc, strlen(loc), &a, err, sizeof err) && a.perms[WK_CAMERA] == WP_ASK, "local http, permissions default to ask: %s", err);
-    CHECK(webreg_parse("[]", 2, &a, err, sizeof err) && webreg_parse("{", 1, &a, err, sizeof err), "not an object");
-
-    /* the file: a throwaway home */
-    char home[] = "/tmp/webapp-test.XXXXXX";
-    if (!mkdtemp(home)) { CHECK(0, "mkdtemp"); return; }
-    char p[512], q[512];
-    snprintf(p, sizeof p, "%s/.config/lordos/web/apps", home);
-    char mk[600];
-    snprintf(mk, sizeof mk, "mkdir -p '%s'", p);
-    CHECK(!system(mk), "mkdir");
-    snprintf(p, sizeof p, "%s/.config/lordos/web/apps/chat.json", home);
-    FILE *f = fopen(p, "w");
-    if (f) { fputs(GOOD, f); fclose(f); }
-    CHECK(!webreg_load(home, "chat", &a, err, sizeof err) && !strcmp(a.id, "chat"), "load: %s", err);
-    CHECK(webreg_load(home, "mail", &a, err, sizeof err), "a missing file");
-    CHECK(webreg_load(home, "../chat", &a, err, sizeof err), "a bad id never reaches the folder");
-    /* the file of another app, under this app's name: refused at launch */
-    snprintf(q, sizeof q, "%s/.config/lordos/web/apps/mail.json", home);
-    CHECK(!symlink(p, q), "symlink");
-    CHECK(webreg_load(home, "mail", &a, err, sizeof err), "a link is not followed");
-    unlink(q);
-    f = fopen(q, "w");
-    if (f) { fputs(GOOD, f); fclose(f); }
-    CHECK(!webreg_load(home, "mail", &a, err, sizeof err) && webreg_check_launch(&a, "mail", "work", err, sizeof err), "the file's id must be the app");
-    /* over 64 KB */
-    f = fopen(p, "w");
-    if (f) { fputs("{\"schema\":1,\"name\":\"", f); for (int i = 0; i < WEBREG_FILE_MAX; i++) fputc('a', f); fputs("\"}", f); fclose(f); }
-    CHECK(webreg_load(home, "chat", &a, err, sizeof err) && strstr(err, "over"), "too big: %s", err);
-    snprintf(mk, sizeof mk, "rm -rf '%s'", home);
-    CHECK(!system(mk), "cleanup");
 }
 
 static void test_args(void) {
@@ -228,7 +121,7 @@ static void test_manifest(void) {
     CHECK(webmanifest_answer("https://plain.example/", "[1]", 3, out, sizeof out), "not an object");
     CHECK(!webmanifest_error("web.probe.load", out, sizeof out) && !strcmp(out, "{\"ok\":false,\"error\":\"web.probe.load\"}"), "error: %s", out);
 
-    unsigned char png[32] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R' };
+    unsigned char png[33] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R', 0, 0, 0, 16, 0, 0, 0, 16, 8, 6 };
     CHECK(webicon_kind(png, sizeof png) == WEBICON_PNG && !strcmp(webicon_type(WEBICON_PNG), "image/png"), "png");
     png[12] = 'X';
     CHECK(webicon_kind(png, sizeof png) == WEBICON_NONE, "png without IHDR");
@@ -276,7 +169,6 @@ static void test_downloads(void) {
 
 int main(void) {
     test_url();
-    test_registry();
     test_args();
     test_manifest();
     test_downloads();

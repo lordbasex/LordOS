@@ -242,6 +242,10 @@ EOF
     if have node; then run "gtk-defaults-test (assets/gtk, #52)" node tests/gtk_defaults_test.mjs; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # (0.8.8.8) web apps: the window's app id and its process, the Dock's profiles menu, the Store's address sheet,
+    # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
+    if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs
+    else skip "webapps-model-test" "node"; fi
     # glibc region names: what the installer and Settings send for every UTF-8 region (sdk/localename.js)
     if have node; then run "localename-test (sdk/localename.js)" node tests/localename_test.mjs
     else skip "localename-test" "node"; fi
@@ -374,6 +378,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8) the Store's "Add from an address" sheet: https only, the origin lord-web read, Install sends no URL
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-sheet-scene (apps/store/addweb.js)" node tests/textfield_menu_test.mjs webapps_sheet_scene.mjs
+    else skip "webapps-sheet-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs

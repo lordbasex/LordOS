@@ -20,6 +20,7 @@
 
 #include "webargs.h"
 #include "webreg.h"
+#include "weburl.h"
 
 #include <limits.h>
 

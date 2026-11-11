@@ -201,18 +201,18 @@ static gboolean on_permission(WebKitWebView *v, WebKitPermissionRequest *req, gp
     Web *w = d;
     Pending *p = g_new0(Pending, 1);
     p->allowed = 1;
-    if (WEBKIT_IS_NOTIFICATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WK_NOTIFICATIONS;
-    else if (WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WK_LOCATION;
+    if (WEBKIT_IS_NOTIFICATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WEBREG_PERM_NOTIFICATIONS;
+    else if (WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WEBREG_PERM_LOCATION;
     else if (WEBKIT_IS_USER_MEDIA_PERMISSION_REQUEST(req)) {
         WebKitUserMediaPermissionRequest *m = WEBKIT_USER_MEDIA_PERMISSION_REQUEST(req);
-        if (webkit_user_media_permission_is_for_display_device(m)) p->kinds[p->n++] = WK_SCREEN;
+        if (webkit_user_media_permission_is_for_display_device(m)) p->kinds[p->n++] = WEBREG_PERM_SCREEN;
         else {
-            if (webkit_user_media_permission_is_for_video_device(m)) p->kinds[p->n++] = WK_CAMERA;
-            if (webkit_user_media_permission_is_for_audio_device(m)) p->kinds[p->n++] = WK_MICROPHONE;
+            if (webkit_user_media_permission_is_for_video_device(m)) p->kinds[p->n++] = WEBREG_PERM_CAMERA;
+            if (webkit_user_media_permission_is_for_audio_device(m)) p->kinds[p->n++] = WEBREG_PERM_MICROPHONE;
         }
     } else if (WEBKIT_IS_DEVICE_INFO_PERMISSION_REQUEST(req)) {
         /* the names of cameras and microphones: only when one of them is already allowed, never a dialog of its own */
-        p->allowed = w->app.perms[WK_CAMERA] == WP_ALLOW || w->app.perms[WK_MICROPHONE] == WP_ALLOW;
+        p->allowed = w->app.perms[WEBREG_PERM_CAMERA] == WEBREG_ALLOW || w->app.perms[WEBREG_PERM_MICROPHONE] == WEBREG_ALLOW;
     } else p->allowed = 0;      /* storage access, media keys, plugins: no */
     if (!p->n) p->allowed = p->allowed && WEBKIT_IS_DEVICE_INFO_PERMISSION_REQUEST(req);
     p->req = g_object_ref(req);
@@ -222,11 +222,11 @@ static gboolean on_permission(WebKitWebView *v, WebKitPermissionRequest *req, gp
 
 static int query_kind(const char *name) {
     if (!name) return -1;
-    if (!strcmp(name, "notifications")) return WK_NOTIFICATIONS;
-    if (!strcmp(name, "camera")) return WK_CAMERA;
-    if (!strcmp(name, "microphone")) return WK_MICROPHONE;
-    if (!strcmp(name, "geolocation")) return WK_LOCATION;
-    if (!strcmp(name, "display-capture")) return WK_SCREEN;
+    if (!strcmp(name, "notifications")) return WEBREG_PERM_NOTIFICATIONS;
+    if (!strcmp(name, "camera")) return WEBREG_PERM_CAMERA;
+    if (!strcmp(name, "microphone")) return WEBREG_PERM_MICROPHONE;
+    if (!strcmp(name, "geolocation")) return WEBREG_PERM_LOCATION;
+    if (!strcmp(name, "display-capture")) return WEBREG_PERM_SCREEN;
     return -1;
 }
 
@@ -234,8 +234,8 @@ static gboolean on_query(WebKitWebView *v, WebKitPermissionStateQuery *q, gpoint
     (void)v;
     Web *w = d;
     int k = query_kind(webkit_permission_state_query_get_name(q));
-    WebPerm p = k >= 0 ? w->app.perms[k] : WP_DENY;
-    webkit_permission_state_query_finish(q, p == WP_ALLOW ? WEBKIT_PERMISSION_STATE_GRANTED : p == WP_ASK ? WEBKIT_PERMISSION_STATE_PROMPT : WEBKIT_PERMISSION_STATE_DENIED);
+    int p = k >= 0 ? w->app.perms[k] : WEBREG_DENY;
+    webkit_permission_state_query_finish(q, p == WEBREG_ALLOW ? WEBKIT_PERMISSION_STATE_GRANTED : p == WEBREG_ASK ? WEBKIT_PERMISSION_STATE_PROMPT : WEBKIT_PERMISSION_STATE_DENIED);
     return TRUE;
 }
 

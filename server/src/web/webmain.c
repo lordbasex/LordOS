@@ -186,7 +186,7 @@ static int run_app(Web *w) {
     snprintf(w->window_id, sizeof w->window_id, "lordos-web.%s.%s", w->app.id, w->profile->id);
     if (snprintf(w->profile_dir, sizeof w->profile_dir, "%s/.local/share/lordos/web/%s/%s", w->home, w->app.id, w->profile->id) >= (int)sizeof w->profile_dir) return 2;
     if (w->app.icon[0]) {
-        char p[PATH_MAX + WEBREG_ICON_MAX + 2];
+        char p[PATH_MAX + WEBREG_ICON_PATH_MAX + 2];
         struct stat st;
         snprintf(p, sizeof p, "%s/%s", w->config_dir, w->app.icon);
         if (!lstat(p, &st) && S_ISREG(st.st_mode) && strlen(p) < sizeof w->icon_path) snprintf(w->icon_path, sizeof w->icon_path, "%s", p);
