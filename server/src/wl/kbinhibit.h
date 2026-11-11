@@ -37,6 +37,8 @@ int kbi_peer_proc(int sock, int pid);
  * process ("" if nothing): when it names another app, no one. 1 if out holds one; 0: no identity (fail closed). */
 int kbi_context_identity(const char *engine, const char *app_id, const char *checked, char *out, size_t n);
 int kbi_flatpak_name(const char *text, size_t len, char *out, size_t n);
+/* [Instance] instance-id= of a .flatpak-info text (digits only, at most 20): 1, or 0. */
+int kbi_flatpak_instance(const char *text, size_t len, char *out, size_t n);
 /* Is this a name kbi_identity could have made? (lord.perms.set takes one only for "shortcuts".) Names of the
  * first, never released format ("desktop:<app_id>", "exe:<path>") don't pass and are never looked up. */
 int kbi_key_valid(const char *key);

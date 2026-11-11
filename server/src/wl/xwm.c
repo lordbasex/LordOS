@@ -1270,7 +1270,14 @@ void xwm_xdrag_finished(int accepted, uint32_t action) {
 
 /* Drags that take too long: data never written, a drop never finished. */
 static void dnd_tick(time_t now) {
-    for (Pull *p = pulls, *nx; p; p = nx) { nx = p->next; if (now - p->t0 > DND_READ_S) pull_end(p, 0); }
+    /* pull_end can flush, and a flush that finds the X connection gone runs dnd_stop, which frees every pull: never
+     * keep a pointer across it, walk again from the head after each one ended */
+    for (;;) {
+        Pull *p = pulls;
+        while (p && now - p->t0 <= DND_READ_S) p = p->next;
+        if (!p) break;
+        pull_end(p, 0);
+    }
     if (DO.dropped && now - DO.t_drop > DND_FINISH_S) do_end(0, 0);
     if (XI.stage && now - XI.t_fetch > DND_READ_S) xi_fetch_done(0);
     if (XI.src && XI.dropped && now - XI.t_drop > DND_FINISH_S) xi_finish(0, 0);

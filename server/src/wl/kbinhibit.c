@@ -46,36 +46,106 @@ int kbi_key_kind(const char *key, const char **rest) {
 }
 int kbi_key_valid(const char *key) { return kbi_key_kind(key, NULL) != 0; }
 
-int kbi_flatpak_name(const char *text, size_t len, char *out, size_t n) {
+/* The value of key= in [section] of an ini-like text, once: 1, or 0 (missing, twice, too long, a NUL in the text). */
+static int ini_value(const char *text, size_t len, const char *section, const char *key, char *out, size_t n) {
     if (!text || !out || !n) return 0;
     out[0] = 0;
-    int in_app = 0, found = 0;
+    size_t sl = strlen(section), kl = strlen(key);
+    int in_sec = 0, found = 0;
     for (size_t i = 0; i < len;) {
         size_t e = i;
         while (e < len && text[e] != '\n') e++;
         const char *l = text + i;
         size_t ll = e - i;
         if (ll && l[ll - 1] == '\r') ll--;
-        if (memchr(l, 0, ll)) return 0;                     /* not a text file */
-        if (ll && l[0] == '[') in_app = ll == 13 && !memcmp(l, "[Application]", 13);
-        else if (in_app && ll > 5 && !memcmp(l, "name=", 5)) {
-            if (found || ll - 5 >= n) return 0;             /* twice (which one?), or too long */
-            memcpy(out, l + 5, ll - 5);
-            out[ll - 5] = 0;
+        if (memchr(l, 0, ll)) { out[0] = 0; return 0; }    /* not a text file */
+        if (ll && l[0] == '[') in_sec = ll == sl && !memcmp(l, section, sl);
+        else if (in_sec && ll > kl && !memcmp(l, key, kl)) {
+            if (found || ll - kl >= n) { out[0] = 0; return 0; }   /* twice (which one?), or too long */
+            memcpy(out, l + kl, ll - kl);
+            out[ll - kl] = 0;
             found = 1;
         }
         i = e + 1;
     }
-    if (found && id_ok(out, KBI_ID_MAX - 8)) return 1;
-    out[0] = 0;
+    return found;
+}
+
+int kbi_flatpak_name(const char *text, size_t len, char *out, size_t n) {
+    if (ini_value(text, len, "[Application]", "name=", out, n) && id_ok(out, KBI_ID_MAX - 8)) return 1;
+    if (out && n) out[0] = 0;
     return 0;
+}
+
+int kbi_flatpak_instance(const char *text, size_t len, char *out, size_t n) {
+    if (!ini_value(text, len, "[Instance]", "instance-id=", out, n)) return 0;
+    size_t l = strlen(out);
+    int ok = l > 0 && l <= 20;
+    for (size_t i = 0; ok && i < l; i++) ok = out[i] >= '0' && out[i] <= '9';
+    if (!ok) out[0] = 0;
+    return ok;
 }
 
 #define INFO_MAX (64 * 1024)
 
-/* A Flatpak sandbox's .flatpak-info in rootfd → "flatpak:<name>". 1, or 0 (no file, a link, not a regular file,
- * too big, no valid name). */
-static int flatpak_identity(int rootfd, char *out, size_t n) {
+/* A Flatpak sandbox's .flatpak-info in rootfd → "flatpak:<name>", only when Flatpak's own record of that instance
+ * outside the sandbox agrees (flatpak_host_ok). 1, or 0 (no file, a link, not a regular file, too big, no valid
+ * name or instance, or nothing outside that confirms it). */
+/* A regular file of ours, at most INFO_MAX, read whole from dirfd/name without following links: malloc'd, or NULL. */
+static char *read_small(int dirfd, const char *name, ssize_t *got, int ours) {
+    int fd = openat(dirfd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    *got = -1;
+    if (fd < 0) return NULL;
+    struct stat st;
+    char *buf = NULL;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && (!ours || st.st_uid == getuid()) && st.st_size > 0 && st.st_size <= INFO_MAX &&
+        (buf = malloc((size_t)st.st_size + 1))) {
+        size_t have = 0;
+        while (have < (size_t)st.st_size) {
+            ssize_t r = read(fd, buf + have, (size_t)st.st_size - have);
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) break;
+            have += (size_t)r;
+        }
+        *got = (ssize_t)have;
+        buf[have] = 0;
+    }
+    close(fd);
+    return buf;
+}
+
+/* What the sandbox says is checked against what Flatpak wrote outside it, where the sandbox can't write: the
+ * instance's info in $XDG_RUNTIME_DIR/.flatpak/<instance-id>/ must name the same app, and the client must be in the
+ * pid namespace of the instance's sandbox (bwrapinfo.json's child-pid). A .flatpak-info written by any other
+ * container or sandbox names no one. */
+static int flatpak_host_ok(int procfd, const char *instance, const char *name) {
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char dir[PATH_MAX];
+    if (!rt || rt[0] != '/' || snprintf(dir, sizeof dir, "%s/.flatpak/%s", rt, instance) >= (int)sizeof dir) return 0;
+    int dfd = open(dir, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (dfd < 0) return 0;
+    struct stat ds;
+    int ok = !fstat(dfd, &ds) && ds.st_uid == getuid();
+    ssize_t got;
+    char host[KBI_ID_MAX];
+    char *info = ok ? read_small(dfd, "info", &got, 1) : NULL;
+    ok = info && got > 0 && kbi_flatpak_name(info, (size_t)got, host, sizeof host) && !strcmp(host, name);
+    free(info);
+    char *bw = ok ? read_small(dfd, "bwrapinfo.json", &got, 1) : NULL;
+    close(dfd);
+    if (!ok || !bw) { free(bw); return 0; }
+    const char *c = strstr(bw, "\"child-pid\"");
+    long child = 0;
+    if (c && (c = strchr(c, ':'))) child = strtol(c + 1, NULL, 10);
+    free(bw);
+    if (child <= 0 || child > 4194304) return 0;
+    char ns[48];
+    struct stat a, b;
+    snprintf(ns, sizeof ns, "/proc/%ld/ns/pid", child);
+    return !fstatat(procfd, "ns/pid", &a, 0) && !stat(ns, &b) && a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+static int flatpak_identity(int rootfd, int procfd, char *out, size_t n) {
     int fd = openat(rootfd, ".flatpak-info", O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
     if (fd < 0) return 0;
     struct stat st;
@@ -92,8 +162,9 @@ static int flatpak_identity(int rootfd, char *out, size_t n) {
         got = (ssize_t)have;
     }
     close(fd);
-    char name[KBI_ID_MAX];
-    int ok = got > 0 && kbi_flatpak_name(buf, (size_t)got, name, sizeof name) && snprintf(out, n, FLATPAK "%s", name) < (int)n;
+    char name[KBI_ID_MAX], inst[24];
+    int ok = got > 0 && kbi_flatpak_name(buf, (size_t)got, name, sizeof name) && kbi_flatpak_instance(buf, (size_t)got, inst, sizeof inst) &&
+             flatpak_host_ok(procfd, inst, name) && snprintf(out, n, FLATPAK "%s", name) < (int)n;
     free(buf);
     return ok;
 }
@@ -160,7 +231,7 @@ int kbi_identity(int procfd, char *out, size_t n) {
     int root = openat(procfd, "root", O_PATH | O_DIRECTORY | O_CLOEXEC);
     if (root < 0) return 0;
     int flatpak = dndg_root_sandboxed(root);
-    int ok = flatpak ? flatpak_identity(root, out, n) : !dndg_proc_sandboxed(procfd) && program_identity(procfd, out, n);
+    int ok = flatpak ? flatpak_identity(root, procfd, out, n) : !dndg_proc_sandboxed(procfd) && program_identity(procfd, out, n);
     close(root);
     if (!ok) out[0] = 0;
     return ok;

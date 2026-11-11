@@ -107,7 +107,7 @@ int main(void) {
     CHECK(kbi_key_valid(longp));
 
     /* .flatpak-info: the [Application] group's name, nothing else */
-    static const char info[] = "[Application]\nname=org.example.Viewer\nruntime=runtime/org.x/1\n\n[Instance]\nname=other\n";
+    static const char info[] = "[Application]\nname=org.example.Viewer\nruntime=runtime/org.x/1\n\n[Instance]\nname=other\ninstance-id=4242\n";
     CHECK(kbi_flatpak_name(info, sizeof info - 1, k, sizeof k) && !strcmp(k, "org.example.Viewer"));
     static const char crlf[] = "[Application]\r\nname=org.example.Viewer\r\n";
     CHECK(kbi_flatpak_name(crlf, sizeof crlf - 1, k, sizeof k) && !strcmp(k, "org.example.Viewer"));
@@ -126,6 +126,12 @@ int main(void) {
     static const char empty[] = "[Application]\nname=\n";
     CHECK(!kbi_flatpak_name(empty, sizeof empty - 1, k, sizeof k));
     CHECK(!kbi_flatpak_name(info, sizeof info - 1, k, 5));          /* too small a buffer */
+    /* …and its [Instance] instance-id, digits only */
+    CHECK(kbi_flatpak_instance(info, sizeof info - 1, k, sizeof k) && !strcmp(k, "4242"));
+    static const char noinst[] = "[Application]\nname=org.a.A\n";
+    CHECK(!kbi_flatpak_instance(noinst, sizeof noinst - 1, k, sizeof k));
+    static const char badinst[] = "[Instance]\ninstance-id=../1\n";
+    CHECK(!kbi_flatpak_instance(badinst, sizeof badinst - 1, k, sizeof k) && !k[0]);
 
     /* who a process is: a fake /proc/<pid> for each case */
     char dir[] = "/tmp/kbinhibit-XXXXXX", self[PATH_MAX], real[PATH_MAX], tmp[100];
@@ -138,12 +144,43 @@ int main(void) {
     struct stat st;
     int host_flatpak = stat("/.flatpak-info", &st) == 0;            /* tests run inside a Flatpak: no program case */
 
-    /* a Flatpak app: its .flatpak-info's name, whatever program it runs */
+    /* a Flatpak app: its .flatpak-info's name, whatever program it runs, but only once Flatpak's record outside the
+     * sandbox ($XDG_RUNTIME_DIR/.flatpak/<instance>/) agrees and the client is in that sandbox's pid namespace */
     snprintf(p, sizeof p, "%s/fp", tmp);
     int fd = fake_proc(p, NULL, self, NULL);
     snprintf(p, sizeof p, "%s/fp/root/.flatpak-info", tmp);
     write_file(p, info);
+    char rt[300];
+    snprintf(rt, sizeof rt, "%s/rt", tmp);
+    CHECK(mkdir(rt, 0700) == 0);
+    setenv("XDG_RUNTIME_DIR", rt, 1);
+    CHECK(!identity_of(fd, k) && !k[0]);                            /* a .flatpak-info alone: any container can write one */
+    snprintf(p, sizeof p, "%s/.flatpak", rt);
+    CHECK(mkdir(p, 0700) == 0);
+    snprintf(p, sizeof p, "%s/.flatpak/4242", rt);
+    CHECK(mkdir(p, 0700) == 0);
+    snprintf(p, sizeof p, "%s/.flatpak/4242/info", rt);
+    write_file(p, "[Application]\nname=org.example.Other\n");
+    char bw[64];
+    snprintf(bw, sizeof bw, "{\"child-pid\": %d}\n", (int)getpid());
+    snprintf(p, sizeof p, "%s/.flatpak/4242/bwrapinfo.json", rt);
+    write_file(p, bw);
+    fd = fake_proc(strcat(strcpy((char[600]){0}, tmp), "/fp2"), NULL, self, NULL);
+    snprintf(p, sizeof p, "%s/fp2/root/.flatpak-info", tmp);
+    write_file(p, info);
+    CHECK(!identity_of(fd, k));                                     /* Flatpak's record names another app */
+    snprintf(p, sizeof p, "%s/.flatpak/4242/info", rt);
+    write_file(p, info);
+    fd = fake_proc(strcat(strcpy((char[600]){0}, tmp), "/fp3"), NULL, self, NULL);
+    snprintf(p, sizeof p, "%s/fp3/root/.flatpak-info", tmp);
+    write_file(p, info);
     CHECK(identity_of(fd, k) && !strcmp(k, "flatpak:org.example.Viewer"));
+    snprintf(p, sizeof p, "%s/.flatpak/4242/bwrapinfo.json", rt);
+    write_file(p, "{\"child-pid\": 1}\n");                        /* pid 1's namespace: ours only if the tests are pid 1's */
+    fd = fake_proc(strcat(strcpy((char[600]){0}, tmp), "/fp4"), NULL, self, "pid");
+    snprintf(p, sizeof p, "%s/fp4/root/.flatpak-info", tmp);
+    write_file(p, info);
+    CHECK(!identity_of(fd, k));                                     /* not in the instance's pid namespace */
     /* …a damaged one names no one (and never falls back to its program) */
     snprintf(p, sizeof p, "%s/fpbad", tmp);
     fd = fake_proc(p, NULL, self, NULL);

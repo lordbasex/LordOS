@@ -4221,9 +4221,9 @@ static void ksim_inhibit(struct wl_client *c, struct wl_resource *r, uint32_t id
     int w = kbi_waiting_at(k->app);
     if (w >= 0 && kbi_app_alive(k)) return;
     if (w < 0) {
-        static int next;
+        static unsigned next;                                    /* unsigned and kept in range: never a negative slot */
         for (w = 0; w < KBI_WAITING && kbi_waiting[w][0]; w++) {}
-        if (w == KBI_WAITING) w = next++ % KBI_WAITING;          /* full: each in turn makes room */
+        if (w == KBI_WAITING) { w = (int)next; next = (next + 1) % KBI_WAITING; }   /* full: each in turn makes room */
         snprintf(kbi_waiting[w], sizeof kbi_waiting[w], "%s", k->app);
     }
     /* the shell asks (sdk/wayland.js), showing the identity and, when an installed app's entry runs that program,
