@@ -31,8 +31,8 @@
 #define WEB_MEM_HIGH_MB 2048            /* the app's scope: reclaim from here */
 #define WEB_MEM_MAX_MB  4096            /* and never past this */
 #define WEB_CPU_PERCENT 200             /* two cores */
-#define SHOW_IFACE "org.lordos.WebApp1"
-#define SHOW_PATH  "/org/lordos/WebApp1"
+#define SHOW_IFACE WEBREG_SHOW_IFACE
+#define SHOW_PATH  WEBREG_SHOW_PATH
 
 extern char **environ;
 
@@ -125,10 +125,9 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method></interface></node>";
 
-/* org.lordos.WebApp.app_<app>.profile_<profile> ('-' as '_': ids never hold a '_') */
+/* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {
-    snprintf(out, n, "org.lordos.WebApp.app_%s.profile_%s", w->app.id, w->profile->id);
-    for (char *p = out; *p; p++) if (*p == '-') *p = '_';
+    if (webreg_bus_name(w->app.id, w->profile->id, out, n) && n) out[0] = 0;
 }
 
 static void serve_show(Web *w) {

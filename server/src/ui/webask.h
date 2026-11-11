@@ -25,6 +25,12 @@ void webask_gone(const char *name);            /* that connection left the bus: 
 void webask_lost(void);                        /* the bus went away */
 /* The person's answer to question id: "allow", "deny" or "once". 0 answered, -1 unknown id or value. */
 int  webask_answer(int id, const char *value);
+/* The session bus connection (portal.c, once it is up): also for the calls lord-server makes itself. */
+void webask_attach(DConn *c);
+/* Brings a running web app forward: org.lordos.WebApp1.Show(token) to its lord-web (webreg_bus_name), no reply
+ * wanted. lord-web activates its window with the token, or maps it again when it was hidden behind its tray icon.
+ * 0 sent, -1 no bus or a bad id. */
+int  webask_show(const char *app, const char *profile, const char *token);
 /* The questions waiting for the person, as a JSON array (malloc'd), for a new JS context. */
 char *webask_pending(void);
 

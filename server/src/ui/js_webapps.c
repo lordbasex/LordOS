@@ -15,7 +15,7 @@
  *   renameProfile(app, profile, name) · removeProfile(app, profile, deleteData)
  *   setPermission(app, kind, value)     kind: notifications|camera|microphone|screen|location; value: allow|ask|deny
  *   setBackground(app, on) · uninstall(app, deleteData)
- *   launch(app, profile)                → 'started' or 'running' (the shell raises its window)
+ *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
  *   running()                           [{ app, profile, pid }]
  *   owner(surface)                      { app, profile } when window surface is one of our lord-web processes, else null
  *   answer(id, value)                   a permission question (the "webapps-ask" event): allow|deny|once|deny-once
@@ -26,6 +26,9 @@
 #include "webask.h"
 #include "../web/webmgr.h"
 #include "../wl/wl.h"
+#include "../wl/xdgact.h"
+
+#include <stdio.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -185,6 +188,14 @@ static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
     int raised = 0;
     const char *err = !app || !prof ? "sys.badArgument" : webmgr_launch(app, prof, &raised);
+    if (!err && raised) {
+        /* the one way a running app comes forward: lord-server's own activation token, handed to its lord-web over
+         * the bus (Show); lord-web activates its window with it, or maps it again from behind its tray icon */
+        char wid[2 * WEBREG_ID_MAX + 16];
+        snprintf(wid, sizeof wid, "lordos-web.%s.%s", app, prof);
+        const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, wid);
+        if (webask_show(app, prof, tk)) fprintf(stderr, "webapps: %s/%s is running but the session bus is not there to show it\n", app, prof);
+    }
     JS_FreeCString(c, app);
     JS_FreeCString(c, prof);
     return done(c, err, JS_NewString(c, raised ? "running" : "started"));

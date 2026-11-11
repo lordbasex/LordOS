@@ -67,7 +67,9 @@ Only lord-server starts `lord-web`:
   its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on).
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
-running app and profile raises its window instead (xdg-activation token from lord-server).
+running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
+xdg-activation token and calls `Show(token)` on that lord-web (below); lord-web activates its window with it, or maps it
+again when it was hidden behind its tray icon. The shell does not focus it on its own.
 
 The window's `xdg_toplevel` app id is `lordos-web.<app>.<profile>`. lord-server maps that prefix to the registry
 entry, so the Dock and the window switcher show the app's name, its icon and the profile name. The title is the page's

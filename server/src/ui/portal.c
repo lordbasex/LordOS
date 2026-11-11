@@ -768,6 +768,7 @@ int portal_start(void) {
     dbus_send(&conn, &h, &b);
     dw_free(&b);
     up = 1;
+    webask_attach(&conn);                   /* lord-server's own calls to web apps (Show) */
     if (!only_web)
         fprintf(stderr, "portal: Settings, FileChooser, OpenURI and Inhibit on the session bus%s\n",
                 ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");

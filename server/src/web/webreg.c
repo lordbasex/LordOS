@@ -595,6 +595,14 @@ const WebProfile *webreg_profile(const WebApp *a, const char *id) {
     return i >= 0 ? &a->profiles[i] : NULL;
 }
 
+int webreg_bus_name(const char *app, const char *profile, char *out, size_t n) {
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return -1;
+    int w = snprintf(out, n, "org.lordos.WebApp.app_%s.profile_%s", app, profile);
+    if (w < 0 || (size_t)w >= n) return -1;
+    for (char *p = out; *p; p++) if (*p == '-') *p = '_';
+    return 0;
+}
+
 int webreg_check_launch(const WebApp *a, const char *app, const char *profile, char *why, size_t wn) {
     if (!webreg_id_ok(app)) return bad(why, wn, "bad app id");
     if (!webreg_id_ok(profile)) return bad(why, wn, "bad profile id");

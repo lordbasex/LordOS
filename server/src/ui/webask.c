@@ -153,6 +153,22 @@ int webask_answer(int id, const char *value) {
     return 0;
 }
 
+void webask_attach(DConn *c) { bus = c; }
+
+int webask_show(const char *app, const char *profile, const char *token) {
+    char name[160];
+    if (!bus || webreg_bus_name(app, profile, name, sizeof name)) return -1;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, token ? token : "");
+    DHdr h = { .type = DBUS_CALL, .flags = DBUS_NO_REPLY | DBUS_NO_AUTOSTART, .path = WEBREG_SHOW_PATH, .iface = WEBREG_SHOW_IFACE,
+               .member = "Show", .dest = name, .sig = "s" };
+    uint32_t serial = dbus_send(bus, &h, &b);
+    dw_free(&b);
+    if (serial) dbus_flush(bus);
+    return serial ? 0 : -1;
+}
+
 void webask_gone(const char *name) {
     for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && !strcmp(asks[i].sender, name)) drop(&asks[i], 1);
 }

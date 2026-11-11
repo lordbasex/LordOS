@@ -91,6 +91,10 @@ static void test_rules(void) {
     CHECK(!webreg_default_scope("https://a.example/x/y?q=/z", sc, sizeof sc) && !strcmp(sc, "https://a.example/x/"), "default scope: %s", sc);
     CHECK(!webreg_default_scope("https://a.example", sc, sizeof sc) && !strcmp(sc, "https://a.example/"), "default scope of an origin: %s", sc);
 
+    char bn[160];
+    CHECK(!webreg_bus_name("my-chat", "work-2", bn, sizeof bn) && !strcmp(bn, "org.lordos.WebApp.app_my_chat.profile_work_2"), "the Show bus name: %s", bn);
+    CHECK(!webreg_bus_name("0chat", "p", bn, sizeof bn) && !strcmp(bn, "org.lordos.WebApp.app_0chat.profile_p"), "an id that starts with a digit: %s", bn);
+    CHECK(webreg_bus_name("a.b", "p", bn, sizeof bn) && webreg_bus_name("a", "P", bn, sizeof bn) && webreg_bus_name("a", "p", bn, 10), "bad ids, a short buffer");
     CHECK(webreg_perm_kind("camera") == WEBREG_PERM_CAMERA && webreg_perm_kind("contacts") < 0, "permission kinds");
     CHECK(webreg_perm_value("ask") == WEBREG_ASK && webreg_perm_value("once") < 0 && webreg_perm_value("Allow") < 0, "permission values");
 }

@@ -98,6 +98,13 @@ int  webreg_check_launch(const WebApp *a, const char *app, const char *profile, 
  * WEBREG_FILE_MAX bytes) and parses it. 0, or -1 with the reason in why. */
 int  webreg_load(const char *home, const char *app, WebApp *a, char *why, size_t wn);
 
+/* The bus name a running lord-web serves org.lordos.WebApp1.Show at (/org/lordos/WebApp1):
+ * "org.lordos.WebApp.app_<app>.profile_<profile>", '-' as '_' (ids never hold a '_'). lord-server calls it to bring a
+ * running app forward; a second lord-web for the same profile would too. 0, or -1 for a bad id or a short buffer. */
+#define WEBREG_SHOW_PATH  "/org/lordos/WebApp1"
+#define WEBREG_SHOW_IFACE "org.lordos.WebApp1"
+int  webreg_bus_name(const char *app, const char *profile, char *out, size_t n);
+
 /* ---- lord-web --probe's answers (docs/WEBAPPS.md, "Adding an app from an address") ---- */
 typedef struct {
     int  ok, manifest;

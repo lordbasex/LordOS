@@ -3,7 +3,7 @@
 // shown by <WebAppAskPrompt /> in hardware.jsx). Pure rules live in webappsmodel.js.
 //
 //   webApps (store) · refreshWebApps() · useWebApps() · webAppsAvailable()
-//   launchWebApp(app, profile?)    the first profile when none is named; a running one is brought forward
+//   launchWebApp(app, profile?)    the first profile when none is named; a running one is brought forward (by lord-server)
 //   probeWebApp(url)               → promise of the probe's answer (lord-web --probe, at most 20 s)
 //   installWebApp(entry) · webAppCall(fn, ...args)   (addProfile, renameProfile, removeProfile, setPermission,
 //                                  setBackground, uninstall: each refreshes the list)
@@ -14,7 +14,6 @@
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { windows, wm } from './windows.js';
 import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer } from './webappsmodel.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -46,9 +45,6 @@ export function webRunning() {
   try { return has() ? lord.webapps.running() || [] : []; } catch (e) { return []; }
 }
 
-// The window of an app and profile, if it has one.
-const windowOf = (app, profile) => windows.get().find((w) => w.args?.web?.app === app && w.args?.web?.profile === profile) || null;
-
 // Starts an app with a profile (the first one by default). Throws the server's error (with .code).
 export function launchWebApp(app, profile) {
   if (!has()) return false;
@@ -56,11 +52,9 @@ export function launchWebApp(app, profile) {
   const entry = webAppEntry(app);
   const p = profile || defaultProfile(entry)?.id;
   if (!entry || !p) return false;
-  const r = lord.webapps.launch(app, p);
-  if (r === 'running') {
-    const w = windowOf(app, p);
-    if (w) wm.focus(w.id);
-  }
+  // 'running': lord-server has already asked that lord-web to show its window (an activation token over the bus),
+  // which also brings it back from behind its tray icon; nothing else to do here
+  lord.webapps.launch(app, p);
   return true;
 }
 
