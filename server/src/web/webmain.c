@@ -191,6 +191,13 @@ static int run_app(Web *w) {
         if (!lstat(p, &st) && S_ISREG(st.st_mode) && strlen(p) < sizeof w->icon_path) snprintf(w->icon_path, sizeof w->icon_path, "%s", p);
     }
     if (mkdir_p(w->profile_dir)) { fprintf(stderr, "lord-web: %s: %s\n", w->profile_dir, strerror(errno)); return 1; }
+    char state[PATH_MAX + 16];
+    size_t slen = 0;
+    snprintf(state, sizeof state, "%s/state.json", w->profile_dir);
+    char *stext = webreg_read_file(state, 4096, &slen);
+    webpage_state_parse(stext, stext ? slen : 0, &w->state);
+    free(stext);
+    w->audio_ms = w->note_ms = -1;
     const char *token = getenv("XDG_ACTIVATION_TOKEN");
     char tok[256] = "";
     if (token) snprintf(tok, sizeof tok, "%s", token);
@@ -211,7 +218,7 @@ static int run_app(Web *w) {
     if (!win) { fprintf(stderr, "lord-web: no Wayland display\n"); return 1; }
     if (webwin_init_backend(win) || web_engine_start(w)) return 1;
     webwin_attach(win);
-    if (w->app.background) w->tray = webtray_new(w);
+    if (w->app.background && w->app.tray) w->tray = webtray_new(w);
     serve_show(w);
     webwin_show(win, tok);
     g_main_loop_run(w->loop);

@@ -9,7 +9,8 @@
 // <NotificationBanner /> is mounted by startShell, so it shows with any theme: at the top, on the
 // end side of the line (right; left in Arabic or Hebrew), below the theme's bar (workArea). A
 // notification goes away after `timeout` ms, except `sticky` ones (alarms), which wait until an
-// action or the × is pressed. Clicking the banner runs the first action.
+// action or the × is pressed. Clicking the banner runs `defaultAction` ({ id, run }: the click on the notification
+// itself, never shown as a button) when there is one, else the first action.
 // The app passes texts already translated (t()). The history lives in memory only.
 import { createElement as h, useEffect, useState } from 'react';
 import { View, Text } from '@lordos/runtime';
@@ -77,13 +78,14 @@ function fwNotifyBlocked(app) {
   } catch (e) { return false; }
 }
 
-export function notify({ app = '', title = '', body = '', actions = [], sound: withSound = true, sticky = false, timeout = 6000, onClose, label = '', icon = null } = {}) {
+export function notify({ app = '', title = '', body = '', actions = [], defaultAction = null, sound: withSound = true, sticky = false, timeout = 6000, onClose, label = '', icon = null } = {}) {
   app = String(app);
   const ap = appNotifyPrefs(app);
   remember(app);
   if (!ap.allow || fwNotifyBlocked(app)) return 0;          // not delivered at all
   const id = seq++;
   const n = { id, app, label: String(label), Icon: typeof icon === 'function' ? icon : null, title: String(title), body: String(body), actions: Array.isArray(actions) ? actions.slice(0, 3) : [],
+    defaultAction: defaultAction && typeof defaultAction.run === 'function' ? defaultAction : null,
     sticky: !!sticky || ap.style === 'alert', time: Date.now(), onClose };
   notifyHistory.set((l) => [{ id, app: n.app, label: n.label, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
   // Do Not Disturb or "no banner": kept in the history only, without a sound
@@ -119,7 +121,7 @@ function runAction(n, a) {
 function Banner({ n, th }) {
   const [hover, setHover] = useState(false);
   const app = n.app ? getApp(n.app) : null;
-  const first = n.actions[0];
+  const first = n.defaultAction || n.actions[0];
   return h(View, {
     onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
     onClick: () => (first ? runAction(n, first) : dismissNotification(n.id)),

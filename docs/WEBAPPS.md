@@ -50,11 +50,19 @@ LordOS's compositor, with WebKit's sandbox running. For one account it used abou
 - `icon` is relative to `~/.config/lordos/web/`: a PNG, or an SVG drawn by lord-media.
 - A permission is `"allow"`, `"ask"` or `"deny"`.
 - `source` is `"catalog"` (from the Store's signed list) or `"url"` (added by the person from an address).
-- `background`: closing the window keeps the app running behind its tray icon (for notifications), until Quit.
+- `background`: closing the window keeps the app running (for notifications), until Quit; the Dock and the launcher
+  bring the window back (through `Show`, below).
+- `tray` (optional, `false` when missing, written only when `true`): an app in the background also shows a tray icon
+  (StatusNotifierItem) with Open and Quit. Without it the app still runs in the background; it is just not in the tray.
+- `notifySound` (optional, `"auto"` when missing, written only when it isn't): LordOS's sound for the page's
+  notifications. `"auto"`: LordOS plays its sound unless the page plays its own (below); `"app"`: never LordOS's sound;
+  `"system"`: always LordOS's sound; `"none"`: never LordOS's sound, and lord-web doesn't touch the page's audio
+  either (a page that plays its own sound still does).
 - Unknown keys are refused. The file is at most 64 KB.
 
 Data, per app and profile, under `~/.local/share/lordos/web/<app>/<profile>/` (also in `fsops_protected`): `data/`,
-`cache/` and `cookies.sqlite`. Nothing of one profile is readable by another.
+`cache/`, `cookies.sqlite` and `state.json`, lord-web's own (what it learned about the page: `{ "ownSound": true }`).
+Nothing of one profile is readable by another.
 
 ## Starting an app
 
@@ -69,7 +77,7 @@ Only lord-server starts `lord-web`:
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
 xdg-activation token and calls `Show(token)` on that lord-web (below); lord-web activates its window with it, or maps it
-again when it was hidden behind its tray icon. The shell does not focus it on its own.
+again when it was hidden in the background. The shell does not focus it on its own.
 
 The window's `xdg_toplevel` app id is `lordos-web.<app>.<profile>`. lord-server maps that prefix to the registry
 entry, so the Dock and the window switcher show the app's name, its icon and the profile name. The title is the page's
@@ -85,13 +93,54 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   frame the compositor can't import restarts lord-web once on the shared memory path. Otherwise (`LORD_GPU=0`, no GPU,
   VM 127) every frame is copied into one of three `wl_shm` buffers. WebKit's next frame is released only after the
   compositor's frame callback. Scale: `wp_fractional_scale_v1` with `wp_viewport`, or the outputs' integer scale.
-- **Input:** the compositor's keymap (xkbcommon) and key repeat, the pointer (side buttons go back and forward), the
-  wheel in lines for a mouse and in pixels for a touchpad, touch (up to 10 points). Ctrl+R/F5 reload, Alt+Left/Right go
-  back and forward, Ctrl+plus/minus/0 zoom. text-input-v3 is WebKit's input method context (preedit, commit, the
-  cursor rectangle and the surrounding text).
-- **Clipboard:** text, both ways, through `wl_data_device`: the session's selection is copied into WebKit's pasteboard
+- **Input:** the compositor's keymap (xkbcommon) and key repeat, the pointer (side buttons go back and forward), touch
+  (up to 10 points). Ctrl+R/F5 reload, Alt+Left/Right go back and forward, Ctrl+plus/minus/0 zoom. text-input-v3 is
+  WebKit's input method context (preedit, commit, the cursor rectangle and the surrounding text).
+- **The wheel and the touchpad** (`webaxis.c`, per `wl_pointer.frame`): a mouse wheel (`axis_value120`, or
+  `axis_discrete` before `wl_seat` 8) is one libwpe line event per notch, on the axis that moved only; a
+  high-resolution wheel's partial notches add up across frames (a change of direction drops the partial one), at most
+  10 lines per frame. WebKit 2.48 reads a line event's two values by their sign alone (`copysign`), so the 2D event
+  lord-web sent before (with a 0 on the other axis) scrolled one line sideways too and pages didn't scroll. A touchpad
+  (`axis_source` finger or continuous) is pixels times the scale, an exact 0 on the axis that didn't move, and
+  `axis_stop` ends the gesture (a 2D event of 0, 0: WebKit's "ended" phase). Wayland's positive is down, libwpe's up.
+- **Clipboard:** text both ways through `wl_data_device`: the session's selection is copied into WebKit's pasteboard
   while the window has the keyboard; what the page copies is offered to the session as plain text (and HTML when the
-  page gave it). Dragging into the page is not passed on yet.
+  page gave it). WebKit 2.48's pasteboard on WPE holds text only (its `Pasteboard` for libwpe reads no files or
+  images and writes no image), so images go around it (`webxfer.c`):
+  - **Pasting an image:** when the session's clipboard offers `image/png` or `image/jpeg` and no text, Ctrl+V or
+    Shift+Insert reads it (at most 32 MB, non-blocking) instead of sending the key, and the page gets a `paste` event
+    on its focused element with a `DataTransfer` holding the image as a `File` (`image.png`), `types` `["Files"]`.
+    WebKit's pasteboard is emptied when such an image arrives, so it never pastes the text copied before it.
+  - **Copying an image:** WPE 2.48 has no Async Clipboard API (`navigator.clipboard` is undefined), so a script at
+    document start gives the page `navigator.clipboard.write` and `writeText` (and `ClipboardItem`) when they are
+    missing. They post to lord-web (a script message handler), which takes text (at most 16 MB) or a PNG or JPEG
+    (at most 32 MB, checked by its signature) only while the window shows the app's own page and the person pressed
+    a key, clicked or touched it less than 5 s before (what browsers call user activation), and offers it to the
+    session as that one type. Anything else rejects the page's promise.
+- **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
+  so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
+  drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and
+  drop") or text is accepted as a copy. At the drop lord-web reads the list (at most 1 MB) and calls `finish`. Only
+  local files are taken: `file://` URIs with no host (or `localhost`), percent-decoded, a regular file when opened (a
+  link is followed), at most 64 MB each and 20 files; anything else on the list is skipped. lord-web reads the files
+  itself and passes them in 1 MB pieces to a script in an isolated world of its own (`lordos-web-xfer`: the page's
+  scripts can't see or change it), which makes `File` objects (name, a type from the name, the modification time) and
+  `blob:` addresses. A script in the page's world then makes the `DataTransfer` and dispatches `dragenter`,
+  `dragover` and `drop` at the drop point (in CSS pixels, the zoom taken into account) on the element there. It has
+  to be the page's world because in WebKit 2.48 a script-made `DataTransfer` lists no `"Files"` in `types`, which
+  pages check, and only that world can mend it; the `blob:` addresses are revoked right after. A drop with no local
+  file gives the page its text (`text/plain`, and `text/uri-list` for a list). One transfer at a time; none while the
+  window shows another site.
+- **User agent** (`webpage_user_agent`): `Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
+  Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own (frozen) AppleWebKit and Safari tokens, and
+  LordOS's version. WebKit's site-specific quirks are off on the app's own pages and on for any other site in the
+  window (a sign-in): one of those quirks hands some sites a Mac user agent whatever the setting, and a messaging web
+  app then offers its Mac download. Checked 2026-11-11: that app's sign-in page loads with this user agent and quirks
+  off, without the download offer.
+- **Unread count:** a title that starts with `(N) ` (N 1..9999, `(99+)` is 99; `webpage_title_badge`) on the app's
+  own pages is the app's unread count; lord-web sends it to lord-server with `SetBadge(app, profile, count)` on
+  `org.lordos.WebApps1` (0: none) when it changes, without waiting for an answer. WPE 2.48 has no Badging API for an
+  embedder (`navigator.setAppBadge` is off and reaches no signal), so the title is the only source.
 - **Navigation:** an address inside `scope` stays; a link clicked to an address outside it, a new window outside it
   and `mailto:` or `tel:` go to OpenURI; a new window inside it loads in the same window. A redirect outside (a sign-in
   on another site) stays, and the title then starts with that site's host. No context menu, no developer extras, no
@@ -100,8 +149,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   WebKit's own), memory pressure settings (a web process past 1.5 GB frees its caches), the document cache model.
   WebKit 2.48 has no switch for its sandbox: it is always on, and lord-web refuses the variable that turns it off.
 - **Closing:** without `background`, closing the window quits. With it the window is hidden (WebKit is told it is not
-  visible and throttles) and a StatusNotifierItem with the app's icon offers Open and Quit; a click on the icon or on
-  a notification shows the window again. When the web process crashes it reloads once; a second crash within 30 s
+  visible and throttles); the Dock, the launcher or a notification shows it again, and with `tray` a
+  StatusNotifierItem with the app's icon offers Open and Quit too. When the web process crashes it reloads once; a second crash within 30 s
   quits.
 
 ## Adding an app from an address ("probe")
@@ -257,14 +306,29 @@ asks both kinds and needs both. The page's `navigator.permissions` queries get t
 media keys and anything else are denied. Notifications carry the app's name (with the profile's when it has more than
 one) and icon, and a notification with the same tag replaces the one before it.
 
+Notifications (`webbus.c`): the app's icon file goes as `app_icon` and `image-path`, and `desktop-entry` is
+`lordos-web.<app>.<profile>`. notifyd keeps that entry only when the notification comes from the lord-web lord-server
+started for that app and profile (`webmgr_owner` on the sender's PID); the shell then shows it under the web app, with
+its name and icon (before, the banner had no icon). A click on the notification itself is its `default` action: the
+shell sends it (it never shows it as a button), and lord-web calls `webkit_notification_clicked` first, so the page's
+own `onclick` runs (a messaging app opens that chat), and then brings the window forward with the activation token
+LordOS sent. WebKit 2.48 gives neither a notification's image (the sender's photo) nor its `silent` option.
+
+LordOS's sound (`notifySound`, `webpage_sound_suppress`): with `"auto"`, lord-web watches WebKit's
+`is-playing-audio`. A page that starts audio less than 1.5 s before or after one of its notifications plays its own
+sound: that notification (when it came first) and every later one go with the `suppress-sound` hint, so LordOS
+doesn't play a second sound. lord-web remembers it for the profile (`state.json`, `"ownSound": true`), so after the
+first time nothing waits or guesses. notifyd passes `suppress-sound` to the shell, which then shows the banner
+silently.
+
 ## What `lord-web` uses of the session (like any Linux app)
 
 - **Files:** WebKit's file chooser goes through the FileChooser portal. Downloads go to the XDG Downloads folder only,
   with a notification when done.
-- **Notifications:** `org.freedesktop.Notifications` (`notifyd`). A click opens that app's window.
+- **Notifications:** `org.freedesktop.Notifications` (`notifyd`). A click tells the page, then opens that app's window.
 - **Links outside `scope`:** OpenURI, so they open in the person's browser.
 - **Screen sharing:** the ScreenCast portal (`docs/WAYLAND.md`).
-- **Background:** a StatusNotifierItem tray icon with Open and Quit when `background` is on.
+- **Background:** a StatusNotifierItem tray icon with Open and Quit when `background` and `tray` are on.
 - **The clipboard and the keyboard:** a normal Wayland client.
 
 ## Isolation
@@ -288,7 +352,10 @@ one) and icon, and a notification with the same tag replaces the one before it.
     `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
     `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
     point WebKit or GStreamer at other code (`WEBKIT_*`, `WPE_*`, `GST_PLUGIN*`, `GIO_EXTRA_MODULES`, `LD_PRELOAD`…).
-- **What a page never gets:** no `lord.*`, no broker, no script injected with privileges.
+- **What a page never gets:** no `lord.*`, no broker, no script injected with privileges. The one script of lord-web's
+  a page can see is the clipboard's `write` and `writeText` that WPE lacks, and what it hands over reaches the
+  session only right after the person's own key or click in the window. The files of a drop are only the ones the
+  person dropped on the window, read by lord-web, never by the page.
 - **What a crash or hang affects:** only that window. lord-server sees the process end and the Dock shows the app as
   closed.
 

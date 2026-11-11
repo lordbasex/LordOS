@@ -27,13 +27,13 @@ import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatDate, formatTime, weekdayName } from './i18n.js';
 import { notify, dismissNotification } from './notify.js';
-import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
+import { linuxAppFor, shortAppName, windowAppName, webAppIcon } from './apps.js';
 import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
 import { webAsks, webAskEvent, answerWebAsk, webAppEntry } from './webapps.js';
-import { profileOf } from './webappsmodel.js';
+import { profileOf, parseWindowAppId } from './webappsmodel.js';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
@@ -523,16 +523,25 @@ export function PortalOpenPrompt() {
 // ---- Linux apps' notifications (org.freedesktop.Notifications, server/src/hw/notifyd.c) ----
 
 const fromLinux = new Map();            // D-Bus id → our notification id
+// A web app's notification (desktop-entry lordos-web.<app>.<profile>, which notifyd.c keeps only when it comes from that
+// app's own lord-web) shows under the web app, with its name and icon. "default" is the click on the notification
+// itself: it goes back to the app (lord-web tells the page, then brings its window forward), never as a button.
+// "suppress-sound": the app plays its own sound, LordOS doesn't add one.
 function linuxNotify(n) {
   if (!n || !n.id) return;
-  const app = linuxAppFor(n.desktop || n.app);
-  const key = `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
+  const web = parseWindowAppId(n.desktop);
+  const entry = web ? webAppEntry(web.app) : null;
+  const app = entry ? null : linuxAppFor(n.desktop || n.app);
+  const key = entry ? `linux:${n.desktop}` : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
   const prev = fromLinux.get(n.id);
   if (prev) dismissNotification(prev, 'replaced');
   const reason = { closed: 2, expired: 1, action: 2, replaced: 0, remote: 0 };
+  const hasDefault = (n.actions || []).some(([k]) => k === 'default');
   const id = notify({
-    app: key, label: shortAppName(app) || n.app, icon: app?.Icon || null, title: n.title, body: n.body, sticky: n.urgency === 2,
+    app: key, label: entry ? entry.name : shortAppName(app) || n.app, icon: entry ? webAppIcon(entry) : app?.Icon || null,
+    title: n.title, body: n.body, sticky: n.urgency === 2, sound: !n.suppressSound,
     timeout: n.timeout > 0 ? n.timeout : 6000,
+    defaultAction: hasDefault ? { id: 'default', run: () => lord.notifyd.action(n.id, 'default') } : null,
     actions: (n.actions || []).filter(([k]) => k !== 'default').map(([k, label]) => ({ id: k, label, run: () => lord.notifyd.action(n.id, k) })),
     onClose: (why) => { if (fromLinux.get(n.id) === id) fromLinux.delete(n.id); if (reason[why]) lord.notifyd.closed(n.id, reason[why]); },
   });

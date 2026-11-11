@@ -1,16 +1,23 @@
 /* webapp_test.c — lord-web's pure parts (src/web, docs/WEBAPPS.md) without WebKit: the addresses (weburl.c: what is
  * an app address, origins, the scope prefix), argv and the probe's request line (webargs.c), the probe's
- * answer and the icon check (webmanifest.c), and the download names (webdl.c). The registry file itself (webreg.c,
+ * answer and the icon check (webmanifest.c), the download names (webdl.c), the wheel and touchpad (webaxis.c), the
+ * title's unread count, the user agent and the notification sound (webpage.c), the files of a drop (webdrop.c) and
+ * the registry's optional tray and notifySound. The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
 #include "../src/web/webargs.h"
+#include "../src/web/webaxis.h"
+#include "../src/web/webdrop.h"
+#include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
 #include "../src/web/webmanifest.h"
 #include "../src/web/webreg.h"
 #include "../src/web/weburl.h"
 
 #include <fcntl.h>
+#include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -264,7 +271,253 @@ static void test_downloads(void) {
     rmdir(dir);
 }
 
+static int axis_frame(WebAxis *a, double scale, WebAxisOut *out) { return webaxis_frame(a, scale, out); }
+
+static void test_axis(void) {
+    WebAxis a;
+    WebAxisOut o[2];
+    webaxis_reset(&a);
+    /* a mouse notch down (wl_seat 8: value120), as LordOS's compositor sends it: source, value120, axis, frame */
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, 120);
+    webaxis_value(&a, WEBAXIS_V, 10);
+    int n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].kind == WEBAXIS_OUT_LINES && o[0].y == -1 && o[0].x == 0 && !signbit(o[0].x), "a notch down is one line, libwpe's sign, nothing sideways");
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, -240);
+    n = axis_frame(&a, 2, o);
+    CHECK(n == 1 && o[0].y == 2 && o[0].x == 0, "two notches up: two lines, whatever the scale");
+    /* a high-resolution wheel: quarter notches add up */
+    int lines = 0;
+    for (int i = 0; i < 4; i++) {
+        webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+        webaxis_value120(&a, WEBAXIS_V, 30);
+        n = axis_frame(&a, 1, o);
+        if (n) lines += (int)o[0].y;
+    }
+    CHECK(lines == -1, "four quarter notches are one line (%d)", lines);
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, 60);
+    axis_frame(&a, 1, o);
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, -60);
+    CHECK(axis_frame(&a, 1, o) == 0, "half a notch back the other way doesn't make a line");
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, -60);
+    CHECK(axis_frame(&a, 1, o) == 1 && o[0].y == 1, "two halves up are a line up: the half down before them was dropped");
+    /* sideways (a tilt wheel) */
+    webaxis_source(&a, WEBAXIS_SRC_TILT);
+    webaxis_value120(&a, WEBAXIS_H, 120);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].x == -1 && o[0].y == 0, "a tilt right is a line on x only");
+    /* before wl_seat 8: axis_discrete */
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_discrete(&a, WEBAXIS_V, 3);
+    webaxis_value(&a, WEBAXIS_V, 30);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].y == -3, "axis_discrete counts notches");
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_discrete(&a, WEBAXIS_V, 1);
+    webaxis_value120(&a, WEBAXIS_V, 120);
+    CHECK(axis_frame(&a, 1, o) == 1 && o[0].y == -1, "value120 replaces discrete, never both");
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value120(&a, WEBAXIS_V, 120 * 50);
+    CHECK(axis_frame(&a, 1, o) == 1 && o[0].y == -WEBAXIS_LINES_MAX, "a burst is cut to %d lines", WEBAXIS_LINES_MAX);
+    /* a wheel that doesn't count (wl_pointer before 5 has no source either: then pixels) */
+    webaxis_source(&a, WEBAXIS_SRC_WHEEL);
+    webaxis_value(&a, WEBAXIS_V, -15);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].kind == WEBAXIS_OUT_LINES && o[0].y == 1 && o[0].x == 0, "a wheel without notches: one line");
+    webaxis_value(&a, WEBAXIS_V, 12.5);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].kind == WEBAXIS_OUT_PIXELS && o[0].y == -12.5, "no source at all: pixels");
+    /* a touchpad: pixels times the scale, then the end of the gesture */
+    webaxis_source(&a, WEBAXIS_SRC_FINGER);
+    webaxis_value(&a, WEBAXIS_V, 4.5);
+    webaxis_value(&a, WEBAXIS_V, 1.5);
+    n = axis_frame(&a, 1.5, o);
+    CHECK(n == 1 && o[0].kind == WEBAXIS_OUT_PIXELS && o[0].y == -9 && o[0].x == 0 && !signbit(o[0].x), "finger: pixels times the scale (%g), an exact 0 sideways", o[0].y);
+    webaxis_source(&a, WEBAXIS_SRC_FINGER);
+    webaxis_value(&a, WEBAXIS_H, -2);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].x == 2 && o[0].y == 0, "finger left");
+    webaxis_source(&a, WEBAXIS_SRC_FINGER);
+    webaxis_stop(&a, WEBAXIS_V);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 1 && o[0].kind == WEBAXIS_OUT_END, "axis_stop ends the gesture");
+    webaxis_source(&a, WEBAXIS_SRC_CONTINUOUS);
+    webaxis_value120(&a, WEBAXIS_V, 120);
+    webaxis_value(&a, WEBAXIS_V, 3);
+    webaxis_stop(&a, WEBAXIS_H);
+    n = axis_frame(&a, 1, o);
+    CHECK(n == 2 && o[0].kind == WEBAXIS_OUT_PIXELS && o[0].y == -3 && o[1].kind == WEBAXIS_OUT_END, "continuous: pixels, then the end");
+    CHECK(axis_frame(&a, 1, o) == 0, "an empty frame sends nothing");
+    webaxis_value(&a, 7, 3);
+    webaxis_value120(&a, 2, 120);
+    webaxis_source(&a, 99);
+    CHECK(axis_frame(&a, 1, o) == 0, "unknown axes and sources are ignored");
+}
+
+static void test_badge(void) {
+    struct { const char *t; int want; } c[] = {
+        { "(3) Chat", 3 }, { "(1)", 1 }, { "(9999) Chat", 9999 }, { "(99+) Chat", 99 }, { "(12) ", 12 },
+        { "Chat", 0 }, { "(0) Chat", 0 }, { "(03) Chat", 0 }, { "(10000) Chat", 0 }, { "(3)Chat", 0 }, { " (3) Chat", 0 },
+        { "(3 Chat", 0 }, { "(-3) Chat", 0 }, { "(a) Chat", 0 }, { "Chat (3)", 0 }, { "", 0 }, { NULL, 0 }, { "(3++) x", 0 },
+    };
+    for (size_t i = 0; i < sizeof c / sizeof c[0]; i++)
+        CHECK(webpage_title_badge(c[i].t) == c[i].want, "badge of %s: %d (want %d)", c[i].t ? c[i].t : "(null)", webpage_title_badge(c[i].t), c[i].want);
+}
+
+static void test_user_agent(void) {
+    char ua[256];
+    CHECK(!webpage_user_agent("x86_64", "0.8.8.8", ua, sizeof ua) &&
+          !strcmp(ua, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 LordOS/0.8.8.8"), "%s", ua);
+    CHECK(!webpage_user_agent("aarch64", "0.9.0~rc1", ua, sizeof ua) && strstr(ua, "(X11; Linux aarch64)") && strstr(ua, " LordOS/0.9.0~rc1"), "%s", ua);
+    CHECK(!strstr(ua, "Macintosh") && strstr(ua, "AppleWebKit/605.1.15") && strstr(ua, "Safari/605.1.15"), "WebKit's tokens, no Mac");
+    CHECK(!webpage_user_agent("x86 64; evil)", "1.0", ua, sizeof ua) && strstr(ua, "(X11; Linux) "), "a strange machine is left out: %s", ua);
+    CHECK(!webpage_user_agent("x86_64", "1.0 (evil)", ua, sizeof ua) && !strstr(ua, "LordOS"), "a strange version drops the token: %s", ua);
+    CHECK(!webpage_user_agent(NULL, NULL, ua, sizeof ua) && strstr(ua, "(X11; Linux) ") && !strstr(ua, "LordOS"), "nothing known: %s", ua);
+    CHECK(webpage_user_agent("x86_64", "1.0", ua, 20) < 0, "too short");
+}
+
+static void test_sound(void) {
+    double now = 100000;
+    /* auto: LordOS's sound unless the page plays its own */
+    CHECK(!webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 0, -1, now), "auto, never any audio: LordOS plays");
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 0, now - 400, now), "auto, the page started audio 0.4 s before: quiet");
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 0, now - 1500, now), "1.5 s before still counts");
+    CHECK(!webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 0, now - 1501, now), "longer before doesn't");
+    CHECK(!webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 0, now - 60000, now), "a minute before doesn't");
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_AUTO, 1, 0, -1, now), "auto, learned: quiet at once");
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_AUTO, 0, 1, -1, now), "a silent notification: quiet");
+    /* learning: audio within 1.5 s either side of a notification */
+    CHECK(webpage_sound_learns(WEBREG_SOUND_AUTO, now, now + 300), "audio 0.3 s after teaches it");
+    CHECK(webpage_sound_learns(WEBREG_SOUND_AUTO, now, now - 1000), "audio 1 s before teaches it");
+    CHECK(!webpage_sound_learns(WEBREG_SOUND_AUTO, now, now + 2000), "2 s after doesn't");
+    CHECK(!webpage_sound_learns(WEBREG_SOUND_AUTO, -1, now), "no notification yet");
+    CHECK(!webpage_sound_learns(WEBREG_SOUND_AUTO, now, -1), "no audio yet");
+    /* the registry's override */
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_APP, 0, 0, -1, now), "app: always quiet");
+    CHECK(webpage_sound_suppress(WEBREG_SOUND_NONE, 0, 0, -1, now), "none: quiet");
+    CHECK(!webpage_sound_suppress(WEBREG_SOUND_SYSTEM, 1, 1, now, now), "system: LordOS's sound, learned or not, silent or not");
+    for (int m = WEBREG_SOUND_APP; m < WEBREG_SOUND_N; m++) CHECK(!webpage_sound_learns(m, now, now), "only auto learns (%d)", m);
+    /* the state file */
+    WebPageState s;
+    char text[64];
+    const char *st = "{ \"ownSound\": true, \"later\": 1 }";
+    webpage_state_parse(st, strlen(st), &s);
+    CHECK(s.own_sound == 1, "ownSound read, unknown keys ignored");
+    webpage_state_parse("not json", 8, &s);
+    CHECK(s.own_sound == 0, "unreadable: the defaults");
+    webpage_state_parse(NULL, 0, &s);
+    CHECK(s.own_sound == 0, "no file: the defaults");
+    s.own_sound = 1;
+    size_t n = webpage_state_write(&s, text, sizeof text);
+    WebPageState back;
+    webpage_state_parse(text, n, &back);
+    CHECK(n && back.own_sound == 1, "written and read back: %s", text);
+    CHECK(!webpage_state_write(&s, text, 4), "too short");
+}
+
+static void put_file(const char *path, size_t size) {
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) return;
+    if (size && ftruncate(fd, (off_t)size)) { }
+    close(fd);
+}
+
+static void test_drop(void) {
+    char p[PATH_MAX];
+    CHECK(!webdrop_uri_path("file:///home/a/b%20c.txt", 24, p, sizeof p) && !strcmp(p, "/home/a/b c.txt"), "percent-decoded: %s", p);
+    CHECK(!webdrop_uri_path("file://localhost/tmp/x", 22, p, sizeof p) && !strcmp(p, "/tmp/x"), "localhost");
+    CHECK(!webdrop_uri_path("file:///tmp/%C3%A9", 18, p, sizeof p) && !strcmp(p, "/tmp/\xc3\xa9"), "UTF-8");
+    const char *bad[] = { "file://otherhost/tmp/x", "https://example.com/x", "file:/tmp/x", "file://", "file:///tmp/a%00b",
+                          "file:///tmp/a%0Ab", "file:///tmp/a%zz", "file:///tmp/a%4", "file:///tmp/a?x=1", "file:///tmp/a#b",
+                          "file://localhostevil/tmp/x", "FILE:///tmp/x", NULL };
+    for (int i = 0; bad[i]; i++) CHECK(webdrop_uri_path(bad[i], strlen(bad[i]), p, sizeof p), "refused: %s", bad[i]);
+
+    char dir[] = "/tmp/webdrop-test.XXXXXX";
+    if (!mkdtemp(dir)) { CHECK(0, "mkdtemp"); return; }
+    char a[PATH_MAX], big[PATH_MAX], sub[PATH_MAX], link[PATH_MAX], sp[PATH_MAX];
+    snprintf(a, sizeof a, "%s/a.png", dir);
+    snprintf(big, sizeof big, "%s/big.bin", dir);
+    snprintf(sub, sizeof sub, "%s/folder", dir);
+    snprintf(link, sizeof link, "%s/link.png", dir);
+    snprintf(sp, sizeof sp, "%s/two words.txt", dir);
+    put_file(a, 10);
+    put_file(big, (size_t)WEBDROP_FILE_MAX + 1);
+    put_file(sp, 0);
+    mkdir(sub, 0755);
+    CHECK(!symlink(a, link), "symlink");
+    static char list[8 * PATH_MAX + 512];
+    snprintf(list, sizeof list,
+             "# a comment\r\nfile://%s\r\nhttps://example.com/x.png\r\nfile://%s\r\nfile://%s\r\nfile://%s\r\nfile://%s/two%%20words.txt\nfile://%s/missing\r\nfile://otherhost%s\r\n",
+             a, big, sub, link, dir, dir, a);
+    WebDropFile f[WEBDROP_FILES_MAX];
+    int n = webdrop_files(list, strlen(list), f, WEBDROP_FILES_MAX);
+    CHECK(n == 3, "the regular files only: %d", n);
+    if (n == 3) {
+        CHECK(!strcmp(f[0].name, "a.png") && f[0].size == 10 && f[0].fd >= 0, "a.png");
+        CHECK(!strcmp(f[1].name, "link.png") && f[1].size == 10, "a link to a file is that file, under its own name");
+        CHECK(!strcmp(f[2].name, "two words.txt") && f[2].size == 0, "an empty file, LF line end");
+    }
+    webdrop_close(f, n);
+    /* at most 20 */
+    static char many[32 * (PATH_MAX + 16)];
+    many[0] = 0;
+    for (int i = 0; i < 30; i++) { size_t l = strlen(many); snprintf(many + l, sizeof many - l, "file://%s\r\n", a); }
+    n = webdrop_files(many, strlen(many), f, WEBDROP_FILES_MAX);
+    CHECK(n == WEBDROP_FILES_MAX, "at most %d: %d", WEBDROP_FILES_MAX, n);
+    webdrop_close(f, n);
+    CHECK(webdrop_files(many, strlen(many), f, 2) == 2, "a smaller limit");
+    webdrop_close(f, 2);
+    CHECK(webdrop_files("", 0, f, WEBDROP_FILES_MAX) == 0 && webdrop_files(NULL, 0, f, WEBDROP_FILES_MAX) == 0, "nothing");
+    unlink(a);
+    unlink(big);
+    unlink(sp);
+    unlink(link);
+    rmdir(sub);
+    rmdir(dir);
+}
+
+static void test_registry_options(void) {
+    static const char base[] =
+        "{ \"schema\": 1, \"id\": \"chat\", \"name\": \"Chat\", \"startUrl\": \"https://web.chat.example/\", \"scope\": \"https://web.chat.example/\","
+        " \"origin\": \"https://web.chat.example\", \"source\": \"catalog\", \"background\": true, %s \"profiles\": [ { \"id\": \"default\", \"name\": \"Default\" } ] }";
+    char j[1024], out[WEBREG_FILE_MAX];
+    WebApp a;
+    snprintf(j, sizeof j, base, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && !a.tray && a.notify_sound == WEBREG_SOUND_AUTO, "tray off and notifySound auto when missing");
+    size_t n = webreg_write(&a, out, sizeof out);
+    CHECK(n && !strstr(out, "tray") && !strstr(out, "notifySound"), "the defaults aren't written (an older lord-web reads the file)");
+    snprintf(j, sizeof j, base, "\"tray\": true, \"notifySound\": \"app\",");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.tray && a.notify_sound == WEBREG_SOUND_APP, "tray and notifySound read");
+    n = webreg_write(&a, out, sizeof out);
+    WebApp b;
+    CHECK(n && !webreg_parse(out, n, &b, NULL, 0) && b.tray && b.notify_sound == WEBREG_SOUND_APP, "written and read back");
+    const char *sounds[] = { "auto", "app", "system", "none" };
+    for (int i = 0; i < 4; i++) {
+        char v[64];
+        snprintf(v, sizeof v, "\"notifySound\": \"%s\",", sounds[i]);
+        snprintf(j, sizeof j, base, v);
+        CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.notify_sound == i && !strcmp(webreg_sound_name(i), sounds[i]), "notifySound %s", sounds[i]);
+    }
+    const char *bad[] = { "\"tray\": 1,", "\"tray\": \"yes\",", "\"notifySound\": \"loud\",", "\"notifySound\": true,", "\"notifySound\": \"\",",
+                          "\"trayIcon\": true,", "\"tray\": true, \"tray\": false,", NULL };
+    for (int i = 0; bad[i]; i++) {
+        snprintf(j, sizeof j, base, bad[i]);
+        CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad[i]);
+    }
+    CHECK(webreg_sound_value("none") == WEBREG_SOUND_NONE && webreg_sound_value("x") < 0 && !webreg_sound_name(9), "names");
+}
+
 int main(void) {
+    test_axis();
+    test_badge();
+    test_user_agent();
+    test_sound();
+    test_drop();
+    test_registry_options();
     test_url();
     test_perm_context();
     test_probe_hops();

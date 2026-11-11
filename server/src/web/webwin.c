@@ -11,10 +11,16 @@
  * hidden (an app in the background) frames are completed at once and the view is not visible, so WebKit throttles.
  *
  * Input goes to libwpe's events: the keyboard with the compositor's keymap and its key repeat, the pointer, the wheel
- * (in lines for a mouse wheel, in pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
+ * (webaxis.c: lines for a mouse wheel, pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
  * session's text is mirrored into WebKit's pasteboard whenever the selection changes while the window has the
- * keyboard, and the page's copies are offered to the session. text-input-v3 is WebKit's input method context. */
+ * keyboard, and the page's copies are offered to the session. WebKit's pasteboard holds text only: an image on the
+ * session's clipboard (image/png or image/jpeg, at most CLIP_IMAGE_MAX) is read when the person pastes (Ctrl+V,
+ * Shift+Insert) and handed to the page by webxfer.c, and an image the page copies (webxfer.c) is offered from here.
+ * The same data device takes drops: a drag that offers text/uri-list (Files) or text is accepted as a copy, its list
+ * read at the drop (at most WEBDROP_LIST_MAX) and the local files on it (webdrop.c) given to webxfer.c.
+ * text-input-v3 is WebKit's input method context. */
 #include "webwin.h"
+#include "webaxis.h"
 
 #include "xdg-shell-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
@@ -50,6 +56,8 @@
 #define MAX_OUTPUTS 8
 #define MAX_TOUCH 10
 #define CLIP_MAX (16 * 1024 * 1024)
+#define CLIP_IMAGE_MAX (32 * 1024 * 1024)
+#define USER_ACTIVE_US (5 * G_USEC_PER_SEC)   /* how long after a key or a click the page may write the clipboard */
 #define PB_TEXT "text/plain;charset=utf-8"
 #define PB_HTML "text/html;charset=utf-8"
 
@@ -92,6 +100,7 @@ struct WebWin {
     struct wl_seat *seat;
     uint32_t seat_caps;                 /* what the seat has: only those devices are asked for */
     struct wl_data_device_manager *ddm;
+    uint32_t ddm_ver;
     struct wl_data_device *dd;
     struct wp_viewporter *viewporter;
     struct wp_fractional_scale_manager_v1 *frac_mgr;
@@ -129,9 +138,9 @@ struct WebWin {
     int focused;
     double px, py;
     uint32_t buttons, mods;
-    double ax, ay;
-    int a120x, a120y, discrete;
+    WebAxis axis;
     uint32_t axis_time;
+    gint64 last_input_us;               /* the person's last key, click or touch in the window */
     int repeat_rate, repeat_delay;
     uint32_t repeat_key;
     guint repeat_src;
@@ -139,8 +148,15 @@ struct WebWin {
 
     struct wl_data_offer *sel_offer;
     char *sel_mime;                     /* the best text type the session's selection offers */
+    const char *sel_img;                /* its image type (image/png before image/jpeg), or NULL */
     struct wl_data_source *source;      /* our own selection */
     char *own_text, *own_html;
+    GBytes *own_img;                    /* or an image the page copied */
+    char *own_img_mime;
+
+    struct wl_data_offer *drag_offer;   /* a drag over the window */
+    const char *drag_mime;              /* what it gives us: text/uri-list, or a text type; NULL when nothing */
+    double drag_x, drag_y;
     char *known;                        /* the pasteboard's text as last mirrored or offered */
     guint pb_timer;
 
@@ -220,7 +236,10 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     else if (!strcmp(iface, wl_seat_interface.name) && !win->seat) {
         win->seat = wl_registry_bind(r, name, &wl_seat_interface, min_u(ver, 8));
         wl_seat_add_listener(win->seat, &seat_listener, win);
-    } else if (!strcmp(iface, wl_data_device_manager_interface.name)) win->ddm = wl_registry_bind(r, name, &wl_data_device_manager_interface, min_u(ver, 3));
+    } else if (!strcmp(iface, wl_data_device_manager_interface.name)) {
+        win->ddm_ver = min_u(ver, 3);
+        win->ddm = wl_registry_bind(r, name, &wl_data_device_manager_interface, win->ddm_ver);
+    }
     else if (!strcmp(iface, wp_viewporter_interface.name)) win->viewporter = wl_registry_bind(r, name, &wp_viewporter_interface, 1);
     else if (!strcmp(iface, wp_fractional_scale_manager_v1_interface.name)) win->frac_mgr = wl_registry_bind(r, name, &wp_fractional_scale_manager_v1_interface, 1);
     else if (!strcmp(iface, zwp_linux_dmabuf_v1_interface.name) && ver >= 3) win->dmabuf = wl_registry_bind(r, name, &zwp_linux_dmabuf_v1_interface, 3);
@@ -617,11 +636,18 @@ static void src_target(void *d, struct wl_data_source *s, const char *m) { (void
 static void src_send(void *d, struct wl_data_source *s, const char *mime, int32_t fd) {
     (void)s;
     WebWin *win = d;
-    const char *data = !strncmp(mime, "text/html", 9) ? win->own_html : win->own_text;
+    const void *data = NULL;
+    gsize len = 0;
+    if (win->own_img) {
+        if (win->own_img_mime && !strcmp(mime, win->own_img_mime)) data = g_bytes_get_data(win->own_img, &len);
+    } else {
+        const char *t = !strncmp(mime, "text/html", 9) ? win->own_html : win->own_text;
+        if (t) { data = t; len = strlen(t); }
+    }
     if (!data) { close(fd); return; }
     Outgoing *o = g_new0(Outgoing, 1);
-    o->data = g_strdup(data);
-    o->len = strlen(data);
+    o->data = g_memdup2(data, len);
+    o->len = len;
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
     g_unix_fd_add(fd, G_IO_OUT | G_IO_ERR | G_IO_HUP, out_write, o);
 }
@@ -635,21 +661,61 @@ static void src_dnd_finished(void *d, struct wl_data_source *s) { (void)d; (void
 static void src_action(void *d, struct wl_data_source *s, uint32_t a) { (void)d; (void)s; (void)a; }
 static const struct wl_data_source_listener src_listener = { src_target, src_send, src_cancelled, src_dnd_drop, src_dnd_finished, src_action };
 
-/* the page copied something: offer it to the session */
-static void offer_own(WebWin *win, char *text) {
-    if (!win->ddm || !win->dd || !win->input_serial) { g_free(text); return; }
+static void clear_own(WebWin *win) {
     g_free(win->own_text);
     g_free(win->own_html);
-    win->own_text = text;
-    win->own_html = pb_read(PB_HTML);
+    win->own_text = win->own_html = NULL;
+    if (win->own_img) g_bytes_unref(win->own_img);
+    win->own_img = NULL;
+    g_free(win->own_img_mime);
+    win->own_img_mime = NULL;
+}
+
+/* our own selection, with what own_* holds */
+static void new_source(WebWin *win) {
     if (win->source) wl_data_source_destroy(win->source);
     win->source = wl_data_device_manager_create_data_source(win->ddm);
     wl_data_source_add_listener(win->source, &src_listener, win);
-    static const char *const types[] = { "text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "TEXT", "STRING" };
-    for (size_t i = 0; i < sizeof types / sizeof types[0]; i++) wl_data_source_offer(win->source, types[i]);
-    if (win->own_html) wl_data_source_offer(win->source, "text/html");
+    if (win->own_img) wl_data_source_offer(win->source, win->own_img_mime);
+    else {
+        static const char *const types[] = { "text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "TEXT", "STRING" };
+        for (size_t i = 0; i < sizeof types / sizeof types[0]; i++) wl_data_source_offer(win->source, types[i]);
+        if (win->own_html) wl_data_source_offer(win->source, "text/html");
+    }
     wl_data_device_set_selection(win->dd, win->source, win->input_serial);
     wl_display_flush(win->dpy);
+}
+
+/* the page copied something: offer it to the session */
+static void offer_own(WebWin *win, char *text) {
+    if (!win->ddm || !win->dd || !win->input_serial) { g_free(text); return; }
+    clear_own(win);
+    win->own_text = text;
+    win->own_html = pb_read(PB_HTML);
+    new_source(win);
+}
+
+void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
+    gsize n = 0;
+    const char *p = g_bytes_get_data(data, &n);
+    if (!mime) {
+        char *text = g_strndup(p, n);
+        g_bytes_unref(data);
+        pb_write_text(text, strlen(text));
+        g_free(win->known);
+        win->known = g_strdup(text);
+        offer_own(win, text);
+        return;
+    }
+    if (!win->ddm || !win->dd || !win->input_serial || !n) { g_bytes_unref(data); return; }
+    clear_own(win);
+    win->own_img = data;
+    win->own_img_mime = g_strdup(mime);
+    new_source(win);
+}
+
+int webwin_user_active(WebWin *win) {
+    return win->focused && win->last_input_us && g_get_monotonic_time() - win->last_input_us < USER_ACTIVE_US;
 }
 
 static gboolean pb_watch(gpointer d) {
@@ -663,41 +729,74 @@ static gboolean pb_watch(gpointer d) {
     return G_SOURCE_CONTINUE;
 }
 
-typedef struct { WebWin *win; struct wl_data_offer *offer; GByteArray *buf; } Incoming;
+/* ---- reading what another client offers: a pipe, non-blocking, in the main loop, at most max bytes ---- */
+
+/* data is NULL when the read failed or passed max (the offer pointer only to compare: it may be gone) */
+typedef void (*ReadDone)(WebWin *win, struct wl_data_offer *o, GByteArray *data, void *d);
+typedef struct { WebWin *win; struct wl_data_offer *offer; GByteArray *buf; size_t max; int over; ReadDone done; void *d; } Incoming;
 
 static gboolean in_read(gint fd, GIOCondition c, gpointer d) {
     Incoming *in = d;
-    char chunk[16384];
+    char chunk[65536];
     if (c & G_IO_IN) {
         ssize_t k = read(fd, chunk, sizeof chunk);
         if (k < 0 && (errno == EINTR || errno == EAGAIN)) return G_SOURCE_CONTINUE;
-        if (k > 0 && in->buf->len + (guint)k <= CLIP_MAX) { g_byte_array_append(in->buf, (const guint8 *)chunk, (guint)k); return G_SOURCE_CONTINUE; }
-        if (k > 0) g_byte_array_set_size(in->buf, 0);           /* too big: nothing */
+        if (k > 0 && in->buf->len + (size_t)k <= in->max) { g_byte_array_append(in->buf, (const guint8 *)chunk, (guint)k); return G_SOURCE_CONTINUE; }
+        if (k != 0) in->over = 1;                       /* too big, or an error: nothing */
     }
     close(fd);
-    WebWin *win = in->win;
-    if (in->buf->len && in->offer == win->sel_offer && g_utf8_validate((const char *)in->buf->data, (gssize)in->buf->len, NULL)) {
-        pb_write_text((const char *)in->buf->data, in->buf->len);
-        g_free(win->known);
-        win->known = g_strndup((const char *)in->buf->data, in->buf->len);
-    }
+    in->done(in->win, in->offer, in->over ? NULL : in->buf, in->d);
     g_byte_array_unref(in->buf);
     g_free(in);
     return G_SOURCE_REMOVE;
 }
 
-static void mirror_selection(WebWin *win) {
-    if (!win->sel_offer || !win->sel_mime || win->source) return;
+static void read_offer(WebWin *win, struct wl_data_offer *o, const char *mime, size_t max, ReadDone done, void *d) {
     int p[2];
-    if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
-    wl_data_offer_receive(win->sel_offer, win->sel_mime, p[1]);
+    if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { done(win, o, NULL, d); return; }
+    wl_data_offer_receive(o, mime, p[1]);
     close(p[1]);
     wl_display_flush(win->dpy);
     Incoming *in = g_new0(Incoming, 1);
     in->win = win;
-    in->offer = win->sel_offer;
+    in->offer = o;
     in->buf = g_byte_array_new();
+    in->max = max;
+    in->done = done;
+    in->d = d;
     g_unix_fd_add(p[0], G_IO_IN | G_IO_HUP | G_IO_ERR, in_read, in);
+}
+
+static void sel_text_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
+    (void)d;
+    if (!b || !b->len || o != win->sel_offer || !g_utf8_validate((const char *)b->data, (gssize)b->len, NULL)) return;
+    pb_write_text((const char *)b->data, b->len);
+    g_free(win->known);
+    win->known = g_strndup((const char *)b->data, b->len);
+}
+
+static void mirror_selection(WebWin *win) {
+    if (!win->sel_offer || !win->sel_mime || win->source) return;
+    read_offer(win, win->sel_offer, win->sel_mime, CLIP_MAX, sel_text_read, NULL);
+}
+
+static void sel_image_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
+    const char *mime = d;
+    if (b && b->len && o == win->sel_offer) webxfer_paste_image(win->w, mime, g_bytes_new(b->data, b->len));
+}
+
+/* Ctrl+V or Shift+Insert while the session's clipboard holds an image and no text: the image goes to the page (the
+ * key doesn't: WebKit would paste its pasteboard's text). 1 when that is what happened. */
+static int paste_image(WebWin *win, uint32_t key) {
+    if (!win->sel_offer || !win->sel_img || win->sel_mime) return 0;
+    struct xkb_state *st = wpe_input_xkb_context_get_state(wpe_input_xkb_context_get_default());
+    if (!st) return 0;
+    xkb_keysym_t sym = xkb_state_key_get_one_sym(st, key + 8);
+    int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
+    int shift = (win->mods & wpe_input_keyboard_modifier_shift) != 0;
+    if (!((ctrl && !alt && (sym == XKB_KEY_v || sym == XKB_KEY_V)) || (shift && !ctrl && !alt && sym == XKB_KEY_Insert))) return 0;
+    read_offer(win, win->sel_offer, win->sel_img, CLIP_IMAGE_MAX, sel_image_read, (void *)win->sel_img);
+    return 1;
 }
 
 static int mime_rank(const char *m) {
@@ -706,14 +805,18 @@ static int mime_rank(const char *m) {
     if (!strcmp(m, "text/plain")) return 2;
     return 0;
 }
-/* each offer keeps the best text type it listed; the selection event that follows names the offer */
-typedef struct { char *mime; int rank; } OfferInfo;
+/* each offer keeps the best text type it listed, its image type and whether it has a file list; the selection or
+ * enter event that follows names the offer */
+typedef struct { char *mime; int rank; const char *img; int uri; } OfferInfo;
 
 static void offer_mime(void *d, struct wl_data_offer *o, const char *m) {
     (void)o;
     OfferInfo *in = d;
     int r = mime_rank(m);
     if (r > in->rank) { g_free(in->mime); in->mime = g_strdup(m); in->rank = r; }
+    if (!strcmp(m, "image/png")) in->img = "image/png";
+    else if (!strcmp(m, "image/jpeg") && !in->img) in->img = "image/jpeg";
+    else if (!strcmp(m, "text/uri-list")) in->uri = 1;
 }
 static void offer_actions(void *d, struct wl_data_offer *o, uint32_t a) { (void)d; (void)o; (void)a; }
 static void offer_action(void *d, struct wl_data_offer *o, uint32_t a) { (void)d; (void)o; (void)a; }
@@ -726,14 +829,77 @@ static void offer_free(struct wl_data_offer *o) {
 }
 
 static void dd_offer(void *d, struct wl_data_device *dd, struct wl_data_offer *o) { (void)d; (void)dd; wl_data_offer_add_listener(o, &offer_listener, g_new0(OfferInfo, 1)); }
-/* drag and drop into the page isn't passed on (WPE's view has no drop target) */
-static void dd_enter(void *d, struct wl_data_device *dd, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *o) {
-    (void)d; (void)dd; (void)s; (void)sf; (void)x; (void)y;
-    if (o) offer_free(o);
+
+/* ---- drops: WPE's view has no drop target of its own, so lord-web is the target and webxfer.c hands the files over ---- */
+
+static void dd_enter(void *d, struct wl_data_device *dd, uint32_t serial, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *o) {
+    (void)dd;
+    WebWin *win = d;
+    if (win->drag_offer) offer_free(win->drag_offer);
+    win->drag_offer = o;
+    win->drag_mime = NULL;
+    if (!o) return;
+    OfferInfo *in = wl_data_offer_get_user_data(o);
+    if (sf == win->surface && in && (in->uri || in->mime)) win->drag_mime = in->uri ? "text/uri-list" : in->mime;
+    win->drag_x = wl_fixed_to_double(x);
+    win->drag_y = wl_fixed_to_double(y);
+    wl_data_offer_accept(o, serial, win->drag_mime);
+    if (win->ddm_ver >= 3) {
+        uint32_t a = win->drag_mime ? WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY : WL_DATA_DEVICE_MANAGER_DND_ACTION_NONE;
+        wl_data_offer_set_actions(o, a, a);
+    }
+    wl_display_flush(win->dpy);
 }
-static void dd_leave(void *d, struct wl_data_device *dd) { (void)d; (void)dd; }
-static void dd_motion(void *d, struct wl_data_device *dd, uint32_t t, wl_fixed_t x, wl_fixed_t y) { (void)d; (void)dd; (void)t; (void)x; (void)y; }
-static void dd_drop(void *d, struct wl_data_device *dd) { (void)d; (void)dd; }
+static void dd_leave(void *d, struct wl_data_device *dd) {
+    (void)dd;
+    WebWin *win = d;
+    if (win->drag_offer) offer_free(win->drag_offer);
+    win->drag_offer = NULL;
+    win->drag_mime = NULL;
+}
+static void dd_motion(void *d, struct wl_data_device *dd, uint32_t t, wl_fixed_t x, wl_fixed_t y) {
+    (void)dd; (void)t;
+    WebWin *win = d;
+    win->drag_x = wl_fixed_to_double(x);
+    win->drag_y = wl_fixed_to_double(y);
+}
+
+typedef struct { double x, y; int uri; } DropAt;
+
+static void drop_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
+    DropAt *at = d;
+    if (b && win->ddm_ver >= 3) wl_data_offer_finish(o);
+    offer_free(o);
+    wl_display_flush(win->dpy);
+    if (b && b->len) {
+        WebDropFile files[WEBDROP_FILES_MAX];
+        int n = at->uri ? webdrop_files((const char *)b->data, b->len, files, WEBDROP_FILES_MAX) : 0;
+        if (n) webxfer_drop(win->w, at->x, at->y, files, n, NULL, NULL);
+        else if (g_utf8_validate((const char *)b->data, (gssize)b->len, NULL)) {
+            char *t = g_strndup((const char *)b->data, b->len);
+            webxfer_drop(win->w, at->x, at->y, NULL, 0, at->uri ? t : NULL, t);
+            g_free(t);
+        }
+    }
+    g_free(at);
+}
+
+static void dd_drop(void *d, struct wl_data_device *dd) {
+    (void)dd;
+    WebWin *win = d;
+    struct wl_data_offer *o = win->drag_offer;
+    const char *mime = win->drag_mime;
+    win->drag_offer = NULL;                         /* the read owns it now: the leave that follows leaves it alone */
+    win->drag_mime = NULL;
+    if (!o) return;
+    if (!mime) { offer_free(o); return; }
+    DropAt *at = g_new0(DropAt, 1);
+    at->x = win->drag_x;
+    at->y = win->drag_y;
+    at->uri = !strcmp(mime, "text/uri-list");
+    read_offer(win, o, mime, WEBDROP_LIST_MAX, drop_read, at);
+}
+
 static void dd_selection(void *d, struct wl_data_device *dd, struct wl_data_offer *o) {
     (void)dd;
     WebWin *win = d;
@@ -741,9 +907,17 @@ static void dd_selection(void *d, struct wl_data_device *dd, struct wl_data_offe
     win->sel_offer = o;
     g_free(win->sel_mime);
     win->sel_mime = NULL;
+    win->sel_img = NULL;
     if (!o) return;
     OfferInfo *in = wl_data_offer_get_user_data(o);
     if (in && in->mime) win->sel_mime = g_strdup(in->mime);
+    if (in) win->sel_img = in->img;
+    if (!win->sel_mime && win->sel_img && !win->source) {
+        /* an image and no text: WebKit's pasteboard must not paste the text copied before it */
+        pb_write_text("", 0);
+        g_free(win->known);
+        win->known = NULL;
+    }
     mirror_selection(win);
 }
 static const struct wl_data_device_listener dd_listener = { dd_offer, dd_enter, dd_leave, dd_motion, dd_drop, dd_selection };
@@ -954,8 +1128,8 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t tim
     (void)k;
     WebWin *win = d;
     int pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
-    if (pressed) win->input_serial = serial;
-    if (pressed && own_key(win, key)) return;
+    if (pressed) { win->input_serial = serial; win->last_input_us = g_get_monotonic_time(); }
+    if (pressed && (own_key(win, key) || paste_image(win, key))) return;
     send_key(win, time, key, pressed);
     if (pressed) {
         repeat_stop(win);
@@ -1020,6 +1194,7 @@ static void ptr_button(void *d, struct wl_pointer *p, uint32_t serial, uint32_t 
     (void)p;
     WebWin *win = d;
     win->input_serial = serial;
+    if (state == WL_POINTER_BUTTON_STATE_PRESSED) win->last_input_us = g_get_monotonic_time();
     /* libwpe's buttons: 1 left, 2 right, 3 middle */
     uint32_t b = button == BTN_LEFT ? 1 : button == BTN_RIGHT ? 2 : button == BTN_MIDDLE ? 3 : 0;
     if (!b) {
@@ -1037,43 +1212,43 @@ static void ptr_axis(void *d, struct wl_pointer *p, uint32_t time, uint32_t axis
     (void)p;
     WebWin *win = d;
     win->axis_time = time;
-    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) win->ay += wl_fixed_to_double(v);
-    else win->ax += wl_fixed_to_double(v);
+    webaxis_value(&win->axis, axis, wl_fixed_to_double(v));
 }
+static void send_axis(WebWin *win, enum wpe_input_axis_event_type type, uint32_t axis, int32_t value, double x, double y) {
+    int px = (int)(win->px * win->scale), py = (int)(win->py * win->scale);
+    if (type & wpe_input_axis_event_type_mask_2d) {
+        struct wpe_input_axis_2d_event e = { { type, win->axis_time, px, py, 0, 0, win->mods }, x, y };
+        wpe_view_backend_dispatch_axis_event(win->backend, &e.base);
+    } else {
+        struct wpe_input_axis_event e = { type, win->axis_time, px, py, axis, value, win->mods };
+        wpe_view_backend_dispatch_axis_event(win->backend, &e);
+    }
+}
+/* the frame ends the axis events that belong together (webaxis.c decides what they make) */
 static void ptr_frame(void *d, struct wl_pointer *p) {
     (void)p;
     WebWin *win = d;
-    if (win->discrete && (win->a120x || win->a120y)) {
-        /* a mouse wheel: whole lines, one event per notch direction */
-        struct wpe_input_axis_2d_event e = { { (enum wpe_input_axis_event_type)(wpe_input_axis_event_type_mask_2d | wpe_input_axis_event_type_motion), win->axis_time,
-                                               (int)(win->px * win->scale), (int)(win->py * win->scale), 0, 0, win->mods }, -win->a120x / 120.0, -win->a120y / 120.0 };
-        if (abs(win->a120x) >= 120 || abs(win->a120y) >= 120) {
-            wpe_view_backend_dispatch_axis_event(win->backend, &e.base);
-            win->a120x %= 120;
-            win->a120y %= 120;
-        }
-    } else if (win->ax != 0 || win->ay != 0) {
-        struct wpe_input_axis_2d_event e = { { (enum wpe_input_axis_event_type)(wpe_input_axis_event_type_mask_2d | wpe_input_axis_event_type_motion_smooth), win->axis_time,
-                                               (int)(win->px * win->scale), (int)(win->py * win->scale), 0, 0, win->mods }, -win->ax * win->scale, -win->ay * win->scale };
-        wpe_view_backend_dispatch_axis_event(win->backend, &e.base);
+    WebAxisOut out[2];
+    int n = webaxis_frame(&win->axis, win->scale, out);
+    enum wpe_input_axis_event_type smooth = (enum wpe_input_axis_event_type)(wpe_input_axis_event_type_mask_2d | wpe_input_axis_event_type_motion_smooth);
+    for (int i = 0; i < n; i++) {
+        if (out[i].kind == WEBAXIS_OUT_LINES) {
+            /* one line event per notch, on its own axis only */
+            for (int k = 0; k < (int)(out[i].y < 0 ? -out[i].y : out[i].y); k++) send_axis(win, wpe_input_axis_event_type_motion, WEBAXIS_V, out[i].y > 0 ? 1 : -1, 0, 0);
+            for (int k = 0; k < (int)(out[i].x < 0 ? -out[i].x : out[i].x); k++) send_axis(win, wpe_input_axis_event_type_motion, WEBAXIS_H, out[i].x > 0 ? 1 : -1, 0, 0);
+        } else if (out[i].kind == WEBAXIS_OUT_PIXELS) send_axis(win, smooth, 0, 0, out[i].x, out[i].y);
+        else send_axis(win, smooth, 0, 0, 0, 0);
     }
-    win->ax = win->ay = 0;
-    win->discrete = 0;
 }
-static void ptr_axis_source(void *d, struct wl_pointer *p, uint32_t s) { (void)d; (void)p; (void)s; }
-static void ptr_axis_stop(void *d, struct wl_pointer *p, uint32_t t, uint32_t a) { (void)d; (void)p; (void)t; (void)a; }
-static void ptr_axis_discrete(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) {
+static void ptr_axis_source(void *d, struct wl_pointer *p, uint32_t s) { (void)p; webaxis_source(&((WebWin *)d)->axis, s); }
+static void ptr_axis_stop(void *d, struct wl_pointer *p, uint32_t t, uint32_t a) {
     (void)p;
     WebWin *win = d;
-    win->discrete = 1;
-    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) win->a120y += v * 120; else win->a120x += v * 120;
+    win->axis_time = t;
+    webaxis_stop(&win->axis, a);
 }
-static void ptr_axis_120(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) {
-    (void)p;
-    WebWin *win = d;
-    win->discrete = 1;
-    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) win->a120y += v; else win->a120x += v;
-}
+static void ptr_axis_discrete(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) { (void)p; webaxis_discrete(&((WebWin *)d)->axis, axis, v); }
+static void ptr_axis_120(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) { (void)p; webaxis_value120(&((WebWin *)d)->axis, axis, v); }
 static void ptr_axis_rel(void *d, struct wl_pointer *p, uint32_t a, uint32_t r) { (void)d; (void)p; (void)a; (void)r; }
 static const struct wl_pointer_listener ptr_listener = { ptr_enter, ptr_leave, ptr_motion, ptr_button, ptr_axis, ptr_frame, ptr_axis_source, ptr_axis_stop, ptr_axis_discrete, ptr_axis_120, ptr_axis_rel };
 
@@ -1090,6 +1265,7 @@ static void touch_down(void *d, struct wl_touch *t, uint32_t serial, uint32_t ti
     (void)t; (void)s;
     WebWin *win = d;
     win->input_serial = serial;
+    win->last_input_us = g_get_monotonic_time();
     if (id < 0 || id >= MAX_TOUCH) return;
     win->touches[id] = (struct wpe_input_touch_event_raw){ wpe_input_touch_event_type_down, time, id, (int32_t)(wl_fixed_to_double(x) * win->scale), (int32_t)(wl_fixed_to_double(y) * win->scale) };
     touch_send(win, wpe_input_touch_event_type_down, id, time);
@@ -1150,6 +1326,7 @@ WebWin *webwin_new(Web *w) {
     win->width = DEFAULT_W;
     win->height = DEFAULT_H;
     win->repeat_delay = 400;
+    webaxis_reset(&win->axis);
     win->reg = wl_display_get_registry(dpy);
     wl_registry_add_listener(win->reg, &reg_listener, win);
     wl_display_roundtrip(dpy);

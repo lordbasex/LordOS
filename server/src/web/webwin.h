@@ -16,6 +16,11 @@ void webwin_hide(WebWin *win);
 int webwin_visible(WebWin *win);
 void webwin_set_title(WebWin *win, const char *title);
 void webwin_set_cursor_hint(WebWin *win, int link, int text);
+/* the person pressed a key, clicked or touched the window less than a few seconds ago and it has the keyboard: what a
+ * page may write to the clipboard needs it */
+int webwin_user_active(WebWin *win);
+/* the page copied: offer this text (mime NULL) or image (image/png, image/jpeg) to the session; data taken over */
+void webwin_offer(WebWin *win, const char *mime, GBytes *data);
 void webwin_free(WebWin *win);
 
 /* webshm.c: wpebackend-fdo's shared memory buffers and resources are libwayland-server objects */
