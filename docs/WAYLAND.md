@@ -1070,7 +1070,7 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   painting the changed part again in capture mode: the whole 1920×1080 desktop took 1.5 ms (a headless session's,
   wallpaper, menu bar and Dock), a window or a video only its own area. A still screen sends no frames.
 - **Not yet.** dmabuf buffers (the frames are shared memory); the cursor as metadata; restoring a choice
-  (`restore_token`); a window's menus (popups) in a window share; audio. Not yet checked with a browser on the VM.
+  (`restore_token`); a window's menus (popups) in a window share; audio. Checked on VM 127 with a browser on 2026-11-11 (176 frames in 10 s at 1280x800, the helper at about 2 % CPU).
 - **Tests** (`make -C server test`): `build/castsm-test` (every call in its state and refused in the others, Cancel,
   the app's `Request.Close` of its `Start`, the limits, an app leaving the bus, who gets the chooser: `csm_gate`),
   `build/engine-test` (`test_node_ref`: a destroyed node's id taken by another, never its serial), `build/castproto-test` (the ring's
