@@ -248,6 +248,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A browser's profile picker no longer flickers between dark and light while Notes is open.** Every `ThemeProvider`
+  told Linux apps (the Settings portal, `lord.portal.set`) and isolated apps (`lord.broker.publish('theme')`) its
+  colors, not only the theme's. Notes draws its paper with a nested light provider, so each render of a note sent light
+  mode and each render of the desktop sent dark mode back: the portal's `color-scheme` and GTK theme went back and forth
+  (56 `SettingChanged` signals in 20 seconds on VM 127), and a window that follows the system's mode, such as the
+  profile picker of a browser whose profiles each chose a theme, flickered with it. Only the outermost provider, the
+  theme's, speaks for the desktop now; a nested one colors its own subtree. It showed only now because the session's
+  apps only now have a session bus and `lord.portal.set` only now reaches the portal. Checked on VM 127 in an isolated
+  session with a browser's profile picker over Notes: light frames while typing in a note before, none and no signal
+  after. Test: `tests/theme_portal_scene.mjs` (through `tests/textfield_menu_test.mjs`).
 - **Notifications from Chromium-based browsers are LordOS banners, and their own popups no longer take the keyboard.**
   The session started without `DBUS_SESSION_BUS_ADDRESS`, and those browsers don't look for `$XDG_RUNTIME_DIR/bus`
   themselves: they had no session bus at all, so no notification service (they drew their own windows), no tray icon and
