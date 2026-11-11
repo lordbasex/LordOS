@@ -1,6 +1,6 @@
 // editor_scrollbar_test.mjs — the Text Editor's scroll bar (apps/editor/scrollbar.js, GitHub #84): the thumb's size
 // and place, and dragging it back to a scroll position (the end of a long log in one drag).
-import { thumbOf, topOfThumb } from '../../apps/editor/scrollbar.js';
+import { BAR_COL, textWidth, thumbOf, topOfThumb } from '../../apps/editor/scrollbar.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => { n++; if (JSON.stringify(got) !== JSON.stringify(want)) { bad++; console.log(`✗ ${what}\n    got  ${JSON.stringify(got)}\n    want ${JSON.stringify(want)}`); } };
@@ -14,6 +14,11 @@ eq('dragged to the bottom: the end of the file', topOfThumb(400, log, 400 - 24),
 eq('dragged past the bottom: still the end', topOfThumb(400, log, 9999), log - 400);
 eq('dragged above the top: the start', topOfThumb(400, log, -50), 0);
 eq('round trip', Math.round(topOfThumb(400, 800, thumbOf(400, 800, 123).pos)), 123);
+
+// GitHub #109: the text stops before the bar's column, so the caret is scrolled into view before it reaches the bar
+eq('bar shown: its column is not text', textWidth(600, 40, 10, true), 600 - 40 - 20 - BAR_COL);
+eq('no bar: the full width', textWidth(600, 40, 10, false), 600 - 40 - 20);
+eq('a view narrower than the gutter: no width, not negative', textWidth(30, 40, 10, true), 0);
 
 console.log(`editor_scrollbar_test: ${n - bad}/${n} checks`);
 process.exit(bad ? 1 : 0);

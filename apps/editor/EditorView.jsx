@@ -6,7 +6,7 @@ import { View, Text, useAppWindow, addListener, ime, clipboard, hasTextFocus } f
 import { memo, useEffect, useRef, useState } from 'react';
 import { cmp, head, anchor, hasSel, selStart, selEnd, cursorAt } from './buffer.js';
 import { tokenizeLine } from './syntax.js';
-import { BAR, thumbOf, topOfThumb } from './scrollbar.js';
+import { BAR, BAR_COL, textWidth, thumbOf, topOfThumb } from './scrollbar.js';
 
 export const FONT = 13;
 export const LH = 20;
@@ -167,7 +167,8 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
   const ensureVisible = (p = head(doc.cursors[doc.cursors.length - 1])) => {
     setScroll((s) => {
       let { top, left } = s;
-      const y = p.l * LH, h = st.current.h || size.h, w = (st.current.w || size.w) - gutter - PAD * 2;
+      const y = p.l * LH, h = st.current.h || size.h;
+      const w = textWidth(st.current.w || size.w, gutter, PAD, !!thumbOf(h, contentH(), top));
       if (y < top) top = y;
       if (y + LH > top + h) top = y + LH - h;
       // horizontal: with a single cursor it follows it; with several, only if none is in view
@@ -675,7 +676,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
         ))}
       </View>
       {thumb && (
-        <View onMouseDown={barDown} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: BAR + 4 }}>
+        <View onMouseDown={barDown} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: BAR_COL, backgroundColor: t.editorBg }}>
           <View style={{ position: 'absolute', right: 2, top: thumb.pos, width: BAR - 2, height: thumb.size, borderRadius: (BAR - 2) / 2,
             backgroundColor: t.scrollThumb }} />
         </View>

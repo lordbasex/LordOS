@@ -443,6 +443,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Text Editor: the end of a long line was drawn under the vertical scroll bar, and typing at the end of a line
+  could leave the caret there. The bar now has its own column at the right edge, painted with the editor's
+  background, and the view scrolls sideways so the caret stays left of that column. Without the bar (a file that
+  fits) the text keeps the full width. A regression case is in `editor_scrollbar_test.mjs`. (GitHub #109)
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.
