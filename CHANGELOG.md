@@ -547,6 +547,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (the build before this fix said "denied" there) and was still refused through one that always leaves it unsigned.
   Not yet tried against the reporter's kind of server (GitHub #101).
 
+- Notes and Mail's message editor at 100 %: the caret and the selection drifted to the right of the text, 0.6 px more
+  with every character (20 px at the end of a 33-character line with 14 px text). Both editors measure each character
+  once with `lord.measureText`, which rounds a width up to a whole pixel, so an 8.4 px JetBrains Mono character
+  counted as 9. Each character is now measured as 64 copies and divided, which keeps the rounding under 0.02 px.
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.

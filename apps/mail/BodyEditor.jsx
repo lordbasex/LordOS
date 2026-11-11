@@ -7,9 +7,12 @@ import { useEffect, useRef, useState } from 'react';
 
 const MONO = 1400;
 const charW = new Map();
+// lord.measureText rounds a width up to a whole pixel: one 8.4 px character alone reads 9, and the
+// caret drifted 0.6 px to the right of the text with every character. REP copies make that < 0.02 px.
+const REP = 64;
 const cw = (ch, size) => {
   const k = `${size}:${ch}`;
-  if (!charW.has(k)) charW.set(k, ch === '\t' ? lord.measureText('    ', size, MONO) : lord.measureText(ch, size, MONO) || size * 0.6);
+  if (!charW.has(k)) charW.set(k, lord.measureText((ch === '\t' ? '    ' : ch).repeat(REP), size, MONO) / REP || size * 0.6);
   return charW.get(k);
 };
 const WORD = /[\p{L}\p{N}_]/u;
