@@ -455,6 +455,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   simulated radio (`mac80211_hwsim`, a WPA2 access point from wpa_supplicant in AP mode) through `net-test act`:
   joined with the password, disconnected, joined again with no password; the build before saved it as `open` and
   stayed `SCANNING`, this one reached `COMPLETED` with the key kept. New `net-test wifi-saved`. (GitHub #124)
+- Files and Settings → Default Apps: VLC was missing from Open With for common video files (MP4, Matroska, WebM,
+  QuickTime) and couldn't be chosen as the video app. The launcher read each `.desktop` line into a 2 KB buffer and kept
+  `MimeType` in 1 KB, and VLC's `MimeType` line is 2.4 KB: only its first 1023 bytes were kept (`audio/mpeg` and
+  `video/x-msvideo` survived, `video/mp4` did not), and the rest of an over-long line was read as a line of its own.
+  `.desktop` lines are now read whole (`getline`), `MimeType` holds 8 KB, and a list longer than that keeps only its
+  whole types, so a cut type never matches another. `tests/defaults_test.c` covers a type after 2 KB of `MimeType`, a
+  long line whose tail looks like a key, and a list longer than the field; checked against this machine's real VLC
+  3.0 `.desktop`: before, `video/mp4` had no app; now VLC is the declared app for MP4, Matroska, WebM and QuickTime.
+  Dragging a file from Files onto a Linux app's window is new in this version (Added, Wayland drag and drop)
+  (GitHub #123).
+- Linux apps: a Qt app whose Qt Wayland platform plugin isn't installed (Debian's `qtwayland5` or `qt6-wayland`, which
+  no Qt app depends on) didn't open at all: MusicBrainz Picard from the Store stopped at start with "Could not find the
+  Qt platform plugin "wayland"". The session set `QT_QPA_PLATFORM=wayland`, which leaves Qt no other platform. It now
+  sets `wayland;xcb` (Qt tries them in order), as GTK already got `wayland,x11`: Qt apps still open on Wayland, and
+  those without the plugin open through Xwayland. The toolkit variables moved to `server/src/wl/toolkitenv.h`, checked
+  by the new `tests/toolkitenv_test.c`. Checked on VM 127 with Picard (Qt 5) and Qt 5's Wayland plugins hidden in a
+  private mount namespace: `wayland` alone aborted with the reporter's message, `wayland;xcb` opened Picard's window
+  through Xwayland, and with the plugins present Qt still chose Wayland (GitHub #96).
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title

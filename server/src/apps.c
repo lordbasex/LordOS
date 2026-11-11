@@ -145,14 +145,28 @@ static void set_tr(Entry *e, int slot, char *dst, size_t n, const char *val, con
     snprintf(dst, n, "%s", val);
 }
 
+/* MimeType into its field; a list longer than the field keeps only its whole types, so a cut type
+ * ("video/mp" of "video/mp4") never stands for another. */
+static void set_mime(char *dst, size_t n, const char *v) {
+    size_t len = strlen(v);
+    if (len < n) { memcpy(dst, v, len + 1); return; }
+    len = n - 1;
+    while (len && v[len] != ';') len--;
+    memcpy(dst, v, len);
+    dst[len] = 0;
+}
+
 static int parse_desktop(const char *file, const char *lang, Entry *e) {
     FILE *f = fopen(file, "r");
     if (!f) return -1;
     memset(e, 0, sizeof *e);
-    char line[2048];
+    /* a whole line however long: a fixed buffer would cut VLC's MimeType (2.4 KB) and read the rest
+     * as a line of its own (GitHub #123) */
+    char *line = NULL;
+    size_t cap = 0;
     int in_main = 0;
     Action *act = NULL;                 /* inside a [Desktop Action …] group that is kept */
-    while (fgets(line, sizeof line, f)) {
+    while (getline(&line, &cap, f) >= 0) {
         line[strcspn(line, "\r\n")] = 0;
         if (line[0] == '[') {
             static const char pre[] = "[Desktop Action ";
@@ -197,7 +211,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         else if (!strcmp(k, "Icon")) snprintf(e->icon_name, sizeof e->icon_name, "%s", v);
         else if (!strcmp(k, "Path")) snprintf(e->path, sizeof e->path, "%s", v);
         else if (!strcmp(k, "Categories")) snprintf(e->a.categories, sizeof e->a.categories, "%s", v);
-        else if (!strcmp(k, "MimeType")) snprintf(e->a.mime, sizeof e->a.mime, "%s", v);
+        else if (!strcmp(k, "MimeType")) set_mime(e->a.mime, sizeof e->a.mime, v);
         else if (!strcmp(k, "StartupWMClass")) snprintf(e->a.wmclass, sizeof e->a.wmclass, "%s", v);
         else if (!strcmp(k, "OnlyShowIn")) snprintf(e->only, sizeof e->only, "%s", v);
         else if (!strcmp(k, "NotShowIn")) snprintf(e->not_, sizeof e->not_, "%s", v);
@@ -206,6 +220,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         else if (!strcmp(k, "Terminal")) e->terminal = !strcmp(v, "true");
         else if (!strcmp(k, "Actions")) snprintf(e->actions, sizeof e->actions, "%s", v);
     }
+    free(line);
     fclose(f);
     unescape(e->a.name); unescape(e->a.name_c); unescape(e->a.generic); unescape(e->a.comment);
     for (int i = 0; i < e->nact; i++) unescape(e->act[i].label);
