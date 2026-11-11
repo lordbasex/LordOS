@@ -7,7 +7,7 @@
 // An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint),
 // tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first),
 // tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
-// sheet). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
+// sheet), tests/theme_portal_scene.mjs (only the theme's ThemeProvider sets the portal's colors). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
 // not the whole desktop.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
