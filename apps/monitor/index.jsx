@@ -324,10 +324,10 @@ function MemTop() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: t.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label(g.item)}</Text>
               {g.count > 1 && <Text style={{ fontSize: 12, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('monitor.memTopCount', { count: g.count })}</Text>}
-              <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{fmt.mem(g.rss)}</Text>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{fmt.mem(g.mem)}</Text>
             </View>
             <View style={{ height: 6, borderRadius: 3, backgroundColor: t.control }}>
-              <View style={{ width: `${(g.rss / top[0].rss) * 100}%`, height: 6, borderRadius: 3, backgroundColor: C.mem }} />
+              <View style={{ width: `${(g.mem / top[0].mem) * 100}%`, height: 6, borderRadius: 3, backgroundColor: C.mem }} />
             </View>
           </View>
         </View>

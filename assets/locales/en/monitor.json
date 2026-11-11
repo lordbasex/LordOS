@@ -58,7 +58,7 @@
     "one": "{count} process",
     "other": "{count} processes"
   },
-  "memTopHint": "Each app's processes added up. Memory that processes share counts in each of them, so these can add up to more than Apps.",
+  "memTopHint": "Each app's processes added up. Shared memory is split among the processes that share it (your own larger processes); for the others it counts in each one, so these can add up to more than Apps.",
   "swap": "Swap",
   "swapValue": "{used} of {total}",
   "last60": "Last 60 seconds",

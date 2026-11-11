@@ -7,8 +7,13 @@
  *     lord-web once on the shared memory path.
  *   - shared memory (LordOS's CPU path; a computer with no GPU): the frame is copied into one of our own wl_shm
  *     buffers.
- * Either way the frame WebKit waits for is completed only after the compositor's frame callback. While the window is
- * hidden (an app in the background) frames are completed at once and the view is not visible, so WebKit throttles.
+ * Either way the frame WebKit waits for is completed only after the compositor's frame callback. WebKit is told the view
+ * is visible only while the window is mapped, configured and not suspended (xdg_toplevel's "suspended" state, which
+ * lord-server sends for a minimized window and one on a hidden desktop): otherwise the page stops painting, its
+ * requestAnimationFrame stops, its CSS animations pause and its timers are throttled (webengine.c turns on WebKit's
+ * hidden page throttling), and frames are completed at once. Audio and the page's network keep going.
+ * LORD_WEB_TRACE=1 logs, for each click or key, the time to the frame WebKit exports after it, to its commit and to
+ * the compositor's frame callback (the frame on screen).
  *
  * Input goes to libwpe's events: the keyboard with the compositor's keymap and its key repeat, the pointer, the wheel
  * (webaxis.c: lines for a mouse wheel, pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
@@ -119,6 +124,8 @@ struct WebWin {
     struct wp_fractional_scale_v1 *frac;
     int width, height, cfg_w, cfg_h;
     int configured, shown;
+    int suspended, cfg_suspended;       /* xdg_toplevel's suspended state: applied, and pending until the configure */
+    uint32_t activity;                  /* the visible and in-window states WebKit was given */
     double scale;
     struct wl_callback *frame_cb;
     char title[512];
@@ -141,6 +148,9 @@ struct WebWin {
     WebAxis axis;
     uint32_t axis_time;
     gint64 last_input_us;               /* the person's last key, click or touch in the window */
+    int trace;                          /* LORD_WEB_TRACE: input to frame on screen */
+    int trace_stage;                    /* 1 waiting for the frame, 2 for its commit, 3 for its frame callback */
+    gint64 trace_in, trace_export, trace_commit, trace_copy;
     int repeat_rate, repeat_delay;
     uint32_t repeat_key;
     guint repeat_src;
@@ -230,7 +240,7 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     if (!strcmp(iface, wl_compositor_interface.name)) win->comp = wl_registry_bind(r, name, &wl_compositor_interface, min_u(ver, 4));
     else if (!strcmp(iface, wl_shm_interface.name)) win->shm = wl_registry_bind(r, name, &wl_shm_interface, 1);
     else if (!strcmp(iface, xdg_wm_base_interface.name)) {
-        win->wm = wl_registry_bind(r, name, &xdg_wm_base_interface, min_u(ver, 2));
+        win->wm = wl_registry_bind(r, name, &xdg_wm_base_interface, min_u(ver, 6));    /* 6: suspended */
         xdg_wm_base_add_listener(win->wm, &wm_listener, win);
     } else if (!strcmp(iface, zxdg_decoration_manager_v1_interface.name)) win->deco_mgr = wl_registry_bind(r, name, &zxdg_decoration_manager_v1_interface, 1);
     else if (!strcmp(iface, wl_seat_interface.name) && !win->seat) {
@@ -309,11 +319,34 @@ static gboolean complete_later(gpointer d) {
     return G_SOURCE_REMOVE;
 }
 
+/* ---- LORD_WEB_TRACE ---- */
+
+static void trace_input(WebWin *win) {
+    if (!win->trace || win->trace_stage) return;
+    win->trace_stage = 1;
+    win->trace_in = g_get_monotonic_time();
+}
+static void trace_frame(WebWin *win, gint64 copy_us) {
+    if (win->trace_stage != 1) return;
+    win->trace_stage = 2;
+    win->trace_export = g_get_monotonic_time();
+    win->trace_copy = copy_us;
+}
+static void trace_presented(WebWin *win) {
+    if (win->trace_stage != 3) return;
+    win->trace_stage = 0;
+    gint64 now = g_get_monotonic_time();
+    fprintf(stderr, "lord-web: trace: input to frame %.1f ms, to commit %.1f ms (copy %.1f), to frame callback %.1f ms\n",
+            (win->trace_export - win->trace_in) / 1e3, (win->trace_commit - win->trace_in) / 1e3, win->trace_copy / 1e3,
+            (now - win->trace_in) / 1e3);
+}
+
 static void frame_done(void *d, struct wl_callback *cb, uint32_t t) {
     (void)t;
     WebWin *win = d;
     wl_callback_destroy(cb);
     win->frame_cb = NULL;
+    trace_presented(win);
     if (win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_frame_complete(win->w->exportable);
 }
 static const struct wl_callback_listener frame_listener = { frame_done };
@@ -330,6 +363,7 @@ static void present(WebWin *win, struct wl_buffer *buf, int bw, int bh) {
     win->frame_cb = wl_surface_frame(win->surface);
     wl_callback_add_listener(win->frame_cb, &frame_listener, win);
     wl_surface_commit(win->surface);
+    if (win->trace_stage == 2) { win->trace_stage = 3; win->trace_commit = g_get_monotonic_time(); }
 }
 
 static int can_show(WebWin *win) { return win->shown && win->configured; }
@@ -388,9 +422,11 @@ static void export_shm(void *d, struct wpe_fdo_shm_exported_buffer *b) {
     int w, h, stride;
     unsigned format;
     ShmBuf *s = NULL;
+    gint64 t0 = win->trace ? g_get_monotonic_time() : 0;
     if (can_show(win) && !webshm_info(b, &w, &h, &stride, &format) && (format == WL_SHM_FORMAT_ARGB8888 || format == WL_SHM_FORMAT_XRGB8888)
         && (s = shm_buf_get(win, w, h, format)))
         webshm_copy(b, s->data, s->stride, s->h);
+    if (s) trace_frame(win, win->trace ? g_get_monotonic_time() - t0 : 0);
     wpe_view_backend_exportable_fdo_dispatch_release_shm_exported_buffer(win->w->exportable, b);
     if (!s) { g_idle_add(complete_later, win); return; }
     s->busy = 1;
@@ -442,6 +478,7 @@ static void dma_show(DmaBuf *b) {
         return;
     }
     b->busy = 1;
+    trace_frame(win, 0);
     present(win, b->buf, b->w, b->h);
 }
 
@@ -505,6 +542,16 @@ static const struct wpe_view_backend_exportable_fdo_client export_client = { exp
 
 /* ---- the toplevel ---- */
 
+/* WebKit's visible and in-window states follow the window (webpage_view_visible) */
+static void update_activity(WebWin *win) {
+    const uint32_t both = wpe_view_activity_state_visible | wpe_view_activity_state_in_window;
+    uint32_t want = webpage_view_visible(win->shown, win->configured, win->suspended) ? both : 0;
+    if (!win->backend || want == win->activity) return;
+    if (want) wpe_view_backend_add_activity_state(win->backend, both);
+    else wpe_view_backend_remove_activity_state(win->backend, both);
+    win->activity = want;
+}
+
 static void xsurf_configure(void *d, struct xdg_surface *xs, uint32_t serial) {
     WebWin *win = d;
     xdg_surface_ack_configure(xs, serial);
@@ -515,18 +562,18 @@ static void xsurf_configure(void *d, struct xdg_surface *xs, uint32_t serial) {
     win->width = w;
     win->height = h;
     if (changed && win->backend) wpe_view_backend_dispatch_set_size(win->backend, (uint32_t)w, (uint32_t)h);
-    if (!win->configured) {
-        win->configured = 1;
-        if (win->backend) wpe_view_backend_add_activity_state(win->backend, wpe_view_activity_state_visible | wpe_view_activity_state_in_window);
-    }
+    win->configured = 1;
+    win->suspended = win->cfg_suspended;
+    update_activity(win);
 }
 static const struct xdg_surface_listener xsurf_listener = { xsurf_configure };
 
 static void top_configure(void *d, struct xdg_toplevel *t, int32_t w, int32_t h, struct wl_array *states) {
-    (void)t; (void)states;
+    (void)t;
     WebWin *win = d;
     win->cfg_w = w;
     win->cfg_h = h;
+    win->cfg_suspended = webpage_toplevel_suspended(states->data, states->size / sizeof(uint32_t));
 }
 static void top_close(void *d, struct xdg_toplevel *t) { (void)t; web_close_requested(((WebWin *)d)->w); }
 static void top_bounds(void *d, struct xdg_toplevel *t, int32_t w, int32_t h) { (void)d; (void)t; (void)w; (void)h; }
@@ -555,6 +602,7 @@ void webwin_show(WebWin *win, const char *token) {
     if (win->shown) { activate(win, token); wl_display_flush(win->dpy); return; }
     win->shown = 1;
     win->configured = 0;
+    win->cfg_suspended = 0;
     win->xsurf = xdg_wm_base_get_xdg_surface(win->wm, win->surface);
     xdg_surface_add_listener(win->xsurf, &xsurf_listener, win);
     win->top = xdg_surface_get_toplevel(win->xsurf);
@@ -575,7 +623,8 @@ void webwin_hide(WebWin *win) {
     if (!win->shown) return;
     win->shown = 0;
     win->configured = 0;
-    if (win->backend) wpe_view_backend_remove_activity_state(win->backend, wpe_view_activity_state_visible | wpe_view_activity_state_focused | wpe_view_activity_state_in_window);
+    update_activity(win);
+    if (win->backend) wpe_view_backend_remove_activity_state(win->backend, wpe_view_activity_state_focused);
     if (win->frame_cb) { wl_callback_destroy(win->frame_cb); win->frame_cb = NULL; g_idle_add(complete_later, win); }
     if (win->deco) { zxdg_toplevel_decoration_v1_destroy(win->deco); win->deco = NULL; }
     xdg_toplevel_destroy(win->top);
@@ -1128,7 +1177,7 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t tim
     (void)k;
     WebWin *win = d;
     int pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
-    if (pressed) { win->input_serial = serial; win->last_input_us = g_get_monotonic_time(); }
+    if (pressed) { win->input_serial = serial; win->last_input_us = g_get_monotonic_time(); trace_input(win); }
     if (pressed && (own_key(win, key) || paste_image(win, key))) return;
     send_key(win, time, key, pressed);
     if (pressed) {
@@ -1194,7 +1243,7 @@ static void ptr_button(void *d, struct wl_pointer *p, uint32_t serial, uint32_t 
     (void)p;
     WebWin *win = d;
     win->input_serial = serial;
-    if (state == WL_POINTER_BUTTON_STATE_PRESSED) win->last_input_us = g_get_monotonic_time();
+    if (state == WL_POINTER_BUTTON_STATE_PRESSED) { win->last_input_us = g_get_monotonic_time(); trace_input(win); }
     /* libwpe's buttons: 1 left, 2 right, 3 middle */
     uint32_t b = button == BTN_LEFT ? 1 : button == BTN_RIGHT ? 2 : button == BTN_MIDDLE ? 3 : 0;
     if (!b) {
@@ -1326,6 +1375,7 @@ WebWin *webwin_new(Web *w) {
     win->width = DEFAULT_W;
     win->height = DEFAULT_H;
     win->repeat_delay = 400;
+    win->trace = getenv("LORD_WEB_TRACE") != NULL;
     webaxis_reset(&win->axis);
     win->reg = wl_display_get_registry(dpy);
     wl_registry_add_listener(win->reg, &reg_listener, win);

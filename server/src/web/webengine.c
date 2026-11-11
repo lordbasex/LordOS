@@ -52,12 +52,26 @@ WebKitWebContext *web_context_new(void) {
     return c;
 }
 
+/* WebKit's own throttling of a page that isn't visible (the window minimized, on another desktop or in the
+ * background), off by default in WPE 2.48: its timers are aligned to a second and its CSS animations stop. Its
+ * requestAnimationFrame and painting already stop then; its network, audio and notifications go on. */
+static void hidden_page_throttling(WebKitSettings *st) {
+    static const char *const on[] = { "HiddenPageDOMTimerThrottling", "HiddenPageCSSAnimationSuspension" };
+    WebKitFeatureList *all = webkit_settings_get_all_features();
+    for (gsize i = 0; all && i < webkit_feature_list_get_length(all); i++) {
+        WebKitFeature *f = webkit_feature_list_get(all, i);
+        for (size_t k = 0; k < G_N_ELEMENTS(on); k++)
+            if (!g_strcmp0(webkit_feature_get_identifier(f), on[k])) webkit_settings_set_feature_enabled(st, f, TRUE);
+    }
+    if (all) webkit_feature_list_unref(all);
+}
+
 WebKitSettings *web_settings_new(void) {
     struct utsname u;
     char ua[256];
     if (uname(&u)) u.machine[0] = 0;
     if (webpage_user_agent(u.machine, LORD_VERSION, ua, sizeof ua)) ua[0] = 0;
-    return webkit_settings_new_with_settings(
+    WebKitSettings *st = webkit_settings_new_with_settings(
         "user-agent", ua[0] ? ua : NULL,
         "enable-developer-extras", FALSE,
         "enable-write-console-messages-to-stdout", FALSE,
@@ -75,6 +89,8 @@ WebKitSettings *web_settings_new(void) {
         "enable-html5-database", TRUE,
         "enable-site-specific-quirks", TRUE,
         NULL);
+    hidden_page_throttling(st);
+    return st;
 }
 
 static int mkdirs(const char *path, mode_t mode) {

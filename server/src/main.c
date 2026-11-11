@@ -2633,6 +2633,11 @@ int main(int argc, char **argv) {
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
         int unseen = s.headless && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
+        /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
+        if (!unseen) {
+            double hd = wl_frame_hidden((unsigned)now_ms());
+            if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
+        }
         /* nothing is drawn: the Linux apps waiting for a frame get it at most once a second (wl.c) */
         if (unseen) {
             /* a frame prepared before the screen went off would be shown stale when it comes back */

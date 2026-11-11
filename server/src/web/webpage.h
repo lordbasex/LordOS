@@ -38,4 +38,11 @@ typedef struct { int own_sound; } WebPageState;
 void   webpage_state_parse(const char *json, size_t len, WebPageState *s);
 size_t webpage_state_write(const WebPageState *s, char *out, size_t n);
 
+/* The window as WebKit should see it: visible (painting, requestAnimationFrame, CSS animations, timers at full rate)
+ * only while it is mapped, configured and not suspended. */
+int  webpage_view_visible(int shown, int configured, int suspended);
+/* 1 when xdg_toplevel's configure states hold "suspended" (9, xdg-shell 6: lord-server sends it for a minimized
+ * window and one on a hidden desktop) */
+int  webpage_toplevel_suspended(const unsigned *states, size_t n);
+
 #endif

@@ -331,6 +331,12 @@ build/inputkind-test: tests/inputkind_test.c src/inputkind.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/inputkind_test.c
 	./$@
+# the frame callbacks of minimized windows and windows on a hidden desktop: once a second (src/wl/framegate.h)
+test: build/framegate-test
+build/framegate-test: tests/framegate_test.c src/wl/framegate.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/xdgact-test
 build/xdgact-test: tests/xdgact_test.c src/wl/xdgact.c src/wl/xdgact.h
 	@mkdir -p build

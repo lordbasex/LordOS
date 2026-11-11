@@ -368,6 +368,19 @@ static void test_badge(void) {
         CHECK(webpage_title_badge(c[i].t) == c[i].want, "badge of %s: %d (want %d)", c[i].t ? c[i].t : "(null)", webpage_title_badge(c[i].t), c[i].want);
 }
 
+/* WebKit sees the window as visible only while it is mapped, configured and not suspended (minimized, a hidden
+ * desktop: lord-server's xdg_toplevel "suspended", 9) */
+static void test_visibility(void) {
+    CHECK(webpage_view_visible(1, 1, 0), "a shown, configured window is visible");
+    CHECK(!webpage_view_visible(1, 1, 1), "a suspended window is not");
+    CHECK(!webpage_view_visible(1, 0, 0), "not before its first configure");
+    CHECK(!webpage_view_visible(0, 1, 0), "nor hidden in the background");
+    unsigned st[] = { 4, 9, 1 }, act[] = { 4, 1 };
+    CHECK(webpage_toplevel_suspended(st, 3), "suspended among the states");
+    CHECK(!webpage_toplevel_suspended(act, 2), "activated and maximized are not suspended");
+    CHECK(!webpage_toplevel_suspended(NULL, 0) && !webpage_toplevel_suspended(st, 1), "no states, or only the first");
+}
+
 static void test_user_agent(void) {
     char ua[256];
     CHECK(!webpage_user_agent("x86_64", "0.8.8.8", ua, sizeof ua) &&
@@ -514,6 +527,7 @@ static void test_registry_options(void) {
 int main(void) {
     test_axis();
     test_badge();
+    test_visibility();
     test_user_agent();
     test_sound();
     test_drop();

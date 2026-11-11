@@ -60,3 +60,10 @@ size_t webpage_state_write(const WebPageState *s, char *out, size_t n) {
     int k = snprintf(out, n, "{ \"ownSound\": %s }\n", s->own_sound ? "true" : "false");
     return k < 0 || (size_t)k >= n ? 0 : (size_t)k;
 }
+
+int webpage_view_visible(int shown, int configured, int suspended) { return shown && configured && !suspended; }
+
+int webpage_toplevel_suspended(const unsigned *states, size_t n) {
+    for (size_t i = 0; states && i < n; i++) if (states[i] == 9) return 1;
+    return 0;
+}

@@ -58,7 +58,7 @@
     "one": "{count} processo",
     "other": "{count} processos"
   },
-  "memTopHint": "Os processos de cada app, somados. A memória que vários processos compartilham conta em cada um, então a soma pode passar de Apps.",
+  "memTopHint": "Os processos de cada app, somados. A memória compartilhada é dividida entre os processos que a compartilham (seus processos maiores); nos outros conta em cada um, então a soma pode passar de Apps.",
   "swap": "Swap",
   "swapValue": "{used} de {total}",
   "last60": "Últimos 60 segundos",
