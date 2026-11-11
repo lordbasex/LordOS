@@ -63,7 +63,8 @@ Only lord-server starts `lord-web`:
 - **Path:** fixed, next to the lord-server binary (`<lord-server dir>/lord-web`).
 - **argv:** exactly `lord-web --app <app> --profile <profile>`, both checked against the registry first.
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
-  `LANG`) plus `LORDOS_WEB=1`.
+  `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
+  its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on).
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead (xdg-activation token from lord-server).

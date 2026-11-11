@@ -501,6 +501,15 @@ static void test_manager(void) {
     CHECK(env && strstr(env, "LORDOS_WEB=1") && strstr(env, "WAYLAND_DISPLAY=wayland-test") && strstr(env, "LANG=C.UTF-8") && !strstr(env, "SECRET_TOKEN"),
           "environment: %s", env ? env : "(none)");
     free(env);
+    /* under lord-sessiond the marker goes too (lord-web is strict then), whatever its value was */
+    setenv("LORDOS_SESSIOND", "/some/value", 1);
+    CHECK(!webmgr_launch("chat", "personal", &raised) && raised == 0, "started under lord-sessiond");
+    unsetenv("LORDOS_SESSIOND");
+    snprintf(p, sizeof p, "%s/env-chat-personal", root);
+    env = NULL;
+    for (int i = 0; i < 200 && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+    CHECK(env && strstr(env, "LORDOS_SESSIOND=1\n") && !strstr(env, "/some/value"), "LORDOS_SESSIOND=1: %s", env ? env : "(none)");
+    free(env);
     snprintf(p, sizeof p, "%s/.local/share/lordos/web/chat/work", root);
     CHECK(!stat(p, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0700, "its data folder, 0700");
     snprintf(q, sizeof q, "%s/cookies.sqlite", p);
@@ -508,7 +517,8 @@ static void test_manager(void) {
 
     /* removing a profile ends its process and, when asked, its data */
     CHECK(webmgr_remove_profile("chat", "work", 1) == NULL, "the profile removed");
-    CHECK(webmgr_running(r, WEB_MAX_RUNNING) == 0, "its process ended");
+    n = webmgr_running(r, WEB_MAX_RUNNING);
+    CHECK(n == 1 && !strcmp(r[0].profile, "personal"), "its process ended, the other profile's runs: %d", n);
     CHECK(stat(p, &st) != 0, "its data gone");
     CHECK(webmgr_remove_profile("chat", "personal", 0) != NULL, "the last profile stays");
 
