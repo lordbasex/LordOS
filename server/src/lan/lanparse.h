@@ -41,8 +41,10 @@ int    smb_parse(const uint8_t *buf, size_t len, SmbMsg *m);
 
 /* Requests: each writes the transport header too and returns the total length, 0 if it doesn't fit. */
 size_t smb_negotiate(uint8_t *out, size_t cap, uint64_t msgid);
-size_t smb_negotiate_signed(uint8_t *out, size_t cap, uint64_t msgid);   /* 2.0.2 and 2.1 */
+size_t smb_negotiate_signed(uint8_t *out, size_t cap, uint64_t msgid);   /* 2.0.2 and 2.1, signing required */
 size_t smb_session_setup(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, const uint8_t *blob, size_t blen);
+/* the same, for a sign-in: signing required, so the server must sign its final answer */
+size_t smb_session_setup_signed(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, const uint8_t *blob, size_t blen);
 size_t smb_tree_connect(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, const char *ip);
 size_t smb_create_pipe(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, uint32_t tree);
 size_t smb_pipe_ioctl(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, uint32_t tree, const uint8_t fid[16], const uint8_t *in, size_t ilen);

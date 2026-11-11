@@ -178,12 +178,16 @@ size_t smb_negotiate(uint8_t *out, size_t cap, uint64_t msgid) {
     return n;
 }
 
-/* Listing after signing in signs its messages, and these two dialects sign with HMAC-SHA256 alone. */
+/* Listing after signing in signs its messages, and these two dialects sign with HMAC-SHA256 alone. Signing is
+ * asked for as required: in 2.0.2 and 2.1 a server signs its final SESSION_SETUP answer only when the session
+ * requires signing (MS-SMB2 3.3.5.5.3), and that signature is the proof that it knew the password. Many
+ * desktop systems don't require it by default, so without this every correct password was refused (GitHub #101). */
 size_t smb_negotiate_signed(uint8_t *out, size_t cap, uint64_t msgid) {
     size_t n = smb_negotiate(out, cap, msgid);
     if (!n) return 0;
     uint8_t *b = out + 4 + SMB_HDR;
     put16(b + 2, 2);
+    put16(b + 4, 3);                    /* signing enabled and required */
     n -= 4;
     transport(out, n - 4);
     return n;
@@ -201,6 +205,12 @@ size_t smb_session_setup(uint8_t *out, size_t cap, uint64_t msgid, uint64_t sess
     put16(b + 14, (uint32_t)blen);
     memcpy(b + 24, blob, blen);
     transport(out, n - 4);
+    return n;
+}
+
+size_t smb_session_setup_signed(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, const uint8_t *blob, size_t blen) {
+    size_t n = smb_session_setup(out, cap, msgid, session, blob, blen);
+    if (n) out[4 + SMB_HDR + 3] = 3;    /* signing enabled and required, as in smb_negotiate_signed */
     return n;
 }
 

@@ -533,6 +533,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   row stays in the middle of the display while there is room and moves toward the start once the tray would be in
   its way. ❖1 to ❖9 still count every app, also those in the menu. Folders of apps on the bar were not added.
   (GitHub #111)
+- Files → Network: signing in to a desktop computer's shared folders said the password was refused although it
+  was right and the command-line SMB client connected with it. `lord-lan` asked for SMB signing to be enabled but not
+  required, and in dialects 2.0.2 and 2.1 a server signs its final session setup answer only when the session
+  requires signing (MS-SMB2 3.3.5.5.3); a desktop system that doesn't require signing (the default on many) sent
+  that answer unsigned, and `lord-lan` takes an unsigned answer as "not the server you signed in to". The
+  NEGOTIATE and both SESSION_SETUP requests of the sign-in now mark signing as required (`smb_negotiate_signed`,
+  `smb_session_setup_signed` in `lan/lanparse.c`), so the server must sign that answer. Nothing is weakened: the
+  answer must still carry a valid signature with the session key, a wrong password is still refused, and the
+  anonymous pass is unchanged. `build/lan-test` checks the security mode of each request. On VM 127, `build/lan-list`
+  listed the shares of a test server with its signing set to default, disabled and mandatory, refused a wrong
+  password in each, listed through a proxy that leaves the answer unsigned when the client doesn't require signing
+  (the build before this fix said "denied" there) and was still refused through one that always leaves it unsigned.
+  Not yet tried against the reporter's kind of server (GitHub #101).
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title

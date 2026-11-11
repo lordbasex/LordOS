@@ -258,20 +258,21 @@ static void smb_auth_job(uint32_t id, const char *ip, const char *user, const ch
     const uint8_t *sb;
     size_t sl;
     unsigned flags;
-    if (smb_exchange(fd, tx, smb_session_setup(tx, sizeof tx, mid++, 0, blob, bl), &m, deadline) || m.status != SMB_STATUS_MORE ||
+    if (smb_exchange(fd, tx, smb_session_setup_signed(tx, sizeof tx, mid++, 0, blob, bl), &m, deadline) || m.status != SMB_STATUS_MORE ||
         smb_session_reply(&m, &sb, &sl, &flags) || !sb) { fail(id, "smb-session"); return; }
     sid = m.session;
     char spn[80];
     snprintf(spn, sizeof spn, "cifs/%s", ip);
     bl = ntlm_user_auth(blob, sizeof blob, neg, nl, sb, sl, user, domain, password, spn, rnd, key);
     if (!bl) { fail(id, "smb-session"); return; }
-    size_t n = smb_session_setup(tx, sizeof tx, mid++, sid, blob, bl);
+    size_t n = smb_session_setup_signed(tx, sizeof tx, mid++, sid, blob, bl);
     explicit_bzero(blob, sizeof blob);
     int rc = smb_exchange(fd, tx, n, &m, deadline);
     explicit_bzero(tx, sizeof tx);
     /* a server that takes a bad password as its guest says so with these flags */
     if (rc || m.status || smb_session_reply(&m, &sb, &sl, &flags) || (flags & 3)) { fail(id, "denied"); return; }
-    /* the server proves it knew the password: it signs this answer. Whoever can't is not the server the person signed in to */
+    /* the server proves it knew the password: it signs this answer, which it must because the session requires
+     * signing. Whoever can't is not the server the person signed in to */
     if (!smb_verify(rxbuf, rxlen, key)) { fail(id, "denied"); return; }
     uint8_t fid[16], dce[256];
     const uint8_t *o;
