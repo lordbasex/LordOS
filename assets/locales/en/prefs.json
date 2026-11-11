@@ -274,5 +274,12 @@
   "video.statusHardware": "Off: this computer decodes VP9 and AV1 video in hardware.",
   "video.statusNever": "Off: video sites choose the format, even when the computer has to decode it without help.",
   "video.title": "Video in the browser",
-  "bt.searchAgain": "Search again"
+  "bt.searchAgain": "Search again",
+  "notif.lordSound": "LordOS’s sound",
+  "notif.tone.default": "Default",
+  "notif.tone.none": "None",
+  "notif.tone.pop": "Pop",
+  "notif.tone.chime": "Chime",
+  "notif.tone.ping": "Ping",
+  "notif.tone.drop": "Drop"
 }

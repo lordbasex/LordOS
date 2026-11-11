@@ -275,5 +275,12 @@
   "video.statusHardware": "Išjungta: šis kompiuteris VP9 ir AV1 vaizdo įrašus dekoduoja aparatine įranga.",
   "video.statusNever": "Išjungta: formatą renkasi vaizdo įrašų svetainės, net kai kompiuteris turi jį dekoduoti be pagalbos.",
   "video.title": "Vaizdo įrašai naršyklėje",
-  "bt.searchAgain": "Ieškoti dar kartą"
+  "bt.searchAgain": "Ieškoti dar kartą",
+  "notif.lordSound": "LordOS garsas",
+  "notif.tone.default": "Numatytasis",
+  "notif.tone.none": "Jokio",
+  "notif.tone.pop": "Spragtelėjimas",
+  "notif.tone.chime": "Varpelis",
+  "notif.tone.ping": "Dzin",
+  "notif.tone.drop": "Lašas"
 }

@@ -33,6 +33,7 @@ function Item({ item, onPick, active, onEnter }) {
       style={{ height: ROW, paddingHorizontal: 10, marginHorizontal: 5, borderRadius: 5, flexDirection: 'row', alignItems: 'center',
         backgroundColor: lit ? t.accent : 'transparent' }}>
       <Text style={{ width: 16, fontSize: 12, color: lit ? '#fff' : t.text }}>{item.checked ? '✓' : ''}</Text>
+      {item.dot ? <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.dot }} /></View> : null}
       <Text style={{ flex: 1, fontSize: 13, color: lit ? '#fff' : off ? t.textDim : item.danger ? '#ff453a' : t.text, whiteSpace: 'nowrap' }}>{item.label}</Text>
       {item.hint ? <Text style={{ fontSize: 12, color: lit ? '#fff' : t.textDim }}>{item.hint}</Text> : null}
       {item.submenu ? <Text style={{ fontSize: 12, color: lit ? '#fff' : t.textDim }}>›</Text> : null}

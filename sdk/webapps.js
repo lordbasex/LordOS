@@ -11,17 +11,22 @@
 //   webAppMemory(app)              lord.webapps.memory: { kb, processes, profiles } while it runs, else null
 //   webEngine()                    { installed, version, webkit }: the lordos-web package and the WebKit it links
 //   webAsks (store) · answerWebAsk(ask, allow, remember)
+//   webBadges (store) · webBadgeEvent(data)    the unread counts lord-web set (SetBadge): { [app]: { [profile]: n } }
+//   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
+//                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
 //
 // Only lord-server starts lord-web, with an app and a profile from the registry; nothing here names a URL to
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
 
 export const webApps = createStore([]);
 export const webAsks = createStore([]);
+export const webBadges = createStore({});
+export const siteIcons = createStore({});
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -57,6 +62,8 @@ export function launchWebApp(app, profile) {
   // 'running': lord-server has already asked that lord-web to show its window (an activation token over the bus),
   // which also brings it back from behind its tray icon; nothing else to do here
   lord.webapps.launch(app, p);
+  // a catalog app installed before LordOS fetched sites' icons: its own icon, once, without waiting for it
+  if (entry.source === 'catalog' && !entry.siteIcon) wantSiteIcon(app);
   return true;
 }
 
@@ -86,7 +93,7 @@ export function installWebApp(entry) {
 }
 
 // One of the registry's calls by name, then the list again. Throws the server's error.
-const CALLS = ['addProfile', 'renameProfile', 'removeProfile', 'setPermission', 'setBackground', 'uninstall'];
+const CALLS = ['addProfile', 'renameProfile', 'removeProfile', 'setPermission', 'setBackground', 'uninstall', 'setTray', 'setNotifySound', 'setProfileColor'];
 export function webAppCall(name, ...args) {
   if (!has() || !CALLS.includes(name)) throw new Error('unavailable');
   try { return lord.webapps[name](...args); } finally { refreshWebApps(); }
@@ -117,6 +124,59 @@ export function webEngine() {
   return { installed: !!(own && own.installed), version: (own && own.installed) || '', webkit: upstreamVersion(wk && wk.installed) };
 }
 
+// ---- the site's own icon ----
+//
+// One probe at a time (each is a WebKit page load: about 220 MB for some seconds), queued; a failure is not tried
+// again this session, except by refreshSiteIcon (Settings → Web apps → Refresh icon).
+const tried = new Set();
+const queue = [];
+let busy = null;
+
+function readIcons() {
+  try { const m = has() && typeof lord.webapps.icons === 'function' ? lord.webapps.icons() : null; if (m && typeof m === 'object') siteIcons.set(m); } catch (e) { /* an older server */ }
+}
+
+function pump() {
+  if (busy || !queue.length) return;
+  const app = queue.shift();
+  let id = 0;
+  try { id = lord.webapps.fetchIcon(app); } catch (e) { id = 0; }
+  if (!id) { pump(); return; }
+  busy = app;
+  const t0 = Date.now();
+  const timer = setInterval(() => {
+    let r = null;
+    try { r = lord.webapps.iconResult(app); } catch (e) { r = { done: true, ok: false }; }
+    if (!r && Date.now() - t0 < 45000) return;
+    clearInterval(timer);
+    busy = null;
+    if (r && r.ok) { readIcons(); refreshWebApps(); }
+    pump();
+  }, 500);
+}
+
+function enqueue(app, force) {
+  if (!has() || typeof lord.webapps.fetchIcon !== 'function' || busy === app || queue.includes(app)) return;
+  const cached = !!siteIcons.get()[app];
+  if (!force && !wantsSiteIcon({ available: webAppsAvailable(), cached, tried: tried.has(app) })) return;
+  if (force && !webAppsAvailable()) return;
+  tried.add(app);
+  queue.push(app);
+  pump();
+}
+// The Store's cards and an app's launch: fetched once when lord-web is there and nothing is cached yet.
+export const wantSiteIcon = (app) => enqueue(app, false);
+// Settings → Web apps → Refresh icon: fetched again now.
+export const refreshSiteIcon = (app) => enqueue(app, true);
+export const siteIconBusy = (app) => busy === app || queue.includes(app);
+
+// ---- unread counts ----
+
+export function webBadgeEvent(data) {
+  const next = badgeReducer(webBadges.get(), data);
+  if (next !== webBadges.get()) webBadges.set(next);
+}
+
 // ---- permission questions ----
 
 export function webAskEvent(kind, data) {
@@ -135,5 +195,10 @@ export function answerWebAsk(ask, allow, remember) {
 
 if (has()) {
   refreshWebApps();
+  readIcons();
+  try {
+    const list = typeof lord.webapps.badges === 'function' ? lord.webapps.badges() : [];
+    if (Array.isArray(list)) webBadges.set(list.reduce(badgeReducer, {}));
+  } catch (e) { /* an older server */ }
   try { const pending = lord.webapps.asks(); if (Array.isArray(pending) && pending.length) webAsks.set(pending); } catch (e) { /* an older server */ }
 }

@@ -2,9 +2,13 @@
 // allow, style (none / banners / alerts), sound and lock screen. Packages (.lpk) use the sandbox's
 // "notifications" permission for "allow", the same switch as Privacy & Security. Linux apps notify
 // through org.freedesktop.Notifications (server/src/hw/notifyd.c). See docs/SETTINGS.md.
+// Sound: Default, None or one of LordOS's sounds (sdk/notifytones.js), heard when chosen. A web app's row
+// (lordos-web.<app>) shows its Notification sound from Settings → Web apps (the registry's notifySound, one choice for
+// both pages) and, when LordOS's sound plays, which one.
 import {
   View, Text, useTheme, useLocale, useSettings, Toggle, Segmented, Button, useStore, permsRev, packages, getApp, appName, useLauncherApps,
   notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, notify, direction,
+  useWebApps, webAppIcon, webAppCall, webAppsModel as M, notifyTones as N, sound, errorText,
 } from '@lordos/sdk';
 import { useState } from 'react';
 import { GroupBox, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -14,25 +18,37 @@ import { compareNames } from '../../sdk/collate.js';
 // that declare the permission.
 const BUILTIN = ['settings', 'backup', 'clock', 'terminal', 'store', 'mail', 'passwords', 'recorder', 'screenshots'];
 
-function AppIcon({ app, linux }) {
+function AppIcon({ app, linux, web }) {
   const t = useTheme();
+  if (web) { const I = webAppIcon(web); return <I size={28} />; }
   if (app?.Icon) return <app.Icon size={28} />;
   if (linux?.Icon) return <linux.Icon size={28} />;
   return <View style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: t.control }} />;
 }
 
-function AppRow({ id, name, app, linux, tr }) {
+function AppRow({ id, name, app, linux, web, tr }) {
   const t = useTheme();
   const [s] = useSettings();
   useStore(permsRev);
   const [open, setOpen] = useState(false);
   const p = appNotifyPrefs(id, s);
+  // whose sound: a web app's own choice (registry), then LordOS's sound when it plays one
+  const webSound = web ? M.notifySoundOf(web) : null;
+  const lordSound = !web || webSound === 'auto' || webSound === 'system';
+  const tone = N.toneChoice(p.sound);
   const summary = !p.allow ? tr('prefs.notif.off')
-    : [tr(`prefs.notif.style.${p.style}`), p.sound ? tr('prefs.notif.sound') : null].filter(Boolean).join(', ');
+    : [tr(`prefs.notif.style.${p.style}`), web ? tr(`webapps.sound.${webSound}`) : tone !== 'none' ? tr('prefs.notif.sound') : null].filter(Boolean).join(', ');
   const set = (x) => setAppNotifyPrefs(id, x);
+  const pickTone = (c) => {
+    if (!p.allow) return;
+    set({ sound: N.prefOfChoice(c) });
+    const play = N.toneOf(N.prefOfChoice(c));
+    if (play) sound.play(play);                       // heard when chosen
+  };
+  const toneOptions = (web ? N.TONE_CHOICES.filter((c) => c !== 'none') : N.TONE_CHOICES).map((c) => [c, tr(`prefs.notif.tone.${c}`)]);
   return (
     <View>
-      <SettingRow icon={<AppIcon app={app} linux={linux} />} label={name} hint={summary} onClick={() => setOpen(!open)}>
+      <SettingRow icon={<AppIcon app={app} linux={linux} web={web} />} label={name} hint={summary} onClick={() => setOpen(!open)}>
         <Text style={{ fontSize: 12, color: t.textDim }}>{open ? '⌃' : '⌄'}</Text>
       </SettingRow>
       {open && (
@@ -44,9 +60,17 @@ function AppRow({ id, name, app, linux, tr }) {
             <Segmented small value={p.style} onChange={(style) => p.allow && set({ style })}
               options={['none', 'banner', 'alert'].map((x) => [x, tr(`prefs.notif.style.${x}`)])} />
           </SettingRow>
-          <SettingRow label={tr('prefs.notif.playSound')} disabled={!p.allow}>
-            <Toggle small on={p.sound} onChange={(sound) => p.allow && set({ sound })} />
-          </SettingRow>
+          {web ? (
+            <SettingRow label={tr('webapps.settings.notifySound')} hint={tr(`webapps.sound.${webSound}Hint`)} disabled={!p.allow}>
+              <PopUp value={webSound} options={M.NOTIFY_SOUNDS.map((v) => [v, tr(`webapps.sound.${v}`)])}
+                onChange={(v) => { if (p.allow) { try { webAppCall('setNotifySound', web.id, v); } catch (e) { notify({ app: 'settings', title: errorText(e) }); } } }} />
+            </SettingRow>
+          ) : null}
+          {lordSound ? (
+            <SettingRow label={tr(web ? 'prefs.notif.lordSound' : 'prefs.notif.sound')} disabled={!p.allow}>
+              <PopUp value={web && tone === 'none' ? 'default' : tone} options={toneOptions} onChange={pickTone} />
+            </SettingRow>
+          ) : null}
           <SettingRow label={tr('prefs.notif.lockScreen')} hint={tr('prefs.notif.lockScreenHint')} disabled>
             <Toggle small on={p.lock} onChange={() => {}} />
           </SettingRow>
@@ -61,12 +85,19 @@ export function NotificationsSettings() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const linux = useLauncherApps().filter((a) => a.kind === 'linux');
+  const webList = useWebApps();
   const p = notifyPrefs(s);
   const patch = (x) => set({ notifications: { ...p, ...x } });
   const now = dndActive();
   // the list: seen + built-in + packages with the permission
-  const ids = [...new Set([...p.seen, ...BUILTIN.filter((id) => getApp(id)), ...packages.list().filter((x) => (x.permissions || []).includes('notifications')).map((x) => x.id)])];
+  const ids = [...new Set([...p.seen, ...BUILTIN.filter((id) => getApp(id)), ...packages.list().filter((x) => (x.permissions || []).includes('notifications')).map((x) => x.id),
+    ...webList.map((e) => M.notifyKey(e.id))])];
   const rows = ids.map((id) => {
+    const webId = M.appOfNotifyKey(id);
+    if (webId) {
+      const e = webList.find((x) => x.id === webId);
+      return e ? { id, name: e.name, web: e } : null;
+    }
     if (id.startsWith('linux:')) {
       const did = id.slice(6);
       const la = linux.find((a) => a.desktopId === did || a.desktopId.toLowerCase() === did.toLowerCase());

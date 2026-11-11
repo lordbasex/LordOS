@@ -5,7 +5,6 @@
 #include "mpris.h"
 #include "notifyd.h"
 #include "../sec/pwguard.h"
-#include "../web/webmgr.h"
 #include "ppd.h"
 #include "sysbus.h"
 #include "pkagent.h"
@@ -59,9 +58,6 @@ static void td_signal(const DMsg *m) {
     if (m->path && !strcmp(m->path, "/org/freedesktop/timedate1") && m->member && !strcmp(m->member, "PropertiesChanged")) hw_timedate_refresh();
 }
 
-/* a web app's notifications are shown under it only when they come from its own lord-web (notifyd.c) */
-static int web_owner(uint32_t pid, char *app, char *profile) { return pid ? webmgr_owner((pid_t)pid, app, profile) : -1; }
-
 void hw_start(const DisplayHost *h, int with_bus) {
     host = h;
     display_init(h);
@@ -69,7 +65,6 @@ void hw_start(const DisplayHost *h, int with_bus) {
     power_json(&power, power_last, sizeof power_last);
     if (power.has_battery) power_next = hw_now_ms() + POWER_POLL_MS;
     if (uevent_open()) fprintf(stderr, "hw: no kernel uevents (hotplugged displays and batteries are not followed)\n");
-    notifyd_set_web_owner(web_owner);
     if (with_bus && notifyd_start(hw_emit)) fprintf(stderr, "hw: no notification server for Linux apps\n");
     if (with_bus && mpris_start(hw_emit)) fprintf(stderr, "hw: no session bus for the Linux players (Now Playing)\n");
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");

@@ -85,11 +85,12 @@ static struct {
     double peak;
     int peak_ready;
     int debug;                          /* LORD_SND_DEBUG=1: every packet to stderr */
-    int samples_uploaded, uploading, play_after;   /* bits: pop, notify, error */
+    int samples_uploaded, uploading, play_after;   /* bits: pop, notify, error, chime, ping, drop */
     char last_error[128];
 } S = { .fd = -1, .timer = -1, .meter_source = PA_INVALID_INDEX, .meter_channel = PA_INVALID_INDEX };
 
 static void disconnect(const char *why);
+#define SAMPLES 6                           /* the system sounds: pop, notify, error, chime, ping, drop */
 static void upload_data(int which, uint32_t channel);
 static int play_sample(int which);
 
@@ -512,7 +513,7 @@ static void on_reply(Pending p, TsIn *t) {
     case R_UPLOAD: {
         uint32_t ch = ts_get_u32(t), len = ts_get_u32(t);
         (void)len;
-        if (t->err || p.arg > 2) break;
+        if (t->err || p.arg >= SAMPLES) break;
         upload_data((int)p.arg, ch);
         break;
     }
@@ -950,16 +951,19 @@ int snd_meter(uint32_t source) {
 
 /* ---- system sounds ---- */
 
-static const char *const sample_names[3] = { "lordos-pop", "lordos-notify", "lordos-error" };
+static const char *const sample_names[SAMPLES] = { "lordos-pop", "lordos-notify", "lordos-error", "lordos-chime", "lordos-ping", "lordos-drop" };
 
 #define SR 44100
 
 /* Synthesizes the sound: sines with an envelope (short attack, exponential decay). s16le mono. */
 static int16_t *synth(int which, uint32_t *bytes) {
-    static const struct { double f1, f2, dur, split; } tone[3] = {
+    static const struct { double f1, f2, dur, split; } tone[SAMPLES] = {
         { 880, 0, 0.07, 0 },                        /* pop: a short tap */
         { 1046.5, 1568, 0.32, 0.12 },               /* notify: C6 → G6 */
         { 311, 233, 0.30, 0.13 },                   /* error: two low notes */
+        { 783.99, 1174.66, 0.42, 0.14 },            /* chime: G5 → D6, a softer rise (a notification sound to choose) */
+        { 1318.51, 0, 0.36, 0 },                    /* ping: one high E6 */
+        { 1567.98, 1046.5, 0.30, 0.10 },            /* drop: G6 → C6, falling */
     };
     int n = (int)(tone[which].dur * SR);
     int16_t *s = malloc((size_t)n * 2);
@@ -1013,6 +1017,9 @@ int snd_play(const char *name) {
     if (!strcmp(name, "pop")) which = 0;
     else if (!strcmp(name, "notify")) which = 1;
     else if (!strcmp(name, "error")) which = 2;
+    else if (!strcmp(name, "chime")) which = 3;
+    else if (!strcmp(name, "ping")) which = 4;
+    else if (!strcmp(name, "drop")) which = 5;
     if (which < 0 || !S.connected) return -1;
     if (S.samples_uploaded & 1 << which) return play_sample(which);
     S.play_after |= 1 << which;

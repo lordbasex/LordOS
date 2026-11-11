@@ -864,5 +864,9 @@
   "termconf.verifyFailed": "perskaitytas naujas failas nesutapo, todėl niekas neperkelta",
   "termconf.corrupt": "failas nėra tinkamas Terminalo JSON",
   "termconf.newer": "failą įrašė naujesnė LordOS",
-  "vm.shareProtected": "Bendrinamas aplankas su rašymo teise negali būti apsaugotas šio kompiuterio failas ar jo turėti (pvz., Terminalo konfigūracijos ar settings.json): mašina galėtų pakeisti tai, ką vykdo šis kompiuteris. Bendrinkite jį tik skaitymui arba bendrinkite aplanką be jo."
+  "vm.shareProtected": "Bendrinamas aplankas su rašymo teise negali būti apsaugotas šio kompiuterio failas ar jo turėti (pvz., Terminalo konfigūracijos ar settings.json): mašina galėtų pakeisti tai, ką vykdo šis kompiuteris. Bendrinkite jį tik skaitymui arba bendrinkite aplanką be jo.",
+  "webapps.badSound": "Nežinomas pranešimo garsas",
+  "webapps.badColor": "Nežinoma profilio spalva",
+  "webapps.iconOrigin": "Svetainė perėjo kitu adresu, todėl jos piktograma neišsaugota",
+  "webapps.noIcon": "Svetainė nesiūlo piktogramos, kurią LordOS galėtų naudoti"
 }

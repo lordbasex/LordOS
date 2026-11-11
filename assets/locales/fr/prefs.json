@@ -274,5 +274,12 @@
   "video.statusHardware": "Désactivé : cet ordinateur décode matériellement les vidéos VP9 et AV1.",
   "video.statusNever": "Désactivé : les sites vidéo choisissent le format, même si l’ordinateur doit le décoder sans aide.",
   "video.title": "Vidéo dans le navigateur",
-  "bt.searchAgain": "Rechercher à nouveau"
+  "bt.searchAgain": "Rechercher à nouveau",
+  "notif.lordSound": "Son de LordOS",
+  "notif.tone.default": "Par défaut",
+  "notif.tone.none": "Aucun",
+  "notif.tone.pop": "Pop",
+  "notif.tone.chime": "Carillon",
+  "notif.tone.ping": "Ping",
+  "notif.tone.drop": "Goutte"
 }

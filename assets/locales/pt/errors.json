@@ -863,5 +863,9 @@
   "termconf.verifyFailed": "o arquivo novo não foi lido igual, então nada foi movido",
   "termconf.corrupt": "o arquivo não é um JSON válido para o Terminal",
   "termconf.newer": "o arquivo foi gravado por um LordOS mais novo",
-  "vm.shareProtected": "Uma pasta compartilhada com escrita não pode ser nem conter um arquivo protegido deste computador (como a configuração do Terminal ou o settings.json): a máquina poderia mudar o que este computador executa. Compartilhe-a somente leitura, ou compartilhe uma pasta sem esse arquivo."
+  "vm.shareProtected": "Uma pasta compartilhada com escrita não pode ser nem conter um arquivo protegido deste computador (como a configuração do Terminal ou o settings.json): a máquina poderia mudar o que este computador executa. Compartilhe-a somente leitura, ou compartilhe uma pasta sem esse arquivo.",
+  "webapps.badSound": "Som de notificação desconhecido",
+  "webapps.badColor": "Cor de perfil desconhecida",
+  "webapps.iconOrigin": "O site foi para outro endereço, então o ícone não foi guardado",
+  "webapps.noIcon": "O site não oferece um ícone que o LordOS possa usar"
 }

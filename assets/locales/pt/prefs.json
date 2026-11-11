@@ -274,5 +274,12 @@
   "video.statusHardware": "Desligado: este computador decodifica vídeo VP9 e AV1 por hardware.",
   "video.statusNever": "Desligado: os sites de vídeo escolhem o formato, mesmo quando o computador precisa decodificá-lo sem ajuda.",
   "video.title": "Vídeo no navegador",
-  "bt.searchAgain": "Procurar de novo"
+  "bt.searchAgain": "Procurar de novo",
+  "notif.lordSound": "Som do LordOS",
+  "notif.tone.default": "Padrão",
+  "notif.tone.none": "Nenhum",
+  "notif.tone.pop": "Toque",
+  "notif.tone.chime": "Sininho",
+  "notif.tone.ping": "Ping",
+  "notif.tone.drop": "Gota"
 }

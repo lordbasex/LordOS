@@ -13,9 +13,10 @@
  *     lower case, printable ASCII only (a host in punycode), no user or password; origin is exactly
  *     "scheme://host[:port]" (no default port); scope has no query or fragment and is a prefix of startUrl
  *   - icon: "icons/<id>.png" or "icons/<id>.svg"; themeColor "#rrggbb"
- *   - a permission is allow, ask or deny; source is catalog or url; background a boolean
- *   - optional: tray, a boolean (false when missing: the tray icon of an app in the background); notifySound, one of
- *     auto (when missing), app, system or none (LordOS's sound for the page's notifications, webpage.h)
+ *   - a permission is allow, ask or deny; source is catalog or url; background a boolean; tray (optional, false when
+ *     missing) a boolean: the app's tray icon (StatusNotifierItem, Open and Quit); background mode does not need it;
+ *     notifySound (optional, "auto" when missing) auto|app|system|none: whose sound a notification makes;
+ *     a profile is { id, name } or { id, name, color } (color: red, orange, yellow, green, blue, purple, gray or none)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
 #ifndef LORD_WEB_WEBREG_H
@@ -36,14 +37,18 @@
 enum { WEBREG_PERM_NOTIFICATIONS, WEBREG_PERM_CAMERA, WEBREG_PERM_MICROPHONE, WEBREG_PERM_SCREEN, WEBREG_PERM_LOCATION, WEBREG_PERM_N };
 /* a permission's value */
 enum { WEBREG_ALLOW, WEBREG_ASK, WEBREG_DENY };
+/* "notifySound": auto (LordOS's sound only when the page plays none of its own), app (the page's only), system
+ * (LordOS's only), none */
+enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NONE, WEBREG_SOUND_N };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
-/* "notifySound" */
-enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NONE, WEBREG_SOUND_N };
 
+/* a profile's "color" (optional): one of LordOS's tag colors (Files' tags, Databases' favorites), or "none" */
+#define WEBREG_COLOR_MAX 7
 typedef struct {
     char id[WEBREG_ID_MAX + 1];
     char name[WEBREG_NAME_MAX + 1];
+    char color[WEBREG_COLOR_MAX + 1];     /* red|orange|yellow|green|blue|purple|gray|none, or "" when not set */
 } WebProfile;
 
 typedef struct {
@@ -54,7 +59,7 @@ typedef struct {
     char theme_color[8];                  /* "#rrggbb", or "" */
     int  source;                          /* WEBREG_SRC_* */
     int  background;
-    int  tray;                            /* the tray icon while in the background (written only when true) */
+    int  tray;                            /* "tray": a tray icon with Open and Quit (written only when on) */
     int  notify_sound;                    /* WEBREG_SOUND_* (written only when not auto) */
     int  nprofiles;
     WebProfile profiles[WEBREG_PROFILES_MAX];
@@ -76,6 +81,10 @@ const char *webreg_perm_name(int kind);        /* "notifications" … ; NULL out
 int  webreg_perm_kind(const char *name);       /* -1 if unknown */
 const char *webreg_perm_value_name(int v);     /* "allow" / "ask" / "deny" */
 int  webreg_perm_value(const char *name);      /* -1 if unknown */
+int  webreg_color_ok(const char *s);           /* one of the profile colors above (not "") */
+/* The color a new profile gets: none for the first, then orange, purple, blue, green, red, yellow, gray, the first
+ * one no other profile of a has (in that order, round again when all are taken). */
+const char *webreg_profile_default_color(const WebApp *a);
 const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "none"; NULL out of range */
 int  webreg_sound_value(const char *name);     /* -1 if unknown */
 

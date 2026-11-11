@@ -436,6 +436,13 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             onMouseDown={(e) => { if (!e.button) beginDockDrag({ id: app.id, Icon: app.Icon, x: e.x, y: e.y, source: 'dock' }); }}
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i] }}>
             <app.Icon size={sizes[i]} />
+            {/* a web app's unread count (SetBadge, docs/WEBAPPS.md): a red badge, "99+" past 99 */}
+            {app.badge ? (
+              <View style={{ position: 'absolute', right: -Math.round(sizes[i] * 0.08), top: -Math.round(sizes[i] * 0.06), minWidth: 18, height: 18, paddingHorizontal: 5,
+                borderRadius: 9, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap' }}>{app.badge}</Text>
+              </View>
+            ) : null}
             {/* a window that asked for attention (xdg-activation): a larger dot in the accent */}
             {running.includes(app.id) && (app.attention
               ? <View style={{ position: 'absolute', ...dot(sizes[i], 6), width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent }} />

@@ -9,7 +9,7 @@
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
 // icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -235,6 +235,8 @@ export function Window({ win, t, focused, app }) {
       </View>
       <AppMenuStrip t={t} win={win} focused={focused} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
+      {/* a web app's profile: a thin strip in its color on top of the frame */}
+      {windowAccent(win) ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: windowAccent(win), pointerEvents: 'none' }} /> : null}
       {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       {menu && (
         <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={windowMenuItems()} />

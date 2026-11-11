@@ -26,6 +26,7 @@ static NotifydEvent emit;
 static struct { uint32_t serial; DMsg call; double since; } pending[MAX_PENDING];
 static int npending;
 static int (*app_of_pid)(uint32_t pid, char *out, size_t n);
+static int (*web_of_pid)(uint32_t pid, char *app, char *profile);
 
 static double mono_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
 
@@ -78,26 +79,12 @@ static void reply_info(const DMsg *m) {
     dw_free(&b);
 }
 
-static int (*web_owner)(uint32_t pid, char *app, char *profile);
-void notifyd_set_web_owner(int (*fn)(uint32_t pid, char *app, char *profile)) { web_owner = fn; }
-
-/* "desktop-entry" lordos-web.<app>.<profile> puts the notification under that web app (its name and icon): only the
- * lord-web lord-server started for that app and profile may say so; anyone else's entry is dropped */
-static int web_entry_ok(const char *desktop, uint32_t pid) {
-    if (strncmp(desktop, "lordos-web.", 11)) return 1;
-    char app[48] = "", profile[48] = "", want[112];
-    if (!web_owner || !pid || web_owner(pid, app, profile)) return 0;
-    snprintf(want, sizeof want, "lordos-web.%s.%s", app, profile);
-    return !strcmp(desktop, want);
-}
-
 static void on_notify(const DMsg *m, uint32_t pid) {
     DRd r;
     dr_init(&r, m);
     const char *app = dr_str(&r, NULL);
     uint32_t replaces = dr_u32(&r);
     const char *icon = dr_str(&r, NULL), *summary = dr_str(&r, NULL), *body = dr_str(&r, NULL);
-    (void)icon;
     HBuf j = { 0 };
     char plain[2048];
     hb_printf(&j, "{\"actions\":[");
@@ -123,7 +110,7 @@ static void on_notify(const DMsg *m, uint32_t pid) {
         if (r.err || !k || !sig) break;
         if (!strcmp(k, "desktop-entry") && !strcmp(sig, "s")) { const char *v = dr_str(&r, NULL); snprintf(desktop, sizeof desktop, "%s", v ? v : ""); }
         else if (!strcmp(k, "urgency") && !strcmp(sig, "y")) urgency = dr_u8(&r);
-        else if (!strcmp(k, "suppress-sound") && !strcmp(sig, "b")) quiet = dr_bool(&r);
+        else if (!strcmp(k, "suppress-sound") && !strcmp(sig, "b")) quiet = dr_bool(&r);   /* it played its own */
         else dr_skip(&r, sig);
     }
     int32_t timeout = dr_i32(&r);
@@ -132,15 +119,28 @@ static void on_notify(const DMsg *m, uint32_t pid) {
         dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "Notify(susssasa{sv}i)");
         return;
     }
-    if (!web_entry_ok(desktop, pid)) desktop[0] = 0;
     uint32_t id = replaces ? replaces : next_id++;
     if (!next_id) next_id = 1;
-    hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":%d,\"suppressSound\":%s,\"app\":", id, replaces ? "true" : "false", urgency, timeout,
-              quiet ? "true" : "false");
+    hb_printf(&j, "],\"id\":%u,\"replaces\":%s,\"urgency\":%d,\"timeout\":%d,\"app\":", id, replaces ? "true" : "false", urgency, timeout);
     notifyd_plain(app, plain, 128);
     hb_str(&j, plain);
     hb_printf(&j, ",\"desktop\":");
     hb_str(&j, desktop);
+    /* a web app's lord-web, as lord-server knows it from the pid (never from the desktop-entry the caller wrote) */
+    char wapp[48] = "", wprof[48] = "";
+    if (web_of_pid && pid && !web_of_pid(pid, wapp, wprof) && wapp[0]) {
+        hb_printf(&j, ",\"webApp\":");
+        hb_str(&j, wapp);
+        hb_printf(&j, ",\"webProfile\":");
+        hb_str(&j, wprof);
+        /* its registry or cached icon, as lord-web names it: the shell takes it only when it is exactly that app's
+         * icon file (sdk/webappsmodel.js webIconPathOk), else it draws the app's icon it knows */
+        if (icon && icon[0] == '/' && strlen(icon) < 512 && !strstr(icon, "/../")) {
+            hb_printf(&j, ",\"appIcon\":");
+            hb_str(&j, icon);
+        }
+    }
+    if (quiet) hb_printf(&j, ",\"suppressSound\":true");
     hb_printf(&j, ",\"title\":");
     notifyd_plain(summary, plain, 256);
     hb_str(&j, plain);
@@ -161,6 +161,7 @@ static void on_notify(const DMsg *m, uint32_t pid) {
 static int app_of_pid_proc(uint32_t pid, char *out, size_t n) { return appid_of_pid(pid, out, n); }
 
 void notifyd_set_app_of_pid(int (*fn)(uint32_t pid, char *out, size_t n)) { app_of_pid = fn; }
+void notifyd_set_web_of_pid(int (*fn)(uint32_t pid, char *app, char *profile)) { web_of_pid = fn; }
 
 /* Shown or not: only a PID the bus gave us whose process is outside any restricted app's scope.
  * Fails closed: no PID, or a process we can't read (it already exited), is not shown. */

@@ -359,6 +359,90 @@ silently.
 - **What a crash or hang affects:** only that window. lord-server sees the process end and the Dock shows the app as
   closed.
 
+## The desktop's side: icons, unread counts, sounds and profiles
+
+### More registry keys (all optional; `webreg.c`, `tests/webreg_test.c`)
+
+- `tray` (boolean, `false` when missing, written only when `true`): the app's tray icon (StatusNotifierItem, Open and
+  Quit). Settings → Web apps → "Show in the menu bar", `lord.webapps.setTray(app, on)`. Background mode
+  (`background`, "Keep running when closed") stays its own switch.
+- `notifySound` (`"auto"` when missing, written only when it isn't): `"auto"` LordOS's sound only when the page plays
+  none of its own (lord-web learns it and then sends the `suppress-sound` hint), `"app"` the page's sound only,
+  `"system"` always LordOS's, `"none"` no sound from LordOS. `lord.webapps.setNotifySound(app, value)`; Settings → Web
+  apps → Notification sound, and the same choice in Settings → Notifications (one value for both pages). LordOS
+  controls only its own sound: to silence the page's own sound, use the site's settings.
+- A profile is `{ id, name }` or `{ id, name, color }`, `color` one of LordOS's tag colors (Files' tags, Databases'
+  favorites): `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, or `none`. A new profile gets one by
+  itself (`webreg_profile_default_color`: the first none, then orange, purple, blue, green, red, yellow, gray, the
+  first not taken); a profile without the key reads the same by its place. `lord.webapps.setProfileColor(app,
+  profile, color)`.
+
+### The site's own icon
+
+The catalog ships only LordOS's letter tiles (`assets/webapps/icons/`): no third-party logo is in the repository. When
+`lordos-web` is installed, `lord.webapps.fetchIcon(app)` runs the probe ("Adding an app from an address") on the
+app's own start address (the registry's, or the catalog's for an app not installed yet); `lord.webapps.iconResult(app)`
+then keeps the icon `--probe-icon` fetched, only when the probe ended on the app's own origin and the file is the
+probe's (`$XDG_RUNTIME_DIR/lordos-web-probe/`), checked again as a PNG or an SVG of at most 1 MB, as
+`~/.cache/lordos/web/icons/<app>.png|svg` (`ui/webicon.c`: the name is the app id and the kind, nothing from the site;
+the folder is in `fsops_protected`). `list()` and `get()` give it as `iconPath` (with `siteIcon: true`), so the Dock,
+the launcher, the switcher and Settings use it; `icons()` lists the cache for the Store. Errors: `webapps.iconOrigin`,
+`webapps.noIcon` and the probe's.
+
+- **When:** the Store's cards ask for it lazily (`wantSiteIcon`), one probe at a time, never twice in a session for an
+  app that failed; an installed catalog app without one gets it when it is launched (never blocking the launch);
+  Settings → Web apps → Refresh icon fetches it again. Without lord-web the letter tile stays.
+- An address-added app's icon is still the one saved in the registry when it was added; uninstalling it removes its
+  cached icon too (a catalog app's stays for the Store's card).
+
+### Unread count on the Dock
+
+`org.lordos.WebApps1.SetBadge(s app, s profile, u count)` on `/org/lordos/WebApps1` (no answer needed; lord-web calls
+it without waiting). Only the lord-web lord-server started for that app and profile counts, the same check as `Ask`:
+the bus gives the caller's pid, `webmgr_owner` says whose lord-web it is (`ui/webbadge.c`, `tests/webdock_test.c`). A
+bus name is never reused, so a sender checked once stays that app and profile until it leaves the bus; one that
+turned out to be another process is refused from then on (refused senders give their place when the table of 32 is
+full). The count is clamped to 0..9999; it reaches the shell as the event `webapps-badge` `{ app, profile, count }`,
+and a lord-web that leaves the bus gets a 0. `lord.webapps.badges()` gives the counts to a new JS context.
+
+The Dock draws a red badge on the app's icon with the sum of its profiles ("99+" past 99), Lord Classic's taskbar
+too; the Dock's window list shows each profile's own count. Settings → Web apps → "Show unread count on the Dock"
+(per user, `settings.webAppPrefs[app].badge`, on by default).
+
+### Notifications
+
+notifyd (`hw/notifyd.c`) asks lord-server whose process sent a Notify (`notifyd_set_web_of_pid` → `webmgr_owner`):
+only for a lord-web it adds `webApp` and `webProfile` to the event, and the `app_icon` it sent as `appIcon`.
+`suppress-sound` is passed on for every app. The shell then files the notification under `lordos-web.<app>` (one row
+in Settings → Notifications for all the app's profiles, whatever desktop-entry was sent), names it "<app>
+(<profile>)" with more than one profile, and draws the app's icon with the profile's colored dot. It shows the file
+named in `appIcon` only when it is exactly one of that app's icons (`~/.config/lordos/web/icons/<app>.png|svg`, the
+cache's, or the profile's icon below; `webIconPathOk`); anything else gets the icon LordOS knows. The same
+desktop-entry from any other process is a plain Linux app's notification.
+
+Settings → Notifications → an app → Sound: Default, None or one of LordOS's sounds (all synthesized by lord-server,
+`sound/snd.c`): the default `notify`, `pop`, `chime`, `ping`, `drop` (`sdk/notifytones.js`; the stored value is
+`true`, `false` or the sound's name, so older settings keep their meaning). For a web app the row shows its
+Notification sound and, when LordOS's sound plays, which one.
+
+### Profiles told apart
+
+- **Windows:** with more than one profile the frame and the switcher say "<app> — <profile>", the Dock's window list
+  "<page title> — <profile>" with a dot in the profile's color (and its unread count); the frame has a thin strip in
+  the color along its top. The Dock's "New window: <profile>" items are actions and never carry a check mark.
+- **Icons:** the profile's color as a small dot with its initial on the app's icon (windows, notifications, Settings).
+- **For lord-web's tray icon and notifications:** lord-server writes each colored profile's icon, the app's PNG (the
+  site's own when cached, else the registry's) at 64 px with the dot and the initial (A–Z, 0–9; another letter gives
+  the dot alone), as `~/.config/lordos/web/icons/<app>.<profile>.png` (`webicon_profile_write`, 0600, written again
+  when the color or the site's icon changes, removed with the profile or for "none"). lord-web uses it when it is
+  there, else the app's icon.
+- **One Dock icon per profile** (Settings → Web apps, off by default, `settings.webAppPrefs[app].dockPerProfile`):
+  while a profile other than the first has windows, it has an icon of its own (not pinnable), with its own count; the
+  first profile stays on the app's icon.
+- **Each profile's data** in Settings → Web apps is measured again when a profile is added or starts running and every
+  30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
+  only exists after its first start.
+
 ## Not in the first version
 
 - Web push while the app is closed: WPE has no push service outside Apple's platforms, so the tray keeps the app

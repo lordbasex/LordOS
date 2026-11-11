@@ -169,19 +169,37 @@ int webreg_default_scope(const char *url, char *out, size_t n) {
 
 static const char *const perm_names[WEBREG_PERM_N] = { "notifications", "camera", "microphone", "screen", "location" };
 static const char *const value_names[3] = { "allow", "ask", "deny" };
-static const char *const sound_names[WEBREG_SOUND_N] = { "auto", "app", "system", "none" };
-
-const char *webreg_sound_name(int v) { return v >= 0 && v < WEBREG_SOUND_N ? sound_names[v] : NULL; }
-int webreg_sound_value(const char *name) {
-    for (int i = 0; name && i < WEBREG_SOUND_N; i++) if (!strcmp(name, sound_names[i])) return i;
-    return -1;
-}
 
 const char *webreg_perm_name(int kind) { return kind >= 0 && kind < WEBREG_PERM_N ? perm_names[kind] : NULL; }
 int webreg_perm_kind(const char *name) {
     for (int i = 0; name && i < WEBREG_PERM_N; i++) if (!strcmp(name, perm_names[i])) return i;
     return -1;
 }
+static const char *const color_names[] = { "red", "orange", "yellow", "green", "blue", "purple", "gray", "none" };
+int webreg_color_ok(const char *s) {
+    for (size_t i = 0; s && i < sizeof color_names / sizeof color_names[0]; i++) if (!strcmp(s, color_names[i])) return 1;
+    return 0;
+}
+
+const char *webreg_profile_default_color(const WebApp *a) {
+    static const char *const order[] = { "orange", "purple", "blue", "green", "red", "yellow", "gray" };
+    if (!a || a->nprofiles < 1) return "none";
+    for (int round = 0; round < 3; round++)
+        for (size_t i = 0; i < sizeof order / sizeof order[0]; i++) {
+            int used = 0;
+            for (int j = 0; j < a->nprofiles; j++) used += !strcmp(a->profiles[j].color, order[i]);
+            if (used <= round) return order[i];
+        }
+    return order[0];
+}
+
+static const char *const sound_names[WEBREG_SOUND_N] = { "auto", "app", "system", "none" };
+const char *webreg_sound_name(int v) { return v >= 0 && v < WEBREG_SOUND_N ? sound_names[v] : NULL; }
+int webreg_sound_value(const char *name) {
+    for (int i = 0; name && i < WEBREG_SOUND_N; i++) if (!strcmp(name, sound_names[i])) return i;
+    return -1;
+}
+
 const char *webreg_perm_value_name(int v) { return v >= 0 && v < 3 ? value_names[v] : NULL; }
 int webreg_perm_value(const char *name) {
     for (int i = 0; name && i < 3; i++) if (!strcmp(name, value_names[i])) return i;
@@ -220,13 +238,15 @@ int webreg_check(const WebApp *a, char *why, size_t wn) {
     if (a->icon[0] && !icon_ok(a->icon, a->id)) return bad(why, wn, "icon is not icons/%s.png or .svg", a->id);
     if (a->theme_color[0] && !color_ok(a->theme_color)) return bad(why, wn, "themeColor is not #rrggbb");
     if (a->source != WEBREG_SRC_CATALOG && a->source != WEBREG_SRC_URL) return bad(why, wn, "source is not catalog or url");
-    if (a->notify_sound < 0 || a->notify_sound >= WEBREG_SOUND_N) return bad(why, wn, "notifySound is not auto, app, system or none");
     if (a->nprofiles < 1 || a->nprofiles > WEBREG_PROFILES_MAX) return bad(why, wn, "profiles: 1 to %d", WEBREG_PROFILES_MAX);
     for (int i = 0; i < a->nprofiles; i++) {
         if (!webreg_id_ok(a->profiles[i].id) || !webreg_name_ok(a->profiles[i].name)) return bad(why, wn, "profiles: bad id or name");
+        if (a->profiles[i].color[0] && !webreg_color_ok(a->profiles[i].color)) return bad(why, wn, "profiles: a bad color");
         for (int j = 0; j < i; j++) if (!strcmp(a->profiles[i].id, a->profiles[j].id)) return bad(why, wn, "profiles: %s twice", a->profiles[i].id);
     }
     for (int i = 0; i < WEBREG_PERM_N; i++) if (a->perms[i] < WEBREG_ALLOW || a->perms[i] > WEBREG_DENY) return bad(why, wn, "permissions: a bad value");
+    if (a->notify_sound < WEBREG_SOUND_AUTO || a->notify_sound >= WEBREG_SOUND_N) return bad(why, wn, "notifySound is not auto, app, system or none");
+    if (a->tray != 0 && a->tray != 1) return bad(why, wn, "tray is not a boolean");
     return 0;
 }
 
@@ -242,10 +262,12 @@ static int parse_profiles(const JVal *arr, WebApp *a, char *why, size_t wn) {
     if (!arr || arr->type != J_ARR || arr->len < 1 || arr->len > WEBREG_PROFILES_MAX) return bad(why, wn, "profiles: a list of 1 to %d", WEBREG_PROFILES_MAX);
     a->nprofiles = 0;
     for (const JVal *p = arr->kid; p; p = p->next) {
-        if (p->type != J_OBJ || p->len != 2) return bad(why, wn, "profiles: each is { id, name } and nothing else");
+        const JVal *col = p->type == J_OBJ ? json_get(p, "color") : NULL;
+        if (p->type != J_OBJ || p->len != (col ? 3u : 2u)) return bad(why, wn, "profiles: each is { id, name, color? } and nothing else");
         WebProfile *w = &a->profiles[a->nprofiles++];
-        if (take_str(json_get(p, "id"), w->id, sizeof w->id) || take_str(json_get(p, "name"), w->name, sizeof w->name))
-            return bad(why, wn, "profiles: each is { id, name } and nothing else");
+        if (take_str(json_get(p, "id"), w->id, sizeof w->id) || take_str(json_get(p, "name"), w->name, sizeof w->name) ||
+            (col && (take_str(col, w->color, sizeof w->color) || !webreg_color_ok(w->color))))
+            return bad(why, wn, "profiles: each is { id, name, color? } and nothing else");
     }
     return 0;
 }
@@ -294,7 +316,7 @@ int webreg_parse(const char *json, size_t len, WebApp *a, char *why, size_t wn) 
         else if (!strcmp(k, "themeColor")) e = take_str(m, a->theme_color, sizeof a->theme_color);
         else if (!strcmp(k, "background")) { e = m->type != J_BOOL; a->background = m->num != 0; }
         else if (!strcmp(k, "tray")) { e = m->type != J_BOOL; a->tray = m->num != 0; }
-        else if (!strcmp(k, "notifySound")) { e = m->type != J_STR || (a->notify_sound = webreg_sound_value(m->str)) < 0; }
+        else if (!strcmp(k, "notifySound")) { a->notify_sound = m->type == J_STR ? webreg_sound_value(m->str) : -1; e = a->notify_sound < 0; }
         else if (!strcmp(k, "permissions")) { if (parse_perms(m, a, why, wn)) goto out; }
         else { bad(why, wn, "unknown key %.40s", k); goto out; }
         if (e) { bad(why, wn, "bad %s", k); goto out; }
@@ -353,14 +375,15 @@ size_t webreg_write(const WebApp *a, char *out, size_t cap) {
     if (a->theme_color[0]) member(&o, "themeColor", a->theme_color, 0);
     member(&o, "source", a->source == WEBREG_SRC_CATALOG ? "catalog" : "url", 0);
     put(&o, a->background ? "  \"background\": true,\n" : "  \"background\": false,\n");
-    if (a->tray) put(&o, "  \"tray\": true,\n");
-    if (a->notify_sound != WEBREG_SOUND_AUTO) member(&o, "notifySound", sound_names[a->notify_sound], 0);
+    if (a->tray) put(&o, "  \"tray\": true,\n");     /* only when on: a file without it reads the same everywhere */
+    if (a->notify_sound > WEBREG_SOUND_AUTO && a->notify_sound < WEBREG_SOUND_N) member(&o, "notifySound", sound_names[a->notify_sound], 0);
     put(&o, "  \"profiles\": [");
     for (int i = 0; i < a->nprofiles; i++) {
         put(&o, i ? ", { \"id\": " : " { \"id\": ");
         putq(&o, a->profiles[i].id);
         put(&o, ", \"name\": ");
         putq(&o, a->profiles[i].name);
+        if (a->profiles[i].color[0]) { put(&o, ", \"color\": "); putq(&o, a->profiles[i].color); }
         put(&o, " }");
     }
     put(&o, " ],\n  \"permissions\": {");

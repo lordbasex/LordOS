@@ -16,7 +16,7 @@ import { createElement as h, useEffect } from 'react';
 import { View, Text, Image } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
-import { locale, appName, t } from './i18n.js';
+import { locale, appName, t, direction } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
 import { compareNames } from './collate.js';
@@ -25,7 +25,7 @@ import { listApps, wm, windows, appRegistry, getApp as registryApp, openAllowed 
 import { appsOff } from './appsoff.js';
 import { launchable } from './appsoffmodel.js';
 import { webApps, refreshWebApps, launchWebApp, webAppOfWindow } from './webapps.js';
-import { launcherItem, webAppOfKey, windowLabel } from './webappsmodel.js';
+import { launcherItem, webAppOfKey, windowLabel, profileColor, profileHex, profileInitial, profileOf } from './webappsmodel.js';
 
 const DESKTOP = 'desktop:';
 export const isLinuxApp = (id) => String(id).startsWith(DESKTOP);
@@ -62,14 +62,35 @@ export function withTerminalMark(Icon) {
   };
 }
 
-// A web app's icon: its PNG in the registry folder, else its initial (an SVG icon is drawn as the initial too).
-// One component per app and file, so a list that renders again keeps its pictures.
+// A web app's icon: the site's own (cached by lord.webapps.iconResult) or its registry PNG or SVG (an SVG is drawn by
+// lord-media), else its initial. One component per app and file, so a list that renders again keeps its pictures.
 const webIcons = new Map();
 export function webAppIcon(entry) {
-  const path = entry && String(entry.iconPath || '').endsWith('.png') ? entry.iconPath : '';
+  const path = entry && /\.(png|svg)$/.test(String(entry.iconPath || '')) ? entry.iconPath : '';
   const key = `${entry?.id}|${path}|${entry?.name}`;
   if (!webIcons.has(key)) webIcons.set(key, iconFromFile(path, entry?.name || '?'));
   return webIcons.get(key);
+}
+// A profile's icon: the app's (or Base) with the profile's color as a small dot holding its initial, in the bottom end
+// corner; the app's own icon when the profile has no color.
+const profileIcons = new Map();
+export function webProfileIcon(entry, profileId, Base = null) {
+  const color = profileHex(profileColor(entry, profileId));
+  const Icon = Base || webAppIcon(entry);
+  if (!color) return Icon;
+  const letter = profileInitial(profileOf(entry, profileId));
+  const key = `${entry.id}|${profileId}|${color}|${letter}|${entry.iconPath}|${Base ? 'b' : ''}`;
+  if (!Base && profileIcons.has(key)) return profileIcons.get(key);
+  const Marked = ({ size = 32 }) => {
+    const d = Math.max(10, Math.round(size * 0.44));
+    return h(View, { style: { width: size, height: size } },
+      h(Icon, { size }),
+      h(View, { style: { position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: -Math.round(d * 0.12), bottom: -Math.round(d * 0.12), width: d, height: d, borderRadius: d / 2,
+        backgroundColor: color, border: `${Math.max(1, Math.round(d / 10))}px solid #ffffff`, alignItems: 'center', justifyContent: 'center' } },
+      letter ? h(Text, { style: { fontSize: Math.round(d * 0.55), fontWeight: 700, color: '#ffffff' } }, letter) : null));
+  };
+  if (!Base) profileIcons.set(key, Marked);
+  return Marked;
 }
 const webItems = (list) => list.map((e) => { const it = launcherItem(e); return it && { ...it, Icon: webAppIcon(e) }; }).filter(Boolean);
 
@@ -219,7 +240,7 @@ export function windowIcon(w, getApp) {
   const appId = w?.args?.appId;
   if (String(w?.id).startsWith('linux#')) {
     const web = webAppOfWindow(w);
-    if (web) return webAppIcon(web.entry);
+    if (web) return webProfileIcon(web.entry, web.profile);
     // an isolated .lpk app (lord-server --app) arrives as a Wayland window with app_id = its id
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;

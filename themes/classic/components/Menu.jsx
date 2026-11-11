@@ -79,6 +79,7 @@ export function Menu({ t, items: raw, x, y, above, onClose, width = 240, boxRef,
         style={{ flexDirection: 'row', alignItems: 'center', height: ROW, paddingHorizontal: 10, gap: 8, borderRadius: t.menuItemRadius,
           backgroundColor: i === active ? t.hover : 'transparent', opacity: it.disabled ? 0.45 : 1 }}>
         <Text style={{ width: 14, fontSize: 12, color: t.accent }}>{it.checked ? '✓' : ''}</Text>
+        {it.dot ? <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: it.dot }} /></View> : null}
         <Text style={{ flex: 1, fontSize: 13, color: it.destructive ? t.closeHover : t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{it.label}</Text>
         {it.hint ? <Text style={{ fontSize: 11, color: t.textDim }}>{it.hint}</Text> : null}
       </View>
