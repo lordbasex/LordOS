@@ -522,6 +522,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dialog, Cleaner, the Terminal (tags, actions, secrets), the installer and the Imager's countries. Lists sorted by
   internal keys (hashes, ids, dates, paths) are unchanged.
 
+### Security
+
+- **Web apps: a page's clipboard writes can no longer be forged by another site.** lord-web's `navigator.clipboard`
+  shim posted to a message handler visible to every frame, guarded by one random key per process that the shim put
+  in the page's own world, in every top-level document (also another site's page reached by a redirect or a script)
+  and that never changed; a page could read it (a setter on `Object.prototype` during `Object.assign`, or a replaced
+  `postMessage`) and hand it to a frame of another site, which could then overwrite the session's clipboard after
+  any click. The handler now lives in lord-web's isolated world (`lordos-web-xfer`), where only a bridge script runs
+  (top frame, and only in documents of the app's scope through the scripts' allow-list, `weburl_scope_pattern`); the
+  page's shim, which holds nothing secret, asks it through document events with JSON text and builds only fresh
+  objects. At each write lord-web checks that the document's address (read in the isolated world), the main frame's
+  committed address and the view's are all in scope, besides the user-activation rule. Tests: `build/webapp-test`
+  (the scope pattern). Checked on VM 127 (2026-11-11): the page still has `navigator.clipboard` and its
+  `writeText` after a click reached the session's clipboard and pasted back; the handler was not visible to the page
+  or to a frame of another origin inside it, and a write the page sent without a click was refused.
+- **Web apps: drops from sandboxed apps no longer hand files to a page.** lord-web opened every local file a drag's
+  `text/uri-list` named, so an isolated LordOS app or a Flatpak could make lord-web read and give a web page files it
+  can't reach itself, past the rule that keeps those drags from handing files to LordOS. lord-server now leaves
+  `text/uri-list` and the other file-list types (`x-special/gnome-copied-files`, the portals' lists) out of
+  such a drag's offer to a lord-web client (known by its pid, `webmgr_owner`; `dndg_file_mime`, `DOffer.nofiles`,
+  also refused at `receive`), so the drop arrives as text only. A dropped file is now opened with `openat2` and
+  `RESOLVE_NO_SYMLINKS` on its resolved path (else one component at a time with `O_NOFOLLOW`), so a folder swapped
+  for a link after `realpath` is refused, and the page's `File` has the name of the file opened, not the one in the
+  list. Tests: `build/webapp-test` (a link in place of a folder, both open paths), `build/dndgate-test` (the file-list
+  types). Checked on VM 127 (2026-11-11): a JPEG dragged from Files onto a page's drop zone still arrives as a file
+  (`types` `["Files"]`, its name, type and size). A drag from a sandboxed app was not tried there (no Flatpak on the
+  VM).
+
 ## [0.8.8.7-beta] - 2026-11-09
 
 ### Added
