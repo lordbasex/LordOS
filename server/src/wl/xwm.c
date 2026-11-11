@@ -608,6 +608,31 @@ static int xfer_step(uint32_t win, uint32_t prop) {
     return 0;
 }
 
+/* A paste request from a window of another X client than the focused window's, waiting for X-Resource to say
+ * whether both clients are one process (sel_ask_reply). */
+typedef struct { int used; uint32_t time, requestor, selection, target, prop, focus; } SelAsk;
+#define NASK 16
+static SelAsk sel_asks[NASK];
+static unsigned sel_ask_n;
+
+static void xres_pids(ReplyFn fn, uint32_t a, uint32_t b);
+static void sel_answer(uint32_t time_, uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop);
+
+static void sel_ask_reply(const uint8_t *r, size_t n, uint32_t slot, uint32_t serial) {
+    SelAsk *q = &sel_asks[slot];
+    if (!q->used || serial != q->requestor) return;
+    SelAsk a = *q;
+    memset(q, 0, sizeof *q);
+    uint32_t base[256], pid[256];
+    int k = r ? x11_xres_pids(r, n, base, pid, 256) : -1;
+    /* the keyboard may have moved while X-Resource answered: the window asked about must still have it */
+    int ok = X.focus && X.focus->id == a.focus && x11_same_process(a.requestor, a.focus, base, pid, k, X.su.id_mask);
+    if (X.debug) fprintf(stderr, "xwm: paste request from 0x%x (focus 0x%x): %s\n", a.requestor, a.focus,
+                         ok ? "the same process" : "another process, refused");
+    if (ok) sel_answer(a.time, a.requestor, a.selection, a.target, a.prop);
+    else notify_requestor(a.time, a.requestor, a.selection, a.target, 0);
+}
+
 static void do_sel_request(uint32_t time_, uint32_t owner, uint32_t requestor, uint32_t target, uint32_t prop);
 static void sel_request(const uint8_t *p) {
     uint32_t time_ = x11_get32(p + 4), owner = x11_get32(p + 8), requestor = x11_get32(p + 12), selection = x11_get32(p + 16),
@@ -615,11 +640,31 @@ static void sel_request(const uint8_t *p) {
     int k = sel_index(selection);
     if (!prop) prop = target;                               /* obsolete clients */
     if (selection == AT(XdndSelection)) { do_sel_request(time_, owner, requestor, target, prop); return; }
-    /* LordOS's selection is in X only while an X window has the keyboard (clip_sync). Asking from
-     * a window of the focused client is a hint, not a boundary: the requestor id isn't
-     * authenticated in X11 and X apps on one display can read each other's selections anyway
-     * (docs/PRIVACY.md, "X11 apps") */
-    if (k < 0 || owner != X.wmwin || !X.sel[k].owned || !X.focus || !same_client(requestor, X.focus->id) || !lord_has(k)) {
+    /* LordOS's selection is in X only while an X window has the keyboard (clip_sync), and a request is answered
+     * only for the focused window's app: a window of its X client, or of another X client of the same process
+     * (X-Resource's pid, which the X server takes from the socket, never from the client; arboard's clipboard
+     * has its own connection). That is a hint, not a boundary: the requestor id isn't authenticated in X11 and
+     * X apps on one display can read each other's selections anyway (docs/PRIVACY.md, "X11 apps") */
+    if (k < 0 || owner != X.wmwin || !X.sel[k].owned || !X.focus || !lord_has(k)) {
+        notify_requestor(time_, requestor, selection, target, 0);
+        return;
+    }
+    if (!same_client(requestor, X.focus->id)) {
+        unsigned slot = sel_ask_n++ % NASK;
+        if (!X.xres_op || !requestor || sel_asks[slot].used) {    /* no X-Resource, or too many waiting */
+            notify_requestor(time_, requestor, selection, target, 0);
+            return;
+        }
+        sel_asks[slot] = (SelAsk){ 1, time_, requestor, selection, target, prop, X.focus->id };
+        xres_pids(sel_ask_reply, slot, requestor);
+        return;
+    }
+    sel_answer(time_, requestor, selection, target, prop);
+}
+
+static void sel_answer(uint32_t time_, uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop) {
+    int k = sel_index(selection);
+    if (k < 0 || !X.sel[k].owned || !X.focus || !lord_has(k)) {     /* checked again: an X-Resource answer comes later */
         notify_requestor(time_, requestor, selection, target, 0);
         return;
     }
@@ -1021,11 +1066,11 @@ static void xi_finish(int accepted, uint32_t action) {
 }
 
 /* XResQueryClientIds: every client's pid. */
-static void xres_pids(ReplyFn fn, uint32_t a) {
+static void xres_pids(ReplyFn fn, uint32_t a, uint32_t b) {
     req(X.xres_op, 4);
     xo_u32(&X.out, 1); xo_u32(&X.out, 0); xo_u32(&X.out, 2);
     xo_end(&X.out);
-    expect(fn, a, 0);
+    expect(fn, a, b);
 }
 
 static void xi_owner_of(XdndOwner *o, uint32_t win, const uint8_t *r, size_t n) {
@@ -1050,7 +1095,7 @@ static void xi_begin(void) {
     for (int i = 0; i < XI.n; i++) list[i] = XI.mimes[i];
     XI.started = wlx_xdrag_begin(list, XI.n);
     if (!XI.started || !X.xres_op) return;           /* without X-Resource its files never reach LordOS */
-    xres_pids(xi_trust_reply, XI.gen);
+    xres_pids(xi_trust_reply, XI.gen, 0);
 }
 
 static void xi_name_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t type) {
@@ -1168,7 +1213,7 @@ static void xi_read(int stage) {
     xo_u32(&X.out, AT(XdndSelection));
     xo_end(&X.out);
     expect(xi_cur_reply, XI.gen, 0);
-    if (X.xres_op) xres_pids(xi_now_reply, XI.gen);
+    if (X.xres_op) xres_pids(xi_now_reply, XI.gen, 0);
     get_prop(X.wmwin, AT(LORD_SEL_XDND), 1, CLIP_MAX / 4, xi_data_reply, XI.gen, (uint32_t)stage);
 }
 
@@ -1765,6 +1810,8 @@ void xwm_stop(void) {
     while (X.wins) free_win(X.wins);
     while (X.xfers) xfer_free(X.xfers);
     for (int k = 0; k < NSEL; k++) sel_reset(&X.sel[k]);
+    memset(sel_asks, 0, sizeof sel_asks);                   /* their replies never come now */
+    sel_ask_n = 0;
     if (X.ev) wl_event_source_remove(X.ev);
     if (X.idle) wl_event_source_remove(X.idle);
     if (X.fd >= 0) close(X.fd);

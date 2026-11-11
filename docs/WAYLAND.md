@@ -834,7 +834,12 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   Terminal and the history (with the X app's class as its source) see it.
 - **LordOS → X11.** LordOS's selection is put in X **only while an X window has the keyboard** and
   only if it's newer than what an X app copied; when the keyboard goes to a LordOS or Wayland
-  window, the window manager gives the selection up. Large pastes go in `INCR` chunks. Files copied
+  window, the window manager gives the selection up. A paste request is answered only for the app with
+  the keyboard: a window of the focused window's X client, or of another X client that X-Resource
+  (`XResQueryClientIds`, the pid Xwayland reads from the socket) ties to the same process, as with
+  apps whose clipboard library opens its own X connection and window (arboard in Rust apps; GitHub
+  #125). Any other requestor, a client without a known pid, or a focus change before X-Resource
+  answers gets a refusal. Large pastes go in `INCR` chunks. Files copied
   in Files are also offered as `text/uri-list` and `x-special/gnome-copied-files`; files an X app
   copies arrive as their text only (the window manager reads one text target; an X client's sandbox
   can't be told, so its file list is never read).

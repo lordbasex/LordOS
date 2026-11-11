@@ -319,6 +319,18 @@ int x11_xres_pids(const uint8_t *r, size_t n, uint32_t *base, uint32_t *pid, int
     return k;
 }
 
+static uint32_t xres_pid_of(uint32_t win, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask) {
+    for (int i = 0; win && i < n; i++)
+        if (x11_same_client(win, base[i], id_mask)) return pid[i] && pid[i] <= 0x7fffffffu ? pid[i] : 0;
+    return 0;
+}
+
+int x11_same_process(uint32_t a, uint32_t b, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask) {
+    if (n < 0) return 0;
+    uint32_t pa = xres_pid_of(a, base, pid, n, id_mask);
+    return pa && pa == xres_pid_of(b, base, pid, n, id_mask);
+}
+
 int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
                      int (*sandboxed)(int pid)) {
     int known = 0;
