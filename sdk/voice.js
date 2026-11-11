@@ -29,6 +29,7 @@ import { settings } from './settings.js';
 import { windowAppName } from './apps.js';
 import { userDirs } from './media.js';
 import { voiceLabel, langOf } from './voicecatalog.js';
+import { webEditMenu } from './webapps.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.voice) || null;
 // for a text too short to tell its language (say_language in server/src/tts/saytext.c): the interface's
@@ -244,12 +245,15 @@ export function speechItems(getText) {
   return m ? [m, '-'] : [];
 }
 
-// a window's menus; a Linux app's gets an Edit menu with Speech, as its own menus aren't the desktop's
+// a window's menus; a Linux app's gets an Edit menu with Speech, as its own menus aren't the desktop's, and a web
+// app's (lord-web, docs/WEBAPPS.md "Editing") gets Undo, Redo, Cut, Copy, Paste and Select All in it as well
 export function useMenusWithSpeech(wid) {
   const menus = useAppMenus(wid);
   useStore(settings, (s) => s.voice);    // Settings → AI turns it on and off
   if (!isLinux(wid)) return menus;
   const sp = speechMenu(null);
-  if (!sp) return menus;
-  return [...(menus || []), { label: t('shell.menu.edit'), items: [sp] }];
+  const edit = webEditMenu(wm.get(wid));
+  if (!sp && !edit) return menus;
+  const items = [...(edit || []), ...(edit && sp ? ['-'] : []), ...(sp ? [sp] : [])];
+  return [...(menus || []), { label: t('shell.menu.edit'), items }];
 }

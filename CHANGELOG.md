@@ -12,6 +12,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Web apps: editing like in a browser.** The Edit menu of a web app's window now has Undo, Redo, Cut, Copy, Paste
+  and Select All (Speech stays below them): the shell asks lord-server, which sends `org.lordos.WebApp1.Edit(command)`
+  to that window's lord-web, and lord-web runs it only when the bus says the caller is the lord-server that started it
+  (its parent's pid). The commands are a closed list checked on both sides (`server/src/web/webedit.c`). Copy and Cut
+  reach the session's clipboard at once, Paste of an image goes the image way, and Undo and Redo are sent as Ctrl+Z
+  and Ctrl+Shift+Z, which a page with its own history (a rich text editor) handles; WPE 2.48 keeps no undo stack of
+  its own, so a plain text field has none.
+- **Web apps: a right click opens LordOS's own menu.** Cut, Copy, Paste, Select All, Copy Link Address, Open Link in
+  Browser and Copy Image, whichever fit what is under the pointer. A script of lord-web's in an isolated world reports
+  a right click the page left alone; lord-web asks lord-server with `org.lordos.WebApps1.Menu(app, profile, items)`,
+  whose items are names from the closed list, never text, checked with the same pid check as Ask; the shell shows the
+  menu at the pointer in the person's language and a press elsewhere closes it. Copy Image reads the image with the
+  page's own origin (a PNG unless it is a PNG or a JPEG) and offers it as an image.
+- **Web apps: Settings… and Help in the menu bar.** A web app's Settings… (was greyed out) opens Settings → Web apps
+  on that app, and Help starts with "<app> on the Web", which opens the app's site in the browser.
 - **Web apps: hidden windows stop working for nothing.** A window that is minimized, on another desktop, closed into
   the background or wholly covered by an opaque window now tells its page it is hidden: the page stops painting, its
   animations pause and its timers run at most once a second, while its network, audio and notifications go on. Measured
@@ -336,6 +351,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Web apps: dragging the mouse across text selected nothing (a message couldn't be selected to copy it). WPE WebKit
+  2.48 is built without drag support, which in WebCore also holds selecting by dragging; lord-web now extends the
+  page's own selection while the left button is held (a script in an isolated world: `caretRangeFromPoint` for text
+  and editable content, the character under the pointer measured with the field's font inside a text field).
+  Double click (word), triple click (paragraph) and Shift+click were already WebKit's and still are. A motion also
+  names the button held, so a page's own drag code sees it.
+- Web apps: Ctrl+C (and Ctrl+Insert, Ctrl+A) did nothing on text the page shows, outside a text field: WPE's key
+  bindings run only where the page can be edited. lord-web now runs Copy or Select All for those keys when the page
+  didn't take them itself.
+- Web apps: pasting text copied in another app did nothing, and sometimes closed the app. The text was written to
+  WebKit's pasteboard with strings that weren't zeroed first, and libwpe keeps a string that already holds data, so
+  stack garbage went in instead (or a crash, seen on VM 127).
+- Web apps: after one right click in a page that doesn't handle it, the window took no more clicks, drags or wheel
+  until it was restarted: WPE 2.48 waits forever for a menu its embedder is never asked for. The right click's
+  default is now always prevented and LordOS's own menu shown instead (above).
+- Web apps: files dropped on a page and images pasted into it never arrived ("Invalid parameter types"): WebKit 2.48
+  takes no arrays as a called function's arguments, so the files' list now goes to the page as one JSON text.
 - Web apps said their notifications were off after every start (a messaging web app showed "notifications are
   disabled, turn on") although LordOS allowed them: WebKit wasn't told the app's choice, so each new web process
   started at "default". lord-web now hands WebKit the allowed or denied origin before the page loads

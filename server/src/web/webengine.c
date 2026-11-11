@@ -31,6 +31,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <xkbcommon/xkbcommon-keysyms.h>
 
 /* A web process's memory pressure (WebKit's MemoryPressureHandler, polled every 30 s): past a third of the limit it
  * drops its rebuildable caches (fonts, glyphs, line layout, selectors, style sheets) at every poll, past half it also
@@ -344,7 +345,63 @@ static gboolean on_query(WebKitWebView *v, WebKitPermissionStateQuery *q, gpoint
 
 static gboolean on_notification(WebKitWebView *v, WebKitNotification *n, gpointer d) { (void)v; webbus_notify(d, n); return TRUE; }
 static gboolean on_file_chooser(WebKitWebView *v, WebKitFileChooserRequest *r, gpointer d) { (void)v; webbus_choose_files(d, r); return TRUE; }
-static gboolean on_context_menu(WebKitWebView *v, WebKitContextMenu *m, WebKitHitTestResult *h, gpointer d) { (void)v; (void)m; (void)h; (void)d; return TRUE; }
+/* ---- editing: the shell's Edit menu and the page's context menu (LordOS's own menu, webbus_menu) ---- */
+
+void web_edit(Web *w, int cmd) {
+    const char *c = webedit_webkit(cmd);
+    if (!c || !w->view || !w->win) return;
+    /* an image on the session's clipboard goes to the page as a paste of its own (webxfer.c); WebKit would paste text */
+    if (cmd == WEBEDIT_PASTE && webwin_paste_image(w->win)) return;
+    /* Undo and Redo as their keys: WPE 2.48 keeps no undo stack of its own (its page client drops every edit
+     * command), so WebKit's command does nothing, while a page with its own history (a rich text editor) listens for
+     * Ctrl+Z and Ctrl+Shift+Z */
+    if ((cmd == WEBEDIT_UNDO || cmd == WEBEDIT_REDO) && webwin_send_shortcut(w->win, XKB_KEY_z, cmd == WEBEDIT_REDO)) return;
+    webkit_web_view_execute_editing_command(w->view, c);
+    if (cmd == WEBEDIT_COPY || cmd == WEBEDIT_CUT) webwin_after_edit(w->win);
+}
+
+/* an address the menu may offer: a web, mail or phone link, or (for an image) one the page itself can read again */
+static int menu_uri_ok(const char *u, int image) {
+    if (!u || !u[0] || strlen(u) > 8192) return 0;
+    if (!g_ascii_strncasecmp(u, "https://", 8) || !g_ascii_strncasecmp(u, "http://", 7)) return 1;
+    if (image) return !g_ascii_strncasecmp(u, "blob:", 5) || !g_ascii_strncasecmp(u, "data:image/", 11);
+    return !g_ascii_strncasecmp(u, "mailto:", 7) || !g_ascii_strncasecmp(u, "tel:", 4);
+}
+
+void web_menu_chosen(Web *w, int item, const char *link, const char *image) {
+    switch (item) {
+    case WEBMENU_CUT: web_edit(w, WEBEDIT_CUT); break;
+    case WEBMENU_COPY: web_edit(w, WEBEDIT_COPY); break;
+    case WEBMENU_PASTE: web_edit(w, WEBEDIT_PASTE); break;
+    case WEBMENU_SELECT_ALL: web_edit(w, WEBEDIT_SELECT_ALL); break;
+    case WEBMENU_COPY_LINK: if (link && w->win) webwin_offer(w->win, NULL, g_bytes_new(link, strlen(link))); break;
+    case WEBMENU_OPEN_LINK: if (link) webbus_open_uri(w, link); break;
+    case WEBMENU_COPY_IMAGE: if (image) webxfer_copy_image(w, image); break;
+    default: break;
+    }
+}
+
+/* WebKit's own menu is never shown (WPE has none to show): lord-server shows LordOS's, with items for what is under
+ * the pointer. A page that handles its own right click (and prevents the default) never gets here. */
+void web_context_menu(Web *w, unsigned at, const char *link, const char *image) {
+    at &= WEBMENU_AT_EDITABLE | WEBMENU_AT_SELECTION;
+    if (menu_uri_ok(link, 0)) at |= WEBMENU_AT_LINK;
+    else link = NULL;
+    if (menu_uri_ok(image, 1) && !w->outside) at |= WEBMENU_AT_IMAGE;
+    else image = NULL;
+    int items[WEBMENU_N];
+    int n = webmenu_items(at, items);
+    webbus_menu(w, items, n, link, image);
+}
+
+/* should WebKit ever ask (2.48's WPE port doesn't; webselect.c reports the right click instead) */
+static gboolean on_context_menu(WebKitWebView *v, WebKitContextMenu *m, WebKitHitTestResult *h, gpointer d) {
+    (void)v; (void)m;
+    unsigned at = (webkit_hit_test_result_context_is_editable(h) ? WEBMENU_AT_EDITABLE : 0) | (webkit_hit_test_result_context_is_selection(h) ? WEBMENU_AT_SELECTION : 0);
+    web_context_menu(d, at, webkit_hit_test_result_context_is_link(h) ? webkit_hit_test_result_get_link_uri(h) : NULL,
+                     webkit_hit_test_result_context_is_image(h) ? webkit_hit_test_result_get_image_uri(h) : NULL);
+    return TRUE;
+}
 
 static void on_target(WebKitWebView *v, WebKitHitTestResult *h, guint mods, gpointer d) {
     (void)v; (void)mods;
@@ -459,6 +516,7 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
     g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
     webxfer_init(w);
+    webselect_init(w);
     g_signal_connect(w->session, "download-started", G_CALLBACK(on_download), w);
     webkit_web_view_load_uri(w->view, w->app.start_url);
     return 0;

@@ -135,7 +135,52 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   to be the page's world because in WebKit 2.48 a script-made `DataTransfer` lists no `"Files"` in `types`, which
   pages check, and only that world can mend it; the `blob:` addresses are revoked right after. A drop with no local
   file gives the page its text (`text/plain`, and `text/uri-list` for a list). One transfer at a time; none while the
-  window shows another site.
+  window shows another site. WebKit 2.48 takes only numbers, strings and dictionaries as a called function's arguments
+  (an array is "Invalid parameter types"), so the files' addresses, names, types and times go to the page's world as
+  one JSON text. Checked on VM 127 (2026-11-11): a JPEG dragged from Files onto a page's drop zone arrives as
+  `hacker.jpg image/jpeg 6753` with `types` `["Files"]`.
+- **Editing** (`webselect.c`, `webedit.c`, `webengine.c` `web_edit`):
+  - **Selecting with the mouse:** WPE WebKit 2.48 is built without `ENABLE_DRAG_SUPPORT`, and in WebCore that switch
+    also holds the code that extends a selection while the left button is dragged, so dragging across text selected
+    nothing. A press still places the caret, a double click selects a word, a triple click the paragraph and
+    Shift+click extends (WebKit's own, from the presses' times and places). Dragging is lord-web's: a script in an
+    isolated world (`lordos-web-select`, every frame, the page can't see or change it) takes the caret WebKit placed at
+    the press as the anchor and extends the page's own selection to the pointer on each move with the button held
+    (`document.caretRangeFromPoint` for text and editable content; inside a text field, which that can't reach, the
+    character under the pointer measured with the field's font, padding, scroll and wrapping). Not on a link, an image,
+    a draggable element or `user-select: none`, and not when the page prevented the press's default. A motion also
+    names the button held (as GTK's does), so a page sees `which` 1 during a drag.
+  - **Copy from the keyboard:** WPE's WebEditorClient runs its key bindings only where the page can be edited
+    (`handleKeyboardEvent` returns when `!canEdit()`), so Ctrl+C on a message's text copied nothing. The isolated
+    script reports Ctrl+C, Ctrl+Insert and Ctrl+A outside a text field or editable content (trusted, not prevented
+    by the page's listeners) and lord-web runs Copy or Select All.
+  - **Clipboard text:** what WebKit's pasteboard gets from the session is written with zeroed strings: libwpe's
+    `wpe_pasteboard_string_initialize` leaves a string that already has data alone, and the stack garbage it kept
+    made pasting text copied in another app do nothing or crash lord-web.
+  - **The Edit menu:** a web app's window gets Undo, Redo, Cut, Copy, Paste and Select All in the menu bar's Edit
+    menu (with Speech). The shell calls `lord.webapps.edit(app, profile, command)`; lord-server sends
+    `org.lordos.WebApp1.Edit(command)` to that lord-web's bus name (no reply). lord-web asks the bus for the caller's
+    pid (`GetConnectionUnixProcessID`, from the socket's credentials) and runs the command only when it is the
+    lord-server that started it (its parent): WebKit's editing command (`Cut`, `Copy`, `Paste`, `SelectAll`), Paste
+    of an image going the image way. Undo and Redo go to the page as Ctrl+Z and Ctrl+Shift+Z: WPE 2.48's page client
+    drops every edit command (no undo stack: `canUndoRedo` is always false), so only a page with its own history (a
+    rich text editor) undoes; a plain text field can't, from the menu or the keys. What Copy or Cut put in WebKit's pasteboard is offered to the
+    session at once (the window may not have the keyboard while the menu is open). The commands are a closed list
+    (`webedit.c`), checked on both sides.
+  - **The context menu:** WPE 2.48 never asks its embedder for a menu (the view's `context-menu` signal doesn't
+    come) and, once a right click's default asked WebKit for one, the view took no more mouse input. So the same
+    isolated script prevents the default of every trusted `contextmenu` event and, when the page's own listeners
+    (on the element or the document) left it alone, tells lord-web what is under the pointer: an editable field, a
+    selection, a link's address, an image's. lord-web takes it only right after a click in the window and asks
+    lord-server for LordOS's own menu: `org.lordos.WebApps1.Menu(app, profile, items) → item`, the items being names
+    from the closed list (`cut`, `copy`, `paste`, `selectAll`, `copyLink`, `openLink`, `copyImage`), never text.
+    lord-server checks them and the caller's pid as for Ask, and the shell shows the menu at the pointer with its own
+    words (a press anywhere else closes it and goes no further). Copy Link Address offers the link's address as text;
+    Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
+    origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
+    image.
+  - **The app menu and Help:** Settings… opens Settings → Web apps on that app; Help starts with "<app> on the Web",
+    the app's origin in the browser.
 - **User agent** (`webpage_user_agent`): `Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
   Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own (frozen) AppleWebKit and Safari tokens, and
   LordOS's version. WebKit's site-specific quirks are off on the app's own pages and on for any other site in the
@@ -148,8 +193,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   embedder (`navigator.setAppBadge` is off and reaches no signal), so the title is the only source.
 - **Navigation:** an address inside `scope` stays; a link clicked to an address outside it, a new window outside it
   and `mailto:` or `tel:` go to OpenURI; a new window inside it loads in the same window. A redirect outside (a sign-in
-  on another site) stays, and the title then starts with that site's host. No context menu, no developer extras, no
-  windows opened without a click, no page cache, TLS errors fail.
+  on another site) stays, and the title then starts with that site's host. No WebKit context menu (LordOS's own,
+  above), no developer extras, no windows opened without a click, no page cache, TLS errors fail.
 - **Engine:** the profile's own `WebKitNetworkSession` (`data/`, `cache/`, `cookies.sqlite`, no credential storage of
   WebKit's own), memory pressure settings (a web process past 1.5 GB frees its caches), the document cache model.
   WebKit 2.48 has no switch for its sandbox: it is always on, and lord-web refuses the variable that turns it off.

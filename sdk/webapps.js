@@ -11,6 +11,9 @@
 //   webAppMemory(app)              lord.webapps.memory: { kb, processes, profiles } while it runs, else null
 //   webEngine()                    { installed, version, webkit }: the lordos-web package and the WebKit it links
 //   webAsks (store) · answerWebAsk(ask, allow, remember)
+//   webEditMenu(w)                 the Edit menu's items for a web app's window (lord.webapps.edit), else null
+//   webMenu (store) · webMenuEvent(kind, data) · answerWebMenu(item)   a page's right click (org.lordos.WebApps1.Menu):
+//                                  LordOS's own menu at the pointer, with items from lord-server's closed list
 //   webBadges (store) · webBadgeEvent(data)    the unread counts lord-web set (SetBadge): { [app]: { [profile]: n } }
 //   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
 //                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
@@ -19,13 +22,15 @@
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
 
 export const webApps = createStore([]);
 export const webAsks = createStore([]);
 export const webBadges = createStore({});
+export const webMenu = createStore(null);
 export const siteIcons = createStore({});
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -191,6 +196,34 @@ export function answerWebAsk(ask, allow, remember) {
   webAsks.set(webAsks.get().filter((a) => a.id !== ask.id));
   try { lord.webapps.answer(ask.id, askAnswer(allow, remember)); } catch (e) { /* the app left meanwhile */ }
   if (remember) refreshWebApps();
+}
+
+// ---- editing ----
+
+// The Edit menu of a window of a lord-web we started: each item asks lord-server to run that command in its page.
+export function webEditMenu(w) {
+  const web = w?.args?.web;
+  if (!web || !has() || typeof lord.webapps.edit !== 'function') return null;
+  return webEditItems((c) => t(`shell.edit.${c}`), (c) => { try { lord.webapps.edit(web.app, web.profile, c); } catch (e) { /* it ended */ } });
+}
+
+// A page's right click: shown at the pointer by <WebAppMenu /> (hardware.jsx); one at a time.
+export function webMenuEvent(kind, data) {
+  if (!data || typeof data.id !== 'number') return;
+  const cur = webMenu.get();
+  if (kind === 'webapps-menu') {
+    if (cur && cur.id !== data.id) answerWebMenu('', cur);
+    let at = { x: 0, y: 0 };
+    try { const p = lord.wm.pointer(); at = { x: p.x, y: p.y }; } catch (e) { /* no pointer: the corner */ }
+    webMenu.set({ ...data, ...at });
+  } else if (cur && cur.id === data.id) webMenu.set(null);
+}
+
+// once per menu: a later answer for the same menu (its close after a pick) is ignored
+export function answerWebMenu(item, menu = webMenu.get()) {
+  if (!menu || webMenu.get()?.id !== menu.id) return;
+  webMenu.set(null);
+  try { lord.webapps.menuAnswer(menu.id, item || ''); } catch (e) { /* the app left meanwhile */ }
 }
 
 if (has()) {

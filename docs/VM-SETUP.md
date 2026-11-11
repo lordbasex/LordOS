@@ -1874,6 +1874,7 @@ fingerprint compared with the one Settings shows. Test apps, from Debian (tests 
 
 ```sh
 sudo apt-get install -y chromium gtk-4-examples foot mpv xterm python3-gi gir1.2-gtk-4.0 wl-clipboard
+sudo apt-get install -y gdb        # 2026-11-11: backtraces of lord-web (the pasteboard crash, docs/WEBAPPS.md "Editing")
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The

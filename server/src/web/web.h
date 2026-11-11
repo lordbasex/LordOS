@@ -9,6 +9,7 @@
  *                 read wpebackend-fdo's own buffers)
  *   webbus.c      the session bus: notifications, the OpenURI and FileChooser portals, org.lordos.WebApps1.Ask
  *   webtray.c     the StatusNotifierItem of an app that keeps running in the background (when its "tray" is on)
+ *   webselect.c   selecting text by dragging (a script in an isolated world: WPE 2.48 is built without drag support)
  *   webxfer.c     files dropped on the window and images pasted into the page (WebKit 2.48's WPE takes neither: a
  *                 script hands the page the bytes lord-web read itself), and the page's copies of an image
  *   webprobe.c    --probe and --probe-icon, headless, in a throwaway profile
@@ -28,8 +29,10 @@
 #include "weburl.h"
 #include "webdrop.h"
 #include "webpage.h"
+#include "webedit.h"
 
 #include <limits.h>
+#include <sys/types.h>
 
 #include <wpe/webkit.h>
 #include <wpe/fdo.h>
@@ -59,6 +62,8 @@ typedef struct {
     WebPageState state;                 /* <profile>/state.json: what lord-web learned about the page */
     double audio_ms;                    /* when the page last started playing audio (monotonic ms), or -1 */
     double note_ms;                     /* when its last notification went out with LordOS's sound, or -1 */
+    pid_t server_pid;                   /* the lord-server that started this lord-web (its parent): Edit comes only from it */
+    int menu_open;                      /* a context menu is waiting for the person (Menu on lord-server) */
     int quitting;
     int exit_code;
 } Web;
@@ -73,6 +78,13 @@ void web_quit(Web *w, int code);
 void web_close_requested(Web *w);
 void web_show(Web *w, const char *activation_token);
 double web_now_ms(void);                                 /* monotonic */
+/* an editing command on the page (webedit.h's WEBEDIT_*): the Edit menu, the context menu */
+void web_edit(Web *w, int cmd);
+/* the person chose item (WEBMENU_*) in the page's context menu; link and image are what was under the pointer */
+void web_menu_chosen(Web *w, int item, const char *link, const char *image);
+/* a right click in the page (WEBMENU_AT_* of what is under the pointer, a link's and an image's address or NULL):
+ * LordOS's menu with the items for it (webbus_menu); addresses of the wrong kind are dropped */
+void web_context_menu(Web *w, unsigned at, const char *link, const char *image);
 void web_state_save(Web *w);
 
 /* webxfer.c */
@@ -82,6 +94,12 @@ void webxfer_init(Web *w);                               /* the clipboard script
 void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const char *uris, const char *text);
 /* an image from the session's clipboard, pasted into the focused element (data taken over) */
 void webxfer_paste_image(Web *w, const char *mime, GBytes *data);
+/* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
+ * made a PNG when it is in another format) goes to the session's clipboard */
+void webxfer_copy_image(Web *w, const char *uri);
+
+/* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too) */
+void webselect_init(Web *w);
 
 /* webbus.c */
 void webbus_init(Web *w);
@@ -94,6 +112,11 @@ void webbus_notify(Web *w, WebKitNotification *n);
 void webbus_notify_text(Web *w, const char *summary, const char *body);
 void webbus_set_badge(Web *w, unsigned count);           /* org.lordos.WebApps1.SetBadge, no answer awaited */
 void webbus_choose_files(Web *w, WebKitFileChooserRequest *req);
+/* org.lordos.WebApp1.Edit(command) from sender: run only once the bus says sender is w->server_pid's */
+void webbus_edit(Web *w, const char *sender, int cmd);
+/* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
+ * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */
+void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image);
 
 /* webtray.c */
 WebTray *webtray_new(Web *w);

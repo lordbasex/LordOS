@@ -423,3 +423,34 @@ export const sizesKey = (entry, running = []) => {
   const live = new Set(running.filter((r) => r.app === entry.id).map((r) => r.profile));
   return entry.profiles.map((p) => `${p.id}${live.has(p.id) ? '*' : ''}`).join(',');
 };
+
+// ---- editing (docs/WEBAPPS.md, "Editing") ----
+
+// The Edit menu of a web app's window: [command, shortcut] rows and '-' separators. lord.webapps.edit(app,
+// profile, command) sends the command to that window's lord-web (WebKit's editing command); the shortcuts are
+// WebKit's own key bindings, which work in the page as well.
+export const WEB_EDIT_ROWS = [['undo', 'Ctrl+Z'], ['redo', 'Ctrl+Shift+Z'], '-', ['cut', 'Ctrl+X'], ['copy', 'Ctrl+C'], ['paste', 'Ctrl+V'], '-', ['selectAll', 'Ctrl+A']];
+
+// The Edit menu's items: label(command) is its text, run(command) what a click does.
+export function webEditItems(label, run) {
+  return WEB_EDIT_ROWS.map((r) => (r === '-' ? '-' : { label: label(r[0]), hint: r[1], onClick: () => run(r[0]) }));
+}
+
+// The items a page's context menu may have (server/src/web/webedit.c's closed list, in its order); the editing
+// ones come first, then the link's, then the image's, with a separator between the groups.
+export const WEB_MENU_ITEMS = ['cut', 'copy', 'paste', 'selectAll', 'copyLink', 'openLink', 'copyImage'];
+const MENU_GROUP = { cut: 0, copy: 0, paste: 0, selectAll: 0, copyLink: 1, openLink: 1, copyImage: 2 };
+
+// The "webapps-menu" event's items → ContextMenu items. Unknown names and repeats are left out (lord-server sends
+// only known ones, once); pick(name) is what a click does.
+export function webMenuItems(names, label, pick) {
+  const out = [];
+  let group = -1;
+  for (const n of Array.isArray(names) ? names : []) {
+    if (!WEB_MENU_ITEMS.includes(n) || out.some((i) => i !== '-' && i.id === n)) continue;
+    if (group >= 0 && MENU_GROUP[n] !== group) out.push('-');
+    group = MENU_GROUP[n];
+    out.push({ id: n, label: label(n), onClick: () => pick(n) });
+  }
+  return out;
+}

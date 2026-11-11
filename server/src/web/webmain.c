@@ -115,17 +115,28 @@ void web_registry_refresh(Web *w) {
 
 /* ---- one process per app and profile ---- */
 
+/* Show(token): anyone may (a second start of the app does); Edit(command): only lord-server, checked by pid (webbus.c) */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
-    (void)c; (void)sender; (void)path; (void)iface;
+    (void)c; (void)path; (void)iface;
     if (!strcmp(method, "Show")) {
         const char *token = NULL;
         g_variant_get(p, "(&s)", &token);
         web_show(d, token);
+    } else if (!strcmp(method, "Edit")) {
+        const char *cmd = NULL;
+        g_variant_get(p, "(&s)", &cmd);
+        int k = webedit_command(cmd);
+        if (k < 0 || !sender) {
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "unknown command");
+            return;
+        }
+        webbus_edit(d, sender, k);
     }
     g_dbus_method_invocation_return_value(inv, NULL);
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
-static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method></interface></node>";
+static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
+                               "<method name='Edit'><arg type='s' direction='in'/></method></interface></node>";
 
 /* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {
@@ -262,6 +273,7 @@ int main(int argc, char **argv) {
     static Web web;
     Web *w = &web;
     if (webargs_parse(argc, argv, &w->args) == WEBARGS_BAD) { usage(); return 2; }
+    w->server_pid = getppid();          /* lord-server forks and execs lord-web itself (web/webmgr.c) */
     if (clean_env()) return 2;
     const char *home = getenv("HOME");
     if (!home || home[0] != '/' || !realpath(home, w->home)) { fprintf(stderr, "lord-web: no home folder\n"); return 2; }

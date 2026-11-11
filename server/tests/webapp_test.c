@@ -2,13 +2,15 @@
  * an app address, origins, the scope prefix), argv and the probe's request line (webargs.c), the probe's
  * answer and the icon check (webmanifest.c), the download names (webdl.c), the wheel and touchpad (webaxis.c), the
  * title's unread count, the user agent and the notification sound (webpage.c), the files of a drop (webdrop.c) and
- * the registry's optional tray and notifySound. The rest of the registry file (webreg.c,
+ * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
+ * pass each other (webedit.c). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
 #include "../src/web/webargs.h"
 #include "../src/web/webaxis.h"
 #include "../src/web/webdrop.h"
+#include "../src/web/webedit.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
 #include "../src/web/webmanifest.h"
@@ -560,7 +562,49 @@ static void test_registry_options(void) {
     CHECK(webreg_sound_value("none") == WEBREG_SOUND_NONE && webreg_sound_value("x") < 0 && !webreg_sound_name(9), "names");
 }
 
+static void test_edit(void) {
+    static const char *const names[] = { "undo", "redo", "cut", "copy", "paste", "selectAll" };
+    static const char *const wk[] = { "Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll" };
+    for (int i = 0; i < 6; i++) {
+        int k = webedit_command(names[i]);
+        CHECK(k >= 0 && !strcmp(webedit_name(k), names[i]) && !strcmp(webedit_webkit(k), wk[i]), "edit %s", names[i]);
+    }
+    static const char *const bad[] = { "", "Copy", "selectall", "delete", "InsertHTML", "copy ", "paste\n", "copyLink" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(webedit_command(bad[i]) < 0, "edit refuses '%s'", bad[i]);
+    CHECK(webedit_command(NULL) < 0 && !webedit_name(-1) && !webedit_webkit(WEBEDIT_N), "edit: nothing");
+
+    int it[WEBMENU_N];
+    int n = webmenu_items(0, it);
+    CHECK(n == 1 && it[0] == WEBMENU_SELECT_ALL, "plain page: Select All only (%d)", n);
+    n = webmenu_items(WEBMENU_AT_SELECTION, it);
+    CHECK(n == 2 && it[0] == WEBMENU_COPY && it[1] == WEBMENU_SELECT_ALL, "a selection: Copy, Select All");
+    n = webmenu_items(WEBMENU_AT_EDITABLE, it);
+    CHECK(n == 2 && it[0] == WEBMENU_PASTE && it[1] == WEBMENU_SELECT_ALL, "an empty field: Paste, Select All");
+    n = webmenu_items(WEBMENU_AT_EDITABLE | WEBMENU_AT_SELECTION, it);
+    CHECK(n == 4 && it[0] == WEBMENU_CUT && it[1] == WEBMENU_COPY && it[2] == WEBMENU_PASTE && it[3] == WEBMENU_SELECT_ALL, "a field with a selection");
+    n = webmenu_items(WEBMENU_AT_LINK | WEBMENU_AT_IMAGE, it);
+    CHECK(n == 4 && it[1] == WEBMENU_COPY_LINK && it[2] == WEBMENU_OPEN_LINK && it[3] == WEBMENU_COPY_IMAGE, "a linked image");
+    n = webmenu_items(~0u, it);
+    CHECK(n == WEBMENU_N, "everything: %d items", n);
+
+    const char *ok[] = { "copy", "selectAll", "openLink" };
+    n = webmenu_parse(ok, 3, it);
+    CHECK(n == 3 && it[0] == WEBMENU_COPY && it[2] == WEBMENU_OPEN_LINK, "parse");
+    const char *all[] = { "cut", "copy", "paste", "selectAll", "copyLink", "openLink", "copyImage" };
+    CHECK(webmenu_parse(all, 7, it) == 7, "all seven");
+    const char *twice[] = { "copy", "copy" };
+    CHECK(webmenu_parse(twice, 2, it) < 0, "an item twice is refused");
+    const char *unknown[] = { "copy", "Delete everything" };
+    CHECK(webmenu_parse(unknown, 2, it) < 0, "an unknown item (text) is refused");
+    const char *nul[] = { "copy", NULL };
+    CHECK(webmenu_parse(nul, 2, it) < 0, "a missing item is refused");
+    CHECK(webmenu_parse(ok, 0, it) < 0 && webmenu_parse(all, 8, it) < 0 && webmenu_parse(NULL, 1, it) < 0, "none, or too many");
+    for (int i = 0; i < WEBMENU_N; i++) CHECK(webmenu_item(webmenu_name(i)) == i, "menu name %d", i);
+    CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
+}
+
 int main(void) {
+    test_edit();
     test_axis();
     test_badge();
     test_visibility();

@@ -162,6 +162,7 @@ static const char JS_DONE[] =
     "return true;";
 /* in the page's world */
 static const char JS_DISPATCH[] =
+    "const { urls, names, types, mtimes } = JSON.parse(meta);\n"
     "const dt = new DataTransfer();\n"
     "for (let i = 0; i < urls.length; i++) {\n"
     "  const blob = await (await fetch(urls[i])).blob();\n"
@@ -238,24 +239,31 @@ static void cleanup(Xfer *x) {
 
 static void on_dispatched(GObject *src, GAsyncResult *res, gpointer d) { finished(src, res, NULL); cleanup(d); }
 
+/* one JSON string value, quoted, appended to g */
+static void add_quoted(GString *g, const char *v) {
+    size_t n = strlen(v) * 6 + 3;
+    char *q = g_malloc(n);
+    json_quote(q, n, v);
+    g_string_append(g, q);
+    g_free(q);
+}
+
+/* WebKit 2.48 takes only numbers, strings and dictionaries as a function's arguments ("Invalid parameter types"
+ * for an array: no drop or pasted image ever reached the page), so the files' lists go as one JSON text, "meta" */
 static void dispatch(Xfer *x) {
-    GVariantBuilder names, types, mtimes;
-    g_variant_builder_init(&names, G_VARIANT_TYPE("as"));
-    g_variant_builder_init(&types, G_VARIANT_TYPE("as"));
-    g_variant_builder_init(&mtimes, G_VARIANT_TYPE("ad"));
-    for (int i = 0; i < x->n; i++) {
-        g_variant_builder_add(&names, "s", x->files[i].name);
-        g_variant_builder_add(&types, "s", x->types[i]);
-        g_variant_builder_add(&mtimes, "d", (double)x->files[i].mtime_ms);
-    }
+    GString *m = g_string_new("{\"urls\":[");
+    for (int i = 0; i < x->n; i++) { if (i) g_string_append_c(m, ','); add_quoted(m, x->urls && x->urls[i] ? x->urls[i] : ""); }
+    g_string_append(m, "],\"names\":[");
+    for (int i = 0; i < x->n; i++) { if (i) g_string_append_c(m, ','); add_quoted(m, x->files[i].name); }
+    g_string_append(m, "],\"types\":[");
+    for (int i = 0; i < x->n; i++) { if (i) g_string_append_c(m, ','); add_quoted(m, x->types[i]); }
+    g_string_append(m, "],\"mtimes\":[");
+    for (int i = 0; i < x->n; i++) g_string_append_printf(m, "%s%lld", i ? "," : "", (long long)x->files[i].mtime_ms);
+    g_string_append(m, "]}");
     GVariantDict args;
     g_variant_dict_init(&args, NULL);
-    const char *const none[] = { NULL };
-    g_variant_dict_insert_value(&args, "urls", g_variant_new_strv(x->urls ? (const char *const *)x->urls : none, -1));
-    g_variant_dict_insert_value(&args, "names", g_variant_builder_end(&names));
-    g_variant_dict_insert_value(&args, "types", g_variant_builder_end(&types));
-    g_variant_dict_insert_value(&args, "mtimes", g_variant_builder_end(&mtimes));
-    g_variant_dict_insert_value(&args, "paste", g_variant_new_boolean(x->paste));
+    g_variant_dict_insert_value(&args, "meta", g_variant_new_take_string(g_string_free(m, FALSE)));
+    g_variant_dict_insert_value(&args, "paste", g_variant_new_double(x->paste ? 1 : 0));
     g_variant_dict_insert_value(&args, "x", g_variant_new_double(x->x));
     g_variant_dict_insert_value(&args, "y", g_variant_new_double(x->y));
     g_variant_dict_insert_value(&args, "uris", g_variant_new_string(x->uris ? x->uris : ""));
@@ -378,4 +386,53 @@ void webxfer_paste_image(Web *w, const char *mime, GBytes *data) {
     snprintf(t->files[0].name, sizeof t->files[0].name, "%s", !strcmp(mime, "image/png") ? "image.png" : "image.jpg");
     t->types[0] = g_strdup(mime);
     start(t);
+}
+
+/* ---- the context menu's Copy Image ---- */
+
+/* in lord-web's isolated world (the page's scripts can't change fetch or the canvas there), with the page's origin:
+ * the image's bytes as a data: address, a PNG unless it already is a PNG or a JPEG; "" when it can't be read */
+static const char JS_IMAGE[] =
+    "const r = await fetch(u);\n"
+    "if (!r.ok) return '';\n"
+    "let b = await r.blob();\n"
+    "if (b.size > max) return '';\n"
+    "if (b.type !== 'image/png' && b.type !== 'image/jpeg') {\n"
+    "  const bm = await createImageBitmap(b);\n"
+    "  const c = document.createElement('canvas');\n"
+    "  c.width = bm.width; c.height = bm.height;\n"
+    "  c.getContext('2d').drawImage(bm, 0, 0);\n"
+    "  b = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n"
+    "  if (!b || b.size > max) return '';\n"
+    "}\n"
+    "return await new Promise((ok, no) => { const f = new FileReader(); f.onload = () => ok(String(f.result)); f.onerror = () => no(f.error); f.readAsDataURL(b); });";
+
+static int copying;
+
+static void on_image(GObject *src, GAsyncResult *res, gpointer d) {
+    Web *w = d;
+    copying = 0;
+    GError *e = NULL;
+    JSCValue *v = webkit_web_view_call_async_javascript_function_finish(WEBKIT_WEB_VIEW(src), res, &e);
+    char *s = v && jsc_value_is_string(v) ? jsc_value_to_string(v) : NULL;
+    if (v) g_object_unref(v);
+    if (!v) { fprintf(stderr, "lord-web: the image could not be read (%s)\n", e ? e->message : "?"); g_clear_error(&e); }
+    const char *mime = NULL, *b64 = NULL;
+    if (s && !strncmp(s, "data:image/png;base64,", 22)) { mime = "image/png"; b64 = s + 22; }
+    else if (s && !strncmp(s, "data:image/jpeg;base64,", 23)) { mime = "image/jpeg"; b64 = s + 23; }
+    gsize n = 0;
+    guchar *img = b64 && strlen(b64) <= (size_t)CLIP_IMAGE_MAX / 3 * 4 + 8 ? g_base64_decode(b64, &n) : NULL;
+    g_free(s);
+    if (img && n <= CLIP_IMAGE_MAX && image_ok(mime, img, n) && w->win) { webwin_offer(w->win, mime, g_bytes_new_take(img, n)); img = NULL; }
+    g_free(img);
+}
+
+void webxfer_copy_image(Web *w, const char *uri) {
+    if (copying || !w->view || w->outside || !uri) return;
+    copying = 1;
+    GVariantDict args;
+    g_variant_dict_init(&args, NULL);
+    g_variant_dict_insert_value(&args, "u", g_variant_new_string(uri));
+    g_variant_dict_insert_value(&args, "max", g_variant_new_double((double)CLIP_IMAGE_MAX));
+    webkit_web_view_call_async_javascript_function(w->view, JS_IMAGE, -1, g_variant_dict_end(&args), XFER_WORLD, NULL, NULL, on_image, w);
 }

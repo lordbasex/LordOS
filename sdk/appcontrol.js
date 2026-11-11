@@ -15,7 +15,8 @@
 import { windows, wm, getApp, appMenus, onActiveDesktop, activeDesktop } from './windows.js';
 import { launcherIdOf, quitApp } from './dock.js';
 import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
-import { openFileWithApps } from './sysopen.js';
+import { openFileWithApps, openUrl } from './sysopen.js';
+import { webAppOfWindow } from './webapps.js';
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
 import { compareNames } from './collate.js';
@@ -58,8 +59,20 @@ export function hideOthers(winId) {
   const mine = new Set(g.windows.map((w) => w.id));
   windows.get().forEach((w) => { if (!mine.has(w.id) && !isShellPanel(w) && onActiveDesktop(w)) wm.minimize(w.id); });
 }
-// The app's own Settings… item, if it has one (❖,).
-export const appSettingsItem = settingsItemOf;
+// A web app's window (lord-web, docs/WEBAPPS.md): Settings… opens Settings → Web apps on that app, and Help offers
+// the app's own site ("<app> on the web") in the browser.
+function webSettingsItem(winId) {
+  const web = webAppOfWindow(wm.get(winId));
+  return web ? { onClick: () => wm.open('settings', { args: { section: 'webapps', app: web.entry.id, nonce: Date.now() } }) } : null;
+}
+export function webHelpItems(winId) {
+  const web = webAppOfWindow(wm.get(winId));
+  if (!web || !/^https?:\/\//.test(String(web.entry.origin || ''))) return [];
+  return [{ label: t('shell.app.webSite', { app: web.entry.name }), onClick: () => openUrl(`${web.entry.origin}/`) }, '-'];
+}
+
+// The app's own Settings… item, if it has one (❖,); a web app's is its page in Settings → Web apps.
+export const appSettingsItem = (winId) => settingsItemOf(winId) || webSettingsItem(winId);
 
 // Show desktop: everything visible on this desktop goes away, and the next time what it took away
 // comes back (each desktop remembers its own).
@@ -75,7 +88,7 @@ export function toggleShowDesktop() {
 export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
-  const settingsItem = settingsItemOf(winId);
+  const settingsItem = appSettingsItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
