@@ -190,10 +190,10 @@ static const char SELECT_JS[] =
     "      for (const n of path) { n.removeEventListener(e.type, take, true); n.removeEventListener(e.type, take); }\n"
     "      if (!e.defaultPrevented) return;\n"
     "      if (!text && html) { try { text = new DOMParser().parseFromString(html, 'text/html').body.innerText || ''; } catch (x) { } }\n"
-    "      if (text) ch.postMessage(JSON.stringify({ type: e.type, text, html }));\n"
+    "      if (text) ch.postMessage(JSON.stringify({ type: e.type, text, html, href: String(location.href) }));\n"
     "    }, 0);\n"
     "  };\n"
-    "  if (ch) { addEventListener('copy', onCopy, true); addEventListener('cut', onCopy, true); }\n"
+    "  if (ch && window === window.top) { addEventListener('copy', onCopy, true); addEventListener('cut', onCopy, true); }\n"
     "})();\n";
 
 #define MENU_MSG_MAX (64 * 1024)
@@ -243,7 +243,10 @@ static void on_copy_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     g_free(s);
     const JVal *r = doc.root;
     const char *text = r && r->type == J_OBJ ? json_str(r, "text") : NULL, *html = r && r->type == J_OBJ ? json_str(r, "html") : NULL;
-    if (!text || !text[0] || strlen(text) > COPY_PART_MAX) web_note("page copy refused (copy event): %s", text && text[0] ? "too long" : "no text");
+    const char *href = r && r->type == J_OBJ ? json_str(r, "href") : NULL;
+    /* the same gate as the clipboard API's writes (webxfer.c): the app's own top-level document, in scope */
+    if (!webxfer_in_scope(w, href)) web_note("page copy refused (copy event): not the app's own page");
+    else if (!text || !text[0] || strlen(text) > COPY_PART_MAX) web_note("page copy refused (copy event): %s", text && text[0] ? "too long" : "no text");
     else webwin_offer_text(w->win, g_strdup(text), html && html[0] && strlen(html) <= COPY_PART_MAX ? g_strdup(html) : NULL);
     json_free(&doc);
 }

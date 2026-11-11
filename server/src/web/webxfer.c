@@ -131,7 +131,7 @@ static char *committed;                 /* the main frame's document, as last co
 
 /* 1 while the document that sent a copy is the app's own: the address it says it has (from the isolated world), the
  * main frame's committed document and the view's current address are all inside the scope */
-static int clip_in_scope(Web *w, const char *href) {
+int webxfer_in_scope(Web *w, const char *href) {
     const char *now = webkit_web_view_get_uri(w->view);
     return !w->outside && href && committed && now && weburl_in_scope(href, w->app.scope) &&
            weburl_in_scope(committed, w->app.scope) && weburl_in_scope(now, w->app.scope);
@@ -141,7 +141,7 @@ static int clip_in_scope(Web *w, const char *href) {
 static const char *clip_take(Web *w, JSCValue *v) {
     if (!w->win || !jsc_value_is_object(v)) return "NotAllowedError: nothing to write";
     char *href = prop_str(v, "href");
-    int mine = clip_in_scope(w, href);
+    int mine = webxfer_in_scope(w, href);
     g_free(href);
     if (!mine) return "NotAllowedError: not this app's page";
     if (!webwin_user_active(w->win)) return "NotAllowedError: the clipboard needs a key or a click in the window first";

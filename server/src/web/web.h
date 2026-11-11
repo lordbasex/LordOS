@@ -97,6 +97,7 @@ void web_state_save(Web *w);
 
 /* webxfer.c */
 void webxfer_init(Web *w);                               /* the clipboard script and its message handler */
+int  webxfer_in_scope(Web *w, const char *href);         /* href, the main frame's committed document and the view's address are in the app's scope, and the window isn't outside it */
 /* files dropped at (x, y) in the window's surface coordinates (n of them, their fds taken over), else the dropped text
  * (a uri-list's lines or plain text; may be NULL) */
 void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const char *uris, const char *text);
