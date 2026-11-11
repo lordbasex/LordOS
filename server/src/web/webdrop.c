@@ -1,11 +1,14 @@
 /* webdrop.c — the files of a drop's text/uri-list (see webdrop.h). */
 #include "webdrop.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <linux/openat2.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 static int hex(char c) {
@@ -50,6 +53,40 @@ int webdrop_place_ok(const char *real, const char *home) {
     return 1;
 }
 
+#define OPEN_FLAGS (O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK | O_NOFOLLOW)
+
+/* the fallback for a kernel without openat2 (or a filter that refuses it): one component at a time from "/", each
+ * folder opened without following a link, the last one as the file */
+int webdrop_open_walk(const char *real) {
+    if (!real || real[0] != '/' || !real[1]) return -1;
+    int dir = open("/", O_PATH | O_DIRECTORY | O_CLOEXEC);
+    const char *p = real + 1;
+    while (dir >= 0) {
+        const char *e = strchr(p, '/');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        char name[NAME_MAX + 1];
+        if (!l || l > NAME_MAX || (l == 1 && p[0] == '.') || (l == 2 && p[0] == '.' && p[1] == '.')) { close(dir); return -1; }
+        memcpy(name, p, l);
+        name[l] = 0;
+        int next = openat(dir, name, e ? O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC : OPEN_FLAGS);
+        close(dir);
+        if (!e) return next;
+        dir = next;
+        p = e + 1;
+    }
+    return -1;
+}
+
+int webdrop_open(const char *real) {
+    if (!real || real[0] != '/' || !real[1]) return -1;
+#ifdef SYS_openat2
+    struct open_how how = { .flags = OPEN_FLAGS, .resolve = RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS };
+    int fd = (int)syscall(SYS_openat2, AT_FDCWD, real, &how, sizeof how);
+    if (fd >= 0 || (errno != ENOSYS && errno != EPERM && errno != E2BIG)) return fd;
+#endif
+    return webdrop_open_walk(real);
+}
+
 int webdrop_files(const char *list, size_t len, const char *home, WebDropFile *out, int max) {
     int n = 0;
     if (!list || len > WEBDROP_LIST_MAX) return 0;
@@ -64,12 +101,12 @@ int webdrop_files(const char *list, size_t len, const char *home, WebDropFile *o
         struct stat st;
         /* the list comes from whichever app started the drag: only a file of the person's own places (where it really
          * is, links resolved), a regular file before opening it (opening a device or a pipe may do something), and
-         * again once open, without following a link put there in between */
+         * again once open, without following a link put anywhere on that path in between (webdrop_open) */
         if (l && p[0] != '#' && !webdrop_uri_path(p, l, path, sizeof path) && realpath(path, real) && webdrop_place_ok(real, home) &&
             !stat(real, &st) && S_ISREG(st.st_mode)) {
-            int fd = open(real, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK | O_NOFOLLOW);
+            int fd = webdrop_open(real);
             if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size >= 0 && (unsigned long long)st.st_size <= WEBDROP_FILE_MAX) {
-                const char *base = strrchr(path, '/');
+                const char *base = strrchr(real, '/');        /* the name of the file opened, not the list's */
                 base = base && base[1] ? base + 1 : "file";
                 WebDropFile *f = &out[n++];
                 f->fd = fd;

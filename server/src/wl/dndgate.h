@@ -17,6 +17,11 @@ int dndg_pid_sandboxed(int pid);
  * even if its pid is someone else's by then. 1 if procfd < 0. */
 int dndg_proc_sandboxed(int procfd);
 
+/* 1 if a drag's type mime is a list of files (text/uri-list, and the file managers' and the portals' lists): left
+ * out of a contained drag's offer to a target that would open those files and hand them on (wl.c: lord-web gives a
+ * page the files of a drop). */
+int dndg_file_mime(const char *mime);
+
 /* A Linux app's drop on LordOS, and who may take it: only what runs while the UI handles the release that
  * made the drop. pending: a drop is waiting; claimable: that release is being handled; claimed: someone took it. */
 typedef struct { int pending, claimable, claimed; } DropGate;

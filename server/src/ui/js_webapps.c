@@ -50,6 +50,7 @@
 #include "../web/webmem.h"
 #include "../web/webmgr.h"
 #include "../wl/wl.h"
+#include "../wl/wl.h"
 #include "../wl/xdgact.h"
 
 #include <dirent.h>
@@ -643,10 +644,16 @@ static const JSCFunctionListEntry webapps_funcs[] = {
 
 /* notifyd's question: is pid one of our lord-web processes (and whose)? */
 static int web_of_pid(uint32_t pid, char *app, char *profile) { return pid ? webmgr_owner((pid_t)pid, app, profile) : -1; }
+/* the compositor's: is this client a lord-web (a drop's files go to a page there)? */
+static int web_pid(int pid) {
+    char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1];
+    return pid > 0 && !webmgr_owner((pid_t)pid, app, profile);
+}
 
 void js_webapps_register(JSContext *c, JSValue lord) {
     webmgr_init(js_sys_assets());
     notifyd_set_web_of_pid(web_of_pid);
+    wl_set_web_pid(web_pid);
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, webapps_funcs, sizeof webapps_funcs / sizeof webapps_funcs[0]);
     JS_SetPropertyStr(c, lord, "webapps", o);

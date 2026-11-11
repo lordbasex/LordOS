@@ -506,7 +506,7 @@ static void test_drop(void) {
     CHECK(n == 3, "the regular files only: %d", n);
     if (n == 3) {
         CHECK(!strcmp(f[0].name, "a.png") && f[0].size == 10 && f[0].fd >= 0, "a.png");
-        CHECK(!strcmp(f[1].name, "link.png") && f[1].size == 10, "a link to a file is that file, under its own name");
+        CHECK(!strcmp(f[1].name, "a.png") && f[1].size == 10, "a link to a file is that file, under that file's name: %s", f[1].name);
         CHECK(!strcmp(f[2].name, "two words.txt") && f[2].size == 0, "an empty file, LF line end");
     }
     webdrop_close(f, n);
@@ -522,6 +522,39 @@ static void test_drop(void) {
     webdrop_close(f, n);
     unlink(tohid);
     unlink(hid);
+    /* opened without following a link anywhere on the way: one put in place of a folder after realpath is refused */
+    {
+        char rd[PATH_MAX], rf[PATH_MAX], via[PATH_MAX], vf[PATH_MAX];
+        snprintf(rd, sizeof rd, "%s/realdir", dir);
+        snprintf(rf, sizeof rf, "%s/realdir/f.txt", dir);
+        snprintf(via, sizeof via, "%s/via", dir);
+        snprintf(vf, sizeof vf, "%s/via/f.txt", dir);
+        mkdir(rd, 0755);
+        put_file(rf, 3);
+        CHECK(!symlink(rd, via), "symlink to a folder");
+        int (*const opens[2])(const char *) = { webdrop_open, webdrop_open_walk };
+        for (int k = 0; k < 2; k++) {
+            int fd = opens[k](rf);
+            CHECK(fd >= 0, "%d: a path without links opens", k);
+            if (fd >= 0) close(fd);
+            fd = opens[k](vf);
+            CHECK(fd < 0, "%d: a link to a folder on the way is refused", k);
+            if (fd >= 0) close(fd);
+            fd = opens[k](link);
+            CHECK(fd < 0, "%d: a link as the file itself is refused", k);
+            if (fd >= 0) close(fd);
+            CHECK(opens[k]("relative/f.txt") < 0 && opens[k]("/") < 0 && opens[k](NULL) < 0, "%d: not an absolute file path", k);
+        }
+        /* the list may name the file through the link (realpath resolves it): the file it leads to, under its name */
+        char vl[PATH_MAX + 16];
+        snprintf(vl, sizeof vl, "file://%s\n", vf);
+        n = webdrop_files(vl, strlen(vl), "/home/u", f, WEBDROP_FILES_MAX);
+        CHECK(n == 1 && !strcmp(f[0].name, "f.txt") && f[0].size == 3, "through a folder link: %d", n);
+        webdrop_close(f, n);
+        unlink(via);
+        unlink(rf);
+        rmdir(rd);
+    }
     /* at most 20 */
     static char many[32 * (PATH_MAX + 16)];
     many[0] = 0;

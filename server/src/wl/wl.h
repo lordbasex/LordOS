@@ -123,6 +123,9 @@ int  wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *
  * person's answer to a "shortcuts" prompt for app (a kbinhibit key that is waiting for one: 0 otherwise); and
  * the saved decisions changed (Settings → Privacy), so every inhibitor is told whether it holds. */
 void wl_set_greeter(int on);
+/* fn(pid): 1 if pid is one of lord-server's lord-web processes. A drag by an isolated or sandboxed app offers them no
+ * file list (they would open the files for a web page), only its text. */
+void wl_set_web_pid(int (*fn)(int pid));
 int  wl_shortcuts_answer(const char *app, int allow);
 void wl_shortcuts_changed(void);
 /* 1 if this key press goes to the window with the keyboard because its inhibitor holds (kbi_route: KBI_KEY_APP, or
