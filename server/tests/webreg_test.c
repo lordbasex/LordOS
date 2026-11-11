@@ -581,7 +581,7 @@ static void test_repo_catalog(void) {
         CHECK(id && !err && !strcmp(app, id), "catalog entry %s installs: %s", id ? id : "(no id)", err ? err : "");
         CHECK(id && !webmgr_load(id, &a) && a.source == WEBREG_SRC_CATALOG && strstr(a.icon, ".png"), "catalog entry %s has its icon", id ? id : "");
     }
-    CHECK(n >= 4, "the catalog has its apps: %d", n);
+    CHECK(n >= 30, "the catalog has its apps: %d", n);
     if (parsed) json_free(&d);
     free(t);
     snprintf(q, sizeof q, "rm -rf '%s'", tmpl);
