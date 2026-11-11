@@ -5,6 +5,7 @@
 //
 // lord-server is the one that decides: these only shape what the person sees and what is asked of
 // lord.webapps (server/src/ui/js_webapps.c), which validates everything again.
+import { utf8Length } from './utf8.js';
 
 export const WEB_ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 export const PERM_KINDS = ['notifications', 'camera', 'microphone', 'screen', 'location'];
@@ -127,8 +128,9 @@ export const addressEntry = (s, profileName) => ({ source: 'url', probe: s.probe
 const HIDDEN = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁩﻿]/;
 export function nameOk(name) {
   if (typeof name !== 'string' || !name || name !== name.trim() || HIDDEN.test(name)) return false;
-  return new TextEncoder().encode(name).length <= 64;
+  return utf8Length(name) <= 64;
 }
+
 
 // The catalog (assets/webapps/catalog.json) for the Store: each entry, whether it is installed, in the catalog's
 // order or filtered by a search. An entry that breaks a rule is left out.

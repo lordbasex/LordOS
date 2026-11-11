@@ -9,6 +9,7 @@
 //   legacy: 'host:port' of a device saved before 0.8.8.4, whose remembered password is still under that key.
 // Cred = { id, user, domain, label } (label: an optional display name) — the password is only in the keyring (service rdesk://<id>/), never in settings.
 
+import { utf8Decode } from './utf8.js';
 import { compareNames } from './collate.js';
 export const DEVICE = { id: '', proto: 'rdp', host: '', port: 0, name: '', cred: '', group: '', fav: false, last: 0, shot: 0,
   reconnect: true, admin: false, swap: false, res: 'auto', full: false, scale: 100, depth: 32, sound: 'here', folders: [], legacy: '' };
@@ -153,7 +154,7 @@ export function decodeRdp(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
   if (b[0] === 0xff && b[1] === 0xfe) { let s = ''; for (let i = 2; i + 1 < b.length; i += 2) s += String.fromCharCode(b[i] | (b[i + 1] << 8)); return s; }
   const start = b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf ? 3 : 0;
-  return new TextDecoder().decode(b.subarray(start));
+  return utf8Decode(b.subarray(start));
 }
 // what we take from one: { device, user, domain } or null if it has no address
 export function parseRdp(text) {

@@ -5,6 +5,7 @@
 // In the theme (compositor) process: lord-server notifies with __lordBrokerPick(reqid, app, save,
 // suggest); the dialog is shown and, with the choice, lord.broker.pickResult(reqid,
 // path) is called. In the app process: the SDK offers fs.openFile()/fs.saveFile().
+import { utf8Encode, utf8Decode } from './utf8.js';
 import { createElement as h } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -57,14 +58,14 @@ export async function openFile() {
   if (!r) return null;
   const data = lord.broker.fdRead(r.fd);
   lord.broker.fdClose(r.fd);
-  return { name: r.name, arrayBuffer: () => data, text: () => new TextDecoder().decode(data) };
+  return { name: r.name, arrayBuffer: () => data, text: () => utf8Decode(new Uint8Array(data)) };
 }
 
 export async function saveFile(suggestedName, data) {
   if (!inApp()) throw new Error('the file dialog only exists in an isolated app');
   const r = lord.broker.pick(true, suggestedName || 'untitled.txt');
   if (!r) return false;
-  const buf = typeof data === 'string' ? new TextEncoder().encode(data).buffer : data;
+  const buf = typeof data === 'string' ? utf8Encode(data).buffer : data;
   const ok = lord.broker.fdWrite(r.fd, buf);
   lord.broker.fdClose(r.fd);
   return { name: r.name, ok };
