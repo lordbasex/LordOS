@@ -305,5 +305,28 @@ eq('the key changes when a profile starts', [k0, M.sizesKey(chat, [{ app: 'chat'
   ['personal,work', 'personal,work*', 'personal,work']);
 eq('and when one is added', M.sizesKey({ ...chat, profiles: [...chat.profiles, { id: 'new', name: 'New' }] }, []), 'personal,work,new');
 
+// ---- editing: the Edit menu and a page's context menu ----
+const ran = [];
+const edit = M.webEditItems((c) => `L:${c}`, (c) => ran.push(c));
+eq('the Edit menu', edit.map((i) => (i === '-' ? '-' : `${i.label} ${i.hint}`)),
+  ['L:undo Ctrl+Z', 'L:redo Ctrl+Shift+Z', '-', 'L:cut Ctrl+X', 'L:copy Ctrl+C', 'L:paste Ctrl+V', '-', 'L:selectAll Ctrl+A']);
+edit.filter((i) => i !== '-').forEach((i) => i.onClick());
+eq('each item runs its command (lord-server\'s names, server/src/web/webedit.c)', ran, ['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll']);
+const picked = [];
+const menu = M.webMenuItems(['cut', 'copy', 'paste', 'selectAll', 'copyLink', 'openLink', 'copyImage'], (x) => x.toUpperCase(), (x) => picked.push(x));
+eq('a context menu with every item, grouped', menu.map((i) => (i === '-' ? '-' : i.label)), ['CUT', 'COPY', 'PASTE', 'SELECTALL', '-', 'COPYLINK', 'OPENLINK', '-', 'COPYIMAGE']);
+menu.filter((i) => i !== '-')[5].onClick();
+eq('a pick names the item', picked, ['openLink']);
+eq('unknown names and repeats are left out', M.webMenuItems(['selectAll', 'rm -rf', 'selectAll', 'copyImage', null], (x) => x, () => {}).map((i) => (i === '-' ? '-' : i.id)),
+  ['selectAll', '-', 'copyImage']);
+eq('nothing', [M.webMenuItems(null, (x) => x, () => {}), M.webMenuItems([], (x) => x, () => {})], [[], []]);
+const cSrc = fs.readFileSync(path.join(root, 'server/src/web/webedit.c'), 'utf8');
+eq('the menu\'s names are lord-server\'s', M.WEB_MENU_ITEMS.every((x) => cSrc.includes(`"${x}"`)) && M.WEB_EDIT_ROWS.filter((r) => r !== '-').every((r) => cSrc.includes(`"${r[0]}"`)), true);
+for (const lang of ['en', 'es', 'pt', 'fr', 'it', 'lt']) {
+  const sh = JSON.parse(fs.readFileSync(path.join(root, `assets/locales/${lang}/shell.json`), 'utf8'));
+  const missing = [...M.WEB_MENU_ITEMS, 'undo', 'redo'].filter((k) => !sh[`edit.${k}`]);
+  eq(`edit words in ${lang}`, missing, []);
+}
+
 console.log(bad ? `webapps-model: ${bad} of ${n} failed` : `webapps-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

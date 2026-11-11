@@ -654,7 +654,10 @@ static char *pb_read(const char *type) {
 }
 
 static void pb_write_text(const char *text, size_t len) {
+    /* zeroed: libwpe's wpe_pasteboard_string_initialize leaves a string that already has data alone, so stack garbage
+     * was written to the pasteboard (or read: a crash) and the session's text never reached the page */
     struct wpe_pasteboard_string_pair pairs[2];
+    memset(pairs, 0, sizeof pairs);
     wpe_pasteboard_string_initialize(&pairs[0].type, PB_TEXT, strlen(PB_TEXT));
     wpe_pasteboard_string_initialize(&pairs[0].string, text, len);
     wpe_pasteboard_string_initialize(&pairs[1].type, "text/plain", 10);
@@ -763,6 +766,43 @@ void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
     new_source(win);
 }
 
+/* an editing command ran (the Edit menu, the context menu): WebKit writes its pasteboard a moment later, from the web
+ * process, and the window may not have the keyboard (the menu had it), so it is looked at now rather than by the timer */
+static gboolean pb_watch(gpointer d);
+
+static gboolean pb_check_once(gpointer d) {
+    WebWin *win = d;
+    pb_watch(win);
+    return G_SOURCE_REMOVE;
+}
+
+/* Ctrl+<letter> (with Shift) as the page would get it from the keyboard: the key that makes that letter in the
+ * compositor's keymap, pressed and released. 0 when the keymap has no such key. */
+int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift) {
+    struct wpe_input_xkb_context *x = wpe_input_xkb_context_get_default();
+    struct xkb_keymap *km = wpe_input_xkb_context_get_keymap(x);
+    if (!km || !win->backend) return 0;
+    xkb_keycode_t code = 0;
+    for (xkb_keycode_t k = xkb_keymap_min_keycode(km); k <= xkb_keymap_max_keycode(km) && !code; k++) {
+        const xkb_keysym_t *syms;
+        int n = xkb_keymap_key_get_syms_by_level(km, k, 0, 0, &syms);
+        for (int i = 0; i < n; i++) if (syms[i] == keysym) code = k;
+    }
+    if (!code) return 0;
+    uint32_t mods = wpe_input_keyboard_modifier_control | (shift ? wpe_input_keyboard_modifier_shift : 0);
+    uint32_t t = (uint32_t)(g_get_monotonic_time() / 1000);
+    for (int pressed = 1; pressed >= 0; pressed--) {
+        struct wpe_input_keyboard_event e = { t, shift ? xkb_keysym_to_upper(keysym) : keysym, code, pressed != 0, mods };
+        wpe_view_backend_dispatch_keyboard_event(win->backend, &e);
+    }
+    return 1;
+}
+
+void webwin_after_edit(WebWin *win) {
+    g_timeout_add(150, pb_check_once, win);
+    g_timeout_add(600, pb_check_once, win);
+}
+
 int webwin_user_active(WebWin *win) {
     return win->focused && win->last_input_us && g_get_monotonic_time() - win->last_input_us < USER_ACTIVE_US;
 }
@@ -834,6 +874,13 @@ static void sel_image_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, 
     if (b && b->len && o == win->sel_offer) webxfer_paste_image(win->w, mime, g_bytes_new(b->data, b->len));
 }
 
+/* the session's clipboard holds an image and no text: it goes to the page (webxfer.c). 1 when that is what happened. */
+int webwin_paste_image(WebWin *win) {
+    if (!win->sel_offer || !win->sel_img || win->sel_mime) return 0;
+    read_offer(win, win->sel_offer, win->sel_img, CLIP_IMAGE_MAX, sel_image_read, (void *)win->sel_img);
+    return 1;
+}
+
 /* Ctrl+V or Shift+Insert while the session's clipboard holds an image and no text: the image goes to the page (the
  * key doesn't: WebKit would paste its pasteboard's text). 1 when that is what happened. */
 static int paste_image(WebWin *win, uint32_t key) {
@@ -844,8 +891,7 @@ static int paste_image(WebWin *win, uint32_t key) {
     int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
     int shift = (win->mods & wpe_input_keyboard_modifier_shift) != 0;
     if (!((ctrl && !alt && (sym == XKB_KEY_v || sym == XKB_KEY_V)) || (shift && !ctrl && !alt && sym == XKB_KEY_Insert))) return 0;
-    read_offer(win, win->sel_offer, win->sel_img, CLIP_IMAGE_MAX, sel_image_read, (void *)win->sel_img);
-    return 1;
+    return webwin_paste_image(win);
 }
 
 static int mime_rank(const char *m) {
@@ -1217,8 +1263,20 @@ void webwin_set_cursor_hint(WebWin *win, int link, int text) {
     if (shape != win->cursor_shape) set_cursor(win, shape);
 }
 
+/* A motion names the button held (left first, then right, then middle), as GTK's does: WebKit 2.48 turns a libwpe
+ * motion's button into the mouse event's, and WebCore drags a selection (or anything else) only while a motion says
+ * the left button is down; with 0 a drag over text selected nothing. The click count (double and triple clicks) is
+ * WebKit's own, from the presses' times and places. */
+static uint32_t motion_button(uint32_t buttons) {
+    if (buttons & wpe_input_pointer_modifier_button1) return 1;
+    if (buttons & wpe_input_pointer_modifier_button2) return 2;
+    if (buttons & wpe_input_pointer_modifier_button3) return 3;
+    return 0;
+}
+
 static void send_motion(WebWin *win, uint32_t time) {
-    struct wpe_input_pointer_event e = { wpe_input_pointer_event_type_motion, time, (int)(win->px * win->scale), (int)(win->py * win->scale), 0, 0, win->mods | win->buttons };
+    uint32_t b = motion_button(win->buttons);
+    struct wpe_input_pointer_event e = { wpe_input_pointer_event_type_motion, time, (int)(win->px * win->scale), (int)(win->py * win->scale), b, b != 0, win->mods | win->buttons };
     wpe_view_backend_dispatch_pointer_event(win->backend, &e);
 }
 

@@ -6,7 +6,7 @@
 // where a click lights that bar and opens the menu there. sdk/menubarmodel.js decides which bar is lit.
 // From the keyboard: F10, or ⌥ pressed and released alone, opens the lit bar's first menu (sdk/shortcuts.js
 // addMenuBarKeys); ← and → then move between its menus (sdk/menunav.js barIndex), and the same key closes it.
-import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex } from '@lordos/sdk';
+import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex, webHelpItems } from '@lordos/sdk';
 import { useState, useRef, useEffect } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -123,6 +123,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
     // Minimize, Zoom, Fill, Center, Move & Resize, Move to <display>, the open windows (sdk/windowmenu.js)
     window: { items: windowMenuItems(app ? focused : null) },
     help: { items: [
+      ...(focused ? webHelpItems(focused) : []),
       ...(getApp('help') ? [{ label: tr('shell.help.open'), onClick: () => wm.open('help') }, { label: tr('shell.help.tour'), onClick: () => help.startTour() }, '-'] : []),
       { label: tr('shell.menu.about'), onClick: () => wm.open('about') },
       { label: tr('shell.help.theme'), disabled: true },

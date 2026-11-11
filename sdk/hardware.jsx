@@ -21,7 +21,7 @@
 //
 // Everything arrives as __lordHw(kind, data) from lord-server (ui/js_hw.c): no polling.
 import { createElement as h, useEffect, useRef, useState } from 'react';
-import { View, Text, mainBox, addListener } from '@lordos/runtime';
+import { View, Text, mainBox, addListener, screen } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
@@ -32,8 +32,9 @@ import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent } from './webapps.js';
-import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel } from './webappsmodel.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu } from './webapps.js';
+import { ContextMenu } from './contextmenu.jsx';
+import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
@@ -616,6 +617,25 @@ export function WebAppAskPrompt() {
     h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.ask.allow'), primary: true, th, onClick: () => answerWebAsk(q, true, remember) })))));
 }
 
+// ---- A right click in a web app's page (org.lordos.WebApps1.Menu, server/src/ui/webask.c) ----
+//
+// lord-server checked that the menu comes from that app's lord-web and that its items are names from the closed list
+// (Cut, Copy, Paste, Select All, Copy Link Address, Open Link in Browser, Copy Image): the words are LordOS's, never
+// the page's. The menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web.
+export function WebAppMenu() {
+  const m = useStore(webMenu);
+  if (!m) return null;
+  const items = webMenuItems(m.items, (n) => t(`shell.edit.${n}`), (n) => answerWebMenu(n, m));
+  if (!items.length) return null;
+  const all = { w: screen.width, h: screen.height };
+  // a press anywhere else closes it and goes no further (not into the page), as a browser's menu does
+  // the menu closes before its item's click runs: the "" waits, so a pick answers first
+  const close = () => setTimeout(() => answerWebMenu('', m), 0);
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, width: all.w, height: all.h, zIndex: 100000 } },
+    h(View, { style: { position: 'absolute', left: 0, top: 0, width: all.w, height: all.h }, onMouseDown: close, onContextMenu: close }),
+    h(ContextMenu, { key: m.id, x: m.x, y: m.y, items, bounds: all, onClose: close }));
+}
+
 // ---- events from lord-server ----
 
 globalThis.__lordHw = (kind, data) => {
@@ -642,6 +662,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-cast': case 'portal-cast-gone': case 'portal-casts': castEvent(kind, data); break;   // ScreenCast (screencast.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
+    case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

@@ -35,7 +35,10 @@
  *                                       the app and of its WebKit processes (web/webmem.c; read-only, bounded)
  *   owner(surface)                      { app, profile } when window surface is one of our lord-web processes, else null
  *   answer(id, value)                   a permission question (the "webapps-ask" event): allow|deny|once|deny-once
- *   asks()                              the questions still waiting */
+ *   asks()                              the questions still waiting
+ *   edit(app, profile, command)         the Edit menu on that web app's window: undo|redo|cut|copy|paste|selectAll, to its
+ *                                       lord-web (org.lordos.WebApp1.Edit, which checks the caller is lord-server)
+ *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or "" */
 #include "js_webapps.h"
 #include "js_err.h"
 #include "js_sys.h"
@@ -43,6 +46,7 @@
 #include "webicon.h"
 #include "../hw/notifyd.h"
 #include "../sec/json.h"
+#include "../web/webedit.h"
 #include "../web/webmem.h"
 #include "../web/webmgr.h"
 #include "../wl/wl.h"
@@ -573,6 +577,31 @@ static JSValue f_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return JS_NewBool(c, r == 0);
 }
 
+/* The shell's Edit menu on a web app's window: the command goes to that app and profile's lord-web (webask_edit),
+ * which runs it only when lord-server itself asked. */
+static JSValue f_edit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1), *cmd = arg_str(c, argc, argv, 2);
+    int ok = app && prof && cmd && webreg_id_ok(app) && webreg_id_ok(prof) && webedit_command(cmd) >= 0;
+    int sent = ok && !webask_edit(app, prof, cmd);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    JS_FreeCString(c, cmd);
+    if (!ok) return js_throw_code(c, "sys.badArgument", NULL);
+    return JS_NewBool(c, sent);
+}
+
+/* The person's choice in a page's context menu (the "webapps-menu" event): one of its items, or "" */
+static JSValue f_menu_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t id = 0;
+    const char *v = arg_str(c, argc, argv, 1);
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0]) || !v) { JS_FreeCString(c, v); return js_throw_code(c, "sys.badArgument", NULL); }
+    int r = webask_menu_answer(id, v);
+    JS_FreeCString(c, v);
+    return JS_NewBool(c, r == 0);
+}
+
 static JSValue f_asks(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     char *j = webask_pending();
@@ -608,6 +637,8 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("owner", 1, f_owner),
     JS_CFUNC_DEF("answer", 2, f_answer),
     JS_CFUNC_DEF("asks", 0, f_asks),
+    JS_CFUNC_DEF("edit", 3, f_edit),
+    JS_CFUNC_DEF("menuAnswer", 2, f_menu_answer),
 };
 
 /* notifyd's question: is pid one of our lord-web processes (and whose)? */

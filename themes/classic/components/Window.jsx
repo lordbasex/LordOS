@@ -9,7 +9,7 @@
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
 // icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -29,6 +29,7 @@ function MenuStrip({ t, win, focused, menus }) {
     ...menus,
     { label: tr('shell.menu.window'), items: windowMenuItems(win.id) },
     { label: tr('shell.menu.help'), items: [
+      ...webHelpItems(win.id),
       ...(getApp('help') ? [{ label: tr('shell.help.open'), onClick: () => wm.open('help') }, '-'] : []),
       ...(getApp('appabout') && appGroup(win.id) ? [{ label: tr('shell.app.about', { app: appGroup(win.id).name }), onClick: () => wm.open('appabout', { new: true, args: { key: appGroup(win.id).key, win: win.id } }) }] : []),
       { label: tr('shell.menu.about'), onClick: () => wm.open('about') },

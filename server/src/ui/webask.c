@@ -3,6 +3,7 @@
 #include "webbadge.h"
 #include "../hw/hw.h"
 #include "../web/webmgr.h"
+#include "../web/webedit.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,8 @@ typedef struct {
     char sender[256];
     char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1];
     int kind;
+    int menu, nitems;                /* a context menu (Menu) rather than a permission question (Ask) */
+    int items[WEBMENU_N];
 } Ask;
 
 static Ask asks[WEBASK_MAX];
@@ -31,6 +34,8 @@ static const char introspect[] =
     "<arg type=\"s\" name=\"kind\" direction=\"in\"/><arg type=\"s\" name=\"answer\" direction=\"out\"/></method>\n"
     "    <method name=\"SetBadge\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
     "<arg type=\"u\" name=\"count\" direction=\"in\"/></method>\n"
+    "    <method name=\"Menu\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
+    "<arg type=\"as\" name=\"items\" direction=\"in\"/><arg type=\"s\" name=\"item\" direction=\"out\"/></method>\n"
     "  </interface>\n"
     "</node>\n";
 
@@ -58,8 +63,16 @@ static void event(const char *kind, const Ask *a) {
     hw_emit(kind, j);
 }
 
+/* the menu for the shell: { id, app, profile, items: [names] } (names from webedit.c's list only) */
+static void menu_event(const char *kind, const Ask *a) {
+    char j[512];
+    int o = snprintf(j, sizeof j, "{\"id\":%d,\"app\":\"%s\",\"profile\":\"%s\",\"items\":[", a->id, a->app, a->profile);
+    for (int i = 0; i < a->nitems && o > 0 && (size_t)o < sizeof j - 32; i++) o += snprintf(j + o, sizeof j - (size_t)o, "%s\"%s\"", i ? "," : "", webmenu_name(a->items[i]));
+    if (o > 0 && (size_t)o < sizeof j - 3) { snprintf(j + o, sizeof j - (size_t)o, "]}"); hw_emit(kind, j); }
+}
+
 static void drop(Ask *a, int tell) {
-    if (tell && a->shown) event("webapps-ask-gone", a);
+    if (tell && a->shown) { if (a->menu) menu_event("webapps-menu-gone", a); else event("webapps-ask-gone", a); }
     memset(a, 0, sizeof *a);
 }
 
@@ -110,22 +123,37 @@ void webask_call(DConn *c, const DMsg *m) {
         return;
     }
     if (m->iface && !strcmp(m->iface, WEBASK_IFACE) && !strcmp(m->member, "SetBadge")) { set_badge(c, m); return; }
-    if (!m->iface || strcmp(m->iface, WEBASK_IFACE) || strcmp(m->member, "Ask")) {
+    int menu = m->iface && !strcmp(m->iface, WEBASK_IFACE) && !strcmp(m->member, "Menu");
+    if (!menu && (!m->iface || strcmp(m->iface, WEBASK_IFACE) || strcmp(m->member, "Ask"))) {
         dbus_error(c, m, "org.freedesktop.DBus.Error.UnknownMethod", "unknown method");
         return;
     }
-    if (!m->sig || strcmp(m->sig, "sss") || !m->sender || strlen(m->sender) >= sizeof asks[0].sender || (m->flags & DBUS_NO_REPLY)) {
+    if (!m->sig || strcmp(m->sig, menu ? "ssas" : "sss") || !m->sender || strlen(m->sender) >= sizeof asks[0].sender || (m->flags & DBUS_NO_REPLY)) {
         dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments");
         return;
     }
     DRd r;
     dr_init(&r, m);
-    const char *app = dr_str(&r, NULL), *profile = dr_str(&r, NULL), *kind = dr_str(&r, NULL);
-    int k = r.err ? -1 : webreg_perm_kind(kind);
+    const char *app = dr_str(&r, NULL), *profile = dr_str(&r, NULL);
+    int k = 0, items[WEBMENU_N], nitems = 0;
+    if (menu) {
+        /* the items: names from the closed list (webedit.h), none twice; never text to show */
+        const char *names[WEBMENU_N + 1];
+        int n = 0;
+        size_t end = dr_arr(&r, 4);
+        while (dr_more(&r, end) && n <= WEBMENU_N) names[n++] = dr_str(&r, NULL);
+        nitems = r.err || dr_more(&r, end) ? -1 : webmenu_parse(names, n, items);
+        k = nitems < 0 ? -1 : 0;
+    } else {
+        const char *kind = dr_str(&r, NULL);
+        k = r.err ? -1 : webreg_perm_kind(kind);
+    }
     if (k < 0 || !webreg_id_ok(app) || !webreg_id_ok(profile)) { dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
     Ask *a = NULL;
     int mine = 0;
     for (int i = 0; i < WEBASK_MAX; i++) {
+        /* a new menu from a lord-web closes the one it had open (answered "") */
+        if (menu && asks[i].used && asks[i].menu && !strcmp(asks[i].sender, m->sender)) { send_answer(&asks[i], ""); drop(&asks[i], 1); }
         if (asks[i].used && !strcmp(asks[i].sender, m->sender)) mine++;
         else if (!asks[i].used && !a) a = &asks[i];
     }
@@ -134,6 +162,9 @@ void webask_call(DConn *c, const DMsg *m) {
     a->id = next_id++;
     a->serial = m->serial;
     a->kind = k;
+    a->menu = menu;
+    a->nitems = menu ? nitems : 0;
+    for (int i = 0; i < a->nitems; i++) a->items[i] = items[i];
     snprintf(a->sender, sizeof a->sender, "%s", m->sender);
     snprintf(a->app, sizeof a->app, "%s", app);
     snprintf(a->profile, sizeof a->profile, "%s", profile);
@@ -170,9 +201,14 @@ int webask_reply(DConn *c, const DMsg *m) {
     if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
     char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1];
     if (!pid || webmgr_owner((pid_t)pid, app, profile) || strcmp(app, a->app) || strcmp(profile, a->profile)) {
-        fprintf(stderr, "webapps: a question for %s (%s) from a process that is not its lord-web: refused\n", a->app, a->profile);
+        fprintf(stderr, "webapps: a %s for %s (%s) from a process that is not its lord-web: refused\n", a->menu ? "menu" : "question", a->app, a->profile);
         send_error(a, "org.freedesktop.DBus.Error.AccessDenied", "not this app's process");
         drop(a, 0);
+        return 1;
+    }
+    if (a->menu) {
+        a->shown = 1;
+        menu_event("webapps-menu", a);
         return 1;
     }
     /* decided meanwhile (Settings, or the answer to an earlier question): no need to ask */
@@ -190,7 +226,7 @@ int webask_answer(int id, const char *value) {
     /* "once": allowed this time; "deny-once": refused this time (the reply is "deny"); neither is kept */
     int v = !strcmp(value, "once") ? 3 : !strcmp(value, "deny-once") ? 4 : webreg_perm_value(value);
     Ask *a = NULL;
-    for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && asks[i].shown && asks[i].id == id) a = &asks[i];
+    for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && asks[i].shown && !asks[i].menu && asks[i].id == id) a = &asks[i];
     if (!a || v < 0 || v == WEBREG_ASK) return -1;
     if (v >= 3) { send_answer(a, v == 3 ? "once" : "deny"); drop(a, 0); return 0; }
     const char *e = webmgr_set_permission(a->app, webreg_perm_name(a->kind), value);
@@ -206,7 +242,33 @@ int webask_answer(int id, const char *value) {
     return 0;
 }
 
+int webask_menu_answer(int id, const char *item) {
+    Ask *a = NULL;
+    for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && asks[i].shown && asks[i].menu && asks[i].id == id) a = &asks[i];
+    if (!a || !item) return -1;
+    int k = item[0] ? webmenu_item(item) : -1, offered = 0;
+    for (int i = 0; i < a->nitems; i++) if (a->items[i] == k) offered = 1;
+    if (item[0] && !offered) return -1;            /* only an item this menu had */
+    send_answer(a, item);
+    drop(a, 0);
+    return 0;
+}
+
 void webask_attach(DConn *c) { bus = c; }
+
+int webask_edit(const char *app, const char *profile, const char *command) {
+    char name[160];
+    if (!bus || webedit_command(command) < 0 || webreg_bus_name(app, profile, name, sizeof name)) return -1;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, command);
+    DHdr h = { .type = DBUS_CALL, .flags = DBUS_NO_REPLY | DBUS_NO_AUTOSTART, .path = WEBREG_SHOW_PATH, .iface = WEBREG_SHOW_IFACE,
+               .member = "Edit", .dest = name, .sig = "s" };
+    uint32_t serial = dbus_send(bus, &h, &b);
+    dw_free(&b);
+    if (serial) dbus_flush(bus);
+    return serial ? 0 : -1;
+}
 
 int webask_show(const char *app, const char *profile, const char *token) {
     char name[160];
@@ -266,7 +328,7 @@ char *webask_pending(void) {
     if (!out) return NULL;
     out[o++] = '[';
     for (int i = 0; i < WEBASK_MAX; i++) {
-        if (!asks[i].used || !asks[i].shown) continue;
+        if (!asks[i].used || !asks[i].shown || asks[i].menu) continue;
         int w = snprintf(out + o, cap - o, "%s{\"id\":%d,\"app\":\"%s\",\"profile\":\"%s\",\"kind\":\"%s\"}", o > 1 ? "," : "",
                          asks[i].id, asks[i].app, asks[i].profile, webreg_perm_name(asks[i].kind));
         if (w > 0 && o + (size_t)w < cap - 2) o += (size_t)w;

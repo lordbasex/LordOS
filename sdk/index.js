@@ -192,7 +192,7 @@ export {
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
-import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, startHardware } from './hardware.jsx';
+import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, WebAppMenu, startHardware } from './hardware.jsx';
 import { GlobalShortcutsPrompt } from './globalshortcuts.jsx';
 export { KeyComboField, useGlobalShortcuts, checkGlobalShortcut, setGlobalShortcut, forgetGlobalShortcuts } from './globalshortcuts.jsx';
 import { startTray } from './trayitems.jsx';
@@ -349,12 +349,12 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, VoiceSavePrompt, DisplayConfirm),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
-export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem } from './appcontrol.js';
+export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems } from './appcontrol.js';
 export { windowMenuItems, moveResizeItems } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';

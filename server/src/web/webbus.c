@@ -10,7 +10,11 @@
  *   - the page's file chooser: the FileChooser portal;
  *   - a permission the registry says to ask about: org.lordos.WebApps1.Ask(app, profile, kind) on lord-server, which
  *     shows the dialog and stores the answer. Anything but "allow", "deny" or "once", an error or no lord-server is
- *     "deny".
+ *     "deny";
+ *   - the shell's Edit menu: org.lordos.WebApp1.Edit(command) from lord-server (webmain.c serves it), run only when
+ *     the bus says the caller's pid is the lord-server that started this lord-web;
+ *   - the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows LordOS's own
+ *     menu with those items (names from webedit.h, never the page's text) and answers the one chosen.
  * Every call is asynchronous: nothing here waits for another program. */
 #include "web.h"
 #include "webwin.h"
@@ -282,4 +286,68 @@ void webbus_ask(Web *w, int kind, WebAskDone cb, void *data) {
     a->data = data;
     g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Ask", g_variant_new("(sss)", w->app.id, w->profile->id, webreg_perm_name(kind)),
                            G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_ask, a);
+}
+
+/* ---- editing: the shell's Edit menu and the page's context menu ---- */
+
+typedef struct { Web *w; int cmd; } EditCall;
+
+static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
+    EditCall *ec = d;
+    GVariant *r = g_dbus_connection_call_finish(G_DBUS_CONNECTION(src), res, NULL);
+    guint32 pid = 0;
+    if (r) { g_variant_get(r, "(u)", &pid); g_variant_unref(r); }
+    if (pid && ec->w->server_pid > 1 && (pid_t)pid == ec->w->server_pid) web_edit(ec->w, ec->cmd);
+    else fprintf(stderr, "lord-web: an Edit call from a process that is not lord-server: refused\n");
+    g_free(ec);
+}
+
+void webbus_edit(Web *w, const char *sender, int cmd) {
+    if (!w->bus || !sender) return;
+    EditCall *ec = g_new0(EditCall, 1);
+    ec->w = w;
+    ec->cmd = cmd;
+    /* the bus answers from the caller's socket credentials, never from the caller */
+    g_dbus_connection_call(w->bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetConnectionUnixProcessID",
+                           g_variant_new("(s)", sender), G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, on_edit_pid, ec);
+}
+
+typedef struct { Web *w; int items[WEBMENU_N], n; char *link, *image; } MenuCall;
+
+static void on_menu(GObject *src, GAsyncResult *res, gpointer d) {
+    MenuCall *mc = d;
+    GError *e = NULL;
+    GVariant *r = g_dbus_connection_call_finish(G_DBUS_CONNECTION(src), res, &e);
+    mc->w->menu_open = 0;
+    int item = -1;
+    if (r) {
+        const char *s = NULL;
+        g_variant_get(r, "(&s)", &s);
+        int k = s && s[0] ? webmenu_item(s) : -1;
+        for (int i = 0; i < mc->n; i++) if (mc->items[i] == k) item = k;     /* only one this menu had */
+        g_variant_unref(r);
+    } else {
+        fprintf(stderr, "lord-web: no context menu (%s)\n", e ? e->message : "?");
+        g_clear_error(&e);
+    }
+    if (item >= 0) web_menu_chosen(mc->w, item, mc->link, mc->image);
+    g_free(mc->link);
+    g_free(mc->image);
+    g_free(mc);
+}
+
+void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image) {
+    if (!w->bus || !w->profile || n < 1 || n > WEBMENU_N || w->menu_open) return;
+    GVariantBuilder b;
+    g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
+    for (int i = 0; i < n; i++) g_variant_builder_add(&b, "s", webmenu_name(items[i]));
+    MenuCall *mc = g_new0(MenuCall, 1);
+    mc->w = w;
+    mc->n = n;
+    for (int i = 0; i < n; i++) mc->items[i] = items[i];
+    mc->link = link ? g_strdup(link) : NULL;
+    mc->image = image ? g_strdup(image) : NULL;
+    w->menu_open = 1;
+    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Menu", g_variant_new("(ssas)", w->app.id, w->profile->id, &b),
+                           G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_menu, mc);
 }

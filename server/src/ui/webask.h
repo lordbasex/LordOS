@@ -14,7 +14,17 @@
  *
  * The page's unread count for the Dock (docs/WEBAPPS.md, "Unread count on the Dock"). The same pid check as Ask
  * (webbadge.h keeps who was checked); the count is clamped to 0..9999 and goes to the shell as the "webapps-badge"
- * event { app, profile, count }; a lord-web that leaves the bus gets a 0. */
+ * event { app, profile, count }; a lord-web that leaves the bus gets a 0.
+ *
+ *   org.lordos.WebApps1.Menu(s app, s profile, as items) → s item
+ *
+ * A right click in a web app's page (docs/WEBAPPS.md, "Editing"): lord-web asks for a menu at the pointer. The items
+ * are names from webedit.h's closed list (never text), checked, with the same pid check as Ask; the shell gets the
+ * "webapps-menu" event { id, app, profile, items } and lord.webapps.menuAnswer(id, item) brings back the chosen
+ * item, or "" when the menu closed. A new menu from the same lord-web closes the one before ("webapps-menu-gone").
+ *
+ * The other way, lord-server to lord-web: org.lordos.WebApp1.Edit(s command) on its bus name, from the shell's Edit
+ * menu (webask_edit); lord-web runs it only when the caller is the lord-server that started it. */
 #ifndef LORD_UI_WEBASK_H
 #define LORD_UI_WEBASK_H
 
@@ -37,6 +47,11 @@ void webask_attach(DConn *c);
  * wanted. lord-web activates its window with the token, or maps it again when it was hidden behind its tray icon.
  * 0 sent, -1 no bus or a bad id. */
 int  webask_show(const char *app, const char *profile, const char *token);
+/* The person's choice in the menu id: one of its items, or "" (closed). 0 answered, -1 unknown id or item. */
+int  webask_menu_answer(int id, const char *item);
+/* The Edit menu: org.lordos.WebApp1.Edit(command) to that app and profile's lord-web, no reply wanted; command is
+ * one of webedit.h's names. 0 sent, -1 no bus, a bad id or an unknown command. */
+int  webask_edit(const char *app, const char *profile, const char *command);
 /* The counts shown now, as a JSON array [{ app, profile, count }] (malloc'd), for a new JS context. */
 char *webask_badges(void);
 /* The questions waiting for the person, as a JSON array (malloc'd), for a new JS context. */

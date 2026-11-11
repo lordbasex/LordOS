@@ -21,6 +21,12 @@ void webwin_set_cursor_hint(WebWin *win, int link, int text);
 int webwin_user_active(WebWin *win);
 /* the page copied: offer this text (mime NULL) or image (image/png, image/jpeg) to the session; data taken over */
 void webwin_offer(WebWin *win, const char *mime, GBytes *data);
+/* an editing command was run on the page (copy, cut): what it put in WebKit's pasteboard goes to the session */
+void webwin_after_edit(WebWin *win);
+/* Ctrl+<letter> (Shift too when shift) to the page as from the keyboard; 0 when the keymap has no such key */
+int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift);
+/* the session's clipboard holds an image and no text: it is pasted into the page (webxfer.c); 1 when it was */
+int webwin_paste_image(WebWin *win);
 void webwin_free(WebWin *win);
 
 /* webshm.c: wpebackend-fdo's shared memory buffers and resources are libwayland-server objects */

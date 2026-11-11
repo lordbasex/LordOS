@@ -1,8 +1,8 @@
 # Web apps, lord-server's side (0.8.8.8, docs/WEBAPPS.md): lord.webapps (ui/js_webapps.c), the registry
 # (web/webreg.c, shared with lord-web), the probe and the lord-web processes (web/webmgr.c) and the permission
 # questions on the session bus (ui/webask.c, on portal.c's connection). No WebKit here: only lord-web links it.
-WEBAPPS_HDR := src/web/webreg.h src/web/weburl.h src/web/webmgr.h src/web/webmem.h src/ui/webask.h src/ui/webbadge.h src/ui/webicon.h src/ui/js_webapps.h src/sec/json.h src/hw/notifyd.h
-WEBAPPS_OBJ := build/obj/web/webreg.o build/obj/web/weburl.o build/obj/web/webmgr.o build/obj/web/webmem.o build/obj/ui/webask.o build/obj/ui/webbadge.o build/obj/ui/webicon.o build/obj/ui/js_webapps.o
+WEBAPPS_HDR := src/web/webreg.h src/web/webedit.h src/web/weburl.h src/web/webmgr.h src/web/webmem.h src/ui/webask.h src/ui/webbadge.h src/ui/webicon.h src/ui/js_webapps.h src/sec/json.h src/hw/notifyd.h
+WEBAPPS_OBJ := build/obj/web/webreg.o build/obj/web/webedit.o build/obj/web/weburl.o build/obj/web/webmgr.o build/obj/web/webmem.o build/obj/ui/webask.o build/obj/ui/webbadge.o build/obj/ui/webicon.o build/obj/ui/js_webapps.o
 build/lord-server: $(WEBAPPS_OBJ)
 $(WEBAPPS_OBJ): $(WEBAPPS_HDR)
 build/obj/ui/js.o build/obj/ui/portal.o: $(WEBAPPS_HDR)
