@@ -3,7 +3,7 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  Segmented, admin, canDeactivate, deactivateApp, activateApp,
+  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry,
   suggestions, unseenSuggestions, refreshSuggestions,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +11,8 @@ import { AiDetail, AiDiscover, AiPage, CatalogResults, catalogApp, catalogApps, 
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
-import { WebAppsPage, webCatalog } from './webapps.js';
+import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits } from './webapps.js';
+import { WebAppDetail } from './webdetail.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
 // first of the usual names that exists, or the home folder itself.
@@ -333,8 +334,8 @@ function InstalledPage({ query, filter: initial }) {
 // ---- window ----
 
 // Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'webapps', 'lordos' or 'cat:<Category>')
-// and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app). Back returns to
-// the page.
+// and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id).
+// Back returns to the page.
 const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
@@ -362,6 +363,7 @@ export default function Store() {
     if (args?.install) setFile(args.install);
     if (args?.page) go(args.page);
     if (args?.app) openAi(args.app);
+    if (args?.webapp) openWeb(args.webapp);
     if (args?.search) { setQuery(args.search); go('discover'); }       // from Search
   }, [args?.nonce]);
   const sug = useStore(suggestions);
@@ -372,19 +374,38 @@ export default function Store() {
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
+  const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
   const pageTitle = cat ? tr(`store.cat.${cat}`) : tr(`store.page.${page}`);
-  const appTitle = app && (app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
+  const appTitle = app && (app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
+    : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
   const searchable = !app && page !== 'updates' && page !== 'suggested';
   const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
   let body;
-  if (app) body = app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
-  else if (cat) body = <debian.Category cat={cat} query={query} onOpen={openDeb} />;
+  if (app) body = app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  else if (cat) {
+    body = (
+      <View style={{ gap: 26 }}>
+        <WebCategory cat={cat} query={query} onOpen={openWeb} />
+        <debian.Category cat={cat} query={query} onOpen={openDeb} />
+      </View>
+    );
+  }
   else if (page === 'discover') {
-    // while searching, the catalog apps that match come first (#37)
+    // while searching, the catalog apps that match come first (#37), then the web apps that match
     // (and the package results leave them out)
     const hits = query.trim() ? searchCatalog(catalogApps(), query) : [];
-    const top = !query.trim() ? <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />
-      : hits.length ? <CatalogResults query={query} onOpen={openAi} /> : null;
+    const web = query.trim() ? webHits(query) : 0;
+    const top = !query.trim() ? (
+      <View style={{ gap: 26 }}>
+        <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />
+        <WebDiscover onOpen={openWeb} onMore={() => go('webapps')} />
+      </View>
+    ) : hits.length || web ? (
+      <View style={{ gap: 26 }}>
+        {hits.length ? <CatalogResults query={query} onOpen={openAi} /> : null}
+        {web ? <WebResults query={query} onOpen={openWeb} /> : null}
+      </View>
+    ) : null;
     body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={top} hide={hits.map((a) => a.package)} />;
   }
   else if (page === 'suggested') body = <debian.SuggestedPage />;
@@ -393,7 +414,7 @@ export default function Store() {
   else if (page === 'remote') body = <AiPage section="remote" query={query} onOpen={openAi} />;
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
-  else if (page === 'webapps') body = <WebAppsPage query={query} />;
+  else if (page === 'webapps') body = <WebAppsPage query={query} onOpen={openWeb} />;
   else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
   else body = <debian.Updates />;
   const item = (id, label, detail, glyph) => (
@@ -430,7 +451,7 @@ export default function Store() {
           </View>
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={200} /> : null}
         </Toolbar>
-        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
+        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />

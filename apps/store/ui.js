@@ -36,8 +36,17 @@ export function Pill({ label, onClick, big, onDark, disabled }) {
   }, h(Text, { style: { fontSize: big ? 13.5 : 12.5, fontWeight: 650, color: onDark ? '#1d1d3a' : th.accent, whiteSpace: 'nowrap' } }, label));
 }
 
-// A card: icon, name, kind, two lines of summary, and a foot with a note (the size) and the action.
-export function Card({ icon, name, kind, summary, note, action, onClick, dim }) {
+// A small outlined label that tells kinds of apps apart ("Web app"), on cards and on an app's page.
+export function Tag({ label }) {
+  const th = useTheme();
+  return h(View, { style: { height: 16, paddingHorizontal: 6, borderRadius: 4, border: `1px solid ${tint(th.accent, 0.55)}`, backgroundColor: tint(th.accent, 0.08),
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+  h(Text, { style: { fontSize: 10, fontWeight: 650, color: th.accent, whiteSpace: 'nowrap', lineHeight: 14 } }, label));
+}
+
+// A card: icon, name, kind (after an optional tag), two lines of summary, and a foot with a note (the size) and the
+// action.
+export function Card({ icon, name, kind, tag, summary, note, action, onClick, dim }) {
   const th = useTheme();
   const [hover, setHover] = useState(false);
   const bg = th.mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.025)';
@@ -50,7 +59,9 @@ export function Card({ icon, name, kind, summary, note, action, onClick, dim }) 
     h(View, { style: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, icon),
     h(View, { style: { flex: 1, minWidth: 0, gap: 1 } },
       h(Text, { style: { fontSize: 14, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, name),
-      kind ? h(Text, { style: { fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null,
+      tag ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 } }, h(Tag, { label: tag }),
+        kind ? h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null)
+        : kind ? h(Text, { style: { fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null,
       summary ? h(Text, { style: { height: 34, fontSize: 12, lineHeight: 1.42, color: th.textDim, marginTop: 5, numberOfLines: 2, overflow: 'hidden', textAlign: 'start' } }, summary) : null)),
   h(View, { style: { flex: 1 } }),
   h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24, flexShrink: 0 } },

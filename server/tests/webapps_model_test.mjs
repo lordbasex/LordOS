@@ -102,8 +102,8 @@ eq('name refused', ['', ' Chat', 'Chat ', 'a‮b', 'a​b', 'a\nb', 'x'.repeat(6
   [false, false, false, false, false, false, false, false, false]);
 
 // ---- the Store: the section ----
-eq('section without lord-web', M.storeSection({ available: false, installed: [] }), { view: 'runtime', canAdd: false });
-eq('section with lord-web', M.storeSection({ available: true, installed: [chat] }), { view: 'list', canAdd: true, count: 1 });
+eq('section without lord-web: the list, no address, the engine first', M.storeSection({ available: false, installed: [] }), { view: 'list', canAdd: false, needsEngine: true, count: 0 });
+eq('section with lord-web', M.storeSection({ available: true, installed: [chat] }), { view: 'list', canAdd: true, needsEngine: false, count: 1 });
 const cat = { apps: [
   { id: 'chat', name: 'Chat', startUrl: 'https://web.chat.example/', scope: 'https://web.chat.example/', origin: 'https://web.chat.example', icon: 'chat.png', description: 'webapps.desc.chat', keywords: ['messages'] },
   { id: 'evil', name: 'Evil', startUrl: 'https://evil.example/', scope: 'https://other.example/', origin: 'https://evil.example', icon: 'evil.png', description: 'x' },
@@ -135,6 +135,83 @@ for (const a of shipped.apps) {
   }
 }
 eq('shipped catalog: lowercase keywords (the search lowers the query only)', shipped.apps.flatMap((a) => a.keywords || []).filter((k) => k !== k.toLowerCase()), []);
+
+for (const a of shipped.apps) {
+  const f = M.catalogFacts(a);
+  eq(`shipped ${a.id}: a publisher`, typeof f.publisher, 'string');
+  eq(`shipped ${a.id}: verified is a real date or left out`, a.verified === undefined || M.validDate(a.verified), true);
+  eq(`shipped ${a.id}: verified only when tested`, !a.verified || a.tested === true, true);
+  eq(`shipped ${a.id}: typicalMemoryMB a whole number or left out`, a.typicalMemoryMB === undefined || f.typicalMemoryMB === a.typicalMemoryMB, true);
+  eq(`shipped ${a.id}: limitations are known keys`, (a.limitations || []).filter((k) => !M.LIMITATIONS.includes(k)), []);
+  eq(`shipped ${a.id}: only the documented keys`, Object.keys(a).filter((k) => !['id', 'name', 'startUrl', 'scope', 'origin', 'icon', 'themeColor', 'background', 'category',
+    'description', 'keywords', 'tested', 'publisher', 'verified', 'typicalMemoryMB', 'limitations'].includes(k)), []);
+}
+eq('shipped whatsapp: the memory measured on VM 127', M.catalogFacts(shipped.apps.find((a) => a.id === 'whatsapp')).typicalMemoryMB, 810);
+for (const l of langs) for (const k of M.LIMITATIONS) eq(`limit ${k} in ${l}`, typeof loc(l, 'webapps')[`limit.${k}`], 'string');
+
+// ---- the Store: Discover and the categories ----
+const two = { apps: [cat.apps[0], { ...cat.apps[0], id: 'mail', name: 'Mail', category: 'Office', keywords: ['mail'] }] };
+eq('featured: the catalog\'s first ones, installed marked', M.featuredApps(two, [chat], 1).map((a) => [a.id, a.installed]), [['chat', true]]);
+eq('featured: never more than asked', M.featuredApps(two, [], 4).length, 2);
+eq('category apps', M.categoryApps(two, [], 'Office').map((a) => a.id), ['mail']);
+eq('category apps: none', M.categoryApps(two, [], 'Game'), []);
+
+// ---- the Store: Get, with the engine first when lordos-web isn't installed ----
+const run = (actions, from = M.GET_IDLE) => actions.reduce((st, a) => M.getReducer(st, a), from);
+const plan = { ok: true, download: 52428800, installedDelta: 209715200, items: [{ name: 'lordos-web', action: 'install', requested: true }] };
+eq('get: with the engine, straight to the app', run([{ type: 'start', available: true }]).step, 'app');
+eq('get: with the engine, installed', run([{ type: 'start', available: true }, { type: 'installed', app: 'chat' }]), { ...M.GET_IDLE, step: 'done', app: 'chat' });
+eq('get: without it, the engine step with its plan', run([{ type: 'start', available: false, plan }]), { ...M.GET_IDLE, step: 'engine', plan });
+eq('get: confirm runs the package job', run([{ type: 'start', available: false, plan }, { type: 'confirm' }]).step, 'engineJob');
+eq('get: the job ends well, the app goes on with no click', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'jobDone', ok: true, available: true }]).step, 'app');
+eq('get: … and is installed', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'jobDone', ok: true, available: true }, { type: 'installed', app: 'chat' }]).step, 'done');
+eq('get: the job failed', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'jobDone', ok: false }]), { ...M.GET_IDLE, step: 'failed', plan });
+eq('get: installed but lord-web not found', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'jobDone', ok: true, available: false }]).error, 'webapps.noRuntime');
+eq('get: no confirm without a usable plan', run([{ type: 'start', available: false, plan: { ok: false, error: 'pkg.noIndex' } }, { type: 'confirm' }]).step, 'engine');
+eq('get: no confirm without a plan at all', run([{ type: 'start', available: false, plan: null }, { type: 'confirm' }]).step, 'engine');
+eq('get: a second start while the job runs is ignored', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'start', available: true }]).step, 'engineJob');
+eq('get: cancel is ignored while the job runs', run([{ type: 'start', available: false, plan }, { type: 'confirm' }, { type: 'cancel' }]).step, 'engineJob');
+eq('get: cancel from the engine step', run([{ type: 'start', available: false, plan }, { type: 'cancel' }]), M.GET_IDLE);
+eq('get: a job result out of turn is ignored', run([{ type: 'jobDone', ok: true, available: true }]), M.GET_IDLE);
+eq('get: install threw', run([{ type: 'start', available: true }, { type: 'error', error: 'webapps.exists' }]).error, 'webapps.exists');
+eq('get: retry after a failure', run([{ type: 'start', available: true }, { type: 'error' }, { type: 'start', available: true }]).step, 'app');
+eq('get: from the second app on, no engine step', run([{ type: 'start', available: true, plan }]).plan, null);
+eq('get: busy', ['idle', 'engine', 'engineJob', 'app', 'done', 'failed'].map((step) => M.getBusy({ step })), [false, false, true, true, false, false]);
+eq('engine sizes', M.engineSizes(plan), { download: 52428800, disk: 209715200 });
+eq('engine sizes: a shrinking plan reads as 0', M.engineSizes({ ok: true, download: 0, installedDelta: -5 }), { download: 0, disk: 0 });
+eq('engine sizes: no plan', [M.engineSizes(null), M.engineSizes({ ok: false })], [null, null]);
+
+// ---- the Store: a web app's page ----
+eq('valid dates', ['2026-11-11', '2026-02-30', '2026-1-1', '', null, 20261111].map(M.validDate), [true, false, false, false, false, false]);
+eq('facts', M.catalogFacts({ publisher: ' Chat Inc. ', verified: '2026-11-11', typicalMemoryMB: 810, limitations: ['push', 'teleport', 'drm'] }),
+  { publisher: 'Chat Inc.', verified: '2026-11-11', typicalMemoryMB: 810, limitations: ['drm', 'push'] });
+eq('facts: wrong values read as missing', M.catalogFacts({ publisher: 5, verified: 'soon', typicalMemoryMB: -3, limitations: 'drm' }),
+  { publisher: null, verified: null, typicalMemoryMB: null, limitations: [] });
+eq('facts: none', M.catalogFacts(null), { publisher: null, verified: null, typicalMemoryMB: null, limitations: [] });
+eq('tested: verified on a day', M.testedState({ tested: true, verified: '2026-11-11' }), { state: 'verified', date: '2026-11-11' });
+eq('tested: with no day', M.testedState({ tested: true }), { state: 'tested' });
+eq('tested: not yet', [M.testedState({ tested: false }), M.testedState({})], [{ state: 'untested' }, { state: 'untested' }]);
+const chatCat = { ...cat.apps[0], category: 'Network', background: true };
+const catOne = { apps: [chatCat] };
+eq('detail: a catalog app not installed', M.detailOf('chat', catOne, []),
+  { id: 'chat', entry: null, catalog: { ...chatCat, installed: false }, installed: false, name: 'Chat', origin: 'https://web.chat.example', source: 'catalog', background: true });
+const mine = { ...chat, source: 'catalog', background: false };
+eq('detail: installed from the catalog', (({ installed, source, background, name }) => ({ installed, source, background, name }))(M.detailOf('chat', catOne, [mine])),
+  { installed: true, source: 'catalog', background: false, name: 'Chat' });
+const added = { ...solo, id: 'notes', source: 'url', origin: 'https://notes.example' };
+eq('detail: added from an address', (({ catalog, source, origin }) => ({ catalog, source, origin }))(M.detailOf('notes', catOne, [added])),
+  { catalog: null, source: 'url', origin: 'https://notes.example' });
+eq('detail: an address app with a catalog app\'s id is not the catalog\'s', M.detailOf('chat', catOne, [{ ...chat, source: 'url' }]).source, 'url');
+eq('detail: unknown', M.detailOf('nope', catOne, []), null);
+eq('disk: not installed', M.diskUsage(null), { installed: false, total: 0, complete: true, profiles: [] });
+eq('disk: per profile and total', M.diskUsage(chat, { personal: { size: 1000, complete: true }, work: { size: 500, complete: false } }),
+  { installed: true, total: 1500, complete: false, profiles: [{ id: 'personal', name: 'Personal', bytes: 1000, complete: true }, { id: 'work', name: 'Work', bytes: 500, complete: false }] });
+eq('disk: a profile not measured (no folder yet) is 0', M.diskUsage(solo, { personal: null }).total, 0);
+eq('memory: live, by profile', M.memoryView({ kb: 829440, processes: 5, profiles: [{ profile: 'personal', kb: 829440 }] }, M.catalogFacts({ typicalMemoryMB: 810 })),
+  { kind: 'live', bytes: 849346560, profiles: [{ profile: 'personal', bytes: 849346560 }] });
+eq('memory: not running, what LordOS measured', M.memoryView(null, M.catalogFacts({ typicalMemoryMB: 810 })), { kind: 'typical', bytes: 849346560, profiles: [] });
+eq('memory: unknown', M.memoryView({ kb: 0 }, M.catalogFacts({})), { kind: 'unknown', bytes: 0, profiles: [] });
+eq('upstream versions', ['2.48.7-1~deb13u1', '1:2.0+dfsg-3', '2.50', '', null, 'x1'].map(M.upstreamVersion), ['2.48.7', '2.0', '2.50', '', '', '']);
 
 // ---- Settings → Web apps ----
 eq('permission rows', M.permissionRows(chat).map((r) => r.value), ['ask', 'allow', 'ask', 'deny', 'deny']);

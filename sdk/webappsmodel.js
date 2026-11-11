@@ -152,11 +152,126 @@ export function catalogEntryOk(a) {
     (!a.themeColor || /^#[0-9a-f]{6}$/i.test(a.themeColor));
 }
 
-// Which state the Store's section is in: no lord-web (offer the package), or the list.
+// Which state the Store's section is in: always the list; without lord-web nothing can be probed ("Add from an
+// address" waits), and the first install brings the engine first (getReducer).
 export function storeSection({ available, installed }) {
-  if (!available) return { view: 'runtime', canAdd: false };
-  return { view: 'list', canAdd: true, count: installed.length };
+  return { view: 'list', canAdd: !!available, needsEngine: !available, count: installed.length };
 }
+
+// The catalog's first apps, for Discover's banner and shelf (the catalog's order is LordOS's choice).
+export const featuredApps = (catalog, installed = [], n = 4) => catalogApps(catalog, installed).slice(0, n);
+// The catalog's apps of one of the Store's categories (its category pages show them above the packages).
+export const categoryApps = (catalog, installed, cat) => catalogApps(catalog, installed).filter((a) => a.category === cat);
+
+// ---- the Store: getting a web app, the engine first when it isn't there ----
+
+// The steps of Get / Install (the catalog sheet and a web app's page):
+//   idle → app → done                                   lord-web is installed: lord.webapps.install, nothing else
+//   idle → engine → engineJob → app → done              the first web app: the lordos-web package's plan is shown
+//                                                       (its download and disk size), Install runs the Store's own
+//                                                       package job (the admin password, the progress), and when it
+//                                                       ends well the app is installed with no other click
+//   … → failed                                          the plan can't be made, the job failed, or install threw
+// { step, plan, error, text, app }: error is a code (errorText), text a message the package job already wrote.
+export const GET_IDLE = { step: 'idle', plan: null, error: null, text: null, app: null };
+export function getReducer(s, a) {
+  switch (a.type) {
+    case 'start':
+      if (s.step !== 'idle' && s.step !== 'failed' && s.step !== 'done') return s;
+      return a.available ? { ...GET_IDLE, step: 'app' } : { ...GET_IDLE, step: 'engine', plan: a.plan || null };
+    case 'confirm': return s.step === 'engine' && s.plan && s.plan.ok ? { ...s, step: 'engineJob' } : s;
+    case 'jobDone':
+      if (s.step !== 'engineJob') return s;
+      if (!a.ok) return { ...s, step: 'failed', error: null, text: a.text || null };
+      // the package is in, but lord-server must find lord-web next to it before an app is installed
+      return a.available ? { ...s, step: 'app' } : { ...s, step: 'failed', error: 'webapps.noRuntime' };
+    case 'installed': return s.step === 'app' ? { ...s, step: 'done', app: a.app } : s;
+    case 'error': return s.step === 'app' ? { ...s, step: 'failed', error: a.error || 'webapps.badEntry' } : s;
+    case 'cancel': return s.step === 'engineJob' || s.step === 'app' ? s : GET_IDLE;
+    default: return s;
+  }
+}
+export const getBusy = (s) => s.step === 'engineJob' || s.step === 'app';
+// What the engine step says it takes: the plan's download and the space it adds, or null without a usable plan.
+export function engineSizes(plan) {
+  if (!plan || !plan.ok) return null;
+  const n = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
+  return { download: n(plan.download), disk: n(plan.installedDelta) };
+}
+
+// ---- the Store: a web app's page ----
+
+// The catalog's data about an app that the page shows (all optional; a wrong value reads as missing):
+//   publisher        who makes the service (data: a name, never in LordOS's texts)
+//   verified         "YYYY-MM-DD": the day LordOS last checked it works (docs/WEBAPPS.md)
+//   typicalMemoryMB  what one profile took when LordOS measured it (Pss of lord-web and WebKit's processes)
+//   limitations      keys of what doesn't work in LordOS's engine (webapps.limit.<key>)
+export const LIMITATIONS = ['drm', 'calls', 'push'];
+export function validDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+export function catalogFacts(a) {
+  const pub = a && typeof a.publisher === 'string' ? a.publisher.trim() : '';
+  return {
+    publisher: pub && pub.length <= 80 ? pub : null,
+    verified: a && validDate(a.verified) ? a.verified : null,
+    typicalMemoryMB: a && Number.isInteger(a.typicalMemoryMB) && a.typicalMemoryMB > 0 && a.typicalMemoryMB < 65536 ? a.typicalMemoryMB : null,
+    limitations: a && Array.isArray(a.limitations) ? LIMITATIONS.filter((k) => a.limitations.includes(k)) : [],
+  };
+}
+// "Tested on LordOS": the day it was verified; tested with no day recorded; or not tested yet.
+export function testedState(a) {
+  const f = catalogFacts(a);
+  if (f.verified) return { state: 'verified', date: f.verified };
+  return { state: a && a.tested === true ? 'tested' : 'untested' };
+}
+
+// What the page is about: a catalog app (installed or not) or an installed one added from an address. null when the
+// id is neither. installed: the registry's entries (lord.webapps.list).
+export function detailOf(id, catalog, installed = []) {
+  const entry = (installed || []).find((e) => e.id === id) || null;
+  const cat = catalogApps(catalog, installed).find((a) => a.id === id) || null;
+  if (!entry && !cat) return null;
+  const fromCatalog = entry ? entry.source === 'catalog' && !!cat : true;
+  return {
+    id, entry, catalog: fromCatalog ? cat : null, installed: !!entry,
+    name: entry ? entry.name : cat.name,
+    origin: entry ? entry.origin : cat.origin,
+    source: fromCatalog ? 'catalog' : 'url',
+    background: entry ? !!entry.background : !!cat.background,
+  };
+}
+
+// Size on disk: each profile's data (lord.fs.du's answers by profile id) and the total; not installed: none.
+export function diskUsage(entry, sizes = {}) {
+  if (!entry || !Array.isArray(entry.profiles)) return { installed: false, total: 0, complete: true, profiles: [] };
+  const profiles = entry.profiles.map((p) => {
+    const d = sizes && sizes[p.id];
+    const ok = d && Number.isFinite(d.size) && d.size >= 0;
+    return { id: p.id, name: p.name, bytes: ok ? d.size : 0, complete: !ok || d.complete !== false };
+  });
+  return { installed: true, total: profiles.reduce((t, p) => t + p.bytes, 0), complete: profiles.every((p) => p.complete), profiles };
+}
+
+// Memory: what it takes now (lord.webapps.memory: Pss in kB, by running profile), else what LordOS measured.
+export function memoryView(live, facts) {
+  if (live && Number.isFinite(live.kb) && live.kb > 0) {
+    return { kind: 'live', bytes: live.kb * 1024,
+      profiles: (Array.isArray(live.profiles) ? live.profiles : []).filter((p) => p && Number.isFinite(p.kb)).map((p) => ({ profile: p.profile, bytes: p.kb * 1024 })) };
+  }
+  if (facts && facts.typicalMemoryMB) return { kind: 'typical', bytes: facts.typicalMemoryMB * 1024 * 1024, profiles: [] };
+  return { kind: 'unknown', bytes: 0, profiles: [] };
+}
+
+// The upstream version in a Debian version: "2.48.7-1~deb13u1" → "2.48.7", "1:2.0+dfsg-3" → "2.0"; "" if none.
+export function upstreamVersion(v) {
+  const m = /^(?:\d+:)?(\d+(?:\.\d+)*)/.exec(String(v || ''));
+  return m ? m[1] : '';
+}
+// The WebKit package lord-web links (tools/iso/mkdeb-web.sh), whose version the page names.
+export const WEBKIT_PACKAGE = 'libwpewebkit-2.0-1';
 
 // ---- Settings → Web apps ----
 

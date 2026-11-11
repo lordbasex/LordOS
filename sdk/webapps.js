@@ -8,13 +8,15 @@
 //   installWebApp(entry) · webAppCall(fn, ...args)   (addProfile, renameProfile, removeProfile, setPermission,
 //                                  setBackground, uninstall: each refreshes the list)
 //   webAppOfWindow(w)              { entry, profile } for a window of a lord-web we started, else null
+//   webAppMemory(app)              lord.webapps.memory: { kb, processes, profiles } while it runs, else null
+//   webEngine()                    { installed, version, webkit }: the lordos-web package and the WebKit it links
 //   webAsks (store) · answerWebAsk(ask, allow, remember)
 //
 // Only lord-server starts lord-web, with an app and a profile from the registry; nothing here names a URL to
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
 
@@ -101,6 +103,18 @@ export function webAppOfWindow(w) {
   if (!web) return null;
   if (!webAppEntry(web.app)) refreshWebApps();
   return windowWebApp(w.args.appId, web, webApps.get());
+}
+
+// The memory a running app takes now (read-only; an older server without memory() answers null).
+export function webAppMemory(app) {
+  try { return has() && typeof lord.webapps.memory === 'function' ? lord.webapps.memory(app) : null; } catch (e) { return null; }
+}
+
+// The engine, from the package index (no program is run): lordos-web's version and the WebKit version it links.
+export function webEngine() {
+  const info = (name) => { try { return typeof lord !== 'undefined' && lord.pkg ? lord.pkg.info(name, {}) : null; } catch (e) { return null; } };
+  const own = info(RUNTIME_PACKAGE), wk = info(WEBKIT_PACKAGE);
+  return { installed: !!(own && own.installed), version: (own && own.installed) || '', webkit: upstreamVersion(wk && wk.installed) };
 }
 
 // ---- permission questions ----
