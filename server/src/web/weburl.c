@@ -113,6 +113,14 @@ int weburl_in_scope(const char *url, const char *scope) {
     return 1;
 }
 
+int weburl_perm_allowed(const char *view_uri, const char *asker, const char *scope, const char *app_origin) {
+    if (!view_uri || !scope || !app_origin || !weburl_app_ok(view_uri)) return 0;
+    if (!weburl_in_scope(view_uri, scope) || !weburl_same_origin(view_uri, app_origin)) return 0;
+    if (!asker) return 1;
+    char o[WEBURL_ORIGIN_MAX + 1], a[WEBURL_ORIGIN_MAX + 1];
+    return !weburl_origin(asker, o, sizeof o) && !weburl_origin(app_origin, a, sizeof a) && !strcmp(o, a);
+}
+
 int weburl_dir(const char *url, char *out, size_t n) {
     WebUrl u;
     if (!out || !n || weburl_parse(url, &u) || origin_of(&u, out, n)) return -1;

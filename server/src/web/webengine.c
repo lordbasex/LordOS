@@ -188,7 +188,16 @@ static void asked(Web *w, int kind, const char *answer, void *data) {
     ask_next(w, p);
 }
 
+/* the page in the window is the app's own (weburl_perm_allowed): WebKit says no origin for a permission request,
+ * so it is the main frame's address, inside the scope (a frame of another origin can't ask without the page's
+ * Permissions Policy, and then it asks as the page) */
+static int page_is_app(Web *w) {
+    return !w->outside && weburl_perm_allowed(webkit_web_view_get_uri(w->view), NULL, w->app.scope, w->app.origin);
+}
+
 static void ask_next(Web *w, Pending *p) {
+    /* again before each question and the answer: the page may have left the scope while lord-server asked */
+    if (p->allowed && !page_is_app(w)) p->allowed = 0;
     if (p->allowed && p->i < p->n) { webbus_ask(w, p->kinds[p->i], asked, p); return; }
     if (p->allowed) webkit_permission_request_allow(p->req);
     else webkit_permission_request_deny(p->req);
@@ -201,6 +210,13 @@ static gboolean on_permission(WebKitWebView *v, WebKitPermissionRequest *req, gp
     Web *w = d;
     Pending *p = g_new0(Pending, 1);
     p->allowed = 1;
+    if (!page_is_app(w)) {
+        /* another site in the window (a sign-in, a redirect): the app's permissions are not its own, and nobody is asked */
+        fprintf(stderr, "lord-web: a permission request from outside %s: denied\n", w->app.scope);
+        webkit_permission_request_deny(req);
+        g_free(p);
+        return TRUE;
+    }
     if (WEBKIT_IS_NOTIFICATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WEBREG_PERM_NOTIFICATIONS;
     else if (WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(req)) p->kinds[p->n++] = WEBREG_PERM_LOCATION;
     else if (WEBKIT_IS_USER_MEDIA_PERMISSION_REQUEST(req)) {
@@ -234,7 +250,12 @@ static gboolean on_query(WebKitWebView *v, WebKitPermissionStateQuery *q, gpoint
     (void)v;
     Web *w = d;
     int k = query_kind(webkit_permission_state_query_get_name(q));
-    int p = k >= 0 ? w->app.perms[k] : WEBREG_DENY;
+    WebKitSecurityOrigin *so = webkit_permission_state_query_get_security_origin(q);
+    gchar *asker = so ? webkit_security_origin_to_string(so) : NULL;
+    /* the origin that asks must be the app's, and the window inside its scope: else "denied", whatever the registry says */
+    int mine = asker && !w->outside && weburl_perm_allowed(webkit_web_view_get_uri(w->view), asker, w->app.scope, w->app.origin);
+    g_free(asker);
+    int p = k >= 0 && mine ? w->app.perms[k] : WEBREG_DENY;
     webkit_permission_state_query_finish(q, p == WEBREG_ALLOW ? WEBKIT_PERMISSION_STATE_GRANTED : p == WEBREG_ASK ? WEBKIT_PERMISSION_STATE_PROMPT : WEBKIT_PERMISSION_STATE_DENIED);
     return TRUE;
 }

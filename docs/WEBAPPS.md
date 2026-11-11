@@ -156,6 +156,12 @@ permission requests. If the registry says `allow` or `deny`, `lord-web` answers 
 lord-server checks that the caller's pid is the `lord-web` it started for that app and profile. A page never gets an
 answer from anything else.
 
+The registry's words count only for the app's own pages: a request is answered from it only while the window shows an
+address inside `scope` (WebKit gives no origin for a request, so it is the main frame's), and a `navigator.permissions`
+query only when the origin that asks is `origin` too. A page outside the scope (a sign-in on another site, a redirect,
+a navigation inside the window) or a frame of another origin is denied everything, and lord-server is never asked for
+it; the check is made again before each question and before the answer (`weburl_perm_allowed`).
+
 `lord-web` reads its registry file again before each request, so an answer lord-server stored since the app started
 counts. No answer (no lord-server, an error, anything but the three words) is `deny`. A camera and microphone request
 asks both kinds and needs both. The page's `navigator.permissions` queries get the registry's word (`allow` granted,

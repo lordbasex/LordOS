@@ -34,6 +34,12 @@ int weburl_origin(const char *s, char *out, size_t n);
 int weburl_same_origin(const char *a, const char *b);
 /* 1 when url is inside scope: the same origin and url's path (query included, fragment not) begins with scope's. */
 int weburl_in_scope(const char *url, const char *scope);
+/* 1 when a page may use the app's permissions (docs/WEBAPPS.md, "Permissions"): the window shows view_uri, an address
+ * inside scope and of app_origin, and the origin that asks (asker, "https://host[:port]"; NULL when WebKit's API doesn't
+ * say, as for a permission request) is app_origin too. Anything else (another site in the window after a redirect or a
+ * navigation, a frame of another origin, an opaque origin, no address yet) gets every permission denied and nothing is
+ * asked. */
+int weburl_perm_allowed(const char *view_uri, const char *asker, const char *scope, const char *app_origin);
 /* The folder of url: its origin and its path up to the last '/' before any query ("https://a.example/b/c?d" →
  * "https://a.example/b/"), the default scope of a manifest without one. 0, or -1. */
 int weburl_dir(const char *url, char *out, size_t n);

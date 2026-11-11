@@ -62,6 +62,25 @@ static void test_url(void) {
     CHECK(!weburl_dir("https://a.example", o, sizeof o) && !strcmp(o, "https://a.example/"), "dir of root %s", o);
 }
 
+/* who may use the app's permissions (webengine.c on_permission and on_query) */
+static void test_perm_context(void) {
+    const char *sc = "https://web.example.com/app/", *or = "https://web.example.com";
+    CHECK(weburl_perm_allowed("https://web.example.com/app/inbox", NULL, sc, or), "the app's page, a request (no origin given)");
+    CHECK(weburl_perm_allowed("https://web.example.com/app/", "https://web.example.com", sc, or), "the app's page, a query from its origin");
+    CHECK(weburl_perm_allowed("https://Web.Example.com:443/app/x", "https://web.example.com:443", sc, or), "case and the default port");
+    CHECK(!weburl_perm_allowed("https://evil.example/app/", NULL, sc, or), "another site in the window");
+    CHECK(!weburl_perm_allowed("https://accounts.example.org/signin", NULL, sc, or), "a sign-in page after a redirect");
+    CHECK(!weburl_perm_allowed("https://web.example.com/other/", NULL, sc, or), "the app's origin, outside its scope");
+    CHECK(!weburl_perm_allowed("https://web.example.com/app/", "https://ads.example.net", sc, or), "a frame of another origin");
+    CHECK(!weburl_perm_allowed("https://web.example.com/app/", "null", sc, or) && !weburl_perm_allowed("https://web.example.com/app/", "", sc, or), "an opaque origin");
+    CHECK(!weburl_perm_allowed("https://web.example.com/app/", "http://web.example.com", sc, or), "the same host over http");
+    CHECK(!weburl_perm_allowed("https://web.example.com/app/", "https://web.example.com:8443", sc, or), "another port");
+    CHECK(!weburl_perm_allowed(NULL, NULL, sc, or) && !weburl_perm_allowed("about:blank", NULL, sc, or) && !weburl_perm_allowed("data:text/html,x", NULL, sc, or),
+          "no page yet, about:, data:");
+    CHECK(!weburl_perm_allowed("http://web.example.com/app/", NULL, "http://web.example.com/app/", "http://web.example.com"), "plain http is never an app's");
+    CHECK(weburl_perm_allowed("http://localhost:8000/x", "http://localhost:8000", "http://localhost:8000/", "http://localhost:8000"), "http on this computer");
+}
+
 static void test_args(void) {
     WebArgs a;
     char *ok[] = { "lord-web", "--app", "chat", "--profile", "work", NULL };
@@ -169,6 +188,7 @@ static void test_downloads(void) {
 
 int main(void) {
     test_url();
+    test_perm_context();
     test_args();
     test_manifest();
     test_downloads();
