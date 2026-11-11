@@ -62,6 +62,42 @@ static void test_url(void) {
     CHECK(!weburl_dir("https://a.example", o, sizeof o) && !strcmp(o, "https://a.example/"), "dir of root %s", o);
 }
 
+static int cls(const char *url) {
+    WebUrl u;
+    return weburl_parse(url, &u) ? -1 : weburl_host_class(&u);
+}
+
+/* the probe never goes from a public address to this computer or a local network, nor from https to http */
+static void test_probe_hops(void) {
+    const char *priv[] = { "http://localhost/", "https://LOCALHOST./", "https://a.localhost/", "https://printer.local/", "https://127.0.0.1/",
+                           "https://127.8.9.1/", "https://127.1/", "https://0x7f.1/", "https://017700000001/", "https://2130706433/", "https://0.0.0.0/",
+                           "https://10.1.2.3/", "https://172.16.0.1/", "https://172.31.255.255/", "https://192.168.1.1/", "https://169.254.169.254/",
+                           "https://100.64.0.1/", "https://[::1]/", "https://[::]/", "https://[fc00::1]/", "https://[fd12:3456::1]/", "https://[fe80::1]/",
+                           "https://[::ffff:127.0.0.1]/", "https://[::ffff:192.168.0.1]/", "https://[::ffff:7f00:1]/", "https://1.2.3.999/" };
+    for (size_t i = 0; i < sizeof priv / sizeof priv[0]; i++) CHECK(cls(priv[i]) == WEBURL_PRIVATE, "private: %s", priv[i]);
+    const char *pub[] = { "https://example.com/", "https://8.8.8.8/", "https://172.32.0.1/", "https://172.15.0.1/", "https://192.169.0.1/",
+                          "https://100.128.0.1/", "https://[2001:db8::1]/", "https://[::ffff:8.8.8.8]/", "https://local.example/", "https://localhost.example/",
+                          "https://10.example/" };
+    for (size_t i = 0; i < sizeof pub / sizeof pub[0]; i++) CHECK(cls(pub[i]) == WEBURL_PUBLIC, "public: %s", pub[i]);
+
+    CHECK(weburl_probe_hop_ok("https://a.example/", "https://b.example/x"), "public to public");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "http://a.example/"), "https to http");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "http://localhost:8080/"), "https to http on this computer");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "https://127.0.0.1:8443/"), "public to this computer");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "https://192.168.1.1/admin"), "public to the local network");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "https://[::1]/"), "public to ::1");
+    CHECK(weburl_probe_hop_ok("http://localhost:8000/", "http://127.0.0.1:8000/x"), "this computer to itself (tests)");
+    CHECK(weburl_probe_hop_ok("https://10.0.0.5/", "https://example.com/"), "private to public");
+    CHECK(!weburl_probe_hop_ok("https://a.example/", "ftp://a.example/") && !weburl_probe_hop_ok("bad", "https://a.example/"), "not addresses");
+
+    CHECK(weburl_probe_final_ok("https://a.example/", "https://b.example/"), "ended public");
+    CHECK(!weburl_probe_final_ok("https://a.example/", "http://localhost/"), "ended on http://localhost from a public request");
+    CHECK(!weburl_probe_final_ok("https://a.example/", "https://localhost/"), "ended on this computer from a public request");
+    CHECK(!weburl_probe_final_ok("https://a.example/", "http://b.example/"), "ended on plain http");
+    CHECK(weburl_probe_final_ok("http://localhost:8000/", "http://localhost:8000/app/"), "asked for this computer, ended there");
+    CHECK(!weburl_probe_final_ok("https://localhost:8000/", "http://localhost:8000/"), "even here, not from https to http");
+}
+
 /* who may use the app's permissions (webengine.c on_permission and on_query) */
 static void test_perm_context(void) {
     const char *sc = "https://web.example.com/app/", *or = "https://web.example.com";
@@ -189,6 +225,7 @@ static void test_downloads(void) {
 int main(void) {
     test_url();
     test_perm_context();
+    test_probe_hops();
     test_args();
     test_manifest();
     test_downloads();

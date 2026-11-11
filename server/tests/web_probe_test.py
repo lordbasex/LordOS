@@ -72,6 +72,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split('?', 1)[0]
         if path == '/app/':
             path = '/app/index.html'
+        if path == '/r/app':
+            # a redirect on this computer (the request was for it too): followed (webprobe.c on_decide)
+            self.send_response(302)
+            self.send_header('Location', 'http://localhost:%d/app/' % self.server.server_address[1])
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         body, ctype = SITE.get(path, (None, None))
         if body is None:
             self.send_error(404)
@@ -210,6 +217,15 @@ check(not left, 'nothing left in the throwaway home: %r' % left[:5])
 check(boxed, 'the web process ran in WebKit\'s sandbox (a mount namespace of its own)')
 if WANT_PSS:
     print('probe PSS: %d MB (lord-web and its WebKit processes, peak)' % (peak // 1024))
+
+# a redirect from this computer to itself (another name of it) is followed; one from a public https address to this
+# computer or a local network, or from https to http, is refused (needs a public https server: tests/webapp_test.c
+# checks the rule, weburl_probe_hop_ok and weburl_probe_final_ok)
+data, code, left, _, _ = probe('--probe', (base + '/r/app\n').encode())
+a = answer(data)
+lbase = 'http://localhost:%d' % srv.server_address[1]
+check(a.get('ok') is True and a.get('origin') == lbase and a.get('startUrl') == lbase + '/app/?source=pwa',
+      'a local redirect followed, the answer is the page it ended on: %r' % a)
 
 # a page without one
 data, code, left, _, _ = probe('--probe', (base + '/plain/page.html#top\n').encode())

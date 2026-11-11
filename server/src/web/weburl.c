@@ -1,7 +1,10 @@
 /* weburl.c — see weburl.h. */
 #include "weburl.h"
 
+#include <arpa/inet.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -110,6 +113,99 @@ int weburl_in_scope(const char *url, const char *scope) {
     path_at(&s, 0, &sl);
     if (sl > xl) return 0;
     for (size_t i = 0; i < sl; i++) if (path_at(&x, i, &xl) != path_at(&s, i, &sl)) return 0;
+    return 1;
+}
+
+/* a host as browsers read an IPv4 address (WHATWG URL): 1 to 4 parts of decimal, 0x hex or 0 octal, the last one
+ * filling the bytes left. 0 and *ip, -1 when it isn't one (a name). */
+static int ipv4_of(const char *h, uint32_t *ip) {
+    char buf[WEBURL_HOST_MAX + 1];
+    size_t n = strlen(h);
+    if (!n || n >= sizeof buf) return -1;
+    memcpy(buf, h, n + 1);
+    if (buf[n - 1] == '.') buf[--n] = 0;              /* "127.0.0.1." */
+    uint64_t part[4];
+    int np = 0;
+    for (char *s = buf, *dot; s; s = dot ? dot + 1 : NULL) {
+        dot = strchr(s, '.');
+        if (dot) *dot = 0;
+        if (np == 4 || !*s) return -1;
+        int base = 10;
+        const char *d = s;
+        if (d[0] == '0' && (d[1] == 'x' || d[1] == 'X')) { base = 16; d += 2; }
+        else if (d[0] == '0' && d[1]) { base = 8; d += 1; }
+        if (strlen(d) > 12) return -1;
+        uint64_t v = 0;
+        for (const char *q = d; *q; q++) {
+            int c = *q, x = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 99;
+            if (x >= base) return -1;
+            v = v * (uint64_t)base + (uint64_t)x;
+        }
+        part[np++] = v;
+    }
+    uint64_t r = 0;
+    for (int i = 0; i < np - 1; i++) { if (part[i] > 255) return -1; r |= part[i] << (8 * (3 - i)); }
+    if (part[np - 1] >= (1ull << (8 * (5 - np)))) return -1;
+    r |= part[np - 1];
+    *ip = (uint32_t)r;
+    return 0;
+}
+
+static int private4(uint32_t a) {
+    return (a >> 24) == 127 || (a >> 24) == 0 || (a >> 24) == 10 || (a >> 22) == (100u << 2 | 1) || (a >> 20) == (172u << 4 | 1) ||
+           (a >> 16) == (192u << 8 | 168) || (a >> 16) == (169u << 8 | 254);
+}
+
+static int ends_with(const char *s, const char *tail) {
+    size_t n = strlen(s), t = strlen(tail);
+    return n >= t && !strcmp(s + n - t, tail);
+}
+
+int weburl_host_class(const WebUrl *u) {
+    const char *h = u->host;
+    if (h[0] == '[') {
+        char a[64];
+        size_t n = strlen(h);
+        unsigned char b[16];
+        if (n < 3 || n - 2 >= sizeof a) return WEBURL_PRIVATE;      /* nothing we can read: never trusted as public */
+        memcpy(a, h + 1, n - 2);
+        a[n - 2] = 0;
+        if (inet_pton(AF_INET6, a, b) != 1) return WEBURL_PRIVATE;
+        static const unsigned char zero[16];
+        if (!memcmp(b, zero, 15) && (b[15] == 0 || b[15] == 1)) return WEBURL_PRIVATE;      /* :: and ::1 */
+        if ((b[0] & 0xfe) == 0xfc || (b[0] == 0xfe && (b[1] & 0xc0) == 0x80)) return WEBURL_PRIVATE;
+        static const unsigned char mapped[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
+        if (!memcmp(b, mapped, 12) || !memcmp(b, zero, 12))                             /* ::ffff:a.b.c.d, ::a.b.c.d */
+            return private4((uint32_t)b[12] << 24 | (uint32_t)b[13] << 16 | (uint32_t)b[14] << 8 | b[15]) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
+        return WEBURL_PUBLIC;
+    }
+    char name[WEBURL_HOST_MAX + 1];
+    snprintf(name, sizeof name, "%s", h);
+    size_t n = strlen(name);
+    if (n && name[n - 1] == '.') name[n - 1] = 0;
+    if (!strcmp(name, "localhost") || ends_with(name, ".localhost") || ends_with(name, ".local")) return WEBURL_PRIVATE;
+    uint32_t ip;
+    /* browsers read a host whose last label is a number as an IPv4 address */
+    const char *last = strrchr(name, '.');
+    last = last ? last + 1 : name;
+    int numeric = last[0] >= '0' && last[0] <= '9';
+    if (numeric) return ipv4_of(name, &ip) || private4(ip) ? WEBURL_PRIVATE : WEBURL_PUBLIC;
+    return WEBURL_PUBLIC;
+}
+
+int weburl_probe_hop_ok(const char *from, const char *to) {
+    WebUrl f, t;
+    if (weburl_parse(from, &f) || weburl_parse(to, &t)) return 0;
+    if (f.https && !t.https) return 0;
+    if (weburl_host_class(&f) == WEBURL_PUBLIC && weburl_host_class(&t) != WEBURL_PUBLIC) return 0;
+    return 1;
+}
+
+int weburl_probe_final_ok(const char *typed, const char *final) {
+    WebUrl q, f;
+    if (weburl_parse(typed, &q) || weburl_parse(final, &f) || !(f.https || weburl_is_local(&f))) return 0;
+    if (q.https && !f.https) return 0;
+    if (weburl_host_class(&f) != WEBURL_PUBLIC && weburl_host_class(&q) == WEBURL_PUBLIC) return 0;
     return 1;
 }
 

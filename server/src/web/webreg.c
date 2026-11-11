@@ -465,9 +465,13 @@ static int ends_ci(const char *s, const char *tail) {
 static void pick_icon(const JVal *icons, WebProbe *p) {
     long best_png = -1, best_svg = -1;
     int png_big = 0;
+    WebUrl pu, iu;
+    int page_public = !weburl_parse(p->origin, &pu) && weburl_host_class(&pu) == WEBURL_PUBLIC;
     for (const JVal *i = icons && icons->type == J_ARR ? icons->kid : NULL; i; i = i->next) {
         const char *src = i->type == J_OBJ ? json_str(i, "src") : NULL, *type = i->type == J_OBJ ? json_str(i, "type") : NULL;
         if (!src || strlen(src) > WEBREG_URL_MAX || strncmp(src, "https://", 8) || webreg_url_origin(src, NULL, 0)) continue;
+        /* a public page never sends --probe-icon to this computer or a local network */
+        if (weburl_parse(src, &iu) || (page_public && weburl_host_class(&iu) != WEBURL_PUBLIC)) continue;
         int png = type && type[0] ? !strcmp(type, "image/png") : ends_ci(src, ".png");
         int svg = type && type[0] ? !strcmp(type, "image/svg+xml") : ends_ci(src, ".svg");
         long px = icon_px(json_str(i, "sizes"));

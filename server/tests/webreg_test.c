@@ -190,6 +190,11 @@ static void test_probe(void) {
     CHECK(!webreg_probe_parse(lb, strlen(lb), &p) && !strcmp(p.icon_url, "https://c.example/1024.png"), "only big ones: the smallest (%s)", p.icon_url);
     const char *ls = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/f.ico\"},{\"src\":\"https://c.example/i.svg\"}]}";
     CHECK(!webreg_probe_parse(ls, strlen(ls), &p) && !strcmp(p.icon_url, "https://c.example/i.svg"), "no PNG: the SVG (%s)", p.icon_url);
+    const char *lp = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://127.0.0.1/a.png\",\"sizes\":\"512x512\"},"
+                     "{\"src\":\"https://192.168.1.1/b.png\",\"sizes\":\"256x256\"},{\"src\":\"https://c.example/48.png\",\"sizes\":\"48x48\"}]}";
+    CHECK(!webreg_probe_parse(lp, strlen(lp), &p) && !strcmp(p.icon_url, "https://c.example/48.png"), "a public page's icon is never local (%s)", p.icon_url);
+    const char *ll = "{\"ok\":true,\"startUrl\":\"http://localhost:8000/\",\"icons\":[{\"src\":\"https://localhost:8443/a.png\"}]}";
+    CHECK(!webreg_probe_parse(ll, strlen(ll), &p) && !strcmp(p.icon_url, "https://localhost:8443/a.png"), "a local page's local icon (%s)", p.icon_url);
     const char *ln = "{\"ok\":true,\"startUrl\":\"https://c.example/\",\"icons\":[{\"src\":\"https://c.example/f.ico\"}]}";
     CHECK(!webreg_probe_parse(ln, strlen(ln), &p) && !p.icon_url[0], "no usable icon");
     const char *l4 = "{\"ok\":true,\"startUrl\":\"http://b.example/\"}";

@@ -34,6 +34,18 @@ int weburl_origin(const char *s, char *out, size_t n);
 int weburl_same_origin(const char *a, const char *b);
 /* 1 when url is inside scope: the same origin and url's path (query included, fragment not) begins with scope's. */
 int weburl_in_scope(const char *url, const char *scope);
+/* Where a host is: WEBURL_PUBLIC, or WEBURL_PRIVATE for this computer and the local networks: localhost and *.localhost,
+ * *.local, 127.0.0.0/8, 0.0.0.0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, ::, ::1, fc00::/7, fe80::/10, and
+ * an IPv4-mapped IPv6 address of those. An IPv4 address is read the way browsers do (shortened, hex or octal parts:
+ * "127.1", "0x7f.1"). A name that only resolves to such an address is not seen here (no DNS lookups). */
+enum { WEBURL_PUBLIC, WEBURL_PRIVATE };
+int weburl_host_class(const WebUrl *u);
+/* The probe (webprobe.c): 1 when a redirect or main-frame navigation from `from` to `to` keeps the request's scheme and
+ * place: never https to http, never from a public host to a private one. */
+int weburl_probe_hop_ok(const char *from, const char *to);
+/* 1 when the address the probe ended on may be read for the address it was asked for: https (or http on this
+ * computer, for an http request on it), and private only when the request was private too. */
+int weburl_probe_final_ok(const char *typed, const char *final);
 /* 1 when a page may use the app's permissions (docs/WEBAPPS.md, "Permissions"): the window shows view_uri, an address
  * inside scope and of app_origin, and the origin that asks (asker, "https://host[:port]"; NULL when WebKit's API doesn't
  * say, as for a permission request) is app_origin too. Anything else (another site in the window after a redirect or a

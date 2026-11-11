@@ -133,6 +133,13 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   loaded page's, a `start_url` on another origin becomes the page itself, a `scope` that doesn't hold the start address
   becomes the start address's folder, the name is cleaned (no control characters, spaces folded, at most 128 bytes),
   colors become `#rrggbb`, at most 16 icons with `https:` addresses. Without a manifest the icons are the page's.
+- **Where it may go:** the probe keeps the request's scheme and place. A redirect or a navigation of the page from
+  `https:` to `http:`, or from a public host to this computer or a local network (localhost and `*.localhost`,
+  `*.local`, 127/8, 0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, `::1`, fc00::/7, fe80::/10, IPv4 written
+  the short, hex or octal way browsers accept), is refused (`web.probe.notHttps` for the scheme, `web.probe.load` for
+  the place), and the page and the icon are read only when the address they ended on passes the same rule against
+  the request (`weburl_probe_hop_ok`, `weburl_probe_final_ok`). lord-server never sends a public page's local icon to
+  `--probe-icon`. A public name that only resolves to a private address is not caught (no DNS lookups of our own).
 - **`--probe-icon`** takes one icon address the same way, downloads it into a temporary folder (removed after) and
   answers `{"ok":true,"type":"image/png"|"image/svg+xml","size":N}` and a newline, then exactly N bytes. A PNG needs its
   signature and an `IHDR` chunk; an SVG is text whose first element is `<svg>`. Anything else is

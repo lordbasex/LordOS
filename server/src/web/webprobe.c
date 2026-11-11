@@ -75,6 +75,8 @@ static int write_all(int fd, const void *p, size_t n) {
 }
 
 static int answered;
+/* the address asked for, and the last main-frame address allowed on the way (redirects and navigations) */
+static char typed[WEBARGS_LINE_MAX + 1], current[WEBURL_MAX + 1];
 
 static void answer_line(Web *w, const char *line) {
     if (answered) return;
@@ -118,8 +120,8 @@ static void on_js(GObject *src, GAsyncResult *res, gpointer d) {
     if (e) g_clear_error(&e);
     if (v) g_object_unref(v);
     const char *uri = webkit_web_view_get_uri(w->view);
-    WebUrl u;
-    if (!uri || weburl_parse(uri, &u) || !(u.https || weburl_is_local(&u))) { g_free(page); answer_error(w, "web.probe.notHttps"); return; }
+    /* https (or http on this computer, asked for as such), and this computer or a local network only when asked for */
+    if (!uri || !weburl_probe_final_ok(typed, uri)) { g_free(page); answer_error(w, "web.probe.notHttps"); return; }
     char *line = g_malloc(WEBMANIFEST_LINE_MAX);
     if (page && !webmanifest_answer(uri, page, strlen(page), line, WEBMANIFEST_LINE_MAX)) answer_line(w, line);
     else answer_error(w, "web.probe.page");
@@ -154,8 +156,23 @@ static gboolean on_tls(WebKitWebView *v, const char *uri, GTlsCertificate *c, GT
 }
 
 static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPolicyDecisionType type, gpointer d) {
-    (void)v; (void)d;
+    (void)v;
     if (type == WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION) { webkit_policy_decision_ignore(dec); return TRUE; }
+    if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
+        /* a redirect or a navigation of the page itself: never from https to http, never from a public host to this
+         * computer or a local network (a public page must not make the probe read what only this computer can reach) */
+        WebKitNavigationAction *a = webkit_navigation_policy_decision_get_navigation_action(WEBKIT_NAVIGATION_POLICY_DECISION(dec));
+        const char *uri = webkit_uri_request_get_uri(webkit_navigation_action_get_request(a));
+        if (!uri || !strncmp(uri, "about:", 6)) return FALSE;
+        if (!weburl_probe_hop_ok(current, uri) || !weburl_probe_hop_ok(typed, uri)) {
+            webkit_policy_decision_ignore(dec);
+            WebUrl f, t;
+            answer_error(d, !weburl_parse(current, &f) && !weburl_parse(uri, &t) && f.https && !t.https ? "web.probe.notHttps" : "web.probe.load");
+            return TRUE;
+        }
+        snprintf(current, sizeof current, "%s", uri);
+        return FALSE;
+    }
     if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
         WebKitResponsePolicyDecision *r = WEBKIT_RESPONSE_POLICY_DECISION(dec);
         if (!webkit_response_policy_decision_is_mime_type_supported(r)) { webkit_policy_decision_ignore(dec); return TRUE; }
@@ -188,6 +205,8 @@ int webprobe_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
     w->loop = g_main_loop_new(NULL, FALSE);
     if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
+    snprintf(typed, sizeof typed, "%s", url);
+    snprintf(current, sizeof current, "%s", url);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     if (!wpe_fdo_initialize_shm()) { answer_error(w, "web.probe.load"); return 1; }
     w->exportable = wpe_view_backend_exportable_fdo_create(&headless, w, 1280, 800);
@@ -255,7 +274,7 @@ static void icon_done(WebKitDownload *dl, gpointer d) {
     if (g_object_get_data(G_OBJECT(dl), "lord-web-failed")) return;
     WebKitURIResponse *resp = webkit_download_get_response(dl);
     const char *final = resp ? webkit_uri_response_get_uri(resp) : NULL;
-    if (!final || !weburl_app_ok(final)) { answer_error(w, "web.probe.notHttps"); return; }
+    if (!final || !weburl_probe_final_ok(typed, final)) { answer_error(w, "web.probe.notHttps"); return; }
     char p[PATH_MAX + 16];
     snprintf(p, sizeof p, "%s/icon", tmpdir);
     int fd = open(p, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
@@ -286,6 +305,7 @@ int webprobe_icon_run(Web *w) {
     char url[WEBARGS_LINE_MAX + 1];
     w->loop = g_main_loop_new(NULL, FALSE);
     if (read_request(url, sizeof url)) { answer_error(w, "web.probe.request"); return 0; }
+    snprintf(typed, sizeof typed, "%s", url);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     snprintf(tmpdir, sizeof tmpdir, "%s/lordos-web-icon.XXXXXX", rt && rt[0] == '/' ? rt : "/tmp");
     if (!mkdtemp(tmpdir)) { tmpdir[0] = 0; answer_error(w, "web.probe.load"); return 1; }
