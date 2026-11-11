@@ -5,7 +5,8 @@
 // with esbuild (as the theme is built) over a stub `lord` that keeps the node tree, its texts and a clipboard, runs
 // it, and reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
 // An argument names another scene over the same stub: tests/password_field_scene.mjs (the eye and the Caps Lock hint),
-// tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
+// tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first),
+// tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
 // sheet). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
 // not the whole desktop.
 import { createRequire } from 'node:module';

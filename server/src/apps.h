@@ -80,6 +80,11 @@ int apps_launch_action(const char *id, const char *action);
  * the launcher would, is exe (a resolved path); or, with flatpak_id, if it is "flatpak run" for that app id. hint
  * (a window's app_id, or NULL) only says which entries to look at first. out = "" if none runs it. */
 void apps_name_of_program(const char *exe, const char *flatpak_id, const char *hint, char *out, size_t n);
+/* The .desktop file of a listed system app (from /usr/share/applications, never the user's
+ * ~/.local/share/applications: those are no package's), as the system sees it (without the test root),
+ * for lord.pkg.ownerOfApp (which package brought it). The id is validated and looked up as the launcher
+ * does; the caller never gives a path. 0 if found. */
+int apps_system_file(const char *id, char *out, size_t n);
 /* Why the last apps_launch/apps_launch_with refused, as an error code ("" = no specific reason). */
 const char *apps_last_error(void);
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "The web apps the Store offers (docs/WEBAPPS.md). Data, not text of LordOS: each entry is installed exactly as written here, by lord-server (server/src/web/webmgr.c reads this file from /usr/lib/lordos/assets/webapps/catalog.json; the Store bundles it to show it). 'icon' is a file in icons/ (LordOS's own letter tile, not the service's logo); 'description' is a key in assets/locales/<lang>/webapps.json; 'tested' is true only for an app checked on LordOS (docs/WEBAPPS.md, 'First check'). Checked by server/tests/webapps_model_test.mjs.",
+  "note": "The web apps the Store offers (docs/WEBAPPS.md). Data, not text of LordOS: each entry is installed exactly as written here, by lord-server (server/src/web/webmgr.c reads this file from /usr/lib/lordos/assets/webapps/catalog.json; the Store bundles it to show it). 'icon' is a file in icons/ (LordOS's own letter tile, not the service's logo); 'description' is a key in assets/locales/<lang>/webapps.json; 'tested' is true only for an app checked on LordOS (docs/WEBAPPS.md, 'First check'). The Store's page of an app also shows: 'publisher' (who makes the service), 'verified' (YYYY-MM-DD, the day LordOS last checked it works on lord-web; left out until then), 'typicalMemoryMB' (Pss of one profile measured on LordOS: lord-web and WebKit's processes) and 'limitations' (keys of webapps.limit.*: drm, calls, push). Checked by server/tests/webapps_model_test.mjs.",
   "apps": [
     {
       "id": "whatsapp",
@@ -14,7 +14,10 @@
       "category": "Network",
       "description": "webapps.desc.chat",
       "keywords": ["chat", "messages", "whatsapp"],
-      "tested": true
+      "tested": true,
+      "publisher": "Meta Platforms",
+      "typicalMemoryMB": 810,
+      "limitations": ["calls", "push"]
     },
     {
       "id": "telegram",
@@ -28,7 +31,9 @@
       "category": "Network",
       "description": "webapps.desc.chat",
       "keywords": ["chat", "messages", "telegram"],
-      "tested": false
+      "tested": false,
+      "publisher": "Telegram FZ-LLC",
+      "limitations": ["push"]
     },
     {
       "id": "element",
@@ -42,7 +47,9 @@
       "category": "Network",
       "description": "webapps.desc.chat",
       "keywords": ["chat", "matrix", "element"],
-      "tested": false
+      "tested": false,
+      "publisher": "Element (New Vector Ltd)",
+      "limitations": ["push"]
     },
     {
       "id": "discord",
@@ -56,7 +63,9 @@
       "category": "Network",
       "description": "webapps.desc.community",
       "keywords": ["chat", "voice", "discord"],
-      "tested": false
+      "tested": false,
+      "publisher": "Discord Inc.",
+      "limitations": ["calls", "push"]
     },
     {
       "id": "outlook",
@@ -70,7 +79,9 @@
       "category": "Office",
       "description": "webapps.desc.mail",
       "keywords": ["mail", "calendar", "outlook"],
-      "tested": false
+      "tested": false,
+      "publisher": "Microsoft",
+      "limitations": ["push"]
     },
     {
       "id": "notion",
@@ -84,7 +95,8 @@
       "category": "Office",
       "description": "webapps.desc.notes",
       "keywords": ["notes", "wiki", "notion"],
-      "tested": false
+      "tested": false,
+      "publisher": "Notion Labs"
     }
   ]
 }

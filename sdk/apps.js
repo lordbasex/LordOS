@@ -15,12 +15,15 @@
 import { createElement as h, useEffect } from 'react';
 import { View, Text, Image } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
+import { settings } from './settings.js';
 import { locale, appName, t } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
 import { compareNames } from './collate.js';
 import { iconSrc } from './iconsrc.js';
-import { listApps, wm, windows, appRegistry, getApp as registryApp } from './windows.js';
+import { listApps, wm, windows, appRegistry, getApp as registryApp, openAllowed } from './windows.js';
+import { appsOff } from './appsoff.js';
+import { launchable } from './appsoffmodel.js';
 import { webApps, refreshWebApps, launchWebApp, webAppOfWindow } from './webapps.js';
 import { launcherItem, webAppOfKey, windowLabel } from './webappsmodel.js';
 
@@ -92,15 +95,21 @@ export function refreshApps() {
 export function linuxIds() { refreshApps(); const l = linux.get(); return l.length ? new Set(l.map((a) => a.desktopId)) : null; }
 locale.subscribe(refreshApps);
 
-export function useLauncherApps() {
+// Deactivated built-in apps (Store → Installed, sdk/appsoffmodel.js) are left out; { all: true } keeps
+// them, marked off: true (the Store's Installed page, which turns them back on).
+export function useLauncherApps({ all = false } = {}) {
   const lin = useStore(linux);
+  useStore(settings, (s) => s.appsOff);
   useEffect(refreshApps, []);    // an app installed outside the Store (a terminal, another app's installer) shows the next time a list opens
   useStore(locale);
   useStore(appRegistry);
   const web = useStore(webApps);
   useEffect(refreshWebApps, []);
   const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  return [...own, ...lin, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  const every = [...own, ...lin, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  const off = appsOff();
+  if (all) return off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every;
+  return launchable(every, off);
 }
 
 // Main freedesktop standard categories (the same as AppStream's in the Store).
@@ -138,6 +147,8 @@ export function launchApp(id) {
   // An installed .lpk app runs as its own isolated process (lord-server --app <id>), if the
   // server supports it; it reaches the desktop as a Wayland window with app_id = its id. Otherwise it
   // falls back to in-process mode (compatibility). See docs/PRIVACY.md.
+  // a deactivated built-in app doesn't start: a notice offers to activate it (appsoffactions.js)
+  if (!openAllowed(id)) return false;
   const app = registryApp(id);
   if (app && app.package && typeof lord.apps !== 'undefined' && typeof lord.apps.launchPackage === 'function')
     return lord.apps.launchPackage(id);

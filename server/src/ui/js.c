@@ -10,6 +10,7 @@
 #include "js_sys.h"
 #include "js_term.h"
 #include "js_pkg.h"
+#include "../apps.h"
 #include "js_sound.h"
 #include "js_monitor.h"
 #include "js_sec.h"
@@ -432,6 +433,7 @@ static void session_context(void) {
     js_sys_register(ctx, lord);
     js_term_register(ctx, lord);
     js_pkg_register(ctx, lord);
+    js_pkg_set_app_file(apps_system_file);
     js_sound_register(ctx, lord);
     js_wasm_register(ctx, g);           /* the WebAssembly global (our own interpreter, src/wasm) */
     js_net_register(ctx, lord);

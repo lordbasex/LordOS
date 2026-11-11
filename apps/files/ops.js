@@ -1,6 +1,6 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
-import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard } from '@lordos/sdk';
+import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 
@@ -134,24 +134,29 @@ export function moveTags(from, to) {
 // ---- open ----
 
 // Apps that open an entry: [{ id, label, run }] (the first one is the default).
-export function openersFor(e, linuxApps, t) {
-  const out = [];
+export function openersFor(e, linuxApps, t) { return openersOf(e, linuxApps, t).list; }
+
+// { list, off }: off names the deactivated LordOS apps (Store → Installed) that would have opened it, left
+// out of the list; a file only they open offers to activate one (openEntry).
+function openersOf(e, linuxApps, t) {
+  const all = [];
   const k = kindOf(e);
-  if (k === 'lpk' || k === 'deb') out.push({ id: 'store', label: t('apps.store'), run: () => wm.open('store', { args: { install: e.path } }) });
+  if (k === 'lpk' || k === 'deb') all.push({ id: 'store', label: t('apps.store'), run: () => wm.open('store', { args: { install: e.path } }) });
   // documents (M9): PDFs in the PDF Viewer and fonts in Fonts
-  if (k === 'pdf') out.push({ id: 'pdf', label: t('apps.pdf'), run: () => wm.open('pdf', { new: true, args: { path: e.path } }) });
-  if (/\.(ttf|otf|ttc|otc)$/i.test(e.name)) out.push({ id: 'fonts', label: t('apps.fonts'), run: () => wm.open('fonts', { args: { path: e.path } }) });
+  if (k === 'pdf') all.push({ id: 'pdf', label: t('apps.pdf'), run: () => wm.open('pdf', { new: true, args: { path: e.path } }) });
+  if (/\.(ttf|otf|ttc|otc)$/i.test(e.name)) all.push({ id: 'fonts', label: t('apps.fonts'), run: () => wm.open('fonts', { args: { path: e.path } }) });
   // media (M9): images in Photos; audio and video in the Player (the defaults)
-  if (k === 'image') out.push({ id: 'photos', label: t('apps.photos'), run: () => wm.open('photos', { new: true, args: { path: e.path } }) });
-  if (k === 'audio' || k === 'video') out.push({ id: 'player', label: t('apps.player'), run: () => wm.open('player', { args: { path: e.path } }) });
-  if (isTextual(e) || k === 'other') out.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
+  if (k === 'image') all.push({ id: 'photos', label: t('apps.photos'), run: () => wm.open('photos', { new: true, args: { path: e.path } }) });
+  if (k === 'audio' || k === 'video') all.push({ id: 'player', label: t('apps.player'), run: () => wm.open('player', { args: { path: e.path } }) });
+  if (isTextual(e) || k === 'other') all.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
   // the system's MIME database's type first (lord.mime.guess), then Files' own table: an app that
   // declares either one opens the file (issue #49: an .xlsx had no type of its own here, so WPS and
   // GridCraft, which declare it, were never offered)
   const mimes = mimesOf(e, typeof lord.mime !== 'undefined' && lord.mime.guess ? (n) => lord.mime.guess(n) : null);
   for (const a of linuxApps) {
-    if (a.kind === 'linux' && mimes.some((m) => appOpens(a.mimeTypes, m))) out.push({ id: a.id, desktopId: a.desktopId, label: a.name, run: () => lord.apps.launchWith(a.desktopId, e.path) });
+    if (a.kind === 'linux' && mimes.some((m) => appOpens(a.mimeTypes, m))) all.push({ id: a.id, desktopId: a.desktopId, label: a.name, run: () => lord.apps.launchWith(a.desktopId, e.path) });
   }
+  const { list: out, off } = openersAvailable(all, appsOff());
   // the default app for this type (Settings → Default Apps, ~/.config/mimeapps.list) goes first,
   // marked
   let def = null;
@@ -162,7 +167,7 @@ export function openersFor(e, linuxApps, t) {
     const [d] = out.splice(i, 1);
     out.unshift({ ...d, label: t('prefs.defaults.tag', { name: d.label }), isDefault: true });
   }
-  return out;
+  return { list: out, off };
 }
 
 export function openEntry(e, ctx) {
@@ -171,7 +176,9 @@ export function openEntry(e, ctx) {
   if (e.arc) { if (e.dir) ctx.navigate({ type: 'archive', path: e.arc.file, inner: e.arc.inner }); else ctx.openArc(e); return; }
   if (e.dir) { ctx.navigate({ type: 'dir', path: e.path }); return; }
   if (!e.trash && archive.isArchive(e.name)) { ctx.navigate({ type: 'archive', path: e.path, inner: '' }); return; }
-  const list = openersFor(e, ctx.linuxApps, ctx.t);
+  const { list, off } = openersOf(e, ctx.linuxApps, ctx.t);
+  // only a deactivated LordOS app opens it (Photos, PDF Viewer…): the notice offers to activate it
+  if (off.length && !list.some((o) => o.id !== 'editor')) { offerActivate(off[0], () => openEntry(e, ctx)); return; }
   if (isImage(e) && !list.some((o) => o.id !== 'editor')) { ctx.quickLook(e); return; }    // no viewer: Quick Preview
   if (list.length) list[0].run();
   else ctx.quickLook(e);

@@ -3,6 +3,7 @@
 #include "deb.h"
 #include "idx.h"
 
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -166,4 +167,109 @@ const StPkg *status_find(const Status *s, const char *name, size_t n) {
         if (s->p[i].native) return &s->p[i];
     }
     return NULL;
+}
+
+/* ---- who owns a launcher's .desktop file (dpkg's file lists) ---- */
+
+static const char *const OWN_DIRS[] = { "/usr/share/applications/", "/usr/local/share/applications/" };
+
+typedef struct { char *path; char pkg[128]; } OwnEnt;
+static struct {
+    char info[512];
+    long long mtime;
+    OwnEnt *e;
+    int n;
+    int loaded;
+} own;
+
+/* A path directly in one of the two folders: one component, a .desktop name, no "..". */
+static int own_path_ok(const char *path) {
+    size_t len = strlen(path);
+    if (len >= 512 || len < 9 || strcmp(path + len - 8, ".desktop") || strstr(path, "..")) return 0;
+    for (size_t i = 0; i < sizeof OWN_DIRS / sizeof OWN_DIRS[0]; i++) {
+        size_t l = strlen(OWN_DIRS[i]);
+        if (!strncmp(path, OWN_DIRS[i], l) && path[l] && !strchr(path + l, '/')) return 1;
+    }
+    return 0;
+}
+
+static int own_cmp(const void *a, const void *b) { return strcmp(((const OwnEnt *)a)->path, ((const OwnEnt *)b)->path); }
+
+static void own_free(void) {
+    for (int i = 0; i < own.n; i++) free(own.e[i].path);
+    free(own.e);
+    own.e = NULL;
+    own.n = 0;
+    own.loaded = 0;
+}
+
+/* One .list file: its lines in the two folders. 0 ok, -1 out of memory or the entry bound reached. */
+static int own_read_list(const char *file, const char *pkg, int *cap) {
+    FILE *f = fopen(file, "re");
+    if (!f) return 0;
+    char line[4096];
+    int skipping = 0, r = 0;
+    while (fgets(line, sizeof line, f)) {
+        size_t l = strlen(line);
+        int whole = l && line[l - 1] == '\n';
+        if (skipping) { skipping = !whole; continue; }          /* the rest of a line too long to keep */
+        if (!whole && !feof(f)) { skipping = 1; continue; }
+        if (whole) line[--l] = 0;
+        if (!own_path_ok(line)) continue;
+        if (own.n >= DPKG_OWNER_MAX_ENTRIES) { r = -1; break; }
+        if (own.n == *cap) {
+            int nc = *cap ? *cap * 2 : 256;
+            OwnEnt *ne = realloc(own.e, sizeof *ne * (size_t)nc);
+            if (!ne) { r = -1; break; }
+            own.e = ne;
+            *cap = nc;
+        }
+        char *p = strdup(line);
+        if (!p) { r = -1; break; }
+        own.e[own.n].path = p;
+        snprintf(own.e[own.n].pkg, sizeof own.e[0].pkg, "%s", pkg);
+        own.n++;
+    }
+    fclose(f);
+    return r;
+}
+
+static int own_load(const char *info) {
+    struct stat st;
+    if (strlen(info) >= sizeof own.info || stat(info, &st) || !S_ISDIR(st.st_mode)) { own_free(); return -1; }
+    long long mt = st.st_mtim.tv_sec * 1000000000LL + st.st_mtim.tv_nsec;
+    if (own.loaded && own.mtime == mt && !strcmp(own.info, info)) return 0;
+    own_free();
+    DIR *d = opendir(info);
+    if (!d) return -1;
+    struct dirent *de;
+    int lists = 0, cap = 0;
+    while ((de = readdir(d)) && lists < DPKG_OWNER_MAX_LISTS) {
+        size_t l = strlen(de->d_name);
+        if (l < 6 || l - 5 >= 128 || strcmp(de->d_name + l - 5, ".list")) continue;
+        char pkg[128];
+        snprintf(pkg, sizeof pkg, "%.*s", (int)(l - 5), de->d_name);
+        char *colon = strchr(pkg, ':');            /* "libfoo:amd64.list": the name without its architecture */
+        if (colon) *colon = 0;
+        if (!deb_valid_name(pkg, strlen(pkg))) continue;
+        char file[1024];
+        if (snprintf(file, sizeof file, "%s/%s", info, de->d_name) >= (int)sizeof file) continue;
+        lists++;
+        if (own_read_list(file, pkg, &cap)) break;
+    }
+    closedir(d);
+    qsort(own.e, (size_t)own.n, sizeof *own.e, own_cmp);
+    snprintf(own.info, sizeof own.info, "%s", info);
+    own.mtime = mt;
+    own.loaded = 1;
+    return 0;
+}
+
+int dpkg_owner(const char *info, const char *path, char *out, size_t n) {
+    if (!info || !path || !out || !n || !own_path_ok(path) || own_load(info)) return -1;
+    OwnEnt key = { (char *)path, "" };
+    const OwnEnt *e = own.n ? bsearch(&key, own.e, (size_t)own.n, sizeof *own.e, own_cmp) : NULL;
+    if (!e || strlen(e->pkg) >= n) return -1;
+    snprintf(out, n, "%s", e->pkg);
+    return 0;
 }

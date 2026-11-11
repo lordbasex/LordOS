@@ -397,11 +397,59 @@ function Status() {
     at ? t('store.debian.lastUpdate', { date: formatDate(new Date(at * 1000), 'short') }) : '');
 }
 
-// Debian package that brings an installed Linux app (for "Remove" in Installed).
+// Debian package that brings an installed Linux app (for "Remove" in Installed): { name, essential } or
+// null. First the index (AppStream names the app's .desktop), then dpkg's own file lists
+// (lord.pkg.ownerOfApp: a .deb installed from a file, or an app the index doesn't name, like VLC's).
+// Read once per change of the index or of what is installed (state.gen).
+let ownersGen = -1, byApp = null;
+const owners = new Map();
 function packageOfApp(a) {
-  if (!ready()) return null;
-  const want = new Set([a.desktopId, `${a.desktopId}.desktop`]);
-  return lord.pkg.installed({}).find((p) => p.app && want.has(p.app.id))?.name || null;
+  if (!ready() || !a || a.kind !== 'linux' || !a.desktopId) return null;
+  const gen = state.get().gen;
+  if (gen !== ownersGen) { ownersGen = gen; byApp = null; owners.clear(); }
+  if (owners.has(a.desktopId)) return owners.get(a.desktopId);
+  if (!byApp) {
+    byApp = new Map();
+    for (const p of lord.pkg.installed({})) if (p.app && p.app.id) byApp.set(p.app.id, p);
+  }
+  const p = byApp.get(`${a.desktopId}.desktop`) || byApp.get(a.desktopId);
+  let r = null;
+  if (p) r = { name: p.name, essential: !!p.essential || lord.pkg.info(p.name, {})?.priority === 'required' };
+  else if (typeof lord.pkg.ownerOfApp === 'function') {
+    try { const o = lord.pkg.ownerOfApp(a.desktopId); r = o && o.name ? { name: o.name, essential: !!o.essential } : null; } catch (e) { r = null; }
+  }
+  owners.set(a.desktopId, r);
+  return r;
+}
+
+// The package LordOS itself comes in: a plan that would remove it is never offered.
+const LORDOS_PKG = 'lordos';
+const removesLordOS = (plan) => !!plan && Array.isArray(plan.items) && plan.items.some((i) => i.action === 'remove' && i.name === LORDOS_PKG);
+const refusedPkgs = new Set();          // packages whose removal plan would take LordOS with them (this session)
+
+// Store → Installed: what removing a Linux app's package would do, before doing it (the same plan sheet
+// as the package page): Cancel, or Remove; never when the plan removes LordOS itself.
+function RemoveSheet({ app, onClose }) {
+  const th = useTheme();
+  const { job } = useStore(state);
+  const owner = packageOfApp(app);
+  const [plan] = useState(() => (owner ? lord.pkg.plan({ remove: [owner.name] }) : null));
+  if (!owner || !plan) return null;
+  const blocked = removesLordOS(plan);
+  if (blocked) refusedPkgs.add(owner.name);
+  const confirm = () => {
+    const extra = plan.items.some((i) => i.action === 'remove' && !i.requested);
+    runJob('pkg-remove', extra ? `${owner.name} --cascade` : owner.name, t('store.job.remove', { name: app.name }));
+    onClose();
+  };
+  return h(View, { style: boxStyle(th, { marginTop: spacing.xs }) },
+    h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.plan.titleRemove')),
+    h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' } }, t('store.remove.package', { name: owner.name })),
+    blocked ? h(Text, { style: { fontSize: 12, color: '#ff453a', lineHeight: 1.4, textAlign: 'start' } }, t('store.remove.wouldRemoveLordOS'))
+      : h(PlanView, { plan }),
+    h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end', marginTop: spacing.m } },
+      h(Button, { label: t('store.cancel'), onClick: onClose }),
+      !blocked && plan.ok ? h(Button, { primary: true, label: t('store.plan.confirm'), disabled: !!job, onClick: () => !job && confirm() }) : null));
 }
 
 export const debian = {
@@ -416,11 +464,10 @@ export const debian = {
   // the last job was refused with "not an administrator" (a page that shows the error itself)
   Refused: () => (useStore(state).msg?.notAdmin ? h(AdminRescue) : null),
   installFile: (path) => runJob('pkg-install-file', path, t('store.job.installFile')).then((ok) => { if (!ok) throw new Error(state.get().msg?.text || ''); }),
-  removeApp(a) {
-    const name = packageOfApp(a);
-    if (name) runJob('pkg-remove', name, t('store.job.remove', { name: a.name }));
-  },
-  canRemove: (a) => !!packageOfApp(a),
+  // a Linux app a Debian package brought, that may be removed: never an essential or required package,
+  // nor one whose removal plan was seen to remove LordOS (RemoveSheet)
+  canRemove: (a) => { const o = packageOfApp(a); return !!o && !o.essential && !refusedPkgs.has(o.name) && o.name !== LORDOS_PKG; },
+  RemoveSheet,
   Progress,
   PlanView,
   state,

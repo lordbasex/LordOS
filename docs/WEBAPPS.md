@@ -163,6 +163,33 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
 - **Memory** (2026-11-10, the main machine, `tests/web_probe_test.py --pss` on a small local page): 224 MB PSS at the
   peak for lord-web and its WebKit processes together, about 11 s for the test's nine probes.
 
+## The Store: Discover, the first install and an app's page
+
+- **Where web apps show:** the Web apps section, a banner and a shelf in Discover (the catalog's first apps; "See all"
+  opens the section), Discover's search, and their category's page. Every card has a "Web app" tag, so web apps are
+  told apart from LordOS apps and Linux apps (`apps/store/webapps.js`).
+- **The first web app installs the engine first.** Without `lordos-web` the list is still shown (only "Add from an
+  address" waits, since the probe is lord-web's). Get / Install says LordOS's web engine is needed once and shows the
+  package plan's download and disk size (`lord.pkg.plan({ install: ['lordos-web'] })`); its Install runs the Store's
+  own package job (`pkg-install lordos-web`: the administrator's password, the progress) and, when the job ends well
+  and lord-server finds `lord-web`, installs the app with no other click. From the second app on there is no engine
+  step. The steps are `getReducer` in `sdk/webappsmodel.js` (`apps/store/getweb.js`; `tests/webapps_get_scene.mjs`).
+- **An app's page ("See more", `apps/store/webdetail.js`)**, laid out like a package's: Install / Open / Remove and the
+  tag; the facts row (version "always up to date", the day LordOS tested it, its data on disk, its memory); the
+  description; publisher, the verified https origin, where it came from (LordOS's catalog or an address), the test,
+  the engine ("LordOS Web (WPE WebKit <version>)", the installed `libwpewebkit-2.0-1` from the package index, no
+  program run), the permissions with their state (a link to Settings → Web apps), the profiles (each one's data and
+  memory, Open, New profile), background mode and the known limitations.
+- **The catalog's data for that page** (all optional, checked by `tests/webapps_model_test.mjs`): `publisher`;
+  `verified` (`YYYY-MM-DD`, the day LordOS last checked the app on lord-web: left out until it is, and the page says
+  "not tested yet"); `typicalMemoryMB` (one profile's Pss measured on LordOS: WhatsApp's 810 MB from the first check);
+  `limitations` (keys of `webapps.limit.*`: `drm`, `calls`, `push`). lord-server's own copy ignores them.
+- **Memory now:** `lord.webapps.memory(app)` (read-only) sums `Pss` from `/proc/<pid>/smaps_rollup` of each running
+  lord-web of the app and of every process under it (WebKit's web and network processes, bubblewrap), by profile:
+  one pass over `/proc` for the parents, at most 64 processes (`server/src/web/webmem.c`, `tests/webmem_test.c` on a
+  made-up `/proc`). A process it can't read is counted apart, never guessed. The page reads it every 5 s while open;
+  when the app isn't running it shows the catalog's measured figure, if any.
+
 ## Permissions (asked once per app, revocable in Settings → Web apps)
 
 The page's requests (notifications, camera, microphone, screen sharing, location) reach `lord-web` as WebKit

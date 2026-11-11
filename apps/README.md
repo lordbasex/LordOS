@@ -81,7 +81,7 @@ Store (see `docs/NATIVE-APPS.md`).
 | System | `useSystemInfo()`, `useCpuUsage()`, `useServerStats()`, `formatBytes`, `formatDuration` |
 | Settings | `useSettings()` → `[settings, update]`, stored in `~/.config/lordos/settings.json` |
 | Session | `session.quit()`, `themes.list()`, `themes.use(id)` |
-| Apps | `useLauncherApps()` (LordOS, packages and Linux apps), `launchApp(id)`, `packages.*`, `windowIcon(w)` — see `docs/NATIVE-APPS.md` |
+| Apps | `useLauncherApps({ all })` (LordOS, packages and Linux apps; deactivated built-in apps only with `all`, marked `off`), `launchApp(id)`, `packages.*`, `windowIcon(w)` — see `docs/NATIVE-APPS.md`; `isAppOff(id)`, `useAppsOff()`, `deactivateApp(id)`/`activateApp(id)`, `DEACTIVATABLE`/`CORE_APPS` (Store → Installed, see `docs/PACKAGES.md`, "Store → Installed") |
 | Clipboard | `clipboard.get/set(text, { secure })/use/pin/remove/clear`, `clipboardHistory` and `clipboardKind` (saved history; ❖V and ❖⇧V panels) — see `docs/SPOTLIGHT.md` |
 | Search | `spotlight.open/close/toggle` (❖Space; `open(display)` and `toggle(display)` open it on that display); `spotlightCalc(text)` and `spotlightConvert(text)` |
 | Sound | `useSound()`, `sound.setVolume/setMute/setDefault/setPort/move/meter/play`, `defaultSink(s)`, `microphones(s)` — see `docs/SOUND.md` |

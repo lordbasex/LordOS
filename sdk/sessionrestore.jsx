@@ -24,6 +24,7 @@ import { desktopAt, indexOfDesktop, activeIndex } from './desktops.js';
 import { cleanIndex } from './desktopmodel.js';
 import { dockIdOfWindow, launchDockItem } from './dock.js';
 import { parseDockId } from './dockmodel.js';
+import { isAppOff } from './appsoff.js';
 import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { clipboard } from './clipboard.js';
@@ -197,7 +198,9 @@ function restore(list, active = 0) {
     restoredIds.add(e.id);
     try {
       const a = p.kind === 'desktop' ? null : getApp(p.key);
-      if (a && !a.isolated && !a.package) {
+      if (a && !a.package && isAppOff(p.key)) {
+        // deactivated in Store → Installed (appsoffactions.js): it stays closed, without a notice
+      } else if (a && !a.isolated && !a.package) {
         if (!a.builtin && !a.hidden && !a.live) {
           const first = !windows.get().some((w) => w.app === p.key);
           if (!first && a.singleWindow) { if (i < steps.length) setTimeout(step, STAGGER_MS); else setTimeout(finish, SETTLE_MS); return; }

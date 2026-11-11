@@ -16,6 +16,7 @@ import { cleaner } from './cleaner.js';
 import { cleanerPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
 import { cleanerItemShown } from './menubarmodel.js';
+import { isAppOff } from './appsoff.js';
 
 
 // The rule, documented in docs/CLEANER.md: under 10 % of the disk free is "low"; with a LordOS update waiting,
@@ -87,7 +88,7 @@ function Panel({ p, onClose }) {
 function CleanerItem({ height }) {
   const th = useTheme();
   const all = useStore(settings);
-  const on = cleanerItemShown(all);
+  const on = cleanerItemShown(all) && !isAppOff('cleaner');      // Cleaner deactivated (Store → Installed): no item
   const [open, setOpen] = useState(false);
   const btn = useRef(null), panel = useRef(null);
   useEffect(() => {

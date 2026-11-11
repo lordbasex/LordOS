@@ -186,6 +186,48 @@ with a featured banner, then the AI shelf and a shelf per category; an app's pag
 (version, size, category, distribution). The hardware suggestions moved to their own page, **For this
 computer** (below). Store → Installed shows each native LordOS app's own version.
 
+**Store → Installed (0.8.8.8, in development).** Every installed app, with a filter: **All** or
+**Deactivated**.
+
+- *Removing a Linux app.* "Remove" shows for a Linux app that a Debian package brought. The package is
+  found first through the index (AppStream names the app's `.desktop` file), then through dpkg's own
+  file lists: `lord.pkg.ownerOfApp(desktopId)` (below), so a `.deb` installed from a file (ZapZap:
+  `/usr/share/applications/com.rtosta.zapzap.desktop` belongs to `zapzap`) or an app the index doesn't
+  name (VLC) can be removed too. The button opens the same plan sheet as a package's page: what else
+  would be removed and how much space comes back, then Remove (`pkg-remove`, the existing action; an
+  administrator only). It is never offered for an Essential, Protected or `Priority: required`
+  package, and when the plan would remove the `lordos` package itself the sheet says so and has no
+  Remove button (and the app's button goes for the rest of the session).
+- *Deactivating a LordOS app.* A built-in app LordOS can do without has **Deactivate** (and, once
+  deactivated, **Activate**); the core keeps "System app — part of LordOS". The lists are in
+  `sdk/appsoffmodel.js` (tested by `server/tests/apps_off_model_test.mjs`, which also checks that every
+  app in `apps/` is in exactly one of them):
+
+  | Deactivatable | Core (never) |
+  |---|---|
+  | Remote Desktop, Machines, Databases, Imager, Scanner, Voice Recorder, Camera, Characters, Calculator, Clock, Calendar, Contacts, Mail, Notes, Reminders, Photos, Player, PDF Viewer, Fonts, Cleaner, Backups | Files, Settings, Store, Terminal, Monitor, Logs, Disks, System Information, Force Quit, Screenshots, Help, Passwords, Text Editor, About, About this app, the installer, the sandbox probe |
+
+  The choice is per user, in `settings.json` → `appsOff` (a new key with a default: no migration;
+  only deactivatable ids are ever read from it). A deactivated app stays installed and verified with the
+  `lordos` package, but: it leaves the launcher, the start menu, the Dock (unpinned; pinned again on
+  Activate), Spotlight (Notes' notes too), Files' "Open With" and Settings → Default Apps. A file type
+  whose default is a deactivated app opens with the next capable app; a file only that app opens gives
+  the notice instead. `launchApp` and `wm.open` refuse it (`setOpenGate` in `sdk/windows.js`) and show
+  a small notice, "<App> is deactivated", with **Activate** (which then opens what was asked); session
+  restore leaves it closed. What it did in the background stops (`sdk/appsoffactions.js`):
+  - **Mail**: lord-maild stops syncing the mail accounts (`"mailPaused": true` in the mail config;
+    `accounts_apply_config` stops their workers without dropping what they keep on disk), and there are
+    no new-mail notices. With **Calendar, Contacts and Reminders** all off, the calendar-and-contacts
+    accounts pause too (`"davPaused"`).
+  - **Calendar**, **Reminders**: their alarms don't ring. **Clock**: its alarms and timer stop, and its
+    item by the clock goes.
+  - **Backups**: no scheduled backups (the schedule becomes "manual" and comes back on Activate; a backup
+    running now is cancelled; refused while it restores or deletes one).
+  - **Cleaner**: its item by the clock goes.
+  - **Machines**: refused while a machine is running, paused, starting or stopping, with a message; a
+    running VM is never stopped by this.
+  - The others only work in their window, which is closed first (one with unsaved changes stops it).
+
 - **Artificial Intelligence** lists LordOS's catalog of AI apps (`UPDATES.md`, "Mirrored apps
   (catalog)"), each with its kind, vendor and licence, dimmed on an architecture it doesn't support. An
   app from its vendor's repository first says whose repository it adds and its key fingerprint, then
@@ -369,6 +411,13 @@ lord.pkg.icon(name)             // path of the 64×64 PNG or null
 lord.pkg.releaseNotes(name, version)   // Markdown release notes a source published for that version, or null
 lord.pkg.featured()             // (0.8.5) the Store's banner from the signed LordOS repository, or null
 lord.pkg.rebootRequired()       // null, or the packages that asked for a restart (/run/reboot-required.pkgs)
+lord.pkg.ownerOfApp(desktopId)  // (0.8.8.8) { name, essential } | null: the installed package whose files include
+                                //   that launcher app's .desktop file. Only the id comes from JS: lord-server finds the
+                                //   file the way the launcher does (apps.c apps_system_file, /usr/share/applications
+                                //   only, never ~/.local) and reads dpkg's /var/lib/dpkg/info/*.list for an exact path
+                                //   match (status.c dpkg_owner: only lines in /usr/share/applications or
+                                //   /usr/local/share/applications are kept, cached until the info folder changes,
+                                //   bounded). essential: Essential, Protected or Priority: required.
 
 // Summary = { name, version (candidate), summary, section, size, installedSize (bytes),
 //             installed (version or null), upgradable, essential, auto, app: App | null }
@@ -430,7 +479,8 @@ await admin.run('pkg-install', 'featherpad', (line) => …)    // line: "progres
 ```sh
 make -C server build/pkg-test
 build/pkg-test                         # unit tests: versions, deb822, SHA, RSA, Ed25519, xz/gz,
-                                       # index and resolver over a toy repository
+                                       # index and resolver over a toy repository, dpkg_owner over a
+                                       # fake /var/lib/dpkg/info (exact matches, architectures, cache)
 build/pkg-test pgp /usr/share/keyrings/debian-archive-keyring.gpg InRelease
 build/pkg-test plan /var/lib/lordos/pkg /var/lib/dpkg/status gimp     # the plan, without installing
 sudo build/pkg-test run pkg-update     # the real actions, without lord-server

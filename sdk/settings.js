@@ -37,6 +37,8 @@ const DEFAULTS = {
   bluetoothOff: false,        // 0.8.8.6 (#75), the user's last Bluetooth switch: applied again at login (btpowermodel.js)
   windowButtons: 'auto',      // 0.8.8.7 (#58), Settings → Desktop & Dock → Title bars: 'auto' | 'left' | 'right' (windowbuttons.js)
   x11Scaling: 'self',         // 0.8.8.8, Settings → Displays → X11 apps: 'self' (they scale themselves, sharp) | 'lordos' (wayland.js)
+  appsOff: [],                // 0.8.8.8, Store → Installed → Deactivate: built-in apps turned off (appsoff.js, appsoffmodel.js)
+  appsOffKept: null,          // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
 };
 
 // Per-user settings migrations (docs/UPDATES.md, "Migrations"): when an update changes the shape or

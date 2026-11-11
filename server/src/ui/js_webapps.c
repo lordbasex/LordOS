@@ -17,6 +17,9 @@
  *   setBackground(app, on) · uninstall(app, deleteData)
  *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
  *   running()                           [{ app, profile, pid }]
+ *   memory(app)                         null when none of its profiles runs; else { kb, processes, unreadable,
+ *                                       profiles: [{ profile, kb, processes }] }: the Pss of each running lord-web of
+ *                                       the app and of its WebKit processes (web/webmem.c; read-only, bounded)
  *   owner(surface)                      { app, profile } when window surface is one of our lord-web processes, else null
  *   answer(id, value)                   a permission question (the "webapps-ask" event): allow|deny|once|deny-once
  *   asks()                              the questions still waiting */
@@ -24,6 +27,7 @@
 #include "js_err.h"
 #include "js_sys.h"
 #include "webask.h"
+#include "../web/webmem.h"
 #include "../web/webmgr.h"
 #include "../wl/wl.h"
 #include "../wl/xdgact.h"
@@ -216,6 +220,38 @@ static JSValue f_running(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return arr;
 }
 
+static JSValue f_memory(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0);
+    if (!app) return js_throw_code(c, "sys.badArgument", NULL);
+    if (!webreg_id_ok(app)) { JS_FreeCString(c, app); return js_throw_code(c, "webapps.badId", NULL); }
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING), found = 0;
+    long long total = 0;
+    int procs = 0, unreadable = 0;
+    JSValue arr = JS_NewArray(c);
+    for (int i = 0; i < n; i++) {
+        WebMem m;
+        if (strcmp(r[i].app, app) || webmem_tree("/proc", r[i].pid, &m)) continue;
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "profile", JS_NewString(c, r[i].profile));
+        JS_SetPropertyStr(c, o, "kb", JS_NewInt64(c, m.pss_kb));
+        JS_SetPropertyStr(c, o, "processes", JS_NewInt32(c, m.procs));
+        JS_SetPropertyUint32(c, arr, (uint32_t)found++, o);
+        total += m.pss_kb;
+        procs += m.procs;
+        unreadable += m.unreadable;
+    }
+    JS_FreeCString(c, app);
+    if (!found) { JS_FreeValue(c, arr); return JS_NULL; }
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "kb", JS_NewInt64(c, total));
+    JS_SetPropertyStr(c, o, "processes", JS_NewInt32(c, procs));
+    JS_SetPropertyStr(c, o, "unreadable", JS_NewInt32(c, unreadable));
+    JS_SetPropertyStr(c, o, "profiles", arr);
+    return o;
+}
+
 /* A window says it is lordos-web.<app>.<profile>: only a window of the lord-web we started for that app and
  * profile is shown as that web app (any client can set any app id). */
 static JSValue f_owner(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -265,6 +301,7 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("uninstall", 2, f_uninstall),
     JS_CFUNC_DEF("launch", 2, f_launch),
     JS_CFUNC_DEF("running", 0, f_running),
+    JS_CFUNC_DEF("memory", 1, f_memory),
     JS_CFUNC_DEF("owner", 1, f_owner),
     JS_CFUNC_DEF("answer", 2, f_answer),
     JS_CFUNC_DEF("asks", 0, f_asks),
