@@ -12,6 +12,7 @@
  *     network up themselves (while lord-netd restarts, the action answers with an error). */
 #include "sessiond.h"
 #include "../sec/cgroup.h"
+#include "../lordlog.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -86,6 +87,9 @@ void sd_netd_start(void) {
     if (!adopt()) return;
     pid_t p = fork();
     if (p == 0) {
+        /* lord-netd stamps its own log (/var/log/lordos/lord-netd.log): its stderr is the journal
+         * again, not lord-sessiond's log */
+        if (lordlog_journal_fd() >= 0) dup2(lordlog_journal_fd(), 2);
         syscall(SYS_close_range, 3, ~0u, 0);    /* nothing from the monitor or the connections */
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) dup2(null, 0);

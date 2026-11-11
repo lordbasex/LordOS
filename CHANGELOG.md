@@ -12,6 +12,58 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Logs move to `/var/log/lordos`, one per app, rotated, and the previous session is kept.** Every LordOS log now
+  lives under `/var/log/lordos` (`server/src/lordlog.c`, docs/SYSTEM.md "Log files"):
+  - **The root daemons:** `lord-sessiond.log`, `lord-netd.log`, `lord-fand.log` and `admin.log` (the administration
+    helper's refusals, never an action's arguments; its stderr used to go nowhere), root's, mode 0640. Their lines
+    still reach the journal as before; lord-netd's own lines no longer pass through lord-sessiond's file.
+  - **Each user's:** `/var/log/lordos/users/<user>/` (mode 0700, the user's) with `compositor.log` (lord-server),
+    `shell.log` (the shell's React/QuickJS `js:` lines and their stack lines, which used to be mixed into
+    `session.log`), `xwayland.log`, `cloud.log` (rclone), `apps/<app>.log` (each isolated native app and each Linux
+    app, which used to share `apps.log`, or, for isolated apps, the compositor's log) and `web/<app>-<profile>.log`
+    (each web app's lord-web, which used to share `web.log`; `web/probe.log` for the Store's probe). Ids become safe
+    file names (`[A-Za-z0-9._+-]`, no leading `.` or `-`, at most 96 bytes).
+  - **The folder is made by lord-sessiond at each login, before the session starts** (and for the login screen's
+    `lordos-greeter`): each step is an `openat` from a folder opened with `O_NOFOLLOW|O_DIRECTORY`; `/var/log/lordos`
+    (0755) and `users/` (0711, so nobody can list the names) must be root's and writable by nobody else; the user's
+    folder is fixed with `fchown`/`fchmod` on its own descriptor. A symlink, a file or another uid's folder in its
+    place is refused and left untouched, the session then logs to `~/.cache/lordos`. Root never touches anything
+    inside the user's folder.
+  - **Fallback:** a nested or development lord-server, one without lord-sessiond, or one with another `$HOME` (the
+    test harnesses) writes the same names under `~/.cache/lordos`, so development keeps working and a test never
+    rotates the running session's files.
+  - **Lines carry a timestamp, a level and a subsystem:** `2026-11-11T12:43:56.123-03:00 INFO  xwayland: starting
+    Xwayland on :0` (local time with milliseconds and offset; `ERROR`/`WARN`/`INFO` from the message's words; the
+    line's own `name:` prefix or `compositor`/`shell`/the daemon). A small `lord-log` child stamps them, reading
+    lord-server's (or the daemon's) stderr through a pipe; it ignores SIGTERM and drains the pipe until the last
+    writer is gone, so a crash loses nothing already written. Linux apps, Xwayland, lord-web and rclone write their
+    own output as is, after a stamped "starting …" line written by lord-server before it forks.
+  - **The previous session is kept:** at login `compositor.log` and `shell.log` become `.1`; `session.log` used to
+    be opened with "w", losing the crash that ended the previous session.
+  - **Rotation:** `/etc/logrotate.d/lordos` (daily, or at the first run after a file passes 10 MB; 7 copies,
+    compressed; `copytruncate`, because most writers are other programs holding the file with `O_APPEND` that can't
+    be told to reopen it). logrotate is now a Recommends of the lordos package and in every image's tool list. Its
+    handling of the users' folders was checked on VM 127: a `<name>.log.1` and a `<name>.log` planted as symlinks to
+    a root-only file were refused, nothing was read. As a fallback the writers cap every file at 16 MB themselves (the
+    newest part goes to `<name>.1` from a line start and the file is emptied in place, so writers holding it go on),
+    when a log is opened and every minute from the session's `lord-log` child, so the disk never fills even without
+    logrotate. The old 1 MB truncations of `apps.log`, `xwayland.log` and `web.log` are gone.
+  - **The Logs app** lists the session's files (each previous session's as "<name> (previous session)"), then
+    **Apps**, **Web apps** and **Older logs** (what earlier versions left in `~/.cache/lordos`), shows each stamped
+    line's real time, level and subsystem (`sdk/logfile.js`), and follows `apps/` and `web/` live. `lord.logs` still
+    reads only the user's own logs: a name is `[<apps|web|cache>/]<safe name>.log[.1]`, opened with `openat` and
+    `O_NOFOLLOW`; `lord.logs.dir()` is new. Settings → Cloud's "copy the log" reads rclone's log through `lord.logs`.
+  - **Migration** `007-0.8.8.8-logs.sh` makes `/var/log/lordos` (0755) and `users/` (0711), root's, moving aside
+    anything there that is not a folder without following it. The old `~/.cache/lordos/*.log` are left where they
+    are (migrations never touch home folders). `lord-fand.service` gains `LogsDirectory=lordos` (it runs with
+    `ProtectSystem=strict`); purging the package removes `/var/log/lordos`.
+  - `lordos-issue` reads the new places and adds the shell's log, the previous session's last lines and the five
+    most recent apps' logs; `tools/diag/keylag.sh`, `tools/rpi/verify-board.sh`, the e2e scripts and the docs use the
+    new names.
+  - Tests: `build/lordlog-test` (109 checks: names and sanitizing; the root side's folder against a symlink, a
+    dangling symlink, a file, a symlinked or group-writable root and a symlinked `users/`, in a temporary folder; the
+    cap and rotation, never through a symlink or a FIFO; the line format; `lord-log` end to end with the previous
+    session kept as `.1`) and `server/tests/logfile_test.mjs` (the Logs app's parser and order).
 - **Web apps: editing like in a browser.** The Edit menu of a web app's window now has Undo, Redo, Cut, Copy, Paste
   and Select All (Speech stays below them): the shell asks lord-server, which sends `org.lordos.WebApp1.Edit(command)`
   to that window's lord-web, and lord-web runs it only when the bus says the caller is the lord-server that started it

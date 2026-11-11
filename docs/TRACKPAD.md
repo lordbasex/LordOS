@@ -75,7 +75,7 @@ but badly.
   (`BTN_TOOL_TRIPLETAP` with 2 slots), counting goes by `BTN_TOOL_*`.
 
 `lord-sessiond` lends them just like mice (see `SESSIONS.md`). The session log
-(`~/.cache/lordos/session.log`) says what it found:
+(`/var/log/lordos/users/$USER/compositor.log`) says what it found:
 
 ```
 tp: LordOS SynPS/2 Synaptics TouchPad (simulado): touchpad (clickpad), 105×87 mm, 5 contacts
@@ -464,7 +464,7 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
 
 ## Checklist for real hardware (laptop, Raspberry Pi 5 with a USB touchpad or touchscreen)
 
-1. `session.log` shows `tp: … touchpad (clickpad), N×M mm` with real dimensions. If it says `0×0` or
+1. `compositor.log` shows `tp: … touchpad (clickpad), N×M mm` with real dimensions. If it says `0×0` or
    odd dimensions, the absinfo lacks a resolution: record with `tpsim record` and send it.
 2. **Pointer:**
    - slow is precise (you can aim at a menu bar button);

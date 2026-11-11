@@ -12,7 +12,7 @@ build/obj/main.o: src/cloud/cloud.h src/ui/js_cloud.h
 # the closed rc method table, argument and path checks, authorize's output, the status merge, the eviction choice,
 # and Free Up Space on a real cache tree in a throwaway home (no rclone needed)
 test: build/cloud-test
-CLOUD_CORE_SRC := src/cloud/cloud.c src/cloud/cloud_trust.c src/lan/rconnect_run.c src/lan/rconnect_pure.c src/cloud/cloud_files.c src/cloud/cloud_rc.c src/cloud/cloud_pure.c src/doc/wire.c src/sec/json.c src/sec/cgroup.c src/sec/sandbox.c
+CLOUD_CORE_SRC := src/lordlog.c src/cloud/cloud.c src/cloud/cloud_trust.c src/lan/rconnect_run.c src/lan/rconnect_pure.c src/cloud/cloud_files.c src/cloud/cloud_rc.c src/cloud/cloud_pure.c src/doc/wire.c src/sec/json.c src/sec/cgroup.c src/sec/sandbox.c
 build/cloud-test: tests/cloud_test.c $(CLOUD_CORE_SRC) $(wildcard src/cloud/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -DCLOUD_TEST $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/cloud_test.c $(CLOUD_CORE_SRC) -lpthread -lcrypt -lm

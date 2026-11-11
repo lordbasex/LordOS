@@ -18,9 +18,12 @@ export LC_ALL=C          # decimal points in awk and printf
 SECS=${1:-30}
 RT=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 TRACE=$RT/lordos-keylag.log
-LOGDIR=$HOME/.cache/lordos
-SLOG=$LOGDIR/session.log
-ALOG=$LOGDIR/apps.log
+# the session's logs (server/src/lordlog.h): /var/log/lordos/users/<user>, or ~/.cache/lordos without lord-sessiond
+LOGDIR=/var/log/lordos/users/$(id -un)
+[ -d "$LOGDIR" ] && [ ! -L "$LOGDIR" ] || LOGDIR=$HOME/.cache/lordos
+SLOG=$LOGDIR/compositor.log
+[ -r "$SLOG" ] || SLOG=$LOGDIR/session.log            # an older version's
+ALOG=$LOGDIR/apps
 
 say() { printf '%s\n' "$*"; }
 
@@ -45,7 +48,7 @@ say "guest tools:    $tools"
 case " $cmd " in *" lordos.gpu=0 "*) say "boot flag:      lordos.gpu=0 (CPU composition forced)";; esac
 case " $cmd " in *" lordos.inputdebug=1 "*) say "boot flag:      lordos.inputdebug=1 (key latency trace)";; esac
 buggy=0
-[ -r "$ALOG" ] && buggy=$(grep -c "buggy presentation feedback" "$ALOG" 2>/dev/null)
+[ -d "$ALOG" ] && buggy=$(cat "$ALOG"/*.log 2>/dev/null | grep -c "buggy presentation feedback")
 say "Chromium:       \"buggy presentation feedback\" $buggy time(s) in this session's app log"
 say ""
 

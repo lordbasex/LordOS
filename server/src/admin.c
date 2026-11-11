@@ -28,6 +28,7 @@
  * marked A_ANYONE (connecting to a network, as in NetworkManager). It exits when lord-server
  * closes the connection, and with it the resident processes (wpa_supplicant, VPN, DHCP). */
 #include "admin.h"
+#include "lordlog.h"
 #include "pkg/pkg.h"
 #include "net/net.h"
 #include "install/install.h"
@@ -760,10 +761,13 @@ static void helper_request(int id, const char *action, char *arg, size_t len, vo
     h->req->id = id;
     size_t a = find_action(action);
     int fw = 1;
-    if (a == N_ACTIONS) admin_err("admin.unknownAction", NULL);
+    /* admin.log (lordlog.h): refusals and the long actions, never their arguments */
+    if (a == N_ACTIONS) { fprintf(stderr, "admin: %s asked for an unknown action: refused\n", h->user); admin_err("admin.unknownAction", NULL); }
     else if (strlen(arg) != len) admin_err("admin.invalidArgument", NULL);
-    else if (!h->allowed && !(actions[a].flags & A_ANYONE)) admin_err("admin.notAdmin", "user", h->user, NULL);
-    else if (!strncmp(action, "net-", 4) && (fw = netd_forward(id, action, arg, len)) <= 0) {
+    else if (!h->allowed && !(actions[a].flags & A_ANYONE)) {
+        fprintf(stderr, "admin: %s is not an administrator: %s refused\n", h->user, actions[a].name);
+        admin_err("admin.notAdmin", "user", h->user, NULL);
+    } else if (!strncmp(action, "net-", 4) && (fw = netd_forward(id, action, arg, len)) <= 0) {
         if (fw < 0) admin_err("netd.unavailable", NULL);
     } else run_action(a, h->req, id, arg, len, -1);
     cur_id = 0;
@@ -774,6 +778,8 @@ static void helper(int fd, const char *user) {
     prctl(PR_SET_NAME, "lord-admin");
     prctl(PR_SET_PDEATHSIG, SIGTERM);       /* if lord-server dies, the helper does too */
     signal(SIGPIPE, SIG_IGN);
+    /* its stderr (lord-server's, /dev/null under lord-sessiond) is stamped into /var/log/lordos/admin.log */
+    lordlog_system_start("admin");
     umask(022);
     struct passwd *pw = getpwnam(user);
     if (!pw) _exit(1);

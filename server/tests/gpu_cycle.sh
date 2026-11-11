@@ -50,5 +50,5 @@ echo "before: fds=$(ls /proc/$SESS/fd | wc -l) rss_kb=$(awk '/VmRSS/{print $2}' 
 sudo build/seat-cycle "$RT/lordos/remote.sock" "$CARD" "$CYCLES" 3000 1500 "$OUT/c" \
     "echo cycle \$CYCLE: fds=\$(ls /proc/$SESS/fd | wc -l) rss_kb=\$(awk '/VmRSS/{print \$2}' /proc/$SESS/status)"
 echo "end (on the monitor): fds=$(ls /proc/$SESS/fd | wc -l) rss_kb=$(awk '/VmRSS/{print $2}' /proc/$SESS/status)"
-grep -E "^(gpu|monitor|wayland):" "$OUT/home/.cache/lordos/session.log" | sort | uniq -c | sort -rn | head -20
+grep -oE " (gpu|monitor|wayland): .*" "$OUT/home/.cache/lordos/compositor.log" | sed "s/^ //" | sort | uniq -c | sort -rn | head -20
 echo "snapshots: $OUT/c-NN.bmp (each time it was shown) and $OUT/c-final.bmp"

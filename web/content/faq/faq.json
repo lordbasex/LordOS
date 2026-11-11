@@ -1064,6 +1064,19 @@
           }
         },
         {
+          "id": "where-logs",
+          "q": {
+            "en": "Where are LordOS's logs?",
+            "es": "¿Dónde están los registros de LordOS?",
+            "pt": "Onde ficam os registros do LordOS?"
+          },
+          "a": {
+            "en": "Open the Logs app: under LordOS it lists your session's logs, the previous session's, and one log per app and per web app. In development (0.8.8.8) they move to /var/log/lordos/users/<you>, which only you can read, and the system services' to /var/log/lordos; each line has a time, a level and the part of LordOS that wrote it, and old logs are compressed and removed after a week. The latest release, 0.8.8.7, keeps them in ~/.cache/lordos.",
+            "es": "Abrí la app Registros: en LordOS muestra los registros de tu sesión, los de la sesión anterior y uno por cada app y app web. En desarrollo (0.8.8.8) pasan a /var/log/lordos/users/<vos>, que solo vos podés leer, y los de los servicios del sistema a /var/log/lordos; cada línea tiene hora, nivel y la parte de LordOS que la escribió, y los viejos se comprimen y se borran después de una semana. La última versión publicada, 0.8.8.7, los guarda en ~/.cache/lordos.",
+            "pt": "Abra o app Registros: em LordOS ele mostra os registros da sua sessão, os da sessão anterior e um por app e por app web. Em desenvolvimento (0.8.8.8) eles passam para /var/log/lordos/users/<você>, que só você pode ler, e os dos serviços do sistema para /var/log/lordos; cada linha tem hora, nível e a parte do LordOS que a escreveu, e os antigos são comprimidos e apagados depois de uma semana. A última versão publicada, 0.8.8.7, os guarda em ~/.cache/lordos."
+          }
+        },
+        {
           "id": "contribute",
           "q": {
             "en": "Can I contribute code or translations?",

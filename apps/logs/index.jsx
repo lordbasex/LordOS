@@ -1,7 +1,9 @@
 // Logs — a log viewer (see docs/SYSTEM.md, «Logs»).
 //
 // Sources (sidebar):
-//   - LordOS: the session logs (~/.cache/lordos/<name>.log: session.log…);
+//   - LordOS: the session's logs (compositor, shell, Xwayland, Cloud; each previous session's too), each app's
+//     and each web app's, in the user's log folder (/var/log/lordos/users/<user>, or ~/.cache/lordos without
+//     lord-sessiond; server/src/lordlog.h), read through lord.logs; lines parsed by sdk/logfile.js;
 //   - My logs: the user's journal (user-<uid>.journal), read by lord-server as the user with our
 //     own reader (server/src/logs/journal.c);
 //   - System and Kernel: the system journal. If the user is in systemd-journal or adm it is read
@@ -10,7 +12,7 @@
 // filtered view to Documents. The list draws only the visible rows.
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
-  logs, fs, formatDate, formatNumber, addListener,
+  logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -43,22 +45,6 @@ export function Icon({ size: s = 32 }) {
 const pad = (n, w = 2) => String(n).padStart(w, '0');
 export function levelOf(p) { return p == null || p < 0 ? 'info' : p <= 3 ? 'error' : p === 4 ? 'warning' : p === 7 ? 'debug' : 'info'; }
 function clock(ms) { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`; }
-
-// Lines of a LordOS .log (they have no timestamp): level by keywords.
-export function parseLordLog(text, file) {
-  const out = [];
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i];
-    if (!m) continue;
-    const low = m.toLowerCase();
-    // the Spanish words match lines written by older LordOS builds, which logged in Spanish
-    const p = /\b(error|err|fail|failed|falla|fallo|abort|crash|segfault)\b/.test(low) ? 3 : /\b(warning|warn|could not|cannot|aviso|sin |no se pudo)\b/.test(low) ? 4 : 6;
-    const src = /^([a-z][\w.-]{1,30})(\[\d+\])?:/i.exec(m);
-    out.push({ t: 0, line: i + 1, p, id: src ? src[1] : file.replace(/\.log$/, ''), u: '', pid: -1, uid: -1, k: 0, b: '', m });
-  }
-  return out;
-}
 
 // The user's Documents (xdg-user-dirs; otherwise whichever localized folder name exists)
 function documentsDir() {
@@ -174,7 +160,7 @@ export default function Registros() {
   const { t: tr } = useLocale();
   const { args } = useAppWindow() || {};
   // opened on one LordOS log (Settings → Cloud → Show Log: { file: 'cloud.log' })
-  const [src, setSrc] = useState(() => (/^[a-z0-9._-]+\.log$/.test(args?.file || '') ? { kind: 'lordos', file: args.file } : { kind: 'user' }));        // { kind: 'user'|'system'|'kernel'|'lordos', file }
+  const [src, setSrc] = useState(() => (/^((apps|web)\/)?[A-Za-z0-9._+-]+\.log$/.test(args?.file || '') ? { kind: 'lordos', file: args.file } : { kind: 'user' }));        // { kind: 'user'|'system'|'kernel'|'lordos', file }
   const [items, setItems] = useState([]);
   const [level, setLevel] = useState('all');
   const [range, setRange] = useState('hour');
@@ -186,7 +172,8 @@ export default function Registros() {
   const [state, setState] = useState({ loading: false, error: '', ms: 0 });
   const [notice, setNotice] = useState('');
   const sources = useMemo(() => { try { return logs.sources(); } catch (e) { return { user: 0, system: false }; } }, []);
-  const files = useMemo(() => { try { return logs.files().sort((a, b) => b.mtime - a.mtime); } catch (e) { return []; } }, [src.kind]);
+  const files = useMemo(() => { try { return sortFiles(logs.files()); } catch (e) { return []; } }, [src.kind]);
+  const logDir = useMemo(() => { try { return (logs.dir() || {}).dir || ''; } catch (e) { return ''; } }, []);
   const query = useRef({ seq: 0 });
   const box = useRef(null);
   const [width, height] = useSize(box, [820, 600]);
@@ -324,11 +311,18 @@ export default function Registros() {
         {side('system', tr('logs.src.system'), '▣')}
         {side('kernel', tr('logs.src.kernel'), '◐')}
         <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
-        {files.length ? files.map((f) => side('lordos', f.name.replace(/\.log$/, ''), '≡', { file: f.name })) :
-          <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
+        {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
+        {['session', 'apps', 'web', 'old'].map((g) => {
+          const list = files.filter((f) => fileGroup(f.name) === g);
+          if (!list.length) return null;
+          return [
+            g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
+            ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
+          ];
+        })}
         <View style={{ flex: 1 }} />
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
-          {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos') : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
+          {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
         </Text>
         <Hairline edge="end" />
       </View>

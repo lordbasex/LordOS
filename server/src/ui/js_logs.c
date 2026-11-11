@@ -2,17 +2,21 @@
  *
  * Everything is read-only and runs as the session user: the journal files that the kernel and
  * journald's ACLs let them read (their user-<uid>.journal; the system one only if they are in
- * systemd-journal or adm) and their LordOS logs (~/.cache/lordos/<name>.log). The system journal
- * for an administrator goes through the helper's logs-system action (logs/logs_admin.c).
+ * systemd-journal or adm) and their LordOS logs (lordlog.h: /var/log/lordos/users/<user>, or
+ * ~/.cache/lordos without lord-sessiond). The system journal for an administrator goes through the
+ * helper's logs-system action (logs/logs_admin.c).
  *
  *   sources()                  { user: n files, system: bool (readable directly), uid }
  *   query({ scope, since, until, prio, kernel, match, grep, limit })  → id (>0)
  *                              a thread of its own does the reading; when done,
  *                              __lordLogs('result', id) arrives; fetch the result with take(id)
  *   take(id)                   [{ t, s, p, pid, uid, k, id, u, b, m }] (t in µs) or null
- *   files()                    [{ name, size, mtime }] of ~/.cache/lordos/<name>.log
+ *   dir()                      { dir, system }: the user's log folder, and whether it is under /var/log/lordos
+ *   files()                    [{ name, size, mtime }]: "<name>.log" and "<name>.log.1" (the previous
+ *                              session) in it, "apps/<app>.log", "web/<app>-<profile>.log", and when it is
+ *                              /var/log/lordos the logs left in ~/.cache/lordos by older versions as "cache/<name>.log"
  *   tail(name, bytes)          the end of one of those files (max. 1 MB), from a line start
- *   follow(on)                 inotify on the journal folders and ~/.cache/lordos:
+ *   follow(on)                 inotify on the journal folders and those folders:
  *                              __lordLogs('journal') or __lordLogs('file', name) on change
  *
  * The thread and inotify go through a single epoll fd that the main loop watches (logs_fd()), so
@@ -20,11 +24,13 @@
 #include "js_logs.h"
 #include "js_err.h"
 #include "../logs/journal.h"
+#include "../lordlog.h"
 
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,11 +54,45 @@ static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 static Req queue[QMAX];
 static int nq;
 static Res done[QMAX];
-static int jdirs[2] = { -1, -1 }, cachedir = -1;
+static int jdirs[2] = { -1, -1 };
+
+/* the folders of LordOS logs: "" (the log folder itself), "apps", "web", and "cache" (the old place) */
+#define NSUB 4
+static const char *const subs[NSUB] = { "", "apps", "web", "cache" };
+static int subwd[NSUB] = { -1, -1, -1, -1 };
 
 int logs_fd(void) { return ep; }
 
 static const char *home(void) { const char *h = getenv("HOME"); return h && *h == '/' ? h : NULL; }
+
+/* The folder of subs[i]; 0, or -1 if there is none (the old place only when the logs moved). */
+static int sub_dir(int i, char *out, size_t n) {
+    const char *d = lordlog_dir();
+    if (!*d) return -1;
+    if (i == 3) return lordlog_dir_is_system() && home() && (size_t)snprintf(out, n, "%s/.cache/lordos", home()) < n ? 0 : -1;
+    return (size_t)snprintf(out, n, i ? "%s/%s" : "%s", d, subs[i]) < n ? 0 : -1;
+}
+
+/* a log file's own name: <safe name>.log or <safe name>.log.1 */
+static int file_ok(const char *n) {
+    size_t l = strlen(n);
+    if (!lordlog_name_ok(n) || l < 5) return 0;
+    return !strcmp(n + l - 4, ".log") || (l >= 7 && !strcmp(n + l - 6, ".log.1"));
+}
+
+/* "name", "apps/name", "web/name" or "cache/name" → its folder's index and the file's name; -1 if not one */
+static int split_name(const char *n, const char **file) {
+    const char *slash = strchr(n, '/');
+    int i = 0;
+    if (slash) {
+        for (i = 1; i < NSUB; i++) if ((size_t)(slash - n) == strlen(subs[i]) && !strncmp(n, subs[i], (size_t)(slash - n))) break;
+        if (i == NSUB) return -1;
+        n = slash + 1;
+    }
+    if (!file_ok(n)) return -1;
+    *file = n;
+    return i;
+}
 
 /* ---- reader thread ---- */
 
@@ -118,7 +158,8 @@ static void unfollow(void) {
     epoll_ctl(ep, EPOLL_CTL_DEL, ino, NULL);
     close(ino);
     ino = -1;
-    jdirs[0] = jdirs[1] = cachedir = -1;
+    jdirs[0] = jdirs[1] = -1;
+    for (int i = 0; i < NSUB; i++) subwd[i] = -1;
 }
 
 static int follow(void) {
@@ -137,21 +178,16 @@ static int follow(void) {
         snprintf(p, sizeof p, "/run/log/journal/%s", mid);
         jdirs[1] = inotify_add_watch(ino, p, IN_MODIFY | IN_CREATE | IN_MOVED_TO);
     }
-    if (home()) {
-        snprintf(p, sizeof p, "%s/.cache/lordos", home());
-        cachedir = inotify_add_watch(ino, p, IN_MODIFY | IN_CREATE | IN_MOVED_TO);
+    for (int i = 0; i < NSUB; i++) {
+        if (sub_dir(i, p, sizeof p)) continue;
+        if (i == 1 || i == 2) mkdir(p, 0700);          /* so a first app's log is seen too */
+        subwd[i] = inotify_add_watch(ino, p, IN_MODIFY | IN_CREATE | IN_MOVED_TO | IN_DONT_FOLLOW | IN_ONLYDIR);
     }
     struct epoll_event ev = { .events = EPOLLIN, .data.fd = ino };
     if (epoll_ctl(ep, EPOLL_CTL_ADD, ino, &ev)) { close(ino); ino = -1; return -1; }
     return 0;
 }
 
-static int log_name_ok(const char *n) {
-    size_t l = strlen(n);
-    if (l < 5 || l > 64 || strcmp(n + l - 4, ".log") || n[0] == '.') return 0;
-    for (; *n; n++) if (!isalnum((unsigned char)*n) && !strchr("._-", *n)) return 0;
-    return 1;
-}
 
 void logs_dispatch(void (*fn)(const char *kind, int id, const char *name)) {
     struct epoll_event evs[4];
@@ -169,7 +205,7 @@ void logs_dispatch(void (*fn)(const char *kind, int id, const char *name)) {
             /* coalesce all events of this round: one per kind (and per LordOS file) */
             char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
             int journal = 0;
-            char files[4][72];
+            char files[4][LORDLOG_NAME_MAX + 8];
             int nf = 0;
             ssize_t r;
             while ((r = read(ino, buf, sizeof buf)) > 0) {
@@ -177,10 +213,17 @@ void logs_dispatch(void (*fn)(const char *kind, int id, const char *name)) {
                     struct inotify_event *e = (struct inotify_event *)p;
                     if (e->wd == jdirs[0] || e->wd == jdirs[1]) {
                         if (e->len && strstr(e->name, ".journal")) journal = 1;
-                    } else if (e->wd == cachedir && e->len && log_name_ok(e->name)) {
+                    } else if (e->len && file_ok(e->name)) {
+                        int s = -1;
+                        for (int j = 0; j < NSUB; j++) if (subwd[j] >= 0 && e->wd == subwd[j]) s = j;
+                        char name[LORDLOG_NAME_MAX + 8];
+                        if (s < 0 || (size_t)snprintf(name, sizeof name, "%s%s%s", subs[s], s ? "/" : "", e->name) >= sizeof name) {
+                            p += sizeof *e + e->len;
+                            continue;
+                        }
                         int seen = 0;
-                        for (int j = 0; j < nf; j++) if (!strcmp(files[j], e->name)) seen = 1;
-                        if (!seen && nf < 4) snprintf(files[nf++], sizeof files[0], "%s", e->name);
+                        for (int j = 0; j < nf; j++) if (!strcmp(files[j], name)) seen = 1;
+                        if (!seen && nf < 4) snprintf(files[nf++], sizeof files[0], "%s", name);
                     }
                     p += sizeof *e + e->len;
                 }
@@ -289,43 +332,57 @@ static JSValue f_sources(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     JSValue arr = JS_NewArray(c);
-    if (!home()) return arr;
-    char dir[512];
-    snprintf(dir, sizeof dir, "%s/.cache/lordos", home());
-    DIR *d = opendir(dir);
-    if (!d) return arr;
-    struct dirent *de;
-    uint32_t i = 0;
-    while ((de = readdir(d)) && i < 64) {
-        if (!log_name_ok(de->d_name)) continue;
-        char p[1024];
-        struct stat st;
-        if (snprintf(p, sizeof p, "%s/%s", dir, de->d_name) >= (int)sizeof p) continue;
-        if (lstat(p, &st) || !S_ISREG(st.st_mode)) continue;
-        JSValue o = JS_NewObject(c);
-        JS_SetPropertyStr(c, o, "name", JS_NewString(c, de->d_name));
-        JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, (double)st.st_size));
-        JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, (double)st.st_mtime * 1000.0));
-        JS_SetPropertyUint32(c, arr, i++, o);
+    uint32_t n = 0;
+    for (int i = 0; i < NSUB && n < 256; i++) {
+        char dir[PATH_MAX];
+        if (sub_dir(i, dir, sizeof dir)) continue;
+        int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        DIR *d = dfd >= 0 ? fdopendir(dfd) : NULL;
+        if (!d) { if (dfd >= 0) close(dfd); continue; }
+        struct dirent *de;
+        while ((de = readdir(d)) && n < 256) {
+            if (!file_ok(de->d_name)) continue;
+            struct stat st;
+            if (fstatat(dirfd(d), de->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISREG(st.st_mode)) continue;
+            char name[LORDLOG_NAME_MAX + 8];
+            if ((size_t)snprintf(name, sizeof name, "%s%s%s", subs[i], i ? "/" : "", de->d_name) >= sizeof name) continue;
+            JSValue o = JS_NewObject(c);
+            JS_SetPropertyStr(c, o, "name", JS_NewString(c, name));
+            JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, (double)st.st_size));
+            JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, (double)st.st_mtime * 1000.0));
+            JS_SetPropertyUint32(c, arr, n++, o);
+        }
+        closedir(d);
     }
-    closedir(d);
     return arr;
+}
+
+static JSValue f_dir(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "dir", JS_NewString(c, lordlog_dir()));
+    JS_SetPropertyStr(c, o, "system", JS_NewBool(c, lordlog_dir_is_system()));
+    return o;
 }
 
 static JSValue f_tail(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    if (argc < 1 || !JS_IsString(argv[0]) || !home()) return JS_NULL;
+    if (argc < 1 || !JS_IsString(argv[0])) return JS_NULL;
     const char *name = JS_ToCString(c, argv[0]);
     if (!name) return JS_EXCEPTION;
-    int ok = log_name_ok(name);
-    char p[1024];
-    snprintf(p, sizeof p, "%s/.cache/lordos/%s", home(), name);
+    const char *file = NULL;
+    char dir[PATH_MAX], fname[LORDLOG_NAME_MAX + 8];
+    int i = split_name(name, &file);
+    if (i >= 0) snprintf(fname, sizeof fname, "%s", file);
     JS_FreeCString(c, name);
-    if (!ok) return js_throw_code(c, "logs.badName", NULL);
+    if (i < 0) return js_throw_code(c, "logs.badName", NULL);
+    if (sub_dir(i, dir, sizeof dir)) return JS_NULL;
     double want = 262144;
     if (argc > 1) JS_ToFloat64(c, &want, argv[1]);
     size_t max = want < 1024 ? 1024 : want > 1048576 ? 1048576 : (size_t)want;
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    int fd = dfd >= 0 ? openat(dfd, fname, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK) : -1;
+    if (dfd >= 0) close(dfd);
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode)) { if (fd >= 0) close(fd); return JS_NULL; }
     off_t from = st.st_size > (off_t)max ? st.st_size - (off_t)max : 0;
@@ -352,6 +409,7 @@ static const JSCFunctionListEntry logs_funcs[] = {
     JS_CFUNC_DEF("query", 1, f_query),
     JS_CFUNC_DEF("take", 1, f_take),
     JS_CFUNC_DEF("files", 0, f_files),
+    JS_CFUNC_DEF("dir", 0, f_dir),
     JS_CFUNC_DEF("tail", 2, f_tail),
     JS_CFUNC_DEF("follow", 1, f_follow),
 };

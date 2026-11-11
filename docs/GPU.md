@@ -63,7 +63,7 @@ list of plain drivers, so Mesa is loaded: with the machine's 3D acceleration on,
 driver (`vmwgfx_dri.so`, in `libgl1-mesa-dri`, which the ISO ships) is the renderer and lord-server
 composites on the GPU (`GL_RENDERER` starts with `SVGA3D`); with 3D off, Mesa falls back to
 llvmpipe and lord-server to the CPU path. Which one ran is in the session log: in a LordOS
-Terminal, `grep gpu: ~/.cache/lordos/session.log` (for example `gpu: GPU composition (SVGA3D; …)`
+Terminal, `grep gpu: /var/log/lordos/users/$USER/compositor.log` (for example `gpu: GPU composition (SVGA3D; …)`
 or `gpu: the renderer is software (llvmpipe …): CPU composition`). Not verified: the Proxmox test
 machines' "VMware compatible" display is QEMU's 2D-only `vmware-svga`, which `vmwgfx` refuses
 (since 0.8.1 it isn't even loaded there; see `ISO.md`, "Firmware and displays"), so only the
@@ -638,7 +638,7 @@ compositing is the GPU's work, and the CPU only uploads what changed in the UI.
 
 To test it on the AMD PC (live ISO):
 1. Boot.
-2. In the LordOS Terminal, `grep gpu: ~/.cache/lordos/session.log` (or System Information →
+2. In the LordOS Terminal, `grep gpu: /var/log/lordos/users/$USER/compositor.log` (or System Information →
    Hardware → Graphics, 0.8.5): it must say
    `GPU composition (AMD Radeon …)` and `cursor by hardware (cursor plane, …)` (the plane's size, the driver's).
 3. `vkcube`, `glmark2-es2-wayland`, a game (SuperTuxKart, 0 A.D.).

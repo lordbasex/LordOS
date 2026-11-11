@@ -840,7 +840,7 @@ No desktop measurements on real PCs are in the repository yet; the few real-PC n
 - Window memory across two displays is not tested; session restore doesn't reopen a Files folder (§3.6).
 - HFS+ and APFS disks are read-only (§5.1).
 - Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
-- A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries. An X11 app started from the launcher on a system without `xwayland` fails with no message; the reason is in `session.log`.
+- A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries. An X11 app started from the launcher on a system without `xwayland` fails with no message; the reason is in `compositor.log`.
 - A graphics driver that loads more than 30 s after boot needs the service restarted; a display with KMS that fails stays silent.
 - The volume and mute keys (fixed in 0.8.8) were tested with a virtual keyboard only, not on a laptop's top row; the brightness and keyboard light keys have never fired end to end, since no test machine has them. The on-screen keyboard opened once on an empty desktop with no text field, not reproduced.
 - LordBench's x86 PC reference is still to be chosen.

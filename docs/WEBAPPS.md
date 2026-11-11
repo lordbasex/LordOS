@@ -398,7 +398,7 @@ silently.
     (`fw_app_canon`, `desktop:lordos-web-<app>`) to change, so it stays per app;
   - a crash of `lord-web` itself (a fatal signal, or a C++ exception nobody caught in WebKit's UI process, which ends in
     `abort`) writes `lord-web: crashed, stack:` and the stack (`backtrace_symbols_fd`, addresses for `addr2line`) to
-    `~/.cache/lordos/web.log` before the signal's default. lord-server waits for an ended `lord-web` from its main loop
+    `web/<app>-<profile>.log` of the user's log folder (docs/SYSTEM.md, "Log files") before the signal's default. lord-server waits for an ended `lord-web` from its main loop
     (`webmgr_reap`), so none is left a zombie;
   - Landlock's scoping (no abstract unix socket and no signal outside its own processes) and `no_new_privs`, again
     refusing to start inside a session when they fail. **Not Landlock's file rules:** a process under them can't mount,

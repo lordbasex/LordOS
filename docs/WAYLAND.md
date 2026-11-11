@@ -125,7 +125,8 @@ shell. The user approved it for M7. Limits:
   below), so the window it opens, or the window of the copy already running it hands the link to,
   comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
-  descriptors. Its output goes to `~/.cache/lordos/apps.log`, which is trimmed when it passes 1 MB.
+  descriptors. Its output goes to its own `apps/<id>.log` in the user's log folder (`/var/log/lordos/users/<user>`,
+  docs/SYSTEM.md "Log files"), after a stamped "starting" line; rotated by logrotate and capped at 16 MB.
 - A `.desktop` can't be created from JS:
   - `lord.fs.write` rejects `~/.local/share/applications` and `~/.config/autostart`, also
     through a symlink (see `EDITOR.md`);
@@ -753,7 +754,7 @@ like any other Linux app.
   only trigger is a connection to the session's own X socket.
 - Xwayland runs in its own scope (`lordos-xwayland.scope`, never lord-server's), in an empty network
   namespace inside a user namespace that maps only the user (it has no network at all), with
-  `no_new_privs`, a minimal environment and its log in `~/.cache/lordos/xwayland.log`. **XTEST is
+  `no_new_privs`, a minimal environment and its log in `/var/log/lordos/users/<user>/xwayland.log`. **XTEST is
   off**: an X11 app can't type or click into another one with synthetic input.
 - **Off when unused.** The window manager is an X client too, so Xwayland's own `-terminate` never
   fires: 10 s after the last X window closes, the window manager asks the X-Resource extension

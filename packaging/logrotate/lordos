@@ -1,0 +1,33 @@
+# LordOS's logs (server/src/lordlog.h, docs/SYSTEM.md "Log files"): the root daemons' files in
+# /var/log/lordos and each user's in /var/log/lordos/users/<user> (their session, apps and web apps).
+# Daily, or at the first run after one passes 10 MB; 7 compressed copies. Between runs, the writers
+# themselves cap every file at 16 MB, so the disk never fills even without logrotate.
+#
+# copytruncate, not a reopen signal: most writers are other programs holding the file as their
+# stdout/stderr (Linux apps, Xwayland, lord-web and WebKit, rclone), opened with O_APPEND, which
+# can't be told to reopen it; after the truncation they simply go on at the start. The price is that
+# lines written between the copy and the truncation are lost, which is fine for these logs.
+#
+# The users' folders are theirs (0700): logrotate opens their files without following symlinks
+# and skips anything that is not a regular file, and users/ itself is root's, so a user can't point
+# a rotation anywhere else. A plain <name>.log.1 there is the previous session's, kept at login;
+# logrotate's own copies are <name>.log.N.gz.
+/var/log/lordos/*.log {
+    daily
+    maxsize 10M
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+
+/var/log/lordos/users/*/*.log /var/log/lordos/users/*/apps/*.log /var/log/lordos/users/*/web/*.log {
+    daily
+    maxsize 10M
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

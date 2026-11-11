@@ -119,7 +119,7 @@ if command -v eglinfo >/dev/null; then
     if echo "$R" | grep -q 'V3D'; then row PASS "GPU (EGL on GBM)" "$R"
     else row FAIL "GPU (EGL on GBM)" "renderer: '${R:-none}'"; fi
 else row WARN "GPU (EGL on GBM)" "eglinfo missing (mesa-utils)"; fi
-SLOG=$(ls -t /home/*/.cache/lordos/session.log 2>/dev/null | head -1)
+SLOG=$(ls -t /var/log/lordos/users/*/compositor.log /home/*/.cache/lordos/compositor.log /home/*/.cache/lordos/session.log 2>/dev/null | grep -v lordos-greeter | head -1)
 if [ -n "$SLOG" ]; then
     G=$(grep -m1 'gpu:' "$SLOG" | sed 's/^.*gpu: //')
     if echo "$G" | grep -q 'GPU composition'; then row PASS "LordOS GPU composition" "$G"

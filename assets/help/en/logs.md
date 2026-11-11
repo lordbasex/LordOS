@@ -14,7 +14,10 @@ System and LordOS logs. Use it to see what happened when something fails.
 - **My logs:** your systemd journal (your apps and services), read with your permissions.
 - **System** and **Kernel:** the system journal. Administrators (sudo group) see it through the
   administration helper, as does anyone in the journal reader group.
-- **LordOS:** your session logs (`~/.cache/lordos`, like `session.log`).
+- **LordOS:** your session's logs (`compositor`, `shell`, `xwayland`…; "previous session" is the one
+  before this login), and below them each **app**'s and each **web app**'s own log. They are in
+  `/var/log/lordos/users/<you>`, which only you can read, and old ones are compressed and removed
+  after a week. **Older logs** are the ones earlier versions left in `~/.cache/lordos`.
 
 ## Filter
 

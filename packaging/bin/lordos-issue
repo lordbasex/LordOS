@@ -37,9 +37,12 @@ user=${SUDO_USER:-$(id -un)}
 as_user() {
     if [ "$(id -u)" = 0 ] && [ -n "$SUDO_USER" ]; then runuser -u "$SUDO_USER" -- "$@"; else "$@"; fi
 }
-user_log() {    # user_log FILE N: the last N lines of a regular file in the user's cache, or "none"
+user_log() {    # user_log FILE N: the last N lines of a regular file in the user's log folder, or "none"
     if as_user test -f "$1" && ! as_user test -L "$1"; then as_user tail -n "$2" -- "$1"; else echo "none"; fi
 }
+# the user's log folder (server/src/lordlog.h): /var/log/lordos/users/<user>, or ~/.cache/lordos without lord-sessiond
+LOGS=/var/log/lordos/users/$user
+if ! as_user test -d "$LOGS" || as_user test -L "$LOGS"; then LOGS=$HOME/.cache/lordos; fi
 
 clean() {
     sed -E \
@@ -178,19 +181,35 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
     step "logs"
     section "This session's log (last 60 lines)"
-    user_log "$HOME/.cache/lordos/session.log" 60
+    user_log "$LOGS/compositor.log" 60
+    end
+
+    section "The shell's log (last 30 lines)"
+    user_log "$LOGS/shell.log" 30
+    end
+
+    # what the previous session wrote last: a crash or a freeze that ended it is here
+    section "The previous session's log (last 30 lines)"
+    user_log "$LOGS/compositor.log.1" 30
     end
 
     # A Linux app that closes as soon as it starts leaves its reason only here (#95): what the apps LordOS started
     # printed, and Xwayland's own log for X11 apps (without xkbcomp's keymap warnings, printed at every start).
-    section "Linux apps' output (last 40 lines)"
-    user_log "$HOME/.cache/lordos/apps.log" 40
+    section "Apps' output (last 40 lines of the 5 most recent)"
+    n=0
+    for f in $(as_user ls -t "$LOGS/apps" 2>/dev/null); do
+        case $f in *.log) ;; *) continue;; esac
+        n=$((n + 1)); [ $n -le 5 ] || break
+        echo "--- $f"
+        user_log "$LOGS/apps/$f" 40
+    done
+    [ $n -gt 0 ] || echo "none"
     end
 
     section "Xwayland's log (last 20 lines)"
-    if as_user test -f "$HOME/.cache/lordos/xwayland.log" && ! as_user test -L "$HOME/.cache/lordos/xwayland.log"; then
+    if as_user test -f "$LOGS/xwayland.log" && ! as_user test -L "$LOGS/xwayland.log"; then
         # (Xwayland's own messages may lack a newline, so xkbcomp's header can end someone else's line)
-        user_log "$HOME/.cache/lordos/xwayland.log" 400 | sed -e 's/The XKEYBOARD keymap compiler (xkbcomp) reports:$//' |
+        user_log "$LOGS/xwayland.log" 400 | sed -e 's/The XKEYBOARD keymap compiler (xkbcomp) reports:$//' |
             grep -v -E '^(> |Errors from xkbcomp are not fatal|$)' | tail -n 20
     else echo "none"; fi
     end
