@@ -43,10 +43,15 @@ WebKitWebContext *web_context_new(void) {
     webkit_memory_pressure_settings_set_poll_interval(mp, 10);
     /* the network process: the same settings, set once before any session exists */
     webkit_network_session_set_memory_pressure_settings(mp);
+    /* One app, one page: the document browser model keeps smaller caches than a browser's. It is set before the
+     * context exists because in WPE 2.48 the model is process-wide (the call ignores its context) and the web process
+     * cache sizes itself from it once, when the context is made: set after, as before 0.8.8.8, the cache kept room
+     * for 30 processes, and the web process a page left at its first navigation (any site sending
+     * Cross-Origin-Opener-Policy, a messaging web app's own included, is loaded in a second one) stayed cached,
+     * about 130 MB PSS of each profile doing nothing. With the document browser model that cache is off. */
+    webkit_web_context_set_cache_model(NULL, WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
     WebKitWebContext *c = g_object_new(WEBKIT_TYPE_WEB_CONTEXT, "memory-pressure-settings", mp, NULL);
     webkit_memory_pressure_settings_free(mp);
-    /* one app, one page: the document browser model keeps smaller caches than a browser's, and with no
-     * back-forward cache WebKit has no reason to keep a second, prewarmed web process */
     webkit_web_context_set_cache_model(c, WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
     webkit_web_context_set_spell_checking_enabled(c, FALSE);
     return c;
