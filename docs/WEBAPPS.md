@@ -1,7 +1,7 @@
 # Web apps: the LordOS Web Runtime (`lord-web`)
 
-Web apps and PWAs (WhatsApp, Telegram, Outlook, Notion…) installed as LordOS apps, each one in its own process, with
-as many accounts ("profiles") as the person wants. Approved by the maintainer on 2026-11-10 (AGENTS.md, `lord-web`).
+Web apps and PWAs (WhatsApp, Telegram, Outlook, Notion, Spotify…: 37 in the catalog) installed as LordOS apps, each one
+in its own process, with as many accounts ("profiles") as the person wants. Approved by the maintainer on 2026-11-10 (AGENTS.md, `lord-web`).
 In development for 0.8.8.8.
 
 ## What it is
@@ -162,6 +162,48 @@ How the two steps are built (`server/src/web/webprobe.c`, `webmanifest.c`, `weba
   scope `lordos-webprobe`.
 - **Memory** (2026-11-10, the main machine, `tests/web_probe_test.py --pss` on a small local page): 224 MB PSS at the
   peak for lord-web and its WebKit processes together, about 11 s for the test's nine probes.
+
+## The catalog (`assets/webapps/catalog.json`)
+
+37 apps (2026-11-11), here by category. The file's order is the Store's: its first four (whatsapp, telegram, element,
+discord) make Discover's banner. Outlook's address moved from `outlook.live.com` to `outlook.office.com/mail/`, the one
+that was probed.
+
+| Category | Apps (`id`) |
+|---|---|
+| Internet (`Network`) | whatsapp, telegram, element, discord, teams, gchat, messenger, instagram, x, pinterest, meet |
+| Office (`Office`) | outlook, notion, gmail, calendar, drive, docs, sheets, keep, m365, todo, todoist, trello, icloud, chatgpt, claude, gemini, copilot |
+| Audio & video (`AudioVideo`) | youtube, ytmusic, spotify, applemusic |
+| Graphics (`Graphics`) | photos, canva, excalidraw, photopea |
+| Utilities (`Utility`) | uber |
+
+- **How they got in:** every one passed `lord-web --probe` on 2026-11-11 (it loaded and gave a name). Only WhatsApp is
+  `tested` (`verified` 2026-11-11: the maintainer used it with two accounts); the others say "not tested yet" until
+  someone checks them on LordOS. Left out: one video editor that answers "unsupported browser" to WPE WebKit and one
+  coffee shop's site that no longer loads.
+- **`startUrl` is the app's own address**, never the marketing page or the sign-in page a signed-out probe lands on
+  (`mail.google.com`, `outlook.office.com/mail/`, `to-do.office.com/tasks/`, `app.todoist.com/app/`…). A redirect to
+  a sign-in on another site stays in the window (above, "Navigation"), so the first start signs in there and comes
+  back. Some services then settle on another origin (`outlook.office.com` → `outlook.cloud.microsoft`,
+  `copilot.microsoft.com` → `copilot.com`, `www.pinterest.com` → a country's subdomain, `www.notion.so` →
+  `www.notion.com` when signed out): the page works, but a link clicked there counts as outside the scope and opens in
+  the browser. Worth checking when each app is tested.
+- **`scope` is the origin plus `/`**, except where two apps share an origin: Google's Docs and Sheets are
+  `https://docs.google.com/document/` and `https://docs.google.com/spreadsheets/`, so a spreadsheet linked from a
+  document opens in the browser rather than inside Docs (the same origin also serves presentations and forms, which
+  neither app should keep). `tests/webapps_model_test.mjs` checks that no app's start address falls inside another
+  app's scope and that no two apps share a scope.
+- **Descriptions are generic** (`webapps.desc.*`: "Music streaming", "Email", "Team chat and spaces"…), translated in
+  every language and free of brand names (`tools/brand-check.mjs`); `name` and `publisher` are data.
+- **Limitations:** `drm` for the two music services whose catalogs are protected (their songs likely won't play);
+  `calls` where calls need WebRTC that WPE WebKit may not give (WhatsApp, Discord, Teams, Messenger, Meet); `push` for
+  the apps people keep for their notifications (chat, social, mail, calendar, notes and tasks), which arrive only while
+  the app runs.
+  `background` is on for chat, mail, calendar and music (closing the window keeps the music playing).
+- **Icons** are LordOS's own letter tiles, never the service's logo: 128×128 RGBA PNG, a rounded square (radius 24)
+  in a color close to the service's, its first letter in white DejaVu Sans Bold with a 50 px cap height from y = 39.
+  The letter is the product's own word when the name starts with its company's family name ("Google Drive" → D,
+  "Microsoft Teams" → T, "YouTube Music" → M). They are the shipped fallback when an app's own icon isn't fetched.
 
 ## The Store: Discover, the first install and an app's page
 

@@ -134,6 +134,15 @@ for (const a of shipped.apps) {
     eq(`shipped ${a.id}: category in ${l}`, typeof loc(l, 'store')[`cat.${a.category}`], 'string');
   }
 }
+// two apps on one origin (docs.google.com's Docs and Sheets) each keep to their own path: no scope holds another's
+// start address, so neither one's window keeps the other's links (docs/WEBAPPS.md, "The catalog")
+eq('shipped catalog: no app starts inside another app\'s scope', shipped.apps.flatMap((a) => shipped.apps
+  .filter((b) => b.id !== a.id && b.startUrl.startsWith(a.scope)).map((b) => `${b.id} in ${a.id}`)), []);
+eq('shipped catalog: no two apps with one scope', new Set(shipped.apps.map((a) => a.scope)).size, shipped.apps.length);
+eq('shipped catalog: every icon file is used', fs.readdirSync(path.join(root, 'assets/webapps/icons')).filter((f) => !shipped.apps.some((a) => a.icon === f)), []);
+eq('shipped catalog: only whatsapp checked on LordOS so far', shipped.apps.filter((a) => a.tested).map((a) => [a.id, a.verified]), [['whatsapp', '2026-11-11']]);
+eq('shipped catalog: protected music says so', shipped.apps.filter((a) => (a.limitations || []).includes('drm')).map((a) => a.id).sort(), ['applemusic', 'spotify']);
+eq('shipped catalog: a catalog of 37', shipped.apps.length, 37);
 eq('shipped catalog: lowercase keywords (the search lowers the query only)', shipped.apps.flatMap((a) => a.keywords || []).filter((k) => k !== k.toLowerCase()), []);
 
 for (const a of shipped.apps) {
