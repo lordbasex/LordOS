@@ -4,7 +4,7 @@
 // It checks a taskbar per display, each display's work area, one clock timer and one network poll for all the
 // bars, the start menu, quick settings and notifications opening on the display whose bar was clicked (and the
 // power menu's Lock still reaching the session there, #48), a pin dropped on one bar, the setting turned off,
-// mirrored displays, and a monitor unplugged and plugged back. Prints one line per check: "ok <name>" or
+// mirrored displays, a monitor unplugged and plugged back, and (#111) more pins than a bar holds. Prints one line per check: "ok <name>" or
 // "FAIL <name> <detail>".
 
 // the timers alive, by interval (installed before anything starts one)
@@ -155,4 +155,27 @@ sdk.settings.set({ taskbarAlign: 'start' }); await flush();
 check('three bars re-rendered: the network is not read again', [bars().length, counts.netPolls - p0], [3, 0]);
 // (the first render reads it, the timer's start reads it again: not once per bar)
 check('and the bars appearing read it at most twice', polls <= 2, true);
+
+// (#111) 60 more pins than a 1920 px bar holds: the app buttons shrink to 30 px and the rest go into "more apps", so
+// the row ends before the tray (its length the bar measures from the last frame) and is no longer centered
+const { taskbarFit, rowLength } = await import('../../themes/classic/taskbarfit.js');
+sdk.settings.set({ taskbarAlign: 'center', dockPinned: ['files', 'terminal', 'store', 'settings', ...Array.from({ length: 60 }, (_, i) => `extra${i}`)].map((id) => `app:${id}`) });
+await flush();
+const trays = () => [...styles].filter(([id, s]) => s.flexDirection === 'row' && s.gap === 2 && s.alignItems === 'center' && attached(id)
+  && styles.get(parents.get(id))?.flex === undefined && styles.get(parents.get(id))?.justifyContent === 'flex-end').map(([id]) => id);
+// the trays laid out 300 px wide; the bars read that after they render again
+for (const tr of trays()) layouts.set(tr, [0, 0, 300, 48]);
+sdk.settings.set({ taskbarAlign: 'start' }); await flush();
+sdk.settings.set({ taskbarAlign: 'center' }); await flush();
+await new Promise((res) => setTimeout(res, 120)); await flush();
+const appBtns = (x) => [...styles].filter(([id, s]) => s.width === 30 && s.height === 40 && s.borderRadius === 6 && attached(id) && barOf(id) === x);
+const want = taskbarFit({ length: L.w, tray: 304, count: 64, center: true });
+check('#111: the full bar\'s buttons shrink to 30 px, the rest in "more apps"', [want.size, want.more, appBtns(L.x).length], [30, true, want.shown + 1]);
+const spacer = [...styles].filter(([id, s]) => s.width === want.spacer && s.height === undefined && attached(id) && barOf(id) === L.x).length;
+check('#111: the row moves toward the start so it ends before the tray', [spacer, 6 + want.spacer + rowLength(want.shown, 30, true) <= L.w - 6 - 304], [1, true]);
+const moreBtn = appBtns(L.x).map(([id]) => id).sort((a, b) => a - b).pop();
+await click(moreBtn, L.x + 1000, L.h - 20);
+const hiddenNames = Array.from({ length: 64 - want.shown }, (_, i) => `extra${60 - (64 - want.shown) + i}`);
+const listed = [...texts].filter(([id, v]) => hiddenNames.includes(v) && attached(id)).length;
+check('#111: "more apps" lists every app that is not on the bar', listed, hiddenNames.length);
 process.exit(0);

@@ -9,6 +9,9 @@
 // apps from the start menu. Click: opens the app or brings its window (if it was already in front,
 // minimizes it); right click: its jump list.
 //
+// With more apps than the bar holds (GitHub #111) the app buttons get smaller and the ones that still don't fit
+// go into a "more apps" button at the end of the row, so the row never runs over the tray (../taskbarfit.js).
+//
 // One taskbar per display (0.8.8.6; Settings → Desktop & Dock → Taskbar → "Show the taskbar on every display", on by
 // default, the same settings.menuBarAllDisplays as Lord Flow's menu bar): each one is whole (start, pinned and
 // running apps, Trash, tray, clock) and every bar shows every app, as there is no per-display window list. `area`
@@ -18,10 +21,11 @@ import {
   View, Text, Layer, useSettings, useWindows, wm, windowTitle, formatTime, formatDate, t as tr, settings, sharedTicker,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
-  mainDisplay, toggleShowDesktop, menuBarPrefs,
+  mainDisplay, toggleShowDesktop, menuBarPrefs, statusItems, useIndicators,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
+import { taskbarFit, iconFor } from '../taskbarfit.js';
 import { SearchGlyph, TaskViewGlyph, NetworkGlyph, SpeakerGlyph, BellGlyph, TrashGlyph } from '../glyphs.jsx';
 
 export const BAR_H = 48;      // bar at the top or bottom
@@ -54,12 +58,13 @@ export function useNet() {
 let barEntries = [];
 export const taskbarEntries = () => barEntries;
 
-function BarButton({ t, vert, active, onClick, onContextMenu, onMouseDown, onEnter, onLeave, children, refFn, width, style }) {
+// len: the button's size along the bar (40; an app button is smaller on a full bar)
+function BarButton({ t, vert, active, onClick, onContextMenu, onMouseDown, onEnter, onLeave, children, refFn, width, len = 40, style }) {
   const [hover, setHover] = useState(false);
   return (
     <View ref={refFn} onClick={onClick} onContextMenu={onContextMenu} onMouseDown={onMouseDown}
       onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => { setHover(false); onLeave?.(); }}
-      style={{ width: width || (vert ? 44 : 40), height: vert ? 40 : 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+      style={{ width: width || (vert ? 44 : len), height: vert ? len : 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
         backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.7)') : hover ? t.hover : 'transparent',
         border: `1px solid ${active ? t.tileBorder : 'transparent'}`, ...style }}>
       {children}
@@ -77,6 +82,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   const [jump, setJump] = useState(null);
   const [trashAt, setTrashAt] = useState(null);
   const [tip, setTip] = useState(null);
+  const [more, setMore] = useState(null);
   const tipTimer = useRef(0);
   const trash = useTrash();
   const drag = useStore(dockDrag);
@@ -91,6 +97,25 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   const m = area || mainDisplay();
   const barId = m.id;
   useEffect(() => () => clearTimeout(tipTimer.current), []);
+
+  // the tray's length, from the last frame (an estimate until it has been laid out); measured again after every
+  // render of the bar, which also renders when a status item or a privacy dot comes or goes
+  useStore(statusItems);
+  useIndicators();
+  const trayRef = useRef(null);
+  const [trayLen, setTrayLen] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!trayRef.current) return;
+      const [, , w, h] = lord.getLayout(trayRef.current.id);
+      const l = Math.ceil(vert ? h : w);
+      if (l > 1 && l !== trayLen) setTrayLen(l);
+    }, 50);
+    return () => clearTimeout(id);
+  });
+  const fit = taskbarFit({ length: vert ? m.h : m.w, tray: (trayLen || (vert ? 150 : 240)) + 4, count: entries.length, center });
+  const shown = fit.more ? entries.slice(0, fit.shown) : entries;
+  const hidden = fit.more ? entries.slice(fit.shown) : [];
 
   const click = (e) => {
     if (dockDragJustEnded()) return;
@@ -134,7 +159,8 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   const overHere = !!drag && !!drag.over && drag.over.bar === barId;
   if (overHere && drag.over.index != null && barRef.current) {
     const own = drag.source === 'dock' ? drag.id : null;
-    const pinned = entries.filter((e) => e.pinned && !e.recent && e.id !== own);
+    // the pinned buttons on the bar (not the ones in "more apps": those are always the last ones)
+    const pinned = entries.filter((e) => e.pinned && !e.recent && e.id !== own && refs.current.has(e.id));
     const k = Math.max(0, Math.min(pinned.length, drag.over.index));
     const ref = refs.current.get((pinned[k] || pinned[pinned.length - 1])?.id);
     if (ref) {
@@ -163,10 +189,10 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   const indicator = (e) => {
     if (!e.running) return null;
     const on = e.focused || e.attention;     // a window that asked for attention (xdg-activation): long, in the accent
-    const len = on ? 16 : 6;
-    const at = pos === 'top' ? { top: 2, left: 20 - len / 2, width: len, height: 3 }
-      : pos === 'left' ? { left: 2, top: 20 - len / 2, width: 3, height: len }
-        : pos === 'right' ? { right: 2, top: 20 - len / 2, width: 3, height: len } : { bottom: 2, left: 20 - len / 2, width: len, height: 3 };
+    const len = on ? 16 : 6, c = fit.size / 2;
+    const at = pos === 'top' ? { top: 2, left: c - len / 2, width: len, height: 3 }
+      : pos === 'left' ? { left: 2, top: c - len / 2, width: 3, height: len }
+        : pos === 'right' ? { right: 2, top: c - len / 2, width: 3, height: len } : { bottom: 2, left: c - len / 2, width: len, height: 3 };
     return <View style={{ position: 'absolute', ...at, borderRadius: 2, backgroundColor: on ? t.accent : t.textDim }} />;
   };
 
@@ -174,11 +200,11 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
     const dragged = drag && drag.source === 'dock' && drag.id === e.id;
     const title = e.windows.length > 1 ? `${e.name} · ${e.windows.length}` : e.windows.length ? windowTitle(e.windows[e.windows.length - 1]) : e.name;
     return (
-      <BarButton key={e.id} t={t} vert={vert} active={e.focused} refFn={(n) => { if (n) refs.current.set(e.id, n); else refs.current.delete(e.id); }}
+      <BarButton key={e.id} t={t} vert={vert} len={fit.size} active={e.focused} refFn={(n) => { if (n) refs.current.set(e.id, n); else refs.current.delete(e.id); }}
         onClick={() => { hideTip(); click(e); }} onContextMenu={(ev) => { hideTip(); setJump({ entry: e, at: menuAt(ev) }); }}
         onMouseDown={(ev) => { if (!ev.button) beginDockDrag({ id: e.id, Icon: e.Icon, x: ev.x, y: ev.y, source: 'dock' }); }}
         onEnter={() => showTip(title, refs.current.get(e.id))} onLeave={hideTip} style={{ opacity: dragged ? 0.35 : 1 }}>
-        <e.Icon size={26} />
+        <e.Icon size={iconFor(fit.size)} />
         {indicator(e)}
         {/* a web app's unread count (SetBadge): a red badge, "99+" past 99 (the window count moves down then) */}
         {e.badge ? <View style={{ position: 'absolute', right: 1, top: 1, minWidth: 14, height: 14, paddingHorizontal: 3, borderRadius: 7,
@@ -191,7 +217,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
     );
   };
 
-  const startRef = useRef(null), searchRef = useRef(null), tvRef = useRef(null);
+  const startRef = useRef(null), searchRef = useRef(null), tvRef = useRef(null), moreRef = useRef(null);
   const apps = (
     <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2, direction: 'ltr' }}>
       <BarButton t={t} vert={vert} active={start} refFn={startRef} onClick={() => { hideTip(); onStart(); }}
@@ -206,7 +232,16 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
         onEnter={() => showTip(tr('shell.desktops.overview'), tvRef.current)} onLeave={hideTip}>
         <TaskViewGlyph color={t.text} bg={t.mode === 'dark' ? '#2a2a30' : '#eceef2'} size={19} />
       </BarButton>
-      {entries.map(appButton)}
+      {shown.map(appButton)}
+      {hidden.length ? (
+        <BarButton t={t} vert={vert} len={fit.size} active={!!more || hidden.some((e) => e.focused)} refFn={moreRef}
+          onClick={(ev) => { hideTip(); setMore(menuAt(ev)); }}
+          onEnter={() => showTip(tr('shell.classic.moreApps', { count: hidden.length }), moreRef.current)} onLeave={hideTip}>
+          <View style={{ flexDirection: vert ? 'column' : 'row', gap: 3 }}>
+            {[0, 1, 2].map((i) => <View key={i} style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: t.text }} />)}
+          </View>
+        </BarButton>
+      ) : null}
       <View style={vert ? { width: 24, height: 1, marginVertical: 3, backgroundColor: t.separator } : { width: 1, height: 24, marginHorizontal: 3, backgroundColor: t.separator }} />
       <View ref={trashRef} dropTrash onMouseUp={() => setTimeout(refreshTrash, 60)}>
         <BarButton t={t} vert={vert} active={overHere && !!drag.over.trash} onClick={() => { if (!dockDragJustEnded()) openTrash(); }}
@@ -225,7 +260,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
     </View>
   );
   const tray = (
-    <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2 }}>
+    <View ref={trayRef} style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2 }}>
       <PrivacyIndicators />
       {/* as tall as the bar's buttons, so a status item's panel opens clear of the bar (sdk/statusplace.js) */}
       {vert ? null : <StatusItems color={t.text} height={40} />}
@@ -252,10 +287,12 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   return (
     <View ref={barRef} style={{ position: 'absolute', ...edge, alignItems: 'center', borderColor: t.barBorder,
       backgroundColor: t.barBg, backdropFilter: t.blur ? `blur(${t.blur}px)` : undefined }}>
-      {center ? <View style={{ flex: 1 }} /> : null}
+      {fit.spacer ? <View style={vert ? { height: fit.spacer } : { width: fit.spacer }} /> : null}
       {apps}
       <View style={{ flex: 1, flexDirection: vert ? 'column' : 'row', justifyContent: 'flex-end', alignItems: 'center' }}>{tray}</View>
       {dropLine && <View style={{ position: 'absolute', ...dropLine, backgroundColor: t.accent, pointerEvents: 'none' }} />}
+      {more && hidden.length ? <Menu t={t} {...more} onClose={() => setMore(null)}
+        items={hidden.map((e) => ({ label: e.name, checked: e.focused, onClick: () => dockActivate(e) }))} /> : null}
       {jump && <Menu t={t} {...jump.at} onClose={() => setJump(null)} items={jumpItems(entries.find((x) => x.id === jump.entry.id) || jump.entry)} />}
       {trashAt && <Menu t={t} {...trashAt} onClose={() => setTrashAt(null)} items={trashMenu({ onEmpty: onEmptyTrash })} />}
       {tip && (

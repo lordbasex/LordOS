@@ -460,6 +460,8 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
     else skip "classic-taskbar-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
+    if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
     if have node && [ -d ../node_modules/esbuild ]; then
         run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs
