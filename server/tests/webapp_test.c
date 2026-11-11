@@ -3,7 +3,8 @@
  * answer and the icon check (webmanifest.c), the download names (webdl.c), the wheel and touchpad (webaxis.c), the
  * title's unread count, the user agent and the notification sound (webpage.c), the files of a drop (webdrop.c) and
  * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
- * pass each other (webedit.c). The rest of the registry file (webreg.c,
+ * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
+ * page (webscheme.c). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
@@ -15,6 +16,7 @@
 #include "../src/web/webdl.h"
 #include "../src/web/webmanifest.h"
 #include "../src/web/webreg.h"
+#include "../src/web/webscheme.h"
 #include "../src/web/weburl.h"
 
 #include <fcntl.h>
@@ -645,7 +647,41 @@ static void test_edit(void) {
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
 
+static void test_scheme(void) {
+    CHECK(webscheme_parse("light") == WEBSCHEME_LIGHT && webscheme_parse("dark") == WEBSCHEME_DARK, "scheme: the two words");
+    static const char *const bad[] = { "", "Dark", "DARK", "dark ", " dark", "dark\n", "prefer-dark", "default", "1", "true", "no-preference", "darkk", "lig" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(webscheme_parse(bad[i]) < 0, "scheme refuses '%s'", bad[i]);
+    CHECK(webscheme_parse(NULL) < 0, "scheme: NULL");
+    CHECK(!strcmp(webscheme_name(WEBSCHEME_LIGHT), "light") && !strcmp(webscheme_name(WEBSCHEME_DARK), "dark") && !webscheme_name(2) && !webscheme_name(-1),
+          "scheme names");
+    for (int k = 0; k < 2; k++) CHECK(webscheme_parse(webscheme_name(k)) == k, "scheme round trip %d", k);
+    CHECK(webscheme_from_env("dark") == WEBSCHEME_DARK && webscheme_from_env("light") == WEBSCHEME_LIGHT, "env");
+    CHECK(webscheme_from_env(NULL) == WEBSCHEME_LIGHT && webscheme_from_env("Dark") == WEBSCHEME_LIGHT && webscheme_from_env("") == WEBSCHEME_LIGHT,
+          "env: anything else is light");
+
+    const char *key = "0123456789abcdef0123456789abcdef";
+    char *s = webscheme_script("(function (k, d) {})", key, WEBSCHEME_DARK);
+    CHECK(s && !strcmp(s, "(function (k, d) {})(\"__lordosScheme0123456789abcdef0123456789abcdef\", true);\n"), "script dark: %s", s ? s : "NULL");
+    free(s);
+    s = webscheme_script("(function (k, d) {})", key, WEBSCHEME_LIGHT);
+    CHECK(s && strstr(s, "\", false);\n"), "script light");
+    free(s);
+    s = webscheme_call(key, WEBSCHEME_DARK);
+    CHECK(s && !strcmp(s, "(function () { var f = window.__lordosScheme0123456789abcdef0123456789abcdef; if (typeof f === 'function') f(true); })();"),
+          "call dark: %s", s ? s : "NULL");
+    free(s);
+    s = webscheme_call(key, WEBSCHEME_LIGHT);
+    CHECK(s && strstr(s, "f(false);"), "call light");
+    free(s);
+    static const char *const badkey[] = { "", "0123456789abcdef0123456789abcde", "0123456789abcdef0123456789abcdef0", "0123456789ABCDEF0123456789abcdef",
+                                          "0123456789abcdef0123456789abcde\"", "0123456789abcdef'); alert(1); ('ab", "0123456789abcdef 123456789abcdef" };
+    for (size_t i = 0; i < sizeof badkey / sizeof badkey[0]; i++)
+        CHECK(!webscheme_script("x", badkey[i], WEBSCHEME_DARK) && !webscheme_call(badkey[i], WEBSCHEME_DARK), "bad key %zu refused", i);
+    CHECK(!webscheme_script(NULL, key, 0) && !webscheme_script("x", NULL, 0) && !webscheme_script("x", key, 2) && !webscheme_call(key, -1), "script: nothing");
+}
+
 int main(void) {
+    test_scheme();
     test_edit();
     test_axis();
     test_badge();

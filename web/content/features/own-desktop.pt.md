@@ -112,10 +112,10 @@ Ainda não lançada; o último lançamento é a 0.8.8.7.
 - **Os apps Linux se integram.** Arrastar e soltar e arquivos copiados entre o Arquivos e os apps Linux, os métodos de entrada do LordOS dentro deles, os ícones de bandeja e os players na Central de Controle (veja *Seus apps Linux também*). Mais adiante na 0.8.8.8 também compartilhar uma tela ou uma janela, ícones SVG, apps que tomam os atalhos, atalhos globais, arrastar com apps X11 e apps X11 nítidos em HiDPI.
 - **Listas, tabelas e escolhas pelo teclado.** As listas e tabelas do SDK selecionam com as setas, Shift e Ctrl e acham uma linha enquanto você digita; menus suspensos, abas, botões de opção, caixas de seleção, popovers, dicas e barras de progresso também funcionam pelo teclado, e a roda move os controles deslizantes.
 - **O cursor segue o texto como ele é desenhado.** Em hebraico ou árabe misturados com números a seleção é desenhada por trechos, as setas andam na tela, e nunca se parte um emoji, uma bandeira ou uma letra com seus acentos.
-- **Apps web.** Instale apps web pela Loja, cada um numa janela e num processo próprios, com várias contas e permissões perguntadas uma vez (Ajustes → Apps web). Eles precisam do pacote opcional `lordos-web`; um app fechado pode continuar rodando atrás do ícone da bandeja.
+- **Apps web.** Instale apps web pela Loja, cada um numa janela e num processo próprios, com várias contas e permissões perguntadas uma vez (Ajustes → Apps web). Eles precisam do pacote opcional `lordos-web`; um app fechado pode continuar rodando atrás do ícone da bandeja. Eles seguem o modo claro ou escuro do desktop, ao vivo, exceto as páginas cujas cores vêm só de media queries de CSS. Testado na nossa máquina de testes.
 - **Bloqueio pelo logind.** `loginctl lock-sessions` e outras ferramentas de administração bloqueiam a tela; só a sua senha a desbloqueia.
 
-Os widgets com teclado, o cursor, os apps web e o bloqueio do logind estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
+Os widgets com teclado, o cursor e o bloqueio do logind estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
 
 ## Novo na 0.8.8.7
 

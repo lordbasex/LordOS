@@ -166,6 +166,7 @@
   "limit.drm": "Apsaugotos muzikos ir vaizdo įrašų (DRM) LordOS žiniatinklio variklyje leisti negalima.",
   "limit.calls": "Balso ir vaizdo skambučiai gali dar neveikti.",
   "limit.push": "Pranešimai ateina tik kol programa veikia: palikite ją veikti fone, kad juos gautumėte.",
+  "limit.theme": "Jei svetainė lieka šviesi, kai darbalaukis tamsus, pasirinkite Tamsi pačios svetainės Nustatymuose → Tema.",
   "settings.noColor": "Be spalvos",
   "settings.sizeSoon": "matuojama",
   "settings.unread": "Neperskaityta: {count}",

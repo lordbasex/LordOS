@@ -27,6 +27,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   page's own origin (a PNG unless it is a PNG or a JPEG) and offers it as an image.
 - **Web apps: Settings… and Help in the menu bar.** A web app's Settings… (was greyed out) opens Settings → Web apps
   on that app, and Help starts with "<app> on the Web", which opens the app's site in the browser.
+- **Web apps follow the desktop's light or dark mode.** WPE WebKit 2.48 has no way to set a page's
+  `prefers-color-scheme`, so every web app saw light. lord-server now starts lord-web with `LORDOS_WEB_SCHEME=light`
+  or `dark` (the mode the theme gives the Settings portal) and, when the mode changes, sends
+  `org.lordos.WebApp1.SetColorScheme(scheme)` to every running lord-web; the word is `light` or `dark` only, and
+  lord-web applies it only when the bus says the caller is the lord-server that started it, the same pid check as
+  Edit (`server/src/web/webscheme.c`). A script of lord-web's at document start in every frame
+  (`server/src/web/webscheme.js`, no privileges and no message handler) makes the page's `matchMedia` answer any query
+  about `prefers-color-scheme` with the desktop's mode: the query is rewritten so WebKit's own `matchMedia` answers
+  the rest of it (`not`, `and`, `only`, commas, other features), the page gets a `MediaQueryList` of its own
+  (`matches`, the original `media`, `onchange`, `addEventListener`, `addListener` and their removals, `instanceof
+  MediaQueryList`), and it sends `change` when the mode flips, live, without reloading; same-origin frames follow at
+  once and frames of other origins with their next load. In dark mode the view's background is the desktop's dark
+  window color while a page loads, so no white flashes before the page paints. Checked on the test VM with a page
+  that prints `matchMedia('(prefers-color-scheme: dark)').matches`: true when started in dark, false when started in
+  light, and switching the mode in Control Center flips it at once (one `change` event each way, the same-origin frame
+  too), and a call from another process is refused. A lord-web that takes its bus name after the mode changed (the
+  change came between its start and that moment, so the call went to a name nobody owned) gets the mode when its name
+  appears: lord-server watches `NameOwnerChanged` and sends `SetColorScheme` to the running lord-web whose name it is.
+  A page's `{ once: true }` listener that ran and a `{ signal }` listener whose signal aborted are released, so a page
+  that keeps making such lists does not keep them all alive. Limit: a page that picks its colors only with CSS
+  `@media (prefers-color-scheme)` rules stays light until a newer WebKit (rewriting those rules was weighed and left
+  out: style sheets from other origins can't be read); a site with its own theme setting can be set by hand, and the
+  Store's page of the messaging app now says so under Known limitations (new limitation key `theme`, in every
+  language). Tests: `tests/webapp_test.c` (the two words, the environment's value, the script's and the hook's text,
+  bad keys refused), `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`, with `once` and `signal`
+  listeners released) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent until the theme tells the mode, `dark`
+  and `light` after, absent again for any other value). See
+  `docs/WEBAPPS.md`, "Light and dark".
 - **Web apps: hidden windows stop working for nothing.** A window that is minimized, on another desktop, closed into
   the background or wholly covered by an opaque window now tells its page it is hidden: the page stops painting, its
   animations pause and its timers run at most once a second, while its network, audio and notifications go on. Measured

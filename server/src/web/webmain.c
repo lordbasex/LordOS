@@ -115,7 +115,8 @@ void web_registry_refresh(Web *w) {
 
 /* ---- one process per app and profile ---- */
 
-/* Show(token): anyone may (a second start of the app does); Edit(command): only lord-server, checked by pid (webbus.c) */
+/* Show(token): anyone may (a second start of the app does); Edit(command) and SetColorScheme("light" | "dark"): only
+ * lord-server, checked by pid (webbus.c) */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
     if (!strcmp(method, "Show")) {
@@ -131,12 +132,22 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
             return;
         }
         webbus_edit(d, sender, k);
+    } else if (!strcmp(method, "SetColorScheme")) {
+        const char *word = NULL;
+        g_variant_get(p, "(&s)", &word);
+        int k = webscheme_parse(word);
+        if (k < 0 || !sender) {
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "light or dark");
+            return;
+        }
+        webbus_scheme(d, sender, k);
     }
     g_dbus_method_invocation_return_value(inv, NULL);
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
-                               "<method name='Edit'><arg type='s' direction='in'/></method></interface></node>";
+                               "<method name='Edit'><arg type='s' direction='in'/></method>"
+                               "<method name='SetColorScheme'><arg type='s' direction='in'/></method></interface></node>";
 
 /* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {
@@ -211,6 +222,8 @@ static int run_app(Web *w) {
     webpage_state_parse(stext, stext ? slen : 0, &w->state);
     free(stext);
     w->audio_ms = w->note_ms = -1;
+    w->scheme = webscheme_from_env(getenv(WEBSCHEME_ENV));      /* lord-server's word for the desktop's mode */
+    unsetenv(WEBSCHEME_ENV);
     const char *token = getenv("XDG_ACTIVATION_TOKEN");
     char tok[256] = "";
     if (token) snprintf(tok, sizeof tok, "%s", token);

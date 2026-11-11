@@ -164,6 +164,7 @@
   "limit.drm": "Protected music and video (DRM) can't play in LordOS's web engine.",
   "limit.calls": "Voice and video calls may not work yet.",
   "limit.push": "Notifications arrive only while the app runs: keep it in the background to get them.",
+  "limit.theme": "If the site stays light when the desktop is dark, choose Dark in the site's own Settings → Theme.",
   "settings.noColor": "No color",
   "settings.sizeSoon": "being measured",
   "settings.unread": "{count} unread",

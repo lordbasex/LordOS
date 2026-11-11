@@ -9,6 +9,7 @@
  *   make -C server build/webreg-test        (also in `make test`) */
 #include "../src/web/webreg.h"
 #include "../src/web/webmgr.h"
+#include "../src/web/webscheme.h"
 #include "../src/sec/json.h"
 
 #include <dirent.h>
@@ -572,8 +573,12 @@ static void test_manager(void) {
     for (int i = 0; i < 200 && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
     CHECK(env && strstr(env, "LORDOS_WEB=1") && strstr(env, "WAYLAND_DISPLAY=wayland-test") && strstr(env, "LANG=C.UTF-8") && !strstr(env, "SECRET_TOKEN"),
           "environment: %s", env ? env : "(none)");
+    /* the theme has not told the desktop's mode yet: no scheme in the environment */
+    CHECK(webmgr_scheme() == -1 && env && !strstr(env, WEBSCHEME_ENV "="), "no %s before the theme tells it: %s", WEBSCHEME_ENV, env ? env : "(none)");
     free(env);
-    /* under lord-sessiond the marker goes too (lord-web is strict then), whatever its value was */
+    /* under lord-sessiond the marker goes too (lord-web is strict then), whatever its value was; and the theme said dark */
+    webmgr_set_scheme(WEBSCHEME_DARK);
+    CHECK(webmgr_scheme() == WEBSCHEME_DARK, "the scheme kept: dark");
     setenv("LORDOS_SESSIOND", "/some/value", 1);
     CHECK(!webmgr_launch("chat", "personal", &raised) && raised == 0, "started under lord-sessiond");
     unsetenv("LORDOS_SESSIOND");
@@ -581,7 +586,23 @@ static void test_manager(void) {
     env = NULL;
     for (int i = 0; i < 200 && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
     CHECK(env && strstr(env, "LORDOS_SESSIOND=1\n") && !strstr(env, "/some/value"), "LORDOS_SESSIOND=1: %s", env ? env : "(none)");
+    CHECK(env && strstr(env, "\n" WEBSCHEME_ENV "=dark\n"), "%s=dark after the theme said dark: %s", WEBSCHEME_ENV, env ? env : "(none)");
     free(env);
+    /* light, then a value that is neither: the scheme is unknown again and leaves the environment */
+    const char *const sch[][3] = { { "Bright", "bright", WEBSCHEME_ENV "=light\n" }, { "Spare", "spare", NULL } };
+    for (int k = 0; k < 2; k++) {
+        webmgr_set_scheme(k ? 7 : WEBSCHEME_LIGHT);
+        CHECK(webmgr_scheme() == (k ? -1 : WEBSCHEME_LIGHT), "the scheme kept: %d", webmgr_scheme());
+        CHECK(!webmgr_add_profile("chat", sch[k][0], prof, sizeof prof) && !strcmp(prof, sch[k][1]), "profile %s added", sch[k][1]);
+        CHECK(!webmgr_launch("chat", sch[k][1], &raised) && raised == 0, "%s started", sch[k][1]);
+        snprintf(q, sizeof q, "%s/env-chat-%s", root, sch[k][1]);
+        env = NULL;
+        for (int i = 0; i < 200 && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+        if (sch[k][2]) CHECK(env && strstr(env, sch[k][2]) && !strstr(env, WEBSCHEME_ENV "=dark"), "%s: %s", sch[k][2], env ? env : "(none)");
+        else CHECK(env && !strstr(env, WEBSCHEME_ENV "="), "no %s after an unknown value: %s", WEBSCHEME_ENV, env ? env : "(none)");
+        free(env);
+        CHECK(webmgr_remove_profile("chat", sch[k][1], 1) == NULL, "profile %s removed", sch[k][1]);
+    }
     snprintf(p, sizeof p, "%s/.local/share/lordos/web/chat/work", root);
     CHECK(!stat(p, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0700, "its data folder, 0700");
     snprintf(q, sizeof q, "%s/cookies.sqlite", p);

@@ -112,10 +112,10 @@ Todavía no se publicó; el último lanzamiento es la 0.8.8.7.
 - **Las apps de Linux se integran.** Arrastrar y soltar y archivos copiados entre Archivos y las apps de Linux, los métodos de entrada de LordOS dentro de ellas, sus íconos de bandeja y sus reproductores en el Centro de control (mirá *También tus apps de Linux*). Más adelante en la 0.8.8.8 también compartir una pantalla o una ventana, los íconos SVG, las apps que toman los atajos, los atajos globales, arrastrar con apps X11 y apps X11 nítidas en HiDPI.
 - **Listas, tablas y opciones con el teclado.** Las listas y tablas del SDK seleccionan con las flechas, Mayús y Ctrl y encuentran una fila mientras escribís; los desplegables, las pestañas, los botones de opción, las casillas, los popovers, los tooltips y las barras de progreso también funcionan con el teclado, y la rueda mueve los deslizadores.
 - **El cursor sigue al texto como se dibuja.** En hebreo o árabe mezclados con números la selección se dibuja por tramos, las flechas se mueven en pantalla, y nunca se parte un emoji, una bandera ni una letra con sus acentos.
-- **Apps web.** Instalá apps web desde la Tienda, cada una en una ventana y un proceso propios, con varias cuentas y permisos que se preguntan una vez (Ajustes → Apps web). Necesitan el paquete opcional `lordos-web`; una app cerrada puede seguir corriendo detrás de su ícono de bandeja.
+- **Apps web.** Instalá apps web desde la Tienda, cada una en una ventana y un proceso propios, con varias cuentas y permisos que se preguntan una vez (Ajustes → Apps web). Necesitan el paquete opcional `lordos-web`; una app cerrada puede seguir corriendo detrás de su ícono de bandeja. Siguen el modo claro u oscuro del escritorio, en vivo, salvo las páginas cuyos colores salen solo de media queries de CSS. Probado en nuestra máquina de pruebas.
 - **Bloqueo desde logind.** `loginctl lock-sessions` y otras herramientas de administración bloquean la pantalla; solo tu contraseña la desbloquea.
 
-Los widgets con teclado, el cursor, las apps web y el bloqueo de logind están construidos y probados, pero todavía no se verificaron en nuestra máquina de pruebas.
+Los widgets con teclado, el cursor y el bloqueo de logind están construidos y probados, pero todavía no se verificaron en nuestra máquina de pruebas.
 
 ## Nuevo en la 0.8.8.7
 
