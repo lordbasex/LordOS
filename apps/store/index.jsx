@@ -3,6 +3,7 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
+  Segmented, admin, canDeactivate, deactivateApp, activateApp,
   suggestions, unseenSuggestions, refreshSuggestions,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -278,22 +279,50 @@ const pkgManifest = (pkg) => ({ name: pkg.name, description: pkg.description, ic
 
 // ---- installed apps (all of them: LordOS, packages and Linux) ----
 
-function InstalledPage({ query }) {
+// Every installed app. A LordOS app LordOS can do without is deactivated here, and activated again
+// (sdk/appsoffactions.js; the core keeps "System app — part of LordOS"); a Linux app a Debian package
+// brought is removed after its plan (debian.RemoveSheet). "Deactivated" lists the apps turned off.
+function InstalledPage({ query, filter: initial }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const apps = useLauncherApps();
-  const shown = apps.filter((a) => matches(query, [a.name, a.id, a.genericName], [a.comment]));
+  const apps = useLauncherApps({ all: true });
+  const [filter, setFilter] = useState(initial === 'off' ? 'off' : 'all');
+  const [removing, setRemoving] = useState(null);
+  const [msg, setMsg] = useState(null);
+  useEffect(() => { if (initial === 'off') setFilter('off'); }, [initial]);
+  useStore(debian.state);
+  const offCount = apps.filter((a) => a.off).length;
+  const shown = apps.filter((a) => (filter === 'off' ? a.off : true) && matches(query, [a.name, a.id, a.genericName], [a.comment]));
   // the kind, and a LordOS app's or package's own version (manifest "version")
   const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
+  const builtin = (a) => a.kind === 'lordos' && isSystemApp(a.id);
+  const deactivate = (a) => {
+    const r = deactivateApp(a.id);
+    setMsg(r.ok ? { ok: true, text: tr('store.off.done', { name: a.name }) } : { ok: false, text: tr(`store.off.refused.${r.reason}`, { name: a.name }) });
+  };
+  const activate = (a) => { activateApp(a.id); setMsg({ ok: true, text: tr('store.off.activated', { name: a.name }) }); };
   return (
     <View>
-      <List count={null} empty={tr('store.debian.none')}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l }}>
+        <Segmented small appearance="neutral" value={filter} onChange={setFilter}
+          options={[['all', tr('store.off.filterAll')], ['off', offCount ? tr('store.off.filterOffCount', { count: offCount }) : tr('store.off.filterOff')]]} />
+      </View>
+      <debian.Progress />
+      <Message msg={msg} />
+      <List count={null} empty={filter === 'off' ? tr('store.off.none') : tr('store.debian.none')}>
         {shown.map((a) => (
-          <AppRow key={a.id} icon={<a.Icon size={32} />} name={a.name} detail={a.comment || a.genericName || ''} extra={kind(a)}>
-            {/* a system app is part of LordOS: never removable here (docs/SIGNING.md, "Verified system code") */}
-            {a.kind === 'lordos' && isSystemApp(a.id) && <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('store.systemApp')}</Text>}
-            {a.kind === 'linux' && debian.canRemove(a) && <Button small label={tr('store.remove')} onClick={() => debian.removeApp(a)} />}
-            <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />
+          <AppRow key={a.id} icon={<View style={{ opacity: a.off ? 0.45 : 1 }}><a.Icon size={32} /></View>} name={a.name} detail={a.comment || a.genericName || ''}
+            extra={a.off ? `${kind(a)} · ${tr('store.off.badge')}` : kind(a)}
+            below={removing === a.id ? <debian.RemoveSheet app={a} onClose={() => setRemoving(null)} /> : null}>
+            {/* a system app is part of LordOS: never removable here (docs/SIGNING.md, "Verified system code"); the ones
+                LordOS can do without are deactivated instead (sdk/appsoffmodel.js) */}
+            {builtin(a) && !canDeactivate(a.id) && <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('store.systemApp')}</Text>}
+            {builtin(a) && canDeactivate(a.id) && (a.off
+              ? <Button small primary label={tr('store.off.activate')} onClick={() => activate(a)} />
+              : <Button small label={tr('store.off.deactivate')} onClick={() => deactivate(a)} />)}
+            {a.kind === 'linux' && debian.canRemove(a) && <Button small label={tr('store.remove')} disabled={!admin.available()}
+              onClick={() => setRemoving(removing === a.id ? null : a.id)} />}
+            {!a.off && <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />}
           </AppRow>
         ))}
       </List>
@@ -365,7 +394,7 @@ export default function Store() {
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
   else if (page === 'webapps') body = <WebAppsPage query={query} />;
-  else if (page === 'installed') body = <InstalledPage query={query} />;
+  else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
   else body = <debian.Updates />;
   const item = (id, label, detail, glyph) => (
     <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => go(id)} />

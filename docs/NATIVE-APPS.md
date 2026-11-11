@@ -99,7 +99,10 @@ The apps in `apps/` are **system apps**: they are built into the theme bundles (
 run as their own process, `"process": "isolated"`, into `assets/sysapps/<id>/`: Passwords, Mail,
 Calendar, Contacts, Reminders and, in 0.8.5, the hidden Sandbox Probe), which LordOS checks
 against its signed manifest before running them (see [SIGNING.md](SIGNING.md), "Verified system
-code"), and the Store never offers to remove them ("System app — part of LordOS"). An installed
+code"), and the Store never offers to remove them ("System app — part of LordOS"). Since 0.8.8.8 (in
+development) 21 of them can be **deactivated** in Store → Installed instead: they leave the launcher,
+the Dock, search and "Open With", can't be started and stop their background work, and come back with
+Activate (`sdk/appsoffmodel.js`; [PACKAGES.md](PACKAGES.md), "Store → Installed"). An installed
 `.lpk` is never a system app, even with the same id: the theme's app wins and the package is not
 listed. `isSystemApp(id)` from `@lordos/sdk` tells them apart.
 

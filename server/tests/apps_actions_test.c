@@ -7,6 +7,7 @@
 #include "apps.h"
 #include "fsops.h"
 #include "fw/rules.h"
+#include "hw/defaults.h"
 #include "sec/broker.h"
 #include "sec/perms.h"
 #include "sec/restrict.h"
@@ -178,6 +179,29 @@ int main(void) {
     CHECK("an entry named like the Flatpak id that doesn't run it: no name", !name[0]);
     apps_name_of_program("relative/x", NULL, "viewer", name, sizeof name);
     CHECK("a relative program: no name", !name[0]);
+
+    /* the .desktop file of a system app, for lord.pkg.ownerOfApp (which package brought it): only from
+     * /usr/share/applications (here under a test root), never a home folder's, never by a path */
+    char sysroot[400], sysfile[600];
+    snprintf(sysroot, sizeof sysroot, "%s/root", home);
+    const char *sdirs[] = { "%s/root", "%s/root/usr", "%s/root/usr/share", "%s/root/usr/share/applications", NULL };
+    for (int i = 0; sdirs[i]; i++) { snprintf(path, sizeof path, sdirs[i], home); mkdir(path, 0700); }
+    snprintf(path, sizeof path, "%s/usr/share/applications/com.example.Zap.desktop", sysroot);
+    f = fopen(path, "w");
+    if (f) { fputs("[Desktop Entry]\nType=Application\nName=Zap\nExec=/usr/bin/true\n", f); fclose(f); }
+    snprintf(path, sizeof path, "%s/usr/share/applications/Zap Two.desktop", sysroot);
+    f = fopen(path, "w");
+    if (f) { fputs("[Desktop Entry]\nType=Application\nName=Zap Two\nExec=/usr/bin/true\n", f); fclose(f); }
+    defaults_set_root(sysroot);
+    CHECK("a system app's file", apps_system_file("com.example.Zap", sysfile, sizeof sysfile) == 0 &&
+          !strcmp(sysfile, "/usr/share/applications/com.example.Zap.desktop"));
+    CHECK("a sanitized id gives the real file name", apps_system_file("Zap-Two", sysfile, sizeof sysfile) == 0 &&
+          !strcmp(sysfile, "/usr/share/applications/Zap Two.desktop"));
+    CHECK("a home folder's app has none", apps_system_file("lord-demo", sysfile, sizeof sysfile) != 0);
+    CHECK("an unknown id has none", apps_system_file("com.example.Nope", sysfile, sizeof sysfile) != 0);
+    CHECK("a path is no id", apps_system_file("../root/usr/share/applications/com.example.Zap", sysfile, sizeof sysfile) != 0);
+    CHECK("too small a buffer", apps_system_file("com.example.Zap", sysfile, 10) != 0);
+    defaults_set_root(NULL);
 
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);

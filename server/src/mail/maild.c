@@ -352,6 +352,9 @@ static void server_from(const JVal *o, Server *s, int defport) {
 void accounts_apply_config(const JVal *cfg) {
     const JVal *acc = json_get(cfg, "accounts");
     int seen[MAIL_MAX_ACCOUNTS * 2] = { 0 };
+    /* Mail deactivated (Store → Installed, sdk/appsoffactions.js): its accounts' workers stop, but the
+     * accounts and what they keep on disk stay; davPaused: Calendar, Contacts and Reminders are all off */
+    int paused_mail = json_bool(cfg, "mailPaused", 0), paused_dav = json_bool(cfg, "davPaused", 0);
     for (const JVal *a = acc && acc->type == J_ARR ? acc->kid : NULL; a; a = a->next) {
         const char *id = json_str(a, "id");
         if (!valid_id(id)) continue;
@@ -360,6 +363,18 @@ void accounts_apply_config(const JVal *cfg) {
         memset(&tmp, 0, sizeof tmp);
         CPY(tmp.id, id);
         CPY(tmp.kind, kind && !strcmp(kind, "dav") ? "dav" : "mail");
+        if (tmp.kind[0] == 'd' ? paused_dav : paused_mail) {
+            /* paused: a running worker exits on its own (as when its server changes); nothing is dropped
+             * (the loop below never touches a stopped account), and the next config without the pause
+             * starts a new one */
+            Account *cur = acct_get(id);
+            if (cur) {
+                cur->stop = 1;
+                uint64_t one = 1;
+                if (write(cur->wake, &one, sizeof one) < 0) { /* signalled */ }
+            }
+            continue;
+        }
         CPY(tmp.name, json_str(a, "name"));
         CPY(tmp.email, json_str(a, "email"));
         CPY(tmp.full_name, json_str(a, "fullName"));

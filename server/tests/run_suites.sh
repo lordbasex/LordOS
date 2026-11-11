@@ -256,6 +256,9 @@ EOF
     if have node; then run "gtk-defaults-test (assets/gtk, #52)" node tests/gtk_defaults_test.mjs; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # (0.8.8.8) deactivated LordOS apps: the core list, the setting, launcher/search, default apps, Open With, VMs, mail pauses
+    if have node; then run "apps-off-model-test (sdk/appsoffmodel.js)" node tests/apps_off_model_test.mjs
+    else skip "apps-off-model-test" "node"; fi
     # (0.8.8.8) web apps: the window's app id and its process, the Dock's profiles menu, the Store's address sheet,
     # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
     if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs

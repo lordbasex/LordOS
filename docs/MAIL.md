@@ -175,6 +175,13 @@ become a notification ("2 new messages", with Open). UI requests (open, flags, m
 drafts) interrupt the IDLE through an eventfd. Every 15 minutes all folders sync again. Gmail's
 "All Mail" is not synced in the background.
 
+**Paused (0.8.8.8, in development).** With Mail deactivated in Store → Installed (PACKAGES.md, "Store →
+Installed"), the accounts file carries `"mailPaused": true` and `accounts_apply_config` stops the mail
+accounts' workers (as when an account's server changes) without dropping the account or its cache; the
+next config without it starts them again. `"davPaused": true` does the same for the calendar-and-contacts
+accounts when Calendar, Contacts and Reminders are all deactivated. The session writes both
+(`sdk/appsoffactions.js`) and shows no new-mail notices meanwhile.
+
 Flags map to IMAP: `\Seen`, `\Flagged`, `\Answered`, `$Forwarded`, `$Junk`, and the six
 categories to `$label1`…`$label6` (the keywords Thunderbird uses for its first five tags), so
 other clients see them. Archive moves to the `\Archive` folder (created as "Archive" if missing);
@@ -419,7 +426,9 @@ Like the Clock's alarms (`sdk/alarms.js`), they live in the SDK, not in an app w
 one (in pieces of at most a minute when it is close, because the monotonic clock stops during
 suspend), rings a sticky notification (Snooze 10 min, *Mark as done* for to-dos, Open), and
 remembers what rang in `settings.pimAlarms.fired`. An alarm missed by less than 10 minutes still
-rings. It re-reads the list whenever calendar data changes.
+rings. It re-reads the list whenever calendar data changes. An event's alarm doesn't ring while
+Calendar is deactivated, nor a to-do's while Reminders is (Store → Installed; `alarmAllowed` in
+`sdk/appsoffmodel.js`).
 
 ## Programming interface
 

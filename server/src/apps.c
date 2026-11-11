@@ -690,6 +690,19 @@ static const DesktopApp *find_app(const char *id) {
     return NULL;
 }
 
+int apps_system_file(const char *id, char *out, size_t n) {
+    if (!id || !out || !n) return -1;
+    const DesktopApp *a = find_app(id);
+    if (!a || a->user) return -1;
+    const char *root = defaults_root();
+    size_t rl = strlen(root);
+    if (rl && strncmp(a->file, root, rl)) return -1;
+    const char *p = a->file + rl;
+    if (strncmp(p, "/usr/share/applications/", 24) || strchr(p + 24, '/') || strlen(p) >= n) return -1;
+    snprintf(out, n, "%s", p);
+    return 0;
+}
+
 int apps_actions(const char *id, const char *lang, AppAction *out, int max) {
     const DesktopApp *a = find_app(id);
     if (!a || a->terminal || max <= 0) return 0;        /* a terminal app's actions would need a shell too */

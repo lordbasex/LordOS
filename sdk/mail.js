@@ -26,6 +26,7 @@ import { keyringTrouble, askUnlock, authAfterStatus } from './mailauthmodel.js';
 import { notify } from './notify.js';
 import { t } from './i18n.js';
 import { wm, getApp } from './windows.js';
+import { isAppOff } from './appsoff.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.mail !== 'undefined';
 export const mailAvailable = () => has() && lord.mail.available();
@@ -373,6 +374,7 @@ export function startMail() {
     } else if (ev.ev === 'cert') {
       mailStatus.set((s) => ({ ...s, certs: [...s.certs.filter((c) => !(c.acct === ev.acct && c.host === ev.host)), ev] }));
     } else if (ev.ev === 'new') {
+      if (isAppOff('mail')) return;                // Mail deactivated (Store → Installed): lord-maild pauses its accounts
       refreshCounts();
       const prefs = (mailConfig.get().notify ?? true);
       if (!prefs) return;

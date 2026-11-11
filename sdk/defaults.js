@@ -12,6 +12,11 @@
 //   defaultOpenerId(mime)               the default for one type (Files: "Open With", double click)
 import { getApp } from './windows.js';
 import { appName } from './i18n.js';
+import { isAppOff, appsOff } from './appsoff.js';
+import { usableDefault } from './appsoffmodel.js';
+
+// A LordOS app that can be a default: installed and not deactivated (Store → Installed, appsoffmodel.js).
+const nativeOn = (n) => !!getApp(n) && !isAppOff(n);
 
 const NATIVE = (id) => `lordos-${id}.desktop`;
 export const nativeOf = (desktopId) => (desktopId && /^lordos-[a-z0-9_-]+\.desktop$/.test(desktopId) ? desktopId.slice(7, -8) : null);
@@ -38,8 +43,8 @@ export function defaultFor(id) {
   const c = cat(id);
   if (!c || !api()) return null;
   if (c.terminal) return lord.mime.terminal() || NATIVE('terminal');
-  for (const m of c.mimes) { const d = lord.mime.get(m); if (d) return d; }
-  return c.natives.find((n) => getApp(n)) ? NATIVE(c.natives.find((n) => getApp(n))) : null;
+  for (const m of c.mimes) { const d = usableDefault(lord.mime.get(m), appsOff()); if (d) return d; }
+  return c.natives.find(nativeOn) ? NATIVE(c.natives.find(nativeOn)) : null;
 }
 
 // lord.mime.resolve: { id, explicit, source: 'user'|'system'|'declared' } or null. The app
@@ -56,12 +61,14 @@ export function defaultInfo(id) {
   if (c.terminal) return { id: defaultFor(id), auto: false };
   const rs = c.mimes.map(resolve);
   const mine = rs.find((r) => r && r.explicit);
+  // a choice of a deactivated LordOS app still shows as the choice (Settings can change it); what
+  // actually opens these files meanwhile is the next capable app (defaultOpenerId)
   if (mine) return { id: mine.id, auto: false };
-  const sys = rs.find((r) => r && r.source === 'system');
+  const sys = rs.find((r) => r && r.source === 'system' && usableDefault(r.id, appsOff()));
   if (sys) return { id: sys.id, auto: true };
-  const native = c.natives.find((n) => getApp(n));
+  const native = c.natives.find(nativeOn);
   if (native) return { id: NATIVE(native), auto: true };
-  const first = rs.find(Boolean);
+  const first = rs.find((r) => r && usableDefault(r.id, appsOff()));
   return first ? { id: first.id, auto: true } : null;
 }
 
@@ -94,7 +101,7 @@ function covers(mimeTypes, c) {
 export function candidatesFor(id, linuxApps = []) {
   const c = cat(id);
   if (!c) return [];
-  const out = c.natives.map((n) => getApp(n)).filter(Boolean).map((a) => ({ id: NATIVE(a.id), name: appName(a), Icon: a.Icon, native: true }));
+  const out = c.natives.filter(nativeOn).map((n) => getApp(n)).map((a) => ({ id: NATIVE(a.id), name: appName(a), Icon: a.Icon, native: true }));
   for (const a of linuxApps) {
     if (a.kind !== 'linux') continue;
     const ok = c.terminal ? /(^|;)TerminalEmulator(;|$)/.test(a.categories || '') : covers(a.mimeTypes, c);
@@ -106,13 +113,15 @@ export function candidatesFor(id, linuxApps = []) {
 export function defaultOpenerId(mime) {
   if (!api() || !mime) return null;
   // the user's choice or the system's default, if that app is installed
+  // a deactivated LordOS app is skipped (appsoffmodel.js usableDefault): the next capable app opens it
   const r = resolve(mime);
-  if (r && r.source !== 'declared') return r.id;
+  const off = appsOff();
+  if (r && r.source !== 'declared' && usableDefault(r.id, off)) return r.id;
   // the category that lists the type itself first (text/calendar is Calendar's, not the text editor's), then the
   // family's (text/x-foo goes to the editor)
   const c = DEFAULT_CATEGORIES.find((x) => x.mimes.includes(mime))
     || DEFAULT_CATEGORIES.find((x) => x.mimes[0] && x.family !== false && mime.startsWith(`${x.mimes[0].split('/')[0]}/`) && x.id !== 'browser' && x.id !== 'mail');
   const d = c ? defaultFor(c.id) : null;
   // then the category's (LordOS's own app), then the first installed app that declares the type
-  return d || (r ? r.id : null);
+  return d || (r ? usableDefault(r.id, off) : null);
 }

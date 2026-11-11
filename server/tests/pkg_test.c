@@ -21,6 +21,7 @@
 #include "pkg/xz.h"
 #include "errcode.h"
 
+#include <fcntl.h>
 #include <pwd.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -636,6 +637,79 @@ static void test_notes(void) {
           "pre-release versions sort between releases");
 }
 
+/* Who owns a launcher's .desktop file (status.c dpkg_owner, Store → Installed's "Remove"): dpkg's
+ * file lists in a fake info folder, exact path matches only, the two applications folders only,
+ * cached until the folder changes. */
+static void write_list(const char *info, const char *name, const char *text) {
+    char p[600];
+    snprintf(p, sizeof p, "%s/%s", info, name);
+    FILE *f = fopen(p, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+static void touch_dir(const char *dir, long sec) {
+    struct timespec ts[2] = { { sec, 0 }, { sec, 0 } };
+    utimensat(AT_FDCWD, dir, ts, 0);
+}
+static void test_dpkg_owner(const char *dir) {
+    char info[512], out[128];
+    snprintf(info, sizeof info, "%s/dpkg-info", dir);
+    mkdir(info, 0755);
+    write_list(info, "zapzap.list", "/.\n/usr\n/usr/share\n/usr/share/applications\n/usr/share/applications/com.rtosta.zapzap.desktop\n"
+                                    "/usr/share/icons/hicolor/scalable/apps/com.rtosta.zapzap.svg\n");
+    write_list(info, "vlc-bin:amd64.list", "/usr/bin/vlc\n");
+    write_list(info, "vlc.list", "/usr/share/applications/vlc.desktop\n/usr/share/applications/vlc-extra/x.desktop\n");
+    write_list(info, "local-tool.list", "/usr/local/share/applications/local-tool.desktop");    /* no final newline */
+    write_list(info, "libfoo1:amd64.list", "/usr/share/applications/foo-viewer.desktop\n");
+    write_list(info, "Bad_Name.list", "/usr/share/applications/bad.desktop\n");
+    write_list(info, "zapzap.md5sums", "0123 usr/share/applications/other.desktop\n");
+    write_list(info, "home.list", "/home/u/.local/share/applications/mine.desktop\n");
+    /* a line far longer than the reader's buffer, then a real entry on the next line */
+    char *longl = malloc(20000);
+    if (longl) {
+        memcpy(longl, "/usr/share/applications/", 24);
+        memset(longl + 24, 'x', 20000 - 24 - 64);
+        snprintf(longl + 20000 - 64, 64, ".desktop\n/usr/share/applications/l.desktop\n");
+        write_list(info, "longline.list", longl);
+        free(longl);
+    }
+    touch_dir(info, 1000);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/com.rtosta.zapzap.desktop", out, sizeof out) && !strcmp(out, "zapzap"),
+          "a .deb installed from a file owns its launcher: [%s]", out);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out) && !strcmp(out, "vlc"), "vlc: [%s]", out);
+    CHECK(!dpkg_owner(info, "/usr/local/share/applications/local-tool.desktop", out, sizeof out) && !strcmp(out, "local-tool"),
+          "/usr/local and a last line without a newline: [%s]", out);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/foo-viewer.desktop", out, sizeof out) && !strcmp(out, "libfoo1"),
+          "the architecture is not part of the name: [%s]", out);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/l.desktop", out, sizeof out) && !strcmp(out, "longline"),
+          "the line after a too-long line is read: [%s]", out);
+    CHECK(dpkg_owner(info, "/usr/share/applications/vlc", out, sizeof out), "an exact match only (no prefix)");
+    CHECK(dpkg_owner(info, "/usr/share/applications/zapzap.desktop", out, sizeof out), "a path no list holds");
+    CHECK(dpkg_owner(info, "/usr/share/applications/bad.desktop", out, sizeof out), "a list with an invalid package name is skipped");
+    CHECK(dpkg_owner(info, "/usr/share/applications/other.desktop", out, sizeof out), "only .list files count");
+    CHECK(dpkg_owner(info, "/usr/share/applications/vlc-extra/x.desktop", out, sizeof out), "only files directly in the folder");
+    CHECK(dpkg_owner(info, "/home/u/.local/share/applications/mine.desktop", out, sizeof out), "never a home folder");
+    CHECK(dpkg_owner(info, "/usr/share/applications/../applications/vlc.desktop", out, sizeof out), "no ..");
+    CHECK(dpkg_owner(info, "/usr/bin/vlc", out, sizeof out), "only launchers are answered");
+    CHECK(dpkg_owner(info, "/usr/share/applications/com.rtosta.zapzap.desktop", out, 4), "a buffer too small");
+    CHECK(dpkg_owner(info, NULL, out, sizeof out) && dpkg_owner(NULL, "/usr/share/applications/vlc.desktop", out, sizeof out), "NULLs");
+    char nodir[600];
+    snprintf(nodir, sizeof nodir, "%s/missing", dir);
+    CHECK(dpkg_owner(nodir, "/usr/share/applications/vlc.desktop", out, sizeof out), "no info folder");
+    /* cached until the folder changes: a list replaced without touching the folder keeps the old answer */
+    CHECK(!dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out), "again (cached)");
+    write_list(info, "vlc.list", "/usr/bin/cvlc\n");
+    write_list(info, "vlc-qt.list", "/usr/share/applications/vlc.desktop\n");
+    touch_dir(info, 1000);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out) && !strcmp(out, "vlc"), "cached: [%s]", out);
+    touch_dir(info, 2000);
+    CHECK(!dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out) && !strcmp(out, "vlc-qt"),
+          "read again after the folder changed: [%s]", out);
+    snprintf(nodir, sizeof nodir, "%s/vlc-qt.list", info);
+    unlink(nodir);
+    touch_dir(info, 3000);
+    CHECK(dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out), "removed package: no owner");
+}
+
 int main(int argc, char **argv) {
     if (argc >= 4 && !strcmp(argv[1], "pgp")) {
         PgpKeyring kr = { 0 };
@@ -685,6 +759,7 @@ int main(int argc, char **argv) {
     test_new_recommends(dir);
     test_hwdata(dir);
     test_pins(dir);
+    test_dpkg_owner(dir);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
     if (system(cmd)) {}

@@ -26,6 +26,7 @@ import { sound } from './sound.js';
 import { registerStatusItem } from './statusitems.js';
 import { sharedTicker, idleStore } from './ticker.js';
 import { wm } from './windows.js';
+import { isAppOff } from './appsoff.js';
 
 const MIN = 60000, LATE = 10 * MIN, SNOOZE = 9 * MIN, RING_MS = 60000;
 
@@ -163,6 +164,8 @@ function check() {
 export function arm() {
   clearTimeout(handle);
   if (!started) return;
+  // Clock deactivated (Store → Installed): no alarm rings and none is shown by the clock
+  if (isAppOff('clock')) { nextAlarm.set(null); return; }
   check();                 // may re-enter here (saving the alarms notifies the subscription)
   clearTimeout(handle);
   const now = Date.now();
@@ -199,7 +202,8 @@ function ClockStatus({ color, height }) {
   const tm = useStore(clockTimer);
   const na = useStore(nextAlarm);
   const soon = na && na.at - Date.now() < 24 * 60 * MIN;
-  if (tm.state === 'idle' && !soon) return null;
+  useStore(settings, (s) => s.appsOff);
+  if ((tm.state === 'idle' && !soon) || isAppOff('clock')) return null;
   return h(View, {
     onClick: () => wm.open('clock', { args: { tab: tm.state !== 'idle' ? 'timer' : 'alarms' } }),
     style: { height, paddingHorizontal: 7, flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -212,10 +216,10 @@ function ClockStatus({ color, height }) {
 export function startAlarms() {
   if (started) return;
   started = true;
-  let last = JSON.stringify(alarmsOf());
+  let last = JSON.stringify(alarmsOf()), off = isAppOff('clock');
   settings.subscribe(() => {
-    const now = JSON.stringify(alarmsOf());
-    if (now !== last) { last = now; arm(); }
+    const now = JSON.stringify(alarmsOf()), nowOff = isAppOff('clock');
+    if (now !== last || nowOff !== off) { last = now; off = nowOff; arm(); }
   });
   registerStatusItem('clock', ClockStatus, 10);
   arm();

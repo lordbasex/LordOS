@@ -201,6 +201,11 @@ export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlaceme
 // Fans and cooling (lord-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
 export { useFan, fanStatus, fanHistory, fanCase, fanControl, refreshFan, coolingVariant, heatColor, CoolingArt, GpuArt, FanCurveChart, formatTemp, FAN_HISTORY } from './cooling.jsx';
 export { DEFAULT_CATEGORIES, defaultFor, defaultInfo, setDefaultFor, resetDefaultFor, candidatesFor, defaultOpenerId, nativeOf } from './defaults.js';
+// deactivated built-in apps (Store → Installed; docs/PACKAGES.md, "Deactivating LordOS apps")
+export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
+export { DEACTIVATABLE, CORE_APPS, canDeactivate, isCoreApp, openersAvailable } from './appsoffmodel.js';
+export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
+import { startAppsOff } from './appsoffactions.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
 // ---- installed themes ----
@@ -258,6 +263,7 @@ export function startShell(element) {
   const current = themes.current();
   if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
   refreshPackages();                    // after the theme's configureWindows
+  startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();

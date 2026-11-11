@@ -615,7 +615,34 @@ static JSValue f_reboot_required(JSContext *c, JSValueConst this_val, int argc, 
     return arr;
 }
 
+/* ownerOfApp(desktopId) → { name, essential } | null: the installed package that brought a Linux app
+ * (Store → Installed: "Remove" for a .deb installed from a file, or an app the index doesn't name).
+ * Only the id comes from JS: apps_system_file finds the app's .desktop file as the launcher does,
+ * only in /usr/share/applications; dpkg's own file lists say whose it is (status.c dpkg_owner).
+ * essential: Essential, Protected or Priority: required (never offered for removal). */
+static int (*app_file)(const char *id, char *out, size_t n);
+void js_pkg_set_app_file(int (*fn)(const char *id, char *out, size_t n)) { app_file = fn; }
+
+static JSValue f_owner_of_app(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsString(argv[0]) || !app_file) return JS_NULL;
+    const char *id = JS_ToCString(c, argv[0]);
+    if (!id) return JS_EXCEPTION;
+    char file[600], name[128];
+    int ok = strlen(id) < 160 && !app_file(id, file, sizeof file) && !dpkg_owner(DPKG_INFO, file, name, sizeof name);
+    JS_FreeCString(c, id);
+    if (!ok) return JS_NULL;
+    refresh();
+    const StPkg *inst = status_find(&ST, name, strlen(name));
+    if (!inst) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    set_s(c, o, "name", name);
+    JS_SetPropertyStr(c, o, "essential", JS_NewBool(c, (inst->flags & (IF_ESSENTIAL | IF_PROTECTED)) || inst->prio == 1));
+    return o;
+}
+
 static const JSCFunctionListEntry pkg_funcs[] = {
+    JS_CFUNC_DEF("ownerOfApp", 1, f_owner_of_app),
     JS_CFUNC_DEF("releaseNotes", 2, f_release_notes),
     JS_CFUNC_DEF("featured", 0, f_featured),
     JS_CFUNC_DEF("rebootRequired", 0, f_reboot_required),

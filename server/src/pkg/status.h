@@ -32,6 +32,18 @@ void status_free(Status *s);
 /* Native (or all) installed package with that name, or NULL. */
 const StPkg *status_find(const Status *s, const char *name, size_t n);
 
+/* The installed package that owns a launcher's .desktop file, from dpkg's file lists
+ * (<info>/<package>[:<arch>].list, one absolute path per line; read-only). Only paths directly in
+ * /usr/share/applications or /usr/local/share/applications are answered (the only ones Store →
+ * Installed asks about; never a home folder). One pass over the lists keeps just the lines in those two
+ * folders, cached until the info folder's modification time changes (dpkg replaces a .list by renaming
+ * it there); bounded: DPKG_OWNER_MAX_LISTS lists, DPKG_OWNER_MAX_ENTRIES entries, lines up to 4 KiB.
+ * out gets the package name without its architecture. 0 if found, -1 otherwise. */
+#define DPKG_INFO "/var/lib/dpkg/info"
+#define DPKG_OWNER_MAX_LISTS 50000
+#define DPKG_OWNER_MAX_ENTRIES 20000
+int dpkg_owner(const char *info, const char *path, char *out, size_t n);
+
 /* dpkg's native architecture (amd64, arm64…), according to the machine. */
 const char *pkg_native_arch(void);
 

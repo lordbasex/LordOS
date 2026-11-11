@@ -24,6 +24,8 @@ import { notify, dismissNotification } from './notify.js';
 import { settings } from './settings.js';
 import { t, formatTime } from './i18n.js';
 import { wm, getApp } from './windows.js';
+import { appsOff } from './appsoff.js';
+import { alarmAllowed } from './appsoffmodel.js';
 
 export const pimRev = createStore(0);
 let hooked = false;
@@ -77,6 +79,7 @@ const snoozed = createStore([]);       // [{ ...alarm, at }] in memory
 
 function ring(a) {
   markFired(keyOf(a));
+  if (!alarmAllowed(a, appsOff())) return;         // Calendar or Reminders deactivated (Store → Installed)
   const when = a.allDay ? '' : formatTime(new Date(a.start));
   const body = [when, a.loc].filter(Boolean).join(' · ');
   const isTodo = a.kind === 'todo';

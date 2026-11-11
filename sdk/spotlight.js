@@ -13,6 +13,7 @@ import { t, tOptional, formatNumber, formatDate, locale } from './i18n.js';
 import { settings } from './settings.js';
 import { wm, getApp, windows } from './windows.js';
 import { useLauncherApps, launchApp } from './apps.js';
+import { isAppOff } from './appsoff.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { logOut } from './sessionrestore.jsx';
 import { TextInput, focusToken, restoreFocus } from './components.jsx';
@@ -223,7 +224,7 @@ function revealFile(f) {
 
 let notesCache = { at: 0, list: [] };
 function loadNotes() {
-  if (!getApp('notes')) return [];
+  if (!getApp('notes') || isAppOff('notes')) return [];
   if (Date.now() - notesCache.at < 30000) return notesCache.list;
   const list = [];
   let dirs = [];

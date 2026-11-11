@@ -340,6 +340,12 @@ globalThis.__lordWm = (type, d) => {
 // when each window was opened (lord.now()), for the developer timing log (settings "debugTiming")
 export const openedAt = new Map();
 
+// Asked before wm.open makes a window: (appId, opts) → false to refuse. Set once by the session
+// (appsoffactions.js startAppsOff: deactivated apps); null in an isolated app's process.
+let openGate = null;
+export function setOpenGate(fn) { openGate = typeof fn === 'function' ? fn : null; }
+export const openAllowed = (appId, opts = {}) => !openGate || openGate(appId, opts) !== false;
+
 export const wm = {
   // opts: { new: true } another window of the same app; { instance: 'x' } named window;
   //       { frame: { x, y, w, h } } initial geometry; { args: {...} } data for the app
@@ -358,6 +364,8 @@ export const wm = {
       console.warn('unknown app:', appId);
       return null;
     }
+    // a deactivated built-in app (sdk/appsoffactions.js) doesn't open: the gate shows its notice
+    if (openGate && !openGate(appId, opts)) return null;
     const id = opts.instance ? `${appId}#${opts.instance}` : opts.new ? `${appId}#${seq++}` : appId;
     const args = opts.args ? { ...opts.args, nonce: seq++ } : null;
     if (globalThis.__lordTiming && typeof lord !== 'undefined' && lord.now) openedAt.set(id, lord.now());
