@@ -124,6 +124,25 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     is JSON text, and builds its own objects only (no page setter or replaced method sees what is written). At each
     message lord-web checks that the document's address (as the isolated world reads it), the main frame's committed
     one and the view's are inside the scope. Anything else rejects the page's promise.
+  - **A copy the page handles itself:** many pages (chats among them) handle the `copy` or `cut` event, put their
+    own text in the event's `clipboardData` (several messages with their sender and time, emoji pictures as text)
+    and prevent the default; `document.execCommand('copy')` after a click with such a listener is the same. In
+    WebKit 2.48 for WPE that data goes nowhere: WebCore commits it to the platform's `Pasteboard::writeCustomData`,
+    which is empty in `PasteboardLibWPE.cpp`, so nothing reached the session (checked on VM 127 with a page that
+    does this: the session's clipboard kept what it had). The isolated script (`lordos-web-select`, every frame)
+    watches trusted `copy` and `cut` events: from the window's capture phase it adds a listener of its own to each
+    node on the event's path, in both phases, so it runs after the page's listeners there and still sees the data
+    when a listener stops the propagation (not `stopImmediatePropagation`). After the event, when the page prevented
+    the default and left `text/plain` (or only `text/html`, whose text is taken), it posts the text and the HTML
+    (message handler `lordosCopy`, that world only). lord-web offers them to the session (`text/plain` and
+    `text/html`), at most 16 MB each, only less than 5 s after the person's own key, click or touch in the window,
+    and writes the text into WebKit's pasteboard too, so a paste back into the page pastes it.
+  - **Ctrl+C with the focus in a message box:** the isolated script decides by where the selection is, not by the
+    focused element: Ctrl+C with the focus in an editable box but the selection on text the page shows runs Copy
+    (WebKit's own key binding runs only where the selection can be edited).
+  - **What the log says** (lord-web's stderr, the app's log; at most 20 lines in 10 s, sizes and reasons only, never
+    what was copied or dropped): `page copy offered (N bytes[ and HTML], editing command|copy event|clipboard
+    API|image/png)` and `page copy refused (...)` with the reason.
 - **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
   so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
   drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and
@@ -140,15 +159,28 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   LordOS itself that such a drag never makes. lord-web reads the files
   itself and passes them in 1 MB pieces to a script in an isolated world of its own (`lordos-web-xfer`: the page's
   scripts can't see or change it), which makes `File` objects (name, a type from the name, the modification time) and
-  `blob:` addresses. A script in the page's world then makes the `DataTransfer` and dispatches `dragenter`,
-  `dragover` and `drop` at the drop point (in CSS pixels, the zoom taken into account) on the element there. It has
+  `blob:` addresses. While the drag moves over the window, before any drop, the page's world gets `dragenter` on
+  the element that comes under the pointer (then `dragleave` on the one it left), `dragover` on it at each move (one
+  call at a time, the latest position kept), and `dragleave` when the drag leaves the window or its drop can't be
+  handed over; their `DataTransfer` says `types` `["Files"]` for a file drag (`["text/plain"]` for text) and holds no
+  data, as a browser's before the drop. That matters: a chat page shows its drop area only after `dragenter`, a
+  render a frame later, and puts its only `drop` listener there, so when lord-web sent `dragenter`, `dragover` and
+  `drop` together at the drop, the drop landed on the element under an area that didn't exist yet and nothing was
+  sent (the area was then left on the screen). At the drop the script in the page's world waits two frames (at most
+  150 ms), finds the element at the drop point again, sends `dragenter` (and `dragleave` to the old one) if the
+  drag hadn't reached it, then `dragover` and `drop` with the files (in CSS pixels, the zoom taken into account). It has
   to be the page's world because in WebKit 2.48 a script-made `DataTransfer` lists no `"Files"` in `types`, which
   pages check, and only that world can mend it; the `blob:` addresses are revoked right after. A drop with no local
   file gives the page its text (`text/plain`, and `text/uri-list` for a list). One transfer at a time; none while the
   window shows another site. WebKit 2.48 takes only numbers, strings and dictionaries as a called function's arguments
   (an array is "Invalid parameter types"), so the files' addresses, names, types and times go to the page's world as
   one JSON text. Checked on VM 127 (2026-11-11): a JPEG dragged from Files onto a page's drop zone arrives as
-  `hacker.jpg image/jpeg 6753` with `types` `["Files"]`.
+  `hacker.jpg image/jpeg 6753` with `types` `["Files"]`; and on a page whose drop area appears a frame after
+  `dragenter` and is the only drop target, a JPEG and a text file arrive there, and the area goes away when the drag
+  leaves without dropping. The events are made by a script, so `isTrusted` is false (no embedder can make trusted
+  ones). The log says `drag over the page (files|text, first target TAG)`, `drop received (text/uri-list, N lines, M
+  local files accepted; the others refused: ...)` or `drop refused: <reason>`, and `drop dispatched (N files, target
+  TAG, a listener took it|no listener took it)`.
 - **Editing** (`webselect.c`, `webedit.c`, `webengine.c` `web_edit`):
   - **Selecting with the mouse:** WPE WebKit 2.48 is built without `ENABLE_DRAG_SUPPORT`, and in WebCore that switch
     also holds the code that extends a selection while the left button is dragged, so dragging across text selected

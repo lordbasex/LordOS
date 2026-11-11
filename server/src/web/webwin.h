@@ -21,6 +21,11 @@ void webwin_set_cursor_hint(WebWin *win, int link, int text);
 int webwin_user_active(WebWin *win);
 /* the page copied: offer this text (mime NULL) or image (image/png, image/jpeg) to the session; data taken over */
 void webwin_offer(WebWin *win, const char *mime, GBytes *data);
+/* the page copied text (and its HTML, may be NULL) through a copy event it handled itself: offer it to the session;
+ * both taken over */
+void webwin_offer_text(WebWin *win, char *text, char *html);
+/* a short diagnostic line in lord-web's log (stderr), at most a few a second: never what was copied or dropped */
+void web_note(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
 /* an editing command was run on the page (copy, cut): what it put in WebKit's pasteboard goes to the session */
 void webwin_after_edit(WebWin *win);
 /* Ctrl+<letter> (Shift too when shift) to the page as from the keyboard; 0 when the keymap has no such key */

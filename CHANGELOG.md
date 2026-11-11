@@ -443,6 +443,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Web apps: copying from a page that handles the copy itself put nothing on the session's clipboard (copying
+  messages from a chat, then pasting in another app, pasted what was there before). Such a page handles the `copy`
+  or `cut` event, writes its own text into the event's `clipboardData` (messages with their sender and time, emoji
+  pictures as text) and prevents the default, or runs `document.execCommand('copy')` with such a listener from its
+  own Copy item. WebKit 2.48 for WPE throws that data away: WebCore commits it through
+  `Pasteboard::writeCustomData`, which is empty in `PasteboardLibWPE.cpp`. lord-web's isolated script now reads the
+  event's data after the page's listeners (a listener of its own on each node of the event's path, both phases, so
+  a page that stops the propagation is seen too) and, when the page prevented the default and left text, posts the
+  text and its HTML; lord-web offers both to the session only within 5 s of the person's own key, click or touch in
+  the window, at most 16 MB each, trusted events only, and writes the text into WebKit's pasteboard so pasting back
+  into the page works. Ctrl+C with the focus in a message box but the selection on the messages now copies too
+  (decided by where the selection is). Checked on VM 127 with a test page that imitates this: a two-message
+  selection reached `wl-paste` as `[10:01] Ana: ... 😀 ?` and `[10:02] Bruno: ...` lines (with `text/html`), and its
+  Copy button (`execCommand` plus a listener that stops the propagation) as its own text; the build before left the
+  clipboard as it was.
+- Web apps: dropping a file on a chat page to send it did nothing. Such a page
+  draws its drop area only after `dragenter` (a render a frame later) and has its only `drop` listener there;
+  lord-web sent `dragenter`, `dragover` and `drop` together at the drop, so the drop landed on the element under an
+  area that didn't exist yet. lord-web now sends `dragenter`, `dragover` and `dragleave` to the page while the drag
+  moves over the window (one call at a time, the latest position kept; `types` `["Files"]` and no data, as a
+  browser does before the drop), `dragleave` when the drag leaves or its drop can't be handed over, and at the drop
+  waits two frames (at most 150 ms), finds the element at the drop point again and sends `dragover` and `drop`
+  there. Checked on VM 127 with a page whose drop area appears a frame after `dragenter`: a JPEG and a text file
+  from Files arrived (`foto.jpg (6753 B, image/jpeg)`), and the area went away when the drag left without dropping;
+  the build before left the area up and the page got no file.
+- Web apps: lord-web's log now says what happened to copies and drops, sizes, types and reasons only, never their
+  contents, at most 20 lines in 10 s: `page copy offered (N bytes, editing command|copy event|clipboard API)`,
+  `page copy refused (...)`, `drag over the page (files, first target DIV)`, `drop received (text/uri-list, N lines,
+  M local files accepted)`, `drop refused: <reason>`, `drop dispatched (N files, target DIV, a listener took it)`.
 - Web apps: dragging the mouse across text selected nothing (a message couldn't be selected to copy it). WPE WebKit
   2.48 is built without drag support, which in WebCore also holds selecting by dragging; lord-web now extends the
   page's own selection while the left button is held (a script in an isolated world: `caretRangeFromPoint` for text

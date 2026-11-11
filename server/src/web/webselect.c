@@ -29,7 +29,16 @@
  * And Ctrl+C (Ctrl+Insert) and Ctrl+A outside an editable field: WPE's WebEditorClient runs its key bindings only
  * where the page can be edited (handleKeyboardEvent returns when !canEdit()), so text the page shows could be
  * selected but never copied from the keyboard. The script reports the key (not prevented by the page) and lord-web
- * runs Copy or Select All. */
+ * runs Copy or Select All.
+ *
+ * And a copy the page makes itself: a page that handles the copy (or cut) event, puts its own text in the event's
+ * clipboardData and prevents the default (a chat that copies messages with their sender and time, or its emoji
+ * pictures as text) writes nothing in WPE 2.48: its Pasteboard::writeCustomData, where WebCore commits that data,
+ * is empty. The script watches the event (trusted only: WebKit made it for a Copy the person asked for, or for the
+ * page's execCommand('copy') right after a click) at every node on its path, in both phases, after the page's
+ * listeners there (so a listener that stops the propagation is seen too, unless it stops it at once), and
+ * once it is over, if the page prevented the default and left text in it, reports that text (and its HTML) to
+ * lord-web, which offers it to the session only right after the person's own key or click in the window. */
 #include "web.h"
 #include "webwin.h"
 #include "../sec/json.h"
@@ -156,9 +165,35 @@ static const char SELECT_JS[] =
     "    const k = String(e.key).toLowerCase();\n"
     "    const key = k === 'c' || k === 'insert' ? 'copy' : k === 'a' ? 'selectAll' : '';\n"
     "    const t = e.target instanceof Element ? e.target : null;\n"
-    "    if (!key || (t && (fieldOf(t) || t.isContentEditable))) return;\n"
+    "    if (!key || (t && fieldOf(t))) return;\n"
+    "    // WebKit's own binding runs where the selection can be edited (a copy with the focus in a message box but the\n"
+    "    // selection on the messages is lord-web's to run)\n"
+    "    const sel = getSelection(), an = sel && sel.anchorNode, ae = an && (an instanceof Element ? an : an.parentElement);\n"
+    "    if (key === 'copy' ? ae && ae.isContentEditable : t && t.isContentEditable) return;\n"
     "    h.postMessage(JSON.stringify({ key }));\n"
     "  });\n"
+    "  // a copy or cut the page handled itself (preventDefault and clipboardData.setData): WPE 2.48 drops that data, so\n"
+    "  // it is read at each node of the event's path, in both phases, after the page's listeners there (added now, they\n"
+    "  // come last; the last read wins, also when a listener stopped the propagation) and, once the event is over,\n"
+    "  // given to lord-web\n"
+    "  const ch = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.lordosCopy;\n"
+    "  const onCopy = (e) => {\n"
+    "    if (!e.isTrusted || !e.clipboardData) return;\n"
+    "    let text = '', html = '';\n"
+    "    const take = (ev) => {\n"
+    "      if (ev !== e) return;\n"
+    "      try { const d = ev.clipboardData; text = d.getData('text/plain') || ''; html = d.getData('text/html') || ''; } catch (x) { }\n"
+    "    };\n"
+    "    const path = e.composedPath();\n"
+    "    for (const n of path) { n.addEventListener(e.type, take, true); n.addEventListener(e.type, take); }\n"
+    "    setTimeout(() => {\n"
+    "      for (const n of path) { n.removeEventListener(e.type, take, true); n.removeEventListener(e.type, take); }\n"
+    "      if (!e.defaultPrevented) return;\n"
+    "      if (!text && html) { try { text = new DOMParser().parseFromString(html, 'text/html').body.innerText || ''; } catch (x) { } }\n"
+    "      if (text) ch.postMessage(JSON.stringify({ type: e.type, text, html }));\n"
+    "    }, 0);\n"
+    "  };\n"
+    "  if (ch) { addEventListener('copy', onCopy, true); addEventListener('cut', onCopy, true); }\n"
     "})();\n";
 
 #define MENU_MSG_MAX (64 * 1024)
@@ -192,9 +227,32 @@ static void on_menu_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
     g_free(s);
 }
 
+#define COPY_MSG_MAX (40 * 1024 * 1024)    /* text and HTML of at most 16 MB each, as JSON */
+#define COPY_PART_MAX (16 * 1024 * 1024)
+
+/* the script's report of a copy the page handled, { type: copy|cut, text, html }, as JSON text */
+static void on_copy_msg(WebKitUserContentManager *m, JSCValue *v, gpointer d) {
+    (void)m;
+    Web *w = d;
+    if (!w->win || !jsc_value_is_string(v)) return;
+    if (!webwin_user_active(w->win)) { web_note("page copy refused (copy event): no key or click in the window in the last seconds"); return; }
+    char *s = jsc_value_to_string(v);
+    size_t n = s ? strlen(s) : 0;
+    JDoc doc;
+    if (!s || n > COPY_MSG_MAX || json_parse(s, n, &doc, NULL, 0)) { web_note("page copy refused (copy event): too big or not readable"); g_free(s); return; }
+    g_free(s);
+    const JVal *r = doc.root;
+    const char *text = r && r->type == J_OBJ ? json_str(r, "text") : NULL, *html = r && r->type == J_OBJ ? json_str(r, "html") : NULL;
+    if (!text || !text[0] || strlen(text) > COPY_PART_MAX) web_note("page copy refused (copy event): %s", text && text[0] ? "too long" : "no text");
+    else webwin_offer_text(w->win, g_strdup(text), html && html[0] && strlen(html) <= COPY_PART_MAX ? g_strdup(html) : NULL);
+    json_free(&doc);
+}
+
 void webselect_init(Web *w) {
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(w->view);
     if (!ucm) return;
+    if (webkit_user_content_manager_register_script_message_handler(ucm, "lordosCopy", SELECT_WORLD))
+        g_signal_connect(ucm, "script-message-received::lordosCopy", G_CALLBACK(on_copy_msg), w);
     if (webkit_user_content_manager_register_script_message_handler(ucm, "lordosMenu", SELECT_WORLD))
         g_signal_connect(ucm, "script-message-received::lordosMenu", G_CALLBACK(on_menu_msg), w);
     WebKitUserScript *s = webkit_user_script_new_for_world(SELECT_JS, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,

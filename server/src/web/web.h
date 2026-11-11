@@ -100,6 +100,12 @@ void webxfer_init(Web *w);                               /* the clipboard script
 /* files dropped at (x, y) in the window's surface coordinates (n of them, their fds taken over), else the dropped text
  * (a uri-list's lines or plain text; may be NULL) */
 void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const char *uris, const char *text);
+/* a drag over the window at (x, y) (surface coordinates): dragenter, dragover and dragleave reach the page as the
+ * pointer moves, before any drop, so a page that shows its drop area only after dragenter has it there by the drop;
+ * files is 1 for a drag of files (its types say "Files", its data comes only with the drop) */
+void webxfer_drag(Web *w, double x, double y, int files);
+/* the drag left the window without dropping: dragleave on the element it was over */
+void webxfer_drag_leave(Web *w);
 /* an image from the session's clipboard, pasted into the focused element (data taken over) */
 void webxfer_paste_image(Web *w, const char *mime, GBytes *data);
 /* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
