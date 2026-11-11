@@ -116,13 +116,18 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     missing. They post to lord-web (a script message handler), which takes text (at most 16 MB) or a PNG or JPEG
     (at most 32 MB, checked by its signature) only while the window shows the app's own page and the person pressed
     a key, clicked or touched it less than 5 s before (what browsers call user activation), and offers it to the
-    session as that one type. Anything else rejects the page's promise.
+    session as that one type. The handler is visible to every frame of the page, so the script carries a random key
+    lord-web makes at start (only in the app's top frame, never in a frame of another site inside it), and a message
+    without it is refused. Anything else rejects the page's promise.
 - **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
   so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
   drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and
   drop") or text is accepted as a copy. At the drop lord-web reads the list (at most 1 MB) and calls `finish`. Only
   local files are taken: `file://` URIs with no host (or `localhost`), percent-decoded, a regular file when opened (a
-  link is followed), at most 64 MB each and 20 files; anything else on the list is skipped. lord-web reads the files
+  link is followed), at most 64 MB each and 20 files; anything else on the list is skipped. Any app can start a drag
+  with any list, so the file, where it really is (links resolved), must be in the person's places: under the home
+  folder, `/media`, `/mnt`, `/run/media` or `/tmp`, with no hidden folder or file on the way (`~/.ssh`, `~/.config`
+  and the like are never sent), and it is opened without following a link put there in between (`webdrop_place_ok`). lord-web reads the files
   itself and passes them in 1 MB pieces to a script in an isolated world of its own (`lordos-web-xfer`: the page's
   scripts can't see or change it), which makes `File` objects (name, a type from the name, the modification time) and
   `blob:` addresses. A script in the page's world then makes the `DataTransfer` and dispatches `dragenter`,

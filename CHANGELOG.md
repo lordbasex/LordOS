@@ -43,14 +43,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   its own Dock icon".
 - **Web apps: files dragged onto a web app's window reach the page as a real drop.** WPE WebKit 2.48 cannot take an
   external drop, so lord-web is the drop target: it reads the drag's text/uri-list, keeps only local regular files (at
-  most 64 MB each, 20 files), reads them itself and gives them to the page through a script in an isolated world. The
+  most 64 MB each, 20 files) that really are in the person's places (home, mounts, `/tmp`; never a hidden folder such
+  as `~/.ssh`, since any app can start a drag with any list), reads them itself and gives them to the page through a script in an isolated world. The
   page then gets dragenter, dragover and drop with a DataTransfer whose types include "Files". A drop with no local
   file gives the page its text.
 - **Web apps: image paste and copy.** An image on the clipboard (image/png or image/jpeg, up to 32 MB) is pasted into
   the page with Ctrl+V or Shift+Insert as a paste event carrying the image as a file. WebKit's pasteboard is emptied
   when such an image arrives, so text copied earlier is never pasted instead. Pages can copy images and text to the
   session through navigator.clipboard.write and writeText, which lord-web adds because WPE 2.48 lacks them; lord-web
-  accepts them only on the app's own pages and right after a key, click or touch in the window.
+  accepts them only on the app's own pages, from the app's top frame (a random key a frame of another site doesn't
+  have) and right after a key, click or touch in the window.
 - **Web apps: the mouse wheel scrolls pages again.** WebKit 2.48 reads a line scroll event by its signs alone, so the old
   event also scrolled one line sideways and pages didn't move. Each notch is now one line on its own axis,
   high-resolution wheels add up their partial notches, and touchpads scroll in pixels with an end-of-gesture event.

@@ -873,7 +873,7 @@ static void drop_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void 
     wl_display_flush(win->dpy);
     if (b && b->len) {
         WebDropFile files[WEBDROP_FILES_MAX];
-        int n = at->uri ? webdrop_files((const char *)b->data, b->len, files, WEBDROP_FILES_MAX) : 0;
+        int n = at->uri ? webdrop_files((const char *)b->data, b->len, g_get_home_dir(), files, WEBDROP_FILES_MAX) : 0;
         if (n) webxfer_drop(win->w, at->x, at->y, files, n, NULL, NULL);
         else if (g_utf8_validate((const char *)b->data, (gssize)b->len, NULL)) {
             char *t = g_strndup((const char *)b->data, b->len);

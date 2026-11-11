@@ -436,6 +436,16 @@ static void test_drop(void) {
                           "file://localhostevil/tmp/x", "FILE:///tmp/x", NULL };
     for (int i = 0; bad[i]; i++) CHECK(webdrop_uri_path(bad[i], strlen(bad[i]), p, sizeof p), "refused: %s", bad[i]);
 
+    /* only the person's places, never a hidden folder: an app's drag may list any path */
+    CHECK(webdrop_place_ok("/home/u/Downloads/a.png", "/home/u") && webdrop_place_ok("/home/u/a b/c.txt", "/home/u/"), "home");
+    CHECK(webdrop_place_ok("/media/u/USB/a.png", "/home/u") && webdrop_place_ok("/mnt/x/a", "/home/u") &&
+          webdrop_place_ok("/run/media/u/d/a", "/home/u") && webdrop_place_ok("/tmp/a.png", "/home/u"), "mounts and /tmp");
+    const char *out_of_place[] = { "/etc/passwd", "/home/u/.ssh/id_ed25519", "/home/u/.config/lordos/settings.json",
+                                   "/home/u/Docs/.secret", "/home/uu/a.png", "/home/u", "/proc/self/environ",
+                                   "/run/user/1000/a", "/home/u/a/", "/tmp/.X11-unix/x", "relative/a", NULL };
+    for (int i = 0; out_of_place[i]; i++) CHECK(!webdrop_place_ok(out_of_place[i], "/home/u"), "refused place: %s", out_of_place[i]);
+    CHECK(!webdrop_place_ok("/home/u/a.png", NULL) && !webdrop_place_ok("/home/u/a.png", "") && !webdrop_place_ok("/a", "/"), "no home");
+
     char dir[] = "/tmp/webdrop-test.XXXXXX";
     if (!mkdtemp(dir)) { CHECK(0, "mkdtemp"); return; }
     char a[PATH_MAX], big[PATH_MAX], sub[PATH_MAX], link[PATH_MAX], sp[PATH_MAX];
@@ -454,7 +464,7 @@ static void test_drop(void) {
              "# a comment\r\nfile://%s\r\nhttps://example.com/x.png\r\nfile://%s\r\nfile://%s\r\nfile://%s\r\nfile://%s/two%%20words.txt\nfile://%s/missing\r\nfile://otherhost%s\r\n",
              a, big, sub, link, dir, dir, a);
     WebDropFile f[WEBDROP_FILES_MAX];
-    int n = webdrop_files(list, strlen(list), f, WEBDROP_FILES_MAX);
+    int n = webdrop_files(list, strlen(list), "/home/u", f, WEBDROP_FILES_MAX);
     CHECK(n == 3, "the regular files only: %d", n);
     if (n == 3) {
         CHECK(!strcmp(f[0].name, "a.png") && f[0].size == 10 && f[0].fd >= 0, "a.png");
@@ -462,16 +472,28 @@ static void test_drop(void) {
         CHECK(!strcmp(f[2].name, "two words.txt") && f[2].size == 0, "an empty file, LF line end");
     }
     webdrop_close(f, n);
+    /* a link to a hidden file is that hidden file: refused */
+    char hid[PATH_MAX], tohid[PATH_MAX], hl[2 * PATH_MAX + 32];
+    snprintf(hid, sizeof hid, "%s/.hidden", dir);
+    snprintf(tohid, sizeof tohid, "%s/tohidden.png", dir);
+    put_file(hid, 4);
+    CHECK(!symlink(hid, tohid), "symlink to a hidden file");
+    snprintf(hl, sizeof hl, "file://%s\r\nfile://%s\r\n", hid, tohid);
+    n = webdrop_files(hl, strlen(hl), "/home/u", f, WEBDROP_FILES_MAX);
+    CHECK(n == 0, "a hidden file and a link to it refused: %d", n);
+    webdrop_close(f, n);
+    unlink(tohid);
+    unlink(hid);
     /* at most 20 */
     static char many[32 * (PATH_MAX + 16)];
     many[0] = 0;
     for (int i = 0; i < 30; i++) { size_t l = strlen(many); snprintf(many + l, sizeof many - l, "file://%s\r\n", a); }
-    n = webdrop_files(many, strlen(many), f, WEBDROP_FILES_MAX);
+    n = webdrop_files(many, strlen(many), "/home/u", f, WEBDROP_FILES_MAX);
     CHECK(n == WEBDROP_FILES_MAX, "at most %d: %d", WEBDROP_FILES_MAX, n);
     webdrop_close(f, n);
-    CHECK(webdrop_files(many, strlen(many), f, 2) == 2, "a smaller limit");
+    CHECK(webdrop_files(many, strlen(many), "/home/u", f, 2) == 2, "a smaller limit");
     webdrop_close(f, 2);
-    CHECK(webdrop_files("", 0, f, WEBDROP_FILES_MAX) == 0 && webdrop_files(NULL, 0, f, WEBDROP_FILES_MAX) == 0, "nothing");
+    CHECK(webdrop_files("", 0, "/home/u", f, WEBDROP_FILES_MAX) == 0 && webdrop_files(NULL, 0, "/home/u", f, WEBDROP_FILES_MAX) == 0, "nothing");
     unlink(a);
     unlink(big);
     unlink(sp);

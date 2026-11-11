@@ -15,7 +15,9 @@
  *     missing. They post to lord-web, which takes text (at most 16 MB) or an image/png or image/jpeg (at most
  *     32 MB, checked by its signature) only while the page is the app's own (not another site in the window) and
  *     the person pressed a key, clicked or touched the window in the last seconds (webwin_user_active: the browser's
- *     "user activation"), and offers it to the session. Anything else is refused, the page's promise rejected. */
+ *     "user activation"), and offers it to the session. The message handler is visible to every frame, so the script
+ *     (top frame only) sends a random key of this lord-web; a message without it (another site's frame) is refused.
+ *     Anything else is refused, the page's promise rejected. */
 #include "web.h"
 #include "webwin.h"
 #include "../sec/json.h"
@@ -23,6 +25,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/random.h>
 #include <unistd.h>
 
 #define XFER_WORLD "lordos-web-xfer"
@@ -33,11 +36,14 @@
 
 /* ---- the page's copies ---- */
 
+/* a format: %s is the key of this lord-web (clip_key), so only this script, in the app's top frame, can write; a frame
+ * of another site inside the page sees the same message handler but not the key */
 static const char CLIP_JS[] =
     "(() => {\n"
+    "  const key = '%s';\n"
     "  const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers." CLIP_HANDLER ";\n"
     "  if (!h || navigator.clipboard) return;\n"
-    "  const post = (m) => h.postMessage(m);\n"
+    "  const post = (m) => h.postMessage(Object.assign(m, { key }));\n"
     "  const dataUrl = (blob) => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(r.error); r.readAsDataURL(blob); });\n"
     "  if (typeof window.ClipboardItem !== 'function') {\n"
     "    class ClipboardItem {\n"
@@ -78,9 +84,15 @@ static int image_ok(const char *mime, const guchar *b, gsize n) {
     return 0;
 }
 
+static char clip_key[33];
+
 /* NULL when taken, else why not */
 static const char *clip_take(Web *w, JSCValue *v) {
     if (!w->win || !jsc_value_is_object(v)) return "NotAllowedError: nothing to write";
+    char *key = prop_str(v, "key");
+    int known = key && clip_key[0] && strlen(key) == 32 && !memcmp(key, clip_key, 32);
+    g_free(key);
+    if (!known) return "NotAllowedError: not this page's clipboard";
     if (w->outside || !webwin_user_active(w->win)) return "NotAllowedError: the clipboard needs a key or a click in the window first";
     char *type = prop_str(v, "type");
     const char *why = "NotAllowedError: type not supported";
@@ -116,9 +128,15 @@ static gboolean on_clip(WebKitUserContentManager *m, JSCValue *v, WebKitScriptMe
 
 void webxfer_init(Web *w) {
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(w->view);
-    if (!ucm || !webkit_user_content_manager_register_script_message_handler_with_reply(ucm, CLIP_HANDLER, NULL)) return;
+    if (!ucm) return;
+    guint8 r[16];
+    if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) return;      /* no key, no clipboard shim */
+    for (int i = 0; i < 16; i++) snprintf(clip_key + 2 * i, 3, "%02x", r[i]);
+    if (!webkit_user_content_manager_register_script_message_handler_with_reply(ucm, CLIP_HANDLER, NULL)) return;
     g_signal_connect(ucm, "script-message-with-reply-received::" CLIP_HANDLER, G_CALLBACK(on_clip), w);
-    WebKitUserScript *s = webkit_user_script_new(CLIP_JS, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+    char *js = g_strdup_printf(CLIP_JS, clip_key);
+    WebKitUserScript *s = webkit_user_script_new(js, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+    g_free(js);
     webkit_user_content_manager_add_script(ucm, s);
     webkit_user_script_unref(s);
 }
