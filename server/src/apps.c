@@ -18,7 +18,8 @@
  *   - JS cannot create .desktop files: lord.fs is read-only and LordOS app packages are installed
  *     in another folder (~/.local/share/lordos/apps), so a command cannot be
  *     invented from the UI.
- * App output goes to ~/.cache/lordos/apps.log (trimmed when it exceeds 1 MB).
+ * App output goes to apps/<id>.log in the user's log folder (lordlog.h: /var/log/lordos/users/<user>,
+ * or ~/.cache/lordos), after a stamped "started" line; capped there and rotated by logrotate.
  *
  * An app the owner restricted with "no access to your files" (Settings → Privacy, firewall id
  * desktop:<id>, sec/restrict.h) starts under Landlock (sandbox_apply_files): only its own config,
@@ -29,6 +30,7 @@
  * the window of the copy already running that the new process hands the link or file to (a browser),
  * comes to the front, because the person asked for it. */
 #include "apps.h"
+#include "lordlog.h"
 #include "iconfind.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
@@ -456,20 +458,15 @@ static int terminal_program_ok(const Entry *e, int user) {
     return ok;
 }
 
-static void open_log(void) {
-    const char *home = getenv("HOME");
+/* The app's own log, apps/<id>.log, opened (and its "started" line written) here, before fork: the
+ * child only dup2s it. -1 if there is none. */
+static int open_log(const char *id, const char *action, const char *file) {
     char path[PATH_MAX];
-    if (!home) return;
-    snprintf(path, sizeof path, "%s/.cache", home);
-    mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos", home);
-    mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos/apps.log", home);
-    struct stat st;
-    int flags = O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW;
-    if (!lstat(path, &st) && st.st_size > 1024 * 1024) flags |= O_TRUNC;
-    int fd = open(path, flags, 0600);
-    if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); if (fd > 2) close(fd); }
+    if (lordlog_path("apps", id, path, sizeof path)) return -1;
+    int fd = lordlog_open(path);
+    lordlog_write(fd, "INFO", "apps", "starting %s%s%s%s", id, action ? " (action " : "", action ? action : "", action ? ")" : "");
+    (void)file;                                  /* never the file's name: it may say what the person opened */
+    return fd;
 }
 
 /* ---- "no access to your files": the Landlock plan (built before fork) ---- */
@@ -1016,6 +1013,7 @@ static int launch(const char *id, const char *file, const char *action) {
     char token[XACT_TOKEN_LEN + 1] = "";
     const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
     if (tk) snprintf(token, sizeof token, "%s", tk);
+    int logfd = open_log(id, action, file);
     pid_t pid = fork();
     if (pid == 0) {
         /* orphaned grandchild: it does not remain a child of lord-server */
@@ -1027,7 +1025,7 @@ static int launch(const char *id, const char *file, const char *action) {
         for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
-        open_log();
+        if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         syscall(SYS_close_range, 3, ~0u, 0);
         const char *home = getenv("HOME");
         if (!cwd[0] || chdir(cwd)) { if (home && chdir(home)) {} }
@@ -1054,6 +1052,7 @@ static int launch(const char *id, const char *file, const char *action) {
         execve(prog, argv, environ);
         _exit(127);
     }
+    if (logfd >= 0) close(logfd);
     free(plan);
     free(buf);
     if (pid < 0) return -1;

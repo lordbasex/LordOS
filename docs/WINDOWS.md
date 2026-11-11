@@ -278,7 +278,7 @@ reached 95–103 frames per second: virtio-gpu completes the flip before the ref
 ## Measurements (VM 118, 1280×800 at 75 Hz, 4 vCPU)
 
 Continuous 6 s drag in circles with a virtual tablet (uinput, 125 events/s). lord-server writes one
-line per drag to `~/.cache/lordos/session.log`:
+line per drag to `/var/log/lordos/users/$USER/compositor.log`:
 
 ```
 drag: 464 frames in 6011 ms = 77.2 FPS (464 moves); per frame: work 12.80 ms (max 36.83;

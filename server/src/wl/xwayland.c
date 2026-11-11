@@ -12,7 +12,7 @@
  * and fd 5 is the window manager's connection (xwm.c). XTEST (synthetic input) is off: an X11 app
  * can't type into another one. Xwayland runs in its own scope (lordos-xwayland.scope) and its own
  * network namespace (no network at all), with no_new_privs, a minimal environment and its log in
- * ~/.cache/lordos/xwayland.log. 10 s after the last X11 app closes, the window manager stops it
+ * xwayland.log of the user's log folder (lordlog.h). 10 s after the last X11 app closes, the window manager stops it
  * (xwl_idle); the socket stays in lord-server, so the next X11 app starts it again.
  *
  * HiDPI (xwscale.h): when it starts, X gets its pixel size for that run, the largest display's scale
@@ -22,9 +22,11 @@
 #include "x11wire.h"
 #include "wl.h"
 #include "../sec/cgroup.h"
+#include "../lordlog.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -194,13 +196,11 @@ static int binary_ok(void) {
 }
 
 static int open_log(void) {
-    const char *home = getenv("HOME");
-    if (!home) return -1;
-    char p[512];
-    snprintf(p, sizeof p, "%s/.cache/lordos/xwayland.log", home);
-    struct stat st;
-    int trunc = !stat(p, &st) && st.st_size > (1 << 20);
-    return open(p, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_CLOEXEC | (trunc ? O_TRUNC : 0), 0600);
+    char p[PATH_MAX];
+    if (lordlog_path(NULL, "xwayland", p, sizeof p)) return -1;
+    int fd = lordlog_open(p);
+    lordlog_write(fd, "INFO", "xwayland", "starting Xwayland on :%d", XW.disp);
+    return fd;
 }
 
 static void spawn(void) {

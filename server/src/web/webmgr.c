@@ -2,6 +2,7 @@
 #include "webmgr.h"
 #include "webscheme.h"
 #include "../sec/json.h"
+#include "../lordlog.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -22,7 +23,6 @@
 #include <unistd.h>
 
 #define PROBE_KEEP_MS   (15 * 60 * 1000)      /* a finished probe waits this long for its Install */
-#define LOG_MAX         (1024 * 1024)
 
 static char assets[PATH_MAX];
 static char helper[PATH_MAX];
@@ -103,7 +103,7 @@ int webmgr_available(void) {
 }
 
 /* The session's environment for lord-web (docs/WEBAPPS.md, "Starting an app"), built before fork. */
-typedef struct { char buf[5][PATH_MAX + 32]; char *envp[10]; char log[PATH_MAX]; char home[PATH_MAX]; } Env;
+typedef struct { char buf[5][PATH_MAX + 32]; char *envp[10]; char home[PATH_MAX]; } Env;
 
 static int scheme = -1;                         /* the desktop's, from the theme (webmgr_set_scheme), -1 not told yet */
 void webmgr_set_scheme(int s) { scheme = s == WEBSCHEME_DARK ? WEBSCHEME_DARK : s == WEBSCHEME_LIGHT ? WEBSCHEME_LIGHT : -1; }
@@ -127,24 +127,33 @@ static void env_build(Env *e) {
     else if (scheme == WEBSCHEME_LIGHT) e->envp[n++] = WEBSCHEME_ENV "=light";
     e->envp[n] = NULL;
     const char *h = home();
-    e->log[0] = e->home[0] = 0;
-    if (!h) return;
-    snprintf(e->home, sizeof e->home, "%s", h);
-    char d[PATH_MAX];
-    snprintf(d, sizeof d, "%s/.cache/lordos", h);
-    if (mkdirs(d)) return;
-    if (snprintf(e->log, sizeof e->log, "%s/web.log", d) >= (int)sizeof e->log) { e->log[0] = 0; return; }
-    struct stat st;
-    if (!lstat(e->log, &st) && S_ISREG(st.st_mode) && st.st_size > LOG_MAX && truncate(e->log, 0)) e->log[0] = 0;
+    e->home[0] = 0;
+    if (h) snprintf(e->home, sizeof e->home, "%s", h);
+}
+
+/* lord-web's log, web/<name>.log of the user's log folder (lordlog.h), with a stamped line saying
+ * what starts; opened before fork, above the fds the child sets up. -1 if there is none. */
+static int open_log(const char *name, char *const argv[]) {
+    char p[PATH_MAX];
+    if (lordlog_path("web", name, p, sizeof p)) return -1;
+    int fd = lordlog_open(p);
+    if (fd < 0) return -1;
+    lordlog_write(fd, "INFO", "webapps", "starting lord-web %s%s%s%s%s", argv[1] ? argv[1] : "", argv[1] && argv[2] ? " " : "",
+                  argv[1] && argv[2] ? argv[2] : "", argv[1] && argv[2] && argv[3] && argv[4] ? " " : "",
+                  argv[1] && argv[2] && argv[3] && argv[4] ? argv[4] : "");
+    int hi = fcntl(fd, F_DUPFD_CLOEXEC, 10);
+    close(fd);
+    return hi;
 }
 
 /* Starts lord-web with argv; chan (or -1) becomes its fd 3. Its own session (so its WebKit processes
  * can be ended with it), no signal mask, nothing else of lord-server's open. */
-static pid_t spawn(char *const argv[], int chan) {
+static pid_t spawn(char *const argv[], int chan, const char *logname) {
     Env e;
     env_build(&e);
+    int lg = open_log(logname, argv);
     pid_t pid = fork();
-    if (pid != 0) return pid;
+    if (pid != 0) { if (lg >= 0) close(lg); return pid; }
     setsid();
     sigset_t none;
     sigemptyset(&none);
@@ -152,7 +161,6 @@ static pid_t spawn(char *const argv[], int chan) {
     for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
     if (chan >= 0) { if (chan == 3) fcntl(3, F_SETFD, 0); else if (dup2(chan, 3) < 0) _exit(127); }
     int null = open("/dev/null", O_RDWR | O_CLOEXEC);
-    int lg = e.log[0] ? open(e.log, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_CLOEXEC, 0600) : -1;
     if (null >= 0) dup2(null, 0);
     if (lg < 0) lg = null;
     if (lg >= 0) { dup2(lg, 1); dup2(lg, 2); }
@@ -467,7 +475,7 @@ static pid_t start_step(const char *mode, const char *url, int *fd) {
     char m[16];
     snprintf(m, sizeof m, "%s", mode);
     char *const argv[] = { "lord-web", m, NULL };
-    pid_t pid = spawn(argv, sv[1]);
+    pid_t pid = spawn(argv, sv[1], "probe");
     close(sv[1]);
     if (pid < 0) { close(sv[0]); return -1; }
     /* small: it fits the socket's buffer, the write never waits */
@@ -833,7 +841,9 @@ const char *webmgr_launch(const char *app, const char *profile, int *raised) {
     snprintf(a_arg, sizeof a_arg, "%s", app);
     snprintf(p_arg, sizeof p_arg, "%s", profile);
     char *const argv[] = { "lord-web", "--app", a_arg, "--profile", p_arg, NULL };
-    pid_t pid = spawn(argv, -1);
+    char logname[2 * WEBREG_ID_MAX + 2];
+    snprintf(logname, sizeof logname, "%s-%s", app, profile);
+    pid_t pid = spawn(argv, -1, logname);
     if (pid < 0) return "webapps.startFailed";
     k->used = 1;
     k->pid = pid;

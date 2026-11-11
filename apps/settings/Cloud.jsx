@@ -865,7 +865,8 @@ function KnownIssue({ a }) {
   if (!k || a.state !== 'signin') return null;
   const copyLog = () => {
     let text = '';
-    try { text = lord.fs.read(`${lord.fs.home()}/.cache/lordos/${lord.cloud && lord.cloud.logName ? lord.cloud.logName() : 'cloud.log'}`, 'text') || ''; } catch (e) { text = ''; }
+    // rclone's log is in the user's log folder (/var/log/lordos/users/<user>, or ~/.cache/lordos): read through lord.logs
+    try { text = lord.logs.tail(lord.cloud && lord.cloud.logName ? lord.cloud.logName() : 'cloud.log', 262144) || ''; } catch (e) { text = ''; }
     if (!text) { toast.set(tr('cloud.known.noLog')); return; }
     let info = {};
     try { info = systemInfo() || {}; } catch (e) { /* none */ }

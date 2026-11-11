@@ -15,7 +15,10 @@ algo falha.
 - **Meus registros:** o seu journal do systemd (seus apps e serviços), lido com as suas permissões.
 - **Sistema** e **Kernel:** o journal do sistema. Os administradores (grupo sudo) o veem pelo
   assistente de administração, assim como quem estiver no grupo de leitura do journal.
-- **LordOS:** os registros da sua sessão (`~/.cache/lordos`, como `session.log`).
+- **LordOS:** os registros da sua sessão (`compositor`, `shell`, `xwayland`…; "sessão anterior" é a de
+  antes deste login), e abaixo o registro de cada **app** e de cada **app web**. Ficam em
+  `/var/log/lordos/users/<você>`, que só você pode ler. Cada um fica em 16 MB: ao passar disso, a sua
+  parte anterior vira "<nome> (parte anterior)". **Registros antigos** são os que versões anteriores deixaram em `~/.cache/lordos`.
 
 ## Filtrar
 

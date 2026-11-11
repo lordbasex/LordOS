@@ -409,7 +409,7 @@ something changes), 0 dropped frames.
 
 **To measure VA-API on the AMD PC** (live ISO):
 1. `vainfo`: it must say radeonsi and list `H264`.
-2. Play a 1080p video and look in `~/.cache/lordos/session.log` for the playback summary line
+2. Play a 1080p video and look in `/var/log/lordos/users/$USER/compositor.log` for the playback summary line
    (`media: playback (…): …, VA-API, …`).
 3. With `python3 server/tests/media_cpu.py 30` (or `top`), compare against
    `LORD_MEDIA_HWACCEL=none`.

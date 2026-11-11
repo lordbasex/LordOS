@@ -33,6 +33,7 @@
 #include "rsec.h"
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
 #include "../bench/boottest.h"
+#include "../lordlog.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -1414,6 +1415,9 @@ int main(int argc, char **argv) {
         else { fprintf(stderr, "usage: lord-sessiond [--no-monitor]\n"); return 2; }
     }
     if (geteuid() != 0) { fprintf(stderr, "lord-sessiond: must run as root (lordos.service)\n"); return 1; }
+    signal(SIGPIPE, SIG_IGN);
+    /* its lines also go, stamped, to /var/log/lordos/lord-sessiond.log (lordlog.h) */
+    if (lordlog_system_start("lord-sessiond")) fprintf(stderr, "lord-sessiond: no " LORDLOG_ROOT "/lord-sessiond.log: the journal only\n");
     char prefix[64];
     snprintf(prefix, sizeof prefix, "lord-sessiond[%d]", (int)getpid());
     sd_log_prefix(prefix);

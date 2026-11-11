@@ -5,7 +5,7 @@
 //          user: their journal, and the system one only if their group allows it)
 //   await logs.system(query)      the same for the system journal, through the helper's
 //                                 logs-system action (administrators only)
-//   logs.sources() → { user, system, uid }   logs.files() / logs.tail(name, bytes)
+//   logs.sources() → { user, system, uid }   logs.files() / logs.tail(name, bytes)   logs.dir() → { dir, system }
 //   logs.follow(on), logs.onChange((kind, name) => …)   kind: 'journal' | 'file'
 import { admin } from './admin.js';
 
@@ -38,6 +38,7 @@ export const logs = {
   available: () => !!(globalThis.lord && lord.logs),
   sources: () => lord.logs.sources(),
   files: () => lord.logs.files(),
+  dir: () => (lord.logs.dir ? lord.logs.dir() : { dir: '', system: false }),
   tail: (name, bytes) => lord.logs.tail(name, bytes),
   follow: (on) => lord.logs.follow(!!on),
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },

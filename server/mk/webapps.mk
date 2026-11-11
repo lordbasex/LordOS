@@ -10,7 +10,7 @@ build/obj/ui/js.o build/obj/ui/portal.o build/obj/ui/js_wm.o: $(WEBAPPS_HDR)
 # the registry's rules (ids, names, URLs, unknown keys, the probe's answers, icons), the writes and the probe protocol
 # against a stand-in lord-web (tests/webreg_test.c)
 test: build/webreg-test
-WEBREG_TEST_SRC := tests/webreg_test.c src/web/webreg.c src/web/weburl.c src/web/webmgr.c src/sec/json.c
+WEBREG_TEST_SRC := tests/webreg_test.c src/web/webreg.c src/web/weburl.c src/web/webmgr.c src/sec/json.c src/lordlog.c
 build/webreg-test: $(WEBREG_TEST_SRC) $(WEBAPPS_HDR) ../assets/webapps/catalog.json
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \

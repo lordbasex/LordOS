@@ -1351,7 +1351,7 @@ The installed tree was saved first in `/var/backups/lordos-classic-bak` and put 
   switched theme, mode or language. Screenshots with `screendump` from the Proxmox host, the pointer
   with `lord-qmp-input.py 119 1280 800`, keys with `qm monitor 119` `sendkey`, holding
   `flock /tmp/sistema-119-screen.lock`. Window drags for the frame times with a QMP script in the
-  host's `/tmp` (deleted afterwards); lord-server's own `drag:` lines in `~/.cache/lordos/session.log`.
+  host's `/tmp` (deleted afterwards); lord-server's own `drag:` lines in `/var/log/lordos/users/$USER/compositor.log`.
 - **Test notifications** with `notify-send` (they live in the session's memory only).
 - **Undone at the end:** `/usr/lib/lordos` put back from the backup (the files the deploy added
   removed, the rest copied back; `diff -r` against the backup empty, then the backup deleted),
@@ -1875,6 +1875,8 @@ fingerprint compared with the one Settings shows. Test apps, from Debian (tests 
 ```sh
 sudo apt-get install -y chromium gtk-4-examples foot mpv xterm python3-gi gir1.2-gtk-4.0 wl-clipboard
 sudo apt-get install -y gdb        # 2026-11-11: backtraces of lord-web (the pasteboard crash, docs/WEBAPPS.md "Editing")
+sudo apt-get install -y logrotate  # 2026-11-11: /etc/logrotate.d/lordos (docs/SYSTEM.md "Log files"); a Recommends since 0.8.8.8,
+                                   # missing from this install because the ISO predates it
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The

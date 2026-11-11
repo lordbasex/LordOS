@@ -255,7 +255,7 @@ static int run_app(Web *w) {
 }
 
 /* A crash of lord-web itself (the WebKit UI process lives in it: a C++ exception nobody catches ends in abort) leaves
- * its stack in web.log, for addr2line: libstdc++ prints "terminate called after throwing ..." first, and the stack at
+ * its stack in its web/<app>-<profile>.log (lordlog.h), for addr2line: libstdc++ prints "terminate called after throwing ..." first, and the stack at
  * the abort still holds the frame that threw. Then the signal's own default (a core, the exit status lord-server
  * sees). */
 static void crash_log(int sig) {

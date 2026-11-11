@@ -807,7 +807,7 @@ session, the variables set in the session's environment; the results above):
 1. LordBench → Desktop impact, twice with the build's defaults then (GPU drag where its self-test passes, the
    pipeline while frames are heavy), three times with `LORD_PIPELINE=0`, and twice with `LORD_PIPELINE=0
    LORD_GPU_DRAG=0` (the defaults now).
-2. From `~/.cache/lordos/session.log`: the `gpu: GPU drag on|off` line, the `lord-server: frame pipeline …` line, the
+2. From `/var/log/lordos/users/$USER/compositor.log`: the `gpu: GPU drag on|off` line, the `lord-server: frame pipeline …` line, the
    `lordbench: desktop … phases` lines and the `drag (scripted):` line, and from
    `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
 3. Read under load: if most frames are `cpuLate`, the build is too long (`paintMs`, `uploadMs`, `beforeRenderMs`
