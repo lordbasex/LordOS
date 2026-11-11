@@ -46,6 +46,7 @@ typedef struct {
     uint32_t fmt;                       /* negotiated SPA_VIDEO_FORMAT_*, 0 none */
     uint32_t fw, fh;                    /* negotiated size */
     int node_sent, streaming;
+    int pending;                        /* the ring slot waiting for the next graph cycle, -1 none */
     uint64_t seq;
 } Stream;
 
@@ -143,6 +144,7 @@ static void on_state(void *data, enum pw_stream_state old, enum pw_stream_state 
         say(CM_NODE, s->idx, id, 0, 0);
     }
     int on = now == PW_STREAM_STATE_STREAMING;
+    if (!on && s->pending >= 0) { say(CM_DONE, s->idx, (uint32_t)s->pending, 0, 0); s->pending = -1; }
     if (on != s->streaming) { s->streaming = on; want(s, on, rate_of[s->idx]); }
 }
 
@@ -176,10 +178,49 @@ static void on_param(void *data, uint32_t id, const struct spa_pod *param) {
     pw_stream_update_params(s->st, p, 2);
 }
 
+/* Our own buffers, each a memfd of its own (PW_STREAM_FLAG_ALLOC_BUFFERS), the way xdg-desktop-portal-wlr and mutter
+ * make theirs. Left to PipeWire, a video stream's buffers are one shared block the consumer sees as SPA_DATA_MemPtr
+ * with no fd, and the screen cast consumers take only MemFd or DmaBuf: Chromium's WebRTC capturer drops every such
+ * buffer without a word, so the page's video never gets a frame. Sealed so that no consumer can shrink a buffer under
+ * us (a write past the end would fault). */
+static void on_add_buffer(void *data, struct pw_buffer *pb) {
+    Stream *s = data;
+    struct spa_data *d = &pb->buffer->datas[0];
+    if (pb->buffer->n_datas < 1 || !(d->type & (1u << SPA_DATA_MemFd))) return;
+    size_t size = (size_t)s->fw * 4 * s->fh;
+    int fd = size ? memfd_create("lordos-screencast", MFD_CLOEXEC | MFD_ALLOW_SEALING) : -1;
+    if (fd < 0) return;
+    void *m = MAP_FAILED;
+    if (!ftruncate(fd, (off_t)size) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL))
+        m = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { close(fd); return; }
+    d->type = SPA_DATA_MemFd;
+    d->flags = SPA_DATA_FLAG_READWRITE;
+    d->fd = fd;
+    d->mapoffset = 0;
+    d->maxsize = (uint32_t)size;
+    d->data = m;
+}
+
+static void on_remove_buffer(void *data, struct pw_buffer *pb) {
+    (void)data;
+    struct spa_data *d = &pb->buffer->datas[0];
+    if (pb->buffer->n_datas < 1 || d->type != SPA_DATA_MemFd || d->fd < 0) return;
+    if (d->data) munmap(d->data, d->maxsize);
+    close((int)d->fd);
+    d->data = NULL;
+    d->fd = -1;
+}
+
+static void on_process(void *data);
+
 static const struct pw_stream_events stream_events = {
     PW_VERSION_STREAM_EVENTS,
     .state_changed = on_state,
     .param_changed = on_param,
+    .add_buffer = on_add_buffer,
+    .remove_buffer = on_remove_buffer,
+    .process = on_process,
 };
 
 static int map_ring(Stream *s, int fd, uint32_t w, uint32_t h) {
@@ -203,6 +244,7 @@ static int stream_set(const CastMsg *m, int fd) {
     Stream *s = &S[m->stream];
     if (map_ring(s, fd, m->w, m->h)) return -1;
     s->idx = m->stream;
+    if (!s->st) s->pending = -1;
     s->w = m->w;
     s->h = m->h;
     s->fps = m->a;
@@ -223,20 +265,25 @@ static int stream_set(const CastMsg *m, int fd) {
     if (!s->st) return -1;
     pw_stream_add_listener(s->st, &s->hook, &stream_events, s);
     return pw_stream_connect(s->st, PW_DIRECTION_OUTPUT, PW_ID_ANY,
-                             PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_MAP_BUFFERS, p, 1) < 0 ? -1 : 0;
+                             PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_ALLOC_BUFFERS, p, 1) < 0 ? -1 : 0;
 }
 
-/* A frame from slot m->a into the next free buffer: rows of w * 4 bytes, swapped to RGBx when that was asked for.
- * The slot goes back at once: its pixels are copied. */
-static void frame(const CastMsg *m) {
-    Stream *s = &S[m->stream];
-    struct pw_buffer *pb = s->fmt && s->streaming && s->fw == m->w && s->fh == m->h ? pw_stream_dequeue_buffer(s->st) : NULL;
+/* The slot waiting in s->pending into the next free buffer: rows of w * 4 bytes, swapped to RGBx when that was asked
+ * for. It runs in the stream's process callback: the stream drives the graph (PW_STREAM_FLAG_DRIVER), so a buffer
+ * reaches the consumer only from the cycle pw_stream_trigger_process starts. The slot goes back at once: its pixels
+ * are copied. */
+static void on_process(void *data) {
+    Stream *s = data;
+    if (s->pending < 0) return;
+    uint32_t slot = (uint32_t)s->pending;
+    s->pending = -1;
+    struct pw_buffer *pb = s->fmt && s->streaming ? pw_stream_dequeue_buffer(s->st) : NULL;
     if (pb) {
         struct spa_buffer *buf = pb->buffer;
         struct spa_data *d = &buf->datas[0];
         size_t stride = (size_t)s->w * 4, need = stride * s->h;
         if (d->data && d->maxsize >= need) {
-            const uint8_t *src = s->ring + cast_slot_off(&s->lay, m->a);
+            const uint8_t *src = s->ring + cast_slot_off(&s->lay, slot);
             uint8_t *dst = d->data;
             if (s->fmt == SPA_VIDEO_FORMAT_BGRx) memcpy(dst, src, need);
             else {
@@ -263,7 +310,17 @@ static void frame(const CastMsg *m) {
         } else d->chunk->size = 0;
         pw_stream_queue_buffer(s->st, pb);
     }
-    say(CM_DONE, m->stream, m->a, 0, 0);
+    say(CM_DONE, s->idx, slot, 0, 0);
+}
+
+/* A frame from slot m->a: kept for the next graph cycle, which it starts. A newer frame replaces one still waiting
+ * (that slot goes back unused). Without a consumer streaming, the slot goes back at once. */
+static void frame(const CastMsg *m) {
+    Stream *s = &S[m->stream];
+    if (!(s->fmt && s->streaming && s->fw == m->w && s->fh == m->h)) { say(CM_DONE, m->stream, m->a, 0, 0); return; }
+    if (s->pending >= 0) say(CM_DONE, m->stream, (uint32_t)s->pending, 0, 0);
+    s->pending = (int)m->a;
+    pw_stream_trigger_process(s->st);
 }
 
 /* ---- the app's connection ---- */

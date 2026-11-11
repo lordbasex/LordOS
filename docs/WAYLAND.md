@@ -1036,7 +1036,11 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   module, no D-Bus and no devices, then `sandbox_apply_helper` (scope `lordos-screencast`, `/usr` read-only, extra
   syscalls only the three `timerfd_*`; no socket, connect, bind, clone of a process or exec) before the connection says
   a word. Each source is a `Video/Source` node (`media.role` Screen, `node.name` `lordos-screencast-N`), BGRx or RGBx,
-  the source's size, a variable rate up to 60, PipeWire's own memfd buffers, driven by us (`PW_STREAM_FLAG_DRIVER`).
+  the source's size, a variable rate up to 60, driven by us (`PW_STREAM_FLAG_DRIVER`: each frame from lord-server starts
+  a graph cycle with `pw_stream_trigger_process`, and the buffer is filled in that cycle's `process`). Its buffers are
+  its own (`PW_STREAM_FLAG_ALLOC_BUFFERS`), each a sealed memfd, as xdg-desktop-portal-wlr's and mutter's are: left to
+  PipeWire, a video stream's buffers are one shared block that the consumer sees as `SPA_DATA_MemPtr` with no fd, and
+  Chromium's WebRTC capturer takes only MemFd or DmaBuf, so it dropped every frame and the page's video stayed black.
   Once its nodes exist, its own connection lowers its permissions: read-only for everything (a link is only made
   between nodes whose owners see each other) and full only for its nodes, so it can execute no factory: no node of its
   own to record with, no link, no module. It never runs a thread of its own.

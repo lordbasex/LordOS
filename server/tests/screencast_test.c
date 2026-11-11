@@ -4,7 +4,8 @@
  *     the PipeWire guard tells from a camera (media.role Screen: hidden from apps with no screen capture);
  *   - the app's connection comes back restricted: from it the registry shows the stream's node and nothing else of
  *     the daemon, and the app can still make its own stream there and receive;
- *   - frames written into the ring reach the app pixel for pixel, in BGRx, each slot given back (CM_DONE);
+ *   - frames written into the ring reach the app pixel for pixel, in BGRx, each slot given back (CM_DONE), and each in a
+ *     memfd buffer of its own that the app maps itself, as Chromium and OBS do (they drop any other kind);
  *   - a resize: the stream again at another size, frames at the new size;
  *   - CM_STOP ends it; a message lord-server may not send ends it too.
  * With "bench": 1920x1080 at 30 frames a second for 5 seconds, every frame different, and what that costs: the copy
@@ -30,6 +31,7 @@
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <spa/param/buffers.h>
+#include <spa/buffer/meta.h>
 
 static int ok, bad;
 #define CHECK(c) do { if (c) ok++; else { bad++; printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); } } while (0)
@@ -144,7 +146,7 @@ typedef struct {
     struct pw_registry *reg;
     struct spa_hook ch, rh, sh;
     struct pw_stream *st;
-    int globals, others, factories, saw_node, synced, sync_seq, frames, wrong, fmt_ok;
+    int globals, others, factories, saw_node, synced, sync_seq, frames, wrong, not_memfd, fmt_ok;
     uint32_t w, h, last_k, node;
 } App;
 static App app;
@@ -164,6 +166,9 @@ static const struct pw_registry_events reg_events = { PW_VERSION_REGISTRY_EVENTS
 static void app_done(void *data, uint32_t id, int seq) { App *a = data; if (id == PW_ID_CORE && seq == a->sync_seq) a->synced = 1; }
 static const struct pw_core_events app_core_events = { PW_VERSION_CORE_EVENTS, .done = app_done };
 
+/* The app takes buffers the way the screen cast consumers do (Chromium's WebRTC capturer, OBS): it asks for MemFd (or
+ * DmaBuf) buffers, maps each buffer's fd itself (no PW_STREAM_FLAG_MAP_BUFFERS) and has no use for any other kind. A
+ * buffer that comes without a memfd counts as not received (not_memfd): WebRTC drops those without a word. */
 static void app_param(void *data, uint32_t id, const struct spa_pod *param) {
     App *a = data;
     if (id != SPA_PARAM_Format || !param) return;
@@ -172,14 +177,26 @@ static void app_param(void *data, uint32_t id, const struct spa_pod *param) {
     a->fmt_ok = info.format == SPA_VIDEO_FORMAT_BGRx;
     a->w = info.size.width;
     a->h = info.size.height;
+    uint8_t buf[512];
+    struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buf, sizeof buf);
+    const struct spa_pod *p[2];
+    p[0] = spa_pod_builder_add_object(&b, SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
+        SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int((1 << SPA_DATA_MemFd) | (1 << SPA_DATA_DmaBuf)));
+    p[1] = spa_pod_builder_add_object(&b, SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+        SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header), SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
+    pw_stream_update_params(a->st, p, 2);
 }
 static void app_process(void *data) {
     App *a = data;
     struct pw_buffer *b;
     while ((b = pw_stream_dequeue_buffer(a->st))) {
         struct spa_data *d = &b->buffer->datas[0];
-        if (d->data && d->chunk->size >= a->w * 4 * a->h && a->w) {
-            const uint32_t *p = (const uint32_t *)((uint8_t *)d->data + d->chunk->offset);
+        if (d->type != SPA_DATA_MemFd || d->fd < 0) { a->not_memfd++; pw_stream_queue_buffer(a->st, b); continue; }
+        size_t len = (size_t)d->mapoffset + d->maxsize;
+        uint8_t *map = mmap(NULL, len, PROT_READ, MAP_SHARED, (int)d->fd, 0);
+        if (map == MAP_FAILED) { a->wrong++; pw_stream_queue_buffer(a->st, b); continue; }
+        if (a->w && d->chunk->size >= a->w * 4 * a->h && (size_t)d->chunk->offset + d->chunk->size <= d->maxsize) {
+            const uint32_t *p = (const uint32_t *)(map + d->mapoffset + d->chunk->offset);
             /* which frame: from pixel (0, 0)'s blue byte, then every pixel against it */
             uint32_t k = 0;
             while (k < 256 && (px_of(k, 0, 0) & 0xff) != (p[0] & 0xff)) k++;
@@ -188,6 +205,7 @@ static void app_process(void *data) {
                 if ((p[(size_t)y * (d->chunk->stride / 4) + x] & 0xffffff) != (px_of(k, x, y) & 0xffffff)) { same = 0; break; }
             if (same) { a->frames++; a->last_k = k; } else a->wrong++;
         }
+        munmap(map, len);
         pw_stream_queue_buffer(a->st, b);
     }
 }
@@ -247,7 +265,7 @@ static int app_stream(void) {
     p[0] = spa_pod_builder_add_object(&b, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
         SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
         SPA_FORMAT_VIDEO_format, SPA_POD_Id(SPA_VIDEO_FORMAT_BGRx));
-    if (pw_stream_connect(app.st, PW_DIRECTION_INPUT, node_id, PW_STREAM_FLAG_MAP_BUFFERS, p, 1) < 0) return -1;
+    if (pw_stream_connect(app.st, PW_DIRECTION_INPUT, node_id, 0, p, 1) < 0) return -1;
     double end = now_ms() + 3000;
     while (pw_stream_get_state(app.st, NULL) != PW_STREAM_STATE_PAUSED && now_ms() < end) pw_loop_iterate(lp, 20);
     printf("  the app's stream: %s\n", pw_stream_state_as_string(pw_stream_get_state(app.st, NULL)));
@@ -369,8 +387,10 @@ int main(int argc, char **argv) {
     if (!bench) {
         int sent = frames_for(&ring, 1500, &k);
         CHECK(app.fmt_ok && app.w == W && app.h == H);
-        printf("  %d frames sent, %d received whole, %d wrong, last %u\n", sent, app.frames, app.wrong, app.last_k);
-        CHECK(sent > 10 && app.frames > 5 && app.wrong == 0);
+        printf("  %d frames sent, %d received whole in their own memfd, %d wrong, %d without a memfd, last %u\n", sent, app.frames,
+               app.wrong, app.not_memfd, app.last_k);
+        /* in 1.5 s at 30 a second: most of them reach the app, every one in a memfd buffer of the right size */
+        CHECK(sent > 10 && app.frames >= 10 && app.wrong == 0 && app.not_memfd == 0);
         for (int i = 0; i < CAST_SLOTS; i++) if (peer.busy[0][i]) { pw_loop_iterate(lp, 50); }
         int held = 0;
         for (int i = 0; i < CAST_SLOTS; i++) held += peer.busy[0][i];
@@ -391,8 +411,9 @@ int main(int argc, char **argv) {
         CHECK(cast_send(chan, &rs, r2.ro) == 0);
         int before = app.frames;
         frames_for(&r2, 1500, &k);
-        printf("  after the resize: %ux%u, %d more frames, %d wrong\n", app.w, app.h, app.frames - before, app.wrong);
-        CHECK(app.w == 400 && app.h == 300 && app.frames > before + 3 && app.wrong == 0);
+        printf("  after the resize: %ux%u, %d more frames, %d wrong, %d without a memfd\n", app.w, app.h, app.frames - before, app.wrong,
+               app.not_memfd);
+        CHECK(app.w == 400 && app.h == 300 && app.frames > before + 3 && app.wrong == 0 && app.not_memfd == 0);
         ring_free(&r2);
         CHECK(bad_msgs == 0);
 
@@ -410,7 +431,7 @@ int main(int argc, char **argv) {
         printf("bench: 1920x1080, %d frames in 5 s (%.1f a second), %d received\n", sent, sent / 5.0, app.frames - before);
         printf("bench: lord-server's copy into the ring %.2f ms a frame; lord-screencast %.1f %% of one core (%.2f ms a frame)\n",
                copy_ms / (sent ? sent : 1), (c1 - c0) / 50.0, (c1 - c0) / (sent ? sent : 1));
-        CHECK(sent >= 140 && app.frames - before >= 120 && app.wrong == 0);
+        CHECK(sent >= 140 && app.frames - before >= 120 && app.wrong == 0 && app.not_memfd == 0);
         send_msg(CM_STOP, 0, 0, 0, 0, 0, -1);
         run_until(&ended, 3000);
     }
