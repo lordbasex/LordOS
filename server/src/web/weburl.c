@@ -116,6 +116,18 @@ int weburl_in_scope(const char *url, const char *scope) {
     return 1;
 }
 
+int weburl_scope_pattern(const char *scope, char *out, size_t n) {
+    WebUrl s;
+    if (weburl_parse(scope, &s)) return -1;
+    size_t pl = s.path_len;
+    const char *q = memchr(s.path, '?', pl), *star = memchr(s.path, '*', pl);
+    if (q) pl = (size_t)(q - s.path);
+    if (star && (size_t)(star - s.path) < pl) pl = (size_t)(star - s.path);
+    int slash = !pl || s.path[0] != '/';
+    int w = snprintf(out, n, "%s://%s%s%.*s*", s.https ? "https" : "http", s.host, slash ? "/" : "", (int)pl, s.path);
+    return w > 0 && (size_t)w < n ? 0 : -1;
+}
+
 /* a host as browsers read an IPv4 address (WHATWG URL): 1 to 4 parts of decimal, 0x hex or 0 octal, the last one
  * filling the bytes left. 0 and *ip, -1 when it isn't one (a name). */
 static int ipv4_of(const char *h, uint32_t *ip) {

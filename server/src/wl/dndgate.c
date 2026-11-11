@@ -3,12 +3,15 @@
  * .flatpak-info), or any process in another root or mount, pid or user namespace, sees only part of the
  * person's files, so its drags never hand files to LordOS (nor do an
  * isolated LordOS app's, which wl.c checks through the broker). And a drop is taken only by what the UI runs
- * for the release that made it (DropGate): nothing later can claim a drop left pending. Tests:
+ * for the release that made it (DropGate): nothing later can claim a drop left pending. Nor do those drags hand
+ * files to a web app: lord-web opens a drop's files itself for the page, so wl.c leaves their file lists out of the
+ * offer (dndg_file_mime) and the drop arrives as text. Tests:
  * tests/dndgate_test.c. */
 #include "dndgate.h"
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -70,4 +73,11 @@ int dndg_release_done(DropGate *g) {
 
 void dndg_reset(DropGate *g) {
     g->pending = g->claimable = g->claimed = 0;
+}
+
+int dndg_file_mime(const char *mime) {
+    static const char *const lists[] = { "text/uri-list", "x-special/gnome-copied-files", "application/x-kde-cutselection",
+                                         "application/vnd.portal.filetransfer", "application/vnd.portal.files", NULL };
+    for (int i = 0; mime && lists[i]; i++) if (!strcmp(mime, lists[i])) return 1;
+    return 0;
 }

@@ -15,17 +15,20 @@
  *     missing. They post to lord-web, which takes text (at most 16 MB) or an image/png or image/jpeg (at most
  *     32 MB, checked by its signature) only while the page is the app's own (not another site in the window) and
  *     the person pressed a key, clicked or touched the window in the last seconds (webwin_user_active: the browser's
- *     "user activation"), and offers it to the session. The message handler is visible to every frame, so the script
- *     (top frame only) sends a random key of this lord-web; a message without it (another site's frame) is refused.
+ *     "user activation"), and offers it to the session. The message handler lives in lord-web's isolated world, where
+ *     only a bridge script runs (the app's top frame, and only in documents of its scope by the scripts' allow-list):
+ *     no script of the page's world, and no frame of another site, can reach it or forge its messages. The page's
+ *     navigator.clipboard asks the bridge through events on the document. lord-web checks again, at each message,
+ *     that the document's address, the main frame's committed one and the view's are inside the scope.
  *     Anything else is refused, the page's promise rejected. */
 #include "web.h"
 #include "webwin.h"
+#include "weburl.h"
 #include "../sec/json.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/random.h>
 #include <unistd.h>
 
 #define XFER_WORLD "lordos-web-xfer"
@@ -36,14 +39,35 @@
 
 /* ---- the page's copies ---- */
 
-/* a format: %s is the key of this lord-web (clip_key), so only this script, in the app's top frame, can write; a frame
- * of another site inside the page sees the same message handler but not the key */
+#define CLIP_ASK "lordos-clipboard-write"
+#define CLIP_DONE "lordos-clipboard-done"
+
+/* in the page's world: navigator.clipboard and ClipboardItem when WPE has none. It holds nothing secret and talks
+ * only to CLIP_BRIDGE, through events on the document whose detail is JSON text (a string crosses worlds as it is);
+ * the page could send those events itself, which is the same as calling writeText. Fresh objects only: nothing of
+ * the page's (a setter on Object.prototype, a replaced dispatchEvent) is called with what is written. */
 static const char CLIP_JS[] =
     "(() => {\n"
-    "  const key = '%s';\n"
-    "  const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers." CLIP_HANDLER ";\n"
-    "  if (!h || navigator.clipboard) return;\n"
-    "  const post = (m) => h.postMessage(Object.assign(m, { key }));\n"
+    "  if (navigator.clipboard) return;\n"
+    "  const doc = document, dispatch = EventTarget.prototype.dispatchEvent, listen = EventTarget.prototype.addEventListener;\n"
+    "  const CE = CustomEvent, DE = DOMException, json = JSON.stringify, parse = JSON.parse, waiting = new Map();\n"
+    "  const mget = Map.prototype.get, mset = Map.prototype.set, mdel = Map.prototype.delete;\n"
+    "  let next = 1;\n"
+    "  listen.call(doc, '" CLIP_DONE "', (e) => {\n"
+    "    if (typeof e.detail !== 'string') return;\n"
+    "    let r; try { r = parse(e.detail); } catch (x) { return; }\n"
+    "    const w = r && mget.call(waiting, r.id);\n"
+    "    if (!w) return;\n"
+    "    mdel.call(waiting, r.id);\n"
+    "    if (!r.error) { w.ok(); return; }\n"
+    "    const m = String(r.error), i = m.indexOf(': ');\n"
+    "    w.no(new DE(i > 0 ? m.slice(i + 2) : m, i > 0 ? m.slice(0, i) : 'NotAllowedError'));\n"
+    "  }, true);\n"
+    "  const post = (type, text, data) => new Promise((ok, no) => {\n"
+    "    const id = next++;\n"
+    "    mset.call(waiting, id, { ok, no });\n"
+    "    dispatch.call(doc, new CE('" CLIP_ASK "', { detail: json({ id: id, type: type, text: text, data: data }) }));\n"
+    "  });\n"
     "  const dataUrl = (blob) => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(r.error); r.readAsDataURL(blob); });\n"
     "  if (typeof window.ClipboardItem !== 'function') {\n"
     "    class ClipboardItem {\n"
@@ -56,18 +80,36 @@ static const char CLIP_JS[] =
     "    window.ClipboardItem = ClipboardItem;\n"
     "  }\n"
     "  const clipboard = {\n"
-    "    async writeText(t) { await post({ type: 'text/plain', text: String(t) }); },\n"
+    "    async writeText(t) { await post('text/plain', String(t), ''); },\n"
     "    async write(items) {\n"
     "      const item = items && items[0];\n"
     "      if (!item) throw new DOMException('Nothing to write', 'DataError');\n"
     "      const types = Array.from(item.types);\n"
     "      const img = types.find((t) => t === 'image/png' || t === 'image/jpeg');\n"
-    "      if (img) { const u = await dataUrl(await item.getType(img)); await post({ type: img, data: u.slice(u.indexOf(',') + 1) }); return; }\n"
-    "      if (types.includes('text/plain')) { await post({ type: 'text/plain', text: await (await item.getType('text/plain')).text() }); return; }\n"
+    "      if (img) { const u = await dataUrl(await item.getType(img)); await post(img, '', u.slice(u.indexOf(',') + 1)); return; }\n"
+    "      if (types.includes('text/plain')) { await post('text/plain', await (await item.getType('text/plain')).text(), ''); return; }\n"
     "      throw new DOMException('Type not supported', 'NotAllowedError');\n"
     "    },\n"
     "  };\n"
     "  Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => clipboard, configurable: true, enumerable: true });\n"
+    "})();\n";
+
+/* in lord-web's isolated world (XFER_WORLD), the app's top frame only: the one script that can reach the message
+ * handler, which no script of the page's world (of any frame, of any site) can see. It passes CLIP_JS's requests
+ * on with the document's own address (location as this world sees it: the page can't change it here) and answers. */
+static const char CLIP_BRIDGE[] =
+    "(() => {\n"
+    "  const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers." CLIP_HANDLER ";\n"
+    "  if (!h) return;\n"
+    "  document.addEventListener('" CLIP_ASK "', (e) => {\n"
+    "    if (typeof e.detail !== 'string') return;\n"
+    "    let m; try { m = JSON.parse(e.detail); } catch (x) { return; }\n"
+    "    if (!m || typeof m !== 'object') return;\n"
+    "    const id = Number(m.id);\n"
+    "    const done = (error) => document.dispatchEvent(new CustomEvent('" CLIP_DONE "', { detail: JSON.stringify(error ? { id, error } : { id }) }));\n"
+    "    const msg = { type: String(m.type), text: typeof m.text === 'string' ? m.text : '', data: typeof m.data === 'string' ? m.data : '', href: String(location.href) };\n"
+    "    h.postMessage(msg).then(() => done(''), (err) => done(String((err && err.message) || err || 'NotAllowedError')));\n"
+    "  }, true);\n"
     "})();\n";
 
 static char *prop_str(JSCValue *o, const char *name) {
@@ -84,16 +126,24 @@ static int image_ok(const char *mime, const guchar *b, gsize n) {
     return 0;
 }
 
-static char clip_key[33];
+static char *committed;                 /* the main frame's document, as last committed */
+
+/* 1 while the document that sent a copy is the app's own: the address it says it has (from the isolated world), the
+ * main frame's committed document and the view's current address are all inside the scope */
+static int clip_in_scope(Web *w, const char *href) {
+    const char *now = webkit_web_view_get_uri(w->view);
+    return !w->outside && href && committed && now && weburl_in_scope(href, w->app.scope) &&
+           weburl_in_scope(committed, w->app.scope) && weburl_in_scope(now, w->app.scope);
+}
 
 /* NULL when taken, else why not */
 static const char *clip_take(Web *w, JSCValue *v) {
     if (!w->win || !jsc_value_is_object(v)) return "NotAllowedError: nothing to write";
-    char *key = prop_str(v, "key");
-    int known = key && clip_key[0] && strlen(key) == 32 && !memcmp(key, clip_key, 32);
-    g_free(key);
-    if (!known) return "NotAllowedError: not this page's clipboard";
-    if (w->outside || !webwin_user_active(w->win)) return "NotAllowedError: the clipboard needs a key or a click in the window first";
+    char *href = prop_str(v, "href");
+    int mine = clip_in_scope(w, href);
+    g_free(href);
+    if (!mine) return "NotAllowedError: not this app's page";
+    if (!webwin_user_active(w->win)) return "NotAllowedError: the clipboard needs a key or a click in the window first";
     char *type = prop_str(v, "type");
     const char *why = "NotAllowedError: type not supported";
     if (type && !strcmp(type, "text/plain")) {
@@ -126,17 +176,28 @@ static gboolean on_clip(WebKitUserContentManager *m, JSCValue *v, WebKitScriptMe
     return TRUE;
 }
 
+static void on_committed(WebKitWebView *v, WebKitLoadEvent e, gpointer d) {
+    (void)d;
+    if (e != WEBKIT_LOAD_COMMITTED) return;
+    g_free(committed);
+    committed = g_strdup(webkit_web_view_get_uri(v));
+}
+
 void webxfer_init(Web *w) {
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(w->view);
     if (!ucm) return;
-    guint8 r[16];
-    if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) return;      /* no key, no clipboard shim */
-    for (int i = 0; i < 16; i++) snprintf(clip_key + 2 * i, 3, "%02x", r[i]);
-    if (!webkit_user_content_manager_register_script_message_handler_with_reply(ucm, CLIP_HANDLER, NULL)) return;
+    g_signal_connect(w->view, "load-changed", G_CALLBACK(on_committed), w);
+    if (!webkit_user_content_manager_register_script_message_handler_with_reply(ucm, CLIP_HANDLER, XFER_WORLD)) return;
     g_signal_connect(ucm, "script-message-with-reply-received::" CLIP_HANDLER, G_CALLBACK(on_clip), w);
-    char *js = g_strdup_printf(CLIP_JS, clip_key);
-    WebKitUserScript *s = webkit_user_script_new(js, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
-    g_free(js);
+    /* only into the app's own documents (another site's page in the window keeps WPE's own: no clipboard API) */
+    char pat[WEBURL_MAX + 16];
+    const char *allow[2] = { pat, NULL };
+    const char *const *only = !weburl_scope_pattern(w->app.scope, pat, sizeof pat) ? allow : NULL;
+    WebKitUserScript *s = webkit_user_script_new_for_world(CLIP_BRIDGE, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
+                                                           XFER_WORLD, only, NULL);
+    webkit_user_content_manager_add_script(ucm, s);
+    webkit_user_script_unref(s);
+    s = webkit_user_script_new(CLIP_JS, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, only, NULL);
     webkit_user_content_manager_add_script(ucm, s);
     webkit_user_script_unref(s);
 }

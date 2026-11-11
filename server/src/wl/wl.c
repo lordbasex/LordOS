@@ -3312,7 +3312,9 @@ static Surf *surface_under(float x, float y, Node *hit, float *lx, float *ly) { 
  * pointer (dnd_take_files). Only the UI's handling of that release may claim it (wl_drop_claim, DropGate);
  * one nobody claimed there is cancelled at once, and a claimed list has DNDG_READ_MS to arrive. The drags of
  * an isolated LordOS app or a sandboxed (Flatpak) app never hand files to LordOS: they may name files the app
- * itself can't reach (dnd_contained). Isolated LordOS apps take no drop (a drop there needs a grant of its own,
+ * itself can't reach (dnd_contained). Nor to a web app: lord-web opens a drop's local files itself and hands them to
+ * the page, so a contained drag's offer to a lord-web client (wl_set_web_pid) leaves out its file lists
+ * (dndg_file_mime; DOffer.nofiles) and the drop arrives there as text only. Isolated LordOS apps take no drop (a drop there needs a grant of its own,
  * docs/DESKTOP-PARITY.md).
  *
  * X11 apps (xwm.c, XDND): a drag over an Xwayland window goes to xwm, which is its XDND source (dnd_x_enter,
@@ -3336,6 +3338,7 @@ struct DOffer {
     unsigned lord, x;                   /* x: the X app's drag it offers (xsrc_gen), 0 none */
     uint32_t dest, pref, action;        /* the target's set_actions, and the action agreed */
     int accepted, dropped, finished, receives;
+    int nofiles;                        /* a contained drag offered to lord-web: no file list (dndg_file_mime) */
 };
 
 static struct {
@@ -3405,7 +3408,7 @@ static void dnd_icon_damage(void) {
 }
 
 static int dnd_offers(const DOffer *o, const char *mime) {
-    if (!mime) return 0;
+    if (!mime || (o->nofiles && dndg_file_mime(mime))) return 0;
     if (o->x) {
         for (int i = 0; o->x == xsrc_gen && i < nxsrc; i++) if (!strcmp(xsrc_mimes[i], mime)) return 1;
         return 0;
@@ -3545,6 +3548,14 @@ static struct wl_resource *dnd_device(struct wl_client *c) {
     return NULL;
 }
 
+/* lord-server's lord-web processes (webmgr_owner, set by js_webapps.c): the clients that open a drop's files for a page */
+static int (*web_pid)(int pid);
+void wl_set_web_pid(int (*fn)(int pid)) { web_pid = fn; }
+static int dnd_relays_files(struct wl_client *c) {
+    pid_t pid = c ? client_pid(c) : 0;
+    return web_pid && pid > 0 && web_pid((int)pid);
+}
+
 /* Who may take the drag: a Wayland app's surface; a drag without a source stays inside the client that started it. */
 static int dnd_takes(Surf *t) {
     if (!t || t->client == xwl_client || app_of_client(t->client)) return 0;
@@ -3611,16 +3622,17 @@ static void dnd_focus(Surf *t, float lx, float ly) {
         ores = o ? wl_resource_create(t->client, &wl_data_offer_interface, wl_resource_get_version(drag.dev), 0) : NULL;
         if (!ores) { free(o); wl_client_post_no_memory(t->client); drag.dev = NULL; return; }
         o->res = ores;
+        o->nofiles = drag.contained && dnd_relays_files(t->client);
         if (wl_resource_get_version(ores) < 3) o->dest = o->pref = DND_COPY;   /* before version 3 a drop copies */
         wl_resource_set_implementation(ores, &dnd_offer_impl, o, dnd_offer_gone);
         wl_data_device_send_data_offer(drag.dev, ores);
         if (drag.src) {
             o->src = drag.src;
             drag.src->offer = o;
-            for (int i = 0; i < drag.src->nmimes; i++) wl_data_offer_send_offer(ores, drag.src->mimes[i]);
+            for (int i = 0; i < drag.src->nmimes; i++) if (dnd_offers(o, drag.src->mimes[i])) wl_data_offer_send_offer(ores, drag.src->mimes[i]);
         } else if (drag.xsrc) {
             o->x = xsrc_gen;
-            for (int i = 0; i < nxsrc; i++) wl_data_offer_send_offer(ores, xsrc_mimes[i]);
+            for (int i = 0; i < nxsrc; i++) if (dnd_offers(o, xsrc_mimes[i])) wl_data_offer_send_offer(ores, xsrc_mimes[i]);
         } else {
             o->lord = lord_gen;
             for (size_t i = 0; i < NLORD_MIMES; i++) wl_data_offer_send_offer(ores, lord_mimes[i]);

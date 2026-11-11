@@ -110,6 +110,12 @@ int main(void) {
     CHECK(!g.claimed && g.claimable);
     CHECK(dndg_release_done(&g));
 
+    /* the file lists a contained drag's offer to lord-web leaves out; text and images stay */
+    CHECK(dndg_file_mime("text/uri-list") && dndg_file_mime("x-special/gnome-copied-files") &&
+          dndg_file_mime("application/vnd.portal.filetransfer") && dndg_file_mime("application/vnd.portal.files") &&
+          dndg_file_mime("application/x-kde-cutselection"));
+    CHECK(!dndg_file_mime("text/plain") && !dndg_file_mime("text/plain;charset=utf-8") && !dndg_file_mime("UTF8_STRING") &&
+          !dndg_file_mime("image/png") && !dndg_file_mime("text/uri-list2") && !dndg_file_mime("") && !dndg_file_mime(NULL));
     if (fails) { printf("dndgate-test: %d failed\n", fails); return 1; }
     printf("dndgate-test: ok\n");
     return 0;

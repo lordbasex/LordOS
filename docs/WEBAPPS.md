@@ -116,9 +116,13 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     missing. They post to lord-web (a script message handler), which takes text (at most 16 MB) or a PNG or JPEG
     (at most 32 MB, checked by its signature) only while the window shows the app's own page and the person pressed
     a key, clicked or touched it less than 5 s before (what browsers call user activation), and offers it to the
-    session as that one type. The handler is visible to every frame of the page, so the script carries a random key
-    lord-web makes at start (only in the app's top frame, never in a frame of another site inside it), and a message
-    without it is refused. Anything else rejects the page's promise.
+    session as that one type. The message handler lives in lord-web's isolated world (`lordos-web-xfer`), where only a
+    bridge script runs, in the app's top frame and only in documents of its scope (the scripts' allow-list, made from
+    the scope by `weburl_scope_pattern`): no script of the page's world, of any frame or site, can see the handler or
+    forge its messages. The page's `navigator.clipboard` asks the bridge through events on the document whose detail
+    is JSON text, and builds its own objects only (no page setter or replaced method sees what is written). At each
+    message lord-web checks that the document's address (as the isolated world reads it), the main frame's committed
+    one and the view's are inside the scope. Anything else rejects the page's promise.
 - **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
   so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
   drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and
@@ -127,7 +131,12 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   link is followed), at most 64 MB each and 20 files; anything else on the list is skipped. Any app can start a drag
   with any list, so the file, where it really is (links resolved), must be in the person's places: under the home
   folder, `/media`, `/mnt`, `/run/media` or `/tmp`, with no hidden folder or file on the way (`~/.ssh`, `~/.config`
-  and the like are never sent), and it is opened without following a link put there in between (`webdrop_place_ok`). lord-web reads the files
+  and the like are never sent), and it is opened without following a link put anywhere on that path in between (`webdrop_place_ok`, `webdrop_open`:
+  `openat2` with `RESOLVE_NO_SYMLINKS`, else one component at a time with `O_NOFOLLOW`); the page's `File` has the
+  name of the file opened, not the list's. A drag started by an isolated LordOS app or a sandboxed (Flatpak) client
+  offers lord-web no file list at all: lord-server leaves `text/uri-list` and the other file-list types out of that
+  offer (`wl.c`, `DOffer.nofiles`, lord-web known by its pid), so the drop arrives as text only, like the drop on
+  LordOS itself that such a drag never makes. lord-web reads the files
   itself and passes them in 1 MB pieces to a script in an isolated world of its own (`lordos-web-xfer`: the page's
   scripts can't see or change it), which makes `File` objects (name, a type from the name, the modification time) and
   `blob:` addresses. A script in the page's world then makes the `DataTransfer` and dispatches `dragenter`,

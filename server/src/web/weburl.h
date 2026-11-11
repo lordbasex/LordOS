@@ -34,6 +34,11 @@ int weburl_origin(const char *s, char *out, size_t n);
 int weburl_same_origin(const char *a, const char *b);
 /* 1 when url is inside scope: the same origin and url's path (query included, fragment not) begins with scope's. */
 int weburl_in_scope(const char *url, const char *scope);
+/* The user-script allow-list pattern (WebKit's "scheme://host/path*") of the addresses in scope, so a script is not even
+ * put into another site's page: 0 and out filled, -1 when scope doesn't parse or out is too small. WebKit's patterns
+ * have no port, so a scope with one gives its host on every port, and a '*' in scope's path ends the pattern there:
+ * a pattern may be wider than the scope, never narrower (weburl_in_scope still decides). */
+int weburl_scope_pattern(const char *scope, char *out, size_t n);
 /* Where a host is: WEBURL_PUBLIC, or WEBURL_PRIVATE for this computer and the local networks: localhost and *.localhost,
  * *.local, 127.0.0.0/8, 0.0.0.0/8, 10/8, 100.64/10, 172.16/12, 192.168/16, 169.254/16, ::, ::1, fc00::/7, fe80::/10, and
  * an IPv4-mapped IPv6 address of those. An IPv4 address is read the way browsers do (shortened, hex or octal parts:
