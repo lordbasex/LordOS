@@ -40,6 +40,7 @@ int  wl_text_caret(float *x, float *y, float *w, float *h);
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
 const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
 int  wl_focus_pid(void);                 /* the process of the app with the keyboard, 0 if none (ui/portal.c) */
+int  wl_surface_pid(int id);             /* the process of window id (its client), 0 if none (lord.webapps.owner) */
 const char *wl_focus_primary(size_t *n);    /* the text the app with the keyboard selected (primary selection), or NULL */
 /* The primary selection (select to copy, middle click to paste), for LordOS's own text fields and the Terminal:
  * wl_set_primary makes `t` the selection the apps are offered (-1 if empty or over 16 MB); wl_primary is the

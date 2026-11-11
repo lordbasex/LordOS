@@ -10,6 +10,7 @@
  * GLib watches: GTK 3 also changes live (without dconf or running gsettings). */
 #include "portal.h"
 #include "portalcheck.h"
+#include "webask.h"
 #include "../hw/hw.h"
 #include "../hw/jbuf.h"
 #include "../fsops.h"
@@ -32,6 +33,7 @@
 
 static DConn conn;
 static int up;
+static int only_web;                        /* another program serves the portal: only org.lordos.WebApps1 here */
 
 /* valores actuales */
 static int dark = 1;
@@ -604,6 +606,7 @@ static void screensaver(const DMsg *m) {
 /* ---- the bus: who asked, and who left ---- */
 static void on_reply(const DMsg *m) {
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return;
+    if (webask_reply(&conn, m)) return;
     for (int i = 0; i < nopens; i++) {
         if (opens[i].shown || opens[i].serial != m->reply_serial) continue;
         uint32_t pid = 0;
@@ -627,6 +630,7 @@ static void on_signal(const DMsg *m) {
     for (int i = nholds; i-- > 0;) if (!strcmp(holds[i].sender, name)) hold_drop(i);
     for (int i = nopens; i-- > 0;) if (!strcmp(opens[i].sender, name)) open_drop(i, 1);
     for (int i = npicks; i-- > 0;) if (!strcmp(picks[i].sender, name)) pick_drop(i);
+    webask_gone(name);
 }
 
 /* Request.Close: the app no longer wants it (a dialog, an open or a hold); only the app that asked */
@@ -669,6 +673,9 @@ static void handle(const DMsg *m) {
         }
         return;
     }
+    /* web apps' permission questions (webask.c) */
+    if (m->path && !strcmp(m->path, WEBASK_PATH)) { webask_call(&conn, m); return; }
+    if (only_web) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return; }
     if (!strcmp(mem, "Introspect")) {
         DBuf b;
         dw_init(&b);
@@ -745,12 +752,13 @@ int portal_start(void) {
     int fd = dbus_connect_session();
     /* with fds: OpenFile and OpenDirectory hand the file over as one */
     if (fd < 0 || dbus_open_fds(&conn, fd, 2000)) { if (fd >= 0) dbus_close(&conn); return -1; }
+    int web = own_name(WEBASK_NAME);
     if (!own_name(BUS_NAME)) {
         fprintf(stderr, "portal: %s is already served by another program (xdg-desktop-portal); not serving Settings\n", BUS_NAME);
-        dbus_close(&conn);
-        return -1;
+        if (!web) { dbus_close(&conn); return -1; }
+        only_web = 1;                       /* web apps still ask their questions here */
     }
-    int ss = own_name(SS_NAME);
+    int ss = !only_web && own_name(SS_NAME);
     /* the connections that leave the bus: their holds and requests go with them */
     DBuf b;
     dw_init(&b);
@@ -760,8 +768,10 @@ int portal_start(void) {
     dbus_send(&conn, &h, &b);
     dw_free(&b);
     up = 1;
-    fprintf(stderr, "portal: Settings, FileChooser, OpenURI and Inhibit on the session bus%s\n",
-            ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
+    if (!only_web)
+        fprintf(stderr, "portal: Settings, FileChooser, OpenURI and Inhibit on the session bus%s\n",
+                ss ? ", and " SS_NAME : " (" SS_NAME " is another program's)");
+    if (!web) fprintf(stderr, "portal: %s is another program's: web apps can't ask for permissions\n", WEBASK_NAME);
     return 0;
 }
 
@@ -778,6 +788,7 @@ void portal_dispatch(void) {
         dbus_close(&conn);
         up = 0;
         nholds = 0;                         /* nobody can let them go any more */
+        webask_lost();
         while (nopens) open_drop(nopens - 1, 1);
     }
 }

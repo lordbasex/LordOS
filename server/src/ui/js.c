@@ -18,6 +18,7 @@
 #include "js_vault.h"
 #include "js_mail.h"
 #include "js_sql.h"
+#include "js_webapps.h"
 #include "js_sftp.h"
 #include "js_termconf.h"
 #include "js_input.h"
@@ -435,6 +436,7 @@ static void session_context(void) {
     js_mail_register(ctx, lord);       /* lord.mail: Mail, Calendar, Contacts, Reminders via lord-maild (docs/MAIL.md) */
     js_sftp_register(ctx, lord);       /* lord.sftp: the Terminal's Files mode via lord-sftp (docs/TERMINAL.md) */
     js_sql_register(ctx, lord);        /* lord.sql: Databases (MySQL / MariaDB) via lord-sql (docs/DATABASES.md) */
+    js_webapps_register(ctx, lord);    /* lord.webapps: web apps and their profiles via lord-web (docs/WEBAPPS.md) */
     js_termconf_register(ctx, lord);   /* lord.termconf: the Terminal's configuration file (docs/TERMINAL.md) */
     js_wm_register(ctx, lord);         /* lord.wm: moving and resizing windows in C (grab.c) */
     js_input_register(ctx, lord);      /* lord.input: touchpads and touchscreens (tp/) */

@@ -7,8 +7,10 @@
 //   dockMenu(entry)            // items for the context menu: [{ label, onClick, checked, submenu, header } | '-']
 //   dock.pin(id, index) · dock.move(id, index) · dock.unpin(id) · dock.reset()
 //
-// Pinned items are typed ids (sdk/dockmodel.js): "app:files", "lpk:<id>", "desktop:<desktop id>"
-// and "shell:launcher". The methods also take a plain launcher id ("files", "desktop:firefox").
+// Pinned items are typed ids (sdk/dockmodel.js): "app:files", "lpk:<id>", "desktop:<desktop id>",
+// "web:<web app>" and "shell:launcher". The methods also take a plain launcher id ("files", "desktop:firefox").
+// A web app's windows (lordos-web.<app>.<profile>, docs/WEBAPPS.md) group under its "web:<app>" item, whose
+// menu opens its other profiles ("New window: Work").
 // The Trash is always last; Files, Settings and the launcher can't be removed but move like any
 // other app (docs/DOCK.md, "Rules").
 //
@@ -28,6 +30,10 @@ import { desktopSuffix } from './desktops.js';
 import { screen, onScreenChange, displayFor } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
+import { webAppOfWindow, webAppEntry, webRunning, launchWebApp } from './webapps.js';
+import { profileMenu } from './webappsmodel.js';
+import { errorText } from './errors.js';
+import { notify } from './notify.js';
 import { restoredIds } from './sessionrestore.jsx';
 import * as fs from './fs.js';
 import {
@@ -51,6 +57,7 @@ const classify = (id) => { const a = getApp(id); return !a || a.builtin ? null :
 export function dockIdOf(x) {
   if (x && typeof x === 'object') {
     if (x.kind === 'linux') return x.desktopId ? `desktop:${x.desktopId}` : null;
+    if (x.kind === 'web') return toTypedId(x.id);
     return toTypedId(x.package ? `lpk:${x.id}` : `app:${x.id}`);
   }
   return toTypedId(String(x ?? ''), classify);
@@ -59,7 +66,7 @@ export function dockIdOf(x) {
 const launcherKey = (id) => {
   const p = parseDockId(id);
   if (!p || p.kind === 'shell') return null;
-  return p.kind === 'desktop' ? `desktop:${p.key}` : p.key;
+  return p.kind === 'desktop' || p.kind === 'web' ? `${p.kind}:${p.key}` : p.key;
 };
 
 // ---- pinned (in ~/.config/lordos/settings.json → dockPinned) ----
@@ -153,6 +160,8 @@ windows.subscribe(() => {
 // Which launcher app a window belongs to: its LordOS app, or the Linux app from its .desktop.
 export function launcherIdOf(w) {
   if (!String(w.id).startsWith('linux#')) return appIdOf(w.id);
+  const web = webAppOfWindow(w);
+  if (web) return `web:${web.entry.id}`;            // every profile's windows under the app
   const appId = w.args?.appId || '';
   if (w.args?.pkg && appId && (getApp(appId)?.package || getApp(appId)?.isolated)) return appId;   // isolated app (.lpk or built-in): grouped under its own entry
   const a = linuxAppFor(appId);
@@ -178,7 +187,7 @@ export function useDockEntries(defaults = [], opts = {}) {
   const appFor = (id) => {
     const p = parseDockId(id);
     if (!p) return null;
-    if (p.kind === 'desktop') return byId.get(`desktop:${p.key}`) || null;
+    if (p.kind === 'desktop' || p.kind === 'web') return byId.get(`${p.kind}:${p.key}`) || null;
     const a = byId.get(p.key);
     if (!a || a.kind === 'linux') return null;
     return (p.kind === 'lpk') === !!a.package ? a : null;
@@ -233,7 +242,7 @@ export function useDockEntries(defaults = [], opts = {}) {
 export function launchDockItem(id) {
   const p = parseDockId(id);
   if (!p || p.kind === 'shell') return false;
-  if (p.kind === 'desktop') return launchApp(`desktop:${p.key}`);
+  if (p.kind === 'desktop' || p.kind === 'web') return launchApp(`${p.kind}:${p.key}`);
   const a = getApp(p.key);
   if (!a || a.builtin || (p.kind === 'lpk') !== !!a.package) return false;
   return launchApp(p.key);
@@ -288,6 +297,13 @@ export function dockQuickActions(e) {
     try { list = lord.apps.actions(p.key, locale.get().lang) || []; } catch (err) { list = []; }
     return list.filter((a) => a && a.id && a.name).map((a) => ({ label: a.name, onClick: () => lord.apps.launchAction(p.key, a.id) }));
   }
+  // a web app: a window of each of its other profiles (the click opens the first one)
+  if (p.kind === 'web') {
+    return profileMenu(webAppEntry(p.key), webRunning()).map((r) => ({
+      label: t('webapps.dock.newWindow', { profile: r.name }), checked: r.running,
+      onClick: () => { try { launchWebApp(p.key, r.profile); } catch (err) { notify({ app: 'settings', title: errorText(err) }); } },
+    }));
+  }
   if (p.kind !== 'app') return [];                          // .lpk: launchPackage takes no arguments
   const app = getApp(p.key);
   // an isolated built-in app (its own process) gets the action's args through the session
@@ -319,7 +335,7 @@ export function dockMenu(e, opts = {}) {
   const appKey = p && p.kind === 'app' ? p.key : null;
   const custom = appKey && menuProviders.get(appKey) ? menuProviders.get(appKey)(e) : null;
   if (custom && custom.length) items.push(...custom, '-');
-  else if (e.windows.length && p && !(appKey && getApp(appKey)?.singleWindow)) {
+  else if (e.windows.length && p && p.kind !== 'web' && !(appKey && getApp(appKey)?.singleWindow)) {
     const iso = appKey && getApp(appKey)?.isolated;
     items.push({ label: t('shell.dock.newWindow'), onClick: () => (appKey && (!iso || isolatedArgs()) ? wm.open(appKey, { new: true }) : launchDockItem(e.id)) }, '-');
   }

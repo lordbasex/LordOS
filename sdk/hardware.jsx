@@ -12,12 +12,14 @@
 //   polkit        a Linux app's request for administrator rights (<PolkitPrompt />)
 //   portal open   a Linux app asks to open a link or a file (OpenURI): opened like everything else, and asked
 //                 first when the app is not the one in front (<PortalOpenPrompt />, portalopenmodel.js)
+//   web apps      a web app's page asks for the camera, the microphone, the screen, the location or notifications
+//                 and its registry entry says "ask" (org.lordos.WebApps1.Ask, <WebAppAskPrompt />, webapps.js)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
 // Everything arrives as __lordHw(kind, data) from lord-server (ui/js_hw.c): no polling.
-import { createElement as h, useEffect, useState } from 'react';
-import { View, Text, mainBox } from '@lordos/runtime';
+import { createElement as h, useEffect, useRef, useState } from 'react';
+import { View, Text, mainBox, addListener } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
@@ -26,7 +28,10 @@ import { notify, dismissNotification } from './notify.js';
 import { linuxAppFor, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
-import { TextInput } from './components.jsx';
+import { TextInput, Toggle } from './components.jsx';
+import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry } from './webapps.js';
+import { profileOf } from './webappsmodel.js';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
@@ -517,6 +522,56 @@ function linuxNotify(n) {
   if (id) fromLinux.set(n.id, id);
 }
 
+// ---- A web app asks for a device or for notifications (org.lordos.WebApps1.Ask, server/src/ui/webask.c) ----
+//
+// lord-server already checked that the question comes from the lord-web it started for that app and profile. One
+// question at a time; Don't allow is the default (Enter and Escape), as in every dialog that lets something in
+// (dialogkeys.js): Allow needs a click, or Tab to it and then Space. "Remember" keeps the answer in the registry
+// (Settings → Web apps changes it later); off, it counts for this time only.
+export function WebAppAskPrompt() {
+  const list = useStore(webAsks);
+  const th = useSystemTokens();
+  const [remember, setRemember] = useState(true);
+  const [focus, setFocus] = useState('cancel');
+  const token = useRef({}).current;
+  const q = list[0];
+  const owner = useStore(dialogStack, (l) => keyOwner(l) === token);
+  const latest = useRef(null);
+  latest.current = { q, remember, focus };
+  useEffect(() => {
+    if (!q) return undefined;
+    setFocus('cancel');
+    dialogStack.open(token, null, true);
+    return () => dialogStack.close(token);
+  }, [q?.id]);
+  useEffect(() => addListener('keydown', (e) => {
+    const cur = latest.current;
+    if (!cur.q || dialogStack.owner() !== token) return;
+    const r = dialogKey(e, { destructive: true, focus: cur.focus });
+    if (r) dialogStack.take(e);
+    if (r?.focus) setFocus(r.focus);
+    else if (r?.press) answerWebAsk(cur.q, r.press === 'ok', cur.remember);
+  }), []);
+  if (!q) return null;
+  const entry = webAppEntry(q.app);
+  const prof = profileOf(entry, q.profile);
+  const app = entry ? (entry.profiles.length > 1 && prof ? t('webapps.windowName', { app: entry.name, profile: prof.name }) : entry.name) : q.app;
+  const ring = (which) => (owner && focus === which ? { boxShadow: `0 0 0 2px ${th.accent}` } : null);
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
+  h(View, { style: { marginTop: 90, width: 380, borderRadius: 14, padding: 22, gap: 10, alignItems: 'center', backgroundColor: th.windowBg,
+    border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
+  h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t(`webapps.ask.${q.kind}`, { app })),
+  entry ? h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: th.textDim, textAlign: 'center', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' } }, entry.origin) : null,
+  h(Text, { style: { fontSize: 12, color: th.textDim, textAlign: 'center', lineHeight: 1.4 } }, t('webapps.ask.where')),
+  h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' } },
+    h(Text, { style: { flex: 1, fontSize: 12, color: th.text, textAlign: 'start' } }, t('webapps.ask.remember')),
+    h(Toggle, { small: true, on: remember, onChange: setRemember })),
+  h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('cancel') } }, h(DialogButton, { label: t('webapps.ask.deny'), onClick: () => answerWebAsk(q, false, remember), th })),
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.ask.allow'), primary: true, th, onClick: () => answerWebAsk(q, true, remember) })))));
+}
+
 // ---- events from lord-server ----
 
 globalThis.__lordHw = (kind, data) => {
@@ -539,6 +594,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-file': portalFile.set(data); break;
     case 'portal-open': portalOpen(data); break;
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
+    case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

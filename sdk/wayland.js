@@ -15,6 +15,7 @@ import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
+import { webOwnerOf } from './webapps.js';
 import { osk } from './osk.js';
 import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
@@ -97,6 +98,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // cascaded, but always inside the work area (never under the Dock)
       const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
       const args = { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) };
+      // a web app's window (lordos-web.<app>.<profile>): lord-server says whether its process is that lord-web
+      const web = d.x11 ? null : webOwnerOf(sid, d.appId);
+      if (web) args.web = web;
       // a dialog over the window it belongs to (sdk/dialogmodel.js), on that window's desktop
       const owner = d.parent ? wm.get(idOf(d.parent)) : null;
       const saved = owner ? null : placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had

@@ -10,6 +10,7 @@ import { AiDetail, AiDiscover, AiPage, CatalogResults, catalogApp, catalogApps, 
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
+import { WebAppsPage, webCatalog } from './webapps.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
 // first of the usual names that exists, or the home folder itself.
@@ -302,10 +303,10 @@ function InstalledPage({ query }) {
 
 // ---- window ----
 
-// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'lordos' or 'cat:<Category>')
+// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'webapps', 'lordos' or 'cat:<Category>')
 // and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app). Back returns to
 // the page.
-const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, lordos: GLYPH.lordos };
+const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
   const t = useTheme();
@@ -363,6 +364,7 @@ export default function Store() {
   else if (page === 'remote') body = <AiPage section="remote" query={query} onOpen={openAi} />;
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
+  else if (page === 'webapps') body = <WebAppsPage query={query} />;
   else if (page === 'installed') body = <InstalledPage query={query} />;
   else body = <debian.Updates />;
   const item = (id, label, detail, glyph) => (
@@ -380,6 +382,7 @@ export default function Store() {
           {item('updates', tr('store.page.updates'), deb.upgrades?.length, PAGE_GLYPH.updates)}
           <SectionTitle>{tr('store.section.categories')}</SectionTitle>
           {item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
+          {item('webapps', tr('store.page.webapps'), webCatalog().length, PAGE_GLYPH.webapps)}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {catalogApps('remote').length ? item('remote', tr('store.page.remote'), catalogApps('remote').length, PAGE_GLYPH.remote) : null}
           {catalogApps('suites').length ? item('suites', tr('store.page.suites'), catalogApps('suites').length, PAGE_GLYPH.suites) : null}
