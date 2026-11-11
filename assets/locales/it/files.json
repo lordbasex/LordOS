@@ -69,6 +69,7 @@
   },
   "job.copying": "Copia di «{name}»…",
   "job.moving": "Spostamento di «{name}»…",
+  "job.more": "altri {count}",
   "kind.app": "Applicazione",
   "kind.archive": "Archivio",
   "kind.audio": "Audio",

@@ -3,6 +3,7 @@
 import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
+import { createJobQueue } from './jobqueue.js';
 
 // Changes every time something changed on disk (a copy finished, the trash…): the views reload.
 export const fsVersion = createStore(0);
@@ -44,21 +45,28 @@ export function freeName(dir, name, existing) {
 
 // ---- copy / move jobs (server threads) ----
 export const jobState = createStore([]);                  // [{ id, src, dst, move, done, bytes, total, … }]
+// lord-server runs a few at a time: the rest wait here and start as those finish (apps/files/jobqueue.js, GitHub #104)
+const queue = createJobQueue({ start: (src, dst, move) => (move ? fs.move(src, dst) : fs.copy(src, dst)), jobs: () => fs.jobs(), forget: (id) => fs.forgetJob(id) });
+export const jobsWaiting = createStore(0);
+const failText = (f) => `${fs.basename(f.src)}: ${f.error?.message || f.error}`;
 let polling = null;
 function poll() {
-  const list = fs.jobs();
-  const done = list.filter((j) => j.done);
-  for (const j of done) {
-    fs.forgetJob(j.id);
-    if (j.failed) jobErrors.set((e) => [...e, `${fs.basename(j.src)}: ${errorText(j.error)}`].slice(-5));
-  }
-  if (done.length) bump();
-  const running = list.filter((j) => !j.done);
+  const { finished, failed, running } = queue.drain();
+  const errs = [...finished.filter((j) => j.failed).map((j) => `${fs.basename(j.src)}: ${errorText(j.error)}`), ...failed.map(failText)];
+  if (errs.length) jobErrors.set((e) => [...e, ...errs].slice(-5));
+  if (finished.length) bump();
   jobState.set(running);
-  if (!running.length && polling) { clearInterval(polling); polling = null; }
+  jobsWaiting.set(queue.size());
+  if (!running.length && !queue.size() && polling) { clearInterval(polling); polling = null; }
 }
 export const jobErrors = createStore([]);
 function watchJobs() { if (!polling) polling = setInterval(poll, 250); poll(); }
+// the ✕ of the copy shown: it stops, and what waits behind it doesn't start
+export function cancelJob(id) {
+  queue.clear();
+  jobsWaiting.set(0);
+  fs.cancelJob(id);
+}
 
 // Copy or move several paths to a folder. Copying to the same place = duplicate with a free name.
 // known: the names already in destDir when the caller has them (a slow folder's listing, apps/files/remotedirs.js),
@@ -66,17 +74,16 @@ function watchJobs() { if (!polling) polling = setInterval(poll, 250); poll(); }
 export function transfer(paths, destDir, move, known) {
   const existing = known ? new Set(known) : new Set(lord.fs.list(destDir).map((e) => e.name));
   const errors = [];
+  const items = [];
   for (const p of paths) {
     const name = fs.basename(p);
     if (move && fs.parent(p) === destDir) continue;                       // already there
     if (move && (destDir === p || destDir.startsWith(`${p}/`))) { errors.push(name); continue; }
     const target = freeName(destDir, name, existing);
-    existing.add(target);
-    try {
-      if (move) fs.move(p, `${destDir}/${target}`);
-      else fs.copy(p, `${destDir}/${target}`);
-    } catch (e) { errors.push(`${name}: ${e.message}`); }
+    existing.add(target);                                                 // the name is taken now, even while it waits
+    items.push({ src: p, dst: `${destDir}/${target}`, move });
   }
+  for (const f of queue.add(items)) errors.push(failText(f));
   watchJobs();
   if (errors.length) jobErrors.set((e) => [...e, ...errors].slice(-5));
   return errors;

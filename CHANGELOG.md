@@ -443,6 +443,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Files: copying or moving many items at once copies all of them.** lord-server runs at most 8 copy or move jobs
+  at a time and refused one more with "Too many copies in progress", and Files started one job per selected item with
+  nothing to hold the rest: a paste, a drop or a Duplicate of more than 8 items copied the first 8 and the others failed
+  at once (moves on the same disk too, since a finished job keeps its slot until Files reads it). The items past the
+  free slots now wait in Files and start, in the order chosen, as the running ones finish; moves on the same disk all
+  go in one pass. The status bar says how many more are left next to the one in progress, and its ✕ stops that copy and
+  drops the ones still waiting. An item that fails for its own reason (the name was taken meanwhile, a protected
+  folder) is reported and the rest go on. Suite `files-jobqueue-test` (GitHub #104).
+
+- **Files: in Home, and in the column view, Move to Trash, Cut, Paste and New Folder work, and a file picked in a
+  deeper column can be copied.** Two causes. Files greys out what changes a folder when the folder is read-only, and the
+  home folder's own entry reads as read-only (its parent is outside what LordOS writes), so in Home those actions were
+  disabled and a drop on the Dock's Trash did nothing; what is inside the home folder now counts as writable, as the
+  file chooser already did. Also the selection was looked up only among the first column's items, so with Pictures →
+  Screenshots open a file picked in the last column was selected on screen but ⌘C copied nothing and the menus had
+  nothing to act on. Every column's items now count. Shift + click selects a range inside the clicked column, and
+  Duplicate, Compress and New Folder with Selection put what they make next to the item, not in the first column's
+  folder. Suite `files-colview-test` (GitHub #100).
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.
