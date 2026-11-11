@@ -443,6 +443,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Web apps: pasting a file copied in Files (or another file manager) pasted its path as text, so a chat page could not
+  send it; and any text past ASCII pasted by WebKit came out garbled (a path in `Imágenes` as `ImÃ¡genes`). WebKit
+  2.48's pasteboard for WPE holds text only, and it reads its stored bytes back as Latin-1 while it writes them as
+  UTF-8 (`PlatformPasteboardLibWPE.cpp`, `readString`). Now, at the person's own paste (Ctrl+V, Shift+Insert, the
+  Edit menu's or the context menu's Paste; never at any other moment), lord-web looks at the session's selection
+  first: when it offers `text/uri-list` (or `x-special/gnome-copied-files`), lord-web reads the list then (at most
+  1 MB), opens its local files with exactly the drop's checks and limits (`file://` without a host, the person's
+  places, no hidden folder or file, no link on the resolved path, a regular file, at most 64 MB each and 20 files)
+  and dispatches a `paste` event on the focused element whose `DataTransfer` holds them as `File`s (`types`
+  `["Files"]`, no text); when every file is refused it pastes the selection's text as before (the list itself when the
+  selection has no text). A text that isn't plain ASCII is pasted by lord-web too: a `paste` event with it as
+  `text/plain`, and when no listener takes it the text is inserted at the caret (WebKit's `InsertText`); ASCII text is
+  still WebKit's own paste. The session's text is read as `text/plain;charset=utf-8`, then `UTF8_STRING`, then
+  `text/plain` (UTF-8 when it is valid, else converted from Latin-1), then `STRING` (Latin-1); `TEXT` is never read,
+  and a UTF-8 type that isn't valid UTF-8 is refused. A selection with no text (only a file list or an image) now
+  empties WebKit's pasteboard, so an older text is never pasted in its place. A copy from an isolated LordOS app or a
+  sandboxed (Flatpak) client reaches lord-web without its file lists: lord-server leaves `text/uri-list` and the
+  other file-list types out of that selection's offer to a lord-web client and refuses them at `receive`
+  (`OfferRef.nofiles`, the same rule as for drags), so it pastes as text only. The log says `paste: N files from the
+  clipboard accepted[; others refused: <reason>]`, `paste: no file from the clipboard accepted (...); pasting its
+  text`, `paste: text (N bytes, <type>[; WebKit's own paste])` and `paste dispatched (...)`, sizes, types and reasons
+  only. Tests: `build/webapp-test` (the text type order, UTF-8 checks, Latin-1 conversion and the `Imágenes` case,
+  which text WebKit's own paste reads right, gnome and uri lists, a pasted list's files through the drop's checks).
+  Checked on VM 127 (2026-11-11): `hacker.jpg` copied in Files from `~/Imágenes` and pasted with Ctrl+V, and with
+  the Edit menu's Paste, into a test page arrived as `hacker.jpg image/jpeg 6753` (`types` `["Files"]`, the page
+  showed the picture); a text `/home/alex/Imágenes/hacker.jpg` pasted into a text area arrived as it is (the build
+  before pasted `/home/alex/ImÃ¡genes/hacker.jpg`), and `Fotos en ~/Imágenes: café, niño, €` from the context
+  menu's Paste into an editable box too; a list naming a hidden file was refused and its text pasted instead.
 - Web apps: copying from a page that handles the copy itself put nothing on the session's clipboard (copying
   messages from a chat, then pasting in another app, pasted what was there before). Such a page handles the `copy`
   or `cut` event, writes its own text into the event's `clipboardData` (messages with their sender and time, emoji
