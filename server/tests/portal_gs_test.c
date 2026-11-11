@@ -3,6 +3,7 @@
  * compositor. Run by tests/run_suites.sh under dbus-run-session, with a temporary home folder. */
 #include "../src/ui/portal.h"
 #include "../src/ui/gshort.h"
+#include "../src/ui/webask.h"
 #include "../src/wl/keygrab.h"
 #include "../src/vault/dbus.h"
 #include <linux/input-event-codes.h>
@@ -33,6 +34,12 @@ void cast_end(int id) { (void)id; }
 int cast_remote(int id, uint32_t req) { (void)id; (void)req; return -1; }
 void cast_shown(int id) { (void)id; }
 int cast_thumb(const CastSource *src, int max) { (void)src; (void)max; return 0; }
+/* web apps' questions share the connection (src/ui/webask.c, its own tests): none here */
+void webask_attach(DConn *c) { (void)c; }
+void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
+int webask_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void webask_gone(const char *name) { (void)name; }
+void webask_lost(void) {}
 
 static DConn app;
 typedef struct { char member[64], sig[64], path[400], s1[400], s2[128]; uint32_t code; uint64_t t; int type; char err[128]; int nlist; char list[8][128]; } Got;
