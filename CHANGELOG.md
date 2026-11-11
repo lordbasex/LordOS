@@ -12,6 +12,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Web apps: files dragged onto a web app's window reach the page as a real drop.** WPE WebKit 2.48 cannot take an
+  external drop, so lord-web is the drop target: it reads the drag's text/uri-list, keeps only local regular files (at
+  most 64 MB each, 20 files), reads them itself and gives them to the page through a script in an isolated world. The
+  page then gets dragenter, dragover and drop with a DataTransfer whose types include "Files". A drop with no local
+  file gives the page its text.
+- **Web apps: image paste and copy.** An image on the clipboard (image/png or image/jpeg, up to 32 MB) is pasted into
+  the page with Ctrl+V or Shift+Insert as a paste event carrying the image as a file. WebKit's pasteboard is emptied
+  when such an image arrives, so text copied earlier is never pasted instead. Pages can copy images and text to the
+  session through navigator.clipboard.write and writeText, which lord-web adds because WPE 2.48 lacks them; lord-web
+  accepts them only on the app's own pages and right after a key, click or touch in the window.
+- **Web apps: the mouse wheel scrolls pages again.** WebKit 2.48 reads a line scroll event by its signs alone, so the old
+  event also scrolled one line sideways and pages didn't move. Each notch is now one line on its own axis,
+  high-resolution wheels add up their partial notches, and touchpads scroll in pixels with an end-of-gesture event.
+- **Web apps: clicking a notification opens what it is about.** lord-web runs the page's own click handler (a messaging
+  web app opens that chat) and then brings the window forward. The shell now sends the notification's default action
+  on a click instead of only dismissing it (`defaultAction` in `sdk/notify.js`).
+- **Web apps: notifications show the web app's name and icon** instead of an empty square. notifyd accepts a
+  `lordos-web.<app>.<profile>` desktop entry only from the lord-web that lord-server started for that app and profile.
+- **Web apps: no more double notification sound.** When a page plays its own sound within 1.5 s of a notification,
+  LordOS suppresses its own and remembers this per profile (`state.json`). The new registry key `notifySound` (auto,
+  app, system, none) overrides it, and notifyd now honors the suppress-sound hint.
+- **Web apps: a Linux user agent** with WebKit's usual browser tokens and `LordOS/<version>`. WebKit's site-specific quirks are
+  off on the app's own pages, so sites no longer offer a download for another system.
+- **Web apps: unread count.** The count a page puts in its title ("(3) …") is sent to lord-server with
+  `org.lordos.WebApps1.SetBadge` when it changes.
+- **Web apps: tray icon is optional.** New registry key `tray` (default off). An app in the background keeps running
+  without it, and the Dock or launcher brings its window back.
 - **Web apps: the catalog grows from 6 to 37 apps.** Every new one passed `lord-web --probe` on 2026-11-11 and starts at
   the service's own address (its mail, calendar, documents or player, never its marketing or sign-in page): team chat
   and video meetings, social networks, mail and calendars, cloud files, documents and spreadsheets, notes and task
