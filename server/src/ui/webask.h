@@ -8,7 +8,13 @@
  * profile (or one of its own processes) gets an answer: the bus says the caller's pid
  * (GetConnectionUnixProcessID), never the caller. The question goes to the shell as the "webapps-ask" event;
  * lord.webapps.answer() brings the person's answer back, which is stored in the registry unless it is "once".
- * Served on portal.c's connection; portal.c hands the calls, replies and departures over. */
+ * Served on portal.c's connection; portal.c hands the calls, replies and departures over.
+ *
+ *   org.lordos.WebApps1.SetBadge(s app, s profile, u count)                  (no answer needed)
+ *
+ * The page's unread count for the Dock (docs/WEBAPPS.md, "Unread count on the Dock"). The same pid check as Ask
+ * (webbadge.h keeps who was checked); the count is clamped to 0..9999 and goes to the shell as the "webapps-badge"
+ * event { app, profile, count }; a lord-web that leaves the bus gets a 0. */
 #ifndef LORD_UI_WEBASK_H
 #define LORD_UI_WEBASK_H
 
@@ -31,6 +37,8 @@ void webask_attach(DConn *c);
  * wanted. lord-web activates its window with the token, or maps it again when it was hidden behind its tray icon.
  * 0 sent, -1 no bus or a bad id. */
 int  webask_show(const char *app, const char *profile, const char *token);
+/* The counts shown now, as a JSON array [{ app, profile, count }] (malloc'd), for a new JS context. */
+char *webask_badges(void);
 /* The questions waiting for the person, as a JSON array (malloc'd), for a new JS context. */
 char *webask_pending(void);
 

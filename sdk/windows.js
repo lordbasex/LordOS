@@ -8,6 +8,8 @@
 import { screen, onScreenChange, addListener, mainDisplay, displayAt, displayFor } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { appName, t } from './i18n.js';
+import { webAppOfWindow } from './webapps.js';
+import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext } from './snap.js';
 import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
 
@@ -583,5 +585,15 @@ export function appMenuClick(itemId) { const fn = appMenuHandlers.get(itemId); i
 // Menus of window `id` (for the theme's menu bar).
 export const useAppMenus = (id) => useStore(appMenus, (m) => (id ? m[id] : null)) || null;
 
-// Display name of a window: its title or the app's name.
-export const windowTitle = (w) => w?.title || appName(getApp(w?.id)) || '';
+// Display name of a window: its title or the app's name. A web app's window with more than one profile says
+// "<app> — <profile>" (webappsmodel.js webWindowTitles), so two accounts' windows are told apart.
+const webTitles = (w) => {
+  if (!w?.args?.web) return null;
+  const web = webAppOfWindow(w);
+  return web ? webWindowTitles(web.entry, web.profile, w.title) : null;
+};
+export const windowTitle = (w) => webTitles(w)?.frame || w?.title || appName(getApp(w?.id)) || '';
+// The title in the Dock's window list ("<page title> — <profile>" for a web app with several profiles).
+export const windowMenuTitle = (w) => webTitles(w)?.menu || windowTitle(w);
+// The profile's color of a web app's window (#rrggbb), or null: the frame's thin strip and the menu's dot.
+export const windowAccent = (w) => profileHex(webTitles(w)?.color);

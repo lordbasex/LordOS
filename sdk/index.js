@@ -29,9 +29,11 @@ export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
-export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, webAppIcon, APP_CATEGORIES, appCategory } from './apps.js';
+export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
-export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine } from './webapps.js';
+export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
+  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy } from './webapps.js';
+export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
 export { compareNames } from './collate.js';
 import { windowIcon as windowIconOf } from './apps.js';
@@ -92,7 +94,7 @@ export * as netModel from './netmodel.js';        // (0.8.5) Monitor → Network
 export { packages, packageList, refreshPackages, packageFile, loadWasm } from './packages.js';
 import { refreshPackages, forgetGonePackaged, packageList as packageListOf } from './packages.js';
 export {
-  windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, appRegistry, appMenuClick,
+  windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
   keepWindowsInWorkAreas, pointerDisplay,
 } from './windows.js';

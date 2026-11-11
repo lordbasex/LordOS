@@ -274,5 +274,12 @@
   "video.statusHardware": "Apagado: esta computadora decodifica video VP9 y AV1 por hardware.",
   "video.statusNever": "Apagado: los sitios de video eligen el formato, aunque la computadora lo tenga que decodificar sin ayuda.",
   "video.title": "Video en el navegador",
-  "bt.searchAgain": "Buscar de nuevo"
+  "bt.searchAgain": "Buscar de nuevo",
+  "notif.lordSound": "Sonido de LordOS",
+  "notif.tone.default": "Predeterminado",
+  "notif.tone.none": "Ninguno",
+  "notif.tone.pop": "Toque",
+  "notif.tone.chime": "Campanita",
+  "notif.tone.ping": "Ping",
+  "notif.tone.drop": "Gota"
 }

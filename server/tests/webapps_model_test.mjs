@@ -227,5 +227,74 @@ eq('data folder', [M.dataDir('chat', 'work'), M.dataDir('chat'), M.dataDir('../x
 eq('the dialog\'s answers', [M.askAnswer(true, true), M.askAnswer(true, false), M.askAnswer(false, true), M.askAnswer(false, false)],
   ['allow', 'once', 'deny', 'deny-once']);
 
+// ---- the site's own icon: the cache's names, and which icon a notification may name ----
+eq('icon cache names', [M.iconCacheName('whatsapp', 'png'), M.iconCacheName('my-chat', 'svg'), M.iconCacheName('../x', 'png'), M.iconCacheName('chat', 'gif'),
+  M.iconCacheName('Chat', 'png'), M.iconCacheName('chat.x', 'png')], ['whatsapp.png', 'my-chat.svg', null, null, null, null]);
+const H = '/home/u';
+eq('a notification\'s icon: only the app\'s own files', [
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', 'chat', H),
+  M.webIconPathOk('/home/u/.cache/lordos/web/icons/chat.svg', 'chat', H),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.work.png', 'chat', H, 'work'),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.work.png', 'chat', H),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/mail.png', 'chat', H),
+  M.webIconPathOk('/etc/passwd', 'chat', H),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/../../../.ssh/id.png', 'chat', H),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', 'chat', 'relative'),
+  M.webIconPathOk('/home/u/.config/lordos/web/icons/chat.png', '../x', H)],
+  [true, true, true, false, false, false, false, false, false]);
+eq('when to fetch the site\'s icon', [M.wantsSiteIcon({ available: true, cached: false, tried: false }), M.wantsSiteIcon({ available: false, cached: false, tried: false }),
+  M.wantsSiteIcon({ available: true, cached: true, tried: false }), M.wantsSiteIcon({ available: true, cached: false, tried: true })], [true, false, false, false]);
+
+// ---- unread counts ----
+let b = {};
+b = M.badgeReducer(b, { app: 'chat', profile: 'personal', count: 3 });
+b = M.badgeReducer(b, { app: 'chat', profile: 'work', count: 120 });
+b = M.badgeReducer(b, { app: 'mail', profile: 'personal', count: 1 });
+eq('the counts by app and profile', b, { chat: { personal: 3, work: 120 }, mail: { personal: 1 } });
+eq('summed per app, or one profile', [M.badgeTotal(b, 'chat'), M.badgeTotal(b, 'chat', 'work'), M.badgeTotal(b, 'none')], [123, 120, 0]);
+eq('bad events change nothing', [M.badgeReducer(b, { app: '../x', profile: 'a', count: 1 }) === b, M.badgeReducer(b, null) === b], [true, true]);
+eq('clamped to 0..9999', M.badgeReducer({}, { app: 'a', profile: 'p', count: 123456 }), { a: { p: 9999 } });
+eq('a 0 drops it', [M.badgeReducer(b, { app: 'mail', profile: 'personal', count: 0 }).mail, M.badgeReducer(b, { app: 'chat', profile: 'work', count: -4 }).chat],
+  [undefined, { personal: 3 }]);
+eq('what the badge says', [M.badgeLabel(0), M.badgeLabel(1), M.badgeLabel(99), M.badgeLabel(100), M.badgeLabel(9999), M.badgeLabel(NaN)], ['', '1', '99', '99+', '99+', '']);
+const prefsOn = () => ({ badge: true, dockPerProfile: false }), prefsOff = () => ({ badge: false, dockPerProfile: false }), perProfile = () => ({ badge: true, dockPerProfile: true });
+eq('the Dock: the app\'s icon sums its profiles', M.dockBadge(b, 'web:chat', prefsOn), '99+');
+eq('the Dock: turned off', M.dockBadge(b, 'web:chat', prefsOff), '');
+eq('the Dock: not a web app', [M.dockBadge(b, 'app:files', prefsOn), M.dockBadge(b, 'linux:firefox', prefsOn)], ['', '']);
+eq('the Dock: per-profile icons', [M.dockBadge(b, 'web:chat', perProfile, (app, p) => p === 'work'), M.dockBadge(b, 'linux:lordos-web.chat.work', perProfile),
+  M.dockBadge(b, 'web:chat', perProfile, () => false)], ['3', '99+', '99+']);
+
+// ---- the shell's choices per app, the Dock entry of a window ----
+eq('per-app choices: defaults and stored', [M.webPrefs({}, 'chat'), M.webPrefs({ webAppPrefs: { chat: { badge: false, dockPerProfile: true } } }, 'chat'), M.webPrefs(null, 'chat')],
+  [{ badge: true, dockPerProfile: false }, { badge: false, dockPerProfile: true }, { badge: true, dockPerProfile: false }]);
+eq('a window\'s Dock entry', [M.webDockId(chat, 'work', false), M.webDockId(chat, 'work', true), M.webDockId(chat, 'personal', true), M.webDockId(chat, 'ghost', true), M.webDockId(null, 'work', true)],
+  ['web:chat', 'linux:lordos-web.chat.work', 'web:chat', 'web:chat', null]);
+
+// ---- notification sounds ----
+eq('whose sound', [M.notifySoundOf({}), M.notifySoundOf({ notifySound: 'app' }), M.notifySoundOf({ notifySound: 'loud' }), M.notifySoundOf(null)], ['auto', 'app', 'auto', 'auto']);
+eq('LordOS plays its sound', [
+  M.playsSystemSound({}, false), M.playsSystemSound({}, true), M.playsSystemSound({ notifySound: 'system' }, true),
+  M.playsSystemSound({ notifySound: 'app' }, false), M.playsSystemSound({ notifySound: 'none' }, false)], [true, false, true, false, false]);
+eq('notification keys', [M.notifyKey('chat'), M.notifyKey('../x'), M.appOfNotifyKey('lordos-web.chat'), M.appOfNotifyKey('lordos-web.chat.work'), M.appOfNotifyKey('linux:firefox')],
+  ['lordos-web.chat', null, 'chat', null, null]);
+
+// ---- profile colors, window titles ----
+const colored = { ...chat, profiles: [{ id: 'personal', name: 'Personal' }, { id: 'work', name: 'trabajo', color: 'blue' }, { id: 'x', name: 'X', color: 'none' }, { id: 'y', name: 'Y' }] };
+eq('a profile\'s color', [M.profileColor(colored, 'personal'), M.profileColor(colored, 'work'), M.profileColor(colored, 'x'), M.profileColor(colored, 'y'), M.profileColor(colored, 'ghost'),
+  M.profileColor(chat, 'work')], [null, 'blue', null, 'blue', null, 'orange']);
+eq('colors\' hex', [M.profileHex('orange'), M.profileHex('pink'), M.profileHex(null)], ['#ff9f0a', null, null]);
+eq('a profile\'s initial', [M.profileInitial({ name: 'trabajo' }), M.profileInitial({ name: ' ñandú' }), M.profileInitial({ name: '' }), M.profileInitial(null)], ['T', 'Ñ', '', '']);
+eq('window titles with two profiles', M.webWindowTitles(colored, 'work', 'WhatsApp Business'),
+  { frame: 'Chat — trabajo', menu: 'WhatsApp Business — trabajo', color: 'blue' });
+eq('window titles with one profile', M.webWindowTitles(solo, 'personal', '(3) Notes'), { frame: '(3) Notes', menu: '(3) Notes', color: null });
+eq('window titles without a page title', M.webWindowTitles(colored, 'personal', ''), { frame: 'Chat — Personal', menu: 'Chat — Personal', color: null });
+eq('the Dock menu\'s profiles are actions (no "running" mark to show as a check)', M.profileMenu(chat, [{ app: 'chat', profile: 'work' }]).map((r) => r.profile), ['work']);
+
+// ---- Settings → Web apps: measuring each profile's data again (a profile added during the visit had none) ----
+const k0 = M.sizesKey(chat, []);
+eq('the key changes when a profile starts', [k0, M.sizesKey(chat, [{ app: 'chat', profile: 'work' }]), M.sizesKey(chat, [{ app: 'other', profile: 'work' }])],
+  ['personal,work', 'personal,work*', 'personal,work']);
+eq('and when one is added', M.sizesKey({ ...chat, profiles: [...chat.profiles, { id: 'new', name: 'New' }] }, []), 'personal,work,new');
+
 console.log(bad ? `webapps-model: ${bad} of ${n} failed` : `webapps-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

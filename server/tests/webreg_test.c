@@ -129,6 +129,57 @@ static void test_file(void) {
     CHECK(parses_with("\"themeColor\": \"#25d366\"", "\"themeColor\": \"red\"") < 0, "a color");
     CHECK(parses_with("\"source\": \"catalog\"", "\"source\": \"store\"") < 0, "a source");
     CHECK(parses_with("\"background\": true", "\"background\": 1") < 0, "background is a boolean");
+    /* "tray" and "notifySound": optional, off and auto when missing (the sample has neither) */
+    CHECK(!a.tray && a.notify_sound == WEBREG_SOUND_AUTO, "tray off and notifySound auto by default");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"tray\": true,") == 0, "tray true");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"tray\": false,") == 0, "tray false");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"tray\": 1,") < 0, "tray is a boolean");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"tray\": \"yes\",") < 0, "tray is not text");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"tray\": true, \"tray\": true,") < 0, "tray twice");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"app\",") == 0 &&
+          parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"system\",") == 0 &&
+          parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"none\",") == 0 &&
+          parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"auto\",") == 0, "notifySound's four values");
+    CHECK(parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"loud\",") < 0 &&
+          parses_with("\"background\": true,", "\"background\": true, \"notifySound\": \"App\",") < 0 &&
+          parses_with("\"background\": true,", "\"background\": true, \"notifySound\": 1,") < 0, "notifySound: another word or type");
+    /* a profile's optional color */
+    CHECK(parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"color\": \"orange\" }") == 0, "a profile color");
+    CHECK(parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"color\": \"none\" }") == 0, "no color, said");
+    CHECK(parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"color\": \"#ff0000\" }") < 0 &&
+          parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"color\": \"pink\" }") < 0 &&
+          parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"color\": 3 }") < 0 &&
+          parses_with("{ \"id\": \"work\", \"name\": \"Work\" }", "{ \"id\": \"work\", \"name\": \"Work\", \"colour\": \"red\" }") < 0, "a bad color or key");
+    {
+        WebApp t = a;
+        CHECK(!strcmp(webreg_profile_default_color(&t), "orange"), "the second profile's color: orange");
+        snprintf(t.profiles[1].color, sizeof t.profiles[1].color, "orange");
+        CHECK(!strcmp(webreg_profile_default_color(&t), "purple"), "then purple");
+        snprintf(t.profiles[0].color, sizeof t.profiles[0].color, "purple");
+        CHECK(!strcmp(webreg_profile_default_color(&t), "blue"), "then blue");
+        char o3[WEBREG_FILE_MAX + 1];
+        size_t n3 = webreg_write(&t, o3, sizeof o3);
+        WebApp u;
+        CHECK(n3 && strstr(o3, "\"name\": \"Work\", \"color\": \"orange\" }") && !webreg_parse(o3, n3, &u, NULL, 0) && !strcmp(u.profiles[1].color, "orange"),
+              "a color written and read back:\n%s", o3);
+        snprintf(t.profiles[1].color, sizeof t.profiles[1].color, "pink");
+        CHECK(!webreg_write(&t, o3, sizeof o3), "a bad color is never written");
+    }
+    CHECK(webreg_sound_value("system") == WEBREG_SOUND_SYSTEM && webreg_sound_value("") < 0 && !strcmp(webreg_sound_name(WEBREG_SOUND_NONE), "none") &&
+          !webreg_sound_name(WEBREG_SOUND_N), "sound names");
+    {
+        WebApp t = a;
+        t.tray = 1;
+        t.notify_sound = WEBREG_SOUND_NONE;
+        char o2[WEBREG_FILE_MAX + 1];
+        size_t n2 = webreg_write(&t, o2, sizeof o2);
+        WebApp u;
+        CHECK(n2 > 0 && strstr(o2, "\"tray\": true") && strstr(o2, "\"notifySound\": \"none\"") && !webreg_parse(o2, n2, &u, NULL, 0) && u.tray &&
+              u.notify_sound == WEBREG_SOUND_NONE, "tray and notifySound written and read back:\n%s", o2);
+        t.notify_sound = 7;
+        CHECK(!webreg_write(&t, o2, sizeof o2), "a bad notifySound is never written");
+        CHECK(!strstr(out, "tray") && !strstr(out, "notifySound"), "neither is written when off and auto");
+    }
     CHECK(parses_with("\"name\": \"Chat\"", "\"name\": \"\"") < 0, "an empty name");
     CHECK(parses_with("\"profiles\": [ { \"id\": \"personal\", \"name\": \"Personal\" }, { \"id\": \"work\", \"name\": \"Work\" } ]", "\"profiles\": []") < 0, "no profiles");
     CHECK(parses_with("\"id\": \"chat\"", "\"id\": \"chat\", \"id\": \"chat\"") < 0, "a key twice");

@@ -24,14 +24,14 @@ import { useEffect } from 'react';
 import { addListener } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
-import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
+import { useWindows, wm, windowMenuTitle, windowAccent, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
 import { pickWindow } from './desktopmodel.js';
 import { desktopSuffix } from './desktops.js';
 import { screen, onScreenChange, displayFor } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
-import { webAppOfWindow, webAppEntry, webRunning, launchWebApp } from './webapps.js';
-import { profileMenu } from './webappsmodel.js';
+import { webAppOfWindow, webAppEntry, webRunning, launchWebApp, webBadges } from './webapps.js';
+import { profileMenu, webDockId, webPrefs, dockBadge, badgeTotal, badgeLabel, parseWindowAppId } from './webappsmodel.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
 import { restoredIds } from './sessionrestore.jsx';
@@ -169,6 +169,9 @@ export function launcherIdOf(w) {
 }
 // The Dock entry a window belongs to (a typed id, or "linux:…" for a window with no .desktop).
 export function dockIdOfWindow(w) {
+  // a web app with "Each profile has its own Dock icon": a profile other than the first on an icon of its own
+  const web = String(w.id).startsWith('linux#') ? webAppOfWindow(w) : null;
+  if (web) return webDockId(web.entry, web.profile, webPrefs(settings.get(), web.entry.id).dockPerProfile);
   const k = launcherIdOf(w);
   return k.startsWith('linux:') ? k : dockIdOf(k) || k;
 }
@@ -181,6 +184,7 @@ export function useDockEntries(defaults = [], opts = {}) {
   if (!typedDefaults.includes(LAUNCHER)) typedDefaults.splice(1, 0, LAUNCHER);
   themeDefaults = typedDefaults;
   const s = useStore(settings);
+  const badges = useStore(webBadges);
   const { windows: wins, focused } = useWindows();
   const apps = useLauncherApps();
   const byId = new Map(apps.map((a) => [a.id, a]));
@@ -214,6 +218,8 @@ export function useDockEntries(defaults = [], opts = {}) {
     windows: ws, pinned: pinned.includes(id), running: ws.length > 0, focused: ws.some((w) => w.id === focused), app: a,
     attention: ws.some((w) => w.attention && w.id !== focused),   // a window asked to come forward (xdg-activation)
     locked: isLocked(id), movable: isMovable(id),
+    // a web app's unread count (SetBadge): the app's sum, or a profile's on its own icon ('' when none or turned off)
+    badge: dockBadge(badges, id, (app) => webPrefs(s, app), (app, p) => groups.has(`linux:lordos-web.${app}.${p}`)),
   });
   const out = [];
   for (const id of pinned) {
@@ -301,7 +307,8 @@ export function dockQuickActions(e) {
   // a web app: a window of each of its other profiles (the click opens the first one)
   if (p.kind === 'web') {
     return profileMenu(webAppEntry(p.key), webRunning()).map((r) => ({
-      label: t('webapps.dock.newWindow', { profile: r.name }), checked: r.running,
+      // an action, never a choice: no check mark (only the window list marks the window in front)
+      label: t('webapps.dock.newWindow', { profile: r.name }),
       onClick: () => { try { launchWebApp(p.key, r.profile); } catch (err) { notify({ app: 'settings', title: errorText(err) }); } },
     }));
   }
@@ -328,7 +335,11 @@ export function dockMenu(e, opts = {}) {
   if (quick.length) items.push(...quick, '-');
   if (e.windows.length) {
     for (const w of [...e.windows].reverse()) {
-      items.push({ label: `${windowTitle(w) || e.name}${desktopSuffix(w)}`, checked: w.id === top, hint: w.minimized ? '–' : '', onClick: () => wm.focus(w.id) });
+      // a web app's window: "<title> — <profile>", the profile's color as a dot and its own unread count
+      const own = parseWindowAppId(w.args?.appId || '');
+      const count = own && w.args?.web && webPrefs(settings.get(), own.app).badge ? badgeLabel(badgeTotal(webBadges.get(), own.app, own.profile)) : '';
+      const hint = [count, w.minimized ? '–' : ''].filter(Boolean).join(' ');
+      items.push({ label: `${windowMenuTitle(w) || e.name}${desktopSuffix(w)}`, checked: w.id === top, dot: windowAccent(w), hint, onClick: () => wm.focus(w.id) });
     }
     items.push('-');
   }

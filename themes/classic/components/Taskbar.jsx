@@ -180,7 +180,11 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
         onEnter={() => showTip(title, refs.current.get(e.id))} onLeave={hideTip} style={{ opacity: dragged ? 0.35 : 1 }}>
         <e.Icon size={26} />
         {indicator(e)}
-        {e.windows.length > 1 ? <View style={{ position: 'absolute', right: 3, top: 3, minWidth: 12, height: 12, paddingHorizontal: 2, borderRadius: 6,
+        {/* a web app's unread count (SetBadge): a red badge, "99+" past 99 (the window count moves down then) */}
+        {e.badge ? <View style={{ position: 'absolute', right: 1, top: 1, minWidth: 14, height: 14, paddingHorizontal: 3, borderRadius: 7,
+          backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap' }}>{e.badge}</Text></View> : null}
+        {e.windows.length > 1 ? <View style={{ position: 'absolute', right: 3, [e.badge ? 'bottom' : 'top']: 3, minWidth: 12, height: 12, paddingHorizontal: 2, borderRadius: 6,
           backgroundColor: t.control, border: `1px solid ${t.tileBorder}`, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 8, fontWeight: 700, color: t.text }}>{e.windows.length}</Text></View> : null}
       </BarButton>

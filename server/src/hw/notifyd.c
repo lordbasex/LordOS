@@ -26,6 +26,7 @@ static NotifydEvent emit;
 static struct { uint32_t serial; DMsg call; double since; } pending[MAX_PENDING];
 static int npending;
 static int (*app_of_pid)(uint32_t pid, char *out, size_t n);
+static int (*web_of_pid)(uint32_t pid, char *app, char *profile);
 
 static double mono_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
 
@@ -78,13 +79,12 @@ static void reply_info(const DMsg *m) {
     dw_free(&b);
 }
 
-static void on_notify(const DMsg *m) {
+static void on_notify(const DMsg *m, uint32_t pid) {
     DRd r;
     dr_init(&r, m);
     const char *app = dr_str(&r, NULL);
     uint32_t replaces = dr_u32(&r);
     const char *icon = dr_str(&r, NULL), *summary = dr_str(&r, NULL), *body = dr_str(&r, NULL);
-    (void)icon;
     HBuf j = { 0 };
     char plain[2048];
     hb_printf(&j, "{\"actions\":[");
@@ -102,7 +102,7 @@ static void on_notify(const DMsg *m) {
         hb_printf(&j, "]");
     }
     char desktop[160] = "";
-    int urgency = 1;
+    int urgency = 1, quiet = 0;
     end = dr_arr(&r, 8);
     while (!r.err && dr_more(&r, end)) {
         dr_struct(&r);
@@ -110,6 +110,7 @@ static void on_notify(const DMsg *m) {
         if (r.err || !k || !sig) break;
         if (!strcmp(k, "desktop-entry") && !strcmp(sig, "s")) { const char *v = dr_str(&r, NULL); snprintf(desktop, sizeof desktop, "%s", v ? v : ""); }
         else if (!strcmp(k, "urgency") && !strcmp(sig, "y")) urgency = dr_u8(&r);
+        else if (!strcmp(k, "suppress-sound") && !strcmp(sig, "b")) quiet = dr_bool(&r);   /* it played its own */
         else dr_skip(&r, sig);
     }
     int32_t timeout = dr_i32(&r);
@@ -125,6 +126,21 @@ static void on_notify(const DMsg *m) {
     hb_str(&j, plain);
     hb_printf(&j, ",\"desktop\":");
     hb_str(&j, desktop);
+    /* a web app's lord-web, as lord-server knows it from the pid (never from the desktop-entry the caller wrote) */
+    char wapp[48] = "", wprof[48] = "";
+    if (web_of_pid && pid && !web_of_pid(pid, wapp, wprof) && wapp[0]) {
+        hb_printf(&j, ",\"webApp\":");
+        hb_str(&j, wapp);
+        hb_printf(&j, ",\"webProfile\":");
+        hb_str(&j, wprof);
+        /* its registry or cached icon, as lord-web names it: the shell takes it only when it is exactly that app's
+         * icon file (sdk/webappsmodel.js webIconPathOk), else it draws the app's icon it knows */
+        if (icon && icon[0] == '/' && strlen(icon) < 512 && !strstr(icon, "/../")) {
+            hb_printf(&j, ",\"appIcon\":");
+            hb_str(&j, icon);
+        }
+    }
+    if (quiet) hb_printf(&j, ",\"suppressSound\":true");
     hb_printf(&j, ",\"title\":");
     notifyd_plain(summary, plain, 256);
     hb_str(&j, plain);
@@ -145,6 +161,7 @@ static void on_notify(const DMsg *m) {
 static int app_of_pid_proc(uint32_t pid, char *out, size_t n) { return appid_of_pid(pid, out, n); }
 
 void notifyd_set_app_of_pid(int (*fn)(uint32_t pid, char *out, size_t n)) { app_of_pid = fn; }
+void notifyd_set_web_of_pid(int (*fn)(uint32_t pid, char *app, char *profile)) { web_of_pid = fn; }
 
 /* Shown or not: only a PID the bus gave us whose process is outside any restricted app's scope.
  * Fails closed: no PID, or a process we can't read (it already exited), is not shown. */
@@ -206,7 +223,7 @@ static void on_sender(const DMsg *m) {
         uint32_t pid = 0;
         if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
         if (pid_blocked(pid)) drop_notify(&call);
-        else on_notify(&call);
+        else on_notify(&call, pid);
         dbus_msg_free(&call);
         return;
     }

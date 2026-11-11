@@ -9,7 +9,9 @@
  * Also what Chromium checks before it uses the service instead of drawing its own popups
  * (GetCapabilities with "body" and "actions", GetServerInformation with spec 1.2), a Notify the way
  * Chrome sends it (actions, image-data, image-path, desktop-entry, suppress-sound hints), and
- * dbus_session_export, which gives the session's apps the bus address (docs/WAYLAND.md). */
+ * dbus_session_export, which gives the session's apps the bus address (docs/WAYLAND.md).
+ * A web app's lord-web (pid 300 is lord-server's lord-web for chat/work): its notification carries webApp, webProfile
+ * and its app_icon; the same desktop-entry and icon from any other process carry neither. suppress-sound is passed on. */
 #include "hw/notifyd.h"
 #include "fw/rules.h"
 #include "sec/broker.h"
@@ -47,18 +49,29 @@ static void on_event(const char *kind, const char *json) {
     const char *a = strstr(json, "\"actions\":[[\"default\",\"Activate\"],[\"settings\",\"Settings\"]]");
     if (d && write(shown_fd, "|desktop", 8) < 0) {}
     if (a && write(shown_fd, "|actions", 8) < 0) {}
+    if (strstr(json, "\"webApp\":\"chat\",\"webProfile\":\"work\"") && write(shown_fd, "|web", 4) < 0) {}
+    if (strstr(json, "\"appIcon\":\"/home/u/.config/lordos/web/icons/chat.png\"") && write(shown_fd, "|icon", 5) < 0) {}
+    if (strstr(json, "\"suppressSound\":true") && write(shown_fd, "|quiet", 6) < 0) {}
     if (write(shown_fd, "\n", 1) < 0) {}
 }
 static int fake_app_of_pid(uint32_t pid, char *out, size_t n) {
     if (pid == 100) { snprintf(out, n, "desktop:bad"); return 0; }
     if (pid == 200) { snprintf(out, n, "desktop:good"); return 0; }
+    if (pid == 300) return 1;                       /* lord-web: in no app's firewall scope here */
     return -1;
+}
+static int fake_web_of_pid(uint32_t pid, char *app, char *profile) {
+    if (pid != 300) return -1;
+    snprintf(app, 41, "chat");
+    snprintf(profile, 41, "work");
+    return 0;
 }
 static void run_notifyd(int secs) {
     FwStore *s = fw_store_new();
     fw_set_restricted(s, "desktop:bad", FW_R_NO_NOTIFICATIONS);
     restrict_set_store(s);
     notifyd_set_app_of_pid(fake_app_of_pid);
+    notifyd_set_web_of_pid(fake_web_of_pid);
     if (notifyd_start(on_event)) _exit(3);
     time_t end = time(NULL) + secs;
     while (time(NULL) < end) {
@@ -137,6 +150,23 @@ static uint32_t notify_chrome(const char *title) {
     dw_struct(&b); dw_str(&b, "suppress-sound"); dw_variant(&b, "b"); dw_bool(&b, 1);
     dw_struct(&b); dw_str(&b, "x-kde-origin-name"); dw_variant(&b, "s"); dw_str(&b, "web.example.org");
     dw_struct(&b); dw_str(&b, "urgency"); dw_variant(&b, "y"); dw_u8(&b, 1);
+    dw_arr_end(&b, a);
+    dw_i32(&b, -1);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/Notifications", .iface = "org.freedesktop.Notifications",
+               .member = "Notify", .dest = ":1.1", .sig = "susssasa{sv}i", .sender = ":1.9" };
+    bus_send(&h, &b);
+    dw_free(&b);
+    return bserial;
+}
+
+/* a Notify as lord-web sends it: its registry icon as app_icon, desktop-entry lordos-web.<app>.<profile> */
+static uint32_t notify_web(const char *title) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, "Chat"); dw_u32(&b, 0); dw_str(&b, "/home/u/.config/lordos/web/icons/chat.png"); dw_str(&b, title); dw_str(&b, "hi");
+    size_t a = dw_arr_begin(&b, 4); dw_arr_end(&b, a);
+    a = dw_arr_begin(&b, 8);
+    dw_struct(&b); dw_str(&b, "desktop-entry"); dw_variant(&b, "s"); dw_str(&b, "lordos-web.chat.work");
     dw_arr_end(&b, a);
     dw_i32(&b, -1);
     DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/Notifications", .iface = "org.freedesktop.Notifications",
@@ -296,6 +326,16 @@ int main(void) {
     pid_answer(q, 200, "org.freedesktop.DBus");
     check(notify_answer(n, 2000) > 0, "1b: Chrome's Notify answered with an id");
 
+    /* 1c. lord-server's lord-web for chat/work: shown as that web app, with its icon */
+    n = notify_web("web"); q = pid_question();
+    pid_answer(q, 300, "org.freedesktop.DBus");
+    check(notify_answer(n, 2000) > 0, "1c: lord-web's Notify answered");
+
+    /* 1d. the same Notify from a process that is not a lord-web: no web app, no icon */
+    n = notify_web("notweb"); q = pid_question();
+    pid_answer(q, 200, "org.freedesktop.DBus");
+    check(notify_answer(n, 2000) > 0, "1d: answered");
+
     /* 2. restricted: answered, not shown */
     n = notify("bad"); q = pid_question();
     pid_answer(q, 100, "org.freedesktop.DBus");
@@ -328,8 +368,10 @@ int main(void) {
     char shown[512] = "";
     ssize_t r = read(pipefd[0], shown, sizeof shown - 1);
     shown[r > 0 ? r : 0] = 0;
-    check(!strcmp(shown, "good\nchrome|desktop|actions\n"), "only the unrestricted notifications were shown, Chrome's with its entry and actions");
-    if (strcmp(shown, "good\nchrome|desktop|actions\n")) printf("  shown: %s\n", shown);
+    const char *want = "good\nchrome|desktop|actions|quiet\nweb|web|icon\nnotweb\n";
+    check(!strcmp(shown, want), "only the unrestricted notifications were shown, Chrome's with its entry, actions and suppress-sound, "
+                                "lord-web's as its web app with its icon, an impostor's without");
+    if (strcmp(shown, want)) printf("  shown: %s\n", shown);
     unlink(sock);
     rmdir(path);
     printf("notifyd-test: %d/%d passed\n", total - fails, total);

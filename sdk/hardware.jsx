@@ -32,8 +32,9 @@ import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry } from './webapps.js';
-import { profileOf } from './webappsmodel.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent } from './webapps.js';
+import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel } from './webappsmodel.js';
+import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
 import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
@@ -523,15 +524,38 @@ export function PortalOpenPrompt() {
 // ---- Linux apps' notifications (org.freedesktop.Notifications, server/src/hw/notifyd.c) ----
 
 const fromLinux = new Map();            // D-Bus id → our notification id
+// A web app's notification: lord-server said from the pid that it is that app's lord-web (n.webApp; never from the
+// desktop-entry, which any process can write). Filed under lordos-web.<app> (Settings → Notifications), named and drawn
+// as the app with the profile's dot; LordOS's sound follows Settings → Web apps → Notification sound.
+function webNotifyLook(n) {
+  if (!n.webApp) return null;
+  let entry = webAppEntry(n.webApp);
+  if (!entry) { refreshWebApps(); entry = webAppEntry(n.webApp); }
+  if (!entry) return null;
+  const l = windowLabel(entry, n.webProfile);
+  let home = '';
+  try { home = lord.fs.home(); } catch (e) { home = ''; }
+  const named = n.appIcon && webIconPathOk(n.appIcon, entry.id, home, n.webProfile) ? n.appIcon : '';
+  // the profile's own icon (lord-server drew its dot already) as it is; the app's icon gets the dot here
+  const composed = named && named.endsWith(`/${entry.id}.${n.webProfile}.png`);
+  return {
+    key: notifyKey(entry.id), label: l.profile ? t('webapps.windowName', { app: l.name, profile: l.profile }) : l.name,
+    icon: composed ? iconFromFile(named, entry.name) : webProfileIcon(entry, n.webProfile, named ? iconFromFile(named, entry.name) : null),
+    sound: playsSystemSound(entry, !!n.suppressSound),
+  };
+}
+
 function linuxNotify(n) {
   if (!n || !n.id) return;
-  const app = linuxAppFor(n.desktop || n.app);
-  const key = `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
+  const web = webNotifyLook(n);
+  const app = web ? null : linuxAppFor(n.desktop || n.app);
+  const key = web ? web.key : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
   const prev = fromLinux.get(n.id);
   if (prev) dismissNotification(prev, 'replaced');
   const reason = { closed: 2, expired: 1, action: 2, replaced: 0, remote: 0 };
   const id = notify({
-    app: key, label: shortAppName(app) || n.app, icon: app?.Icon || null, title: n.title, body: n.body, sticky: n.urgency === 2,
+    app: key, label: web ? web.label : shortAppName(app) || n.app, icon: web ? web.icon : app?.Icon || null, sound: web ? web.sound : true,
+    title: n.title, body: n.body, sticky: n.urgency === 2,
     timeout: n.timeout > 0 ? n.timeout : 6000,
     actions: (n.actions || []).filter(([k]) => k !== 'default').map(([k, label]) => ({ id: k, label, run: () => lord.notifyd.action(n.id, k) })),
     onClose: (why) => { if (fromLinux.get(n.id) === id) fromLinux.delete(n.id); if (reason[why]) lord.notifyd.closed(n.id, reason[why]); },
@@ -614,6 +638,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-shortcuts': case 'portal-shortcuts-gone': case 'portal-shortcuts-changed': globalShortcutsEvent(kind, data); break;
     case 'portal-cast': case 'portal-cast-gone': case 'portal-casts': castEvent(kind, data); break;   // ScreenCast (screencast.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
+    case 'webapps-badge': webBadgeEvent(data); break;
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

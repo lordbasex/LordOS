@@ -689,7 +689,7 @@
   "webapps.deleteFailed": "Could not delete its data",
   "webapps.exists": "That web app is already installed",
   "webapps.lastProfile": "A web app needs at least one profile",
-  "webapps.noProfile": "That profile doesn't exist",
+  "webapps.noProfile": "That profile is not there",
   "webapps.noRuntime": "The LordOS Web Runtime (the lordos-web package) isn't installed",
   "webapps.notInCatalog": "That web app isn't in LordOS's list",
   "webapps.notInstalled": "That web app isn't installed",
@@ -863,5 +863,9 @@
   "termconf.verifyFailed": "the new file didn’t read back the same, so nothing was moved",
   "termconf.corrupt": "the file isn’t valid JSON for the Terminal",
   "termconf.newer": "the file was written by a newer LordOS",
-  "vm.shareProtected": "A folder shared with write access can’t be, or hold, a protected file of this computer (such as the Terminal’s configuration or settings.json): the machine could change what this computer runs. Share it read-only, or share a folder without it."
+  "vm.shareProtected": "A folder shared with write access can’t be, or hold, a protected file of this computer (such as the Terminal’s configuration or settings.json): the machine could change what this computer runs. Share it read-only, or share a folder without it.",
+  "webapps.badSound": "Unknown notification sound",
+  "webapps.badColor": "Unknown profile color",
+  "webapps.iconOrigin": "The site moved to another address, so its icon was not kept",
+  "webapps.noIcon": "The site offers no icon LordOS can use"
 }

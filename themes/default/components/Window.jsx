@@ -4,7 +4,7 @@
 // (docs/WINDOWS.md); the JS drag below is only kept for a maximized window.
 // The lights go at the start of the bar (close, minimize, maximize), or at the end (minimize, maximize, close) when
 // Settings → Desktop & Dock → Title bars puts the buttons on that side (useWindowButtons, issue #58).
-import { View, Text, addListener, wm, AppHost, windowTitle, WindowShell, moveToDesktopItems, t as tr, solidOver, useWindowButtons } from '@lordos/sdk';
+import { View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, moveToDesktopItems, t as tr, solidOver, useWindowButtons } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -130,6 +130,8 @@ export function Window({ win, app, t, focused, fx }) {
       </View>
       <View style={{ height: 1, backgroundColor: app.transparent ? solidOver(t.separator, t.titleBg) : t.separator }} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
+      {/* a web app's profile: a thin strip in its color on top of the frame */}
+      {windowAccent(win) ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: windowAccent(win), pointerEvents: 'none' }} /> : null}
     </WindowShell>
   );
 }

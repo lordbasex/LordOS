@@ -1,5 +1,6 @@
 /* webask.c — see webask.h. */
 #include "webask.h"
+#include "webbadge.h"
 #include "../hw/hw.h"
 #include "../web/webmgr.h"
 
@@ -19,6 +20,7 @@ typedef struct {
 static Ask asks[WEBASK_MAX];
 static int next_id = 1;
 static DConn *bus;
+static WebBadges badges;
 
 static const char introspect[] =
     "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\" "
@@ -27,6 +29,8 @@ static const char introspect[] =
     "  <interface name=\"" WEBASK_IFACE "\">\n"
     "    <method name=\"Ask\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
     "<arg type=\"s\" name=\"kind\" direction=\"in\"/><arg type=\"s\" name=\"answer\" direction=\"out\"/></method>\n"
+    "    <method name=\"SetBadge\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
+    "<arg type=\"u\" name=\"count\" direction=\"in\"/></method>\n"
     "  </interface>\n"
     "</node>\n";
 
@@ -59,6 +63,42 @@ static void drop(Ask *a, int tell) {
     memset(a, 0, sizeof *a);
 }
 
+/* asks the bus for sender's pid (its answer comes to webask_reply); the serial, 0 when it could not */
+static uint32_t ask_pid(DConn *c, const char *sender) {
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, sender);
+    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
+               .member = "GetConnectionUnixProcessID", .dest = "org.freedesktop.DBus", .sig = "s" };
+    uint32_t serial = dbus_send(c, &h, &b);
+    dw_free(&b);
+    return serial;
+}
+
+static void badge_event(const char *app, const char *profile, uint32_t count) {
+    char j[160];
+    snprintf(j, sizeof j, "{\"app\":\"%s\",\"profile\":\"%s\",\"count\":%u}", app, profile, count);
+    hw_emit("webapps-badge", j);
+}
+
+/* SetBadge(s app, s profile, u count): shown only once the caller is known to be that app and profile's lord-web */
+static void set_badge(DConn *c, const DMsg *m) {
+    if (!m->sig || strcmp(m->sig, "ssu") || !m->sender) { dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    DRd r;
+    dr_init(&r, m);
+    const char *app = dr_str(&r, NULL), *profile = dr_str(&r, NULL);
+    uint32_t count = dr_u32(&r);
+    int slot = -1;
+    int what = r.err ? WB_REFUSE : webbadge_call(&badges, m->sender, app, profile, count, &slot);
+    if (what == WB_REFUSE) { dbus_error(c, m, "org.freedesktop.DBus.Error.AccessDenied", "not this app's process"); return; }
+    if (what == WB_ASK_PID) {
+        uint32_t serial = ask_pid(c, m->sender);
+        webbadge_asked(&badges, slot, serial);
+        if (!serial) { dbus_error(c, m, "org.freedesktop.DBus.Error.Failed", "no answer from the bus"); return; }
+    } else if (what == WB_EMIT) badge_event(badges.b[slot].app, badges.b[slot].profile, badges.b[slot].count);
+    dbus_reply(c, m, NULL, NULL);
+}
+
 void webask_call(DConn *c, const DMsg *m) {
     bus = c;
     if (!strcmp(m->member, "Introspect")) {
@@ -69,6 +109,7 @@ void webask_call(DConn *c, const DMsg *m) {
         dw_free(&b);
         return;
     }
+    if (m->iface && !strcmp(m->iface, WEBASK_IFACE) && !strcmp(m->member, "SetBadge")) { set_badge(c, m); return; }
     if (!m->iface || strcmp(m->iface, WEBASK_IFACE) || strcmp(m->member, "Ask")) {
         dbus_error(c, m, "org.freedesktop.DBus.Error.UnknownMethod", "unknown method");
         return;
@@ -97,19 +138,31 @@ void webask_call(DConn *c, const DMsg *m) {
     snprintf(a->app, sizeof a->app, "%s", app);
     snprintf(a->profile, sizeof a->profile, "%s", profile);
     /* who asked: the bus answers from the socket's credentials, never the caller */
-    DBuf b;
-    dw_init(&b);
-    dw_str(&b, m->sender);
-    DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/DBus", .iface = "org.freedesktop.DBus",
-               .member = "GetConnectionUnixProcessID", .dest = "org.freedesktop.DBus", .sig = "s" };
-    a->pid_serial = dbus_send(c, &h, &b);
-    dw_free(&b);
+    a->pid_serial = ask_pid(c, m->sender);
     if (!a->pid_serial) { send_error(a, "org.freedesktop.DBus.Error.Failed", "no answer from the bus"); drop(a, 0); }
+}
+
+/* the bus's pid of a SetBadge caller: 1 if m was that answer */
+static int badge_reply(const DMsg *m) {
+    int slot = -1;
+    for (int i = 0; i < WEBBADGE_MAX && slot < 0; i++) if (badges.b[i].state == WB_ASKING && badges.b[i].serial == m->reply_serial) slot = i;
+    if (slot < 0) return 0;
+    uint32_t pid = 0;
+    if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u")) { DRd r; dr_init(&r, m); pid = dr_u32(&r); if (r.err) pid = 0; }
+    char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1];
+    const WebBadge *b = &badges.b[slot];
+    int ok = pid && !webmgr_owner((pid_t)pid, app, profile) && !strcmp(app, b->app) && !strcmp(profile, b->profile);
+    if (!ok) fprintf(stderr, "webapps: a badge for %s (%s) from a process that is not its lord-web: refused\n", b->app, b->profile);
+    int show = 0;
+    slot = webbadge_answer(&badges, m->reply_serial, ok, &show);
+    if (slot >= 0 && show) badge_event(badges.b[slot].app, badges.b[slot].profile, badges.b[slot].count);
+    return 1;
 }
 
 int webask_reply(DConn *c, const DMsg *m) {
     (void)c;
     if (!m->sender || strcmp(m->sender, "org.freedesktop.DBus")) return 0;
+    if (badge_reply(m)) return 1;
     Ask *a = NULL;
     for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && !asks[i].shown && asks[i].pid_serial == m->reply_serial) a = &asks[i];
     if (!a) return 0;
@@ -169,13 +222,42 @@ int webask_show(const char *app, const char *profile, const char *token) {
     return serial ? 0 : -1;
 }
 
+/* that connection's count goes: its lord-web ended (or the bus did) */
+static void badge_gone(const char *name) {
+    char app[WEBBADGE_ID_MAX + 1], profile[WEBBADGE_ID_MAX + 1];
+    if (webbadge_gone(&badges, name, app, profile)) badge_event(app, profile, 0);
+}
+
 void webask_gone(const char *name) {
     for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used && !strcmp(asks[i].sender, name)) drop(&asks[i], 1);
+    badge_gone(name);
 }
 
 void webask_lost(void) {
     for (int i = 0; i < WEBASK_MAX; i++) if (asks[i].used) drop(&asks[i], 1);
+    for (int i = 0; i < WEBBADGE_MAX; i++) {
+        if (badges.b[i].state == WB_NEW) continue;
+        char s[WEBBADGE_NAME_MAX + 1];
+        snprintf(s, sizeof s, "%s", badges.b[i].sender);
+        badge_gone(s);
+    }
     bus = NULL;
+}
+
+char *webask_badges(void) {
+    size_t cap = 128 * WEBBADGE_MAX + 4, o = 0;
+    char *out = malloc(cap);
+    if (!out) return NULL;
+    out[o++] = '[';
+    for (int i = 0; i < WEBBADGE_MAX; i++) {
+        const WebBadge *b = &badges.b[i];
+        if (b->state != WB_OK) continue;
+        int w = snprintf(out + o, cap - o, "%s{\"app\":\"%s\",\"profile\":\"%s\",\"count\":%u}", o > 1 ? "," : "", b->app, b->profile, b->count);
+        if (w > 0 && o + (size_t)w < cap - 2) o += (size_t)w;
+    }
+    out[o++] = ']';
+    out[o] = 0;
+    return out;
 }
 
 char *webask_pending(void) {

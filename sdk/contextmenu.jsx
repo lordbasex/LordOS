@@ -50,6 +50,7 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
             onClick={() => { if (!it.disabled) onPick(i); }}
             style={{ height: ITEM_H, marginHorizontal: 5, paddingHorizontal: 9, borderRadius: 5, flexDirection: 'row', alignItems: 'center', backgroundColor: on ? t.accent : 'transparent' }}>
             <Text style={{ width: 16, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
+            {it.dot ? <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: it.dot }} /></View> : null}
             <Text style={{ flex: 1, fontSize: 13, color: on ? '#fff' : it.disabled ? t.textDim : it.danger ? '#ff453a' : t.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{it.label}</Text>
             {it.hint ? <Text style={{ fontSize: 11, color: on ? '#fff' : t.textDim, marginHorizontal: 4 }}>{it.hint}</Text> : null}
             {it.submenu ? <Text style={{ fontSize: 12, color: on ? '#fff' : t.textDim }}>›</Text> : null}
@@ -60,7 +61,7 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
   );
 }
 
-// Context menu: items [{ label, onClick, hint, checked, disabled, danger, submenu } | '-' | { header } | { swatches }]
+// Context menu: items [{ label, onClick, hint, checked, dot (a color), disabled, danger, submenu } | '-' | { header } | { swatches }]
 export function ContextMenu({ x, y, items, onClose, bounds = { w: 4000, h: 4000 } }) {
   const ref = useRef(null), subRef = useRef(null);
   const [sub, setSub] = useState(null);           // { items, left, top, width, side, row, keys }

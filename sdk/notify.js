@@ -18,6 +18,7 @@ import { useTheme } from './theme.js';
 import { direction, formatTime, appName } from './i18n.js';
 import { getApp, workArea } from './windows.js';
 import { sound } from './sound.js';
+import { toneOf } from './notifytones.js';
 import { settings } from './settings.js';
 import { perms } from './privacy.js';
 import { screen } from '@lordos/runtime';
@@ -32,8 +33,10 @@ const timers = new Map();
 //
 // settings.notifications = { dnd: false | until (ms), schedule: { on, from, to } (local minutes),
 //   grouping: 'app' | 'off', apps: { [app]: { allow, style: 'banner' | 'alert' | 'none', sound, lock } },
+//   (sound: true the default sound, false none, or one of notifytones.js NOTIFY_TONES)
 //   seen: [app ids that have notified] }
-// app is an app id ('backup'), a package id, or 'linux:<desktop id or name>' for Linux apps
+// app is an app id ('backup'), a package id, 'lordos-web.<app>' for a web app (lord-server checked it is that
+// app's lord-web; its sound also follows Settings → Web apps), or 'linux:<desktop id or name>' for Linux apps
 // (org.freedesktop.Notifications, server/src/hw/notifyd.c). For .lpk packages "allow" is the
 // sandbox's "notifications" permission (the same switch as in Privacy & Security).
 export const NOTIFY_DEFAULTS = { dnd: false, schedule: { on: false, from: 22 * 60, to: 7 * 60 }, grouping: 'app', apps: {}, seen: [] };
@@ -71,7 +74,8 @@ function remember(app) {
 function fwNotifyBlocked(app) {
   try {
     if (typeof lord === 'undefined' || !lord.fw || typeof lord.fw.blocks !== 'function') return false;
-    if (!app || app === 'settings' || app.startsWith('linux:')) return false;
+    // Linux apps and web apps ('lordos-web.…', from lord-web) are checked where their D-Bus call arrives
+    if (!app || app === 'settings' || app.startsWith('linux:') || app.startsWith('lordos-web.')) return false;
     const a = getApp(app);
     return !!lord.fw.blocks(a && (a.package || a.isolated) ? `lpk:${app}` : 'lordos', 'no-notifications');
   } catch (e) { return false; }
@@ -89,7 +93,8 @@ export function notify({ app = '', title = '', body = '', actions = [], sound: w
   // Do Not Disturb or "no banner": kept in the history only, without a sound
   if (dndActive() || ap.style === 'none') return id;
   notifications.set((l) => [n, ...l].slice(0, MAX_SHOWN));
-  if (withSound && ap.sound) sound.play('notify');
+  const tone = toneOf(ap.sound);
+  if (withSound && tone) sound.play(tone);
   if (!n.sticky) timers.set(id, setTimeout(() => dismissNotification(id), Math.max(1500, timeout)));
   return id;
 }

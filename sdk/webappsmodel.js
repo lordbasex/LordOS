@@ -297,3 +297,129 @@ export const dataDir = (app, profile) => (isWebId(app) && (!profile || isWebId(p
 
 // The answer the permission dialog sends: remembered (allow / deny, kept in the registry) or this time only.
 export const askAnswer = (allow, remember) => (allow ? (remember ? 'allow' : 'once') : remember ? 'deny' : 'deny-once');
+
+// ---- the site's own icon (lord.webapps.fetchIcon / iconResult: ~/.cache/lordos/web/icons/<app>.<png|svg>) ----
+
+export const ICON_CACHE_DIR = '.cache/lordos/web/icons';
+// The cached icon's file name: the app id and the kind's extension, nothing taken from the site. null when either is bad.
+export const iconCacheName = (app, kind) => (isWebId(app) && (kind === 'png' || kind === 'svg') ? `${app}.${kind}` : null);
+// Is path exactly one of app's own icon files (the registry's, the cache's or a profile's), under home? A notification
+// from lord-web names its icon as app_icon: the shell shows that file only when this holds, else the app's known icon.
+export function webIconPathOk(path, app, home, profile = null) {
+  if (typeof path !== 'string' || typeof home !== 'string' || !home.startsWith('/') || !isWebId(app) || path.includes('/../')) return false;
+  const ok = [`${home}/.config/lordos/web/icons/${app}.png`, `${home}/.config/lordos/web/icons/${app}.svg`,
+    `${home}/${ICON_CACHE_DIR}/${iconCacheName(app, 'png')}`, `${home}/${ICON_CACHE_DIR}/${iconCacheName(app, 'svg')}`];
+  if (isWebId(profile)) ok.push(`${home}/.config/lordos/web/icons/${app}.${profile}.png`);
+  return ok.includes(path);
+}
+// Whether the Store or a launch should fetch the site's icon now: lord-web there, not fetched yet and not tried
+// this session (a failure is not retried until the next session or "Refresh icon").
+export const wantsSiteIcon = ({ available, cached, tried }) => !!available && !cached && !tried;
+
+// ---- unread counts on the Dock (org.lordos.WebApps1.SetBadge → the "webapps-badge" event) ----
+
+// The counts after one event { app, profile, count }: { [app]: { [profile]: count } }, a 0 dropping the profile.
+export function badgeReducer(state, ev) {
+  if (!ev || !isWebId(ev.app) || !isWebId(ev.profile)) return state;
+  const n = Math.max(0, Math.min(9999, Math.floor(Number(ev.count) || 0)));
+  const app = { ...((state || {})[ev.app] || {}) };
+  if (n) app[ev.profile] = n; else delete app[ev.profile];
+  const next = { ...(state || {}) };
+  if (Object.keys(app).length) next[ev.app] = app; else delete next[ev.app];
+  return next;
+}
+// The sum of an app's profiles (or one profile's count).
+export function badgeTotal(state, app, profile = null) {
+  const a = (state || {})[app] || {};
+  if (profile) return a[profile] || 0;
+  return Object.values(a).reduce((s, n) => s + n, 0);
+}
+// What the badge says: '' for 0, the number up to 99, then '99+'.
+export const badgeLabel = (n) => (!(n > 0) ? '' : n > 99 ? '99+' : String(Math.floor(n)));
+
+// ---- notifications (Settings → Web apps "Notification sound": registry "notifySound") ----
+
+export const NOTIFY_SOUNDS = ['auto', 'app', 'system', 'none'];
+export const notifySoundOf = (entry) => (entry && NOTIFY_SOUNDS.includes(entry.notifySound) ? entry.notifySound : 'auto');
+// Does LordOS play its own sound for a notification of this app? auto: only when the page played none of its own
+// (lord-web sends the suppress-sound hint then); system: always; app and none: never.
+export function playsSystemSound(entry, suppressed) {
+  const s = notifySoundOf(entry);
+  return s === 'system' || (s === 'auto' && !suppressed);
+}
+// The key Settings → Notifications files a web app's notifications under: its desktop id without the profile.
+export const notifyKey = (app) => (isWebId(app) ? `${WINDOW_PREFIX}${app}` : null);
+export const appOfNotifyKey = (key) => {
+  const s = typeof key === 'string' && key.startsWith(WINDOW_PREFIX) ? key.slice(WINDOW_PREFIX.length) : '';
+  return isWebId(s) ? s : null;
+};
+
+// ---- profile colors (the tag colors of Files and Databases) ----
+
+export const PROFILE_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];
+const DEFAULT_ORDER = ['orange', 'purple', 'blue', 'green', 'red', 'yellow', 'gray'];
+// sdk/fileglyphs.jsx TAG_COLORS (Files' tags), the same as Databases' favorites and lord-server's webicon.c
+const HEX = { red: '#ff453a', orange: '#ff9f0a', yellow: '#ffd60a', green: '#30d158', blue: '#0a84ff', purple: '#bf5af2', gray: '#8e8e93' };
+export const profileHex = (color) => HEX[color] || null;
+// A profile's color id, or null for none. A profile without one (made before colors) gets the default for its place:
+// none for the first, then orange, purple, blue…
+export function profileColor(entry, profileId) {
+  const list = entry && Array.isArray(entry.profiles) ? entry.profiles : [];
+  const i = list.findIndex((p) => p.id === profileId);
+  if (i < 0) return null;
+  const c = list[i].color;
+  if (c === 'none') return null;
+  if (PROFILE_COLORS.includes(c)) return c;
+  return i === 0 ? null : DEFAULT_ORDER[(i - 1) % DEFAULT_ORDER.length];
+}
+// The letter in a profile's dot: its name's first character, in capitals.
+export const profileInitial = (p) => (p && typeof p.name === 'string' && p.name.trim() ? Array.from(p.name.trim())[0].toLocaleUpperCase() : '');
+
+// What LordOS calls a web app's window: with more than one profile the frame and the switcher say "<app> — <profile>"
+// and the Dock's window list "<page title> — <profile>"; with one, the page's title (or the app's name).
+// → { frame, menu, color } (color: the profile's color id or null).
+export function webWindowTitles(entry, profileId, pageTitle) {
+  const title = String(pageTitle || '') || (entry ? entry.name : '');
+  const l = windowLabel(entry, profileId);
+  if (!l || !l.profile) return { frame: title, menu: title, color: null };
+  return { frame: `${l.name} — ${l.profile}`, menu: `${title} — ${l.profile}`, color: profileColor(entry, profileId) };
+}
+
+// ---- the shell's own choices per web app (per user, settings.json "webAppPrefs": { [app]: { badge, dockPerProfile } }) ----
+
+export const WEB_PREFS_DEFAULTS = { badge: true, dockPerProfile: false };
+export function webPrefs(s, app) {
+  const p = s && s.webAppPrefs && typeof s.webAppPrefs === 'object' ? s.webAppPrefs[app] : null;
+  return { badge: !(p && p.badge === false), dockPerProfile: !!(p && p.dockPerProfile === true) };
+}
+// The Dock entry of a web app's window: the app's own ("web:<app>"), or with "Each profile has its own Dock icon" a
+// profile other than the first gets one of its own while it has windows ("linux:lordos-web.<app>.<profile>", never
+// pinned; the first profile stays on the app's icon).
+export function webDockId(entry, profileId, perProfile) {
+  if (!entry) return null;
+  const first = defaultProfile(entry);
+  if (!perProfile || !first || first.id === profileId || !profileOf(entry, profileId)) return webKey(entry.id);
+  return `linux:${windowAppId(entry.id, profileId)}`;
+}
+// What the Dock's badge counts for an entry: the app's sum, or one profile's on a profile's own icon.
+// prefsOf(app): webPrefs; ownIcon(app, profile): that profile shows on an icon of its own now. A profile's icon
+// counts its own; the app's icon sums every other profile (all of them without per-profile icons).
+export function dockBadge(state, entryId, prefsOf, ownIcon = () => false) {
+  const k = typeof entryId === 'string' ? entryId : '';
+  const own = k.startsWith('linux:') ? parseWindowAppId(k.slice(6)) : null;
+  const app = own ? own.app : webAppOfKey(k);
+  if (!app || !prefsOf(app).badge) return '';
+  if (own) return badgeLabel(badgeTotal(state, app, own.profile));
+  const per = prefsOf(app).dockPerProfile;
+  return badgeLabel(Object.entries((state || {})[app] || {}).reduce((s, [p, n]) => s + (per && ownIcon(app, p) ? 0 : n), 0));
+}
+
+// ---- Settings → Web apps: each profile's data ----
+
+// When the page measures the profiles' data again: their ids and which of them run. A profile added during the visit
+// has no folder until it first runs, so starting it changes the key (and the size is read again).
+export const sizesKey = (entry, running = []) => {
+  if (!entry || !Array.isArray(entry.profiles)) return '';
+  const live = new Set(running.filter((r) => r.app === entry.id).map((r) => r.profile));
+  return entry.profiles.map((p) => `${p.id}${live.has(p.id) ? '*' : ''}`).join(',');
+};

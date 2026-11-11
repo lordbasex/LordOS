@@ -84,6 +84,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.config/lordos/fwlists.json",  /* (0.8.5) subscribed blocklists: only lord.fw */
                                            "/.config/lordos/fwlists.txt",   /* their compiled entries, read by lord-netperm */
                                            "/.cache/lordos/fwlists",        /* their downloads: only lord-server writes them */
+                                           "/.cache/lordos/web",            /* Web apps' own icons, shown as that app in the Dock: only lord.webapps (docs/WEBAPPS.md) */
                                            "/.config/lordos/backup.json",   /* Backups: decides where the data goes */
                                            "/.config/lordos/mail",          /* Mail accounts and trusted certificates: only lord.mail.saveConfig (docs/MAIL.md) */
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */

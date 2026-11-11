@@ -263,6 +263,9 @@ EOF
     # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
     if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs
     else skip "webapps-model-test" "node"; fi
+    # (0.8.8.8) Settings → Notifications → Sound: Default, None or one of LordOS's sounds (sdk/notifytones.js)
+    if have node; then run "notify-tones-test (sdk/notifytones.js)" node tests/notify_tones_test.mjs
+    else skip "notify-tones-test" "node"; fi
     # glibc region names: what the installer and Settings send for every UTF-8 region (sdk/localename.js)
     if have node; then run "localename-test (sdk/localename.js)" node tests/localename_test.mjs
     else skip "localename-test" "node"; fi

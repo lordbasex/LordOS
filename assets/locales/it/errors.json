@@ -689,7 +689,7 @@
   "webapps.deleteFailed": "Impossibile cancellare i suoi dati",
   "webapps.exists": "Questa app web è già installata",
   "webapps.lastProfile": "Un’app web ha bisogno di almeno un profilo",
-  "webapps.noProfile": "Questo profilo non esiste",
+  "webapps.noProfile": "Quel profilo non esiste",
   "webapps.noRuntime": "Il LordOS Web Runtime (il pacchetto lordos-web) non è installato",
   "webapps.notInCatalog": "Questa app web non è nell’elenco di LordOS",
   "webapps.notInstalled": "Questa app web non è installata",
@@ -863,5 +863,9 @@
   "termconf.verifyFailed": "il nuovo file non si è riletto uguale, quindi non è stato spostato nulla",
   "termconf.corrupt": "il file non è un JSON valido per il Terminale",
   "termconf.newer": "il file è stato scritto da un LordOS più recente",
-  "vm.shareProtected": "Una cartella condivisa in scrittura non può essere né contenere un file protetto di questo computer (come la configurazione del Terminale o settings.json): la macchina potrebbe cambiare ciò che questo computer esegue. Condividila in sola lettura, o condividi una cartella senza quel file."
+  "vm.shareProtected": "Una cartella condivisa in scrittura non può essere né contenere un file protetto di questo computer (come la configurazione del Terminale o settings.json): la macchina potrebbe cambiare ciò che questo computer esegue. Condividila in sola lettura, o condividi una cartella senza quel file.",
+  "webapps.badSound": "Suono di notifica sconosciuto",
+  "webapps.badColor": "Colore del profilo sconosciuto",
+  "webapps.iconOrigin": "Il sito è passato a un altro indirizzo, quindi la sua icona non è stata tenuta",
+  "webapps.noIcon": "Il sito non offre un’icona che LordOS possa usare"
 }

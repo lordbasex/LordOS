@@ -4,10 +4,10 @@
 // also show in Discover (a banner and a shelf), in its search and in their category, always as cards with a "Web app"
 // tag. Without the lordos-web package (lord-web missing) the list is still there: the first Get installs the engine
 // first, in the same sheet (getweb.js).
-import { createElement as h, useState } from 'react';
+import { createElement as h, useEffect, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, useTheme, useWebApps, webAppsAvailable, webAppIcon, webAppsModel as M,
-  wm, typeScale, spacing, t,
+  wm, typeScale, spacing, t, useStore, siteIcons, wantSiteIcon, iconFromFile,
 } from '@lordos/sdk';
 import catalog from '../../assets/webapps/catalog.json';
 import { debian } from './debian.js';
@@ -18,7 +18,16 @@ import { GetSteps, useGetWebApp } from './getweb.js';
 export const webCatalog = () => M.catalogApps(catalog, []);
 export const webCatalogData = catalog;
 
+// A catalog app's icon: the site's own once lord-web fetched it (asked for here, lazily, one at a time, when the engine
+// is installed), else LordOS's letter tile from the catalog (the only icon the repository ships).
+const siteIconOf = new Map();
 export function CatalogIcon({ a, size }) {
+  const own = useStore(siteIcons, (m) => m[a.id] || '');
+  useEffect(() => { if (!own) wantSiteIcon(a.id); }, [a.id, own]);
+  if (own) {
+    if (!siteIconOf.has(own)) siteIconOf.set(own, iconFromFile(own, a.name));
+    return h(siteIconOf.get(own), { size });
+  }
   return h(Image, { src: `asset:webapps/icons/${a.icon}`, style: { width: size, height: size, borderRadius: size * 0.225, objectFit: 'contain' } });
 }
 

@@ -274,5 +274,12 @@
   "video.statusHardware": "Disattivato: questo computer decodifica i video VP9 e AV1 in hardware.",
   "video.statusNever": "Disattivato: i siti di video scelgono il formato, anche quando il computer deve decodificarlo senza aiuto.",
   "video.title": "Video nel browser",
-  "bt.searchAgain": "Cerca di nuovo"
+  "bt.searchAgain": "Cerca di nuovo",
+  "notif.lordSound": "Suono di LordOS",
+  "notif.tone.default": "Predefinito",
+  "notif.tone.none": "Nessuno",
+  "notif.tone.pop": "Pop",
+  "notif.tone.chime": "Campanella",
+  "notif.tone.ping": "Ping",
+  "notif.tone.drop": "Goccia"
 }

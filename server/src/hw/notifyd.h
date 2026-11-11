@@ -36,6 +36,10 @@ void notifyd_action(uint32_t id, const char *key);
 /* Tests only: replaces the PID → firewall id lookup (/proc/<pid>/cgroup). fn returns 0 with the
  * id, 1 if the PID is in no app's scope, -1 if it can't tell. */
 void notifyd_set_app_of_pid(int (*fn)(uint32_t pid, char *out, size_t n));
+/* lord-server's lord-web processes (webmgr_owner): fn fills app and profile (each at most 40 bytes and a NUL) and
+ * returns 0 when pid is the lord-web it started for them. A notification from one carries "webApp" and "webProfile",
+ * so the shell files it under that web app (Settings → Notifications) whatever desktop-entry the page's process sent. */
+void notifyd_set_web_of_pid(int (*fn)(uint32_t pid, char *app, char *profile));
 /* Strips markup (<b>, <i>, <a href>, <img>...) and decodes &amp; &lt; &gt; &quot; &apos;. */
 void notifyd_plain(const char *in, char *out, size_t n);
 
