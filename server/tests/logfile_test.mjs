@@ -32,9 +32,9 @@ eq('empty', parseLordLog('', 'x.log'), []);
 eq('not a stamp', parseLordLog('2026-11-11 12:00 INFO x: y', 'a.log')[0].t, 0);
 
 eq('groups', ['compositor.log', 'apps/a.log', 'web/b-c.log', 'cache/session.log'].map(fileGroup), ['session', 'apps', 'web', 'old']);
-eq('labels', ['compositor.log', 'compositor.log.1', 'apps/org.x.log', 'web/gmail-default.log'].map(fileLabel), ['compositor', 'compositor', 'org.x', 'gmail-default']);
-eq('previous', ['compositor.log.1', 'compositor.log'].map(isPrevious), [true, false]);
-const names = ['web/b.log', 'xwayland.log', 'apps/z.log', 'shell.log.1', 'cache/session.log', 'compositor.log.1', 'apps/a.log', 'cloud.log', 'shell.log', 'compositor.log'];
+eq('labels', ['compositor.log', 'compositor.log.prev', 'apps/org.x.log', 'web/gmail-default.log'].map(fileLabel), ['compositor', 'compositor', 'org.x', 'gmail-default']);
+eq('previous', ['compositor.log.prev', 'compositor.log'].map(isPrevious), [true, false]);
+const names = ['web/b.log', 'xwayland.log', 'apps/z.log', 'shell.log.prev', 'cache/session.log', 'compositor.log.prev', 'apps/a.log', 'cloud.log', 'shell.log', 'compositor.log'];
 eq('order', sortFiles(names.map((name) => ({ name }))).map((f) => f.name),
-  ['compositor.log', 'compositor.log.1', 'shell.log', 'shell.log.1', 'cloud.log', 'xwayland.log', 'apps/a.log', 'apps/z.log', 'web/b.log', 'cache/session.log']);
+  ['compositor.log', 'compositor.log.prev', 'shell.log', 'shell.log.prev', 'cloud.log', 'xwayland.log', 'apps/a.log', 'apps/z.log', 'web/b.log', 'cache/session.log']);
 console.log(`logfile-test: ${ok} ok`);

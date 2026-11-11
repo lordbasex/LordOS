@@ -4,7 +4,7 @@
 //   parseLordLog(text, file) → [{ t, line, p, id, u, pid, uid, k, b, m }]   rows like the journal's (t in µs, p a syslog priority)
 //   fileGroup(name)          → 'session' | 'apps' | 'web' | 'old'           where the Logs sidebar lists a file
 //   fileLabel(name)          → the name shown: "compositor", "compositor (previous)" is done by the app with t()
-//   isPrevious(name)         → true for "<name>.log.1" (the previous session's)
+//   isPrevious(name)         → true for "<name>.log.prev" (the previous session's)
 //
 // A line written by LordOS is "2026-11-11T12:43:56.123-03:00 INFO  xwayland: message" (local time with its
 // offset, ERROR|WARN|INFO|DEBUG, the subsystem). Anything else (a Linux app's own output, or a log from an
@@ -26,7 +26,7 @@ function guessLevel(low) {
 }
 
 export function fileBase(file) {
-  return String(file || '').replace(/^.*\//, '').replace(/\.log(\.1)?$/, '');
+  return String(file || '').replace(/^.*\//, '').replace(/\.log(\.prev)?$/, '');
 }
 
 export function parseLordLog(text, file) {
@@ -58,7 +58,7 @@ export function fileGroup(name) {
   return 'session';
 }
 
-export const isPrevious = (name) => /\.log\.1$/.test(String(name || ''));
+export const isPrevious = (name) => /\.log\.prev$/.test(String(name || ''));
 
 export function fileLabel(name) { return fileBase(name); }
 

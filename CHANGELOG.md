@@ -38,14 +38,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-server's (or the daemon's) stderr through a pipe; it ignores SIGTERM and drains the pipe until the last
     writer is gone, so a crash loses nothing already written. Linux apps, Xwayland, lord-web and rclone write their
     own output as is, after a stamped "starting …" line written by lord-server before it forks.
-  - **The previous session is kept:** at login `compositor.log` and `shell.log` become `.1`; `session.log` used to
+  - **The previous session is kept:** at login `compositor.log` and `shell.log` become `.prev` (not `.1`, which is logrotate's own numbering); `session.log` used to
     be opened with "w", losing the crash that ended the previous session.
   - **Rotation:** `/etc/logrotate.d/lordos` (daily, or at the first run after a file passes 10 MB; 7 copies,
     compressed; `copytruncate`, because most writers are other programs holding the file with `O_APPEND` that can't
     be told to reopen it). logrotate is now a Recommends of the lordos package and in every image's tool list. Its
     handling of the users' folders was checked on VM 127: a `<name>.log.1` and a `<name>.log` planted as symlinks to
     a root-only file were refused, nothing was read. As a fallback the writers cap every file at 16 MB themselves (the
-    newest part goes to `<name>.1` from a line start and the file is emptied in place, so writers holding it go on),
+    newest part goes to `<name>.prev` from a line start and the file is emptied in place, so writers holding it go on),
     when a log is opened and every minute from the session's `lord-log` child, so the disk never fills even without
     logrotate. The old 1 MB truncations of `apps.log`, `xwayland.log` and `web.log` are gone.
   - **The Logs app** lists the session's files (each previous session's as "<name> (previous session)"), then
@@ -63,7 +63,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `build/lordlog-test` (109 checks: names and sanitizing; the root side's folder against a symlink, a
     dangling symlink, a file, a symlinked or group-writable root and a symlinked `users/`, in a temporary folder; the
     cap and rotation, never through a symlink or a FIFO; the line format; `lord-log` end to end with the previous
-    session kept as `.1`) and `server/tests/logfile_test.mjs` (the Logs app's parser and order).
+    session kept as `.prev`) and `server/tests/logfile_test.mjs` (the Logs app's parser and order).
 - **Web apps: editing like in a browser.** The Edit menu of a web app's window now has Undo, Redo, Cut, Copy, Paste
   and Select All (Speech stays below them): the shell asks lord-server, which sends `org.lordos.WebApp1.Edit(command)`
   to that window's lord-web, and lord-web runs it only when the bus says the caller is the lord-server that started it

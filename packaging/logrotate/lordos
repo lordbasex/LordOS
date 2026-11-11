@@ -10,8 +10,8 @@
 #
 # The users' folders are theirs (0700): logrotate opens their files without following symlinks
 # and skips anything that is not a regular file, and users/ itself is root's, so a user can't point
-# a rotation anywhere else. A plain <name>.log.1 there is the previous session's, kept at login;
-# logrotate's own copies are <name>.log.N.gz.
+# a rotation anywhere else. A <name>.log.prev there is the previous session's, kept at login (or
+# the part a writer's cap moved aside); logrotate's own copies are <name>.log.N.gz.
 /var/log/lordos/*.log {
     daily
     maxsize 10M

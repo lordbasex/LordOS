@@ -536,7 +536,7 @@ LordOS's log viewer.
     action `logs-system`; anyone else is told it needs an administrator;
   - **Kernel:** the kernel's messages (`_TRANSPORT=kernel`) from the readable journal;
   - **LordOS:** the user's LordOS log files (see "Log files" below): the session's (`compositor`,
-    `shell`, `xwayland`, `cloud`, each with its previous session's `.1`), then **Apps** (`apps/<app>.log`),
+    `shell`, `xwayland`, `cloud`, each with its previous session's `.prev`), then **Apps** (`apps/<app>.log`),
     **Web apps** (`web/<app>-<profile>.log`) and **Older logs** (`cache/<name>.log`: what an older version
     left in `~/.cache/lordos`). Stamped lines show their time, level and subsystem; other lines (a
     Linux app's own output) get a level from their words (`sdk/logfile.js`).
@@ -590,14 +590,14 @@ user's ones:
   loses nothing already written, and it ignores SIGTERM for that. The root daemons' lines still go
   to the journal as they were. A child with a log of its own (Linux apps, Xwayland, lord-web, rclone)
   writes its own output as is, after a stamped "starting …" line from lord-server.
-- **The previous session.** At login `compositor.log` and `shell.log` become `.1` (they used to be
+- **The previous session.** At login `compositor.log` and `shell.log` become `.prev` (they used to be
   truncated, losing the crash that ended the session).
 - **Rotation.** `/etc/logrotate.d/lordos` (`packaging/logrotate/lordos`; logrotate is a Recommends):
   daily, or at the first run after a file passes 10 MB, 7 copies, compressed, `copytruncate`, because
   most writers are other programs holding the file with `O_APPEND` that can't be told to reopen it.
   logrotate opens the users' files without following symlinks (checked on VM 127 with a symlink to a
   root-only file planted as `<name>.log.1` and as `<name>.log`: refused, nothing read). As a fallback
-  the writers cap every file at 16 MB themselves (the newest part goes to `<name>.1`, the file is
+  the writers cap every file at 16 MB themselves (the newest part goes to `<name>.prev`, the file is
   emptied in place), checked when a log is opened and every minute by the session's `lord-log`
   child, so the disk never fills even without logrotate.
 - **Tests.** `make -C server build/lordlog-test` (names, folders against symlink tricks, the cap,

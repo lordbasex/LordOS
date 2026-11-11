@@ -148,12 +148,12 @@ int lordlog_path(const char *sub, const char *name, char *out, size_t n) {
 
 /* ---- opening, the cap, rotation ---- */
 
-/* "<path>.1" without stdio (used after fork) */
+/* "<path>.prev" without stdio (used after fork); not ".1", which is logrotate's */
 static int dot1(const char *path, char *out, size_t n) {
     size_t l = strlen(path);
-    if (l + 3 > n) return -1;
+    if (l + 6 > n) return -1;
     memcpy(out, path, l);
-    memcpy(out + l, ".1", 3);
+    memcpy(out + l, ".prev", 6);
     return 0;
 }
 

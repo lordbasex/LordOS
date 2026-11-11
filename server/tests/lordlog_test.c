@@ -188,9 +188,9 @@ static void test_user_dir(void) {
 }
 
 static void test_cap_rotate(void) {
-    char p[PATH_MAX], p1[PATH_MAX + 4];
+    char p[PATH_MAX], p1[PATH_MAX + 8];
     snprintf(p, sizeof p, "%s/cap.log", T);
-    snprintf(p1, sizeof p1, "%s.1", p);
+    snprintf(p1, sizeof p1, "%s.prev", p);
     CHECK(lordlog_cap(p, 100) == 0, "missing: nothing to do");
     int fd = lordlog_open(p);
     CHECK(fd >= 0 && mode_of(p) == 0600, "opened 0600: %o", mode_of(p));
@@ -205,7 +205,7 @@ static void test_cap_rotate(void) {
     CHECK(size_of(p) == 0, "emptied: %lld", (long long)size_of(p));
     char *old = slurp(p1);
     CHECK(old && strlen(old) <= 1000 && strlen(old) >= 980 && !strncmp(old, "line 05", 7) && strstr(old, "line 099"),
-          ".1 has the newest part from a line start: %.20s (%zu)", old ? old : "", old ? strlen(old) : 0);
+          ".prev has the newest part from a line start: %.20s (%zu)", old ? old : "", old ? strlen(old) : 0);
     /* a writer holding it with O_APPEND goes on at the start */
     if (write(fd, "after\n", 6) != 6) {}
     CHECK(size_of(p) == 6, "append after cap: %lld", (long long)size_of(p));
@@ -227,10 +227,10 @@ static void test_cap_rotate(void) {
     char fifo[PATH_MAX];
     snprintf(fifo, sizeof fifo, "%s/fifo.log", T);
     CHECK(!mkfifo(fifo, 0600) && lordlog_open(fifo) < 0, "open refuses a fifo");
-    /* rotation: the previous one as .1, an empty one is not rotated */
-    char r[PATH_MAX], r1[PATH_MAX + 4];
+    /* rotation: the previous one as .prev, an empty one is not rotated */
+    char r[PATH_MAX], r1[PATH_MAX + 8];
     snprintf(r, sizeof r, "%s/rot.log", T);
-    snprintf(r1, sizeof r1, "%s.1", r);
+    snprintf(r1, sizeof r1, "%s.prev", r);
     put(r, "previous session\n");
     lordlog_rotate(r);
     CHECK(access(r, F_OK) && !strcmp(slurp(r1) ? slurp(r1) : "", "previous session\n"), "rotated");
@@ -316,12 +316,12 @@ static int wait_for(const char *p, const char *text) {
 }
 
 static void test_session(void) {
-    char home[PATH_MAX], comp[PATH_MAX * 2], shell[PATH_MAX * 2], comp1[PATH_MAX * 2 + 4], app[PATH_MAX * 2];
+    char home[PATH_MAX], comp[PATH_MAX * 2], shell[PATH_MAX * 2], comp1[PATH_MAX * 2 + 8], app[PATH_MAX * 2];
     snprintf(home, sizeof home, "%s/s-home", T);
     mkdir(home, 0700);
     snprintf(comp, sizeof comp, "%s/.cache/lordos/compositor.log", home);
     snprintf(shell, sizeof shell, "%s/.cache/lordos/shell.log", home);
-    snprintf(comp1, sizeof comp1, "%s.1", comp);
+    snprintf(comp1, sizeof comp1, "%s.prev", comp);
     session_once(home, "first session", "one");
     CHECK(wait_for(comp, "no newline at the end"), "first written");
     char *c = slurp(comp);
@@ -334,13 +334,13 @@ static void test_session(void) {
     char *s = slurp(shell);
     CHECK(s && strstr(s, " js: TypeError: one\n") && strstr(s, " js:     at f (theme.js:1)\n"), "shell with its stack:\n%s", s ? s : "");
     CHECK(mode_of(comp) == 0600 && mode_of(shell) == 0600, "0600");
-    /* the next session keeps this one as .1 */
+    /* the next session keeps this one as .prev */
     session_once(home, "second session", "two");
     CHECK(wait_for(comp, "second session"), "second written");
     c = slurp(comp);
     CHECK(c && !strstr(c, "first session"), "new file");
     char *c1 = slurp(comp1);
-    CHECK(c1 && strstr(c1, "first session"), "previous session kept as .1");
+    CHECK(c1 && strstr(c1, "first session"), "previous session kept as .prev");
     /* lordlog_path: apps/ and web/ under the same folder, names sanitized */
     fflush(stdout);
     pid_t pid = fork();

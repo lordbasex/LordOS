@@ -190,7 +190,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
     # what the previous session wrote last: a crash or a freeze that ended it is here
     section "The previous session's log (last 30 lines)"
-    user_log "$LOGS/compositor.log.1" 30
+    user_log "$LOGS/compositor.log.prev" 30
     end
 
     # A Linux app that closes as soon as it starts leaves its reason only here (#95): what the apps LordOS started
