@@ -15,7 +15,7 @@ import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
 import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
 import {
-  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, pastePlan, canPaste, transfer, freeName, jobState, jobErrors, tagStore, toggleTag, moveTags,
+  fsVersion, bump, fileClipboard, copyFiles, cutFiles, paste, pastePlan, canPaste, transfer, freeName, jobState, jobErrors, jobsWaiting, cancelJob, tagStore, toggleTag, moveTags,
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
@@ -26,6 +26,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
+import { columnEntries, columnRange, byFolder, folderReadOnly } from './colview.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
@@ -177,6 +178,7 @@ export default function Files() {
   const arcVer = useStore(archiveVersion);
   const clip = useStore(fileClipboard);
   const jobs = useStore(jobState);
+  const waiting = useStore(jobsWaiting);
   const errs = useStore(jobErrors);
   const saved = winStates.get(wid);
   const prefs = useFilesPrefs();
@@ -352,7 +354,7 @@ export default function Files() {
   const readOnly = useMemo(() => {
     if (!curDir) return false;
     if (curRemote) return !!remoteInfo && remoteInfo.path === curDir && remoteInfo.writable === false;
-    try { return !fs.stat(curDir).writable; } catch (e) { return true; }
+    return folderReadOnly(curDir, fs.home(), fs.stat);         // the home folder takes changes (apps/files/colview.js)
   }, [curDir, version, curRemote, remoteInfo]);
   const wDir = readOnly ? null : curDir;
   const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
@@ -382,7 +384,15 @@ export default function Files() {
   useEffect(() => { if (errs.length) { setMsg(errs[errs.length - 1]); jobErrors.set([]); } }, [errs]);
   useEffect(() => { wm.setTitle(wid, title); }, [title]);
 
-  const sel = flat.filter((e) => selected.has(e.path));
+  // what a folder in the column view or an unfolded one in the list shows: a slow one from rdirs, never on this thread
+  const listOf = (dir) => (fs.isRemote(dir) ? rdirs.get(dir).entries || [] : lord.fs.list(dir));
+  const entriesOf = (dir) => { try { return listOf(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
+  // the column view shows the folders down its chain too: what is picked in a deeper column is part of the selection
+  // (GitHub #100: it was looked up only among the first column's items, so Copy, Move to Trash… had nothing to act on)
+  const colView = tab.view === 'columns' && loc.type === 'dir';
+  const colItems = useMemo(() => (colView ? columnEntries(curDir || fs.home(), tab.chain, (d) => sortEntries(entriesOf(d), tab.sort, sortOpts)) : null),
+    [colView, curDir, tab.chain, tab.sort.by, tab.sort.desc, prefs.foldersFirst, hidden, version, remoteVer]);
+  const sel = (colItems || flat).filter((e) => selected.has(e.path));
   const selPaths = sel.map((e) => e.path);
   const first = sel[0];
   const local = (ev) => (root.current ? ev.local(root.current) : { x: ev.x, y: ev.y });
@@ -390,11 +400,12 @@ export default function Files() {
 
   // ---- actions ----
   const report = (e) => { console.log(`files: ${e?.message || e}`); setMsg(String(e?.message || e)); };
-  const newFolder = (withPaths) => {
-    if (!wDir) return;
-    if (fs.isRemote(wDir)) {
+  // at: the folder it goes in (the shown one; in the column view, the one the selection is in)
+  const newFolder = (withPaths, at = wDir) => {
+    if (!at) return;
+    if (fs.isRemote(at)) {
       // a slow folder: the names it shows, and the folder made off the thread (the field opens when it exists)
-      const dir = wDir;
+      const dir = at;
       const name = freeName(dir, tr('files.newFolder'), new Set((rdirs.get(dir).entries || []).map((e) => e.name)));
       fs.mkdirAsync(`${dir}/${name}`).then(() => {
         if (withPaths && withPaths.length) transfer(withPaths, `${dir}/${name}`, true, new Set());
@@ -405,13 +416,13 @@ export default function Files() {
       }, report);
       return;
     }
-    const name = freeName(wDir, tr('files.newFolder'));
+    const name = freeName(at, tr('files.newFolder'));
     try {
-      fs.mkdir(`${wDir}/${name}`);
-      if (withPaths && withPaths.length) transfer(withPaths, `${wDir}/${name}`, true);
+      fs.mkdir(`${at}/${name}`);
+      if (withPaths && withPaths.length) transfer(withPaths, `${at}/${name}`, true);
       bump();
-      setSelected(new Set([`${wDir}/${name}`]));
-      setRenaming({ path: `${wDir}/${name}`, value: name });
+      setSelected(new Set([`${at}/${name}`]));
+      setRenaming({ path: `${at}/${name}`, value: name });
     } catch (e) { report(e); }
   };
   const startRename = (e = first) => { if (e && !e.app && !e.trash && wDir !== null) { setSelected(new Set([e.path])); setRenaming({ path: e.path, value: e.name }); } };
@@ -557,7 +568,8 @@ export default function Files() {
       () => { setVolumes(fs.volumes()); setMsg(tr(r.action === 'disk-eject' ? 'disks.ejected' : 'disks.unmounted')); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); },
       (e) => setMsg(e.message));
   };
-  const duplicate = (paths = selPaths) => { if (wDir && paths.length) transfer(paths, wDir, false, knownNames(wDir)); };
+  // next to each item: in the column view one picked in a deeper column stays in its own folder
+  const duplicate = (paths = selPaths) => { if (wDir && paths.length) for (const g of byFolder(paths)) transfer(g.paths, g.dir, false, knownNames(g.dir)); };
   // Files another app copied are copied for real: a sheet first says how many, from which app and which ones
   // (Enter cancels), so a list put on the clipboard behind the person's back is never pasted unseen.
   const doPaste = () => {
@@ -636,6 +648,7 @@ export default function Files() {
     if (ev.button === 2) return;
     let next;
     if (ev.meta || ev.ctrl) { next = new Set(selected); if (next.has(e.path)) next.delete(e.path); else next.add(e.path); anchor.current = e.path; }
+    else if (ev.shift && anchor.current && colItems) next = new Set(columnRange(colItems, anchor.current, e.path));
     else if (ev.shift && anchor.current) {
       const a = flat.findIndex((x) => x.path === anchor.current), b = flat.findIndex((x) => x.path === e.path);
       next = new Set(flat.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.path));
@@ -738,6 +751,8 @@ export default function Files() {
           archive.extract(e.arc.file, `${dir}/${name}`, { only: list.map((x) => x.arc.inner) }).then((r) => { bump(); setMsg(tr('docs.extracted', { name, count: r.files })); }).catch((err) => setMsg(tr('docs.extractError', { name, error: err.message }))); } }];
     }
     const openers = openersFor(e, launcherApps, tr);
+    // where Compress and New Folder with Selection put what they make: next to the item (a deeper column's own folder)
+    const here = wDir && colItems ? fs.parent(e.path) || wDir : wDir;
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
       ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
@@ -748,7 +763,7 @@ export default function Files() {
       '-',
       // compress and extract (M9, lord-doc)
       ...(wDir && list.length === 1 && isArchiveFile(e) ? [{ label: tr('docs.extractHere'), onClick: () => extractHere(e, arcReport, tr) }] : []),
-      ...(wDir ? [{ label: list.length === 1 ? tr('docs.compressOne', { name: e.name }) : tr('docs.compressMany', { count: list.length }), onClick: () => compress(paths, wDir, arcReport, tr) }] : []),
+      ...(wDir ? [{ label: list.length === 1 ? tr('docs.compressOne', { name: e.name }) : tr('docs.compressMany', { count: list.length }), onClick: () => compress(paths, here, arcReport, tr) }] : []),
       '-',
       { label: tr('files.menu.getInfo'), hint: '❖I', onClick: () => setInfo(true) },
       { label: tr('files.menu.rename'), hint: '↵', onClick: () => startRename(e), disabled: paths.length > 1 || !wDir },
@@ -758,7 +773,7 @@ export default function Files() {
       { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(paths) },
       { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutFiles(paths), disabled: readOnly },
       { label: tr('files.menu.copyPath'), onClick: () => clipboard.set(paths.join('\n')) },
-      ...(wDir ? [{ label: tr('files.menu.newFolderWith', { count: paths.length }), onClick: () => newFolder(paths) }] : []),
+      ...(wDir ? [{ label: tr('files.menu.newFolderWith', { count: paths.length }), onClick: () => newFolder(paths, here) }] : []),
       '-',
       { header: tr('files.menu.tags') }, tagSwatches(paths),
     ];
@@ -973,14 +988,11 @@ export default function Files() {
   };
   // columns only in folders; elsewhere, the list
   const view = shownView;
-  const entriesOf = (dir) => { try { return listOf(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
   // not in a cloud account: its status bar tells its own space, and statfs there waits for the provider (rclone asks it)
   const freeSpace = useMemo(() => {
     if (curRemote) return remoteInfo && remoteInfo.path === curDir ? remoteInfo.free || null : null;
     try { return curDir && !curAcc && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; }
   }, [curDir, version, !!curAcc, curRemote, remoteInfo]);
-  // what a folder in the column view or an unfolded one in the list shows: a slow one from rdirs, never on this thread
-  const listOf = (dir) => (fs.isRemote(dir) ? rdirs.get(dir).entries || [] : lord.fs.list(dir));
   const quickEntry = quick ? (first || flat[0]) : null;
   const infoEntry = info ? (first || (curDir ? { name: fs.basename(curDir), path: curDir, dir: true, size: 0 } : null)) : null;
   const job = jobs[0];
@@ -1165,7 +1177,8 @@ export default function Files() {
               <View style={{ width: 120, height: 5, borderRadius: 3, backgroundColor: t.control, direction: 'ltr' }}>
                 <View style={{ width: Math.round(120 * (job.total ? Math.min(1, job.bytes / job.total) : 0)), height: 5, borderRadius: 3, backgroundColor: t.accent }} />
               </View>
-              <View onClick={() => fs.cancelJob(job.id)} style={{ width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 10, color: t.textDim }}>✕</Text></View>
+              {jobs.length + waiting > 1 && <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('files.job.more', { count: jobs.length - 1 + waiting })}</Text>}
+              <View onClick={() => cancelJob(job.id)} style={{ width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 10, color: t.textDim }}>✕</Text></View>
             </View>
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>

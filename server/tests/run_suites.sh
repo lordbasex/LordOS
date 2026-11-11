@@ -340,6 +340,12 @@ EOF
     # what a paste in Files copies: its own cut or copy, or the files a Linux app copied (apps/files/clipfiles.js)
     if have node; then run "files-clipfiles-test (apps/files/clipfiles.js)" node tests/files_clipfiles_test.mjs
     else skip "files-clipfiles-test" "node"; fi
+    # a paste of many items: the copies past lord-server's job slots wait their turn (apps/files/jobqueue.js, GitHub #104)
+    if have node; then run "files-jobqueue-test (apps/files/jobqueue.js)" node tests/files_jobqueue_test.mjs
+    else skip "files-jobqueue-test" "node"; fi
+    # the column view: what is picked in a deeper column is selected (apps/files/colview.js, GitHub #100)
+    if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
+    else skip "files-colview-test" "node"; fi
     # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
     if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
     else skip "menu-nav-test" "node"; fi
