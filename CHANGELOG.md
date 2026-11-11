@@ -12,6 +12,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Store → Installed: remove any Linux app a Debian package brought, and deactivate the LordOS apps you don't use.**
+  A read-only `lord.pkg.ownerOfApp(desktopId)` finds an app's package from dpkg's own lists (`dpkg_owner` in
+  `server/src/pkg/status.c`; only the id comes from JS, `/usr/share/applications` only), so a `.deb` installed from a file
+  or an app the index doesn't name gets Remove, through the same plan sheet and `pkg-remove`; never for Essential,
+  Protected or required packages, nor when the plan would remove `lordos`. 21 built-in apps can be deactivated (the core
+  never can: `sdk/appsoffmodel.js`): out of the launcher, the Dock, search, Open With and default apps, opening one shows
+  Activate, and its background work stops (lord-maild pauses mail accounts with `mailPaused`, alarms don't ring, backups
+  turn manual; Machines can't be deactivated while a VM runs). Checked on VM 127 that the Store opens. Tests:
+  `test_dpkg_owner` in `build/pkg-test`, `tests/apps_off_model_test.mjs`.
+- **Store: web apps in Discover, the web engine installed with the first one, and a page for each.** A banner and a shelf
+  of web app cards in Discover (also in search and categories), each tagged "Web app". Installing the first one without
+  `lordos-web` shows the engine's size from the package plan, installs it with the Store's package job and then the app,
+  with no other click. A web app's page lists version (always up to date), tested on LordOS, size on disk per profile,
+  memory (live from `lord.webapps.memory`, `server/src/web/webmem.c`, or the catalog's measured figure), publisher,
+  verified origin, source, engine, permissions, profiles, background mode and known limitations. Checked on VM 127: the
+  banner, the page, Install, and Open bringing up the app's own window with its Dock and tray icons. Tests:
+  `build/webmem-test`, `tests/webapps_model_test.mjs`, `tests/webapps_get_scene.mjs`.
+- **Cloud: an on/off switch for each account that keeps its settings and sign-in, and a password account that asks for a
+  new code at every start turns itself off.** Off, an account is never given to rclone (no mount, listing, token check or
+  sign-in prompt) and leaves Files, the file dialogs, Photos and the menu bar; its `accounts.json` entry, `rclone.conf`
+  section, keyring item and waiting changes stay, so turning it on needs no new sign-in. An `iclouddrive` account that
+  needs a new sign-in before its first good mount of the session turns off with a reason instead of notifying at every
+  login (rclone issues 9966 and 9658, still open in rclone 1.76.0). Tests: `t_onoff` in `build/cloud-test`,
+  `tests/cloud_signin_fake.sh` parts 6 and 7, `tests/cloud_model_test.mjs`. Documented in `docs/CLOUD.md` 6.4.
 - **Wayland drag and drop: between Linux apps, from Files to a Linux app, and from a Linux app to Files.** Checked on VM 127: a file dragged from Files opened in Chromium, and a GTK 4 drop target got copy, or move with Shift held.
   - `wl_data_device.start_drag` is implemented in `server/src/wl/wl.c` (`dev_drag` and the `dnd_*` functions). The serial must be the one of a current press of that client on the window that got it. Any other serial, or a second `start_drag` while one runs, is cancelled.
   - While the button is down no app gets the pointer. The surface under it gets `enter`, `motion` and `leave` with a new `wl_data_offer` each time it enters, with the source's types and, from version 3, `source_actions`.
@@ -224,6 +248,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Notifications from Chromium-based browsers are LordOS banners, and their own popups no longer take the keyboard.**
+  The session started without `DBUS_SESSION_BUS_ADDRESS`, and those browsers don't look for `$XDG_RUNTIME_DIR/bus`
+  themselves: they had no session bus at all, so no notification service (they drew their own windows), no tray icon and
+  no portals. lord-server now sets it for the apps the session starts when it is unset and the socket is the user's
+  (`dbus_session_export`). A browser's own notification popup (a nameless, notification-sized toplevel, at most 480x300)
+  floats in the top corner without the keyboard instead of opening in the middle with it. Checked on VM 127 with a
+  browser. Tests: `build/notifyd-test`, `tests/desktop_model_test.mjs`.
+- **Opening the Store's web apps no longer takes the whole desktop down.** The desktop's JavaScript engine has no
+  `TextEncoder` or `TextDecoder`; the web apps model, Remote Desk's `.rdp` reader and the isolated apps' file dialog used
+  them. `sdk/utf8.js` does UTF-8 by hand and `tests/utf8_test.mjs` keeps those globals out of desktop code.
 - **Linux apps follow LordOS's light or dark mode, accent and title-bar buttons through the Settings portal again.** Since 0.8.8, `lord.portal` was made twice. The FileChooser's functions (`js_hw.c`) replaced the object that held `lord.portal.set` (`js_wm.c`). The theme's call then failed silently, and the portal kept answering dark mode, blue and the default buttons. The FileChooser's functions now go on the same object. Found while adding the global shortcuts.
 - **The permission prompt wraps a long title whole.** Its title, the app line and the note took their own width instead of the box's, so a long title was cut (`sdk/privacy.js`).
 - **Security fixes from the reviews of this work (two automated security scans of the branch and the review of each feature).** None of them is in a release: each was found and fixed before 0.8.8.8.
