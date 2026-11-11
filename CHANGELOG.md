@@ -443,6 +443,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
+  screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
+  to 2 lines. Notification Center already showed 3.
+
 - Web apps: copying from a page that handles the copy itself put nothing on the session's clipboard (copying
   messages from a chat, then pasting in another app, pasted what was there before). Such a page handles the `copy`
   or `cut` event, writes its own text into the event's `clipboardData` (messages with their sender and time, emoji
