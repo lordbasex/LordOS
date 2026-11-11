@@ -13,6 +13,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -387,6 +388,17 @@ static char *wait_probe(int id) {
 }
 
 static void test_manager(void) {
+    /* the real lord-web, next to this program (build/, as next to lord-server) when WPE was there to build it */
+    struct stat rs;
+    char self[PATH_MAX], real[PATH_MAX + 16];
+    ssize_t sn = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (sn > 0) {
+        self[sn] = 0;
+        *strrchr(self, '/') = 0;
+        snprintf(real, sizeof real, "%s/lord-web", self);
+        if (!stat(real, &rs)) CHECK(webmgr_available(), "the lord-web built next to lord-server is found (%s)", real);
+        else printf("webreg-test: no %s (WEB=0 or no WPE): its lookup not checked\n", real);
+    }
     char tmpl[] = "/tmp/webreg-test.XXXXXX";
     if (!mkdtemp(tmpl)) { printf("FAIL: mkdtemp\n"); fails++; return; }
     snprintf(root, sizeof root, "%s", tmpl);

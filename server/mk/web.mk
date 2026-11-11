@@ -23,6 +23,8 @@ ALL += build/lord-web
 all: build/lord-web
 # the smoke test (tests/web_probe_test.py from tests/run_suites.sh) probes a page served by the test itself
 test: build/lord-web
+# webreg-test checks that lord-server's lookup finds this lord-web next to it (webmgr_available)
+build/webreg-test: | build/lord-web
 
 # xdg-activation is the one protocol of lord-web's that the test clients' CLIENT_PROTO (Makefile) doesn't have
 WEB_PROTO := staging/xdg-activation/xdg-activation-v1
