@@ -58,6 +58,15 @@ static void test_url(void) {
     CHECK(!weburl_same_origin("https://a.example/", "http://a.example/"), "scheme differs");
     CHECK(!weburl_same_origin("https://a.example/", "https://a.example:8443/"), "port differs");
 
+    {
+        char pat[WEBURL_MAX + 16];
+        CHECK(!weburl_scope_pattern("https://web.example.com/", pat, sizeof pat) && !strcmp(pat, "https://web.example.com/*"), "pattern: %s", pat);
+        CHECK(!weburl_scope_pattern("https://Web.Example.com", pat, sizeof pat) && !strcmp(pat, "https://web.example.com/*"), "pattern, no path: %s", pat);
+        CHECK(!weburl_scope_pattern("https://example.com/app/#x", pat, sizeof pat) && !strcmp(pat, "https://example.com/app/*"), "pattern, a path: %s", pat);
+        CHECK(!weburl_scope_pattern("https://example.com:8443/a*b", pat, sizeof pat) && !strcmp(pat, "https://example.com/a*"), "pattern, port and star: %s", pat);
+        CHECK(!weburl_scope_pattern("http://localhost:8080/x", pat, sizeof pat) && !strcmp(pat, "http://localhost/x*"), "pattern, http on this computer: %s", pat);
+        CHECK(weburl_scope_pattern("ftp://example.com/", pat, sizeof pat) && weburl_scope_pattern("https://example.com/", pat, 10), "pattern refused");
+    }
     CHECK(weburl_in_scope("https://web.example.com/chat?x#y", "https://web.example.com/"), "in scope");
     CHECK(weburl_in_scope("https://web.example.com", "https://web.example.com/"), "no path is /");
     CHECK(!weburl_in_scope("https://web.example.com.evil.net/", "https://web.example.com"), "a longer host is not in scope");
