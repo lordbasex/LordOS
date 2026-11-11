@@ -63,6 +63,9 @@ char *cloud_unlink(const char *path, int *req);
 char *cloud_links(const char *id);
 void  cloud_pause(const char *id, int pause);                   /* id NULL: every account */
 char *cloud_set_options(const char *json);                      /* {ok} | {error} */
+/* turns an account on or off (cloud_switch): off keeps its record, rclone.conf section and keyring item. how: CS_ASK
+ * ({ error: "busy", files, open, moving } while files are open, waiting or moving), CS_WAIT_IDLE, CS_FORCE */
+char *cloud_set_enabled(const char *id, int on, int how);
 void  cloud_restart(void);
 const char *cloud_log_name(void);                               /* ~/.cache/lordos/<this>, shown by Logs */
 

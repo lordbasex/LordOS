@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "Seansas neturi privataus vykdymo aplanko debesies tarnybai",
   "cloud.notFound": "Tokios paskyros nėra",
   "cloud.notReady": "Teikėjų sąrašas dar įkeliamas. Netrukus bandykite dar kartą",
+  "cloud.settingUp": "Ši paskyra dar nustatoma. Bandykite dar kartą po akimirkos",
   "cloud.notRunning": "Debesies tarnyba neveikia",
   "cloud.offline": "Debesies pasiekti nepavyksta",
   "cloud.renameFailed": "Paskyros aplanko pervadinti nepavyko",

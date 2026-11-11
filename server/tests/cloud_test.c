@@ -828,7 +828,41 @@ static void t_browse(void) {
     CHECK(cloud_seen_at(&s, 1000 + CLOUD_SEEN_MAX + 9) == 100 + CLOUD_SEEN_MAX + 9 && cloud_seen_at(&s, 1010) == 110);
 }
 
+/* on and off: an account turned off keeps everything; a busy one asks, waits or is forced; iCloud Drive turns itself off
+ * when it needs a new sign-in before its first mount of the session (rclone issues 9966 and 9658) */
+static void t_onoff(void) {
+    CHECK(!cloud_busy(0, 0, 0) && cloud_busy(1, 0, 0) && cloud_busy(0, 2, 0) && cloud_busy(0, 0, 1));
+    /* turning on: an account off, or waiting to turn off (the wait is cancelled); one already on: nothing */
+    CHECK(cloud_switch(1, 0, 1, CS_ASK, 0) == CS_ON);
+    CHECK(cloud_switch(0, 1, 1, CS_ASK, 1) == CS_ON);
+    CHECK(cloud_switch(0, 0, 1, CS_ASK, 0) == CS_NOTHING);
+    /* turning off: at once when idle, whatever was asked */
+    CHECK(cloud_switch(0, 0, 0, CS_ASK, 0) == CS_OFF);
+    CHECK(cloud_switch(0, 0, 0, CS_WAIT_IDLE, 0) == CS_OFF);
+    /* busy: the person is asked; then waits or forces */
+    CHECK(cloud_switch(0, 0, 0, CS_ASK, 1) == CS_BUSY);
+    CHECK(cloud_switch(0, 0, 0, CS_WAIT_IDLE, 1) == CS_WAIT);
+    CHECK(cloud_switch(0, 1, 0, CS_WAIT_IDLE, 1) == CS_NOTHING);
+    CHECK(cloud_switch(0, 1, 0, CS_FORCE, 1) == CS_OFF);
+    CHECK(cloud_switch(0, 0, 0, CS_FORCE, 1) == CS_OFF);
+    /* already off: nothing, even forced */
+    CHECK(cloud_switch(1, 0, 0, CS_FORCE, 1) == CS_NOTHING);
+    CHECK(cloud_off_due(1, 0) && !cloud_off_due(1, 1) && !cloud_off_due(0, 0));
+    /* iCloud Drive at the start of the session, needing a sign-in: off, with its reason */
+    CHECK(cloud_auto_off("iclouddrive", "cloud.signInAgain", 1) && !strcmp(cloud_auto_off("iclouddrive", "cloud.signInAgain", 1), CLOUD_OFF_SIGNIN));
+    /* not once it was mounted in this session, or turned on by the person: the sign-in is asked as before */
+    CHECK(!cloud_auto_off("iclouddrive", "cloud.signInAgain", 0));
+    /* other errors, other providers: never */
+    CHECK(!cloud_auto_off("iclouddrive", "cloud.offline", 1) && !cloud_auto_off("iclouddrive", "", 1));
+    CHECK(!cloud_auto_off("onedrive", "cloud.signInAgain", 1) && !cloud_auto_off("drive", "cloud.signInAgain", 1));
+    CHECK(!cloud_auto_off(NULL, "cloud.signInAgain", 1) && !cloud_auto_off("iclouddrive", NULL, 1));
+    /* the reason read back: ours only */
+    CHECK(!strcmp(cloud_off_reason(CLOUD_OFF_SIGNIN), CLOUD_OFF_SIGNIN));
+    CHECK(!strcmp(cloud_off_reason("rm -rf"), "") && !strcmp(cloud_off_reason(NULL), "") && !strcmp(cloud_off_reason(""), ""));
+}
+
 int main(void) {
+    t_onoff();
     t_browse();
     t_methods();
     t_http();

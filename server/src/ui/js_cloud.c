@@ -23,6 +23,7 @@
 #include "../apps.h"
 #include "../cloud/cloud.h"
 #include "../cloud/cloud_kr.h"
+#include "../cloud/cloud_pure.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,6 +148,19 @@ static JSValue f_remove(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (argc > 1 && JS_IsObject(argv[1])) { JSValue v = JS_GetPropertyStr(c, argv[1], "discardPending"); discard = JS_ToBool(c, v) > 0; JS_FreeValue(c, v); }
     JSValue r = id ? parsed(c, cloud_remove(id, discard)) : err(c, "cloud.badArgument");
     fr(c, id);
+    return r;
+}
+
+/* setEnabled(id, on, { how: 'ask' | 'wait' | 'force' }): an account turned off keeps its settings and sign-in */
+static JSValue f_set_enabled(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    int on = argc > 1 && JS_ToBool(c, argv[1]) > 0, how = CS_ASK;
+    const char *h = argc > 2 && JS_IsObject(argv[2]) ? prop(c, argv[2], "how") : NULL;
+    if (h && !strcmp(h, "wait")) how = CS_WAIT_IDLE;
+    else if (h && !strcmp(h, "force")) how = CS_FORCE;
+    JSValue r = id ? parsed(c, cloud_set_enabled(id, on, how)) : err(c, "cloud.badArgument");
+    fr(c, id); fr(c, h);
     return r;
 }
 
@@ -348,6 +362,7 @@ static const JSCFunctionListEntry fns[] = {
     JS_CFUNC_DEF("search", 2, f_search),
     JS_CFUNC_DEF("remove", 2, f_remove),
     JS_CFUNC_DEF("rename", 2, f_rename),
+    JS_CFUNC_DEF("setEnabled", 3, f_set_enabled),
     JS_CFUNC_DEF("refreshAbout", 1, f_about),
     JS_CFUNC_DEF("retry", 1, f_retry),
     JS_CFUNC_DEF("websiteUrl", 1, f_website),

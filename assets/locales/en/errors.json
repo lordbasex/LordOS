@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "The session has no private runtime folder for the cloud service",
   "cloud.notFound": "That account doesn't exist",
   "cloud.notReady": "The list of providers is still loading. Try again in a moment",
+  "cloud.settingUp": "This account is still being set up. Try again in a moment",
   "cloud.notRunning": "The cloud service isn't running",
   "cloud.offline": "The cloud can't be reached",
   "cloud.renameFailed": "The account's folder couldn't be renamed",

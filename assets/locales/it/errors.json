@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "La sessione non ha una cartella di runtime privata per il servizio cloud",
   "cloud.notFound": "Questo account non esiste",
   "cloud.notReady": "L’elenco dei fornitori è ancora in caricamento. Riprova tra un momento",
+  "cloud.settingUp": "Questo account è ancora in configurazione. Riprova tra un momento",
   "cloud.notRunning": "Il servizio cloud non è in esecuzione",
   "cloud.offline": "Il cloud non è raggiungibile",
   "cloud.renameFailed": "Impossibile rinominare la cartella dell’account",

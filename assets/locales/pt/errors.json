@@ -87,6 +87,7 @@
   "cloud.noRuntimeDir": "A sessão não tem uma pasta privada de execução para o serviço de nuvem",
   "cloud.notFound": "Essa conta não existe",
   "cloud.notReady": "A lista de provedores ainda está carregando. Tente de novo em um instante",
+  "cloud.settingUp": "Esta conta ainda está a ser configurada. Tente de novo daqui a pouco",
   "cloud.notRunning": "O serviço de nuvem não está em execução",
   "cloud.offline": "Não é possível alcançar a nuvem",
   "cloud.renameFailed": "Não foi possível renomear a pasta da conta",

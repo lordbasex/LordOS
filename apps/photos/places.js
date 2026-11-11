@@ -7,7 +7,7 @@ import { compareNames } from '../../sdk/collate.js';
 export function keptPlaces(accounts) {
   const out = [];
   for (const a of accounts || []) {
-    if (!a || typeof a.mount !== 'string' || !a.mount || !Array.isArray(a.kept)) continue;
+    if (!a || a.disabled || a.state === 'off' || typeof a.mount !== 'string' || !a.mount || !Array.isArray(a.kept)) continue;   // turned off: not mounted
     const name = String(a.name || a.id || '');
     const kept = a.kept.filter((p) => typeof p === 'string' && (p === a.mount || p.startsWith(`${a.mount}/`)));
     // a folder inside another kept one is already listed with it
