@@ -208,7 +208,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 2.4 | Updates bring only the Recommends a new version adds | Test (`build/pkg-test`: the new Recommends come with the upgrade) | Holds in the test; the update against the signed repository not recorded here |
 | 5.1 | Four more verified Cloud providers | `assets/cloud/providers.json` (evidence per provider), `docs/CLOUD.md` §19 | Holds as recorded evidence |
 
-## 0.8.8.8 (in development, not released; the paper's edition of 2026-11-10)
+## 0.8.8.8 (in development, not released; the paper's editions of 2026-11-10 and 2026-11-11)
 
 | § | Claim | How | State |
 |---|---|---|---|
@@ -233,6 +233,25 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 3.3 | Tab and Shift+Tab reach every shared control, with a focus ring shown only after keyboard use | Test (`tests/focus_model_test.mjs`, 102; `tests/focus_scene_test.mjs`, 41); checked on VM 127 in Settings | Holds; VM only |
 | 3.3 | Menus in both themes work from the keyboard; F10 or the left ⌥ alone opens the menu bar | Test (`tests/menu_nav_test.mjs`, 68; `tests/menu_keys_test.mjs`, 31); checked on VM 127 | Holds; VM only |
 | 3.3 | Password fields have an eye and a Caps Lock warning, and stay password fields while shown | Test (`tests/password_field_test.mjs`, 32; `password_field_scene.mjs`, 16; `test_locked` in `osk_test.c`) | Holds |
+| 3.4, 6.7 | ScreenCast: nothing is shared until the person picks in LordOS's chooser; the chooser names only a verified identity; an app with "no screen capture" is refused before any question and an unknown sender fails closed; no `restore_token` | Test (`build/castsm-test`, `tests/screencast_model_test.mjs`) | Holds in the tests |
+| 3.4, 6.7 | `lord-screencast` is the only binary that links libpipewire, sandboxed before its connection speaks; the app's PipeWire connection sees only the session's streams; each side checks the other's messages | Test (`build/screencast-test` against a private PipeWire daemon, `build/castproto-test` with ASan and UBSan, `build/pwguard-test`) | Holds in the tests (skipped without `pipewire`) |
+| 3.4 | Screen sharing works with a browser: 176 frames in 10 s at 1280×800, the helper at about 2 % of a CPU, nothing running when nothing is shared | Checked on VM 127 with a browser's screen-sharing page (after the memfd buffer fix) | Measured once |
+| 3.4 | A share follows a window by node id and a never-reused serial | Test (`test_node_ref` in `build/engine-test`) | Holds |
+| 3.4, 6.7 | SVG icons are drawn only by `lord-media` (nanosvg) on an fd `lord-server` opened, with limits counted by nanosvg's own tokenizer | Test (`build/svgrast-test`, `build/media-test svg` in `test-full`, `build/iconfind-test`, `tests/iconsrc_test.mjs`); checked on VM 127 (the volume applet's symbolic tray icon) | Holds |
+| 3.4 | An app takes the shortcuts only after the person allows it; the decision goes by the identity `lord-server` checks, never the app_id; ❖Esc gives them back | Test (`build/kbinhibit-test`, `tests/kbinhibit_model_test.mjs`, `build/kbinhibit-client` inside a session); checked on VM 127 (the prompt shows the verified identity) | Holds |
+| 3.4 | Global shortcuts: nothing is bound before the person's answer; ❖ combinations, typing keys and LordOS's keys are never given; press and release reach only the session's connection | Test (`build/gshort-test`, `build/portal-gs-test` on a private session bus, `tests/global_shortcuts_model_test.mjs`) | Holds in the tests; not checked on the VM |
+| 3.4 | XDND both ways with X11 apps; X files reach Files only from an unsandboxed owner, and data only from the X server's own `SelectionNotify` | Test (`build/xwm-test`) | Holds in the test; not checked on the VM |
+| 3.4 | Security contexts: only an unsandboxed client may make one, and its clients count as sandboxed and don't see the trusted-only globals | Test (`build/secctx-test`, end to end over socketpairs) | Holds in the test; no real Flatpak run |
+| 3.4 | X11 apps scale themselves on HiDPI (X pixels are device pixels on the densest display, `Xft.dpi`) | Test (`build/xwscale-test`) | Holds in the test; not checked on the VM |
+| 3.4, 5.1 | Linux apps follow LordOS's mode and accent through the Settings portal again (from 0.8.8 to 0.8.8.7 `lord.portal.set` was lost) | Design (`js_hw.c` adds to the `lord.portal` object `js_wm.c` made) | Not automated |
+| 3.6 | logind's Lock locks the screen, only from the owner of `org.freedesktop.login1`; `Unlock` is never obeyed | Test (`build/logindlock-test`) | Holds in the test; not checked on the VM |
+| 4.4 | Caret and selection from the shaped, reordered text; movement by grapheme cluster | Test (`build/bidi-test` with `GraphemeBreakTest.txt`, 1,187 cases; `build/engine-test`; `tests/textfield_cluster_test.mjs`) | Holds in the tests; not checked on the VM |
+| 5.1 | SDK `List`, `Table`, `Dropdown`, `Checkbox`, `RadioGroup`, `Tabs`, `Popover`, `Tooltip` and `ProgressBar` work from the keyboard | Test (`tests/list_model_test.mjs`, `tests/control_model_test.mjs`, `list_scene.mjs`) | Holds in the tests; not checked on the VM |
+| 1.2, 5.1 | A `Terminal=true` app's command is typed by `lord-server` from a one-shot token, quoted in C; JavaScript never holds the command | Test (`build/apps-term-test`, `tests/terminal_profilefields_test.mjs`) | Holds in the tests; not checked on the VM |
+| 1.2, 5.4 | Only `lord-server` starts `lord-web`, from a fixed path with checked `--app`/`--profile`; the registry is in `fsops_protected`; a bad registry file stops `lord-web` | Test (`build/webreg-test`, `build/webapp-test`, `build/fsops-test`) | Holds in the tests |
+| 5.4, 6.7 | The web app probe never follows `https` to `http` or a public address to a local one; a permission is answered only for the app's own pages and its own `lord-web` | Test (`tests/web_probe_test.py`, headless, where `lord-web` is built; `build/webapp-test`) | Holds in the tests; `lord-web` not yet run on the VM |
+| 5.4 | A probe peaks at 224 MB PSS; one account of a messaging web app in WPE's reference browser used about 810 MB PSS | Measured (`tests/web_probe_test.py --pss` on the main machine; VM 127 with WPE's reference browser, `docs/WEBAPPS.md`) | Measured once |
+| 6.7 | The fixes from the two automated scans and the reviews (Flatpak identity record, slot counter, `dnd_tick`, `lord-web`'s DmaBuf) | Test (new cases in `build/kbinhibit-test`; the suites: 139 passed, 0 failed, 2 skipped after the last fix) | Holds |
 
 ## What the paper must change for 0.8.5
 
