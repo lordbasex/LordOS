@@ -525,6 +525,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   while the caret and the line breaks use the logical ones. The pen now moves by the logical advance times the scale,
   so text, caret and selection line up at every scale; 100 %, 150 % and 200 % were already exact. `engine-test`
   checks the caret edge against the drawn ink at 125 % and 175 % (GitHub #110).
+- Lord Classic's taskbar: with many pinned apps the row of app buttons grew past its room, ran over the tray
+  (quick settings, status items, the clock) and, centered, kept growing toward both edges of the display. The
+  taskbar now fits its row to the room left by the tray, which it measures from the last frame: the app buttons get
+  smaller first (down to 30 px from 40, with a smaller icon), then the apps that still don't fit go into a "more
+  apps" button at the end of the row, whose menu lists them and opens them like a click on their button. A centered
+  row stays in the middle of the display while there is room and moves toward the start once the tray would be in
+  its way. ❖1 to ❖9 still count every app, also those in the menu. Folders of apps on the bar were not added.
+  (GitHub #111)
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
