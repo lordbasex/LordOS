@@ -3,7 +3,10 @@
  * (per-app style, sound, Do Not Disturb). The banner is drawn by the theme (sdk/notify.js); this
  * only translates the protocol (spec 1.2): Notify, CloseNotification, GetCapabilities,
  * GetServerInformation, and the NotificationClosed / ActionInvoked signals. Body markup is reduced
- * to plain text. Uses our own D-Bus client (vault/dbus.c).
+ * to plain text. Uses our own D-Bus client (vault/dbus.c). Chromium and Electron use the service
+ * only if GetCapabilities has "body" and "actions" and the spec version is 1.1 or later; otherwise
+ * they draw their own popups (docs/WAYLAND.md, "Notifications of Linux apps"). Image hints
+ * (image-data, image-path) are read past.
  *
  * The firewall's "no notifications" (docs/FIREWALL.md, "Linux apps"): before showing a Notify,
  * the bus is asked for the caller's PID (GetConnectionUnixProcessID, answered by the bus from the

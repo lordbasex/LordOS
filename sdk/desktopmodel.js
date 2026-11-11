@@ -73,6 +73,33 @@ export function surfaceState(w, active) {
   return { maximized: !!w.maximized, parked, iconic: !!w.minimized || parked };
 }
 
+// A Linux app's own notification popup (docs/WAYLAND.md, "Notifications of Linux apps"). Chromium and
+// Electron draw their notifications themselves when they find no notification service on the session bus
+// (none there, no bus at all, or the feature turned off), each one an xdg toplevel with no app id, no
+// title and no parent, which they can neither place nor mark as "no focus". Taken as a normal window it
+// opened in the middle, in front, with the keyboard, one on top of the other. So such a window floats as
+// picture-in-picture does: above the windows, on every desktop, never the front window (the keyboard
+// stays where it was), in the top corner of the work area. A real window has an app id or a title; one
+// that gets a title later goes back to being a normal window (sdk/wayland.js).
+export const isNoticeWindow = (d) => !!d && !d.x11 && !d.appId && !d.title && !d.parent && !d.dialog && !d.modal;
+
+// Where a notice popup goes: the top corner of the work area at the end of the reading direction (right,
+// or left in right-to-left languages), below the ones already there (others: their frames) while it fits,
+// else back at the top. Never larger than the area.
+export const NOTICE_MARGIN = 12;
+export function noticeFrame(area, others, width, height, rtl = false) {
+  const w = Math.max(1, Math.min(Math.round(width) || 1, area.w - 2 * NOTICE_MARGIN));
+  const h = Math.max(1, Math.min(Math.round(height) || 1, area.h - 2 * NOTICE_MARGIN));
+  const x = rtl ? area.x + NOTICE_MARGIN : area.x + area.w - NOTICE_MARGIN - w;
+  let y = area.y + NOTICE_MARGIN;
+  for (const o of others || []) {
+    if (!o || o.x + o.w <= area.x || o.x >= area.x + area.w || o.y < area.y || o.y >= area.y + area.h) continue;
+    y = Math.max(y, o.y + o.h + NOTICE_MARGIN / 2);
+  }
+  if (y + h > area.y + area.h - NOTICE_MARGIN) y = area.y + NOTICE_MARGIN;
+  return { x, y, w, h };
+}
+
 // The window an app comes back with: on this desktop if it has one, a visible one before a minimized
 // one, else the top one of any desktop (focusing that one switches desktop).
 export function pickWindow(wins, active) {

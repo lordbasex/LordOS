@@ -418,6 +418,12 @@ it from LordOS would make dpkg ask about it on every package update (or drop the
   `NotificationClosed`, `ActionInvoked`), so GTK, Qt, Electron and `notify-send` notifications
   become LordOS banners with the app's icon and actions, and follow the same per-app settings (the
   key is `linux:<desktop id>`, from the `desktop-entry` hint). Body markup is reduced to text.
+  Capabilities: `body`, `body-markup`, `actions` (Chromium and Electron need `body` and `actions`, or
+  they draw their own popups); image hints (`image-data`, `image-path`) are read past, not shown.
+  The apps reach the service through `DBUS_SESSION_BUS_ADDRESS`, which lord-server sets for the
+  session since 0.8.8.8: without it Google Chrome had no bus and drew its notifications as windows
+  of its own. Such popups, when a browser still draws them, float in the top corner and never take
+  the keyboard (`docs/WAYLAND.md`, "Notifications of Linux apps").
 
   ![A notification banner (the test button in Settings; a Linux app's notifications look the same)](settings-notifications-linux-app.png)
 

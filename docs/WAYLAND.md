@@ -902,6 +902,56 @@ display.
   frame, close, the Dock icons, Xwayland stopping 10 s after the last app and starting again, the
   firewall restriction on XTerm, and the protected-window checks in `PRIVACY.md`.
 
+## Notifications of Linux apps (0.8.8.8, in development)
+
+A Linux app's notifications are LordOS banners: `hw/notifyd.c` serves `org.freedesktop.Notifications` on the
+session bus (`docs/SETTINGS.md`, "Notifications"). Chromium, Google Chrome and Electron use it only when they reach
+the bus at startup and the service answers `GetCapabilities` with `body` and `actions` and `GetServerInformation`
+with a specification version of at least 1.1 (notifyd: `body`, `body-markup`, `actions`; spec 1.2). Otherwise they
+draw each notification themselves, as a window of their own.
+
+**The address of the bus.** lord-sessiond starts lord-server with `XDG_RUNTIME_DIR` but without
+`DBUS_SESSION_BUS_ADDRESS` (no PAM session sets it), and every app the session starts inherited that. LordOS's own
+D-Bus client and GIO look for `$XDG_RUNTIME_DIR/bus` by themselves; Chromium does not: without the variable it
+has no session bus at all ("Failed to connect to the bus: Could not parse server address" in its log, no connection
+in `busctl --user list`). So it found no notification service and drew its own popups, and it also lost the tray,
+the portal and every other D-Bus service. Since 0.8.8.8 lord-server sets `DBUS_SESSION_BUS_ADDRESS` to
+`unix:path=$XDG_RUNTIME_DIR/bus` (escaped as the D-Bus address syntax asks) right after Wayland starts, when the
+variable is unset and that path is a socket of the session's user (`dbus_session_export`, `vault/dbus.c`); the
+session log says `lord-server: DBUS_SESSION_BUS_ADDRESS=…`. An address already set is kept. The login screen has
+no bus and doesn't set it. A restricted app still can't reach the bus: its sandbox hides the socket, whatever the
+variable says.
+
+![Chromium's notification as a LordOS banner, with its Settings action](wayland-chromium-notification.png)
+
+**The browser's own popups.** A browser that still draws them (another bus, the feature turned off with
+`--disable-features=SystemNotifications`, an old version) makes each one an `xdg_toplevel` with an empty app id
+and an empty title, no parent, `set_min_size(1, 1)` and `set_max_size(0, 0)`, and no activation token. xdg-shell
+has no way to say "a notification" or "don't focus me", and no way to place a toplevel. Taken as a normal window,
+LordOS opened it in the middle of the work area, in front, cascaded over the one before, and gave it the keyboard
+(`wl_keyboard.enter` on the popup, the browser shown inactive), so typing went nowhere until it closed.
+`sdk/desktopmodel.js` `isNoticeWindow` names such a window: a Wayland toplevel with no app id, no title, no parent
+and not a dialog (an X11 window of type `_NET_WM_WINDOW_TYPE_NOTIFICATION` was already a popup in `xwm.c`, never a
+managed window). `sdk/wayland.js` opens it floating, as picture-in-picture is (`wm.open` with `pip`): above the
+windows and on every desktop, never the front window, so the keyboard stays with the window that had it, in the
+top end corner of the work area (`noticeFrame`: top right, top left in right-to-left languages), each new one below
+the ones already there while they fit. Its pointer input is its own (the browser's close button and clicks work),
+it follows its own size changes, it isn't a Dock item, and a window taken for one that later sets a title becomes
+a normal window.
+
+![Chromium's own popup with no bus: in the top corner, the keyboard still in the browser](wayland-chromium-own-popup.png)
+
+Tests: `build/notifyd-test` (the capabilities and server information Chromium checks, a Notify the way Chrome sends
+it with actions and its `image-data`, `image-path`, `desktop-entry`, `suppress-sound` and `x-kde-origin-name`
+hints, and `dbus_session_export`: set when unset, escaped, an address already set kept, nothing without the socket
+or a runtime directory); `tests/desktop_model_test.mjs` (which windows are notices, where they go, and that the
+keyboard stays with the window below). Checked on VM 127 (Chromium 156) in a dev session started without the
+variable: Chromium launched from the session got the address, called `GetCapabilities`, `GetServerInformation`
+and `Notify`, and showed a LordOS banner; started with no bus, its popup opened in the top right corner, the
+keyboard entered only the browser's window, and a click on the popup's close button closed it. On the maintainer's
+computer Google Chrome 157, started from the launcher by a 0.8.8.7 session, had no `DBUS_SESSION_BUS_ADDRESS` and
+no bus connection, and its popup took the keyboard.
+
 ## Security contexts (`wp_security_context_v1`, 0.8.8.8, in development)
 
 A sandbox engine tells lord-server which connections come from inside it. Flatpak 1.15 and later

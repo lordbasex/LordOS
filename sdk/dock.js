@@ -203,6 +203,7 @@ export function useDockEntries(defaults = [], opts = {}) {
   const groups = new Map();
   for (const w of wins) {
     if (getApp(w.id)?.builtin && !String(w.id).startsWith('linux#')) continue;
+    if (w.args?.notice) continue;          // a browser's own notification popup (sdk/wayland.js) is no app in the Dock
     const k = dockIdOfWindow(w);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(w);

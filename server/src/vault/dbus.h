@@ -134,6 +134,11 @@ typedef struct {
 /* Connects (without authenticating) to the session bus: DBUS_SESSION_BUS_ADDRESS (unix:path= or
  * unix:abstract=) or $XDG_RUNTIME_DIR/bus. For lord-server, outside the sandbox. fd or -1. */
 int  dbus_connect_session(void);
+/* Sets DBUS_SESSION_BUS_ADDRESS to unix:path=$XDG_RUNTIME_DIR/bus when it is unset and that path is a
+ * socket of this user, so the apps the session starts find the session bus. libdbus without the variable
+ * may look there or not: Google Chrome 157 does not, and then it has no bus at all (its notifications
+ * become its own windows, docs/WAYLAND.md "Notifications of Linux apps"). 1 if it set it. */
+int  dbus_session_export(void);
 /* System bus: DBUS_SYSTEM_BUS_ADDRESS (unix:path=) or /run/dbus/system_bus_socket. fd or -1. */
 int  dbus_connect_system(void);
 /* SASL EXTERNAL + Hello over a connected socket (waits up to timeout_ms). Leaves the fd

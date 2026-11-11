@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <time.h>
@@ -511,6 +512,26 @@ int dbus_build(const DHdr *h, const DBuf *body, DBuf *out) {
 }
 
 /* ================= connection ================= */
+
+int dbus_session_export(void) {
+    const char *cur = getenv("DBUS_SESSION_BUS_ADDRESS");
+    if (cur && cur[0]) return 0;
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char path[sizeof ((struct sockaddr_un *)0)->sun_path];
+    if (!rt || rt[0] != '/' || (size_t)snprintf(path, sizeof path, "%s/bus", rt) >= sizeof path) return 0;
+    struct stat st;
+    if (lstat(path, &st) || !S_ISSOCK(st.st_mode) || st.st_uid != getuid()) return 0;
+    /* the address syntax (D-Bus specification, "Addresses"): a byte outside [-0-9A-Za-z_/.\*] is written as %XX */
+    char addr[16 + 3 * sizeof path];
+    size_t o = (size_t)snprintf(addr, sizeof addr, "unix:path=");
+    for (const unsigned char *c = (const unsigned char *)path; *c; c++) {
+        if ((*c >= '0' && *c <= '9') || (*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || strchr("-_/.\\*", *c))
+            addr[o++] = (char)*c;
+        else o += (size_t)snprintf(addr + o, sizeof addr - o, "%%%02x", *c);
+    }
+    addr[o] = 0;
+    return setenv("DBUS_SESSION_BUS_ADDRESS", addr, 1) == 0;
+}
 
 int dbus_connect_session(void) {
     struct sockaddr_un a = { .sun_family = AF_UNIX };
