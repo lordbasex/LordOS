@@ -284,6 +284,17 @@ static void t_smb(void) {
     CHECK(n > 100 && !memcmp(out + 4, "\xfeSMB", 4) && out[3] == n - 4);
     CHECK(!smb_parse(out + 4, n - 4, &m) && m.cmd == 0);
     CHECK(smb_negotiate(out, 20, 0) == 0);
+    /* the sign-in requires signing, or a server that doesn't require it leaves its final answer
+     * unsigned and a correct password reads as refused (GitHub #101); the anonymous pass only enables it */
+    CHECK(out[4 + SMB_HDR + 4] == 1);
+    n = smb_negotiate_signed(out, sizeof out, 0);
+    CHECK(n && out[4 + SMB_HDR + 2] == 2 && out[4 + SMB_HDR + 4] == 3 && out[4 + SMB_HDR + 5] == 0 && out[3] == n - 4);
+    uint8_t ntb[8] = "NTLMSSP";
+    n = smb_session_setup(out, sizeof out, 1, 0, ntb, 8);
+    CHECK(n && out[4 + SMB_HDR + 3] == 1);
+    n = smb_session_setup_signed(out, sizeof out, 1, 0, ntb, 8);
+    CHECK(n && out[4 + SMB_HDR + 3] == 3 && !memcmp(out + 4 + SMB_HDR + 24, ntb, 8));
+    CHECK(smb_session_setup_signed(out, 40, 1, 0, ntb, 8) == 0);
     CHECK(smb_parse(out, 10, &m) && smb_parse((const uint8_t *)"\xffSMB0000000000000000000000000000000000000000000000000000000000000000", 64, &m));
     n = smb_msg(b, 0, 0);
     memset(b + n, 0, 65); p16(b + n, 65); p16(b + n + 2, 3); p16(b + n + 4, 0x0302); n += 65;
