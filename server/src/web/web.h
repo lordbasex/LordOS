@@ -109,6 +109,12 @@ void webxfer_drag(Web *w, double x, double y, int files);
 void webxfer_drag_leave(Web *w);
 /* an image from the session's clipboard, pasted into the focused element (data taken over) */
 void webxfer_paste_image(Web *w, const char *mime, GBytes *data);
+/* local files from the session's clipboard (n of them, their fds taken over), pasted into the focused element: a
+ * paste event whose DataTransfer holds them as Files */
+void webxfer_paste_files(Web *w, WebDropFile *files, int n);
+/* text (UTF-8) pasted into the focused element: a paste event with it as text/plain, and when no listener takes it
+ * the text inserted at the caret (WebKit's InsertText). 0 when it can't be now (another transfer runs, another site). */
+int webxfer_paste_text(Web *w, const char *text);
 /* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
  * made a PNG when it is in another format) goes to the session's clipboard */
 void webxfer_copy_image(Web *w, const char *uri);

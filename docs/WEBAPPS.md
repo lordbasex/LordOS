@@ -107,11 +107,33 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 - **Clipboard:** text both ways through `wl_data_device`: the session's selection is copied into WebKit's pasteboard
   while the window has the keyboard; what the page copies is offered to the session as plain text (and HTML when the
   page gave it). WebKit 2.48's pasteboard on WPE holds text only (its `Pasteboard` for libwpe reads no files or
-  images and writes no image), so images go around it (`webxfer.c`):
-  - **Pasting an image:** when the session's clipboard offers `image/png` or `image/jpeg` and no text, Ctrl+V or
-    Shift+Insert reads it (at most 32 MB, non-blocking) instead of sending the key, and the page gets a `paste` event
+  images and writes no image), and it reads its stored bytes back as Latin-1 while it writes them as UTF-8
+  (`PlatformPasteboardLibWPE.cpp`, `readString`), so files, images and any text past ASCII go around it
+  (`webwin_paste`, `webclip.c`, `webxfer.c`). All of it happens only at the person's own paste (Ctrl+V, Shift+Insert,
+  the Edit menu's or the context menu's Paste); nothing is read for the page at any other moment:
+  - **Pasting files:** when the session's selection offers `text/uri-list` (or `x-special/gnome-copied-files`; Files
+    offers both for its copies, `WAYLAND.md`), the paste reads the list (at most 1 MB, non-blocking) instead of sending
+    the key or running WebKit's Paste, and opens its local files with exactly the drop's checks and limits (`webdrop.c`,
+    see "Drag and drop": `file://` without a host, the person's places, no hidden folder or file, no link on the
+    resolved path, a regular file, at most 64 MB each and 20 files). The page gets a `paste` event on its focused
+    element whose `DataTransfer` holds them as `File`s, `types` `["Files"]` and no text. When every file is refused, the
+    selection's text is pasted as below (the list itself when the selection has no text). Before, the page got the
+    files' paths as text. A copy made by an isolated LordOS app or a sandboxed (Flatpak) client reaches lord-web without
+    its file lists: lord-server leaves `text/uri-list` and the other file-list types (`dndg_file_mime`) out of that
+    selection's offer to a lord-web client and refuses them at `receive` (`wl.c`, `OfferRef.nofiles`, as for a drag's
+    `DOffer.nofiles`), so it pastes as text only.
+  - **Pasting text:** the session's text is read as `text/plain;charset=utf-8`, then `UTF8_STRING`, then
+    `text/plain` (UTF-8 when it is valid UTF-8, else converted from Latin-1), then `STRING` (Latin-1, X11's rule);
+    `TEXT` and `COMPOUND_TEXT` are never read, and a UTF-8 type that isn't valid UTF-8 is refused (`webclip.c`). It
+    is mirrored into WebKit's pasteboard as UTF-8. Plain ASCII text is WebKit's own paste. Any other text would come
+    out garbled from WebKit (a path in `Imágenes` as `ImÃ¡genes`), so lord-web pastes it itself: a `paste` event on the
+    focused element with it as `text/plain` (from a script, so `isTrusted` is false), and when no listener prevents
+    the default, the text is inserted at the caret with WebKit's `InsertText` editing command.
+  - **Pasting an image:** when the session's clipboard offers `image/png` or `image/jpeg` and no text, the paste
+    reads it (at most 32 MB, non-blocking) instead of sending the key, and the page gets a `paste` event
     on its focused element with a `DataTransfer` holding the image as a `File` (`image.png`), `types` `["Files"]`.
-    WebKit's pasteboard is emptied when such an image arrives, so it never pastes the text copied before it.
+    WebKit's pasteboard is emptied when a selection with no text arrives (an image, a file list only), so it never
+    pastes the text copied before it.
   - **Copying an image:** WPE 2.48 has no Async Clipboard API (`navigator.clipboard` is undefined), so a script at
     document start gives the page `navigator.clipboard.write` and `writeText` (and `ClipboardItem`) when they are
     missing. They post to lord-web (a script message handler), which takes text (at most 16 MB) or a PNG or JPEG
@@ -142,7 +164,10 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     (WebKit's own key binding runs only where the selection can be edited).
   - **What the log says** (lord-web's stderr, the app's log; at most 20 lines in 10 s, sizes and reasons only, never
     what was copied or dropped): `page copy offered (N bytes[ and HTML], editing command|copy event|clipboard
-    API|image/png)` and `page copy refused (...)` with the reason.
+    API|image/png)` and `page copy refused (...)` with the reason; for a paste `paste: N files from the clipboard
+    accepted[; others refused: <reason>]`, `paste: no file from the clipboard accepted (N on its list, <reason>);
+    pasting its text`, `paste: text (N bytes, <type>[; WebKit's own paste])`, `clipboard text refused (N bytes,
+    <type>): not UTF-8` and `paste dispatched (N files, target TAG, a listener took it|no listener took it)`.
 - **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
   so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
   drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and

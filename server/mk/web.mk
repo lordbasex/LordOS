@@ -9,11 +9,11 @@ WEB_PKGS := wpe-webkit-2.0 wpe-1.0 wpebackend-fdo-1.0 egl wayland-client wayland
 WEB ?= $(shell pkg-config --exists $(WEB_PKGS) 2>/dev/null && echo 1 || echo 0)
 
 # the pure checks: argv, the registry, addresses and scope, the probe's answer, the icon check, download names, the wheel,
-# the unread count, the user agent, the notification sound, dropped files, the Edit commands and context menu items, the color scheme
+# the unread count, the user agent, the notification sound, dropped files, pasted text and file lists, the Edit commands and context menu items, the color scheme
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webedit.c src/web/webscheme.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webedit.h src/web/webscheme.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/sec/json.h
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)

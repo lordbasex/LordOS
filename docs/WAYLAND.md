@@ -310,7 +310,10 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   sandboxed Linux app (Flatpak: its root, `/proc/<pid>/root` looked at once when it connects, holds
   `.flatpak-info`) may name files the app itself can't reach, so it is never offered to LordOS: over LordOS
   it is told nothing, and released there it is cancelled. A client whose root can't be looked at counts as
-  sandboxed. Drags between Linux windows are unchanged.
+  sandboxed. Drags between Linux windows are unchanged, except into a web app (lord-web, which opens a list's
+  local files and hands them to the page): such a drag's offer to it, and such an app's clipboard selection offered
+  to it, leave out `text/uri-list` and the other file-list types (`dndg_file_mime`; `DOffer.nofiles`,
+  `OfferRef.nofiles`, also refused at `receive`), so they arrive there as text only (`WEBAPPS.md`).
 - **With X11 apps (XDND, version 5; built, to check on the VM).** The window manager (`xwm.c`) bridges
   both ways:
   - *Files or a Wayland app → an X window.* While the drag is over an X window that is `XdndAware`, the

@@ -30,8 +30,10 @@ void web_note(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
 void webwin_after_edit(WebWin *win);
 /* Ctrl+<letter> (Shift too when shift) to the page as from the keyboard; 0 when the keymap has no such key */
 int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift);
-/* the session's clipboard holds an image and no text: it is pasted into the page (webxfer.c); 1 when it was */
-int webwin_paste_image(WebWin *win);
+/* the person pastes (the Edit menu, the context menu; the keys are webwin.c's own): the session's file list, its image
+ * when it has no text, or a text WebKit would garble, pasted into the page by lord-web (webxfer.c); 1 when it was,
+ * 0 for WebKit's own Paste */
+int webwin_paste(WebWin *win);
 void webwin_free(WebWin *win);
 
 /* webshm.c: wpebackend-fdo's shared memory buffers and resources are libwayland-server objects */

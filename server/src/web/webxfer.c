@@ -353,8 +353,12 @@ static void on_dispatched(GObject *src, GAsyncResult *res, gpointer d) {
         char tag[40];
         tag_of(r, tag, sizeof tag);
         const char *sp = strchr(r, ' ');
+        int taken = sp && !strcmp(sp + 1, "taken");
         web_note("%s dispatched (%d files, target %s, %s)", x->paste ? "paste" : "drop", x->n, tag[0] ? tag : "?",
-                 sp && !strcmp(sp + 1, "taken") ? "a listener took it" : "no listener took it");
+                 taken ? "a listener took it" : "no listener took it");
+        /* a pasted text no listener took: inserted where the caret is, as a browser's own paste would */
+        if (x->paste && !x->n && x->text && !taken && x->w->view && !x->w->outside)
+            webkit_web_view_execute_editing_command_with_argument(x->w->view, "InsertText", x->text);
     }
     g_free(r);
     cleanup(x);
@@ -560,6 +564,28 @@ void webxfer_paste_image(Web *w, const char *mime, GBytes *data) {
     snprintf(t->files[0].name, sizeof t->files[0].name, "%s", !strcmp(mime, "image/png") ? "image.png" : "image.jpg");
     t->types[0] = g_strdup(mime);
     start(t);
+}
+
+void webxfer_paste_files(Web *w, WebDropFile *files, int n) {
+    Xfer *t = n > 0 ? xfer_new(w) : NULL;
+    if (!t) { webdrop_close(files, n); if (n > 0) web_note("paste refused: %s", running ? "another transfer is still being handed over" : "the page is not the app's own"); return; }
+    t->paste = 1;
+    for (int i = 0; i < n && i < WEBDROP_FILES_MAX; i++) {
+        t->files[i] = files[i];
+        t->types[i] = type_of(files[i].name);
+        t->n++;
+    }
+    for (int i = t->n; i < n; i++) webdrop_close(&files[i], 1);
+    start(t);
+}
+
+int webxfer_paste_text(Web *w, const char *text) {
+    Xfer *t = text && text[0] ? xfer_new(w) : NULL;
+    if (!t) return 0;
+    t->paste = 1;
+    t->text = g_strdup(text);
+    start(t);
+    return 1;
 }
 
 /* ---- the context menu's Copy Image ---- */
