@@ -350,8 +350,9 @@ static gboolean on_file_chooser(WebKitWebView *v, WebKitFileChooserRequest *r, g
 void web_edit(Web *w, int cmd) {
     const char *c = webedit_webkit(cmd);
     if (!c || !w->view || !w->win) return;
-    /* an image on the session's clipboard goes to the page as a paste of its own (webxfer.c); WebKit would paste text */
-    if (cmd == WEBEDIT_PASTE && webwin_paste_image(w->win)) return;
+    /* files or an image on the session's clipboard, or a text that isn't ASCII, go to the page as a paste of lord-web's
+     * own (webwin_paste, webxfer.c): WebKit would paste the files' paths, no image, and that text garbled */
+    if (cmd == WEBEDIT_PASTE && webwin_paste(w->win)) return;
     /* Undo and Redo as their keys: WPE 2.48 keeps no undo stack of its own (its page client drops every edit
      * command), so WebKit's command does nothing, while a page with its own history (a rich text editor) listens for
      * Ctrl+Z and Ctrl+Shift+Z */
