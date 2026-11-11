@@ -470,7 +470,10 @@ static void draw_fast(Canvas *c, const char *s, int font, float size, float line
             const Glyph *g = text_glyph(cp, font, size);
             if (g->bmp)
                 canvas_alpha_mask(c, (int)roundf(pen) + g->xoff, (int)baseline + g->yoff, g->bmp, g->w, g->h, g->w, argb);
-            pen += g->adv;
+            /* the glyph's size is quantized to half a pixel (16.25 px at 125 % draws at 16.5): the pen
+             * moves by the logical advance times the scale, the one layout and the caret measured,
+             * or the text drifts away from the caret with every character (GitHub #110) */
+            pen += k != 1 ? text_glyph(cp, font, size / k)->adv * k : g->adv;
             prev = cp;
         }
     }

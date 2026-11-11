@@ -443,6 +443,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Text fields on a display at 125 % or 175 %: the caret drifted away from the text as you typed, a few pixels more with
+  every character, in Notes, Text Editor and the text boxes of Settings. Glyphs are drawn at the display's size
+  rounded to half a pixel (13 px text at 125 % is 16.25 px and draws at 16.5), and the pen moved by those rounded advances,
+  while the caret and the line breaks use the logical ones. The pen now moves by the logical advance times the scale,
+  so text, caret and selection line up at every scale; 100 %, 150 % and 200 % were already exact. `engine-test`
+  checks the caret edge against the drawn ink at 125 % and 175 % (GitHub #110).
+
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
   to 2 lines. Notification Center already showed 3.
