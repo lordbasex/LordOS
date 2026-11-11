@@ -1,6 +1,6 @@
 // Settings → General (machine and software details) and Updates (Debian and LordOS).
 import {
-  View, Text, Button, useTheme, useLocale, useSystemInfo, useServerStats, lordosVersion, screen, formatBytes, formatDuration, formatNumber,
+  View, Text, Button, useTheme, useLocale, useSystemInfo, useServerStats, memUsedKB, lordosVersion, screen, formatBytes, formatDuration, formatNumber,
   admin, wm, LordOSLogo, LordOSWordmark, spacing, typeScale,
 } from '@lordos/sdk';
 import { useState, version as reactVersion } from 'react';
@@ -33,7 +33,7 @@ export function General() {
       <Card title={tr('settings.general.machine')} rows={[
         [tr('settings.general.name'), info.hostname],
         [tr('about.cpu'), tr('about.cpuValue', { cpu: cpu.slice(0, 44) || tr('about.cpuUnknown'), count: info.cores })],
-        [tr('about.memory'), tr('shell.cc.memDetail', { used: formatBytes((info.memUsedKB != null ? info.memUsedKB : info.memTotalKB - info.memAvailableKB) * 1024), total: formatBytes(info.memTotalKB * 1024) })],
+        [tr('about.memory'), tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })],
         info.diskTotal ? [tr('settings.general.storage'), tr('settings.general.storageValue', { free: formatBytes(info.diskFree), total: formatBytes(info.diskTotal) })] : null,
         [tr('about.display'), `${screen.width} × ${screen.height}`],
         [tr('about.uptime'), formatDuration(info.uptime)],

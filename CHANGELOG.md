@@ -473,6 +473,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   by the new `tests/toolkitenv_test.c`. Checked on VM 127 with Picard (Qt 5) and Qt 5's Wayland plugins hidden in a
   private mount namespace: `wayland` alone aborted with the reporter's message, `wayland;xcb` opened Picard's window
   through Xwayland, and with the plugins present Qt still chose Wayland (GitHub #96).
+- Text Editor: the end of a long line was drawn under the vertical scroll bar, and typing at the end of a line
+  could leave the caret there. The bar now has its own column at the right edge, painted with the editor's
+  background, and the view scrolls sideways so the caret stays left of that column. Without the bar (a file that
+  fits) the text keeps the full width. A regression case is in `editor_scrollbar_test.mjs`. (GitHub #109)
+
+- Memory figures: the Control Center worked out memory in use as total minus the kernel's "available" figure, which
+  also counts its own reserve, so it read 1.9 GB where Monitor, About and Settings → General read 1.7 GB at the same
+  moment. Every place now takes the one figure the server reports (in use, without the page cache or the reserve;
+  `sdk/memfigure.js`). The Cleaner panel by the clock showed memory "available" and disk "free" with no total; both
+  cards now read "used of total", like the bars under them and the rest of the system. Monitor → Memory keeps its
+  breakdown (in use, cache and free add up to the total). New test `mem_figure_test.mjs`. (GitHub #118)
 
 - Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
   screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title

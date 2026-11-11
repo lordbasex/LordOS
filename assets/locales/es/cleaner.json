@@ -296,7 +296,7 @@
   "panel.word.update": "Hay una actualización de LordOS",
   "panel.disk": "Disco",
   "panel.memory": "Memoria",
-  "panel.memoryValue": "{size} disponibles",
+  "panel.usedOf": "{used} de {total} en uso",
   "panel.cpu": "Procesador",
   "panel.network": "Red",
   "panel.devices": {

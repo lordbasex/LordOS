@@ -303,7 +303,7 @@
   "panel.word.update": "Laukia LordOS atnaujinimas",
   "panel.disk": "Diskas",
   "panel.memory": "Atmintis",
-  "panel.memoryValue": "Prieinama {size}",
+  "panel.usedOf": "Naudojama {used} iš {total}",
   "panel.cpu": "Procesorius",
   "panel.network": "Tinklas",
   "panel.devices": {
