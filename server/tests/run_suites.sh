@@ -254,6 +254,8 @@ EOF
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
+    # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
+    if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi
     if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
     else skip "share-model-test" "node"; fi
     if have node; then run "gtk-defaults-test (assets/gtk, #52)" node tests/gtk_defaults_test.mjs; fi

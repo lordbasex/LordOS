@@ -443,6 +443,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Lord Flow: minimizing a window still played the shrink towards the Dock with Settings → Appearance → Reduce
+  motion on, although that setting stops decorative animations. The minimize effect (`themes/default/index.jsx`
+  `useMinimizing`) never read it; which windows start the effect is now decided in `themes/default/minimize.js`,
+  where Reduce motion starts none, so the window goes at once, as in Lord Classic. Tested by
+  `server/tests/minimize_model_test.mjs` (GitHub #112).
 - Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
   with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
   a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
