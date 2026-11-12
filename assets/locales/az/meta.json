@@ -1,0 +1,9 @@
+{
+  "id": "az",
+  "name": "Azərbaycan",
+  "english": "Azerbaijani",
+  "plural": "one-other",
+  "region": "az_AZ",
+  "direction": "ltr",
+  "partial": true
+}

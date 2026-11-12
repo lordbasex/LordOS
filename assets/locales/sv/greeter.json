@@ -1,0 +1,19 @@
+{
+  "bootTest": "Mäter starttiden: start {k} av {n} klar. Startar om om {s} s. Att logga in stoppar också testet.",
+  "bootTestCancel": "Stoppa testet",
+  "busy": "Ett ögonblick…",
+  "cancel": "Avbryt",
+  "confirmRestart": "Det finns öppna sessioner: osparat arbete går förlorat. Starta om ändå?",
+  "confirmShutdown": "Det finns öppna sessioner: osparat arbete går förlorat. Stänga av ändå?",
+  "error": "Sessionen kunde inte öppnas.",
+  "locked": "Skärmen är låst",
+  "noUsers": "Inga användare",
+  "password": "Lösenord",
+  "restart": "Starta om",
+  "shutdown": "Stäng av",
+  "wait": {
+    "one": "För många försök. Vänta {count} sekund.",
+    "other": "För många försök. Vänta {count} sekunder."
+  },
+  "wrong": "Fel lösenord."
+}

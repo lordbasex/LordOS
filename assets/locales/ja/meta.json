@@ -1,0 +1,9 @@
+{
+  "id": "ja",
+  "name": "日本語",
+  "english": "Japanese",
+  "plural": "none",
+  "region": "ja_JP",
+  "direction": "ltr",
+  "partial": true
+}

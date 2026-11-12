@@ -1,0 +1,20 @@
+{
+  "bootTest": "Pomiar czasu uruchamiania: ukończono {k} z {n}. Ponowne uruchomienie za {s} s. Zalogowanie się również zatrzymuje test.",
+  "bootTestCancel": "Zatrzymaj test",
+  "busy": "Chwileczkę…",
+  "cancel": "Anuluj",
+  "confirmRestart": "Są otwarte sesje: niezapisana praca zostanie utracona. Uruchomić ponownie mimo to?",
+  "confirmShutdown": "Są otwarte sesje: niezapisana praca zostanie utracona. Wyłączyć mimo to?",
+  "error": "Nie udało się otworzyć sesji.",
+  "locked": "Ekran zablokowany",
+  "noUsers": "Brak użytkowników",
+  "password": "Hasło",
+  "restart": "Uruchom ponownie",
+  "shutdown": "Wyłącz",
+  "wait": {
+    "one": "Zbyt wiele prób. Poczekaj {count} sekundę.",
+    "few": "Zbyt wiele prób. Poczekaj {count} sekundy.",
+    "many": "Zbyt wiele prób. Poczekaj {count} sekund."
+  },
+  "wrong": "Nieprawidłowe hasło."
+}

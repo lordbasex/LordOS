@@ -18,3 +18,25 @@ export function localeOf(region) {
 
 // The country of a region ("en_AU" → "AU", "ca_ES@valencia" → "ES"), '' when it has none.
 export const regionCountry = (region) => (/^[a-z]{2,3}_([A-Z]{2})(?=[.@]|$)/.exec(String(region || '')) || [])[1] || '';
+
+// The interface language for a glibc locale, among the languages LordOS has (ids): its language part
+// ("pt_BR.UTF-8" → "pt"), or for Chinese the script the country writes ("zh_TW", "zh_HK", "zh_MO" →
+// "zh-Hant"; "zh_CN", "zh_SG" → "zh-Hans"), or the only id of that language with a script or variant
+// ("xx" → "xx-Yyyy"). '' when LordOS has none: the caller uses English.
+const TRADITIONAL = ['TW', 'HK', 'MO'];
+export function languageOfLocale(name, ids) {
+  const r = regionOf(name);
+  const ll = (/^([a-z]{2,3})(?=[_.@]|$)/.exec(r) || [])[1];
+  if (!ll || !Array.isArray(ids)) return '';
+  if (ids.includes(ll)) return ll;
+  if (ll === 'zh') {
+    const want = TRADITIONAL.includes(regionCountry(r)) ? 'zh-Hant' : 'zh-Hans';
+    if (ids.includes(want)) return want;
+  }
+  const variants = ids.filter((id) => typeof id === 'string' && id.startsWith(`${ll}-`));
+  return variants.length ? variants[0] : '';
+}
+
+// The glibc language part of an interface language: "zh-Hant" → "zh", "pt" → "pt" (regions are
+// named with it: zh_TW, pt_BR).
+export const localeLanguage = (id) => String(id || '').split('-')[0];

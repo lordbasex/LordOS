@@ -1,0 +1,9 @@
+{
+  "isolated": "Berjalan secara terasing, dalam prosesnya sendiri",
+  "linux": "Apl Linux",
+  "lordos": "Apl LordOS",
+  "package": "Apl dipasang (.lpk)",
+  "system": "Apl sistem — sebahagian daripada LordOS, disahkan bersamanya",
+  "title": "Perihal {app}",
+  "version": "Versi {v}"
+}

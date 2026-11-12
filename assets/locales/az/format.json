@@ -1,0 +1,57 @@
+{
+  "months": [
+    "yanvar",
+    "fevral",
+    "mart",
+    "aprel",
+    "may",
+    "iyun",
+    "iyul",
+    "avqust",
+    "sentyabr",
+    "oktyabr",
+    "noyabr",
+    "dekabr"
+  ],
+  "monthsShort": [
+    "yan",
+    "fev",
+    "mar",
+    "apr",
+    "may",
+    "iyn",
+    "iyl",
+    "avq",
+    "sen",
+    "okt",
+    "noy",
+    "dek"
+  ],
+  "weekdays": [
+    "bazar günü",
+    "bazar ertəsi",
+    "çərşənbə axşamı",
+    "çərşənbə",
+    "cümə axşamı",
+    "cümə",
+    "şənbə"
+  ],
+  "weekdaysShort": [
+    "baz",
+    "ber",
+    "çax",
+    "çər",
+    "cax",
+    "cüm",
+    "şnb"
+  ],
+  "date": {
+    "short": "{day} {mon}, {wd}",
+    "long": "{day} {month} {yyyy}, {weekday}",
+    "dayMonth": "{day} {month}, {weekday}",
+    "numeric": "{dd}.{mm}.{yyyy}"
+  },
+  "decimal": ",",
+  "group": ".",
+  "hour12": false
+}

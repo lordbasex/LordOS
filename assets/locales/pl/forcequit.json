@@ -1,0 +1,7 @@
+{
+  "intro": "Jeśli aplikacja przez dłuższy czas nie odpowiada, wybierz ją i kliknij Wymuś zakończenie. Zostanie zamknięta bez zapisywania.",
+  "none": "Żadna aplikacja nie jest otwarta",
+  "quit": "Wymuś zakończenie",
+  "shortcut": "Także w menu korony: Wymuś zakończenie…",
+  "windows": "Okna: {count}"
+}

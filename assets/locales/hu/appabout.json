@@ -1,0 +1,9 @@
+{
+  "isolated": "Elszigetelten fut, saját folyamatban",
+  "linux": "Linux-alkalmazás",
+  "lordos": "LordOS-alkalmazás",
+  "package": "Telepített alkalmazás (.lpk)",
+  "system": "Rendszeralkalmazás – a LordOS része, vele együtt ellenőrizve",
+  "title": "{app} névjegye",
+  "version": "{v} verzió"
+}

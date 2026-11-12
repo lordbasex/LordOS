@@ -1,0 +1,57 @@
+{
+  "months": [
+    "ianuarie",
+    "februarie",
+    "martie",
+    "aprilie",
+    "mai",
+    "iunie",
+    "iulie",
+    "august",
+    "septembrie",
+    "octombrie",
+    "noiembrie",
+    "decembrie"
+  ],
+  "monthsShort": [
+    "ian",
+    "feb",
+    "mar",
+    "apr",
+    "mai",
+    "iun",
+    "iul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec"
+  ],
+  "weekdays": [
+    "duminică",
+    "luni",
+    "marți",
+    "miercuri",
+    "joi",
+    "vineri",
+    "sâmbătă"
+  ],
+  "weekdaysShort": [
+    "dum.",
+    "lun.",
+    "mar.",
+    "mie.",
+    "joi",
+    "vin.",
+    "sâm."
+  ],
+  "date": {
+    "short": "{wd}, {day} {mon}",
+    "long": "{weekday}, {day} {month} {yyyy}",
+    "dayMonth": "{weekday}, {day} {month}",
+    "numeric": "{dd}.{mm}.{yyyy}"
+  },
+  "decimal": ",",
+  "group": ".",
+  "hour12": false
+}

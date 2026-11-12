@@ -650,7 +650,8 @@ function AddLanguage({ langs, have, onAdd }) {
   const needle = fold(q.trim());
   const match = (...xs) => !needle || xs.some((x) => fold(x).includes(needle));
   const ready = langs.filter((l) => !have.includes(l.id) && match(l.name, l.english, l.id));
-  const later = LANGUAGE_NAMES.filter(([id, name, en]) => !langs.some((l) => l.id === id) && match(name, en, id));
+  // zh is listed while neither zh-Hans nor zh-Hant is installed
+  const later = LANGUAGE_NAMES.filter(([id, name, en]) => !langs.some((l) => l.id === id || l.id.startsWith(`${id}-`)) && match(name, en, id));
   const head = (text) => <Text style={{ paddingHorizontal: 8, paddingTop: 8, paddingBottom: 3, fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{text}</Text>;
   const row = (key, name, en, right, onClick) => (
     <View key={key} onClick={onClick} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: 8, borderRadius: 5 }}>

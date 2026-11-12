@@ -16,7 +16,7 @@ import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/ru
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, CORE_LANGUAGES, keyboard, settings, LordOSWordmark,
   lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, fs, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
-  regionOf, regionCountry,
+  regionOf, regionCountry, languageOfLocale,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -253,8 +253,9 @@ function Greeter() {
         // language: the one chosen here before or the system's (if there is no catalog, English)
         const shipped = languages().filter((l) => !l.user).map((l) => l.id);
         if (!shipped.includes(settings.get().language)) {
-          const sys = String(m.lang || '').slice(0, 2);
-          setLanguage(shipped.includes(sys) ? sys : 'en');
+          // zh_TW → zh-Hant (sdk/localename.js); a partial language without this screen's texts yet: English
+          const sys = languageOfLocale(String(m.lang || ''), shipped);
+          setLanguage(sys && lord.locale.catalog(sys, 'greeter') ? sys : 'en');
         }
         // region: the computer's, for the clock and the date (lt_LT: 24 hours, #45). This screen has no
         // choice of its own, so it follows /etc/default/locale even when that changes while it shows.

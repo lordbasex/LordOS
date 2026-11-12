@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { regionOf, localeOf, regionCountry } = await import(path.join(here, '../../sdk/localename.js'));
+const { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } = await import(path.join(here, '../../sdk/localename.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -32,6 +32,24 @@ eq('country', regionCountry('en_AU'), 'AU');
 eq('country three-letter language', regionCountry('ast_ES'), 'ES');
 eq('country modifier', regionCountry('ca_ES@valencia'), 'ES');
 eq('no country', regionCountry('eo'), '');
+
+// the interface language for a locale (the login screen and a first session without a saved choice)
+const IDS = ['en', 'es', 'pt', 'ja', 'zh-Hans', 'zh-Hant', 'sr-Latn'];
+eq('language of pt_BR', languageOfLocale('pt_BR.UTF-8', IDS), 'pt');
+eq('language without country', languageOfLocale('ja', IDS), 'ja');
+eq('Chinese of China', languageOfLocale('zh_CN.UTF-8', IDS), 'zh-Hans');
+eq('Chinese of Singapore', languageOfLocale('zh_SG.UTF-8', IDS), 'zh-Hans');
+eq('Chinese of Taiwan', languageOfLocale('zh_TW.UTF-8', IDS), 'zh-Hant');
+eq('Chinese of Hong Kong', languageOfLocale('zh_HK.UTF-8', IDS), 'zh-Hant');
+eq('Chinese of Macau', languageOfLocale('zh_MO', IDS), 'zh-Hant');
+eq('Chinese with only one script', languageOfLocale('zh_TW.UTF-8', ['en', 'zh-Hans']), 'zh-Hans');
+eq('the only variant of a language', languageOfLocale('sr_RS.UTF-8@latin', IDS), 'sr-Latn');
+eq('a language LordOS lacks', languageOfLocale('de_DE.UTF-8', IDS), '');
+eq('C locale', languageOfLocale('C.UTF-8', IDS), '');
+eq('empty locale', languageOfLocale('', IDS), '');
+eq('no ids', languageOfLocale('es_AR.UTF-8', null), '');
+eq('glibc language of zh-Hant', localeLanguage('zh-Hant'), 'zh');
+eq('glibc language of pt', localeLanguage('pt'), 'pt');
 
 // Every UTF-8 region of this machine: shown once, sent in the form the root side accepts
 // (the codeset inserted before any modifier, the same rule as localename.h's locale_utf8_form).

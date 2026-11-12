@@ -1,0 +1,18 @@
+{
+  "bootTest": "正在测量启动时间：已完成第 {k} 次启动（共 {n} 次）。将在 {s} 秒后重新启动。登录也会停止测试。",
+  "bootTestCancel": "停止测试",
+  "busy": "请稍候…",
+  "cancel": "取消",
+  "confirmRestart": "还有打开的会话：未保存的工作将会丢失。仍要重新启动吗？",
+  "confirmShutdown": "还有打开的会话：未保存的工作将会丢失。仍要关机吗？",
+  "error": "无法打开会话。",
+  "locked": "屏幕已锁定",
+  "noUsers": "没有用户",
+  "password": "密码",
+  "restart": "重新启动",
+  "shutdown": "关机",
+  "wait": {
+    "other": "尝试次数过多。请等待 {count} 秒。"
+  },
+  "wrong": "密码错误。"
+}

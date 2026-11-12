@@ -1,0 +1,9 @@
+{
+  "isolated": "Chạy cô lập, trong tiến trình riêng",
+  "linux": "Ứng dụng Linux",
+  "lordos": "Ứng dụng LordOS",
+  "package": "Ứng dụng đã cài (.lpk)",
+  "system": "Ứng dụng hệ thống — một phần của LordOS, được xác minh cùng LordOS",
+  "title": "Giới thiệu {app}",
+  "version": "Phiên bản {v}"
+}

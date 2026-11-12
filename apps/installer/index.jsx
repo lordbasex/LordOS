@@ -6,7 +6,7 @@
 // running system (install-account): lord.system.info().firstAccount.
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, MenuButton, useTheme, useLocale, useStore, createStore,
-  admin, keyboard, languages, setLanguage, formatBytes, locale, regionOf, localeOf, regionCountry, tOptional, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
+  admin, keyboard, languages, setLanguage, formatBytes, locale, regionOf, localeOf, regionCountry, localeLanguage, tOptional, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
@@ -109,9 +109,9 @@ function Language() {
   const langs = languages();
   const [locales] = useState(() => [...new Set(lord.locale.available().map((l) => regionOf(l.name)))]);
   const [zones] = useState(() => lord.time.zones().sort((a, b) => (a === 'UTC' ? -1 : b === 'UTC' ? 1 : a.localeCompare(b))));
-  const lang = s.lang || locale.get().lang.split('-')[0];
-  // "United Kingdom · en_GB": found by the country's name too (#53)
-  const regions = locales.filter((r) => r.startsWith(`${lang}_`))
+  const lang = s.lang || locale.get().lang;
+  // "United Kingdom · en_GB": found by the country's name too (#53); zh-Hans and zh-Hant list the zh_ regions
+  const regions = locales.filter((r) => r.startsWith(`${localeLanguage(lang)}_`))
     .map((r) => { const cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : ''; return [r, name ? `${name} · ${r}` : r]; })
     .sort((a, b) => compareNames(a[1], b[1]));
   return (
@@ -442,8 +442,8 @@ const kbName = (kb) => {
 };
 
 const plan = (s) => {
-  const lang = s.lang || locale.get().lang.split('-')[0];
-  const region = s.region || (locale.get().region && locale.get().region.startsWith(`${lang}_`) ? locale.get().region : '');
+  const lang = s.lang || locale.get().lang;
+  const region = s.region || (locale.get().region && locale.get().region.startsWith(`${localeLanguage(lang)}_`) ? locale.get().region : '');
   const kb = s.kb || keyboard.active() || { layout: 'us', variant: '' };
   return {
     // without a choice: the language's own region (its meta.json: lt → lt_LT), not en_US

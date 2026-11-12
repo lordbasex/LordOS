@@ -1,0 +1,9 @@
+{
+  "id": "bg",
+  "name": "Български",
+  "english": "Bulgarian",
+  "plural": "one-other",
+  "region": "bg_BG",
+  "direction": "ltr",
+  "partial": true
+}

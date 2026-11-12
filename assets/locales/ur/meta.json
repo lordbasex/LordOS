@@ -1,0 +1,9 @@
+{
+  "id": "ur",
+  "name": "اردو",
+  "english": "Urdu",
+  "plural": "one-other",
+  "region": "ur_PK",
+  "direction": "rtl",
+  "partial": true
+}

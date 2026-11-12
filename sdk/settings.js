@@ -18,7 +18,7 @@ const DEFAULTS = {
   keyboard: null,        // before M5; now keyboards (see keyboard.js). It was 'latam' until 0.8.8.6 (#55)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,
-  language: null,        // interface language ('es', 'en', 'pt', 'fr', 'it'…); null = the region's
+  language: null,        // interface language ('es', 'en', 'pt', 'fr', 'it', 'zh-Hant'…); null = the region's
   languages: null,       // preferred languages in order, the first is `language` (Settings → Language & Region); null = en, es, pt
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)

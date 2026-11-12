@@ -1,0 +1,18 @@
+{
+  "bootTest": "正在測量開機時間：已完成第 {k} 次開機（共 {n} 次）。將在 {s} 秒後重新開機。登入也會停止測試。",
+  "bootTestCancel": "停止測試",
+  "busy": "請稍候…",
+  "cancel": "取消",
+  "confirmRestart": "還有開啟的工作階段：未儲存的工作將會遺失。仍要重新開機嗎？",
+  "confirmShutdown": "還有開啟的工作階段：未儲存的工作將會遺失。仍要關機嗎？",
+  "error": "無法開啟工作階段。",
+  "locked": "螢幕已鎖定",
+  "noUsers": "沒有使用者",
+  "password": "密碼",
+  "restart": "重新開機",
+  "shutdown": "關機",
+  "wait": {
+    "other": "嘗試次數過多。請等待 {count} 秒。"
+  },
+  "wrong": "密碼錯誤。"
+}

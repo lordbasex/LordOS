@@ -1,0 +1,9 @@
+{
+  "isolated": "별도의 프로세스에서 격리되어 실행",
+  "linux": "Linux 앱",
+  "lordos": "LordOS 앱",
+  "package": "설치된 앱(.lpk)",
+  "system": "시스템 앱 — LordOS의 일부로, LordOS와 함께 확인됨",
+  "title": "{app}에 관하여",
+  "version": "버전 {v}"
+}

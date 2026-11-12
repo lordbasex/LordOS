@@ -1,0 +1,9 @@
+{
+  "id": "el",
+  "name": "Ελληνικά",
+  "english": "Greek",
+  "plural": "one-other",
+  "region": "el_GR",
+  "direction": "ltr",
+  "partial": true
+}

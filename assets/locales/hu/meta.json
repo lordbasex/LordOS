@@ -1,0 +1,9 @@
+{
+  "id": "hu",
+  "name": "Magyar",
+  "english": "Hungarian",
+  "plural": "one-other",
+  "region": "hu_HU",
+  "direction": "ltr",
+  "partial": true
+}

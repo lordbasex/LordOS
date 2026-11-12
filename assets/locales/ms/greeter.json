@@ -1,0 +1,18 @@
+{
+  "bootTest": "Mengukur masa but: but {k} daripada {n} selesai. Dimulakan semula dalam {s} saat. Log masuk juga menghentikan ujian.",
+  "bootTestCancel": "Hentikan ujian",
+  "busy": "Sebentar…",
+  "cancel": "Batal",
+  "confirmRestart": "Ada sesi yang terbuka: kerja yang belum disimpan akan hilang. Mulakan semula juga?",
+  "confirmShutdown": "Ada sesi yang terbuka: kerja yang belum disimpan akan hilang. Matikan juga?",
+  "error": "Sesi tidak dapat dibuka.",
+  "locked": "Skrin dikunci",
+  "noUsers": "Tiada pengguna",
+  "password": "Kata laluan",
+  "restart": "Mulakan Semula",
+  "shutdown": "Matikan",
+  "wait": {
+    "other": "Terlalu banyak percubaan. Tunggu {count} saat."
+  },
+  "wrong": "Kata laluan salah."
+}

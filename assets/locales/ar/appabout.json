@@ -1,0 +1,9 @@
+{
+  "isolated": "يعمل معزولًا في عملية خاصة به",
+  "linux": "تطبيق Linux",
+  "lordos": "تطبيق LordOS",
+  "package": "تطبيق مثبّت (.lpk)",
+  "system": "تطبيق نظام — جزء من LordOS ويُتحقَّق منه معه",
+  "title": "حول {app}",
+  "version": "الإصدار {v}"
+}

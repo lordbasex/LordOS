@@ -1,0 +1,7 @@
+{
+  "intro": "Om en app slutar svara en stund väljer du den och klickar på Tvångsavsluta. Den avslutas utan att spara.",
+  "none": "Ingen app är öppen",
+  "quit": "Tvångsavsluta",
+  "shortcut": "Finns även i kronmenyn: Tvångsavsluta…",
+  "windows": "{count} fönster"
+}

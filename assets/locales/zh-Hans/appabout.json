@@ -1,0 +1,9 @@
+{
+  "isolated": "在独立的进程中隔离运行",
+  "linux": "Linux 应用",
+  "lordos": "LordOS 应用",
+  "package": "已安装的应用（.lpk）",
+  "system": "系统应用 — LordOS 的一部分，随 LordOS 一起验证",
+  "title": "关于 {app}",
+  "version": "版本 {v}"
+}

@@ -1,0 +1,9 @@
+{
+  "isolated": "Yalıtılmış olarak, kendi işleminde çalışır",
+  "linux": "Linux uygulaması",
+  "lordos": "LordOS uygulaması",
+  "package": "Yüklü uygulama (.lpk)",
+  "system": "Sistem uygulaması — LordOS’un parçası, onunla birlikte doğrulanır",
+  "title": "{app} Hakkında",
+  "version": "Sürüm {v}"
+}

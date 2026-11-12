@@ -1,0 +1,9 @@
+{
+  "id": "vi",
+  "name": "Tiếng Việt",
+  "english": "Vietnamese",
+  "plural": "none",
+  "region": "vi_VN",
+  "direction": "ltr",
+  "partial": true
+}

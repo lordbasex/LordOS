@@ -1,0 +1,9 @@
+{
+  "id": "pl",
+  "name": "Polski",
+  "english": "Polish",
+  "plural": "polish",
+  "region": "pl_PL",
+  "direction": "ltr",
+  "partial": true
+}

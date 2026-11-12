@@ -1,0 +1,57 @@
+{
+  "months": [
+    "tammikuuta",
+    "helmikuuta",
+    "maaliskuuta",
+    "huhtikuuta",
+    "toukokuuta",
+    "kesäkuuta",
+    "heinäkuuta",
+    "elokuuta",
+    "syyskuuta",
+    "lokakuuta",
+    "marraskuuta",
+    "joulukuuta"
+  ],
+  "monthsShort": [
+    "tammik.",
+    "helmik.",
+    "maalisk.",
+    "huhtik.",
+    "toukok.",
+    "kesäk.",
+    "heinäk.",
+    "elok.",
+    "syysk.",
+    "lokak.",
+    "marrask.",
+    "jouluk."
+  ],
+  "weekdays": [
+    "sunnuntai",
+    "maanantai",
+    "tiistai",
+    "keskiviikko",
+    "torstai",
+    "perjantai",
+    "lauantai"
+  ],
+  "weekdaysShort": [
+    "su",
+    "ma",
+    "ti",
+    "ke",
+    "to",
+    "pe",
+    "la"
+  ],
+  "date": {
+    "short": "{wd} {day}. {mon}",
+    "long": "{weekday} {day}. {month} {yyyy}",
+    "dayMonth": "{weekday} {day}. {month}",
+    "numeric": "{dd}.{mm}.{yyyy}"
+  },
+  "decimal": ",",
+  "group": " ",
+  "hour12": false
+}

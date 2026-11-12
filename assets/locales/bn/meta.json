@@ -1,0 +1,9 @@
+{
+  "id": "bn",
+  "name": "বাংলা",
+  "english": "Bengali",
+  "plural": "zero-one-other",
+  "region": "bn_BD",
+  "direction": "ltr",
+  "partial": true
+}

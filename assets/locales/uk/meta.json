@@ -1,0 +1,9 @@
+{
+  "id": "uk",
+  "name": "Українська",
+  "english": "Ukrainian",
+  "plural": "east-slavic",
+  "region": "uk_UA",
+  "direction": "ltr",
+  "partial": true
+}

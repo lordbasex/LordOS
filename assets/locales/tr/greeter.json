@@ -1,0 +1,19 @@
+{
+  "bootTest": "Açılış süresi ölçülüyor: {n} açılıştan {k} tanesi tamamlandı. {s} sn içinde yeniden başlatılacak. Oturum açmak da testi durdurur.",
+  "bootTestCancel": "Testi durdur",
+  "busy": "Bir dakika…",
+  "cancel": "Vazgeç",
+  "confirmRestart": "Açık oturumlar var: kaydedilmemiş çalışmalar kaybolacak. Yine de yeniden başlatılsın mı?",
+  "confirmShutdown": "Açık oturumlar var: kaydedilmemiş çalışmalar kaybolacak. Yine de kapatılsın mı?",
+  "error": "Oturum açılamadı.",
+  "locked": "Ekran kilitli",
+  "noUsers": "Kullanıcı yok",
+  "password": "Parola",
+  "restart": "Yeniden Başlat",
+  "shutdown": "Kapat",
+  "wait": {
+    "one": "Çok fazla deneme. {count} saniye bekleyin.",
+    "other": "Çok fazla deneme. {count} saniye bekleyin."
+  },
+  "wrong": "Parola yanlış."
+}

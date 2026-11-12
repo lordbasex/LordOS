@@ -1,0 +1,20 @@
+{
+  "bootTest": "Se măsoară timpul de pornire: pornirea {k} din {n} gata. Repornire în {s} s. Autentificarea oprește și ea testul.",
+  "bootTestCancel": "Oprește testul",
+  "busy": "Un moment…",
+  "cancel": "Anulează",
+  "confirmRestart": "Există sesiuni deschise: munca nesalvată se va pierde. Reporniți oricum?",
+  "confirmShutdown": "Există sesiuni deschise: munca nesalvată se va pierde. Opriți oricum?",
+  "error": "Sesiunea nu a putut fi deschisă.",
+  "locked": "Ecran blocat",
+  "noUsers": "Niciun utilizator",
+  "password": "Parolă",
+  "restart": "Repornește",
+  "shutdown": "Oprește",
+  "wait": {
+    "one": "Prea multe încercări. Așteptați {count} secundă.",
+    "few": "Prea multe încercări. Așteptați {count} secunde.",
+    "other": "Prea multe încercări. Așteptați {count} de secunde."
+  },
+  "wrong": "Parolă greșită."
+}
