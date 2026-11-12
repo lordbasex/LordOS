@@ -1,7 +1,8 @@
 # LordOS on Raspberry Pi (ARM64)
 
-Since M8, ARM64 is an official LordOS platform. **The only supported board is the Raspberry Pi 5**:
-it is the only one we test. Other boards may boot the same image, but they are not supported.
+Since M8, ARM64 is an official LordOS platform. **The supported boards are the Raspberry Pi 5 and the
+Raspberry Pi 500** (a Pi 5 built into a keyboard), with the same image. We test on the Pi 5; the Pi 500
+was tested by a community member. Other boards may boot the same image, but they are not supported.
 This document gathers what's needed to build the image, write it, develop on the board and test it.
 
 > **Status (2026-10-18):** first bring-up on a real **Raspberry Pi 5 (16 GB, SD card)** running
@@ -68,8 +69,9 @@ This document gathers what's needed to build the image, write it, develop on the
 
 | Board | Status | Notes |
 |---|---|---|
-| **Raspberry Pi 5** (4, 8 or 16 GB) | **supported (the only one)** | BCM2712, 4× Cortex-A76 at 2.4 GHz, V3D 7.1 (OpenGL ES 3.1, Vulkan 1.3), kernel with 16K pages |
-| Raspberry Pi 500 / CM5 | not supported | same SoC, so it may work; untested |
+| **Raspberry Pi 5** (4, 8 or 16 GB) | **supported** | BCM2712, 4× Cortex-A76 at 2.4 GHz, V3D 7.1 (OpenGL ES 3.1, Vulkan 1.3), kernel with 16K pages |
+| **Raspberry Pi 500** (8 GB) | **supported** | the same image; tested by the community. No fan header: the Imager offers no fan, case or overclock for it (see [IMAGER.md](IMAGER.md)) |
+| Compute Module 5 | not supported | same SoC, so it may work; untested |
 | Raspberry Pi 4 / 400 / CM4 | not supported | BCM2711; the image still carries a `rpi-v8` kernel, but it is untested |
 | Pi 3 and earlier, Zero 2 | no | too little RAM and an old vc4 GPU (GLES 2 without modern dmabuf) |
 
@@ -89,7 +91,7 @@ This document gathers what's needed to build the image, write it, develop on the
 ## The image
 
 `tools/rpi/build-img.sh` builds `lordos-<version>-rpi5-arm64.img.xz`. It is written the same way to an
-SD card or an NVMe. The Pi 5 is the only supported board: the image also carries a kernel for the Pi 4,
+SD card or an NVMe. The Pi 5 and the Pi 500 are the supported boards: the image also carries a kernel for the Pi 4,
 but booting it there is untested (see "Models").
 
 ### What it ships

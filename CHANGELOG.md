@@ -10,6 +10,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Documentation
+
+- **Platform docs match 0.8.8.8.** The install, unattended install, packages, updates, release, ISO, Raspberry Pi,
+  compliance, troubleshooting and development VM guides, the documentation index and the README now say 0.8.8.8 is
+  released, list migration 007 (logs), the Store's Web apps section, the languages the installer generates, the
+  `lordos-rclone` and `lordos-web` packages in the install and release steps, the Raspberry Pi 500 as supported (same
+  image, tested by the community), the build refusing missing helpers (and `libsystemd-dev`), nanosvg and the mirrored
+  artcraft-launcher and AGPL-3.0 RustDesk packages (whose source is not published yet), X11 apps run as root and web
+  app logs, and four documents missing from the index (Cloud, Databases, Disk life, Voice).
+
 ### Website
 
 - **lordos.org: the LordOS Web Runtime as a headline feature, in English, Spanish and Portuguese.** A seventh card on

@@ -12,7 +12,7 @@ curl -fsSL https://lordos.org/install.sh | sh
 The script asks before changing anything. It reads the answers from the terminal (`/dev/tty`), so
 this works even though the script itself comes through a pipe.
 
-> **Status (2026-11-02):** the latest release is 0.8.8-beta, and the GitHub repository is now public, so
+> **Status (2026-11-12):** the latest release is 0.8.8.8-beta, and the GitHub repository is public, so
 > the installer can look up and download its release files. Without access to GitHub, use `--deb` with a
 > package you already have (see [Testing](#testing)).
 
@@ -31,7 +31,9 @@ this works even though the script itself comes through a pipe.
 
 1. **Checks** the points above and shows what it is going to do. Nothing changes until you answer `y`.
 2. **Downloads** `SHA256SUMS` and `lordos_<version>_<arch>.deb` from the GitHub release
-   (`https://github.com/lordbasex/LordOS/releases`), by default the latest one. The latest
+   (`https://github.com/lordbasex/LordOS/releases`), by default the latest one, plus the two packages
+   `lordos` depends on: `lordos-hwdata_<date>_all.deb` (0.8.7, the signed tested-hardware snapshot) and
+   `lordos-rclone_<version>_<arch>.deb` (0.8.8.5, rclone for Cloud), each checked against `SHA256SUMS`. The latest
    release is looked up through the GitHub API; since betas are marked as pre-releases, which
    `releases/latest` skips, it falls back to the newest release of any kind.
 3. **Verifies** the `.deb`'s SHA-256 against `SHA256SUMS`. A mismatch stops everything.
@@ -54,7 +56,8 @@ this works even though the script itself comes through a pipe.
      A system installed before this (the Store refuses with "<user> is not an administrator" and nobody is one)
      is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
      the session user to `sudo`, effective after a reboot;
-   - generates the `en_US`, `es_ES`, `pt_BR` and `fr_FR` UTF-8 locales (the languages the interface ships).
+   - generates the `en_US`, `es_ES`, `pt_BR`, `fr_FR` and `it_IT` UTF-8 locales. The interface also ships
+     Lithuanian (`lt`), but the script doesn't generate `lt_LT.UTF-8`; add it with `dpkg-reconfigure locales` if you need it.
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
      login (Settings → Users changes it). An existing file is kept;
@@ -103,7 +106,7 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- [options]
 |---|---|
 | `-y`, `--yes` | don't ask (also `LORDOS_YES=1`). With it, the display manager **is** disabled; add `--keep-display-manager` to avoid that |
 | `--version X` | install release `X` (`0.8.0-beta` or `v0.8.0-beta`) instead of the latest |
-| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified. (0.8.7) The `lordos-hwdata_<date>_all.deb` the package depends on (the signed tested-hardware snapshot) is taken from the same folder, checked the same way |
+| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified. (0.8.7) The `lordos-hwdata_<date>_all.deb` the package depends on (the signed tested-hardware snapshot) is taken from the same folder, checked the same way, and so is `lordos-rclone_<version>_<arch>.deb` (0.8.8.5) |
 | `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root, who logged in, or the only regular user) |
 | `--keep-display-manager` | leave the current display manager enabled; LordOS is not enabled at boot |
 | `--no-extras` | don't install the extra sound and font packages |

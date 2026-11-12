@@ -719,18 +719,26 @@ installing packages and compressing.
 sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorriso grub-pc-bin \
   grub-efi-amd64-bin grub-common mtools dosfstools lintian libgbm-dev libegl-dev libgles-dev libssl-dev \
   libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-  libswresample-dev libva-dev libsrtp2-dev libusrsctp-dev libtesseract-dev libpipewire-0.3-dev clang cmake glslc libvulkan-dev spirv-headers
+  libswresample-dev libva-dev libsrtp2-dev libusrsctp-dev libtesseract-dev libpipewire-0.3-dev libsystemd-dev \
+  clang cmake glslc libvulkan-dev spirv-headers
 sh tools/tts/fetch-audiocpp.sh          # audio.cpp for lord-tts, at its pinned commit (network)
 ```
+
+Since 0.8.8.7, `tools/iso/mkdeb.sh` refuses to build the package when any helper is missing (`lord-media`, `lord-doc`,
+`lord-ocr`, `lord-tts`, `lord-screencast`, `lord-vmdisplay`, `lord-vault`, `lord-maild`, `lord-bench`, `lord-clean`,
+`lord-lan`, `lord-fetch`, `lord-tls`, `lord-sql`, `lord-sftp`, `lord-vm`, `lordos-guest`) and names what each needs.
+Where the table says `make` skips a helper, the build goes on without it, and `mkdeb.sh` then stops unless
+`ALLOW_MISSING="<helper> …"` names it to leave it out on purpose; only then does the package ship without that feature.
 
 | Package | What for |
 |---|---|
 | `libssl-dev` | compiling `lord-sessiond` (remote desktop TLS), `lord-maild` (Mail) and, since 0.8.5, `lord-fetch` (the blocklists) and `lord-tls` (the package engine's HTTPS); without it, `make` builds only lord-server and `mkdeb.sh` refuses |
-| `libpoppler-glib-dev`, `libarchive-dev` | compiling `lord-doc` (PDF and archives); without them `make` skips it and the package ships without a PDF viewer |
-| `cmake`, `glslc`, `libvulkan-dev`, `spirv-headers` | compiling `lord-tts` (since 0.8.8.6: text to speech, `say`; docs/VOICE.md) with audio.cpp from `tools/tts/fetch-audiocpp.sh`: Pocket TTS, ggml's CPU kernels for every x86-64 generation and its Vulkan backend. Without them, or without the source, `make` skips it and `say` says speech isn't installed. The package then depends on `libvulkan1`, `libgomp1` and `libstdc++6`; no voice model is installed |
-| `libpipewire-0.3-dev` | compiling `lord-screencast` (since 0.8.8.8: a screen or a window shared with a Linux app, the ScreenCast portal); without it `make` skips it and the portal offers no source types. The package then depends on `libpipewire-0.3-0t64` |
-| `libtesseract-dev` | compiling `lord-ocr` (since 0.8.8.6: Screenshots' "copy the text"); without it `make` skips it and Screenshots says text recognition isn't available. The package then depends on `libtesseract5` and `tesseract-ocr-eng`, and recommends Spanish, Portuguese, French and Italian |
-| `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | compiling `lord-media` (video, photos, camera, recorder); without them `make` skips it |
+| `libpoppler-glib-dev`, `libarchive-dev` | compiling `lord-doc` (PDF and archives); without them `make` skips it, and a package left without it (`ALLOW_MISSING`) has no PDF viewer |
+| `cmake`, `glslc`, `libvulkan-dev`, `spirv-headers` | compiling `lord-tts` (since 0.8.8.6: text to speech, `say`; docs/VOICE.md) with audio.cpp from `tools/tts/fetch-audiocpp.sh`: Pocket TTS, ggml's CPU kernels for every x86-64 generation and its Vulkan backend. Without them, or without the source, `make` skips it; in a package left without it (`ALLOW_MISSING`), `say` says speech isn't installed. The package then depends on `libvulkan1`, `libgomp1` and `libstdc++6`; no voice model is installed |
+| `libpipewire-0.3-dev` | compiling `lord-screencast` (since 0.8.8.8: a screen or a window shared with a Linux app, the ScreenCast portal); without it `make` skips it, and in a package left without it (`ALLOW_MISSING`) the portal offers no source types. The package then depends on `libpipewire-0.3-0t64` |
+| `libtesseract-dev` | compiling `lord-ocr` (since 0.8.8.6: Screenshots' "copy the text"); without it `make` skips it, and in a package left without it (`ALLOW_MISSING`) Screenshots says text recognition isn't available. The package then depends on `libtesseract5` and `tesseract-ocr-eng`, and recommends Spanish, Portuguese, French and Italian |
+| `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | compiling `lord-media` (video, photos, camera, recorder); without them `make` skips it and `mkdeb.sh` refuses the package |
+| `libsystemd-dev` | compiling `lord-vmdisplay` (Machines: the machine's picture and input over D-Bus) and logind support in `lord-vm`; without it `make` skips `lord-vmdisplay` and `mkdeb.sh` refuses the package |
 | `libva-dev` | optional: GPU decoding (VA-API) in `lord-media` |
 | `libsrtp2-dev`, `libusrsctp-dev` | the remote desktop (WebRTC: SRTP and the data channels) in `lord-sessiond`; required: without them `make` stops with an error for `lord-sessiond` (or build with `SESSIOND=0`), and the package always depends on `libsrtp2-1` and `libusrsctp2` |
 | `clang` | compiling `lord-netperm`'s BPF programs (per-app network permissions); without it the build still works, but no rules are applied |
@@ -738,6 +746,7 @@ sh tools/tts/fetch-audiocpp.sh          # audio.cpp for lord-tts, at its pinned 
 | `squashfs-tools` | `mksquashfs` |
 | `xorriso`, `grub-pc-bin`, `grub-efi-amd64-bin`, `grub-common`, `mtools`, `dosfstools` | `grub-mkrescue`: the hybrid BIOS + UEFI ISO. On an arm64 host, `grub-efi-arm64-bin` instead of the two grub binaries (`build-arm64.sh` installs them in its overlay) |
 | `lintian` | checking the `.deb` |
+| `libwpewebkit-2.0-dev`, `libwpebackend-fdo-1.0-dev` | not for the `lordos` package: compiling `lord-web` (the LordOS Web Runtime, 0.8.8.8), packaged on each architecture as the optional `lordos-web` by `tools/iso/mkdeb-web.sh`; without them `make` skips `lord-web` with a message |
 | `qemu-utils`, `libarchive13t64`, `gdisk`, `e2fsprogs` 1.47.1 or later | the OVA (`build-ova.sh`): `qemu-img` writes the VMDK, `mke2fs -d` reads a tar through libarchive |
 
 ### lintian

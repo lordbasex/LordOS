@@ -74,15 +74,20 @@ The releases page is the project's public changelog: every release is documented
      (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh`), plus (0.8.7) `lordos-disk-formats_<version>_<arch>.deb` on each architecture (`tools/iso/mkdeb-diskformats.sh <folder>`, the Store's Disk Formats item, published with `lordos` and never inside the images),
      and the one `lordos-hwdata_<date>_all.deb` for both
      (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb-hwdata.sh <folder>`; the ISO and image builds make it too and install
-     it with `lordos`, which depends on it). The package is reproducible: built again from the same snapshot and
+     it with `lordos`, which depends on it), plus (0.8.8.5) `lordos-rclone_<version>_<arch>.deb` for each architecture
+     (`tools/iso/mkdeb-rclone.sh <folder>`: rclone's signed upstream binary, unmodified; `lordos` depends on it) and
+     (0.8.8.8) `lordos-web_<version>_<arch>.deb`, the LordOS Web Runtime, on each architecture after `make -C server`
+     with `libwpewebkit-2.0-dev` and `libwpebackend-fdo-1.0-dev` installed (`tools/iso/mkdeb-web.sh <folder>`; it
+     depends on that exact `lordos` version and is optional, never inside the images). The package is reproducible: built again from the same snapshot and
      signature on another VM it has the same bytes. `mkdeb.sh` puts `code-manifest.json` and
      `code-manifest.sig` in `/usr/lib/lordos/` and runs `lord-server --check-code` on the staged tree:
      the package is not built if a bundle changed after signing or the signature is missing. A bundle
      rebuilt after signing means signing again. An update with a fourth number may ship without a
      new ISO (0.8.4.1 did: the 0.8.4 ISO stayed the current one, see [ISO.md](ISO.md)).
    - Copy them, and `tools/install/install.sh` as `install.sh`, into one release folder (with
-     `lordos-hwdata_<date>_all.deb`: `install.sh` installs it from the release together with `lordos`, since a
-     Debian system has no LordOS repository yet).
+     `lordos-hwdata_<date>_all.deb` and both `lordos-rclone` packages: `install.sh` installs them from the release
+     together with `lordos`, since a Debian system has no LordOS repository yet; `sign-release.sh` refuses a folder
+     without them, unless `ALLOW_NO_HWDATA=1` or `ALLOW_NO_RCLONE=1` says that `lordos` doesn't depend on them).
 4. **SBOM.** On each build VM, `tools/release/make-sbom.sh lordos_<v>_<arch>.deb`, and put the
    `.spdx.json` files in the release folder ([COMPLIANCE.md](COMPLIANCE.md)).
 5. **Sign.** On the maintainer's machine, `tools/release/sign-release.sh <release-dir>`: it writes
@@ -93,13 +98,16 @@ The releases page is the project's public changelog: every release is documented
    changelog section for that version (relative links made absolute for the tag, hard-wrapped
    lines joined, its "Verifying" part replaced by the footer) plus a fixed footer: the downloads
    table, the verification steps and links to lordos.org, the paper, the docs and the security
-   page. Read it once before publishing.
+   page. Read it once before publishing. The downloads table takes one Imager version for every
+   platform, `lordos.imager` in `package.json`; when the platforms' Imager builds come from different
+   releases (0.8.8.8: the Mac build is 0.8.6's, Windows and Linux 0.8.8.6's), fix those links by hand. It
+   lists no row for `lordos-web` or `lordos-disk-formats`.
 7. **The APT repository** (what installed systems update from; [UPDATES.md](UPDATES.md)). On the
    maintainer's Mac, where the archive key lives (never on a VM):
 
    ```sh
    # staging first: the same .debs, the notes from this version's CHANGELOG section
-   tools/release/apt-repo.sh build staging <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb
+   tools/release/apt-repo.sh build staging <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
    tools/release/apt-repo.sh publish staging
    tools/release/apt-repo.sh verify staging        # https and http, signature, every index hash
    ```
@@ -114,12 +122,13 @@ The releases page is the project's public changelog: every release is documented
    Then the same for the live repository:
 
    ```sh
-   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb
+   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
    tools/release/apt-repo.sh publish live
    tools/release/apt-repo.sh verify live
    ```
 
    A version is never re-uploaded with other contents (the script refuses); a fix is a new version.
+   (0.8.8.5) It refuses a `lordos` that depends on `lordos-rclone` while the pool has none of its architecture.
    (0.8.7) The script also refuses a `lordos` that depends on `lordos-hwdata` while the pool has none, and a
    `lordos-hwdata` whose snapshot signature doesn't verify with `lordos-release.pub.pem`. When the snapshot didn't
    change since it was last published, passing the same `lordos-hwdata` again is fine (same bytes).

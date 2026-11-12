@@ -38,15 +38,20 @@ materials (SBOM) published with each release. The website summary is at
   `firmware-brcm80211` on both ISOs, from Debian's `non-free-firmware` component: Broadcom's binary-only firmware,
   redistributed unmodified under its own licence, with no source to publish. The Raspberry Pi image already carried
   it, from Raspberry Pi's archive.
-- **The app catalog (0.8.5, Store → Artificial Intelligence and Commercial;** `apt/catalog.json`,
-  `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
+- **The app catalog (0.8.5, Store → Artificial Intelligence, Commercial, Remote access and Third-party apps;**
+  `apt/catalog.json`, `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
   Apps delivered `direct` (Claude Code, Claude Desktop, Visual Studio Code, Cursor, Google Chrome,
-  Microsoft Edge, Spotify, all proprietary) are not redistributed by LordOS: the Store adds the
-  vendor's own signed APT repository with a pinned key, and the package comes from there under the
-  vendor's terms. The packages published in `pool/catalog/` are goose (Apache-2.0) and opencode (MIT),
-  the vendors' `.deb` files unmodified with a pinned SHA-256, and three LordOS builds: `llama.cpp` and
+  Microsoft Edge, Spotify, all proprietary; and VSCodium (MIT), Brave Browser (MPL-2.0) and Tailscale
+  (BSD-3-Clause)) are not redistributed by LordOS: the Store adds the vendor's own signed APT repository
+  with a pinned key, and the package comes from there under the vendor's terms. The catalog's mirrored
+  packages, published in `pool/catalog/`, are goose (Apache-2.0), opencode (MIT), artcraft-launcher
+  (Apache-2.0, 0.14.0) and RustDesk (AGPL-3.0, 1.5.1), the vendors' `.deb` files unmodified with a pinned
+  SHA-256, and three LordOS builds: `llama.cpp` and
   `whisper.cpp` (MIT), built from the upstream source tarball pinned by URL and SHA-256 in the
   catalog, and `codex-cli` (Apache-2.0), OpenAI's static binary with its sigstore signature checked.
+  **RustDesk is AGPL-3.0**, so redistributing its binaries carries a source obligation. Its source is
+  upstream's tag `1.5.1` (`https://github.com/rustdesk/rustdesk`); unlike kms++ and FFmpeg, LordOS does
+  not yet publish that source next to the binaries or a written offer for it (see "Gaps today").
 
 ## The SBOM
 
@@ -56,7 +61,7 @@ document for a built package:
 | Part | What | Version from |
 |---|---|---|
 | `lordos` | the `.deb` itself: version, architecture, SHA-256, download URL on GitHub Releases, MIT | `dpkg-deb -f` |
-| Bundled code | QuickJS, Monocypher, stb_image, stb_image_write, stb_truetype, the EFF and SecLists word lists, react, react-reconciler, scheduler, the Unicode data | `third_party/*/VERSION`, the stb headers, `package-lock.json`, `server/src/ui/unidata.h` |
+| Bundled code | QuickJS, Monocypher, nanosvg (Zlib, compiled into lord-media only), stb_image, stb_image_write, stb_truetype, the EFF and SecLists word lists, react, react-reconciler, scheduler, the Unicode data | `third_party/*/VERSION`, the stb headers, `package-lock.json`, `server/src/ui/unidata.h` |
 | Fonts | Inter, Plus Jakarta Sans, JetBrains Mono (OFL-1.1), with the SHA-256 of each `.ttf` in the package; the Noto subsets built into `lord-bench` (OFL-1.1), with no checksum of their own | the font's revision (`fc-scan`, when fontconfig is installed); not versioned for the Noto subsets |
 | Data | DB-IP Lite Country (CC-BY-4.0) and Natural Earth (public domain), with the SHA-256 of the files in the package | not versioned |
 | Debian packages | every package in the `.deb`'s `Depends` (`DEPENDS_ON`) and `Recommends` (`OPTIONAL_DEPENDENCY_OF`), with a `pkg:deb/debian/…` purl | `dpkg-query` on the machine that runs the script |
@@ -100,4 +105,6 @@ what is still missing is listed on [lordos.org/legal/standards](https://lordos.o
 
 Gaps today: no formal OpenChain conformance self-certification, no automated matching of the SBOM
 against vulnerability databases, no SBOM for the ISO and Raspberry Pi images as a whole (only for
-the `.deb` and what it depends on), and no third-party audit.
+the `.deb` and what it depends on), no third-party audit, lord-tts's libraries (audio.cpp, ggml,
+SentencePiece, cJSON and libyaml, in `/usr/lib/lordos/lib/tts`; listed in `THIRD_PARTY.md`) not yet in
+the SBOM, and no published source or written source offer for the mirrored AGPL-3.0 RustDesk binaries.

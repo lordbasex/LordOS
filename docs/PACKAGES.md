@@ -179,14 +179,23 @@ progress. "Updates" lists what can be upgraded and upgrades everything together.
 | Installed and opened from the Store (GTK 4 + libadwaita, in Spanish, with its AppStream icon in the Dock) | |
 
 **The Store since 0.8.5.** A sidebar in three groups (Store: Discover, For this computer, Installed,
-Updates; Categories: Artificial Intelligence and Debian's ten categories, each with its count; LordOS
+Updates; Categories: Artificial Intelligence, Web apps (0.8.8.8), Commercial, Remote access and
+Third-party apps when the catalog has any, and Debian's ten categories, each with its count; LordOS
 apps), the page's title, a back button and the search in a toolbar, and apps as cards in a grid (icon,
 name, category, two lines of summary, the download size and a Get, Open or View button). Discover opens
 with a featured banner, then the AI shelf and a shelf per category; an app's page has a row of facts
 (version, size, category, distribution). The hardware suggestions moved to their own page, **For this
 computer** (below). Store → Installed shows each native LordOS app's own version.
 
-**Store → Installed (0.8.8.8, in development).** Every installed app, with a filter: **All** or
+**Web apps in the Store (0.8.8.8).** The Web apps section lists the web app catalog
+(`assets/webapps/catalog.json`, 37 apps), and Discover shows a web apps banner and shelf after the AI
+shelf; search and each category's page show the matching web apps too. Every card has a "Web app" tag.
+The first web app installed also installs `lordos-web` (the LordOS Web Runtime) through the Store's own
+package job; an app's page shows the version, the day LordOS tested it, its data and memory, the
+permissions and the profiles. Details in [WEBAPPS.md](WEBAPPS.md), "The catalog" and "The Store:
+Discover, the first install and an app's page".
+
+**Store → Installed (0.8.8.8).** Every installed app, with a filter: **All** or
 **Deactivated**.
 
 - *Removing a Linux app.* "Remove" shows for a Linux app that a Debian package brought. The package is

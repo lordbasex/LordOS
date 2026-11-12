@@ -251,6 +251,7 @@ Today's migrations:
 | `004-0.8.3-smartd-off` | 0.8.3 ships a drop-in that keeps Debian's smartd (`smartmontools.service`) off unless `/etc/lordos/smartd-enabled` exists ([SYSTEM.md](SYSTEM.md), "smartd"). A condition is only checked at start, so a smartd already running from an earlier smartmontools install is stopped once. Does nothing without systemd, without smartmontools or where an administrator opted in. |
 | `005-0.8.4-browser-frames` | 0.8.4 makes the preinstalled browsers draw their own bar with LordOS's window buttons (`WAYLAND.md`, "The browsers by default"). Where `/etc/chromium/master_preferences` still has the 0.8.3 ISO's `"custom_chrome_frame": false` it becomes `true` and the GTK theme is added (new Chromium profiles only); where `/etc/firefox-esr/lordos.js` is still exactly the 0.8.3 file it becomes `inTitlebar` 1 (every Firefox profile whose user didn't change «Title Bar»). Anything an administrator changed is kept; home folders are not touched. |
 | `006-0.8.7-greeter-gpu` | 0.8.7 composes the login screen on the GPU: `lordos-greeter` joins `render` and `video`. On a Raspberry Pi it adds FFmpeg to `/etc/apt/preferences.d/raspberrypi`, and the next update brings Raspberry Pi's build ([WALLPAPERS.md](WALLPAPERS.md)) |
+| `007-0.8.8.8-logs` | 0.8.8.8 moves LordOS's logs to `/var/log/lordos` ([SYSTEM.md](SYSTEM.md), "Log files"). It creates `/var/log/lordos` (0755) and `users/` (0711), owned by root, and moves aside (to `<name>.not-a-folder`) anything at those paths that isn't a folder, without following links. The old `~/.cache/lordos/*.log` stay where they are (a migration never touches home folders); the Logs app shows them under "Older logs". |
 
 **Settings migrations** (each user), in `sdk/settings.js`: `MIGRATIONS` is a list of
 `[schema, (settings) => newSettings]` applied in order when the session loads
@@ -465,7 +466,7 @@ mirrored app, it reaches the Store once the maintainer publishes the repository 
 - **Connecting to other computers** is what LordOS offers it for: RustDesk's window is a GTK 3 app
   like any other Linux app, with the same firewall and permissions. Not tested yet on LordOS.
 - **Being reached from another computer is not expected to work, by design:** LordOS has no
-  RemoteDesktop portal, and its ScreenCast portal (0.8.8.8, in development) shares only what the person picks each
+  RemoteDesktop portal, and its ScreenCast portal (0.8.8.8) shares only what the person picks each
   time, with no input (`WAYLAND.md`); Xwayland runs rootless with XTEST off, and
   `remote.sock` refuses the user's own processes ([GO-LINK.md](GO-LINK.md), D6). LordOS's Remote
   Desktop (port 5673) is the way into a LordOS computer. Not tested on LordOS.
