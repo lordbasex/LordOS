@@ -12,6 +12,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Mail: fold a whole account in the sidebar.** The account's name in the sidebar now has a disclosure triangle,
+  and a click on the name folds the account to that one line. A folded account shows its unread mail on the line
+  (every folder but Sent, Drafts, Junk and Trash, so folding never hides new mail), and the line is highlighted
+  while one of its folders is the one shown. The choice is kept per account in Mail's accounts file (`folded`,
+  next to the folders' `collapsed` list), so the sidebar looks the same at the next launch; the ⚠ mark still opens
+  the password or certificate sheet without folding (`apps/mail/index.jsx`, `accountUnread` in
+  `apps/mail/foldertree.js`, tested in `server/tests/mail_foldertree_test.mjs`) (GitHub #121).
+- **Text Editor: File → Open recent.** A submenu under Open folder lists the last 5 files the Editor opened or
+  saved, newest first; choosing one opens it (or switches to its tab). A file that is not there now (deleted, or on
+  a drive that is not mounted) is greyed out, and one that is gone by the time it is chosen leaves the list with a
+  note in the status bar. Two files with the same name show their folder. *Clear menu* empties the list. The list
+  is kept in `settings.json` as `editor.recent`, a new key, so no migration (`apps/editor/recent.js`, tested in
+  `server/tests/editor_recent_test.mjs`; texts in every language) (GitHub #113).
 - **Logs move to `/var/log/lordos`, one per app, rotated, and the previous session is kept.** Every LordOS log now
   lives under `/var/log/lordos` (`server/src/lordlog.c`, docs/SYSTEM.md "Log files"):
   - **The root daemons:** `lord-sessiond.log`, `lord-netd.log`, `lord-fand.log` and `admin.log` (the administration
