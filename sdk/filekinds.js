@@ -1,4 +1,5 @@
 // filekinds.js — each file's kind (by extension), its MIME type and whether it can be previewed.
+import { splitVolume } from './archivevol.js';
 
 const EXT = {
   image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'tif', 'tiff', 'heic', 'avif'],
@@ -28,7 +29,8 @@ export function kindOf(e) {
   if (e.app) return 'app';
   if (e.dir) return 'folder';
   const ext = extOf(e.name);
-  return BY_EXT.get(ext) || (TEXT_NAMES.test(e.name) ? 'text' : 'other');
+  // a volume of a split archive ("docs.zip.001", "docs.z01"): an archive too (GitHub #103)
+  return BY_EXT.get(ext) || (TEXT_NAMES.test(e.name) ? 'text' : splitVolume(e.name) ? 'archive' : 'other');
 }
 
 // For "Open With" of Linux apps (their MimeType in the .desktop file). The names are

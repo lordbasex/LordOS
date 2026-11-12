@@ -270,6 +270,22 @@ static void test_xres(void) {
     CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
 }
 
+/* A paste request from another X client of the focused window's process (arboard's own connection, GitHub #125):
+ * answered only when X-Resource ties both clients to one known pid. */
+static void test_same_process(void) {
+    uint32_t mask = 0x1fffff, b[4] = { 0x200000, 0x400000, 0x600000, 0x800000 }, p[4] = { 1000, 1001, 1001, 0 };
+    CHECK(x11_same_process(0x400005, 0x600002, b, p, 4, mask));              /* the app's helper window */
+    CHECK(x11_same_process(0x400005, 0x400009, b, p, 4, mask));              /* its own client */
+    CHECK(!x11_same_process(0x200001, 0x400005, b, p, 4, mask));             /* another process */
+    CHECK(!x11_same_process(0x800001, 0x800002, b, p, 4, mask));             /* no pid known: never "the same" */
+    CHECK(!x11_same_process(0xa00001, 0x400005, b, p, 4, mask));             /* a client X-Resource didn't list */
+    CHECK(!x11_same_process(0xa00001, 0xa00002, b, p, 4, mask));
+    CHECK(!x11_same_process(0, 0, b, p, 4, mask));
+    CHECK(!x11_same_process(0x400005, 0x600002, b, p, -1, mask));            /* too many clients to tell */
+    p[1] = p[2] = 0x80000000u;                                               /* not a pid */
+    CHECK(!x11_same_process(0x400005, 0x600002, b, p, 4, mask));
+}
+
 static void notify_ev(uint8_t ev[32], int code, uint32_t req, uint32_t sel, uint32_t target, uint32_t prop) {
     memset(ev, 0, 32);
     ev[0] = (uint8_t)code;
@@ -345,6 +361,7 @@ int main(void) {
     test_display();
     test_xdnd();
     test_xres();
+    test_same_process();
     test_xdnd_owner();
     printf("xwm-test: %d/%d\n", checks - fails, checks);
     return fails ? 1 : 0;

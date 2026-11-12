@@ -15,7 +15,7 @@ nothing about go-link. It's the only way third-party code gets to run a binary f
 - **At every load,** before the sandbox goes on: `firma.json` over `contenido.json`, every file hashed, none missing or extra, and the key must be a **Verified author's** in LordOS's
   signed catalog, not revoked. A key the catalog doesn't list, no catalog, and the official key all fail. It's installed and removed by dpkg, so Remove isn't offered.
 
-A refused app doesn't open, and the reason is in `~/.cache/lordos/session.log`.
+A refused app doesn't open, and the reason is in `/var/log/lordos/users/$USER/compositor.log`.
 
 ## What only this root may declare
 

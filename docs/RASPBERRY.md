@@ -679,7 +679,7 @@ The order of `card0` and `card1` depends on which driver loads first.
 
 ### What to verify on the board
 
-1. `grep -E 'kms:|gpu:' ~/.cache/lordos/session.log` (or the session log). It has to show:
+1. `grep -E 'kms:|gpu:' /var/log/lordos/users/$USER/compositor.log` (or the session log). It has to show:
    - the chosen card, with the `vc4` driver;
    - the plane's modifiers (with `0x0`, linear, present);
    - `GPU composition (V3D 7.1…)`;

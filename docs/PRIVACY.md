@@ -689,8 +689,10 @@ window titles and properties, the X keyboard state while an X window has the key
 polling `XQueryKeymap` sees what is typed into xterm), and the X selections (any X client can ask
 for the CLIPBOARD and PRIMARY while they are in X, and read the property they are pasted into).
 The window manager refuses paste requests that come from a window of a client other than the
-focused one, but that is only a hint: X11 doesn't authenticate who sends a request, so it is not a
-boundary between X apps. **If two programs must not see each other, at least one of them should be
+focused one, unless the X server's X-Resource extension says both clients are one process (the pid
+it takes from the socket's credentials, never a property the client sets: some toolkits open a
+second X connection just for the clipboard). That is only a hint: X11 doesn't authenticate who sends
+a request, so it is not a boundary between X apps. **If two programs must not see each other, at least one of them should be
 a Wayland app.**
 
 **What LordOS controls: the border between X11 and the rest.**
@@ -727,6 +729,12 @@ a Wayland app.**
 - **Xwayland itself** runs in `lordos-xwayland.scope` (not lord-server's), without network (its own
   empty network namespace) and with `no_new_privs`; it is started only by a connection to the
   session's X socket (mode 0600, no abstract socket, no TCP) and stopped 10 s after the last X app.
+- **The X cookie (0.8.8.8).** Xwayland requires the session's random `MIT-MAGIC-COOKIE-1`
+  (`-auth $XDG_RUNTIME_DIR/lord-xauth.<n>`, 0600), so a program run as root through pkexec or sudo can
+  open its window (GitHub #107) while a client without the cookie is refused. The apps LordOS starts
+  get it through `XAUTHORITY`; restricted Linux apps and isolated apps don't (both `DISPLAY` and
+  `XAUTHORITY` are removed and a restricted app's runtime folder is an empty one), and `lord.fs`
+  can't read or write the file.
 
 **Per-app identity.** An X11 app launched from LordOS is placed in its app scope
 (`app-lordos-<desktop id>.scope`) before it runs, exactly like a Wayland app, so the per-app
@@ -738,7 +746,7 @@ its own view (private `/tmp`, see `FIREWALL.md`), and LordOS doesn't put the X s
 removes `DISPLAY`: given the shared display above, a restricted X11 app could watch or drive the
 other X apps. Such an app must speak Wayland (most GTK/Qt apps do); an X11-only app with one of
 those restrictions doesn't open. Isolated `.lpk` apps never get X either (their seccomp filter
-refuses new unix sockets, and `DISPLAY` is removed). *Not done:* a separate Xwayland per restricted
+refuses new unix sockets, and `DISPLAY` and `XAUTHORITY` are removed). *Not done:* a separate Xwayland per restricted
 app, or "untrusted" X connections (the SECURITY extension), which would let such apps run with X
 isolated from the rest; tracked for a later version.
 
@@ -934,6 +942,10 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`
   (`xkbcommon: ERROR … rules 'evdev'`); the broker now only moves the active group.
+- **Held keys:** the compositor sends a Wayland client only the press and the release, so the app
+  repeats a held key itself, at the rate and delay of `wl_keyboard.repeat_info`, and hands the repeats
+  to the JS keymap as an in-process app gets them (`app/keyrepeat.h`, `appclient.c`). Modifiers don't
+  repeat (`kb_key_repeats`); a release, another press or the keyboard leaving the window ends it.
 
 ![an isolated app's menu open in the system menu bar](appmode-menu.png)
 

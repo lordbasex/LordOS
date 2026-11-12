@@ -47,6 +47,7 @@
   "classic.dnd": "Do not disturb",
   "classic.maximize": "Maximize",
   "classic.minimize": "Minimize",
+  "classic.moreApps": "More apps: {count}",
   "classic.nightLight": "Night Light",
   "classic.noNotifications": "No new notifications",
   "classic.noPins": "Right-click an app in All apps to pin it here.",

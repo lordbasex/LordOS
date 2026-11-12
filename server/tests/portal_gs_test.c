@@ -39,6 +39,7 @@ void webask_attach(DConn *c) { (void)c; }
 void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
 int webask_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
 void webask_gone(const char *name) { (void)name; }
+void webask_appeared(const char *name) { (void)name; }
 void webask_lost(void) {}
 
 static DConn app;

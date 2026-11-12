@@ -13,6 +13,7 @@
 #include "sessiond.h"
 #include "proto.h"
 #include "../drmcard.h"
+#include "blackfb.h"
 
 #include <errno.h>
 #include <pthread.h>
@@ -155,21 +156,16 @@ static int black_out(int fd) {
             if (!ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &e) && e.crtc_id == crtcs[i]) on[n++] = conns[j];
         }
         if (!n) continue;
-        struct drm_mode_create_dumb d = { .width = c.mode.hdisplay, .height = c.mode.vdisplay, .bpp = 32 };
-        if (ioctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &d)) continue;       /* a new dumb buffer is zeroed: black */
-        struct drm_mode_fb_cmd f = { .width = d.width, .height = d.height, .pitch = d.pitch, .bpp = 32, .depth = 24, .handle = d.handle };
-        int ok = !ioctl(fd, DRM_IOCTL_MODE_ADDFB, &f);
-        if (ok) {
-            struct drm_mode_crtc set = { .crtc_id = crtcs[i], .fb_id = f.fb_id, .set_connectors_ptr = (uint64_t)(uintptr_t)on,
-                                         .count_connectors = n, .mode = c.mode, .mode_valid = 1 };
-            if (!ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set)) {
-                struct drm_mode_closefb cf = { .fb_id = f.fb_id };
-                if (ioctl(fd, DRM_IOCTL_MODE_CLOSEFB, &cf)) { /* an older kernel: drop_framebuffers removes it */ }
-                done++;
-            } else ioctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id);
-        }
-        struct drm_gem_close g = { .handle = d.handle };                /* the framebuffer keeps the buffer */
-        ioctl(fd, DRM_IOCTL_GEM_CLOSE, &g);
+        /* cleared by hand: radeon's dumb buffers come from VRAM as they were (noise on the screen, GitHub #94) */
+        uint32_t fb = black_fb(fd, c.mode.hdisplay, c.mode.vdisplay);
+        if (!fb) continue;                                              /* not blacked: drop_framebuffers turns it off */
+        struct drm_mode_crtc set = { .crtc_id = crtcs[i], .fb_id = fb, .set_connectors_ptr = (uint64_t)(uintptr_t)on,
+                                     .count_connectors = n, .mode = c.mode, .mode_valid = 1 };
+        if (!ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set)) {
+            struct drm_mode_closefb cf = { .fb_id = fb };
+            if (ioctl(fd, DRM_IOCTL_MODE_CLOSEFB, &cf)) { /* an older kernel: drop_framebuffers removes it */ }
+            done++;
+        } else ioctl(fd, DRM_IOCTL_MODE_RMFB, &fb);
     }
     return done;
 }

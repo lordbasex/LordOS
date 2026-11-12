@@ -296,7 +296,7 @@
   "panel.word.update": "È disponibile un aggiornamento di LordOS",
   "panel.disk": "Disco",
   "panel.memory": "Memoria",
-  "panel.memoryValue": "{size} disponibili",
+  "panel.usedOf": "{used} di {total} in uso",
   "panel.cpu": "Processore",
   "panel.network": "Rete",
   "panel.devices": {
@@ -307,7 +307,6 @@
   "panel.noScan": "Non ancora analizzato",
   "panel.freeUp": "Libera spazio",
   "panel.open": "Apri Pulizia",
-  "panel.prefs": "Impostazioni",
   "prefs.menuItem": "Mostra accanto all’orologio",
   "prefs.on": "Attivo",
   "prefs.off": "Disattivo",

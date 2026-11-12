@@ -65,6 +65,7 @@
 #include "xdg-activation-v1-protocol.h"
 #include "xdgact.h"
 #include "dndgate.h"
+#include "toolkitenv.h"
 #include "urilist.h"
 #include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
@@ -1563,7 +1564,8 @@ static Source *selection;           /* source of the app owning the selection, o
 /* Bumped whenever the selection changes: an offer is only good for the selection it was made for,
  * and only while its client has the keyboard (an app can't keep an old offer to read later copies). */
 static unsigned clip_offer_gen = 1;
-typedef struct { Source *src; unsigned gen; } OfferRef;
+/* nofiles: an isolated or sandboxed app's selection offered to lord-web, without its file lists (dndg_file_mime) */
+typedef struct { Source *src; unsigned gen; int nofiles; } OfferRef;
 static unsigned clip_seen;          /* LordOS clipboard generation already offered */
 static unsigned char *clip_png;     /* last copied image */
 static size_t clip_png_len;
@@ -1900,6 +1902,7 @@ static void ofr_receive(struct wl_client *c, struct wl_resource *r, const char *
     OfferRef *ref = wl_resource_get_user_data(r);
     if (!ref || ref->gen != clip_offer_gen || !key_focus || key_focus->client != c) { close(fd); return; }   /* stale, or not focused */
     Source *src = ref->src;
+    if (ref->nofiles && dndg_file_mime(mime)) { close(fd); return; }
     if (src && src == selection) { wl_data_source_send_send(src->res, mime, fd); close(fd); return; }
     if (!src && clip_is_image && clip_png && !strcmp(mime, "image/png")) { send_bytes(fd, clip_png, clip_png_len); return; }
     if (!src && !clip_is_image && text_mime(mime)) { const char *t = term_clipboard(); send_bytes(fd, t, strlen(t)); return; }
@@ -1922,6 +1925,12 @@ static const struct wl_data_offer_interface offer_impl = {
 
 static void offer_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
 
+static int dnd_contained(struct wl_client *c);
+static int dnd_relays_files(struct wl_client *c);
+
+/* An isolated LordOS app's or a sandboxed client's selection may name files that app can't reach: lord-web, which
+ * opens a pasted list's local files and hands them to the page, gets its offer without the file lists (as for a
+ * drag, DOffer.nofiles), so such a copy pastes there as text only. */
 static void offer_selection(struct wl_resource *dev) {
     struct wl_client *c = wl_resource_get_client(dev);
     /* the focused client gets every new selection, its own included (the protocol says so; its receive is
@@ -1935,10 +1944,12 @@ static void offer_selection(struct wl_resource *dev) {
     if (!ref) { wl_resource_destroy(o); return; }
     ref->src = selection;
     ref->gen = clip_offer_gen;
+    ref->nofiles = selection && dnd_contained(wl_resource_get_client(selection->res)) && dnd_relays_files(c);
     wl_resource_set_implementation(o, &offer_impl, ref, offer_gone);
     wl_data_device_send_data_offer(dev, o);
-    if (selection) for (int i = 0; i < selection->nmimes; i++) wl_data_offer_send_offer(o, selection->mimes[i]);
-    else if (image) wl_data_offer_send_offer(o, "image/png");
+    if (selection) {
+        for (int i = 0; i < selection->nmimes; i++) if (!ref->nofiles || !dndg_file_mime(selection->mimes[i])) wl_data_offer_send_offer(o, selection->mimes[i]);
+    } else if (image) wl_data_offer_send_offer(o, "image/png");
     else {
         wl_data_offer_send_offer(o, "text/plain;charset=utf-8");
         wl_data_offer_send_offer(o, "text/plain");
@@ -5189,16 +5200,7 @@ int wl_start(void) {
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
     setenv("XDG_CURRENT_DESKTOP", "LordOS", 1);
-    /* Wayland first; x11 only for a GTK program that allows nothing else (gdk_set_allowed_backends:
-     * VMware's vmware-user agent). With "wayland" alone GTK skips x11 and such a program can't open
-     * any display (docs/WAYLAND.md, "VMware Tools") */
-    setenv("GDK_BACKEND", "wayland,x11", 1);
-    setenv("QT_QPA_PLATFORM", "wayland", 1);
-    setenv("MOZ_ENABLE_WAYLAND", "1", 1);
-    /* GTK 4.18 doesn't pick its text-input-v3 module by itself here (no input-method framework running), and the
-     * keys then reach the app raw: LordOS's input methods compose only through it. Not overwritten when the person
-     * set another one (an IBus or Fcitx user) */
-    setenv("GTK_IM_MODULE", "wayland", 0);
+    toolkit_env();                      /* GDK_BACKEND, QT_QPA_PLATFORM, …: Wayland first, X11 as the fallback (toolkitenv.h) */
     clip_seen = term_clipboard_gen();
     fprintf(stderr, "wayland: %s/%s\n", getenv("XDG_RUNTIME_DIR"), socket_name);
     return 0;

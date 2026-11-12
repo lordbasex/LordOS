@@ -10,8 +10,10 @@
  * nothing beyond what those actions already run (wpa_supplicant, openvpn, charon, pppd, resolvectl,
  * networkctl… at fixed paths). */
 #include "../admin.h"
+#include "../lordlog.h"
 
 #include <stdio.h>
+#include <signal.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -20,5 +22,8 @@ int main(int argc, char **argv) {
     if (argc != 1) { fprintf(stderr, "usage: lord-netd (no arguments; started by lord-sessiond)\n"); return 2; }
     if (geteuid() != 0) { fprintf(stderr, "lord-netd: must run as root\n"); return 1; }
     setvbuf(stderr, NULL, _IOLBF, 0);
+    signal(SIGPIPE, SIG_IGN);
+    /* its lines also go, stamped, to /var/log/lordos/lord-netd.log (lordlog.h) */
+    if (lordlog_system_start("lord-netd")) fprintf(stderr, "lord-netd: no " LORDLOG_ROOT "/lord-netd.log: the journal only\n");
     return admin_netd_serve();
 }

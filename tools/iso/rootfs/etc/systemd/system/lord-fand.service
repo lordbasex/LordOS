@@ -20,6 +20,9 @@ RuntimeDirectory=lordos
 RuntimeDirectoryPreserve=yes
 ConfigurationDirectory=lordos
 ConfigurationDirectoryMode=0755
+# /var/log/lordos/lord-fand.log (server/src/lordlog.h): writable under ProtectSystem=strict
+LogsDirectory=lordos
+LogsDirectoryMode=0755
 # root only for sysfs writes: no capabilities beyond reading other users' groups is needed
 CapabilityBoundingSet=
 AmbientCapabilities=

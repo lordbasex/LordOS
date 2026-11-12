@@ -11,6 +11,7 @@
  * Lo lanza lord-server (tercera excepción acotada a «el servidor no ejecuta comandos», ver
  * AGENTS.md): el único argumento es un id validado de un paquete instalado. */
 #include "app.h"
+#include "../lordlog.h"
 #include "../sec/codesig.h"
 #include "../ui/ui.h"
 #include "../ui/js.h"
@@ -22,6 +23,7 @@
 #include "../sec/pkgapp.h"
 #include "../sec/sandbox.h"
 #include "probe.h"
+#include "keyrepeat.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -396,6 +398,9 @@ static void gestures_setup(void) {
     zwp_pointer_gesture_swipe_v1_add_listener(zwp_pointer_gestures_v1_get_swipe_gesture(gestures, pointer), &swipe_listener, NULL);
 }
 
+/* a held key: the compositor sends no repeats to its clients, so the app makes them (keyrepeat.h) */
+static KeyRepeat krep = { KEYREPEAT_RATE, KEYREPEAT_DELAY, -1, 0 };
+
 /* The compositor's keymap (the user's layouts, already expanded): compiling it reads no files,
  * so it also works inside the sandbox (keyboard.c kb_set_keymap_string). */
 static void k_keymap(void *d, struct wl_keyboard *k, uint32_t fmt, int32_t fd, uint32_t sz) {
@@ -418,19 +423,22 @@ static void k_enter(void *d, struct wl_keyboard *k, uint32_t s, struct wl_surfac
     (void)d; (void)k; (void)s; (void)keys;
     AppWin *w = win_by_surface(sf);
     kb_reset_state();                       /* keys released while another window had the keyboard */
+    keyrepeat_stop(&krep);
     if (w && w != kbd_win) { kbd_win = w; win_event(w, "focus"); }
 }
-static void k_leave(void *d, struct wl_keyboard *k, uint32_t s, struct wl_surface *sf) { (void)d; (void)k; (void)s; (void)sf; kb_reset_state(); }
+static void k_leave(void *d, struct wl_keyboard *k, uint32_t s, struct wl_surface *sf) { (void)d; (void)k; (void)s; (void)sf; kb_reset_state(); keyrepeat_stop(&krep); }
 static void k_key(void *d, struct wl_keyboard *k, uint32_t s, uint32_t t, uint32_t key, uint32_t st) {
     (void)d; (void)k; (void)s; (void)t;
-    js_key((int)key, st == WL_KEYBOARD_KEY_STATE_PRESSED ? 1 : 0);
+    int down = st == WL_KEYBOARD_KEY_STATE_PRESSED;
+    keyrepeat_key(&krep, (int)key, down, down && kb_key_repeats((int)key), now_ms());
+    js_key((int)key, down);
 }
 static void k_mods(void *d, struct wl_keyboard *k, uint32_t s, uint32_t dep, uint32_t lat, uint32_t lock, uint32_t grp) {
     (void)d; (void)k; (void)s; (void)dep; (void)lat;   /* held modifiers come from the keys themselves */
     kb_set_locked(lock);                                /* the locks (Caps Lock) and the layout follow the compositor */
     kb_set_group((int)grp);
 }
-static void k_repeat(void *d, struct wl_keyboard *k, int32_t rate, int32_t delay) { (void)d; (void)k; (void)rate; (void)delay; }
+static void k_repeat(void *d, struct wl_keyboard *k, int32_t rate, int32_t delay) { (void)d; (void)k; keyrepeat_info(&krep, rate, delay); }
 static const struct wl_keyboard_listener k_listener = { k_keymap, k_enter, k_leave, k_key, k_mods, k_repeat };
 
 static void seat_caps(void *d, struct wl_seat *s, uint32_t caps) {
@@ -477,6 +485,9 @@ static int manifest_pair(const char *dir, const char *key, int *w, int *h) {
 int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     t_start = now_ms();
     if (!lpk_valid_id(id)) { fprintf(stderr, "lord-server --app: invalid id\n"); return 2; }
+    /* apps/<id>.log (app_spawn opened it as our stderr) goes through a lord-log child that copies and
+     * caps it, so this app's output can't fill /var between the session's checks (lordlog.h) */
+    lordlog_app_start("apps", id);
     /* the process name is the app's id ("mail"), not "exe" (it was started through /proc/self/exe):
      * ps, top and the Monitor's process list show which app it is */
     prctl(PR_SET_NAME, id, 0, 0, 0);
@@ -600,6 +611,8 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         if (ifd >= 0) { ii = n; pfd[n].fd = ifd; pfd[n].events = POLLIN; n++; }
         int wait = delay < 0 ? 100 : (int)ceil(delay);
         if (js_broker_pending()) wait = 0;       /* events that arrived during an RPC */
+        int rw = keyrepeat_wait(&krep, now_ms());
+        if (rw >= 0 && rw < wait) wait = rw;
         if (wl_display_prepare_read(dpy) != 0) { wl_display_dispatch_pending(dpy); continue; }
         if (poll(pfd, (nfds_t)n, wait) < 0 && errno != EINTR) { wl_display_cancel_read(dpy); break; }
         if (pfd[0].revents & POLLIN) wl_display_read_events(dpy); else wl_display_cancel_read(dpy);
@@ -608,6 +621,8 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         if (ci >= 0 && pfd[ci].revents) js_broker_companion_read();
         if (ii >= 0 && pfd[ii].revents) image_async_dispatch();
         if (pfd[0].revents & (POLLHUP | POLLERR)) break;
+        int rk = keyrepeat_due(&krep, now_ms());
+        if (rk >= 0) js_key(rk, 2);
     }
     js_shutdown();
     wl_display_disconnect(dpy);

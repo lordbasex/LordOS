@@ -30,6 +30,16 @@ check "repetido: does not overwrite" '[ "$(cat "$T/dest-repetido.tar/adentro/mis
 check "sano: scripts" '[ "$(cat "$T/dest-sano.zip/adentro/carpeta/日本語.txt")" = こんにちは ] && [ -d "$T/dest-sano.zip/adentro/carpeta/sub/vacío" ]'
 check "basura: error" 'grep -q "^err" "$T/basura.zip.out"'
 check "suelto: raw" '[ "$(cat "$T/dest-suelto.txt.gz/adentro/raw.bin")" = "texto comprimido suelto" ]'
+# split archives (GitHub #103): every volume's fd, in order, read as one archive
+for set in vol span; do
+  if [ $set = vol ]; then vols=$(ls "$T/arch"/vol.zip.0*); else vols="$(ls "$T/arch"/span.z[0-9]*) $T/arch/span.zip"; fi
+  d="$T/dest-$set/adentro"; mkdir -p "$d"
+  # shellcheck disable=SC2086
+  build/doc-test build/lord-doc vextract "$d" $vols > "$T/$set.out" 2>&1
+  build/doc-test build/lord-doc vlist $vols > "$T/$set.list" 2>&1
+  check "split $set: listed" 'grep -q "sub/c.txt" "$T/$set.list"'
+  check "split $set: extracted" '[ "$(cat "$d/a.txt")" = hola ] && [ "$(cat "$d/sub/c.txt")" = fin ] && [ "$(wc -c < "$d/sub/b.txt")" = 300000 ] && grep -q "\"skipped\":0" "$T/$set.out"'
+done
 # the confinement
 build/doc-test build/lord-doc selftest > "$T/self.out" 2>&1
 # the same confinement in extraction mode (with a writable folder)
@@ -58,6 +68,13 @@ if command -v bsdtar >/dev/null && command -v zstd >/dev/null; then
     build/doc-test build/lord-doc extract "$T/fmt/$f" "$T/fmt/out-$f" > "$T/fmt/$f.out" 2>&1
     check "formato $f" '[ "$(cat "$T/fmt/out-$f/sub/b.txt")" = 日本語 ] && grep -q "\"skipped\":0" "$T/fmt/$f.out"'
   done
+  # a 7z split in byte volumes (its index is at the end: libarchive seeks across the volumes)
+  head -c 200000 /dev/urandom > "$T/fmt/src/big.bin"
+  ( cd "$T/fmt" && bsdtar -cf big.7z --format 7zip -C src . && split -b 60000 -d -a 3 --numeric-suffixes=1 big.7z big.7z. )
+  mkdir -p "$T/fmt/out-split7z"
+  # shellcheck disable=SC2046
+  build/doc-test build/lord-doc vextract "$T/fmt/out-split7z" $(ls "$T/fmt"/big.7z.0*) > "$T/fmt/split7z.out" 2>&1
+  check "split 7z" 'cmp -s "$T/fmt/src/big.bin" "$T/fmt/out-split7z/big.bin" && [ "$(cat "$T/fmt/out-split7z/sub/b.txt")" = 日本語 ]'
 fi
 # save a copy of a PDF with annotations (the helper is still alive when the file is checked)
 if [ -f /usr/share/cups/data/form_english.pdf ]; then

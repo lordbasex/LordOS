@@ -109,6 +109,7 @@
   "display.native": "{w} × {h} (savoji)",
   "display.noBacklight": "Šis ekranas nesiūlo ryškumo valdymo (išoriniai monitoriai ir virtualios mašinos).",
   "display.noCrtc": "{connector}: prijungtas, bet vaizdo plokštė negali valdyti dar vieno ekrano",
+  "display.lidClosed": "{connector}: išjungtas, kol dangtis uždarytas (prijungtas kitas ekranas)",
   "display.notOnMonitor": "Šis seansas dabar nėra monitoriuje (jis peržiūrimas per tinklą), todėl jo ekranų keisti negalima. Kai jis grįš, naktinės šviesos nustatymai vis tiek bus taikomi.",
   "display.number": "Ekranas {n}",
   "display.recommended": "Rekomenduojama",

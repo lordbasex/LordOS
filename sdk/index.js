@@ -76,13 +76,14 @@ import { startCleanerStatus } from './cleanerstatus.jsx';
 import { startCloud } from './cloudstatus.jsx';
 export { errorText, statusText, codeError, parseCode } from './errors.js';
 export { logs } from './logs.js';
+export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } from './logfile.js';
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
 export { Lumo, lumoSource } from './mascot.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
   dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
-  launchDockItem, dockPrefs, DOCK_DEFAULTS, dockHideSettings, DOCK_HIDE_MODES, useDockCovered, quitApp, DOCK_LAUNCHER, useTrash, trashState, refreshTrash, openTrash, emptyTrash, trashMenu,
+  launchDockItem, dockPrefs, DOCK_DEFAULTS, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dockBadgeMetrics, useDockCovered, quitApp, DOCK_LAUNCHER, useTrash, trashState, refreshTrash, openTrash, emptyTrash, trashMenu,
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones, headsetMics } from './sound.js';
@@ -130,7 +131,7 @@ import { maybeStartTour } from './help.js';
 import { liveStartWindow } from './livestart.js';
 import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
-export { systemInfo, systemReport, lordosVersion, useSystemInfo, useServerStats, useCpuUsage, formatBytes, formatDuration } from './system.js';
+export { systemInfo, systemReport, lordosVersion, useSystemInfo, useServerStats, useCpuUsage, memUsedKB, formatBytes, formatDuration } from './system.js';
 export * as fs from './fs.js';
 export { useDirectory } from './fs.js';
 export { ThemeProvider, useTheme, DEFAULT_TOKENS, solidOver } from './theme.js';

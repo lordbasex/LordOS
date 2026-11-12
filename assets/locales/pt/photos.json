@@ -57,5 +57,21 @@
   "size": "Tamanho",
   "keepRatio": "Manter as proporções",
   "sizeInvalid": "A largura e a altura devem ser números inteiros de 1 a {max}",
-  "cloud": "Nuvem"
+  "cloud": "Nuvem",
+  "menu.open": "Abrir",
+  "menu.selectAll": "Selecionar tudo",
+  "menu.trash": "Mover para o Lixo",
+  "menu.trashCount": {
+    "one": "Mover {count} foto para o Lixo",
+    "other": "Mover {count} fotos para o Lixo"
+  },
+  "trashed": {
+    "one": "{count} foto movida para o Lixo",
+    "other": "{count} fotos movidas para o Lixo"
+  },
+  "selectedOf": {
+    "one": "{count} de {total} selecionada",
+    "other": "{count} de {total} selecionadas"
+  },
+  "cancel": "Cancelar"
 }

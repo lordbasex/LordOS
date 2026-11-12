@@ -1,6 +1,7 @@
 // system.js — system and server information, as React hooks.
 import { useEffect, useState } from 'react';
 import { formatNumber, t } from './i18n.js';
+export { memUsedKB } from './memfigure.js';
 
 export const systemInfo = () => lord.system.info();
 

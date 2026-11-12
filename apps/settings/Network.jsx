@@ -200,6 +200,9 @@ function WifiPage({ net }) {
     if (password && n.ssid) keyring.set('settings', { service: `wifi:${n.ssid}`, secret: password, label: `Wi-Fi ${n.ssid}` }).catch(() => {});
     run(setMsg, 'net-wifi-connect', `${dev}\n${n.ssid}\n${password || ''}`, tr('network.wifi.connecting', { ssid: n.ssid }));
   };
+  // A secured network saved as open (one an older version overwrote, GitHub #124) asks for its
+  // password again instead of joining without one.
+  const savedOpen = (n) => known.some((k) => k.ssid === n.ssid && k.security === 'open');
   const dim = { fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' };
   return (
     <Stack>
@@ -213,7 +216,7 @@ function WifiPage({ net }) {
         {list.length === 0 ? <SettingRow label={scanning ? tr('network.wifi.scanning') : tr('network.wifi.noNetworks')} labelStyle={{ color: t.textDim }} /> : null}
         {list.map((n, idx) => (
           <View key={`${n.bssid}${idx}`}>
-            <SettingRow onClick={() => (n.security === 'open' || n.known ? connect(n, '') : setPick(n))}
+            <SettingRow onClick={() => (n.security === 'open' || (n.known && !savedOpen(n)) ? connect(n, '') : setPick(n))}
               icon={<Text style={{ width: 30, fontSize: typeScale.callout, color: t.accent, direction: 'ltr' }}>{bars(n.signal)}</Text>}
               label={n.ssid || tr('network.wifi.hidden')} labelStyle={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {n.known && <Text style={dim}>{tr('network.wifi.saved')}</Text>}

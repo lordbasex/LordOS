@@ -21,6 +21,7 @@
  * For tests only (never in the unit): --root DIR (sysfs root), --config FILE, --run DIR. */
 #include "fan/fancurve.h"
 #include "fan/fanhw.h"
+#include "lordlog.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -298,6 +299,12 @@ int main(int argc, char **argv) {
     snprintf(S.state, sizeof S.state, "%s/fand.restore", S.run);
     umask(022);
 
+    /* the service (not --detect, not a test's --root): its lines also go, stamped, to
+     * /var/log/lordos/lord-fand.log (lordlog.h; LogsDirectory= in lord-fand.service makes it writable) */
+    if (!mode_detect && !S.root[0] && geteuid() == 0) {
+        signal(SIGPIPE, SIG_IGN);
+        if (lordlog_system_start("lord-fand")) fprintf(stderr, "lord-fand: no " LORDLOG_ROOT "/lord-fand.log: the journal only\n");
+    }
     if (mode_restore) {
         if (access(S.state, F_OK)) return 0;          /* nothing taken */
         int r = fanhw_restore_file(S.root, S.state);

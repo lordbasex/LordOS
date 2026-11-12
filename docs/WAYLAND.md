@@ -59,8 +59,13 @@ app; ❖ combinations still belong to LordOS.
 ## How to open an app
 
 From the LordOS Terminal: every new tab has `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE=wayland`,
-`GDK_BACKEND=wayland,x11` and `QT_QPA_PLATFORM=wayland`, so `featherpad &`, `gtk4-demo &` or
-`foot &` is enough. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
+`GDK_BACKEND=wayland,x11` and `QT_QPA_PLATFORM=wayland;xcb`, so `featherpad &`, `gtk4-demo &` or
+`foot &` is enough. Both toolkits try Wayland first and fall back to X11 (Xwayland): GTK for a program that
+allows only X11 (see "VMware Tools"), Qt for an app whose Wayland platform plugin is not installed
+(Debian's `qtwayland5` or `qt6-wayland`, which no Qt app depends on). Until 0.8.8.7 Qt got `wayland` alone, and
+such an app (MusicBrainz Picard from the Store) stopped at start with "Could not find the Qt platform plugin
+\"wayland\"" (GitHub #96). The values are set in `server/src/wl/toolkitenv.h` and checked by
+`tests/toolkitenv_test.c`. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
 They also appear in the **app launcher**, in the Lord Classic theme's start menu and in the Store (see
@@ -125,7 +130,8 @@ shell. The user approved it for M7. Limits:
   below), so the window it opens, or the window of the copy already running it hands the link to,
   comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
-  descriptors. Its output goes to `~/.cache/lordos/apps.log`, which is trimmed when it passes 1 MB.
+  descriptors. Its output goes to its own `apps/<id>.log` in the user's log folder (`/var/log/lordos/users/<user>`,
+  docs/SYSTEM.md "Log files"), after a stamped "starting" line; capped at 16 MB by its writers (the older part in `xwayland.log.old`).
 - A `.desktop` can't be created from JS:
   - `lord.fs.write` rejects `~/.local/share/applications` and `~/.config/autostart`, also
     through a symlink (see `EDITOR.md`);
@@ -309,7 +315,10 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   sandboxed Linux app (Flatpak: its root, `/proc/<pid>/root` looked at once when it connects, holds
   `.flatpak-info`) may name files the app itself can't reach, so it is never offered to LordOS: over LordOS
   it is told nothing, and released there it is cancelled. A client whose root can't be looked at counts as
-  sandboxed. Drags between Linux windows are unchanged.
+  sandboxed. Drags between Linux windows are unchanged, except into a web app (lord-web, which opens a list's
+  local files and hands them to the page): such a drag's offer to it, and such an app's clipboard selection offered
+  to it, leave out `text/uri-list` and the other file-list types (`dndg_file_mime`; `DOffer.nofiles`,
+  `OfferRef.nofiles`, also refused at `receive`), so they arrive there as text only (`WEBAPPS.md`).
 - **With X11 apps (XDND, version 5; built, to check on the VM).** The window manager (`xwm.c`) bridges
   both ways:
   - *Files or a Wayland app → an X window.* While the drag is over an X window that is `XdndAware`, the
@@ -743,7 +752,7 @@ like any other Linux app.
 - When the first X11 client connects, lord-server starts Xwayland with a fixed argument list:
 
   ```
-  /usr/bin/Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST
+  /usr/bin/Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST -auth $XDG_RUNTIME_DIR/lord-xauth.<n>
   ```
 
   fd 3 is the listening socket (Xwayland accepts that first connection), fd 4 its Wayland connection
@@ -751,9 +760,48 @@ like any other Linux app.
   window manager's connection. This is the fourth launcher exception (`AGENTS.md`): the binary must
   be a root-owned file nobody else can write; there are no arguments from JS or from anyone; the
   only trigger is a connection to the session's own X socket.
+- **The X cookie (0.8.8.8, GitHub #107).** When it reserves the display, lord-server makes a random
+  `MIT-MAGIC-COOKIE-1` (16 bytes from `getrandom`) and writes it as an Xauthority file,
+  `$XDG_RUNTIME_DIR/lord-xauth.<n>` (mode 0600, written to a fresh `O_EXCL | O_NOFOLLOW` name, fsynced and
+  renamed into place; entries for the host name and `FamilyWild`, so renaming the computer doesn't
+  matter), and sets `XAUTHORITY` to it for the apps it starts. Xwayland gets `-auth` with that file
+  and then lets in any client that shows the cookie, whatever its uid. That is what a program run as
+  root needs: `pkexec gparted` or `sudo gparted` from the Terminal keeps `DISPLAY` and `XAUTHORITY`
+  (GParted's polkit action has `allow_gui`; sudo keeps both by default), and root connects with the
+  cookie. Before this, Xwayland let in only its own uid and refused root with "Authorization
+  required, but no authorization protocol specified". The socket is still 0600, so in practice only
+  this user's programs and root's reach it. **Same uid included:** with `-auth`, a client of this user
+  without the cookie is refused too, so a program that drops `XAUTHORITY` from its environment can't
+  open a window (everything LordOS starts has it). If the file is gone when Xwayland starts again it
+  is written again with the same cookie (the X client that started it had already read the missing
+  file and fails once; the next ones connect), and it is removed at logout (`xwl_stop`). If it can't be written (no private
+  runtime folder), Xwayland starts as before, without `-auth`, and the session log says so.
+  **Who doesn't get it:** restricted Linux apps and isolated apps lose `XAUTHORITY` together with
+  `DISPLAY` (`xauth_env_drop`, `server/src/wl/xauth.h`), and a restricted app's own view mounts an
+  empty runtime folder, so the file isn't there; `lord.fs` neither reads nor writes it
+  (`FSOPS_PF_XAUTH`, besides `/run` being outside what it reads); lord-web starts with a fixed
+  environment without either; a Flatpak app gets the cookie only if it has the X11 permission
+  (Flatpak copies the entry for the display into its own sandbox, as with any X server). Tested by
+  `build/xauth-test` (the file format, 0600, `O_EXCL`, a link at either name never followed, and
+  both variables removed by the two launchers).
+  **Checked on VM 127 (2026-11-11, the 0.8.8.8 release candidate):** before, `sudo env DISPLAY=:0 xdpyinfo`
+  gave "Authorization required, but no authorization protocol specified"; with this, Xwayland runs
+  with `-auth /run/user/1000/lord-xauth.0` (0600, 105 bytes: the `lordos-autotest` entry and the wild
+  one), XTerm and UXTerm opened by LordOS carry `XAUTHORITY` and open, root with the cookie connects
+  (`sudo` keeps both variables), root or alex without it or with a wrong one is refused, and
+  `pkexec /usr/sbin/gparted` from a terminal (pkexec's text prompt) opened GParted as root on the desktop
+  (`xwayland-gparted-root.png`). Through the real launcher (`build/launch-cli`), an unrestricted probe
+  app got both variables and read the file; the same app with `no-files` or `no-mic` got neither and
+  its runtime folder held only `wayland-0`, `pipewire-0` and `pulse`. An isolated app (Calendar) had
+  neither variable.
+
+  | |
+  |---|
+  | ![gparted](xwayland-gparted-root.png) |
+  | GParted run as root with `pkexec` from a terminal, its window on the LordOS desktop through Xwayland's cookie |
 - Xwayland runs in its own scope (`lordos-xwayland.scope`, never lord-server's), in an empty network
   namespace inside a user namespace that maps only the user (it has no network at all), with
-  `no_new_privs`, a minimal environment and its log in `~/.cache/lordos/xwayland.log`. **XTEST is
+  `no_new_privs`, a minimal environment and its log in `/var/log/lordos/users/<user>/xwayland.log`. **XTEST is
   off**: an X11 app can't type or click into another one with synthetic input.
 - **Off when unused.** The window manager is an X client too, so Xwayland's own `-terminate` never
   fires: 10 s after the last X window closes, the window manager asks the X-Resource extension
@@ -833,7 +881,12 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
   Terminal and the history (with the X app's class as its source) see it.
 - **LordOS → X11.** LordOS's selection is put in X **only while an X window has the keyboard** and
   only if it's newer than what an X app copied; when the keyboard goes to a LordOS or Wayland
-  window, the window manager gives the selection up. Large pastes go in `INCR` chunks. Files copied
+  window, the window manager gives the selection up. A paste request is answered only for the app with
+  the keyboard: a window of the focused window's X client, or of another X client that X-Resource
+  (`XResQueryClientIds`, the pid Xwayland reads from the socket) ties to the same process, as with
+  apps whose clipboard library opens its own X connection and window (arboard in Rust apps; GitHub
+  #125). Any other requestor, a client without a known pid, or a focus change before X-Resource
+  answers gets a refusal. Large pastes go in `INCR` chunks. Files copied
   in Files are also offered as `text/uri-list` and `x-special/gnome-copied-files`; files an X app
   copies arrive as their text only (the window manager reads one text target; an X client's sandbox
   can't be told, so its file list is never read).
@@ -1080,6 +1133,11 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   to lord-server and the bus passes fds, else 0; `AvailableCursorModes` is 3 (hidden, embedded): the cursor as
   metadata isn't offered. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the
   person picks every time.
+- **Not offered: `org.freedesktop.portal.RemoteDesktop`.** Nothing lets a Linux app move the pointer or type into
+  the session through a portal, and adding it would be a new security exception (`AGENTS.md`). A remote desktop host
+  whose Linux build asks for RemoteDesktop and ScreenCast together finds no portal for it, so it never calls
+  `CreateSession` and LordOS never shows the chooser: what such a host sends is its own fallback. Checked on VM 127:
+  `AvailableSourceTypes` reads 3 and `RemoteDesktop.AvailableDeviceTypes` is an unknown interface.
 - **The chooser** (`sdk/screencast.jsx`, `sdk/screencastmodel.js`): `Start` asks the bus which process called
   (`GetConnectionUnixProcessID`, the socket's credentials), and the system layer shows the app's name (only an
   identity LordOS verified: the app id of its launcher's scope, `appid_of_pid`; a process it can't tell is "An unknown

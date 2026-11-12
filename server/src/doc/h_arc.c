@@ -35,14 +35,100 @@ static double now_ms(void) {
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
-static struct archive *open_reader(int fd) {
-    if (lseek(fd, 0, SEEK_SET) < 0) return NULL;
-    struct archive *a = archive_read_new();
+/* Split archives (name.7z.001, name.zip.001…, name.z01…name.zip, name.part1.rar…): lord-server opens
+ * every volume and sends them in order; libarchive reads them as one archive through its own
+ * multi-volume support (one client data per volume, switched at each end). Only read and lseek on
+ * fds it already has: nothing new for the sandbox. */
+#define ARC_MAX_VOLS 255
+
+typedef struct { int fd; char buf[1 << 16]; } Vol;
+typedef struct { struct archive *a; Vol *v; int n; } Reader;
+
+static la_ssize_t vol_read(struct archive *a, void *cd, const void **buf) {
+    (void)a;
+    Vol *v = cd;
+    for (;;) {
+        ssize_t r = read(v->fd, v->buf, sizeof v->buf);
+        if (r < 0 && errno == EINTR) continue;
+        *buf = v->buf;
+        return r;
+    }
+}
+
+static la_int64_t vol_seek(struct archive *a, void *cd, la_int64_t off, int whence) {
+    (void)a;
+    off_t r = lseek(((Vol *)cd)->fd, (off_t)off, whence);
+    return r < 0 ? ARCHIVE_FATAL : (la_int64_t)r;
+}
+
+static la_int64_t vol_skip(struct archive *a, void *cd, la_int64_t req) {
+    (void)a;
+    Vol *v = cd;
+    off_t cur = lseek(v->fd, 0, SEEK_CUR);
+    if (cur < 0 || req <= 0) return 0;
+    off_t end = lseek(v->fd, 0, SEEK_END);
+    if (end < 0) return 0;
+    off_t to = cur + (off_t)req > end ? end : cur + (off_t)req;
+    return lseek(v->fd, to, SEEK_SET) < 0 ? 0 : (la_int64_t)(to - cur);
+}
+
+static int vol_switch(struct archive *a, void *from, void *to) {
+    (void)a; (void)from;
+    return to && lseek(((Vol *)to)->fd, 0, SEEK_SET) < 0 ? ARCHIVE_FATAL : ARCHIVE_OK;
+}
+
+/* The archive's fds, in order: "vols" (the slots of every volume, only "file" ones) or the single "slot". */
+static int arc_fds(const JVal *args, int *fds) {
+    const JVal *vols = json_get(args, "vols");
+    if (!vols) { fds[0] = slot_fd(args, "slot"); return fds[0] >= 0 ? 1 : 0; }
+    if (vols->type != J_ARR) return 0;
+    int n = 0;
+    for (const JVal *k = vols->kid; k; k = k->next) {
+        if (n >= ARC_MAX_VOLS || k->type != J_NUM) return 0;
+        double d = k->num;
+        if (d < 0 || d >= hnslots || d != (double)(int)d) return 0;
+        int fd = hslots[(int)d].fd;
+        if (fd < 0 || strcmp(hslots[(int)d].role, "file")) return 0;
+        fds[n++] = fd;
+    }
+    return n;
+}
+
+static off_t arc_size(const int *fds, int n) {
+    off_t total = 0;
+    struct stat st;
+    for (int i = 0; i < n; i++) if (!fstat(fds[i], &st)) total += st.st_size;
+    return total;
+}
+
+static void close_reader(Reader *r) {
+    if (r->a) archive_read_free(r->a);
+    free(r->v);
+    r->a = NULL;
+    r->v = NULL;
+}
+
+static int open_reader(Reader *r, const int *fds, int n) {
+    r->a = NULL;
+    r->n = n;
+    r->v = n > 0 ? calloc((size_t)n, sizeof *r->v) : NULL;
+    if (!r->v) return -1;
+    for (int i = 0; i < n; i++) {
+        r->v[i].fd = fds[i];
+        if (lseek(fds[i], 0, SEEK_SET) < 0) { close_reader(r); return -1; }
+    }
+    struct archive *a = r->a = archive_read_new();
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
-    archive_read_support_format_raw(a);           /* a bare .gz/.xz/.zst: a single file */
-    if (archive_read_open_fd(a, fd, 1 << 16) != ARCHIVE_OK) { archive_read_free(a); return NULL; }
-    return a;
+    if (n == 1) archive_read_support_format_raw(a);   /* a bare .gz/.xz/.zst: a single file */
+    archive_read_set_read_callback(a, vol_read);
+    archive_read_set_seek_callback(a, vol_seek);
+    archive_read_set_skip_callback(a, vol_skip);
+    archive_read_set_switch_callback(a, vol_switch);
+    int bad = archive_read_set_callback_data(a, &r->v[0]) != ARCHIVE_OK;
+    for (int i = 1; i < n && !bad; i++) bad = archive_read_append_callback_data(a, &r->v[i]) != ARCHIVE_OK;
+    if (bad || archive_read_open1(a) != ARCHIVE_OK) { close_reader(r); return -1; }
+    return 0;
 }
 
 /* "." or "./": the archive's root folder (tar -C x .); not a problem, ignored */
@@ -63,9 +149,11 @@ static const char *entry_name(struct archive_entry *e) {
 }
 
 static void op_list(uint32_t id, const JVal *args) {
-    int fd = slot_fd(args, "slot");
-    struct archive *a = fd >= 0 ? open_reader(fd) : NULL;
-    if (!a) { reply_err(id, "invalid", ""); return; }
+    int fds[ARC_MAX_VOLS];
+    Reader rd;
+    int nf = arc_fds(args, fds);
+    if (!nf || open_reader(&rd, fds, nf)) { reply_err(id, "invalid", ""); return; }
+    struct archive *a = rd.a;
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"entries\":[");
@@ -96,7 +184,7 @@ static void op_list(uint32_t id, const JVal *args) {
     jb_str(&b, fmt ? fmt : "");
     jb_printf(&b, ",\"raw\":%s,\"truncated\":%s,\"encrypted\":%s}", archive_format(a) == ARCHIVE_FORMAT_RAW ? "true" : "false",
               truncated ? "true" : "false", encrypted ? "true" : "false");
-    archive_read_free(a);
+    close_reader(&rd);
     if (fatal) { jb_free(&b); reply_err(id, "invalid", ""); return; }
     reply_json(DR_DONE, id, &b);
 }
@@ -125,7 +213,7 @@ static int open_parent(int root, char *path, int create, const char **leaf) {
 
 typedef struct {
     uint32_t id;
-    int root, arcfd;
+    int root;
     off_t arcsize;
     long files, skipped;
     unsigned long long bytes;
@@ -202,13 +290,13 @@ static int write_file(Ex *x, struct archive *a, struct archive_entry *e, int dir
 }
 
 static void op_extract(uint32_t id, const JVal *args) {
-    int fd = slot_fd(args, "slot"), root = slot_fd(args, "dir");
-    struct archive *a = fd >= 0 && root >= 0 ? open_reader(fd) : NULL;
-    if (!a) { reply_err(id, "invalid", ""); return; }
-    Ex x = { .id = id, .root = root, .arcfd = fd };
+    int fds[ARC_MAX_VOLS], root = slot_fd(args, "dir");
+    Reader rd;
+    int nf = arc_fds(args, fds);
+    if (!nf || root < 0 || open_reader(&rd, fds, nf)) { reply_err(id, "invalid", ""); return; }
+    struct archive *a = rd.a;
+    Ex x = { .id = id, .root = root, .arcsize = arc_size(fds, nf) };
     jb_init(&x.skips);
-    struct stat st;
-    if (!fstat(fd, &st)) x.arcsize = st.st_size;
     const JVal *only = json_get(args, "only");
     const char *rawname = json_str(args, "rawname");
     char rawclean[256] = "data";
@@ -267,7 +355,7 @@ static void op_extract(uint32_t id, const JVal *args) {
     }
     if (!x.err && r == ARCHIVE_FATAL) x.err = n ? "corrupt" : "invalid";
     progress(&x, a, "", 1);
-    archive_read_free(a);
+    close_reader(&rd);
     JBuf b;
     jb_init(&b);
     jb_printf(&b, "{\"files\":%ld,\"bytes\":%llu,\"skipped\":%ld,\"skips\":[", x.files, x.bytes, x.skipped);

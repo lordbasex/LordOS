@@ -12,6 +12,83 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Mail: fold a whole account in the sidebar.** The account's name in the sidebar now has a disclosure triangle,
+  and a click on the name folds the account to that one line. A folded account shows its unread mail on the line
+  (every folder but Sent, Drafts, Junk and Trash, so folding never hides new mail), and the line is highlighted
+  while one of its folders is the one shown. The choice is kept per account in Mail's accounts file (`folded`,
+  next to the folders' `collapsed` list), so the sidebar looks the same at the next launch; the ⚠ mark still opens
+  the password or certificate sheet without folding (`apps/mail/index.jsx`, `accountUnread` in
+  `apps/mail/foldertree.js`, tested in `server/tests/mail_foldertree_test.mjs`) (GitHub #121).
+- **Text Editor: File → Open recent.** A submenu under Open folder lists the last 5 files the Editor opened or
+  saved, newest first; choosing one opens it (or switches to its tab). A file that is not there now (deleted, or on
+  a drive that is not mounted) is greyed out, and one that is gone by the time it is chosen leaves the list with a
+  note in the status bar. Two files with the same name show their folder. *Clear menu* empties the list. The list
+  is kept in `settings.json` as `editor.recent`, a new key, so no migration (`apps/editor/recent.js`, tested in
+  `server/tests/editor_recent_test.mjs`; texts in every language) (GitHub #113).
+- **Logs move to `/var/log/lordos`, one per app, rotated, and the previous session is kept.** Every LordOS log now
+  lives under `/var/log/lordos` (`server/src/lordlog.c`, docs/SYSTEM.md "Log files"):
+  - **The root daemons:** `lord-sessiond.log`, `lord-netd.log`, `lord-fand.log` and `admin.log` (the administration
+    helper's refusals by action name, never an action's arguments, plus the output of the programs it runs: dpkg,
+    wpa_supplicant, openvpn, pppd; its stderr used to go nowhere), root's, mode 0640. Their lines
+    still reach the journal as before; lord-netd's own lines no longer pass through lord-sessiond's file.
+  - **Each user's:** `/var/log/lordos/users/<user>/` (mode 0700, the user's) with `compositor.log` (lord-server),
+    `shell.log` (the shell's React/QuickJS `js:` lines and their stack lines, which used to be mixed into
+    `session.log`), `xwayland.log`, `cloud.log` (rclone), `apps/<app>.log` (each isolated native app and each Linux
+    app, which used to share `apps.log`, or, for isolated apps, the compositor's log) and `web/<app>-<profile>.log`
+    (each web app's lord-web, which used to share `web.log`; `web/probe.log` for the Store's probe). Ids become safe
+    file names (`[A-Za-z0-9._+-]`, no leading `.` or `-`, at most 96 bytes).
+  - **The folder is made by lord-sessiond at each login, before the session starts** (and for the login screen's
+    `lordos-greeter`): each step is an `openat` from a folder opened with `O_NOFOLLOW|O_DIRECTORY`; `/var/log/lordos`
+    (0755) and `users/` (0711, so nobody can list the names) must be root's and writable by nobody else; the user's
+    folder is fixed with `fchown`/`fchmod` on its own descriptor. A symlink, a file or another uid's folder in its
+    place is refused and left untouched, the session then logs to `~/.cache/lordos`. Root never touches anything
+    inside the user's folder, and root's logrotate has no rule there (see Rotation).
+  - **Fallback:** a nested or development lord-server, one without lord-sessiond, or one with another `$HOME` (the
+    test harnesses) writes the same names under `~/.cache/lordos`, so development keeps working and a test never
+    rotates the running session's files.
+  - **Lines carry a timestamp, a level and a subsystem:** `2026-11-11T12:43:56.123-03:00 INFO  xwayland: starting
+    Xwayland on :0` (local time with milliseconds and offset; `ERROR`/`WARN`/`INFO` from the message's words; the
+    line's own `name:` prefix or `compositor`/`shell`/the daemon). A small `lord-log` child stamps them, reading
+    lord-server's (or the daemon's) stderr through a pipe; it ignores SIGTERM and drains the pipe until the last
+    writer is gone, so a crash loses nothing already written. Linux apps, Xwayland, lord-web and rclone write their
+    own output as is, after a stamped "starting …" line written by lord-server before it forks.
+  - **The previous session is kept:** at login `compositor.log` and `shell.log` become `.prev` (not `.1`, which is
+    logrotate's own numbering); `session.log` used to be opened with "w", losing the crash that ended the previous
+    session. Only that makes a `.prev`: what the 16 MB cap moves aside during a session goes to `.old`, so a long or
+    noisy session never overwrites the previous one's log.
+  - **Rotation:** `/etc/logrotate.d/lordos` rotates only the root daemons' files directly in `/var/log/lordos`:
+    daily, 7 copies, compressed, `copytruncate` (each daemon's `lord-log` child holds its file with `O_APPEND`).
+    logrotate is now a Recommends of the lordos package and in every image's tool list. It has no rule inside
+    `users/<user>`: those folders and their `apps/` and `web/` are the user's, and logrotate works on path strings,
+    so a user could swap a subfolder for a symlink during a run and have root create its copies (owned by the user,
+    holding the user's text) in any folder, the known attack on logrotate in user-controlled folders.
+  - **The cap:** every file is capped at 16 MB by its own writers, as its owner: above that the newest part goes to
+    `<name>.log.old` from a line start and the file is emptied in place, so writers holding it go on. It is checked
+    when a log is opened, after every MB a `lord-log` child writes, and every minute by the session's `lord-log`
+    child for the other files, so the disk never fills even without logrotate. An isolated app (`lord-server --app`)
+    no longer holds its `apps/<id>.log`: before its sandbox and before any of its code runs, a `lord-log` child takes
+    the file over and the app writes to a pipe; the child copies the bytes as is (it never parses the app's output)
+    and checks the cap after every MB, so an app writing in a loop can't fill `/var` between the minute's checks
+    (`RLIMIT_FSIZE` was not an option: it would also stop the app's window buffers, memfds larger than 16 MB). The
+    old 1 MB truncations of `apps.log`, `xwayland.log` and `web.log` are gone.
+  - **The Logs app** lists the session's files (each previous session's as "<name> (previous session)", each `.old`
+    as "<name> (older part)", a new `logs.older` key in all six languages), then
+    **Apps**, **Web apps** and **Older logs** (what earlier versions left in `~/.cache/lordos`), shows each stamped
+    line's real time, level and subsystem (`sdk/logfile.js`), and follows `apps/` and `web/` live. `lord.logs` still
+    reads only the user's own logs: a name is `[<apps|web|cache>/]<safe name>.log[.prev|.old]`, opened with `openat` and
+    `O_NOFOLLOW`; `lord.logs.dir()` is new. Settings → Cloud's "copy the log" reads rclone's log through `lord.logs`.
+  - **Migration** `007-0.8.8.8-logs.sh` makes `/var/log/lordos` (0755) and `users/` (0711), root's, moving aside
+    anything there that is not a folder without following it. The old `~/.cache/lordos/*.log` are left where they
+    are (migrations never touch home folders). `lord-fand.service` gains `LogsDirectory=lordos` (it runs with
+    `ProtectSystem=strict`); purging the package removes `/var/log/lordos`.
+  - `lordos-issue` reads the new places and adds the shell's log, the previous session's last lines and the five
+    most recent apps' logs; `tools/diag/keylag.sh`, `tools/rpi/verify-board.sh`, the e2e scripts and the docs use the
+    new names.
+  - Tests: `build/lordlog-test` (121 checks: names and sanitizing; the root side's folder against a symlink, a
+    dangling symlink, a file, a symlinked or group-writable root and a symlinked `users/`, in a temporary folder; the
+    cap and rotation, never through a symlink or a FIFO; the line format; `lord-log` end to end with the previous
+    session kept as `.prev`, also after a third session writes 18 MB and its overflow goes to `.old`; an isolated
+    app's output copied as is through `lord-log` and capped while it writes 19 MB) and `server/tests/logfile_test.mjs` (the Logs app's parser and order).
 - **Web apps: editing like in a browser.** The Edit menu of a web app's window now has Undo, Redo, Cut, Copy, Paste
   and Select All (Speech stays below them): the shell asks lord-server, which sends `org.lordos.WebApp1.Edit(command)`
   to that window's lord-web, and lord-web runs it only when the bus says the caller is the lord-server that started it
@@ -27,6 +104,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   page's own origin (a PNG unless it is a PNG or a JPEG) and offers it as an image.
 - **Web apps: Settings… and Help in the menu bar.** A web app's Settings… (was greyed out) opens Settings → Web apps
   on that app, and Help starts with "<app> on the Web", which opens the app's site in the browser.
+- **Web apps follow the desktop's light or dark mode.** WPE WebKit 2.48 has no way to set a page's
+  `prefers-color-scheme`, so every web app saw light. lord-server now starts lord-web with `LORDOS_WEB_SCHEME=light`
+  or `dark` (the mode the theme gives the Settings portal) and, when the mode changes, sends
+  `org.lordos.WebApp1.SetColorScheme(scheme)` to every running lord-web; the word is `light` or `dark` only, and
+  lord-web applies it only when the bus says the caller is the lord-server that started it, the same pid check as
+  Edit (`server/src/web/webscheme.c`). A script of lord-web's at document start in every frame
+  (`server/src/web/webscheme.js`, no privileges and no message handler) makes the page's `matchMedia` answer any query
+  about `prefers-color-scheme` with the desktop's mode: the query is rewritten so WebKit's own `matchMedia` answers
+  the rest of it (`not`, `and`, `only`, commas, other features), the page gets a `MediaQueryList` of its own
+  (`matches`, the original `media`, `onchange`, `addEventListener`, `addListener` and their removals, `instanceof
+  MediaQueryList`), and it sends `change` when the mode flips, live, without reloading; same-origin frames follow at
+  once and frames of other origins with their next load. In dark mode the view's background is the desktop's dark
+  window color while a page loads, so no white flashes before the page paints. Checked on the test VM with a page
+  that prints `matchMedia('(prefers-color-scheme: dark)').matches`: true when started in dark, false when started in
+  light, and switching the mode in Control Center flips it at once (one `change` event each way, the same-origin frame
+  too), and a call from another process is refused. A lord-web that takes its bus name after the mode changed (the
+  change came between its start and that moment, so the call went to a name nobody owned) gets the mode when its name
+  appears: lord-server watches `NameOwnerChanged` and sends `SetColorScheme` to the running lord-web whose name it is.
+  A page's `{ once: true }` listener that ran and a `{ signal }` listener whose signal aborted are released, so a page
+  that keeps making such lists does not keep them all alive. Limit: a page that picks its colors only with CSS
+  `@media (prefers-color-scheme)` rules stays light until a newer WebKit (rewriting those rules was weighed and left
+  out: style sheets from other origins can't be read); a site with its own theme setting can be set by hand, and the
+  Store's page of the messaging app now says so under Known limitations (new limitation key `theme`, in every
+  language). Tests: `tests/webapp_test.c` (the two words, the environment's value, the script's and the hook's text,
+  bad keys refused), `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`, with `once` and `signal`
+  listeners released) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent until the theme tells the mode, `dark`
+  and `light` after, absent again for any other value). See
+  `docs/WEBAPPS.md`, "Light and dark".
 - **Web apps: hidden windows stop working for nothing.** A window that is minimized, on another desktop, closed into
   the background or wholly covered by an opaque window now tells its page it is hidden: the page stops painting, its
   animations pause and its timers run at most once a second, while its network, audio and notifications go on. Measured
@@ -346,8 +451,65 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Isolation of `lord-web`.** Its own firewall scope (`lordos-web-<app>`), a cgroup with memory and CPU limits, Landlock's scoping and `no_new_privs`. In a managed session it refuses to start without them.
   - Tests: `build/webreg-test`, `build/webapp-test`, `tests/web_probe_test.py` (headless probes of a page the test serves; 224 MB PSS at the peak on the main machine), `tests/webapps_model_test.mjs` and `webapps_sheet_scene.mjs`.
   - Documented in `docs/WEBAPPS.md`. The packages to build it are recorded in `docs/VM-SETUP.md`. WPE WebKit is added to the dependency table in `docs/ARCHITECTURE.md`.
+- **Photos: Move to Trash.** The File menu, a right click on a thumbnail, a button in the viewer's toolbar and the Delete
+  key (or ❖⌫) move pictures to the Trash with `lord.fs.trash`, as Files does: nothing is asked for a picture on this
+  computer, a picture on a network share goes off the interface thread (`fs.trashAsync`), and a picture in a cloud
+  account's kept folder is deleted in that account after the same question Files asks ("Delete from {provider}?",
+  saying whether it goes to the provider's trash). The library now selects several pictures: ❖-click adds or takes one
+  away, Shift-click selects a range, ❖A selects all, Escape clears; the right-click menu acts on the selection, and the
+  title line says "N of M selected". The library has a File menu of its own (Open, Select All, Move to Trash). In the
+  viewer the next picture opens, or the previous one after the last, and the library comes back when none is left. A
+  toast says how many went. Pure logic in `apps/photos/trash.js` with `photos_trash_test.mjs` (20 checks); new keys
+  `photos.menu.*`, `photos.trashed`, `photos.selectedOf` and `photos.cancel` in en, es, pt, fr, it and lt. No new
+  permission: Photos already had `fs:home:write` (GitHub #119).
+- **Settings → Cloud: an account's Details.** The account's page has a Details box with the provider, rclone's backend
+  type (`drive`, `webdav`, `sftp`…), how it signs in (browser, server or object storage), the server and port for a
+  server kind, and "Your own app" when it signs in with the person's own client ID (`accountDetails` in
+  `sdk/cloudmodel.js`, 6 new checks in `cloud_model_test.mjs`, including one that no secret field reaches the box). It
+  shows only what the account's state already carries: the user name or email is not there, because rclone marks those
+  options sensitive and they live in the keyring with the password, out of JavaScript's reach. Account colors are kept
+  as they were, by the order accounts were added, so two accounts on the same provider still look different and no
+  one's colors change after the update (GitHub #115).
 - **The paper and the site describe the rest of 0.8.8.8's work (in development; the latest release is 0.8.8.7).** Paper (en, es, pt; meta 2026-11-11): the abstract, §2.3, §3.4, §3.6, §4.4, §5.1, §5.4, §6.6, §6.7, §10.1 to §10.3, §11.2 and the Changelog table now cover screen and window sharing, SVG icons, apps that take the shortcuts, global shortcuts, XDND, security contexts, X11 apps on HiDPI, the SDK widgets, the bidi caret, Terminal apps, logind's Lock and the LordOS Web Runtime. §6.7 no longer says 0.8.8.8 adds no helper. `docs/PAPER-VALIDATION.md` gets rows for these claims. Site: the Linux apps and own-desktop feature pages and the FAQ (Linux apps, and a new web apps answer).
 - **The paper and the site describe 0.8.8.8 as in development; the latest release is 0.8.8.7.** Paper (en, es, pt; meta 0.8.8.8 Beta, 2026-11-10): the abstract, §10.1 and the Changelog table call 0.8.8.8 in development. §1.2 says the Terminal's port forwards, drop uploads and `ls` downloads go through the tab's own `ssh` socket and run no program. §5.1 gains three in-development items: the Terminal over `ssh` (forwards, drop to upload, ❖ + click downloads, the remote directory, and Open, Open With and Edit in Files mode), the Terminal's settings (the triggers sheet, multi-line "Send text at start", tags in one field), and text fields with selection, dragged files above every window, Text Editor drops, tag and group colors and one name order (GitHub #64). §6.7 covers the security of these: the 127.0.0.1-only forward, how the remote directory is kept, links never followed, Edit as the only upload that replaces a file. §10.2 adds a limit (one private OpenSSH server), §10.3 drops "not in 0.8.8.7", and §11.2 lists the new suites. The Databases entry no longer says groups had a color in 0.8.8.7. `docs/PAPER-VALIDATION.md` adds a 0.8.8.8 table. Site: an "In development for 0.8.8.8" section on the own-desktop feature page, and the FAQ's latest-release and Terminal Files answers updated; `docs/PAPER.md` regenerated by `web/build.mjs`.
+- **Files opens split archives as one archive.** Volumes made by byte-splitting (`name.zip.001`, `name.7z.001`,
+  `name.tar.gz.001`… up to 255 of them) and Info-ZIP splits (`name.z01`, `name.z02` … `name.zip`) are recognised by
+  name (`sdk/archivevol.js`, an archive kind in `sdk/filekinds.js`). Double-clicking any volume browses the whole set,
+  and Extract Here, Extract N Items and Quick Preview work on it, into a folder named after the set (`name`). Files
+  finds the sibling volumes in order; if one is missing it names it ("a part of the split archive is missing", in the
+  six languages) instead of failing halfway. lord-server validates and opens every volume like a single archive and
+  hands lord-doc one fd per volume (`lord.doc.arcList` and `arcExtract` take a path or the array of volumes; the
+  request carries `"vols"` with their slots, only `file` slots are accepted); lord-doc reads them as one archive
+  through libarchive's own multi-volume support (read, seek and skip callbacks on those fds). No new syscall, path
+  or sandbox rule. Tested with split zips of both styles and a split 7z (its index sits at the end, so the reader
+  seeks across volumes): `tests/doc_evil.sh` (new `vlist`/`vextract` commands in `build/doc-test`) and
+  `tests/archive_vol_test.mjs` (names, order, holes, a lone `.001`, the 255-volume cap). Split RAR sets
+  (`.part1.rar`) are not recognised yet: there was no sample to test them with. (GitHub #103)
+- **Files' column view: each column can be resized.** Dragging a column's divider widens or narrows it (140 to 600
+  px), and a double click on the divider fits it to its longest name, tags included. The width is kept per folder
+  in Files' settings (`files.colWidths`, the 200 most recent folders), and the view shows as many of the last
+  folders as fit next to the preview instead of always three. The divider reuses the list header's drag handling
+  and the view stays laid out left to right in every language. Width logic in `apps/files/colview.js`, tested in
+  `tests/files_colview_test.mjs`. (GitHub #99)
+
+### Changed
+
+- **The Dock can be much smaller: icons now go down to 20 px (the minimum was 36).** On a small high-density screen
+  the smallest Dock still took a large share of the height. Settings → Desktop & Dock → Size now goes from 20 to
+  80 px; the magnified size still starts at the icon size and goes up to 128. The limits live in one place,
+  `dockSizes()` and `DOCK_SIZE_MIN`/`DOCK_SIZE_MAX`/`DOCK_MAGNIFY_MAX` in `sdk/dockmodel.js`, which both
+  `dockPrefs()` and the Settings sliders use. At small sizes the unread badge on a web app's icon shrinks with the
+  icon (`dockBadgeMetrics()`: 12 to 18 px high, never most of the icon) and the bar's rounded corners never exceed
+  half its thickness; the running and attention dots, the separators, the Trash, the app launcher icon, the
+  tooltip and the drop areas already scale with the icon. Only Lord Flow has a Dock; Lord Classic's taskbar is
+  unchanged. A stored size only became valid, so nothing migrates. Tests: `server/tests/dock_model_test.mjs` (the
+  clamp, junk values, the old minimum, the badge sizes); docs/DOCK.md (GitHub #128)
+- **The Cleaner panel by the clock has one way into the app.** It used to end with three: the button beside the
+  last scan, an "Open Cleaner" text and a "Settings" text. Now only the button stays: with a last scan that found
+  something it reads "Free up" and opens the cleanup; with no scan yet it reads "Open Cleaner" and opens the scan.
+  Cleaner's settings are reached from inside the app. The choice is `cleanerPanelAction()` in
+  `sdk/menubarmodel.js`, tested in `server/tests/menubar_model_test.mjs`; the unused `cleaner.panel.prefs` string is
+  gone from every language; docs/CLEANER.md (GitHub #116)
 
 ### Changed
 
@@ -378,6 +540,239 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- X11 apps run as root (GParted through `pkexec gparted` or `sudo gparted` from the Terminal) couldn't open their
+  window: "Authorization required, but no authorization protocol specified" and "cannot open display: :0".
+  Xwayland was started without an authorization file, and then lets in only its own uid, so root was refused
+  even though pkexec and sudo pass `DISPLAY` on. lord-server now makes a random `MIT-MAGIC-COOKIE-1` for the session
+  (16 bytes from `getrandom`), writes it as an Xauthority file in `$XDG_RUNTIME_DIR/lord-xauth.<n>` (0600, created
+  with `O_CREAT | O_EXCL | O_NOFOLLOW` under a temporary name, fsynced and renamed into place, with entries for the
+  host name and `FamilyWild`), sets `XAUTHORITY` for the apps it starts and adds `-auth <file>` to Xwayland's fixed
+  command line (the Xwayland launcher exception in `AGENTS.md`, amended with the maintainer's approval). Any client
+  with the cookie connects, whatever its uid; pkexec (GParted's polkit action has `allow_gui`) and sudo keep
+  `XAUTHORITY`. The file is written again with the same cookie if it is missing when Xwayland restarts, removed at
+  logout, and if it can't be written Xwayland starts as before, without `-auth`. The cookie stays away from what must
+  not use X: restricted Linux apps and isolated apps lose `XAUTHORITY` together with `DISPLAY` (`xauth_env_drop`), a
+  restricted app's runtime folder is an empty one, `lord.fs` neither reads nor writes the file (`FSOPS_PF_XAUTH`), and
+  lord-web's environment is a fixed list without it. New test `build/xauth-test` (file format, 0600, `O_EXCL`, links
+  at either name never followed, both variables removed by both launchers) and cases in `fsops-test`;
+  checked on VM 127: before, root's `xdpyinfo` was refused; after, `pkexec /usr/sbin/gparted` opened GParted as
+  root on the desktop, root with the cookie connects and without it is refused, XTerm opened by LordOS carries
+  `XAUTHORITY`, and through the real launcher a `no-files` or `no-mic` app gets neither variable nor the file in its
+  runtime folder. Note: a client of the same user without the cookie is now refused as well (everything LordOS
+  starts has `XAUTHORITY`). docs/WAYLAND.md and docs/PRIVACY.md (GitHub #107)
+- Isolated apps (Mail, Calendar, Contacts, Reminders, Passwords): holding a key did nothing more than one press,
+  so Backspace, Delete and the arrows had to be pressed again for every character. These apps run as Wayland clients
+  (`lord-server --app`), and the compositor sends its clients only the press and the release of a key, with the rate
+  and delay to repeat it themselves in `wl_keyboard.repeat_info` (30/s after 500 ms). The app client ignored that
+  event, so no repeat ever reached the JS keymap, which already handles them. It now repeats the held key itself
+  (`server/src/app/keyrepeat.h`, wired in `appclient.c`'s poll loop): after the delay, then at the rate, sent as the
+  same value-2 key event an in-process app gets from the kernel. Modifiers don't repeat (new `kb_key_repeats` in
+  `keyboard.c`, from the keymap); the key's release, another press, or the keyboard leaving or entering a window
+  ends it; a rate of 0 turns it off; an app that stalls catches up with one repeat, not a burst. New
+  `build/keyrepeat-test` in `make test`; `docs/PRIVACY.md` describes it. Arrows, Home/End and Ctrl+A already worked
+  in these fields. (GitHub #130)
+- Lord Flow: minimizing a window still played the shrink towards the Dock with Settings → Appearance → Reduce
+  motion on, although that setting stops decorative animations. The minimize effect (`themes/default/index.jsx`
+  `useMinimizing`) never read it; which windows start the effect is now decided in `themes/default/minimize.js`,
+  where Reduce motion starts none, so the window goes at once, as in Lord Classic. Tested by
+  `server/tests/minimize_model_test.mjs` (GitHub #112).
+- Files: in the column view a tagged file showed no tag at all; only a folder's icon took the tag's tint. Each item
+  now shows its tag dots right after the name, as the list view does, and they stay visible when a long name is cut
+  short (`apps/files/views.jsx` `ColumnView`). Tested by `server/tests/files_colview_scene.mjs`, run through
+  `menubar_test.mjs`, which now takes a scene as its argument (GitHub #99).
+- **The built-in panel turns off when the lid is closed on an external display.** lord-server never
+  looked at the lid: `display_plan` put every connected connector in the plan, so with the lid
+  closed and a monitor connected the laptop panel stayed lit (`/sys/class/drm/*-eDP-1/enabled` read
+  `enabled`, a laptop's logo stayed lit), kept part of the desktop and windows could sit on a panel
+  nobody sees. lord-server now reads logind's `LidClosed` on the system bus (Properties.Get, then
+  PropertiesChanged believed only from logind's own connection; new `hw/lid.c`, no grab and no
+  polling, logind's own lid handling unchanged). While the lid is closed and another display is
+  connected, the eDP, LVDS or DSI panel leaves the plan: its head is closed as on an unplug, its
+  windows move to the other displays and the external display becomes the main one if the panel
+  was. With only the panel connected it is kept (the only display is never turned off), and it comes
+  back when the lid opens. Settings → Displays lists the panel as off because of the lid (new
+  `lidClosed` in `lord.display.list()`, text in every language). New `build/lid-test` (28 checks:
+  the logind side with the bus replaced, and the plan with the card replaced) (GitHub #97).
+- A moment of noise on the screen between the console and the login screen and between the login screen and the
+  desktop, on older graphics cards run by the `radeon` kernel driver. At each hand-off lord-sessiond keeps every lit
+  display on a black frame of its own mode (added in 0.8.8.7 so DisplayPort monitors keep their signal), and that
+  frame was a new dumb buffer put on the screen as it came: the code assumed it was zeroed, but `radeon` gives one
+  in video memory with whatever was there last, so the "black" frame showed leftover pixels until the next session
+  drew. The buffer is now mapped (`DRM_IOCTL_MODE_MAP_DUMB` + `mmap`) and cleared before it becomes a framebuffer;
+  if it can't be mapped, that display is not blacked out and is turned off with the rest of the leaving session's
+  framebuffers, as before 0.8.8.7 (`server/src/remote/blackfb.c`, used by `monitor.c`). New `blackfb-test`: a fake
+  card (ioctl and mmap wrapped) whose new buffers are full of noise checks the whole buffer, pitch padding
+  included, is black before `ADDFB`, and that a failed map, mmap or `ADDFB` leaves nothing behind. (GitHub #94)
+- Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
+  with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
+  a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
+  `.key` lost the password (or the derived key a first-run file leaves), and with wpa_supplicant running the network
+  was reloaded with `key_mgmt NONE`, which never associates with a WPA network. A join without a password for a
+  network saved with a key now joins it with the saved key and leaves its files as they are (`server/src/net/wifi.c`);
+  a new password still replaces the saved one. A network an earlier version already overwrote can't be repaired by
+  an update (the key is gone, and a real open network looks the same), so Settings now asks for the password when a
+  network saved as open is secured in the scan, and joining with it saves it again. Checked on VM 127 with a
+  simulated radio (`mac80211_hwsim`, a WPA2 access point from wpa_supplicant in AP mode) through `net-test act`:
+  joined with the password, disconnected, joined again with no password; the build before saved it as `open` and
+  stayed `SCANNING`, this one reached `COMPLETED` with the key kept. New `net-test wifi-saved`. (GitHub #124)
+- Files and Settings → Default Apps: VLC was missing from Open With for common video files (MP4, Matroska, WebM,
+  QuickTime) and couldn't be chosen as the video app. The launcher read each `.desktop` line into a 2 KB buffer and kept
+  `MimeType` in 1 KB, and VLC's `MimeType` line is 2.4 KB: only its first 1023 bytes were kept (`audio/mpeg` and
+  `video/x-msvideo` survived, `video/mp4` did not), and the rest of an over-long line was read as a line of its own.
+  `.desktop` lines are now read whole (`getline`), `MimeType` holds 8 KB, and a list longer than that keeps only its
+  whole types, so a cut type never matches another. `tests/defaults_test.c` covers a type after 2 KB of `MimeType`, a
+  long line whose tail looks like a key, and a list longer than the field; checked against this machine's real VLC
+  3.0 `.desktop`: before, `video/mp4` had no app; now VLC is the declared app for MP4, Matroska, WebM and QuickTime.
+  Dragging a file from Files onto a Linux app's window is new in this version (Added, Wayland drag and drop)
+  (GitHub #123).
+- Linux apps: a Qt app whose Qt Wayland platform plugin isn't installed (Debian's `qtwayland5` or `qt6-wayland`, which
+  no Qt app depends on) didn't open at all: MusicBrainz Picard from the Store stopped at start with "Could not find the
+  Qt platform plugin "wayland"". The session set `QT_QPA_PLATFORM=wayland`, which leaves Qt no other platform. It now
+  sets `wayland;xcb` (Qt tries them in order), as GTK already got `wayland,x11`: Qt apps still open on Wayland, and
+  those without the plugin open through Xwayland. The toolkit variables moved to `server/src/wl/toolkitenv.h`, checked
+  by the new `tests/toolkitenv_test.c`. Checked on VM 127 with Picard (Qt 5) and Qt 5's Wayland plugins hidden in a
+  private mount namespace: `wayland` alone aborted with the reporter's message, `wayland;xcb` opened Picard's window
+  through Xwayland, and with the plugins present Qt still chose Wayland (GitHub #96).
+- Text Editor: the end of a long line was drawn under the vertical scroll bar, and typing at the end of a line
+  could leave the caret there. The bar now has its own column at the right edge, painted with the editor's
+  background, and the view scrolls sideways so the caret stays left of that column. Without the bar (a file that
+  fits) the text keeps the full width. A regression case is in `editor_scrollbar_test.mjs`. (GitHub #109)
+
+- Memory figures: the Control Center worked out memory in use as total minus the kernel's "available" figure, which
+  also counts its own reserve, so it read 1.9 GB where Monitor, About and Settings → General read 1.7 GB at the same
+  moment. Every place now takes the one figure the server reports (in use, without the page cache or the reserve;
+  `sdk/memfigure.js`). The Cleaner panel by the clock showed memory "available" and disk "free" with no total; both
+  cards now read "used of total", like the bars under them and the rest of the system. Monitor → Memory keeps its
+  breakdown (in use, cache and free add up to the total). New test `mem_figure_test.mjs`. (GitHub #118)
+- Notes: there was no way to copy or paste except the keys, which only work while a note is being edited; the menu
+  bar had no Edit menu, the Format menu's rows were always off and a right click in the editor offered only Speech.
+  Notes now has an Edit menu (Undo, Redo, Cut, Copy, Paste, Select All) and its Format rows work while editing; each
+  row sends the editor's own key, so it does exactly what the key does (`apps/notes/editmenu.js`). From the reading
+  view, Paste and Select All open the editor first (pasting at the end of the note, or selecting all of it to copy).
+  A right click in the editor offers Cut, Copy, Paste and Select All before Speech, and on a desktop note it no
+  longer drops the note back to reading while the menu is open. Ctrl/⌘+Shift+C copied instead of making a code
+  block as its Format row says; it now makes the code block. Test: `notes-editor-scene` (GitHub #117).
+- X11 apps: pasting text copied in LordOS, a Wayland app or a web app into an X11 app whose clipboard library
+  opens its own X connection (Rust apps using arboard) said "Clipboard empty". The window manager
+  answered a paste request only from a window of the focused window's X client, and that library asks from a helper
+  window on a second connection. It now also answers when the X server's X-Resource extension ties the requestor's
+  client and the focused window's client to the same process (the pid Xwayland reads from the socket, never a
+  property the client sets), checked again when the answer comes back: the focus must not have moved, and the
+  selection must still be LordOS's and not a secret. Any other requestor, a client without a known pid, or a server
+  without X-Resource is still refused, so only the app with the keyboard gets the clipboard (`x11_same_process`,
+  `build/xwm-test`; docs/WAYLAND.md "Clipboard and primary selection", docs/PRIVACY.md "X11 apps") (GitHub #125).
+- **Files: copying or moving many items at once copies all of them.** lord-server runs at most 8 copy or move jobs
+  at a time and refused one more with "Too many copies in progress", and Files started one job per selected item with
+  nothing to hold the rest: a paste, a drop or a Duplicate of more than 8 items copied the first 8 and the others failed
+  at once (moves on the same disk too, since a finished job keeps its slot until Files reads it). The items past the
+  free slots now wait in Files and start, in the order chosen, as the running ones finish; moves on the same disk all
+  go in one pass. The status bar says how many more are left next to the one in progress, and its ✕ stops that copy and
+  drops the ones still waiting. An item that fails for its own reason (the name was taken meanwhile, a protected
+  folder) is reported and the rest go on. Suite `files-jobqueue-test` (GitHub #104).
+
+- **Files: in Home, and in the column view, Move to Trash, Cut, Paste and New Folder work, and a file picked in a
+  deeper column can be copied.** Two causes. Files greys out what changes a folder when the folder is read-only, and the
+  home folder's own entry reads as read-only (its parent is outside what LordOS writes), so in Home those actions were
+  disabled and a drop on the Dock's Trash did nothing; what is inside the home folder now counts as writable, as the
+  file chooser already did. Also the selection was looked up only among the first column's items, so with Pictures →
+  Screenshots open a file picked in the last column was selected on screen but ⌘C copied nothing and the menus had
+  nothing to act on. Every column's items now count. Shift + click selects a range inside the clicked column, and
+  Duplicate, Compress and New Folder with Selection put what they make next to the item, not in the first column's
+  folder. Suite `files-colview-test` (GitHub #100).
+- Text fields on a display at 125 % or 175 %: the caret drifted away from the text as you typed, a few pixels more with
+  every character, in Notes, Text Editor and the text boxes of Settings. Glyphs are drawn at the display's size
+  rounded to half a pixel (13 px text at 125 % is 16.25 px and draws at 16.5), and the pen moved by those rounded advances,
+  while the caret and the line breaks use the logical ones. The pen now moves by the logical advance times the scale,
+  so text, caret and selection line up at every scale; 100 %, 150 % and 200 % were already exact. `engine-test`
+  checks the caret edge against the drawn ink at 125 % and 175 % (GitHub #110).
+- Lord Classic's taskbar: with many pinned apps the row of app buttons grew past its room, ran over the tray
+  (quick settings, status items, the clock) and, centered, kept growing toward both edges of the display. The
+  taskbar now fits its row to the room left by the tray, which it measures from the last frame: the app buttons get
+  smaller first (down to 30 px from 40, with a smaller icon), then the apps that still don't fit go into a "more
+  apps" button at the end of the row, whose menu lists them and opens them like a click on their button. A centered
+  row stays in the middle of the display while there is room and moves toward the start once the tray would be in
+  its way. ❖1 to ❖9 still count every app, also those in the menu. Folders of apps on the bar were not added.
+  (GitHub #111)
+- Files → Network: signing in to a desktop computer's shared folders said the password was refused although it
+  was right and the command-line SMB client connected with it. `lord-lan` asked for SMB signing to be enabled but not
+  required, and in dialects 2.0.2 and 2.1 a server signs its final session setup answer only when the session
+  requires signing (MS-SMB2 3.3.5.5.3); a desktop system that doesn't require signing (the default on many) sent
+  that answer unsigned, and `lord-lan` takes an unsigned answer as "not the server you signed in to". The
+  NEGOTIATE and both SESSION_SETUP requests of the sign-in now mark signing as required (`smb_negotiate_signed`,
+  `smb_session_setup_signed` in `lan/lanparse.c`), so the server must sign that answer. Nothing is weakened: the
+  answer must still carry a valid signature with the session key, a wrong password is still refused, and the
+  anonymous pass is unchanged. `build/lan-test` checks the security mode of each request. On VM 127, `build/lan-list`
+  listed the shares of a test server with its signing set to default, disabled and mandatory, refused a wrong
+  password in each, listed through a proxy that leaves the answer unsigned when the client doesn't require signing
+  (the build before this fix said "denied" there) and was still refused through one that always leaves it unsigned.
+  Not yet tried against the reporter's kind of server (GitHub #101).
+
+- Notes and Mail's message editor at 100 %: the caret and the selection drifted to the right of the text, 0.6 px more
+  with every character (20 px at the end of a 33-character line with 14 px text). Both editors measure each character
+  once with `lord.measureText`, which rounds a width up to a whole pixel, so an 8.4 px JetBrains Mono character
+  counted as 9. Each character is now measured as 64 copies and divided, which keeps the rounding under 0.02 px.
+
+- Notification banners: a long message (a whole chat paragraph from a web app) made the banner as tall as the
+  screen. Its text is now cut to 4 lines with an ellipsis, and up to 12 while the pointer is on the banner; the title
+  to 2 lines. Notification Center already showed 3.
+
+- Web apps: pasting a file copied in Files (or another file manager) pasted its path as text, so a chat page could not
+  send it; and any text past ASCII pasted by WebKit came out garbled (a path in `Imágenes` as `ImÃ¡genes`). WebKit
+  2.48's pasteboard for WPE holds text only, and it reads its stored bytes back as Latin-1 while it writes them as
+  UTF-8 (`PlatformPasteboardLibWPE.cpp`, `readString`). Now, at the person's own paste (Ctrl+V, Shift+Insert, the
+  Edit menu's or the context menu's Paste; never at any other moment), lord-web looks at the session's selection
+  first: when it offers `text/uri-list` (or `x-special/gnome-copied-files`), lord-web reads the list then (at most
+  1 MB), opens its local files with exactly the drop's checks and limits (`file://` without a host, the person's
+  places, no hidden folder or file, no link on the resolved path, a regular file, at most 64 MB each and 20 files)
+  and dispatches a `paste` event on the focused element whose `DataTransfer` holds them as `File`s (`types`
+  `["Files"]`, no text); when every file is refused it pastes the selection's text as before (the list itself when the
+  selection has no text). A text that isn't plain ASCII is pasted by lord-web too: a `paste` event with it as
+  `text/plain`, and when no listener takes it the text is inserted at the caret (WebKit's `InsertText`); ASCII text is
+  still WebKit's own paste. The session's text is read as `text/plain;charset=utf-8`, then `UTF8_STRING`, then
+  `text/plain` (UTF-8 when it is valid, else converted from Latin-1), then `STRING` (Latin-1); `TEXT` is never read,
+  and a UTF-8 type that isn't valid UTF-8 is refused. A selection with no text (only a file list or an image) now
+  empties WebKit's pasteboard, so an older text is never pasted in its place. A copy from an isolated LordOS app or a
+  sandboxed (Flatpak) client reaches lord-web without its file lists: lord-server leaves `text/uri-list` and the
+  other file-list types out of that selection's offer to a lord-web client and refuses them at `receive`
+  (`OfferRef.nofiles`, the same rule as for drags), so it pastes as text only. The log says `paste: N files from the
+  clipboard accepted[; others refused: <reason>]`, `paste: no file from the clipboard accepted (...); pasting its
+  text`, `paste: text (N bytes, <type>[; WebKit's own paste])` and `paste dispatched (...)`, sizes, types and reasons
+  only. Tests: `build/webapp-test` (the text type order, UTF-8 checks, Latin-1 conversion and the `Imágenes` case,
+  which text WebKit's own paste reads right, gnome and uri lists, a pasted list's files through the drop's checks).
+  Checked on VM 127 (2026-11-11): `hacker.jpg` copied in Files from `~/Imágenes` and pasted with Ctrl+V, and with
+  the Edit menu's Paste, into a test page arrived as `hacker.jpg image/jpeg 6753` (`types` `["Files"]`, the page
+  showed the picture); a text `/home/alex/Imágenes/hacker.jpg` pasted into a text area arrived as it is (the build
+  before pasted `/home/alex/ImÃ¡genes/hacker.jpg`), and `Fotos en ~/Imágenes: café, niño, €` from the context
+  menu's Paste into an editable box too; a list naming a hidden file was refused and its text pasted instead.
+- Web apps: copying from a page that handles the copy itself put nothing on the session's clipboard (copying
+  messages from a chat, then pasting in another app, pasted what was there before). Such a page handles the `copy`
+  or `cut` event, writes its own text into the event's `clipboardData` (messages with their sender and time, emoji
+  pictures as text) and prevents the default, or runs `document.execCommand('copy')` with such a listener from its
+  own Copy item. WebKit 2.48 for WPE throws that data away: WebCore commits it through
+  `Pasteboard::writeCustomData`, which is empty in `PasteboardLibWPE.cpp`. lord-web's isolated script now reads the
+  event's data after the page's listeners (a listener of its own on each node of the event's path, both phases, so
+  a page that stops the propagation is seen too) and, when the page prevented the default and left text, posts the
+  text and its HTML; lord-web offers both to the session only within 5 s of the person's own key, click or touch in
+  the window, at most 16 MB each, trusted events only, and writes the text into WebKit's pasteboard so pasting back
+  into the page works. Ctrl+C with the focus in a message box but the selection on the messages now copies too
+  (decided by where the selection is). Checked on VM 127 with a test page that imitates this: a two-message
+  selection reached `wl-paste` as `[10:01] Ana: ... 😀 ?` and `[10:02] Bruno: ...` lines (with `text/html`), and its
+  Copy button (`execCommand` plus a listener that stops the propagation) as its own text; the build before left the
+  clipboard as it was.
+- Web apps: dropping a file on a chat page to send it did nothing. Such a page
+  draws its drop area only after `dragenter` (a render a frame later) and has its only `drop` listener there;
+  lord-web sent `dragenter`, `dragover` and `drop` together at the drop, so the drop landed on the element under an
+  area that didn't exist yet. lord-web now sends `dragenter`, `dragover` and `dragleave` to the page while the drag
+  moves over the window (one call at a time, the latest position kept; `types` `["Files"]` and no data, as a
+  browser does before the drop), `dragleave` when the drag leaves or its drop can't be handed over, and at the drop
+  waits two frames (at most 150 ms), finds the element at the drop point again and sends `dragover` and `drop`
+  there. Checked on VM 127 with a page whose drop area appears a frame after `dragenter`: a JPEG and a text file
+  from Files arrived (`foto.jpg (6753 B, image/jpeg)`), and the area went away when the drag left without dropping;
+  the build before left the area up and the page got no file.
+- Web apps: lord-web's log now says what happened to copies and drops, sizes, types and reasons only, never their
+  contents, at most 20 lines in 10 s: `page copy offered (N bytes, editing command|copy event|clipboard API)`,
+  `page copy refused (...)`, `drag over the page (files, first target DIV)`, `drop received (text/uri-list, N lines,
+  M local files accepted)`, `drop refused: <reason>`, `drop dispatched (N files, target DIV, a listener took it)`.
 - Web apps: dragging the mouse across text selected nothing (a message couldn't be selected to copy it). WPE WebKit
   2.48 is built without drag support, which in WebCore also holds selecting by dragging; lord-web now extends the
   page's own selection while the left button is held (a script in an isolated world: `caretRangeFromPoint` for text
@@ -548,6 +943,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the Network monitor, Remote Desk, Settings (themes, notifications, Bluetooth devices, languages), Help, the file
   dialog, Cleaner, the Terminal (tags, actions, secrets), the installer and the Imager's countries. Lists sorted by
   internal keys (hashes, ids, dates, paths) are unchanged.
+- **Documentation: what a remote desktop host's generic Linux build shows on LordOS.** A host that captures a Wayland
+  session only through the RemoteDesktop and ScreenCast portals together finds no RemoteDesktop portal on LordOS, never
+  asks for a screen, and streams its own fallback picture; one such host's fallback is the same PM5544 test card as
+  `lordos-testbench`'s, which made it look as if LordOS shared the test bench. Nothing in LordOS sends that card: the
+  ScreenCast portal shares only what the person picks in the chooser. `docs/WAYLAND.md` now says RemoteDesktop isn't
+  offered and why, and `docs/UPDATES.md` no longer says LordOS has no ScreenCast portal. Checked on VM 127: the portal
+  answers `ScreenCast.AvailableSourceTypes` 3 and has no RemoteDesktop interface.
 
 ### Security
 

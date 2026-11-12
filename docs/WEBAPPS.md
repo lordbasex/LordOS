@@ -72,7 +72,8 @@ Only lord-server starts `lord-web`:
 - **argv:** exactly `lord-web --app <app> --profile <profile>`, both checked against the registry first.
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
   `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
-  its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on).
+  its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on). Once the
+  theme has told lord-server the desktop's mode, also `LORDOS_WEB_SCHEME=light` or `dark` ("Light and dark", below).
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
@@ -106,11 +107,33 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
 - **Clipboard:** text both ways through `wl_data_device`: the session's selection is copied into WebKit's pasteboard
   while the window has the keyboard; what the page copies is offered to the session as plain text (and HTML when the
   page gave it). WebKit 2.48's pasteboard on WPE holds text only (its `Pasteboard` for libwpe reads no files or
-  images and writes no image), so images go around it (`webxfer.c`):
-  - **Pasting an image:** when the session's clipboard offers `image/png` or `image/jpeg` and no text, Ctrl+V or
-    Shift+Insert reads it (at most 32 MB, non-blocking) instead of sending the key, and the page gets a `paste` event
+  images and writes no image), and it reads its stored bytes back as Latin-1 while it writes them as UTF-8
+  (`PlatformPasteboardLibWPE.cpp`, `readString`), so files, images and any text past ASCII go around it
+  (`webwin_paste`, `webclip.c`, `webxfer.c`). All of it happens only at the person's own paste (Ctrl+V, Shift+Insert,
+  the Edit menu's or the context menu's Paste); nothing is read for the page at any other moment:
+  - **Pasting files:** when the session's selection offers `text/uri-list` (or `x-special/gnome-copied-files`; Files
+    offers both for its copies, `WAYLAND.md`), the paste reads the list (at most 1 MB, non-blocking) instead of sending
+    the key or running WebKit's Paste, and opens its local files with exactly the drop's checks and limits (`webdrop.c`,
+    see "Drag and drop": `file://` without a host, the person's places, no hidden folder or file, no link on the
+    resolved path, a regular file, at most 64 MB each and 20 files). The page gets a `paste` event on its focused
+    element whose `DataTransfer` holds them as `File`s, `types` `["Files"]` and no text. When every file is refused, the
+    selection's text is pasted as below (the list itself when the selection has no text). Before, the page got the
+    files' paths as text. A copy made by an isolated LordOS app or a sandboxed (Flatpak) client reaches lord-web without
+    its file lists: lord-server leaves `text/uri-list` and the other file-list types (`dndg_file_mime`) out of that
+    selection's offer to a lord-web client and refuses them at `receive` (`wl.c`, `OfferRef.nofiles`, as for a drag's
+    `DOffer.nofiles`), so it pastes as text only.
+  - **Pasting text:** the session's text is read as `text/plain;charset=utf-8`, then `UTF8_STRING`, then
+    `text/plain` (UTF-8 when it is valid UTF-8, else converted from Latin-1), then `STRING` (Latin-1, X11's rule);
+    `TEXT` and `COMPOUND_TEXT` are never read, and a UTF-8 type that isn't valid UTF-8 is refused (`webclip.c`). It
+    is mirrored into WebKit's pasteboard as UTF-8. Plain ASCII text is WebKit's own paste. Any other text would come
+    out garbled from WebKit (a path in `Imágenes` as `ImÃ¡genes`), so lord-web pastes it itself: a `paste` event on the
+    focused element with it as `text/plain` (from a script, so `isTrusted` is false), and when no listener prevents
+    the default, the text is inserted at the caret with WebKit's `InsertText` editing command.
+  - **Pasting an image:** when the session's clipboard offers `image/png` or `image/jpeg` and no text, the paste
+    reads it (at most 32 MB, non-blocking) instead of sending the key, and the page gets a `paste` event
     on its focused element with a `DataTransfer` holding the image as a `File` (`image.png`), `types` `["Files"]`.
-    WebKit's pasteboard is emptied when such an image arrives, so it never pastes the text copied before it.
+    WebKit's pasteboard is emptied when a selection with no text arrives (an image, a file list only), so it never
+    pastes the text copied before it.
   - **Copying an image:** WPE 2.48 has no Async Clipboard API (`navigator.clipboard` is undefined), so a script at
     document start gives the page `navigator.clipboard.write` and `writeText` (and `ClipboardItem`) when they are
     missing. They post to lord-web (a script message handler), which takes text (at most 16 MB) or a PNG or JPEG
@@ -123,6 +146,28 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     is JSON text, and builds its own objects only (no page setter or replaced method sees what is written). At each
     message lord-web checks that the document's address (as the isolated world reads it), the main frame's committed
     one and the view's are inside the scope. Anything else rejects the page's promise.
+  - **A copy the page handles itself:** many pages (chats among them) handle the `copy` or `cut` event, put their
+    own text in the event's `clipboardData` (several messages with their sender and time, emoji pictures as text)
+    and prevent the default; `document.execCommand('copy')` after a click with such a listener is the same. In
+    WebKit 2.48 for WPE that data goes nowhere: WebCore commits it to the platform's `Pasteboard::writeCustomData`,
+    which is empty in `PasteboardLibWPE.cpp`, so nothing reached the session (checked on VM 127 with a page that
+    does this: the session's clipboard kept what it had). The isolated script (`lordos-web-select`, every frame)
+    watches trusted `copy` and `cut` events: from the window's capture phase it adds a listener of its own to each
+    node on the event's path, in both phases, so it runs after the page's listeners there and still sees the data
+    when a listener stops the propagation (not `stopImmediatePropagation`). After the event, when the page prevented
+    the default and left `text/plain` (or only `text/html`, whose text is taken), it posts the text and the HTML
+    (message handler `lordosCopy`, that world only). lord-web offers them to the session (`text/plain` and
+    `text/html`), at most 16 MB each, only less than 5 s after the person's own key, click or touch in the window,
+    and writes the text into WebKit's pasteboard too, so a paste back into the page pastes it.
+  - **Ctrl+C with the focus in a message box:** the isolated script decides by where the selection is, not by the
+    focused element: Ctrl+C with the focus in an editable box but the selection on text the page shows runs Copy
+    (WebKit's own key binding runs only where the selection can be edited).
+  - **What the log says** (lord-web's stderr, the app's log; at most 20 lines in 10 s, sizes and reasons only, never
+    what was copied or dropped): `page copy offered (N bytes[ and HTML], editing command|copy event|clipboard
+    API|image/png)` and `page copy refused (...)` with the reason; for a paste `paste: N files from the clipboard
+    accepted[; others refused: <reason>]`, `paste: no file from the clipboard accepted (N on its list, <reason>);
+    pasting its text`, `paste: text (N bytes, <type>[; WebKit's own paste])`, `clipboard text refused (N bytes,
+    <type>): not UTF-8` and `paste dispatched (N files, target TAG, a listener took it|no listener took it)`.
 - **Drag and drop** (`webwin.c`, `webdrop.c`, `webxfer.c`): libwpe has no drag and drop and WPE's view no drop target,
   so lord-web is the target itself, and the page gets the drop from a script (WPE 2.48 cannot receive an external
   drop any other way). A drag over the window that offers `text/uri-list` (a Files drag, see `WAYLAND.md` "Drag and
@@ -139,15 +184,28 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   LordOS itself that such a drag never makes. lord-web reads the files
   itself and passes them in 1 MB pieces to a script in an isolated world of its own (`lordos-web-xfer`: the page's
   scripts can't see or change it), which makes `File` objects (name, a type from the name, the modification time) and
-  `blob:` addresses. A script in the page's world then makes the `DataTransfer` and dispatches `dragenter`,
-  `dragover` and `drop` at the drop point (in CSS pixels, the zoom taken into account) on the element there. It has
+  `blob:` addresses. While the drag moves over the window, before any drop, the page's world gets `dragenter` on
+  the element that comes under the pointer (then `dragleave` on the one it left), `dragover` on it at each move (one
+  call at a time, the latest position kept), and `dragleave` when the drag leaves the window or its drop can't be
+  handed over; their `DataTransfer` says `types` `["Files"]` for a file drag (`["text/plain"]` for text) and holds no
+  data, as a browser's before the drop. That matters: a chat page shows its drop area only after `dragenter`, a
+  render a frame later, and puts its only `drop` listener there, so when lord-web sent `dragenter`, `dragover` and
+  `drop` together at the drop, the drop landed on the element under an area that didn't exist yet and nothing was
+  sent (the area was then left on the screen). At the drop the script in the page's world waits two frames (at most
+  150 ms), finds the element at the drop point again, sends `dragenter` (and `dragleave` to the old one) if the
+  drag hadn't reached it, then `dragover` and `drop` with the files (in CSS pixels, the zoom taken into account). It has
   to be the page's world because in WebKit 2.48 a script-made `DataTransfer` lists no `"Files"` in `types`, which
   pages check, and only that world can mend it; the `blob:` addresses are revoked right after. A drop with no local
   file gives the page its text (`text/plain`, and `text/uri-list` for a list). One transfer at a time; none while the
   window shows another site. WebKit 2.48 takes only numbers, strings and dictionaries as a called function's arguments
   (an array is "Invalid parameter types"), so the files' addresses, names, types and times go to the page's world as
   one JSON text. Checked on VM 127 (2026-11-11): a JPEG dragged from Files onto a page's drop zone arrives as
-  `hacker.jpg image/jpeg 6753` with `types` `["Files"]`.
+  `hacker.jpg image/jpeg 6753` with `types` `["Files"]`; and on a page whose drop area appears a frame after
+  `dragenter` and is the only drop target, a JPEG and a text file arrive there, and the area goes away when the drag
+  leaves without dropping. The events are made by a script, so `isTrusted` is false (no embedder can make trusted
+  ones). The log says `drag over the page (files|text, first target TAG)`, `drop received (text/uri-list, N lines, M
+  local files accepted; the others refused: ...)` or `drop refused: <reason>`, and `drop dispatched (N files, target
+  TAG, a listener took it|no listener took it)`.
 - **Editing** (`webselect.c`, `webedit.c`, `webengine.c` `web_edit`):
   - **Selecting with the mouse:** WPE WebKit 2.48 is built without `ENABLE_DRAG_SUPPORT`, and in WebCore that switch
     also holds the code that extends a selection while the left button is dragged, so dragging across text selected
@@ -190,6 +248,58 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     image.
   - **The app menu and Help:** Settings… opens Settings → Web apps on that app; Help starts with "<app> on the Web",
     the app's origin in the browser.
+- **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; 0.8.8.8, in development): a web app
+  follows the desktop's light or dark mode as far as WPE WebKit 2.48 lets it.
+  - **What WebKit lacks:** WPE 2.48's public API has no way to set the page's `prefers-color-scheme`, so every page
+    sees light: `matchMedia('(prefers-color-scheme: dark)').matches` is false and CSS `@media (prefers-color-scheme:
+    dark)` rules never apply.
+  - **How lord-web learns the mode:** lord-server knows the desktop's mode from the theme (`lord.portal.set`, the same
+    call that feeds the Settings portal to Linux apps). It starts lord-web with `LORDOS_WEB_SCHEME=light` or `dark`
+    (missing or anything else is light) and, when the mode changes, sends `org.lordos.WebApp1.SetColorScheme(s
+    scheme)` to each running lord-web's bus name (no reply). The word is `light` or `dark` only, refused otherwise
+    (`InvalidArgs`); lord-web asks the bus for the caller's pid and applies it only when it is the lord-server that
+    started it, as for `Edit`. A mode change between a lord-web's start and the moment it takes its bus name would
+    reach a name nobody owns yet, so lord-server watches `NameOwnerChanged`: when the name of one of the lord-web it
+    started gets an owner, that lord-web gets `SetColorScheme` with the mode now (lord-web ignores a mode it already
+    has).
+  - **matchMedia:** a script of lord-web's (`webscheme.js`) runs at document start in every frame, in the page's own
+    world (the page's scripts must see its answers). A query that names `prefers-color-scheme` is rewritten so the real
+    `matchMedia` answers it as the desktop would: when WebKit's answer and the desktop's differ, every
+    `(prefers-color-scheme: dark)` becomes `(prefers-color-scheme: light)` and the other way round, and the rest of the
+    query (`not`, `and`, `only`, commas, other features) stays WebKit's. The page gets its own `MediaQueryList`
+    (`instanceof MediaQueryList`, an `EventTarget`) with `matches`, the original query's `media`, `onchange`,
+    `addEventListener`/`removeEventListener` and `addListener`/`removeListener`; it sends `change` when the desktop's
+    mode flips (only when its answer changes) and when the real list changes (a width). Any other query gets WebKit's
+    own list untouched. A list is kept alive only while the page has `change` listeners on it, as in a browser: a
+    `{ once: true }` listener that ran and a `{ signal }` listener whose signal aborted are let go. A new mode replaces the script for the next loads and calls its hook (a random name per
+    process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
+    load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
+    itself, and nothing goes from the page to lord-web or lord-server.
+  - **No white flash:** in dark mode the view's background is the desktop's dark window color (`#1f1f23`) from a
+    load's start to its end, so nothing white shows before the page paints; then it is WebKit's white again, so a page
+    without a background of its own reads as in a browser.
+  - **The limit:** a page that decides only through CSS `@media (prefers-color-scheme)` rules stays light until a newer
+    WebKit lets lord-web set the scheme. Rewriting those rules from the script was weighed and left out: style sheets
+    of another origin (most sites serve theirs from a CDN) can't be read, constructed and shadow-root sheets, `<link
+    media>` and `<picture>` sources would each need their own path, and CSS-in-JS libraries that keep rule indices
+    would break. A site with a theme setting of its own can be set by hand: for example the messaging app's
+    Settings → Theme → Dark keeps it dark whatever the desktop's mode (the Store's page of that app says so, limitation
+    `theme`).
+  - **Checked on VM 127 (2026-11-11):** a local test page that prints `matchMedia('(prefers-color-scheme: dark)')
+    .matches` and logs its `change` events showed `true` when the app started in dark mode and `false` when it started
+    in light; switching Dark Mode in Control Center flipped it at once, with one `change` each way, and its same-origin
+    frame followed; a reload after a switch started with the new mode; the CSS `@media` rule on the same page stayed
+    light (the limit above); a `SetColorScheme` sent with `busctl` from an ssh shell was refused ("not lord-server")
+    and a word other than `light` or `dark` got `InvalidArgs`. The messaging app's sign-in page (QR code) stays light
+    in dark mode; whether its "System default" theme follows after signing in was not tested (it needs a phone).
+    After the review fixes: the app launched in dark with the mode switched to light right away got `SetColorScheme
+    ("dark")` from lord-server one millisecond after its name appeared (seen with `dbus-monitor`), then `"light"`, and
+    showed light; a later switch to dark flipped the page live with one `change`, the frame following.
+  - **Tests:** `tests/webapp_test.c` (the two words, the environment's value, the script's and the hook's text, bad
+    keys refused), `tests/webscheme_test.mjs` (the script against a stand-in `matchMedia`: plain, negated, combined
+    and listed queries, `media`, listeners and `onchange`, no event when the answer stays, frames, an engine that
+    already answers dark, `once` and `signal` listeners let go) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent
+    until the theme tells the mode, `dark` and `light` after it, absent again for any other value).
 - **User agent** (`webpage_user_agent`): `Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
   Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own (frozen) AppleWebKit and Safari tokens, and
   LordOS's version. WebKit's site-specific quirks are off on the app's own pages and on for any other site in the
@@ -407,7 +517,7 @@ silently.
     (`fw_app_canon`, `desktop:lordos-web-<app>`) to change, so it stays per app;
   - a crash of `lord-web` itself (a fatal signal, or a C++ exception nobody caught in WebKit's UI process, which ends in
     `abort`) writes `lord-web: crashed, stack:` and the stack (`backtrace_symbols_fd`, addresses for `addr2line`) to
-    `~/.cache/lordos/web.log` before the signal's default. lord-server waits for an ended `lord-web` from its main loop
+    `web/<app>-<profile>.log` of the user's log folder (docs/SYSTEM.md, "Log files") before the signal's default. lord-server waits for an ended `lord-web` from its main loop
     (`webmgr_reap`), so none is left a zombie;
   - Landlock's scoping (no abstract unix socket and no signal outside its own processes) and `no_new_privs`, again
     refusing to start inside a session when they fail. **Not Landlock's file rules:** a process under them can't mount,
@@ -555,4 +665,6 @@ Notification sound and, when LordOS's sound plays, which one.
 - Web push while the app is closed: WPE has no push service outside Apple's platforms, so the tray keeps the app
   running instead.
 - DRM video and music (Widevine): not available for WPE on Linux, so services that need it can't play.
+- Dark mode through CSS alone: pages that choose their colors only with `@media (prefers-color-scheme)` rules stay
+  light (WPE 2.48 has no API for the scheme; "Light and dark" above). Scripts that ask `matchMedia` follow the desktop.
 - WhatsApp Web's calls: they depend on WPE's WebRTC and on the service. Still to check.

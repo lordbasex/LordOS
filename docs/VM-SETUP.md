@@ -675,6 +675,7 @@ sudo usermod -aG lpadmin lord        # manage printers (LordOS administrators ha
 | `printer-driver-cups-pdf` | 3.0.2 | tests only: the virtual «PDF» printer (it leaves jobs in `~/PDF/`) |
 | `cups-ipp-utils` | 2.4.10 | tests only: `ippeveprinter`, an IPP Everywhere printer "on the network" |
 | `samba`, `nfs-kernel-server` | 0.8.7 | VM 125, for an hour on 2026-10-31: the test servers of Files → Network, inside a network namespace, with every unit masked so nothing listened on the LAN; purged afterwards (`FILES.md`, "Network") |
+| `samba` (`--no-install-recommends`) | 4.22.11 | VM 127, for about ten minutes on 2026-11-11 (GitHub #101): `smbd` run by hand on `127.0.0.1:4445` only, with its own `smb.conf`, passdb and folders in `/tmp`, every unit masked before installing; `build/lan-list` signed in with `server signing` set to default, disabled and mandatory, directly and through a loopback proxy that leaves the final session setup answer unsigned as a server that doesn't require signing does. Purged with its dependencies and the units unmasked afterwards |
 | `avahi-daemon`, `avahi-utils` | 0.8 | CUPS announces and finds printers; in the tests, announcing the scanner (`avahi-publish`). LordOS's mDNS doesn't need it |
 | `libarchive-tools`, `zstd` | 3.7.4, 1.5.7 | tests only: building `.7z` and `.tar.zst` in `tests/doc_evil.sh` |
 | `strace` | — | only for debugging the helper |
@@ -1351,7 +1352,7 @@ The installed tree was saved first in `/var/backups/lordos-classic-bak` and put 
   switched theme, mode or language. Screenshots with `screendump` from the Proxmox host, the pointer
   with `lord-qmp-input.py 119 1280 800`, keys with `qm monitor 119` `sendkey`, holding
   `flock /tmp/sistema-119-screen.lock`. Window drags for the frame times with a QMP script in the
-  host's `/tmp` (deleted afterwards); lord-server's own `drag:` lines in `~/.cache/lordos/session.log`.
+  host's `/tmp` (deleted afterwards); lord-server's own `drag:` lines in `/var/log/lordos/users/$USER/compositor.log`.
 - **Test notifications** with `notify-send` (they live in the session's memory only).
 - **Undone at the end:** `/usr/lib/lordos` put back from the backup (the files the deploy added
   removed, the rest copied back; `diff -r` against the backup empty, then the backup deleted),
@@ -1875,6 +1876,12 @@ fingerprint compared with the one Settings shows. Test apps, from Debian (tests 
 ```sh
 sudo apt-get install -y chromium gtk-4-examples foot mpv xterm python3-gi gir1.2-gtk-4.0 wl-clipboard
 sudo apt-get install -y gdb        # 2026-11-11: backtraces of lord-web (the pasteboard crash, docs/WEBAPPS.md "Editing")
+sudo apt-get install -y logrotate  # 2026-11-11: /etc/logrotate.d/lordos (docs/SYSTEM.md "Log files"); a Recommends since 0.8.8.8,
+                                   # missing from this install because the ISO predates it
+sudo apt-get install -y --no-install-recommends picard   # 2026-11-11: a Qt 5 app for GitHub #96 (QT_QPA_PLATFORM's
+                                   # xcb fallback, docs/WAYLAND.md "How to open an app")
+sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through pkexec, for GitHub #107 (the X cookie,
+                                   # docs/WAYLAND.md "How it starts"); x11-utils (xdpyinfo) came with the ISO
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The

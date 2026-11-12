@@ -8,14 +8,14 @@ import { useStore } from './store.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t } from './i18n.js';
-import { formatBytes, systemInfo } from './system.js';
+import { formatBytes, memUsedKB, systemInfo } from './system.js';
 import { wm } from './windows.js';
 import { Overlay } from './layers.js';
 import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { cleaner } from './cleaner.js';
 import { cleanerPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
-import { cleanerItemShown } from './menubarmodel.js';
+import { cleanerItemShown, cleanerPanelAction } from './menubarmodel.js';
 import { isAppOff } from './appsoff.js';
 
 
@@ -32,7 +32,7 @@ const call = (fn, d) => { try { return fn(); } catch (e) { return d; } };
 function read(prev) {
   const st = cleaner.status();
   const si = call(() => systemInfo(), null);
-  const mem = si && si.memTotalKB ? { total: si.memTotalKB * 1024, available: (si.memAvailableKB) * 1024 } : null;
+  const mem = si && si.memTotalKB ? { total: si.memTotalKB * 1024, used: memUsedKB(si) * 1024 } : null;
   const [t1, i1] = call(() => lord.system.cpuTimes(), [0, 0]);
   const net = call(() => lord.monitor.netTotals(), null);
   const fan = call(() => (lord.fan ? lord.fan.status() : null), null);
@@ -57,32 +57,31 @@ function Panel({ p, onClose }) {
     const id = setInterval(() => setD((o) => read(o)), 2000);
     return () => clearInterval(id);
   }, []);
-  const c = settings.get().cleaner || {};
+  const act = cleanerPanelAction(settings.get());      // the one way into Cleaner (issue #116)
   const open = (section) => { onClose(); wm.open('cleaner', { args: { section } }); };
   const word = statusWord(d.st.free, d.st.total, waiting);
   const host = call(() => systemInfo().hostname, '') || '';
   const rate = (v) => (v == null ? '…' : `${formatBytes(v)}/s`);
-  const memAvail = d.mem ? (d.mem.available != null ? d.mem.available : d.mem.free) : null;
   const memTotal = d.mem ? d.mem.total : 0;
+  // both cards read "used of total", as the bars below them and the Control Center and Monitor do (GitHub #118)
+  const diskUsed = d.st.total > 0 ? Math.max(0, d.st.total - d.st.free) : 0;
   return h(View, { style: { width: 384, padding: 16, gap: 10, borderRadius: 20, backgroundColor: p.panel, border: `1px solid ${p.line}`, boxShadow: '0 24px 60px rgba(8,4,30,0.5)' } },
     h(View, null,
       h(Text, { style: { fontSize: 17, fontWeight: 600, color: p.text, textAlign: 'start' } }, host),
       word ? h(Text, { style: { fontSize: 12, color: word === 'good' ? p.good : p.warn, textAlign: 'start' } }, t(`cleaner.panel.word.${word}`)) : null),
     h(View, { style: { flexDirection: 'row', gap: 10 } },
-      h(Card, { p, name: t('cleaner.panel.disk'), value: t('cleaner.disk.free', { size: formatBytes(d.st.free) }), pct: d.st.total > 0 ? 1 - d.st.free / d.st.total : null }),
-      memTotal ? h(Card, { p, name: t('cleaner.panel.memory'), value: t('cleaner.panel.memoryValue', { size: formatBytes(memAvail) }), pct: 1 - memAvail / memTotal }) : null),
+      h(Card, { p, name: t('cleaner.panel.disk'), value: d.st.total > 0 ? t('cleaner.panel.usedOf', { used: formatBytes(diskUsed), total: formatBytes(d.st.total) }) : t('cleaner.disk.free', { size: formatBytes(d.st.free) }),
+        pct: d.st.total > 0 ? diskUsed / d.st.total : null }),
+      memTotal ? h(Card, { p, name: t('cleaner.panel.memory'), value: t('cleaner.panel.usedOf', { used: formatBytes(d.mem.used), total: formatBytes(memTotal) }), pct: d.mem.used / memTotal }) : null),
     h(View, { style: { flexDirection: 'row', gap: 10 } },
       h(Card, { p, name: t('cleaner.panel.cpu'), value: `${d.cpu == null ? '…' : `${Math.round(d.cpu * 100)} %`}${d.temp != null ? ` · ${Math.round(d.temp)} °C` : ''}`, pct: d.cpu }),
       h(Card, { p, name: t('cleaner.panel.network'), value: `↑ ${rate(d.up)}  ↓ ${rate(d.down)}` })),
     d.disks ? h(Text, { style: { fontSize: 12, color: p.sub, textAlign: 'start' } }, t('cleaner.panel.devices', { count: d.disks })) : null,
     h(View, { style: { padding: 12, gap: 12, flexDirection: 'row', alignItems: 'center', borderRadius: 14, backgroundColor: p.glass, border: `1px solid ${p.line}` } },
       h(View, { style: { flex: 1 } }, h(Text, { style: { fontSize: 12, color: p.sub, textAlign: 'start' } },
-        c.lastScan && c.lastScan.allocated > 0 ? t('cleaner.panel.lastScan', { size: formatBytes(c.lastScan.allocated) }) : t('cleaner.panel.noScan'))),
-      h(View, { onClick: () => open('cleanup'), style: { height: 36, paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center', background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` } },
-        h(Text, { style: { fontSize: 13, fontWeight: 600, color: p.btnText } }, t('cleaner.panel.freeUp')))),
-    h(View, { style: { flexDirection: 'row', justifyContent: 'space-between' } },
-      h(Text, { onClick: () => open('scan'), style: { fontSize: 13, color: p.sub } }, t('cleaner.panel.open')),
-      h(Text, { onClick: () => open('settings'), style: { fontSize: 13, color: p.sub } }, t('cleaner.panel.prefs'))));
+        act.size ? t(act.note, { size: formatBytes(act.size) }) : t(act.note))),
+      h(View, { onClick: () => open(act.section), style: { height: 36, paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center', background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` } },
+        h(Text, { style: { fontSize: 13, fontWeight: 600, color: p.btnText } }, t(act.label)))));
 }
 
 function CleanerItem({ height }) {

@@ -4,7 +4,7 @@
 // A click on a tile's name (and the line under it) opens its page in Settings, as the Wi-Fi tile always did: Dark
 // Mode, Transparency and Accent open Appearance, Sound opens Sound and Wallpaper opens Wallpaper (issue #58).
 import {
-  View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, formatBytes, wm, session, addListener, t as tr,
+  View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, memUsedKB, formatBytes, wm, session, addListener, t as tr,
   useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
   panelLeft, inBar,
 } from '@lordos/sdk';
@@ -157,7 +157,7 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
   const cpu = useCpuUsage(1500);
   const info = useSystemInfo(3000);
   const ref = useRef(null);
-  const used = (info.memTotalKB - info.memAvailableKB) / info.memTotalKB;
+  const used = info.memTotalKB > 0 ? memUsedKB(info) / info.memTotalKB : 0;
   // a click on this display's bar is its items' own (the button toggles the panel); anywhere else closes it, another
   // display's bar too (its button then opens the panel there)
   useEffect(() => addListener('pointerdown', (e) => {
@@ -211,7 +211,7 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
       </Tile>
       {p.ccSystem ? <Tile t={t} style={{ gap: 12 }}>
         <Meter t={t} label="CPU" value={cpu} detail={tr('shell.cc.cpuDetail', { pct: Math.round(cpu * 100), count: info.cores })} />
-        <Meter t={t} label={tr('shell.cc.memory')} value={used} detail={tr('shell.cc.memDetail', { used: formatBytes((info.memTotalKB - info.memAvailableKB) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
+        <Meter t={t} label={tr('shell.cc.memory')} value={used} detail={tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
       </Tile> : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>

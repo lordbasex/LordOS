@@ -52,6 +52,7 @@ static struct {
     int auto_pref;                      /* displays.json "autoRotate": -1 unset (by the chassis), 0, 1 */
     int orient;                         /* the accelerometer's rotation added to the built-in panel's */
     AccelFilter af;
+    int lid;                            /* logind's LidClosed (hw/lid.c): the built-in panel may leave the plan */
 } D = { .kelvin = NIGHT_K_MAX, .auto_pref = -1 };
 
 static void apply_tint_all(void);
@@ -239,13 +240,29 @@ static int connected_count(const KmsOutput *o, int n) {
     return c;
 }
 
+static int is_builtin(const KmsOutput *k) {
+    return k->type == DRM_MODE_CONNECTOR_eDP || k->type == DRM_MODE_CONNECTOR_LVDS || k->type == DRM_MODE_CONNECTOR_DSI;
+}
+
+/* The lid is closed and another display is connected: the built-in panel stays dark (issue #97). With
+ * only the panel connected it is kept: the only display is never turned off. */
+static int lid_hides(const KmsOutput *o, int n, int i) {
+    if (!D.lid || !is_builtin(&o[i])) return 0;
+    for (int j = 0; j < n && j < KMS_MAX_OUTPUTS; j++)
+        if (o[j].connected && o[j].nmodes && !is_builtin(&o[j])) return 1;
+    return 0;
+}
+
+/* Does outs[i] go into the plan? */
+static int usable(const KmsOutput *o, int n, int i) { return o[i].connected && o[i].nmodes && !lid_hides(o, n, i); }
+
 int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
     memset(p, 0, sizeof *p);
     const Conf *c = &D.live;
     int idx[OUT_MAX], m = 0, main_i = -1;
     char ids[KMS_MAX_OUTPUTS][ID_MAX], names[KMS_MAX_OUTPUTS][64];
     for (int i = 0; i < n && i < KMS_MAX_OUTPUTS; i++) {
-        if (!o[i].connected || !o[i].nmodes) continue;
+        if (!usable(o, n, i)) continue;
         unique_identity(o, i, ids[i], ID_MAX, names[i], sizeof names[i]);
         if (main_i < 0 && c->main_id[0] && !strcmp(ids[i], c->main_id)) main_i = i;
     }
@@ -255,13 +272,13 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
     for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && main_i < 0 && want && want[0]; i++) {
         char conn[32];
         snprintf(conn, sizeof conn, "%s-%u", kms_connector_type_name(o[i].type), o[i].type_id);
-        if (o[i].connected && o[i].nmodes && !strcmp(conn, want)) main_i = i;
+        if (usable(o, n, i) && !strcmp(conn, want)) main_i = i;
     }
-    for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && main_i < 0; i++) if (o[i].connected && o[i].nmodes) main_i = i;
+    for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && main_i < 0; i++) if (usable(o, n, i)) main_i = i;
     if (main_i < 0) return 0;
     idx[m++] = main_i;                                      /* the main display first */
     for (int i = 0; i < n && i < KMS_MAX_OUTPUTS && m < OUT_MAX; i++)
-        if (i != main_i && o[i].connected && o[i].nmodes) idx[m++] = i;
+        if (i != main_i && usable(o, n, i)) idx[m++] = i;
     ORect r[OUT_MAX];
     int placed[OUT_MAX];
     for (int j = 0; j < m; j++) {
@@ -277,7 +294,7 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         if (mi < 0) mi = 0;
         d->mode = k->modes[mi];
         d->rot = f ? f->rot & 3 : 0;
-        d->builtin = k->type == DRM_MODE_CONNECTOR_eDP || k->type == DRM_MODE_CONNECTOR_LVDS || k->type == DRM_MODE_CONNECTOR_DSI;
+        d->builtin = is_builtin(k);
         if (d->builtin && D.orient && display_auto_rotate()) {
             d->auto_rot = D.orient;
             d->rot = (d->rot + D.orient) & 3;
@@ -370,6 +387,17 @@ static void auto_resync(void) {
     if (!D.dirty) D.undo = D.live;
     D.dirty = 1;
 }
+
+void display_set_lid(int closed) {
+    closed = closed != 0;
+    if (closed == D.lid) return;
+    D.lid = closed;
+    fprintf(stderr, "displays: the lid is %s\n", closed ? "closed" : "open");
+    auto_resync();                      /* main.c drops the built-in panel or brings it back */
+    notify_list();
+}
+
+int display_lid_closed(void) { return D.lid; }
 
 void display_set_auto_rotate(int on) {
     on = on != 0;
@@ -492,7 +520,7 @@ static const DisplayOut *plan_out(uint32_t conn, int *index) {
     return NULL;
 }
 
-static void out_json(HBuf *b, const KmsOutput *all, int i) {
+static void out_json(HBuf *b, const KmsOutput *all, int n, int i) {
     const KmsOutput *o = &all[i];
     char id[ID_MAX], name[64], conn[48];
     unique_identity(all, i, id, sizeof id, name, sizeof name);
@@ -507,10 +535,11 @@ static void out_json(HBuf *b, const KmsOutput *all, int i) {
     hb_str(b, id);
     hb_printf(b, ",\"name\":");
     hb_str(b, name);
-    hb_printf(b, ",\"builtin\":%s,\"connected\":%s,\"current\":%s,\"main\":%s,\"active\":%s,\"mmWidth\":%u,\"mmHeight\":%u,\"diagonal\":%d,\"vendor\":",
-              o->type == DRM_MODE_CONNECTOR_eDP || o->type == DRM_MODE_CONNECTOR_LVDS || o->type == DRM_MODE_CONNECTOR_DSI ? "true" : "false",
+    /* lidClosed: off because the lid is closed (and another display is on), not for want of a CRTC */
+    hb_printf(b, ",\"builtin\":%s,\"connected\":%s,\"current\":%s,\"main\":%s,\"active\":%s,\"lidClosed\":%s,\"mmWidth\":%u,\"mmHeight\":%u,\"diagonal\":%d,\"vendor\":",
+              is_builtin(o) ? "true" : "false",
               o->connected ? "true" : "false", pi == D.cur.main ? "true" : "false", pi == D.cur.main ? "true" : "false", d ? "true" : "false",
-              o->mm_w, o->mm_h, has_edid ? edid_diagonal_tenths(&e) : 0);
+              !d && o->connected && lid_hides(all, n, i) ? "true" : "false", o->mm_w, o->mm_h, has_edid ? edid_diagonal_tenths(&e) : 0);
     hb_str(b, has_edid ? e.vendor : "");
     int pref = mode_preferred(o->modes, o->nmodes);
     hb_printf(b, ",\"preferred\":{\"w\":%d,\"h\":%d}", pref >= 0 ? o->modes[pref].hdisplay : 0, pref >= 0 ? o->modes[pref].vdisplay : 0);
@@ -554,7 +583,7 @@ char *display_list_json(void) {
             if (!outs[i].connected) continue;
             if (!first) hb_printf(&b, ",");
             first = 0;
-            out_json(&b, outs, i);
+            out_json(&b, outs, n, i);
         }
         kms_outputs_free(outs, n);
     }

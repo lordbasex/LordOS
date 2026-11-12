@@ -29,8 +29,9 @@ lordos-issue
 It only reads and sends nothing. It saves `~/lordos-issue-<date>.txt` with the LordOS version, the hardware (PCI and
 USB devices, CPU, memory, disks, displays, input devices, network, sound and drivers), an integrity check (LordOS's
 signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware
-messages, the session's log, the last lines Linux apps printed (`~/.cache/lordos/apps.log`) and Xwayland's log
-(`~/.cache/lordos/xwayland.log`, without its keymap warnings), and this boot's errors. Addresses, your user and computer names and home paths are
+messages, the session's and the shell's logs and the previous session's, the last lines the five most recent apps
+printed (`apps/<app>.log`) and Xwayland's log (`xwayland.log`, without its keymap warnings), all from
+`/var/log/lordos/users/<you>`, and this boot's errors. Addresses, your user and computer names and home paths are
 replaced; serial numbers, Wi-Fi names and paired devices are left out. It asks for your password to read the kernel
 log and every package file; without it (or with `--no-root`) the report is shorter. `--print` also shows it.
 **Read the file before posting it**, since issues are public, and paste it in the issue form's **Logs** box
@@ -48,8 +49,9 @@ log and every package file; without it (or with `--no-root`) the report is short
 
 ## A Linux app doesn't open
 
-LordOS starts the app from its `.desktop` file and writes everything the app prints to `~/.cache/lordos/apps.log`; an
-X11 app also starts Xwayland, whose log is `~/.cache/lordos/xwayland.log`. When an app closes right after it starts,
+LordOS starts the app from its `.desktop` file and writes everything the app prints to its own log,
+`/var/log/lordos/users/<you>/apps/<app>.log` (Logs → Apps); an X11 app also starts Xwayland, whose log is
+`xwayland.log` there (before 0.8.8.8 both were in `~/.cache/lordos`). When an app closes right after it starts,
 its reason is there. To see it live, run the app's command from Terminal (the `Exec=` line of its `.desktop` file, for
 example `wordcraft`). Since 0.8.8.7 `lordos-issue` includes the last lines of both logs ([#95](https://github.com/lordbasex/LordOS/issues/95)).
 

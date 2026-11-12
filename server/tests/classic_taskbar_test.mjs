@@ -2,7 +2,7 @@
 // tests/classic_taskbar_scene.mjs with esbuild (as the theme is built) together with the whole theme
 // (themes/classic/index.jsx, its startShell caught by a shim so the scene renders the shell itself) over a stub
 // `lord` whose screen has three monitors, runs it, and reads its checks. Needs node and the repository's
-// node_modules (esbuild, react, react-reconciler).
+// node_modules (esbuild, react, react-reconciler). Also (#111) a bar with more pins than it holds.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
@@ -67,7 +67,8 @@ try {
     + 'export function startShell(element) { globalThis.__shellElement = element; }\n');
   const appsStub = path.join(dir, 'apps-stub.js');
   writeFileSync(appsStub, 'const Icon = () => null, Component = () => null;\nexport const apps = '
-    + "['files', 'terminal', 'store', 'settings', 'calculator'].map((id) => ({ id, name: id, version: '1.0.0', system: true, Icon, Component }));\n");
+    + "['files', 'terminal', 'store', 'settings', 'calculator', ...Array.from({ length: 60 }, (_, i) => `extra${i}`)]"
+    + ".map((id) => ({ id, name: id, version: '1.0.0', system: true, Icon, Component }));\n");
   const scene = 'classic_taskbar_scene.mjs';
   const out = await esbuild.build({
     entryPoints: [path.join(here, scene)], bundle: true, write: false, format: 'esm',

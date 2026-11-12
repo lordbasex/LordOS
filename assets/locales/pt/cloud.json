@@ -431,5 +431,12 @@
   "known.copied": "Registro copiado, sem nada pessoal: cole-o na issue do rclone",
   "known.noLog": "Ainda não há registro para copiar",
   "files.signin": "{name} precisa que você entre de novo",
-  "files.signinOpen": "Entrar…"
+  "files.signinOpen": "Entrar…",
+  "details.title": "Detalhes",
+  "details.provider": "Provedor",
+  "details.backend": "Tipo",
+  "details.signIn": "Início de sessão",
+  "details.server": "Servidor",
+  "details.app": "App",
+  "details.ownApp": "Seu próprio app"
 }

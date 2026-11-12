@@ -6,7 +6,7 @@
 // sdk/menubarmodel.js); everything is on until the user turns it off. Title bars: the side of the window buttons in
 // both themes (sdk/windowbuttons.js, issue #58).
 import {
-  View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, dock, themes,
+  View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dock, themes,
   spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp, menuBarEveryDisplay, WINDOW_BUTTON_SIDES, windowButtonsPref,
 } from '@lordos/sdk';
 import { useState } from 'react';
@@ -178,14 +178,14 @@ export function DockSettings() {
       </Section>
       <Section>
         <SettingRow label={tr('settings.dock.size')}>
-          <SizeSlider value={p.dockSize} min={36} max={80} onChange={(dockSize) => set({ dockSize })} />
+          <SizeSlider value={p.dockSize} min={DOCK_SIZE_MIN} max={DOCK_SIZE_MAX} onChange={(dockSize) => set({ dockSize })} />
         </SettingRow>
         <SettingRow label={tr('settings.dock.magnify')} hint={tr('settings.dock.magnifyHint')}>
           <Toggle small on={p.dockMagnify} onChange={(dockMagnify) => set({ dockMagnify })} />
         </SettingRow>
         {p.dockMagnify && (
           <SettingRow label={tr('settings.dock.magnifySize')}>
-            <SizeSlider value={p.dockMagnifySize} min={p.dockSize} max={128} onChange={(dockMagnifySize) => set({ dockMagnifySize })} />
+            <SizeSlider value={p.dockMagnifySize} min={p.dockSize} max={DOCK_MAGNIFY_MAX} onChange={(dockMagnifySize) => set({ dockMagnifySize })} />
           </SettingRow>
         )}
       </Section>

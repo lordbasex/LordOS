@@ -44,6 +44,7 @@
     "other": "and {count} more"
   },
   "err.invalid": "not an archive, or it is damaged",
+  "err.missing-volume": "a part of the split archive is missing: “{name}”",
   "err.disk-full": "the disk is full",
   "err.too-big": "it is too large",
   "err.too-many": "it has too many files",

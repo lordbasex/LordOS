@@ -581,6 +581,27 @@ function ReadySheet({ st, sheet }) {
   );
 }
 
+// An account's Details (GitHub #115): provider, rclone's backend type, how it signs in and its server; never a secret
+// (sdk/cloudmodel.js accountDetails says why the user or email isn't there)
+function Details({ a }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const rows = M.accountDetails(a, providerCache.get());
+  return (
+    <View aria-label={tr('cloud.details.title')} style={box(t)}>
+      <BoxRow t={t}>
+        <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.details.title')}</Text>
+      </BoxRow>
+      {rows.map((r, i) => (
+        <BoxRow key={r.label} t={t} last={i === rows.length - 1} pad={8}>
+          <Text style={{ fontSize: typeScale.body, color: t.textDim, textAlign: 'start' }}>{tr(r.label)}</Text>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.key ? tr(r.key) : r.value}</Text>
+        </BoxRow>
+      ))}
+    </View>
+  );
+}
+
 function Options({ a, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -865,7 +886,8 @@ function KnownIssue({ a }) {
   if (!k || a.state !== 'signin') return null;
   const copyLog = () => {
     let text = '';
-    try { text = lord.fs.read(`${lord.fs.home()}/.cache/lordos/${lord.cloud && lord.cloud.logName ? lord.cloud.logName() : 'cloud.log'}`, 'text') || ''; } catch (e) { text = ''; }
+    // rclone's log is in the user's log folder (/var/log/lordos/users/<user>, or ~/.cache/lordos): read through lord.logs
+    try { text = lord.logs.tail(lord.cloud && lord.cloud.logName ? lord.cloud.logName() : 'cloud.log', 262144) || ''; } catch (e) { text = ''; }
     if (!text) { toast.set(tr('cloud.known.noLog')); return; }
     let info = {};
     try { info = systemInfo() || {}; } catch (e) { /* none */ }
@@ -918,6 +940,7 @@ function AccountPage({ a, st }) {
           <OnSwitch a={a} />
         </View>
         <OffCard a={a} />
+        <Details a={a} />
         <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 4 }]}>
           <Text style={{ fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{M.providerName(a, providerCache.get())}</Text>
           <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
@@ -957,6 +980,7 @@ function AccountPage({ a, st }) {
         <Dim t={t}>{last ? tr('cloud.lastSynced', { when: (() => { const g = M.ago(last.at); return tr(g.key, g.vars); })() }) : tr('cloud.notSyncedYet')}</Dim>
         <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
       </View>
+      <Details a={a} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Button label={tr('cloud.signInAgain')} style={{ flex: 1 }} onClick={() => signInAgain(a)} />
         <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ flex: 1, height: 28, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>

@@ -17,6 +17,7 @@
 #include "js_wm.h"
 #include "grab.h"
 #include "portal.h"
+#include "webask.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -125,6 +126,7 @@ static JSValue f_portal_set(JSContext *c, JSValueConst t, int argc, JSValueConst
     int has_name = get_word(c, argv[0], "accentName", name, sizeof name, "abcdefghijklmnopqrstuvwxyz");
     int has_buttons = get_word(c, argv[0], "buttons", buttons, sizeof buttons, "abcdefghijklmnopqrstuvwxyz,:");
     portal_set(dark, rgb, has_name ? name : NULL, has_buttons ? buttons : NULL);
+    webask_scheme(dark);                    /* web apps' prefers-color-scheme (web/webscheme.h) */
     return JS_TRUE;
 }
 

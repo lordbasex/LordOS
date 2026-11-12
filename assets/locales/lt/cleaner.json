@@ -303,7 +303,7 @@
   "panel.word.update": "Laukia LordOS atnaujinimas",
   "panel.disk": "Diskas",
   "panel.memory": "Atmintis",
-  "panel.memoryValue": "Prieinama {size}",
+  "panel.usedOf": "Naudojama {used} iš {total}",
   "panel.cpu": "Procesorius",
   "panel.network": "Tinklas",
   "panel.devices": {
@@ -315,7 +315,6 @@
   "panel.noScan": "Dar nenuskaityta",
   "panel.freeUp": "Atlaisvinti",
   "panel.open": "Atidaryti „Valymas“",
-  "panel.prefs": "Nustatymai",
   "prefs.menuItem": "Rodyti šalia laikrodžio",
   "prefs.on": "Įjungta",
   "prefs.off": "Išjungta",

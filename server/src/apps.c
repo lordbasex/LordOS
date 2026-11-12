@@ -18,7 +18,8 @@
  *   - JS cannot create .desktop files: lord.fs is read-only and LordOS app packages are installed
  *     in another folder (~/.local/share/lordos/apps), so a command cannot be
  *     invented from the UI.
- * App output goes to ~/.cache/lordos/apps.log (trimmed when it exceeds 1 MB).
+ * App output goes to apps/<id>.log in the user's log folder (lordlog.h: /var/log/lordos/users/<user>,
+ * or ~/.cache/lordos), after a stamped "started" line; capped there and rotated by logrotate.
  *
  * An app the owner restricted with "no access to your files" (Settings → Privacy, firewall id
  * desktop:<id>, sec/restrict.h) starts under Landlock (sandbox_apply_files): only its own config,
@@ -29,6 +30,7 @@
  * the window of the copy already running that the new process hands the link or file to (a browser),
  * comes to the front, because the person asked for it. */
 #include "apps.h"
+#include "lordlog.h"
 #include "iconfind.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
@@ -37,6 +39,7 @@
 #include "sec/restrict.h"
 #include "sec/sandbox.h"
 #include "fw/rules.h"
+#include "wl/xauth.h"
 #include "wl/xdgact.h"
 #include "term/termapp.h"
 
@@ -143,14 +146,28 @@ static void set_tr(Entry *e, int slot, char *dst, size_t n, const char *val, con
     snprintf(dst, n, "%s", val);
 }
 
+/* MimeType into its field; a list longer than the field keeps only its whole types, so a cut type
+ * ("video/mp" of "video/mp4") never stands for another. */
+static void set_mime(char *dst, size_t n, const char *v) {
+    size_t len = strlen(v);
+    if (len < n) { memcpy(dst, v, len + 1); return; }
+    len = n - 1;
+    while (len && v[len] != ';') len--;
+    memcpy(dst, v, len);
+    dst[len] = 0;
+}
+
 static int parse_desktop(const char *file, const char *lang, Entry *e) {
     FILE *f = fopen(file, "r");
     if (!f) return -1;
     memset(e, 0, sizeof *e);
-    char line[2048];
+    /* a whole line however long: a fixed buffer would cut VLC's MimeType (2.4 KB) and read the rest
+     * as a line of its own (GitHub #123) */
+    char *line = NULL;
+    size_t cap = 0;
     int in_main = 0;
     Action *act = NULL;                 /* inside a [Desktop Action …] group that is kept */
-    while (fgets(line, sizeof line, f)) {
+    while (getline(&line, &cap, f) >= 0) {
         line[strcspn(line, "\r\n")] = 0;
         if (line[0] == '[') {
             static const char pre[] = "[Desktop Action ";
@@ -195,7 +212,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         else if (!strcmp(k, "Icon")) snprintf(e->icon_name, sizeof e->icon_name, "%s", v);
         else if (!strcmp(k, "Path")) snprintf(e->path, sizeof e->path, "%s", v);
         else if (!strcmp(k, "Categories")) snprintf(e->a.categories, sizeof e->a.categories, "%s", v);
-        else if (!strcmp(k, "MimeType")) snprintf(e->a.mime, sizeof e->a.mime, "%s", v);
+        else if (!strcmp(k, "MimeType")) set_mime(e->a.mime, sizeof e->a.mime, v);
         else if (!strcmp(k, "StartupWMClass")) snprintf(e->a.wmclass, sizeof e->a.wmclass, "%s", v);
         else if (!strcmp(k, "OnlyShowIn")) snprintf(e->only, sizeof e->only, "%s", v);
         else if (!strcmp(k, "NotShowIn")) snprintf(e->not_, sizeof e->not_, "%s", v);
@@ -204,6 +221,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         else if (!strcmp(k, "Terminal")) e->terminal = !strcmp(v, "true");
         else if (!strcmp(k, "Actions")) snprintf(e->actions, sizeof e->actions, "%s", v);
     }
+    free(line);
     fclose(f);
     unescape(e->a.name); unescape(e->a.name_c); unescape(e->a.generic); unescape(e->a.comment);
     for (int i = 0; i < e->nact; i++) unescape(e->act[i].label);
@@ -456,20 +474,15 @@ static int terminal_program_ok(const Entry *e, int user) {
     return ok;
 }
 
-static void open_log(void) {
-    const char *home = getenv("HOME");
+/* The app's own log, apps/<id>.log, opened (and its "started" line written) here, before fork: the
+ * child only dup2s it. -1 if there is none. */
+static int open_log(const char *id, const char *action, const char *file) {
     char path[PATH_MAX];
-    if (!home) return;
-    snprintf(path, sizeof path, "%s/.cache", home);
-    mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos", home);
-    mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos/apps.log", home);
-    struct stat st;
-    int flags = O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW;
-    if (!lstat(path, &st) && st.st_size > 1024 * 1024) flags |= O_TRUNC;
-    int fd = open(path, flags, 0600);
-    if (fd >= 0) { dup2(fd, 1); dup2(fd, 2); if (fd > 2) close(fd); }
+    if (lordlog_path("apps", id, path, sizeof path)) return -1;
+    int fd = lordlog_open(path);
+    lordlog_write(fd, "INFO", "apps", "starting %s%s%s%s", id, action ? " (action " : "", action ? action : "", action ? ")" : "");
+    (void)file;                                  /* never the file's name: it may say what the person opened */
+    return fd;
 }
 
 /* ---- "no access to your files": the Landlock plan (built before fork) ---- */
@@ -1016,6 +1029,7 @@ static int launch(const char *id, const char *file, const char *action) {
     char token[XACT_TOKEN_LEN + 1] = "";
     const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
     if (tk) snprintf(token, sizeof token, "%s", tk);
+    int logfd = open_log(id, action, file);
     pid_t pid = fork();
     if (pid == 0) {
         /* orphaned grandchild: it does not remain a child of lord-server */
@@ -1027,7 +1041,7 @@ static int launch(const char *id, const char *file, const char *action) {
         for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
-        open_log();
+        if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         syscall(SYS_close_range, 3, ~0u, 0);
         const char *home = getenv("HOME");
         if (!cwd[0] || chdir(cwd)) { if (home && chdir(home)) {} }
@@ -1042,8 +1056,8 @@ static int launch(const char *id, const char *file, const char *action) {
         /* its own view (namespaces: no session sockets, only its folders), then Landlock */
         /* a restricted app gets no X display: X11 apps share one X server and can watch each
          * other's windows, input and selections (docs/PRIVACY.md, "X11 apps"); its private /tmp has no
-         * X socket either */
-        if (plan) unsetenv("DISPLAY");
+         * X socket either, nor its own runtime folder the X cookie (wl/xauth.h) */
+        if (plan) xauth_env_drop();
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         if (plan && (sandbox_files_isolate(&plan->cfg) ||
                      (plan->cfg.keep_home ? sandbox_apply_scope() : sandbox_apply_files(&plan->cfg)))) {
@@ -1054,6 +1068,7 @@ static int launch(const char *id, const char *file, const char *action) {
         execve(prog, argv, environ);
         _exit(127);
     }
+    if (logfd >= 0) close(logfd);
     free(plan);
     free(buf);
     if (pid < 0) return -1;

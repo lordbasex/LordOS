@@ -24,7 +24,9 @@
  * item, or "" when the menu closed. A new menu from the same lord-web closes the one before ("webapps-menu-gone").
  *
  * The other way, lord-server to lord-web: org.lordos.WebApp1.Edit(s command) on its bus name, from the shell's Edit
- * menu (webask_edit); lord-web runs it only when the caller is the lord-server that started it. */
+ * menu (webask_edit); lord-web runs it only when the caller is the lord-server that started it. And
+ * org.lordos.WebApp1.SetColorScheme(s scheme), "light" or "dark" only (web/webscheme.h), when the desktop's mode
+ * changes (webask_scheme), with the same check. */
 #ifndef LORD_UI_WEBASK_H
 #define LORD_UI_WEBASK_H
 
@@ -52,6 +54,13 @@ int  webask_menu_answer(int id, const char *item);
 /* The Edit menu: org.lordos.WebApp1.Edit(command) to that app and profile's lord-web, no reply wanted; command is
  * one of webedit.h's names. 0 sent, -1 no bus, a bad id or an unknown command. */
 int  webask_edit(const char *app, const char *profile, const char *command);
+/* The desktop's mode, from the theme (lord.portal.set): kept for the next lord-web's environment and, when it
+ * changed, told to every running one (SetColorScheme, no reply wanted). */
+void webask_scheme(int dark);
+/* A well-known name got an owner (NameOwnerChanged): when it is the bus name of a running lord-web and the mode is
+ * known, that lord-web gets SetColorScheme with it. A mode change between its start (the environment) and the
+ * moment it took its name would otherwise be lost: the call before went to a name nobody owned. */
+void webask_appeared(const char *name);
 /* The counts shown now, as a JSON array [{ app, profile, count }] (malloc'd), for a new JS context. */
 char *webask_badges(void);
 /* The questions waiting for the person, as a JSON array (malloc'd), for a new JS context. */

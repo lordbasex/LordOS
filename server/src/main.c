@@ -17,6 +17,7 @@
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
 #include "admin.h"
+#include "lordlog.h"
 #include "keylag.h"
 #include "bench/lbinput.h"
 #include "net/net.h"
@@ -2449,16 +2450,13 @@ int main(int argc, char **argv) {
      * session's helper brings it up (see net_act_restore and docs/NETWORK.md) */
     else if (session_user) admin_send("net-restore", "", 0);
     int ok = drop_privileges(user) == 0;
+    /* the log folder (lordlog.h): /var/log/lordos/users/<user>, which lord-sessiond made at login, or
+     * ~/.cache/lordos; worked out once, here, before anything forks a child that opens a log */
+    if (ok) lordlog_dir();
     if (ok && s.headless && getenv("HOME")) {
-        /* no terminal: the session log goes to the home folder */
-        char log[1024];
-        snprintf(log, sizeof log, "%s/.cache", getenv("HOME"));
-        mkdir(log, 0700);
-        snprintf(log, sizeof log, "%s/.cache/lordos", getenv("HOME"));
-        mkdir(log, 0700);
-        snprintf(log, sizeof log, "%s/.cache/lordos/%s", getenv("HOME"), s.greeter ? "greeter.log" : "session.log");
-        if (!freopen(log, "w", stderr)) { /* carries on without a log */ }
-        setvbuf(stderr, NULL, _IOLBF, 0);
+        /* no terminal: stderr is stamped into compositor.log and shell.log there, the previous
+         * session's kept as .prev (a small lord-log child; it outlives a crash, so nothing written is lost) */
+        if (lordlog_session_start()) fprintf(stderr, "lord-server: no session log\n");
     }
     /* the CPU path's pixel loops on a pool (par.h): blur, blits, gradients, the remote desktop's
      * comparison and copies; same pixels as one thread. Its threads sleep between jobs, and jobs only

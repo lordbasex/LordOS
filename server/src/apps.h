@@ -10,7 +10,7 @@ typedef struct {
     char name[160], generic[160], comment[320], keywords[320], categories[256];
     char name_c[160];                   /* the untranslated Name ("Chromium" next to "Navegador web Chromium") */
     char wmclass[160];                  /* StartupWMClass: to recognize its Wayland window */
-    char mime[1024];                    /* MimeType: file types it opens ("text/plain;…") */
+    char mime[8192];                    /* MimeType: file types it opens ("text/plain;…"; VLC's is 2.4 KB) */
     char icon[PATH_MAX];                /* PNG found, or "" */
     char file[PATH_MAX];                /* the .desktop file */
     char bin[128];                      /* program name from Exec (for the Monitor: process → app) */

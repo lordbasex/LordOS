@@ -1,20 +1,24 @@
 /* webapp_test.c — lord-web's pure parts (src/web, docs/WEBAPPS.md) without WebKit: the addresses (weburl.c: what is
  * an app address, origins, the scope prefix), argv and the probe's request line (webargs.c), the probe's
  * answer and the icon check (webmanifest.c), the download names (webdl.c), the wheel and touchpad (webaxis.c), the
- * title's unread count, the user agent and the notification sound (webpage.c), the files of a drop (webdrop.c) and
+ * title's unread count, the user agent and the notification sound (webpage.c), the files of a drop (webdrop.c), what a
+ * paste takes from the session's clipboard (webclip.c: the text type, its charset, the file list) and
  * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
- * pass each other (webedit.c). The rest of the registry file (webreg.c,
+ * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
+ * page (webscheme.c). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
 #include "../src/web/webargs.h"
 #include "../src/web/webaxis.h"
+#include "../src/web/webclip.h"
 #include "../src/web/webdrop.h"
 #include "../src/web/webedit.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
 #include "../src/web/webmanifest.h"
 #include "../src/web/webreg.h"
+#include "../src/web/webscheme.h"
 #include "../src/web/weburl.h"
 
 #include <fcntl.h>
@@ -573,6 +577,88 @@ static void test_drop(void) {
     rmdir(dir);
 }
 
+/* a paste: which text type, its bytes as UTF-8 (the "Imágenes" pasted as "ImÃ¡genes" case), the file lists */
+static void test_clip(void) {
+    CHECK(webclip_text_rank("text/plain;charset=utf-8") > webclip_text_rank("UTF8_STRING") &&
+          webclip_text_rank("UTF8_STRING") > webclip_text_rank("text/plain") && webclip_text_rank("text/plain") > webclip_text_rank("STRING") &&
+          webclip_text_rank("STRING") > 0, "text type order");
+    CHECK(!webclip_text_rank("TEXT") && !webclip_text_rank("COMPOUND_TEXT") && !webclip_text_rank("text/html") && !webclip_text_rank(NULL) &&
+          !webclip_text_rank("text/uri-list"), "never read as text");
+
+    static const char utf8[] = "/home/u/Im\xc3\xa1genes/hacker.jpg", latin1[] = "/home/u/Im\xe1genes/hacker.jpg";
+    static const char mojibake[] = "/home/u/Im\xc3\x83\xc2\xa1genes/hacker.jpg";     /* UTF-8 read as Latin-1, once more as UTF-8 */
+    size_t n = 0;
+    char *t = webclip_text_utf8("text/plain;charset=utf-8", utf8, strlen(utf8), &n);
+    CHECK(t && n == strlen(utf8) && !strcmp(t, utf8), "UTF-8 as it is");
+    free(t);
+    t = webclip_text_utf8("UTF8_STRING", utf8, strlen(utf8), &n);
+    CHECK(t && !strcmp(t, utf8), "UTF8_STRING as it is");
+    free(t);
+    t = webclip_text_utf8("text/plain", utf8, strlen(utf8), &n);
+    CHECK(t && !strcmp(t, utf8) && strcmp(t, mojibake), "text/plain that is UTF-8: not converted again");
+    free(t);
+    t = webclip_text_utf8("text/plain", latin1, strlen(latin1), &n);
+    CHECK(t && !strcmp(t, utf8) && n == strlen(utf8), "text/plain that isn't UTF-8: from Latin-1");
+    free(t);
+    t = webclip_text_utf8("STRING", latin1, strlen(latin1), &n);
+    CHECK(t && !strcmp(t, utf8), "STRING: from Latin-1");
+    free(t);
+    t = webclip_text_utf8("STRING", utf8, strlen(utf8), &n);
+    CHECK(t && !strcmp(t, mojibake), "STRING is Latin-1 even when its bytes look like UTF-8");
+    free(t);
+    CHECK(!webclip_text_utf8("text/plain;charset=utf-8", latin1, strlen(latin1), &n) && !webclip_text_utf8("UTF8_STRING", latin1, strlen(latin1), &n),
+          "a UTF-8 type that isn't UTF-8 refused");
+    CHECK(!webclip_text_utf8("TEXT", "abc", 3, &n) && !webclip_text_utf8("text/html", "abc", 3, &n), "other types refused");
+    t = webclip_text_utf8("text/plain", "", 0, &n);
+    CHECK(t && n == 0 && !t[0], "empty");
+    free(t);
+    t = webclip_text_utf8("STRING", "\xff\x80", 2, &n);
+    CHECK(t && n == 4 && !memcmp(t, "\xc3\xbf\xc2\x80", 4), "Latin-1 high bytes");
+    free(t);
+
+    CHECK(webclip_utf8_valid("", 0) && webclip_utf8_valid("a\xe2\x82\xac\xf0\x9f\x98\x80", 8), "valid UTF-8 (euro, emoji)");
+    static const char *const bad[] = { "\xc0\xaf", "\xe0\x80\xaf", "\xed\xa0\x80", "\xf4\x90\x80\x80", "\xc3", "\xe2\x82", "\x80", "\xfe" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(!webclip_utf8_valid(bad[i], strlen(bad[i])), "invalid UTF-8 %zu", i);
+
+    /* WebKit's own paste garbles anything past ASCII: lord-web pastes it */
+    CHECK(webclip_webkit_reads("/home/u/a.txt", 13) && !webclip_webkit_reads(utf8, strlen(utf8)) && webclip_webkit_reads(NULL, 0), "WebKit reads ASCII only");
+
+    CHECK(webclip_list_rank(WEBCLIP_URIS) == 2 && webclip_list_rank(WEBCLIP_GNOME) == 1 && !webclip_list_rank("text/plain") &&
+          !webclip_list_rank("application/x-kde-cutselection") && !webclip_list_rank(NULL), "file list types");
+    static const char gnome[] = "copy\nfile:///home/u/a.png\nfile:///home/u/b.png", gcut[] = "cut\r\nfile:///home/u/a.png";
+    CHECK(webclip_list_body(WEBCLIP_GNOME, gnome, strlen(gnome)) == 5, "gnome: after copy");
+    CHECK(webclip_list_body(WEBCLIP_GNOME, gcut, strlen(gcut)) == 5, "gnome: after cut, CRLF");
+    CHECK(webclip_list_body(WEBCLIP_GNOME, "copy", 4) == 4, "gnome: only the action");
+    CHECK(webclip_list_body(WEBCLIP_GNOME, "file:///a", 9) == 0, "gnome without an action line");
+    CHECK(webclip_list_body(WEBCLIP_URIS, gnome, strlen(gnome)) == 0, "a uri-list starts at once");
+    static const char uris[] = "# from Files\r\nfile:///home/u/Im%C3%A1genes/hacker.jpg\r\n\r\nfile:///home/u/b.txt";
+    CHECK(webclip_list_count(uris, strlen(uris)) == 2 && webclip_list_count(gnome + 5, strlen(gnome) - 5) == 2 && webclip_list_count(NULL, 0) == 0,
+          "URI lines counted");
+
+    /* the files of a pasted list go through the drop's checks: a Files copy of a file whose folder isn't ASCII */
+    char dir[] = "/tmp/webclip-test.XXXXXX";
+    if (!mkdtemp(dir)) { CHECK(0, "mkdtemp"); return; }
+    char sub[64], f1[96], hid[64];
+    snprintf(sub, sizeof sub, "%s/Im\xc3\xa1genes", dir);
+    snprintf(f1, sizeof f1, "%s/hacker.jpg", sub);
+    snprintf(hid, sizeof hid, "%s/.secret", dir);
+    mkdir(sub, 0755);
+    put_file(f1, 6753);
+    put_file(hid, 3);
+    char list[512];
+    snprintf(list, sizeof list, "copy\nfile://%s/Im%%C3%%A1genes/hacker.jpg\nfile://%s\nfile://%s/Im%%C3%%A1genes\n", dir, hid, dir);
+    size_t at = webclip_list_body(WEBCLIP_GNOME, list, strlen(list));
+    WebDropFile f[WEBDROP_FILES_MAX];
+    int k = webdrop_files(list + at, strlen(list) - at, "/home/u", f, WEBDROP_FILES_MAX);
+    CHECK(k == 1 && !strcmp(f[0].name, "hacker.jpg") && f[0].size == 6753, "a pasted list: the file, not the hidden one nor the folder: %d", k);
+    CHECK(webclip_list_count(list + at, strlen(list) - at) == 3, "three on the list");
+    webdrop_close(f, k);
+    unlink(f1);
+    unlink(hid);
+    rmdir(sub);
+    rmdir(dir);
+}
+
 static void test_registry_options(void) {
     static const char base[] =
         "{ \"schema\": 1, \"id\": \"chat\", \"name\": \"Chat\", \"startUrl\": \"https://web.chat.example/\", \"scope\": \"https://web.chat.example/\","
@@ -645,7 +731,41 @@ static void test_edit(void) {
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
 
+static void test_scheme(void) {
+    CHECK(webscheme_parse("light") == WEBSCHEME_LIGHT && webscheme_parse("dark") == WEBSCHEME_DARK, "scheme: the two words");
+    static const char *const bad[] = { "", "Dark", "DARK", "dark ", " dark", "dark\n", "prefer-dark", "default", "1", "true", "no-preference", "darkk", "lig" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(webscheme_parse(bad[i]) < 0, "scheme refuses '%s'", bad[i]);
+    CHECK(webscheme_parse(NULL) < 0, "scheme: NULL");
+    CHECK(!strcmp(webscheme_name(WEBSCHEME_LIGHT), "light") && !strcmp(webscheme_name(WEBSCHEME_DARK), "dark") && !webscheme_name(2) && !webscheme_name(-1),
+          "scheme names");
+    for (int k = 0; k < 2; k++) CHECK(webscheme_parse(webscheme_name(k)) == k, "scheme round trip %d", k);
+    CHECK(webscheme_from_env("dark") == WEBSCHEME_DARK && webscheme_from_env("light") == WEBSCHEME_LIGHT, "env");
+    CHECK(webscheme_from_env(NULL) == WEBSCHEME_LIGHT && webscheme_from_env("Dark") == WEBSCHEME_LIGHT && webscheme_from_env("") == WEBSCHEME_LIGHT,
+          "env: anything else is light");
+
+    const char *key = "0123456789abcdef0123456789abcdef";
+    char *s = webscheme_script("(function (k, d) {})", key, WEBSCHEME_DARK);
+    CHECK(s && !strcmp(s, "(function (k, d) {})(\"__lordosScheme0123456789abcdef0123456789abcdef\", true);\n"), "script dark: %s", s ? s : "NULL");
+    free(s);
+    s = webscheme_script("(function (k, d) {})", key, WEBSCHEME_LIGHT);
+    CHECK(s && strstr(s, "\", false);\n"), "script light");
+    free(s);
+    s = webscheme_call(key, WEBSCHEME_DARK);
+    CHECK(s && !strcmp(s, "(function () { var f = window.__lordosScheme0123456789abcdef0123456789abcdef; if (typeof f === 'function') f(true); })();"),
+          "call dark: %s", s ? s : "NULL");
+    free(s);
+    s = webscheme_call(key, WEBSCHEME_LIGHT);
+    CHECK(s && strstr(s, "f(false);"), "call light");
+    free(s);
+    static const char *const badkey[] = { "", "0123456789abcdef0123456789abcde", "0123456789abcdef0123456789abcdef0", "0123456789ABCDEF0123456789abcdef",
+                                          "0123456789abcdef0123456789abcde\"", "0123456789abcdef'); alert(1); ('ab", "0123456789abcdef 123456789abcdef" };
+    for (size_t i = 0; i < sizeof badkey / sizeof badkey[0]; i++)
+        CHECK(!webscheme_script("x", badkey[i], WEBSCHEME_DARK) && !webscheme_call(badkey[i], WEBSCHEME_DARK), "bad key %zu refused", i);
+    CHECK(!webscheme_script(NULL, key, 0) && !webscheme_script("x", NULL, 0) && !webscheme_script("x", key, 2) && !webscheme_call(key, -1), "script: nothing");
+}
+
 int main(void) {
+    test_scheme();
     test_edit();
     test_axis();
     test_badge();
@@ -654,6 +774,7 @@ int main(void) {
     test_user_agent();
     test_sound();
     test_drop();
+    test_clip();
     test_registry_options();
     test_url();
     test_perm_context();

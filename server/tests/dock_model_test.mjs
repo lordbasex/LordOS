@@ -1,5 +1,5 @@
 // dock_model_test.mjs — the Dock's pinned-list model (sdk/dockmodel.js): typed ids, migration of
-// untyped lists, move/pin/unpin edge cases, hidden (uninstalled) items, quick actions and hiding (#46).
+// untyped lists, move/pin/unpin edge cases, hidden (uninstalled) items, quick actions, hiding (#46) and icon sizes (#128).
 //
 //   node tests/dock_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
 import path from 'node:path';
@@ -174,6 +174,25 @@ eq('cover: no rect', dockCovered([win({ y: 500 })], 1, null), false);
 eq('cover: empty rect', dockCovered([win({ y: 500 })], 1, { x0: 5, x1: 5, y0: 0, y1: 10 }), false);
 eq('cover: zero-size window', dockCovered([win({ y: 1010, w: 0 })], 1, R), false);
 eq('cover: junk entries', dockCovered([null, 3, win({ y: 500 })], 1, R), true);
+
+// ---- icon sizes (issue #128: the minimum went from 36 to 20 px) ----
+const { dockSizes, dockBadgeMetrics, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX } = M;
+eq('size: limits', [DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX], [20, 80, 128]);
+eq('size: defaults', dockSizes(undefined, undefined), { dockSize: 54, dockMagnifySize: 86 });
+eq('size: the new minimum', dockSizes(20, 40), { dockSize: 20, dockMagnifySize: 40 });
+eq('size: 24 kept (was raised to 36)', dockSizes(24, 86).dockSize, 24);
+eq('size: below the minimum', dockSizes(8, 86).dockSize, 20);
+eq('size: above the maximum', dockSizes(200, 300), { dockSize: 80, dockMagnifySize: 128 });
+eq('size: rounded', dockSizes(30.6, 50.2), { dockSize: 31, dockMagnifySize: 50 });
+eq('size: junk', dockSizes('x', null), { dockSize: 54, dockMagnifySize: 86 });
+eq('size: string number', dockSizes('28', '60'), { dockSize: 28, dockMagnifySize: 60 });
+eq('size: magnified never smaller than the icon', dockSizes(40, 22), { dockSize: 40, dockMagnifySize: 40 });
+eq('size: old minimum still valid', dockSizes(36, 86), { dockSize: 36, dockMagnifySize: 86 });
+eq('badge: usual size', dockBadgeMetrics(54), { height: 18, font: 11, pad: 5 });
+eq('badge: magnified', dockBadgeMetrics(128).height, 18);
+eq('badge: smallest Dock', dockBadgeMetrics(20), { height: 12, font: 9, pad: 3 });
+eq('badge: 32 px', dockBadgeMetrics(32), { height: 14, font: 10, pad: 3 });
+eq('badge: never more than 60 % of the icon at the minimum', dockBadgeMetrics(20).height <= 20 * 0.6, true);
 
 console.log(bad ? `dock-model: ${bad} of ${n} failed` : `dock-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

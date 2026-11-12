@@ -118,6 +118,10 @@ panel is open, every two seconds: disk, memory, processor load, temperature if `
 connected disks. It makes no monitoring claim, has no memory "free up" and no speed test. Its one recommendation is the last
 scan's real size. Turn it off in Cleaner → Settings.
 
+The panel has one way into the app, the button beside the last scan (`cleanerPanelAction` in `sdk/menubarmodel.js`,
+GitHub #116): **Free up** opens the cleanup when the last scan found something, and **Open Cleaner** opens the scan when
+there is no scan yet. Cleaner's settings are reached from inside the app.
+
 **The status word** (`statusWord` in `sdk/cleanerstatus.jsx`) has one written rule:
 
 - under 10 % of the home disk free: low on space;

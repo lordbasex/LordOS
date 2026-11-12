@@ -10,6 +10,7 @@
 #include "../sec/cgroup.h"
 #include "rsec.h"
 #include "../par.h"
+#include "../lordlog.h"
 
 #include <crypt.h>
 #include <ctype.h>
@@ -396,9 +397,12 @@ int sd_session_get(const struct passwd *pw, int w, int h) {
             snprintf(p, sizeof p, "%s/.config/locale.conf", pw->pw_dir);
             read_lang(p, lang, sizeof lang);
             sd_log("new session for %s (%dx%d)", pw->pw_name, w, h);
+            /* its log folder, /var/log/lordos/users/<user> (lordlog.h); without it, ~/.cache/lordos */
+            if (lordlog_prepare_user(pw->pw_name, pw->pw_uid, pw->pw_gid))
+                sd_log("no " LORDLOG_ROOT "/users/%s (%s): the session logs to ~/.cache/lordos", pw->pw_name, strerror(errno));
             spawn(pw, rt, lang, w, h, 0);
             fd = wait_socket(NULL, pw->pw_uid, 0);
-            if (fd < 0) sd_log("%s's session did not start (see ~/.cache/lordos/session.log)", pw->pw_name);
+            if (fd < 0) sd_log("%s's session did not start (see " LORDLOG_ROOT "/users/%s/compositor.log)", pw->pw_name, pw->pw_name);
         }
     }
     if (lk >= 0) close(lk);
@@ -422,9 +426,10 @@ int sd_greeter_get(int w, int h) {
     }
     char lang[64] = "LANG=en_US.UTF-8";
     read_lang("/etc/default/locale", lang, sizeof lang);
+    if (lordlog_prepare_user(pw->pw_name, uid, gid)) sd_log("no " LORDLOG_ROOT "/users/%s (%s)", pw->pw_name, strerror(errno));
     spawn(pw, SD_GREETER_RUN, lang, w, h, 1);
     fd = wait_socket(sock, 0, 1);
-    if (fd < 0) sd_log("the login screen did not start (see /var/lib/%s/.cache/lordos/greeter.log)", SD_GREETER_USER);
+    if (fd < 0) sd_log("the login screen did not start (see " LORDLOG_ROOT "/users/%s/compositor.log)", SD_GREETER_USER);
     return fd;
 }
 

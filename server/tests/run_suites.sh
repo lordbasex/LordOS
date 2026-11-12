@@ -174,6 +174,7 @@ EOF
     run "net-test errors" build/net-test errors
     run "net-test ifwatch" build/net-test ifwatch
     run "net-test wake" build/net-test wake
+    run "net-test wifi-saved" build/net-test wifi-saved
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "portal-check-test" build/portal-check-test
@@ -195,10 +196,15 @@ EOF
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
+    if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi
     if have node; then run "editor-scrollbar-test (apps/editor/scrollbar.js)" node tests/editor_scrollbar_test.mjs; fi
+    if have node; then run "editor-recent-test (apps/editor/recent.js, File → Open Recent, #113)" node tests/editor_recent_test.mjs; fi
+    if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
+    if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
+    if have node; then run "archive-vol-test (sdk/archivevol.js)" node tests/archive_vol_test.mjs; fi
     if have node; then run "bt-audio-model-test (sdk/btaudiomodel.js)" node tests/bt_audio_model_test.mjs; fi
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
@@ -251,6 +257,8 @@ EOF
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
+    # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
+    if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi
     if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
     else skip "share-model-test" "node"; fi
     if have node; then run "gtk-defaults-test (assets/gtk, #52)" node tests/gtk_defaults_test.mjs; fi
@@ -263,6 +271,9 @@ EOF
     # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
     if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs
     else skip "webapps-model-test" "node"; fi
+    # (0.8.8.8) web apps follow the desktop's light or dark mode: the matchMedia script lord-web adds (src/web/webscheme.js)
+    if have node; then run "webscheme-test (src/web/webscheme.js)" node tests/webscheme_test.mjs
+    else skip "webscheme-test" "node"; fi
     # (0.8.8.8) Settings → Notifications → Sound: Default, None or one of LordOS's sounds (sdk/notifytones.js)
     if have node; then run "notify-tones-test (sdk/notifytones.js)" node tests/notify_tones_test.mjs
     else skip "notify-tones-test" "node"; fi
@@ -334,6 +345,12 @@ EOF
     # what a paste in Files copies: its own cut or copy, or the files a Linux app copied (apps/files/clipfiles.js)
     if have node; then run "files-clipfiles-test (apps/files/clipfiles.js)" node tests/files_clipfiles_test.mjs
     else skip "files-clipfiles-test" "node"; fi
+    # a paste of many items: the copies past lord-server's job slots wait their turn (apps/files/jobqueue.js, GitHub #104)
+    if have node; then run "files-jobqueue-test (apps/files/jobqueue.js)" node tests/files_jobqueue_test.mjs
+    else skip "files-jobqueue-test" "node"; fi
+    # the column view: what is picked in a deeper column is selected (apps/files/colview.js, GitHub #100)
+    if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
+    else skip "files-colview-test" "node"; fi
     # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
     if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
     else skip "menu-nav-test" "node"; fi
@@ -416,6 +433,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs
+    else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
@@ -452,10 +473,16 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menubar-test (themes/default ControlCenter, NotificationCenter, MenuBars on every display, sdk/soundoutputs.js)" node tests/menubar_test.mjs
     else skip "menubar-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8, #99) Files' column view: a tagged item shows its tag dots after the name, as the list view does
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
+    else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6) Lord Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
     else skip "classic-taskbar-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
+    if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
     if have node && [ -d ../node_modules/esbuild ]; then
         run "terminal-keymap-test (apps/terminal, sdk/settings.js)" node tests/terminal_keymap_test.mjs

@@ -19,6 +19,7 @@
   "cmd.nextTab": "Kita kortelė",
   "cmd.open": "Atidaryti…",
   "cmd.openFolder": "Atidaryti aplanką…",
+  "cmd.openRecent": "Atidaryti naujausius",
   "cmd.outdent": "Mažinti įtrauką",
   "cmd.paste": "Įklijuoti",
   "cmd.prevTab": "Ankstesnė kortelė",
@@ -80,5 +81,8 @@
   "find.next": "Kitas atitikmuo",
   "find.close": "Uždaryti paiešką",
   "find.regex": "Reguliarioji išraiška",
-  "find.case": "Skirti didžiąsias ir mažąsias raides"
+  "find.case": "Skirti didžiąsias ir mažąsias raides",
+  "recent.none": "Naujausių failų nėra",
+  "recent.clear": "Išvalyti meniu",
+  "recent.gone": "{name} nebėra; pašalintas iš naujausių"
 }

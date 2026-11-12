@@ -18,14 +18,20 @@
  * Input goes to libwpe's events: the keyboard with the compositor's keymap and its key repeat, the pointer, the wheel
  * (webaxis.c: lines for a mouse wheel, pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
  * session's text is mirrored into WebKit's pasteboard whenever the selection changes while the window has the
- * keyboard, and the page's copies are offered to the session. WebKit's pasteboard holds text only: an image on the
- * session's clipboard (image/png or image/jpeg, at most CLIP_IMAGE_MAX) is read when the person pastes (Ctrl+V,
- * Shift+Insert) and handed to the page by webxfer.c, and an image the page copies (webxfer.c) is offered from here.
+ * keyboard, and the page's copies are offered to the session. WebKit's pasteboard holds text only, and reads back as
+ * Latin-1 what it holds as UTF-8 (webclip.h), so when the person pastes (Ctrl+V, Shift+Insert, the Edit menu, the
+ * context menu) lord-web looks first: a file list on the session's clipboard (text/uri-list, gnome-copied-files; Files'
+ * copies) is read then (at most WEBDROP_LIST_MAX) and its local files, checked like a drop's (webdrop.c), go to the page
+ * as a paste of Files (webxfer.c), its text when none passes; an image (image/png or image/jpeg, at most CLIP_IMAGE_MAX)
+ * with no text goes as a File; a text that isn't ASCII is pasted by webxfer.c (WebKit would garble it); anything
+ * else is WebKit's own paste. An image the page copies (webxfer.c) is offered from here.
  * The same data device takes drops: a drag that offers text/uri-list (Files) or text is accepted as a copy, its list
- * read at the drop (at most WEBDROP_LIST_MAX) and the local files on it (webdrop.c) given to webxfer.c.
+ * read at the drop (at most WEBDROP_LIST_MAX) and the local files on it (webdrop.c) given to webxfer.c; while it moves
+ * over the window the page gets dragenter, dragover and dragleave (webxfer_drag).
  * text-input-v3 is WebKit's input method context. */
 #include "webwin.h"
 #include "webaxis.h"
+#include "webclip.h"
 
 #include "xdg-shell-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
@@ -42,6 +48,7 @@
 #include <fcntl.h>
 #include <glib-unix.h>
 #include <linux/input-event-codes.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,6 +166,7 @@ struct WebWin {
     struct wl_data_offer *sel_offer;
     char *sel_mime;                     /* the best text type the session's selection offers */
     const char *sel_img;                /* its image type (image/png before image/jpeg), or NULL */
+    const char *sel_list;               /* its file list type (WEBCLIP_URIS before WEBCLIP_GNOME), or NULL */
     struct wl_data_source *source;      /* our own selection */
     char *own_text, *own_html;
     GBytes *own_img;                    /* or an image the page copied */
@@ -167,6 +175,7 @@ struct WebWin {
     struct wl_data_offer *drag_offer;   /* a drag over the window */
     const char *drag_mime;              /* what it gives us: text/uri-list, or a text type; NULL when nothing */
     double drag_x, drag_y;
+    int drag_page;                      /* the page was told of this drag (dragenter): it is told when it leaves */
     char *known;                        /* the pasteboard's text as last mirrored or offered */
     guint pb_timer;
 
@@ -738,13 +747,33 @@ static void new_source(WebWin *win) {
     wl_display_flush(win->dpy);
 }
 
-/* the page copied something: offer it to the session */
-static void offer_own(WebWin *win, char *text) {
-    if (!win->ddm || !win->dd || !win->input_serial) { g_free(text); return; }
+void web_note(const char *fmt, ...) {
+    static gint64 window_us;
+    static int lines;
+    gint64 now = g_get_monotonic_time();
+    if (now - window_us > 10 * G_USEC_PER_SEC) { window_us = now; lines = 0; }
+    if (++lines > 20) return;                       /* at most 20 lines in 10 seconds */
+    va_list ap;
+    va_start(ap, fmt);
+    fputs("lord-web: ", stderr);
+    vfprintf(stderr, fmt, ap);
+    fputc('\n', stderr);
+    va_end(ap);
+}
+
+/* the page copied something: offer it to the session (its HTML too, may be NULL) */
+static void offer_own(WebWin *win, char *text, char *html, const char *how) {
+    if (!win->ddm || !win->dd || !win->input_serial) {
+        web_note("page copy refused (%zu bytes, %s): %s", text ? strlen(text) : 0, how, !win->input_serial ? "no key or click in the window yet" : "no data device");
+        g_free(text);
+        g_free(html);
+        return;
+    }
     clear_own(win);
     win->own_text = text;
-    win->own_html = pb_read(PB_HTML);
+    win->own_html = html;
     new_source(win);
+    web_note("page copy offered (%zu bytes%s, %s)", strlen(text), html ? " and HTML" : "", how);
 }
 
 void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
@@ -756,7 +785,7 @@ void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
         pb_write_text(text, strlen(text));
         g_free(win->known);
         win->known = g_strdup(text);
-        offer_own(win, text);
+        offer_own(win, text, NULL, "clipboard API");
         return;
     }
     if (!win->ddm || !win->dd || !win->input_serial || !n) { g_bytes_unref(data); return; }
@@ -764,6 +793,17 @@ void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
     win->own_img = data;
     win->own_img_mime = g_strdup(mime);
     new_source(win);
+    web_note("page copy offered (%zu bytes, %s)", (size_t)n, mime);
+}
+
+void webwin_offer_text(WebWin *win, char *text, char *html) {
+    if (!text) { g_free(html); return; }
+    /* WebKit's pasteboard gets the text too: a paste back into the page pastes what was copied, and the timer that
+     * watches the pasteboard doesn't offer the older text again */
+    pb_write_text(text, strlen(text));
+    g_free(win->known);
+    win->known = g_strdup(text);
+    offer_own(win, text, html, "copy event");
 }
 
 /* an editing command ran (the Edit menu, the context menu): WebKit writes its pasteboard a moment later, from the web
@@ -813,7 +853,7 @@ static gboolean pb_watch(gpointer d) {
     if (t && (!win->known || strcmp(t, win->known))) {
         g_free(win->known);
         win->known = g_strdup(t);
-        offer_own(win, t);
+        offer_own(win, t, pb_read(PB_HTML), "editing command");
     } else g_free(t);
     return G_SOURCE_CONTINUE;
 }
@@ -858,10 +898,15 @@ static void read_offer(WebWin *win, struct wl_data_offer *o, const char *mime, s
 
 static void sel_text_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
     (void)d;
-    if (!b || !b->len || o != win->sel_offer || !g_utf8_validate((const char *)b->data, (gssize)b->len, NULL)) return;
-    pb_write_text((const char *)b->data, b->len);
+    if (!b || !b->len || o != win->sel_offer || !win->sel_mime) return;
+    /* as UTF-8: a UTF-8 type only when it is valid, STRING and a text/plain that isn't UTF-8 from Latin-1 */
+    size_t n = 0;
+    char *t = webclip_text_utf8(win->sel_mime, (const char *)b->data, b->len, &n);
+    if (!t) { web_note("clipboard text refused (%u bytes, %s): not UTF-8", b->len, win->sel_mime); return; }
+    pb_write_text(t, n);
     g_free(win->known);
-    win->known = g_strndup((const char *)b->data, b->len);
+    win->known = g_strndup(t, n);
+    free(t);
 }
 
 static void mirror_selection(WebWin *win) {
@@ -874,41 +919,90 @@ static void sel_image_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, 
     if (b && b->len && o == win->sel_offer) webxfer_paste_image(win->w, mime, g_bytes_new(b->data, b->len));
 }
 
-/* the session's clipboard holds an image and no text: it goes to the page (webxfer.c). 1 when that is what happened. */
-int webwin_paste_image(WebWin *win) {
-    if (!win->sel_offer || !win->sel_img || win->sel_mime) return 0;
-    read_offer(win, win->sel_offer, win->sel_img, CLIP_IMAGE_MAX, sel_image_read, (void *)win->sel_img);
+/* the clipboard's text as WebKit's pasteboard holds it (mirrored from the session, or the page's own copy): one that
+ * isn't ASCII goes to the page from webxfer.c, since WebKit's paste would read its UTF-8 as Latin-1. Else WebKit's
+ * own paste: 0 to let the key or the command go on, or with run, the Paste command now. 1 when it was pasted. */
+static int paste_text(WebWin *win, int run) {
+    const char *t = win->known;
+    size_t n = t ? strlen(t) : 0;
+    const char *type = win->source ? "the page's own copy" : win->sel_mime ? win->sel_mime : "WebKit's pasteboard";
+    if (n && !webclip_webkit_reads(t, n) && webxfer_paste_text(win->w, t)) {
+        web_note("paste: text (%zu bytes, %s)", n, type);
+        return 1;
+    }
+    if (n) web_note("paste: text (%zu bytes, %s; WebKit's own paste)", n, type);
+    if (!run) return 0;
+    if (win->w->view) webkit_web_view_execute_editing_command(win->w->view, WEBKIT_EDITING_COMMAND_PASTE);
     return 1;
 }
 
-/* Ctrl+V or Shift+Insert while the session's clipboard holds an image and no text: the image goes to the page (the
- * key doesn't: WebKit would paste its pasteboard's text). 1 when that is what happened. */
-static int paste_image(WebWin *win, uint32_t key) {
-    if (!win->sel_offer || !win->sel_img || win->sel_mime) return 0;
+/* the session's file list, read at the person's paste: its local files (the same checks and limits as a drop's) to
+ * the page; when none passes, its text as before */
+static void paste_list_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
+    const char *mime = d;
+    if (o != win->sel_offer) { web_note("paste refused: the clipboard changed while its file list was read"); return; }
+    if (!b || !b->len) {
+        web_note("paste: the clipboard's file list %s; pasting its text", b ? "is empty" : "could not be read, or it is too big");
+        paste_text(win, 1);
+        return;
+    }
+    const char *list = (const char *)b->data;
+    size_t at = webclip_list_body(mime, list, b->len);
+    int lines = webclip_list_count(list + at, b->len - at);
+    WebDropFile files[WEBDROP_FILES_MAX];
+    int n = webdrop_files(list + at, b->len - at, g_get_home_dir(), files, WEBDROP_FILES_MAX);
+    static const char why[] = "not a local regular file in the home folder or a mount, hidden, too big, or past the 20";
+    if (n) {
+        web_note("paste: %d files from the clipboard accepted%s%s", n, n < lines ? "; others refused: " : "", n < lines ? why : "");
+        webxfer_paste_files(win->w, files, n);
+        return;
+    }
+    web_note("paste: no file from the clipboard accepted (%d on its list, %s); pasting its text", lines, why);
+    if (win->sel_mime) { paste_text(win, 1); return; }
+    /* a list and no text: the list is the text (text/plain), as a browser pastes it */
+    char *t = webclip_utf8_valid(list + at, b->len - at) ? g_strndup(list + at, b->len - at) : NULL;
+    if (t && t[0] && webxfer_paste_text(win->w, t)) web_note("paste: text (%zu bytes, %s)", strlen(t), mime);
+    g_free(t);
+}
+
+/* The person pastes (a key, the Edit menu, the context menu): the session's file list, else its image when it has no
+ * text, else its text (paste_text). Only from here: nothing is read from the clipboard for the page without the
+ * person's paste. 1 when lord-web pastes it (the key or WebKit's command must not then). */
+int webwin_paste(WebWin *win) {
+    if (win->sel_offer && win->sel_list && !win->source) {
+        read_offer(win, win->sel_offer, win->sel_list, WEBDROP_LIST_MAX, paste_list_read, (void *)win->sel_list);
+        return 1;
+    }
+    if (win->sel_offer && win->sel_img && !win->sel_mime) {
+        read_offer(win, win->sel_offer, win->sel_img, CLIP_IMAGE_MAX, sel_image_read, (void *)win->sel_img);
+        return 1;
+    }
+    return paste_text(win, 0);
+}
+
+/* Ctrl+V or Shift+Insert: webwin_paste. 1 when lord-web pasted (the key doesn't go to WebKit). */
+static int paste_key(WebWin *win, uint32_t key) {
     struct xkb_state *st = wpe_input_xkb_context_get_state(wpe_input_xkb_context_get_default());
     if (!st) return 0;
     xkb_keysym_t sym = xkb_state_key_get_one_sym(st, key + 8);
     int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
     int shift = (win->mods & wpe_input_keyboard_modifier_shift) != 0;
     if (!((ctrl && !alt && (sym == XKB_KEY_v || sym == XKB_KEY_V)) || (shift && !ctrl && !alt && sym == XKB_KEY_Insert))) return 0;
-    return webwin_paste_image(win);
+    return webwin_paste(win);
 }
 
-static int mime_rank(const char *m) {
-    if (!strcmp(m, "text/plain;charset=utf-8")) return 4;
-    if (!strcmp(m, "UTF8_STRING")) return 3;
-    if (!strcmp(m, "text/plain")) return 2;
-    return 0;
-}
-/* each offer keeps the best text type it listed, its image type and whether it has a file list; the selection or
- * enter event that follows names the offer */
-typedef struct { char *mime; int rank; const char *img; int uri; } OfferInfo;
+/* each offer keeps the best text type it listed (webclip_text_rank), its image type, whether it has a text/uri-list
+ * (a drag's files) and its best file list type (the clipboard's); the selection or enter event that follows names
+ * the offer */
+typedef struct { char *mime; int rank; const char *img; int uri; const char *list; } OfferInfo;
 
 static void offer_mime(void *d, struct wl_data_offer *o, const char *m) {
     (void)o;
     OfferInfo *in = d;
-    int r = mime_rank(m);
+    int r = webclip_text_rank(m);
     if (r > in->rank) { g_free(in->mime); in->mime = g_strdup(m); in->rank = r; }
+    int l = webclip_list_rank(m);
+    if (l > webclip_list_rank(in->list)) in->list = l == 2 ? WEBCLIP_URIS : WEBCLIP_GNOME;
     if (!strcmp(m, "image/png")) in->img = "image/png";
     else if (!strcmp(m, "image/jpeg") && !in->img) in->img = "image/jpeg";
     else if (!strcmp(m, "text/uri-list")) in->uri = 1;
@@ -939,6 +1033,10 @@ static void dd_enter(void *d, struct wl_data_device *dd, uint32_t serial, struct
     win->drag_x = wl_fixed_to_double(x);
     win->drag_y = wl_fixed_to_double(y);
     wl_data_offer_accept(o, serial, win->drag_mime);
+    if (win->drag_mime) {
+        win->drag_page = 1;
+        webxfer_drag(win->w, win->drag_x, win->drag_y, in->uri);
+    }
     if (win->ddm_ver >= 3) {
         uint32_t a = win->drag_mime ? WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY : WL_DATA_DEVICE_MANAGER_DND_ACTION_NONE;
         wl_data_offer_set_actions(o, a, a);
@@ -948,6 +1046,8 @@ static void dd_enter(void *d, struct wl_data_device *dd, uint32_t serial, struct
 static void dd_leave(void *d, struct wl_data_device *dd) {
     (void)dd;
     WebWin *win = d;
+    if (win->drag_page) webxfer_drag_leave(win->w);
+    win->drag_page = 0;
     if (win->drag_offer) offer_free(win->drag_offer);
     win->drag_offer = NULL;
     win->drag_mime = NULL;
@@ -957,25 +1057,40 @@ static void dd_motion(void *d, struct wl_data_device *dd, uint32_t t, wl_fixed_t
     WebWin *win = d;
     win->drag_x = wl_fixed_to_double(x);
     win->drag_y = wl_fixed_to_double(y);
+    if (win->drag_offer && win->drag_mime && win->drag_page) webxfer_drag(win->w, win->drag_x, win->drag_y, !strcmp(win->drag_mime, "text/uri-list"));
 }
 
-typedef struct { double x, y; int uri; } DropAt;
+typedef struct { double x, y; int uri; char *mime; } DropAt;
 
 static void drop_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, void *d) {
     DropAt *at = d;
     if (b && win->ddm_ver >= 3) wl_data_offer_finish(o);
     offer_free(o);
     wl_display_flush(win->dpy);
+    int given = 0;
     if (b && b->len) {
         WebDropFile files[WEBDROP_FILES_MAX];
+        int lines = 0;
+        for (guint i = 0; at->uri && i < b->len; i++) if (b->data[i] == '\n' || i + 1 == b->len) lines++;
         int n = at->uri ? webdrop_files((const char *)b->data, b->len, g_get_home_dir(), files, WEBDROP_FILES_MAX) : 0;
-        if (n) webxfer_drop(win->w, at->x, at->y, files, n, NULL, NULL);
-        else if (g_utf8_validate((const char *)b->data, (gssize)b->len, NULL)) {
-            char *t = g_strndup((const char *)b->data, b->len);
-            webxfer_drop(win->w, at->x, at->y, NULL, 0, at->uri ? t : NULL, t);
-            g_free(t);
+        if (at->uri) web_note("drop received (text/uri-list, %d lines, %d local files accepted%s)", lines, n,
+                              n < lines ? "; the others refused: not a regular file in the home folder or a mount, hidden, or too big" : "");
+        else web_note("drop received (text, %u bytes)", b->len);
+        if (n) { webxfer_drop(win->w, at->x, at->y, files, n, NULL, NULL); given = 1; }
+        else {
+            /* as UTF-8, like a pasted text (webclip_text_utf8); a list must be UTF-8 already */
+            char *t = at->uri ? (g_utf8_validate((const char *)b->data, (gssize)b->len, NULL) ? g_strndup((const char *)b->data, b->len) : NULL)
+                              : webclip_text_utf8(at->mime, (const char *)b->data, b->len, NULL);
+            if (t) {
+                webxfer_drop(win->w, at->x, at->y, NULL, 0, at->uri ? t : NULL, t);
+                given = 1;
+            } else web_note("drop refused: the text is not UTF-8");
+            if (at->uri) g_free(t);
+            else free(t);
         }
-    }
+    } else web_note("drop refused: %s", b ? "nothing in it" : "it could not be read, or it is too big");
+    if (!given) webxfer_drag_leave(win->w);          /* the page's drop area, if it showed one, goes away */
+    g_free(at->mime);
     g_free(at);
 }
 
@@ -986,12 +1101,14 @@ static void dd_drop(void *d, struct wl_data_device *dd) {
     const char *mime = win->drag_mime;
     win->drag_offer = NULL;                         /* the read owns it now: the leave that follows leaves it alone */
     win->drag_mime = NULL;
+    win->drag_page = 0;                             /* and the page gets the drop, not dragleave */
     if (!o) return;
-    if (!mime) { offer_free(o); return; }
+    if (!mime) { offer_free(o); web_note("drop refused: it offers neither files nor text"); return; }
     DropAt *at = g_new0(DropAt, 1);
     at->x = win->drag_x;
     at->y = win->drag_y;
     at->uri = !strcmp(mime, "text/uri-list");
+    at->mime = g_strdup(mime);
     read_offer(win, o, mime, WEBDROP_LIST_MAX, drop_read, at);
 }
 
@@ -1003,12 +1120,13 @@ static void dd_selection(void *d, struct wl_data_device *dd, struct wl_data_offe
     g_free(win->sel_mime);
     win->sel_mime = NULL;
     win->sel_img = NULL;
+    win->sel_list = NULL;
     if (!o) return;
     OfferInfo *in = wl_data_offer_get_user_data(o);
     if (in && in->mime) win->sel_mime = g_strdup(in->mime);
-    if (in) win->sel_img = in->img;
-    if (!win->sel_mime && win->sel_img && !win->source) {
-        /* an image and no text: WebKit's pasteboard must not paste the text copied before it */
+    if (in) { win->sel_img = in->img; win->sel_list = in->list; }
+    if (!win->sel_mime && !win->source) {
+        /* no text (an image, a file list only): WebKit's pasteboard must not paste the text copied before it */
         pb_write_text("", 0);
         g_free(win->known);
         win->known = NULL;
@@ -1224,7 +1342,7 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t tim
     WebWin *win = d;
     int pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
     if (pressed) { win->input_serial = serial; win->last_input_us = g_get_monotonic_time(); trace_input(win); }
-    if (pressed && (own_key(win, key) || paste_image(win, key))) return;
+    if (pressed && (own_key(win, key) || paste_key(win, key))) return;
     send_key(win, time, key, pressed);
     if (pressed) {
         repeat_stop(win);

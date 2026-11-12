@@ -75,9 +75,9 @@ sudo "$SRV/build/lock-seat" "$T/rt/lordos/remote.sock" "$T/grt/lordos/remote.soc
 RC=$?
 sleep 5     # logind's wake
 # lord-server writes its log to ~/.cache/lordos when its output is not a terminal
-cp "$T/home/.cache/lordos/session.log" "$OUT/$MODE-session.log" 2>/dev/null
-cp "$T/ghome/.cache/lordos/greeter.log" "$OUT/$MODE-greeter.log" 2>/dev/null
-grep -h -E "^sleep:|^monitor:|sysbus" "$OUT/$MODE-session.log" | sed 's/^/session: /' >> "$LOG"
+cp "$T/home/.cache/lordos/compositor.log" "$OUT/$MODE-session.log" 2>/dev/null
+cp "$T/ghome/.cache/lordos/compositor.log" "$OUT/$MODE-greeter.log" 2>/dev/null
+grep -h -E " (sleep|monitor): |sysbus" "$OUT/$MODE-session.log" | sed 's/^/session: /' >> "$LOG"
 cat "$LOG"
 for p in $PIDS; do kill "$p" 2>/dev/null; done
 sleep 1

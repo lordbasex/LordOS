@@ -19,6 +19,7 @@
   "cmd.nextTab": "Onglet suivant",
   "cmd.open": "Ouvrir…",
   "cmd.openFolder": "Ouvrir un dossier…",
+  "cmd.openRecent": "Ouvrir un fichier récent",
   "cmd.outdent": "Réduire le retrait",
   "cmd.paste": "Coller",
   "cmd.prevTab": "Onglet précédent",
@@ -78,5 +79,8 @@
   "find.next": "Résultat suivant",
   "find.close": "Fermer la recherche",
   "find.regex": "Expression régulière",
-  "find.case": "Respecter la casse"
+  "find.case": "Respecter la casse",
+  "recent.none": "Aucun fichier récent",
+  "recent.clear": "Effacer le menu",
+  "recent.gone": "{name} n’existe plus ; retiré des fichiers récents"
 }

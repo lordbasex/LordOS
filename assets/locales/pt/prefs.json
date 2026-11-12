@@ -108,6 +108,7 @@
   "display.native": "{w} × {h} (nativa)",
   "display.noBacklight": "Esta tela não permite mudar o brilho (monitores externos e máquinas virtuais).",
   "display.noCrtc": "{connector}: conectada, mas a placa de vídeo não consegue controlar outra tela",
+  "display.lidClosed": "{connector}: desligada enquanto a tampa está fechada (há outra tela conectada)",
   "display.notOnMonitor": "Esta sessão não está no monitor agora (está sendo vista pela rede), então suas telas não podem ser alteradas. A Luz noturna vale quando ela voltar.",
   "display.number": "Tela {n}",
   "display.recommended": "Recomendado",

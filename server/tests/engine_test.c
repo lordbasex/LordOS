@@ -323,6 +323,33 @@ static void test_carets(void) {
     printf("carets: Latin, Hebrew with digits, emoji sequences, lam-alef\n");
 }
 
+/* A scaled display (125 %, 175 %): the glyphs are drawn at the display's size, quantized to half a
+ * pixel, but the pen moves by the logical advances times the scale, the ones text_carets and the
+ * layout measured. Before 0.8.8.8 the pen used the quantized size's advances (13 px at 125 % drew
+ * 16.5 px advances instead of 16.25), so each character drifted right of the caret (GitHub #110). */
+static void test_scaled_caret(void) {
+    const char *s = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm I";
+    static float ks[] = { 1.25f, 1.75f };
+    static uint32_t px[1000 * 40];
+    for (int j = 0; j < 2; j++) {
+        float k = ks[j];
+        TextCarets t;
+        CHECK(!text_carets(s, 400, 13, &t), "scaled caret: carets");
+        float end = 10 + t.x1[t.n - 1] * k;           /* the right edge of the final I, on screen */
+        text_carets_free(&t);
+        Canvas c;
+        canvas_init(&c, px, 1000, 40, 1000);
+        canvas_clear(&c, 0);
+        text_paint_scale = k;
+        text_draw(&c, s, 400, 13 * k, 0, 10, 4, 980, TEXT_LEFT, 1, 0xffffffffu);
+        text_paint_scale = 1;
+        int right = -1;
+        for (int y = 0; y < 40; y++) for (int x = 0; x < 1000; x++) if ((px[y * 1000 + x] & 0xff) && x > right) right = x;
+        CHECK(right > 0 && fabsf(right + 1 - end) < 3, "scaled caret at %.2f: the I ends at %d, its caret edge at %.1f", k, right + 1, end);
+    }
+    printf("scaled caret: the pen follows the logical advances at 125 %% and 175 %%\n");
+}
+
 #endif
 
 /* ---- nodes ---- */
@@ -3389,6 +3416,7 @@ int main(int argc, char **argv) {
     test_drag_corners();
     test_ellipsis();
     test_carets();
+    test_scaled_caret();
     test_covered();
     test_borders();
     test_logical();

@@ -25,6 +25,7 @@ import { perms } from './privacy.js';
 import { screen } from '@lordos/runtime';
 
 const MAX_SHOWN = 4, HISTORY = 50;
+const BODY_LINES = 4, BODY_LINES_HOVER = 12;   // a banner's message: lines shown, and while the pointer is on it
 export const notifications = createStore([]);        // on screen, newest first
 export const notifyHistory = createStore([]);
 let seq = 1;
@@ -140,8 +141,9 @@ function Banner({ n, th }) {
         h(Text, { style: { flex: 1, fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } },
           `${app ? appName(app) : n.label}${n.more ? ` · +${n.more}` : ''}`),
         h(Text, { style: { fontSize: 11, color: th.textDim } }, formatTime(new Date(n.time)))),
-      h(Text, { style: { fontSize: 13, fontWeight: 700, color: th.text, textAlign: 'start' } }, n.title),
-      n.body ? h(Text, { style: { fontSize: 12, color: th.text, lineHeight: 1.35, textAlign: 'start' } }, n.body) : null),
+      h(Text, { style: { fontSize: 13, fontWeight: 700, color: th.text, textAlign: 'start', textOverflow: 'ellipsis', numberOfLines: 2 } }, n.title),
+      // a long message (a chat's whole paragraph) is cut to a few lines, more while the pointer is on the banner
+      n.body ? h(Text, { style: { fontSize: 12, color: th.text, lineHeight: 1.35, textAlign: 'start', textOverflow: 'ellipsis', numberOfLines: hover ? BODY_LINES_HOVER : BODY_LINES } }, n.body) : null),
     h(View, {
       onClick: (e) => { e.stopPropagation(); dismissNotification(n.id); },
       style: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? th.control : 'transparent' },

@@ -9,6 +9,8 @@
  *                 read wpebackend-fdo's own buffers)
  *   webbus.c      the session bus: notifications, the OpenURI and FileChooser portals, org.lordos.WebApps1.Ask
  *   webtray.c     the StatusNotifierItem of an app that keeps running in the background (when its "tray" is on)
+ *   webdark.c     the desktop's light or dark mode: the page's prefers-color-scheme through matchMedia (webscheme.js),
+ *                 the view's background while a page loads
  *   webselect.c   selecting text by dragging (a script in an isolated world: WPE 2.48 is built without drag support)
  *   webxfer.c     files dropped on the window and images pasted into the page (WebKit 2.48's WPE takes neither: a
  *                 script hands the page the bytes lord-web read itself), and the page's copies of an image
@@ -17,9 +19,10 @@
  *   webargs.c, webreg.c, weburl.c, webmanifest.c, webdl.c, webaxis.c, webpage.c, webdrop.c   the pure parts
  *                 (tests/webapp_test.c)
  *
- * No LordOS API reaches the page: no lord.*, no broker, no script with privileges. The one script of lord-web's the
- * page can see is the Async Clipboard API's write and writeText that WPE 2.48 lacks (webxfer.c): what it hands over
- * becomes the session's clipboard only right after the person's own key or click in the window. lord-web is a plain
+ * No LordOS API reaches the page: no lord.*, no broker, no script with privileges. The scripts of lord-web's the page
+ * can see are the Async Clipboard API's write and writeText that WPE 2.48 lacks (webxfer.c): what it hands over
+ * becomes the session's clipboard only right after the person's own key or click in the window; and matchMedia's
+ * answers about prefers-color-scheme (webdark.c), which tell lord-web nothing. lord-web is a plain
  * Wayland and D-Bus client of the session. */
 #ifndef LORD_WEB_WEB_H
 #define LORD_WEB_WEB_H
@@ -30,6 +33,7 @@
 #include "webdrop.h"
 #include "webpage.h"
 #include "webedit.h"
+#include "webscheme.h"
 
 #include <limits.h>
 #include <sys/types.h>
@@ -64,6 +68,10 @@ typedef struct {
     double note_ms;                     /* when its last notification went out with LordOS's sound, or -1 */
     pid_t server_pid;                   /* the lord-server that started this lord-web (its parent): Edit comes only from it */
     int menu_open;                      /* a context menu is waiting for the person (Menu on lord-server) */
+    int scheme;                         /* the desktop's WEBSCHEME_LIGHT or WEBSCHEME_DARK (LORDOS_WEB_SCHEME, SetColorScheme) */
+    char scheme_key[WEBSCHEME_KEY_LEN + 1]; /* webscheme.js's hook on window, random per process ("" none: no script) */
+    WebKitUserScript *scheme_script;    /* the one added for the scheme now: replaced when it changes */
+    int loading;                        /* between a load's start and its end (the dark background) */
     int quitting;
     int exit_code;
 } Web;
@@ -89,14 +97,32 @@ void web_state_save(Web *w);
 
 /* webxfer.c */
 void webxfer_init(Web *w);                               /* the clipboard script and its message handler */
+int  webxfer_in_scope(Web *w, const char *href);         /* href, the main frame's committed document and the view's address are in the app's scope, and the window isn't outside it */
 /* files dropped at (x, y) in the window's surface coordinates (n of them, their fds taken over), else the dropped text
  * (a uri-list's lines or plain text; may be NULL) */
 void webxfer_drop(Web *w, double x, double y, WebDropFile *files, int n, const char *uris, const char *text);
+/* a drag over the window at (x, y) (surface coordinates): dragenter, dragover and dragleave reach the page as the
+ * pointer moves, before any drop, so a page that shows its drop area only after dragenter has it there by the drop;
+ * files is 1 for a drag of files (its types say "Files", its data comes only with the drop) */
+void webxfer_drag(Web *w, double x, double y, int files);
+/* the drag left the window without dropping: dragleave on the element it was over */
+void webxfer_drag_leave(Web *w);
 /* an image from the session's clipboard, pasted into the focused element (data taken over) */
 void webxfer_paste_image(Web *w, const char *mime, GBytes *data);
+/* local files from the session's clipboard (n of them, their fds taken over), pasted into the focused element: a
+ * paste event whose DataTransfer holds them as Files */
+void webxfer_paste_files(Web *w, WebDropFile *files, int n);
+/* text (UTF-8) pasted into the focused element: a paste event with it as text/plain, and when no listener takes it
+ * the text inserted at the caret (WebKit's InsertText). 0 when it can't be now (another transfer runs, another site). */
+int webxfer_paste_text(Web *w, const char *text);
 /* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
  * made a PNG when it is in another format) goes to the session's clipboard */
 void webxfer_copy_image(Web *w, const char *uri);
+
+/* webdark.c */
+void webdark_init(Web *w);                               /* the script and the background, before the first load */
+void web_set_scheme(Web *w, int scheme);                 /* the desktop's mode changed (SetColorScheme) */
+void webdark_load(Web *w, WebKitLoadEvent ev);           /* the view's load-changed */
 
 /* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too) */
 void webselect_init(Web *w);
@@ -114,6 +140,8 @@ void webbus_set_badge(Web *w, unsigned count);           /* org.lordos.WebApps1.
 void webbus_choose_files(Web *w, WebKitFileChooserRequest *req);
 /* org.lordos.WebApp1.Edit(command) from sender: run only once the bus says sender is w->server_pid's */
 void webbus_edit(Web *w, const char *sender, int cmd);
+/* org.lordos.WebApp1.SetColorScheme(scheme) from sender: the same check, then web_set_scheme */
+void webbus_scheme(Web *w, const char *sender, int scheme);
 /* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
  * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */
 void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image);

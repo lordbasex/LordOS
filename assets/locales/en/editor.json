@@ -19,6 +19,7 @@
   "cmd.nextTab": "Next tab",
   "cmd.open": "Open…",
   "cmd.openFolder": "Open folder…",
+  "cmd.openRecent": "Open recent",
   "cmd.outdent": "Outdent",
   "cmd.paste": "Paste",
   "cmd.prevTab": "Previous tab",
@@ -78,5 +79,8 @@
   "find.next": "Next match",
   "find.close": "Close find",
   "find.regex": "Regular expression",
-  "find.case": "Match case"
+  "find.case": "Match case",
+  "recent.none": "No recent files",
+  "recent.clear": "Clear menu",
+  "recent.gone": "{name} is no longer there; removed from Open recent"
 }

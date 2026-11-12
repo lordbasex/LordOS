@@ -36,7 +36,7 @@ X
 grant() { sudo mkdir -p -m755 /var/lib/lordos/share; printf '%s' "$1" | sudo tee $G.t >/dev/null; sudo chown root:$(id -g) $G.t; sudo chmod 640 $G.t; sudo mv $G.t $G; }
 
 session() {
-  rm -f $H/.cache/lordos/session.log
+  rm -f $H/.cache/lordos/compositor.log $H/.cache/lordos/shell.log
   (cd $ROOT/server && exec env -i HOME=$H XDG_RUNTIME_DIR=$R PATH=$PATH LANG=en_US.UTF-8 LORD_GPU=0 LORD_TEST_OFFICIAL=$OFF LORD_TEST_APPS_ROOT=$APPS \
     $B/lord-server-pkgtest --headless 1280x800 --theme ../themes/default/theme.bundle.js --fonts ../assets/fonts --shell ../assets/shell > /dev/null 2>&1) &
   S=$!
@@ -88,8 +88,8 @@ if [ -n "$P" ]; then
   is "not root" "$(awk '/^Uid/{print $2}' /proc/$P/status)" $U
   is "one process, no children" "$(pgrep -P $P | wc -l)" 0
 else no "the companion runs"; fi
-hasnt "lord-server didn't log a refusal" 'not started' $H/.cache/lordos/session.log
-hasnt "the shell took the status item without an error" 'TypeError\|ReferenceError' $H/.cache/lordos/session.log
+hasnt "lord-server didn't log a refusal" 'not started' $H/.cache/lordos/compositor.log
+hasnt "the shell took the status item without an error" 'TypeError\|ReferenceError' $H/.cache/lordos/shell.log
 
 echo "== it stops with the app"
 A=$(pgrep -x pkgtest | head -1)
@@ -119,7 +119,7 @@ f=open('$APPS/pkgtest/bin/engine','r+b'); f.seek(4096); b=f.read(1); f.seek(4096
 x=$(dhome bash -c "$(declare -f direct); B=$B direct pkgtest"); case "$x" in *refused*sig.fileModified*) ok "--companion: one byte: refused ($x)";; *) no "one byte: $x";; esac
 gone "nothing of it ran" $REP
 session; sleep 9
-has "the app itself is refused too" "was refused: sig.fileModified" $H/.cache/lordos/session.log
+has "the app itself is refused too" "was refused: sig.fileModified" $H/.cache/lordos/compositor.log
 gone "no report" $REP
 is "no companion" "$(cpid)" ""
 stop

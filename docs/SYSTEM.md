@@ -535,8 +535,12 @@ LordOS's log viewer.
     `adm`) it is read like the user's own; otherwise an administrator gets it through the closed
     action `logs-system`; anyone else is told it needs an administrator;
   - **Kernel:** the kernel's messages (`_TRANSPORT=kernel`) from the readable journal;
-  - **LordOS:** the session's own logs, `~/.cache/lordos/<name>.log` (`session.log`,
-    `greeter.log`…).
+  - **LordOS:** the user's LordOS log files (see "Log files" below): the session's (`compositor`,
+    `shell`, each with its previous session's `.prev`, then `xwayland`, `cloud`; a file's `.old`, the
+    older part its 16 MB cap moved aside, is shown as "(older part)"), then **Apps** (`apps/<app>.log`),
+    **Web apps** (`web/<app>-<profile>.log`) and **Older logs** (`cache/<name>.log`: what an older version
+    left in `~/.cache/lordos`). Stamped lines show their time, level and subsystem; other lines (a
+    Linux app's own output) get a level from their words (`sdk/logfile.js`).
 - **Filters:** level (all, info and above, warnings and above, errors), time range (15 min, 1 hour,
   24 h, everything), process or unit (`[A-Za-z0-9@._:-]`, the same check as the C side), and free-text
   search in the message.
@@ -547,6 +551,69 @@ LordOS's log viewer.
   `~/Documentos` in Spanish) through `fs.write`.
 - A virtualized list (only the visible rows are drawn); at most 3000 entries per query and
   10,000 kept while following (older ones are dropped). The status bar shows counts and query time.
+
+### Log files (`server/src/lordlog.c`)
+
+Since 0.8.8.8 every LordOS log is under `/var/log/lordos`, rotated, and only its owner can read a
+user's ones:
+
+| File | Written by |
+|---|---|
+| `/var/log/lordos/lord-sessiond.log` | lord-sessiond (root; 0640) |
+| `/var/log/lordos/lord-netd.log` | lord-netd (root; 0640) |
+| `/var/log/lordos/lord-fand.log` | lord-fand (root; 0640; `LogsDirectory=` makes it writable under `ProtectSystem=strict`) |
+| `/var/log/lordos/admin.log` | the administration helper (root; its refusals, by action name, never arguments, and the output of the programs it runs: dpkg, wpa_supplicant, openvpn, pppd) |
+| `users/<user>/compositor.log` | lord-server (the compositor) |
+| `users/<user>/shell.log` | the shell: React/QuickJS (`js: …` lines and their stacks) |
+| `users/<user>/xwayland.log` | Xwayland |
+| `users/<user>/cloud.log` | rclone (Cloud) |
+| `users/<user>/apps/<app>.log` | each isolated native app (`lord-server --app`) and each Linux app |
+| `users/<user>/web/<app>-<profile>.log` | each web app's lord-web (`web/probe.log`: the Store's probe) |
+
+- **Folders.** `/var/log/lordos` is root's (0755), `users/` too (0711: everyone reaches their own folder,
+  nobody lists the names). lord-sessiond makes `users/<user>` at each login, before it starts the session
+  (and the login screen's, for `lordos-greeter`): every step is an `openat` from a folder opened with
+  `O_NOFOLLOW|O_DIRECTORY`, `/var/log/lordos` and `users/` must be root's and writable by nobody else,
+  and the user's folder is fixed with `fchown`/`fchmod` on its own fd to the user, 0700. A `users/<user>`
+  that is a symlink, not a folder, or another uid's folder (an account removed and made again with
+  the same name) is refused and left as it is, and the session falls back to `~/.cache/lordos`. Root
+  never touches anything inside, and root's logrotate has no rule for it (see "Rotation").
+  Migration `007-0.8.8.8-logs.sh` makes the first two folders too.
+- **Which folder.** lord-server uses `users/<user>` only under lord-sessiond (`LORDOS_SESSIOND`), with
+  `$HOME` the account's own home, and when that folder is a real folder of its uid with no group or
+  other access; otherwise (a nested or development lord-server, a test with another `$HOME`)
+  `~/.cache/lordos`, with the same names, so development keeps working and never rotates the running
+  session's files.
+- **Line format.** `2026-11-11T12:43:56.123-03:00 INFO  xwayland: starting Xwayland on :0`: local time
+  with milliseconds and offset, `ERROR`/`WARN`/`INFO` (from the message's words: `fail…`, `error`, a JS
+  `…Error`; `could not`, `cannot`, `warn…`), and the subsystem (the line's own `name:` prefix, else
+  `compositor`, `shell` or the daemon). A small `lord-log` child stamps them: lord-server's (and each
+  root daemon's) stderr is a pipe to it. It drains the pipe until the last writer is gone, so a crash
+  loses nothing already written, and it ignores SIGTERM for that. The root daemons' lines still go
+  to the journal as they were. A child with a log of its own (Linux apps, Xwayland, lord-web, rclone)
+  writes its own output as is, after a stamped "starting …" line from lord-server.
+- **The previous session.** At login `compositor.log` and `shell.log` become `.prev` (they used to be
+  truncated, losing the crash that ended the session). Only this does: `.prev` always means "the
+  previous session", never the overflow of the current one (that is `.old`, below).
+- **Rotation.** `/etc/logrotate.d/lordos` (`packaging/logrotate/lordos`; logrotate is a Recommends)
+  rotates only the root daemons' files directly in `/var/log/lordos`: daily, 7 copies, compressed,
+  `copytruncate` (the writer is the daemon's `lord-log` child holding the file with `O_APPEND`). Root's
+  logrotate never works inside `users/<user>`: those folders and their `apps/` and `web/` are the
+  user's, logrotate works on path strings, and a user could swap a subfolder for a symlink while it
+  runs and have root create its copies anywhere.
+- **The cap.** Every file, the users' and the daemons', is capped at 16 MB by its own writers, as the
+  user who owns it: above that its newest part goes to `<name>.log.old` (replaced each time) and the
+  file is emptied in place, so programs holding it with `O_APPEND` go on at its start. It is checked
+  when a log is opened, after every MB that a `lord-log` child writes, and every minute by the session's
+  `lord-log` child for the other files (`apps/`, `web/`, `xwayland.log`, `cloud.log`). An isolated app
+  (`lord-server --app`) writes to a pipe, not to its file: before its sandbox and before any of its
+  code runs, a `lord-log` child takes the file over and copies the app's bytes as is (never parsing
+  them), checking the cap after every MB, so an app writing in a loop can't fill `/var` between the
+  minute's checks. A user's folder therefore holds at most about 32 MB per log name, plus the previous
+  session's `compositor.log.prev` and `shell.log.prev`.
+- **Tests.** `make -C server build/lordlog-test` (names, folders against symlink tricks, the cap,
+  rotation, the format and `lord-log` end to end, in a temporary folder) and
+  `node server/tests/logfile_test.mjs` (the Logs app's parser).
 
 ### Our own journal reader (`server/src/logs/journal.c`)
 
@@ -578,11 +645,15 @@ lord-server.
     characters), `limit` 1–5000;
   - the paths don't come from the user: `/var/log/journal/<machine-id>/system*.journal*`;
   - it runs no program; it streams one JSON `LOG` line per entry and `OK <n>`.
-- `lord.logs.tail(name)` only reads `~/.cache/lordos/<name>.log` with a validated name.
+- `lord.logs.files()`/`tail(name)` only read the user's own log folder (and the old `~/.cache/lordos`): a
+  name is `[<apps|web|cache>/]<safe name>.log[.prev|.old]`, a safe name is `[A-Za-z0-9._+-]` not starting with `.` or
+  `-`, and each file is opened with `openat` and `O_NOFOLLOW` from its folder, opened with `O_NOFOLLOW` too.
+  `lord.logs.dir()` says which folder that is.
 
 ### Live follow without polling
 
-`lord.logs.follow(true)` adds inotify watches on the journal directories and `~/.cache/lordos`.
+`lord.logs.follow(true)` adds inotify watches on the journal directories and the user's log folders (the
+folder, `apps/`, `web/`, and the old `~/.cache/lordos`).
 Queries run in a lord-server thread; the thread and inotify share one epoll fd in the main loop
 (`logs_fd()`), so the compositor never waits for a read. When something changes, JS gets
 `__lordLogs('journal')` or `__lordLogs('file', name)` and asks only for the entries after the

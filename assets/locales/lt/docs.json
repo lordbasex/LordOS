@@ -52,6 +52,7 @@
     "other": "ir dar {count}"
   },
   "err.invalid": "tai ne archyvas arba jis sugadintas",
+  "err.missing-volume": "trūksta padalyto archyvo dalies: „{name}“",
   "err.disk-full": "diskas pilnas",
   "err.too-big": "jis per didelis",
   "err.too-many": "jame per daug failų",

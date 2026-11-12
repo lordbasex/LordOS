@@ -431,5 +431,12 @@
   "known.copied": "Journal copié, sans rien de personnel : collez-le dans le ticket de rclone",
   "known.noLog": "Il n’y a pas encore de journal à copier",
   "files.signin": "{name} demande une nouvelle connexion",
-  "files.signinOpen": "Se connecter…"
+  "files.signinOpen": "Se connecter…",
+  "details.title": "Détails",
+  "details.provider": "Fournisseur",
+  "details.backend": "Type",
+  "details.signIn": "Connexion",
+  "details.server": "Serveur",
+  "details.app": "Application",
+  "details.ownApp": "Votre propre application"
 }

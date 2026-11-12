@@ -16,6 +16,10 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 // ---- the table ----
 eq('xlsx kind', kindOf(f('a.xlsx')), 'doc');
+// split archive volumes are archives (GitHub #103)
+eq('zip.001 kind', kindOf(f('DOCUMENTS.zip.001')), 'archive');
+eq('z02 kind', kindOf(f('x.z02')), 'archive');
+eq('a numbered text file is not', kindOf(f('notes.txt.001')), 'other');
 eq('xlsx type', mimeOf(f('Book 2.XLSX')), XLSX);
 eq('docx type', mimeOf(f('a.docx')), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 eq('ods type', mimeOf(f('a.ods')), 'application/vnd.oasis.opendocument.spreadsheet');

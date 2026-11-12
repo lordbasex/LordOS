@@ -7,7 +7,8 @@
  *   ~/.config/lordos/cloud/keep.json       Keep on This Computer, per account
  *   ~/.config/lordos/cloud/links.json      the links made from LordOS (rclone can't list them)
  *   ~/.cache/lordos/cloud/                 rclone's VFS cache (vfs/<id>/, vfsMeta/<id>/)
- *   ~/.cache/lordos/cloud.log              rclone's log (the Logs app shows it)
+ *   cloud.log of the user's log folder     rclone's log (the Logs app shows it; lordlog.h: /var/log/lordos/users/<user>,
+ *                                          or ~/.cache/lordos)
  *   $XDG_RUNTIME_DIR/lordos/cloud/rc.sock  the rc socket, in a 0700 folder
  *
  * The secrets of an account (token, password, key) are one keyring item, "cloud:<id>", a JSON object of rclone
@@ -19,6 +20,7 @@
 #include "../doc/wire.h"
 #include "../errcode.h"
 #include "../sec/cgroup.h"
+#include "../lordlog.h"
 #include "../sec/json.h"
 #include "../sec/sandbox.h"
 
@@ -659,12 +661,9 @@ static int daemon_start(void) {
     cl_pf(addr, sizeof addr, "unix://%s", sock);
     cl_pf(cache, sizeof cache, "%s", cl_cache);
     mkdirs(cache, 0700);
-    cl_pf(log_path, sizeof log_path, "%s/.cache/lordos/" LOG_NAME, cl_home);
-    if (!stat(log_path, &st) && st.st_size > LOG_MAX) {
-        char old[PATH_MAX + 8];
-        cl_pf(old, sizeof old, "%s/.cache/lordos/cloud.old", cl_home);
-        rename(log_path, old);
-    }
+    if (lordlog_dir_is_system()) cl_pf(log_path, sizeof log_path, "%s/" LOG_NAME, lordlog_dir());
+    else cl_pf(log_path, sizeof log_path, "%s/.cache/lordos/" LOG_NAME, cl_home);
+    lordlog_cap(log_path, LOG_MAX);                         /* the older part goes to cloud.log.old */
     char *argv[] = { "rclone", "rcd", "--rc-addr", addr, "--rc-htpasswd", "/proc/self/fd/3", "--config", "", "--cache-dir", cache,
                      "--log-file", log_path, "--log-level", "NOTICE", "--use-mmap", "--buffer-size", "16M", "--transfers", "4",
                      /* B10: a server that doesn't answer fails a cold read in about 8 s, not minutes (measured: 8.6 s

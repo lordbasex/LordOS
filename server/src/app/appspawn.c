@@ -5,11 +5,13 @@
  * end is registered in brokersrv.c together with the app process's real pid. */
 #include "app.h"
 #include "../lpk.h"
+#include "../lordlog.h"
 #include "../sec/broker.h"
 #include "../sec/pkgapp.h"
 #include "../ui/js_sys.h"
 #include "../vault/vclient.h"
 #include "apphost_bc.h"
+#include "../wl/xauth.h"
 
 #include <fcntl.h>
 #include <limits.h>
@@ -72,6 +74,10 @@ int app_spawn(const char *id) {
     /* Passwords talks to lord-vault on its own channel: decrypted data never passes through here */
     int vfd = wants_vault(id, sys) ? vc_attach_app() : -1;
     int bcfd = apphost_bc_dup_ro();
+    /* its own log, apps/<id>.log (lordlog.h), opened here: the child only dup2s it */
+    char logp[PATH_MAX];
+    int logfd = lordlog_path("apps", id, logp, sizeof logp) ? -1 : lordlog_open(logp);
+    lordlog_write(logfd, "INFO", "apps", "starting the isolated app %s", id);
 
     pid_t pid = fork();
     if (pid == 0) {
@@ -100,14 +106,16 @@ int app_spawn(const char *id) {
         } else unsetenv(APPHOST_BC_ENV);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); if (null > 2) close(null); }
+        if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         /* lord-server passes the id, already validated; there are no caller arguments */
         char *const argv[] = { self, (char *)"--app", (char *)id, NULL };
-        unsetenv("DISPLAY");                    /* no X11 for isolated apps (their seccomp has no unix socket() either) */
+        xauth_env_drop();                       /* no X11 for isolated apps (their seccomp has no unix socket() either) */
         execve("/proc/self/exe", argv, environ);   /* not `self`: after a package upgrade it is "<path> (deleted)" */
         _exit(127);
     }
     close(sv[1]);
     close(pp[1]);
+    if (logfd >= 0) close(logfd);
     if (vfd >= 0) close(vfd);
     if (bcfd >= 0) close(bcfd);
     if (pid < 0) { close(sv[0]); close(pp[0]); return -1; }

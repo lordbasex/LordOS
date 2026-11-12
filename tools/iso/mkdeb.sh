@@ -42,6 +42,7 @@
 #   /usr/share/keyrings/lordos-archive-keyring.gpg   the key that signs that repository
 #   /usr/lib/lordos/migrate, migrations/  version-to-version system migrations, run by postinst
 #   /etc/kernel/postinst.d/zz-lordos-reboot-required  "restart required" after a kernel update
+#   /etc/logrotate.d/lordos              rotation of /var/log/lordos (server/src/lordlog.h); logrotate is a Recommends
 #   /usr/lib/modules-load.d/lordos-drivetemp.conf    SATA disk temperatures (drivetemp) at boot
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
@@ -248,6 +249,8 @@ install -m 755 packaging/migrations/migrate "$L/migrate"
 install -d "$L/migrations"
 install -m 644 packaging/migrations/[0-9][0-9][0-9]-*.sh "$L/migrations/"
 install -D -m 755 packaging/kernel/zz-lordos-reboot-required "$PKG/etc/kernel/postinst.d/zz-lordos-reboot-required"
+# the logs' rotation (server/src/lordlog.h, docs/SYSTEM.md "Log files"); the folders come from migration 007
+install -D -m 644 packaging/logrotate/lordos "$PKG/etc/logrotate.d/lordos"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
 # a Bluetooth headset plays in high fidelity until its microphone is chosen (issue #78, docs/SOUND.md)
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf"
@@ -418,7 +421,7 @@ Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
-Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
+Recommends: pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
 Section: x11
 Priority: optional
 Protected: yes
@@ -499,7 +502,7 @@ set -e
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lordos.sources; fi
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
-if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations; fi
+if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations /var/log/lordos; fi
 # the real pkexec back in its place
 if [ "$1" = remove ] || [ "$1" = purge ]; then
     if [ -L /usr/bin/pkexec ]; then rm -f /usr/bin/pkexec; fi

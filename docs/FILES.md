@@ -58,7 +58,9 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 - **Views** (❖1 to ❖4):
   - icons (cards, with `flexWrap`; thumbnails of PNG/JPEG up to 24 MB);
   - list (Name, Modified, Size and Kind, sorted by clicking the header);
-  - columns (the last three folders and the preview);
+  - columns (the last folders that fit and the preview). Each column's divider can be dragged to widen it (140 to
+    600 px) and double-clicked to fit its longest name; the width is kept per folder (`files.colWidths`, the 200 most
+    recent, `apps/files/colview.js`, GitHub #99);
   - gallery.
 
   In searches, Recents and Tags, the Kind column becomes the folder.
@@ -282,8 +284,13 @@ AES-CMAC and key derivation for no gain in a list: a server that refuses both ca
 asks for the name. A session the server marks guest or anonymous after a password counts as refused. MD4, MD5 and RC4
 are in `smbauth.c` because NTLM requires them; they are used nowhere else. The sign-in carries the target name `cifs/<address>`
 and a MIC over the three NTLM messages, and the server must sign its final answer with the session key: one that can't is
-refused (`smb_verify`, checked against Samba on the test server). The answers after that are shown, not trusted: their signatures
-aren't checked and they go through `lan_clean_text`, and the mount is the kernel's. A share chosen goes to the
+refused (`smb_verify`, checked against Samba on the test server). The NEGOTIATE and both SESSION_SETUP requests mark
+signing as required: in 2.0.2 and 2.1 a server signs that final answer only when the session requires signing (MS-SMB2
+3.3.5.5.3), and many desktop systems don't require it by default, so asking only for signing to be enabled turned
+every correct password into "refused" there (GitHub #101). Requiring it changes nothing for a server that already
+signs and keeps the check as strict: an unsigned or wrongly signed final answer is still refused. The answers after
+that are shown, not trusted: their signatures aren't checked and they go through `lan_clean_text`, and the mount is
+the kernel's. A share chosen goes to the
 same `share-mount`. *Remember the password* keeps it for the server (service `smb://<address>/`).
 
 **Connecting** runs the closed `share-mount` action (`lan/share_admin.c`, table in `SYSTEM.md`). The kernel's own

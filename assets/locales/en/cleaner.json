@@ -296,7 +296,7 @@
   "panel.word.update": "A LordOS update is waiting",
   "panel.disk": "Disk",
   "panel.memory": "Memory",
-  "panel.memoryValue": "{size} available",
+  "panel.usedOf": "{used} of {total} used",
   "panel.cpu": "Processor",
   "panel.network": "Network",
   "panel.devices": {
@@ -307,7 +307,6 @@
   "panel.noScan": "Not scanned yet",
   "panel.freeUp": "Free up",
   "panel.open": "Open Cleaner",
-  "panel.prefs": "Settings",
   "prefs.menuItem": "Show by the clock",
   "prefs.on": "On",
   "prefs.off": "Off",

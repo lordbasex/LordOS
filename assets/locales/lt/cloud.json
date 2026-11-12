@@ -452,5 +452,12 @@
   "known.copied": "Žurnalas nukopijuotas be jokių asmeninių duomenų: įklijuokite jį į rclone klaidų pranešimą",
   "known.noLog": "Kopijuojamo žurnalo dar nėra",
   "files.signin": "{name} reikia naujo prisijungimo",
-  "files.signinOpen": "Prisijungti…"
+  "files.signinOpen": "Prisijungti…",
+  "details.title": "Išsami informacija",
+  "details.provider": "Teikėjas",
+  "details.backend": "Tipas",
+  "details.signIn": "Prisijungimas",
+  "details.server": "Serveris",
+  "details.app": "Programa",
+  "details.ownApp": "Jūsų programa"
 }

@@ -9,11 +9,11 @@ WEB_PKGS := wpe-webkit-2.0 wpe-1.0 wpebackend-fdo-1.0 egl wayland-client wayland
 WEB ?= $(shell pkg-config --exists $(WEB_PKGS) 2>/dev/null && echo 1 || echo 0)
 
 # the pure checks: argv, the registry, addresses and scope, the probe's answer, the icon check, download names, the wheel,
-# the unread count, the user agent, the notification sound, dropped files, the Edit commands and context menu items
+# the unread count, the user agent, the notification sound, dropped files, pasted text and file lists, the Edit commands and context menu items, the color scheme
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webedit.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webedit.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/sec/json.h
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)
@@ -38,14 +38,20 @@ WEB_CLIENT_C := $(filter %/xdg-shell-protocol.c %/xdg-decoration-unstable-v1-pro
                 $(filter %.c,$(WEB_GEN))
 
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c src/web/webshm.c src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
 WEB_HDR := src/web/web.h src/web/webwin.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only
 WEB_CFLAGS := $(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(WEB_PKGS)))
 WEB_LIBS := $(shell pkg-config --libs $(WEB_PKGS))
 
-build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.o build/gen/lord_version.h
+# the script that answers the page's prefers-color-scheme (src/web/webscheme.js, tests/webscheme_test.mjs) as a C string
+build/gen/webscheme_js.h: src/web/webscheme.js
+	@mkdir -p build/gen
+	@{ printf '/* generated from src/web/webscheme.js by mk/web.mk */\nstatic const char WEBSCHEME_JS[] =\n'; \
+	   sed -e '/^[[:space:]]*\/\//d' -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/' -e 's/$$/\\n"/' $<; printf ';\n'; } > $@.new && mv $@.new $@
+
+build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.o build/gen/lord_version.h build/gen/webscheme_js.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -Ibuild/gen/client $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(WEB_SRC) $(WEB_CLIENT_C) build/obj/ui/stb.o $(WEB_LIBS) -lm
 else

@@ -77,8 +77,9 @@ last account goes, and ends with the session.
 **As built (Phase 1):** not a systemd user unit but a child of `lord-server`'s cloud thread, the way Connect to Server starts
 `rclone mount` (`server/src/cloud/cloud.c`, `daemon_start`): fixed argv and a fixed environment (HOME, PATH, LANG,
 XDG_RUNTIME_DIR, USER), umask 077, `nice 10`, idle I/O, `PR_SET_PDEATHSIG` (rclone unmounts and ends if `lord-server` dies),
-scope through lord-sessiond with `memory.high` 512 MB. Its log is `~/.cache/lordos/cloud.log` (NOTICE level; over 4 MB it
-becomes `cloud.old` at the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
+scope through lord-sessiond with `memory.high` 512 MB. Its log is `cloud.log` in the user's log folder
+(`/var/log/lordos/users/<user>`, docs/SYSTEM.md "Log files"; NOTICE level; over 4 MB its newest part becomes `cloud.log.old` at
+the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
 there: the scope and the socket are the boundary.
 
 - **Listens on a Unix socket only**: `$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, folder 0700, socket 0600. No TCP, not even
@@ -243,6 +244,13 @@ Settings → Cloud → an account: name (renames the folder), **Open Website** (
 table per provider; S3 and WebDAV open the endpoint's address only if it is https), space (section 8), **Keep on This Computer**
 folders, **Pause** syncing, **Sign In Again** (expired token), **Remove Account** (unmounts, deletes the cache after uploads
 finish or after the person confirms discarding them, removes the keyring item; never deletes anything in the cloud).
+
+**Details** (0.8.8.8, GitHub #115): a box on the account's page with the provider, rclone's backend type (`drive`, `webdav`,
+`sftp`…), how it signs in (browser, server, object storage), the server (`host:port`) for a server kind, and "Your own app" when it
+signs in with the person's own client ID (`accountDetails` in `sdk/cloudmodel.js`). It shows only what the state already carries.
+The user name or email is not shown: rclone marks those options sensitive, so they are kept in the keyring with the password and
+JavaScript never sees them (section 3). Account colors stay by the order accounts were added (`accountColor`), so two accounts
+on the same provider still look different and nobody's colors change.
 
 ### 6.4 Turning an account off (0.8.8.8)
 
@@ -594,7 +602,7 @@ contract above leaves open, and the few places the core differs from it:
   `about` has `used` always and the others only when the provider gives them.
 - `pause(null)` / `resume(null)`: Pause All (`options.pauseAll`); `resume(null)` also resumes each account.
 - `pauseOnMetered` is kept but does nothing yet: LordOS's network service doesn't say whether a network is metered.
-- `showLog()` opens Logs on `~/.cache/lordos/cloud.log` (`wm.open('logs', { args: { file: 'cloud.log' } })`; Logs reads
+- `showLog()` opens Logs on `cloud.log` (`wm.open('logs', { args: { file: 'cloud.log' } })`; Logs reads
   `args.file` since this branch).
 - Not in the core: per-account options (`setAccountOptions`, `account.options`: rclone's bandwidth limit is one for the
   whole daemon, and there is no metered information to act on) and `State.conflicts`: rclone's VFS uploads the last version

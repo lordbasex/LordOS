@@ -431,5 +431,12 @@
   "known.copied": "Registro copiado, sin nada personal: pegalo en el issue de rclone",
   "known.noLog": "Todavía no hay registro para copiar",
   "files.signin": "{name} necesita que inicies sesión de nuevo",
-  "files.signinOpen": "Iniciar sesión…"
+  "files.signinOpen": "Iniciar sesión…",
+  "details.title": "Detalles",
+  "details.provider": "Proveedor",
+  "details.backend": "Tipo",
+  "details.signIn": "Inicio de sesión",
+  "details.server": "Servidor",
+  "details.app": "App",
+  "details.ownApp": "Tu propia app"
 }

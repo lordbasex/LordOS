@@ -123,6 +123,8 @@ int  wifi_start(const char *ifname);            /* wpa_supplicant + the interfac
 int  wifi_ctrl(const char *ifname, const char *cmd, char *reply, size_t n);
 void wifi_act_scan(const char *ifname);
 void wifi_act_connect(const char *ifname, const char *ssid, const char *pass);
+enum { WIFI_SAVED_OPEN, WIFI_SAVED_PASS, WIFI_SAVED_PSK };
+int  wifi_saved_kind(const char *keytext);      /* what a saved .key holds (NULL: nothing saved) */
 void wifi_act_disconnect(const char *ifname);
 void wifi_act_forget(const char *ssid);
 int  ovpn_down(const char *name);

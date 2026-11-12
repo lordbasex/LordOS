@@ -512,8 +512,10 @@ Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 **Debugging.**
 
-- Sessions started by `lord-sessiond` write their log to **`~/.cache/lordos/session.log`** (the login
-  screen to `greeter.log`); a standalone `lord-server` writes to the terminal it was started from.
+- Sessions started by `lord-sessiond` write their log to **`/var/log/lordos/users/<user>/compositor.log`**,
+  and the shell's `js:` lines (with their stacks) to `shell.log` next to it; the previous session's are
+  `compositor.log.prev` and `shell.log.prev` (docs/SYSTEM.md, "Log files"). A standalone `lord-server` writes to
+  the terminal it was started from; a headless one without lord-sessiond to `~/.cache/lordos/`.
 - `console.log`, `.info`, `.debug` → `js: …` lines; `console.warn` → `js: [warn] …`;
   `console.error` → `js: [error] …` (the prelude in `server/src/ui/js_prelude.h`). Exceptions in timers
   and animation frames are logged as `js: [error] timer: …` / `raf: …`.

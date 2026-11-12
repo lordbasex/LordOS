@@ -112,10 +112,10 @@ Not released yet; the latest release is 0.8.8.7.
 - **Linux apps fit in.** Drag and drop and copied files between Files and Linux apps, LordOS's input methods inside them, their tray icons and their players in Now Playing (see *Your Linux apps too*). Later in 0.8.8.8 also sharing a screen or a window, SVG icons, apps that take the shortcuts, global shortcuts, drags with X11 apps and sharp X11 apps on HiDPI.
 - **Lists, tables and choices from the keyboard.** The SDK's lists and tables select with the arrows, Shift and Ctrl and find a row as you type; drop-downs, tabs, radio buttons, checkboxes, popovers, tooltips and progress bars work from the keyboard too, and the wheel moves sliders.
 - **The caret follows the text as it is drawn.** In Hebrew or Arabic mixed with numbers the selection is drawn piece by piece, the arrows move on screen, and an emoji, a flag or a letter with its accents is never split.
-- **Web apps.** Install web apps from the Store, each in a window and process of its own, with several accounts and permissions asked once (Settings → Web apps). They need the optional `lordos-web` package; a closed app can keep running behind its tray icon.
+- **Web apps.** Install web apps from the Store, each in a window and process of its own, with several accounts and permissions asked once (Settings → Web apps). They need the optional `lordos-web` package; a closed app can keep running behind its tray icon. They follow the desktop's light or dark mode, live, except pages whose colors come only from CSS media queries. Tried on our test machine.
 - **Locking from logind.** `loginctl lock-sessions` and other admin tools lock the screen; only your password unlocks it.
 
-The keyboard widgets, the caret, web apps and logind's lock are built and tested, but not yet checked on our test machine.
+The keyboard widgets, the caret and logind's lock are built and tested, but not yet checked on our test machine.
 
 ## New in 0.8.8.7
 

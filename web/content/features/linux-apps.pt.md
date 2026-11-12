@@ -64,9 +64,9 @@ Ainda não lançada; a última versão lançada é a 0.8.8.7.
 - **Atalhos globais.** O apertar para falar de um app de chamadas ou os atalhos de um gravador funcionam enquanto outro app está na frente. Você escolhe as teclas na folha do LordOS, e as muda ou esquece em Ajustes → Teclado.
 - **Apps X11.** Participam de arrastar e soltar, e ficam nítidos em telas HiDPI porque se escalam sozinhos (Ajustes → Telas traz de volta o modo antigo, borrado).
 - **Apps de terminal.** Programas como o htop abrem numa aba do Terminal a partir do lançador de apps.
-- **Apps web.** A seção Apps web da Loja instala apps web, cada um numa janela e num processo próprios com suas próprias contas, pelo pacote opcional `lordos-web`. Ainda não testado na nossa máquina de testes.
+- **Apps web.** A seção Apps web da Loja instala apps web, cada um numa janela e num processo próprios com suas próprias contas, pelo pacote opcional `lordos-web`. Os apps web seguem o modo claro ou escuro do desktop, ao vivo, pelo `matchMedia` da página; uma página que escolhe as cores só com media queries de CSS fica clara (escolha Escuro nas configurações dela). Testado na nossa máquina de testes, no claro e no escuro.
 
-Atalhos globais, arrastar com apps X11, apps X11 nítidos, apps de terminal e apps web estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
+Atalhos globais, arrastar com apps X11, apps X11 nítidos e apps de terminal estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
 
 ## Quais protocolos Wayland existem
 

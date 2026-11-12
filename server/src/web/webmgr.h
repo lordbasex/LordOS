@@ -10,7 +10,9 @@
  *   - Starting lord-web: a fixed path next to the lord-server binary (owned by root or the user, not writable by
  *     others), argv exactly "lord-web --app <app> --profile <profile>" (both looked up in the registry first),
  *     and only the session's WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, HOME and LANG plus
- *     LORDOS_WEB=1 (and LORDOS_SESSIOND=1 under lord-sessiond, so lord-web refuses to run without its scope). One process per app and profile; a second launch only says it is running (the shell
+ *     LORDOS_WEB=1 (and LORDOS_SESSIOND=1 under lord-sessiond, so lord-web refuses to run without its scope), and
+ *     LORDOS_WEB_SCHEME=light|dark once the theme has told the desktop's mode (webscheme.h).
+ *     One process per app and profile; a second launch only says it is running (the shell
  *     raises its window).
  *   - The probe, the runtime's two steps (docs/WEBAPPS.md): "lord-web --probe", the address as one line on fd 3
  *     (https: only, under 2 KB), one JSON line back ({"ok":false,"error":"web.probe.…"} passes its code on to JS);
@@ -50,6 +52,11 @@ const char *webmgr_remove_profile(const char *app, const char *profile, int dele
 const char *webmgr_set_permission(const char *app, const char *kind, const char *value);
 const char *webmgr_set_background(const char *app, int on);
 const char *webmgr_uninstall(const char *app, int delete_data);
+
+/* The desktop's color scheme (WEBSCHEME_LIGHT or WEBSCHEME_DARK; anything else: not known) for the next lord-web's
+ * environment; webask_scheme tells the running ones. */
+void webmgr_set_scheme(int scheme);
+int  webmgr_scheme(void);                       /* -1 until set */
 
 /* *raised = 1 when it was already running (nothing started). */
 const char *webmgr_launch(const char *app, const char *profile, int *raised);

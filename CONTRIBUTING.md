@@ -29,7 +29,7 @@ system it works the same way. If `lordos-issue` isn't there (before 0.8.7.1), se
 lordos-fetch --share --color=never
 grep -E '^N:' /proc/bus/input/devices
 journalctl -b -p warning --no-pager | tail -n 80
-tail -n 60 ~/.cache/lordos/session.log
+tail -n 60 /var/log/lordos/users/$USER/compositor.log
 ```
 
 ### 2. Say what happened

@@ -59,7 +59,7 @@ MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
@@ -96,7 +96,7 @@ CLOCK_SRC := src/ui/tzif.c src/ui/js_help.c
 CLOCK_SRC += src/tts/speak.c src/ui/js_voice.c
 SRC += $(CLOCK_SRC)
 # Logs (docs/SYSTEM.md): our own systemd journal reader, the logs-system action and lord.logs
-LOGS_SRC := src/logs/journal.c src/logs/logs_admin.c src/ui/js_logs.c
+LOGS_SRC := src/logs/journal.c src/logs/logs_admin.c src/ui/js_logs.c src/lordlog.c
 SRC += $(LOGS_SRC)
 HDR += $(wildcard src/logs/*.h)
 # Backups (docs/SYSTEM.md): hard-linked snapshots in a low-priority thread
@@ -224,9 +224,15 @@ build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm
 # fake sysfs (run by tests/run_suites.sh).
 FAN_SRC := src/fan/fancurve.c src/fan/fanhw.c src/sec/json.c
 ALL += build/lord-fand
-build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h
+build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c
+# the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
+test: build/toolkitenv-test
+build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/toolkitenv_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/ptrlock-test
 build/ptrlock-test: tests/ptrlock_test.c src/wl/ptrlock.h src/testbench/lockkey.h
 	@mkdir -p build
@@ -337,6 +343,12 @@ build/framegate-test: tests/framegate_test.c src/wl/framegate.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
 	./$@ || { rm -f $@; exit 1; }
+# the repeat of a held key in an isolated app (src/app/keyrepeat.h; the compositor sends its clients no repeats)
+test: build/keyrepeat-test
+build/keyrepeat-test: tests/keyrepeat_test.c src/app/keyrepeat.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/keyrepeat_test.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/xdgact-test
 build/xdgact-test: tests/xdgact_test.c src/wl/xdgact.c src/wl/xdgact.h
 	@mkdir -p build
@@ -374,6 +386,14 @@ test: build/xwscale-test
 build/xwscale-test: tests/xwscale_test.c src/wl/xwscale.c src/wl/xwscale.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xwscale_test.c src/wl/xwscale.c
+	./$@ || { rm -f $@; exit 1; }
+# the session's X cookie for Xwayland's -auth (src/wl/xauth.c, GitHub #107): the Xauthority format, 0600, O_EXCL,
+# no link followed, and DISPLAY and XAUTHORITY both removed for isolated and restricted apps
+test: build/xauth-test
+build/xauth-test: tests/xauth_test.c src/wl/xauth.c src/wl/xauth.h src/apps.c src/app/appspawn.c src/wl/xwayland.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/xauth_test.c src/wl/xauth.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/textinput-test
 build/textinput-test: tests/textinput_test.c src/wl/tiutf8.c src/wl/tiutf8.h
@@ -499,7 +519,7 @@ build/brokermail-test: tests/brokermail_test.c src/sec/brokermail.c src/sec/json
 	./$@ || { rm -f $@; exit 1; }
 # tests/launch_cli.c: the real Linux app launcher outside the desktop, for tests/fwlinux/files.sh
 # (built by `make test`, run by that script in the VM)
-LAUNCH_CLI_SRC := src/apps.c src/iconfind.c src/term/termapp.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
+LAUNCH_CLI_SRC := src/lordlog.c src/apps.c src/iconfind.c src/term/termapp.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
                   src/sec/restrict.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 test: build/launch-cli
 build/launch-cli: tests/launch_cli.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
@@ -660,6 +680,13 @@ build/sni-test: tests/sni_test.c src/ui/snimodel.c src/ui/snimodel.h src/vault/d
 build/portal-check-test: tests/portal_check_test.c src/ui/portalcheck.c src/ui/portalcheck.h src/fsops.c src/fsops.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_check_test.c src/ui/portalcheck.c src/fsops.c -lpthread
+# LordOS's log files (src/lordlog.c): names, folders against symlink tricks, the cap, the line format, lord-log
+test: build/lordlog-test
+build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/lordlog_test.c src/lordlog.c
+	./$@ || { rm -f $@; exit 1; }
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
@@ -885,10 +912,10 @@ build/gen/%.o: build/gen/%.c
 build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/conn.o \
+SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \
                 build/obj/remote/rsec.o build/obj/remote/ipnet.o build/obj/remote/lockout.o build/obj/remote/rtcwire.o build/obj/remote/rtc.o \
-                build/obj/bench/boottest.o
+                build/obj/bench/boottest.o build/obj/lordlog.o
 # The remote desktop shows the screen only over WebRTC (docs/REMOTE.md, "Video (WebRTC)"): our own peer in
 # the bridge, on Debian's libsrtp2 and usrsctp (and OpenSSL's DTLS). lord-sessiond can't be built without
 # them (libsrtp2-dev, libusrsctp-dev).
@@ -907,6 +934,13 @@ test: build/ssh-root-test
 build/ssh-root-test: tests/ssh_root_test.c src/remote/ssh_root.c src/remote/ssh_root.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/ssh_root_test.c src/remote/ssh_root.c src/pkg/crypto.c
+	./$@ || { rm -f $@; exit 1; }
+# the hand-off's black frame is cleared before it is shown: radeon's dumb buffers come from VRAM as they
+# were (src/remote/blackfb.c, GitHub #94); ioctl and mmap are wrapped by a fake card
+test: build/blackfb-test
+build/blackfb-test: tests/blackfb_test.c src/remote/blackfb.c src/remote/blackfb.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/blackfb_test.c src/remote/blackfb.c -Wl,--wrap=ioctl -Wl,--wrap=mmap -Wl,--wrap=munmap
 	./$@ || { rm -f $@; exit 1; }
 build/lord-sessiond: $(SESSIOND_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread
@@ -1014,7 +1048,7 @@ build/lord-server-pkgtest: $(PKGTEST_OBJ) build/obj-pkgtest/sign.o build/obj-pkg
 all: build/lord-netd
 # net/sleepbus.c listens for logind's PrepareForSleep with our own D-Bus client (vault/dbus.c, libc only).
 NETD_OBJ := build/obj/netd/admin.o build/obj/netd/netd.o $(NET_SRC:src/%.c=build/obj/%.o) $(PKG_SRC:src/%.c=build/obj/%.o) build/obj/sec/cgroup.o build/obj/ui/stb.o \
-            build/obj/net/sleepbus.o build/obj/vault/dbus.o
+            build/obj/net/sleepbus.o build/obj/vault/dbus.o build/obj/lordlog.o
 build/obj/netd/admin.o: src/admin.c $(HDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) -DLORD_NETD $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
