@@ -198,11 +198,15 @@ hardened like `lord-netperm.service`, and more:
 
 - no capabilities at all (`CapabilityBoundingSet=` empty: root owns the sysfs files it writes);
 - `RestrictAddressFamilies=AF_UNIX`, `PrivateNetwork=yes`, `IPAddressDeny=any`;
-- `ProtectSystem=strict` with only `/etc/lordos`, `/run/lordos`, `/sys/devices/platform`,
-  `/sys/devices/virtual/thermal` and `/sys/devices/pci0000:00` writable; `ProtectHome=yes`,
+- `ProtectSystem=strict` with only `/etc/lordos`, `/run/lordos`, `/var/log/lordos` (since 0.8.8.8,
+  `LogsDirectory=lordos`, mode 0755), `/sys/devices/platform`, `/sys/devices/virtual/thermal` and
+  `/sys/devices/pci0000:00` writable; `ProtectHome=yes`,
   `PrivateDevices=yes` (it uses no device node);
 - `SystemCallFilter=@system-service` minus `@privileged @resources @mount @clock @debug @module
   @reboot @swap @raw-io`, `MemoryDenyWriteExecute`, `NoNewPrivileges`.
+
+It logs to `/var/log/lordos/lord-fand.log` (root's, 0640; rotated daily by `/etc/logrotate.d/lordos`,
+7 compressed copies) and still sends the same lines to the journal (`docs/SYSTEM.md`, "Log files").
 
 It executes nothing and links only libc. Cost: one sysfs read and at most one write every 2 s; 0.0 %
 CPU and 1.5 MB RSS on the Raspberry Pi 5.

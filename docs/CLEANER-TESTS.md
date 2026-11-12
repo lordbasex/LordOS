@@ -27,7 +27,13 @@ Checked by breaking the code on purpose on 2026-10-30, 823 checks each time: wit
 
 ## The additions of 2026-10-31
 
-At the time of writing `server/tests/clean_test.c` has no case for project outputs, the new rules, bands, the kept map or the minimum times. The figure of 823 checks above is from 2026-10-30 and was left as it was: no new result was available for this page.
+`server/tests/clean_test.c` now covers them too:
+
+- **Project outputs** (`test_projects`): an idle project's `node_modules`, a Rust `target` and a Python `.venv` with `pyvenv.cfg` are offered; a recent or edited project, a `target` with no manifest, hidden and nested look-alikes and a `.venv` without its proof aren't. They can't be chosen by category; when the manifest is gone at plan or at execution nothing moves; a real run goes to the Trash whole and comes back. The rule table refuses a delete action or a rule that isn't explicit-only.
+- **Waking idle projects** (`test_project_wakes`): a project with a file written after the scan is skipped at plan.
+- **Bands and the kept map** (`test_map`): the safe and review bands on the map, saving and loading `~/.cache/lordos/cleaner-map.txt`, and hostile map files the parser refuses.
+
+There is still no case for what each rule finds during a scan (the live counts) or for the minimum time per scan step (CLEANER-ROADMAP.md, the two "Partly" rows). The 823 checks above are from the 2026-10-30 breakage run; on 2026-11-12 `build/clean-test` at main ran 1097 checks, 0 failed.
 
 ## `oldkernels_test.mjs` (in `run_suites.sh`)
 

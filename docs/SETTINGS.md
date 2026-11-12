@@ -31,7 +31,7 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 
 Shared pieces: `apps/settings/ui.jsx` (a row with a hint, a pop-up button, the page header) on top of
 the SDK's `GroupBox` (`docs/DESIGN.md`). All text goes through `t()` in the `prefs` namespace
-(`assets/locales/{en,es,pt,fr}/prefs.json`); `node tools/i18n-check.mjs` passes. Pages use
+(`assets/locales/{en,es,pt,fr,it,lt}/prefs.json`); `node tools/i18n-check.mjs` passes. Pages use
 `textAlign: 'start'` and leading/trailing layout, so they mirror in Arabic and Hebrew; sliders and
 the time fields keep `direction: 'ltr'`.
 
@@ -410,6 +410,13 @@ it from LordOS would make dpkg ask about it on every package update (or drop the
   (Backup, Clock, Settings…) and packages that declare the `notifications` permission. For `.lpk`
   packages "allow" **is** the sandbox's `notifications` permission (`perms.set`), the same switch as
   Privacy & Security.
+- **Sound per app (0.8.8.8):** Default, None, Pop, Chime, Ping or Drop (`sdk/notifytones.js`), heard
+  when chosen. The stored value stays `true` (the default sound), `false` (none) or the sound's name, so
+  older files keep their meaning and no migration is needed.
+- **Web apps:** each installed web app has a row (key `lordos-web.<app>`) with its icon. Its
+  Notification sound (Automatic / The app's / LordOS's / None) is the registry's `notifySound`, the same
+  choice as in Settings → Web apps, and when LordOS's sound plays the row also picks which one
+  (`docs/WEBAPPS.md`).
 - **Do Not Disturb:** manual, and every day on a schedule. Notifications are kept in the history
   without a banner or sound.
 - **Grouping:** several banners from the same app collapse into one with "+N".

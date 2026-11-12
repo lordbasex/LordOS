@@ -1151,19 +1151,19 @@
     },
     "features": {
       "en": [
-        "New in 0.8.7",
+        "Since 0.8.7",
         "A scan only reads; nothing changes until you confirm",
         "Caches, large files, a storage map, exact duplicates and similar images",
         "Each file is checked again right before acting"
       ],
       "es": [
-        "Nuevo en 0.8.7",
+        "Desde la 0.8.7",
         "Un análisis solo lee; nada cambia hasta que confirmes",
         "Cachés, archivos grandes, mapa del disco, copias exactas e imágenes parecidas",
         "Cada archivo se comprueba otra vez antes de actuar"
       ],
       "pt": [
-        "Novo na 0.8.7",
+        "Desde a 0.8.7",
         "Uma análise só lê; nada muda até você confirmar",
         "Caches, arquivos grandes, mapa do disco, cópias exatas e imagens parecidas",
         "Cada arquivo é verificado de novo antes de agir"

@@ -94,6 +94,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [CLEANER-SECURITY.md](CLEANER-SECURITY.md) | Cleaner's safety model |
 | [CLEANER-TESTS.md](CLEANER-TESTS.md) | Cleaner's tests and measurements |
 | [CLEANER-ROADMAP.md](CLEANER-ROADMAP.md) | The state of each Cleaner feature |
+| [DISK-HEALTH.md](DISK-HEALTH.md) | Disk life: how much life each disk has left; a design, not built |
 | [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: plan (MVP from 0.8.9) |
 | [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API from 0.8.7.1, status in the document |
 | [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
@@ -105,6 +106,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [SETTINGS.md](SETTINGS.md) | Settings hardware pages: displays, Bluetooth, energy, cooling, notifications, date and time, default apps |
 | [NETWORK.md](NETWORK.md) | Networking and VPNs |
 | [SOUND.md](SOUND.md) | Sound (PipeWire) |
+| [VOICE.md](VOICE.md) | Voice, text to speech: `lord-tts`, the `say` command, voices, Personal Voice and Live Speech |
 | [FANS.md](FANS.md) | Fan control on the Raspberry Pi 5 and PCs |
 | [BENCHMARK.md](BENCHMARK.md) | System Information (0.8.5), LordBench and hardware reports: design and status |
 

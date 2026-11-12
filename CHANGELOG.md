@@ -55,6 +55,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   labels dropped; the mail test counts are now 47,467 and 77; 0.8.8.8's drops from Files, copy queue, tag colours,
   Cloud on/off, web apps in Search results, protected windows in screen sharing and the password eye are documented, in
   English, Spanish and Portuguese where the site has them.
+- **Docs and site synced with the code: Cleaner, Dock, Monitor, Settings, Sound, Fans, Voice and Disk life.**
+  `docs/CLEANER.md` names Noche as the look that follows light and dark (Aurora, the default, and Cristal are fixed);
+  `docs/CLEANER-TESTS.md` lists what `clean-test` now covers (project outputs, waking projects, map bands, the kept map)
+  and its current count (1097 checks); `docs/SOUND.md` has the six synthesized sounds, the 48 kHz meter (~23 levels a
+  second) and card profiles used for Bluetooth cards; `docs/SETTINGS.md` the per-app notification sound, web app rows
+  and six `prefs.json` locales; `docs/DOCK.md` the `web:<id>` items, unread badges, per-profile icons and Monitor's Disks
+  and GPU quick actions; `docs/MONITOR.md` the `pss` field and proportional memory in "Using the most memory";
+  `docs/FANS.md` `/var/log/lordos` and `lord-fand.log`; `docs/VOICE.md` and `docs/DISK-HEALTH.md` no longer read as in
+  development or due next, and both are in `docs/README.md`. On the site (en, es, pt): the Cleaner page says three looks
+  (only Noche follows the mode), six languages and "Since 0.8.7", its diagram's Spanish label is Spanish, the PC fans
+  answer mentions the AMD graphics card fan set by hand since 0.8.8.6, and the logs answer's broken phrase is fixed.
 
 ## [0.8.8.8-beta] - 2026-11-12
 
