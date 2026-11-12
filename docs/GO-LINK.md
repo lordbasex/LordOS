@@ -28,7 +28,7 @@ These are the maintainer's, final, and this document builds on them.
 | API | Public and general, not go-link-specific: permission prompt on first use, always-visible indicator with a stop control, encoded frames plus Opus, input, protected windows black. |
 | Two consents | The system permission (this app may use the API) and the acceptance of each visitor (this person may come in) are separate things. |
 | Delivery | `.deb` for amd64 and arm64 published first at desk.go-link.org with a signature, verified and mirrored byte for byte to the LordOS APT repository, a Store item, updates through APT, the app's own updater off, a published version never re-uploaded. |
-| Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.9. Live media came with 0.8.8, so the app requires 0.8.8 or later. |
+| Schedule | The API shipped in **LordOS 0.8.8-beta** (2026-11-02), together with live media, so the app requires 0.8.8 or later. (It was first planned for 0.8.7.1, before Machines, which shipped in 0.8.8.5.) |
 
 Non-goal: replacing 5673. Earlier versions of this document also left out a native viewer and the video call; the maintainer asked for both, and section 7 has them. A call is the visitor's to start, as on every platform: this viewer doesn't place calls.
 
@@ -391,7 +391,7 @@ The stages run in order except where noted. Percentages are of what each stage's
 LordOS build this document designs, captures a Wayland session only through the RemoteDesktop portal and the ScreenCast
 portal together (go-link:`pkg/portal/portal_linux.go`, `Available` reads `RemoteDesktop.AvailableDeviceTypes` and
 `ScreenCast.AvailableSourceTypes`), and never tries X11 there (go-link:`pkg/capture/capture_linux.go`, `Problem`). LordOS
-serves ScreenCast (0.8.8.8, in development) but not RemoteDesktop ([WAYLAND.md](WAYLAND.md)), so that build reports
+serves ScreenCast (since 0.8.8.8) but not RemoteDesktop ([WAYLAND.md](WAYLAND.md)), so that build reports
 `wayland_session` and streams go-link's own test card (go-link:`internal/services/screen_source.go`, the fallback
 `TestCardSource`), the PM5544 card with the clock and the FPS box. It looks the same as `lordos-testbench`'s card because
 that one was ported from go-link's (`server/src/testbench/card.c`); the testbench is not involved. The LordOS build, through
@@ -423,8 +423,8 @@ itself was not, since it isn't in LordOS's Store catalog.
 - **D5. Short verification code (decided).** Optional, defined on go-link's side.
 - **D6. Close the same-uid door on `remote.sock` (done, commit `2825555c`; checked in stage 1).** Every real client connects as root: the bridge connects before dropping root
   (`server/src/remote/conn.c:1246`, `:1278`), and the only tests that use it run with `sudo` (`server/tests/gpu_cycle.sh:50`). Refusing other uids
-  looks free and doesn't change what 5673 does, but it touches 5673's socket, so it's for the maintainer to approve. Until it's done, the
-  system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
+  looks free and doesn't change what 5673 does, but it touches 5673's socket, so it was for the maintainer to approve. Before it was done, the
+  system permission could be bypassed by any unsandboxed app of the user. Shipped in 0.8.8-beta.
 - **D7. The numbers (set in stage 1, still the maintainer's to change):** Stop is ⌃⌥⇧Esc, the indicator wait 2 s, keyframes at most one per 500 ms and, on a still screen, a burst of 3 then one per 30 s; 1,000 pointer events and 200 keys a second.
 - **D8. Scope limits (closed: not needed).** One core and 512 MB held: section 6.
 - **D10. The engine's own files (decided).** The companion may write its own app-data folder (`device.json`, logs, settings) and `~/Downloads`, nothing else. It reads the home's

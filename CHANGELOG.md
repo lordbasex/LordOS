@@ -37,6 +37,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `SESSIONS.md`. The site's "A desktop of its own" page (en, es, pt) counts web apps as a fourth kind of window, names
   the web runtime as the one exception to the no-WebKit rule and the newer helpers' libraries, marks global shortcuts
   as not yet checked, and rewrites the X11 and multi-display limits so they no longer contradict themselves.
+- **Security and privacy documents brought in line with the code (en, es, pt on the site).** The privacy policy lists the
+  daily update check that is on by default (it downloads the signed package lists, only notifies, can be turned off in
+  Store → Updates, and still runs once when no package list exists), web apps' icon fetches and Cloud accounts; the FAQ's
+  telemetry, sandbox, firewall and signed-packages answers say the same. The private-by-design and visible-firewall pages
+  describe the 0.8.8.8 ScreenCast portal instead of "no screen capture at all", add web apps to the isolation table and
+  `lord-clean`, `lord-vmdisplay` and `lord-screencast` to the sandboxed helpers. The code-signing page now says that
+  `https://` sources stay on HTTPS (it said the opposite) and adds LordOS's APT repository key and the signed system code.
+  `docs/PRIVACY.md` gains web apps, `lord-sftp`, `lord-sql`, `lord-vmdisplay` and a section on sharing a screen with a
+  Linux app; `docs/FIREWALL.md` lists every reserved firewall id (web apps and Machines included) and the portal's part in
+  "no screen capture"; `docs/PACKAGED-APPS.md` points to `apps/<id>.log` for a refused app; `docs/FLATPAK.md`,
+  `docs/SIGNING.md`, `docs/GO-LINK.md` and `docs/IMMUTABLE.md` drop "in development" for what shipped in 0.8.8.8 and fix
+  the versions they name.
 
 ## [0.8.8.8-beta] - 2026-11-12
 

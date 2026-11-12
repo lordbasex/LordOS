@@ -269,8 +269,8 @@ troubleshooting: `sudo /usr/lib/lordos/bin/lord-server --check-code`).
 
 Every app in `apps/` is a **system app** (`system: true`, set by `tools/build-theme.mjs`; a
 package can never claim it, `sdk/windows.js` `isSystemApp`). Store → Installed shows "System app —
-part of LordOS" where a Linux app has Remove, and About shows a "System app" badge (since 0.8.8.8, in
-development, the ones LordOS can do without have Deactivate instead: they stay installed and verified,
+part of LordOS" where a Linux app has Remove, and About shows a "System app" badge (since 0.8.8.8,
+the ones LordOS can do without have Deactivate instead: they stay installed and verified,
 see [PACKAGES.md](PACKAGES.md), "Store → Installed"). The `lordos`
 Debian package is marked `Protected: yes` (Debian's field for packages the system needs), so the
 Store's package engine refuses to remove it (`pkg.removeEssential`, the same rule as essential

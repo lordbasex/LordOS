@@ -52,7 +52,23 @@ The base system and every package in the Store's Debian section come from Debian
 - Every package list and every `.deb` is checked against the SHA-256 in that signed index before it is stored or passed to `dpkg`.
 - LordOS does these checks with its own package engine, and `apt` keeps working alongside it with the same keys.
 
-Downloads go over HTTP when the source asks for HTTPS, as with `apt` and `deb.debian.org`: security comes from the signatures and hashes, so someone on the network can see which packages you download but cannot change them.
+Downloads use HTTPS when the source's address is `https://` (never downgraded to HTTP, even by a redirect), and HTTP otherwise, as with `apt` and `deb.debian.org`: security comes from the signatures and hashes, so on plain HTTP someone on the network can see which packages you download but cannot change them.
+
+## LordOS's update repository
+
+Installed systems get LordOS's own updates from LordOS's APT repository at `lordos.org/apt`. Its index is signed with the **LordOS archive key**, an OpenPGP Ed25519 key separate from the release key, because APT needs OpenPGP:
+
+- Public key: [`packaging/keys/lordos-archive-keyring.asc`](https://github.com/lordbasex/LordOS/blob/main/packaging/keys/lordos-archive-keyring.asc) in the repository, installed on every system as `/usr/share/keyrings/lordos-archive-keyring.gpg` by the `lordos` package.
+- Fingerprint: `1DDA F390 107D F264 FA8A  0918 3972 CC6D E4DA 2336`
+- The repository's source is limited to that key (`Signed-By`), and its index and packages are checked the same way as Debian's above.
+
+To check the key by hand: `gpg --show-keys /usr/share/keyrings/lordos-archive-keyring.gpg` must show the fingerprint above.
+
+## LordOS's own code
+
+The desktop, the login screen and every native app are JavaScript bundles. Their sizes and SHA-256 are listed in `code-manifest.json`, signed with the **release key** above. Since 0.8.2 `lord-server`, which has that public key compiled in, checks the signature and each bundle's SHA-256 before it runs the bundle. A bundle that doesn't match is not run: About shows **Verified** for a signed system, **Development build** for an unsigned one, and **Modified — not loaded** when something doesn't match, and LordOS shows a recovery screen instead of a blank one when nothing is left to load.
+
+## Raspberry Pi archive key
 
 ## Raspberry Pi archive key
 
@@ -66,6 +82,7 @@ On the Raspberry Pi 5, the kernel and firmware come from the Raspberry Pi archiv
 
 - The **release key**'s private half lives only on the maintainer's computer, readable only by its owner, with an offline backup. It is never stored in the repository, on a build machine or on a server.
 - The private half of the **LordOS key** for `.lpk` packages is also kept outside the repository, on the maintainer's computer. Today it is a development key; the final key for public releases will replace it in the system and the change will be announced.
+- The private half of the **LordOS archive key** is also kept only on the maintainer's computer, with a backup copy.
 - Public keys are published in the repository and on this website, so anyone can check them.
 
 ## If a key is compromised
