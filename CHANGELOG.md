@@ -26,6 +26,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   policy gains a "Web apps" section on third-party service names and icons (no affiliation or endorsement; what "tested
   on LordOS" means), and `docs/WEBAPPS.md` says plainly which small scripts `lord-web` adds and that it doesn't change
   the sites. Feature pages Cleaner and Read aloud move one place down in the order.
+- **Web apps and paper docs synced with the code.** The Spanish and Portuguese papers give the backdrop blur's 27.7 ms
+  like the English one; the X11-without-Xwayland limitation points to `compositor.log` (`/var/log/lordos/users/<user>/`)
+  instead of the old `session.log`; the web apps page lists all four notification sounds (Automatic, the default, too);
+  `docs/WEBAPPS.md` drops "in development" for 0.8.8.8, describes the current memory pressure limits, lists the
+  `theme` limitation and says "Settings → Web Apps" as the English UI does (so does the English paper); the roadmap
+  and `docs/PAPER-VALIDATION.md` lose stale version notes; an unused diagram is removed from the web apps page's data.
 
 ## [0.8.8.8-beta] - 2026-11-12
 
