@@ -1,0 +1,7 @@
+{
+  "intro": "Jika aplikasi tidak merespons cukup lama, pilih aplikasi itu lalu klik Paksa Keluar. Aplikasi akan ditutup tanpa menyimpan.",
+  "none": "Tidak ada aplikasi yang terbuka",
+  "quit": "Paksa Keluar",
+  "shortcut": "Juga ada di menu mahkota: Paksa Keluar…",
+  "windows": "{count} jendela"
+}

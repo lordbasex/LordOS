@@ -1,0 +1,18 @@
+{
+  "bootTest": "Mengukur waktu mulai: mulai {k} dari {n} selesai. Memulai ulang dalam {s} dtk. Masuk juga menghentikan pengujian.",
+  "bootTestCancel": "Hentikan pengujian",
+  "busy": "Sebentar…",
+  "cancel": "Batal",
+  "confirmRestart": "Ada sesi yang terbuka: pekerjaan yang belum disimpan akan hilang. Tetap mulai ulang?",
+  "confirmShutdown": "Ada sesi yang terbuka: pekerjaan yang belum disimpan akan hilang. Tetap matikan?",
+  "error": "Sesi tidak dapat dibuka.",
+  "locked": "Layar terkunci",
+  "noUsers": "Tidak ada pengguna",
+  "password": "Kata sandi",
+  "restart": "Mulai Ulang",
+  "shutdown": "Matikan",
+  "wait": {
+    "other": "Terlalu banyak percobaan. Tunggu {count} detik."
+  },
+  "wrong": "Kata sandi salah."
+}

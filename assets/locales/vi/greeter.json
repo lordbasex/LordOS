@@ -1,0 +1,18 @@
+{
+  "bootTest": "Đang đo thời gian khởi động: đã xong lần {k} trên {n}. Khởi động lại sau {s} giây. Đăng nhập cũng sẽ dừng bài kiểm tra.",
+  "bootTestCancel": "Dừng kiểm tra",
+  "busy": "Chờ một chút…",
+  "cancel": "Hủy",
+  "confirmRestart": "Có phiên đang mở: công việc chưa lưu sẽ bị mất. Vẫn khởi động lại?",
+  "confirmShutdown": "Có phiên đang mở: công việc chưa lưu sẽ bị mất. Vẫn tắt máy?",
+  "error": "Không thể mở phiên.",
+  "locked": "Màn hình đã khóa",
+  "noUsers": "Không có người dùng",
+  "password": "Mật khẩu",
+  "restart": "Khởi động lại",
+  "shutdown": "Tắt máy",
+  "wait": {
+    "other": "Thử quá nhiều lần. Hãy chờ {count} giây."
+  },
+  "wrong": "Sai mật khẩu."
+}

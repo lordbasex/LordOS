@@ -1,0 +1,9 @@
+{
+  "isolated": "Berjalan terisolasi, dalam prosesnya sendiri",
+  "linux": "Aplikasi Linux",
+  "lordos": "Aplikasi LordOS",
+  "package": "Aplikasi terinstal (.lpk)",
+  "system": "Aplikasi sistem — bagian dari LordOS, diverifikasi bersamanya",
+  "title": "Tentang {app}",
+  "version": "Versi {v}"
+}
