@@ -44,6 +44,7 @@
     "other": "e altri {count}"
   },
   "err.invalid": "non è un archivio, oppure è danneggiato",
+  "err.missing-volume": "manca una parte dell’archivio diviso: «{name}»",
   "err.disk-full": "il disco è pieno",
   "err.too-big": "è troppo grande",
   "err.too-many": "contiene troppi file",

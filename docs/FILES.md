@@ -58,7 +58,9 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 - **Views** (❖1 to ❖4):
   - icons (cards, with `flexWrap`; thumbnails of PNG/JPEG up to 24 MB);
   - list (Name, Modified, Size and Kind, sorted by clicking the header);
-  - columns (the last three folders and the preview);
+  - columns (the last folders that fit and the preview). Each column's divider can be dragged to widen it (140 to
+    600 px) and double-clicked to fit its longest name; the width is kept per folder (`files.colWidths`, the 200 most
+    recent, `apps/files/colview.js`, GitHub #99);
   - gallery.
 
   In searches, Recents and Tags, the Kind column becomes the folder.

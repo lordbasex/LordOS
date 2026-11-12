@@ -100,6 +100,13 @@ How it draws:
 - **Formats read** by libarchive: zip, tar (gz, xz, zst, bz2, lzma, lz), 7z, cpio, iso, ar, rar
   (list and extract only, as libarchive allows) and standalone `.gz/.xz/.zst/.bz2`. It only writes
   zip.
+- **Split archives** (GitHub #103): byte-split volumes (`name.zip.001`, `name.7z.001`, `name.tar.gz.001`…) and
+  Info-ZIP splits (`name.z01` … `name.zip`) open as one archive from any of their volumes
+  (`sdk/archivevol.js` finds them in order and names a missing one). lord-server opens each volume as it opens a single
+  archive and passes the fds in order; the request says `"vols": [slots…]` instead of `"slot"` and lord-doc accepts
+  only `file` slots there. `h_arc.c` hands them to libarchive as one client data per volume (read, seek, skip and
+  switch callbacks on those fds), so no path, syscall or sandbox rule is added. At most 255 volumes. Split RAR sets
+  (`.part1.rar`) are not recognised yet.
 - **Encrypted files:** they're listed with their padlock; extracting them isn't supported yet
   (they're skipped with the reason "encrypted").
 
@@ -266,7 +273,7 @@ lord-server (no Poppler or libarchive)
 |---|---|
 | `sdk/doc.js` | `docAvailable()`, `<DocImage image>`, `releaseImage`, `fontInfo`, `fontSample`, `fontGrid`, `decodeImage`, `convertImage`, `makeTextPdf`, `makeImagePdf`, `pdfThumb`, `saveBlob`, `releaseBlob`, `warmDocs()` |
 | `sdk/pdf.js` | `pdf.open(path \| { blob })` → `render`, `select`, `find`, `outline`, `pageInfo`, `setField`, `annot`, `undo`, `save`, `blob`, `sizes`, `close`; `pdf.thumb` |
-| `sdk/archive.js` | `archive.list`, `extract(path, folder, { only, existing, onProgress })`, `create([paths], dest.zip)`, `tree`, `isArchive`, `stem` |
+| `sdk/archive.js` | `archive.list`, `extract(path, folder, { only, existing, onProgress })`, `create([paths], dest.zip)`, `tree`, `isArchive`, `stem`, `volumes(path)` (a split archive's volumes in order) |
 | `sdk/emoji.jsx` | `emoji.groups/search/name/withTone/insert/open`, `EmojiGrid`, `EmojiToneBar` |
 
 ## Performance (measured on VM 116: Xeon Silver 4108 at 1.8 GHz, 4 cores, no GPU)
@@ -304,7 +311,7 @@ The measurements show up in the session log:
 ```sh
 make -C server test        # includes build/arcpath-test, build/ipp-test and build/doc-test
 server/build/arcpath-test  # 37/37: names and link targets
-sh tests/doc_evil.sh       # 31/31 (in server/): malicious archives, formats, confinement and annotated copy
+sh tests/doc_evil.sh       # 36/36 (in server/): malicious archives, formats, split archives, confinement and annotated copy
 server/build/doc-test server/build/lord-doc pdf file.pdf 900   # open, draw and measure
 ```
 

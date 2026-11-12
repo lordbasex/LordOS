@@ -44,6 +44,7 @@
     "other": "y {count} más"
   },
   "err.invalid": "no es un comprimido o está dañado",
+  "err.missing-volume": "falta una parte del comprimido dividido: «{name}»",
   "err.disk-full": "el disco está lleno",
   "err.too-big": "es demasiado grande",
   "err.too-many": "tiene demasiados archivos",

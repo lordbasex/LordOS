@@ -8,8 +8,8 @@
  *   request(sid, op, json, prio, timeoutMs)  → request id (op: open render select find outline
  *                                              pageinfo setfield annot undo blob list)
  *   savePdf(sid, path)                       → id (new copy, never overwrites)
- *   arcList(path)                            → { sid, req }
- *   arcExtract(path, folder, json, exists)   → { sid, req } (new folder unless exists=true)
+ *   arcList(path | [volumes])                → { sid, req } (a split archive: every volume, in order)
+ *   arcExtract(path | [volumes], folder, json, exists) → { sid, req } (new folder unless exists=true)
  *   arcCreate([paths], dest.zip)             → { sid, req }
  *   util(op, json, path?, output?)           → id (fontinfo fontrender fontgrid maketext makeimage
  *                                              decode convert), in a utilities session
@@ -192,51 +192,112 @@ static JSValue pair(JSContext *c, int sid, int req) {
     return o;
 }
 
+/* The archive: one path, or an array with every volume of a split archive in order
+ * (name.7z.001, name.7z.002…; name.z01…name.zip). Each one is validated and opened here like a
+ * single archive; the helper gets the fds (slots 0..n-1), never the paths. Returns n, or -1 with
+ * the exception already thrown (and nothing left open). */
+static int open_volumes(JSContext *c, JSValueConst v, DocInitFd *init, JSValue *exc) {
+    int n = 1;
+    int arr = JS_IsArray(c, v) > 0;
+    if (arr) {
+        JSValue lv = JS_GetPropertyStr(c, v, "length");
+        int32_t len = 0;
+        JS_ToInt32(c, &len, lv);
+        JS_FreeValue(c, lv);
+        if (len < 1 || len > DOC_INIT_FDS - 1) { *exc = js_throw_code(c, "doc.itemCount", "max", lerr_int(DOC_INIT_FDS - 1), NULL); return -1; }
+        n = len;
+    }
+    for (int i = 0; i < n; i++) {
+        JSValue item = arr ? JS_GetPropertyUint32(c, v, (uint32_t)i) : JS_DupValue(c, v);
+        const char *p = JS_IsString(item) ? JS_ToCString(c, item) : NULL;
+        JS_FreeValue(c, item);
+        char real[PATH_MAX];
+        int bad = !p || resolve_read(p, real);
+        if (p) JS_FreeCString(c, p);
+        int fd = bad ? -1 : open_file(real);
+        if (fd < 0) {
+            int e = errno;
+            for (int k = 0; k < i; k++) close(init[k].fd);
+            *exc = bad ? throw_path(c) : js_throw_code(c, "fs.openFailed", "errno", lerr_errno(e), NULL);
+            return -1;
+        }
+        init[i].fd = fd;
+        init[i].role = "file";
+    }
+    return n;
+}
+
+/* {"slot":0} for one file, {"vols":[0,1,…]} for a split archive */
+static void vols_json(JBuf *j, int n) {
+    if (n == 1) { jb_raw(j, "\"slot\":0"); return; }
+    jb_raw(j, "\"vols\":[");
+    for (int i = 0; i < n; i++) jb_printf(j, "%s%d", i ? "," : "", i);
+    jb_raw(j, "]");
+}
+
 static JSValue f_arc_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    const char *p = arg_str(c, argc, argv, 0);
-    char real[PATH_MAX];
-    int bad = !p || resolve_read(p, real);
-    if (p) JS_FreeCString(c, p);
-    if (bad) return throw_path(c);
-    int fd = open_file(real);
-    if (fd < 0) return js_throw_code(c, "fs.openFailed", "errno", lerr_errno(errno), NULL);
-    DocInitFd init = { fd, "file" };
-    int sid = doc_session("arc", &init, 1);
+    if (argc < 1) return throw_path(c);
+    DocInitFd *init = calloc(DOC_INIT_FDS, sizeof *init);
+    if (!init) return JS_ThrowOutOfMemory(c);
+    JSValue exc = JS_UNDEFINED;
+    int n = open_volumes(c, argv[0], init, &exc);
+    if (n < 0) { free(init); return exc; }
+    int sid = doc_session("arc", init, n);
+    free(init);
     if (sid < 0) return js_throw_code(c, "doc.noHelper", NULL);
-    return pair(c, sid, doc_request(sid, DQ_ARC_LIST, "{\"slot\":0}", 10, NULL, 0, 0, 0));
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{");
+    vols_json(&j, n);
+    jb_raw(&j, "}");
+    int req = j.oom ? -1 : doc_request(sid, DQ_ARC_LIST, j.p, j.n, NULL, 0, 0, 0);
+    jb_free(&j);
+    return pair(c, sid, req);
 }
 
 /* arcExtract(archive, folder, json, exists): the folder is created (fails if it already exists) unless
- * exists=true (the Quick Preview cache); the json may carry only and rawname. */
+ * exists=true (the Quick Preview cache); the json may carry only and rawname. The archive is a path or
+ * the array of a split archive's volumes. */
 static JSValue f_arc_extract(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    const char *p = arg_str(c, argc, argv, 0), *d = arg_str(c, argc, argv, 1);
-    char real[PATH_MAX], target[PATH_MAX + 300];
-    int bad = !p || !d || resolve_read(p, real) || js_sys_resolve_target(d, target, sizeof target);
-    if (p) JS_FreeCString(c, p);
+    if (argc < 2) return throw_path(c);
+    const char *d = arg_str(c, argc, argv, 1);
+    char target[PATH_MAX + 300];
+    int bad = !d || js_sys_resolve_target(d, target, sizeof target);
     if (d) JS_FreeCString(c, d);
     if (bad) return throw_path(c);
+    DocInitFd *init = calloc(DOC_INIT_FDS, sizeof *init);
+    if (!init) return JS_ThrowOutOfMemory(c);
+    JSValue exc = JS_UNDEFINED;
+    int n = open_volumes(c, argv[0], init, &exc);
+    if (n < 0) { free(init); return exc; }
     int existing = argc > 3 && JS_ToBool(c, argv[3]) > 0;
-    if (!existing && mkdir(target, 0755)) return errno == EEXIST ? js_throw_code(c, "fs.exists", NULL) : js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
-    int dfd = open(target, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (dfd < 0) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
-    int fd = open_file(real);
-    if (fd < 0) { close(dfd); return js_throw_code(c, "fs.openFailed", "errno", lerr_errno(errno), NULL); }
-    DocInitFd init[2] = { { fd, "file" }, { dfd, "rw" } };
-    int sid = doc_session("arc", init, 2);
+    int dfd = -1, e = 0;
+    if (!existing && mkdir(target, 0755)) e = errno;
+    else if ((dfd = open(target, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)) < 0) e = errno;
+    if (dfd < 0) {
+        for (int i = 0; i < n; i++) close(init[i].fd);
+        free(init);
+        return e == EEXIST ? js_throw_code(c, "fs.exists", NULL) : js_throw_code(c, "sys.errno", "errno", lerr_errno(e), NULL);
+    }
+    init[n].fd = dfd;
+    init[n].role = "rw";
+    int sid = doc_session("arc", init, n + 1);
+    free(init);
     if (sid < 0) return js_throw_code(c, "doc.noHelper", NULL);
-    /* {"slot":0,"dir":1, ...what JS sent} */
+    /* {"slot":0 or "vols":[…], "dir":n, ...what JS sent} */
     size_t len;
     const char *json = arg_json(c, argc, argv, 2, &len);
-    char *full = malloc(len + 32);
-    int n = 0;
-    if (full) {
-        if (json && len > 2 && json[0] == '{') n = snprintf(full, len + 32, "{\"slot\":0,\"dir\":1,%s", json + 1);
-        else n = snprintf(full, len + 32, "{\"slot\":0,\"dir\":1}");
-    }
-    int req = full ? doc_request(sid, DQ_ARC_EXTRACT, full, (size_t)n, NULL, 0, 0, 0) : -1;
-    free(full);
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{");
+    vols_json(&j, n);
+    jb_printf(&j, ",\"dir\":%d", n);
+    if (json && len > 2 && json[0] == '{') { jb_raw(&j, ","); jb_rawn(&j, json + 1, len - 1); }
+    else jb_raw(&j, "}");
+    int req = j.oom ? -1 : doc_request(sid, DQ_ARC_EXTRACT, j.p, j.n, NULL, 0, 0, 0);
+    jb_free(&j);
     if (json) JS_FreeCString(c, json);
     return pair(c, sid, req);
 }

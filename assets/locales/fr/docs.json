@@ -44,6 +44,7 @@
     "other": "et {count} de plus"
   },
   "err.invalid": "ce n’est pas une archive, ou elle est endommagée",
+  "err.missing-volume": "il manque une partie de l’archive fractionnée : « {name} »",
   "err.disk-full": "le disque est plein",
   "err.too-big": "trop volumineux",
   "err.too-many": "trop de fichiers",

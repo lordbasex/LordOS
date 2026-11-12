@@ -8,6 +8,7 @@ import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
+import { colWidth, clampCol, fitCol, colsThatFit } from './colview.js';
 import { iconMetrics, listMetrics } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 
@@ -287,22 +288,53 @@ export function Preview({ e, big = false, name, noRead = false }) {
 
 // ---- columns (Miller) ----
 
-export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
+// Each column's divider widens it by dragging (as the list's column edges do) and fits it to its longest name with a
+// double click; the width is kept per folder (colview.js, GitHub #99). The view is laid out left to right in every
+// language, so the pointer's x needs no flip.
+export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths, onWidth }) {
   const t = useTheme();
+  const box = useRef(null);
+  const op = useRef(null);
+  const [live, setLive] = useState(null);       // { dir, w } while a divider is dragged
   const dirs = [root, ...chain.filter((p) => ctx.isDir(p))];
   const last = chain[chain.length - 1];
   const file = last && !ctx.isDir(last) ? ctx.entryAt(last) : null;
-  // the ones that fit: the last 3 folders
-  const shown = dirs.slice(-3);
+  const widthOf = (dir) => (live && live.dir === dir ? live.w : colWidth(widths, dir));
+  useEffect(() => {
+    const mv = addListener('pointermove', (e) => {
+      const o = op.current;
+      if (!o || (!o.moved && Math.abs(e.x - o.x) < 3)) return;
+      o.moved = true;
+      setLive({ dir: o.dir, w: clampCol(o.w + e.x - o.x) });
+    });
+    const up = () => {
+      const o = op.current;
+      op.current = null;
+      if (o?.moved) setLive((l) => { if (l) onWidth?.(l.dir, l.w); return null; });
+    };
+    const a = addListener('pointerup', up);
+    return () => { mv(); a(); };
+  }, [onWidth]);
+  const startDrag = (ev, dir) => { ev.stopPropagation(); if (ev.button) return; op.current = { dir, x: ev.x, w: widthOf(dir) }; };
+  const fit = (ev, dir, items) => {
+    ev.stopPropagation();
+    op.current = null;
+    const names = items.map((e) => lord.measureText(String(ctx.shownName ? ctx.shownName(e) : e.name), 13, 400));
+    onWidth?.(dir, fitCol(names, items.map((e) => tagsOf(e.path).length * 9)));
+  };
+  // the ones that fit next to the preview (the last 3 until the view has been laid out)
+  const avail = box.current ? lord.getLayout(box.current.id)[2] : 0;
+  const count = colsThatFit(dirs.map(widthOf), avail);
+  const shown = dirs.slice(-count);
   const offset = dirs.length - shown.length;
   return (
-    <View style={{ flex: 1, flexDirection: 'row', direction: 'ltr' }}>
+    <View ref={box} style={{ flex: 1, flexDirection: 'row', direction: 'ltr' }}>
       {shown.map((dir, ci) => {
         const items = sortEntries(entriesOf(dir), sort, ctx.sortOpts);
         const level = offset + ci;
         return (
-          <View key={dir} dropPath={dir} style={{ width: 220, flexDirection: 'row' }}>
-            <View style={{ flex: 1 }}>
+          <View key={dir} dropPath={dir} style={{ width: widthOf(dir), flexDirection: 'row' }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
             <ScrollView focusable={false} style={{ flex: 1 }}>
               <View style={{ paddingHorizontal: 6, paddingVertical: 6 }}>
                 {items.map((e) => {
@@ -325,7 +357,11 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
               </View>
             </ScrollView>
             </View>
-            <View style={{ width: 1, backgroundColor: t.separator }} />
+            {/* the divider: drag to widen, double click to fit the longest name */}
+            <View onMouseDown={(ev) => startDrag(ev, dir)} onDoubleClick={(ev) => fit(ev, dir, items)}
+              style={{ width: 5, alignItems: 'center', cursor: 'ew-resize' }}>
+              <View style={{ width: 1, flex: 1, backgroundColor: live?.dir === dir ? t.accent : t.separator }} />
+            </View>
           </View>
         );
       })}
