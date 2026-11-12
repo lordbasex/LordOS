@@ -1,9 +1,10 @@
 # Databases
 
-Databases (`apps/databases/`, 0.8.8.7 in development) is the MySQL / MariaDB client: favorites, a table's
-structure, content, relations, triggers and information, a query editor, a console, server processes, users,
-import and export. Its screens follow the approved mockups (Connect, Structure, Content, Query, Relations,
-Triggers, Table Info, Users, Console, Processes, Export, Import, Sheets, Preferences). It reads Sequel Ace's and
+Databases (`apps/databases/`, since 0.8.8.7) is the MySQL / MariaDB client. The approved mockups cover
+Connect, Structure, Content, Query, Relations, Triggers, Table Info, Users, Console, Processes, Export, Import,
+Sheets and Preferences. Today the app has favorites and groups, Connect, Structure, Content, Query, Table Info
+and Console; the Relations, Triggers, Users and Processes panes only show a "later" placeholder, and Export,
+Import (of data) and Preferences are not built yet (phase 2, below). It reads Sequel Ace's and
 Sequel Pro's favorites from a Mac disk or home folder (see "Importing").
 
 ## How it connects
@@ -108,7 +109,7 @@ One query runs per connection at a time (`busy` otherwise); at most 16 connectio
   "favorites": [{
     "id": "prod-shop", "name": "prod-shop", "group": "g1", "color": 0,
     "type": "tcp", "host": "db.example.net", "port": 3306, "user": "shop_admin", "database": "shop",
-    "socket": "", "ssh": { "host": "", "port": 22, "user": "", "key": "" },
+    "socket": "", "ssh": { "host": "", "port": 22, "user": "", "key": "", "hostKey": "" },
     "tls": { "mode": "preferred", "ca": "", "cert": "", "key": "" },
     "cloud": { "service": "", "region": "", "iamProfile": "" },
     "readOnly": false, "production": true, "timeZone": "", "trust": "",
@@ -117,8 +118,9 @@ One query runs per connection at a time (`busy` otherwise); at most 16 connectio
 
 `type`: `tcp`, `socket`, `ssh`, `cloud`. `tls.mode`: `off`, `preferred` (encrypt when the server offers it),
 `required`, `verify` (required, and the certificate and host name must check). `color`: 0–6 (red, orange,
-yellow, green, blue, purple, gray) or null. Phase 1 opens `tcp`, `socket` and `cloud` with a password;
-`ssh` and IAM tokens answer `unsupported` until phase 2.
+yellow, green, blue, purple, gray) or null. `tcp`, `socket` and `cloud` open with a password,
+`ssh` through the SSH tunnel (above; `ssh.hostKey` is the trusted server key); a `cloud` favorite with an IAM
+profile and no password answers `unsupported` (IAM tokens are phase 2).
 
 ## Importing
 

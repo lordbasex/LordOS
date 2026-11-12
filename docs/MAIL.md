@@ -74,7 +74,7 @@ run in one sandboxed helper process, **`lord-maild`**.
   to (no DNS rebinding). Redirects (at most 3) go through the same check; each image is capped at
   5 MB and 20 s. Tested by `build/mailc-test`.
 - **OpenSSL** is linked only by `lord-maild`, `lord-sessiond` and, since 0.8.5, `lord-fetch` (the blocklist
-  downloader) and `lord-tls` (the package engine's HTTPS); see `ARCHITECTURE.md`.
+  downloader) and `lord-tls` (the package engine's HTTPS) and, since 0.8.8.7, `lord-sql` (Databases); see `ARCHITECTURE.md`.
   `lord-server` never links it.
 - **The compositor never waits**: requests are asynchronous (`lord.mail.poll()`), and inside
   `lord-maild` network work runs on account threads, never on the thread that reads the channel.
@@ -177,7 +177,7 @@ become a notification ("2 new messages", with Open). UI requests (open, flags, m
 drafts) interrupt the IDLE through an eventfd. Every 15 minutes all folders sync again. Gmail's
 "All Mail" is not synced in the background.
 
-**Paused (0.8.8.8, in development).** With Mail deactivated in Store → Installed (PACKAGES.md, "Store →
+**Paused (0.8.8.8).** With Mail deactivated in Store → Installed (PACKAGES.md, "Store →
 Installed"), the accounts file carries `"mailPaused": true` and `accounts_apply_config` stops the mail
 accounts' workers (as when an account's server changes) without dropping the account or its cache; the
 next config without it starts them again. `"davPaused": true` does the same for the calendar-and-contacts
@@ -216,8 +216,9 @@ sorted by date. It is rebuilt from the cache in milliseconds at start and never 
 
 ### HTML without executing anything
 
-LordOS has no web engine (WebKit/Chromium are not allowed), and Mail does not need one. The
-HTML part goes through **our sanitizer** (`server/src/mail/html.c`): a tolerant tokenizer that
+Mail uses no web engine: `lord-server` and `lord-maild` never link one (since 0.8.8.8 WebKit runs
+only in `lord-web`, the separate process of the optional web apps, `WEBAPPS.md`), and Mail does not
+need one. The HTML part goes through **our sanitizer** (`server/src/mail/html.c`): a tolerant tokenizer that
 builds a small tree in JSON — blocks, layout tables (rows, cells, widths, colors, padding,
 alignment), text runs (bold, monospace, color, size, background, underline/strike), images and
 links — and `apps/mail/HtmlView.jsx` draws it with View/Text/Image. Common newsletter markup
@@ -460,7 +461,7 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
 
 `make -C server test` runs, among the rest:
 
-- `build/mail-test` (47,395 checks): the IMAP response parser (literals, bracketed sections,
+- `build/mail-test` (47,467 checks): the IMAP response parser (literals, bracketed sections,
   modified UTF-7, UID sets), MIME (nested multipart, base64 / quoted-printable, RFC 2047 words,
   RFC 2231 continuations, address lists with groups and comments, dates, 25 charsets including
   KOI8-R, ISO-8859-15 and UTF-16), the HTML sanitizer against hostile input (script, event
@@ -476,7 +477,7 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
 - `build/mailnet-test` (138 checks, needs the OpenSSL headers): HTTP chunk sizes and
   Content-Length (overflow, garbage, negative), header limits, IMAP literals near `SIZE_MAX`,
   every literal size around the buffer-growth boundaries, endless lines — over a socketpair.
-- `build/mailc-test` (69 checks): the connector's endpoint policy and the public-address check.
+- `build/mailc-test` (77 checks): the connector's endpoint policy and the public-address check.
 - `make -C server mail-asan`: the same suites under AddressSanitizer and UBSan.
 - `build/maild-cli '{"op":"status"}' --wait 5` (not part of `test`) drives `lord-maild` from a
   terminal like `lord-server` does; with another `HOME` it uses another cache.

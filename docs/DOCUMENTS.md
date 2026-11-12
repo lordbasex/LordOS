@@ -68,6 +68,8 @@ In the style of a classic document viewer:
   the copy.
 - **Print** (❖P or ⎙): opens the system dialog with the document as it is on screen, including
   forms and annotations.
+- **Drop from Files** (0.8.8.8): PDFs dragged from Files open; the first one here, each of the others in a
+  new window.
 - **Password-protected PDFs:** the password is asked for before opening.
 - **If the helper crashes** with a damaged PDF, the viewer says so and offers to reopen it. The
   desktop carries on as usual.
@@ -300,7 +302,9 @@ lord-server (no Poppler or libarchive)
   is already prepared (Files "warms" it when it opens, with a minimal PDF), so the helper's startup
   isn't paid. On a current desktop CPU it should come in below.
 
-The measurements show up in the session log:
+The measurements show up in the user's log files (`/var/log/lordos/users/<user>/`, or `~/.cache/lordos`
+without lord-sessiond; SYSTEM.md, "Log files"): the `js:` lines in `shell.log`, the `lord-doc:` lines in
+`compositor.log`:
 - `js: pdf: … first page in N ms (N pages)`;
 - `js: quick-look: <kind> <name> in N ms` (Quick Preview, from Files);
 - with the file `~/.cache/lordos/doc-trace` (or `LORD_DOC_TRACE=1`), `lord-doc: request N: queue X
@@ -330,7 +334,8 @@ server/build/doc-test server/build/lord-doc pdf file.pdf 900   # open, draw and 
   without complex-script shaping: Arabic and Indic scripts come out unjoined.
 - **Emoji:**
   - ZWJ sequences (❤️‍🔥, 👩‍💻) show as their parts, because the text engine doesn't join them yet;
-  - in Linux apps it types by pasting, because there's no Wayland `text-input`.
+  - in Linux apps it still types by pasting: the picker doesn't commit through `text-input-v3` yet, although
+    LordOS's input methods compose inside Linux apps since 0.8.8.8.
 - **Untested:**
   - Quick Preview of audio and video with `media.poster` was not measured here (VM 116 had no lord-media
     when this was written; `media.poster` exists now, `MEDIA.md`);

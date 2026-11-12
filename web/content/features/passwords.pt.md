@@ -40,7 +40,7 @@ Vários métodos podem conviver. Por padrão, o cofre se tranca sozinho depois d
 
 **A janela.** A própria janela de Senhas roda como um processo em sandbox próprio (`lord-server --app passwords`), fora do JavaScript do desktop. Os valores revelados nunca entram na memória do desktop. As listas mostram títulos e nomes de usuário, nunca segredos; um valor só trafega quando você clica em revelar, copiar ou editar.
 
-**A tela.** A janela de Senhas é protegida: sai preta em capturas de tela, gravações de tela e na área de trabalho remota.
+**A tela.** A janela de Senhas é protegida: sai preta em capturas de tela, gravações de tela, na área de trabalho remota e, desde a 0.8.8.8, no compartilhamento de tela ou de uma janela com apps Linux.
 
 **A área de transferência.** Um segredo copiado fica fora do histórico da área de transferência, é marcado como sensível para os apps Linux que respeitam essa convenção e é apagado depois de 30 segundos (configurável), se ainda estiver lá.
 
@@ -68,6 +68,7 @@ As duas são exceções aprovadas no regulamento do projeto (`AGENTS.md`), testa
 - **Copie qualquer coisa e saiba o que aconteceu com ela.** Títulos e notas também têm botão de copiar, um clique direito num item copia qualquer campo ou o código 2FA, e uma senha copiada mostra os segundos que faltam para ser apagada, com Manter. O LordOS diz ao Senhas só se a própria cópia ainda está na área de transferência, nunca o que a área de transferência contém.
 - **Colar funciona nos apps isolados.** Mail, Calendário, Contatos, Lembretes e Senhas podem ler a área de transferência uma vez, em até 2 segundos, depois de uma colagem que você pede na janela deles; qualquer outra leitura ainda precisa da permissão.
 - **Um ícone novo:** uma chave dourada sobre grafite.
+- **Desde a 0.8.8.8, todo campo de senha do LordOS tem um olho e um aviso de Caps Lock:** a tela de login e de bloqueio, Wi-Fi e VPN, o desbloqueio do cofre e do chaveiro, Usuários, E-mail, Bancos de dados, Arquivos e a área de trabalho remota, entre outros. O olho mostra o texto, que volta a ficar oculto quando o campo perde o foco e com Enter; se o campo tem o foco com o Caps Lock ligado, ele avisa.
 
 ## As perguntas do leitor cético
 

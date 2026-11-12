@@ -28,7 +28,7 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 1. **The helper starts locked in.** `lord-server` launches `lord-maild` from a fixed path, with no arguments and a minimal environment. Before reading anything from the network it loads the system's certificate authorities and locks itself in with the same helper sandbox as LordOS's other decoders: write access only to its cache folder, no `socket`, `connect`, `bind`, `execve` or `fork`, threads only, no capabilities, its own cgroup.
 2. **It asks for each connection.** To reach a server it sends `lord-server` a request: host and port. `lord-server` checks that endpoint against your accounts file, and only then connects and passes the connected socket back. Allowed endpoints are exactly your accounts' IMAP, SMTP and calendar/contacts servers, plus other hosts of the same domain on port 443 when a calendar server redirects during discovery.
 3. **TLS is checked properly.** Every connection is verified against the system's certificate store and the server name. A certificate that doesn't verify is never accepted silently: Mail shows the problem and its fingerprint, and only if you press *Trust This Certificate* is that exact certificate remembered for that account.
-4. **HTML is translated, not executed.** LordOS has no web engine, and Mail doesn't need one. LordOS's own sanitizer turns a message's HTML into a small tree of blocks, tables, text runs, images and links, and Mail draws it with native views. Scripts, styles, frames, forms, SVG, media, event handlers and hidden "preheader" tricks are dropped.
+4. **HTML is translated, not executed.** Mail uses no web engine (WebKit runs only in `lord-web`, the separate process of the optional web apps), and it doesn't need one. LordOS's own sanitizer turns a message's HTML into a small tree of blocks, tables, text runs, images and links, and Mail draws it with native views. Scripts, styles, frames, forms, SVG, media, event handlers and hidden "preheader" tricks are dropped.
 
 ## What you see and decide
 
@@ -43,7 +43,7 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 
 ## The skeptical reader's questions
 
-**What if a message exploits a bug in the parser?** That is what the design assumes will eventually happen. The parser runs in `lord-maild`, which can't create sockets, can't run programs and can only write to its own cache. The parsers are tested heavily: 47,395 checks in `mail-test`, including mutation fuzzing of MIME, charsets, the HTML sanitizer, iCalendar, vCard, XML and the calendar sync helpers, plus separate suites for the network layer and the connector.
+**What if a message exploits a bug in the parser?** That is what the design assumes will eventually happen. The parser runs in `lord-maild`, which can't create sockets, can't run programs and can only write to its own cache. The parsers are tested heavily: 47,467 checks in `mail-test`, including mutation fuzzing of MIME, charsets, the HTML sanitizer, iCalendar, vCard, XML and the calendar sync helpers, plus separate suites for the network layer and the connector.
 
 **Could a hijacked helper talk to my local network?** Only to the servers in your accounts file. Image grants are limited to public addresses, and the check runs on the address actually connected, so a DNS trick can't redirect it to your router.
 
