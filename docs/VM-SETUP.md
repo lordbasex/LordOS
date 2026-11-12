@@ -1880,6 +1880,8 @@ sudo apt-get install -y logrotate  # 2026-11-11: /etc/logrotate.d/lordos (docs/S
                                    # missing from this install because the ISO predates it
 sudo apt-get install -y --no-install-recommends picard   # 2026-11-11: a Qt 5 app for GitHub #96 (QT_QPA_PLATFORM's
                                    # xcb fallback, docs/WAYLAND.md "How to open an app")
+sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through pkexec, for GitHub #107 (the X cookie,
+                                   # docs/WAYLAND.md "How it starts"); x11-utils (xdpyinfo) came with the ISO
 ```
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The

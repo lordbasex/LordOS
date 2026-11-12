@@ -528,7 +528,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   restricted app's runtime folder is an empty one, `lord.fs` neither reads nor writes the file (`FSOPS_PF_XAUTH`), and
   lord-web's environment is a fixed list without it. New test `build/xauth-test` (file format, 0600, `O_EXCL`, links
   at either name never followed, both variables removed by both launchers) and cases in `fsops-test`;
-  docs/WAYLAND.md and docs/PRIVACY.md (GitHub #107)
+  checked on VM 127: before, root's `xdpyinfo` was refused; after, `pkexec /usr/sbin/gparted` opened GParted as
+  root on the desktop, root with the cookie connects and without it is refused, XTerm opened by LordOS carries
+  `XAUTHORITY`, and through the real launcher a `no-files` or `no-mic` app gets neither variable nor the file in its
+  runtime folder. Note: a client of the same user without the cookie is now refused as well (everything LordOS
+  starts has `XAUTHORITY`). docs/WAYLAND.md and docs/PRIVACY.md (GitHub #107)
 - Isolated apps (Mail, Calendar, Contacts, Reminders, Passwords): holding a key did nothing more than one press,
   so Backspace, Delete and the arrows had to be pressed again for every character. These apps run as Wayland clients
   (`lord-server --app`), and the compositor sends its clients only the press and the release of a key, with the rate

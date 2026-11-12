@@ -770,8 +770,11 @@ like any other Linux app.
   (GParted's polkit action has `allow_gui`; sudo keeps both by default), and root connects with the
   cookie. Before this, Xwayland let in only its own uid and refused root with "Authorization
   required, but no authorization protocol specified". The socket is still 0600, so in practice only
-  this user's programs and root's reach it. The file is rewritten with the same cookie if it is gone
-  when Xwayland starts again, and removed at logout (`xwl_stop`). If it can't be written (no private
+  this user's programs and root's reach it. **Same uid included:** with `-auth`, a client of this user
+  without the cookie is refused too, so a program that drops `XAUTHORITY` from its environment can't
+  open a window (everything LordOS starts has it). If the file is gone when Xwayland starts again it
+  is written again with the same cookie (the X client that started it had already read the missing
+  file and fails once; the next ones connect), and it is removed at logout (`xwl_stop`). If it can't be written (no private
   runtime folder), Xwayland starts as before, without `-auth`, and the session log says so.
   **Who doesn't get it:** restricted Linux apps and isolated apps lose `XAUTHORITY` together with
   `DISPLAY` (`xauth_env_drop`, `server/src/wl/xauth.h`), and a restricted app's own view mounts an
@@ -781,6 +784,21 @@ like any other Linux app.
   (Flatpak copies the entry for the display into its own sandbox, as with any X server). Tested by
   `build/xauth-test` (the file format, 0600, `O_EXCL`, a link at either name never followed, and
   both variables removed by the two launchers).
+  **Checked on VM 127 (2026-11-11, the 0.8.8.8 release candidate):** before, `sudo env DISPLAY=:0 xdpyinfo`
+  gave "Authorization required, but no authorization protocol specified"; with this, Xwayland runs
+  with `-auth /run/user/1000/lord-xauth.0` (0600, 105 bytes: the `lordos-autotest` entry and the wild
+  one), XTerm and UXTerm opened by LordOS carry `XAUTHORITY` and open, root with the cookie connects
+  (`sudo` keeps both variables), root or alex without it or with a wrong one is refused, and
+  `pkexec /usr/sbin/gparted` from a terminal (pkexec's text prompt) opened GParted as root on the desktop
+  (`xwayland-gparted-root.png`). Through the real launcher (`build/launch-cli`), an unrestricted probe
+  app got both variables and read the file; the same app with `no-files` or `no-mic` got neither and
+  its runtime folder held only `wayland-0`, `pipewire-0` and `pulse`. An isolated app (Calendar) had
+  neither variable.
+
+  | |
+  |---|
+  | ![gparted](xwayland-gparted-root.png) |
+  | GParted run as root with `pkexec` from a terminal, its window on the LordOS desktop through Xwayland's cookie |
 - Xwayland runs in its own scope (`lordos-xwayland.scope`, never lord-server's), in an empty network
   namespace inside a user namespace that maps only the user (it has no network at all), with
   `no_new_privs`, a minimal environment and its log in `/var/log/lordos/users/<user>/xwayland.log`. **XTEST is
