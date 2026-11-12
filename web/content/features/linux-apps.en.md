@@ -30,12 +30,12 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 
 - **The frame.** Apps that ask the compositor to draw their frame (Qt apps, foot, Chromium with its system title bar) get the theme's frame. GTK 3 apps such as Firefox get it through a second decoration protocol LordOS also speaks. GTK 4 apps that draw their own bar keep it, and LordOS trims their shadow.
 - **Browsers with a single bar.** Since 0.8.4, the preinstalled Chromium and Firefox draw one bar with their tabs and the window buttons inside it, on the side the LordOS theme uses (left in Lord Flow, right in Lord Classic), following a theme or light/dark change live. One switch in Settings → Appearance, "Browsers: tabs in the title bar", puts both back under the LordOS frame. The compositor honours whichever frame an app asks for, even when it changes while the window is open.
-- **Light and dark, live.** LordOS serves the "Settings" desktop portal itself on the session bus, so GTK 4 and libadwaita apps follow the mode, accent colour and button order. GTK 3 apps follow through the GSettings keyfile, and LordOS ships a matching GTK theme. Both change live when you switch modes. From 0.8.8 to 0.8.8.7, the latest release, GTK 4 apps stayed dark with a blue accent whatever you chose; this is fixed in 0.8.8.8 (in development).
+- **Light and dark, live.** LordOS serves the "Settings" desktop portal itself on the session bus, so GTK 4 and libadwaita apps follow the mode, accent colour and button order. GTK 3 apps follow through the GSettings keyfile, and LordOS ships a matching GTK theme. Both change live when you switch modes. From 0.8.8 to 0.8.8.7 GTK 4 apps stayed dark with a blue accent whatever you chose; this is fixed in 0.8.8.8.
 - **Open and save with LordOS's dialog** (since 0.8.8): Linux apps with no file dialog of their own ask through the standard FileChooser portal, and LordOS answers with its own dialog, which looks and works like Files, inside the home folder.
 - **Administrator rights through LordOS's prompt** (since 0.8.8): an app that asks with `pkexec`, such as a launcher updating itself, gets LordOS's administrator prompt, which names the app and the command, instead of stopping with error 127. Programs that ask polkit over D-Bus still find no agent.
 - **Clicks reach the right surface** (since 0.8.8): the compositor now honours the input region an app sets, so Firefox's tabs, toolbar and pages answer the mouse again.
 - **One clipboard.** Text copied in a Linux app pastes in LordOS and the other way round; images stay available after the source app closes and appear in the clipboard history (❖V).
-- **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says. In 0.8.8.8 (in development) LordOS's own text fields and the Terminal take part too.
+- **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says. Since 0.8.8.8 LordOS's own text fields and the Terminal take part too.
 - **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
 - **Sharp at any scale.** Each display is a separate `wl_output`, and fractional scaling lets GTK 4, Qt 6 and Chromium render sharp at 125–175 %.
 - **Touchpad gestures.** LordOS's own touchpad driver passes pinch, swipe and hold gestures to Linux apps, so pinch-to-zoom works in browsers.
@@ -49,9 +49,9 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 
 [[shot:3]]
 
-## In development for 0.8.8.8
+## New in 0.8.8.8
 
-Not released yet; the latest release is 0.8.8.7.
+Released on 12 November 2026, the latest release.
 
 - **Drag and drop.** Drag files from Files into a Linux app (it gets a copy; hold Shift to move them), from a Linux app into a Files folder, or between Linux apps. Only apps that are not in a sandbox can hand files to LordOS. X11 apps (through Xwayland) take part too, built but not yet checked on our test machine.
 - **Copied files.** Copy in Files and paste in a Linux file manager, or the other way round. Files copied in another app are pasted only after Files asks you, with Cancel as the default.
@@ -70,11 +70,11 @@ Global shortcuts, drags with X11 apps, sharp X11 apps and Terminal apps are buil
 
 ## Which Wayland protocols are there
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard (in 0.8.8.8, in development, also for LordOS's input methods). In 0.8.8.8 (in development) the compositor also offers `xdg_activation_v1`, `zxdg_exporter_v2` and `zxdg_importer_v2`, and `xdg_wm_dialog_v1`, and `wl_data_device` gains drag and drop; later in 0.8.8.8 also `zwp_keyboard_shortcuts_inhibit_manager_v1` and `wp_security_context_manager_v1`.
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard (since 0.8.8.8 also for LordOS's input methods). Since 0.8.8.8 the compositor also offers `xdg_activation_v1`, `zxdg_exporter_v2` and `zxdg_importer_v2`, and `xdg_wm_dialog_v1`, and `wl_data_device` gains drag and drop; later in 0.8.8.8 also `zwp_keyboard_shortcuts_inhibit_manager_v1` and `wp_security_context_manager_v1`.
 
 **Check it from the outside** (since 0.8.5): the **Test Bench** (`lordos-testbench`) is a test-pattern window that checks the display server as any app sees it: frame timing and when frames really reach the screen, every key of the keyboard, the mouse and wheel, and the Wayland protocols the system offers.
 
-Deliberately absent: any protocol that lets an app capture the screen or other apps' windows. In 0.8.8.8 (in development) an app can only ask through the ScreenCast portal, and gets only the screen or window you pick, while the sharing indicator shows it.
+Deliberately absent: any protocol that lets an app capture the screen or other apps' windows. Since 0.8.8.8 an app can only ask through the ScreenCast portal, and gets only the screen or window you pick, while the sharing indicator shows it.
 
 [[shot:4]]
 
@@ -82,7 +82,7 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 
 **Are Linux apps sandboxed?** Not by default. This is important: they run as your user, as on any Debian system, and can read your home folder. What LordOS adds is a per-app cgroup, attribution in the Monitor, the kernel-enforced per-app firewall (allow, deny, LAN only, no incoming connections, rules by domain or address), and restrictions you can set per app: no camera, no USB and no Bluetooth sockets (in the kernel), no microphone (LordOS's PipeWire guard plus the sound card's capture nodes), no notifications, and "no access to your files", applied from the next launch. They don't cover the clipboard, Bluetooth through BlueZ on the system bus, or programs started outside the app launcher. Only LordOS's own `.lpk` apps get the full sandbox.
 
-**Can a Linux app see other windows or record the screen?** Not through LordOS. The compositor only gives an app its own surfaces and offers no screen-capture protocol, X11 apps only see other X11 apps (never Wayland apps or LordOS itself), up to 0.8.8.7 there is no screen-cast portal (in 0.8.8.8, in development, an app can ask for one, and gets only what you pick in LordOS's own chooser, never if you restricted it from capturing the screen), and a restricted app is also denied the framebuffer device, so protected windows like Passwords stay private from them too.
+**Can a Linux app see other windows or record the screen?** Not through LordOS. The compositor only gives an app its own surfaces and offers no screen-capture protocol, X11 apps only see other X11 apps (never Wayland apps or LordOS itself), up to 0.8.8.7 there is no screen-cast portal (since 0.8.8.8 an app can ask for one, and gets only what you pick in LordOS's own chooser, never if you restricted it from capturing the screen), and a restricted app is also denied the framebuffer device, so protected windows like Passwords stay private from them too.
 
 **What about X11-only apps?** Since LordOS 0.8.3 Beta they open through Xwayland, started only when one of them connects, with the theme's window frame, their icon in the Dock and the shared clipboard. They get the same per-app identity, firewall and Monitor attribution as Wayland apps; apps with device or file restrictions get no X display. XTerm, a Java Swing app and an SDL game were tested.
 
@@ -96,10 +96,10 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 
 ## Honest limits
 
-- **X11 apps can see each other,** as on any X11 desktop; they are sharp only at 100 % scale (in 0.8.8.8, in development, they scale themselves and look sharp, unless an app reads no DPI setting).
-- **Not in 0.8.8.7, the latest release:** drag and drop between apps, LordOS input methods (Korean, Japanese, Chinese) inside Linux apps, and app activation requests. All three are in development for 0.8.8.8 (above), where drags with X11 apps are built but not yet checked on our test machine.
-- **SVG-only icons:** up to 0.8.8.7 LordOS doesn't draw SVG and uses the PNG icons Debian publishes for most apps, or the initial; in 0.8.8.8 (in development) `lord-media` draws SVG icons in its sandbox.
-- **Terminal apps** with a `.desktop` file aren't shown in the app launcher up to 0.8.8.7; start them from the Terminal. In 0.8.8.8 (in development) they open in a Terminal tab.
+- **X11 apps can see each other,** as on any X11 desktop; they are sharp only at 100 % scale (since 0.8.8.8 they scale themselves and look sharp, unless an app reads no DPI setting).
+- **Drags with X11 apps** are built and tested but not yet checked on our test machine. Drag and drop between apps, LordOS input methods (Korean, Japanese, Chinese) inside Linux apps and app activation requests came in 0.8.8.8 (above).
+- **SVG-only icons:** up to 0.8.8.7 LordOS doesn't draw SVG and uses the PNG icons Debian publishes for most apps, or the initial; since 0.8.8.8 `lord-media` draws SVG icons in its sandbox.
+- **Terminal apps** with a `.desktop` file aren't shown in the app launcher up to 0.8.8.7; start them from the Terminal. Since 0.8.8.8 they open in a Terminal tab.
 - **GTK 3 apps keep their own blue accent;** Qt 6's reading of the colour scheme from the portal hasn't been tested.
 
 ## Read the source

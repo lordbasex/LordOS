@@ -748,7 +748,7 @@
         "Inline images and font ligatures",
         "Sessions survive a restart; tmux integration",
         "New in 0.8.8: ❖+click or Ctrl+click opens a web address in the default browser",
-        "New in 0.8.8.7: Files mode shows a server's files beside this computer's over the tab's own ssh session, and Settings and Profiles open in windows of their own"
+        "Since 0.8.8.7: Files mode shows a server's files beside this computer's over the tab's own ssh session, and Settings and Profiles open in windows of their own"
       ],
       "es": [
         "Pestañas, paneles divididos y ventana desplegable",
@@ -757,7 +757,7 @@
         "Imágenes en línea y ligaduras tipográficas",
         "Las sesiones sobreviven a un reinicio; integración con tmux",
         "Nuevo en 0.8.8: ❖+clic o Ctrl+clic abre una dirección web en el navegador predeterminado",
-        "Nuevo en 0.8.8.7: el modo Archivos muestra los archivos de un servidor junto a los de este equipo por el mismo ssh de la pestaña, y Ajustes y Perfiles se abren en ventanas propias"
+        "Desde la 0.8.8.7: el modo Archivos muestra los archivos de un servidor junto a los de este equipo por el mismo ssh de la pestaña, y Ajustes y Perfiles se abren en ventanas propias"
       ],
       "pt": [
         "Abas, painéis divididos e janela suspensa",
@@ -766,7 +766,7 @@
         "Imagens em linha e ligaduras tipográficas",
         "As sessões sobrevivem a um reinício; integração com tmux",
         "Novo na 0.8.8: ❖+clique ou Ctrl+clique abre um endereço da web no navegador padrão",
-        "Novo na 0.8.8.7: o modo Arquivos mostra os arquivos de um servidor ao lado dos deste computador pelo próprio ssh da aba, e Ajustes e Perfis abrem em janelas próprias"
+        "Desde a 0.8.8.7: o modo Arquivos mostra os arquivos de um servidor ao lado dos deste computador pelo próprio ssh da aba, e Ajustes e Perfis abrem em janelas próprias"
       ]
     }
   },
@@ -1263,7 +1263,7 @@
     },
     "features": {
       "en": [
-        "New in 0.8.8.7",
+        "Since 0.8.8.7",
         "Favorites in groups with colors; TCP, local socket and managed cloud connections with TLS",
         "Structure shows every change as the ALTER TABLE before it runs",
         "Content with filters, sorting and row editing; Query with completion, history and Explain",
@@ -1271,7 +1271,7 @@
         "Passwords stay in Passwords; the firewall and Monitor show it as its own row"
       ],
       "es": [
-        "Nuevo en 0.8.8.7",
+        "Desde la 0.8.8.7",
         "Favoritos en grupos con colores; conexiones TCP, por socket local y a servicios en la nube con TLS",
         "Estructura muestra cada cambio como el ALTER TABLE antes de ejecutarlo",
         "Contenido con filtros, orden y edición de filas; Consulta con autocompletado, historial y Explain",
@@ -1279,7 +1279,7 @@
         "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila"
       ],
       "pt": [
-        "Novo na 0.8.8.7",
+        "Desde a 0.8.8.7",
         "Favoritos em grupos com cores; conexões TCP, por socket local e a serviços na nuvem com TLS",
         "Estrutura mostra cada mudança como o ALTER TABLE antes de rodar",
         "Conteúdo com filtros, ordenação e edição de linhas; Consulta com autocompletar, histórico e Explain",

@@ -97,9 +97,9 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
-## In development for 0.8.8.8
+## New in 0.8.8.8
 
-Not released yet; the latest release is 0.8.8.7.
+Released on 12 November 2026, the latest release.
 
 - **The Terminal works over the tab's `ssh`.** Port forwards from a profile (a badge on the tab, Open in the browser, Copy, Close), files dragged from Files onto an `ssh` pane uploaded to the remote shell's folder, ❖ + click on a name in `ls` output to download it, and Open, Open With and Edit for a server's file in Files mode, where each save goes back to the server. All over the same connection, with no second login and no program run.
 - **Text fields select as on any desktop,** in every LordOS app: Ctrl/⌘+A, Shift with the arrows, a mouse drag, a double click on a word, typing over the selection, copy and cut (never from a password field).
@@ -109,17 +109,19 @@ Not released yet; the latest release is 0.8.8.7.
 - **The keyboard reaches everything.** Tab and Shift+Tab move between the controls of every LordOS app, with a focus ring that shows only once you use the keyboard; Space and Enter press, the arrows move sliders and selectors, and the menus of both themes work with the arrows, typed letters and Escape. F10, or the left ⌥ on its own, opens the menu bar.
 - **Password fields** have an eye to show what you typed, hidden again when you leave the field, and tell you when Caps Lock is on.
 - **Middle click pastes** what you selected, in LordOS's own text fields and the Terminal as in Linux apps; Settings → Mouse & Trackpad turns it off.
-- **Linux apps fit in.** Drag and drop and copied files between Files and Linux apps, LordOS's input methods inside them, their tray icons and their players in Now Playing (see *Your Linux apps too*). Later in 0.8.8.8 also sharing a screen or a window, SVG icons, apps that take the shortcuts, global shortcuts, drags with X11 apps and sharp X11 apps on HiDPI.
+- **Linux apps fit in.** Drag and drop and copied files between Files and Linux apps, LordOS's input methods inside them, their tray icons and their players in Now Playing (see *Your Linux apps too*). Also sharing a screen or a window, SVG icons, apps that take the shortcuts, global shortcuts, drags with X11 apps and sharp X11 apps on HiDPI.
 - **Lists, tables and choices from the keyboard.** The SDK's lists and tables select with the arrows, Shift and Ctrl and find a row as you type; drop-downs, tabs, radio buttons, checkboxes, popovers, tooltips and progress bars work from the keyboard too, and the wheel moves sliders.
 - **The caret follows the text as it is drawn.** In Hebrew or Arabic mixed with numbers the selection is drawn piece by piece, the arrows move on screen, and an emoji, a flag or a letter with its accents is never split.
-- **Web apps.** Install web apps from the Store, each in a window and process of its own, with several accounts and permissions asked once (Settings → Web apps). They need the optional `lordos-web` package; a closed app can keep running behind its tray icon. They follow the desktop's light or dark mode, live, except pages whose colors come only from CSS media queries. Tried on our test machine.
+- **Web apps.** Install web apps from the Store, each in a window and process of its own, with several accounts and permissions asked once (Settings → Web apps). They need the optional `lordos-web` package; a closed app can keep running behind its tray icon. They follow the desktop's light or dark mode, live, except pages whose colors come only from CSS media queries. Tried on our test machine. The Store's catalog has 37 web apps; one is marked tested on LordOS so far.
+- **Logs in one place.** Every LordOS log is in `/var/log/lordos`, one file per app, rotated, and the previous session's log is kept; the Logs app shows each line's time and level.
+- **From your reports on GitHub.** Fold a whole Mail account, File → Open recent in the Text Editor, remove any Linux app a Debian package brought from Store → Installed and deactivate built-in apps you don't use, turn a Cloud account off without losing its sign-in, a smaller Dock, and about twenty fixes, from X11 apps run as root to rejoining a saved Wi-Fi network.
 - **Locking from logind.** `loginctl lock-sessions` and other admin tools lock the screen; only your password unlocks it.
 
 The keyboard widgets, the caret and logind's lock are built and tested, but not yet checked on our test machine.
 
 ## New in 0.8.8.7
 
-Released on 9 November 2026, the latest release.
+Released on 9 November 2026.
 
 - **The Terminal shows a server's files.** In a tab connected with `ssh`, Files mode puts this computer on the left and the server on the right, over the same connection, with no second login. The SFTP protocol is spoken by `lord-sftp`, a sandboxed helper that gets open descriptors and never a path, and LordOS runs no program for it. The Terminal's Settings and a new Profiles window open in windows of their own, and Claude Code's footer now works inside `screen`, `tmux` and `ssh`.
 - **Databases.** A new app for MySQL and MariaDB, with each connection in its own sandboxed helper, `lord-sql`, and its own row in the firewall and the Monitor.
@@ -151,8 +153,8 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
-- **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. In 0.8.8.7, the latest release, drag and drop with Linux apps and LordOS input methods inside them are missing; both are in development for 0.8.8.8, where X11 apps also take drags and scale themselves on HiDPI, built but not yet checked on our test machine (`docs/WAYLAND.md`).
-- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and keyboard navigation with a focus ring is in development for 0.8.8.8; a screen reader, zoom and high contrast are on the roadmap.
+- **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Since 0.8.8.8 drag and drop with Linux apps and LordOS input methods inside them work, and X11 apps also take drags and scale themselves on HiDPI, built but not yet checked on our test machine (`docs/WAYLAND.md`).
+- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and since 0.8.8.8 keyboard navigation with a focus ring; a screen reader, zoom and high contrast are on the roadmap.
 
 ## Read the source
 

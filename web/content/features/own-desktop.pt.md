@@ -97,9 +97,9 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 - **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
-## Em desenvolvimento para a 0.8.8.8
+## Novo na 0.8.8.8
 
-Ainda não lançada; o último lançamento é a 0.8.8.7.
+Lançada em 12 de novembro de 2026, o último lançamento.
 
 - **O Terminal trabalha pelo `ssh` da aba.** Redirecionamentos de porta a partir de um perfil (um selo na aba, Abrir no navegador, Copiar, Fechar), arquivos arrastados do Arquivos para um painel com `ssh` enviados à pasta do shell remoto, ❖ + clique num nome da saída do `ls` para baixá-lo, e Abrir, Abrir com e Editar para um arquivo do servidor no modo Arquivos, onde cada salvamento volta ao servidor. Tudo pela mesma conexão, sem um segundo login e sem executar programa nenhum.
 - **Os campos de texto selecionam como em qualquer desktop,** em todos os apps do LordOS: Ctrl/⌘+A, Shift com as setas, um arraste com o mouse, um duplo clique numa palavra, digitar sobre a seleção, copiar e recortar (nunca de um campo de senha).
@@ -109,17 +109,19 @@ Ainda não lançada; o último lançamento é a 0.8.8.7.
 - **O teclado chega a tudo.** Tab e Shift+Tab passam de um controle a outro em todos os apps do LordOS, com um anel de foco que só aparece quando você usa o teclado; Espaço e Enter pressionam, as setas movem controles deslizantes e seletores, e os menus dos dois temas funcionam com as setas, letras digitadas e Escape. F10, ou o ⌥ esquerdo sozinho, abre a barra de menus.
 - **Os campos de senha** têm um olho para ver o que você digitou, que volta a ficar oculto quando você sai do campo, e avisam quando o Caps Lock está ativado.
 - **O clique do meio cola** o que você selecionou, nos campos de texto do próprio LordOS e no Terminal assim como nos apps Linux; Ajustes → Mouse e trackpad desliga isso.
-- **Os apps Linux se integram.** Arrastar e soltar e arquivos copiados entre o Arquivos e os apps Linux, os métodos de entrada do LordOS dentro deles, os ícones de bandeja e os players na Central de Controle (veja *Seus apps Linux também*). Mais adiante na 0.8.8.8 também compartilhar uma tela ou uma janela, ícones SVG, apps que tomam os atalhos, atalhos globais, arrastar com apps X11 e apps X11 nítidos em HiDPI.
+- **Os apps Linux se integram.** Arrastar e soltar e arquivos copiados entre o Arquivos e os apps Linux, os métodos de entrada do LordOS dentro deles, os ícones de bandeja e os players na Central de Controle (veja *Seus apps Linux também*). Também compartilhar uma tela ou uma janela, ícones SVG, apps que tomam os atalhos, atalhos globais, arrastar com apps X11 e apps X11 nítidos em HiDPI.
 - **Listas, tabelas e escolhas pelo teclado.** As listas e tabelas do SDK selecionam com as setas, Shift e Ctrl e acham uma linha enquanto você digita; menus suspensos, abas, botões de opção, caixas de seleção, popovers, dicas e barras de progresso também funcionam pelo teclado, e a roda move os controles deslizantes.
 - **O cursor segue o texto como ele é desenhado.** Em hebraico ou árabe misturados com números a seleção é desenhada por trechos, as setas andam na tela, e nunca se parte um emoji, uma bandeira ou uma letra com seus acentos.
-- **Apps web.** Instale apps web pela Loja, cada um numa janela e num processo próprios, com várias contas e permissões perguntadas uma vez (Ajustes → Apps web). Eles precisam do pacote opcional `lordos-web`; um app fechado pode continuar rodando atrás do ícone da bandeja. Eles seguem o modo claro ou escuro do desktop, ao vivo, exceto as páginas cujas cores vêm só de media queries de CSS. Testado na nossa máquina de testes.
+- **Apps web.** Instale apps web pela Loja, cada um numa janela e num processo próprios, com várias contas e permissões perguntadas uma vez (Ajustes → Apps web). Eles precisam do pacote opcional `lordos-web`; um app fechado pode continuar rodando atrás do ícone da bandeja. Eles seguem o modo claro ou escuro do desktop, ao vivo, exceto as páginas cujas cores vêm só de media queries de CSS. Testado na nossa máquina de testes. O catálogo da Loja tem 37 apps web; por enquanto um está marcado como testado no LordOS.
+- **Os registros num só lugar.** Todos os registros do LordOS ficam em `/var/log/lordos`, um arquivo por app, rotacionados, e o registro da sessão anterior é mantido; o app Registros mostra a hora e o nível de cada linha.
+- **Dos seus relatos no GitHub.** Recolher uma conta inteira do Mail, Arquivo → Abrir recentes no Editor de texto, remover pela Loja → Instalados qualquer app Linux que um pacote Debian trouxe e desativar os apps incluídos que você não usa, desligar uma conta da Nuvem sem perder o login, um Dock menor, e uns vinte consertos, dos apps X11 rodando como root a voltar a entrar numa rede Wi-Fi salva.
 - **Bloqueio pelo logind.** `loginctl lock-sessions` e outras ferramentas de administração bloqueiam a tela; só a sua senha a desbloqueia.
 
 Os widgets com teclado, o cursor e o bloqueio do logind estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
 
 ## Novo na 0.8.8.7
 
-Lançada em 9 de novembro de 2026, o último lançamento.
+Lançada em 9 de novembro de 2026.
 
 - **O Terminal mostra os arquivos de um servidor.** Numa aba conectada com `ssh`, o modo Arquivos põe este computador à esquerda e o servidor à direita, pela mesma conexão, sem um segundo login. O protocolo SFTP é falado pelo `lord-sftp`, um ajudante em sandbox que recebe descritores abertos e nunca um caminho, e o LordOS não executa nenhum programa para isso. Os Ajustes do Terminal e uma nova janela de Perfis abrem em janelas próprias, e o rodapé do Claude Code agora funciona dentro do `screen`, do `tmux` e do `ssh`.
 - **Bancos de dados.** Um app novo para MySQL e MariaDB, com cada conexão no seu próprio ajudante em sandbox, `lord-sql`, e uma linha própria no firewall e no Monitor.
@@ -151,8 +153,8 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 - **No Raspberry Pi 5 um app ocupado ainda reduz pela metade os quadros por segundo do desktop:** cerca de 31 em vez de 60 no teste de desktop do LordBench enquanto todos os núcleos estão ocupados. Com essa carga o chip gráfico leva 14–16 ms por quadro em vez de 1,5, sem reduzir a frequência nem por temperatura; na 0.8.7, uma medição apontou a causa na memória: 28 ms por quadro com quatro núcleos lendo memória, 1,4 ms com quatro núcleos só girando. Quanto disso o compositor pode evitar continua em aberto (`docs/GPU.md`).
 - **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para uma versão futura. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
 - **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
-- **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Na 0.8.8.7, a última versão lançada, faltam arrastar e soltar com os apps Linux e os métodos de entrada do LordOS dentro deles; os dois estão em desenvolvimento para a 0.8.8.8, onde os apps X11 também aceitam arrastes e se escalam sozinhos em HiDPI, já construído mas ainda não verificado na nossa máquina de testes (`docs/WAYLAND.md`).
-- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e a navegação pelo teclado com um anel de foco está em desenvolvimento para a 0.8.8.8; leitor de tela, zoom e alto contraste estão no roadmap.
+- **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Desde a 0.8.8.8 funcionam arrastar e soltar com os apps Linux e os métodos de entrada do LordOS dentro deles, e os apps X11 também aceitam arrastes e se escalam sozinhos em HiDPI, já construído mas ainda não verificado na nossa máquina de testes (`docs/WAYLAND.md`).
+- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e desde a 0.8.8.8 a navegação pelo teclado com um anel de foco; leitor de tela, zoom e alto contraste estão no roadmap.
 
 ## Leia o código
 

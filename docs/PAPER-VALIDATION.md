@@ -208,15 +208,15 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 2.4 | Updates bring only the Recommends a new version adds | Test (`build/pkg-test`: the new Recommends come with the upgrade) | Holds in the test; the update against the signed repository not recorded here |
 | 5.1 | Four more verified Cloud providers | `assets/cloud/providers.json` (evidence per provider), `docs/CLOUD.md` §19 | Holds as recorded evidence |
 
-## 0.8.8.8 (in development, not released; the paper's editions of 2026-11-10 and 2026-11-11)
+## 0.8.8.8 (released on 2026-11-12 as 0.8.8.8-beta; the paper's editions of 2026-11-10, 2026-11-11 and 2026-11-12)
 
 | § | Claim | How | State |
 |---|---|---|---|
 | 1.2, 5.1, 6.7 | Port forwards, drop uploads and `ls` downloads run no program: they use the tab's own `ssh` control socket, as Files mode does | Design (`server/src/term/sshmux.c`, `apps/terminal/forwards.js`, `dropupload.js`); Test (`build/sftpc-test`: a forward to the test server's own `sshd`, its banner read through it, a host with a space refused) | Holds in the test; checked on a real session against one private OpenSSH server per `CHANGELOG.md` |
 | 6.7 | A forward listens on 127.0.0.1 only | Design (`sshmux.c`, `docs/TERMINAL.md`) | Not automated beyond `sftpc-test` |
-| 5.1, 6.7 | The remote shell's directory (OSC 7) is kept only as an absolute path with no control characters, and no longer replaces the local one | `CHANGELOG.md`, Unreleased | Not automated here |
+| 5.1, 6.7 | The remote shell's directory (OSC 7) is kept only as an absolute path with no control characters, and no longer replaces the local one | `CHANGELOG.md`, 0.8.8.8-beta | Not automated here |
 | 5.1 | ❖ + click finds a name in `ls` and `ls -l` output, looked up in the reported directory, the prompt's, the title's, then the home | Test (`tests/terminal_lsnames_test.mjs`, 38 checks) | Holds |
-| 5.1, 6.7 | Uploads never follow a link and never replace a name on the server; Edit's saves are the one upload that replaces a file | `CHANGELOG.md`, Unreleased; checked on a real session (a name already there kept, the copy `notes (2).txt`) | Not automated here |
+| 5.1, 6.7 | Uploads never follow a link and never replace a name on the server; Edit's saves are the one upload that replaces a file | `CHANGELOG.md`, 0.8.8.8-beta; checked on a real session (a name already there kept, the copy `notes (2).txt`) | Not automated here |
 | 5.1 | A trigger tried on a sample line says what it matches and what the action would do | Test (`tests/terminal_triggers_test.mjs`, 13) | Holds |
 | 5.1 | An account's Details shows provider, backend type, sign-in and server, never the user name, email or a secret | Test (`server/tests/cloud_model_test.mjs`, accountDetails, 6 checks) | Holds |
 | 5.1 | Photos moves pictures to the Trash, one or a selection, and asks before deleting in a cloud account | Test (`server/tests/photos_trash_test.mjs`, 20 checks) | Holds for the logic |
@@ -258,6 +258,16 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.4 | A probe peaks at 224 MB PSS; one account of a messaging web app in WPE's reference browser used about 810 MB PSS | Measured (`tests/web_probe_test.py --pss` on the main machine; VM 127 with WPE's reference browser, `docs/WEBAPPS.md`) | Measured once |
 | 5.4 | Web apps follow the desktop's light or dark mode through `matchMedia`, live; `lord-server` tells `lord-web` only `light` or `dark`, from its own process; CSS-only pages stay light | Test (`build/webapp-test`, `tests/webscheme_test.mjs`) and VM 127 (a test page printing `matchMedia('(prefers-color-scheme: dark)').matches`, switched in Control Center; a call from another process refused) | Holds on VM 127 (2026-11-11) |
 | 6.7 | The fixes from the two automated scans and the reviews (Flatpak identity record, slot counter, `dnd_tick`, `lord-web`'s DmaBuf) | Test (new cases in `build/kbinhibit-test`; the suites: 139 passed, 0 failed, 2 skipped after the last fix) | Holds |
+| 5.4 | The catalog has 37 web apps, each passed `lord-web --probe` on 2026-11-11; only one chat app is marked tested on LordOS | `assets/webapps/catalog.json` (`verified` per app); Test (`tests/webapps_model_test.mjs`: no app inside another's scope, no shared scope, every icon used) | Holds in the test; 36 apps not tested on LordOS, as the paper says |
+| 5.4 | Discover shows web apps; installing the first one also installs `lordos-web` | `CHANGELOG.md`, 0.8.8.8-beta; checked on VM 127 (banner, page, Install, Open with the app's own window and its Dock and tray icons) | Holds on VM 127 |
+| 5.4 | A web app's Edit commands and right-click menu come from closed lists checked on both sides, and `lord-web` obeys only the `lord-server` that started it | Test (`build/webapp-test`, `server/src/web/webedit.c`) | Holds in the tests; not recorded on the VM |
+| 5.4 | A hidden web app window's page stops painting: a busy page from 115 % of a CPU to 0.4 % while minimized | Measured once on the development VM (`CHANGELOG.md`, 0.8.8.8-beta) | Measured once |
+| 6.7 | Logs in `/var/log/lordos`: the user's folder made by `lord-sessiond` without following links, a 16 MB cap by the writers, the previous session kept as `.prev`, no logrotate rule inside `users/` | Test (`build/lordlog-test`, 121 checks; `server/tests/logfile_test.mjs`); migration `007-0.8.8.8-logs.sh` | Holds in the tests; a login on the VM with the new folders is not recorded in `CHANGELOG.md` |
+| 5.1 | Mail folds a whole account and still counts its unread mail (#121) | Test (`server/tests/mail_foldertree_test.mjs`) | Holds for the logic |
+| 5.1 | Text Editor: File → Open recent, five files (#113) | Test (`server/tests/editor_recent_test.mjs`) | Holds for the logic |
+| 5.1, 2.4 | Store → Installed removes a packaged Linux app found through dpkg's own lists, never an Essential, Protected or required package nor one that would take `lordos`; 21 built-in apps can be deactivated | Test (`test_dpkg_owner` in `build/pkg-test`, `tests/apps_off_model_test.mjs`) | Holds in the tests; on VM 127 only that the Store opens was recorded |
+| 5.1 | A Cloud account turned off is never given to rclone and keeps its settings and sign-in | Test (`t_onoff` in `build/cloud-test`, `tests/cloud_signin_fake.sh`, `tests/cloud_model_test.mjs`) | Holds in the tests |
+| 5.1 | The GitHub fixes of this round (#94, #96, #97, #99, #100, #101, #103, #104, #107, #109, #110, #111, #112, #117, #118, #123, #124, #125, #128, #130) | Each has its test named in `CHANGELOG.md`, 0.8.8.8-beta; #96, #107 and #124 also checked on VM 127 | Holds in the tests; #101 not tried against the reporter's kind of server |
 
 ## What the paper must change for 0.8.5
 

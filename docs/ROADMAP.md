@@ -733,9 +733,11 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.6-beta"); no new I
   [#68](https://github.com/lordbasex/LordOS/issues/68)), and the rest in `CHANGELOG.md`, "Fixed".
 - [x] The CPU's microcode updates on amd64, and the same command-line tools on every image (below, under 0.8.9).
 
-## Release 0.8.8.7-beta (planned)
+## Release 0.8.8.7-beta ✅ (2026-11-09)
 
-- [ ] **Store updates install a package's new Recommends**, as `apt upgrade` does: Store → Updates (`pkg-upgrade`,
+An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.7-beta"); no new ISO.
+
+- [x] **Store updates install a package's new Recommends**, as `apt upgrade` does: Store → Updates (`pkg-upgrade`,
   `server/src/pkg/pkg.c`) plans without Recommends, so a system updated from the Store to 0.8.8.6 got its new Depends
   (the microcode) but not the command-line tools added as Recommends (`screen`, `mc`, `htop`, `tcpdump`, `jq`, `rsync`,
   `rfkill`, Tesseract's languages…); `install.sh`, `apt` and the images do install them. Only Recommends that are new
@@ -743,9 +745,43 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.6-beta"); no new I
 - [ ] **Logitech's special keys and buttons** (MX Keys, MX Master 3/3S): evdev keys with defaults, device profiles as
   data, and per-device actions in Settings → Keyboard and Mouse & Trackpad (work on branch `feat/special-keys`).
   HID++ (battery, DPI, SmartShift, gesture button) is a design for review first (`docs/drafts/HIDPP.md`, needs an
-  AGENTS.md exception).
+  AGENTS.md exception). Not in 0.8.8.7 or 0.8.8.8; still open.
 - [ ] The LordOS Imager 0.8.8.6 for the Mac (built and signed on the maintainer's Mac) and
-  [#73](https://github.com/lordbasex/LordOS/issues/73) closed once it is published.
+  [#73](https://github.com/lordbasex/LordOS/issues/73) closed once it is published. Not in 0.8.8.7 or 0.8.8.8; still open.
+
+## Release 0.8.8.8-beta ✅ (2026-11-12)
+
+An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new ISO, the images stay 0.8.8's.
+
+- [x] **The LordOS Web Runtime** (`WEBAPPS.md`): web apps installed from the Store, each app and profile in its own
+  `lord-web` process with Debian's WPE WebKit, in the optional package `lordos-web`; a catalog of 37 apps, one marked
+  tested on LordOS. Runs on VM 127.
+- [x] **Desktop parity for Linux apps** (`DESKTOP-PARITY.md`, `WAYLAND.md`): drag and drop and copied files with Files,
+  LordOS's input methods inside Linux apps, tray icons, MPRIS, `xdg-activation`, dialogs kept over their window, the
+  ScreenCast portal with the sandboxed `lord-screencast`, SVG icons and apps that take the shortcuts (all but
+  `xdg-activation` and the dialogs checked on VM 127; those two by tests); global shortcuts, XDND with X11 apps, security contexts and X11 apps scaled on HiDPI (built and tested, not yet
+  checked on the VM).
+- [x] **Keyboard focus, keyboard menus and password fields with an eye** in every LordOS app (checked on VM 127); the
+  SDK's lists, tables and choice controls with the keyboard and the bidi caret (built and tested, not yet checked on
+  the VM).
+- [x] **The Terminal over the tab's own `ssh`**: port forwards, uploads by dropping files, downloads from `ls`, the
+  remote shell's directory, Open and Edit for a server's file; Terminal apps (`Terminal=true`) in a Terminal tab.
+- [x] **Logs in `/var/log/lordos`** (`SYSTEM.md`, "Log files"): one per app, rotated, the previous session kept;
+  migration `007-0.8.8.8-logs.sh`.
+- [x] Fixes and requests from GitHub: [#94](https://github.com/lordbasex/LordOS/issues/94),
+  [#96](https://github.com/lordbasex/LordOS/issues/96), [#97](https://github.com/lordbasex/LordOS/issues/97),
+  [#99](https://github.com/lordbasex/LordOS/issues/99), [#100](https://github.com/lordbasex/LordOS/issues/100),
+  [#101](https://github.com/lordbasex/LordOS/issues/101), [#103](https://github.com/lordbasex/LordOS/issues/103),
+  [#104](https://github.com/lordbasex/LordOS/issues/104), [#107](https://github.com/lordbasex/LordOS/issues/107),
+  [#109](https://github.com/lordbasex/LordOS/issues/109), [#110](https://github.com/lordbasex/LordOS/issues/110),
+  [#111](https://github.com/lordbasex/LordOS/issues/111), [#112](https://github.com/lordbasex/LordOS/issues/112),
+  [#113](https://github.com/lordbasex/LordOS/issues/113), [#115](https://github.com/lordbasex/LordOS/issues/115),
+  [#116](https://github.com/lordbasex/LordOS/issues/116), [#117](https://github.com/lordbasex/LordOS/issues/117),
+  [#118](https://github.com/lordbasex/LordOS/issues/118), [#119](https://github.com/lordbasex/LordOS/issues/119),
+  [#121](https://github.com/lordbasex/LordOS/issues/121), [#123](https://github.com/lordbasex/LordOS/issues/123),
+  [#124](https://github.com/lordbasex/LordOS/issues/124), [#125](https://github.com/lordbasex/LordOS/issues/125),
+  [#128](https://github.com/lordbasex/LordOS/issues/128), [#130](https://github.com/lordbasex/LordOS/issues/130) and
+  [#64](https://github.com/lordbasex/LordOS/issues/64); the rest in `CHANGELOG.md`.
 
 ## Release 0.8.9 (planned)
 
