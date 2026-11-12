@@ -1,6 +1,6 @@
 // What the bar shows (sdk/menubarmodel.js, issue #58): the choices' defaults, the settings patch, the outputs a sound
 // panel offers and the month calendar's cells. node server/tests/menubar_model_test.mjs
-import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor,
+import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, cleanerPanelAction, outputChoices, monthCells, weekStartFor,
   menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from '../../sdk/menubarmodel.js';
 import { sharedTicker } from '../../sdk/ticker.js';
 
@@ -24,6 +24,13 @@ eq('patch unknown key', menuBarPatch({}, 'nope', false), {});
 eq('cleaner patch', menuBarPatch({ cleaner: { lastScan: 1 } }, 'cleaner', false), { cleaner: { lastScan: 1, menuItem: false } });
 eq('cleaner shown by default', cleanerItemShown({}), true);
 eq('cleaner hidden', cleanerItemShown({ cleaner: { menuItem: false } }), false);
+// the panel's one entry point (issue #116)
+eq('cleaner panel: no scan', cleanerPanelAction({}), { section: 'scan', label: 'cleaner.panel.open', note: 'cleaner.panel.noScan', size: 0 });
+eq('cleaner panel: null settings', cleanerPanelAction(null).section, 'scan');
+eq('cleaner panel: last scan', cleanerPanelAction({ cleaner: { lastScan: { allocated: 4096 } } }),
+  { section: 'cleanup', label: 'cleaner.panel.freeUp', note: 'cleaner.panel.lastScan', size: 4096 });
+eq('cleaner panel: scan that found nothing', cleanerPanelAction({ cleaner: { lastScan: { allocated: 0 } } }).section, 'scan');
+eq('cleaner panel: junk size', cleanerPanelAction({ cleaner: { lastScan: { allocated: 'x' } } }).section, 'scan');
 
 // outputs: the default one marked, the description as the label
 const st = { sinks: [

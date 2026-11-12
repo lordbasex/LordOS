@@ -15,7 +15,7 @@ import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { cleaner } from './cleaner.js';
 import { cleanerPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
-import { cleanerItemShown } from './menubarmodel.js';
+import { cleanerItemShown, cleanerPanelAction } from './menubarmodel.js';
 import { isAppOff } from './appsoff.js';
 
 
@@ -57,7 +57,7 @@ function Panel({ p, onClose }) {
     const id = setInterval(() => setD((o) => read(o)), 2000);
     return () => clearInterval(id);
   }, []);
-  const c = settings.get().cleaner || {};
+  const act = cleanerPanelAction(settings.get());      // the one way into Cleaner (issue #116)
   const open = (section) => { onClose(); wm.open('cleaner', { args: { section } }); };
   const word = statusWord(d.st.free, d.st.total, waiting);
   const host = call(() => systemInfo().hostname, '') || '';
@@ -79,12 +79,9 @@ function Panel({ p, onClose }) {
     d.disks ? h(Text, { style: { fontSize: 12, color: p.sub, textAlign: 'start' } }, t('cleaner.panel.devices', { count: d.disks })) : null,
     h(View, { style: { padding: 12, gap: 12, flexDirection: 'row', alignItems: 'center', borderRadius: 14, backgroundColor: p.glass, border: `1px solid ${p.line}` } },
       h(View, { style: { flex: 1 } }, h(Text, { style: { fontSize: 12, color: p.sub, textAlign: 'start' } },
-        c.lastScan && c.lastScan.allocated > 0 ? t('cleaner.panel.lastScan', { size: formatBytes(c.lastScan.allocated) }) : t('cleaner.panel.noScan'))),
-      h(View, { onClick: () => open('cleanup'), style: { height: 36, paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center', background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` } },
-        h(Text, { style: { fontSize: 13, fontWeight: 600, color: p.btnText } }, t('cleaner.panel.freeUp')))),
-    h(View, { style: { flexDirection: 'row', justifyContent: 'space-between' } },
-      h(Text, { onClick: () => open('scan'), style: { fontSize: 13, color: p.sub } }, t('cleaner.panel.open')),
-      h(Text, { onClick: () => open('settings'), style: { fontSize: 13, color: p.sub } }, t('cleaner.panel.prefs'))));
+        act.size ? t(act.note, { size: formatBytes(act.size) }) : t(act.note))),
+      h(View, { onClick: () => open(act.section), style: { height: 36, paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center', background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` } },
+        h(Text, { style: { fontSize: 13, fontWeight: 600, color: p.btnText } }, t(act.label)))));
 }
 
 function CleanerItem({ height }) {

@@ -453,6 +453,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   tooltip and the drop areas already scale with the icon. Only Lord Flow has a Dock; Lord Classic's taskbar is
   unchanged. A stored size only became valid, so nothing migrates. Tests: `server/tests/dock_model_test.mjs` (the
   clamp, junk values, the old minimum, the badge sizes); docs/DOCK.md (GitHub #128)
+- **The Cleaner panel by the clock has one way into the app.** It used to end with three: the button beside the
+  last scan, an "Open Cleaner" text and a "Settings" text. Now only the button stays: with a last scan that found
+  something it reads "Free up" and opens the cleanup; with no scan yet it reads "Open Cleaner" and opens the scan.
+  Cleaner's settings are reached from inside the app. The choice is `cleanerPanelAction()` in
+  `sdk/menubarmodel.js`, tested in `server/tests/menubar_model_test.mjs`; the unused `cleaner.panel.prefs` string is
+  gone from every language; docs/CLEANER.md (GitHub #116)
 
 ### Fixed
 

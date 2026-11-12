@@ -45,6 +45,16 @@ export function menuBarPrefs(s) {
 // The Cleaner item (the crown): on unless Cleaner → Settings (or Settings → Desktop & Dock) turned it off.
 export const cleanerItemShown = (s) => ((s && s.cleaner) || {}).menuItem !== false;
 
+// The Cleaner panel's one way into the app (issue #116), next to the last scan: with a scan that found
+// something, "Free up" opens the cleanup; with none yet (or nothing found), "Open Cleaner" opens the scan.
+// Cleaner's settings are one click further, inside the app.
+export function cleanerPanelAction(s) {
+  const last = ((s && s.cleaner) || {}).lastScan;
+  const size = last && last.allocated > 0 ? last.allocated : 0;
+  return size ? { section: 'cleanup', label: 'cleaner.panel.freeUp', note: 'cleaner.panel.lastScan', size }
+    : { section: 'scan', label: 'cleaner.panel.open', note: 'cleaner.panel.noScan', size: 0 };
+}
+
 // A shallow patch for settings.set: only "menuBar" (or "cleaner") changes, every other choice in it is kept.
 export function menuBarPatch(s, key, on) {
   if (key === 'everyDisplay') return { menuBarAllDisplays: !!on };
