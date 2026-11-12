@@ -253,11 +253,11 @@ Discover, the first install and an app's page".
   with the key LordOS pins, added the same way as the AI apps' (`UPDATES.md`, "Mirrored apps (catalog)").
   Tested on VM 116 (amd64): both sources added, verified and installed by the engine.
 - **Remote access** (0.8.8.6) lists third-party remote access apps: Tailscale (#68, from Tailscale's
-  signed repository with the key LordOS pins) and RustDesk (#66, its maker's `.deb` with a pinned
-  SHA-256, mirrored in LordOS's repository), amd64 and arm64. Both install a system service that
-  starts with the computer and isn't held to the per-app firewall; the page says so. What each does
-  on LordOS, and what it can't do: `UPDATES.md`, "Remote access: Tailscale and RustDesk". Not
-  installed on a LordOS system yet.
+  signed repository with the key LordOS pins), amd64 and arm64. It installs a system service that
+  starts with the computer and isn't held to the per-app firewall; the page says so. What it does
+  on LordOS, and what it can't do: `UPDATES.md`, "Remote access: Tailscale". Not installed on a
+  LordOS system yet. RustDesk (#66) was offered here from 0.8.8.6 and is removed from the catalog in
+  the next update (0.8.8.9): LordOS doesn't redistribute it; people who want it can get it from its maker.
 - **Disk Formats** (0.8.7, `lordos-disk-formats`, `tools/iso/mkdeb-diskformats.sh`) is one item in the Commercial group,
   from the LordOS repository: it depends on `ntfs-3g`, `exfatprogs` and `dosfstools`, and on amd64 suggests `apfs-dkms`,
   offered as a switch on its page. Those drivers are free software ([FILES.md](FILES.md), "Disks' file systems").

@@ -44,14 +44,15 @@ materials (SBOM) published with each release. The website summary is at
   Microsoft Edge, Spotify, all proprietary; and VSCodium (MIT), Brave Browser (MPL-2.0) and Tailscale
   (BSD-3-Clause)) are not redistributed by LordOS: the Store adds the vendor's own signed APT repository
   with a pinned key, and the package comes from there under the vendor's terms. The catalog's mirrored
-  packages, published in `pool/catalog/`, are goose (Apache-2.0), opencode (MIT), artcraft-launcher
-  (Apache-2.0, 0.14.0) and RustDesk (AGPL-3.0, 1.5.1), the vendors' `.deb` files unmodified with a pinned
+  packages, published in `pool/catalog/`, are goose (Apache-2.0), opencode (MIT) and artcraft-launcher
+  (Apache-2.0, 0.14.0), the vendors' `.deb` files unmodified with a pinned
   SHA-256, and three LordOS builds: `llama.cpp` and
   `whisper.cpp` (MIT), built from the upstream source tarball pinned by URL and SHA-256 in the
   catalog, and `codex-cli` (Apache-2.0), OpenAI's static binary with its sigstore signature checked.
-  **RustDesk is AGPL-3.0**, so redistributing its binaries carries a source obligation. Its source is
-  upstream's tag `1.5.1` (`https://github.com/rustdesk/rustdesk`); unlike kms++ and FFmpeg, LordOS does
-  not yet publish that source next to the binaries or a written offer for it (see "Gaps today").
+  RustDesk (AGPL-3.0) was offered in Store → Remote access from 0.8.8.6 as a mirrored `.deb` and is
+  removed from the catalog in the next update (0.8.8.9; maintainer's decision, 2026-11-12): LordOS doesn't
+  redistribute it, so it carries no AGPL source obligation. It was never published in lordos.org/apt's pool.
+  People who want it can get it from its maker.
 
 ## The SBOM
 
@@ -107,4 +108,5 @@ Gaps today: no formal OpenChain conformance self-certification, no automated mat
 against vulnerability databases, no SBOM for the ISO and Raspberry Pi images as a whole (only for
 the `.deb` and what it depends on), no third-party audit, lord-tts's libraries (audio.cpp, ggml,
 SentencePiece, cJSON and libyaml, in `/usr/lib/lordos/lib/tts`; listed in `THIRD_PARTY.md`) not yet in
-the SBOM, and no published source or written source offer for the mirrored AGPL-3.0 RustDesk binaries.
+the SBOM. (The source gap for the AGPL-3.0 RustDesk binaries no longer applies: RustDesk is not
+distributed.)

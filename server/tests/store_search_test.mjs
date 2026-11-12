@@ -85,7 +85,10 @@ eq('catalog: "speech recognition"', cat('speech recognition')[0], 'whisper.cpp')
 eq('catalog: "ntfs"', cat('ntfs')[0], 'disk-formats');
 eq('catalog: "vpn"', cat('vpn')[0], 'tailscale');
 eq('catalog: "wireguard"', cat('wireguard')[0], 'tailscale');
-eq('catalog: "remote desktop"', cat('remote desktop')[0], 'rustdesk');
+eq('catalog: "private network"', cat('private network')[0], 'tailscale');
+// LordOS doesn't distribute a remote desktop app in the Store (RustDesk was removed in 0.8.8.9, #66):
+// the words only reach names that contain "desktop"
+eq('catalog: "remote desktop" brings no remote desktop app', cat('remote desktop').filter((id) => catalog.apps.find((a) => a.id === id).section === 'remote'), []);
 // every kind and section the catalog uses has its label (store.ai.kind.<kind>, store.page.<section>) in every language
 const locales = fs.readdirSync(path.join(here, '../../assets/locales'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
 for (const lang of locales) {
