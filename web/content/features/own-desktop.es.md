@@ -27,9 +27,10 @@ Acá conviene ser preciso, porque es fácil exagerar con "propio".
 - PipeWire, para el sonido;
 - el propio protocolo Wayland, a través de `libwayland-server` y `libwayland-client`;
 - `libxkbcommon` para las distribuciones de teclado;
-- bibliotecas que se usan solo dentro de procesos ayudantes aislados: FFmpeg (multimedia), Poppler y libarchive (documentos), OpenSSL (TLS para el correo y el escritorio remoto), el núcleo de FreeRDP (RDP en Remote Desk), Monocypher (la criptografía de la bóveda).
+- bibliotecas que se usan solo dentro de procesos ayudantes aislados: FFmpeg (multimedia), Poppler y libarchive (documentos), OpenSSL (TLS para el correo y el escritorio remoto), el núcleo de FreeRDP (RDP en Remote Desk), Monocypher (la criptografía de la bóveda), libpipewire (compartir pantalla, `lord-screencast`), Tesseract (reconocimiento de texto), audio.cpp (leer en voz alta), nanosvg (íconos SVG);
+- WPE WebKit, solo en `lord-web`, el LordOS Web Runtime opcional, con la caja de arena propia de WebKit alrededor de sus procesos web y de red.
 
-La regla que sigue el proyecto está escrita en `docs/ARCHITECTURE.md`: dentro de LordOS no se usan X11, wlroots, libdrm, libinput, WebKit, GTK ni Qt. Las apps GTK y Qt igual funcionan, como clientes Wayland.
+La regla que sigue el proyecto está escrita en `docs/ARCHITECTURE.md`: dentro de LordOS no se usan X11, wlroots, libdrm, libinput, WebKit, GTK ni Qt; la única excepción es el runtime opcional de apps web, `lord-web`. Las apps GTK y Qt igual funcionan, como clientes Wayland.
 
 ## Cómo llega un cuadro a la pantalla
 
@@ -46,11 +47,12 @@ Si hay una GPU con aceleración 3D, la composición pasa por Mesa (GBM, EGL y GL
 
 ## Dónde se enchufan las apps de Linux
 
-En un escritorio LordOS hay tres tipos de ventanas, y se conectan en capas distintas:
+En un escritorio LordOS hay cuatro tipos de ventanas, y se conectan en capas distintas:
 
 - **Las apps incluidas y el tema** (barra de menú, Dock, Archivos, Ajustes…) corren dentro del contexto de JavaScript del propio `lord-server`, sobre el motor de interfaz. Las excepciones son Contraseñas y, desde 0.8.2, Mail, Calendario, Contactos y Recordatorios, que corren como procesos aislados igual que las apps `.lpk`.
 - **Las apps `.lpk` instaladas** corren cada una como un proceso aparte (`lord-server --app <id>`, el mismo binario en "modo app"). Ese proceso tiene su propia copia del motor de interfaz, se encierra en una caja de arena y dibuja en un buffer de memoria compartida, que le pasa al compositor como un cliente Wayland común.
 - **Las apps de Linux** (GTK, Qt, Chromium, Firefox…) se conectan al socket Wayland del compositor. Se dibujan solas; el tema les pone su marco de ventana alrededor.
+- **Las apps web** (0.8.8.8, el paquete opcional `lordos-web`) corren cada una en su propio proceso `lord-web` por app y perfil, sobre WPE WebKit, como cliente Wayland del compositor (mirá [LordOS Web Runtime](/es/features/web-apps/)).
 
 O sea que el compositor es el punto de encuentro. El motor de interfaz lo usan la interfaz y las apps propias de LordOS, no las apps de Linux.
 
@@ -117,7 +119,7 @@ Publicada el 12 de noviembre de 2026, el último lanzamiento.
 - **De tus reportes en GitHub.** Plegar una cuenta entera de Mail, Archivo → Abrir recientes en el Editor de texto, quitar desde Tienda → Instaladas cualquier app de Linux que trajo un paquete de Debian y desactivar las apps incluidas que no usás, apagar una cuenta de Nube sin perder su inicio de sesión, un Dock más chico, y una veintena de arreglos, desde las apps X11 ejecutadas como root hasta volver a unirse a una red Wi-Fi guardada.
 - **Bloqueo desde logind.** `loginctl lock-sessions` y otras herramientas de administración bloquean la pantalla; solo tu contraseña la desbloquea.
 
-Los widgets con teclado, el cursor y el bloqueo de logind están construidos y probados, pero todavía no se verificaron en nuestra máquina de pruebas.
+Los widgets con teclado, el cursor, los atajos globales y el bloqueo de logind están construidos y probados, pero todavía no se verificaron en nuestra máquina de pruebas.
 
 ## Nuevo en la 0.8.8.7
 
@@ -148,12 +150,12 @@ El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja
 
 - **Las GPU reales de PC todavía no están verificadas.** El camino por GPU corre en la V3D de la Raspberry Pi 5 y en la GPU virtual de VMware (SVGA3D), y se probó con el renderizador por software de Mesa en máquinas virtuales. Falta probar en placas AMD y Nvidia reales (`docs/GPU.md`).
 - **GPU drag, encendido por defecto en la 0.8.7, está verificado solo en V3D y SVGA3D.** En una Raspberry Pi 5, en arrastres reales, reduce a la mitad el CPU de la sesión sin carga y lleva una carga de memoria de 29 a 35 cuadros por segundo. En cualquier otra GPU solo lo protege su autoprueba, y `LORD_GPU_DRAG=0` lo apaga (`docs/GPU.md`).
-- **Las pantallas múltiples se probaron con dos salidas virtuales**, no con monitores reales, paneles de notebook ni hubs DisplayPort (`docs/DISPLAYS.md`). En el desarrollo de la 0.8.8.6, una PC con una Radeon RX 580 y tres monitores trajo dos arreglos (el tamaño del cursor por hardware y la pantalla de inicio de sesión en la pantalla principal elegida); otras placas, paneles de notebook y hubs no se probaron.
+- **Las pantallas múltiples se probaron con dos salidas virtuales y en una PC con una Radeon RX 580 y tres monitores** (`docs/DISPLAYS.md`). Esa PC trajo el tamaño del cursor por hardware y la pantalla de inicio de sesión en la pantalla principal elegida en la 0.8.8.6, y en la 0.8.8.7 el traspaso que mantiene encendidos los monitores DisplayPort al bloquear, cerrar e iniciar sesión; otras placas, paneles de notebook y hubs DisplayPort no se probaron.
 - **La Raspberry Pi 5 solo se probó con un monitor HDMI.** Desde la 0.8.4.1 la imagen muestra la pantalla de ingreso y el escritorio en un monitor HDMI desde el primer arranque, y LordBench la midió así; dos monitores y 4K todavía no se probaron en la placa (`docs/RASPBERRY.md`).
 - **En la Raspberry Pi 5 una app ocupada todavía reduce a la mitad los cuadros por segundo del escritorio:** unos 31 en vez de 60 en la prueba de escritorio de LordBench mientras todos los núcleos están ocupados. Con esa carga el chip gráfico tarda 14–16 ms por cuadro en vez de 1,5, sin bajar su frecuencia ni por temperatura; en la 0.8.7, una medición puso la causa en la memoria: 28 ms por cuadro con cuatro núcleos leyendo memoria, 1,4 ms con cuatro núcleos solo girando. Cuánto de eso puede evitar el compositor sigue abierto (`docs/GPU.md`).
 - **Los fondos en movimiento copian cada cuadro en su camino a la pantalla.** En la Raspberry Pi 5, en la pantalla de inicio de sesión, a 1080p y 60 cuadros por segundo, `lord-media` usó el 41 % de un núcleo y `lord-server` el 147 %; un camino sin esa copia está planeado para una versión posterior. El decodificador por hardware de la Pi 5 maneja solo HEVC, así que los clips H.264, VP9 y AV1 no se reproducen ahí.
 - **Cambiar de tema cierra y vuelve a abrir las ventanas de LordOS,** y el texto sin guardar se pierde, sin aviso.
-- **Las apps X11 funcionan con Xwayland desde 0.8.3,** nítidas solo al 100 % de escala y pudiendo verse entre sí, como en cualquier escritorio X11. Desde la 0.8.8.8 funcionan arrastrar y soltar con las apps de Linux y los métodos de entrada de LordOS dentro de ellas, y las apps X11 también aceptan arrastres y se escalan solas en HiDPI, ya construido pero todavía sin verificar en nuestra máquina de pruebas (`docs/WAYLAND.md`).
+- **Las apps X11 funcionan con Xwayland desde 0.8.3** y pueden verse entre sí, como en cualquier escritorio X11. Desde la 0.8.8.8 se escalan solas en HiDPI (antes eran nítidas solo al 100 %) y aceptan arrastres por XDND, las dos cosas ya construidas pero todavía sin verificar en nuestra máquina de pruebas. Los métodos de entrada de LordOS componen en las apps Wayland, no en las X11 (`docs/WAYLAND.md`).
 - **La accesibilidad está mayormente por delante:** hoy hay un ajuste de "reducir movimiento", un teclado en pantalla y, desde la 0.8.8.6, leer en voz alta y Voz en tiempo real, y desde la 0.8.8.8 la navegación con el teclado con un anillo de foco; un lector de pantalla, el zoom y el alto contraste están en la hoja de ruta.
 
 ## Leé el código

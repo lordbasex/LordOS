@@ -108,7 +108,7 @@ Besides the kernel and libc, only these are allowed:
 | audio.cpp (`libaudiocpp`, Apache-2.0) and its ggml (MIT) | Text to speech (0.8.8.6, `say`; Pocket TTS, Kyutai, weights CC-BY-4.0; approved by the user). **Only `lord-tts` links them**, the sandboxed helper (`server/src/doc/h_tts.c`); audio.cpp at the commit `tools/tts/fetch-audiocpp.sh` pins, built with Pocket TTS only, ggml's CPU kernels for every x86-64 generation and Vulkan, in `/usr/lib/lordos/lib/tts`. No voice model ships with LordOS. Never `lord-server` (`VOICE.md`) | pinned source |
 | PipeWire's client library (`libpipewire-0.3`) | Sharing a screen or a window with a Linux app (0.8.8.8, the ScreenCast portal, approved by the maintainer): the video source node and the app's restricted connection. **Only `lord-screencast` links it**, the sandboxed helper (`server/src/cast/lordscreencast.c`), with no real-time module, no D-Bus and no socket of its own: lord-server connects the user's PipeWire socket and hands the fds over. Never `lord-server`, which keeps its own native-protocol code for the guard (`sec/pwguard.c`) (`WAYLAND.md`, "Sharing a screen or a window") | system |
 | Tesseract (`libtesseract`) | Text recognition (0.8.8.6, Screenshots' "copy the text", approved by the user). **Only `lord-ocr` links it**, the sandboxed helper (`server/src/doc/h_ocr.c`); it brings Leptonica, libarchive, libcurl and libgomp. The language data is Debian's (`tesseract-ocr-eng` as a dependency, Spanish, Portuguese, French and Italian recommended). Never `lord-server` or `lord-doc` | system |
-| WPE WebKit (`libwpewebkit-2.0`, `libwpe`, `wpebackend-fdo`) | Web apps (0.8.8.8 in development, `WEBAPPS.md`, approved by the maintainer). **Only `lord-web` links it**, one process per web app and profile, in the optional package `lordos-web`; it brings GLib/GIO, GStreamer and libsoup, and `lord-web` also uses GIO (the session bus), EGL (the dmabuf path) and `libwayland-client`. WebKit's own sandbox (bubblewrap, `xdg-dbus-proxy`) runs its web and network processes and is never turned off. Never `lord-server` | system |
+| WPE WebKit (`libwpewebkit-2.0`, `libwpe`, `wpebackend-fdo`) | Web apps (0.8.8.8, `WEBAPPS.md`, approved by the maintainer). **Only `lord-web` links it**, one process per web app and profile, in the optional package `lordos-web`; it brings GLib/GIO, GStreamer and libsoup, and `lord-web` also uses GIO (the session bus), EGL (the dmabuf path) and `libwayland-client`. WebKit's own sandbox (bubblewrap, `xdg-dbus-proxy`) runs its web and network processes and is never turned off. Never `lord-server` | system |
 | Poppler (`libpoppler-glib`) and libarchive | PDF and archives (M9, approved by the user). **Only `lord-doc` links them**, the sandboxed helper; Poppler brings cairo, FreeType and fontconfig, which `lord-doc` also uses for font samples and for building PDFs. Never `lord-server` (`DOCUMENTS.md`) | system |
 | `clang` (build time only) | the BPF programs of `lord-netperm` (`np.bpf.c`, `clang -target bpf`); they are embedded in the binary. Without clang (`BPF=0`) the service runs without BPF. Neither libbpf nor bcc is used | build machine |
 | Monocypher 4.0.2 | XChaCha20-Poly1305, Argon2id/Argon2d, BLAKE2b, ChaCha20 for the Passwords vault and the KeePass importer (approved by the user; CC0/BSD-2, one C file). **Only `lord-vault` links it**; its official test vectors run in `make test` (`PASSWORDS.md`) | vendored |
@@ -203,6 +203,35 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   parses HTTP or decides about packages (the signed index still does), and an https:// download is
   never redirected to http://. See `PACKAGES.md`, "HTTPS".
 
+- **`lord-ocr`** and **`lord-tts`** (0.8.8.6): text recognition for Screenshots (Tesseract) and the text-to-speech
+  engine (audio.cpp and ggml), each `lord-doc`'s helper loop built with its one library and the only binary that links
+  it. Same rules as `lord-doc` (fixed path, no arguments, `sandbox_apply_helper`): `lord-ocr` gets the cropped pixels in
+  a sealed memfd and reads only `/usr`; `lord-tts` gets the models folder as an fd. See `VOICE.md`.
+- **`lord-say`** (0.8.8.6): reads text aloud for the desktop and is the `say` command. It holds no speech code and
+  starts `lord-tts`; lord-server starts it from the fixed path next to it with fixed arguments, in its own process
+  group, with the text on a sealed memfd, never in its arguments. See `VOICE.md`.
+- **`lord-sftp`** (0.8.8.7): the Terminal's Files mode. It gets the channel lord-server opened on the tab's own `ssh`
+  control socket and the local file as fds, never a path, in `sandbox_apply_helper`. See `TERMINAL.md`.
+- **`lord-sql`** (0.8.8.7): one process per Databases connection. It gets the connected socket from the `sql`
+  connector (or from lord-server for a local Unix socket), loads the CA bundle and applies `sandbox_apply_helper`
+  before it reads a byte; it speaks the MySQL protocol itself and links OpenSSL. No sockets of its own, no files.
+- **`lord-bench`** (0.8.6): LordBench's workloads, in `sandbox_apply_helper`; it checks its own sandbox before any
+  work. See `BENCHMARK.md`.
+- **`lord-vm`** and **`lord-vmdisplay`** (Machines): `lord-vm`, one per running machine, is the sandboxed supervisor
+  that drives QEMU over QMP with cgroup limits and owns the machine's folder; `lord-vmdisplay`, also one per machine,
+  receives and checks its picture and input through QEMU's D-Bus display, sandboxed, with no files and no network.
+  See `VIRTUALIZATION.md`.
+- **`lord-screencast`** (0.8.8.8): one per screen-sharing session, the only binary that links `libpipewire-0.3`.
+  lord-server connects the user's PipeWire socket and hands the fds over, and the frames come through a sealed memfd
+  ring; it applies `sandbox_apply_helper` (scope `lordos-screencast`, no socket, `connect`, `bind`, process `clone`
+  or `exec`) before the connection speaks. See `WAYLAND.md`, "Sharing a screen or a window".
+- **`lord-web`** (0.8.8.8, the optional package `lordos-web`): the LordOS Web Runtime, one process per web app and
+  profile and the only binary that links WPE WebKit. Only lord-server starts it, from the fixed path next to it with
+  exactly `--app <app> --profile <profile>`, both checked against the registry; it is a Wayland client of the
+  compositor, and WebKit's own sandbox runs its web and network processes. See `WEBAPPS.md`.
+- **The `lord-log` child** (0.8.8.8): a small child of lord-server and of each root daemon that stamps the lines of
+  its stderr pipe into its log file under `/var/log/lordos` and caps the files. See `SYSTEM.md`, "Log files".
+
 - **The components' connectors** (0.8.5): `lord-server --net-connector mail|print|lists`, the same
   binary re-executed with a fixed argv (like the terminal holders), each in its own
   `lordos-net-<name>.scope`, only creating and connecting sockets for lord-server so the kernel
@@ -230,7 +259,9 @@ Sockets and services a user session's `lord-server` offers besides its own (0.8.
   away from the monitor. See `SCREEN-SHARING.md`.
 - **Its own xdg portal:** `org.freedesktop.portal.Settings` (mode, accent, button order),
   `org.freedesktop.portal.FileChooser` (the system file dialog for Linux apps), `OpenURI` (links and files
-  opened the way LordOS opens them, asked first for an app in the background) and `Inhibit`, plus
+  opened the way LordOS opens them, asked first for an app in the background), `Inhibit`, `ScreenCast` (version 4,
+  with `Session`; the frames go out through `lord-screencast`, `WAYLAND.md`, "Sharing a screen or a window") and
+  `GlobalShortcuts` (version 1, `SHORTCUTS.md`, "Linux apps' global shortcuts"), plus
   `org.freedesktop.ScreenSaver`'s Inhibit (both count as the compositor's idle inhibition), on the session bus
   (`server/src/ui/portal.c`), without xdg-desktop-portal. See `WAYLAND.md` and `FLATPAK.md`, "Portals".
 
@@ -262,7 +293,9 @@ Since M7, what LordOS does with its own code and what it delegates to a Debian p
   `/run/cups/cups.sock`; it manages the queue and the drivers, see `PRINTING.md`).
 - **D-Bus services (Settings, `SETTINGS.md`):** BlueZ (`bluetoothd`), power-profiles-daemon and
   systemd-timedated on the system bus, with our own D-Bus client (`vault/dbus.c`); lord-server also
-  serves `org.freedesktop.Notifications` on the session bus. No libdbus, sd-bus or libbluetooth.
+  serves `org.freedesktop.Notifications` on the session bus, owns `org.kde.StatusNotifierWatcher` and hosts the
+  tray (`server/src/ui/sni.c`, `WAYLAND.md`, "Tray icons"), serves `org.lordos.WebApps1` for `lord-web` (`Ask`,
+  `SetBadge`; `WEBAPPS.md`) and is an MPRIS client of the players Linux apps publish (`server/src/hw/mpris.c`). No libdbus, sd-bus or libbluetooth.
 - **Debian programs** (with a fixed path, never linked, launched by the `admin.c` helper):
   - `dpkg`: unpacking and configuring;
   - `mkfs.vfat`, `mkfs.exfat`, `mkfs.ext4`, `mkfs.ntfs` (optional) and their label tools: formatting
@@ -277,7 +310,7 @@ Since M7, what LordOS does with its own code and what it delegates to a Debian p
 - **Sound server:** PipeWire, over the PulseAudio protocol.
 
 apt, libapt, gpgv, zlib, liblzma, NetworkManager, wireguard-tools, libpulse,
-libpipewire, libcups, avahi-client and SANE are not used. `curl` is used only by LordOS Imager's
+libpipewire (except in the sandboxed `lord-screencast`, see the table), libcups, avahi-client and SANE are not used. `curl` is used only by LordOS Imager's
 `imager-*` actions (0.8.4), run as the user with a fixed path, never linked (`IMAGER.md`).
 
 Forbidden: X11/Xorg (Xwayland is a separate program started on demand, see above), wlroots, libdrm, libinput, Mesa as a requirement (only as the optional GPU path), WebKit/Chromium,

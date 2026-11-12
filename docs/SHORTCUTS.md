@@ -93,7 +93,7 @@ leaving out apps with everything minimized, numbers, the windows row, size, a lo
 in C, before any JavaScript, so it works with the shell hung. Only a physical key gets there: what the API, the remote desktop or the
 on-screen keyboard injects takes another path and can't press it. With no share running the key goes on as usual.
 
-## Apps that take the shortcuts (in development)
+## Apps that take the shortcuts (0.8.8.8)
 
 A VM, a remote desktop or a game can ask for ❖, ⌥Tab and the rest while it's in front: a Linux app with
 `zwp_keyboard_shortcuts_inhibit_manager_v1` ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts inhibit"), Machines' VM

@@ -14,10 +14,10 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Status |
 |---|---|
-| Terminal: a trigger fires again for a line printed again while the old one is still on screen | ⬜ |
-| Terminal: a port forward whose fixed local port is taken says so (two tabs of one profile) | ⬜ |
-| Terminal: stale ssh mux sockets no longer count against the 32 looked at (`server/src/term/sshmux.c`) | ⬜ |
-| Paper and site for 0.8.8.8; signed amd64 and arm64 packages; apt staging, then stable; GitHub pre-release; close #64 | ⬜ |
+| Terminal: a trigger fires again for a line printed again while the old one is still on screen | ✅ released in 0.8.8.8 (2026-11-12) |
+| Terminal: a port forward whose fixed local port is taken says so (two tabs of one profile) | ✅ released in 0.8.8.8 (2026-11-12) |
+| Terminal: stale ssh mux sockets no longer count against the 32 looked at (`server/src/term/sshmux.c`) | ✅ released in 0.8.8.8 (2026-11-12) |
+| Paper and site for 0.8.8.8; signed amd64 and arm64 packages; apt staging, then stable; GitHub pre-release; close #64 | ✅ v0.8.8.8-beta released on 2026-11-12, with the #64 fix |
 
 ## Phase 0b — Databases over an SSH tunnel (top priority, the maintainer's daily use)
 
@@ -29,10 +29,10 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| Text fields: a right-click menu (Undo, Redo, Cut, Copy, Paste, Delete, Select All) and Ctrl/⌘+Z, ⇧Z; a right click no longer moves the caret or drops the selection | the first thing tried in any field | S | 🟨 |
-| Text fields: triple click selects the line (`runtime/events.js` counts clicks) | every desktop has it | S | 🟨 |
-| Drop from Files onto Notes (insert), Photos, Player, PDF Viewer (open) | the Editor and Terminal already take drops | S | ⬜ |
-| `xdg-activation-v1`: a link opened from the Terminal or a notification's click raises the browser already open; activation only with a valid token | the wrong window stays in front | S | 🟨 |
+| Text fields: a right-click menu (Undo, Redo, Cut, Copy, Paste, Delete, Select All) and Ctrl/⌘+Z, ⇧Z; a right click no longer moves the caret or drops the selection | the first thing tried in any field | S | ✅ released in 0.8.8.8, to check on the VM |
+| Text fields: triple click selects the line (`runtime/events.js` counts clicks) | every desktop has it | S | ✅ released in 0.8.8.8, to check on the VM |
+| Drop from Files onto Notes (insert), Photos, Player, PDF Viewer (open) | the Editor and Terminal already take drops | S | ✅ released in 0.8.8.8, to check on the VM |
+| `xdg-activation-v1`: a link opened from the Terminal or a notification's click raises the browser already open; activation only with a valid token | the wrong window stays in front | S | ✅ released in 0.8.8.8, to check on the VM |
 | `xdg-foreign-v2` and `xdg-dialog-v1`: portal dialogs attached to their window | dialogs float loose | S | ✅ |
 
 ## Phase 2 — the compositor's big three
@@ -43,7 +43,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | XDND bridge for Xwayland apps (`server/src/wl/xwm.c`) | the same for X apps (Chrome under Xwayland, older apps) | M | 🟨 built, to check on the VM (both ways; X files onto Files only from an unsandboxed owner, X-Resource pids) |
 | `text-input-v3` complete: preedit and commit from LordOS's input method (`server/src/ime.c`, `wl_textinput.c`) | Japanese, Chinese and Korean inside Linux apps | M | ✅ checked on VM 127 (GTK 4, Hangul) |
 | Screen sharing for apps: the xdg-desktop-portal ScreenCast interface in `server/src/ui/portal.c`, screen or window chosen in LordOS's own dialog with the consent and indicator of `remote/share.c`, frames to a PipeWire stream | share a screen or a window in Meet, Zoom, Teams, Discord, OBS | L | ✅ checked on VM 127 with a browser (2026-11-11): Window / Entire Screen offered, LordOS's chooser and indicator with Stop, 176 frames in 10 s at 1280x800, lord-screencast about 2 % CPU; ScreenCast version 4 (`ui/portal.c`, sessions in `cast/castsm.c`), the sandboxed `lord-screencast` (libpipewire-0.3, approved 2026-11-10) |
-| `keyboard-shortcuts-inhibit-v1`: an app may take ❖ and Alt+Tab while focused, after the person allows it once | VMs, remote desktops, games | S | 🟨 built, to check on the VM: the `shortcuts` permission (`sec/perms.c`, `wl/kbinhibit.c`), ❖Esc gives them back; Machines' VM window too (`sdk/kbinhibit.js`) |
+| `keyboard-shortcuts-inhibit-v1`: an app may take ❖ and Alt+Tab while focused, after the person allows it once | VMs, remote desktops, games | S | ✅ checked on VM 127 (the prompt names the app by its verified identity): the `shortcuts` permission (`sec/perms.c`, `wl/kbinhibit.c`), ❖Esc gives them back; Machines' VM window too (`sdk/kbinhibit.js`) |
 
 ## Phase 3 — desktop services Linux apps expect
 
@@ -66,7 +66,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 | Menus with arrows, Enter, type-ahead, delayed submenus, opening left in RTL | keyboard use | M | ✅ checked on VM 127 (F10, arrows) |
 | SDK components with keyboard support built in: List/Table with Shift/Ctrl range selection and type-to-find, Dropdown, Checkbox, Radio, Tabs, Popover, Tooltip, ProgressBar | each app has its own today (three `Popover`s, two tables…) | M | 🟨 built, to check on the VM: `List` and `Table` (`sdk/lists.jsx`, `sdk/listmodel.js`), `Dropdown`, `Checkbox`, `RadioGroup`, `Tabs`, `Popover` (a focus scope), `Tooltip`, `ProgressBar` (`sdk/controls.jsx`, `sdk/controlmodel.js`); Reminders' popovers and Monitor's process table moved to them, the copies in Calendar and Contacts, Monitor's disk table and the Imager's progress bar not yet |
 | Sliders and steppers with arrows and the wheel; ScrollView with Page Up/Down, Home, End and horizontal scrolling | keyboard use | S | 🟨 built, to check on the VM: the keys, `horizontal` ScrollView and the wheel on sliders and steppers (a touchpad swipe only while it has the focus) |
-| Destructive dialogs start on Cancel; a dialog takes keys only when in front | Enter emptied the Trash | S | ⬜ |
+| Destructive dialogs start on Cancel; a dialog takes keys only when in front | Enter emptied the Trash | S | ✅ released in 0.8.8.8, to check on the VM |
 
 ## Phase 5 — text, language and accessibility
 

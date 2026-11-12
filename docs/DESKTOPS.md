@@ -41,9 +41,11 @@ is typed on another desktop, and an app the user can't see must not be able to b
 - `move`, `resize` and `menu` requests from a Linux app are refused unless its window is on the desktop in view
   (`acceptsAppRequest`). Otherwise an app could switch the desktop with `xdg_toplevel.move`.
 - Fullscreen is presented above everything and keeps the keyboard in `wl.c`, whatever the shell says, so the
-  rule needs the compositor: `lord.wayland.state(id, max, 0, iconic, parked)` → `wl_set_parked`. A parked window
+  rule needs the compositor: `lord.wayland.state(id, max, 0, iconic, parked, covered)` → `wl_set_parked`. A parked window
   loses the keyboard, `wl_set_focus` refuses it, its menus close, and it leaves fullscreen and gets it back when
-  its desktop returns. A fullscreen request while parked waits for that. This is the only thing C knows.
+  its desktop returns. A fullscreen request while parked waits for that. C also slows down a window that is
+  minimized, parked or wholly covered (`wl_set_covered`, 0.8.8.8): its frames are paced once a second and it is
+  told `suspended` ([WAYLAND.md](WAYLAND.md), "Hidden windows").
 - A text field of a mounted LordOS app loses the focus when its window leaves the desktop in view
   (`checkFront` in `sdk/components.jsx`).
 - The Overview is in the `overlay` layer, so with it open the keys are the shell's.

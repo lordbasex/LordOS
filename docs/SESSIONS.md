@@ -259,7 +259,7 @@ after the screen went dark`.
   2. The monitor shows the login screen with that user.
   3. Browsers connected to that session are also cut off and go back to the login
      (`/?e=3`).
-- **Lock from logind (0.8.8.8, in development):** `loginctl lock-session`, `loginctl lock-sessions` and
+- **Lock from logind (0.8.8.8; built, not yet checked on the VM):** `loginctl lock-session`, `loginctl lock-sessions` and
   any program or admin that calls logind's `LockSession` make logind emit `Lock` on the session's
   `org.freedesktop.login1.Session` object; logind allows that only to root, the session's owner or
   whoever its polkit rules let through. The session hears it on the system bus (`hw/logindlock.c`,
@@ -536,6 +536,9 @@ session. Everything that changes something goes through closed `admin.c` actions
 | `/run/lordos/no-display`               | no usable display: the boot splash ends without keeping its frame |
 | `tools/boot/lordos-splash`, `tools/boot/systemd/` | the boot splash hand-off: `deactivate`, `quit` and the units |
 | `/etc/lordos/session.conf`             | `AUTOLOGIN=`                                              |
+| `server/src/lordlog.c`                 | the log folders and the `lord-log` child that stamps lord-sessiond's lines (0.8.8.8) |
+| `/var/log/lordos/lord-sessiond.log`    | lord-sessiond's log (root, 0640; also still in the journal)  |
+| `/var/log/lordos/users/<user>/`        | each user's log folder, made by lord-sessiond at each login before the session starts (SYSTEM.md, "Log files") |
 
 ## Screenshots
 
@@ -551,9 +554,13 @@ session. Everything that changes something goes through closed `admin.c` actions
 ## Pending
 
 - **Multiple monitors:** since 0.8.0 the session drives every display of the lent card
-  (`display_attach` → `outputs_apply` in `main.c`, see [DISPLAYS.md](DISPLAYS.md)); the lend/revoke
-  cycle with several real monitors is untested.
+  (`display_attach` → `outputs_apply` in `main.c`, see [DISPLAYS.md](DISPLAYS.md)). The lend/revoke
+  cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
+  it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
+  CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Other cards and laptop
+  panels are untested.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
-- **Testing with a real card** (AMD, on the live USB): in the VMs, the GPU could only be tested
-  with `LORD_GPU=1` and llvmpipe.
+- **Testing with more real cards:** in the VMs the GPU is tested only with `LORD_GPU=1` and llvmpipe; on
+  real hardware only the Radeon RX 580 above (amdgpu). Other AMD, Intel and NVIDIA cards and the live USB on
+  them are untested.

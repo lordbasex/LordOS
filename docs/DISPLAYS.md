@@ -278,16 +278,19 @@ head: `screendump file.ppm vga 1` in `qm monitor 118`.
 
 ## Not done or untested
 
-- **Real monitors and GPUs**: tested only with virtio-gpu (two virtual heads) and llvmpipe.
-  Laptop panels with EDID sizes (the recommended scale), DisplayPort MST and cards with fewer
-  CRTCs than connectors are untested.
+- **Real monitors and GPUs**: tested with virtio-gpu (two virtual heads) and llvmpipe, and on one PC
+  with a Radeon RX 580 (amdgpu) and three monitors, DisplayPort among them. That PC brought 0.8.8.6's
+  fixes (the login screen on the chosen main display, the cursor plane at the driver's size, `GPU.md`) and
+  0.8.8.7's hand-off with a black frame and CLOSEFB, so the displays keep their signal across lock,
+  logout and login (`SESSIONS.md`). Other cards, laptop panels with EDID sizes (the recommended scale),
+  DisplayPort MST and cards with fewer CRTCs than connectors are untested.
 - **Mirror with one CRTC driving two connectors** (hardware cloning) is not used: each mirrored
   display has its own CRTC and frame.
 - **Screenshot and recording files** were not produced on VM 118 (its build has no `lord-media`);
   the capture paths ran (the permission prompt appeared on the main display). The remote desktop
   with two displays was not tested with a browser.
 - **Legacy Wayland clients at 125/150/175 %** get `scale = 2` and are downscaled (bilinear): not
-  pixel-exact. X11 apps (Xwayland) scale themselves since 0.8.8.8 (in development): their pixels are
+  pixel-exact. X11 apps (Xwayland) scale themselves since 0.8.8.8 (built, not yet checked on the VM): their pixels are
   device pixels on the densest display and `Xft.dpi` tells them the scale; «Scaled by LordOS» in
   Settings → Displays brings back the enlarged (blurry) way (`WAYLAND.md`, "X11 apps on HiDPI displays").
 - Apps' own cursor images (`wl_pointer.set_cursor`) are not scaled.

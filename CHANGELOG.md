@@ -26,6 +26,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   policy gains a "Web apps" section on third-party service names and icons (no affiliation or endorsement; what "tested
   on LordOS" means), and `docs/WEBAPPS.md` says plainly which small scripts `lord-web` adds and that it doesn't change
   the sites. Feature pages Cleaner and Read aloud move one place down in the order.
+- **Docs and site: the desktop's documents match 0.8.8.8 as released.** `docs/WAYLAND.md`, `SESSIONS.md`,
+  `DISPLAYS.md`, `SHORTCUTS.md`, `DESKTOPS.md`, `DESKTOP-PARITY.md` and `ARCHITECTURE.md` no longer call 0.8.8.8's work
+  "in development": each item now says whether it was checked on VM 127 or is built and not yet checked on the VM, as
+  the 0.8.8.8 entries below say. `ARCHITECTURE.md` lists the helpers it left out (`lord-ocr`, `lord-tts`, `lord-say`,
+  `lord-sftp`, `lord-sql`, `lord-bench`, `lord-vm`, `lord-vmdisplay`, `lord-screencast`, `lord-web` and the `lord-log`
+  child), the ScreenCast and GlobalShortcuts portals, the tray watcher, `org.lordos.WebApps1` and the media-player
+  client, and no longer says PipeWire's client library is unused. A Linux app's capped log goes to `apps/<id>.log.old`;
+  `lord.wayland.state` takes `covered`; the real multi-monitor PC of 0.8.8.6 and 0.8.8.7 is in `DISPLAYS.md` and
+  `SESSIONS.md`. The site's "A desktop of its own" page (en, es, pt) counts web apps as a fourth kind of window, names
+  the web runtime as the one exception to the no-WebKit rule and the newer helpers' libraries, marks global shortcuts
+  as not yet checked, and rewrites the X11 and multi-display limits so they no longer contradict themselves.
 
 ## [0.8.8.8-beta] - 2026-11-12
 
