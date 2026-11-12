@@ -66,13 +66,18 @@ Destination details:
 `fw_app_canon` accepts:
 
 - `lordos` (lord-server and its built-in apps);
-- `desktop:<id>` (Linux apps with a `.desktop`). Three ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`), `desktop:lordos-cloud` (Cloud's `rclone rcd` and `rclone authorize`, 0.8.8.5, docs/CLOUD.md) and `desktop:lordos-rdesk` (the RDP and VNC apps). The launcher refuses a `.desktop` with any of these ids (`app_scope_reserved`), so none can inherit their rules;
+- `desktop:<id>` (Linux apps with a `.desktop`). These ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`), `desktop:lordos-cloud` (Cloud's `rclone rcd` and `rclone authorize`, 0.8.8.5, docs/CLOUD.md), `desktop:lordos-rdesk` (the RDP and VNC apps), any `desktop:lordos-vm…` (Machines: `app-lordos-lordos-vm-<machine>.scope` for a machine's QEMU and passt) and any `desktop:lordos-web…` (0.8.8.8: `desktop:lordos-web-<app>` for each web app's `lord-web` and its WebKit processes, `desktop:lordos-webprobe` for the Store's probe). The `lpk-` prefix is reserved too, because `app-lordos-lpk-<x>.scope` reads as the package `lpk:<x>`. The launcher refuses a `.desktop` with any of these ids (`app_scope_reserved` in `sec/cgroup.h`), so none can inherit their rules;
 - `lpk:<id>` (`.lpk` apps);
 - the absolute path of the executable (what the Monitor uses when it can't find a `.desktop`).
 
 cgroup scopes are translated automatically: `app-lordos-lpk-<id>.scope` → `lpk:<id>` and
 `app-lordos-<id>.scope` → `desktop:<id>` (see `server/src/sec/cgroup.h`). This way the kernel hook,
 which sees the scope, and the Monitor, which sees the `.desktop`, talk about the same app.
+
+**Web apps (0.8.8.8).** Each web app has one row and one rule set, `desktop:lordos-web-<app>`, shared by all
+its profiles: every profile's `lord-web` and the WebKit processes it starts live in the same scope
+(`app-lordos-lordos-web-<app>.scope`). One row per profile would need a different firewall id, so it stays per
+app. See [WEBAPPS.md](WEBAPPS.md), "Isolation".
 
 A valid id:
 
@@ -173,7 +178,7 @@ the app gives itself.
 | | PipeWire guard (`sec/pwguard.c`) | `Video/Source` nodes hidden from the app, its `Stream/Input/Video` streams destroyed | within 1 s | unit test only (no PipeWire camera node on the test VM) |
 | no USB | `lord-netperm`, `cgroup/dev` | `/dev/bus/usb/*` (189), `/dev/hidraw*` (dynamic, from `/proc/devices`), `/dev/ttyACM*` (166), `/dev/ttyUSB*` (188) | at once (next `open`) | `devices.sh` |
 | no Bluetooth | `lord-netperm`, `cgroup/lsm_socket_create` | `socket(AF_BLUETOOTH, …)` → `EPERM` | at once (new sockets) | `tests/fwlinux/bluetooth.sh` |
-| no screen capture | by design, and `lord-netperm` | the compositor offers no capture protocol, Xwayland (0.8.3) sees only X windows and a restricted app gets no X display, no screen-cast portal is installed; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh` |
+| no screen capture | by design, the ScreenCast portal (`ui/portal.c`), the PipeWire guard (`sec/pwguard.c`) and `lord-netperm` | the compositor offers no capture protocol, Xwayland (0.8.3) sees only X windows and a restricted app gets no X display; LordOS's own ScreenCast portal (0.8.8.8) refuses the app before any question, and the PipeWire guard hides shared-screen nodes (`Video/Source`, `media.role` Screen) from it; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh`, `build/pwguard-test`, `tests/screencast_model_test.mjs` |
 | no microphone | PipeWire guard | capture nodes (`Audio/Source*`, `Audio/Duplex`) and their ports hidden, the app's `Stream/Input/Audio` streams destroyed, including a recording already running | within 1 s | `tests/fwlinux/mic.sh` (`pw-record`, `parecord`, `arecord`) |
 | | `lord-netperm`, `cgroup/dev` | ALSA capture PCM nodes (`/dev/snd/pcmC*D*c`, from `/sys/class/sound`): recording from the card without PipeWire | at once (next `open`) | `mic.sh` |
 | no access to your files | the launcher (`apps.c`, `sec/sandbox.c`) | its own user, mount and PID namespace and Landlock (below) | at the next launch | `tests/fwlinux/files.sh` (a probe app, malicious `.desktop` files, `gtk4-print-editor`) |

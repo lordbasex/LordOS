@@ -52,7 +52,23 @@ El sistema base y todos los paquetes de la sección Debian de la Tienda vienen d
 - Cada lista de paquetes y cada `.deb` se verifican contra el SHA-256 de ese índice firmado antes de guardarlos o pasárselos a `dpkg`.
 - LordOS hace estas verificaciones con su propio motor de paquetes, y `apt` sigue funcionando al lado con las mismas claves.
 
-Cuando la fuente pide HTTPS, las descargas van por HTTP, igual que con `apt` y `deb.debian.org`: la seguridad viene de las firmas y los hashes, así que alguien en la red puede ver qué paquetes descargás pero no puede cambiarlos.
+Las descargas van por HTTPS cuando la dirección de la fuente es `https://` (nunca se rebajan a HTTP, ni siquiera por una redirección), y por HTTP en los demás casos, igual que con `apt` y `deb.debian.org`: la seguridad viene de las firmas y los hashes, así que por HTTP común alguien en la red puede ver qué paquetes descargás pero no puede cambiarlos.
+
+## El repositorio de actualizaciones de LordOS
+
+Los sistemas instalados reciben las actualizaciones propias de LordOS desde el repositorio APT de LordOS en `lordos.org/apt`. Su índice está firmado con la **clave del archivo de LordOS**, una clave OpenPGP Ed25519 distinta de la clave de versiones, porque APT necesita OpenPGP:
+
+- Clave pública: [`packaging/keys/lordos-archive-keyring.asc`](https://github.com/lordbasex/LordOS/blob/main/packaging/keys/lordos-archive-keyring.asc) en el repositorio, instalada en cada sistema como `/usr/share/keyrings/lordos-archive-keyring.gpg` por el paquete `lordos`.
+- Huella: `1DDA F390 107D F264 FA8A  0918 3972 CC6D E4DA 2336`
+- La fuente del repositorio queda limitada a esa clave (`Signed-By`), y su índice y sus paquetes se verifican igual que los de Debian, más arriba.
+
+Para verificar la clave a mano: `gpg --show-keys /usr/share/keyrings/lordos-archive-keyring.gpg` tiene que mostrar la huella de arriba.
+
+## El código propio de LordOS
+
+El escritorio, la pantalla de inicio de sesión y cada app nativa son paquetes de JavaScript. Sus tamaños y su SHA-256 están en `code-manifest.json`, firmado con la **clave de versiones** de arriba. Desde la 0.8.2 `lord-server`, que trae esa clave pública compilada, verifica la firma y el SHA-256 de cada paquete antes de ejecutarlo. Un paquete que no coincide no se ejecuta: Acerca de muestra **Verificado** en un sistema firmado, **Compilación de desarrollo** en uno sin firmar y **Modificado — no se cargó** cuando algo no coincide, y LordOS muestra una pantalla de recuperación en vez de una en blanco cuando no queda nada para cargar.
+
+## Clave del archivo de Raspberry Pi
 
 ## Clave del archivo de Raspberry Pi
 
@@ -66,6 +82,7 @@ En la Raspberry Pi 5, el kernel y el firmware vienen del archivo de Raspberry Pi
 
 - La mitad privada de la **clave de versiones** vive solo en la computadora del mantenedor, legible solo por su dueño, con una copia de respaldo sin conexión. Nunca se guarda en el repositorio, en una máquina de compilación ni en un servidor.
 - La mitad privada de la **clave de LordOS** para los paquetes `.lpk` también se guarda fuera del repositorio, en la computadora del mantenedor. Hoy es una clave de desarrollo; la clave definitiva para las versiones públicas la va a reemplazar en el sistema y el cambio se va a anunciar.
+- La mitad privada de la **clave del archivo de LordOS** también se guarda solo en la computadora del mantenedor, con una copia de respaldo.
 - Las claves públicas se publican en el repositorio y en este sitio, para que cualquiera pueda verificarlas.
 
 ## Si una clave se ve comprometida

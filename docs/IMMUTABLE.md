@@ -1,6 +1,6 @@
 # An immutable LordOS (A/B system images): design study
 
-**Status (0.8.2; unchanged through 0.8.5-beta): design study plus an experimental prototype.** Nothing here changes the regular
+**Status (0.8.2; unchanged through 0.8.8.8-beta): design study plus an experimental prototype.** Nothing here changes the regular
 ISO, the Raspberry Pi image, `install.sh` or the in-place APT updates of [UPDATES.md](UPDATES.md).
 The prototype (`tools/immutable/`) builds a separate disk image that boots in a virtual machine; it
 is a minimal Debian 13, not the LordOS desktop yet. Every statement below is marked as one of:
@@ -11,7 +11,8 @@ is a minimal Debian 13, not the LordOS desktop yet. Every statement below is mar
 
 This is phase 3 of 3 of "System apps immutable". Phase 1 (0.8.2, [SIGNING.md](SIGNING.md),
 "Verified system code") checks LordOS's own JavaScript bundles against a signed manifest; phase 2 marks
-system apps as not removable. This study is about the whole system.
+system apps as not removable (since 0.8.8.8 the ones LordOS can do without can be deactivated, not removed:
+they stay installed and verified). This study is about the whole system.
 
 ## Summary
 

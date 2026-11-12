@@ -40,6 +40,7 @@ Not every program on LordOS is sandboxed. This is exactly what applies to each k
 | Linux apps from the launcher | own process | no by default; with "no access to your files", or restricted from the microphone, camera, USB or Bluetooth, their own user, mount, PID and IPC namespaces plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`lord-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
 | Terminal programs | children of the Terminal's shell | no | `lordos-net-terminal.scope` (0.8.5; best effort, `lord-server`'s if it can't be placed) | no | as "Terminal" (`lordos:terminal`, 0.8.5): network rules, each program listed by name |
 | LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads | a connector (`lord-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `lord-fetch` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
+| Web apps (`lord-web`, 0.8.8.8, with the optional `lordos-web` package) | own process per app and profile, started only by `lord-server` | not LordOS's seccomp: `lord-web` has Landlock's scoping (no abstract unix socket, no signal outside its own processes) and `no_new_privs`; WebKit's web content and network processes run under WebKit's own bubblewrap + seccomp sandbox, never turned off | own, root-owned `app-lordos-lordos-web-<app>.scope`, with memory and CPU limits shared by the app's profiles | no broker: camera, microphone, screen, location and notifications are asked by `lord-server` once per app and kept in the app's registry ([WEBAPPS.md](WEBAPPS.md), "Permissions") | per app (`desktop:lordos-web-<app>`): network rules ([WEBAPPS.md](WEBAPPS.md), "Isolation") |
 
 Built-in apps reach files through `lord.fs`: since 0.8.5 its reading calls (`list`, `read`, `stat`,
 `du`, `free`, `search`) reach the whole tree as the session user (`fsops_readable`; the system's own
@@ -329,7 +330,8 @@ A single sandbox for all of LordOS, no copies: the helpers that decode untrusted
 (`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
 `lord-maild`, `lord-vault`, since 0.8.7 the network reader `lord-lan`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
 engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `lord-bench`, and since 0.8.7 Cleaner's
-scanner `lord-clean` and Remote Desk's `lord-rdesk`, and since 0.8.8.8 `lord-screencast`, the PipeWire stream of a screen or a
+scanner `lord-clean` and Remote Desk's `lord-rdesk`, since 0.8.8.5 Machines' display helper `lord-vmdisplay` (QEMU's D-Bus display protocol), since
+0.8.8.7 `lord-sftp` (the Terminal's Files mode) and `lord-sql` (Databases), and since 0.8.8.8 `lord-screencast`, the PipeWire stream of a screen or a
 window shared with a Linux app, which gets its PipeWire connections already connected and adds only the `timerfd_*` calls) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
 
@@ -448,7 +450,7 @@ development) the apps run without a scope, with a warning.
   restrictions apply. See [FIREWALL.md](FIREWALL.md#rules-by-app-settings-and-monitor).
 
 Permissions: `files`, `clipboard`, `notifications`, `network`, `camera`, `microphone`, `screen`,
-`listen`, `usb`, `bluetooth`, `apps`. Not for a manifest or the broker: `shortcuts` (in development), a Linux app
+`listen`, `usb`, `bluetooth`, `apps`. Not for a manifest or the broker: `shortcuts` (0.8.8.8), a Linux app
 (known by what lord-server checks it is, never by the app_id it sets: `flatpak:<app id>` or `program:<path>`) or
 Machines' VM window taking ❖, ⌥Tab and the rest while in front, asked once and listed under Keyboard shortcuts with
 that identity under its name; ❖Esc always gives them back ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts inhibit").
@@ -671,7 +673,7 @@ package keeps its plain owner while a user `.lpk` with the same id does not reac
   printing over the broker first. The untrusted part, decoding images, already happens in the
   sandboxed `lord-media` helper (`media.image`, `media.edit`), not in the window's process.
 - **Not covered for the isolated four:** printing (none of them prints today) and drag and drop
-  (none of them accepts drops today). Links in mail are shown and copied (LordOS has no web engine),
+  (none of them accepts drops today). Links in mail are shown and copied (Mail doesn't render web content),
   as before.
 - **Limits.** A firewall *network* rule for `lpk:mail` does not stop mail syncing: the connections
   are opened by `lord-server` for `lord-maild` (firewall id `lordos`), as in 0.8.1; the Mail window
@@ -699,7 +701,8 @@ a Wayland app.**
 
 - **Screen and windows.** Xwayland is a Wayland client like any other: it only ever gets the
   buffers of its own windows, never another app's surface or LordOS's screen (there is no
-  screen-copy protocol). `xwd -root` fails (`BadMatch`: rootless Xwayland has no root picture) and
+  screen-copy protocol; an X app may ask through the ScreenCast portal, which shares only what the person
+  picks, see [Sharing a screen with a Linux app](#sharing-a-screen-with-a-linux-app-0888)). `xwd -root` fails (`BadMatch`: rootless Xwayland has no root picture) and
   the X window tree only holds X windows, so **Passwords, the keyring prompt and every other
   Wayland or LordOS window are invisible to X11 apps** (`xwayland-protected.png`).
 - **Keyboard.** Xwayland receives keys only while one of its windows has the keyboard. Global X
@@ -715,7 +718,7 @@ a Wayland app.**
   an X app in the background never reads it. What Passwords copies (marked sensitive) **never**
   enters X. In the other direction, an X app's copy is read once, when it is made, and becomes
   LordOS's.
-- **Drag and drop** (XDND, in development). A drag from Files or a Wayland app is offered to the X
+- **Drag and drop** (XDND, 0.8.8.8). A drag from Files or a Wayland app is offered to the X
   window under the pointer only while it is there, and its data is given only to a window of that
   window's client. An X app's drag of files reaches Files only if the X server ties its selection's
   owner to a process that isn't sandboxed and no X client of the display is sandboxed (X-Resource
@@ -754,6 +757,30 @@ isolated from the rest; tracked for a later version.
 |---|
 | ![protected](xwayland-protected.png) |
 | From XTerm, with Passwords open behind it: `xwd -root` fails, the X window tree holds only XTerm, and the keylogger test run while typing into Passwords saw 0 keys |
+
+## Sharing a screen with a Linux app (0.8.8.8)
+
+No Linux app can copy the screen on its own: the compositor offers no capture protocol. Since 0.8.8.8 an app can
+*ask* through `org.freedesktop.portal.ScreenCast`, which lord-server serves itself (`server/src/ui/portal.c`, no
+`xdg-desktop-portal`). The consent rules:
+
+- **A chooser every time.** `Start` shows LordOS's own chooser (the displays and the open windows, each with a live
+  picture); nothing is shared until the person presses Share, and Cancel answers 1. No `restore_token` is ever given,
+  so a choice is never remembered.
+- **Only a checked name.** The chooser names the app asking only by an identity LordOS checked (the app id of its
+  launcher's scope), never `/proc/<pid>/comm`; a process it can't identify is "An unknown program", with a warning.
+- **The indicator first.** The screen-sharing indicator shows a pill with Stop for each session, and no frame is sent
+  until that pill is on screen. Stop, a lock, a user switch, the shared window closing or the app leaving ends it.
+- **Protected windows stay black**, as in Screenshots: the frames are painted again in capture mode.
+- **"No screen capture" is refused without a question** (answer 2), and an unknown sender is refused too while any
+  app with that restriction runs (`csm_gate`). The PipeWire guard (`sec/pwguard.c`) hides every shared screen's node
+  from a restricted app, so it can't read another app's share.
+- **The frames go through a sandboxed helper.** `lord-screencast` is the only binary that links libpipewire. It gets
+  its PipeWire connections already opened by lord-server, calls `sandbox_apply_helper`, and the app's connection sees
+  only the session's streams.
+
+The full design is in [WAYLAND.md](WAYLAND.md), "Sharing a screen or a window", and the screen-sharing API for
+packaged apps is in [SCREEN-SHARING.md](SCREEN-SHARING.md).
 
 ## Root-owned app scopes
 
