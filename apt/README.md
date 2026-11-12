@@ -24,7 +24,7 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 - **Mirrored** (everything else, and an `apt` entry with `"delivery": "mirror"`): the files are
   downloaded on the maintainer's Mac, verified, packaged when they are not a .deb, and added to
   `pool/catalog/` of lordos.org/apt by `tools/release/apt-repo.sh build <target> --catalog …`, signed
-  with the LordOS archive key together with everything else. Today: llama.cpp, whisper.cpp and codex-cli (built by LordOS) and goose, opencode, ArtCraft and RustDesk (the vendor's .deb).
+  with the LordOS archive key together with everything else. Today: llama.cpp, whisper.cpp and codex-cli (built by LordOS) and goose, opencode and ArtCraft (the vendor's .deb).
 
 ## Schema (version 1)
 
@@ -43,11 +43,11 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
                                        // optional; the Store falls back to "en")
     "license": "MIT", "vendor": "ggml.ai (ggml-org)", "homepage": "https://github.com/ggml-org/llama.cpp",
     "arches": ["amd64", "arm64"],
-    "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | remote | vpn | …
+    "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | vpn | …
                                        // (each needs store.ai.kind.<kind> in every locale; server/tests/store_search_test.mjs)
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
                                        // (Chrome, Edge, Spotify); "remote" = third-party remote access
-                                       // (RustDesk, Tailscale);
+                                       // (Tailscale);
                                        // "suites" = open source apps and suites from other projects,
                                        // Store → Third-party apps (ArtCraft, VSCodium, Brave Browser);
                                        // missing = the AI section

@@ -730,7 +730,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.6-beta"); no new I
   ([#63](https://github.com/lordbasex/LordOS/issues/63)), the remote desktop's stuck Ctrl
   ([#44](https://github.com/lordbasex/LordOS/issues/44)), Cloud's panel ([#71](https://github.com/lordbasex/LordOS/issues/71)),
   Tailscale and RustDesk in Store → Remote access ([#66](https://github.com/lordbasex/LordOS/issues/66),
-  [#68](https://github.com/lordbasex/LordOS/issues/68)), and the rest in `CHANGELOG.md`, "Fixed".
+  [#68](https://github.com/lordbasex/LordOS/issues/68); RustDesk is removed from the catalog in 0.8.8.9, below), and the rest in `CHANGELOG.md`, "Fixed".
 - [x] The CPU's microcode updates on amd64, and the same command-line tools on every image (below, under 0.8.9).
 
 ## Release 0.8.8.7-beta ✅ (2026-11-09)
@@ -790,6 +790,12 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   languages, saying that the product names, logos and icons shown belong to their owners, are used only to identify the
   services, and that LordOS is not affiliated with, endorsed or sponsored by them. The website already carries the same
   notice (the LordOS Web Runtime feature page, the paper's §5.4 and the legal pages).
+- [x] **RustDesk removed from the Store catalog** ([#66](https://github.com/lordbasex/LordOS/issues/66); maintainer,
+  2026-11-12: not distributed for now). If it comes back, it should be delivered directly from its maker: the Store
+  downloads the maker's `.deb` from its own release URL and checks the pinned SHA-256 on the person's computer, and
+  lordos.org never hosts it, so LordOS isn't the distributor and has no AGPL source obligation. That needs a new
+  "direct deb" delivery in the Store's package engine (today "direct" exists only for vendor APT repositories). The same
+  option is worth considering for the other mirrored vendor `.deb`s (ArtCraft, goose, opencode).
 
 ## Release 0.8.9 (planned)
 

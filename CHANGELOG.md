@@ -10,6 +10,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Removed
+
+- **RustDesk is no longer in the Store** (#66; maintainer's decision, 2026-11-12: LordOS doesn't distribute it for now).
+  It was offered in Store → Remote access from 0.8.8.6 as its maker's `.deb` (1.5.1, amd64 and arm64), to be mirrored
+  in LordOS's signed repository; its entry is gone from `apt/catalog.json`, so the Store no longer lists it, offers it
+  in search or installs it. LordOS doesn't redistribute it; people who want it can get it from its maker. Tailscale
+  stays in Remote access, unchanged. No migration: the package was never published in lordos.org/apt's pool (the
+  live amd64 index has no `rustdesk`), so no installed system has it from LordOS. The Remote access intro no longer
+  mentions seeing and controlling other computers, and the "Remote access" kind label (`store.ai.kind.remote`), used
+  only by that entry, is removed in all six languages. store-search-test now checks that "remote desktop" brings no
+  Remote access app and that "private network" brings Tailscale. docs/UPDATES.md, PACKAGES.md, COMPLIANCE.md (the
+  AGPL-3.0 source gap no longer applies), ROADMAP.md and apt/README.md say so; ROADMAP.md (0.8.8.9) notes how it could
+  come back without LordOS distributing it: a "direct deb" delivery where the person's computer downloads the maker's
+  `.deb` and checks the pinned SHA-256.
+
 ### Documentation
 
 - **Platform docs match 0.8.8.8.** The install, unattended install, packages, updates, release, ISO, Raspberry Pi,
@@ -17,7 +32,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   released, list migration 007 (logs), the Store's Web apps section, the languages the installer generates, the
   `lordos-rclone` and `lordos-web` packages in the install and release steps, the Raspberry Pi 500 as supported (same
   image, tested by the community), the build refusing missing helpers (and `libsystemd-dev`), nanosvg and the mirrored
-  artcraft-launcher and AGPL-3.0 RustDesk packages (whose source is not published yet), X11 apps run as root and web
+  artcraft-launcher package, X11 apps run as root and web
   app logs, and four documents missing from the index (Cloud, Databases, Disk life, Voice).
 
 ### Website

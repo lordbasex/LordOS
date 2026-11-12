@@ -607,39 +607,6 @@
         "fingerprint": "2596A99EAAB33821893C0A79458CA832957F5868",
         "package": "tailscale"
       }
-    },
-    {
-      "id": "rustdesk",
-      "package": "rustdesk",
-      "name": "RustDesk",
-      "keywords": ["remote desktop", "remote control", "remote support"],
-      "summary": {
-        "en": "Open source remote desktop: see and control other computers that run RustDesk",
-        "es": "Escritorio remoto de código abierto: ve y controla otras computadoras que usan RustDesk",
-        "pt": "Área de trabalho remota de código aberto: veja e controle outros computadores que usam o RustDesk",
-        "fr": "Bureau à distance open source : voyez et contrôlez d'autres ordinateurs qui utilisent RustDesk",
-        "it": "Desktop remoto open source: vedi e controlla altri computer che usano RustDesk"
-      },
-      "license": "AGPL-3.0",
-      "vendor": "RustDesk (Purslane Ltd)",
-      "homepage": "https://rustdesk.com",
-      "arches": ["amd64", "arm64"],
-      "kind": "remote",
-      "section": "remote",
-      "source": {
-        "type": "deb",
-        "version": "1.5.1",
-        "files": {
-          "amd64": {
-            "url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.1/rustdesk-1.5.1-x86_64.deb",
-            "sha256": "b5d682ad90cb7571ecbdbf26eef58d3c4514e726a74ef6d08ce3f0b114ef0bd9"
-          },
-          "arm64": {
-            "url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.1/rustdesk-1.5.1-aarch64.deb",
-            "sha256": "d1471ed916dc21e3ae3965f936c51944e1f2635a6d521fcc4663486696018465"
-          }
-        }
-      }
     }
   ]
 }
