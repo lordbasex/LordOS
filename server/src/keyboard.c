@@ -240,6 +240,8 @@ static void utf8(uint32_t cp, char *out) {
     else { out[0] = (char)(0xf0 | cp >> 18); out[1] = (char)(0x80 | (cp >> 12 & 0x3f)); out[2] = (char)(0x80 | (cp >> 6 & 0x3f)); out[3] = (char)(0x80 | (cp & 0x3f)); out[4] = 0; }
 }
 
+int kb_key_repeats(int code) { return keymap && code >= 0 && xkb_keymap_key_repeats(keymap, (xkb_keycode_t)code + 8); }
+
 void kb_key(int code, int value, KeyInfo *k) {
     memset(k, 0, sizeof *k);
     if (!state) return;

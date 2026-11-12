@@ -443,6 +443,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Isolated apps (Mail, Calendar, Contacts, Reminders, Passwords): holding a key did nothing more than one press,
+  so Backspace, Delete and the arrows had to be pressed again for every character. These apps run as Wayland clients
+  (`lord-server --app`), and the compositor sends its clients only the press and the release of a key, with the rate
+  and delay to repeat it themselves in `wl_keyboard.repeat_info` (30/s after 500 ms). The app client ignored that
+  event, so no repeat ever reached the JS keymap, which already handles them. It now repeats the held key itself
+  (`server/src/app/keyrepeat.h`, wired in `appclient.c`'s poll loop): after the delay, then at the rate, sent as the
+  same value-2 key event an in-process app gets from the kernel. Modifiers don't repeat (new `kb_key_repeats` in
+  `keyboard.c`, from the keymap); the key's release, another press, or the keyboard leaving or entering a window
+  ends it; a rate of 0 turns it off; an app that stalls catches up with one repeat, not a burst. New
+  `build/keyrepeat-test` in `make test`; `docs/PRIVACY.md` describes it. Arrows, Home/End and Ctrl+A already worked
+  in these fields. (GitHub #130)
 - Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
   with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
   a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
