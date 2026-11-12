@@ -79,10 +79,16 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   (Enter cancels) (`docs/WAYLAND.md`, "Clipboard"; `apps/files/clipfiles.js`).
   Copying into the same place duplicates with a free name («notas 2.txt»).
 - **Copy and move in the background** (server threads): with progress in the status bar and a
-  button to cancel. If something fails, no half-made copies are left.
+  button to cancel. If something fails, no half-made copies are left. lord-server runs at most 8 copy or
+  move jobs at a time; since 0.8.8.8 the items past the free slots wait in Files and start in the order
+  chosen as slots free up (`apps/files/jobqueue.js`, GitHub #104). The status bar says how many are left,
+  and its ✕ stops the copy in progress and drops the waiting ones.
 - **Drag and drop:** moves to a folder, to the sidebar, to a tab or to the Trash; with ⌥ it
   copies. While dragging you see the icon, the count and a «+» when copying. If a file with that
-  name already exists, a free one is chosen (nothing is overwritten).
+  name already exists, a free one is chosen (nothing is overwritten). Since 0.8.8.8 a drag can also
+  leave Files, and the dragged icon keeps following the pointer into the other app: Terminal (an ssh pane
+  uploads what is dropped), Text Editor, Notes, Photos, Player, PDF Viewer, and Linux apps over Wayland drag
+  and drop (copy, or move with Shift); files dragged from a Linux app drop into Files (`docs/WAYLAND.md`).
 - **Trash** (freedesktop.org, the same as GNOME and KDE):
   - things from the home folder go to `~/.local/share/Trash`, and things from a mounted disk to
     `$mount/.Trash-$uid`, with their `.trashinfo` (Path, DeletionDate);
@@ -104,10 +110,11 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   `lord.apps.launchWith(id, path)` (see below).
 - **Recents:** the files in the home folder modified in the last 30 days. It is a bounded walk: 5
   levels, 60,000 entries, no hidden files and no `node_modules`.
-- **Applications:** those from `useLauncherApps()` (LordOS, packages and Linux); double-click
+- **Applications:** those from `useLauncherApps()` (LordOS, packages, Linux and, since 0.8.8.8, web apps); double-click
   opens them.
 - **Tags:** red, orange, yellow, green, blue, purple and gray, stored in
-  `~/.local/share/lordos/tags.json` (path → colors).
+  `~/.local/share/lordos/tags.json` (path → colors). Since 0.8.8.8 a tagged folder is drawn in its first
+  tag's color, in every view and in Get Info, and in the list view the tag dots sit right after the name.
 - **Path bar** at the bottom, clickable on each segment, and **status bar** («N items, X
   available», «N of M selected» or a copy's progress).
 - **App menus** in the theme's bar: File, Edit, View and Go (in Lord Classic, since 0.8.5, in a strip
@@ -361,7 +368,8 @@ mocks (Files, FilesMenu, ShareLink, GetInfo, States); the code is `apps/files/cl
   with the account's color and a small usage ring (used of the quota; none without a quota). An account that needs a
   new sign-in or has an error shows "!" on orange and is dimmed, as is one that is offline or whose keyring is locked.
   A click opens `~/Cloud/<name>`; a right click offers Open in New Tab and Cloud Settings…. Settings → Cloud's
-  "Show in Files" switch (`settings.cloudHidden`) leaves an account out. `fuse.rclone` mounts under `~/Cloud` never
+  "Show in Files" switch (`settings.cloudHidden`) leaves an account out. An account turned off in Settings → Cloud
+  (0.8.8.8, `docs/CLOUD.md` 6.4) is not shown, here or in the file dialog. `fuse.rclone` mounts under `~/Cloud` never
   show under Locations: the Cloud section is where they live (Connect to Server's rclone mounts are elsewhere and stay).
 - **Status**: asked with `cloud.status(paths)` for the rows of the folder shown (at most 400), again on every pushed
   state (at most twice a second). The list view adds a **Status** column at the end in an account's folders; the icon

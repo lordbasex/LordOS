@@ -203,21 +203,24 @@
         "Multiple cursors and column selection",
         "Find and replace, with regular expressions",
         "Syntax highlighting for common languages",
-        "Jump to any project file by typing a few letters"
+        "Jump to any project file by typing a few letters",
+        "Since 0.8.8.8: File → Open recent, and files dragged from Files open in it (a folder becomes the project)"
       ],
       "es": [
         "Árbol de carpetas del proyecto y pestañas",
         "Varios cursores y selección por columnas",
         "Buscar y reemplazar, con expresiones regulares",
         "Resaltado de sintaxis para lenguajes comunes",
-        "Abrí cualquier archivo del proyecto con unas letras"
+        "Abrí cualquier archivo del proyecto con unas letras",
+        "Desde la 0.8.8.8: Archivo → Abrir recientes, y los archivos arrastrados desde Archivos se abren en él (una carpeta pasa a ser el proyecto)"
       ],
       "pt": [
         "Árvore de pastas do projeto e abas",
         "Vários cursores e seleção por colunas",
         "Localizar e substituir, com expressões regulares",
         "Realce de sintaxe para linguagens comuns",
-        "Abra qualquer arquivo do projeto com algumas letras"
+        "Abra qualquer arquivo do projeto com algumas letras",
+        "Desde a 0.8.8.8: Arquivo → Abrir recentes, e arquivos arrastrados do Arquivos abrem nele (uma pasta vira o projeto)"
       ]
     }
   },
@@ -612,7 +615,8 @@
         "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view",
         "New in 0.8.8: the system file dialog now looks and works like Files",
         "Since 0.8.8.4: Markup in Quick Preview opens a picture in the markup editor (crop, resize, redact, arrows and text)",
-        "Since 0.8.8.7: CDs and DVDs mount read-only, and Cloud and network folders never freeze the desktop"
+        "Since 0.8.8.7: CDs and DVDs mount read-only, and Cloud and network folders never freeze the desktop",
+        "Since 0.8.8.8: split archives open as one, column view columns can be resized, and files can be copied, pasted and dragged to and from Linux apps"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -623,7 +627,8 @@
         "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista",
         "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos",
         "Desde la 0.8.8.4: Marcar en la Vista rápida abre una imagen en el editor de marcado (recortar, cambiar tamaño, tapar zonas, flechas y texto)",
-        "Desde la 0.8.8.7: los CD y DVD se montan en solo lectura, y las carpetas de la Nube y de red nunca congelan el escritorio"
+        "Desde la 0.8.8.7: los CD y DVD se montan en solo lectura, y las carpetas de la Nube y de red nunca congelan el escritorio",
+        "Desde la 0.8.8.8: los archivos comprimidos divididos se abren como uno solo, las columnas de la vista en columnas se pueden ensanchar, y los archivos se copian, pegan y arrastran desde y hacia apps de Linux"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -634,7 +639,8 @@
         "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização",
         "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos",
         "Desde a 0.8.8.4: Marcar na Visualização rápida abre uma imagem no editor de marcação (recortar, redimensionar, tapar áreas, setas e texto)",
-        "Desde a 0.8.8.7: CDs e DVDs são montados só para leitura, e as pastas da Nuvem e de rede nunca congelam o desktop"
+        "Desde a 0.8.8.7: CDs e DVDs são montados só para leitura, e as pastas da Nuvem e de rede nunca congelam o desktop",
+        "Desde a 0.8.8.8: arquivos compactados divididos abrem como um só, as colunas da visão em colunas podem ser redimensionadas, e arquivos são copiados, colados e arrastados de e para apps Linux"
       ]
     }
   },
@@ -748,7 +754,8 @@
         "Inline images and font ligatures",
         "Sessions survive a restart; tmux integration",
         "New in 0.8.8: ❖+click or Ctrl+click opens a web address in the default browser",
-        "Since 0.8.8.7: Files mode shows a server's files beside this computer's over the tab's own ssh session, and Settings and Profiles open in windows of their own"
+        "Since 0.8.8.7: Files mode shows a server's files beside this computer's over the tab's own ssh session, and Settings and Profiles open in windows of their own",
+        "Since 0.8.8.8: port forwards, drop files on an ssh pane to upload them, and ❖+click a name in ls output to download it, all over the tab's own ssh"
       ],
       "es": [
         "Pestañas, paneles divididos y ventana desplegable",
@@ -757,7 +764,8 @@
         "Imágenes en línea y ligaduras tipográficas",
         "Las sesiones sobreviven a un reinicio; integración con tmux",
         "Nuevo en 0.8.8: ❖+clic o Ctrl+clic abre una dirección web en el navegador predeterminado",
-        "Desde la 0.8.8.7: el modo Archivos muestra los archivos de un servidor junto a los de este equipo por el mismo ssh de la pestaña, y Ajustes y Perfiles se abren en ventanas propias"
+        "Desde la 0.8.8.7: el modo Archivos muestra los archivos de un servidor junto a los de este equipo por el mismo ssh de la pestaña, y Ajustes y Perfiles se abren en ventanas propias",
+        "Desde la 0.8.8.8: redirecciones de puertos, soltá archivos en un panel con ssh para subirlos y ❖+clic en un nombre de la salida de ls para bajarlo, todo por el mismo ssh de la pestaña"
       ],
       "pt": [
         "Abas, painéis divididos e janela suspensa",
@@ -766,7 +774,8 @@
         "Imagens em linha e ligaduras tipográficas",
         "As sessões sobrevivem a um reinício; integração com tmux",
         "Novo na 0.8.8: ❖+clique ou Ctrl+clique abre um endereço da web no navegador padrão",
-        "Desde a 0.8.8.7: o modo Arquivos mostra os arquivos de um servidor ao lado dos deste computador pelo próprio ssh da aba, e Ajustes e Perfis abrem em janelas próprias"
+        "Desde a 0.8.8.7: o modo Arquivos mostra os arquivos de um servidor ao lado dos deste computador pelo próprio ssh da aba, e Ajustes e Perfis abrem em janelas próprias",
+        "Desde a 0.8.8.8: redirecionamento de portas, solte arquivos num painel com ssh para enviá-los e ❖+clique num nome da saída do ls para baixá-lo, tudo pelo próprio ssh da aba"
       ]
     }
   },
@@ -1268,7 +1277,8 @@
         "Structure shows every change as the ALTER TABLE before it runs",
         "Content with filters, sorting and row editing; Query with completion, history and Explain",
         "A safe mode asks before an UPDATE or DELETE without WHERE; production favorites open read-only",
-        "Passwords stay in Passwords; the firewall and Monitor show it as its own row"
+        "Passwords stay in Passwords; the firewall and Monitor show it as its own row",
+        "Since 0.8.8.8: SSH favorites connect through an SSH tunnel (key only, the server key checked by its fingerprint), and groups of favorites have a color"
       ],
       "es": [
         "Desde la 0.8.8.7",
@@ -1276,7 +1286,8 @@
         "Estructura muestra cada cambio como el ALTER TABLE antes de ejecutarlo",
         "Contenido con filtros, orden y edición de filas; Consulta con autocompletado, historial y Explain",
         "Un modo seguro pregunta antes de un UPDATE o DELETE sin WHERE; los favoritos de producción se abren en solo lectura",
-        "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila"
+        "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila",
+        "Desde la 0.8.8.8: los favoritos SSH se conectan por un túnel SSH (solo con clave, y la clave del servidor se controla por su huella), y los grupos de favoritos tienen color"
       ],
       "pt": [
         "Desde a 0.8.8.7",
@@ -1284,7 +1295,8 @@
         "Estrutura mostra cada mudança como o ALTER TABLE antes de rodar",
         "Conteúdo com filtros, ordenação e edição de linhas; Consulta com autocompletar, histórico e Explain",
         "Um modo seguro pergunta antes de um UPDATE ou DELETE sem WHERE; favoritos de produção abrem só para leitura",
-        "As senhas ficam no Senhas; o firewall e o Monitor o mostram numa linha própria"
+        "As senhas ficam no Senhas; o firewall e o Monitor o mostram numa linha própria",
+        "Desde a 0.8.8.8: favoritos SSH conectam por um túnel SSH (só com chave, e a chave do servidor é conferida pela impressão digital), e os grupos de favoritos têm cor"
       ]
     }
   },

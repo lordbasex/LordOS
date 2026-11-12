@@ -37,7 +37,7 @@ editor, generator, first run); the shots below are from the first version.
 | ![Chromium offers to save](passwords-browser-save.png) | ![Chromium Safe Storage in the session keyring](passwords-browser-keyring.png) |
 | Chromium (Wayland, `--password-store=gnome-libsecret`) saving a password | …its "Chromium Safe Storage" key lands in our Secret Service, visible in *Session keyring* |
 | ![Chromium autofills after a restart](passwords-browser-autofill.png) | ![Protected window in a capture](passwords-protected-capture.png) |
-| After restarting Chromium it decrypts and autofills the saved login: the key came back from our service | The Passwords window comes out black in LordOS screenshots, recordings and the remote desktop |
+| After restarting Chromium it decrypts and autofills the saved login: the key came back from our service | The Passwords window comes out black in LordOS screenshots, recordings, the remote desktop and (0.8.8.8) screens shared with Linux apps through the ScreenCast portal |
 
 | ![Categories tree and tags](passwords-categories.png) | ![The real screen at the same moment](passwords-real-screen.png) |
 |---|---|
@@ -93,7 +93,7 @@ in that process and in `lord-vault`; `lord-server`'s QuickJS heap never sees the
 | Files | The system's own open/save dialog (powerbox, drawn by `lord-server`) picks the file; the app gets only the fd and passes it on to `lord-vault` (`request(json, { fds })`). Key files, attachments, import, export, the breach list and QR images all go this way. |
 | FIDO2 | `BOP_VAULT_FIDO`: after the user allows `usb`, `lord-server` opens the hidraw device and gives it straight to `lord-vault` (`vc_fido_attach`); the app never holds the device. Only the app spawned with a vault channel may ask. |
 | Clipboard | `BOP_CLIP_SECRET`: the copy is marked sensitive (out of the history, password-manager hint for Wayland clients) and `lord-server` clears it after the chosen seconds if it still holds the same text (compared by SHA-256; the text is not kept). |
-| Protection | The manifest says `"protected": true`; `sdk/wayland.js` marks the app's Wayland window protected as soon as it maps, so it is black in screenshots, recordings and the remote desktop (`passwords-app-screenshot.png`). |
+| Protection | The manifest says `"protected": true`; `sdk/wayland.js` marks the app's Wayland window protected as soon as it maps, so it is black in screenshots, recordings, the remote desktop and (0.8.8.8) screen sharing with Linux apps through the ScreenCast portal (`lord-screencast`) (`passwords-app-screenshot.png`). |
 | Window | Opening Passwords (Dock, app launcher, Search, `wm.open('passwords')`) starts the process or focuses its window; the manifest's `size`/`minSize` now size the app window. |
 
 **Fallback.** If `lord-server` has no app mode or the system package is missing (a dev tree
@@ -358,6 +358,11 @@ the address found; Remote Desk the computer's saved address. The rules are in `s
 (test: `cd server && node tests/login_model_test.mjs`).
 Used in Settings → Network (Wi-Fi password, VPN credentials), Settings → Cloud, Databases (each connection's password),
 Files (shared folders, Connect to Server for sftp, ftp and WebDAV) and Remote Desk (the sign-in and the credentials).
+
+**The eye and Caps Lock (0.8.8.8).** Every password field in LordOS shows an eye that reveals the text and a Caps
+Lock warning while it has focus with Caps Lock on. It is built once in the SDK's `TextInput` with `secure`
+(`sdk/components.jsx`, state in `sdk/passwordfieldmodel.js`); the text is hidden again on blur and on Enter, and the
+field stays a password field while shown (no undo history, no input method, Copy and Cut copy nothing).
 
 **Save to Passwords? (0.8.8.7).** After a sign-in in Files or Remote Desk that the server accepted, with a password the
 person typed in that form (not one filled by the 🔑 or remembered in the keyring), `<SaveLoginOffer login onDone />`

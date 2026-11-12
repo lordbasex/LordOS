@@ -44,7 +44,8 @@ top of the SDK: it doesn't use CodeMirror or Monaco, nor vendored TextMate gramm
   TextMate (↑ and ↓ choose).
 - **Files:** ❖N new, ❖O open (own dialog), ❖S save, ❖⇧S save as, ❖W close tab. From Files, a
   double click on a file that isn't an image, sound, video or archive opens it here
-  (`wm.open('editor', { args: { path } })`). Closing the window or a tab with changes asks first.
+  (`wm.open('editor', { args: { path } })`). Files dragged from Files open in it (0.8.8.8): a file in a
+  tab, a folder as the project, with an outline while the drag is over the window. Closing the window or a tab with changes asks first.
   It rejects binary files and files larger than 8 MB. File → Open recent lists the last 5 files
   opened or saved, newest first, kept in `settings.json` as `editor.recent` (`apps/editor/recent.js`).
   A file that is not there now is greyed out, and one that is gone when chosen leaves the list. Two

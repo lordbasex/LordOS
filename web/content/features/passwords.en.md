@@ -40,7 +40,7 @@ Several methods can live side by side. The vault locks itself after 5 minutes of
 
 **The window.** The Passwords window itself runs as its own sandboxed process (`lord-server --app passwords`), not in the desktop's JavaScript. Revealed values never enter the desktop's memory. Lists show titles and user names, never secrets; a value travels only when you click reveal, copy or edit.
 
-**The screen.** The Passwords window is protected: it comes out black in screenshots, screen recordings and the remote desktop.
+**The screen.** The Passwords window is protected: it comes out black in screenshots, screen recordings, the remote desktop and, since 0.8.8.8, a screen or window shared with a Linux app.
 
 **The clipboard.** A copied secret stays out of the clipboard history, is marked as sensitive for Linux apps that honour that convention, and is cleared after 30 seconds (configurable) if it is still there.
 
@@ -68,6 +68,7 @@ Both are exceptions approved in the project's rulebook (`AGENTS.md`), tested on 
 - **Copy anything, and know what became of it.** Titles and notes have a copy button too, a right click on an item copies any field or its 2FA code, and a copied password shows the seconds before it is cleared, with Keep. LordOS tells Passwords only whether its own copy is still on the clipboard, never what the clipboard holds.
 - **Paste works in the isolated apps.** Mail, Calendar, Contacts, Reminders and Passwords can read the clipboard once, within 2 seconds, after a paste you ask for in their window; any other read still needs the permission.
 - **A new icon:** a gold key on graphite.
+- **Since 0.8.8.8, every password field in LordOS has an eye and a Caps Lock warning:** the login and lock screen, Wi-Fi and VPN, the vault and keyring unlock, Users, Mail, Databases, Files and the remote desktop, among others. The eye shows the text, which is hidden again when the field loses focus and on Enter; while the field has focus with Caps Lock on, it says so.
 
 ## The skeptical reader's questions
 

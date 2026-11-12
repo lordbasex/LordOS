@@ -469,14 +469,14 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 
 ## Security
 
-- (0.8.8.7, in development) Files mode, transfers and forwards start **no** process: they open channels on the tab's
+- (0.8.8.7) Files mode, transfers and forwards start **no** process: they open channels on the tab's
   own ssh control socket (OpenSSH multiplexing protocol), and the SFTP replies are parsed by the sandboxed `lord-sftp`
   helper. Remote commands come only from a closed list (`file`, `sha256sum`, `sudo -n sftp-server`). Forwards listen on
   127.0.0.1 only.
-- `lord.term.create()` is the only LordOS API that starts a process. It only launches the login
-  shell of the user already running the session, with no arguments chosen by JS (apart from the
+- `lord.term.create()` is the only Terminal API that starts a process (the other approved launchers, such as the
+  `lord.apps.launch*` family, are listed in AGENTS.md). It only launches the login shell of the user already running the session, with no arguments chosen by JS (apart from the
   initial directory).
-- (0.8.8.8, in development; approved by the maintainer on 2026-11-10) **Terminal apps** (`.desktop` files with
+- (0.8.8.8; approved by the maintainer on 2026-11-10; built, not yet checked on the VM) **Terminal apps** (`.desktop` files with
   `Terminal=true`: htop, mc, ranger, vim's entry) open in a Terminal tab, and the command never passes through JS:
   - `lord.apps.launch(id)` of such an entry runs nothing. `apps.c` parses its `Exec` line as for any other app (field
     codes removed, no caller arguments, no file; the program must be found in the launcher's fixed PATH) and keeps
@@ -501,7 +501,7 @@ Design approved by the maintainer on 2026-11-09 (mockups: the Terminal design ca
 - The child doesn't inherit capabilities (cleared with `capset`), blocked signals, server
   descriptors or the `SUDO_*` variables.
 - OSC 52 can only **write** the clipboard; reading it from a program isn't allowed.
-- (0.8.8.8, in development) A paste, from the clipboard or the primary selection (which any app, or a web page whose
+- (0.8.8.8) A paste, from the clipboard or the primary selection (which any app, or a web page whose
   text is selected, can fill), types no control character but tab and the line ends (`src/term/pastefilter.c`, as
   xterm and VTE do). Removing only the bracketed-paste end marker `ESC[201~` in one pass let `ESC[201` `ESC[201~` `~`
   rebuild it, so the shell ran what followed as typed. Found by Claude Security before release

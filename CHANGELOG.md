@@ -26,6 +26,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   policy gains a "Web apps" section on third-party service names and icons (no affiliation or endorsement; what "tested
   on LordOS" means), and `docs/WEBAPPS.md` says plainly which small scripts `lord-web` adds and that it doesn't change
   the sites. Feature pages Cleaner and Read aloud move one place down in the order.
+- **Docs and site synced with the apps at main (Files, documents, Editor, Notes, Mail, Passwords, Databases, Search,
+  Terminal).** Mail's pages say Mail uses no web engine instead of "LordOS has no web engine"; Databases' SSH tunnel is
+  no longer "later" in the FAQ and the apps page, and its doc lists only the screens that exist; stale "in development"
+  labels dropped; the mail test counts are now 47,467 and 77; 0.8.8.8's drops from Files, copy queue, tag colours,
+  Cloud on/off, web apps in Search results, protected windows in screen sharing and the password eye are documented, in
+  English, Spanish and Portuguese where the site has them.
 
 ## [0.8.8.8-beta] - 2026-11-12
 

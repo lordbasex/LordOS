@@ -68,10 +68,16 @@ On the right is the open note, with these buttons:
 - **Read / Edit:** ❖E switches between them; a double click while reading starts editing.
 - **Colors.**
 - **😀:** the emoji picker.
-- **Image / Attach:** pick a file from the home folder, which is copied into the note.
+- **Image / Attach:** pick a file with the system file dialog (FILES.md, "The system file dialog"); it is
+  copied into the note.
 - **On the desktop.**
 - **Duplicate:** also copies the attachments.
 - **Delete.**
+
+Files dragged from Files (0.8.8.8) are copied into the open note, or into a new note when none is open:
+PNG and JPEG files become images and the others attachments, as «Image» and «Attach» do; folders are
+skipped. While the drag is over the window a dashed outline says what letting go will do (`useFilesDrop`
+and `FilesDropHint`, `sdk/filedrop.js`).
 
 The File menu also has «New note» (❖N) and «Show in Files».
 
@@ -145,7 +151,6 @@ It is a generic layer, not just for notes:
 
 ## Pending
 
-- Dragging a file from Files onto a note (today «Image» or «Attach» is used).
 - Adjusting the UI for right-to-left: the text area is always `ltr`, as in the editor. Notes
   still need testing in Arabic.
 - Seeing hand-made changes to `nota.md` without reopening the session.
