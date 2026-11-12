@@ -1,0 +1,55 @@
+name: Language request
+description: Ask for LordOS in your language, or for a partial language to be completed.
+title: "Language request: "
+labels: ["language-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for asking for your language. A language is added when at least 5 people from a country where it is spoken visit lordos.org within 30 days, or when the community asks for it, as here. The languages LordOS ships and how they are chosen are on [lordos.org/language](https://lordos.org/language/).
+
+        If you can translate, you don't have to wait: the [translators' guide](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md) shows how to start from the English files and open a pull request. This issue is public.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: Its name in English and in the language itself, and the code if you know it (for example "Czech, čeština, cs").
+      placeholder: Czech, čeština, cs
+    validations:
+      required: true
+  - type: input
+    id: country
+    attributes:
+      label: Country or region
+      description: Where you would use it. A language spoken in several countries may need its own dates, numbers or spelling for each (for example Portuguese in Brazil and in Portugal).
+      placeholder: Czech Republic
+    validations:
+      required: true
+  - type: dropdown
+    id: people
+    attributes:
+      label: How many people would use it?
+      description: A rough guess is fine, for example your team, school or community.
+      options:
+        - Just me
+        - 2 to 10
+        - 10 to 100
+        - More than 100
+    validations:
+      required: true
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you help translate?
+      description: Translating the core of LordOS first (the login screen, the desktop, Files, the installer and Settings' language pages) is about 1,050 short texts.
+      options:
+        - Yes, I can translate and open a pull request
+        - Yes, I can review someone else's translation
+        - Not right now
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else? (optional)
+      description: The script and keyboard you use, right-to-left writing, terms that are hard to translate, or a partial language you'd like completed first.

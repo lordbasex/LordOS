@@ -133,6 +133,9 @@ shows a 24-hour clock there too. **Settings → Date & Time → Time format** ca
 
 ## Language packs
 
+Translators: [TRANSLATING.md](TRANSLATING.md) is the step-by-step guide, from the English files to the pull
+request; this section is the reference.
+
 A language is a `<id>/` folder with `meta.json`, `format.json` and one JSON per namespace:
 
 ```

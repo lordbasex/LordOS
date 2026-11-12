@@ -195,6 +195,55 @@
         "missing.bpfLsm": "(the BPF security module is off)",
         "missing.cgroup2": "(no unified cgroup tree)"
       }
+    },
+    "language": {
+      "metaTitle": "Languages · LordOS",
+      "metaDescription": "The languages LordOS speaks, complete and partial, how new ones are chosen, and how to request your language or help translate it.",
+      "kicker": "Languages",
+      "title": "LordOS speaks your language",
+      "lead": "LordOS translates its whole interface, not just a few menus: every app, window and message, with the plurals, dates and numbers of each language. Here are the languages it ships, how new ones are chosen, and how you can bring yours.",
+      "figAlt": "Lumo, the LordOS mascot, waving in front of an embassy with the flags of several countries",
+      "status": "The partial languages are in development for the next pre-release. The latest release is {release}.",
+      "request": "Request a language",
+      "translate": "Translate LordOS",
+      "completeTitle": "Complete languages",
+      "completeText": "Every app, menu, window and message is translated, with the language's own plurals, dates and numbers. You pick the language on the boot menu, in the installer, on the login screen or in Settings → Language & Region. The Help articles are in English, Spanish and Portuguese.",
+      "default": "default",
+      "partialTitle": "Partial languages",
+      "partialText": "A partial language translates the core of LordOS first: the login screen, the desktop, Files, the installer, About, the app names, the file dialogs, and Settings' sections, Language & Region and the Date & Time formats. That is 1,052 of about 12,400 texts, with the language's own plurals, dates and numbers. Everything else shows in your next preferred language, or in English, until it is translated, and Settings lists these languages as partly translated.",
+      "next": "next pre-release",
+      "rtl": "right to left",
+      "nameNote": "Each language is shown by its own name. A language is not a country, so the flags in the picture are only decoration.",
+      "chooseTitle": "How new languages are chosen",
+      "chooseText": "A language is added when at least 5 people from a country where it is spoken visit lordos.org within 30 days, or when the community asks for it. The counts come from the website's private visit statistics, which use no cookies and are never published: {stats}.",
+      "chooseText2": "The partial languages above are the first ones chosen this way, from the visits of the last 30 days. Each one starts partial and grows with every release and every contribution.",
+      "statsLink": "Cookies and statistics",
+      "requestTitle": "Ask for your language",
+      "requestText": "Is your language missing, or would you like a partial one finished sooner? Open a request on GitHub with the language, the country, how many people would use it and whether you can help translate. Requests are public and need a GitHub account.",
+      "requestLink": "Request a language on GitHub",
+      "helpTitle": "Translate LordOS",
+      "helpText": "The best translations come from people who speak the language every day, and pull requests are welcome. You don't need to write code: the texts are plain JSON files.",
+      "steps": [
+        [
+          "Start from English",
+          "Copy assets/locales/en into a folder named with your language's code and add its meta.json and format.json."
+        ],
+        [
+          "Translate the core first",
+          "The login screen, the desktop, Files, the installer and Settings' language pages: about 1,050 texts. Mark the language as partial until it is complete."
+        ],
+        [
+          "Check it",
+          "node tools/i18n-check.mjs shows the coverage and catches broken {placeholders} and plural forms."
+        ],
+        [
+          "Open a pull request",
+          "Signed off, as every contribution. Accepted translations ship in the next release."
+        ]
+      ],
+      "guideLink": "Read the translators' guide on GitHub",
+      "siteNote": "This website itself is in English, Spanish and Portuguese for now.",
+      "menuMore": "More languages"
     }
   },
   "es": {
@@ -393,6 +442,55 @@
         "missing.bpfLsm": "(el módulo de seguridad BPF está apagado)",
         "missing.cgroup2": "(sin árbol de cgroups unificado)"
       }
+    },
+    "language": {
+      "metaTitle": "Idiomas · LordOS",
+      "metaDescription": "Los idiomas de LordOS, completos y parciales, cómo se eligen los nuevos y cómo pedir tu idioma o ayudar a traducirlo.",
+      "kicker": "Idiomas",
+      "title": "LordOS habla tu idioma",
+      "lead": "LordOS traduce toda su interfaz, no solo algunos menús: cada app, ventana y mensaje, con los plurales, las fechas y los números de cada idioma. Acá están los idiomas que trae, cómo se eligen los nuevos y cómo podés sumar el tuyo.",
+      "figAlt": "Lumo, la mascota de LordOS, saludando frente a una embajada con banderas de varios países",
+      "status": "Los idiomas parciales están en desarrollo para la próxima pre-release. La última versión publicada es la {release}.",
+      "request": "Pedir un idioma",
+      "translate": "Traducir LordOS",
+      "completeTitle": "Idiomas completos",
+      "completeText": "Cada app, menú, ventana y mensaje está traducido, con los plurales, las fechas y los números propios del idioma. El idioma se elige en el menú de arranque, en el instalador, en la pantalla de inicio de sesión o en Ajustes → Idioma y región. Los artículos de Ayuda están en inglés, español y portugués.",
+      "default": "predeterminado",
+      "partialTitle": "Idiomas parciales",
+      "partialText": "Un idioma parcial traduce primero el núcleo de LordOS: la pantalla de inicio de sesión, el escritorio, Archivos, el instalador, Acerca de, los nombres de las apps, los diálogos de archivos, y en Ajustes las secciones, Idioma y región y los formatos de Fecha y hora. Son 1052 de unos 12.400 textos, con los plurales, las fechas y los números del idioma. Todo lo demás se ve en tu siguiente idioma preferido, o en inglés, hasta que se traduzca, y Ajustes muestra estos idiomas como traducidos en parte.",
+      "next": "próxima pre-release",
+      "rtl": "de derecha a izquierda",
+      "nameNote": "Cada idioma aparece con su propio nombre. Un idioma no es un país: las banderas del dibujo son solo decoración.",
+      "chooseTitle": "Cómo se eligen los idiomas nuevos",
+      "chooseText": "Un idioma se suma cuando al menos 5 personas de un país donde se habla visitan lordos.org en 30 días, o cuando la comunidad lo pide. Los números salen de las estadísticas privadas de visitas del sitio, que no usan cookies y nunca se publican: {stats}.",
+      "chooseText2": "Los idiomas parciales de arriba son los primeros elegidos así, con las visitas de los últimos 30 días. Cada uno empieza parcial y crece con cada versión y cada aporte.",
+      "statsLink": "Cookies y estadísticas",
+      "requestTitle": "Pedí tu idioma",
+      "requestText": "¿Falta tu idioma, o querés que uno parcial se complete antes? Abrí un pedido en GitHub con el idioma, el país, cuántas personas lo usarían y si podés ayudar a traducir. Los pedidos son públicos y necesitan una cuenta de GitHub.",
+      "requestLink": "Pedir un idioma en GitHub",
+      "helpTitle": "Traducí LordOS",
+      "helpText": "Las mejores traducciones las hacen personas que hablan el idioma todos los días, y los pull requests son bienvenidos. No hace falta programar: los textos son archivos JSON simples.",
+      "steps": [
+        [
+          "Empezá desde el inglés",
+          "Copiá assets/locales/en a una carpeta con el código de tu idioma y sumale su meta.json y su format.json."
+        ],
+        [
+          "Traducí primero el núcleo",
+          "La pantalla de inicio de sesión, el escritorio, Archivos, el instalador y las páginas de idioma de Ajustes: unos 1050 textos. Marcá el idioma como parcial hasta que esté completo."
+        ],
+        [
+          "Revisalo",
+          "node tools/i18n-check.mjs muestra la cobertura y encuentra {variables} rotas y formas de plural que faltan."
+        ],
+        [
+          "Abrí un pull request",
+          "Firmado (Signed-off-by), como todo aporte. Las traducciones aceptadas salen en la próxima versión."
+        ]
+      ],
+      "guideLink": "Leer la guía para traductores en GitHub",
+      "siteNote": "Este sitio, por ahora, está en inglés, español y portugués.",
+      "menuMore": "Más idiomas"
     }
   },
   "pt": {
@@ -591,6 +689,55 @@
         "missing.bpfLsm": "(o módulo de segurança BPF está desligado)",
         "missing.cgroup2": "(sem árvore de cgroups unificada)"
       }
+    },
+    "language": {
+      "metaTitle": "Idiomas · LordOS",
+      "metaDescription": "Os idiomas do LordOS, completos e parciais, como os novos são escolhidos e como pedir o seu idioma ou ajudar a traduzi-lo.",
+      "kicker": "Idiomas",
+      "title": "O LordOS fala o seu idioma",
+      "lead": "O LordOS traduz toda a sua interface, não só alguns menus: cada app, janela e mensagem, com os plurais, as datas e os números de cada idioma. Aqui estão os idiomas que ele traz, como os novos são escolhidos e como você pode trazer o seu.",
+      "figAlt": "Lumo, a mascote do LordOS, acenando diante de uma embaixada com bandeiras de vários países",
+      "status": "Os idiomas parciais estão em desenvolvimento para o próximo pré-lançamento. A versão mais recente é a {release}.",
+      "request": "Pedir um idioma",
+      "translate": "Traduzir o LordOS",
+      "completeTitle": "Idiomas completos",
+      "completeText": "Cada app, menu, janela e mensagem está traduzido, com os plurais, as datas e os números próprios do idioma. O idioma é escolhido no menu de inicialização, no instalador, na tela de login ou em Ajustes → Idioma e região. Os artigos da Ajuda estão em inglês, espanhol e português.",
+      "default": "padrão",
+      "partialTitle": "Idiomas parciais",
+      "partialText": "Um idioma parcial traduz primeiro o núcleo do LordOS: a tela de login, a área de trabalho, Arquivos, o instalador, Sobre, os nomes dos apps, os diálogos de arquivos e, em Ajustes, as seções, Idioma e região e os formatos de Data e hora. São 1.052 de cerca de 12.400 textos, com os plurais, as datas e os números do idioma. Todo o resto aparece no seu próximo idioma preferido, ou em inglês, até ser traduzido, e Ajustes mostra esses idiomas como traduzidos em parte.",
+      "next": "próximo pré-lançamento",
+      "rtl": "da direita para a esquerda",
+      "nameNote": "Cada idioma aparece com o seu próprio nome. Um idioma não é um país: as bandeiras do desenho são só decoração.",
+      "chooseTitle": "Como os novos idiomas são escolhidos",
+      "chooseText": "Um idioma entra quando pelo menos 5 pessoas de um país onde ele é falado visitam o lordos.org em 30 dias, ou quando a comunidade pede. Os números vêm das estatísticas privadas de visitas do site, que não usam cookies e nunca são publicadas: {stats}.",
+      "chooseText2": "Os idiomas parciais acima são os primeiros escolhidos assim, com as visitas dos últimos 30 dias. Cada um começa parcial e cresce a cada versão e a cada contribuição.",
+      "statsLink": "Cookies e estatísticas",
+      "requestTitle": "Peça o seu idioma",
+      "requestText": "O seu idioma não está aqui, ou você quer que um parcial fique completo antes? Abra um pedido no GitHub com o idioma, o país, quantas pessoas o usariam e se você pode ajudar a traduzir. Os pedidos são públicos e precisam de uma conta no GitHub.",
+      "requestLink": "Pedir um idioma no GitHub",
+      "helpTitle": "Traduza o LordOS",
+      "helpText": "As melhores traduções vêm de quem fala o idioma todos os dias, e pull requests são bem-vindos. Não é preciso programar: os textos são arquivos JSON simples.",
+      "steps": [
+        [
+          "Comece pelo inglês",
+          "Copie assets/locales/en para uma pasta com o código do seu idioma e acrescente o meta.json e o format.json dele."
+        ],
+        [
+          "Traduza primeiro o núcleo",
+          "A tela de login, a área de trabalho, Arquivos, o instalador e as páginas de idioma de Ajustes: cerca de 1.050 textos. Marque o idioma como parcial até ficar completo."
+        ],
+        [
+          "Confira",
+          "node tools/i18n-check.mjs mostra a cobertura e encontra {variáveis} quebradas e formas de plural que faltam."
+        ],
+        [
+          "Abra um pull request",
+          "Assinado (Signed-off-by), como toda contribuição. As traduções aceitas saem na próxima versão."
+        ]
+      ],
+      "guideLink": "Ler o guia para tradutores no GitHub",
+      "siteNote": "Este site, por enquanto, está em inglês, espanhol e português.",
+      "menuMore": "Mais idiomas"
     }
   }
 }

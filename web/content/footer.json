@@ -154,6 +154,14 @@
         },
         {
           "label": {
+            "en": "Languages",
+            "es": "Idiomas",
+            "pt": "Idiomas"
+          },
+          "href": "/language/"
+        },
+        {
+          "label": {
             "en": "Code of conduct",
             "es": "Código de conducta",
             "pt": "Código de conduta"

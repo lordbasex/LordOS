@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="language" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main" class="wrap g-main lg-page">
+<section class="lg-hero" aria-labelledby="lg-h">
+<div class="lg-txt">
+<p class="kicker">{{t.pages.language.kicker}}</p>
+<h1 id="lg-h">{{t.pages.language.title}}</h1>
+<p class="g-lead">{{t.pages.language.lead}}</p>
+<p class="hw-note">{{{status}}}</p>
+<div class="ctas">
+<a class="btn btn-primary" href="{{{requestUrl}}}" rel="noopener">{{t.pages.language.request}}</a>
+<a class="btn btn-ghost" href="#lg-help">{{t.pages.language.translate}}</a>
+</div>
+</div>
+<figure class="lg-art">
+{{{embassy}}}
+</figure>
+</section>
+
+<section class="hw-sec" aria-labelledby="lg-c">
+<h2 id="lg-c">{{t.pages.language.completeTitle}}</h2>
+<p class="lg-p">{{t.pages.language.completeText}}</p>
+<ul class="lg-grid">
+{{{complete}}}
+</ul>
+</section>
+
+<section class="hw-sec" aria-labelledby="lg-p">
+<h2 id="lg-p">{{t.pages.language.partialTitle}}{{{partialTag}}}</h2>
+<p class="lg-p">{{t.pages.language.partialText}}</p>
+<ul class="lg-grid lg-small">
+{{{partial}}}
+</ul>
+<p class="lg-note">{{t.pages.language.nameNote}}</p>
+</section>
+
+<section class="hw-sec" aria-labelledby="lg-n">
+<h2 id="lg-n">{{t.pages.language.chooseTitle}}</h2>
+<p class="lg-p">{{{choose}}}</p>
+<p class="lg-p">{{t.pages.language.chooseText2}}</p>
+</section>
+
+<section class="hw-sec lg-ask" aria-labelledby="lg-r">
+<h2 id="lg-r">{{t.pages.language.requestTitle}}</h2>
+<p class="lg-p">{{t.pages.language.requestText}}</p>
+<p><a class="btn btn-primary" href="{{{requestUrl}}}" rel="noopener">{{t.pages.language.requestLink}}</a></p>
+</section>
+
+<section class="hw-sec" id="lg-help" aria-labelledby="lg-t">
+<h2 id="lg-t">{{t.pages.language.helpTitle}}</h2>
+<p class="lg-p">{{t.pages.language.helpText}}</p>
+<ol class="lg-steps">
+{{{steps}}}
+</ol>
+<div class="ctas">
+<a class="btn btn-primary" href="{{{guideUrl}}}" rel="noopener">{{t.pages.language.guideLink}}</a>
+<a class="btn btn-ghost" href="{{{requestUrl}}}" rel="noopener">{{t.pages.language.request}}</a>
+</div>
+<p class="lg-note">{{t.pages.language.siteNote}}</p>
+</section>
+</main>
+
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>
