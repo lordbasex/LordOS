@@ -97,8 +97,8 @@ const Q = {
   porSemana: `${HUMAN_PAGES} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by bin(1w)`,
   porMes: `${HUMAN_PAGES} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by bin(1mo)`,
   paises: `${HUMAN_PAGES} | ${COUNTRY} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by ${BY_COUNTRY} | sort visitantes desc | limit 50`,
-  // the same visitors as a pie: one slice per country (its Spanish name), the 20 with the most visitors
-  paisesTorta: `${HUMAN_PAGES} | ${COUNTRY} | stats count_distinct(\`c-ip\`) as visitantes by c_name | sort visitantes desc | limit 20`,
+  // the page views as a pie: one slice per country (its Spanish name), the 20 with the most views
+  paisesTorta: `${HUMAN_PAGES} | ${COUNTRY} | stats count(*) as paginas_vistas by c_name | sort paginas_vistas desc | limit 20`,
   sistemas: `${HUMAN_PAGES} | ${OS} | stats count_distinct(\`c-ip\`) as visitantes by sistema | sort visitantes desc`,
   dispositivos: `${HUMAN_PAGES} | ${DEVICE} | stats count_distinct(\`c-ip\`) as visitantes by dispositivo | sort visitantes desc`,
   idiomas: `${HUMAN_PAGES} | ${LANG} | stats count(*) as paginas_vistas by idioma | sort paginas_vistas desc`,
@@ -145,7 +145,7 @@ const DASHBOARDS = {
     metric('Errores (% de pedidos)', [['4xxErrorRate', { stat: 'Average' }], ['5xxErrorRate', { stat: 'Average' }]], 16, 2, 8, 3),
     log('Páginas vistas y visitantes por hora', Q.porHora, 'timeSeries', 0, 5, 24, 6),
     log('Países', Q.paises, 'table', 0, 11, 8, 9),
-    log('Países (torta)', Q.paisesTorta, 'pie', 8, 11, 8, 9),
+    log('Países (torta, páginas vistas)', Q.paisesTorta, 'pie', 8, 11, 8, 9),
     log('Sistema operativo (visitantes)', Q.sistemas, 'pie', 16, 11, 8, 9),
     log('Dispositivo (visitantes)', Q.dispositivos, 'pie', 0, 20, 8, 9),
     log('Páginas más vistas', Q.paginas, 'table', 8, 20, 8, 9),
