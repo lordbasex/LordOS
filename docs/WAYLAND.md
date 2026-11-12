@@ -1107,7 +1107,12 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
   entries, submenus up to 4 levels (the SDK opens one; deeper ones are laid out under a header) and
   256 entries. A choice sends `Event(id, "clicked")`, only for an entry of the menu just shown. An item
   with no menu gets `ContextMenu(x, y)` and draws its own. A menu that comes more than 5 s after the
-  click opens nothing.
+  click opens nothing. With a menu bar on every display each bar draws its own copy of the icon; the
+  menu opens only on the display whose copy was clicked (`sdk/traymodel.js`, `trayMenuHere`). While the
+  menu is open, the app's `LayoutUpdated` and `ItemsPropertiesUpdated` make lord-server read the layout
+  again and the open menu takes the new rows: fyne.io/systray's apps build their menu anew with new ids
+  at every change. A choice is matched by its place and label too, so an id the app has already
+  replaced still reaches the entry's new id (a fresh layout is asked for first when needed).
 - **Never waiting.** Every call is sent and its answer handled when it comes in the main loop: an app
   that hangs only loses its own icon or menu. The texts are cleaned (`server/src/ui/snimodel.c`: valid
   UTF-8, no control or bidi formatting characters, 128 bytes).
@@ -1115,8 +1120,10 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
   and `sni-menu` events exist only in the desktop's own context, never in an isolated app.
 - **Tests.** `build/sni-test` (in `make -C server test`): the two registration forms, pixmap picking
   and validation, texts, and dbusmenu layouts within the depth and item caps, over messages built and
-  validated by our own D-Bus code. `server/tests/tray_model_test.mjs`: which items show, the layout as
-  the SDK's menu, where it opens. Not yet checked on the VM with real apps.
+  validated by our own D-Bus code, a menu built again with new ids, and the `Event(isvu)` call a
+  choice sends.
+  `server/tests/tray_model_test.mjs`: which items show, the layout as the SDK's menu, where it opens,
+  and on which display. Checked on VM 127 with pasystray (Ayatana) and go-link Desk (fyne.io/systray).
 
 ## Sharing a screen or a window (ScreenCast, 0.8.8.8, in development)
 

@@ -47,8 +47,17 @@ typedef struct {
     unsigned rev;                       /* goes up with every new pixmap */
     uint32_t fetching;                  /* the GetAll on its way */
     int again;                          /* a New* signal came while it was */
-    int32_t ids[SNI_MENU_ITEMS];        /* the entries of the last menu shown that can be clicked */
-    int nids;
+    /* the menu: the entries of the last layout that can be clicked, with their keys (snimodel.h), and the layout
+     * before it, whose ids a menu on screen may still have */
+    int32_t ids[SNI_MENU_ITEMS], old_ids[SNI_MENU_ITEMS];
+    uint32_t keys[SNI_MENU_ITEMS], old_keys[SNI_MENU_ITEMS];
+    int nids, nold;
+    int showing;                        /* its menu is on screen: a new layout from the app is read and sent again */
+    unsigned upd, upd_asked;            /* LayoutUpdated signals seen; their count when the last layout was asked */
+    uint32_t relaying;                  /* the GetLayout on its way for a menu on screen */
+    int relay_again;                    /* the layout changed again while it was */
+    uint32_t click_key;                 /* clicking: the entry chosen, waiting for a fresh layout to find its id */
+    int clicking;
 } Item;
 
 static Item items[MAX_ITEMS];
@@ -56,7 +65,7 @@ static int item_seq;
 static char hosts[MAX_HOSTS][SNI_NAME_MAX];
 static int nhosts;
 
-enum { C_NAME = 1, C_GETALL, C_LAYOUT, C_ACTIVATE };
+enum { C_NAME = 1, C_GETALL, C_LAYOUT, C_ACTIVATE, C_RELAYOUT, C_CLICK };
 static struct { uint32_t serial; int kind, item; } calls[MAX_CALLS];
 static int ncalls;
 
@@ -67,6 +76,8 @@ static void call_add(uint32_t serial, int kind, int item) {
     if (ncalls == MAX_CALLS) {
         Item *it = calls[0].kind == C_GETALL ? item_by_id(calls[0].item) : NULL;
         if (it && it->fetching == calls[0].serial) it->fetching = 0;   /* forgotten: the next New* reads it again */
+        Item *mi = calls[0].kind == C_RELAYOUT ? item_by_id(calls[0].item) : NULL;
+        if (mi && mi->relaying == calls[0].serial) mi->relaying = 0;   /* forgotten: the next LayoutUpdated asks again */
         memmove(&calls[0], &calls[1], sizeof calls[0] * (MAX_CALLS - 1));
         ncalls--;
     }
@@ -359,6 +370,59 @@ static void method(const DMsg *m) {
 /* ---- answers and signals ---- */
 
 static void open_menu(Item *it);
+static uint32_t ask_layout(Item *it, int kind);
+static void send_event(Item *it, int32_t entry);
+
+/* The menu read again while it is on screen; one GetLayout at a time */
+static void relayout(Item *it) {
+    if (!it->showing || !it->menu[0]) return;
+    if (it->relaying) { it->relay_again = 1; return; }
+    it->relay_again = 0;
+    it->relaying = ask_layout(it, C_RELAYOUT);
+}
+
+/* GetLayout's answer: C_LAYOUT opens the menu, C_RELAYOUT sends the menu on screen again (the app built it anew,
+ * maybe with new ids), C_CLICK finds the entry chosen in the fresh layout and sends its Event. */
+static void got_layout(Item *it, const DMsg *m, int kind) {
+    if (kind == C_RELAYOUT && it->relaying == m->reply_serial) it->relaying = 0;
+    int ok = m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "u(ia{sv}av)");
+    HBuf b = { 0 };
+    int32_t ids[SNI_MENU_ITEMS];
+    uint32_t keys[SNI_MENU_ITEMS];
+    int n = 0;
+    if (ok) {
+        DRd r;
+        dr_init(&r, m);
+        dr_u32(&r);                                 /* the layout's revision */
+        hb_printf(&b, "{\"id\":%d,%s\"items\":", it->id, kind == C_RELAYOUT ? "\"update\":true," : "");
+        ok = !sni_menu_json(&r, &b, ids, keys, SNI_MENU_ITEMS, &n);
+    }
+    if (!ok) {
+        free(hb_take(&b));
+        if (kind == C_LAYOUT) it->nids = it->nold = 0;
+        if (kind == C_CLICK) it->clicking = 0;
+        return;
+    }
+    /* this layout is the current one; the one before stays for a menu on screen that still shows its ids */
+    memcpy(it->old_ids, it->ids, sizeof ids);
+    memcpy(it->old_keys, it->keys, sizeof keys);
+    it->nold = it->nids;
+    memcpy(it->ids, ids, sizeof ids);
+    memcpy(it->keys, keys, sizeof keys);
+    it->nids = n;
+    hb_printf(&b, "}");
+    char *j = hb_take(&b);
+    if (kind == C_LAYOUT) it->showing = 1;
+    if (kind == C_CLICK) {
+        if (it->clicking) {
+            it->clicking = 0;
+            int32_t e = sni_menu_find(it->ids, it->keys, it->nids, it->click_key);
+            if (e >= 0) send_event(it, e);
+        }
+    } else if (j && it->showing) hw_emit("sni-menu", j);
+    free(j);
+    if (it->showing && (it->relay_again || it->upd != it->upd_asked)) relayout(it);
+}
 
 static void on_reply(const DMsg *m) {
     int k = -1;
@@ -385,20 +449,8 @@ static void on_reply(const DMsg *m) {
         if (m->type == DBUS_RETURN && m->sig && !strcmp(m->sig, "a{sv}")) got_props(it, m);
         else if (!it->ready) { item_drop(it); return; }    /* nothing there: not an item */
         if (it->again) { it->again = 0; fetch(it); }
-    } else if (kind == C_LAYOUT) {
-        if (m->type != DBUS_RETURN || !m->sig || strcmp(m->sig, "u(ia{sv}av)")) return;
-        DRd r;
-        dr_init(&r, m);
-        dr_u32(&r);                                 /* the layout's revision */
-        HBuf b = { 0 };
-        hb_printf(&b, "{\"id\":%d,\"items\":", it->id);
-        int n = 0;
-        if (sni_menu_json(&r, &b, it->ids, SNI_MENU_ITEMS, &n)) { free(hb_take(&b)); it->nids = 0; return; }
-        it->nids = n;
-        hb_printf(&b, "}");
-        char *j = hb_take(&b);
-        if (j) hw_emit("sni-menu", j);
-        free(j);
+    } else if (kind == C_LAYOUT || kind == C_RELAYOUT || kind == C_CLICK) {
+        got_layout(it, m, kind);
     } else if (kind == C_ACTIVATE && m->type == DBUS_ERROR && it->menu[0]) open_menu(it);   /* no Activate: Ayatana's items */
 }
 
@@ -423,6 +475,18 @@ static void on_signal(const DMsg *m) {
             }
         return;
     }
+    if (m->sender && m->path && m->iface && !strcmp(m->iface, MENU_IFACE)
+        && (!strcmp(m->member, "LayoutUpdated") || !strcmp(m->member, "ItemsPropertiesUpdated"))) {
+        /* the app changed its menu: fyne.io/systray's apps build it anew, with new ids, at every change */
+        for (int i = 0; i < MAX_ITEMS; i++) {
+            Item *it = &items[i];
+            if (!it->id || !it->menu[0] || strcmp(it->menu, m->path)) continue;
+            if (strcmp(it->owner, m->sender) && strcmp(it->dest, m->sender)) continue;
+            it->upd++;
+            relayout(it);
+        }
+        return;
+    }
     if (!m->sender || !m->path || !m->iface || strcmp(m->iface, ITEM_IFACE) || strncmp(m->member, "New", 3)) return;
     for (int i = 0; i < MAX_ITEMS; i++)
         if (items[i].id && !strcmp(items[i].owner, m->sender) && !strcmp(items[i].path, m->path)) fetch(&items[i]);
@@ -436,20 +500,40 @@ static void handle(const DMsg *m) {
 
 /* ---- from the theme ---- */
 
+static uint32_t ask_layout(Item *it, int kind) {
+    DBuf b;
+    dw_init(&b);
+    dw_i32(&b, 0);                                  /* from the root */
+    dw_i32(&b, SNI_MENU_DEPTH);
+    size_t a = dw_arr_begin(&b, 4);                 /* every property */
+    dw_arr_end(&b, a);
+    uint32_t s = call(it->dest, it->menu, MENU_IFACE, "GetLayout", "iias", &b, 1);
+    dw_free(&b);
+    call_add(s, kind, it->id);
+    it->upd_asked = it->upd;
+    dbus_flush(&conn);
+    return s;
+}
+
 static void open_menu(Item *it) {
     DBuf b;
     dw_init(&b);
     dw_i32(&b, 0);
     call(it->dest, it->menu, MENU_IFACE, "AboutToShow", "i", &b, 0);   /* the app may fill the menu now; GetLayout comes after */
     dw_free(&b);
+    it->relaying = 0;                               /* an app that never answered one doesn't keep its menu frozen */
+    it->relay_again = 0;
+    ask_layout(it, C_LAYOUT);
+}
+
+static void send_event(Item *it, int32_t entry) {
+    DBuf b;
     dw_init(&b);
-    dw_i32(&b, 0);                                  /* from the root */
-    dw_i32(&b, SNI_MENU_DEPTH);
-    size_t a = dw_arr_begin(&b, 4);                 /* every property */
-    dw_arr_end(&b, a);
-    call_add(call(it->dest, it->menu, MENU_IFACE, "GetLayout", "iias", &b, 1), C_LAYOUT, it->id);
+    sni_event_body(&b, entry, 0);
+    call(it->dest, it->menu, MENU_IFACE, "Event", SNI_EVENT_SIG, &b, 0);
     dw_free(&b);
     dbus_flush(&conn);
+    it->nids = it->nold = 0;                        /* one choice per menu shown */
 }
 
 static void send_xy(Item *it, const char *member, int x, int y, int kind) {
@@ -479,24 +563,32 @@ int sni_menu(int id, int x, int y) {
     return 0;
 }
 
+/* The entry chosen is found by its key (its place and label) when the app built its menu again since that menu was
+ * shown: in the layout we have, or, when a LayoutUpdated came after it, in a fresh one asked for now. */
 int sni_menu_clicked(int id, int32_t entry) {
     Item *it = item_by_id(id);
     if (!up || !it || !it->menu[0]) return -1;
-    int found = 0;
-    for (int i = 0; i < it->nids && !found; i++) found = it->ids[i] == entry;
-    if (!found) return -1;
-    DBuf b;
-    dw_init(&b);
-    dw_i32(&b, entry);
-    dw_str(&b, "clicked");
-    dw_variant(&b, "i");
-    dw_i32(&b, 0);
-    dw_u32(&b, 0);                                  /* timestamp */
-    call(it->dest, it->menu, MENU_IFACE, "Event", "isvu", &b, 0);
-    dw_free(&b);
-    dbus_flush(&conn);
-    it->nids = 0;                                   /* one choice per menu shown */
+    uint32_t key;
+    int current = !sni_menu_key(it->ids, it->keys, it->nids, entry, &key);
+    if (!current && sni_menu_key(it->old_ids, it->old_keys, it->nold, entry, &key)) return -1;
+    it->showing = 0;
+    int stale = it->upd != it->upd_asked;
+    if (current && !stale) { send_event(it, entry); return 0; }
+    if (!stale) {
+        int32_t now = sni_menu_find(it->ids, it->keys, it->nids, key);
+        if (now < 0) return -1;
+        send_event(it, now);
+        return 0;
+    }
+    it->clicking = 1;
+    it->click_key = key;
+    ask_layout(it, C_CLICK);
     return 0;
+}
+
+void sni_menu_closed(int id) {
+    Item *it = item_by_id(id);
+    if (it) it->showing = 0;
 }
 
 /* ---- the connection ---- */
@@ -522,6 +614,7 @@ int sni_start(void) {
     dw_free(&b);
     add_match("type='signal',sender='org.freedesktop.DBus',path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged'");
     add_match("type='signal',interface='" ITEM_IFACE "'");
+    add_match("type='signal',interface='" MENU_IFACE "'");
     return 0;
 }
 

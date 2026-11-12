@@ -1888,6 +1888,14 @@ Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm mo
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
 the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.
 
+**2026-11-12, tray menus of Linux apps** (CHANGELOG, Fixed: tray menus). Nothing installed from Debian. pasystray and CopyQ
+(already there) and the generic go-link Desk 1.8.2-dev1 (Fyne, fyne.io/systray), run from an unpacked release tarball in
+`~/tray-test/` without installing it, with `busctl --user monitor --match interface=com.canonical.dbusmenu` to see the
+menu calls. A `RELEASE=1` `lord-server` and the signed bundles of `fix/tray-menus` were installed for the test and the
+ones before put back from `/var/backups/lordos-pre-tray-test-20261112-094218/` afterwards (the session logged out and in
+on them). Removed afterwards: `~/tray-test/`, and what the go-link Desk run made (`~/go-link-desk/`, `~/.config/fyne/`,
+`~/.config/go-link-desk/`).
+
 ## Step — the 0.8.8.8 arm64 release packages on the Raspberry Pi 5 (172.17.0.24, 2026-11-12)
 
 `tools/iso/mkdeb.sh` refuses a package without `lord-screencast` (0.8.8.8), and `lordos-web` needs `lord-web`. Approved by

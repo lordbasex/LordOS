@@ -115,14 +115,25 @@ void sni_text(const char *in, char *out, size_t n, int mnemonic) {
 typedef struct {
     HBuf *b;
     int32_t *ids;
+    uint32_t *keys;
     int max, nids, count;
 } Menu;
 
+/* FNV-1a over an entry's place: its parent's key, its index among its siblings and its label */
+static uint32_t entry_key(uint32_t parent, int index, const char *label) {
+    uint32_t h = parent ^ 2166136261u;
+    const unsigned char *p = (const unsigned char *)&index;
+    for (size_t i = 0; i < sizeof index; i++) h = (h ^ p[i]) * 16777619u;
+    for (const unsigned char *q = (const unsigned char *)label; *q; q++) h = (h ^ *q) * 16777619u;
+    return (h ^ 0xffu) * 16777619u;
+}
+
 #define ENTRY_SIG "(ia{sv}av)"
 
-/* One (ia{sv}av) entry at depth d (1 for the root's children). Writes it to the JSON unless it is hidden, past the
- * item cap or past the depth (its children then are read past). *comma: an entry was already written at this level. */
-static int entry(DRd *r, Menu *m, int d, int *comma) {
+/* One (ia{sv}av) entry at depth d (1 for the root's children), the index-th child of the entry whose key is parent.
+ * Writes it to the JSON unless it is hidden, past the item cap or past the depth (its children then are read past).
+ * *comma: an entry was already written at this level. */
+static int entry(DRd *r, Menu *m, int d, int *comma, uint32_t parent, int index) {
     dr_struct(r);
     int32_t id = dr_i32(r);
     char label[SNI_TEXT_MAX] = "", type[16] = "", toggle[16] = "", display[16] = "";
@@ -142,6 +153,7 @@ static int entry(DRd *r, Menu *m, int d, int *comma) {
         else dr_skip(r, sig);
     }
     if (r->err) return -1;
+    uint32_t key = entry_key(parent, index, label);
     int keep = visible && d <= SNI_MENU_DEPTH && m->count < SNI_MENU_ITEMS;
     int sep = !strcmp(type, "separator");
     /* the children: a submenu when there are any (or children-display says so); one past the depth is shown off */
@@ -162,25 +174,29 @@ static int entry(DRd *r, Menu *m, int d, int *comma) {
         }
     }
     if (keep && !sep && has && d < SNI_MENU_DEPTH) hb_printf(m->b, ",\"sub\":[");
-    int sub = 0;
+    int sub = 0, k = 0;
     while (dr_more(r, cend)) {
         const char *sig = dr_variant(r);
         if (r->err) return -1;
         if (strcmp(sig, ENTRY_SIG)) { dr_skip(r, sig); continue; }
-        if (keep && !sep && d < SNI_MENU_DEPTH) { if (entry(r, m, d + 1, &sub)) return -1; }
+        if (keep && !sep && d < SNI_MENU_DEPTH) { if (entry(r, m, d + 1, &sub, key, k)) return -1; }
         else dr_skip(r, sig);
+        k++;
     }
     if (r->err) return -1;
     if (keep && !sep) {
         if (has && d < SNI_MENU_DEPTH) hb_printf(m->b, "]");
         hb_printf(m->b, "}");
-        if (!has && enabled && m->nids < m->max) m->ids[m->nids++] = id;
+        if (!has && enabled && m->nids < m->max) {
+            if (m->keys) m->keys[m->nids] = key;
+            m->ids[m->nids++] = id;
+        }
     }
     return 0;
 }
 
-int sni_menu_json(DRd *r, HBuf *b, int32_t *ids, int max, int *nids) {
-    Menu m = { b, ids, max, 0, 0 };
+int sni_menu_json(DRd *r, HBuf *b, int32_t *ids, uint32_t *keys, int max, int *nids) {
+    Menu m = { b, ids, keys, max, 0, 0 };
     *nids = 0;
     dr_struct(r);
     dr_i32(r);                                      /* the root's id */
@@ -194,14 +210,37 @@ int sni_menu_json(DRd *r, HBuf *b, int32_t *ids, int max, int *nids) {
     }
     hb_printf(b, "[");
     size_t cend = dr_arr(r, 1);
-    int comma = 0;
+    int comma = 0, k = 0;
     while (dr_more(r, cend)) {
         const char *sig = dr_variant(r);
         if (r->err) return -1;
         if (strcmp(sig, ENTRY_SIG)) { dr_skip(r, sig); continue; }
-        if (entry(r, &m, 1, &comma)) return -1;
+        if (entry(r, &m, 1, &comma, 0, k++)) return -1;
     }
     hb_printf(b, "]");
     *nids = m.nids;
     return r->err ? -1 : 0;
+}
+
+void sni_event_body(DBuf *b, int32_t id, uint32_t timestamp) {
+    dw_i32(b, id);
+    dw_str(b, "clicked");
+    dw_variant(b, "i");
+    dw_i32(b, 0);
+    dw_u32(b, timestamp);
+}
+
+int sni_menu_key(const int32_t *ids, const uint32_t *keys, int n, int32_t id, uint32_t *key) {
+    for (int i = 0; i < n; i++) if (ids[i] == id) { *key = keys[i]; return 0; }
+    return -1;
+}
+
+int32_t sni_menu_find(const int32_t *ids, const uint32_t *keys, int n, uint32_t key) {
+    int32_t found = -1;
+    for (int i = 0; i < n; i++)
+        if (keys[i] == key) {
+            if (found >= 0) return -1;              /* two entries alike: neither is sure */
+            found = ids[i];
+        }
+    return found;
 }
