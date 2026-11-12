@@ -187,13 +187,20 @@
       "media": "Multimedia",
       "system": "Sistema",
       "privacy": "Privacidad y seguridad",
-      "thirdparty": "Apps de terceros"
+      "thirdparty": "Apps de terceros",
+      "webapps": "Apps web"
     },
     "upcoming": "Llega en {v} (en desarrollo)",
     "thirdpartyNote": "Apps y suites de código abierto de otros proyectos que creemos que vale la pena tener. No las hace LordOS: la Store instala cada una desde su autor, desde el repositorio firmado del autor con la clave que LordOS fija o desde el paquete del propio autor guardado con un checksum fijo, y reciben el mismo firewall y los mismos permisos que cualquier otra app de Linux.",
     "by": "De {v}",
     "website": "Sitio web",
-    "fromStore": "En la Store"
+    "fromStore": "En la Store",
+    "more": "{n} más",
+    "webappsNote": "Las {n} apps web del catálogo de la Tienda, instaladas por el LordOS Web Runtime (nuevo en la 0.8.8.8): cada una en su propia ventana, con su propio ícono en el Dock, sus cuentas y sus permisos, aparte de tu navegador. También podés agregar cualquier otro sitio desde su dirección.",
+    "webappsMore": "Cómo funciona el LordOS Web Runtime",
+    "webappTested": "Probada en LordOS",
+    "webappsTrademark": "Los nombres, logos e íconos de productos y servicios de arriba son marcas de sus respectivos titulares y se usan solo para identificar los servicios. LordOS no está afiliado a ellos ni cuenta con su respaldo o patrocinio. Los íconos son mosaicos con letras hechos por LordOS.",
+    "trademarkPolicy": "Política de marca"
   },
   "debHintA": "En un servidor sin pantalla, agregá",
   "debHintB": "y usalo desde el navegador.",

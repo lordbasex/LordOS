@@ -608,39 +608,36 @@
     "features": {
       "en": [
         "Tabs and four views: icons, list, columns, gallery",
-        "Quick Preview with the Space bar",
-        "Color tags, search and Recents",
-        "This computer: the whole system, read-only, as your user",
-        "Every disk in the sidebar, mounted with a click; trash and archives",
-        "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view",
-        "New in 0.8.8: the system file dialog now looks and works like Files",
-        "Since 0.8.8.4: Markup in Quick Preview opens a picture in the markup editor (crop, resize, redact, arrows and text)",
-        "Since 0.8.8.7: CDs and DVDs mount read-only, and Cloud and network folders never freeze the desktop",
-        "Since 0.8.8.8: split archives open as one, column view columns can be resized, and files can be copied, pasted and dragged to and from Linux apps"
+        "Quick Preview with Space; color tags, search and Recents",
+        "Every disk in the sidebar, mounted with a click",
+        "This computer (read-only), Network and Connect to Server",
+        "Trash and archives; split archives open as one (0.8.8.8)",
+        "The system file dialog looks and works like Files (0.8.8)",
+        "Markup in Quick Preview: crop, resize, redact, arrows and text (0.8.8.4)",
+        "CDs and DVDs mount read-only; Cloud and network folders never freeze the desktop (0.8.8.7)",
+        "Resizable columns; copy, paste and drag to and from Linux apps (0.8.8.8)"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
-        "Vista rápida con la barra espaciadora",
-        "Etiquetas de color, búsqueda y Recientes",
-        "Este equipo: todo el sistema, solo lectura, como tu usuario",
-        "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
-        "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista",
-        "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos",
-        "Desde la 0.8.8.4: Marcar en la Vista rápida abre una imagen en el editor de marcado (recortar, cambiar tamaño, tapar zonas, flechas y texto)",
-        "Desde la 0.8.8.7: los CD y DVD se montan en solo lectura, y las carpetas de la Nube y de red nunca congelan el escritorio",
-        "Desde la 0.8.8.8: los archivos comprimidos divididos se abren como uno solo, las columnas de la vista en columnas se pueden ensanchar, y los archivos se copian, pegan y arrastran desde y hacia apps de Linux"
+        "Vista rápida con Espacio; etiquetas de color, búsqueda y Recientes",
+        "Cada disco en la barra lateral, se monta con un clic",
+        "Este equipo (solo lectura), Red y Conectarse al servidor",
+        "Papelera y archivos comprimidos; los divididos se abren como uno solo (0.8.8.8)",
+        "El diálogo de archivos del sistema se ve y funciona como Archivos (0.8.8)",
+        "Marcar en la Vista rápida: recortar, cambiar tamaño, tapar zonas, flechas y texto (0.8.8.4)",
+        "Los CD y DVD se montan en solo lectura; las carpetas de la Nube y de red nunca congelan el escritorio (0.8.8.7)",
+        "Columnas que se ensanchan; copiar, pegar y arrastrar desde y hacia apps de Linux (0.8.8.8)"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
-        "Visualização rápida com a barra de espaço",
-        "Etiquetas de cor, busca e Recentes",
-        "Este computador: todo o sistema, só leitura, como seu usuário",
-        "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
-        "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização",
-        "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos",
-        "Desde a 0.8.8.4: Marcar na Visualização rápida abre uma imagem no editor de marcação (recortar, redimensionar, tapar áreas, setas e texto)",
-        "Desde a 0.8.8.7: CDs e DVDs são montados só para leitura, e as pastas da Nuvem e de rede nunca congelam o desktop",
-        "Desde a 0.8.8.8: arquivos compactados divididos abrem como um só, as colunas da visão em colunas podem ser redimensionadas, e arquivos são copiados, colados e arrastados de e para apps Linux"
+        "Visualização rápida com Espaço; etiquetas de cor, busca e Recentes",
+        "Cada disco na barra lateral, montado com um clique",
+        "Este computador (só leitura), Rede e Conectar ao servidor",
+        "Lixeira e arquivos compactados; os divididos abrem como um só (0.8.8.8)",
+        "O diálogo de arquivos do sistema parece e funciona como o Arquivos (0.8.8)",
+        "Marcar na Visualização rápida: recortar, redimensionar, tapar áreas, setas e texto (0.8.8.4)",
+        "CDs e DVDs montados só para leitura; pastas da Nuvem e de rede nunca congelam o desktop (0.8.8.7)",
+        "Colunas redimensionáveis; copiar, colar e arrastar de e para apps Linux (0.8.8.8)"
       ]
     }
   },
@@ -1216,6 +1213,7 @@
     "category": "system",
     "isolated": false,
     "icon": "apps/machines/index.jsx",
+    "screenshot": "docs/screenshots/machines.png",
     "name": {
       "en": "Machines",
       "es": "Máquinas",
@@ -1260,6 +1258,7 @@
     "category": "productivity",
     "isolated": false,
     "icon": "apps/databases/index.jsx",
+    "screenshot": "docs/screenshots/databases.png",
     "name": {
       "en": "Databases",
       "es": "Bases de datos",
@@ -1272,31 +1271,31 @@
     },
     "features": {
       "en": [
-        "Since 0.8.8.7",
-        "Favorites in groups with colors; TCP, local socket and managed cloud connections with TLS",
-        "Structure shows every change as the ALTER TABLE before it runs",
-        "Content with filters, sorting and row editing; Query with completion, history and Explain",
-        "A safe mode asks before an UPDATE or DELETE without WHERE; production favorites open read-only",
-        "Passwords stay in Passwords; the firewall and Monitor show it as its own row",
-        "Since 0.8.8.8: SSH favorites connect through an SSH tunnel (key only, the server key checked by its fingerprint), and groups of favorites have a color"
+        "Since 0.8.8.7; each connection runs in its own sandbox",
+        "Since 0.8.8.8: SSH tunnels, key only, the server key checked",
+        "Safe mode asks before an UPDATE or DELETE without WHERE",
+        "Structure, Content and Query, with completion and Explain",
+        "Favorites in colored groups; TCP, local socket and cloud with TLS",
+        "Production favorites open read-only",
+        "Passwords stay in Passwords; the firewall and Monitor show it as its own row"
       ],
       "es": [
-        "Desde la 0.8.8.7",
-        "Favoritos en grupos con colores; conexiones TCP, por socket local y a servicios en la nube con TLS",
-        "Estructura muestra cada cambio como el ALTER TABLE antes de ejecutarlo",
-        "Contenido con filtros, orden y edición de filas; Consulta con autocompletado, historial y Explain",
-        "Un modo seguro pregunta antes de un UPDATE o DELETE sin WHERE; los favoritos de producción se abren en solo lectura",
-        "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila",
-        "Desde la 0.8.8.8: los favoritos SSH se conectan por un túnel SSH (solo con clave, y la clave del servidor se controla por su huella), y los grupos de favoritos tienen color"
+        "Desde la 0.8.8.7; cada conexión corre en su propio sandbox",
+        "Desde la 0.8.8.8: túneles SSH, solo con clave, y la clave del servidor controlada",
+        "Un modo seguro pregunta antes de un UPDATE o DELETE sin WHERE",
+        "Estructura, Contenido y Consulta, con autocompletado y Explain",
+        "Favoritos en grupos con colores; TCP, socket local y la nube con TLS",
+        "Los favoritos de producción se abren en solo lectura",
+        "Las contraseñas quedan en Contraseñas; el cortafuegos y el Monitor la muestran en su propia fila"
       ],
       "pt": [
-        "Desde a 0.8.8.7",
-        "Favoritos em grupos com cores; conexões TCP, por socket local e a serviços na nuvem com TLS",
-        "Estrutura mostra cada mudança como o ALTER TABLE antes de rodar",
-        "Conteúdo com filtros, ordenação e edição de linhas; Consulta com autocompletar, histórico e Explain",
-        "Um modo seguro pergunta antes de um UPDATE ou DELETE sem WHERE; favoritos de produção abrem só para leitura",
-        "As senhas ficam no Senhas; o firewall e o Monitor o mostram numa linha própria",
-        "Desde a 0.8.8.8: favoritos SSH conectam por um túnel SSH (só com chave, e a chave do servidor é conferida pela impressão digital), e os grupos de favoritos têm cor"
+        "Desde a 0.8.8.7; cada conexão roda no seu próprio sandbox",
+        "Desde a 0.8.8.8: túneis SSH, só com chave, e a chave do servidor conferida",
+        "Um modo seguro pergunta antes de um UPDATE ou DELETE sem WHERE",
+        "Estrutura, Conteúdo e Consulta, com autocompletar e Explain",
+        "Favoritos em grupos com cores; TCP, socket local e a nuvem com TLS",
+        "Favoritos de produção abrem só para leitura",
+        "As senhas ficam no Senhas; o firewall e o Monitor o mostram numa linha própria"
       ]
     }
   },

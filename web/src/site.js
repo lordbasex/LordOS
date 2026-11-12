@@ -168,8 +168,8 @@
     });
   }
 
-  // language dropdowns: close on Escape or a click outside
-  var dds = $$('.lang-dd');
+  // language dropdowns and the app cards' "N more" lists: close on Escape or a click outside
+  var dds = $$('.lang-dd, .app-more');
   d.addEventListener('click', function (e) { dds.forEach(function (dd) { if (dd.open && !dd.contains(e.target)) dd.open = false; }); });
   d.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;

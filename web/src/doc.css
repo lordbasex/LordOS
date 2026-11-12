@@ -215,7 +215,7 @@ mark.ph{background:#FFE58A;color:#3A2A00;padding:1px 6px;border-radius:6px;font-
 .apps-sec[hidden]{display:none}
 .apps-sec h2{margin:0 0 16px;font-size:clamp(24px,3vw,32px);letter-spacing:-.02em;font-weight:800}
 .apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
-.app{background:var(--surface);border:1px solid var(--line-2);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.app{position:relative;background:var(--surface);border:1px solid var(--line-2);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .app-head{display:flex;gap:14px;align-items:center}
 .app-head img{width:56px;height:56px;flex:0 0 auto}
 .app-head h3{margin:0;font-size:19px;font-weight:700}
@@ -229,6 +229,24 @@ mark.ph{background:#FFE58A;color:#3A2A00;padding:1px 6px;border-radius:6px;font-
 .iso{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);font-size:12.5px;font-weight:700}
 .iso.soon{background:var(--chip);color:var(--ink-2);border:1px solid var(--chip-line)}
 .app .g-card{margin-top:auto}
+/* cards list at most four features; "N more" opens the rest over the card, so a row keeps one height */
+.app-more{margin-top:-4px}
+.app-more summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;padding:4px 10px;border-radius:999px;border:1px solid var(--chip-line);background:var(--chip);color:var(--brand-ink);font-size:13px;font-weight:700}
+.app-more summary::-webkit-details-marker{display:none}
+.app-more summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 2px 2px 0;transform:translateY(-2px) rotate(45deg)}
+.app-more[open] summary::after{transform:translateY(1px) rotate(-135deg)}
+.app-more summary:hover{background:var(--brand-soft)}
+.app-more summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.app-more[open]>ul{position:absolute;z-index:5;left:12px;right:12px;margin-top:8px;padding:14px 16px 14px 32px;max-height:min(60vh,420px);overflow:auto;background:var(--surface);border:1px solid var(--chip-line);border-radius:14px;box-shadow:0 14px 34px var(--shadow-2);color:var(--ink-2)}
+/* web apps of the catalog: a compact list of tiles */
+.webapps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.webapp{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;min-width:0}
+.webapp img,.webapp .app-letter{width:40px;height:40px;flex:0 0 auto;border-radius:10px;font-size:18px}
+.webapp h3{margin:0;font-size:15.5px;font-weight:700}
+.webapp p{margin:2px 0 0;font-size:13.5px;color:var(--muted);line-height:1.45}
+.webapp .iso{margin-top:6px;font-size:11.5px;padding:2px 8px}
+.apps-tm{margin:16px 0 0;max-width:80ch;color:var(--subtle);font-size:13px;line-height:1.55;font-style:italic}
+.apps-tm a,.apps-note a{color:var(--brand-ink)}
 .app .g-card img{box-shadow:0 8px 22px var(--shadow-2)}
 
 
