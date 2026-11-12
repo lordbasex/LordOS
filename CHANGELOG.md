@@ -99,6 +99,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **Cookies and statistics: LordOS's update checks are counted from 2026-11-12.** Until 2026-11-11 the requests
+  LordOS makes to `lordos.org/apt` were left out of every count. The policy (Cookies and statistics and the Privacy
+  policy, in English, Spanish and Portuguese, both dated 2026-11-12) now says exactly what is counted from the same CDN
+  request logs: how many distinct computers check for updates each day, and how many download each version of LordOS
+  and each package (LordOS's own packages, the voices and the Store's apps), by country, architecture and update
+  channel (the normal repository or the test one). The IP address is used only so the same computer is not counted
+  twice in a day (or in the week or month a total covers) and is not combined with anything else; from the user agent
+  only the program that asked (LordOS's package engine or apt, and its version) is taken. No identifier of the
+  computer or the person, no cookies, nothing installed, the same 13 months of retention. To avoid it, turn off Store
+  → Updates → "Check for updates automatically"; checking or installing by hand still asks for the index and is
+  counted the same way. The Privacy policy's default connections table, its "No telemetry" and "Store and updates"
+  sections and the "Does LordOS collect telemetry?" FAQ answer say the same. A new private dashboard,
+  `LordOS-Usuarios`, built by `node tools/web/stats.mjs dashboards`, shows it (every query starts at
+  2026-11-12T00:00:00Z, so nothing logged before the change is counted): computers today, in the last 24 hours and 7
+  days, index checks, packages downloaded, countries and GB served; computers per day and per hour and by hour of
+  day (UTC); computers by country (table and pie); architecture from the package index asked for; update channel;
+  client (LordOS's package engine or the apt version); LordOS versions downloaded (adoption) and by architecture;
+  LordOS's packages, the Store's catalog apps and the voices; repository errors (4xx, 5xx and cut requests) by path;
+  GB served per day; and the test repository's use by day, country and client. There is no "new or returning
+  computers" view: it would follow an IP address from one day to another, which the policy does not cover, and
+  dynamic addresses would make it mostly noise. `stats.mjs test` takes an optional number of hours and a query-name
+  prefix. The downloads dashboard's note now points to `LordOS-Usuarios` for updates.
 - **lordos.org: a Languages page, `/language/` (and `/es/language/`, `/pt/language/`).** Lumo waves in front of an
   embassy with flagpoles (`web/lib/embassy.mjs`, our own drawing from plain shapes that follows the light and dark
   themes; the flags wave with CSS and stand still with reduced motion). The page lists the languages LordOS ships by

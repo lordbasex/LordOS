@@ -2,11 +2,14 @@
 // Private visit statistics for lordos.org, built only from what CloudFront already receives (see
 // web/content/legal/cookies-and-statistics.*.md). Nothing is added to the site: no cookie, no
 // script, no redirect. CloudFront sends its standard (v2) access logs to a CloudWatch Logs group,
-// and three CloudWatch dashboards read them with Logs Insights. Only the team sees them.
+// and CloudWatch dashboards read them with Logs Insights (LordOS-Usuarios: LordOS's requests to lordos.org/apt, counted
+// since 2026-11-12). Only the team sees them.
 //
 //   node tools/web/stats.mjs setup      log group (400 days), delivery source, destination, delivery
-//   node tools/web/stats.mjs dashboards create or replace the three dashboards
-//   node tools/web/stats.mjs test       run every dashboard query over the last hour and report
+//   node tools/web/stats.mjs dashboards create or replace the Logs Insights dashboards
+//   node tools/web/stats.mjs test [hours] [prefix]
+//                                       run every dashboard query (or those whose name starts with prefix) over the
+//                                       last hour (or hours) and report
 //   node tools/web/stats.mjs downloads  GitHub's public download counts of the release files (ISO, OVA, Raspberry Pi
 //                                       image, Imager, .deb) into the LordOS-Descargas dashboard and the LordOS/Descargas
 //                                       metrics; run it once a day. GitHub's numbers only: no CloudFront log is read
@@ -119,7 +122,74 @@ const Q = {
   origenPagina: `${HUMAN_PAGES} | ${REFERRER} | ${OUTSIDE} | stats count(*) as visitas by origen, \`cs-uri-stem\` as pagina | sort visitas desc | limit 50`,
   sistemaMes: `${HUMAN_PAGES} | ${OS} | stats count_distinct(\`c-ip\`) as visitantes by sistema, bin(1mo) as mes | sort mes asc`,
   paisesAnio: `${HUMAN_PAGES} | ${COUNTRY} | stats count_distinct(\`c-ip\`) as visitantes by ${BY_COUNTRY} | sort visitantes desc | limit 100`,
+  ...APT_QUERIES(),
 };
+
+// ---- LordOS computers (the APT repository) -------------------------------------------------
+// What the cookies-and-statistics page describes since 2026-11-12: LordOS's requests to
+// lordos.org/apt, from the same CloudFront logs. Every query starts at that moment, so nothing logged
+// before the policy changed is counted. The IP address only keeps a computer from being counted twice
+// in the same total; it is never followed across days on its own (no "new or returning" view).
+function APT_QUERIES() {
+  const SINCE = `toMillis(@timestamp) >= ${Date.UTC(2026, 10, 12)}`;
+  // the clients that check for updates: LordOS's own package engine and apt (the user agent is URL-encoded)
+  const CLIENT = `${UA} like /LordOS-pkg|APT-HTTP/`;
+  const OK = '`sc-status` in ["200", "304"]';
+  // the daily check: every check starts with the signed index of the live repository
+  const CHECK = `filter ${SINCE} and \`cs-method\` = "GET" and \`cs-uri-stem\` = "/apt/dists/stable/InRelease" and ${OK} and ${CLIENT}`;
+  const REPO = `${SINCE} and \`cs-uri-stem\` like /^\\/apt\\//`;
+  // a package downloaded whole: pool/<component>/<letter>/<source>/<name>_<version>_<arch>.deb
+  const DEB = `filter ${REPO} and \`cs-method\` = "GET" and \`sc-status\` = "200" and \`cs-uri-stem\` like /\\.deb$/ and ${CLIENT}`
+    + ' | parse `cs-uri-stem` /^\\/apt\\/pool\\/(?<componente>[^\\/]+)\\/.*\\/(?<paquete>[^\\/_]+)_(?<version>[^_\\/]+)_(?<arq>[a-z0-9]+)\\.deb$/';
+  const T = 'fields toMillis(@timestamp) / 1000 as t';
+  const CLIENT_NAME = `parse ${UA} /LordOS-pkg\\/(?<motor>[0-9.]+)/ | parse ${UA} /APT-HTTP\\/[0-9.]+%20\\((?<apt>[^)]+)\\)/`
+    + ' | fields if(ispresent(motor), concat("Motor de paquetes de LordOS ", motor), if(ispresent(apt), concat("apt ", apt), "Otro")) as cliente';
+  return {
+    usResumen: `${CHECK} | ${T} | stats max(t) as ultima by \`c-ip\``
+      + ' | stats sum(if(ultima >= now() - now() % 86400, 1, 0)) as hoy_utc, sum(if(ultima >= now() - 86400, 1, 0)) as ultimas_24_h,'
+      + ' sum(if(ultima >= now() - 7 * 86400, 1, 0)) as ultimos_7_dias, count(*) as todo_el_rango',
+    usActividad: `filter ${REPO} and ${CLIENT} | ${T}`
+      + ' | fields if(`cs-uri-stem` = "/apt/dists/stable/InRelease" and `sc-status` in ["200", "304"], 1, 0) as es_busqueda,'
+      + ' if(`cs-uri-stem` like /\\.deb$/ and `sc-status` = "200", 1, 0) as es_paquete'
+      + ' | stats sum(es_busqueda) as busquedas, sum(es_paquete) as paquetes_bajados, count_distinct(`c-country`) as paises,'
+      + ' sum(`sc-bytes`) / 1000000000 as gb_servidos',
+    usPorDia: `${CHECK} | stats count_distinct(\`c-ip\`) as computadoras, count(*) as busquedas by bin(1d)`,
+    usPorHora: `${CHECK} | stats count_distinct(\`c-ip\`) as computadoras by bin(1h)`,
+    usHoraDia: `${CHECK} | fields floor(toMillis(@timestamp) / 3600000) % 24 as hora_utc`
+      + ' | stats count_distinct(`c-ip`) as computadoras by hora_utc | sort hora_utc asc',
+    usPaises: `${CHECK} | ${COUNTRY} | stats count_distinct(\`c-ip\`) as computadoras, count(*) as busquedas by ${BY_COUNTRY}`
+      + ' | sort computadoras desc | limit 60',
+    usPaisesTorta: `${CHECK} | ${COUNTRY} | stats count_distinct(\`c-ip\`) as computadoras by c_name | sort computadoras desc | limit 20`,
+    // the architecture from the package index the computer asked for (only downloaded when it changed)
+    usArquitectura: `filter ${REPO} and ${OK} and \`cs-uri-stem\` like /^\\/apt\\/dists\\/stable\\/main\\/binary-[a-z0-9]+\\/Packages/ and ${CLIENT}`
+      + ' | parse `cs-uri-stem` /binary-(?<arq>[a-z0-9]+)\\// | stats count_distinct(`c-ip`) as computadoras by arq | sort computadoras desc',
+    usCanal: `filter ${SINCE} and \`cs-uri-stem\` like /^\\/(apt|apt-staging)\\/dists\\/stable\\/InRelease$/ and ${OK} and ${CLIENT}`
+      + ' | parse `cs-uri-stem` /^\\/(?<canal_raw>apt|apt-staging)\\//'
+      + ' | fields if(canal_raw = "apt", "estable (apt)", "pruebas (apt-staging)") as canal'
+      + ' | stats count_distinct(`c-ip`) as computadoras by canal',
+    usClientes: `${CHECK} | ${CLIENT_NAME} | stats count_distinct(\`c-ip\`) as computadoras by cliente | sort computadoras desc`,
+    usVersiones: `${DEB} | filter paquete = "lordos" | stats count(*) as descargas, count_distinct(\`c-ip\`) as computadoras by version, arq`
+      + ' | sort version desc',
+    usVersionesBarra: `${DEB} | filter paquete = "lordos" | stats count_distinct(\`c-ip\`) as computadoras by version | sort version asc`,
+    usPaquetes: `${DEB} | filter componente = "main" | stats count(*) as descargas, count_distinct(\`c-ip\`) as computadoras by paquete, version, arq`
+      + ' | sort computadoras desc | limit 80',
+    usPaquetesBarra: `${DEB} | filter componente = "main" and paquete not like /^lordos-voice-/`
+      + ' | stats count_distinct(`c-ip`) as computadoras by paquete | sort computadoras desc',
+    usVoces: `${DEB} | filter paquete like /^lordos-voice-/ | stats count(*) as descargas, count_distinct(\`c-ip\`) as computadoras by paquete`
+      + ' | sort computadoras desc | limit 40',
+    usTienda: `${DEB} | filter componente = "catalog" | stats count(*) as descargas, count_distinct(\`c-ip\`) as computadoras by paquete, version, arq`
+      + ' | sort computadoras desc | limit 40',
+    usTiendaTorta: `${DEB} | filter componente = "catalog" | stats count_distinct(\`c-ip\`) as computadoras by paquete | sort computadoras desc`,
+    // 000 is a request the client cut before the answer ended
+    usErrores: `filter ${SINCE} and \`cs-uri-stem\` like /^\\/(apt|apt-staging)\\// and \`sc-status\` like /^[045]/`
+      + ' | stats count(*) as veces, count_distinct(`c-ip`) as computadoras by `cs-uri-stem` as direccion, `sc-status` as estado'
+      + ' | sort veces desc | limit 40',
+    usBytes: `filter ${REPO} | stats sum(\`sc-bytes\`) / 1000000000 as gb_servidos by bin(1d)`,
+    usStaging: `filter ${SINCE} and \`cs-uri-stem\` like /^\\/apt-staging\\// | ${COUNTRY} | ${CLIENT_NAME}`
+      + ' | stats count(*) as pedidos, count_distinct(`c-ip`) as computadoras by datefloor(@timestamp, 1d) as dia, c_name as pais, cliente'
+      + ' | sort dia desc | limit 60',
+  };
+}
 
 // ---- dashboards -----------------------------------------------------------------------------
 
@@ -167,6 +237,36 @@ const DASHBOARDS = {
     log('Hora del día (Argentina)', Q.horas, 'bar', 0, 12, 12, 7),
     log('Hora del día (Argentina) × país', Q.horaPais, 'table', 12, 12, 12, 7),
     log('Origen × página de entrada', Q.origenPagina, 'table', 0, 19, 24, 9),
+  ] },
+  'LordOS-Usuarios': { start: '-P7D', widgets: [
+    text('## LordOS: computadoras que usan LordOS\n'
+      + 'Pedidos que hace LordOS al repositorio `lordos.org/apt` (búsqueda diaria de actualizaciones, paquetes, Tienda), sacados de los '
+      + 'mismos logs de CloudFront, **contados solo desde el 12 de noviembre de 2026**, cuando cambió la política de estadísticas. '
+      + '**Computadoras** = IPs distintas que pidieron el índice firmado (`dists/stable/InRelease`): es una **estimación**. Varias '
+      + 'computadoras detrás del mismo router (NAT) cuentan como una; una IP dinámica que cambia en el día cuenta dos veces; las '
+      + 'computadoras apagadas o con la búsqueda automática desactivada no aparecen ese día. La IP no se sigue de un día a otro, por eso '
+      + 'no hay "nuevas o que vuelven". Horas en UTC. Cada widget lee todos los logs del rango (unos 75 MB por día cada uno): dejá '
+      + 'el rango en 7 días y abrí 30 días solo cuando lo necesites.', 0, 0, 24, 3),
+    log('Computadoras (según la última búsqueda)', Q.usResumen, 'table', 0, 3, 12, 3),
+    log('Actividad del período', Q.usActividad, 'table', 12, 3, 12, 3),
+    log('Computadoras por día (las que usan LordOS)', Q.usPorDia, 'timeSeries', 0, 6, 16, 7),
+    log('Hora del día (UTC), computadoras', Q.usHoraDia, 'bar', 16, 6, 8, 7),
+    log('Computadoras por hora', Q.usPorHora, 'timeSeries', 0, 13, 24, 6),
+    log('Países (computadoras)', Q.usPaises, 'table', 0, 19, 12, 9),
+    log('Países (torta, computadoras)', Q.usPaisesTorta, 'pie', 12, 19, 12, 9),
+    log('Arquitectura (índice pedido)', Q.usArquitectura, 'pie', 0, 28, 8, 7),
+    log('Canal de actualizaciones', Q.usCanal, 'pie', 8, 28, 8, 7),
+    log('Cliente (motor de LordOS o versión de apt)', Q.usClientes, 'pie', 16, 28, 8, 7),
+    log('Versiones de LordOS bajadas (adopción)', Q.usVersionesBarra, 'bar', 0, 35, 12, 7),
+    log('Versiones de LordOS bajadas, por arquitectura', Q.usVersiones, 'table', 12, 35, 12, 7),
+    log('Paquetes de LordOS (computadoras)', Q.usPaquetesBarra, 'bar', 0, 42, 12, 8),
+    log('Paquetes de LordOS, versión y arquitectura', Q.usPaquetes, 'table', 12, 42, 12, 8),
+    log('Apps de la Tienda (catálogo)', Q.usTiendaTorta, 'pie', 0, 50, 8, 8),
+    log('Apps de la Tienda, versión y arquitectura', Q.usTienda, 'table', 8, 50, 8, 8),
+    log('Voces', Q.usVoces, 'table', 16, 50, 8, 8),
+    log('Errores del repositorio (4xx, 5xx, 000 = cortado)', Q.usErrores, 'table', 0, 58, 12, 8),
+    log('GB servidos por el repositorio por día', Q.usBytes, 'bar', 12, 58, 12, 8),
+    log('Pruebas (apt-staging)', Q.usStaging, 'table', 0, 66, 24, 6),
   ] },
   'LordOS-Historico': { start: '-P365D', widgets: [
     text('## LordOS: histórico\nAbrilo solo cuando lo necesites: con el rango de un año cada gráfico lee todos los logs guardados (hasta 13 meses).', 0, 0, 24, 2),
@@ -217,7 +317,7 @@ async function downloads() {
     + `5. **Gente que la baja y nunca la instala.**\n\n`
     + `Puede haber más descargas que visitantes de lordos.org: mucha gente baja directo desde GitHub (enlaces en foros, Reddit, `
     + `notas de prensa) sin pasar por el sitio, y las estadísticas del sitio empezaron después de publicada la ISO 0.8.8 (3 de noviembre). `
-    + `Tomalos como **interés**, no como usuarios. Las actualizaciones por APT no se cuentan aquí.\n\n`
+    + `Tomalos como **interés**, no como usuarios. Las computadoras que buscan actualizaciones y los paquetes que bajan por APT están en *LordOS-Usuarios*.\n\n`
     + head + line('**Total**', '', total) + rows.map(([t, d, p]) => line(t, d, p)).join('');
   // the totals also go to metrics, so the dashboard can draw how they grow day by day
   const data = KINDS.map(([k, label]) => ({ MetricName: 'Descargas', Dimensions: [{ Name: 'Archivo', Value: label }], Value: total[k], Unit: 'Count' }));
@@ -296,10 +396,11 @@ function countries(out) {
 
 function sleep(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
 
-function test() {
-  const end = Math.floor(Date.now() / 1000), start = end - 3600;
+function test(hours = 1, prefix = '') {
+  const end = Math.floor(Date.now() / 1000), start = end - Math.round(Number(hours) * 3600);
+  const queries = Object.entries(Q).filter(([name]) => name.startsWith(prefix));
   let failed = 0, bytes = 0;
-  for (const [name, q] of Object.entries(Q)) {
+  for (const [name, q] of queries) {
     let id;
     try {
       id = JSON.parse(execFileSync('aws', ['--profile', PROFILE, '--region', REGION, 'logs', 'start-query', '--log-group-name', LOG_GROUP,
@@ -320,14 +421,14 @@ function test() {
     const first = r.results[0]?.filter(c => c.field !== '@ptr').map(c => `${c.field}=${c.value}`).join(' ') || '(no rows)';
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}: ${r.results.length} rows; ${first}`);
   }
-  console.log(`${Object.keys(Q).length - failed}/${Object.keys(Q).length} queries ok, ${(bytes / 1e6).toFixed(1)} MB scanned`);
+  console.log(`${queries.length - failed}/${queries.length} queries ok, ${(bytes / 1e6).toFixed(1)} MB scanned`);
   process.exit(failed ? 1 : 0);
 }
 
 const cmd = process.argv[2];
 if (cmd === 'setup') setup();
 else if (cmd === 'dashboards') dashboards();
-else if (cmd === 'test') test();
+else if (cmd === 'test') test(process.argv[3] || 1, process.argv[4] || '');
 else if (cmd === 'downloads') await downloads();
 else if (cmd === 'countries') countries(process.argv[3]);
 else { console.error('usage: node tools/web/stats.mjs setup|dashboards|test|countries'); process.exit(2); }

@@ -9,7 +9,7 @@ lordos.org sets **no cookies**: no session, analytics, advertising or tracking c
 Nothing runs in your browser to measure you:
 
 - **On the website:** no analytics service, no tracking pixels, no fingerprinting, no social media widgets, and no fonts or scripts loaded from other servers.
-- **In the LordOS distribution:** no telemetry, no usage statistics, no crash reports and no device identifiers. The network connections LordOS makes are listed in the [Privacy policy](/legal/privacy/).
+- **In the LordOS distribution:** no telemetry, no crash reports and no device identifiers, and LordOS sends nothing extra for us to count. What we do count, since 12 November 2026, are the requests its update check makes anyway to `lordos.org/apt` (see below). The network connections LordOS makes are listed in the [Privacy policy](/legal/privacy/).
 
 ## Visit statistics
 
@@ -26,8 +26,9 @@ From each request we keep:
 
 We don't use these logs to find out who you are, we don't combine them with any other data and we don't sell or share them.
 
-- **Who sees them:** only the LordOS team, in a private AWS dashboard: visits per day, week, month and year, the most viewed pages, the visits per country and per system and device. We don't publish these statistics or share them with anyone.
-- **What we don't count:** the requests LordOS makes to `lordos.org/apt` when it checks for updates. CloudFront writes them to the same logs, with the same data, because it can't keep them apart; we leave them out of every count and they are deleted with the rest.
+- **Who sees them:** only the LordOS team, in a private AWS dashboard: visits per day, week, month and year, the most viewed pages, the visits per country and per system and device, and, separately, the LordOS computers that check for updates per day, country, architecture, version and package. We don't publish these statistics or share them with anyone.
+- **LordOS's update checks (since 12 November 2026):** CloudFront writes the requests LordOS makes to `lordos.org/apt` to the same logs, with the same data. Until 11 November 2026 we left them out of every count. From 12 November 2026 we count, from those same logs, how many distinct computers check for updates each day, and how many download each version of LordOS and each package (LordOS's own packages, the voices and the Store's apps), by country, architecture (amd64 or arm64) and update channel (the normal repository or the test one). The IP address is used only so that the same computer isn't counted twice in a day (or in the week or month a total covers), and it is not combined with anything else. From the user agent we take only which program asked (LordOS's package engine or apt, and its version). We keep no identifier of the computer or of you, there are no cookies and nothing is installed: these are the requests LordOS makes anyway to look for updates. These logs are kept for the same 13 months.
+- **How to avoid it:** turn off **Check for updates automatically** in Store → Updates. When you check for updates or install something by hand, LordOS still asks for the package index (and the packages), and those requests are counted the same way.
 - **How long:** these logs are kept for 13 months and then deleted.
 
 ## What the website keeps in your browser

@@ -9,7 +9,7 @@ lordos.org **no usa cookies**: ni de sesión, ni de analítica, ni de publicidad
 Nada corre en tu navegador para medirte:
 
 - **En el sitio:** ningún servicio de analítica, ningún píxel de seguimiento, ninguna huella del navegador, ningún widget de redes sociales y ninguna fuente o script cargado desde otros servidores.
-- **En la distribución LordOS:** sin telemetría, sin estadísticas de uso, sin reportes de fallas y sin identificadores del equipo. Las conexiones de red que hace LordOS están listadas en la [Política de privacidad](/legal/privacy/).
+- **En la distribución LordOS:** sin telemetría, sin reportes de fallas y sin identificadores del equipo, y LordOS no manda nada extra para que lo contemos. Lo que sí contamos, desde el 12 de noviembre de 2026, son los pedidos que su búsqueda de actualizaciones hace igual a `lordos.org/apt` (más abajo). Las conexiones de red que hace LordOS están listadas en la [Política de privacidad](/legal/privacy/).
 
 ## Estadísticas de visitas
 
@@ -26,8 +26,9 @@ De cada solicitud guardamos:
 
 No usamos estos registros para averiguar quién sos, no los cruzamos con otros datos y no los vendemos ni los compartimos.
 
-- **Quién las ve:** solo el equipo de LordOS, en un panel privado de AWS: visitas por día, semana, mes y año, las páginas más vistas, las visitas por país y por sistema y dispositivo. No publicamos estas estadísticas ni las compartimos con nadie.
-- **Qué no contamos:** las solicitudes que hace LordOS a `lordos.org/apt` cuando busca actualizaciones. CloudFront las escribe en los mismos registros, con los mismos datos, porque no puede separarlas; las dejamos fuera de todos los conteos y se borran junto con el resto.
+- **Quién las ve:** solo el equipo de LordOS, en un panel privado de AWS: visitas por día, semana, mes y año, las páginas más vistas, las visitas por país y por sistema y dispositivo, y, aparte, las computadoras con LordOS que buscan actualizaciones por día, país, arquitectura, versión y paquete. No publicamos estas estadísticas ni las compartimos con nadie.
+- **Las búsquedas de actualizaciones de LordOS (desde el 12 de noviembre de 2026):** CloudFront escribe las solicitudes que hace LordOS a `lordos.org/apt` en los mismos registros, con los mismos datos. Hasta el 11 de noviembre de 2026 las dejábamos fuera de todos los conteos. Desde el 12 de noviembre de 2026 contamos, a partir de esos mismos registros, cuántas computadoras distintas buscan actualizaciones cada día, y cuántas descargan cada versión de LordOS y cada paquete (los paquetes propios de LordOS, las voces y las apps de la Tienda), por país, arquitectura (amd64 o arm64) y canal de actualizaciones (el repositorio normal o el de pruebas). La dirección IP se usa solo para no contar dos veces la misma computadora en un día (o en la semana o el mes que abarca un total), y no se combina con nada más. Del agente de usuario solo tomamos qué programa hizo la solicitud (el motor de paquetes de LordOS o apt, y su versión). No guardamos ningún identificador de la computadora ni tuyo, no hay cookies y no se instala nada: son las solicitudes que LordOS hace de todas formas para buscar actualizaciones. Estos registros se guardan los mismos 13 meses.
+- **Cómo evitarlo:** desactivá **Buscar actualizaciones automáticamente** en Tienda → Actualizaciones. Cuando buscás actualizaciones o instalás algo a mano, LordOS igual pide el índice de paquetes (y los paquetes), y esas solicitudes se cuentan de la misma forma.
 - **Por cuánto tiempo:** estos registros se guardan 13 meses y después se borran.
 
 ## Qué guarda el sitio en tu navegador
