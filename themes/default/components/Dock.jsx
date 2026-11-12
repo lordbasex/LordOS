@@ -9,7 +9,7 @@
 // this file only draws it and says where things are. The Trash is always the last item.
 import {
   View, Text, screen, appName, useLocale, addListener, t as tr, useStore, settings, dockDrag, dockPoof, beginDockDrag,
-  registerDockTarget, dockDragJustEnded, refreshTrash, Layer, useDockCovered,
+  registerDockTarget, dockDragJustEnded, refreshTrash, Layer, useDockCovered, dockBadgeMetrics,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -416,7 +416,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
     <>
       <View onMouseMove={(e) => setM(vert ? e.y : e.x)} onMouseLeave={() => setM(null)}
         style={{ position: 'absolute', ...box, direction: 'ltr' }}>
-        <View style={{ position: 'absolute', ...back, borderRadius: 20,
+        <View style={{ position: 'absolute', ...back, borderRadius: Math.min(20, Math.floor(bar / 2)),
           backgroundColor: t.dockBg, backdropFilter: `blur(${t.blur}px)`, border: `1px solid ${t.dockBorder}` }} />
         {sepLines.map((c, i) => (
           <View key={`sep${i}`} style={vert ? { position: 'absolute', top: c, height: 1, width: BASE * 0.7, [position]: PAD + BASE * 0.15, backgroundColor: t.dockBorder }
@@ -437,12 +437,16 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i] }}>
             <app.Icon size={sizes[i]} />
             {/* a web app's unread count (SetBadge, docs/WEBAPPS.md): a red badge, "99+" past 99 */}
-            {app.badge ? (
-              <View style={{ position: 'absolute', right: -Math.round(sizes[i] * 0.08), top: -Math.round(sizes[i] * 0.06), minWidth: 18, height: 18, paddingHorizontal: 5,
-                borderRadius: 9, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
-                <Text style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap' }}>{app.badge}</Text>
-              </View>
-            ) : null}
+            {app.badge ? (() => {
+              const b = dockBadgeMetrics(sizes[i]);      // smaller on a small Dock (issue #128)
+              return (
+                <View style={{ position: 'absolute', right: -Math.round(sizes[i] * 0.08), top: -Math.round(sizes[i] * 0.06), minWidth: b.height, height: b.height,
+                  paddingHorizontal: b.pad, borderRadius: b.height / 2, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
+                  <Text style={{ fontSize: b.font, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap' }}>{app.badge}</Text>
+                </View>
+              );
+            })() : null}
             {/* a window that asked for attention (xdg-activation): a larger dot in the accent */}
             {running.includes(app.id) && (app.attention
               ? <View style={{ position: 'absolute', ...dot(sizes[i], 6), width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent }} />

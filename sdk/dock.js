@@ -38,10 +38,11 @@ import { restoredIds } from './sessionrestore.jsx';
 import * as fs from './fs.js';
 import {
   parseDockId, toTypedId, normalizePinned, ensureItems, moveItem, pinItem, unpinItem, isLocked, isMovable, cleanActions,
-  LAUNCHER, LOCKED, FIRST, dockHideMode, dockHideSettings, dockCovered, DOCK_HIDE_MODES,
+  LAUNCHER, LOCKED, FIRST, dockHideMode, dockHideSettings, dockCovered, DOCK_HIDE_MODES, dockSizes, dockBadgeMetrics,
+  DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX,
 } from './dockmodel.js';
 
-export { LAUNCHER as DOCK_LAUNCHER, dockHideSettings, DOCK_HIDE_MODES };
+export { LAUNCHER as DOCK_LAUNCHER, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dockBadgeMetrics };
 
 const menuProviders = new Map();
 export function registerDockMenu(appId, fn) { menuProviders.set(appId, fn); return () => menuProviders.delete(appId); }
@@ -115,7 +116,7 @@ export const dock = {
 // right-to-left language.
 export const DOCK_DEFAULTS = {
   dockPosition: 'bottom',     // 'bottom' | 'left' | 'right' (Lord Flow theme)
-  dockSize: 54,               // px of each icon (36–80)
+  dockSize: 54,               // px of each icon (20–80: DOCK_SIZE_MIN/MAX in dockmodel.js)
   dockMagnify: true,          // magnification
   dockMagnifySize: 86,        // px of the largest icon when magnified (more than dockSize)
   dockAutohide: false,        // hides and comes back when the edge is touched
@@ -128,8 +129,7 @@ export function dockPrefs(s = settings.get()) {
   for (const k of Object.keys(DOCK_DEFAULTS)) if (s[k] !== undefined && s[k] !== null) p[k] = s[k];
   if (!['bottom', 'left', 'right'].includes(p.dockPosition)) p.dockPosition = 'bottom';
   if (!['bottom', 'top', 'left', 'right'].includes(p.taskbarPosition)) p.taskbarPosition = 'bottom';
-  p.dockSize = Math.max(36, Math.min(80, Math.round(+p.dockSize) || 54));
-  p.dockMagnifySize = Math.max(p.dockSize, Math.min(128, Math.round(+p.dockMagnifySize) || 86));
+  Object.assign(p, dockSizes(p.dockSize, p.dockMagnifySize));
   p.dockAutohide = p.dockAutohide === true;
   p.dockIntellihide = p.dockIntellihide === true;
   p.dockHide = dockHideMode(p);   // 'never' | 'overlap' | 'always'

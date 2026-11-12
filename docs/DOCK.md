@@ -30,7 +30,7 @@ Everything is applied live, without restarting, and is saved in
 | Key | Values | Default |
 |---|---|---|
 | `dockPosition` | `bottom`, `left`, `right` | `bottom` |
-| `dockSize` | 36–80 (px per icon) | 54 |
+| `dockSize` | 20–80 (px per icon; 36–80 before 0.8.8.8) | 54 |
 | `dockMagnify` | `true`/`false` | `true` |
 | `dockMagnifySize` | from the size up to 128 (px of the largest icon) | 86 |
 | `dockAutohide` | `true`/`false`: the Dock hides | `false` |
