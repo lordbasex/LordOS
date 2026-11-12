@@ -19,6 +19,7 @@
   "cmd.nextTab": "Pestaña siguiente",
   "cmd.open": "Abrir…",
   "cmd.openFolder": "Abrir carpeta…",
+  "cmd.openRecent": "Abrir recientes",
   "cmd.outdent": "Reducir sangría",
   "cmd.paste": "Pegar",
   "cmd.prevTab": "Pestaña anterior",
@@ -78,5 +79,8 @@
   "find.next": "Coincidencia siguiente",
   "find.close": "Cerrar la búsqueda",
   "find.regex": "Expresión regular",
-  "find.case": "Distinguir mayúsculas y minúsculas"
+  "find.case": "Distinguir mayúsculas y minúsculas",
+  "recent.none": "No hay archivos recientes",
+  "recent.clear": "Borrar menú",
+  "recent.gone": "{name} ya no está; se quitó de Abrir recientes"
 }

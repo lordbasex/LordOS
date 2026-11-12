@@ -19,6 +19,7 @@
   "cmd.nextTab": "Próxima aba",
   "cmd.open": "Abrir…",
   "cmd.openFolder": "Abrir pasta…",
+  "cmd.openRecent": "Abrir recentes",
   "cmd.outdent": "Diminuir recuo",
   "cmd.paste": "Colar",
   "cmd.prevTab": "Aba anterior",
@@ -78,5 +79,8 @@
   "find.next": "Próxima ocorrência",
   "find.close": "Fechar a busca",
   "find.regex": "Expressão regular",
-  "find.case": "Diferenciar maiúsculas e minúsculas"
+  "find.case": "Diferenciar maiúsculas e minúsculas",
+  "recent.none": "Nenhum arquivo recente",
+  "recent.clear": "Limpar menu",
+  "recent.gone": "{name} não existe mais; removido de Abrir recentes"
 }

@@ -19,6 +19,7 @@
   "cmd.nextTab": "Scheda successiva",
   "cmd.open": "Apri…",
   "cmd.openFolder": "Apri cartella…",
+  "cmd.openRecent": "Apri recenti",
   "cmd.outdent": "Riduci rientro",
   "cmd.paste": "Incolla",
   "cmd.prevTab": "Scheda precedente",
@@ -78,5 +79,8 @@
   "find.next": "Risultato successivo",
   "find.close": "Chiudi ricerca",
   "find.regex": "Espressione regolare",
-  "find.case": "Maiuscole/minuscole"
+  "find.case": "Maiuscole/minuscole",
+  "recent.none": "Nessun file recente",
+  "recent.clear": "Cancella menu",
+  "recent.gone": "{name} non c’è più; rimosso da Apri recenti"
 }
