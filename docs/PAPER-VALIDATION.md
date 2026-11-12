@@ -218,6 +218,8 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1 | ❖ + click finds a name in `ls` and `ls -l` output, looked up in the reported directory, the prompt's, the title's, then the home | Test (`tests/terminal_lsnames_test.mjs`, 38 checks) | Holds |
 | 5.1, 6.7 | Uploads never follow a link and never replace a name on the server; Edit's saves are the one upload that replaces a file | `CHANGELOG.md`, Unreleased; checked on a real session (a name already there kept, the copy `notes (2).txt`) | Not automated here |
 | 5.1 | A trigger tried on a sample line says what it matches and what the action would do | Test (`tests/terminal_triggers_test.mjs`, 13) | Holds |
+| 5.1 | An account's Details shows provider, backend type, sign-in and server, never the user name, email or a secret | Test (`server/tests/cloud_model_test.mjs`, accountDetails, 6 checks) | Holds |
+| 5.1 | Photos moves pictures to the Trash, one or a selection, and asks before deleting in a cloud account | Test (`server/tests/photos_trash_test.mjs`, 20 checks) | Holds for the logic |
 | 5.1 | "Send text at start" types and sends each line, the last one too, and an old `\n` counts once | Test (`tests/terminal_profilefields_test.mjs`, 22) | Holds |
 | 5.1 | The SDK's text fields select and edit (Shift, drag, double click, by word, copy and cut never from a password field) | Test (`tests/textfield_model_test.mjs`, 43; `tests/textarea_model_test.mjs`, 32) | Holds for the models; the drawing was seen on a session |
 | 5.1 | A group of Databases favorites has a color, checked in `lord-server` like a favorite's | Test (`build/sqlc-test`, 5 more checks) | Holds |

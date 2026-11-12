@@ -6,7 +6,7 @@ interface and compositing are our own.
 
 | App | id | What it does |
 |---|---|---|
-| **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy |
+| **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy; **Move to Trash** (0.8.8.8, GitHub #119) from the File menu, a right click on a thumbnail, the viewer's toolbar or Delete / ❖⌫, on one picture or a selection (❖-click, Shift-click, ❖A); a picture in a cloud account is deleted there after asking, as in Files (`apps/photos/trash.js`) |
 | **Player** | `player` | Video with synced audio, time bar, volume, `.srt` and in-track subtitles, full screen, picture in picture; music library by artist and album with covers, queue, shuffle and repeat; media keys and the Control Center |
 | **Screenshots** | `screenshots` | Screen (a file per display), window or area on any display (crosshair, magnifier with the pixel's color; C copies it), a color picker, copy the text in an area (T, OCR in the sandboxed `lord-ocr` helper; Transcribe Ⓣ in the editor, on any picture), timer, to the clipboard or to `~/Pictures/Screenshots`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
 | **Camera** | `camera` | V4L2 preview, JPEG photo, H.264 + AAC video, mirror, choose camera |

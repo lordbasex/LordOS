@@ -6,14 +6,19 @@
 // and C draws it: zoom, panning, rotation, full screen and slideshow. Edits (crop with aspect presets
 // and handles, a new size, rotation, brightness and contrast) are saved as a copy: the original is left
 // untouched. Markup opens the picture in the markup editor (arrows, text, redaction…; issue #30).
+// Move to Trash (GitHub #119) from the File menu, a right click on a thumbnail or the Delete key, on one picture or a
+// selection (Ctrl/⌘-click, Shift-click), as Files does it (trash.js).
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
   Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud, useFilesDrop, FilesDropHint, dropCount,
+  ContextMenu, ConfirmDialog, cloud, cloudModel,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { keptPlaces, inPlaces } from './places.js';
+import { trashPlan, clickSelect, menuTargets, keepListed, afterRemove } from './trash.js';
 import { compareNames } from '../../sdk/collate.js';
+import { TrashGlyph } from '../../sdk/fileglyphs.jsx';
 
 const APP = 'photos';
 const handledNonce = new Map();      // «Open with» already handled, per window
@@ -62,11 +67,11 @@ function subfolders(dir) {
   try { return fs.list(dir).filter((e) => e.dir).map((e) => `${dir}/${e.name}`); } catch (e) { return []; }
 }
 
-function Thumb({ e, size, selected, onOpen, onSelect }) {
+function Thumb({ e, size, selected, onOpen, onSelect, onMenu }) {
   const th = useTheme();
   const thumb = useThumb(e.path, 256);
   return (
-    <View onClick={onSelect} onDoubleClick={onOpen} style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', backgroundColor: th.control,
+    <View onClick={onSelect} onDoubleClick={onOpen} onContextMenu={onMenu} style={{ width: size, height: size, borderRadius: 6, overflow: 'hidden', backgroundColor: th.control,
       border: selected ? `3px solid ${th.accent}` : '0px solid transparent', alignItems: 'center', justifyContent: 'center' }}>
       {thumb ? <Image src={thumb} style={{ width: selected ? size - 6 : size, height: selected ? size - 6 : size, objectFit: 'cover', borderRadius: selected ? 3 : 0 }} />
         : <Text style={{ fontSize: 10, color: th.textDim }}>{e.name.split('.').pop().toUpperCase()}</Text>}
@@ -90,7 +95,7 @@ function ToolBtn({ glyph, label, onClick, active, dark }) {
 
 // ---- viewer ----
 
-function Viewer({ list, index, setIndex, onClose, winId, mode }) {
+function Viewer({ list, index, setIndex, onClose, winId, mode, onTrash }) {
   const th = useTheme();
   const path = list[index]?.path;
   const [id, setId] = useState(0);
@@ -112,7 +117,8 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
     if (!path) return;
     wm.setMenus(winId, [{ label: tr('photos.menu.file'), items: [
       { label: tr('photos.menu.print'), hint: '❖P', onClick: () => print.open({ title: baseName(path), image: path }) },
-      { label: tr('photos.menu.slideshow'), onClick: () => setSlide(true) },
+      { label: tr('photos.menu.slideshow'), onClick: () => setSlide(true) }, '-',
+      { label: tr('photos.menu.trash'), hint: '❖⌫', onClick: () => onTrash([path]) },
     ] }]);
   }, [path]);
 
@@ -182,6 +188,7 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
     else if (String(e.base || '').toLowerCase() === 'f') wm.setFullscreen(winId, mode !== 'fullscreen');
     else if (e.key === ' ') setSlide((v) => !v);
     else if ((e.meta || e.ctrl) && String(e.base || '').toLowerCase() === 'p') print.open({ title: baseName(path), image: path });
+    else if (!edit && (e.key === 'Delete' || ((e.meta || e.ctrl) && e.key === 'Backspace'))) onTrash([path]);
     else if (e.key === 'Escape' && mode !== 'fullscreen') { if (edit) setEdit(null); else onClose(); }
   });
 
@@ -280,6 +287,7 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
           <ToolbarButton icon="⛶" title={tr('photos.fullscreen')} onClick={() => wm.setFullscreen(winId, true)} />
           {M.canMarkup(path) && !info?.animated && !error ? <ToolbarButton icon="✐" label={tr('photos.markup')} title={tr('photos.markupHint')} onClick={() => openMarkup(path)} /> : null}
           <ToolbarButton icon="✎" label={tr('photos.edit')} active={!!edit} onClick={() => (edit ? setEdit(null) : startEdit())} />
+          <ToolbarButton icon={<TrashGlyph color="#f5f5f7" />} title={tr('photos.menu.trash')} onClick={() => onTrash([path])} />
         </View>
       )}
       <View ref={box} style={{ flex: 1, overflow: 'hidden' }}
@@ -394,13 +402,21 @@ export default function Photos() {
   const [folder, setFolder] = useState(dirs.pictures);
   const [all, setAll] = useState(true);
   const [items, setItems] = useState([]);
-  const [sel, setSel] = useState(null);
+  const [sel, setSel] = useState(() => new Set());
+  const anchor = useRef(null);
+  const [menu, setMenu] = useState(null);       // a right click on a thumbnail: { x, y, items }
+  const [ask, setAsk] = useState(null);         // a cloud delete waiting for an answer: ConfirmDialog's props
+  const [msg, setMsg] = useState(null);
+  const root = useRef(null);
   const [viewer, setViewer] = useWindowState('viewer', null);    // { list, index } (survives full screen)
+  const viewerRef = useRef(viewer);
+  viewerRef.current = viewer;
   const [size, setSize] = useState(132);
   const [rev, setRev] = useState(0);
   const winW = useStore(windows, (ws) => ws.find((w) => w.id === win.id)?.w || 980);
 
-  const places = keptPlaces(useCloud().accounts);
+  const cloudSt = useCloud();
+  const places = keptPlaces(cloudSt.accounts);
 
   useEffect(() => {
     const out = [];
@@ -415,6 +431,96 @@ export default function Photos() {
     listImagesAsync(folder, 4, out, () => live).then(() => { if (live) setItems(out.sort(byMtime)); });
     return () => { live = false; };
   }, [folder, all, rev]);
+  useEffect(() => { setSel((s) => keepListed(s, items)); }, [items]);
+  useEffect(() => { if (!msg) return undefined; const tmr = setTimeout(() => setMsg(null), 3000); return () => clearTimeout(tmr); }, [msg]);
+
+  // Move to Trash (trash.js): the pictures leave the library and the viewer at once; what failed comes back on the
+  // next listing
+  const gone = (paths) => {
+    setSel((s) => new Set([...s].filter((p) => !paths.includes(p))));
+    const v = viewerRef.current;
+    if (v) {
+      const nv = afterRemove(v.list, v.index, paths);
+      setViewer(nv);
+      if (!nv) { wm.setTitle(win.id, null); wm.setFullscreen(win.id, false); }    // the last one went: back to the library
+    }
+    setItems((l) => l.filter((e) => !paths.includes(e.path)));
+  };
+  const toTrash = (paths) => {
+    if (!paths.length) return;
+    setMenu(null);
+    const plan = trashPlan(paths, cloudSt.accounts, (p) => fs.isRemote(p));
+    const done = [];
+    for (const p of plan.local) { try { fs.trash(p); done.push(p); } catch (e) { setMsg(errorText(e)); } }
+    if (done.length) { gone(done); setMsg(tr('photos.trashed', { count: done.length })); }
+    if (plan.slow.length) {
+      gone(plan.slow);
+      Promise.all(plan.slow.map((p) => fs.trashAsync(p).then(() => 1, (e) => { setMsg(errorText(e)); return 0; }))).then((r) => {
+        const k = r.reduce((a, b) => a + b, 0);
+        if (k) setMsg(tr('photos.trashed', { count: k }));
+        if (k < r.length) setRev((n) => n + 1);
+      });
+    }
+    // a cloud account's pictures are deleted there, after asking, one account at a time (as in Files)
+    const next = (i) => {
+      const g = plan.cloud[i];
+      if (!g) { setAsk(null); return; }
+      const pr = cloudModel.deletePrompt(g.acc, g.paths.length);
+      setAsk({ title: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars),
+        onCancel: () => next(i + 1),
+        onOk: () => {
+          gone(g.paths);
+          cloud.delete(g.paths).then((res) => {
+            const failed = (res && res.failed) || [];
+            setMsg(res && res.error ? errorText(res.error) : failed.length ? errorText(failed[0].error)
+              : tr('cloud.delete.done', { count: g.paths.length, provider: cloudModel.providerName(g.acc) }));
+            if (res && (res.error || failed.length)) setRev((n) => n + 1);
+          });
+          next(i + 1);
+        } });
+    };
+    next(0);
+  };
+  const trashRef = useRef(toTrash);
+  trashRef.current = toTrash;            // the viewer's menu is set once per picture: it calls the latest one
+  const selected = items.filter((e) => sel.has(e.path)).map((e) => e.path);
+
+  // the library's File menu (the viewer puts its own while it is open)
+  useEffect(() => {
+    if (viewer) return;
+    wm.setMenus(win.id, [{ label: tr('photos.menu.file'), items: [
+      { label: tr('photos.menu.open'), onClick: () => { const i = items.findIndex((e) => sel.has(e.path)); if (i >= 0) setViewer({ list: items, index: i }); }, disabled: !selected.length },
+      { label: tr('photos.menu.selectAll'), hint: '❖A', onClick: () => setSel(new Set(items.map((e) => e.path))), disabled: !items.length }, '-',
+      { label: tr('photos.menu.trash'), hint: '❖⌫', onClick: () => toTrash(selected), disabled: !selected.length },
+    ] }]);
+  }, [!!viewer, items, sel, cloudSt.accounts]);
+  useKeyboard((e) => {
+    if (viewer) return;
+    const mod = e.meta || e.ctrl;
+    if (e.key === 'Delete' || (mod && e.key === 'Backspace')) toTrash(selected);
+    else if (mod && String(e.base || '').toLowerCase() === 'a') setSel(new Set(items.map((x) => x.path)));
+    else if (e.key === 'Escape') setSel(new Set());
+    else if (e.key === 'Enter' && selected.length) setViewer({ list: items, index: items.findIndex((x) => x.path === selected[0]) });
+  });
+  const onThumbMenu = (e, ev) => {
+    ev.stopPropagation?.();
+    const targets = menuTargets(sel, e.path);
+    if (!sel.has(e.path)) { setSel(new Set([e.path])); anchor.current = e.path; }
+    const at = root.current && ev.local ? ev.local(root.current) : ev;
+    setMenu({ x: at.x, y: at.y, items: [
+      { label: tr('photos.menu.open'), onClick: () => { setMenu(null); setViewer({ list: items, index: items.indexOf(e) }); } }, '-',
+      { label: targets.length > 1 ? tr('photos.menu.trashCount', { count: targets.length }) : tr('photos.menu.trash'), hint: '❖⌫', onClick: () => toTrash(targets) },
+    ] });
+  };
+  const toast = msg && (
+    <View style={{ position: 'absolute', left: 0, right: 0, bottom: 20, alignItems: 'center', pointerEvents: 'none' }}>
+      <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.75)' }}>
+        <Text style={{ fontSize: 12, color: '#fff' }}>{msg}</Text>
+      </View>
+    </View>
+  );
+  const confirm = ask && <ConfirmDialog title={ask.title} detail={ask.detail} okLabel={tr('cloud.delete.ok')} cancelLabel={tr('photos.cancel')}
+    onOk={ask.onOk} onCancel={ask.onCancel} destructive />;
 
   // open an image with its neighbors in the same folder (what Files sent, or one image dropped on the window)
   const openWithNeighbors = (p) => {
@@ -450,8 +556,11 @@ export default function Photos() {
       <View {...drop.props} style={{ flex: 1 }}>
         <Viewer list={viewer.list} index={viewer.index} winId={win.id} mode={win.mode}
           setIndex={(f) => setViewer((v) => ({ ...v, index: typeof f === 'function' ? f(v.index) : f }))}
-          onClose={() => { setViewer(null); wm.setTitle(win.id, null); wm.setFullscreen(win.id, false); }} />
+          onClose={() => { setViewer(null); wm.setTitle(win.id, null); wm.setFullscreen(win.id, false); }}
+          onTrash={(paths) => trashRef.current(paths)} />
+        {toast}
         {dropHint}
+        {confirm}
       </View>
     );
   }
@@ -467,7 +576,7 @@ export default function Photos() {
     groups[groups.length - 1].list.push(e);
   }
   return (
-    <View {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
+    <View {...drop.props} ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         <SectionTitle>{tr('photos.library')}</SectionTitle>
@@ -487,7 +596,7 @@ export default function Photos() {
         <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 12 }}>
           <View style={{ flex: 1, overflow: 'hidden' }}>
             <Text style={{ fontSize: narrow ? 17 : 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' }}>{places.find((k) => k.path === folder)?.label || (all ? tr('photos.allPhotos') : baseName(folder))}</Text>
-            <Text style={{ fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' }}>{tr('photos.count', { count: items.length })}</Text>
+            <Text style={{ fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' }}>{selected.length > 1 ? tr('photos.selectedOf', { count: selected.length, total: items.length }) : tr('photos.count', { count: items.length })}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, direction: 'ltr' }}>
             {!narrow && <View style={{ width: 8, height: 8, borderRadius: 2, border: `1.5px solid ${th.textDim}` }} />}
@@ -505,7 +614,9 @@ export default function Photos() {
               <Text style={{ fontSize: 15, fontWeight: 600, color: th.text }}>{tr('photos.monthYear', { month: tr(`photos.month.${g.date.getMonth()}`), year: g.date.getFullYear() })}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                 {g.list.map((e) => (
-                  <Thumb key={e.path} e={e} size={size} selected={sel === e.path} onSelect={() => setSel(e.path)}
+                  <Thumb key={e.path} e={e} size={size} selected={sel.has(e.path)}
+                    onSelect={(ev) => { const r = clickSelect(sel, items.map((x) => x.path), anchor.current, e.path, ev || {}); setSel(r.sel); anchor.current = r.anchor; }}
+                    onMenu={(ev) => onThumbMenu(e, ev)}
                     onOpen={() => setViewer({ list: items, index: items.indexOf(e) })} />
                 ))}
               </View>
@@ -513,8 +624,12 @@ export default function Photos() {
           ))}
         </ScrollView>
       </View>
+      {toast}
       {/* over everything else, so it is not drawn under the grid */}
       {dropHint}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)}
+        bounds={{ w: winW, h: root.current ? lord.getLayout(root.current.id)[3] : 640 }} />}
+      {confirm}
     </View>
   );
 }

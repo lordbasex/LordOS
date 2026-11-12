@@ -431,5 +431,12 @@
   "known.copied": "Log copied, with nothing personal: paste it in rclone’s issue",
   "known.noLog": "There is no log to copy yet",
   "files.signin": "{name} needs a new sign-in",
-  "files.signinOpen": "Sign In…"
+  "files.signinOpen": "Sign In…",
+  "details.title": "Details",
+  "details.provider": "Provider",
+  "details.backend": "Type",
+  "details.signIn": "Sign-in",
+  "details.server": "Server",
+  "details.app": "App",
+  "details.ownApp": "Your own app"
 }

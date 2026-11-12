@@ -245,6 +245,13 @@ table per provider; S3 and WebDAV open the endpoint's address only if it is http
 folders, **Pause** syncing, **Sign In Again** (expired token), **Remove Account** (unmounts, deletes the cache after uploads
 finish or after the person confirms discarding them, removes the keyring item; never deletes anything in the cloud).
 
+**Details** (0.8.8.8, GitHub #115): a box on the account's page with the provider, rclone's backend type (`drive`, `webdav`,
+`sftp`…), how it signs in (browser, server, object storage), the server (`host:port`) for a server kind, and "Your own app" when it
+signs in with the person's own client ID (`accountDetails` in `sdk/cloudmodel.js`). It shows only what the state already carries.
+The user name or email is not shown: rclone marks those options sensitive, so they are kept in the keyring with the password and
+JavaScript never sees them (section 3). Account colors stay by the order accounts were added (`accountColor`), so two accounts
+on the same provider still look different and nobody's colors change.
+
 ### 6.4 Turning an account off (0.8.8.8)
 
 Each account has an on/off switch, on its row in Settings → Cloud and on its page (`cloud.setEnabled(id, on, { how })`,

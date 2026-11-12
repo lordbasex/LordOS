@@ -628,6 +628,22 @@ export function providerName(acc, list) {
   const cut = s.split(/\s+including\s+|,\s|\s\(|\s—\s/)[0].trim();
   return cut.length > 40 ? `${cut.slice(0, 38).replace(/\s+\S*$/, '')}…` : cut;
 }
+// An account's Details box in Settings → Cloud (GitHub #115): only what the state already carries, never a secret.
+// → [{ label, value | key }] (label and key are locale keys, value is shown as it is): the provider, rclone's backend type, how it signs in, the server (host:port)
+// for a server kind. The user or email isn't among them: rclone marks those options sensitive, so they live in the
+// keyring with the password and JavaScript never sees them (docs/CLOUD.md).
+const SIGN_IN = { oauth: 'cloud.group.oauth', server: 'cloud.group.server', object: 'cloud.group.object' };
+export function accountDetails(acc, list) {
+  if (!acc) return [];
+  const p = (list || []).find((x) => x.kind === acc.kind);
+  const rows = [{ label: 'cloud.details.provider', value: providerName(acc, list) }];
+  if (acc.kind) rows.push({ label: 'cloud.details.backend', value: String(acc.kind) });
+  const group = (p && p.group) || acc.group;
+  if (SIGN_IN[group]) rows.push({ label: 'cloud.details.signIn', key: SIGN_IN[group] });
+  if (acc.host) rows.push({ label: 'cloud.details.server', value: acc.port ? `${acc.host}:${acc.port}` : String(acc.host) });
+  if (acc.ownClient) rows.push({ label: 'cloud.details.app', key: 'cloud.details.ownApp' });
+  return rows;
+}
 // a trust question from add/answer: 'hostKey' | 'certificate' | null (an ordinary question of rclone's)
 export const trustKind = (q) => (q && ['hostKey', 'certificate', 'hostKeyChanged'].includes(q.kind) ? q.kind : null);
 // The fingerprints behind a changed key or certificate: the answer's old and new, else the account's message (the new one)

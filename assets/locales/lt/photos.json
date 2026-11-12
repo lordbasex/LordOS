@@ -58,5 +58,24 @@
   "size": "Dydis",
   "keepRatio": "Išlaikyti proporcijas",
   "sizeInvalid": "Plotis ir aukštis turi būti sveikieji skaičiai nuo 1 iki {max}",
-  "cloud": "Debesis"
+  "cloud": "Debesis",
+  "menu.open": "Atidaryti",
+  "menu.selectAll": "Pažymėti viską",
+  "menu.trash": "Perkelti į šiukšlinę",
+  "menu.trashCount": {
+    "one": "Perkelti {count} nuotrauką į šiukšlinę",
+    "few": "Perkelti {count} nuotraukas į šiukšlinę",
+    "other": "Perkelti {count} nuotraukų į šiukšlinę"
+  },
+  "trashed": {
+    "one": "{count} nuotrauka perkelta į šiukšlinę",
+    "few": "{count} nuotraukos perkeltos į šiukšlinę",
+    "other": "{count} nuotraukų perkelta į šiukšlinę"
+  },
+  "selectedOf": {
+    "one": "Pažymėta {count} iš {total}",
+    "few": "Pažymėtos {count} iš {total}",
+    "other": "Pažymėta {count} iš {total}"
+  },
+  "cancel": "Atšaukti"
 }
