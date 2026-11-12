@@ -1,6 +1,6 @@
 {
   "id": "machines",
-  "version": "0.8.9-alpha.2",
+  "version": "0.8.9-alpha.3",
   "name": "Machines",
   "description": "Runs other systems in windows, each in its own sandbox (alpha)",
   "size": [760, 500],

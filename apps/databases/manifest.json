@@ -1,6 +1,6 @@
 {
   "id": "databases",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "Databases",
   "description": "A client for MySQL and MariaDB: favorites, structure, content, queries and a console, each connection in its own sandbox",
   "size": [

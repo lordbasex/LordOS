@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.8-beta] - 2026-11-12
+
 ### Added
 
 - **Mail: fold a whole account in the sidebar.** The account's name in the sidebar now has a disclosure triangle,
@@ -4990,7 +4992,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...HEAD
+[0.8.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...v0.8.8.8-beta
 [0.8.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...v0.8.8.7-beta
 [0.8.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...v0.8.8.6-beta
 [0.8.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...v0.8.8.5-beta

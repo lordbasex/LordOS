@@ -1,6 +1,6 @@
 {
   "id": "reminders",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "name": "Reminders",
   "description": "To-do lists with due dates, priorities and flags",
   "size": [820, 560],

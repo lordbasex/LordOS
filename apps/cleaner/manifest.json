@@ -1,6 +1,6 @@
 {
   "id": "cleaner",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "name": "Cleaner",
   "description": "Finds regenerable files, shows what they use and moves what you choose to the Trash",
   "size": [1100, 700],
