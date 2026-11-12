@@ -443,6 +443,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- A moment of noise on the screen between the console and the login screen and between the login screen and the
+  desktop, on older graphics cards run by the `radeon` kernel driver. At each hand-off lord-sessiond keeps every lit
+  display on a black frame of its own mode (added in 0.8.8.7 so DisplayPort monitors keep their signal), and that
+  frame was a new dumb buffer put on the screen as it came: the code assumed it was zeroed, but `radeon` gives one
+  in video memory with whatever was there last, so the "black" frame showed leftover pixels until the next session
+  drew. The buffer is now mapped (`DRM_IOCTL_MODE_MAP_DUMB` + `mmap`) and cleared before it becomes a framebuffer;
+  if it can't be mapped, that display is not blacked out and is turned off with the rest of the leaving session's
+  framebuffers, as before 0.8.8.7 (`server/src/remote/blackfb.c`, used by `monitor.c`). New `blackfb-test`: a fake
+  card (ioctl and mmap wrapped) whose new buffers are full of noise checks the whole buffer, pitch padding
+  included, is black before `ADDFB`, and that a failed map, mmap or `ADDFB` leaves nothing behind. (GitHub #94)
 - Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
   with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
   a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
