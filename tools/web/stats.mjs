@@ -205,9 +205,19 @@ async function downloads() {
   const head = `| Versión | Fecha | ${KINDS.map(([, l]) => l).join(' | ')} |\n|---|---|${KINDS.map(() => '---:').join('|')}|\n`;
   const line = (a, b, per) => `| ${a} | ${b} | ${KINDS.map(([k]) => per[k].toLocaleString('es-AR')).join(' | ')} |\n`;
   const when = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  const md = `## LordOS: descargas\nContadores públicos de GitHub de los archivos de cada release (una descarga no es una persona). `
-    + `Actualizado ${when} UTC con \`node tools/web/stats.mjs downloads\`. Las actualizaciones por APT no se cuentan: `
-    + `la página de cookies y estadísticas promete que las solicitudes de LordOS a lordos.org/apt quedan fuera de todo conteo.\n\n`
+  const md = `## LordOS: descargas\nContadores públicos de GitHub de los archivos de cada release. `
+    + `Actualizado ${when} UTC con \`node tools/web/stats.mjs downloads\`.\n\n`
+    + `**Son números aproximados: una descarga no es una persona ni una instalación.** GitHub suma 1 cada vez que alguien `
+    + `empieza a bajar un archivo, y varias cosas inflan el número:\n`
+    + `1. **Descargas cortadas y reintentos:** la ISO pesa varios GB; si se corta y se vuelve a empezar, cuenta otra vez.\n`
+    + `2. **Gestores de descarga y navegadores:** algunos piden el archivo en partes o más de una vez.\n`
+    + `3. **El LordOS Imager e install.sh:** bajan los archivos de GitHub; cada uso cuenta, aunque sea la misma persona probando de nuevo.\n`
+    + `4. **Bots y espejos:** sitios de software, robots que indexan releases y escaneos de seguridad también bajan archivos, `
+    + `y GitHub no separa personas de robots en este contador.\n`
+    + `5. **Gente que la baja y nunca la instala.**\n\n`
+    + `Puede haber más descargas que visitantes de lordos.org: mucha gente baja directo desde GitHub (enlaces en foros, Reddit, `
+    + `notas de prensa) sin pasar por el sitio, y las estadísticas del sitio empezaron después de publicada la ISO 0.8.8 (3 de noviembre). `
+    + `Tomalos como **interés**, no como usuarios. Las actualizaciones por APT no se cuentan aquí.\n\n`
     + head + line('**Total**', '', total) + rows.map(([t, d, p]) => line(t, d, p)).join('');
   // the totals also go to metrics, so the dashboard can draw how they grow day by day
   const data = KINDS.map(([k, label]) => ({ MetricName: 'Descargas', Dimensions: [{ Name: 'Archivo', Value: label }], Value: total[k], Unit: 'Count' }));
@@ -215,7 +225,7 @@ async function downloads() {
   const pushed = aws(['cloudwatch', 'put-metric-data', '--namespace', 'LordOS/Descargas', '--metric-data', JSON.stringify(data)],
     { json: false, quiet: true }) !== null;
   if (!pushed) console.log('no cloudwatch:PutMetricData for this profile: the table only, no history graph');
-  const widgets = [text(md, 0, 0, 24, 4 + Math.ceil(rows.length * 0.6))];
+  const widgets = [text(md, 0, 0, 24, 9 + Math.ceil(rows.length * 0.6))];
   if (pushed) widgets.push(
     { type: 'metric', x: 0, y: 20, width: 24, height: 7, properties: { title: 'Descargas acumuladas por tipo de archivo', region: REGION,
       view: 'timeSeries', stacked: false, period: 86400, stat: 'Maximum',
