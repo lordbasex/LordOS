@@ -26,6 +26,7 @@ void kb_set_group(int g);
 void kb_set_locked(uint32_t locked);                       /* app mode: the locks (Caps Lock) the compositor has on */
 void kb_reload_compose(void);                             /* after changing the region */
 void kb_key(int code, int value, KeyInfo *k);
+int  kb_key_repeats(int code);                            /* app mode: does holding it repeat? (not the modifiers) */
 /* For Wayland: the keymap in XKB format (malloc, NULL if none) and the
  * serialized modifiers. */
 char *kb_keymap_string(void);

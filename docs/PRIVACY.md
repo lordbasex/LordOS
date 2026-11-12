@@ -936,6 +936,10 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`
   (`xkbcommon: ERROR … rules 'evdev'`); the broker now only moves the active group.
+- **Held keys:** the compositor sends a Wayland client only the press and the release, so the app
+  repeats a held key itself, at the rate and delay of `wl_keyboard.repeat_info`, and hands the repeats
+  to the JS keymap as an in-process app gets them (`app/keyrepeat.h`, `appclient.c`). Modifiers don't
+  repeat (`kb_key_repeats`); a release, another press or the keyboard leaving the window ends it.
 
 ![an isolated app's menu open in the system menu bar](appmode-menu.png)
 
