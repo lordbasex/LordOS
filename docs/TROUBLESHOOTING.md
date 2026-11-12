@@ -66,6 +66,23 @@ which names the app and the command; before, it stopped with error 127 ([#4](htt
 takes a physical keyboard only, and programs that ask polkit over D-Bus directly still find no agent. After going
 back to a package older than 0.8.8, the diversion leaves a dangling link: remove it with `dpkg-divert --remove` by hand.
 
+## An X11 app run as root doesn't open
+
+Before 0.8.8.8, an X11 app started as root (`pkexec gparted`, `sudo gparted`) stopped with "Authorization required, but no
+authorization protocol specified" and "cannot open display: :0" ([#107](https://github.com/lordbasex/LordOS/issues/107)).
+Since 0.8.8.8 lord-server gives Xwayland a session cookie (`-auth`, a 0600 file in `$XDG_RUNTIME_DIR`) and sets
+`XAUTHORITY` for every app it starts; pkexec and sudo keep `XAUTHORITY`, so root's app connects. The other side: an X11
+client without the cookie is now refused, even one of your own user, so a program started outside LordOS (for example
+from an SSH session) needs `XAUTHORITY` exported from the desktop session. Restricted Linux apps and isolated apps never
+get the cookie ([WAYLAND.md](WAYLAND.md), [PRIVACY.md](PRIVACY.md)).
+
+## A web app misbehaves
+
+Each web app and profile writes its own log, `/var/log/lordos/users/<you>/web/<app>-<profile>.log` (Logs → Web apps;
+`web/probe.log` for the Store's "Add from an address"). If lord-web crashes, its stack is written there too. `lordos-issue`
+doesn't collect these logs yet: attach the app's log to the report yourself, after reading it. More in
+[WEBAPPS.md](WEBAPPS.md).
+
 ## Typing feels slow
 
 If keys show up late in one app (for example Chromium) but not in LordOS's own apps (Notes, the

@@ -44,7 +44,7 @@ a misspelled key stops the install instead of falling back to a default.
 | `password_hash` | yes | | the password as a hash: yescrypt (`$y$…`) or SHA-512 (`$6$…`). The password itself never goes in the file |
 | `ssh_key` | | | one public key line, written to the user's `~/.ssh/authorized_keys`. It works once remote login is turned on (Settings → Sharing): the image has no SSH server |
 | `hostname` | yes | | the computer's name |
-| `lang` | | `en` | the interface language: `en`, `es`, `pt` or `fr` |
+| `lang` | | `en` | the interface language: `en`, `es`, `pt`, `fr`, `it` or `lt` (the installer checks only the form of the id) |
 | `locale` | | `en_US.UTF-8` | formats and Linux programs' language, from `/usr/share/i18n/SUPPORTED` |
 | `timezone` | | `UTC` | such as `America/Argentina/Buenos_Aires` |
 | `keyboard`, `keyboard_variant` | | `us`, none | the XKB layout and variant |
@@ -123,7 +123,7 @@ with the live ISO and a `LORDOSAUTO` ISO made by `make-auto-disk.sh` as two CD d
 | The boot menu | Install automatically is the last entry; the menu still starts the live system by default |
 | An erase install of `/dev/vda` from the file, `autologin = yes`, `after = reboot` | found the file in about 8 s, printed the plan, partitioned, copied, configured and installed the boot loader in 72 s, printed `DONE` and restarted; the whole log on the serial port |
 | The installed system, started from the disk | reached the desktop signed in as the file's user, with no login screen |
-| 0.8.8.8 in development (VM 127, 2026-11-10): an erase install with `lang = es`, `ssh_key`, `after = poweroff`, then Settings → Sharing → Remote login turned on | installed and powered off in about 90 s; the desktop started in Spanish, signed in; with remote login on, `ssh` with the file's key logged in with no password and the host key fingerprint was the one Settings shows |
+| 0.8.8.8 (development build tested on VM 127, 2026-11-10): an erase install with `lang = es`, `ssh_key`, `after = poweroff`, then Settings → Sharing → Remote login turned on | installed and powered off in about 90 s; the desktop started in Spanish, signed in; with remote login on, `ssh` with the file's key logged in with no password and the host key fingerprint was the one Settings shows |
 | The same entry with `disk_bytes` one byte off | `STOP /dev/vda has 34359738368 bytes, lordos-auto.conf expects 34359738369`; the disk's partition table identical before and after, and the live system started |
 
 Not tested yet: mode `free`, a USB stick with a FAT

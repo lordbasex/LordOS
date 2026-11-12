@@ -69,10 +69,13 @@ Result: kernel `6.12.111+deb13-amd64`, `virtio_gpu` module loaded,
 
 ## Versions available in Debian 13 (verified)
 
+The project's first survey of Debian 13. Some rows were evaluated and not used: LordOS never links wlroots
+(the dependency policy in `ARCHITECTURE.md` forbids it), and the React shell runs on QuickJS, not on a web engine.
+
 | Package                 | Version     | Use                              |
 |-------------------------|-------------|----------------------------------|
-| `libwlroots-0.18-dev`   | 0.18.2      | base for the compositor in C     |
-| `libwpewebkit-2.0-dev`  | 2.48.3      | embedded web engine (React shell) |
+| `libwlroots-0.18-dev`   | 0.18.2      | evaluated, not used: lord-server is its own compositor |
+| `libwpewebkit-2.0-dev`  | 2.48.3      | `lord-web` only (the LordOS Web Runtime, 0.8.8.8) |
 | `cog`                   | 0.18.4      | reference WPE launcher           |
 | `libwebkitgtk-6.0-dev`  | 2.54.0      | alternative to WPE               |
 | `nodejs`                | 20.19.2     | building the React shell         |

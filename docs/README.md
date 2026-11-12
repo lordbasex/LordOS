@@ -39,7 +39,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor |
-| [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8, in development) |
+| [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |
@@ -87,6 +87,9 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [MEDIA.md](MEDIA.md) | Photos, Player, Screenshots, Camera and Recorder |
 | [VIDEO.md](VIDEO.md) | Video in the browser without hardware decoding (H.264 instead of VP9/AV1) |
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
+| [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
+| [DATABASES.md](DATABASES.md) | Databases, the MySQL / MariaDB client: connections, structure, content, queries, import and export |
+| [VOICE.md](VOICE.md) | Text to speech without the internet (`lord-tts`): voice packages, reading aloud from the desktop |
 | [MONITOR.md](MONITOR.md) | Monitor: usage, processes, network map and connections, firewall, disk health, cooling |
 | [SYSTEM.md](SYSTEM.md) | Disks, Backups, Logs, Clock and Help |
 | [CLEANER.md](CLEANER.md) | Cleaner: storage and maintenance |
@@ -109,6 +112,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [VOICE.md](VOICE.md) | Voice, text to speech: `lord-tts`, the `say` command, voices, Personal Voice and Live Speech |
 | [FANS.md](FANS.md) | Fan control on the Raspberry Pi 5 and PCs |
 | [BENCHMARK.md](BENCHMARK.md) | System Information (0.8.5), LordBench and hardware reports: design and status |
+| [DISK-HEALTH.md](DISK-HEALTH.md) | Disk life in Monitor → Disks and Disks: a design, status and checklist in the document |
 
 ## Measurements and validation
 

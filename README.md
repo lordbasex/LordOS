@@ -36,6 +36,7 @@ Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside th
 | **[A firewall you can see](https://lordos.org/features/visible-firewall/)** | Watch every connection on a live world map, then allow or block it per app, by domain, address or network, and restrict camera, microphone, files and more. Subscribe to public blocklists of ads, trackers and malware, or deny everything a rule doesn't allow. |
 | **[Passwords built in](https://lordos.org/features/passwords/)** | A vault for passwords, 2FA codes and cards that unlocks with a password or a USB key. |
 | **[Mail, Calendar, Contacts](https://lordos.org/features/mail-calendar/)** | Native apps for your accounts, with remote images blocked until you say so. |
+| **[LordOS Web Runtime](https://lordos.org/features/web-apps/)** | Web apps installed as LordOS apps, with their own window, Dock icon and unread count. Each app and each profile runs in its own sandboxed process, and the Store offers a catalog of 37. |
 | **[Your Linux apps too](https://lordos.org/features/linux-apps/)** | Chromium, Firefox and GTK apps fit right in, with the same window frame and dark mode. |
 | **AI apps in the Store** | A curated catalog: Claude Code, Claude Desktop, Visual Studio Code, Cursor, Codex CLI, goose, opencode, and llama.cpp and whisper.cpp to run models on your own computer, each from a pinned, verified source. The Store downloads over HTTPS. |
 | **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. Community hardware reports: share yours on GitHub with your own account (LordOS sends nothing), and the Compatibility panel shows what others confirmed. |
@@ -66,7 +67,7 @@ and on [lordos.org](https://lordos.org/#download). Before you download, see
 - **Generic arm64 (UEFI):** a live and installable ISO for arm64 machines and virtual machines,
   `lordos-live-0.8.8-arm64.iso`, new in 0.8.7. Tested on emulated QEMU only; this release's was built but not booted.
 - **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.8-rpi5-arm64.img.xz`,
-  with fan control and our own kernel. The Raspberry Pi 5 is the only supported board.
+  with fan control and our own kernel. The Raspberry Pi 5 and the Raspberry Pi 500 (same image) are the supported boards.
 - **Already running LordOS?** It updates in place from the signed repository on lordos.org.
 - **Already on Debian 13?** Install LordOS on top of your current system with one command:
 
@@ -92,8 +93,9 @@ Status: **beta**. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/ROADMAP.md`](doc
 - `server/`: `lord-server` (display server and Wayland compositor: DRM/KMS and evdev straight
   from the kernel, without X11, libdrm or libinput) plus `lord-sessiond`, `lord-netd`,
   `lord-netperm`, `lord-fand` and the sandboxed helpers (`lord-media`, `lord-doc`, `lord-vault`,
-  `lord-maild`, `lord-fetch`, `lord-tls`, `lord-clean`, `lord-lan`, `lord-rdesk`, and LordBench's
-  `lord-bench`).
+  `lord-maild`, `lord-fetch`, `lord-tls`, `lord-clean`, `lord-lan`, `lord-rdesk`, `lord-screencast`,
+  `lord-tts`, `lord-ocr`, `lord-sftp`, `lord-sql`, and LordBench's `lord-bench`), and `lord-web`, the
+  LordOS Web Runtime, one process per web app and profile inside WebKit's own sandbox.
 - `runtime/`: `@lordos/runtime`, the React renderer for lord-server.
 - `sdk/`: `@lordos/sdk`, the API for themes and apps.
 - `apps/`: the native apps. See [`apps/README.md`](apps/README.md).
