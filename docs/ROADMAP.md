@@ -783,6 +783,14 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   [#128](https://github.com/lordbasex/LordOS/issues/128), [#130](https://github.com/lordbasex/LordOS/issues/130) and
   [#64](https://github.com/lordbasex/LordOS/issues/64); the rest in `CHANGELOG.md`.
 
+## Release 0.8.8.9 (planned)
+
+- [ ] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
+  the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all six
+  languages, saying that the product names, logos and icons shown belong to their owners, are used only to identify the
+  services, and that LordOS is not affiliated with, endorsed or sponsored by them. The website already carries the same
+  notice (the LordOS Web Runtime feature page, the paper's §5.4 and the legal pages).
+
 ## Release 0.8.9 (planned)
 
 - [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
