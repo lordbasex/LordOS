@@ -13,6 +13,7 @@ import {
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
+import { minimizeStarts } from './minimize.js';
 import { MenuBars } from './components/MenuBar.jsx';
 import { Dock, LaunchpadIcon, dockThickness } from './components/Dock.jsx';
 import { Window } from './components/Window.jsx';
@@ -49,17 +50,14 @@ configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
 const DOCK_DEFAULT = [...DOCK_ORDER, ...apps.filter((a) => a.dock && !DOCK_ORDER.includes(a.id)).map((a) => a.id)];
 
 // Minimize effect: a window that was just minimized stays drawn for MIN_MS, shrinking towards the
-// Dock (transform: scale, painted from a cached raster by lord-server; layout doesn't change).
+// Dock (transform: scale, painted from a cached raster by lord-server; layout doesn't change). With Reduce motion
+// none starts (minimize.js).
 const MIN_MS = 260;
 function useMinimizing(windows) {
   const prev = useRef(new Map());
   const [anim, setAnim] = useState([]);                 // [{ id, t0 }]
   useEffect(() => {
-    const started = [];
-    for (const w of windows) {
-      if (w.minimized && prev.current.get(w.id) === false && !w.fullscreen && !w.pip) started.push({ id: w.id, t0: Date.now() });
-      prev.current.set(w.id, !!w.minimized);
-    }
+    const started = minimizeStarts(windows, prev.current, { reduce: !!settings.get().reduceMotion });
     if (started.length) setAnim((a) => [...a.filter((x) => !started.some((y) => y.id === x.id)), ...started]);
   }, [windows]);
   const [, tick] = useState(0);

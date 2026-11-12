@@ -454,6 +454,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ends it; a rate of 0 turns it off; an app that stalls catches up with one repeat, not a burst. New
   `build/keyrepeat-test` in `make test`; `docs/PRIVACY.md` describes it. Arrows, Home/End and Ctrl+A already worked
   in these fields. (GitHub #130)
+- Lord Flow: minimizing a window still played the shrink towards the Dock with Settings → Appearance → Reduce
+  motion on, although that setting stops decorative animations. The minimize effect (`themes/default/index.jsx`
+  `useMinimizing`) never read it; which windows start the effect is now decided in `themes/default/minimize.js`,
+  where Reduce motion starts none, so the window goes at once, as in Lord Classic. Tested by
+  `server/tests/minimize_model_test.mjs` (GitHub #112).
+- Files: in the column view a tagged file showed no tag at all; only a folder's icon took the tag's tint. Each item
+  now shows its tag dots right after the name, as the list view does, and they stay visible when a long name is cut
+  short (`apps/files/views.jsx` `ColumnView`). Tested by `server/tests/files_colview_scene.mjs`, run through
+  `menubar_test.mjs`, which now takes a scene as its argument (GitHub #99).
 - Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
   with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
   a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
