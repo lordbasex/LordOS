@@ -556,6 +556,20 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('the form\'s body scrolls between its fixed title and buttons', /<ScrollView style=\{\{ maxHeight: Math\.max\(180, frameH - 220\) \}\}>/.test(src), true);
 }
 
+// ---- an account's Details box (GitHub #115): provider, backend, sign-in, server; never a secret ----
+{
+  const list = [{ kind: 'drive', label: 'Google Drive', group: 'oauth' }, { kind: 'sftp', label: 'SFTP', group: 'server' }];
+  eq('details of an OAuth account', M.accountDetails({ id: 'g', kind: 'drive', provider: 'Google Drive', group: 'oauth', host: null, port: null }, list),
+    [{ label: 'cloud.details.provider', value: 'Google Drive' }, { label: 'cloud.details.backend', value: 'drive' }, { label: 'cloud.details.signIn', key: 'cloud.group.oauth' }]);
+  eq('details of a server account: host and port', M.accountDetails({ kind: 'sftp', provider: 'SSH/SFTP', host: 'nas.lan', port: 2222 }, list).map((r) => r.value || r.key),
+    ['SFTP', 'sftp', 'cloud.group.server', 'nas.lan:2222']);
+  eq('the account\'s own app is said', M.accountDetails({ kind: 'drive', ownClient: true }, list).pop(), { label: 'cloud.details.app', key: 'cloud.details.ownApp' });
+  eq('an unknown group adds no sign-in row', M.accountDetails({ kind: 'x', provider: 'X', group: 'crypt' }, []).map((r) => r.label), ['cloud.details.provider', 'cloud.details.backend']);
+  const secrets = { kind: 'webdav', provider: 'WebDAV', group: 'server', pass: 'hunter2', token: '{"access_token":"t"}', secret_access_key: 'k', user: 'alice' };
+  eq('nothing but the listed fields reaches the box', JSON.stringify(M.accountDetails(secrets, [])).match(/hunter2|access_token|"k"|alice/), null);
+  eq('no account', M.accountDetails(null, list), []);
+}
+
 // ---- e2e findings: short provider names, trust questions, errors with details and their field, Measure for S3 ----
 {
   eq('provider names: the list\'s label, else the description cut short', [M.providerName({ kind: 's3', provider: 'Amazon S3 Compliant Storage Providers including AWS, Alibaba' }, [{ kind: 's3', label: 'S3' }]),
