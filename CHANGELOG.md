@@ -513,6 +513,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- X11 apps run as root (GParted through `pkexec gparted` or `sudo gparted` from the Terminal) couldn't open their
+  window: "Authorization required, but no authorization protocol specified" and "cannot open display: :0".
+  Xwayland was started without an authorization file, and then lets in only its own uid, so root was refused
+  even though pkexec and sudo pass `DISPLAY` on. lord-server now makes a random `MIT-MAGIC-COOKIE-1` for the session
+  (16 bytes from `getrandom`), writes it as an Xauthority file in `$XDG_RUNTIME_DIR/lord-xauth.<n>` (0600, created
+  with `O_CREAT | O_EXCL | O_NOFOLLOW` under a temporary name, fsynced and renamed into place, with entries for the
+  host name and `FamilyWild`), sets `XAUTHORITY` for the apps it starts and adds `-auth <file>` to Xwayland's fixed
+  command line (the Xwayland launcher exception in `AGENTS.md`, amended with the maintainer's approval). Any client
+  with the cookie connects, whatever its uid; pkexec (GParted's polkit action has `allow_gui`) and sudo keep
+  `XAUTHORITY`. The file is written again with the same cookie if it is missing when Xwayland restarts, removed at
+  logout, and if it can't be written Xwayland starts as before, without `-auth`. The cookie stays away from what must
+  not use X: restricted Linux apps and isolated apps lose `XAUTHORITY` together with `DISPLAY` (`xauth_env_drop`), a
+  restricted app's runtime folder is an empty one, `lord.fs` neither reads nor writes the file (`FSOPS_PF_XAUTH`), and
+  lord-web's environment is a fixed list without it. New test `build/xauth-test` (file format, 0600, `O_EXCL`, links
+  at either name never followed, both variables removed by both launchers) and cases in `fsops-test`;
+  checked on VM 127: before, root's `xdpyinfo` was refused; after, `pkexec /usr/sbin/gparted` opened GParted as
+  root on the desktop, root with the cookie connects and without it is refused, XTerm opened by LordOS carries
+  `XAUTHORITY`, and through the real launcher a `no-files` or `no-mic` app gets neither variable nor the file in its
+  runtime folder. Note: a client of the same user without the cookie is now refused as well (everything LordOS
+  starts has `XAUTHORITY`). docs/WAYLAND.md and docs/PRIVACY.md (GitHub #107)
 - Isolated apps (Mail, Calendar, Contacts, Reminders, Passwords): holding a key did nothing more than one press,
   so Backspace, Delete and the arrows had to be pressed again for every character. These apps run as Wayland clients
   (`lord-server --app`), and the compositor sends its clients only the press and the release of a key, with the rate

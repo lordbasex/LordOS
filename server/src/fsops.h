@@ -18,8 +18,10 @@ int  fsops_readable(const char *real);         /* (0.8.5) read-only: the whole t
 int  fsops_protected(const char *real);        /* folders JS does not write to (launcher, apps, settings) */
 int  fsops_protected_below(const char *real);  /* a protected path lies strictly below real (rule tables) */
 /* Files protected with their family (the file, and "<file>." followed by anything: .tmp-…, .1 … .5, .bak), set at
- * run time: the Terminal's configuration may be anywhere the user chose (termconf.h). "" clears a slot. */
-enum { FSOPS_PF_TERMINAL, FSOPS_PF_TERMINAL_CUSTOM, FSOPS_PF_SETTINGS, FSOPS_PF_COUNT };
+ * run time: the Terminal's configuration may be anywhere the user chose (termconf.h). "" clears a slot.
+ * FSOPS_PF_XAUTH (xwayland.c): the X cookie's files, $XDG_RUNTIME_DIR/lord-xauth.<n>; lord.fs neither writes nor
+ * reads them (fsops_readable), wherever the runtime folder is. */
+enum { FSOPS_PF_TERMINAL, FSOPS_PF_TERMINAL_CUSTOM, FSOPS_PF_SETTINGS, FSOPS_PF_XAUTH, FSOPS_PF_COUNT };
 void fsops_protect_file(int slot, const char *real);
 /* real is, lies under or holds a protected path, each protected path resolved first (links followed): for folders
  * handed to something outside lord.fs (a machine's writable share) */

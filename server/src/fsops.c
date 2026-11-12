@@ -69,7 +69,15 @@ const char *fsops_home(void) { return home; }
  * own permissions decide, except the kernel's and the runtime's pseudo-filesystems: /proc (this
  * process's memory, environment and open files), /sys, /dev and /run (the session's sockets and
  * runtime files; /run/media/$USER stays a root). Writing keeps fsops_allowed. */
+static char pfile[FSOPS_PF_COUNT][PATH_MAX];
+
+static int family_match(const char *real, const char *file) {
+    size_t n = strlen(file);
+    return n && !strncmp(real, file, n) && (real[n] == 0 || real[n] == '.');
+}
+
 int fsops_readable(const char *real) {
+    if (family_match(real, pfile[FSOPS_PF_XAUTH])) return 0;       /* the X cookie (xauth.h) */
     if (fsops_allowed(real)) return 1;
     if (real[0] != '/') return 0;
     static const char *const pseudo[] = { "/proc", "/sys", "/dev", "/run", NULL };
@@ -96,8 +104,6 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
                                            NULL };
 
-static char pfile[FSOPS_PF_COUNT][PATH_MAX];
-
 void fsops_protect_file(int slot, const char *real) {
     if (slot < 0 || slot >= FSOPS_PF_COUNT) return;
     if (!real || snprintf(pfile[slot], sizeof pfile[slot], "%s", real) >= (int)sizeof pfile[slot]) pfile[slot][0] = 0;
@@ -105,10 +111,7 @@ void fsops_protect_file(int slot, const char *real) {
 
 /* real is one of the protected files or of its family */
 static int pfile_match(const char *real) {
-    for (int i = 0; i < FSOPS_PF_COUNT; i++) {
-        size_t n = strlen(pfile[i]);
-        if (n && !strncmp(real, pfile[i], n) && (real[n] == 0 || real[n] == '.')) return 1;
-    }
+    for (int i = 0; i < FSOPS_PF_COUNT; i++) if (family_match(real, pfile[i])) return 1;
     return 0;
 }
 

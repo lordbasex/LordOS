@@ -5,6 +5,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,6 +98,22 @@ int main(void) {
     CHECK(!fsops_readable("/run/user/1000/bus"));
     CHECK(!fsops_readable("/run/media/otro/USB"));
     CHECK(!fsops_readable("relative/path"));
+    /* the X cookie (wl/xauth.h): never read or written by lord.fs, even with the runtime folder in the home */
+    {
+        char rt[PATH_MAX + 64], x[PATH_MAX + 96];
+        path(rt, "rt/lord-xauth");
+        fsops_protect_file(FSOPS_PF_XAUTH, rt);
+        snprintf(x, sizeof x, "%s.1", rt);
+        CHECK(!fsops_readable(rt));
+        CHECK(!fsops_readable(x));
+        CHECK(fsops_protected(x));
+        snprintf(x, sizeof x, "%s.1.tmp-0a0b0c0d0e0f", rt);
+        CHECK(!fsops_readable(x) && fsops_protected(x));
+        snprintf(x, sizeof x, "%s-other", rt);
+        CHECK(fsops_readable(x) && !fsops_protected(x));
+        fsops_protect_file(FSOPS_PF_XAUTH, "");
+        CHECK(fsops_readable(rt));
+    }
     path(a, ".local/share/applications/x.desktop");
     CHECK(fsops_protected(a));
     /* web apps: the registry lord-web starts from, and each profile's data (docs/WEBAPPS.md) */

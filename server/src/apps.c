@@ -39,6 +39,7 @@
 #include "sec/restrict.h"
 #include "sec/sandbox.h"
 #include "fw/rules.h"
+#include "wl/xauth.h"
 #include "wl/xdgact.h"
 #include "term/termapp.h"
 
@@ -1055,8 +1056,8 @@ static int launch(const char *id, const char *file, const char *action) {
         /* its own view (namespaces: no session sockets, only its folders), then Landlock */
         /* a restricted app gets no X display: X11 apps share one X server and can watch each
          * other's windows, input and selections (docs/PRIVACY.md, "X11 apps"); its private /tmp has no
-         * X socket either */
-        if (plan) unsetenv("DISPLAY");
+         * X socket either, nor its own runtime folder the X cookie (wl/xauth.h) */
+        if (plan) xauth_env_drop();
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         if (plan && (sandbox_files_isolate(&plan->cfg) ||
                      (plan->cfg.keep_home ? sandbox_apply_scope() : sandbox_apply_files(&plan->cfg)))) {
