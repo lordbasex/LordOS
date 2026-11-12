@@ -1,0 +1,195 @@
+{
+  "id": "web-runtime",
+  "note": "The LordOS Web Runtime's layers, drawn as an inline SVG by web/lib/archsvg.mjs ([[figure:web-runtime]] in a page). Checked against server/src/web/webmain.c (the scope and its limits), server/src/web/webmgr.c and server/src/ui/js_webapps.c (only lord-server starts lord-web), docs/WEBAPPS.md.",
+  "title": {
+    "en": "The LordOS Web Runtime, layer by layer",
+    "es": "El LordOS Web Runtime, capa por capa",
+    "pt": "O LordOS Web Runtime, camada por camada"
+  },
+  "server": {
+    "label": {
+      "en": "lord-server",
+      "es": "lord-server",
+      "pt": "lord-server"
+    },
+    "kicker": {
+      "en": "LordOS's display server, in C",
+      "es": "El servidor gráfico de LordOS, en C",
+      "pt": "O servidor gráfico do LordOS, em C"
+    },
+    "lines": {
+      "en": [
+        "The web app registry · permissions asked once per app",
+        "Dock icon and unread badge · notifications with the app's sound · menu bar and right-click menu"
+      ],
+      "es": [
+        "El registro de apps web · permisos preguntados una vez por app",
+        "Ícono y contador en el Dock · notificaciones con el sonido de la app · barra de menú y menú del clic derecho"
+      ],
+      "pt": [
+        "O registro de apps web · permissões perguntadas uma vez por app",
+        "Ícone e contador no Dock · notificações com o som do app · barra de menu e menu do clique direito"
+      ]
+    }
+  },
+  "start": {
+    "en": "starts lord-web only from its fixed path, with a checked app and profile",
+    "es": "arranca lord-web solo desde su ruta fija, con una app y un perfil verificados",
+    "pt": "inicia o lord-web só do seu caminho fixo, com app e perfil verificados"
+  },
+  "scope": {
+    "en": "{app}'s own scope: firewall row, Monitor row, memory and CPU limits (shared by its profiles)",
+    "es": "Scope propio de {app}: fila en el firewall y en el Monitor, límites de memoria y CPU (compartidos por sus perfiles)",
+    "pt": "Escopo próprio do {app}: linha no firewall e no Monitor, limites de memória e CPU (compartilhados pelos perfis)"
+  },
+  "scopeShort": {
+    "en": "{app}'s own scope",
+    "es": "Scope propio de {app}",
+    "pt": "Escopo próprio do {app}"
+  },
+  "scopeSub": {
+    "en": "Firewall and Monitor row, memory and CPU limits, shared by its profiles",
+    "es": "Fila en el firewall y el Monitor, límites de memoria y CPU, compartidos por sus perfiles",
+    "pt": "Linha no firewall e no Monitor, limites de memória e CPU, compartilhados pelos perfis"
+  },
+  "web": {
+    "label": {
+      "en": "lord-web",
+      "es": "lord-web",
+      "pt": "lord-web"
+    },
+    "kicker": {
+      "en": "The LordOS Web Runtime, in C (package lordos-web)",
+      "es": "El LordOS Web Runtime, en C (paquete lordos-web)",
+      "pt": "O LordOS Web Runtime, em C (pacote lordos-web)"
+    },
+    "sub": {
+      "en": "Its own window · clipboard, drop and menu rules · light and dark · pauses when hidden",
+      "es": "Su propia ventana · reglas de portapapeles, soltar y menús · claro y oscuro · se pausa oculta",
+      "pt": "Janela própria · regras de área de transferência, soltar e menus · claro e escuro · pausa quando oculto"
+    }
+  },
+  "engine": {
+    "label": {
+      "en": "WPE WebKit 2.48",
+      "es": "WPE WebKit 2.48",
+      "pt": "WPE WebKit 2.48"
+    },
+    "sub": {
+      "en": "Debian's; no Chrome, no GTK",
+      "es": "El de Debian; sin Chrome ni GTK",
+      "pt": "O do Debian; sem Chrome nem GTK"
+    },
+    "sandbox": {
+      "en": "Web and network processes in WebKit's sandbox: bubblewrap + seccomp, always on",
+      "es": "Procesos web y de red en la caja de arena de WebKit: bubblewrap + seccomp, siempre activa",
+      "pt": "Processos web e de rede no sandbox do WebKit: bubblewrap + seccomp, sempre ativo"
+    }
+  },
+  "data": {
+    "en": "Its own data and cookies: …/web/{app}/{profile}/",
+    "es": "Sus propios datos y cookies: …/web/{app}/{profile}/",
+    "pt": "Dados e cookies próprios: …/web/{app}/{profile}/"
+  },
+  "net": {
+    "en": "through {app}'s firewall row",
+    "es": "por la fila de {app} en el firewall",
+    "pt": "pela linha do {app} no firewall"
+  },
+  "apps": [
+    {
+      "app": "WhatsApp",
+      "id": "whatsapp",
+      "site": "web.whatsapp.com",
+      "profiles": [
+        {
+          "id": "personal",
+          "name": {
+            "en": "personal",
+            "es": "personal",
+            "pt": "pessoal"
+          }
+        },
+        {
+          "id": "work",
+          "name": {
+            "en": "work",
+            "es": "trabajo",
+            "pt": "trabalho"
+          }
+        }
+      ]
+    },
+    {
+      "app": {
+        "en": "Another web app",
+        "es": "otra app web",
+        "pt": "outro app web"
+      },
+      "id": "another-app",
+      "site": {
+        "en": "its own site",
+        "es": "su propio sitio",
+        "pt": "o próprio site"
+      },
+      "profiles": [
+        {
+          "id": "personal",
+          "name": {
+            "en": "personal",
+            "es": "personal",
+            "pt": "pessoal"
+          }
+        }
+      ]
+    }
+  ],
+  "legend": {
+    "ours": {
+      "en": "LordOS's code",
+      "es": "Código de LordOS",
+      "pt": "Código do LordOS"
+    },
+    "reused": {
+      "en": "Reused (Debian)",
+      "es": "Reutilizado (Debian)",
+      "pt": "Reutilizado (Debian)"
+    },
+    "kernel": {
+      "en": "Kernel limits",
+      "es": "Límites del kernel",
+      "pt": "Limites do kernel"
+    },
+    "net": {
+      "en": "The site, over the network",
+      "es": "El sitio, por la red",
+      "pt": "O site, pela rede"
+    }
+  },
+  "caption": {
+    "en": "One lord-web process per app and profile, each with its own WPE WebKit processes and data; one scope per app, so its profiles share a firewall row and limits. LordOS doesn't change the site: the page is the service's own web interface, as the site serves it, and it never gets a LordOS API.",
+    "es": "Un proceso lord-web por app y perfil, cada uno con sus propios procesos de WPE WebKit y sus datos; un scope por app, así sus perfiles comparten una fila del firewall y los límites. LordOS no cambia el sitio: la página es la interfaz web del propio servicio, tal como la sirve el sitio, y nunca recibe una API de LordOS.",
+    "pt": "Um processo lord-web por app e perfil, cada um com seus próprios processos do WPE WebKit e seus dados; um escopo por app, então os perfis compartilham uma linha do firewall e os limites. O LordOS não muda o site: a página é a interface web do próprio serviço, como o site a serve, e nunca recebe uma API do LordOS."
+  },
+  "text": {
+    "en": [
+      "lord-server (LordOS's display server, C): the web app registry, permissions asked once per app,",
+      "  the Dock icon and badge, notifications with the app's sound, the menu bar and right-click menu",
+      "  │ starts lord-web only from its fixed path, with a checked app and profile",
+      "  ▼",
+      "[App A's scope: firewall row, Monitor row, memory and CPU limits]          [App B's scope: the same]",
+      "  lord-web · A · personal           lord-web · A · work                lord-web · B · personal",
+      "  WPE WebKit 2.48 (web + network    WPE WebKit 2.48 (its own           WPE WebKit 2.48 (its own",
+      "  processes, bubblewrap + seccomp)  processes, same sandbox)           processes, same sandbox)",
+      "  data/cookies: …/web/A/personal/   data/cookies: …/web/A/work/        data/cookies: …/web/B/personal/",
+      "  │ through A's firewall row                                           │ through B's firewall row",
+      "  ▼                                                                    ▼",
+      "  A's own site                                                         B's own site"
+    ]
+  },
+  "notice": {
+    "en": "WhatsApp is a trademark of its owner, used here only as an example of a web app; LordOS is not affiliated with, endorsed or sponsored by it.",
+    "es": "WhatsApp es una marca de su titular, usada acá solo como ejemplo de app web; LordOS no está afiliado a ella ni cuenta con su respaldo o patrocinio.",
+    "pt": "WhatsApp é uma marca do seu titular, usada aqui só como exemplo de app web; o LordOS não é afiliado a ela nem tem seu endosso ou patrocínio."
+  }
+}

@@ -36,3 +36,7 @@ Write to us through [our contact form](https://www.iperfex.com/contacto/?lang=en
 ## Other trademarks
 
 Debian is a registered trademark of Software in the Public Interest, Inc. Linux is the registered trademark of Linus Torvalds. Raspberry Pi is a trademark of Raspberry Pi Ltd. Other names belong to their owners. LordOS is not affiliated with or endorsed by them.
+
+### Web apps
+
+The [LordOS Web Runtime](/features/web-apps/) and the Store's Web apps catalog name third-party services (WhatsApp, Telegram, Discord and others) so that you can find them. WhatsApp, Telegram, Discord and the other product and service names, logos and icons shown are trademarks of their respective owners. They are used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them. The catalog's icons are LordOS's own letter tiles; with the web engine installed, LordOS may fetch each site's own icon from the site and show it on your computer, as a browser does. "Tested on LordOS" means only that the LordOS project checked that the site works in the LordOS Web Runtime on that date, not that the service's owner approved anything. LordOS doesn't change the sites: it runs them as they serve them.

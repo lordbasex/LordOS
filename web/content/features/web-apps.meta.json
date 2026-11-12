@@ -1,0 +1,327 @@
+{
+  "slug": "web-apps",
+  "order": 7,
+  "title": {
+    "en": "LordOS Web Runtime",
+    "es": "LordOS Web Runtime",
+    "pt": "LordOS Web Runtime"
+  },
+  "tagline": {
+    "en": "Web apps and PWAs installed as real LordOS apps: each with its own window, Dock icon, accounts and permissions, apart from your browser. New in 0.8.8.8.",
+    "es": "Apps web y PWA instaladas como apps de LordOS de verdad: cada una con su propia ventana, ícono en el Dock, cuentas y permisos, aparte de tu navegador. Nuevo en la 0.8.8.8.",
+    "pt": "Apps web e PWAs instalados como apps de verdade do LordOS: cada um com janela própria, ícone no Dock, contas e permissões, separados do seu navegador. Novo na 0.8.8.8."
+  },
+  "lumo": {
+    "pose": "wave",
+    "intro": {
+      "en": "Your chat, your mail, your whiteboard: they don't have to live in browser tabs. I give each one a window, a Dock icon and a room of its own, and I keep the door locked between them.",
+      "es": "Tu chat, tu correo, tu pizarra: no tienen por qué vivir en pestañas del navegador. A cada una le doy una ventana, un ícono en el Dock y un cuarto propio, y dejo la puerta cerrada entre ellas.",
+      "pt": "Seu chat, seu e-mail, seu quadro branco: eles não precisam morar em abas do navegador. Dou a cada um uma janela, um ícone no Dock e um quarto próprio, e deixo a porta trancada entre eles."
+    }
+  },
+  "screenshots": [
+    {
+      "file": "docs/webapps-store-discover.png",
+      "caption": {
+        "en": "The Store's Discover page: the web apps banner and the first shelf of the catalog, each card tagged \"Web app\".",
+        "es": "La página Descubrir de la Tienda: el banner de las apps web y el primer estante del catálogo, cada tarjeta con la etiqueta \"App web\".",
+        "pt": "A página Descobrir da Loja: o banner dos apps web e a primeira prateleira do catálogo, cada cartão com a etiqueta \"App web\"."
+      }
+    },
+    {
+      "file": "docs/webapps-store-catalog.png",
+      "caption": {
+        "en": "The Web apps section: add any site from its address, or pick one of the 37 apps of the catalog. \"Not checked yet\" means LordOS hasn't tested that app.",
+        "es": "La sección Apps web: agregá cualquier sitio desde su dirección, o elegí una de las 37 apps del catálogo. \"Sin probar todavía\" quiere decir que LordOS todavía no probó esa app.",
+        "pt": "A seção Apps web: adicione qualquer site pelo endereço, ou escolha um dos 37 apps do catálogo. \"Ainda não verificado\" quer dizer que o LordOS ainda não testou esse app."
+      }
+    },
+    {
+      "file": "docs/webapps-add-address.png",
+      "caption": {
+        "en": "Add from an address: LordOS opened the site in a throwaway session to read its name and icon. Nothing is installed until you press Install.",
+        "es": "Agregar desde una dirección: LordOS abrió el sitio en una sesión descartable para leer su nombre y su ícono. No se instala nada hasta que apretás Instalar.",
+        "pt": "Adicionar a partir de um endereço: o LordOS abriu o site numa sessão descartável para ler o nome e o ícone. Nada é instalado até você apertar Instalar."
+      }
+    },
+    {
+      "file": "docs/webapps-store-detail.png",
+      "caption": {
+        "en": "A web app's page in the Store: always up to date, the day LordOS tested it, its size on disk and its typical memory, who makes it and the verified site.",
+        "es": "La página de una app web en la Tienda: siempre al día, el día en que LordOS la probó, lo que ocupa en el disco y su memoria típica, quién la hace y el sitio verificado.",
+        "pt": "A página de um app web na Loja: sempre atualizado, o dia em que o LordOS o testou, o espaço em disco e a memória típica, quem o faz e o site verificado."
+      }
+    },
+    {
+      "file": "docs/webapps-store-detail-limits.png",
+      "caption": {
+        "en": "Further down the same page: the permissions it may ask for, its profiles, background mode and the known limitations.",
+        "es": "Más abajo en la misma página: los permisos que puede pedir, sus perfiles, el modo en segundo plano y los límites conocidos.",
+        "pt": "Mais abaixo na mesma página: as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas."
+      }
+    },
+    {
+      "file": "docs/webapps-install-sheet.png",
+      "caption": {
+        "en": "Before installing, the Store shows the site and says when an app hasn't been checked on LordOS yet.",
+        "es": "Antes de instalar, la Tienda muestra el sitio y avisa cuando una app todavía no se probó en LordOS.",
+        "pt": "Antes de instalar, a Loja mostra o site e avisa quando um app ainda não foi testado no LordOS."
+      }
+    },
+    {
+      "file": "docs/webapps-window-dock.png",
+      "caption": {
+        "en": "A whiteboard app from the catalog in its own window, with LordOS's frame, its own menu bar, a thin strip in the profile's color and the site's own icon in the Dock.",
+        "es": "Una app de pizarra del catálogo en su propia ventana, con el marco de LordOS, su propia barra de menú, una franja fina del color del perfil y el ícono del propio sitio en el Dock.",
+        "pt": "Um app de quadro branco do catálogo em janela própria, com a moldura do LordOS, a própria barra de menu, uma faixa fina na cor do perfil e o ícone do próprio site no Dock."
+      }
+    },
+    {
+      "file": "docs/webapps-profiles.png",
+      "caption": {
+        "en": "The same app's Work profile: its own window, with an orange strip in the profile's color, and none of the Personal profile's drawing, because each profile keeps its own data.",
+        "es": "El perfil Trabajo de la misma app: su propia ventana, con una franja naranja del color del perfil, y nada del dibujo del perfil Personal, porque cada perfil guarda sus propios datos.",
+        "pt": "O perfil Trabalho do mesmo app: janela própria, com uma faixa laranja na cor do perfil, e nada do desenho do perfil Pessoal, porque cada perfil guarda seus próprios dados."
+      }
+    },
+    {
+      "file": "docs/webapps-edit-menu.png",
+      "caption": {
+        "en": "The Edit menu of a web app: Undo, Redo, Cut, Copy, Paste and Select All, as in any LordOS app.",
+        "es": "El menú Edición de una app web: Deshacer, Rehacer, Cortar, Copiar, Pegar y Seleccionar todo, como en cualquier app de LordOS.",
+        "pt": "O menu Editar de um app web: Desfazer, Refazer, Recortar, Copiar, Colar e Selecionar tudo, como em qualquer app do LordOS."
+      }
+    },
+    {
+      "file": "docs/webapps-context-menu.png",
+      "caption": {
+        "en": "Text selected by dragging, then a right click on a link: LordOS's own menu with Copy, Select All, Copy Link Address and Open Link in Browser.",
+        "es": "Texto seleccionado arrastrando y después un clic derecho en un enlace: el menú propio de LordOS con Copiar, Seleccionar todo, Copiar dirección del enlace y Abrir enlace en el navegador.",
+        "pt": "Texto selecionado arrastando e depois um clique direito num link: o menu próprio do LordOS com Copiar, Selecionar tudo, Copiar endereço do link e Abrir link no navegador."
+      }
+    },
+    {
+      "file": "docs/webapps-settings.png",
+      "caption": {
+        "en": "Settings → Web Apps, in dark mode: each app with the site's own icon, its profiles with their colors and data, and its permissions.",
+        "es": "Ajustes → Apps web, en modo oscuro: cada app con el ícono del propio sitio, sus perfiles con sus colores y sus datos, y sus permisos.",
+        "pt": "Ajustes → Apps web, no modo escuro: cada app com o ícone do próprio site, os perfis com cores e dados, e as permissões."
+      }
+    },
+    {
+      "file": "docs/webapps-settings-more.png",
+      "caption": {
+        "en": "Further down: background mode, the menu bar icon, the unread count on the Dock, one Dock icon per profile and the notification sound.",
+        "es": "Más abajo: el modo en segundo plano, el ícono en la barra de menú, el contador en el Dock, un ícono del Dock por perfil y el sonido de las notificaciones.",
+        "pt": "Mais abaixo: o modo em segundo plano, o ícone na barra de menu, o contador no Dock, um ícone do Dock por perfil e o som das notificações."
+      }
+    },
+    {
+      "file": "docs/webapps-dark.png",
+      "caption": {
+        "en": "Dark mode: with its own theme set to System, the whiteboard follows the desktop, because it asks matchMedia, which LordOS answers.",
+        "es": "Modo oscuro: con su propio tema en Sistema, la pizarra sigue al escritorio, porque le pregunta a matchMedia, que responde LordOS.",
+        "pt": "Modo escuro: com o tema próprio em Sistema, o quadro branco segue o desktop, porque pergunta ao matchMedia, que o LordOS responde."
+      }
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "lwr",
+      "kind": "flow",
+      "title": {
+        "en": "From the Dock to a web app's window",
+        "es": "Del Dock a la ventana de una app web",
+        "pt": "Do Dock à janela de um app web"
+      },
+      "nodes": [
+        {
+          "id": "dock",
+          "label": {
+            "en": "Dock, launcher or Store",
+            "es": "Dock, lanzador o Tienda",
+            "pt": "Dock, lançador ou Loja"
+          },
+          "sub": {
+            "en": "Passes only an app id and a profile",
+            "es": "Pasa solo el id de una app y un perfil",
+            "pt": "Passa só o id de um app e um perfil"
+          },
+          "tone": "user"
+        },
+        {
+          "id": "mgr",
+          "label": {
+            "en": "lord-server",
+            "es": "lord-server",
+            "pt": "lord-server"
+          },
+          "sub": {
+            "en": "Checks the registry, starts lord-web from a fixed path",
+            "es": "Revisa el registro, arranca lord-web desde una ruta fija",
+            "pt": "Confere o registro, inicia o lord-web de um caminho fixo"
+          },
+          "tone": "ours"
+        },
+        {
+          "id": "scope",
+          "label": {
+            "en": "The app's own scope",
+            "es": "El scope propio de la app",
+            "pt": "O escopo próprio do app"
+          },
+          "sub": {
+            "en": "Firewall identity, memory and CPU limits, Monitor row",
+            "es": "Identidad en el firewall, límites de memoria y CPU, fila en el Monitor",
+            "pt": "Identidade no firewall, limites de memória e CPU, linha no Monitor"
+          },
+          "tone": "kernel"
+        },
+        {
+          "id": "web",
+          "label": {
+            "en": "lord-web",
+            "es": "lord-web",
+            "pt": "lord-web"
+          },
+          "sub": {
+            "en": "One process per app and profile, its own cookies and data",
+            "es": "Un proceso por app y perfil, con sus propias cookies y datos",
+            "pt": "Um processo por app e perfil, com cookies e dados próprios"
+          },
+          "tone": "ours"
+        },
+        {
+          "id": "wk",
+          "label": {
+            "en": "WPE WebKit",
+            "es": "WPE WebKit",
+            "pt": "WPE WebKit"
+          },
+          "sub": {
+            "en": "Page and network processes in WebKit's sandbox, always on",
+            "es": "Procesos de la página y de red en la caja de arena de WebKit, siempre activa",
+            "pt": "Processos da página e de rede no sandbox do WebKit, sempre ativo"
+          },
+          "tone": "reused"
+        },
+        {
+          "id": "wl",
+          "label": {
+            "en": "LordOS compositor",
+            "es": "Compositor de LordOS",
+            "pt": "Compositor do LordOS"
+          },
+          "sub": {
+            "en": "A window with LordOS's frame and the app's icon",
+            "es": "Una ventana con el marco de LordOS y el ícono de la app",
+            "pt": "Uma janela com a moldura do LordOS e o ícone do app"
+          },
+          "tone": "ours"
+        }
+      ],
+      "edges": [
+        {
+          "from": "dock",
+          "to": "mgr",
+          "label": {
+            "en": "app, profile",
+            "es": "app, perfil",
+            "pt": "app, perfil"
+          }
+        },
+        {
+          "from": "mgr",
+          "to": "scope",
+          "label": {
+            "en": "placed by root",
+            "es": "ubicado por root",
+            "pt": "posicionado pelo root"
+          }
+        },
+        {
+          "from": "scope",
+          "to": "web",
+          "label": {
+            "en": "--app --profile",
+            "es": "--app --profile",
+            "pt": "--app --profile"
+          }
+        },
+        {
+          "from": "web",
+          "to": "wk",
+          "label": {
+            "en": "bubblewrap, seccomp",
+            "es": "bubblewrap, seccomp",
+            "pt": "bubblewrap, seccomp"
+          }
+        },
+        {
+          "from": "wk",
+          "to": "wl",
+          "label": {
+            "en": "frames, through lord-web",
+            "es": "cuadros, a través de lord-web",
+            "pt": "quadros, através do lord-web"
+          }
+        }
+      ],
+      "caption": {
+        "en": "A web app is not a tab: it is a process of its own, placed and limited like any app, and its page never gets a LordOS API.",
+        "es": "Una app web no es una pestaña: es un proceso propio, ubicado y limitado como cualquier app, y su página nunca recibe una API de LordOS.",
+        "pt": "Um app web não é uma aba: é um processo próprio, posicionado e limitado como qualquer app, e a página nunca recebe uma API do LordOS."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "server/src/web",
+      "what": {
+        "en": "lord-web, the LordOS Web Runtime",
+        "es": "lord-web, el LordOS Web Runtime",
+        "pt": "lord-web, o LordOS Web Runtime"
+      }
+    },
+    {
+      "path": "server/src/ui/js_webapps.c",
+      "what": {
+        "en": "The manager in lord-server (lord.webapps)",
+        "es": "El administrador en lord-server (lord.webapps)",
+        "pt": "O gerenciador no lord-server (lord.webapps)"
+      }
+    },
+    {
+      "path": "assets/webapps/catalog.json",
+      "what": {
+        "en": "The catalog of 37 web apps",
+        "es": "El catálogo de 37 apps web",
+        "pt": "O catálogo de 37 apps web"
+      }
+    },
+    {
+      "path": "apps/store/webapps.js",
+      "what": {
+        "en": "The Store's Web apps section",
+        "es": "La sección Apps web de la Tienda",
+        "pt": "A seção Apps web da Loja"
+      }
+    },
+    {
+      "path": "apps/settings/WebApps.jsx",
+      "what": {
+        "en": "Settings → Web Apps",
+        "es": "Ajustes → Apps web",
+        "pt": "Ajustes → Apps web"
+      }
+    },
+    {
+      "path": "docs/WEBAPPS.md",
+      "what": {
+        "en": "The full design, with every check",
+        "es": "El diseño completo, con cada control",
+        "pt": "O design completo, com cada verificação"
+      }
+    }
+  ]
+}

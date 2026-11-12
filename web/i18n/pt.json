@@ -27,7 +27,7 @@
   "ctaTour": "Fazer o tour",
   "altDesktop": "O desktop do LordOS com o Dock, a barra de menus e a janela Sobre",
   "featTitle": "Tudo o que você precisa. Nada além.",
-  "featLead": "Um desktop completo com apps nativos, privacidade de fábrica e os apps Linux que você já usa.",
+  "featLead": "Um desktop completo com apps nativos, privacidade de fábrica e os apps Linux e web que você já usa.",
   "features": [
     [
       "Um desktop próprio",
@@ -52,6 +52,10 @@
     [
       "Seus apps Linux também",
       "Chromium, Firefox e apps GTK se encaixam, com a mesma moldura de janela e modo escuro."
+    ],
+    [
+      "LordOS Web Runtime",
+      "Apps web e PWAs como apps de verdade do LordOS: com janela própria, ícone no Dock e contas, separados do seu navegador."
     ]
   ],
   "showcase": [

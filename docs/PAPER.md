@@ -369,6 +369,38 @@ Linux apps with a `.desktop` file appear in the app launcher. Launching goes thr
 
 **Web apps (0.8.8.8; `docs/WEBAPPS.md`).** The LordOS Web Runtime installs web apps and PWAs as LordOS apps. `lord-web` (`server/src/web/`) runs one process per app and profile and is the only binary that links WPE WebKit (Debian 13's `libwpewebkit-2.0` 2.48). It ships in the optional package `lordos-web`; without it the rest of LordOS works unchanged. WebKit's own sandbox (bubblewrap, seccomp, `xdg-dbus-proxy`) runs its web and network processes and is never turned off. Only `lord-server` starts `lord-web`, from the fixed path next to it and with exactly `--app <app> --profile <profile>`. The registry (`~/.config/lordos/web/`) and each profile's data are in folders `lord.fs` can't write. Each app has its own window and Dock icon, its profiles (separate accounts, each with its own cookies), its own firewall scope (`lordos-web-<app>`) and a cgroup with memory and CPU limits. The Store's Web apps section lists a catalog that ships with LordOS and adds a site from its address: `lord-web --probe` reads its manifest and icon in a throwaway session, never following `https` to `http` or a public address to a local network, and nothing is installed until the person confirms. Notifications, camera, microphone, screen and location are asked once per app and kept in Settings → Web apps. They are answered only for the `lord-web` that `lord-server` started for that app and profile, and only for the app's own pages. A page's copies to the clipboard reach `lord-web` only through a script in an isolated world that the page's scripts can't see, injected only into the app's own top-level documents, and `lord-web` checks the address again for each one. A drag from an isolated LordOS app or a Flatpak reaches a web app as text only, never as files, and a dropped file is opened without following a link anywhere on its path. In background mode, closing the window keeps the app running behind its tray icon. A probe peaked at 224 MB PSS on the main machine. `lord-web` now runs on VM 127; before that, only the engine was tried there, with WPE's reference browser loading a messaging web app (about 810 MB PSS for one account). Web apps follow the desktop's light or dark mode: WPE 2.48 has no API for a page's `prefers-color-scheme`, so a script of `lord-web`'s, with no privileges, makes the page's `matchMedia` answer with the desktop's mode and sends `change` when it flips, live (checked on VM 127); `lord-server` tells `lord-web` the mode with one closed word, `light` or `dark`, and only from its own process. Pages that choose their colors only through CSS media queries stay light until a newer WebKit. The catalog has 37 apps, each starting at the service's own address; only one chat app is marked tested on LordOS (two accounts), the rest say not tested yet. Discover shows them with a banner and a shelf, and installing the first one also installs `lordos-web` with no other click (checked on VM 127, up to the app's own window with its Dock and tray icons). A web app's window has Undo, Redo, Cut, Copy, Paste and Select All in its Edit menu and LordOS's own right-click menu, both from closed lists checked on both sides; an unread count on its Dock icon, a notification sound per app and a color per profile; and a hidden window's page stops painting and runs its timers at most once a second (a busy page went from 115 % of a CPU to 0.4 % while minimized, on the development VM).
 
+**What the LordOS Web Runtime is.** A native web application runtime written in C, built on WPE WebKit, that installs and runs web apps and PWAs as LordOS apps, without an external browser. It is not a native client of any service: the page is the site's own web interface. LordOS doesn't change the sites or their PWAs; it runs them as their sites serve them, and adds only the window, the desktop integration and the security around it. Where WPE 2.48 lacks something a desktop needs (the Async Clipboard API, drag and drop, selecting by dragging, the Edit and right-click menus, the color scheme), `lord-web` adds small documented scripts of its own (`docs/WEBAPPS.md`), and those that talk to `lord-web` do so only from an isolated world the page can't see, without changing the site's code or content.
+
+| | Plain web wrapper (a site in a desktop window) | PWA installed from a browser | LordOS Web Runtime |
+|---|---|---|---|
+| Runs the page | A web view in a window | That browser's engine and profile | Its own `lord-web` process per app and profile, on Debian's WPE WebKit |
+| Engine sandbox | Depends on the wrapper | That browser's | WebKit's (bubblewrap, seccomp), never off |
+| Permissions, firewall, limits | Depends on the wrapper | Kept by the browser | Asked once per app; the app's own firewall scope and memory and CPU limits |
+| Desktop integration | A window | Varies | Dock icon and badge, notifications with the app's sound, menu bar, Edit and right-click menus, tray, light and dark |
+
+The first two columns describe those kinds of apps in general, not any product.
+
+**Figure: The LordOS Web Runtime, layer by layer.**
+
+```
+lord-server (LordOS's display server, C): the web app registry, permissions asked once per app,
+  the Dock icon and badge, notifications with the app's sound, the menu bar and right-click menu
+  │ starts lord-web only from its fixed path, with a checked app and profile
+  ▼
+[App A's scope: firewall row, Monitor row, memory and CPU limits]          [App B's scope: the same]
+  lord-web · A · personal           lord-web · A · work                lord-web · B · personal
+  WPE WebKit 2.48 (web + network    WPE WebKit 2.48 (its own           WPE WebKit 2.48 (its own
+  processes, bubblewrap + seccomp)  processes, same sandbox)           processes, same sandbox)
+  data/cookies: …/web/A/personal/   data/cookies: …/web/A/work/        data/cookies: …/web/B/personal/
+  │ through A's firewall row                                           │ through B's firewall row
+  ▼                                                                    ▼
+  A's own site                                                         B's own site
+```
+
+*One lord-web process per app and profile, each with its own WPE WebKit processes and data; one scope per app, so its profiles share a firewall row and limits. LordOS doesn't change the site: the page is the service's own web interface, as the site serves it, and it never gets a LordOS API.*
+
+Service names in the catalog (and the one in the figure) are trademarks of their owners, used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them.
+
 ### 5.5 WebAssembly
 
 LordOS includes its own WebAssembly interpreter in C (`server/src/wasm`), exposed as the standard `WebAssembly` global, so a native app can carry modules compiled from C, C++, Rust or Zig. It covers WebAssembly 2.0 without SIMD (the MVP plus sign extension, saturating conversions, multi-value, bulk memory and reference types), passes 26,290 of 26,290 assertions of the official test suite on the VM, and turns every error into a trap rather than a crash. On the project's example it ran 3 to 5 times faster than the same code in JavaScript.
