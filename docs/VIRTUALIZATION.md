@@ -30,6 +30,10 @@ commit that does it. The details of each item are in the section named after it.
 catalog, unattended answer files `vmunattend.c`), `server/src/ui/js_vm*.c` (`lord.vm`), `apps/machines/` (the app, from the
 mocks), `assets/machines/systems.json` and `packaging/keys/machines/` (download cards and the makers' pinned keys).
 
+**Deactivating it (0.8.8.8).** Machines is one of the apps that can be deactivated in Store → Installed
+([NATIVE-APPS.md](NATIVE-APPS.md)), but not while a machine is running, paused, starting or stopping: its window would go and
+the machine with it (`vmActive` in `sdk/appsoffmodel.js`).
+
 **How to test.**
 - Unit and integration: `make -C server test` (vm-test, vmimport, vm-import, vmcatalog, http-resume, vmunattend and the suites);
   on the Mac `node server/tests/vm_catalog_test.mjs` and `node server/tests/vm_model_test.mjs`, `node tools/i18n-check.mjs`,
@@ -284,7 +288,7 @@ Decisions:
 
 ```
 lord-server (the person's user, never root)
-  └─ Machines app (React, sdk/vm.js → lord.vm.*)
+  └─ Machines app (React, apps/machines/*.js(x) → lord.vm.*)
        │  closed RPC
        ▼
   lord-vmdisplay  one per running VM: receiver and validator, sandboxed, no files, no network
@@ -308,7 +312,9 @@ Admin helper (closed actions, root)
   (**Measured**, `apt-cache policy`). `qemu-system-x86` is 68 MB installed by itself (**Measured**).
 - **`lord-vm`**, new, C, the supervisor: starts the tree, holds the QMP connection, applies settings, takes snapshots, reports state.
   It writes no display code.
-- **`sdk/vm.js` and `lord.vm`**: the app's only way in, as `lord.rdesk` is for Remote Desk.
+- **`lord.vm`** (`server/src/ui/js_vm.c`): the app's only way in, as `lord.rdesk` is for Remote Desk. There is no SDK
+  wrapper: the app's own files (`apps/machines/model.js`, `catalog.js`, `diag.js`, `library.jsx`, `configure.jsx` and the
+  other sheets) call `lord.vm.*` directly.
 - The approach is the one `lord-rdesk` proved: a helper in its own cgroup scope with memory limits and a Landlock and seccomp sandbox, talking
   over a socketpair, drawing into something the engine shows.
 
@@ -1443,6 +1449,8 @@ A screen in the app's Help and first run lists, per host, what's native, slow, l
 ### 5.8 Menus, shortcuts
 
 Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination is shown in the bar and is configurable. In Lord Classic the same table.
+
+Since 0.8.8.8 the VM window can also take the desktop's shortcuts (❖, ⌥Tab and the rest) while it has the keyboard, so they reach the guest (`apps/machines/vmwindow.jsx` → `sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`). It follows the same rule as a Linux app's keyboard-shortcuts inhibitor: the person allows it once (the `shortcuts` permission, Settings → Privacy → Keyboard shortcuts), ❖Esc turns it off for that window and back on, and the lock, the console switch and the media keys always stay LordOS's.
 
 ## 6. Features
 

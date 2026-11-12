@@ -6,8 +6,8 @@ interface and compositing are our own.
 
 | App | id | What it does |
 |---|---|---|
-| **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy; **Move to Trash** (0.8.8.8, GitHub #119) from the File menu, a right click on a thumbnail, the viewer's toolbar or Delete / ❖⌫, on one picture or a selection (❖-click, Shift-click, ❖A); a picture in a cloud account is deleted there after asking, as in Files (`apps/photos/trash.js`) |
-| **Player** | `player` | Video with synced audio, time bar, volume, `.srt` and in-track subtitles, full screen, picture in picture; music library by artist and album with covers, queue, shuffle and repeat; media keys and the Control Center |
+| **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy; **Move to Trash** (0.8.8.8, GitHub #119) from the File menu, a right click on a thumbnail, the viewer's toolbar or Delete / ❖⌫, on one picture or a selection (❖-click, Shift-click, ❖A); a picture in a cloud account is deleted there after asking, as in Files (`apps/photos/trash.js`); an image dragged from Files opens with the other images in its folder, several become the viewer's list (0.8.8.8) |
+| **Player** | `player` | Video with synced audio, time bar, volume, `.srt` and in-track subtitles, full screen, picture in picture; music library by artist and album with covers, queue, shuffle and repeat; media keys and the Control Center; music and videos dragged from Files play right away, a folder adds its music and videos in name order, and with ⌥ held they go to the end of the queue (0.8.8.8) |
 | **Screenshots** | `screenshots` | Screen (a file per display), window or area on any display (crosshair, magnifier with the pixel's color; C copies it), a color picker, copy the text in an area (T, OCR in the sandboxed `lord-ocr` helper; Transcribe Ⓣ in the editor, on any picture), timer, to the clipboard or to `~/Pictures/Screenshots`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
 | **Camera** | `camera` | V4L2 preview, JPEG photo, H.264 + AAC video, mirror, choose camera |
 | **Recorder** | `recorder` | Record the microphone, waveform, list, rename, trim and export to Opus, MP3 or WAV |
@@ -51,7 +51,10 @@ We took the way the apps of popular desktop systems work, never their logos or t
 | ![screen](protected-window-screen.png) | ![screenshot](protected-window-capture.png) | ![remote](protected-window-remote.png) |
 | Protected Notes looks normal on the local screen | The saved PNG: the Notes content is black | What the browser receives from the remote desktop (0.8.3; since 0.8.4 the same, as WebRTC video) |
 
-### The markup editor on any picture (in development for 0.8.8.4, issue #30)
+The same windows are black when a Linux app shares a screen or a window through the ScreenCast portal (0.8.8.8, see
+"Sharing a screen or a window with a Linux app" below).
+
+### The markup editor on any picture (0.8.8.4, issue #30)
 
 | | |
 |---|---|
@@ -256,7 +259,7 @@ Screen, microphone and camera go through the system permissions (`sec/perms.c`, 
 ❖⇧3/4/5 weren't used by anyone (see `FILES.md`, `NOTES.md`, `TERMINAL.md`). The compositor
 passes the media keys and Print Screen to LordOS even when a Wayland app has focus (`wl_key`).
 
-### Linux players (MPRIS, in development for 0.8.8.8)
+### Linux players (MPRIS, 0.8.8.8)
 
 Browsers, video and music players publish `org.mpris.MediaPlayer2.<name>` on the session bus. lord-server
 follows them on its own connection (`server/src/hw/mpris.c`, with Passwords' D-Bus client
@@ -278,7 +281,10 @@ them current. Only the name's current owner is listened to.
   (`sdk/mprismodel.js`, `server/tests/mpris_model_test.mjs`). Control Center's Now Playing lists up to three: the
   one the keys reach first, then the others. A click on a Linux player's bar seeks when it can.
 
-### SVG icons (0.8.8.8, in development)
+Checked on VM 127 with mpv and its MPRIS plugin: the tile showed the title and the app, its pause button paused
+and resumed mpv, and the play/pause key did the same.
+
+### SVG icons (0.8.8.8)
 
 Many icons of Linux apps exist only as SVG: the tray's symbolic icons (`audio-volume-high`, which the
 volume applet asks for, lives only in `Adwaita/symbolic/status/audio-volume-high-symbolic.svg`) and
@@ -316,6 +322,18 @@ unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
   separate scan in quotes, comments, CDATA, `<?` and `<!`. `build/media-test svg` (`make
   test-full`): the same kind of files through the real helper and its sandbox. `build/iconfind-test`:
   the lookup order. `server/tests/iconsrc_test.mjs`: the `src` the SDK builds.
+- **Checked on VM 127**: the volume applet's symbolic tray icon is drawn in the bar's text color.
+
+### Sharing a screen or a window with a Linux app (0.8.8.8)
+
+A browser's video call, a recorder or a chat app asks through `org.freedesktop.portal.ScreenCast`, which
+lord-server serves itself (`server/src/ui/portal.c`, no `xdg-desktop-portal`). The person picks a display or a
+window in LordOS's own chooser every time (no choice is remembered), and a pill in the screen-sharing indicator
+shows the share with a Stop button. The pixels are painted again in capture mode, as Screenshots does, so protected
+windows such as Passwords are black. The frames go out through the sandboxed helper `lord-screencast`
+(`server/src/cast/lordscreencast.c`), the only binary that links `libpipewire-0.3`. Checked on VM 127 with a
+browser's screen-sharing test page. The details are in `WAYLAND.md` ("Sharing a screen or a window") and
+[SCREEN-SHARING.md](SCREEN-SHARING.md).
 
 ## API
 

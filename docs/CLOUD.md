@@ -4,8 +4,10 @@ The design of **Cloud**, LordOS's layer over the person's cloud storage accounts
 from Files, set up and watched from Settings, backed up to by Backups, with files that live in the cloud and come down when they
 are opened. The engine is [rclone](https://rclone.org) (MIT, the same license as LordOS); everything the person sees is ours.
 
-Target release: **0.8.8.5**, all of it in one release (decided 2026-11-06). Phase 0 is measured (section 15); Phase 1
-(the core, section 17.1, and the interface, section 18) is built and merged on branch `cloud`.
+Status: **shipped in 0.8.8.5**, all of it in one release (decided 2026-11-06), and changed since in 0.8.8.6, 0.8.8.7 and
+0.8.8.8 (an account's Details and its on/off switch, 6.4, in 0.8.8.8). The packaged rclone is **1.75.2**
+(`tools/iso/mkdeb-rclone.sh`). Phase 0 is measured (section 15); the core (section 17.1) and the interface (section 18) are
+in `main`. The providers checked end to end, real OAuth accounts included, are in section 19.
 
 How to read it:
 
@@ -452,12 +454,12 @@ In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
 Two-way sync of chosen local folders (Desktop, Documents) with `bisync`; **Share Folder on Network** (4.4); photo upload from the
 Camera and Photos; a cloud's shared-with-me folder where the provider exposes it; per-person sharing through each provider's API.
 
-## 14. Phases (all in 0.8.8.5)
+## 14. Phases (all in 0.8.8.5, shipped)
 
 | Phase | Ships | Done when |
 |---|---|---|
 | **0, Proof** | `lordos-rclone` built on both architectures; `rcd` on a Unix socket; every rc call in section 5 answered; eviction while mounted (7.2); OAuth through `config/create` states; token refresh and the keyring | Each To test above is Measured, in section 15 |
-| **1, Core** | `server/src/cloud/` with `lord.cloud`, the unit, Settings → Cloud, accounts with sign-in, space, mounts, Files' Cloud section with status glyphs, Keep / Free Up Space, links, menu bar item | An account of each kind (OAuth drive, WebDAV, S3, SFTP) added, browsed, files opened offline, links made, on amd64 and the Pi. **Core built** (branch `cloud-core`): WebDAV end to end on both architectures (section 15); a real OAuth account, S3 and SFTP still to run; the interface is branch `cloud-ui` |
+| **1, Core** | `server/src/cloud/` with `lord.cloud`, the unit, Settings → Cloud, accounts with sign-in, space, mounts, Files' Cloud section with status glyphs, Keep / Free Up Space, links, menu bar item | An account of each kind (OAuth drive, WebDAV, S3, SFTP) added, browsed, files opened offline, links made, on amd64 and the Pi. **Core built** (branch `cloud-core`): WebDAV end to end on both architectures (section 15). Since then S3 and SFTP passed `cloud_providers_check.sh` and real OAuth accounts were checked (section 19); the interface shipped with it |
 | **2, Backups** | Cloud destination, manifests, versions, crypt, restore | Backup, restore of a file and of everything, a kill in the middle recovered, encrypted names seen on the provider |
 | **3, Release** | Docs, screenshots, translations, tests (section 16), THIRD_PARTY and About | `make test` and the release gates pass on both architectures |
 
@@ -465,8 +467,8 @@ Camera and Photos; a cloud's shared-with-me folder where the provider exposes it
 
 Run on 2026-11-06 with rclone **v1.75.2** built from its tag's source with Go 1.26.10 (`CGO_ENABLED=0 go build -trimpath`; since
 17.2 item 7 the package carries rclone's official release binary instead, the same version), on
-VM 116 (Debian 13.7, amd64) and the Raspberry Pi 5 (arm64, LordOS 0.8.8.4). v1.76.0 came out the same day; 0.8.8.5 takes the newest
-patch release when it is built. Probe: `tools/cloud/phase0.sh` (a local `rclone serve webdav` stands in for the cloud). Same
+VM 116 (Debian 13.7, amd64) and the Raspberry Pi 5 (arm64, LordOS 0.8.8.4). v1.76.0 came out the same day; 0.8.8.5 shipped
+v1.75.2, and it is still the packaged version. Probe: `tools/cloud/phase0.sh` (a local `rclone serve webdav` stands in for the cloud). Same
 results on both architectures unless a number says otherwise.
 
 | Question | Result |
