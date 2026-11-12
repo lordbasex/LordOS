@@ -56,4 +56,22 @@ open(os.path.join(out, 'basura.zip'), 'wb').write(os.urandom(4096))
 import gzip
 with gzip.open(os.path.join(out, 'suelto.txt.gz'), 'wb') as g:
     g.write(b'texto comprimido suelto\n')
+# 11. split archives (GitHub #103): byte splits (vol.zip.001…) and an Info-ZIP split (span.z01…span.zip)
+import struct
+b = io.BytesIO()
+with zipfile.ZipFile(b, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.writestr('a.txt', 'hola')
+    z.writestr('sub/b.txt', os.urandom(150000).hex())
+    z.writestr('sub/c.txt', 'fin')
+whole = b.getvalue()
+open(os.path.join(out, 'vol-whole.zip'), 'wb').write(whole)
+step = 100000
+for i in range(0, len(whole), step):
+    open(os.path.join(out, 'vol.zip.%03d' % (i // step + 1)), 'wb').write(whole[i:i + step])
+span = bytearray(b'PK\x07\x08' + whole)               # the split marker, then the same zip
+n = len(span) // step + 1
+e = span.rfind(b'PK\x05\x06')
+struct.pack_into('<HH', span, e + 4, n - 1, n - 1)       # the end record sits on the last disk
+for i in range(n):
+    open(os.path.join(out, 'span.zip' if i == n - 1 else 'span.z%02d' % (i + 1)), 'wb').write(bytes(span[i * step:(i + 1) * step]))
 print('done:', sorted(os.listdir(out)))

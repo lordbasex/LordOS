@@ -3,6 +3,8 @@
  *   doc-test <lord-doc> selftest                    what the confinement blocks (JSON with errno)
  *   doc-test <lord-doc> list <archive>
  *   doc-test <lord-doc> extract <archive> <folder>    (the folder must exist)
+ *   doc-test <lord-doc> vlist <volume1> <volume2>…   a split archive, its volumes in order
+ *   doc-test <lord-doc> vextract <folder> <volume1>…
  *   doc-test <lord-doc> zip <out.zip> <paths…>
  *   doc-test <lord-doc> pdf <file.pdf> [width]      opens, renders page 1 and measures
  *   doc-test <lord-doc> font <file.ttf>
@@ -133,6 +135,27 @@ int main(int argc, char **argv) {
         const char *roles[] = { "file", "rw" };
         start(helper, "arc", fds, roles, 2);
         st = call(DQ_ARC_EXTRACT, "{\"slot\":0,\"dir\":1,\"rawname\":\"raw.bin\"}", NULL, 0, 1) == DR_DONE ? 0 : 1;
+    } else if ((!strcmp(cmd, "vlist") && argc > 3) || (!strcmp(cmd, "vextract") && argc > 4)) {
+        /* split archive: one fd per volume, "vols" lists their slots in order (as js_doc.c sends them) */
+        int ex = !strcmp(cmd, "vextract"), first = ex ? 4 : 3, n = argc - first;
+        int *fds = calloc((size_t)n + 1, sizeof *fds);
+        const char **roles = calloc((size_t)n + 1, sizeof *roles);
+        char json[8192];
+        size_t o = (size_t)snprintf(json, sizeof json, "{\"vols\":[");
+        for (int i = 0; i < n; i++) {
+            fds[i] = open(argv[first + i], O_RDONLY | O_CLOEXEC);
+            if (fds[i] < 0) { perror("open"); return 2; }
+            roles[i] = "file";
+            o += (size_t)snprintf(json + o, sizeof json - o, "%s%d", i ? "," : "", i);
+        }
+        if (ex) {
+            fds[n] = open(argv[3], O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            if (fds[n] < 0) { perror("open"); return 2; }
+            roles[n] = "rw";
+            snprintf(json + o, sizeof json - o, "],\"dir\":%d}", n);
+        } else snprintf(json + o, sizeof json - o, "]}");
+        start(helper, "arc", fds, roles, n + ex);
+        st = call(ex ? DQ_ARC_EXTRACT : DQ_ARC_LIST, json, NULL, 0, 1) == DR_DONE ? 0 : 1;
     } else if (!strcmp(cmd, "zip") && argc > 4) {
         int n = argc - 4;
         int *fds = calloc((size_t)n + 1, sizeof *fds);

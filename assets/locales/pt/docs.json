@@ -44,6 +44,7 @@
     "other": "e mais {count}"
   },
   "err.invalid": "não é um arquivo compactado ou está danificado",
+  "err.missing-volume": "falta uma parte do arquivo compactado dividido: “{name}”",
   "err.disk-full": "o disco está cheio",
   "err.too-big": "é grande demais",
   "err.too-many": "tem arquivos demais",
