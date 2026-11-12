@@ -108,6 +108,7 @@
   "display.native": "{w} × {h} (nativa)",
   "display.noBacklight": "Questo schermo non offre il controllo della luminosità (monitor esterni e macchine virtuali).",
   "display.noCrtc": "{connector}: connesso, ma la scheda grafica non può gestire un altro schermo",
+  "display.lidClosed": "{connector}: spento finché il coperchio è chiuso (è collegato un altro schermo)",
   "display.notOnMonitor": "Questa sessione non è sul monitor in questo momento (viene visualizzata dalla rete), quindi i suoi schermi non possono essere modificati. Le impostazioni di Luce notturna si applicano comunque quando ritorna.",
   "display.number": "Schermo {n}",
   "display.recommended": "Consigliata",

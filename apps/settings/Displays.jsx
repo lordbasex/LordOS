@@ -395,7 +395,7 @@ export function DisplaysSettings() {
               options={[['main', tr('prefs.display.captureMain')], ['all', tr('prefs.display.captureAll')]]} />
           </SettingRow>
           {outs.filter((o) => !o.active).map((o) => (
-            <SettingRow key={o.id} label={o.name} hint={tr('prefs.display.noCrtc', { connector: o.connector })} disabled />
+            <SettingRow key={o.id} label={o.name} hint={tr(o.lidClosed ? 'prefs.display.lidClosed' : 'prefs.display.noCrtc', { connector: o.connector })} disabled />
           ))}
         </Section>
       ) : null}

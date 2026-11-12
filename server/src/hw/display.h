@@ -13,7 +13,8 @@
  *     "sleep" notices for the theme. Deadlines go into the main loop's poll timeout: no polling;
  *   - hotplug: hw/uevent.c calls display_hotplug() on a DRM "change" uevent;
  *   - automatic rotation of the built-in panel from the accelerometer (hw/accel.h): its orientation is
- *     added to the chosen rotation, is never saved, and is read only while the screen is on. */
+ *     added to the chosen rotation, is never saved, and is read only while the screen is on;
+ *   - the lid (hw/lid.h): closed with another display connected, the built-in panel is left out. */
 #ifndef LORD_HW_DISPLAY_H
 #define LORD_HW_DISPLAY_H
 
@@ -90,6 +91,11 @@ void display_set_auto_rotate(int on);
 int  display_auto_rotate(void);         /* on, and there is an accelerometer */
 /* The rotation a touchscreen's positions go through: the built-in panel's, or the only display's. */
 int  display_touch_rotation(void);
+/* The lid (hw/lid.c, issue #97): while it is closed and another display is connected, the built-in
+ * panel leaves the plan (its windows move to the others, as on an unplug) and comes back when it opens.
+ * With only the panel connected it is kept. Never saved. */
+void display_set_lid(int closed);
+int  display_lid_closed(void);
 const DisplayPlan *display_current(void);   /* the plan main.c applied last (n = 0 before any) */
 
 /* Software rotation (CPU path): rect r of the upright frame (lw×lh) in physical coordinates of the

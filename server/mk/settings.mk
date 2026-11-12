@@ -2,7 +2,7 @@
 # Bluetooth (BlueZ over our own D-Bus client), battery and power, date and time, default apps.
 # Objects are added to lord-server as extra prerequisites ($^ in its link rule takes them).
 HW_SRC := src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/jbuf.c src/hw/display.c src/hw/accel.c \
-          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/ui/js_hw.c \
+          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/hw/lid.c src/ui/js_hw.c \
           src/sysreport/sysreport.c src/sysreport/sysreport_out.c src/sysreport/periph.c src/sysreport/ids.c src/sysreport/smbios.c src/sysreport/facts.c src/sysreport/hwsnap.c src/hw/rpifw.c \
           src/ui/js_fan.c src/fan/fancurve.c
 HW_HDR := $(wildcard src/hw/*.h) src/apps.h $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
@@ -46,6 +46,15 @@ LOGINDLOCK_TEST_SRC := tests/logindlock_test.c src/hw/lockstate.c src/hw/logindl
 build/logindlock-test: $(LOGINDLOCK_TEST_SRC) $(HW_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LOGINDLOCK_TEST_SRC)
+	./$@ || { rm -f $@; exit 1; }
+# the lid closed on an external display (#97): logind's LidClosed (hw/lid.c) and the built-in panel
+# leaving display_plan (hw/display.c), with the bus and the card replaced by the test (tests/lid_test.c)
+test: build/lid-test
+LID_TEST_SRC := tests/lid_test.c src/hw/lid.c src/hw/display.c src/hw/accel.c src/hw/edid.c src/hw/modes.c src/hw/night.c \
+                src/hw/jbuf.c src/sec/json.c src/outputs.c src/vault/dbus.c
+build/lid-test: $(LID_TEST_SRC) $(HW_HDR) src/outputs.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LID_TEST_SRC) -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # hardware facts for the Store's suggestions (hwscan.c) over fake sysfs/DMI/PCI/USB/kmsg trees;
 # `build/hwscan-test dump [root]` prints the facts JSON of a tree (or of this machine)

@@ -108,6 +108,7 @@
   "display.native": "{w} × {h} (native)",
   "display.noBacklight": "Cet écran ne permet pas de régler la luminosité (écrans externes et machines virtuelles).",
   "display.noCrtc": "{connector} : connecté, mais la carte graphique ne peut pas gérer un écran de plus",
+  "display.lidClosed": "{connector} : éteint tant que le couvercle est fermé (un autre écran est connecté)",
   "display.notOnMonitor": "Cette session n’est pas sur l’écran pour l’instant (elle est affichée depuis le réseau) : ses écrans ne peuvent donc pas être modifiés. Les réglages d’Éclairage nocturne s’appliquent toujours à son retour.",
   "display.number": "Écran {n}",
   "display.recommended": "Recommandée",
