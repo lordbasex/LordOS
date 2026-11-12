@@ -148,6 +148,22 @@ export function cleanActions(list, max = 40) {
   return out;
 }
 
+// Icon sizes (Settings → Desktop & Dock): dockSize from DOCK_SIZE_MIN to DOCK_SIZE_MAX px, the
+// magnified size from dockSize to DOCK_MAGNIFY_MAX. The minimum was 36 until 0.8.8.8 (issue #128:
+// on a small HiDPI screen 36 still looked large); a stored value only ever became valid, so nothing
+// needs migrating. Junk (not a number, null) falls back to the defaults.
+export const DOCK_SIZE_MIN = 20, DOCK_SIZE_MAX = 80, DOCK_MAGNIFY_MAX = 128;
+export function dockSizes(size, magnifySize) {
+  const s = Math.max(DOCK_SIZE_MIN, Math.min(DOCK_SIZE_MAX, Math.round(+size) || 54));
+  return { dockSize: s, dockMagnifySize: Math.max(s, Math.min(DOCK_MAGNIFY_MAX, Math.round(+magnifySize) || 86)) };
+}
+// The unread badge on a Dock icon: 18 px high at the usual sizes, smaller on a small Dock so it
+// never covers most of the icon.
+export function dockBadgeMetrics(size) {
+  const h = Math.max(12, Math.min(18, Math.round(size * 0.45)));
+  return { height: h, font: h >= 16 ? 11 : h >= 14 ? 10 : 9, pad: h >= 16 ? 5 : 3 };
+}
+
 // ---- Hiding (Settings → Desktop & Dock; issue #46) ----
 // Three modes, stored as two booleans so that a settings file read by an older LordOS still means
 // something close (it doesn't know dockIntellihide: the Dock just hides, as with 'always'):
