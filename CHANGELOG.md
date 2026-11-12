@@ -783,6 +783,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the Network monitor, Remote Desk, Settings (themes, notifications, Bluetooth devices, languages), Help, the file
   dialog, Cleaner, the Terminal (tags, actions, secrets), the installer and the Imager's countries. Lists sorted by
   internal keys (hashes, ids, dates, paths) are unchanged.
+- **Documentation: what a remote desktop host's generic Linux build shows on LordOS.** A host that captures a Wayland
+  session only through the RemoteDesktop and ScreenCast portals together finds no RemoteDesktop portal on LordOS, never
+  asks for a screen, and streams its own fallback picture; one such host's fallback is the same PM5544 test card as
+  `lordos-testbench`'s, which made it look as if LordOS shared the test bench. Nothing in LordOS sends that card: the
+  ScreenCast portal shares only what the person picks in the chooser. `docs/WAYLAND.md` now says RemoteDesktop isn't
+  offered and why, and `docs/UPDATES.md` no longer says LordOS has no ScreenCast portal. Checked on VM 127: the portal
+  answers `ScreenCast.AvailableSourceTypes` 3 and has no RemoteDesktop interface.
 
 ### Security
 
