@@ -1,0 +1,9 @@
+{
+  "id": "zh-Hans",
+  "name": "简体中文",
+  "english": "Chinese (Simplified)",
+  "plural": "none",
+  "region": "zh_CN",
+  "direction": "ltr",
+  "partial": true
+}

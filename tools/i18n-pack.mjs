@@ -7,8 +7,8 @@
 //
 // The pack is installed in LordOS by copying it to ~/Downloads and using Settings → Language and
 // region → "Add"; it ends up in ~/.local/share/lordos/locales/<id>/. Available plural
-// rules: one-other, zero-one-other, none, east-slavic, polish, czech-slovak, lithuanian, arabic
-// (see sdk/i18n.js). The direction ("rtl" for Arabic, Hebrew, Persian, Urdu…) comes from the id.
+// rules: one-other, zero-one-other, none, east-slavic, polish, czech-slovak, lithuanian, romanian,
+// arabic (see sdk/plurals.js). The direction ("rtl" for Arabic, Hebrew, Persian, Urdu…) comes from the id.
 // Check it with: node tools/i18n-check.mjs lordos-lang-fr.json
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +26,12 @@ const read = (id) => {
   return { meta, catalogs: cats };
 };
 
+const { PLURALS } = await import(path.join(root, 'sdk/plurals.js'));
 const [cmd, id, name, english, plural = 'one-other', region = ''] = process.argv.slice(2);
+if (cmd === 'new' && !(plural in PLURALS)) {
+  console.error(`unknown plural rule "${plural}": one of ${Object.keys(PLURALS).join(', ')}`);
+  process.exit(2);
+}
 if (!/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(id || '')) {
   console.error('usage: i18n-pack.mjs new <id> "<name>" <English name> [plural] [region]  |  export <id>');
   process.exit(2);
@@ -43,3 +48,4 @@ else if (cmd === 'new') {
 const out = `lordos-lang-${id}.json`;
 fs.writeFileSync(out, `${JSON.stringify(pack, null, 2)}\n`);
 console.log(`${out}: ${Object.values(pack.catalogs).reduce((n, c) => n + Object.keys(c).length, 0)} strings`);
+process.exit(0);   // before Node's note that sdk/ is untyped ESM (the themes' bundler reads it the same way)

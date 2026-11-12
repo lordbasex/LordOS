@@ -280,6 +280,9 @@ EOF
     # glibc region names: what the installer and Settings send for every UTF-8 region (sdk/localename.js)
     if have node; then run "localename-test (sdk/localename.js)" node tests/localename_test.mjs
     else skip "localename-test" "node"; fi
+    # plural rules against CLDR and every bundled language's meta.json and format.json (sdk/plurals.js)
+    if have node; then run "locales-test (sdk/plurals.js, assets/locales)" node tests/locales_test.mjs
+    else skip "locales-test" "node"; fi
     # a region's clock, date order and separators from glibc, and the session's region (sdk/regionformat.js, #45)
     if have node; then run "regionformat-test (sdk/regionformat.js)" node tests/regionformat_test.mjs
     else skip "regionformat-test" "node"; fi

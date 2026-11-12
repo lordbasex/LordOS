@@ -1,0 +1,9 @@
+{
+  "id": "de",
+  "name": "Deutsch",
+  "english": "German",
+  "plural": "one-other",
+  "region": "de_DE",
+  "direction": "ltr",
+  "partial": true
+}

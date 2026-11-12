@@ -1,0 +1,9 @@
+{
+  "id": "zh-Hant",
+  "name": "繁體中文",
+  "english": "Chinese (Traditional)",
+  "plural": "none",
+  "region": "zh_TW",
+  "direction": "ltr",
+  "partial": true
+}

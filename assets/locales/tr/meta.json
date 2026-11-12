@@ -1,0 +1,9 @@
+{
+  "id": "tr",
+  "name": "Türkçe",
+  "english": "Turkish",
+  "plural": "one-other",
+  "region": "tr_TR",
+  "direction": "ltr",
+  "partial": true
+}

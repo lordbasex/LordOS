@@ -1,0 +1,9 @@
+{
+  "id": "ko",
+  "name": "한국어",
+  "english": "Korean",
+  "plural": "none",
+  "region": "ko_KR",
+  "direction": "ltr",
+  "partial": true
+}

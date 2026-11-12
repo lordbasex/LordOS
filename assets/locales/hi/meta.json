@@ -1,0 +1,9 @@
+{
+  "id": "hi",
+  "name": "हिन्दी",
+  "english": "Hindi",
+  "plural": "zero-one-other",
+  "region": "hi_IN",
+  "direction": "ltr",
+  "partial": true
+}

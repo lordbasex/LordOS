@@ -30,8 +30,9 @@ for (const c of N.TONE_CHOICES) eq(`round trip ${c}`, N.toneChoice(N.prefOfChoic
 const snd = fs.readFileSync(path.join(root, 'server/src/sound/snd.c'), 'utf8');
 for (const name of [N.DEFAULT_TONE, ...N.NOTIFY_TONES]) eq(`snd_play knows ${name}`, snd.includes(`!strcmp(name, "${name}")`), true);
 
-// every choice has its label in every language
-for (const lang of fs.readdirSync(path.join(root, 'assets/locales'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)) {
+// every choice has its label in every complete language (a partial one shows the missing labels in English)
+const partial = (lang) => { try { return JSON.parse(fs.readFileSync(path.join(root, 'assets/locales', lang, 'meta.json'), 'utf8')).partial === true; } catch (e) { return false; } };
+for (const lang of fs.readdirSync(path.join(root, 'assets/locales'), { withFileTypes: true }).filter((e) => e.isDirectory() && !partial(e.name)).map((e) => e.name)) {
   const prefs = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales', lang, 'prefs.json'), 'utf8'));
   for (const c of N.TONE_CHOICES) eq(`${lang}: prefs.notif.tone.${c}`, typeof prefs[`notif.tone.${c}`], 'string');
 }

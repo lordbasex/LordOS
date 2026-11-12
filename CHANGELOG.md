@@ -10,6 +10,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **26 new interface languages, partial for now** (maintainer's request, 2026-11-12): Indonesian (`id`), Japanese (`ja`),
+  German (`de`), Hindi (`hi`), Malay (`ms`), Bengali (`bn`), Simplified Chinese (`zh-Hans`), Traditional Chinese
+  (`zh-Hant`), Ukrainian (`uk`), Polish (`pl`), Arabic (`ar`), Vietnamese (`vi`), Swedish (`sv`), Greek (`el`), Dutch
+  (`nl`), Turkish (`tr`), Hungarian (`hu`), Persian (`fa`), Russian (`ru`), Romanian (`ro`), Finnish (`fi`), Urdu
+  (`ur`), Bulgarian (`bg`), Korean (`ko`), Thai (`th`) and Azerbaijani (`az`). They were chosen from lordos.org's own
+  visit statistics (CloudWatch, the 30 days to 2026-11-12): every language spoken in a country with at least 5
+  distinct visitors. Each is an `assets/locales/<id>/` folder with `meta.json` (`"partial": true`, its name in its
+  own language, the main region, `rtl` for Arabic, Persian and Urdu) and `format.json` for that region: month and
+  day names from glibc 2.41 or CLDR 45's format forms (the genitive or partitive months a date needs: «12 ноября
+  2026 г.», «torstai 12. marraskuuta 2026»), CLDR 45's full-date patterns («2026年11月12日木曜日», «الخميس، ١٢ نوفمبر
+  ٢٠٢٦»), separators, and the 12- or 24-hour clock glibc has for the region. Their texts arrive namespace by
+  namespace; until then they show the next preferred language or English, Settings marks them "partly translated",
+  and a computer whose LANG is one of them starts in it only once its desktop texts (`shell`) exist, the login
+  screen once its `greeter` texts do. Settings → Language & Region, the installer and the login screen list them
+  from their `meta.json`, with no code list to edit.
+- **The core set** a new language translates first, in `tools/i18n-core.json` (Lithuanian's first part, 1,052 of
+  12,415 English keys): the login screen, the desktop, Files, the installer, About, the app names, the file dialogs,
+  the force-quit and calculator texts, and Settings' sections, Language & Region and Date & Time formats.
+  `node tools/i18n-check.mjs` prints a partial language's coverage of it (`core set (tools/i18n-core.json): N/1052`)
+  and fails when a core entry no longer matches an English key.
+- **Romanian plurals** (`romanian`: 1 → one; 0, 2–19, 101–119 → few; 20–100 → other). The plural rules moved
+  from `sdk/i18n.js` to `sdk/plurals.js` (pure, with `pluralCategories(rule)`), and the new
+  `server/tests/locales_test.mjs` (in `make -C server test`) checks every rule against CLDR 45's whole-number samples
+  and every bundled language's `meta.json` and `format.json` (a known rule, a region of the language, the direction,
+  12 months and 7 days, only LordOS's date placeholders, the clock's AM/PM words, native digits).
+  `tools/i18n-pack.mjs new` refuses an unknown plural rule.
+- **Native digits** in `format.json` (`"native": { "digits", "decimal", "group" }`): Persian writes «۱٬۲۳۴٬۵۶۷٫۸۹ ·
+  ۲۱:۰۵», Arabic «١٬٢٣٤٬٥٦٧٫٨٩» (ar_MA, ar_DZ and ar_TN keep 0–9, as CLDR has them) and Bengali «১,২৩৪,৫৬৭.৮৯»,
+  in dates, times and numbers, only when the region is of the language itself: English with region fa_IR keeps
+  «1,234,567.89».
+
+### Changed
+
+- **Chinese by script.** `languageOfLocale` (`sdk/localename.js`) picks the interface language for a locale: its
+  language part, or `zh-Hant` for `zh_TW`, `zh_HK` and `zh_MO` and `zh-Hans` for `zh_CN` and `zh_SG`; the first
+  session and the login screen use it instead of cutting LANG to two letters. The installer keeps the full id
+  (`zh-Hant`, not `zh`) and lists every `zh_` region for both, and a language's own region gets its own
+  `format.json` for any id with a script (`zh-Hant` with `zh_TW`). Settings' **+** no longer lists "中文" as not
+  translated once either Chinese is installed.
+- **Plural forms are checked.** `node tools/i18n-check.mjs` fails when a translated plural object lacks a form of
+  its language's rule or has one the rule never gives (`few` in Japanese; `other` is always allowed), and when a
+  language names an unknown rule. Every existing catalog already passes.
+- tools/brand-check.mjs allows the Malay name of March in `ms/format.json` (it reads as a computer brand).
+
 ### Removed
 
 - **RustDesk is no longer in the Store** (#66; maintainer's decision, 2026-11-12: LordOS doesn't distribute it for now).
@@ -27,6 +73,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- docs/LANGUAGES.md: the 26 partial languages (ids, names, regions, plural rules, direction, digits, script fonts),
+  how they were chosen, the core set, the plural rules table, native digits, what a translator must keep
+  (variables, plural forms, LordOS's own names, no other system's brands), and what is still pending for them (the
+  Raspberry Pi first-run file takes only en, es, pt, fr and it; home folders named in English; Solar Hijri and
+  Buddhist calendars, Indian digit grouping, Finnish's «21.05» clock; Urdu's interface font is Noto Sans Arabic).
+  The introduction no longer calls Lithuanian partial.
 - **Platform docs match 0.8.8.8.** The install, unattended install, packages, updates, release, ISO, Raspberry Pi,
   compliance, troubleshooting and development VM guides, the documentation index and the README now say 0.8.8.8 is
   released, list migration 007 (logs), the Store's Web apps section, the languages the installer generates, the

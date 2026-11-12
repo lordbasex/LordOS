@@ -1,0 +1,9 @@
+{
+  "id": "ar",
+  "name": "العربية",
+  "english": "Arabic",
+  "plural": "arabic",
+  "region": "ar_EG",
+  "direction": "rtl",
+  "partial": true
+}

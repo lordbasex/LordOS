@@ -1,0 +1,9 @@
+{
+  "id": "sv",
+  "name": "Svenska",
+  "english": "Swedish",
+  "plural": "one-other",
+  "region": "sv_SE",
+  "direction": "ltr",
+  "partial": true
+}

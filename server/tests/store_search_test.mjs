@@ -93,7 +93,8 @@ eq('catalog: "remote desktop" brings no remote desktop app', cat('remote desktop
 const locales = fs.readdirSync(path.join(here, '../../assets/locales'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
 for (const lang of locales) {
   const file = path.join(here, '../../assets/locales', lang, 'store.json');
-  if (!fs.existsSync(file)) continue;   // a partial language (Lithuanian) shows the Store in English
+  // a partial language shows the Store's missing texts in English
+  if (!fs.existsSync(file) || JSON.parse(fs.readFileSync(path.join(here, '../../assets/locales', lang, 'meta.json'), 'utf8')).partial === true) continue;
   const store = JSON.parse(fs.readFileSync(file, 'utf8'));
   const kinds = [...new Set(catalog.apps.map((a) => a.kind))];
   eq(`catalog: every kind has a label in ${lang}`, kinds.filter((k) => !store[`ai.kind.${k}`]), []);

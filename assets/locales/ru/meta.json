@@ -1,0 +1,9 @@
+{
+  "id": "ru",
+  "name": "Русский",
+  "english": "Russian",
+  "plural": "east-slavic",
+  "region": "ru_RU",
+  "direction": "ltr",
+  "partial": true
+}

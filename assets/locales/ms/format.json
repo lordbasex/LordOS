@@ -1,0 +1,57 @@
+{
+  "months": [
+    "Januari",
+    "Februari",
+    "Mac",
+    "April",
+    "Mei",
+    "Jun",
+    "Julai",
+    "Ogos",
+    "September",
+    "Oktober",
+    "November",
+    "Disember"
+  ],
+  "monthsShort": [
+    "Jan",
+    "Feb",
+    "Mac",
+    "Apr",
+    "Mei",
+    "Jun",
+    "Jul",
+    "Ogos",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Dis"
+  ],
+  "weekdays": [
+    "Ahad",
+    "Isnin",
+    "Selasa",
+    "Rabu",
+    "Khamis",
+    "Jumaat",
+    "Sabtu"
+  ],
+  "weekdaysShort": [
+    "Ahd",
+    "Isn",
+    "Sel",
+    "Rab",
+    "Kha",
+    "Jum",
+    "Sab"
+  ],
+  "date": {
+    "short": "{wd}, {day} {mon}",
+    "long": "{weekday}, {day} {month} {yyyy}",
+    "dayMonth": "{weekday}, {day} {month}",
+    "numeric": "{dd}/{mm}/{yyyy}"
+  },
+  "decimal": ".",
+  "group": ",",
+  "hour12": false
+}

@@ -1,8 +1,11 @@
 # Language and region in LordOS
 
-LordOS handles language across the whole system, not just in the interface. It ships with
-**Spanish, English, Portuguese, French and Italian**, and **Lithuanian** as a partial translation (see
-"Partial languages"), and more languages are added with packs, without touching code.
+LordOS handles language across the whole system, not just in the interface. It ships complete in
+**English, Spanish, Portuguese, French, Italian and Lithuanian**, and, in development for the release after 0.8.8.8-beta, with 26 more
+languages as partial translations (see "Partial languages": Indonesian, Japanese, German, Hindi, Malay, Bengali,
+Simplified and Traditional Chinese, Ukrainian, Polish, Arabic, Vietnamese, Swedish, Greek, Dutch, Turkish,
+Hungarian, Persian, Russian, Romanian, Finnish, Urdu, Bulgarian, Korean, Thai and Azerbaijani). More languages
+are added with packs, without touching code.
 
 **Settings → Language & Region → Preferred languages** lists English, Español and Português by
 default. **+** adds another one (Français, Italiano, an installed pack); it goes first and becomes
@@ -56,7 +59,9 @@ formatNumber(1234.5, 2)            // "1.234,50" (es_AR) / "1,234.50" (en_US)
 - The key is `namespace.rest`; the namespace is the file: `t('terminal.action.newTab')` lives in
   `assets/locales/<language>/terminal.json` under `"action.newTab"`.
 - A value can be text or a plurals object (`{ "one": "…", "other": "…" }`, plus
-  `few`/`many`/`two`/`zero` depending on the language). Variables: `{name}`.
+  `few`/`many`/`two`/`zero` depending on the language). The forms are exactly the ones the language's rule
+  gives (`sdk/plurals.js`; `other` is always allowed): Japanese writes only `{ "other": "…" }`, Russian
+  `one`/`few`/`many`, Arabic all six. `node tools/i18n-check.mjs` fails on a missing or foreign form. Variables: `{name}`.
 - If a key is missing in the chosen language, English is used; if it's missing there too, the key itself.
 - App names come from `apps.json` (`appName(app)`); if there is no translation, from
   `manifest.json` (whose `name` and `description` are English).
@@ -107,6 +112,13 @@ Each language's `format.json` has month and day names, date patterns (`short`, `
 and the **order, separators and clock** from the region: English with region pt_BR gives
 «Thursday, October 15, 2026 · 21:56» and «15/10/2026 · 1.234.567,89».
 
+A language that writes its own digits says so with `"native": { "digits": "۰۱۲۳۴۵۶۷۸۹", "decimal": "٫",
+"group": "٬" }` (Persian, Arabic and Bengali today; `decimal` and `group` are optional). Dates, times and numbers
+use them only when the region is of that language: Persian gives «پنجشنبه ۱۲ نوامبر ۲۰۲۶ · ۲۱:۰۵ ·
+۱٬۲۳۴٬۵۶۷٫۸۹», English with region fa_IR keeps «1,234,567.89», and a region can turn them off
+(`"regions": { "ar_MA": { "native": null, "decimal": ",", "group": "." } }`: Morocco, Algeria and Tunisia write
+0–9). Urdu, Hindi and the others use 0–9, as CLDR does for them.
+
 A region whose language has no `format.json` (English with `lt_LT`, `de_DE`, `pl_PL`…) takes its clock,
 numeric date order and separators from glibc's own data for that region (`LC_TIME` and `LC_NUMERIC`,
 read with `nl_langinfo_l` by `lord.locale.formats`, converted in `sdk/regionformat.js`): English with
@@ -140,12 +152,24 @@ node tools/i18n-check.mjs lordos-lang-it.json                           # missin
 ```
 
 Then copy `lordos-lang-it.json` to your Downloads folder and use **Settings → Language & Region →
-Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slavic`, `polish`,
-`czech-slovak`, `lithuanian`, `arabic`. `node tools/i18n-pack.mjs export pt` exports an existing language in
-the same format.
+Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, tested in `server/tests/locales_test.mjs`):
+
+| Rule | Forms | Languages |
+|---|---|---|
+| `one-other` | one (1), other | en, es, it, de, nl, sv, el, tr, hu, fi, bg, az, ur |
+| `zero-one-other` | one (0, 1), other | pt, fr, hi, bn, fa |
+| `none` | other | ja, zh-Hans, zh-Hant, ko, th, vi, id, ms |
+| `east-slavic` | one (1, 21), few (2–4, 22), many (0, 5–20) | ru, uk |
+| `polish` | one (1), few (2–4, 22), many (0, 5–21) | pl |
+| `czech-slovak` | one, few (2–4), other | cs, sk (packs) |
+| `lithuanian` | one (1, 21), few (2–9, 22), other (0, 10–20) | lt |
+| `romanian` | one (1), few (0, 2–19, 101–119), other (20–100) | ro |
+| `arabic` | zero, one, two, few (3–10), many (11–99), other (100–102) | ar |
+
+`node tools/i18n-pack.mjs export pt` exports an existing language in the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.8.8-beta): 12,416 keys, complete in en, es, pt, fr, it and lt, and 577 error codes from the server (earlier: 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (in development after 0.8.8.8-beta): 12,415 keys, complete in en, es, pt, fr, it and lt, 26 partial languages, and 577 error codes from the server (earlier: 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
@@ -165,6 +189,76 @@ other) and `format.json` (2026-11-08, «2026 m. lapkričio 8 d., sekmadienis», 
 Since 0.8.8.7 Lithuanian is complete (11,909 keys, `"partial"` dropped): the emoji names and keywords and the
 country names come from CLDR 45 (`lt` annotations and territories), the rest was translated with the terms the first
 part had set (Debesis, Parduotuvė, šiukšlinė, programų juosta…).
+
+#### The core set
+
+Lithuanian's first part is now the **core set** every new language translates first, kept in
+`tools/i18n-core.json` (1,052 of 12,415 English keys today): the whole `greeter`, `shell`, `files`,
+`installer`, `about`, `appabout`, `apps`, `powerbox`, `forcequit` and `calculator` namespaces, and in
+`settings.json` only `section.*`, `lang.*`, `region.*`, `pack.*`, `system.*`, `tz.*`, `admin.*`, `change`, `light`,
+`dark`, `mode`, `noResults` and `search`, and in `prefs.json` only `time.*`. For a partial language
+`node tools/i18n-check.mjs` prints `core set (tools/i18n-core.json): N/1052` next to its coverage, and fails if a
+core entry stops matching an English key.
+
+#### 26 languages from lordos.org's visitors (in development, after 0.8.8.8-beta)
+
+The languages were chosen from lordos.org's own visit statistics (CloudWatch, the 30 days to 2026-11-12): every
+language spoken in a country with at least 5 distinct visitors. Each one ships as a partial language with its
+`meta.json` (`"partial": true`), its plural rule and a `format.json` for its main region (names from glibc 2.41
+or CLDR 45's format forms, the genitive or partitive months a date needs: «12 ноября», «12. marraskuuta»; date
+patterns from CLDR 45's full dates; the 12- or 24-hour clock as glibc has it for the region, so the region test
+agrees). Its texts arrive namespace by namespace, starting with the core set; whatever isn't translated yet is
+shown in the next preferred language or English.
+
+| Id | Name | Region | Plural | Direction | Digits | Script font |
+|---|---|---|---|---|---|---|
+| `id` | Bahasa Indonesia | id_ID | none | ltr | 0–9 | Inter |
+| `ja` | 日本語 | ja_JP | none | ltr | 0–9 | Noto Sans CJK JP |
+| `de` | Deutsch | de_DE (de_CH: «1’234.5») | one-other | ltr | 0–9 | Inter |
+| `hi` | हिन्दी | hi_IN | zero-one-other | ltr | 0–9 | Noto Sans Devanagari |
+| `ms` | Bahasa Melayu | ms_MY | none | ltr | 0–9 | Inter |
+| `bn` | বাংলা | bn_BD | zero-one-other | ltr | ০–৯ | Noto Sans Bengali |
+| `zh-Hans` | 简体中文 | zh_CN | none | ltr | 0–9 | Noto Sans CJK SC |
+| `zh-Hant` | 繁體中文 | zh_TW | none | ltr | 0–9 | Noto Sans CJK TC |
+| `uk` | Українська | uk_UA | east-slavic | ltr | 0–9 | Inter |
+| `pl` | Polski | pl_PL | polish | ltr | 0–9 | Inter |
+| `ar` | العربية | ar_EG (ar_MA, ar_DZ, ar_TN: 0–9) | arabic | rtl | ٠–٩ | Noto Sans Arabic |
+| `vi` | Tiếng Việt | vi_VN | none | ltr | 0–9 | Inter |
+| `sv` | Svenska | sv_SE | one-other | ltr | 0–9 | Inter |
+| `el` | Ελληνικά | el_GR | one-other | ltr | 0–9 | Inter |
+| `nl` | Nederlands | nl_NL (nl_BE: 12/11/2026) | one-other | ltr | 0–9 | Inter |
+| `tr` | Türkçe | tr_TR | one-other | ltr | 0–9 | Inter |
+| `hu` | Magyar | hu_HU | one-other | ltr | 0–9 | Inter |
+| `fa` | فارسی | fa_IR | zero-one-other | rtl | ۰–۹ | Noto Sans Arabic |
+| `ru` | Русский | ru_RU | east-slavic | ltr | 0–9 | Inter |
+| `ro` | Română | ro_RO | romanian | ltr | 0–9 | Inter |
+| `fi` | Suomi | fi_FI | one-other | ltr | 0–9 | Inter |
+| `ur` | اردو | ur_PK | one-other | rtl | 0–9 | Noto Sans Arabic |
+| `bg` | Български | bg_BG | one-other | ltr | 0–9 | Inter |
+| `ko` | 한국어 | ko_KR | none | ltr | 0–9 | Noto Sans CJK KR |
+| `th` | ไทย | th_TH | none | ltr | 0–9 | Noto Sans Thai |
+| `az` | Azərbaycan | az_AZ | one-other | ltr | 0–9 | Inter |
+
+- **Ids.** A language is its ISO 639 code; Chinese is split by script, BCP 47 style: `zh-Hans` and `zh-Hant`
+  (the same ids the CJK font choice already knew, `textlayout.c`). glibc regions keep their own names (`zh_CN`,
+  `zh_TW`): a computer with `zh_TW.UTF-8`, `zh_HK` or `zh_MO` starts in `zh-Hant` and one with `zh_CN` or `zh_SG` in
+  `zh-Hans` (`languageOfLocale` in `sdk/localename.js`), the installer lists every `zh_` region for both, and
+  **Install language packages** sends `zh` or the region to the root side, as before.
+- **Where they appear.** Nothing lists languages by hand: Settings → Language & Region (**+**, marked "partly
+  translated"), the installer and the login screen's language button read `assets/locales/*/meta.json`. A language
+  is picked by itself (from LANG, without a choice in Settings) only once it has its `shell` texts, and on the login
+  screen once it has `greeter`; until then such a computer shows English with its region's formats.
+- **Fonts.** Latin, Greek and Cyrillic (Vietnamese and Azerbaijani letters included) are Inter's. The others come from
+  `fonts-noto-core` (Arabic for ar, fa and ur, Devanagari, Bengali, Thai) and `fonts-noto-cjk`, both in the ISO and
+  the Raspberry Pi image; on a computer that lacks them, **Install language packages** adds them
+  (`langpack`, `admin.c`), and Thai's word breaking uses `libthai-data`. Urdu uses Noto Sans Arabic, which has
+  every Urdu letter; Noto Nastaliq Urdu is shaped like HarfBuzz but is not the interface font (its tall
+  cascades don't fit the interface's line heights; pending a check on the VM).
+- **What a translator needs to know** (the translators' guide on lordos.org repeats it): keep every `{variable}`
+  exactly; write the plural forms of the language's rule (the table above); keep LordOS's own names in English
+  where the language keeps product names (LordOS, Lord Flow, Lord Classic, Lumo) and use generic words for the
+  rest, never another system's brand (`tools/brand-check.mjs`); `textAlign: 'start'` is already handled by the
+  code, so a right-to-left translation needs nothing special; and run `node tools/i18n-check.mjs <id>`.
 
 ## Privileged helper (`lord-admin`)
 
@@ -464,7 +558,13 @@ translates the desktop, Settings, Files, About and the Calculator; the Terminal 
   `first_weekday` isn't read yet).
 - The installer lists only the regions of the chosen language (English with `lt_LT` is chosen afterwards
   in Settings → Language & Region), and the first-run file of the Raspberry Pi image takes only en, es,
-  pt, fr and it.
+  pt, fr and it (`firstrun.c` checks a closed list, and the image generates only those regions): a Pi set up in
+  Lithuanian or one of the 26 partial languages starts in English and changes it in Settings.
+- The home folders (Desktop, Documents, Downloads…) are named in English for every language but es, pt, fr and
+  it (`server/src/users/homedirs.c`).
+- Formats the 26 partial languages still lack: the Solar Hijri calendar for Persian and the Buddhist era for Thai
+  (dates are Gregorian), Indian digit grouping for Hindi and Bengali («12,34,567»; LordOS groups by three), and
+  Finnish's «21.05» clock (the clock always uses «:»).
 
 ## Packages in the VM (M5b)
 

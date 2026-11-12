@@ -1,0 +1,17 @@
+{
+  "about": "The first part a new language translates (docs/LANGUAGES.md, \"Partial languages\"): the login screen, the desktop, Files, the installer, About, the app names, the file dialogs, and Settings' sections, Language & Region and the Date & Time formats. Each namespace is the whole assets/locales/en/<namespace>.json, or only the keys listed (a key, or a prefix ending in a dot). node tools/i18n-check.mjs prints a partial language's coverage of it.",
+  "namespaces": {
+    "greeter": "*",
+    "shell": "*",
+    "files": "*",
+    "installer": "*",
+    "about": "*",
+    "appabout": "*",
+    "apps": "*",
+    "powerbox": "*",
+    "forcequit": "*",
+    "calculator": "*",
+    "settings": ["section.", "lang.", "region.", "pack.", "system.", "tz.", "admin.", "change", "light", "dark", "mode", "noResults", "search"],
+    "prefs": ["time."]
+  }
+}
