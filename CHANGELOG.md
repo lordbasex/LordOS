@@ -27,6 +27,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **A translators' guide, `docs/TRANSLATING.md`.** How to add a language or finish a partial one without writing
+  code: the `assets/locales/<code>/` layout, `meta.json` (native name, plural rule, region, direction, `"partial"`) and
+  `format.json` (names, date patterns, separators, clock), the core set to translate first (`tools/i18n-core.json`,
+  1,052 of about 12,400 English keys), `{placeholders}`, the plural forms of every rule, style and naming rules (no
+  third-party brand names, LordOS's own names kept), checking with `node tools/i18n-check.mjs`, trying it on LordOS
+  as a pack (`i18n-pack.mjs export`, Settings → Language & Region → Add) and opening a signed-off pull request.
+  `CONTRIBUTING.md`, `docs/LANGUAGES.md` and the documentation index point to it. A new GitHub issue form,
+  `.github/ISSUE_TEMPLATE/language-request.yml`, asks for a language: the language, the country, how many people
+  would use it and whether the person can help translate.
+
 - **Platform docs match 0.8.8.8.** The install, unattended install, packages, updates, release, ISO, Raspberry Pi,
   compliance, troubleshooting and development VM guides, the documentation index and the README now say 0.8.8.8 is
   released, list migration 007 (logs), the Store's Web apps section, the languages the installer generates, the
@@ -36,6 +46,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   app logs, and four documents missing from the index (Cloud, Databases, Disk life, Voice).
 
 ### Website
+
+- **lordos.org: a Languages page, `/language/` (and `/es/language/`, `/pt/language/`).** Lumo waves in front of an
+  embassy with flagpoles (`web/lib/embassy.mjs`, our own drawing from plain shapes that follows the light and dark
+  themes; the flags wave with CSS and stand still with reduced motion). The page lists the languages LordOS ships by
+  their own names, with the site language's name under each and a "right to left" tag for Arabic, Persian and Urdu:
+  the six complete ones (English, the default, Español, Português, Français, Italiano, Lietuvių) and the 26 partial
+  languages of the next pre-release, in development (Bahasa Indonesia, 日本語, Deutsch, हिन्दी, Bahasa Melayu, বাংলা,
+  简体中文, 繁體中文, Українська, Polski, العربية, Tiếng Việt, Svenska, Ελληνικά, Nederlands, Türkçe, Magyar, فارسی,
+  Русский, Română, Suomi, اردو, Български, 한국어, ไทย, Azərbaycan). It says what a partial language covers (the core
+  set, 1,052 of about 12,400 texts, with its own plurals, dates and numbers) and that the rest shows in the next
+  preferred language or in English, and that a language is not a country (the flags are decoration). It explains how
+  new languages are chosen: at least 5 people from a country where the language is spoken visiting lordos.org in 30
+  days, from the site's private statistics (linked to Cookies and statistics; no numbers are published), or a
+  community request. Two calls to action: "Request a language" (the new GitHub issue form) and "Translate LordOS"
+  (four steps and the translators' guide on GitHub), and a note that the site itself is in English, Spanish and
+  Portuguese. The list is built from every `assets/locales/<id>/meta.json` plus `web/content/languages.json` ("next":
+  the languages new in the next pre-release, listed before their files are bundled; emptied when it ships). The page
+  is linked from the footer (Project → Languages), from a "More languages" row at the end of the language picker,
+  from the "Which languages does LordOS speak?" and "Can I contribute code or translations?" FAQ answers (which now
+  name the 26 partial languages as coming in the next pre-release and link the guide), and from the site search.
 
 - **lordos.org: the LordOS Web Runtime as a headline feature, in English, Spanish and Portuguese.** A seventh card on
   the home page's features section ("LordOS Web Runtime"; the section's subtitle now names web apps too) opens a new

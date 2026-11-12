@@ -55,6 +55,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [REMOTE.md](REMOTE.md) | Remote desktop on the LAN (off by default, port 5673), SSH and root over SSH (0.8.5, advanced) |
 | [SCREEN-SHARING.md](SCREEN-SHARING.md) | The screen-sharing API for third-party apps: its own socket, consent prompt, indicator and grants (0.8.8) |
 | [LANGUAGES.md](LANGUAGES.md) | Languages, regions, complex scripts, input methods, error messages |
+| [TRANSLATING.md](TRANSLATING.md) | Translators' guide: adding or finishing a language, from the English files to the pull request |
 
 ## Privacy and security
 

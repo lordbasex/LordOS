@@ -1,0 +1,161 @@
+{
+  "about": "The languages page, /language/ (web/build.mjs), lists every language in assets/locales/<id>/meta.json. \"next\" holds the languages new in the next pre-release, in development: they are listed even before their files are bundled (with the data given here; a meta.json wins) and marked as coming in the next pre-release. Empty it once that release ships.",
+  "next": [
+    {
+      "id": "id",
+      "name": "Bahasa Indonesia",
+      "english": "Indonesian",
+      "direction": "ltr"
+    },
+    {
+      "id": "ja",
+      "name": "日本語",
+      "english": "Japanese",
+      "direction": "ltr"
+    },
+    {
+      "id": "de",
+      "name": "Deutsch",
+      "english": "German",
+      "direction": "ltr"
+    },
+    {
+      "id": "hi",
+      "name": "हिन्दी",
+      "english": "Hindi",
+      "direction": "ltr"
+    },
+    {
+      "id": "ms",
+      "name": "Bahasa Melayu",
+      "english": "Malay",
+      "direction": "ltr"
+    },
+    {
+      "id": "bn",
+      "name": "বাংলা",
+      "english": "Bengali",
+      "direction": "ltr"
+    },
+    {
+      "id": "zh-Hans",
+      "name": "简体中文",
+      "english": "Chinese (Simplified)",
+      "direction": "ltr"
+    },
+    {
+      "id": "zh-Hant",
+      "name": "繁體中文",
+      "english": "Chinese (Traditional)",
+      "direction": "ltr"
+    },
+    {
+      "id": "uk",
+      "name": "Українська",
+      "english": "Ukrainian",
+      "direction": "ltr"
+    },
+    {
+      "id": "pl",
+      "name": "Polski",
+      "english": "Polish",
+      "direction": "ltr"
+    },
+    {
+      "id": "ar",
+      "name": "العربية",
+      "english": "Arabic",
+      "direction": "rtl"
+    },
+    {
+      "id": "vi",
+      "name": "Tiếng Việt",
+      "english": "Vietnamese",
+      "direction": "ltr"
+    },
+    {
+      "id": "sv",
+      "name": "Svenska",
+      "english": "Swedish",
+      "direction": "ltr"
+    },
+    {
+      "id": "el",
+      "name": "Ελληνικά",
+      "english": "Greek",
+      "direction": "ltr"
+    },
+    {
+      "id": "nl",
+      "name": "Nederlands",
+      "english": "Dutch",
+      "direction": "ltr"
+    },
+    {
+      "id": "tr",
+      "name": "Türkçe",
+      "english": "Turkish",
+      "direction": "ltr"
+    },
+    {
+      "id": "hu",
+      "name": "Magyar",
+      "english": "Hungarian",
+      "direction": "ltr"
+    },
+    {
+      "id": "fa",
+      "name": "فارسی",
+      "english": "Persian",
+      "direction": "rtl"
+    },
+    {
+      "id": "ru",
+      "name": "Русский",
+      "english": "Russian",
+      "direction": "ltr"
+    },
+    {
+      "id": "ro",
+      "name": "Română",
+      "english": "Romanian",
+      "direction": "ltr"
+    },
+    {
+      "id": "fi",
+      "name": "Suomi",
+      "english": "Finnish",
+      "direction": "ltr"
+    },
+    {
+      "id": "ur",
+      "name": "اردو",
+      "english": "Urdu",
+      "direction": "rtl"
+    },
+    {
+      "id": "bg",
+      "name": "Български",
+      "english": "Bulgarian",
+      "direction": "ltr"
+    },
+    {
+      "id": "ko",
+      "name": "한국어",
+      "english": "Korean",
+      "direction": "ltr"
+    },
+    {
+      "id": "th",
+      "name": "ไทย",
+      "english": "Thai",
+      "direction": "ltr"
+    },
+    {
+      "id": "az",
+      "name": "Azərbaycan",
+      "english": "Azerbaijani",
+      "direction": "ltr"
+    }
+  ]
+}

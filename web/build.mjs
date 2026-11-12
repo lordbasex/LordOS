@@ -23,6 +23,7 @@ import { diagram } from './lib/diagram.mjs';
 import { paperMarkdown } from './lib/papermd.mjs';
 import { archFigure } from './lib/archsvg.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
+import { embassy } from './lib/embassy.mjs';
 import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
@@ -282,6 +283,23 @@ function parseChangelog(src) {
   });
 }
 const legalDir = path.join(CONTENT, 'legal');
+// UI languages for /language/: every bundled assets/locales/<id>/meta.json, plus content/languages.json "next" (new in
+// the next pre-release, listed even before their files are bundled; a meta.json wins). Complete first, en first.
+const langList = (() => {
+  const dir = path.join(REPO, 'assets/locales');
+  const nextJ = fs.existsSync(path.join(CONTENT, 'languages.json')) ? readJson(path.join(CONTENT, 'languages.json')).next || [] : [];
+  const nextIds = new Set(nextJ.map((x) => x.id));
+  const metas = fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, 'meta.json'))).map((d) => readJson(path.join(dir, d, 'meta.json')));
+  if (!metas.some((m) => m.id === 'en')) metas.unshift({ id: 'en', name: 'English', english: 'English', direction: 'ltr' });
+  const all = [...metas, ...nextJ.filter((x) => !metas.some((m) => m.id === x.id)).map((x) => ({ ...x, partial: true }))]
+    .map((m) => ({ id: m.id, name: m.name, english: m.english, direction: m.direction || 'ltr', partial: m.partial === true, next: nextIds.has(m.id) }));
+  const order = ['en', 'es', 'pt', 'fr', 'it'];
+  const rank = (x) => (order.includes(x.id) ? order.indexOf(x.id) : order.length);
+  const pos = (x) => (nextIds.has(x.id) ? nextJ.findIndex((y) => y.id === x.id) : -1);
+  const complete = all.filter((x) => !x.partial).sort((a, b) => rank(a) - rank(b) || a.english.localeCompare(b.english));
+  const partial = all.filter((x) => x.partial).sort((a, b) => pos(a) - pos(b) || a.english.localeCompare(b.english));
+  return [...complete, ...partial];
+})();
 const legalIndex = fs.existsSync(path.join(legalDir, 'pages.json')) ? readJson(path.join(legalDir, 'pages.json')) : null;
 // guides (0.8.8): plain how-to pages at the site root, /requirements/ and /virtual-machine/, from content/guides
 const guideDir = path.join(CONTENT, 'guides');
@@ -500,14 +518,15 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
 const GLOBE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>';
 const CHEVRON = '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 function langMenu(t, page, up) {
-  const items = LANGS.map((x) => `<li><a href="${pageUrl(x, page)}" hreflang="${x}" lang="${x}"${x === t.lang ? ' aria-current="true"' : ''}>${esc(dict[x].langName)}</a></li>`).join('');
+  const items = LANGS.map((x) => `<li><a href="${pageUrl(x, page)}" hreflang="${x}" lang="${x}"${x === t.lang ? ' aria-current="true"' : ''}>${esc(dict[x].langName)}</a></li>`).join('') +
+    `<li class="ld-more"><a href="${pageUrl(t.lang, 'language')}"${page === 'language' ? ' aria-current="page"' : ''}>${esc(t.pages.language.menuMore)} <span aria-hidden="true">→</span></a></li>`;   // the languages page
   return `<details class="lang-dd${up ? ' up' : ''}"><summary aria-label="${esc(t.langLabel)}: ${esc(t.langName)}">${GLOBE}<span class="ld-name">${esc(t.langName)}</span>${CHEVRON}</summary><ul>${items}</ul></details>`;
 }
 // dark-mode switch (Tabler icons, MIT); site.js runs it, theme.js applies the stored choice before paint
@@ -592,7 +611,7 @@ ${icons}
 }
 
 const PI_ART = JSON.parse(src('pi-art.json'));   // the three drawings (our own, isometric): argon, pi500, pi5
-const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), language: src('language.html'), hardware: src('hardware.html'), guide: src('guide.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -1058,6 +1077,7 @@ ${(c.items || []).map((it) => {
     add('page', t.navDownload, pageUrl(l, 'home') + '#download', t.dlLead || '');
     add('page', t.navSupport, pageUrl(l, 'home') + '#support', '');
     add('page', t.navAbout, pageUrl(l, 'about'), '');
+    add('page', t.pages.language.title, pageUrl(l, 'language'), `${t.pages.language.lead} ${langList.map((x) => `${x.name} ${x.english}`).join(' ')}`);
     if (HAS_PAPER) add('page', t.pages.navPaper, pageUrl(l, 'paper'), '');
     if (HAS_FAQ) add('page', t.pages.faq.title, pageUrl(l, 'faq'), t.pages.faq.lead);
     if (HAS_HW) add('page', t.pages.hardware.title, pageUrl(l, 'hardware'), t.pages.hardware.lead);
@@ -1078,6 +1098,34 @@ ${(c.items || []).map((it) => {
       ...common('hardware', [`${H.title} · LordOS`, H.lead], true), ...sec,
       status: HW_IN_DEV ? esc(H.statusDev.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
       newIssue: `${GITHUB}/issues/new?template=hardware-report.yml`,
+    }, t));
+  }
+
+  // languages (in development for the next pre-release): the UI languages LordOS ships, how new ones are chosen,
+  // asking for one and translating
+  {
+    const L = t.pages.language;
+    const names = new Intl.DisplayNames([l], { type: 'language' });
+    const cap = (s) => s.charAt(0).toLocaleUpperCase(l) + s.slice(1);
+    const card = (x) => {
+      const tags = [x.id === 'en' ? L.default : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)   // partial and "next" are said once, by the section
+        .map((s) => `<span class="hw-st">${esc(s)}</span>`).join(' ');
+      return `<li class="lg-card"><strong lang="${esc(x.id)}" dir="${x.direction === 'rtl' ? 'rtl' : 'ltr'}">${esc(x.name)}</strong>` +
+        `<span class="lg-en">${esc(cap(names.of(x.id) || x.english))}</span>${tags ? `<span class="lg-tags">${tags}</span>` : ''}</li>`;
+    };
+    const stats = linkBuilt('/legal/cookies-and-statistics/') ? `<a href="${pageUrl(l, 'legal/cookies-and-statistics')}">${esc(L.statsLink)}</a>` : esc(L.statsLink);
+    const steps = L.steps.map(([h, p]) => `<li><strong>${esc(h)}</strong><span>${esc(p)}</span></li>`).join('\n');
+    write(path.join(pageUrl(l, 'language'), 'index.html'), render(tpl.language, {
+      ...common('language', [L.metaTitle, L.metaDescription], true),
+      embassy: embassy(img.lumoWave, esc(L.figAlt)),
+      status: langList.some((x) => x.next) ? esc(L.status.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
+      complete: langList.filter((x) => !x.partial).map(card).join('\n'),
+      partial: langList.filter((x) => x.partial).map(card).join('\n'),
+      partialTag: langList.some((x) => x.partial && x.next) ? ` <span class="hw-st">${esc(L.next)}</span>` : '',
+      choose: L.chooseText.split('{stats}').map(esc).join(stats),
+      steps,
+      requestUrl: `${GITHUB}/issues/new?template=language-request.yml`,
+      guideUrl: `${GITHUB}/blob/main/docs/TRANSLATING.md`,
     }, t));
   }
 
@@ -1151,7 +1199,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>
