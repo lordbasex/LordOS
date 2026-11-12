@@ -57,5 +57,21 @@
   "size": "Size",
   "keepRatio": "Keep proportions",
   "sizeInvalid": "Width and height must be whole numbers from 1 to {max}",
-  "cloud": "Cloud"
+  "cloud": "Cloud",
+  "menu.open": "Open",
+  "menu.selectAll": "Select All",
+  "menu.trash": "Move to Trash",
+  "menu.trashCount": {
+    "one": "Move {count} photo to Trash",
+    "other": "Move {count} photos to Trash"
+  },
+  "trashed": {
+    "one": "{count} photo moved to the Trash",
+    "other": "{count} photos moved to the Trash"
+  },
+  "selectedOf": {
+    "one": "{count} of {total} selected",
+    "other": "{count} of {total} selected"
+  },
+  "cancel": "Cancel"
 }
