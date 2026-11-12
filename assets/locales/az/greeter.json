@@ -1,0 +1,19 @@
+{
+  "bootTest": "Yükləmə vaxtı ölçülür: {n} yükləmədən {k} başa çatdı. {s} san. sonra yenidən başladılacaq. Sistemə daxil olmaq da testi dayandırır.",
+  "bootTestCancel": "Testi dayandır",
+  "busy": "Bir an…",
+  "cancel": "Ləğv et",
+  "confirmRestart": "Açıq seanslar var: yadda saxlanmamış iş itəcək. Yenə də yenidən başladılsın?",
+  "confirmShutdown": "Açıq seanslar var: yadda saxlanmamış iş itəcək. Yenə də söndürülsün?",
+  "error": "Seansı açmaq mümkün olmadı.",
+  "locked": "Ekran kilidlənib",
+  "noUsers": "İstifadəçi yoxdur",
+  "password": "Parol",
+  "restart": "Yenidən başlat",
+  "shutdown": "Söndür",
+  "wait": {
+    "one": "Həddən çox cəhd. {count} saniyə gözləyin.",
+    "other": "Həddən çox cəhd. {count} saniyə gözləyin."
+  },
+  "wrong": "Parol yanlışdır."
+}
