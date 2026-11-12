@@ -27,9 +27,10 @@ Aqui a precisão importa, porque é fácil exagerar no "próprio".
 - o PipeWire, para o som;
 - o próprio protocolo Wayland, via `libwayland-server` e `libwayland-client`;
 - a `libxkbcommon`, para os layouts de teclado;
-- bibliotecas usadas só dentro de processos ajudantes em sandbox: FFmpeg (mídia), Poppler e libarchive (documentos), OpenSSL (TLS para e-mail e área de trabalho remota), o núcleo do FreeRDP (RDP no Remote Desk), Monocypher (a criptografia do cofre).
+- bibliotecas usadas só dentro de processos ajudantes em sandbox: FFmpeg (mídia), Poppler e libarchive (documentos), OpenSSL (TLS para e-mail e área de trabalho remota), o núcleo do FreeRDP (RDP no Remote Desk), Monocypher (a criptografia do cofre), libpipewire (compartilhar a tela, `lord-screencast`), Tesseract (reconhecimento de texto), audio.cpp (leitura em voz alta), nanosvg (ícones SVG);
+- WPE WebKit, só no `lord-web`, o LordOS Web Runtime opcional, com o sandbox do próprio WebKit em volta dos seus processos web e de rede.
 
-A regra que o projeto segue está escrita em `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK e Qt não são usados dentro do próprio LordOS. Apps GTK e Qt continuam rodando, como clientes Wayland.
+A regra que o projeto segue está escrita em `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK e Qt não são usados dentro do próprio LordOS; a única exceção é o runtime opcional de apps web, `lord-web`. Apps GTK e Qt continuam rodando, como clientes Wayland.
 
 ## Como um quadro chega à tela
 
@@ -46,11 +47,12 @@ Se houver uma GPU com aceleração 3D, a composição passa pelo Mesa (GBM, EGL 
 
 ## Onde os apps Linux se encaixam
 
-Há três tipos de janela num desktop LordOS, e elas se conectam em camadas diferentes:
+Há quatro tipos de janela num desktop LordOS, e elas se conectam em camadas diferentes:
 
 - **Os apps incluídos e o tema** (barra de menus, Dock, Arquivos, Ajustes…) rodam dentro do próprio contexto JavaScript do `lord-server`, no motor de interface. As exceções são Senhas e, desde a 0.8.2, Mail, Calendário, Contatos e Lembretes, que rodam como processos isolados, como os apps `.lpk`.
 - **Os apps `.lpk` instalados** rodam cada um como um processo separado (`lord-server --app <id>`, o mesmo binário em "modo app"). Esse processo tem sua própria cópia do motor de interface, se tranca num sandbox e desenha num buffer de memória compartilhada, que entrega ao compositor como um cliente Wayland comum.
 - **Os apps Linux** (GTK, Qt, Chromium, Firefox…) se conectam ao socket Wayland do compositor. Eles se desenham sozinhos; o tema coloca sua moldura de janela em volta deles.
+- **Os apps web** (0.8.8.8, o pacote opcional `lordos-web`) rodam cada um num processo `lord-web` próprio por app e perfil, sobre o WPE WebKit, como cliente Wayland do compositor (veja [LordOS Web Runtime](/pt/features/web-apps/)).
 
 Ou seja, o compositor é o ponto de encontro. O motor de interface é usado pela interface e pelos apps do próprio LordOS, não pelos apps Linux.
 
@@ -117,7 +119,7 @@ Lançada em 12 de novembro de 2026, o último lançamento.
 - **Dos seus relatos no GitHub.** Recolher uma conta inteira do Mail, Arquivo → Abrir recentes no Editor de texto, remover pela Loja → Instalados qualquer app Linux que um pacote Debian trouxe e desativar os apps incluídos que você não usa, desligar uma conta da Nuvem sem perder o login, um Dock menor, e uns vinte consertos, dos apps X11 rodando como root a voltar a entrar numa rede Wi-Fi salva.
 - **Bloqueio pelo logind.** `loginctl lock-sessions` e outras ferramentas de administração bloqueiam a tela; só a sua senha a desbloqueia.
 
-Os widgets com teclado, o cursor e o bloqueio do logind estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
+Os widgets com teclado, o cursor, os atalhos globais e o bloqueio do logind estão construídos e testados, mas ainda não foram verificados na nossa máquina de testes.
 
 ## Novo na 0.8.8.7
 
@@ -148,12 +150,12 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 
 - **GPUs reais de PC ainda não foram verificadas.** O caminho da GPU roda na V3D do Raspberry Pi 5 e na GPU virtual do VMware (SVGA3D), e foi exercitado com o renderizador por software do Mesa em máquinas virtuais. O teste em placas AMD e Nvidia reais ainda está pendente (`docs/GPU.md`).
 - **O GPU drag, ligado por padrão na 0.8.7, está verificado só em V3D e SVGA3D.** Num Raspberry Pi 5, em arrastos reais, reduz pela metade a CPU da sessão sem carga e leva uma carga de memória de 29 para 35 quadros por segundo. Em qualquer outra GPU só o autoteste o protege, e `LORD_GPU_DRAG=0` o desliga (`docs/GPU.md`).
-- **Várias telas foram testadas com duas saídas virtuais**, não com monitores reais, painéis de notebook ou hubs DisplayPort (`docs/DISPLAYS.md`). No desenvolvimento da 0.8.8.6, um PC com uma Radeon RX 580 e três monitores trouxe duas correções (o tamanho do cursor por hardware e a tela de login na tela principal escolhida); outras placas, painéis de notebook e hubs não foram testados.
+- **Várias telas foram testadas com duas saídas virtuais e num PC com uma Radeon RX 580 e três monitores** (`docs/DISPLAYS.md`). Esse PC trouxe o tamanho do cursor por hardware e a tela de login na tela principal escolhida na 0.8.8.6, e na 0.8.8.7 a passagem que mantém os monitores DisplayPort acesos ao bloquear, sair e entrar na sessão; outras placas, painéis de notebook e hubs DisplayPort não foram testados.
 - **O Raspberry Pi 5 só foi testado com um monitor HDMI.** Desde a 0.8.4.1 a imagem mostra a tela de login e o desktop num monitor HDMI desde o primeiro boot, e o LordBench o mediu assim; dois monitores e 4K ainda não foram testados na placa (`docs/RASPBERRY.md`).
 - **No Raspberry Pi 5 um app ocupado ainda reduz pela metade os quadros por segundo do desktop:** cerca de 31 em vez de 60 no teste de desktop do LordBench enquanto todos os núcleos estão ocupados. Com essa carga o chip gráfico leva 14–16 ms por quadro em vez de 1,5, sem reduzir a frequência nem por temperatura; na 0.8.7, uma medição apontou a causa na memória: 28 ms por quadro com quatro núcleos lendo memória, 1,4 ms com quatro núcleos só girando. Quanto disso o compositor pode evitar continua em aberto (`docs/GPU.md`).
 - **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para uma versão futura. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
 - **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
-- **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Desde a 0.8.8.8 funcionam arrastar e soltar com os apps Linux e os métodos de entrada do LordOS dentro deles, e os apps X11 também aceitam arrastes e se escalam sozinhos em HiDPI, já construído mas ainda não verificado na nossa máquina de testes (`docs/WAYLAND.md`).
+- **Os apps X11 rodam pelo Xwayland desde a 0.8.3** e podem ver uns aos outros, como em qualquer desktop X11. Desde a 0.8.8.8 eles se escalam sozinhos em HiDPI (antes eram nítidos só em 100 %) e aceitam arrastes por XDND, as duas coisas já construídas mas ainda não verificadas na nossa máquina de testes. Os métodos de entrada do LordOS compõem nos apps Wayland, não nos X11 (`docs/WAYLAND.md`).
 - **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e desde a 0.8.8.8 a navegação pelo teclado com um anel de foco; leitor de tela, zoom e alto contraste estão no roadmap.
 
 ## Leia o código

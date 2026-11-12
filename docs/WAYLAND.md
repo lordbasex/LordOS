@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (in development, see "Drag and drop") |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (0.8.8.8; the Wayland side checked on VM 127, XDND still to check on the VM, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -42,10 +42,10 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
-| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (in development, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
+| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (0.8.8.8, checked on VM 127, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
-| `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (in development, `wl_textinput.c`, see "Input methods") |
-| `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (in development, `secctx.c`, see "Security contexts") |
+| `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
+| `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -117,7 +117,7 @@ shell. The user approved it for M7. Limits:
 
   Anything else (an unlisted group, a bad name, no `Exec`) is refused. Tested by
   `build/apps-actions-test` (in `make test`).
-- **Terminal apps (0.8.8.8, in development; approved 2026-11-10):** htop, mc, ranger, vim's entry. The launcher and
+- **Terminal apps (0.8.8.8, built, not yet checked on the VM; approved 2026-11-10):** htop, mc, ranger, vim's entry. The launcher and
   search show them with the Terminal's icon small in a corner. `lord.apps.launch(id)` doesn't exec them: it parses
   the `Exec` line the same way (no caller arguments, no file), keeps the argv in a one-shot slot
   (`src/term/termapp.c`: random 128-bit token, 10 s, single use, at most 4 pending) and answers `{ terminal: token }`.
@@ -131,7 +131,7 @@ shell. The user approved it for M7. Limits:
   comes to the front.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
   descriptors. Its output goes to its own `apps/<id>.log` in the user's log folder (`/var/log/lordos/users/<user>`,
-  docs/SYSTEM.md "Log files"), after a stamped "starting" line; capped at 16 MB by its writers (the older part in `xwayland.log.old`).
+  docs/SYSTEM.md "Log files"), after a stamped "starting" line; capped at 16 MB by its writers (the part moved aside in `apps/<id>.log.old`).
 - A `.desktop` can't be created from JS:
   - `lord.fs.write` rejects `~/.local/share/applications` and `~/.config/autostart`, also
     through a symlink (see `EDITOR.md`);
@@ -148,7 +148,7 @@ shell. The user approved it for M7. Limits:
   close (`WINDOWS.md`, "The Window menu, the app menu and Force Quit").
 
 Icons (`server/src/iconfind.c`, `build/iconfind-test`): the `hicolor` PNG (64, 48, 128… px, the
-user's theme before the system's) or the one in `/usr/share/pixmaps`. Then (0.8.8.8, in development)
+user's theme before the system's) or the one in `/usr/share/pixmaps`. Then (0.8.8.8)
 SVG, which lord-media draws (`MEDIA.md`, "SVG icons"): `scalable/apps` of hicolor and Adwaita,
 `/usr/share/pixmaps`; then the 64 px PNG Debian publishes in AppStream, which the package engine
 already downloads (`/var/lib/lordos/pkg/icons/64`, see `PACKAGES.md`); and last a symbolic icon
@@ -245,7 +245,7 @@ the home folder and survives reboots. Image previews are first stored in
 5. After each frame is presented, the apps' `frame` callbacks are answered (so they don't draw
    faster than the screen).
 
-### Hidden windows (0.8.8.8, in development)
+### Hidden windows (0.8.8.8)
 
 A window that is minimized, on a hidden desktop (`wl_set_minimized`, `wl_set_parked`: what the shell's
 `surfaceState` says) or wholly covered (`wl_set_covered`: inside an opaque window above it on the showing desktop, a
@@ -270,7 +270,11 @@ session watched so it draws at 60 Hz): minimized, the web app went from 112 % CP
 Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53 MB of RSS
 (each window keeps a copy of its buffer).
 
-## Drag and drop (in development: built, to check on the VM)
+## Drag and drop (0.8.8.8)
+
+The Wayland side was checked on VM 127: a file dragged from Files opened in Chromium, and a GTK 4
+drop target got copy, or move with Shift held. The bridge to X11 apps (XDND, below) is built but not yet
+checked on the VM.
 
 The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file lists in `urilist.c`:
 
@@ -448,7 +452,7 @@ inside a session) checks enter, enable, that commits alone bring no `done`, garb
 and destroying things out of order; `type 30` gives 30 s to type with a method on and checks every
 `done` serial and offset (`type 30 password`: nothing composes).
 
-### Keyboard shortcuts inhibit (`zwp_keyboard_shortcuts_inhibit_manager_v1`, in development)
+### Keyboard shortcuts inhibit (`zwp_keyboard_shortcuts_inhibit_manager_v1`, 0.8.8.8)
 
 A virtual machine viewer, a remote desktop client or a game asks for every key, ❖ and ⌥Tab included, with
 `inhibit_shortcuts` on its window (GTK 4's `gdk_toplevel_inhibit_system_shortcuts` is that request). LordOS asks the person once per app, in
@@ -628,7 +632,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   players a Linux app publishes (`org.mpris.MediaPlayer2.*`) show in Control Center's Now Playing, and the media
   keys, which the compositor keeps from the focused app, reach them when LordOS's own Player isn't playing. Every
   call is asynchronous with a 3 s limit, the number of players and every string are bounded, and only local cover
-  art is shown (docs/MEDIA.md, "Linux players"). In development for 0.8.8.8, to check on the VM.
+  art is shown (docs/MEDIA.md, "Linux players"). 0.8.8.8; checked on VM 127 with mpv and its MPRIS plugin.
 - **GTK 3.** Outside Flatpak it doesn't read the portal: it reads GSettings.
   - lord-server passes `GSETTINGS_BACKEND=keyfile` to the apps and writes the same keys to
     `~/.config/glib-2.0/settings/keyfile`, without deleting what the apps store. GLib watches that
@@ -837,7 +841,7 @@ asynchronously, so lord-server never waits on Xwayland while Xwayland waits on t
 - **Java.** AWT guesses the insets of a reparenting window manager; ours doesn't reparent, so
   `_JAVA_AWT_WM_NONREPARENTING=1` is set for the session's apps (without it Swing windows are blank).
 
-### X11 apps on HiDPI displays (in development, 0.8.8.8)
+### X11 apps on HiDPI displays (0.8.8.8, built, not yet checked on the VM)
 
 On a display above 100 % an X11 app used to be drawn at its logical size and enlarged by LordOS: the right
 size, but blurry. Now, as in KWin's "apps scale themselves", **the X11 apps scale themselves** by default
@@ -977,7 +981,7 @@ display.
   frame, close, the Dock icons, Xwayland stopping 10 s after the last app and starting again, the
   firewall restriction on XTerm, and the protected-window checks in `PRIVACY.md`.
 
-## Notifications of Linux apps (0.8.8.8, in development)
+## Notifications of Linux apps (0.8.8.8)
 
 A Linux app's notifications are LordOS banners: `hw/notifyd.c` serves `org.freedesktop.Notifications` on the
 session bus (`docs/SETTINGS.md`, "Notifications"). Chromium, Google Chrome and Electron use it only when they reach
@@ -1027,7 +1031,7 @@ keyboard entered only the browser's window, and a click on the popup's close but
 computer Google Chrome 157, started from the launcher by a 0.8.8.7 session, had no `DBUS_SESSION_BUS_ADDRESS` and
 no bus connection, and its popup took the keyboard.
 
-## Security contexts (`wp_security_context_v1`, 0.8.8.8, in development)
+## Security contexts (`wp_security_context_v1`, 0.8.8.8, built, not yet checked on the VM)
 
 A sandbox engine tells lord-server which connections come from inside it. Flatpak 1.15 and later
 does it when the compositor offers `wp_security_context_manager_v1`: `flatpak run` makes a listening
@@ -1072,7 +1076,7 @@ socket in the sandbox instead of the normal one (`server/src/wl/secctx.c`).
   `close_fd` hanging up stops the listener; and each protocol error. Not yet checked on the VM with a
   real Flatpak.
 
-## Tray icons (StatusNotifierItem, 0.8.8.8, in development)
+## Tray icons (StatusNotifierItem, 0.8.8.8)
 
 Sync clients, messengers, game launchers and VPNs put an icon in the desktop's tray with the
 StatusNotifierItem protocol (Qt, KDE, Ayatana's AppIndicator, Chromium and Electron). lord-server
@@ -1116,9 +1120,10 @@ the icons show next to LordOS's status items in both themes (`sdk/trayitems.jsx`
 - **Tests.** `build/sni-test` (in `make -C server test`): the two registration forms, pixmap picking
   and validation, texts, and dbusmenu layouts within the depth and item caps, over messages built and
   validated by our own D-Bus code. `server/tests/tray_model_test.mjs`: which items show, the layout as
-  the SDK's menu, where it opens. Not yet checked on the VM with real apps.
+  the SDK's menu, where it opens. Checked on VM 127 with a GTK app using the Ayatana indicator library, and
+  the volume applet's symbolic SVG icon.
 
-## Sharing a screen or a window (ScreenCast, 0.8.8.8, in development)
+## Sharing a screen or a window (ScreenCast, 0.8.8.8, checked on VM 127)
 
 A browser's video call ("share a window / entire screen"), a recorder or a chat app asks the desktop for a screen or
 a window through `org.freedesktop.portal.ScreenCast`. LordOS serves it itself, on the portal name lord-server already
@@ -1224,7 +1229,8 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- Drag and drop (Wayland and X11 through XDND) is in development, see "Drag and drop". (`text-input`, LordOS input methods inside Wayland apps: in development, see "Input methods". Activation,
+- XDND with X11 apps: built in 0.8.8.8, to check on the VM, see "Drag and drop". (Wayland drag and drop: done in
+  0.8.8.8, see "Drag and drop". `text-input`, LordOS input methods inside Wayland apps: done in 0.8.8.8, see "Input methods". Activation,
   `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
 

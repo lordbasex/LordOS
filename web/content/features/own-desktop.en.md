@@ -27,9 +27,10 @@ Being precise matters here, because "our own" is easy to overstate.
 - PipeWire, for sound;
 - the Wayland protocol itself, through `libwayland-server` and `libwayland-client`;
 - `libxkbcommon` for keyboard layouts;
-- libraries used only inside sandboxed helper processes: FFmpeg (media), Poppler and libarchive (documents), OpenSSL (TLS for mail and remote desktop), FreeRDP's core (RDP in Remote Desk), Monocypher (the vault's cryptography).
+- libraries used only inside sandboxed helper processes: FFmpeg (media), Poppler and libarchive (documents), OpenSSL (TLS for mail and remote desktop), FreeRDP's core (RDP in Remote Desk), Monocypher (the vault's cryptography), libpipewire (screen sharing, `lord-screencast`), Tesseract (text recognition), audio.cpp (read aloud), nanosvg (SVG icons);
+- WPE WebKit, only in `lord-web`, the optional LordOS Web Runtime, with WebKit's own sandbox around its web and network processes.
 
-The rule the project follows is written down in `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK and Qt are not used inside LordOS itself. GTK and Qt apps still run, as Wayland clients.
+The rule the project follows is written down in `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK and Qt are not used inside LordOS itself; the one exception is the optional web app runtime, `lord-web`. GTK and Qt apps still run, as Wayland clients.
 
 ## How a frame reaches the screen
 
@@ -46,11 +47,12 @@ If a GPU with 3D acceleration is present, composition goes through Mesa (GBM, EG
 
 ## Where Linux apps plug in
 
-There are three kinds of windows on a LordOS desktop, and they connect at different layers:
+There are four kinds of windows on a LordOS desktop, and they connect at different layers:
 
 - **Built-in apps and the theme** (menu bar, Dock, Files, Settings…) run inside `lord-server`'s own JavaScript context, on the UI engine. The exceptions are Passwords and, since 0.8.2, Mail, Calendar, Contacts and Reminders, which run as isolated processes like `.lpk` apps.
 - **Installed `.lpk` apps** each run as a separate process (`lord-server --app <id>`, the same binary in "app mode"). That process has its own copy of the UI engine, locks itself in a sandbox and draws into a shared-memory buffer, which it hands to the compositor as an ordinary Wayland client.
 - **Linux apps** (GTK, Qt, Chromium, Firefox…) connect to the compositor's Wayland socket. They draw themselves; the theme puts its window frame around them.
+- **Web apps** (0.8.8.8, the optional `lordos-web` package) each run in their own `lord-web` process per app and profile, on WPE WebKit, as a Wayland client of the compositor (see [LordOS Web Runtime](/features/web-apps/)).
 
 So the compositor is the meeting point. The UI engine is used by LordOS's own interface and apps, not by Linux apps.
 
@@ -117,7 +119,7 @@ Released on 12 November 2026, the latest release.
 - **From your reports on GitHub.** Fold a whole Mail account, File → Open recent in the Text Editor, remove any Linux app a Debian package brought from Store → Installed and deactivate built-in apps you don't use, turn a Cloud account off without losing its sign-in, a smaller Dock, and about twenty fixes, from X11 apps run as root to rejoining a saved Wi-Fi network.
 - **Locking from logind.** `loginctl lock-sessions` and other admin tools lock the screen; only your password unlocks it.
 
-The keyboard widgets, the caret and logind's lock are built and tested, but not yet checked on our test machine.
+The keyboard widgets, the caret, global shortcuts and logind's lock are built and tested, but not yet checked on our test machine.
 
 ## New in 0.8.8.7
 
@@ -148,12 +150,12 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 
 - **Real PC GPUs are not verified yet.** The GPU path runs on the Raspberry Pi 5's V3D and on VMware's virtual GPU (SVGA3D), and was exercised with Mesa's software renderer in virtual machines. Testing on real AMD and Nvidia cards is still pending (`docs/GPU.md`).
 - **GPU drag, on by default in 0.8.7, is verified on V3D and SVGA3D only.** On a Raspberry Pi 5, in real drags, it halves the session's CPU alone and takes a memory load from 29 to 35 frames a second. On any other GPU only its self-test guards it, and `LORD_GPU_DRAG=0` turns it off (`docs/GPU.md`).
-- **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`). In 0.8.8.6's development, one PC with a Radeon RX 580 and three monitors brought two fixes (the hardware cursor's size and the login screen on the chosen main display); other cards, laptop panels and hubs are untested.
+- **Multiple displays were tested with two virtual heads and on one PC with a Radeon RX 580 and three monitors** (`docs/DISPLAYS.md`). That PC brought the hardware cursor's size and the login screen on the chosen main display in 0.8.8.6, and in 0.8.8.7 the hand-off that keeps DisplayPort monitors lit across lock, logout and login; other cards, laptop panels and DisplayPort hubs are untested.
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
 - **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
-- **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Since 0.8.8.8 drag and drop with Linux apps and LordOS input methods inside them work, and X11 apps also take drags and scale themselves on HiDPI, built but not yet checked on our test machine (`docs/WAYLAND.md`).
+- **X11 apps run through Xwayland since 0.8.3** and can see each other, as on any X11 desktop. Since 0.8.8.8 they scale themselves on HiDPI (before, they were sharp only at 100 %) and take drags through XDND, both built but not yet checked on our test machine. LordOS input methods compose in Wayland apps, not in X11 ones (`docs/WAYLAND.md`).
 - **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and since 0.8.8.8 keyboard navigation with a focus ring; a screen reader, zoom and high contrast are on the roadmap.
 
 ## Read the source
