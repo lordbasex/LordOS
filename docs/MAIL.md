@@ -98,8 +98,10 @@ Because it decides which servers `lord-maild` may reach, `lord.fs` cannot write 
 `~/.local/share/lordos/mail` is protected the same way.
 
 The file also keeps a little of Mail's view: each account's `collapsed` list names the folders
-whose subfolders are hidden in the sidebar (the disclosure triangles), so the tree looks the same
-at the next launch. Removing an account (Mail → Accounts → *Remove Account…*, after a confirmation)
+whose subfolders are hidden in the sidebar (the disclosure triangles), and `folded: true` marks an
+account folded to its header line (the triangle on the account's name), which then shows the
+account's unread mail (every folder but Sent, Drafts, Junk and Trash; `accountUnread` in
+`apps/mail/foldertree.js`), so the tree looks the same at the next launch. Removing an account (Mail → Accounts → *Remove Account…*, after a confirmation)
 takes it out of the file and its password out of the keyring, and `lord-maild` deletes what it had
 downloaded for it (mail, calendars, contacts); nothing is deleted on the server. Calendar and
 Contacts cannot write this file (`sec/brokermail.c`: Mail only), so the *Account Settings…* and

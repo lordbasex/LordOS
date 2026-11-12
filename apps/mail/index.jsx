@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HtmlView, TextView } from './HtmlView.jsx';
 import { Compose } from './Compose.jsx';
 import { AccountSetup, AccountsPanel, CertDialog, PasswordPrompt, Sheet } from './Setup.jsx';
-import { folderTree, toggleCollapsed } from './foldertree.js';
+import { folderTree, toggleCollapsed, accountUnread } from './foldertree.js';
 import { CATEGORY_COLORS, categoryName, listDate, fullDate, folderName, addrShort, formatSize, openPath, revealPath } from './util.js';
 import { quote } from './md.js';
 import { safeName } from './util.js';
@@ -534,6 +534,12 @@ function MailMain() {
     const cur = mailAccounts.get(a.id);
     if (cur) mailAccounts.update(a.id, { collapsed: toggleCollapsed(cur.collapsed, name, a.folders) }).catch(() => {});
   };
+  // A click on an account's header folds the whole account to that one line (#121), saved the same way
+  // (`folded`); the header then shows the account's unread mail.
+  const toggleAccount = (a) => {
+    const cur = mailAccounts.get(a.id);
+    if (cur) mailAccounts.update(a.id, { folded: !cur.folded }).catch(() => {});
+  };
   const specialOf = (acct, sp) => folders.find((a) => a.id === acct)?.folders.find((f) => f.special === sp)?.name;
   const act = {
     reply: () => msg && compose(replyDraft(msg, 'reply')),
@@ -658,17 +664,26 @@ function MailMain() {
           <SideRow icon="●" label={t('mail.unread')} selected={src.kind === 'unified' && src.filter === 'unread'} onClick={() => setSrc({ kind: 'unified', filter: 'unread' })} />
           <SideRow icon="⚑" label={t('mail.flagged')} selected={src.kind === 'unified' && src.filter === 'flagged'} onClick={() => setSrc({ kind: 'unified', filter: 'flagged' })} />
           {folders.map((a) => {
-            const tree = folderTree(a.folders, 8, accounts.find((x) => x.id === a.id)?.collapsed);
+            const saved = accounts.find((x) => x.id === a.id);
+            const folded = !!saved?.folded;
+            const tree = folded ? [] : folderTree(a.folders, 8, saved?.collapsed);
             const nested = tree.some((x) => x.kids);          // a column for the triangles only when something nests
             const status = st.accounts[a.id]?.status || a.status;
             const bad = st.authFailed[a.id] || status === 'auth' || status === 'cert' || status === 'offline';
+            // folded with one of its folders open: the header stands in for the selected row
+            const onHere = folded && src.kind === 'folder' && src.acct === a.id;
+            const unread = folded ? accountUnread(a.folders) : 0;
+            const dimC = onHere ? 'rgba(255,255,255,0.85)' : th.textDim;
             return (
               <View key={a.id} style={{ gap: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, marginTop: 16, marginBottom: 4, gap: 6 }}>
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
-                  {status === 'sync' || status === 'connecting' ? <Text style={{ fontSize: 10, color: th.textDim }}>⟳</Text> : null}
-                  {bad ? <Text onClick={() => setSheet(st.authFailed[a.id] || status === 'auth' ? { password: a.id } : st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : 'accounts')}
+                <View onClick={() => toggleAccount(a)} style={{ flexDirection: 'row', alignItems: 'center', height: 22, marginHorizontal: 2, [direction() === 'rtl' ? 'paddingLeft' : 'paddingRight']: 8,
+                  marginTop: 12, marginBottom: folded ? 0 : 2, gap: 6, borderRadius: 6, backgroundColor: onHere ? th.accent : 'transparent' }}>
+                  <Disclosure state={folded ? 'closed' : 'open'} color={dimC} onClick={() => toggleAccount(a)} />
+                  <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: onHere ? '#fff' : th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
+                  {status === 'sync' || status === 'connecting' ? <Text style={{ fontSize: 10, color: dimC }}>⟳</Text> : null}
+                  {bad ? <Text onClick={(e) => { e.stopPropagation?.(); setSheet(st.authFailed[a.id] || status === 'auth' ? { password: a.id } : st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : 'accounts'); }}
                     style={{ fontSize: 11, color: '#ff9f0a' }}>⚠</Text> : null}
+                  {unread ? <Text style={{ fontSize: 11, fontWeight: 500, color: dimC }}>{String(unread)}</Text> : null}
                 </View>
                 {tree.map(({ f, depth, kids, open, hidden }) => (
                   <SideRow key={f.name} icon={{ folder: f }} label={folderName(f)} count={hidden.reduce((n, h) => n + folderCount(h), folderCount(f))}
