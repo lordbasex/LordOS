@@ -1,0 +1,10 @@
+{
+  "openTitle": "“{app}”想要打开一个文件",
+  "saveTitle": "“{app}”想要存储一个文件",
+  "open": "打开",
+  "save": "存储",
+  "cancel": "取消",
+  "up": "向上",
+  "name": "名称",
+  "folder": "文件夹"
+}
