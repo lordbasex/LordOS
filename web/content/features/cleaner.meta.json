@@ -7,9 +7,9 @@
     "pt": "Limpeza"
   },
   "tagline": {
-    "en": "See what takes up your disk and remove what can safely go. A scan only reads; nothing changes until you confirm. New in 0.8.7.",
-    "es": "Mirá qué ocupa el disco y quitá lo que se puede quitar con seguridad. Un análisis solo lee; nada cambia hasta que confirmás. Nueva en la 0.8.7.",
-    "pt": "Veja o que ocupa o disco e remova o que pode sair com segurança. Uma análise só lê; nada muda até você confirmar. Novo na 0.8.7."
+    "en": "See what takes up your disk and remove what can safely go. A scan only reads; nothing changes until you confirm. Since 0.8.7.",
+    "es": "Mirá qué ocupa el disco y quitá lo que se puede quitar con seguridad. Un análisis solo lee; nada cambia hasta que confirmás. Desde la 0.8.7.",
+    "pt": "Veja o que ocupa o disco e remova o que pode sair com segurança. Uma análise só lê; nada muda até você confirmar. Desde a 0.8.7."
   },
   "lumo": {
     "pose": "front",
@@ -127,7 +127,7 @@
           "to": "helper",
           "label": {
             "en": "scan request",
-            "es": "pedido de análise",
+            "es": "pedido de análisis",
             "pt": "pedido de análise"
           }
         },

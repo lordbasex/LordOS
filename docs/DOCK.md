@@ -100,7 +100,7 @@ an unpinned running item until it quits.
 
 ### Data model (`sdk/dockmodel.js`, `sdk/dock.js`)
 
-`dockPinned` holds **typed ids**, so the three kinds can never collide:
+`dockPinned` holds **typed ids**, so the kinds can never collide:
 
 | Id | What | Opened with |
 |---|---|---|
@@ -108,6 +108,7 @@ an unpinned running item until it quits.
 | `lpk:<id>` | an installed `.lpk` package | `lord.apps.launchPackage(id)` |
 | `desktop:<desktop id>` | a Linux app's `.desktop` | `lord.apps.launch(id)` |
 | `shell:launcher` | the theme's app launcher | the theme |
+| `web:<id>` | an installed web app (`docs/WEBAPPS.md`) | `lord.webapps.launch(id, its first profile)` |
 
 Only these existing paths open a Dock item (`launchDockItem`): no new way to run anything, no
 commands, no paths. Ids are validated with the server's rules (`lpk_valid_id`, `valid_id` in
@@ -130,6 +131,21 @@ and the poof; the Lord Classic taskbar draws a drop line, unpins with the same d
 from the start menu (drag, or right click → Pin to taskbar) and keeps its Start button fixed (the
 launcher item isn't shown there). The model is tested by `server/tests/dock_model_test.mjs` (in
 `make test` when node is installed).
+
+### Web apps (0.8.8.8)
+
+A web app's windows (app id `lordos-web.<app>.<profile>`) group under its `web:<app>` item; clicking it
+opens the first profile. Its menu adds **New window: <profile>** for each other profile, and its window
+list shows "<title> — <profile>" with the profile's color as a dot (`sdk/dock.js`, `profileMenu` in
+`sdk/webappsmodel.js`).
+
+- **Unread badge.** A site's unread count (`org.lordos.WebApps1.SetBadge`) shows as a red badge on the
+  icon: the sum of the app's profiles, the number up to 99 and then "99+" (`badgeLabel`). Its size
+  follows the Dock's (`dockBadgeMetrics`: 18 px high at the usual sizes, down to 12 px on a small Dock).
+  On by default, with a switch per app in Settings → Web apps (`settings.webAppPrefs[app].badge`).
+- **Each profile has its own Dock icon.** Off by default (`dockPerProfile`). When on, a profile other than
+  the first gets an icon of its own while it has windows (`linux:lordos-web.<app>.<profile>`, `webDockId`),
+  with that profile's own unread count.
 
 ## The Dock's menu: quick actions
 
@@ -165,7 +181,7 @@ registerDockActions('settings', () => [{ id: 'network', label: 'settings.section
 `label` is an i18n key; `args` (strings, numbers, booleans) reach the app as `useAppWindow().args`
 (plus `action`), the app opening or coming to the front; `new: true` opens another window. Today:
 Settings (one per section, built from its own section list so it never drifts), Files (Home,
-Downloads, Documents, Trash), Mail (New Message), Monitor (Network, Cooling); the Terminal keeps its
+Downloads, Documents, Trash), Mail (New Message), Monitor (Network, Cooling, Disks, GPU); the Terminal keeps its
 own New Window and New Tab. A `.lpk` app gets none (it starts with `launchPackage(id)` and no
 arguments). A Linux app shows its `.desktop`'s desktop actions, run through the same launcher (see
 `WAYLAND.md`, "Desktop actions").

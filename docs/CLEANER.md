@@ -133,8 +133,8 @@ SMART is not part of it: reading it needs the admin helper and can wake a restin
 
 ## Looks
 
-Themes are data, one token object each (`sdk/cleanertheme.js`). Aurora is the default and follows the system's light or dark mode live.
-Aurora and Cristal, chosen in Settings, have one fixed look. The app and its panel use the same one.
+Three looks, as data, one token object each (`sdk/cleanertheme.js`): Aurora (the default) and Cristal have one fixed look;
+Noche follows the system's light or dark mode live. Chosen in Cleaner → Settings; the app and its panel use the same one.
 
 Each section tints the window, crossfading over 700 ms. During a full scan the sidebar narrows to a rail with a step badge.
 

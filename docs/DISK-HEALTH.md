@@ -1,6 +1,6 @@
 # Disk life
 
-Design for the next version (after 0.8.8.5). Status: **designed, not built**. Tick the checklist at the end as parts land.
+Design, not yet scheduled (written after 0.8.8.5; not in 0.8.8.6, 0.8.8.7 or 0.8.8.8). Status: **designed, not built**. Tick the checklist at the end as parts land.
 
 Goal: every disk shows **how much life it has left**, the way a laptop shows its battery's health: one number with a heart,
 a plain word (Good, Worn, Replace soon, Failing), and the facts behind it (written terabytes, hours, temperature, spare
@@ -123,5 +123,5 @@ condition word.
 - [ ] Monitor → Disks: heart per disk and the Life summary.
 - [ ] Disks: the Life card with the curve; the SD card wording fix.
 - [ ] Notifications.
-- [ ] i18n (en, es, pt, fr, it) and docs (DISKS section of the user docs, MONITOR.md).
+- [ ] i18n (en, es, pt, fr, it, lt) and docs (DISKS section of the user docs, MONITOR.md).
 - [ ] Tests (parsers, model) and the hardware checks of section 7.

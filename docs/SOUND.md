@@ -55,9 +55,11 @@ That code was only read to follow the format: it isn't linked or copied.
   notified with a `state` carrying the full state.
 - **Reconnection.** If PipeWire crashes or restarts, `snd_fd()` becomes a timer and it retries
   every 2 s. Meanwhile, the state says `connected: false`.
-- **Meter.** It is a recording stream of the chosen input: 1 float channel, at 25 Hz, with
-  `PEAK_DETECT` (the same thing pavucontrol does). The server sends one peak per packet.
-- **System sounds.** `pop`, `notify` and `error` are synthesized on the fly: sine waves with an
+- **Meter.** It is a plain recording stream of the chosen input: 1 float channel at 48 kHz, read
+  in blocks of 2048 samples (~23 levels a second), opened only while the Sound page is open. The
+  level is the largest sample of each block (see "Virtual machines (0.8.1)" below for why it no longer
+  uses a 25 Hz `PEAK_DETECT` stream).
+- **System sounds.** `pop`, `notify`, `error`, `chime`, `ping` and `drop` are synthesized on the fly: sine waves with an
   envelope, with no files or OGG decoder. They're uploaded once to the server's sample cache and
   then played with `PLAY_SAMPLE` on the default output, with `media.role=event`.
 - **Our own streams.** LordOS's streams (the meter and the sounds) don't show up in the app
@@ -75,7 +77,7 @@ That code was only read to follow the format: it isn't linked or copied.
 | `move('input', app, sink)` / `move('output', app, source)` | moves an app to another output or input |
 | `setProfile(card, profile)` | a Bluetooth card's profile (one of `cards`, one of its `profiles`): high fidelity or headset mode |
 | `meter(sourceIndex)` / `meter(-1)` | turns the meter on or off; for an output, its `monitor` is used |
-| `play('pop' \| 'notify' \| 'error')` | system sound |
+| `play('pop' \| 'notify' \| 'error' \| 'chime' \| 'ping' \| 'drop')` | system sound (the per-app notification sound is chosen from `sdk/notifytones.js`) |
 
 - `kind` is `'sink'` (output), `'source'` (input), `'input'` (app playing) or `'output'`
   (app recording).
@@ -86,7 +88,7 @@ That code was only read to follow the format: it isn't linked or copied.
 Events: `globalThis.__lordSound = (type, data) => …`
 
 - `type === 'state'`: `data` is the same as `state()`.
-- `type === 'peak'`: `data` is `{ source, level }` (0..1), 25 times per second while the meter
+- `type === 'peak'`: `data` is `{ source, level }` (0..1), about 23 times per second while the meter
   is on.
 
 Shape of the state:
@@ -323,8 +325,10 @@ does no harm.
   `setPort` (Line Out ↔ Speakers) was tested with `pactl`. Whether it is actually audible can't
   be checked in a VM with no audio on the host (`driver=none`); it still needs testing on a
   physical machine.
-- **Card profiles** (stereo, HDMI, duplex): `GET_CARD_INFO_LIST` and `SET_CARD_PROFILE` are
-  missing.
+- **Card profiles of non-Bluetooth cards** (stereo, HDMI, duplex): the protocol commands
+  (`GET_CARD_INFO_LIST`, `SET_CARD_PROFILE`) exist and are used for Bluetooth cards
+  (`setProfile`), but only Bluetooth cards are kept (`server/src/sound/sndcard.h`), so other
+  cards' profiles are not offered.
 - **Volume of virtual inputs.** The volume of a virtual input
   (`media.class=Audio/Source/Virtual`) doesn't change, not even with `pactl`: that's how it is in
   PipeWire 1.4.
@@ -332,7 +336,7 @@ does no harm.
   after restarting PipeWire ignores the volume, also with `pactl`. With something playing it
   works. It doesn't happen with real outputs.
 - **System sounds from files.** freedesktop themes come in OGG Vorbis and would need a decoder.
-  Today there are 3 synthesized sounds.
+  Today there are 6 synthesized sounds (`pop`, `notify`, `error`, `chime`, `ping`, `drop`).
 - **Repeated events.** Changes in our own streams (meter, sounds) generate a few extra `state`
   events, although they aren't shown. A few per second when turned on, not continuous.
 

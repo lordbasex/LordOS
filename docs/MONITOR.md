@@ -23,7 +23,7 @@ blocklists arrived ("Network, second generation").
 |---|---|
 | Overview | CPU, Memory, Network and Disk with a 60 s chart; (0.8.8.6) the main GPU (load, graphics memory, temperature, fan, the app using it most, "+N" with several; a click opens the GPU tab), LordOS's AI (active engine or idle) and running virtual machines; below, CPU temperature, fan, 1 min load, 5/15 min load and cached memory |
 | CPU | total usage (big chart), one chart per core, 1/5/15 load, temperature and tasks |
-| Memory | stacked bar (apps, system and drivers, file cache, free), swap, "Using the most memory" (each app's processes added up, the 8 largest) and a 60 s chart |
+| Memory | stacked bar (apps, system and drivers, file cache, free), swap, "Using the most memory" (each app's processes added up, the 8 largest; since 0.8.8.8 each process counts its proportional memory, PSS, when lord-server could read it, the user's own processes of 8 MB or more, else its resident memory; a sandbox wrapper (`bwrap`) adds its memory to the app but isn't counted as one of its processes: `apps/monitor/memtop.js`) and a 60 s chart |
 | Network | apps with connections, map, summary or detail of the chosen app (see below) |
 | Disks | total read and write; one row per disk (model, `/dev`, size, temperature, health, rates); the chosen disk's temperature over the last 30 minutes and its health, with "Open in Disks" (see "Disk temperature and health") |
 | Processes | sortable table (CPU, memory, threads, PID, user), search, "Mine" / "All"; Stop and Get Info for the selected process (see "Process actions") |
@@ -734,7 +734,7 @@ server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchma
 | `start()` / `stop()` | adds or removes an interested party; at 0, or with no queries for 3 s, the thread goes to sleep |
 | `want(processes, connections, countries)` | which lists the thread builds besides the sample |
 | `sample()` | the latest sample, or `null` if there is no new one |
-| `processes(lang)` | `{ t, total, hz, list: [{ pid, ppid, uid, user, name, cmd, exe, state, threads, cpu, rss, start, st, self, prot, app, appName, appIcon }] }` (`st`: start time in ticks; `prot`: why it can't be stopped, or `null`) |
+| `processes(lang)` | `{ t, total, hz, list: [{ pid, ppid, uid, user, name, cmd, exe, state, threads, cpu, rss, start, st, self, prot, pss, app, appName, appIcon }] }` (`st`: start time in ticks; `prot`: why it can't be stopped, or `null`; `pss`: proportional memory in bytes, since 0.8.8.8, only for the user's own processes of 8 MB or more resident, absent otherwise) |
 | `connections(lang)` | `{ t, ok, others, list: [{ id, proto, fam, state, dir, local, lport, remote, rport, scope, cc, pid, self, name, exe, sent, recv, app, appName, appIcon }] }` |
 | `info()` | `{ cpuModel, cores, geo, tick, home: { zone, cc, lat, lon } }`; `cpuModel` comes from `js_sys_cpu_name()`, the same one About uses (on ARM, the core from "CPU part" and the board) |
 | `map(view)` | requests a map frame: `{ width, height, lon, lat, ppd, land, border, accent, homeColor, selColor, home, dots: [{ lon, lat, r, sel }] }` (validated numbers, up to 2048×2048 and 256 dots) |
