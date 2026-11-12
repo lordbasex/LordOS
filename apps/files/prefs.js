@@ -21,6 +21,7 @@ const DEFAULTS = {
   searchScope: 'here',        // 'here' | 'home' | 'last'
   lastScope: 'here',
   columns: null,              // columns.js
+  colWidths: {},              // folder → its column's width in the column view (colview.js), the newest last
   recentFolders: [],
   sideWidth: SIDE_DEFAULT,
   defaultView: null,          // { view, sort } for a folder with none of its own

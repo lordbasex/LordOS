@@ -453,6 +453,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   seeks across volumes): `tests/doc_evil.sh` (new `vlist`/`vextract` commands in `build/doc-test`) and
   `tests/archive_vol_test.mjs` (names, order, holes, a lone `.001`, the 255-volume cap). Split RAR sets
   (`.part1.rar`) are not recognised yet: there was no sample to test them with. (GitHub #103)
+- **Files' column view: each column can be resized.** Dragging a column's divider widens or narrows it (140 to 600
+  px), and a double click on the divider fits it to its longest name, tags included. The width is kept per folder
+  in Files' settings (`files.colWidths`, the 200 most recent folders), and the view shows as many of the last
+  folders as fit next to the preview instead of always three. The divider reuses the list header's drag handling
+  and the view stays laid out left to right in every language. Width logic in `apps/files/colview.js`, tested in
+  `tests/files_colview_test.mjs`. (GitHub #99)
 
 ### Fixed
 

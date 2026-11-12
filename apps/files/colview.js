@@ -48,3 +48,42 @@ export function folderReadOnly(dir, home, stat) {
   if (dir === home) return false;
   try { return !stat(dir).writable; } catch (e) { return true; }
 }
+
+// ---- widths (GitHub #99) ----
+// Each column is as wide as its folder's stored width (dragging its divider; a double click fits it to the longest
+// name), else COL_W. The widths are kept per folder, at most MAX_COL_WIDTHS of them, the newest last.
+export const COL_W = 220;
+export const COL_MIN = 140;
+export const COL_MAX = 600;
+export const MAX_COL_WIDTHS = 200;
+// what a row takes besides its name: the column's and the row's padding, the icon and its gap, the › and the divider
+export const COL_EXTRA = 6 * 2 + 8 * 2 + 16 + 6 + 6 + 8 + 5;
+export const clampCol = (w) => Math.min(COL_MAX, Math.max(COL_MIN, Math.round(Number(w) || COL_W)));
+export const colWidth = (widths, dir) => {
+  const w = widths && typeof widths === 'object' ? widths[dir] : undefined;
+  return typeof w === 'number' && Number.isFinite(w) ? clampCol(w) : COL_W;
+};
+// w null forgets the folder's width (back to COL_W)
+export function colWidthsWith(widths, dir, w) {
+  const out = {};
+  if (widths && typeof widths === 'object') for (const [k, v] of Object.entries(widths)) if (k !== dir && typeof v === 'number' && Number.isFinite(v)) out[k] = clampCol(v);
+  if (w != null) out[dir] = clampCol(w);
+  const keys = Object.keys(out);
+  for (let i = 0; i < keys.length - MAX_COL_WIDTHS; i++) delete out[keys[i]];
+  return out;
+}
+// the width that shows the longest of these names (their measured widths, plus what tags add to each row)
+export const fitCol = (nameWidths, extras = []) =>
+  clampCol(Math.ceil(nameWidths.reduce((m, w, i) => Math.max(m, (Number(w) || 0) + (Number(extras[i]) || 0)), 0)) + COL_EXTRA);
+// how many of the last columns fit in avail with at least preview left for the preview (at least one is shown);
+// avail unknown (0): the last three, as before widths could change
+export function colsThatFit(widths, avail, preview = 200) {
+  if (!(avail > 0)) return Math.min(3, widths.length);
+  let used = 0, n = 0;
+  for (let i = widths.length - 1; i >= 0; i--) {
+    if (n && used + widths[i] > avail - preview) break;
+    used += widths[i];
+    n++;
+  }
+  return Math.max(1, n);
+}

@@ -26,7 +26,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
-import { columnEntries, columnRange, byFolder, folderReadOnly } from './colview.js';
+import { columnEntries, columnRange, byFolder, folderReadOnly, colWidthsWith } from './colview.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
@@ -948,6 +948,8 @@ export default function Files() {
 
   // ---- view ----
   const columns = columnsOf(prefs);
+  // the column view's widths, per folder (GitHub #99)
+  const onColWidth = (dir, w) => setPrefs({ colWidths: colWidthsWith(filesPrefs().colWidths, dir, w) });
   const onHeaderMenu = (ev) => {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
@@ -1157,7 +1159,8 @@ export default function Files() {
           {...(curDir ? { dropPath: curDir } : {})}>
             {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
             {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
-            {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort} />}
+            {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort}
+              widths={prefs.colWidths} onWidth={onColWidth} />}
             {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
         </View>
         {/* path bar and status bar */}
