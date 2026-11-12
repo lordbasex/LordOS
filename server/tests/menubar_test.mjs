@@ -3,6 +3,8 @@
 // and the clock panel's calendar. Bundles tests/menubar_scene.mjs with esbuild (as the theme is built) over a stub
 // `lord` with two sound outputs, a Wi-Fi radio and a Bluetooth adapter that records lord.sound calls, runs it, and
 // reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
+// An argument names another scene over the same stub and the whole SDK: tests/files_colview_scene.mjs (Files' column
+// view shows the tag dots, GitHub #99).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
@@ -69,7 +71,8 @@ const dir = mkdtempSync(path.join(tmpdir(), 'lord-menubar-'));
 let bad = 0, n = 0;
 try {
   // menubar_scene.mjs: the panels (#58); menubar_displays_scene.mjs: a bar on every display (0.8.8.6)
-  for (const scene of ['menubar_scene.mjs', 'menubar_displays_scene.mjs']) {
+  const scenes = process.argv[2] ? [path.basename(process.argv[2])] : ['menubar_scene.mjs', 'menubar_displays_scene.mjs'];
+  for (const scene of scenes) {
     const out = await esbuild.build({
       entryPoints: [path.join(here, scene)], bundle: true, write: false, format: 'esm',
       platform: 'node', target: 'es2022', nodePaths, logLevel: 'error', jsx: 'automatic',
@@ -87,7 +90,7 @@ try {
     }
     if (r.status !== 0 || !m) { bad++; console.log(`✗ ${scene} failed (${r.status}): ${r.stderr.slice(0, 2000)}`); }
   }
-  console.log(`menubar: ${n} checks, ${bad} failures`);
+  console.log(`${process.argv[2] ? path.basename(process.argv[2], '.mjs') : 'menubar'}: ${n} checks, ${bad} failures`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

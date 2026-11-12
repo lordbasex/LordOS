@@ -314,7 +314,10 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 24, paddingHorizontal: 8, borderRadius: 5,
                         backgroundColor: ctx.dropTarget === e.path || sel ? (ctx.selected.has(e.path) ? t.accent : t.hover) : 'transparent' }}>
                       <EntryIcon e={e} size={16} dark={t.mode === 'dark'} thumb={false} tint={tagTint(tagsOf(e.path))} />
-                      <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} color={ctx.selected.has(e.path) ? '#fff' : t.text} /></View>
+                      {/* the tag dots right after the name, as in the list view (the tint shows only on folders, GitHub #99) */}
+                      <View style={{ flexShrink: 1, minWidth: 0, ...(ctx.renaming?.path === e.path || !tagsOf(e.path).length ? { flex: 1 } : null) }}><Name e={e} ctx={ctx} color={ctx.selected.has(e.path) ? '#fff' : t.text} /></View>
+                      <TagDots tags={tagsOf(e.path)} size={7} />
+                      {tagsOf(e.path).length && ctx.renaming?.path !== e.path ? <View style={{ flex: 1 }} /> : null}
                       {e.dir && <Text style={{ fontSize: 12, color: ctx.selected.has(e.path) ? '#fff' : t.textDim }}>›</Text>}
                     </View>
                   );
