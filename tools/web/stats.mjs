@@ -7,6 +7,9 @@
 //   node tools/web/stats.mjs setup      log group (400 days), delivery source, destination, delivery
 //   node tools/web/stats.mjs dashboards create or replace the three dashboards
 //   node tools/web/stats.mjs test       run every dashboard query over the last hour and report
+//   node tools/web/stats.mjs downloads  GitHub's public download counts of the release files (ISO, OVA, Raspberry Pi
+//                                       image, Imager, .deb) into the LordOS-Descargas dashboard and the LordOS/Descargas
+//                                       metrics; run it once a day. GitHub's numbers only: no CloudFront log is read
 //   node tools/web/stats.mjs countries out.csv
 //                                       the country lookup table (ISO 3166-1 alpha-2, Spanish name,
 //                                       alpha-3, numeric) from Debian's iso-codes, to upload as
@@ -175,6 +178,53 @@ const DASHBOARDS = {
   ] },
 };
 
+
+// ---- downloads (GitHub's public counters; no visitor data) ----------------------------------
+
+const REPO_API = 'https://api.github.com/repos/lordbasex/LordOS/releases?per_page=100';
+const KINDS = [['iso', 'ISO amd64', (n) => /-amd64\.iso$/.test(n)], ['isoArm', 'ISO arm64', (n) => /-arm64\.iso$/.test(n)],
+  ['ova', 'OVA', (n) => /\.ova$/.test(n)], ['pi', 'Raspberry Pi', (n) => /\.img(\.xz)?$/.test(n)],
+  ['imager', 'Imager', (n) => /imager/.test(n) && /\.(deb|exe|dmg|zip)$/.test(n)], ['deb', '.deb de LordOS', (n) => /^lordos_[0-9.]+_(amd64|arm64)\.deb$/.test(n)]];
+
+async function downloads() {
+  const releases = [];
+  for (let url = REPO_API; url;) {
+    const r = await fetch(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'lordos-stats' } });
+    if (!r.ok) throw new Error(`GitHub: ${r.status}`);
+    releases.push(...await r.json());
+    const next = /<([^>]+)>;\s*rel="next"/.exec(r.headers.get('link') || '');
+    url = next ? next[1] : null;
+  }
+  const total = Object.fromEntries(KINDS.map(([k]) => [k, 0]));
+  const rows = [];
+  for (const rel of releases) {
+    const per = Object.fromEntries(KINDS.map(([k]) => [k, 0]));
+    for (const a of rel.assets || []) for (const [k, , match] of KINDS) if (match(a.name)) { per[k] += a.download_count; total[k] += a.download_count; }
+    if (Object.values(per).some(Boolean)) rows.push([rel.tag_name, (rel.published_at || '').slice(0, 10), per]);
+  }
+  const head = `| Versión | Fecha | ${KINDS.map(([, l]) => l).join(' | ')} |\n|---|---|${KINDS.map(() => '---:').join('|')}|\n`;
+  const line = (a, b, per) => `| ${a} | ${b} | ${KINDS.map(([k]) => per[k].toLocaleString('es-AR')).join(' | ')} |\n`;
+  const when = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const md = `## LordOS: descargas\nContadores públicos de GitHub de los archivos de cada release (una descarga no es una persona). `
+    + `Actualizado ${when} UTC con \`node tools/web/stats.mjs downloads\`. Las actualizaciones por APT no se cuentan: `
+    + `la página de cookies y estadísticas promete que las solicitudes de LordOS a lordos.org/apt quedan fuera de todo conteo.\n\n`
+    + head + line('**Total**', '', total) + rows.map(([t, d, p]) => line(t, d, p)).join('');
+  // the totals also go to metrics, so the dashboard can draw how they grow day by day
+  const data = KINDS.map(([k, label]) => ({ MetricName: 'Descargas', Dimensions: [{ Name: 'Archivo', Value: label }], Value: total[k], Unit: 'Count' }));
+  // (needs cloudwatch:PutMetricData on the deploy profile; without it the dashboard has the table only)
+  const pushed = aws(['cloudwatch', 'put-metric-data', '--namespace', 'LordOS/Descargas', '--metric-data', JSON.stringify(data)],
+    { json: false, quiet: true }) !== null;
+  if (!pushed) console.log('no cloudwatch:PutMetricData for this profile: the table only, no history graph');
+  const widgets = [text(md, 0, 0, 24, 4 + Math.ceil(rows.length * 0.6))];
+  if (pushed) widgets.push(
+    { type: 'metric', x: 0, y: 20, width: 24, height: 7, properties: { title: 'Descargas acumuladas por tipo de archivo', region: REGION,
+      view: 'timeSeries', stacked: false, period: 86400, stat: 'Maximum',
+      metrics: KINDS.map(([, label]) => ['LordOS/Descargas', 'Descargas', 'Archivo', label]) } });
+  aws(['cloudwatch', 'put-dashboard', '--dashboard-name', 'LordOS-Descargas', '--dashboard-body', JSON.stringify({ start: '-P90D', widgets })]);
+  console.log('LordOS-Descargas:', KINDS.map(([k, l]) => `${l} ${total[k]}`).join(', '));
+  console.log(`  https://${REGION}.console.aws.amazon.com/cloudwatch/home?region=${REGION}#dashboards/dashboard/LordOS-Descargas`);
+}
+
 // ---- commands -------------------------------------------------------------------------------
 
 function setup() {
@@ -268,5 +318,6 @@ const cmd = process.argv[2];
 if (cmd === 'setup') setup();
 else if (cmd === 'dashboards') dashboards();
 else if (cmd === 'test') test();
+else if (cmd === 'downloads') await downloads();
 else if (cmd === 'countries') countries(process.argv[3]);
 else { console.error('usage: node tools/web/stats.mjs setup|dashboards|test|countries'); process.exit(2); }
