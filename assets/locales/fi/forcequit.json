@@ -1,0 +1,7 @@
+{
+  "intro": "Jos sovellus lakkaa vastaamasta pitkäksi aikaa, valitse se ja osoita Pakota lopetus. Se sulkeutuu tallentamatta.",
+  "none": "Yhtään sovellusta ei ole auki",
+  "quit": "Pakota lopetus",
+  "shortcut": "Myös kruunuvalikossa: Pakota lopetus…",
+  "windows": "{count} ikkunaa"
+}

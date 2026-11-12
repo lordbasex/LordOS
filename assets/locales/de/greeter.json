@@ -1,0 +1,19 @@
+{
+  "bootTest": "Startzeit wird gemessen: Start {k} von {n} abgeschlossen. Neustart in {s} s. Eine Anmeldung beendet den Test ebenfalls.",
+  "bootTestCancel": "Test beenden",
+  "busy": "Einen Moment …",
+  "cancel": "Abbrechen",
+  "confirmRestart": "Es sind Sitzungen geöffnet: Nicht gespeicherte Arbeit geht verloren. Trotzdem neu starten?",
+  "confirmShutdown": "Es sind Sitzungen geöffnet: Nicht gespeicherte Arbeit geht verloren. Trotzdem ausschalten?",
+  "error": "Die Sitzung konnte nicht geöffnet werden.",
+  "locked": "Bildschirm gesperrt",
+  "noUsers": "Keine Benutzer",
+  "password": "Passwort",
+  "restart": "Neu starten",
+  "shutdown": "Ausschalten",
+  "wait": {
+    "one": "Zu viele Versuche. Warte {count} Sekunde.",
+    "other": "Zu viele Versuche. Warte {count} Sekunden."
+  },
+  "wrong": "Falsches Passwort."
+}

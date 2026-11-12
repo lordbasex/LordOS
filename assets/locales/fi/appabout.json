@@ -1,0 +1,9 @@
+{
+  "isolated": "Toimii eristettynä omassa prosessissaan",
+  "linux": "Linux-sovellus",
+  "lordos": "LordOS-sovellus",
+  "package": "Asennettu sovellus (.lpk)",
+  "system": "Järjestelmäsovellus – osa LordOS:ää ja varmennettu sen mukana",
+  "title": "Tietoja: {app}",
+  "version": "Versio {v}"
+}

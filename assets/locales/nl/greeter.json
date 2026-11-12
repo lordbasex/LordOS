@@ -1,0 +1,19 @@
+{
+  "bootTest": "Opstarttijd meten: opstart {k} van {n} klaar. Herstart over {s} s. Inloggen stopt de test ook.",
+  "bootTestCancel": "Test stoppen",
+  "busy": "Een ogenblik…",
+  "cancel": "Annuleer",
+  "confirmRestart": "Er zijn sessies open: niet-bewaard werk gaat verloren. Toch herstarten?",
+  "confirmShutdown": "Er zijn sessies open: niet-bewaard werk gaat verloren. Toch uitschakelen?",
+  "error": "De sessie kon niet worden geopend.",
+  "locked": "Scherm vergrendeld",
+  "noUsers": "Geen gebruikers",
+  "password": "Wachtwoord",
+  "restart": "Herstart",
+  "shutdown": "Zet uit",
+  "wait": {
+    "one": "Te veel pogingen. Wacht {count} seconde.",
+    "other": "Te veel pogingen. Wacht {count} seconden."
+  },
+  "wrong": "Onjuist wachtwoord."
+}

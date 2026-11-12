@@ -1,0 +1,19 @@
+{
+  "bootTest": "Mitataan käynnistysaikaa: käynnistys {k}/{n} valmis. Uudelleenkäynnistys {s} s:n kuluttua. Myös kirjautuminen lopettaa testin.",
+  "bootTestCancel": "Lopeta testi",
+  "busy": "Hetkinen…",
+  "cancel": "Peruuta",
+  "confirmRestart": "Istuntoja on auki: tallentamaton työ menetetään. Käynnistetäänkö silti uudelleen?",
+  "confirmShutdown": "Istuntoja on auki: tallentamaton työ menetetään. Sammutetaanko silti?",
+  "error": "Istuntoa ei voitu avata.",
+  "locked": "Näyttö lukittu",
+  "noUsers": "Ei käyttäjiä",
+  "password": "Salasana",
+  "restart": "Käynnistä uudelleen",
+  "shutdown": "Sammuta",
+  "wait": {
+    "one": "Liian monta yritystä. Odota {count} sekunti.",
+    "other": "Liian monta yritystä. Odota {count} sekuntia."
+  },
+  "wrong": "Väärä salasana."
+}
