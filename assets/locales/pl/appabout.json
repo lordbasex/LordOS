@@ -1,0 +1,9 @@
+{
+  "isolated": "Działa w izolacji, we własnym procesie",
+  "linux": "Aplikacja Linux",
+  "lordos": "Aplikacja LordOS",
+  "package": "Zainstalowana aplikacja (.lpk)",
+  "system": "Aplikacja systemowa — część LordOS, weryfikowana razem z nim",
+  "title": "{app} — informacje",
+  "version": "Wersja {v}"
+}
