@@ -1887,3 +1887,24 @@ sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
 the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.
+
+## Step — the 0.8.8.8 arm64 release packages on the Raspberry Pi 5 (172.17.0.24, 2026-11-12)
+
+`tools/iso/mkdeb.sh` refuses a package without `lord-screencast` (0.8.8.8), and `lordos-web` needs `lord-web`. Approved by
+the maintainer on 2026-11-12, installed for `make -C server RELEASE=1`, `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh` and
+`tools/iso/mkdeb-web.sh` on arm64:
+
+```sh
+sudo apt-get install -y --no-install-recommends libpipewire-0.3-dev libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev
+```
+
+| Package | Version | Used by |
+|---|---|---|
+| `libpipewire-0.3-dev` (brings `libspa-0.2-dev`) | 1.4.2 | `lord-screencast` |
+| `libwpewebkit-2.0-dev` (brings `libwpewebkit-2.0-1`, `libwpe-1.0-dev`, `libsoup-3.0-dev`, `xdg-dbus-proxy`) | 2.48.3 | `lord-web` |
+| `libwpebackend-fdo-1.0-dev` | 1.16.0 | `lord-web` |
+
+The rest came in as their dependencies: `gir1.2-soup-3.0 libgav1-1 libyuv0 libavif16 libglvnd-core-dev libopengl-dev
+libglvnd-dev libegl1-mesa-dev libgssdp-1.6-0 libgstreamer-gl1.0-0 libgupnp-1.6-0 libgupnp-igd-1.6-0 libnice10
+libgstreamer-plugins-bad1.0-0 libharfbuzz-icu0 libsqlite3-dev libwebpdemux2 libwoff1 libwpe-1.0-1 libwpebackend-fdo-1.0-1`.
+About 0.1 GB of the SD card.
