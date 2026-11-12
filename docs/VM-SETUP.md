@@ -1887,3 +1887,18 @@ sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
 the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.
+
+**2026-11-12, Desk go-link and the sharing API's displays** ([GO-LINK.md](GO-LINK.md) section 12, [SCREEN-SHARING.md](SCREEN-SHARING.md)).
+Tests only, nothing from Debian:
+
+- `go-link-desk-lordos_1.8.1~test8_amd64.deb` (go-link's `feat/lordos-app`), installed with `dpkg -i`: the app in
+  `/usr/lib/lordos-apps/go-link-desk/`, signed by a throwaway author key.
+- A test `lord-server` of branch `feat/share-displays`, built with `RELEASE=1` and one more key in `server/src/sec/keys.h` (a
+  throwaway "official" key, never committed), installed over `/usr/lib/lordos/bin/lord-server`; the one it replaced is in
+  `/var/backups/lordos-pre-share-displays-*/`. Only this binary trusts the catalog below.
+- `~/.local/share/lordos/catalog/catalog.json` and `catalog.sig` of the user `alex`: a catalog with serial 20261112 that lists the
+  throwaway author key, signed by the throwaway official key.
+- `~/gl-test/` (the files above) and `~/gl-e2e/` (a tree for `server/tests/share_e2e.sh`: links to `/usr/lib/lordos/themes`,
+  `assets` and the code manifest, a development `lord-server`, `share-client`, a copy of `lord-media`, and a `sudo` wrapper with
+  an askpass file of the test password, removed after the run). The run's grants file was backed up and put back.
+- Undo: `dpkg -r go-link-desk-lordos`, the backed-up `lord-server` back in place, the catalog folder and both folders removed.
