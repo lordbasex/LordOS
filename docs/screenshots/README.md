@@ -25,3 +25,5 @@ and Portuguese, in [`gallery.json`](gallery.json). A full-screen Passwords shot 
 | [`greeter.png`](greeter.png) | The login screen. |
 | [`remote-desktop.png`](remote-desktop.png) | Settings → Sharing: remote desktop turned on (it is off by default), with its address and fingerprint. |
 | [`firewall-rules.png`](firewall-rules.png) | Settings → Privacy → app network access: trusted apps and per-app restrictions (LAN only, no incoming connections…). |
+| [`databases.png`](databases.png) | Databases: sample favorites in two colored groups, and an SSH favorite with its tunnel settings. |
+| [`machines.png`](machines.png) | Machines → New Machine: the four systems it can download, or an ISO, another app's machine or a disk image. |

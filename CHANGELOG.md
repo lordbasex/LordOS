@@ -37,6 +37,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **Explore → Apps: cards of one height, Databases and Machines with screenshots, and the web apps listed**, in
+  English, Spanish and Portuguese. Each app card lists at most four features (five when only one would be left over);
+  the rest open from an "N more" button over the card, a native `<details>` that works with the mouse, the keyboard
+  (Enter or Space opens it, Escape closes it) and touch, and closes with a click outside (`web/src/site.js`), so the
+  cards of a row keep one height and stay short. Databases' and Files' cards are summarized to the length of the
+  others (Databases: since 0.8.8.7, each connection in its own sandbox, SSH tunnels since 0.8.8.8, the safe mode,
+  Structure, Content and Query; Files: tabs and four views, Quick Preview, disks, Network; each version's additions
+  in "more"). Databases and Machines get real screenshots from a private headless session on the test VM, with
+  sample data only (`docs/screenshots/databases.png`: sample favorites in two colored groups and an SSH favorite's
+  tunnel; `docs/screenshots/machines.png`: the New Machine assistant). A new "Web apps" section, with its own filter
+  chip, lists the 37 web apps of the Store's catalog (`assets/webapps/catalog.json`) with each one's LordOS letter
+  tile and the Store's one-line description (`assets/locales/<lang>/webapps.json`), marks the one tested on LordOS,
+  links to `/features/web-apps/` and ends with the trademark notice (the names, logos and icons belong to their
+  owners, used only to identify the services; no affiliation or endorsement) and a link to the trademark policy.
 - **lordos.org: the LordOS Web Runtime as a headline feature, in English, Spanish and Portuguese.** A seventh card on
   the home page's features section ("LordOS Web Runtime"; the section's subtitle now names web apps too) opens a new
   feature page, `/features/web-apps/` (`web/content/features/web-apps.*`): what the runtime is and that it doesn't change

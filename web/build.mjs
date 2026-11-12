@@ -231,6 +231,21 @@ for (const a of apps) {
 }
 if (apps.length) log(`apps: ${apps.length} apps`);
 const HAS_APPS = apps.length > 0;
+// web apps: the Store's catalog of the LordOS Web Runtime (assets/webapps/catalog.json), shown as a list with
+// each entry's icon (LordOS's letter tile) and the one-line description the Store shows (assets/locales/<l>/webapps.json)
+const webappsFile = r('assets/webapps/catalog.json');
+const webapps = fs.existsSync(webappsFile) ? JSON.parse(fs.readFileSync(webappsFile, 'utf8')).apps.map((w) => ({
+  ...w, iconImg: w.icon && fs.existsSync(r('assets/webapps/icons', w.icon)) ? webp(r('assets/webapps/icons', w.icon), 80, 90, `webapp-${w.id}`) : null,
+})) : [];
+const webappDesc = Object.fromEntries(['en', 'es', 'pt'].map((l) => {
+  const f = r('assets/locales', l, 'webapps.json');
+  return [l, fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}];
+}));
+if (webapps.length) log(`apps: ${webapps.length} web apps from the catalog`);
+// cards show at most this many features; the rest open from "N more" over the card (a <details>, so mouse,
+// keyboard and touch work without the script; site.js only adds Escape and a click outside to close it)
+const CARD_FEATURES = 4;
+const cardCut = (n) => (n > CARD_FEATURES + 1 ? CARD_FEATURES : n);   // a single extra line shows in place of its button
 
 // ---------- pages ----------
 const team = JSON.parse(fs.readFileSync(path.join(WEB, 'i18n/team.json'), 'utf8'));
@@ -721,7 +736,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
   if (HAS_APPS) {
     const present = APP_CATS.filter((c) => apps.some((a) => a.category === c));
     const appCount = (n) => `<span class="n" aria-label="${n} apps">${n}</span>`;
-    const catButtons = [`<button type="button" class="g-chip" data-cat="all" aria-pressed="true">${esc(t.apps.all)} ${appCount(apps.length)}</button>`]
+    const catButtons = [`<button type="button" class="g-chip" data-cat="all" aria-pressed="true">${esc(t.apps.all)} ${appCount(apps.length + webapps.length)}</button>`]
       .concat(present.map((c) => `<button type="button" class="g-chip" data-cat="${c}" aria-pressed="false">${esc(t.apps.cats[c])} ${appCount(apps.filter((a) => a.category === c).length)}</button>`)).join('\n');
     const card = (a) => {
       const name = appName(a, l);
@@ -733,7 +748,12 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
 ${a.vendor ? `<p class="app-by">${esc(t.apps.by.replace('{v}', a.vendor))}${a.homepage ? ` · <a href="${esc(a.homepage)}" rel="noopener">${esc(t.apps.website)}</a>` : ''}</p>` : ''}
 ${a.upcoming ? `<span class="iso soon">${esc(t.apps.upcoming.replace('{v}', a.upcoming))}</span>` : ''}
 ${a.isolated ? `<span class="iso" title="${esc(t.apps.isolatedTitle)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>${esc(t.apps.isolated)}</span>` : ''}
-${feats.length ? `<ul>\n${feats.map((f) => `<li>${esc(f)}</li>`).join('\n')}\n</ul>` : ''}
+${feats.length ? `<ul>\n${feats.slice(0, cardCut(feats.length)).map((f) => `<li>${esc(f)}</li>`).join('\n')}\n</ul>` : ''}
+${feats.length > cardCut(feats.length) ? `<details class="app-more"><summary>${esc(t.apps.more.replace('{n}', feats.length - CARD_FEATURES))}</summary>
+<ul>
+${feats.slice(CARD_FEATURES).map((f) => `<li>${esc(f)}</li>`).join('\n')}
+</ul>
+</details>` : ''}
 ${shot}
 </article>`;
     };
@@ -744,7 +764,19 @@ ${c === 'thirdparty' ? `<p class="apps-note">${esc(t.apps.thirdpartyNote)}</p>` 
 ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompare(appName(y, l), l)).map(card).join('\n')}
 </div>
 </section>`).join('\n');
-    appsHtml = { appButtons: catButtons, sections, count: apps.length };
+    // the web apps of the catalog, after the third-party apps (their own filter chip)
+    const wdesc = (w) => { const k = String(w.description || '').replace(/^webapps\./, ''); return webappDesc[l][k] || webappDesc.en[k] || ''; };
+    const webSec = webapps.length ? `
+<section class="apps-sec" data-item data-cat="webapps" aria-labelledby="cat-webapps">
+<h2 id="cat-webapps">${esc(t.apps.cats.webapps)}</h2>
+<p class="apps-note">${esc(t.apps.webappsNote.replace('{n}', webapps.length))} <a href="${pageUrl(l, 'features/web-apps')}">${esc(t.apps.webappsMore)}</a></p>
+<ul class="webapps" role="list">
+${[...webapps].sort((x, y) => x.name.localeCompare(y.name, l)).map((w) => `<li class="webapp">${w.iconImg ? `<img src="${w.iconImg.url}" width="40" height="40" alt="" loading="lazy" decoding="async">` : `<span class="app-letter" aria-hidden="true">${esc(w.name.slice(0, 1))}</span>`}<div><h3>${esc(w.name)}</h3><p>${esc(wdesc(w))}</p>${w.tested ? `<span class="iso">${esc(t.apps.webappTested)}</span>` : ''}</div></li>`).join('\n')}
+</ul>
+<p class="apps-tm">${esc(t.apps.webappsTrademark)} <a href="${pageUrl(l, 'legal/trademark')}">${esc(t.apps.trademarkPolicy)}</a></p>
+</section>` : '';
+    const webChip = webapps.length ? `\n<button type="button" class="g-chip" data-cat="webapps" aria-pressed="false">${esc(t.apps.cats.webapps)} ${appCount(webapps.length)}</button>` : '';
+    appsHtml = { appButtons: catButtons + webChip, sections: sections + webSec, count: apps.length };
   }
   // Explore: the apps and the screenshots in one page, each with its own filters (site.js [data-filters])
   const nPill = (n) => `<span class="n">${n}</span>`;
