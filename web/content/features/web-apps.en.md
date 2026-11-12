@@ -97,7 +97,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 ## Settings → Web Apps
 
-Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (LordOS's, the site's, or none), the icon (the site's own or LordOS's letter tile) and Uninstall.
+Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the icon (the site's own or LordOS's letter tile) and Uninstall.
 
 [[shot:10]]
 

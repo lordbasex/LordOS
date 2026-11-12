@@ -97,7 +97,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 ## Ajustes → Apps web
 
-Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (el de LordOS, el del sitio o ninguno), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
+Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
 
 [[shot:10]]
 

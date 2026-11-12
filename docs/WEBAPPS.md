@@ -23,7 +23,7 @@ identify the services; LordOS is not affiliated with, endorsed or sponsored by t
 - **The manager** lives in what LordOS already has:
   - `lord.webapps` in lord-server (`server/src/ui/js_webapps.c`) keeps the registry and starts `lord-web`;
   - the Store has a "Web apps" section;
-  - Settings has a "Web apps" page;
+  - Settings has a "Web Apps" page;
   - the Dock and the launcher show each app with its icon.
 - **WebKit's own processes** (web content, network) run under WebKit's sandbox: bubblewrap, seccomp and
   `xdg-dbus-proxy`, always on.
@@ -255,9 +255,9 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
     origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
     image.
-  - **The app menu and Help:** Settings… opens Settings → Web apps on that app; Help starts with "<app> on the Web",
+  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; Help starts with "<app> on the Web",
     the app's origin in the browser.
-- **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; 0.8.8.8, in development): a web app
+- **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; since 0.8.8.8): a web app
   follows the desktop's light or dark mode as far as WPE WebKit 2.48 lets it.
   - **What WebKit lacks:** WPE 2.48's public API has no way to set the page's `prefers-color-scheme`, so every page
     sees light: `matchMedia('(prefers-color-scheme: dark)').matches` is false and CSS `@media (prefers-color-scheme:
@@ -324,7 +324,9 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
   on another site) stays, and the title then starts with that site's host. No WebKit context menu (LordOS's own,
   above), no developer extras, no windows opened without a click, no page cache, TLS errors fail.
 - **Engine:** the profile's own `WebKitNetworkSession` (`data/`, `cache/`, `cookies.sqlite`, no credential storage of
-  WebKit's own), memory pressure settings (a web process past 1.5 GB frees its caches), the document cache model.
+  WebKit's own), memory pressure settings (the computer's memory up to 3 GB as the base: rebuildable caches dropped
+  past a third, ~1 GB, decoded images and compiled code past half, ~1.5 GB, polled every 30 s; see "Performance"), the
+  document cache model.
   WebKit 2.48 has no switch for its sandbox: it is always on, and lord-web refuses the variable that turns it off.
 - **Closing:** without `background`, closing the window quits. With it the window is hidden (WebKit is told it is not
   visible and throttles); the Dock, the launcher or a notification shows it again, and with `tray` a
@@ -425,7 +427,8 @@ that was probed.
 - **Limitations:** `drm` for the two music services whose catalogs are protected (their songs likely won't play);
   `calls` where calls need WebRTC that WPE WebKit may not give (WhatsApp, Discord, Teams, Messenger, Meet); `push` for
   the apps people keep for their notifications (chat, social, mail, calendar, notes and tasks), which arrive only while
-  the app runs.
+  the app runs; `theme` where the site's CSS-only dark mode stays light and the site has a theme setting of its own
+  (WhatsApp).
   `background` is on for chat, mail, calendar and music (closing the window keeps the music playing).
 - **Icons** are LordOS's own letter tiles, never the service's logo: 128×128 RGBA PNG, a rounded square (radius 24)
   in a color close to the service's, its first letter in white DejaVu Sans Bold with a 50 px cap height from y = 39.
@@ -447,19 +450,19 @@ that was probed.
   tag; the facts row (version "always up to date", the day LordOS tested it, its data on disk, its memory); the
   description; publisher, the verified https origin, where it came from (LordOS's catalog or an address), the test,
   the engine ("LordOS Web (WPE WebKit <version>)", the installed `libwpewebkit-2.0-1` from the package index, no
-  program run), the permissions with their state (a link to Settings → Web apps), the profiles (each one's data and
+  program run), the permissions with their state (a link to Settings → Web Apps), the profiles (each one's data and
   memory, Open, New profile), background mode and the known limitations.
 - **The catalog's data for that page** (all optional, checked by `tests/webapps_model_test.mjs`): `publisher`;
   `verified` (`YYYY-MM-DD`, the day LordOS last checked the app on lord-web: left out until it is, and the page says
   "not tested yet"); `typicalMemoryMB` (one profile's Pss measured on LordOS: WhatsApp's 810 MB from the first check);
-  `limitations` (keys of `webapps.limit.*`: `drm`, `calls`, `push`). lord-server's own copy ignores them.
+  `limitations` (keys of `webapps.limit.*`: `drm`, `calls`, `push`, `theme`). lord-server's own copy ignores them.
 - **Memory now:** `lord.webapps.memory(app)` (read-only) sums `Pss` from `/proc/<pid>/smaps_rollup` of each running
   lord-web of the app and of every process under it (WebKit's web and network processes, bubblewrap), by profile:
   one pass over `/proc` for the parents, at most 64 processes (`server/src/web/webmem.c`, `tests/webmem_test.c` on a
   made-up `/proc`). A process it can't read is counted apart, never guessed. The page reads it every 5 s while open;
   when the app isn't running it shows the catalog's measured figure, if any.
 
-## Permissions (asked once per app, revocable in Settings → Web apps)
+## Permissions (asked once per app, revocable in Settings → Web Apps)
 
 The page's requests (notifications, camera, microphone, screen sharing, location) reach `lord-web` as WebKit
 permission requests. If the registry says `allow` or `deny`, `lord-web` answers on its own. If it says `ask`,
@@ -546,7 +549,7 @@ silently.
 - **What a crash or hang affects:** only that window. lord-server sees the process end and the Dock shows the app as
   closed.
 
-## Performance (0.8.8.8, in development)
+## Performance (since 0.8.8.8)
 
 - **Out of sight, WebKit throttles.** WebKit is told the view is visible only while the window is mapped, configured
   and not `suspended` (`webpage_view_visible`). lord-server sends xdg_toplevel's `suspended` (xdg-shell 6) for a window
@@ -590,7 +593,7 @@ silently.
 ### More registry keys (all optional; `webreg.c`, `tests/webreg_test.c`)
 
 - `tray` (boolean, `false` when missing, written only when `true`): the app's tray icon (StatusNotifierItem, Open and
-  Quit). Settings → Web apps → "Show in the menu bar", `lord.webapps.setTray(app, on)`. Background mode
+  Quit). Settings → Web Apps → "Show in the menu bar", `lord.webapps.setTray(app, on)`. Background mode
   (`background`, "Keep running when closed") stays its own switch.
 - `notifySound` (`"auto"` when missing, written only when it isn't): `"auto"` LordOS's sound only when the page plays
   none of its own (lord-web learns it and then sends the `suppress-sound` hint), `"app"` the page's sound only,
@@ -617,7 +620,7 @@ the launcher, the switcher and Settings use it; `icons()` lists the cache for th
 
 - **When:** the Store's cards ask for it lazily (`wantSiteIcon`), one probe at a time, never twice in a session for an
   app that failed; an installed catalog app without one gets it when it is launched (never blocking the launch);
-  Settings → Web apps → Refresh icon fetches it again. Without lord-web the letter tile stays.
+  Settings → Web Apps → Refresh icon fetches it again. Without lord-web the letter tile stays.
 - An address-added app's icon is still the one saved in the registry when it was added; uninstalling it removes its
   cached icon too (a catalog app's stays for the Store's card).
 
@@ -632,7 +635,7 @@ full). The count is clamped to 0..9999; it reaches the shell as the event `webap
 and a lord-web that leaves the bus gets a 0. `lord.webapps.badges()` gives the counts to a new JS context.
 
 The Dock draws a red badge on the app's icon with the sum of its profiles ("99+" past 99), Lord Classic's taskbar
-too; the Dock's window list shows each profile's own count. Settings → Web apps → "Show unread count on the Dock"
+too; the Dock's window list shows each profile's own count. Settings → Web Apps → "Show unread count on the Dock"
 (per user, `settings.webAppPrefs[app].badge`, on by default).
 
 ### Notifications
@@ -662,10 +665,10 @@ Notification sound and, when LordOS's sound plays, which one.
   the dot alone), as `~/.config/lordos/web/icons/<app>.<profile>.png` (`webicon_profile_write`, 0600, written again
   when the color or the site's icon changes, removed with the profile or for "none"). lord-web uses it when it is
   there, else the app's icon.
-- **One Dock icon per profile** (Settings → Web apps, off by default, `settings.webAppPrefs[app].dockPerProfile`):
+- **One Dock icon per profile** (Settings → Web Apps, off by default, `settings.webAppPrefs[app].dockPerProfile`):
   while a profile other than the first has windows, it has an icon of its own (not pinnable), with its own count; the
   first profile stays on the app's icon.
-- **Each profile's data** in Settings → Web apps is measured again when a profile is added or starts running and every
+- **Each profile's data** in Settings → Web Apps is measured again when a profile is added or starts running and every
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
 

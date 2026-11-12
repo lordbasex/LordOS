@@ -744,7 +744,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.7-beta"); no new I
   in the upgraded version, so one the user removed stays removed; tests in the package engine's suite.
 - [ ] **Logitech's special keys and buttons** (MX Keys, MX Master 3/3S): evdev keys with defaults, device profiles as
   data, and per-device actions in Settings → Keyboard and Mouse & Trackpad (work on branch `feat/special-keys`).
-  HID++ (battery, DPI, SmartShift, gesture button) is a design for review first (`docs/drafts/HIDPP.md`, needs an
+  HID++ (battery, DPI, SmartShift, gesture button) is a design for review first (`docs/drafts/HIDPP.md` on branch `feat/special-keys`, needs an
   AGENTS.md exception). Not in 0.8.8.7 or 0.8.8.8; still open.
 - [ ] The LordOS Imager 0.8.8.6 for the Mac (built and signed on the maintainer's Mac) and
   [#73](https://github.com/lordbasex/LordOS/issues/73) closed once it is published. Not in 0.8.8.7 or 0.8.8.8; still open.
@@ -810,7 +810,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
 - [ ] **Command-line tools on the new images** (requested 2026-11-05): `dnsutils` (dig, nslookup), `screen`, `mc`,
   `tcpdump`, `net-tools` (ifconfig, netstat, route) and `vim`, on the PC ISO and the Raspberry Pi image. Systems
   already installed get them from the Store or `apt`; decide whether the `lordos` package should also recommend them.
-  In 0.8.8.6 (in development): `screen`, `mc`, `tcpdump`, `net-tools` and `vim`, with `curl`, `wget`, `rsync`, `htop`,
+  Since 0.8.8.6: `screen`, `mc`, `tcpdump`, `net-tools` and `vim`, with `curl`, `wget`, `rsync`, `htop`,
   `fdisk`, `rfkill` and `jq`, are in one list both images read (`tools/iso/packages-tools.sh`) and are Recommends of
   `lordos`; `dnsutils` is not in it yet.
 - [x] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO. GRUB draws

@@ -86,6 +86,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   of the GitHub #124 fix with `net-test wifi-saved`; `docs/CLOUD.md` says Cloud shipped in 0.8.8.5 with the packaged
   1.75.2 engine. The site's Linux apps page (en, es, pt) adds removing Linux apps from Store → Installed and X11 apps run as
   administrator, and the FAQ's Linux apps answer separates what was checked on the test machine from what was not.
+- **Web apps and paper docs synced with the code.** The Spanish and Portuguese papers give the backdrop blur's 27.7 ms
+  like the English one; the X11-without-Xwayland limitation points to `compositor.log` (`/var/log/lordos/users/<user>/`)
+  instead of the old `session.log`; the web apps page lists all four notification sounds (Automatic, the default, too);
+  `docs/WEBAPPS.md` drops "in development" for 0.8.8.8, describes the current memory pressure limits, lists the
+  `theme` limitation and says "Settings → Web Apps" as the English UI does (so does the English paper); the roadmap
+  and `docs/PAPER-VALIDATION.md` lose stale version notes; an unused diagram is removed from the web apps page's data.
 
 ## [0.8.8.8-beta] - 2026-11-12
 
