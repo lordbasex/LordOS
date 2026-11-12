@@ -21,6 +21,7 @@ import { createRequire } from 'node:module';
 import { markdown, inline, frontMatter, slugify } from './lib/md.mjs';
 import { diagram } from './lib/diagram.mjs';
 import { paperMarkdown } from './lib/papermd.mjs';
+import { archFigure } from './lib/archsvg.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
 import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
 
@@ -246,6 +247,8 @@ const featureList = fs.existsSync(featDir)
     .filter((m) => m.slug && LANGS.every((l) => fs.existsSync(path.join(featDir, `${m.slug}.${l}.md`))))
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
   : [];
+const figDir = path.join(CONTENT, 'figures');
+const FIGURES = fs.existsSync(figDir) ? Object.fromEntries(fs.readdirSync(figDir).filter((f) => f.endsWith('.json')).map((f) => { const d = readJson(path.join(figDir, f)); return [d.id, d]; })) : {};
 const paperDir = path.join(CONTENT, 'paper');
 const HAS_PAPER = !process.argv.includes('--no-paper') && LANGS.every((l) => fs.existsSync(path.join(paperDir, `paper.${l}.md`)));
 const paperMeta = HAS_PAPER && fs.existsSync(path.join(paperDir, 'meta.json')) ? readJson(path.join(paperDir, 'meta.json')) : {};
@@ -556,7 +559,7 @@ ${langMenu(t, page, true)}
 </footer>${toTop(t)}`;
 }
 
-const ICONS = ['M4 17l6-6-6-6M12 19h8', 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z', 'M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18M12 3a9 9 0 110 18 9 9 0 010-18', 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z', 'M4 6h16v12H4zM4 7l8 6 8-6', 'M4 5h16v14H4zM4 9h16M8 5v4'];
+const ICONS = ['M4 17l6-6-6-6M12 19h8', 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z', 'M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18M12 3a9 9 0 110 18 9 9 0 010-18', 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z', 'M4 6h16v12H4zM4 7l8 6 8-6', 'M4 5h16v14H4zM4 9h16M8 5v4', 'M3 5h18v14H3zM3 9h18M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17'];
 const SHOWCASE_IMG = [r('docs/fans-monitor.png'), r('docs/polish/passwords-after-light.png'), r('docs/brand/screenshots/settings-light.png')];
 const TEASER_IDS = ['mail', 'calendar', 'files', 'passwords', 'photos', 'player', 'notes', 'monitor', 'terminal', 'store'];
 
@@ -819,6 +822,11 @@ ${shotList.join('\n')}
         if (!d) { console.warn('[web] unknown diagram', arg); return ''; }
         return diagram(d, l, diaStrings);
       }
+      if (kind === 'figure') {     // [[figure:<id>]]: web/content/figures/<id>.json drawn as inline SVG (web/lib/archsvg.mjs)
+        const f = FIGURES[arg];
+        if (!f) { console.warn('[web] unknown figure', arg); return ''; }
+        return archFigure(f, l);
+      }
       if (kind === 'shot') {
         if (/^\d+$/.test(arg || '')) {
           const sh = (screenshots || [])[+arg];
@@ -929,7 +937,7 @@ ${rels.join('\n')}
     const { data: fm, body } = frontMatter(fs.readFileSync(path.join(paperDir, `paper.${l}.md`), 'utf8'));
     const meta = { ...fm, ...paperMeta };
     if (l === 'en') {         // docs/PAPER.md, the copy on GitHub, always follows the English paper
-      const md = paperMarkdown(body, meta, paperDiagrams.diagrams || []), dst = path.join(REPO, 'docs', 'PAPER.md');
+      const md = paperMarkdown(body, meta, paperDiagrams.diagrams || [], FIGURES), dst = path.join(REPO, 'docs', 'PAPER.md');
       if (!fs.existsSync(dst) || fs.readFileSync(dst, 'utf8') !== md) { fs.writeFileSync(dst, md); log('docs/PAPER.md regenerated from paper.en.md'); }
     }
     let { html: bodyHtml, headings } = renderMd(body, paperDiagrams.diagrams || [], paperDiagrams.screenshots || meta.screenshots || []);

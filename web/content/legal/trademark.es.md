@@ -36,3 +36,7 @@ Escribinos por [nuestro formulario de contacto](https://www.iperfex.com/contacto
 ## Otras marcas
 
 Debian es una marca registrada de Software in the Public Interest, Inc. Linux es la marca registrada de Linus Torvalds. Raspberry Pi es una marca de Raspberry Pi Ltd. Los demás nombres pertenecen a sus dueños. LordOS no está afiliado a ellos ni cuenta con su respaldo.
+
+### Apps web
+
+El [LordOS Web Runtime](/features/web-apps/) y el catálogo de Apps web de la Tienda nombran servicios de terceros (WhatsApp, Telegram, Discord y otros) para que puedas encontrarlos. WhatsApp, Telegram, Discord y los demás nombres de productos y servicios, logos e íconos que se muestran son marcas de sus respectivos titulares. Se usan solo para identificar los servicios; LordOS no está afiliado a ellos ni cuenta con su respaldo o patrocinio. Los íconos del catálogo son los mosaicos con letra propios de LordOS; con el motor web instalado, LordOS puede descargar el ícono propio de cada sitio desde el sitio y mostrarlo en tu computadora, como hace un navegador. "Probada en LordOS" quiere decir solo que el proyecto LordOS comprobó en esa fecha que el sitio funciona en el LordOS Web Runtime, no que el titular del servicio haya aprobado nada. LordOS no modifica los sitios: los ejecuta tal como los sirven.

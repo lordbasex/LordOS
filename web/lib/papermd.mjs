@@ -1,6 +1,8 @@
 // papermd.mjs — docs/PAPER.md, the paper's English copy on GitHub, generated from web/content/paper/paper.en.md
 // on every site build so the two never drift apart (it stayed at 0.8.0 for five releases once). Diagrams
 // ([[diagram:id]]) become text figures from diagrams.json; screenshots become their caption.
+import { archText } from './archsvg.mjs';
+
 const L = (v) => (v && typeof v === 'object' ? v.en : v) || '';
 
 function figure(d) {
@@ -23,10 +25,11 @@ function figure(d) {
   return out.join('\n');
 }
 
-export function paperMarkdown(body, meta, diagrams) {
+export function paperMarkdown(body, meta, diagrams, figures = {}) {
   const byId = Object.fromEntries((diagrams || []).map((d) => [d.id, d]));
   const text = body
     .replace(/^\[\[diagram:([\w-]+)\]\]$/gm, (m, id) => (byId[id] ? figure(byId[id]) : ''))
+    .replace(/^\[\[figure:([\w-]+)\]\]$/gm, (m, id) => (figures[id] ? archText(figures[id]) : ''))
     .replace(/^\[\[screenshot:[^\]]*\]\]$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

@@ -10,6 +10,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Website
+
+- **lordos.org: the LordOS Web Runtime as a headline feature, in English, Spanish and Portuguese.** A seventh card on
+  the home page's features section ("LordOS Web Runtime"; the section's subtitle now names web apps too) opens a new
+  feature page, `/features/web-apps/` (`web/content/features/web-apps.*`): what the runtime is and that it doesn't change
+  the sites, a comparison with a plain web wrapper and a browser-installed PWA, the Store's Web apps section (the
+  catalog of 37 apps, of which one is marked tested on LordOS, and adding a site from its address), profiles, privacy and
+  security, editing, light and dark with its CSS-only limit, performance, Settings → Web Apps and the known limits, with
+  13 screenshots taken on VM 127 (`docs/webapps-*.png`) and a layer figure. The figure is new to the site: an inline
+  SVG drawn by the build from `web/content/figures/web-runtime.json` (`web/lib/archsvg.mjs`, `[[figure:<id>]]` in any
+  page), in the site's fonts and colour tokens so it follows light and dark, with a stacked layout for phones; in
+  `docs/PAPER.md` it becomes a text figure. The paper's §5.4 gains a one-line definition, a comparison table and the
+  figure (`docs/PAPER-VALIDATION.md` has three new rows), the FAQ's web apps answer links to the page, the trademark
+  policy gains a "Web apps" section on third-party service names and icons (no affiliation or endorsement; what "tested
+  on LordOS" means), and `docs/WEBAPPS.md` says plainly which small scripts `lord-web` adds and that it doesn't change
+  the sites. Feature pages Cleaner and Read aloud move one place down in the order.
+
 ## [0.8.8.8-beta] - 2026-11-12
 
 ### Added

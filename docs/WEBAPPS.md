@@ -2,7 +2,16 @@
 
 Web apps and PWAs (WhatsApp, Telegram, Outlook, Notion, Spotify…: 37 in the catalog) installed as LordOS apps, each one
 in its own process, with as many accounts ("profiles") as the person wants. Approved by the maintainer on 2026-11-10 (AGENTS.md, `lord-web`).
-In development for 0.8.8.8.
+In LordOS 0.8.8.8 (released 2026-11-12).
+
+LordOS doesn't change the sites or their PWAs: it runs them as their sites serve them, and the page is the service's
+own web interface (no native client of any service). It adds the window, the desktop integration and the security
+around it. Where WPE WebKit 2.48 lacks something a desktop needs, `lord-web` adds small scripts of its own, each one
+described below: the clipboard's `write`/`writeText` when the page has none and the drop's events (in the page's world,
+talking to a bridge in the isolated world `lordos-web-xfer`), the drag-select and copy helpers (the isolated world
+`lordos-web-select`, which the page can't see or change), and the `matchMedia` answer for light and dark (the page's
+world, with no privileges). None of them changes the site's code or content. The service names in the catalog are trademarks of their owners, used only to
+identify the services; LordOS is not affiliated with, endorsed or sponsored by them.
 
 ## What it is
 
