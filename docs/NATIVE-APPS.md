@@ -99,10 +99,10 @@ The apps in `apps/` are **system apps**: they are built into the theme bundles (
 run as their own process, `"process": "isolated"`, into `assets/sysapps/<id>/`: Passwords, Mail,
 Calendar, Contacts, Reminders and, in 0.8.5, the hidden Sandbox Probe), which LordOS checks
 against its signed manifest before running them (see [SIGNING.md](SIGNING.md), "Verified system
-code"), and the Store never offers to remove them ("System app — part of LordOS"). Since 0.8.8.8 (in
-development) 21 of them can be **deactivated** in Store → Installed instead: they leave the launcher,
+code"), and the Store never offers to remove them ("System app — part of LordOS"). Since 0.8.8.8, 21 of them can be **deactivated** in Store → Installed instead: they leave the launcher,
 the Dock, search and "Open With", can't be started and stop their background work, and come back with
-Activate (`sdk/appsoffmodel.js`; [PACKAGES.md](PACKAGES.md), "Store → Installed"). An installed
+Activate (`sdk/appsoffmodel.js`; [PACKAGES.md](PACKAGES.md), "Store → Installed"). Machines can't be
+deactivated while a machine is running, paused, starting or stopping (`vmActive`). An installed
 `.lpk` is never a system app, even with the same id: the theme's app wins and the package is not
 listed. `isSystemApp(id)` from `@lordos/sdk` tells them apart.
 
@@ -111,7 +111,11 @@ listed. `isSystemApp(id)` from `@lordos/sdk` tells them apart.
 (`MAJOR.MINOR.PATCH`, optionally `-` or `~` and a suffix). Store → Installed shows it next to the app
 ("LordOS app · 0.8.5") and About <app> shows it too, so the apps can later be versioned and released
 apart from LordOS. A system app moves to a new version when it changes: in 0.8.6, System Information and
-Settings. A new app starts at the release it first ships in: Cleaner and Remote Desk at 0.8.7.
+Settings. Since 0.8.8.7 a release package refuses an app whose files changed since the previous release tag while
+its version stayed the same (`node tools/app-versions.mjs`, run by `tools/iso/mkdeb.sh` for a release; `--bump`
+raises the patch number), so the versions now move apart from LordOS's: at 0.8.8.8 most apps are at 0.8.5, 0.8.6
+or 0.8.7, Settings at 0.8.8, Cleaner at 0.8.9 and Machines at 0.8.9-alpha.3. Cleaner and Remote Desk started at
+0.8.7, the release they first shipped in; Databases has its own line from 0.1.0 (0.1.1 at 0.8.8.8).
 
 ## Permissions and trust (M8)
 

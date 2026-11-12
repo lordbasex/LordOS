@@ -26,6 +26,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   policy gains a "Web apps" section on third-party service names and icons (no affiliation or endorsement; what "tested
   on LordOS" means), and `docs/WEBAPPS.md` says plainly which small scripts `lord-web` adds and that it doesn't change
   the sites. Feature pages Cleaner and Read aloud move one place down in the order.
+- **Docs and site match the code for media, languages, Machines, network and Cloud.** `docs/MEDIA.md` drops "in
+  development" from the markup editor (0.8.8.4), Linux players and SVG icons (0.8.8.8, each with its VM 127 check), and adds
+  screen and window sharing for Linux apps (protected windows black there too) and files dragged into Photos and Player;
+  `docs/NATIVE-APPS.md` describes the app versions as they are at 0.8.8.8 and that Machines can't be deactivated while a
+  machine runs; `docs/LANGUAGES.md` gives today's counts (12,416 keys in six complete languages, 577 error codes) and the
+  input methods inside Linux apps as shipped; `docs/VIRTUALIZATION.md` no longer names a nonexistent `sdk/vm.js` and covers
+  the VM window taking the shortcuts and deactivation; `docs/NETWORK.md` names `/var/log/lordos/lord-netd.log` and the rest
+  of the GitHub #124 fix with `net-test wifi-saved`; `docs/CLOUD.md` says Cloud shipped in 0.8.8.5 with the packaged
+  1.75.2 engine. The site's Linux apps page (en, es, pt) adds removing Linux apps from Store → Installed and X11 apps run as
+  administrator, and the FAQ's Linux apps answer separates what was checked on the test machine from what was not.
 
 ## [0.8.8.8-beta] - 2026-11-12
 

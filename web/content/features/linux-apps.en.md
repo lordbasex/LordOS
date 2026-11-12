@@ -64,6 +64,8 @@ Released on 12 November 2026, the latest release.
 - **Global shortcuts.** A call app's push-to-talk or a recorder's hotkeys work while another app is in front. You choose the keys in LordOS's sheet, and change or forget them in Settings → Keyboard.
 - **X11 apps.** They take part in drag and drop, and look sharp on HiDPI displays because they scale themselves (Settings → Displays brings back the old, blurry way).
 - **Terminal apps.** Programs such as htop open in a Terminal tab from the app launcher.
+- **Remove any Linux app.** Store → Installed offers Remove for every app a Debian package brought, a `.deb` installed from a file included, through the same plan sheet. Packages Debian marks essential, protected or required are never removed, nor anything when the plan would remove LordOS itself.
+- **X11 apps run as administrator.** An X11 app started with administrator rights, such as GParted through its prompt, now opens on the desktop (checked on our test machine). X11 access now needs a per-session key that LordOS gives the apps it starts; restricted Linux apps and isolated apps never get it, and a program of yours started some other way without the key is refused.
 - **Web apps.** The Store's Web apps section installs web apps, each in a window and process of its own with its own accounts, through the optional `lordos-web` package. Web apps follow the desktop's light or dark mode, live, through the page's `matchMedia`; a page that picks its colors only through CSS media queries stays light (choose Dark in its own settings). Tried on our test machine, in light and in dark.
 
 Global shortcuts, drags with X11 apps, sharp X11 apps and Terminal apps are built and tested, but not yet checked on our test machine.

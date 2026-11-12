@@ -120,7 +120,8 @@ until the card is turned off and on by hand (reported with the built-in card of 
      wpa_supplicant with the saved networks, DHCP).
   4. Not working 20 s after that: it is logged as `failed` and left alone (no loop).
   An interface turned off meanwhile (`net-down`) is left alone.
-- **The log.** Each step goes to `lord-netd`'s log (`journalctl -u lordos`, lines starting with
+- **The log.** Each step goes to `lord-netd`'s log (since 0.8.8.8 `/var/log/lordos/lord-netd.log`, root's, mode
+  0640, stamped lines; see `SYSTEM.md`, "Log files"; also still `journalctl -u lordos`, lines starting with
   `lord-netd: after sleep:` and `lord-netd: woke from sleep`) and as a `net wake …` notification
   (below).
 - **Tested (build VM, November 4):** `net-test wake` (the state machine: working, late association,
@@ -233,7 +234,7 @@ replies carry only data (a count, a public key).
 | `net-config` | `if\nmethod=dhcp\|static\|off\naddress=ip/n\n…gateway=ip\ndns=ip…` | admin | Saves and applies. Rejects system interfaces. |
 | `net-manage` / `net-unmanage` | `if` | admin | Writes and deletes `/etc/systemd/network/00-lordos-<if>.network` (`Unmanaged=yes`) and runs `networkctl reload`. |
 | `net-wifi-scan` | `if` | anyone | One `LOG` per network with `{ ssid, bssid, freq, signal, security: open\|wep\|wpa\|wpa2\|wpa2/wpa3\|wpa3\|enterprise, known }`, then `OK <n>` (≈3–10 s) |
-| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. An empty password for a network saved with a password or a derived key joins it with the saved one and leaves its files as they are (a click on a saved network in Settings). |
+| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. An empty password for a network saved with a password or a derived key joins it with the saved one and leaves its files as they are (a click on a saved network in Settings; GitHub #124, 0.8.8.8). A network an earlier version had already saved again as open can't be repaired that way, so Settings asks for the password when a network saved as open shows up as secured in the scan, and joining with it saves it again. |
 | `net-wifi-disconnect` | `if` | anyone | |
 | `net-wifi-forget` | `ssid` | admin | |
 | `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK vpn.imported`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR vpn.missingProgram type=<type> package=<package>` |
@@ -447,6 +448,7 @@ Nothing touches eth0, where SSH comes in. Everything runs on veth, network names
 make -C server build/net-test
 ./build/net-test crypto     # X25519 (RFC 7748), WPA PBKDF2 (IEEE 802.11i), base64
 ./build/net-test state      # what lord.net sees
+./build/net-test wifi-saved # a saved network's key file: what a join without a password keeps (GitHub #124)
 ```
 
 `sudo net-test act <action> '<arg with \n>'` runs an action like the helper does. `@file` adds a file. Resident processes leave their log in `/run/lordos/test/<process>.log`.
@@ -501,6 +503,11 @@ sudo ./build/net-test act net-restore ''           # wpa_supplicant on wlan0
 sudo ./build/net-test act net-wifi-scan wlan0
 sudo ./build/net-test act net-wifi-connect 'wlan0\nLordTest\nclave-segura-1'
 ```
+
+Joining a saved network again without its password (GitHub #124, 0.8.8.8): after the join above, `net-wifi-disconnect`,
+then `net-wifi-connect 'wlan0\nLordTest\n'` (empty password). Checked on VM 127 with `mac80211_hwsim` and a WPA2 access
+point from wpa_supplicant in AP mode: the build before saved the network as `open` and stayed `SCANNING`; 0.8.8.8 reaches
+`COMPLETED` with the key kept.
 
 **IPsec**
 

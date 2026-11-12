@@ -145,7 +145,7 @@ Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slav
 the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt, fr and it (0.8.8.2: 9,342 keys; 0.8.8.6: 11,075 keys, lt partial with 961, 8.7%), and 496 error codes from the server (0.8.8.6: 574). It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.8.8-beta): 12,416 keys, complete in en, es, pt, fr, it and lt, and 577 error codes from the server (earlier: 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
@@ -386,7 +386,8 @@ key passes through. Committed text arrives as a key that types that text, so any
 unchanged. `TextInput` shows the composition underlined in place; the terminal, over the cursor.
 The candidate window (`<ImeOverlay />`) is mounted by `startShell`: every theme has it.
 
-In a Linux app's field that speaks `zwp_text_input_v3` (in development) the composition goes to the app
+In a Linux app's field that speaks `zwp_text_input_v3` (since 0.8.8.8: GTK 3 and 4, Qt 6; checked on VM 127 with a
+GTK 4 field) the composition goes to the app
 instead, which draws it in place, and the finished text arrives as text, not as keys; the candidate
 window opens at the app's caret. Password fields never compose. See `WAYLAND.md`, "Input methods".
 
