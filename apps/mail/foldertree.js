@@ -11,6 +11,8 @@
 // - Folders named in `collapsed` (IMAP names, saved per account in Mail's accounts file as
 //   `collapsed`) hide what hangs under them; their row says so (open: false) and carries the hidden
 //   folders (`hidden`) so the sidebar can still count their unread mail.
+// - A whole account folds to its header line (`folded: true` in the same file, #121); the header
+//   then shows accountUnread().
 
 import { compareNames } from '../../sdk/collate.js';
 const ci = (s) => s.toUpperCase();
@@ -82,4 +84,18 @@ export function toggleCollapsed(collapsed, name, folders) {
   const cur = (Array.isArray(collapsed) ? collapsed : []).filter((n) => typeof n === 'string' && names.has(n));
   const next = cur.includes(name) ? cur.filter((n) => n !== name) : names.has(name) ? [...cur, name] : cur;
   return [...new Set(next)].sort();
+}
+
+// What a folded account's header shows (#121): the unread mail in all its folders, so folding an
+// account never hides new mail. Sent, Drafts, Junk and Trash do not count, as in the folder rows
+// (Drafts there shows how many drafts there are, not unread mail).
+const NOT_NEW = new Set(['sent', 'drafts', 'junk', 'trash']);
+export function accountUnread(folders) {
+  let n = 0;
+  for (const f of folders || []) {
+    if (!f || f.noselect || NOT_NEW.has(f.special)) continue;
+    const u = Number(f.unread);
+    if (Number.isFinite(u) && u > 0) n += Math.floor(u);
+  }
+  return n;
 }

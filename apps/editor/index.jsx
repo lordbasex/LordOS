@@ -3,12 +3,13 @@
 // project file (❖T), our own syntax highlighting and input methods.
 // See docs/EDITOR.md.
 import {
-  View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print, speechItems, registerSelection, ContextMenu,
+  View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print, speechItems, registerSelection, ContextMenu, settings, useSettings,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Doc, cursorAt, hasSel, selStart, selEnd } from './buffer.js';
 import { LANGUAGES, languageFor, languageById, paletteFor } from './syntax.js';
 import { EditorView } from './EditorView.jsx';
+import { addRecent, removeRecent, recentRows } from './recent.js';
 
 export function Icon({ size: s }) {
   const line = (w, c, top) => <View style={{ position: 'absolute', left: s * 0.3, top: s * top, width: s * w, height: s * 0.055, borderRadius: s * 0.03, backgroundColor: c }} />;
@@ -35,6 +36,11 @@ const tokensFor = (mode) => (mode === 'light'
 const relOf = (abs) => { const h = fs.home(); return abs === h ? '' : abs.startsWith(`${h}/`) ? abs.slice(h.length + 1) : abs; };
 const baseName = (p) => String(p).split('/').filter(Boolean).pop() || '';
 const dirOf = (p) => String(p).split('/').slice(0, -1).join('/');
+
+// File → Open Recent (#113): settings.json "editor": { recent } (recent.js)
+const editorPrefs = () => ({ recent: [], ...(settings.get().editor || {}) });
+const setRecent = (fn) => settings.set({ editor: { ...editorPrefs(), recent: fn(editorPrefs().recent) } });
+const fileExists = (p) => { const st = fs.stat(p); return !!st && !st.dir; };
 
 let nextTabId = 1;
 function newTab(path, text) {
@@ -241,6 +247,8 @@ export default function Editor() {
   const [find, setFind] = useState({ open: false, query: '', replace: '', regex: false, caseSensitive: false });
   const [msg, setMsg] = useState(null);
   const [lineQuery, setLineQuery] = useState('');
+  const [prefs] = useSettings();
+  const recentList = prefs.editor?.recent;
   const api = useRef(null);
   const tab = tabs.find((x) => x.id === activeId) || tabs[0];
   const doc = tab.doc;
@@ -268,8 +276,16 @@ export default function Editor() {
       setActiveId(nt.id);
       setOverlay(null);
       setMsg(null);
+      setRecent((l) => addRecent(l, abs));
       if (!fromTree && !root && !tabs.some((x) => x.path)) setRoot(dirOf(relOf(abs)));
     } catch (e) { setMsg({ ok: false, text: `${baseName(abs)}: ${e.message}` }); setOverlay(null); }
+  };
+  // a recent file that is gone by the time it is chosen leaves the list
+  const openRecent = (abs) => {
+    let ok = false;
+    try { ok = fileExists(abs); } catch (e) { ok = false; }
+    if (ok) openPath(abs);
+    else { setRecent((l) => removeRecent(l, abs)); setMsg({ ok: false, text: tr('editor.recent.gone', { name: baseName(abs) }) }); }
   };
 
   const saveTo = (tb, abs) => {
@@ -280,6 +296,7 @@ export default function Editor() {
         tb.path = abs;
         tb.langId = languageFor(abs).id;
       }
+      setRecent((l) => addRecent(l, abs));
       setMsg({ ok: true, text: tr('editor.saved', { name: baseName(abs) }) });
       setTabs((ts) => [...ts]);
       return true;
@@ -418,8 +435,14 @@ export default function Editor() {
   // ---- app menus ----
   useEffect(() => {
     const it = (label, action, hint, extra = {}) => ({ label: tr(label), hint, onClick: () => run(action), ...extra });
+    const rows = recentRows(recentList, { exists: fileExists, home: fs.home() });
+    const recentMenu = { label: tr('editor.cmd.openRecent'), submenu: [
+      ...(rows.length ? rows.map((r) => ({ label: r.label, disabled: r.missing, onClick: () => openRecent(r.path) }))
+        : [{ label: tr('editor.recent.none'), disabled: true }]),
+      '-', { label: tr('editor.recent.clear'), disabled: !rows.length, onClick: () => setRecent(() => []) },
+    ] };
     wm.setMenus(wid, [
-      { label: tr('editor.menu.file'), items: [it('editor.cmd.new', 'new', '❖N'), it('editor.cmd.open', 'open', '❖O'), it('editor.cmd.openFolder', 'openFolder', '❖⇧O'), '-',
+      { label: tr('editor.menu.file'), items: [it('editor.cmd.new', 'new', '❖N'), it('editor.cmd.open', 'open', '❖O'), it('editor.cmd.openFolder', 'openFolder', '❖⇧O'), recentMenu, '-',
         it('editor.cmd.save', 'save', '❖S'), it('editor.cmd.saveAs', 'saveAs', '❖⇧S'), '-',
         // print with the system dialog (M9): the text is laid out as a PDF in lord-doc
         it('editor.cmd.print', 'print', '❖P'), '-',
@@ -433,7 +456,7 @@ export default function Editor() {
       { label: tr('editor.menu.go'), items: [it('editor.cmd.gotoLine', 'gotoLine', '❖L'), it('editor.cmd.gotoFile', 'gotoFile', '❖T'),
         it('editor.cmd.nextTab', 'nextTab', 'Ctrl+Tab'), it('editor.cmd.prevTab', 'prevTab', 'Ctrl+⇧Tab')] },
     ]);
-  }, [tabs, activeId, find, doc.version]);
+  }, [tabs, activeId, find, doc.version, recentList]);
 
   const files = useMemo(() => (overlay === 'gotoFile' ? listFiles(root || '').map((p) => ({ key: p, path: p })) : []), [overlay, root]);
   const confirmTab = overlay?.confirm && tabs.find((x) => x.id === overlay.confirm);

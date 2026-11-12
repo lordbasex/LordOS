@@ -1,6 +1,6 @@
 // Mail's sidebar folder tree (issue #28), from server/: node tests/mail_foldertree_test.mjs
 import assert from 'node:assert/strict';
-import { folderTree, toggleCollapsed } from '../../apps/mail/foldertree.js';
+import { folderTree, toggleCollapsed, accountUnread } from '../../apps/mail/foldertree.js';
 
 const F = (name, special = '', delim = '.', extra = {}) => ({ name, display: delim && name.includes(delim) ? name.slice(name.lastIndexOf(delim) + 1) : name, special, delim, noselect: false, ...extra });
 const show = (tree) => tree.map(({ f, depth }) => `${'  '.repeat(depth)}${f.special || f.display}`);
@@ -66,5 +66,12 @@ assert.deepEqual(toggleCollapsed(['INBOX.Work'], 'INBOX.Work', dot), []);
 assert.deepEqual(toggleCollapsed(['INBOX.Work', 'Old/Gone', 7, null], 'INBOX.Trash', dot), ['INBOX.Trash', 'INBOX.Work']);
 assert.deepEqual(toggleCollapsed(undefined, 'Nope', dot), []);
 assert.deepEqual(toggleCollapsed(['INBOX.Work', 'INBOX.Work'], 'INBOX.Family', dot), ['INBOX.Family', 'INBOX.Work']);
+
+// a folded account's header (#121): unread mail in every selectable folder but Sent, Drafts, Junk and Trash
+const U = (f, unread, total = 0) => ({ ...f, unread, total });
+assert.equal(accountUnread([U(dot[0], 3), U(dot[1], 0, 9), U(dot[2], 4), U(dot[3], 7), U(dot[4], 2), U(dot[5], 5), U(dot[8], 1)]), 9);
+assert.equal(accountUnread([U(gmail[3], 6), U(gmail[5], 2)]), 2);           // a \Noselect container counts nothing
+assert.equal(accountUnread([U(dot[0], -1), U(dot[5], 'x'), U(dot[6], 2.5), null]), 2);
+assert.equal(accountUnread(undefined), 0);
 
 console.log('mail-foldertree-test: ok');

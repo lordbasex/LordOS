@@ -45,7 +45,10 @@ top of the SDK: it doesn't use CodeMirror or Monaco, nor vendored TextMate gramm
 - **Files:** ❖N new, ❖O open (own dialog), ❖S save, ❖⇧S save as, ❖W close tab. From Files, a
   double click on a file that isn't an image, sound, video or archive opens it here
   (`wm.open('editor', { args: { path } })`). Closing the window or a tab with changes asks first.
-  It rejects binary files and files larger than 8 MB.
+  It rejects binary files and files larger than 8 MB. File → Open recent lists the last 5 files
+  opened or saved, newest first, kept in `settings.json` as `editor.recent` (`apps/editor/recent.js`).
+  A file that is not there now is greyed out, and one that is gone when chosen leaves the list. Two
+  files with the same name show their folder. *Clear menu* empties the list.
 - **App menus** (in the theme's bar; in Lord Classic, since 0.8.5, in a strip under the window's title
   bar): File, Edit, View and Go, with their shortcuts.
 - **Input methods:** the editor registers with `ime.attach`, so Japanese, Chinese and Korean
