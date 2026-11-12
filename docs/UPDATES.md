@@ -465,7 +465,8 @@ mirrored app, it reaches the Store once the maintainer publishes the repository 
 - **Connecting to other computers** is what LordOS offers it for: RustDesk's window is a GTK 3 app
   like any other Linux app, with the same firewall and permissions. Not tested yet on LordOS.
 - **Being reached from another computer is not expected to work, by design:** LordOS has no
-  ScreenCast or RemoteDesktop portal (`WAYLAND.md`), Xwayland runs rootless with XTEST off, and
+  RemoteDesktop portal, and its ScreenCast portal (0.8.8.8, in development) shares only what the person picks each
+  time, with no input (`WAYLAND.md`); Xwayland runs rootless with XTEST off, and
   `remote.sock` refuses the user's own processes ([GO-LINK.md](GO-LINK.md), D6). LordOS's Remote
   Desktop (port 5673) is the way into a LordOS computer. Not tested on LordOS.
 - **Its system service.** The package's postinst always enables and starts `rustdesk.service`

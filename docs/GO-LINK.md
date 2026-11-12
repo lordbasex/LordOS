@@ -387,6 +387,17 @@ The stages run in order except where noted. Percentages are of what each stage's
 | **5. Measurements and review** | Section 6's numbers, review, attack run | 40 % | A real GPU with VA-API, which the lab hasn't got; an attack run like REMOTE.md's; a protected window; go/no-go on claims |
 | **6. Delivery** | Section 9, privacy page, Store text | 15 % | Everything that needs real keys and a release. Built locally: both `.deb`s with throwaway keys, the Store section, the catalog entry as a draft |
 
+**The generic Linux build on LordOS.** go-link Desk's Linux package (`go-link-desk`, `org.go-link.desk.desktop`), not the
+LordOS build this document designs, captures a Wayland session only through the RemoteDesktop portal and the ScreenCast
+portal together (go-link:`pkg/portal/portal_linux.go`, `Available` reads `RemoteDesktop.AvailableDeviceTypes` and
+`ScreenCast.AvailableSourceTypes`), and never tries X11 there (go-link:`pkg/capture/capture_linux.go`, `Problem`). LordOS
+serves ScreenCast (0.8.8.8, in development) but not RemoteDesktop ([WAYLAND.md](WAYLAND.md)), so that build reports
+`wayland_session` and streams go-link's own test card (go-link:`internal/services/screen_source.go`, the fallback
+`TestCardSource`), the PM5544 card with the clock and the FPS box. It looks the same as `lordos-testbench`'s card because
+that one was ported from go-link's (`server/src/testbench/card.c`); the testbench is not involved. The LordOS build, through
+the screen-sharing API, is the way to share a LordOS session with go-link. Read; the portal check was run on VM 127, go-link
+itself was not, since it isn't in LordOS's Store catalog.
+
 ## 12. What has been tested
 
 **Tested** on 2026-11-02, with test builds signed by throwaway keys, against the public signaling server and website:

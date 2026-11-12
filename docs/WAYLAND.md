@@ -1094,6 +1094,11 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   to lord-server and the bus passes fds, else 0; `AvailableCursorModes` is 3 (hidden, embedded): the cursor as
   metadata isn't offered. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the
   person picks every time.
+- **Not offered: `org.freedesktop.portal.RemoteDesktop`.** Nothing lets a Linux app move the pointer or type into
+  the session through a portal, and adding it would be a new security exception (`AGENTS.md`). A remote desktop host
+  whose Linux build asks for RemoteDesktop and ScreenCast together finds no portal for it, so it never calls
+  `CreateSession` and LordOS never shows the chooser: what such a host sends is its own fallback. Checked on VM 127:
+  `AvailableSourceTypes` reads 3 and `RemoteDesktop.AvailableDeviceTypes` is an unknown interface.
 - **The chooser** (`sdk/screencast.jsx`, `sdk/screencastmodel.js`): `Start` asks the bus which process called
   (`GetConnectionUnixProcessID`, the socket's credentials), and the system layer shows the app's name (only an
   identity LordOS verified: the app id of its launcher's scope, `appid_of_pid`; a process it can't tell is "An unknown
