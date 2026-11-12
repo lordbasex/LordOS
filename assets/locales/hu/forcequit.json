@@ -1,0 +1,7 @@
+{
+  "intro": "Ha egy alkalmazás egy ideje nem válaszol, válassza ki, és kattintson a Kilépés kényszerítése gombra. Mentés nélkül bezárul.",
+  "none": "Nincs megnyitott alkalmazás",
+  "quit": "Kilépés kényszerítése",
+  "shortcut": "A korona menüben is: Kilépés kényszerítése…",
+  "windows": "{count} ablak"
+}

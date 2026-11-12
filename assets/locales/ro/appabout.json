@@ -1,0 +1,9 @@
+{
+  "isolated": "Rulează izolat, în propriul proces",
+  "linux": "Aplicație Linux",
+  "lordos": "Aplicație LordOS",
+  "package": "Aplicație instalată (.lpk)",
+  "system": "Aplicație de sistem – parte din LordOS, verificată împreună cu acesta",
+  "title": "Despre {app}",
+  "version": "Versiunea {v}"
+}

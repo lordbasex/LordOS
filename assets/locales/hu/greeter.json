@@ -1,0 +1,19 @@
+{
+  "bootTest": "Rendszerindítási idő mérése: {k}/{n} indítás kész. Újraindítás {s} mp múlva. A bejelentkezés is leállítja a tesztet.",
+  "bootTestCancel": "Teszt leállítása",
+  "busy": "Egy pillanat…",
+  "cancel": "Mégse",
+  "confirmRestart": "Vannak nyitott munkamenetek: a nem mentett munka elvész. Mégis újraindítja?",
+  "confirmShutdown": "Vannak nyitott munkamenetek: a nem mentett munka elvész. Mégis leállítja?",
+  "error": "A munkamenetet nem sikerült megnyitni.",
+  "locked": "A képernyő zárolva",
+  "noUsers": "Nincsenek felhasználók",
+  "password": "Jelszó",
+  "restart": "Újraindítás",
+  "shutdown": "Leállítás",
+  "wait": {
+    "one": "Túl sok próbálkozás. Várjon {count} másodpercet.",
+    "other": "Túl sok próbálkozás. Várjon {count} másodpercet."
+  },
+  "wrong": "Hibás jelszó."
+}
