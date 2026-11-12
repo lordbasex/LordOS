@@ -5,8 +5,12 @@
  * TCP) and sets DISPLAY=:<n>. Nothing runs until an X11 app connects. Then, and only then, it
  * starts /usr/bin/Xwayland with a fixed argument list:
  *
- *   Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST
+ *   Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST -auth <file>
  *
+ * <file> is $XDG_RUNTIME_DIR/lord-xauth.<n>, the session's X cookie (xauth.h, GitHub #107): a client
+ * must show it, whatever its uid, so a program run as root with pkexec or sudo (GParted) connects
+ * with the DISPLAY and XAUTHORITY passed on to it. The cookie is made here, from getrandom, once
+ * per session; if it can't be written, Xwayland starts without -auth (only its own uid gets in).
  * fd 3 is the listening socket (Xwayland accepts that first connection and the next ones), fd 4 is
  * its Wayland connection (WAYLAND_SOCKET, a socketpair: lord-server knows which client is Xwayland)
  * and fd 5 is the window manager's connection (xwm.c). XTEST (synthetic input) is off: an X11 app
@@ -19,6 +23,8 @@
  * unless Settings → Displays says X11 apps are scaled by LordOS (xwl_set_self_scaling). */
 #include "xwayland.h"
 #include "xwm.h"
+#include "xauth.h"
+#include "../fsops.h"
 #include "x11wire.h"
 #include "wl.h"
 #include "../sec/cgroup.h"
@@ -33,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -59,9 +66,60 @@ static struct {
     time_t started, disabled_until;
     int quick_fails;
     int self_scale;                     /* X11 apps scale themselves (sharp); 0: LordOS enlarges them */
+    char auth[PATH_MAX];                /* the cookie's file (Xwayland's -auth), "" without one */
+    char rtdir[PATH_MAX];               /* the folder it is in */
+    unsigned char cookie[XAUTH_COOKIE_LEN];
 } XW = { .disp = -1, .lfd = -1, .pidfd = -1, .self_scale = 1 };
 
 static int on_connect(int fd, uint32_t mask, void *data);
+
+#define XAUTH_BASE "lord-xauth"
+
+/* Writes the cookie's file (again: Xwayland reads it at each start). 0, or -1. */
+static int auth_write(void) {
+    char host[256] = "", name[32];
+    if (gethostname(host, sizeof host - 1)) host[0] = 0;
+    host[sizeof host - 1] = 0;
+    unsigned char buf[1024];
+    size_t len = xauth_encode(buf, sizeof buf, host, XW.disp, XW.cookie);
+    if (!len) len = xauth_encode(buf, sizeof buf, NULL, XW.disp, XW.cookie);
+    snprintf(name, sizeof name, XAUTH_BASE ".%d", XW.disp);
+    char path[PATH_MAX];
+    if (!len || xauth_write(XW.rtdir, name, buf, len, path, sizeof path)) return -1;
+    snprintf(XW.auth, sizeof XW.auth, "%s", path);
+    return 0;
+}
+
+/* The session's X cookie (xauth.h): a new one, its file, XAUTHORITY for the apps LordOS starts and
+ * the file protected from lord.fs. On any failure, none: Xwayland starts as before 0.8.8.8 (no -auth). */
+static void auth_init(void) {
+    XW.auth[0] = 0;
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char real[PATH_MAX], prot[PATH_MAX + 16];
+    if (!rt || rt[0] != '/' || !realpath(rt, real) || strlen(real) >= sizeof XW.rtdir) {
+        fprintf(stderr, "xwayland: no runtime folder for the X cookie: X11 apps run as root can't connect\n");
+        return;
+    }
+    snprintf(XW.rtdir, sizeof XW.rtdir, "%s", real);
+    snprintf(prot, sizeof prot, "%s/" XAUTH_BASE, real);
+    fsops_protect_file(FSOPS_PF_XAUTH, prot);              /* before the file exists */
+    if (getrandom(XW.cookie, sizeof XW.cookie, 0) != (ssize_t)sizeof XW.cookie || auth_write()) {
+        fprintf(stderr, "xwayland: could not write the X cookie (%s): X11 apps run as root can't connect\n", strerror(errno));
+        explicit_bzero(XW.cookie, sizeof XW.cookie);
+        XW.auth[0] = 0;
+        return;
+    }
+    setenv("XAUTHORITY", XW.auth, 1);                       /* inherited with DISPLAY (xauth_env_drop removes both) */
+}
+
+/* Before each start: the file is still ours and regular, or it is written again with the same
+ * cookie (the apps already running keep working). 0 if Xwayland can get -auth. */
+static int auth_ready(void) {
+    if (!XW.auth[0]) return -1;
+    struct stat st;
+    if (!lstat(XW.auth, &st) && S_ISREG(st.st_mode) && st.st_uid == getuid() && !(st.st_mode & 077)) return 0;
+    return auth_write();
+}
 
 /* Is display n in use? A lock file with a live process, or a socket nobody's lock explains. A
  * stale lock and socket of ours (a previous session that crashed) are removed. */
@@ -138,6 +196,7 @@ int xwl_init(void) {
     }
     if (XW.lfd < 0) { fprintf(stderr, "xwayland: no free X display\n"); return -1; }
     setenv("DISPLAY", XW.display, 1);               /* inherited by the apps LordOS starts */
+    auth_init();
     /* Java (AWT/Swing) guesses frame insets for a reparenting window manager unless told: ours
      * doesn't reparent (the theme draws the frame), so without this its content is shifted and blank */
     setenv("_JAVA_AWT_WM_NONREPARENTING", "1", 1);
@@ -226,7 +285,11 @@ static void spawn(void) {
     snprintf(env_rt, sizeof env_rt, "XDG_RUNTIME_DIR=%s", getenv("XDG_RUNTIME_DIR") ? getenv("XDG_RUNTIME_DIR") : "/tmp");
     char *envp[] = { env_home, env_rt, "PATH=/usr/bin:/bin", "WAYLAND_SOCKET=4", "LANG=C.UTF-8", NULL };
     char *argv[] = { "Xwayland", disp, "-rootless", "-listenfd", "3", "-wm", "5",
-                     "-nolisten", "tcp", "-extension", "XTEST", NULL };
+                     "-nolisten", "tcp", "-extension", "XTEST", "-auth", XW.auth, NULL };
+    if (auth_ready()) {                                     /* no cookie: as before, without -auth */
+        if (XW.auth[0]) fprintf(stderr, "xwayland: the X cookie's file is gone and can't be written: started without it\n");
+        argv[11] = NULL;
+    }
     int managed = getenv("LORDOS_SESSIOND") != NULL;
     int pct = wlx_begin_scale(XW.self_scale);              /* before it binds the outputs */
     pid_t pid = fork();
@@ -318,6 +381,8 @@ void xwl_stop(void) {
         unlink(XW.sock);
         unlink(XW.lock);
     }
+    if (XW.auth[0]) { unlink(XW.auth); XW.auth[0] = 0; }
+    explicit_bzero(XW.cookie, sizeof XW.cookie);
     XW.display[0] = 0;
 }
 

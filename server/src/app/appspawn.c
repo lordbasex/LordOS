@@ -11,6 +11,7 @@
 #include "../ui/js_sys.h"
 #include "../vault/vclient.h"
 #include "apphost_bc.h"
+#include "../wl/xauth.h"
 
 #include <fcntl.h>
 #include <limits.h>
@@ -108,7 +109,7 @@ int app_spawn(const char *id) {
         if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         /* lord-server passes the id, already validated; there are no caller arguments */
         char *const argv[] = { self, (char *)"--app", (char *)id, NULL };
-        unsetenv("DISPLAY");                    /* no X11 for isolated apps (their seccomp has no unix socket() either) */
+        xauth_env_drop();                       /* no X11 for isolated apps (their seccomp has no unix socket() either) */
         execve("/proc/self/exe", argv, environ);   /* not `self`: after a package upgrade it is "<path> (deleted)" */
         _exit(127);
     }

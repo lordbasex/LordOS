@@ -752,7 +752,7 @@ like any other Linux app.
 - When the first X11 client connects, lord-server starts Xwayland with a fixed argument list:
 
   ```
-  /usr/bin/Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST
+  /usr/bin/Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST -auth $XDG_RUNTIME_DIR/lord-xauth.<n>
   ```
 
   fd 3 is the listening socket (Xwayland accepts that first connection), fd 4 its Wayland connection
@@ -760,6 +760,27 @@ like any other Linux app.
   window manager's connection. This is the fourth launcher exception (`AGENTS.md`): the binary must
   be a root-owned file nobody else can write; there are no arguments from JS or from anyone; the
   only trigger is a connection to the session's own X socket.
+- **The X cookie (0.8.8.8, GitHub #107).** When it reserves the display, lord-server makes a random
+  `MIT-MAGIC-COOKIE-1` (16 bytes from `getrandom`) and writes it as an Xauthority file,
+  `$XDG_RUNTIME_DIR/lord-xauth.<n>` (mode 0600, written to a fresh `O_EXCL | O_NOFOLLOW` name, fsynced and
+  renamed into place; entries for the host name and `FamilyWild`, so renaming the computer doesn't
+  matter), and sets `XAUTHORITY` to it for the apps it starts. Xwayland gets `-auth` with that file
+  and then lets in any client that shows the cookie, whatever its uid. That is what a program run as
+  root needs: `pkexec gparted` or `sudo gparted` from the Terminal keeps `DISPLAY` and `XAUTHORITY`
+  (GParted's polkit action has `allow_gui`; sudo keeps both by default), and root connects with the
+  cookie. Before this, Xwayland let in only its own uid and refused root with "Authorization
+  required, but no authorization protocol specified". The socket is still 0600, so in practice only
+  this user's programs and root's reach it. The file is rewritten with the same cookie if it is gone
+  when Xwayland starts again, and removed at logout (`xwl_stop`). If it can't be written (no private
+  runtime folder), Xwayland starts as before, without `-auth`, and the session log says so.
+  **Who doesn't get it:** restricted Linux apps and isolated apps lose `XAUTHORITY` together with
+  `DISPLAY` (`xauth_env_drop`, `server/src/wl/xauth.h`), and a restricted app's own view mounts an
+  empty runtime folder, so the file isn't there; `lord.fs` neither reads nor writes it
+  (`FSOPS_PF_XAUTH`, besides `/run` being outside what it reads); lord-web starts with a fixed
+  environment without either; a Flatpak app gets the cookie only if it has the X11 permission
+  (Flatpak copies the entry for the display into its own sandbox, as with any X server). Tested by
+  `build/xauth-test` (the file format, 0600, `O_EXCL`, a link at either name never followed, and
+  both variables removed by the two launchers).
 - Xwayland runs in its own scope (`lordos-xwayland.scope`, never lord-server's), in an empty network
   namespace inside a user namespace that maps only the user (it has no network at all), with
   `no_new_privs`, a minimal environment and its log in `/var/log/lordos/users/<user>/xwayland.log`. **XTEST is

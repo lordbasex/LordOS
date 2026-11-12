@@ -729,6 +729,12 @@ a Wayland app.**
 - **Xwayland itself** runs in `lordos-xwayland.scope` (not lord-server's), without network (its own
   empty network namespace) and with `no_new_privs`; it is started only by a connection to the
   session's X socket (mode 0600, no abstract socket, no TCP) and stopped 10 s after the last X app.
+- **The X cookie (0.8.8.8).** Xwayland requires the session's random `MIT-MAGIC-COOKIE-1`
+  (`-auth $XDG_RUNTIME_DIR/lord-xauth.<n>`, 0600), so a program run as root through pkexec or sudo can
+  open its window (GitHub #107) while a client without the cookie is refused. The apps LordOS starts
+  get it through `XAUTHORITY`; restricted Linux apps and isolated apps don't (both `DISPLAY` and
+  `XAUTHORITY` are removed and a restricted app's runtime folder is an empty one), and `lord.fs`
+  can't read or write the file.
 
 **Per-app identity.** An X11 app launched from LordOS is placed in its app scope
 (`app-lordos-<desktop id>.scope`) before it runs, exactly like a Wayland app, so the per-app
@@ -740,7 +746,7 @@ its own view (private `/tmp`, see `FIREWALL.md`), and LordOS doesn't put the X s
 removes `DISPLAY`: given the shared display above, a restricted X11 app could watch or drive the
 other X apps. Such an app must speak Wayland (most GTK/Qt apps do); an X11-only app with one of
 those restrictions doesn't open. Isolated `.lpk` apps never get X either (their seccomp filter
-refuses new unix sockets, and `DISPLAY` is removed). *Not done:* a separate Xwayland per restricted
+refuses new unix sockets, and `DISPLAY` and `XAUTHORITY` are removed). *Not done:* a separate Xwayland per restricted
 app, or "untrusted" X connections (the SECURITY extension), which would let such apps run with X
 isolated from the rest; tracked for a later version.
 
