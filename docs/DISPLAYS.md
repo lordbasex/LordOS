@@ -163,6 +163,14 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
 - **The login screen** follows the same DRM uevents since 0.8.5 (without the system bus), so a monitor
   plugged in after boot shows it (a Raspberry Pi 5 booted without HDMI used to stay without video until
   restarted), and it lays out its clock, users and buttons again on the main display.
+- **The lid** (`hw/lid.c`, issue #97): lord-server reads logind's `LidClosed` on the system bus
+  (Properties.Get, then PropertiesChanged from logind's own connection; nothing grabbed, nothing
+  polled, logind keeps its own lid handling). While the lid is closed and another display is
+  connected, `display_plan` leaves the built-in panel (eDP, LVDS, DSI) out: its head is closed as on
+  an unplug, the windows move to the other displays, and an external display becomes the main one
+  if the panel was. With only the panel connected it is kept: the only display is never turned off.
+  It comes back when the lid opens. Never saved; Settings lists it as off because of the lid
+  (`lidClosed`). The login screen has no system bus and does not follow the lid.
 - **No free CRTC** (the card drives fewer displays than are connected): the display is listed as
   connected but not active, and Settings says so.
 - **Settings** changes are live with the 15 s "Keep these display settings?" countdown (mode,

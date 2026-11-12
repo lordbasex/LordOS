@@ -443,6 +443,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The built-in panel turns off when the lid is closed on an external display.** lord-server never
+  looked at the lid: `display_plan` put every connected connector in the plan, so with the lid
+  closed and a monitor connected the laptop panel stayed lit (`/sys/class/drm/*-eDP-1/enabled` read
+  `enabled`, a laptop's logo stayed lit), kept part of the desktop and windows could sit on a panel
+  nobody sees. lord-server now reads logind's `LidClosed` on the system bus (Properties.Get, then
+  PropertiesChanged believed only from logind's own connection; new `hw/lid.c`, no grab and no
+  polling, logind's own lid handling unchanged). While the lid is closed and another display is
+  connected, the eDP, LVDS or DSI panel leaves the plan: its head is closed as on an unplug, its
+  windows move to the other displays and the external display becomes the main one if the panel
+  was. With only the panel connected it is kept (the only display is never turned off), and it comes
+  back when the lid opens. Settings → Displays lists the panel as off because of the lid (new
+  `lidClosed` in `lord.display.list()`, text in every language). New `build/lid-test` (28 checks:
+  the logind side with the bus replaced, and the plan with the card replaced) (GitHub #97).
 - Wi-Fi: a saved network with a password could not be joined again after it was lost; only Forget and joining
   with the password again worked. A click on a saved network in Settings → Network → Wi-Fi sends the join without
   a password, and `net-wifi-connect` saved the network again with that empty password: its `.json` said `open`, its
