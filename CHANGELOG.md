@@ -93,6 +93,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `theme` limitation and says "Settings → Web Apps" as the English UI does (so does the English paper); the roadmap
   and `docs/PAPER-VALIDATION.md` lose stale version notes; an unused diagram is removed from the web apps page's data.
 
+### Fixed
+
+- **Choosing an entry in the tray menu of go-link Desk (and other fyne.io/systray apps) did nothing.** These apps build
+  their com.canonical.dbusmenu menu anew, with new ids, every time they change it: go-link Desk refreshes its menu at
+  each status update, about every 1 to 2 seconds (`ResetMenu` and `AddMenuItem`, 21 `LayoutUpdated` signals each
+  time, seen with `busctl monitor` on VM 127: the ids went from 101–110 to 529–538 in a minute). LordOS read the
+  layout once when the menu opened and never listened to `LayoutUpdated`, so a choice made more than a moment later
+  sent `Event` with an id the app no longer had (406 for "About go-link Desk" while its menu was at 529–538) and the
+  app ignored it. lord-server now listens to the menu's `LayoutUpdated` and `ItemsPropertiesUpdated` and, while the
+  menu is open, reads the layout again (one `GetLayout` at a time) and sends it to the theme, which replaces the rows
+  of the open menu (`"sni-menu"` with `update: true`; `lord.sni.closed(id)` when it closes). A choice is also matched
+  by its place and label (a key per entry, `sni_menu_json` in `server/src/ui/snimodel.c`): an id of the layout before
+  the current one is found again in the current one, and when the app changed its menu after the last layout we read,
+  a fresh layout is asked for and the `Event` goes to the entry's new id. The `Event` call itself was already right,
+  `(isvu)`: the entry's id, `"clicked"`, an `int32` 0 variant and a timestamp, to the bus name and object path of the
+  item's `Menu` property (it is now built by `sni_event_body` so it can be tested). Apps whose ids stay the same
+  (pasystray's Ayatana menu) worked before and still do.
+- **The tray menu of a Linux app opened on every display**, with "Show the menu bar on every display" (the default)
+  and more than one display. Each display's bar draws its own copy of a tray icon, and the menu the app sent was kept
+  once for the item, so every copy drew it: clicking go-link Desk's icon on one of three displays opened its menu on
+  all three. The copies on the other displays then saw a press on a row as a press outside themselves and closed the
+  shared menu before the click reached the row, which also kept a choice from reaching the app. The click now records
+  the display of the copy that was clicked, the layout is kept with that display, and only the copy on it draws the
+  menu (`trayAsk`, `trayMenuShow`, `trayMenuHere`, `trayMenuUpdate` in `sdk/traymodel.js`, used by
+  `sdk/trayitems.jsx`).
+- Tests: `build/sni-test` (a menu built again with new ids: About, Quit and a submenu entry found by their key, a
+  changed label or another place is another entry, two alike entries are refused; the `Event` call parsed back as a
+  real message) and `server/tests/tray_model_test.mjs` (the menu drawn on one display out of three, the clicked one;
+  an open menu updated with new ids on the same display, a closed one left closed). Checked on VM 127 (one display)
+  with the generic go-link Desk 1.8.2-dev1 (Fyne): before, "About go-link Desk" did nothing; after, it opens the About
+  window after the menu had been open for a few seconds, and "Quit" quits; pasystray's menu and About work as before.
+  The several-display part is covered by the model tests only: VM 127 has one display and a headless lord-server has
+  only one output.
+
 ## [0.8.8.8-beta] - 2026-11-12
 
 ### Added

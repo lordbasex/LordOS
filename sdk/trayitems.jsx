@@ -1,7 +1,8 @@
 // trayitems.jsx — the tray icons of Linux apps (StatusNotifierItem) next to LordOS's own status items. lord-server is
 // the watcher and the host (server/src/ui/sni.c): it reads each item's icon, title and menu, and sends them here as the
 // "sni", "sni-gone" and "sni-menu" events (sdk/hardware.jsx). A click activates the app; a right click shows its
-// dbusmenu with the SDK's menu, or lets the app show its own. The pure parts are in traymodel.js.
+// dbusmenu with the SDK's menu, or lets the app show its own; while it is open, a menu the app changes comes again and
+// replaces it. The pure parts are in traymodel.js.
 import { createElement as h, useRef } from 'react';
 import { View, Text, Image, displayAt } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -10,15 +11,15 @@ import { Overlay } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { registerStatusItem } from './statusitems.js';
 import { t } from './i18n.js';
-import { trayShown, trayInitial, trayHeader, trayMenu, trayMenuAt, trayMenuWanted } from './traymodel.js';
+import { trayShown, trayInitial, trayHeader, trayMenu, trayMenuAt, trayMenuWanted, trayAsk, trayMenuShow, trayMenuHere, trayMenuUpdate } from './traymodel.js';
 import { iconSrc } from './iconsrc.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.sni) || null;
 const items = createStore({});            // id → item
-const menus = createStore({});            // id → the layout to show
+const menus = createStore({});            // id → { items, display }: the layout to show and the display asked from
 const off = new Map();                    // id → unregister
 const pixels = new Map();                 // id → { pix, px }: a new object only for a new pixmap (<Image pixels>)
-let asked = null;                         // { id, at }: the last click or right click
+let asked = null;                         // { id, at, display }: the last click or right click, and the display it was on
 
 function pixelsOf(item) {
   const had = pixels.get(item.id);
@@ -33,10 +34,15 @@ function boxOf(ref) {
   try { return ref.current ? lord.getLayout(ref.current.id) : null; } catch (e) { return null; }
 }
 
+// The display an item's copy is on (one copy per menu bar), or null before it is laid out.
+function displayOf(box) {
+  return box ? displayAt(box[0] + box[2] / 2, box[1] + box[3] / 2) : null;
+}
+
 function TrayMenu({ btn, item, layout, close }) {
   const box = boxOf(btn);
   if (!box) return null;
-  const at = trayMenuAt(box, displayAt(box[0] + box[2] / 2, box[1] + box[3] / 2));
+  const at = trayMenuAt(box, displayOf(box));
   const head = trayHeader(item);
   const list = trayMenu(layout, (entry) => { try { lord.sni.clicked(item.id, entry); } catch (e) { /* the app left */ } });
   const all = [...(head ? [{ header: head }] : []), ...(list.length ? list : [{ label: t('shell.tray.noMenu'), disabled: true }])];
@@ -52,13 +58,17 @@ function TrayItem({ id, height }) {
   const item = all[id];
   if (!trayShown(item)) return null;
   const point = (e) => [Math.round(e.x), Math.round(e.y)];
-  const close = () => { menus.set((m) => { const n = { ...m }; delete n[id]; return n; }); };
+  const close = () => {
+    menus.set((m) => { const n = { ...m }; delete n[id]; return n; });
+    try { lord.sni.closed(id); } catch (err) { /* lord-server without it */ }
+  };
+  const here = () => { const d = displayOf(boxOf(btn)); return d ? d.id : null; };
   const onClick = (e) => {
-    asked = { id, at: Date.now() };
+    asked = trayAsk(id, here(), Date.now());
     try { lord.sni.activate(id, ...point(e), false); } catch (err) { /* lord-server without a tray */ }
   };
   const onContextMenu = (e) => {
-    asked = { id, at: Date.now() };
+    asked = trayAsk(id, here(), Date.now());
     try { lord.sni.menu(id, ...point(e)); } catch (err) { /* lord-server without a tray */ }
   };
   const onMouseDown = (e) => { if (e.button === 1) { try { lord.sni.activate(id, ...point(e), true); } catch (err) { /* idem */ } } };
@@ -71,7 +81,14 @@ function TrayItem({ id, height }) {
     glyph,
     item.status === 'NeedsAttention' && !item.icon && !px
       ? h(View, { style: { position: 'absolute', right: 3, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#ff453a' } }) : null,
-    shown[id] ? h(TrayMenu, { btn, item, layout: shown[id], close }) : null);
+    shown[id] ? trayMenuOnHere(btn, item, shown, id, close) : null);
+}
+
+// Only the copy on the display that was clicked draws the menu.
+function trayMenuOnHere(btn, item, shown, id, close) {
+  const d = displayOf(boxOf(btn));
+  const layout = trayMenuHere(shown, id, d ? d.id : null);
+  return layout ? h(TrayMenu, { btn, item, layout, close }) : null;
 }
 
 function add(item) {
@@ -91,9 +108,11 @@ function remove(id) {
 export function trayEvent(kind, data) {
   if (kind === 'sni') add(data);
   else if (kind === 'sni-gone') { if (data && data.id) remove(data.id); }
+  else if (kind === 'sni-menu' && data && data.update) menus.set((m) => trayMenuUpdate(m, data.id, data.items));
   else if (kind === 'sni-menu' && data && trayMenuWanted(asked, data.id, Date.now()) && items.get()[data.id]) {
+    const ask = asked;
     asked = null;
-    menus.set({ [data.id]: Array.isArray(data.items) ? data.items : [] });
+    menus.set(trayMenuShow(ask, data.id, data.items));
   }
 }
 

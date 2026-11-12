@@ -56,3 +56,28 @@ export function trayMenuAt(box, d, gap = 4) {
 // or sends a layout by itself, opens nothing.
 export const TRAY_MENU_WAIT = 5000;
 export const trayMenuWanted = (asked, id, now) => !!asked && asked.id === id && now - asked.at >= 0 && now - asked.at < TRAY_MENU_WAIT;
+
+// With a menu bar on every display each display draws its own copy of an item, and the menu opens only on the display
+// whose copy was clicked: the click records that display's id (trayAsk), the app's layout is kept with it
+// (trayMenuShow) and each copy draws the menu only when it is on that display (trayMenuHere). Drawn on every display,
+// a press on one copy's rows was a press outside the others, which closed the menu before the click reached the row.
+export const trayAsk = (id, display, now) => ({ id, at: now, display: display == null ? null : display });
+
+// The menus to show once the asked-for layout came: only this one, on the display it was asked from.
+export const trayMenuShow = (asked, id, items) => ({ [id]: { items: Array.isArray(items) ? items : [], display: asked ? asked.display : null } });
+
+// The app changed the menu while it is shown (lord-server reads it again: "sni-menu" with update: true). Only an open
+// menu is updated, on the display it is on; fyne.io/systray's apps build their menu again with new ids at every
+// change, so the rows must carry the new ids for a choice to reach the app.
+export function trayMenuUpdate(shown, id, items) {
+  const m = shown && shown[id];
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return shown;
+  return { ...shown, [id]: { ...m, items: Array.isArray(items) ? items : [] } };
+}
+
+// The layout this item's copy on `display` draws, or null.
+export function trayMenuHere(shown, id, display) {
+  const m = shown && shown[id];
+  if (!m || typeof m !== 'object') return null;
+  return m.display === display ? m.items : null;
+}

@@ -22,7 +22,10 @@ int  sni_activate(int id, int x, int y, int secondary);
 /* A right click: 1 the dbusmenu layout was asked for (it comes as the "sni-menu" event), 0 the app shows its own
  * menu (ContextMenu), -1 no such item. */
 int  sni_menu(int id, int x, int y);
-/* An entry of the last menu shown for that item was chosen. 0 sent, -1 not one of its entries. */
+/* An entry of the last menu shown for that item was chosen. 0 sent (or sent once a fresh layout says its id), -1 not
+ * one of its entries. While a menu is shown, a new layout from the app comes as "sni-menu" with "update": true. */
 int  sni_menu_clicked(int id, int32_t entry);
+/* The menu shown for that item closed: new layouts from the app are no longer read. */
+void sni_menu_closed(int id);
 
 #endif

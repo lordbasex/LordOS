@@ -47,7 +47,19 @@ void sni_text(const char *in, char *out, size_t n, int mnemonic);
  *   [{"id":4,"label":"Open","enabled":true,"toggle":"checkmark","on":false,"sub":[…]}, {"sep":true}, …]
  * Hidden entries are left out; labels go through sni_text; past SNI_MENU_DEPTH a submenu is cut and past
  * SNI_MENU_ITEMS entries the rest are left out (still read past). ids (up to max) gets the ids of the entries that can
- * be clicked, *nids their count. 0 ok, -1 malformed. */
-int sni_menu_json(DRd *r, HBuf *b, int32_t *ids, int max, int *nids);
+ * be clicked, *nids their count, and keys (NULL: not wanted) the key of each: a hash of its place in the menu (the
+ * index and label of it and of each entry above it), the same for the same entry in a menu the app built again with
+ * new ids (fyne.io/systray's apps do, every time they change one label). 0 ok, -1 malformed. */
+int sni_menu_json(DRd *r, HBuf *b, int32_t *ids, uint32_t *keys, int max, int *nids);
+
+/* The key of entry id in a table sni_menu_json filled: 0 found, -1 not there. */
+int sni_menu_key(const int32_t *ids, const uint32_t *keys, int n, int32_t id, uint32_t *key);
+/* The id of the one entry with that key, or -1 (none, or more than one). */
+int32_t sni_menu_find(const int32_t *ids, const uint32_t *keys, int n, uint32_t key);
+
+/* com.canonical.dbusmenu's Event for a chosen entry, the body of signature SNI_EVENT_SIG: (id, "clicked", <int32 0>,
+ * timestamp), what libdbusmenu, Qt, Ayatana and fyne.io/systray all read as a click. b must be dw_init'ed. */
+#define SNI_EVENT_SIG "isvu"
+void sni_event_body(DBuf *b, int32_t id, uint32_t timestamp);
 
 #endif

@@ -617,12 +617,20 @@ static JSValue f_sni_clicked(JSContext *c, JSValueConst t, int argc, JSValueCons
     return JS_NewBool(c, !sni_menu_clicked(arg_int(c, argv[0], 0), arg_int(c, argv[1], -1)));
 }
 
+/* lord.sni.closed(id): the menu shown for that item closed */
+static JSValue f_sni_closed(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc >= 1) sni_menu_closed(arg_int(c, argv[0], 0));
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry sni_funcs[] = {
     JS_CFUNC_DEF("list", 0, f_sni_list),
     JS_CFUNC_DEF("pixels", 1, f_sni_pixels),
     JS_CFUNC_DEF("activate", 4, f_sni_activate),
     JS_CFUNC_DEF("menu", 3, f_sni_menu),
     JS_CFUNC_DEF("clicked", 2, f_sni_clicked),
+    JS_CFUNC_DEF("closed", 1, f_sni_closed),
 };
 
 static const JSCFunctionListEntry bt_funcs[] = {
