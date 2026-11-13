@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/capability.h>
 #include <pwd.h>
 #include <signal.h>
@@ -21,7 +22,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-static char integration[1024];      /* folder with lord-bash.sh, zsh/ and lord-fish.fish (absolute path) */
+static char integration[PATH_MAX];  /* folder with lord-bash.sh, zsh/ and lord-fish.fish (absolute path) */
 
 void pty_set_integration(const char *dir) {
     if (!dir || !realpath(dir, integration)) integration[0] = 0;
@@ -106,7 +107,7 @@ static void child(int fd, const char *cwd, int id) {
     }
 
     const char *base = strrchr(shell, '/') ? strrchr(shell, '/') + 1 : shell;
-    char rc[1200], argv0[64];
+    char rc[PATH_MAX + 64], argv0[64];
     snprintf(argv0, sizeof argv0, "-%s", base);   /* "-zsh": login shell */
     if (integration[0] && !strcmp(base, "bash")) {
         /* interactive bash with integration: the rc emulates a login shell and adds the marks. */
@@ -125,7 +126,7 @@ static void child(int fd, const char *cwd, int id) {
         /* fish: --init-command runs after the user's configuration. */
         snprintf(rc, sizeof rc, "%s/lord-fish.fish", integration);
         if (access(rc, R_OK) == 0) {
-            char cmd[1300];
+            char cmd[sizeof rc + 16];
             snprintf(cmd, sizeof cmd, "source '%s'", rc);
             execl(shell, argv0, "--init-command", cmd, (char *)NULL);
         }
