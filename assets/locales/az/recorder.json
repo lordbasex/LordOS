@@ -1,0 +1,22 @@
+{
+  "folder": "Yazılar",
+  "name": "Yazı {date} {time}",
+  "all": "Bütün yazılar",
+  "empty": "Hələ yazı yoxdur",
+  "hint": "Mikrofonla yazmaq üçün qırmızı düyməni (və ya R) basın",
+  "denied": "Səs yazıcısının mikrofondan istifadəsinə icazə verilmir",
+  "play": "Səsləndir",
+  "pause": "Fasilə ver",
+  "rename": "Adını dəyiş",
+  "trim": "Kəs",
+  "cancelTrim": "Kəsməni ləğv et",
+  "saveTrim": "Kəsilmiş nüsxəni saxla",
+  "trimmed": "kəsilmiş",
+  "export": "Belə ixrac et",
+  "exportBtn": "İxrac et",
+  "working": "İxrac edilir…",
+  "exported": "“{name}” saxlanıldı",
+  "exportError": "İxrac etmək mümkün olmadı",
+  "renameError": "Adını dəyişmək mümkün olmadı (bu ad artıq mövcuddurmu?)",
+  "emptyTitle": "Yazı seçin və ya yaradın"
+}

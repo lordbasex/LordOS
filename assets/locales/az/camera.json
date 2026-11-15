@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Güzgü",
+  "none": "Kamera tapılmadı",
+  "denied": "Kamera tətbiqinin kameradan istifadəsinə icazə verilmir. Bunu Parametrlər → Məxfilik bölməsində dəyişin.",
+  "error": "Kameradan istifadə etmək mümkün olmadı: {error}",
+  "noneHint": "USB kamera qoşun: tətbiqi yenidən başlatmadan burada özü görünəcək.",
+  "deniedTitle": "Kameraya çıxış yoxdur",
+  "errorTitle": "Kameranı açmaq mümkün olmadı"
+}

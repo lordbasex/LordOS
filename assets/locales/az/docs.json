@@ -1,0 +1,74 @@
+{
+  "archiveName": "Arxiv",
+  "archiveSummary": {
+    "one": "{count} fayl, {size}",
+    "other": "{count} fayl, {size}"
+  },
+  "compressOne": "“{name}” sıxışdır",
+  "compressMany": {
+    "one": "{count} elementi sıxışdır",
+    "other": "{count} elementi sıxışdır"
+  },
+  "compressing": "“{name}” sıxışdırılır…",
+  "compressProgress": "“{name}” sıxışdırılır: {files} fayl",
+  "compressed": {
+    "one": "“{name}” hazırdır ({count} fayl)",
+    "other": "“{name}” hazırdır ({count} fayl)"
+  },
+  "compressError": "“{name}” sıxışdırmaq mümkün olmadı ({error})",
+  "extractHere": "Buraya çıxar",
+  "extractSelected": {
+    "one": "{count} elementi çıxar",
+    "other": "{count} elementi çıxar"
+  },
+  "extracting": "“{name}” çıxarılır…",
+  "extractProgress": "“{name}” çıxarılır: {files} fayl ({pct}%)",
+  "extracted": {
+    "one": "“{name}” qovluğuna çıxarıldı ({count} fayl)",
+    "other": "“{name}” qovluğuna çıxarıldı ({count} fayl)"
+  },
+  "extractedSkipped": {
+    "one": "“{name}” qovluğuna çıxarıldı ({count} fayl); təhlükəsizlik üçün {skipped} buraxıldı",
+    "other": "“{name}” qovluğuna çıxarıldı ({count} fayl); təhlükəsizlik üçün {skipped} buraxıldı"
+  },
+  "extractError": "“{name}” çıxarmaq mümkün olmadı ({error})",
+  "opening": "“{name}” açılır…",
+  "loading": "Yüklənir…",
+  "locked": "parolla qorunur",
+  "pages": {
+    "one": "{count} səhifə",
+    "other": "{count} səhifə"
+  },
+  "more": {
+    "one": "və daha {count}",
+    "other": "və daha {count}"
+  },
+  "err.invalid": "arxiv deyil və ya zədələnib",
+  "err.missing-volume": "bölünmüş arxivin bir hissəsi çatışmır: “{name}”",
+  "err.disk-full": "disk doludur",
+  "err.too-big": "çox böyükdür",
+  "err.too-many": "həddən artıq fayl var",
+  "err.corrupt": "zədələnib",
+  "err.write": "yazmaq mümkün olmadı",
+  "err.unavailable": "sənəd köməkçisi mövcud deyil",
+  "err.cancelled": "ləğv edildi",
+  "err.crash": "sənəd köməkçisi gözlənilmədən dayandı",
+  "err.timeout": "çox uzun çəkdi",
+  "err.protocol": "sənəd köməkçisi yanlış cavab göndərdi",
+  "err.spawn": "sənəd köməkçisini başlatmaq mümkün olmadı",
+  "err.closed": "sənəd bağlandı",
+  "err.bad-request": "yanlış sorğu",
+  "err.bad-field": "yanlış forma sahəsi",
+  "err.bad-page": "yanlış səhifə",
+  "err.busy": "sənəd köməkçisi məşğuldur",
+  "err.memory": "yaddaş çatmır",
+  "err.no-fonts": "mövcud şrift yoxdur",
+  "err.not-open": "sənəd açıq deyil",
+  "err.nothing": "saxlanılacaq heç nə yoxdur",
+  "err.read-only": "sənəd yalnız oxumaq üçündür",
+  "err.save": "saxlamaq mümkün olmadı",
+  "err.unknown-op": "naməlum əməliyyat",
+  "err.image": "yanlış təsvir",
+  "err.blob": "yanlış verilənlər",
+  "err.password": "sənəd parolla qorunur"
+}
