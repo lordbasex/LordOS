@@ -3,7 +3,7 @@
  *
  *   webmain.c     argv, the registry check, isolation, then the app or a probe
  *   webengine.c   WebKit: the context and network session of the profile, the view, navigation, permissions,
- *                 notifications, downloads, the file chooser
+ *                 notifications, downloads, the file chooser, the page of an app that is offline (weboffline.h)
  *   webwin.c      the Wayland window: xdg-shell, the frame's decoration, scale, the frames WebKit draws (dmabuf or
  *                 shared memory), keyboard, pointer, touch, the clipboard, the input method (webshm.c: the pieces that
  *                 read wpebackend-fdo's own buffers)
@@ -16,7 +16,7 @@
  *                 script hands the page the bytes lord-web read itself), and the page's copies of an image
  *   webprobe.c    --probe and --probe-icon, headless, in a throwaway profile
  *   weblang.c     the few words lord-web shows itself (assets/locales/<lang>/webruntime.json)
- *   webargs.c, webreg.c, weburl.c, webmanifest.c, webdl.c, webaxis.c, webpage.c, webdrop.c   the pure parts
+ *   webargs.c, webreg.c, weburl.c, webmanifest.c, webdl.c, webaxis.c, webpage.c, webdrop.c, weboffline.h   the pure parts
  *                 (tests/webapp_test.c)
  *
  * No LordOS API reaches the page: no lord.*, no broker, no script with privileges. The scripts of lord-web's the page
@@ -73,6 +73,11 @@ typedef struct {
     char scheme_key[WEBSCHEME_KEY_LEN + 1]; /* webscheme.js's hook on window, random per process ("" none: no script) */
     WebKitUserScript *scheme_script;    /* the one added for the scheme now: replaced when it changes */
     int loading;                        /* between a load's start and its end (the dark background) */
+    char *offline_uri;                  /* the app's address that failed for lack of network (weboffline.h), loaded again until it works, or NULL */
+    unsigned offline_failures;          /* its failures in a row: the next try's delay (weboffline_delay_s) */
+    guint offline_timer;                /* the next try, or 0 */
+    int offline_retrying;               /* a try's load is under way */
+    int offline_page;                   /* lord-web's own "No connection" page is in the window */
     int quitting;
     int exit_code;
 } Web;
@@ -87,7 +92,12 @@ int web_engine_start(Web *w);                            /* the view on w->expor
 void web_quit(Web *w, int code);
 /* the window was closed: hidden behind the tray when the app runs in the background, otherwise quit */
 void web_close_requested(Web *w);
+/* the window is shown again (Show, the tray): an app whose page failed for lack of network tries again at once */
 void web_show(Web *w, const char *activation_token);
+/* Ctrl+R, F5: the page again, or, on lord-web's "No connection" page, the address that failed (inside the app's scope) */
+void web_reload(Web *w);
+/* the desktop's mode changed: lord-web's "No connection" page, when it is in the window, again in the new colors */
+void web_offline_restyle(Web *w);
 double web_now_ms(void);                                 /* monotonic */
 /* an editing command on the page (webedit.h's WEBEDIT_*): the Edit menu, the context menu */
 void web_edit(Web *w, int cmd);

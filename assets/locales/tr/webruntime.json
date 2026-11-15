@@ -5,5 +5,8 @@
   "download.done": "İndirme tamamlandı",
   "download.failed": "İndirme başarısız oldu",
   "chooser.open": "Bir dosya seçin",
-  "chooser.openMany": "Dosyaları seçin"
+  "chooser.openMany": "Dosyaları seçin",
+  "offline.title": "Bağlantı yok",
+  "offline.body": "Bu uygulama sitesine ulaşamadı. Ağ geri gelir gelmez kendiliğinden yeniden deneyecek.",
+  "offline.hint": "Şimdi denemek için Ctrl+R tuşlarına basın."
 }

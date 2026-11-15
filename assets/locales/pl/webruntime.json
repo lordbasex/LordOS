@@ -5,5 +5,8 @@
   "download.done": "Pobieranie zakończone",
   "download.failed": "Pobieranie nie powiodło się",
   "chooser.open": "Wybierz plik",
-  "chooser.openMany": "Wybierz pliki"
+  "chooser.openMany": "Wybierz pliki",
+  "offline.title": "Brak połączenia",
+  "offline.body": "Ta aplikacja nie mogła połączyć się ze swoją witryną. Spróbuje ponownie sama, gdy tylko sieć wróci.",
+  "offline.hint": "Naciśnij Ctrl+R, aby spróbować teraz."
 }

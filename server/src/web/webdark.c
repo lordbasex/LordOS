@@ -60,6 +60,7 @@ void web_set_scheme(Web *w, int scheme) {
     char *call = w->scheme_key[0] ? webscheme_call(w->scheme_key, scheme) : NULL;
     if (call) webkit_web_view_evaluate_javascript(w->view, call, -1, NULL, NULL, NULL, NULL, NULL);
     free(call);
+    web_offline_restyle(w);
 }
 
 void webdark_load(Web *w, WebKitLoadEvent ev) {

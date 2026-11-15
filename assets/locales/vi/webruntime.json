@@ -5,5 +5,8 @@
   "download.done": "Tải xuống hoàn tất",
   "download.failed": "Tải xuống thất bại",
   "chooser.open": "Chọn một tệp",
-  "chooser.openMany": "Chọn các tệp"
+  "chooser.openMany": "Chọn các tệp",
+  "offline.title": "Không có kết nối",
+  "offline.body": "Ứng dụng này không thể truy cập trang của nó. Ứng dụng sẽ tự thử lại ngay khi mạng trở lại.",
+  "offline.hint": "Nhấn Ctrl+R để thử ngay."
 }

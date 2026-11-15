@@ -541,6 +541,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A web app opened without network loads by itself once the network is back** (issue
+  [#144](https://github.com/lordbasex/LordOS/issues/144), thanks to pct06). WhatsApp opened before the Wi-Fi was
+  connected showed WebKit's error page («Error resolving “web.whatsapp.com”: Name or service not known») and kept it:
+  lord-web handled no `load-failed` on the app's view, so nothing loaded the page again, and since WhatsApp runs in the
+  background (`"background": true`), closing and opening it again from the Dock only hid and showed the same window
+  with the same error, until the session ended. Now lord-web (`server/src/web/webengine.c`) takes a main frame load
+  of the app's own address (inside its scope) that failed for lack of network: GResolver's errors, GIO's connection
+  errors (timed out, host or network unreachable, refused, proxy failed, closed, not connected) and WebKit's
+  transport error (`weboffline_is_network_error`, `server/src/web/weboffline.h`, pure). Instead of WebKit's page it
+  shows its own, "No connection" with the site's host and "Press Ctrl+R to try now", in the person's language (three
+  new keys in `webruntime.json`, `offline.title`, `offline.body` and `offline.hint`, in all 35 languages) and the
+  desktop's light or dark colors (again in the new colors when the mode changes); the page is `about:blank` HTML with
+  a Content-Security-Policy that allows no script, so it has none of the app's origin. lord-web then loads the failed
+  address again after 2, 4, 8, 16, 32 and then every 60 s (`weboffline_delay_s`), at once when GIO's
+  `GNetworkMonitor` reports the network available again (the waits start over at 2 s), at Ctrl+R or F5, after a
+  crash of the web process, and when the window is shown again from the Dock, the launcher or the tray. A cancelled
+  load, a download, a TLS error, an HTTP answer and any address outside the app's scope (a sign-in on another site)
+  keep WebKit's own handling, and an address outside the scope is never loaded again by lord-web. Tested in
+  `server/tests/webapp_test.c` (`build/webapp-test`: which errors are the network's, the delays, the page's escaping,
+  no script, both color schemes, a buffer too small); the GIO and WebKit codes the header mirrors are checked against
+  GLib's at compile time. Not yet checked on screen or on hardware. Docs: docs/WEBAPPS.md, "No network".
 - **lord-web picks the right language for three-letter ids and for Chinese.** The LordOS Web Runtime's own texts
   (`server/src/web/weblang.c`) took only the first two letters of `LC_ALL`, `LC_MESSAGES` or `LANG`, so `fil_PH.UTF-8`
   loaded Finnish (`fi`) and any `zh_*` looked for a `zh` folder that does not exist and fell back to English. It now

@@ -5,5 +5,8 @@
   "download.done": "Descărcare finalizată",
   "download.failed": "Descărcarea a eșuat",
   "chooser.open": "Alegeți un fișier",
-  "chooser.openMany": "Alegeți fișiere"
+  "chooser.openMany": "Alegeți fișiere",
+  "offline.title": "Nicio conexiune",
+  "offline.body": "Această aplicație nu și-a putut accesa site-ul. Va încerca din nou singură imediat ce rețeaua revine.",
+  "offline.hint": "Apăsați Ctrl+R pentru a încerca acum."
 }

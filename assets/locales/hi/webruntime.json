@@ -5,5 +5,8 @@
   "download.done": "डाउनलोड पूरा हुआ",
   "download.failed": "डाउनलोड विफल रहा",
   "chooser.open": "एक फ़ाइल चुनें",
-  "chooser.openMany": "फ़ाइलें चुनें"
+  "chooser.openMany": "फ़ाइलें चुनें",
+  "offline.title": "कोई कनेक्शन नहीं",
+  "offline.body": "यह ऐप अपनी साइट तक नहीं पहुँच सका। नेटवर्क वापस आते ही यह अपने आप फिर से कोशिश करेगा।",
+  "offline.hint": "अभी कोशिश करने के लिए Ctrl+R दबाएँ।"
 }

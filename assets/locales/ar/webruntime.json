@@ -5,5 +5,8 @@
   "download.done": "اكتمل التنزيل",
   "download.failed": "فشل التنزيل",
   "chooser.open": "اختر ملفًا",
-  "chooser.openMany": "اختر ملفات"
+  "chooser.openMany": "اختر ملفات",
+  "offline.title": "لا يوجد اتصال",
+  "offline.body": "تعذّر على هذا التطبيق الوصول إلى موقعه. سيحاول مجددًا تلقائيًا فور عودة الشبكة.",
+  "offline.hint": "اضغط Ctrl+R للمحاولة الآن."
 }

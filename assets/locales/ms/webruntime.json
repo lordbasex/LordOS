@@ -5,5 +5,8 @@
   "download.done": "Muat turun selesai",
   "download.failed": "Muat turun gagal",
   "chooser.open": "Pilih fail",
-  "chooser.openMany": "Pilih fail-fail"
+  "chooser.openMany": "Pilih fail-fail",
+  "offline.title": "Tiada sambungan",
+  "offline.body": "Aplikasi ini tidak dapat mencapai lamannya. Ia akan mencuba lagi dengan sendiri sebaik sahaja rangkaian kembali.",
+  "offline.hint": "Tekan Ctrl+R untuk mencuba sekarang."
 }

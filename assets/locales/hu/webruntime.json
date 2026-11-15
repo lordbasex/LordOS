@@ -5,5 +5,8 @@
   "download.done": "A letöltés befejeződött",
   "download.failed": "A letöltés sikertelen",
   "chooser.open": "Fájl kiválasztása",
-  "chooser.openMany": "Fájlok kiválasztása"
+  "chooser.openMany": "Fájlok kiválasztása",
+  "offline.title": "Nincs kapcsolat",
+  "offline.body": "Ez az alkalmazás nem érte el a webhelyét. Amint a hálózat visszatér, magától újra megpróbálja.",
+  "offline.hint": "Nyomja meg a Ctrl+R billentyűket a mostani próbálkozáshoz."
 }
