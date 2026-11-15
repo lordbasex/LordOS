@@ -10,6 +10,7 @@
   "offline.body": "Appen kunde inte nå sin webbplats. Den försöker igen av sig själv så snart nätverket är tillbaka.",
   "offline.hint": "Tryck på Ctrl+R för att försöka nu.",
   "inspect.title": "Utvecklarverktygen är på",
-  "inspect.body": "Tills du stänger det här fönstret. Adress:",
+  "inspect.body": "De öppnades i din webbläsare och är på tills du stänger det här fönstret.",
+  "inspect.open": "Öppna i webbläsaren",
   "inspect.failed": "Utvecklarverktygen kunde inte starta"
 }

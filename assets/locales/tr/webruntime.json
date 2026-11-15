@@ -10,6 +10,7 @@
   "offline.body": "Bu uygulama sitesine ulaşamadı. Ağ geri gelir gelmez kendiliğinden yeniden deneyecek.",
   "offline.hint": "Şimdi denemek için Ctrl+R tuşlarına basın.",
   "inspect.title": "Geliştirici araçları açık",
-  "inspect.body": "Bu pencereyi kapatana kadar. Adres:",
+  "inspect.body": "Tarayıcınızda açıldı ve bu pencereyi kapatana kadar açık kalır.",
+  "inspect.open": "Tarayıcıda aç",
   "inspect.failed": "Geliştirici araçları başlatılamadı"
 }

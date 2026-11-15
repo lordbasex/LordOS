@@ -7,7 +7,8 @@
  * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
  * page (webscheme.c), and the catalog folder for its own words (weblangid.h), and an app that is offline (weboffline.h:
  * which load errors mean no network, the retry's delay, lord-web's own page; #144), and the developer tools (webinspect.c:
- * the developer mode file, the inspector's address, who listens on its port). The rest of the registry file (webreg.c,
+ * the developer mode file, the inspector's address, who listens on its port; webguard.c: the gate in front of it). The
+ * rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
@@ -16,6 +17,7 @@
 #include "../src/web/webclip.h"
 #include "../src/web/webdrop.h"
 #include "../src/web/webedit.h"
+#include "../src/web/webguard.h"
 #include "../src/web/webinspect.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
@@ -227,9 +229,8 @@ static void test_inspect(void) {
 
     char s[64];
     CHECK(!webinspect_address(41234, s, sizeof s) && !strcmp(s, "127.0.0.1:41234"), "address: %s", s);
-    CHECK(!webinspect_url(41234, s, sizeof s) && !strcmp(s, "http://127.0.0.1:41234/"), "url: %s", s);
-    CHECK(webinspect_address(0, s, sizeof s) && !s[0] && webinspect_address(80, s, sizeof s) && webinspect_url(65536, s, sizeof s) && !s[0], "ports below 1024, 0 and past 65535");
-    CHECK(webinspect_url(41234, s, 10) && !s[0], "url: buffer too small");
+    CHECK(webinspect_address(0, s, sizeof s) && !s[0] && webinspect_address(80, s, sizeof s) && webinspect_address(65536, s, sizeof s) && !s[0], "ports below 1024, 0 and past 65535");
+    CHECK(webinspect_address(41234, s, 10) && !s[0], "address: buffer too small");
 
     /* /proc/net/tcp: 127.0.0.1 is 0100007F on a little-endian machine; port 41234 is A112 */
     const char *lo = htonl(1) != 1 ? "0100007F" : "7F000001";
@@ -1027,7 +1028,181 @@ static void test_offline(void) {
     CHECK(weboffline_html("App", "a", "b", "c", "h", 0, NULL, 0) == 0, "no buffer");
 }
 
+/* the gate in front of WebKit's inspector (webguard.c): the request head, Host, Origin, the one-time secret, the cookie */
+#define GSECRET "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+#define GCOOKIE "abcdefghijklmnopqrstuvwxyz0123456789-_ABCDE"
+static int gv(const WebGuardKeys *k, const char *head) { return webguard_check(head, strlen(head), k); }
+
+static void test_guard(void) {
+    /* the backend ports: on the browsers' bad port list, none below 1024, not X11's or NFS's */
+    CHECK(WEBGUARD_BACKEND_NPORTS >= 10, "backend ports: %zu", WEBGUARD_BACKEND_NPORTS);
+    for (size_t i = 0; i < WEBGUARD_BACKEND_NPORTS; i++)
+        CHECK(WEBGUARD_BACKEND_PORTS[i] >= 1024 && WEBGUARD_BACKEND_PORTS[i] != 6000 && WEBGUARD_BACKEND_PORTS[i] != 2049, "backend port %u", WEBGUARD_BACKEND_PORTS[i]);
+    CHECK(webguard_backend_port_ok(6665) && webguard_backend_port_ok(10080) && !webguard_backend_port_ok(41234) && !webguard_backend_port_ok(4190)
+          && !webguard_backend_port_ok(6679), "bad ports only (4190 and 6679 reach Chromium 156)");
+
+    /* base64url */
+    unsigned char raw[32];
+    for (int i = 0; i < 32; i++) raw[i] = (unsigned char)(i * 37 + 250);
+    char t[64];
+    CHECK(webguard_b64url(raw, 32, t, sizeof t) == WEBGUARD_TOKEN_LEN && strspn(t, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") == WEBGUARD_TOKEN_LEN, "b64url: %s", t);
+    CHECK(webguard_b64url((const unsigned char *)"\xfb\xff", 2, t, sizeof t) == 3 && !strcmp(t, "-_8"), "b64url: url-safe letters: %s", t);
+    CHECK(webguard_b64url(raw, 32, t, 43) == 0, "b64url: too small");
+
+    WebGuardKeys k;
+    CHECK(webguard_set_keys(&k, 40001, "short", GCOOKIE) == -1 && webguard_set_keys(&k, 40001, GSECRET, GSECRET "A") == -1
+          && webguard_set_keys(&k, 40001, GSECRET, "abcdefghijklmnopqrstuvwxyz0123456789+/ABCDE") == -1 && webguard_set_keys(&k, 80, GSECRET, GCOOKIE) == -1,
+          "keys: 43 base64url characters and a port of 1024 and up");
+    CHECK(webguard_set_keys(&k, 40001, GSECRET, GCOOKIE) == 0, "keys");
+
+    /* where the head ends; the size bound */
+    CHECK(webguard_head_end("GET / HTTP/1.1\r\nHost: x\r\n\r\nrest", 31) == 27, "head end");
+    CHECK(webguard_head_end("GET / HTTP/1.1\r\nHost: x\r\n", 25) == 0, "head: not yet");
+    static char big[WEBGUARD_HEAD_MAX + 8];
+    memset(big, 'a', sizeof big);
+    CHECK(webguard_head_end(big, WEBGUARD_HEAD_MAX) == -1 && webguard_head_end(big, sizeof big) == -1, "head: too big");
+    memcpy(big + WEBGUARD_HEAD_MAX - 4, "\r\n\r\n", 4);
+    CHECK(webguard_head_end(big, sizeof big) == WEBGUARD_HEAD_MAX, "head: the end at the limit");
+    memcpy(big + WEBGUARD_HEAD_MAX - 3, "\r\n\r\n", 4);
+    CHECK(webguard_head_end(big, sizeof big) == -1, "head: the end past the limit");
+
+    const char *ck = "Cookie: lordos-inspect-40001=" GCOOKIE "\r\n";
+    char h[2048];
+    /* the one-time address: Host checked, the cookie not needed */
+    CHECK(gv(&k, "GET /" GSECRET "/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_OPEN, "open");
+    CHECK(gv(&k, "GET /" GSECRET " HTTP/1.1\r\nHost: localhost:40001\r\n\r\n") == WEBGUARD_OPEN, "open without the slash, localhost");
+    CHECK(gv(&k, "GET /" GSECRET "/x HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: exactly the secret");
+    CHECK(gv(&k, "GET /" GSECRET "?a HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: no query");
+    CHECK(gv(&k, "GET /AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: last letter differs");
+    CHECK(gv(&k, "GET /BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: first letter differs");
+    CHECK(gv(&k, "GET /" GSECRET "/ HTTP/1.1\r\nHost: evil.example:40001\r\n\r\n") == WEBGUARD_DENY, "open: rebinding host");
+    CHECK(gv(&k, "GET /" GSECRET "/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: http://evil.example\r\n\r\n") == WEBGUARD_DENY, "open: other origin");
+    WebGuardKeys used = k;
+    memset(used.secret, 0, sizeof used.secret);
+    CHECK(gv(&used, "GET /" GSECRET "/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: once");
+    CHECK(gv(&used, "GET // HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "open: no secret is no address");
+
+    /* with the cookie */
+    snprintf(h, sizeof h, "GET /Main.html?ws=127.0.0.1:40001/socket/1/1/WebPage HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_FORWARD, "cookie: forward");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nhost:localhost:40001 \r\nCOOKIE: a=b; lordos-inspect-40002=x;lordos-inspect-40001=" GCOOKIE "; c=d\r\n\r\n");
+    CHECK(gv(&k, h) == WEBGUARD_FORWARD, "cookie among others, names in any case");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY, "no cookie");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nCookie: lordos-inspect-40001=" GCOOKIE "x\r\n\r\n") == WEBGUARD_DENY, "cookie: longer");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nCookie: lordos-inspect-40001=bbcdefghijklmnopqrstuvwxyz0123456789-_ABCDE\r\n\r\n") == WEBGUARD_DENY, "cookie: other value");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nCookie: lordos-inspect-40002=" GCOOKIE "\r\n\r\n") == WEBGUARD_DENY, "cookie: another window's name");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nCookie: xlordos-inspect-40001=" GCOOKIE "\r\n\r\n") == WEBGUARD_DENY, "cookie: name with a prefix");
+    /* Host */
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40002\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: other port");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: no port");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: rebind.example:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: DNS rebinding");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:400011\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: a longer port");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: missing");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nHost: evil.example:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "host: twice");
+    snprintf(h, sizeof h, "GET http://127.0.0.1:40001/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "absolute-form target");
+    /* Origin */
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: http://127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_FORWARD, "origin: its own");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: http://evil.example\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "origin: another site");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: null\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "origin: null");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: http://127.0.0.1:8080\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "origin: another port of this computer");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: https://127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "origin: https");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nOrigin: http://127.0.0.1:40001\r\nOrigin: http://evil.example\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "origin: twice");
+    /* Sec-Fetch-Site: a page on another port of this computer is the same site for the cookie */
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: same-origin\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_FORWARD, "fetch site: same-origin");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: none\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_FORWARD, "fetch site: none (typed, or opened by another program)");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: same-site\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "fetch site: same-site (a frame or no-cors request from another port)");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: cross-site\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "fetch site: cross-site");
+    CHECK(gv(&k, "GET /" GSECRET "/ HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: cross-site\r\n\r\n") == WEBGUARD_DENY, "open: cross-site");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nSec-Fetch-Site: none\r\nSec-Fetch-Site: same-site\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "fetch site: twice");
+    /* the WebSocket */
+    snprintf(h, sizeof h, "GET /socket/1/1/WebPage HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nOrigin: http://127.0.0.1:40001\r\n"
+             "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_UPGRADE, "websocket");
+    snprintf(h, sizeof h, "GET /socket/1/1/WebPage HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: keep-alive, Upgrade\r\nUpgrade: WebSocket\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_UPGRADE, "websocket: Connection list, any case");
+    CHECK(gv(&k, "GET /socket/1/1/WebPage HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nOrigin: http://127.0.0.1:40001\r\n\r\n") == WEBGUARD_DENY,
+          "websocket: no cookie");
+    snprintf(h, sizeof h, "GET /socket/1/1/WebPage HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nOrigin: http://attacker.example\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "websocket: another site's");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "upgrade: not a websocket");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nUpgrade: websocket\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "upgrade without Connection: upgrade");
+    /* malformed */
+    snprintf(h, sizeof h, "POST / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "POST");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nContent-Length: 5\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a body");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nTransfer-Encoding: chunked\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "chunked");
+    snprintf(h, sizeof h, "GET / HTTP/1.0\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "HTTP/1.0");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a bare LF");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n folded\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a folded line");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost : 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a space before the colon");
+    snprintf(h, sizeof h, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nNoColon\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a line without a colon");
+    snprintf(h, sizeof h, "GET /a\x01 HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a control byte");
+    snprintf(h, sizeof h, "GET /a b HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n%s\r\n", ck);
+    CHECK(gv(&k, h) == WEBGUARD_DENY, "a space in the target");
+    char nul[] = "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\0\r\n\r\n";
+    CHECK(webguard_check(nul, sizeof nul - 1, &k) == WEBGUARD_DENY, "a NUL byte");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\nHost: 127.0.0.1:40001\r\n") == WEBGUARD_DENY, "not complete");
+    CHECK(gv(&k, "\r\n\r\n") == WEBGUARD_DENY && gv(&k, "") == WEBGUARD_DENY && webguard_check(NULL, 0, &k) == WEBGUARD_DENY, "empty");
+    CHECK(gv(&k, "GET / HTTP/1.1\r\n\r\n") == WEBGUARD_DENY, "no headers");
+
+    /* the forwarded head: one request per connection */
+    const char *in = "GET /x HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nConnection: keep-alive\r\nKeep-Alive: 300\r\nAccept: */*\r\nUpgrade: x\r\n\r\n";
+    char out[512];
+    size_t n = webguard_rewrite(in, strlen(in), out, sizeof out);
+    out[n] = 0;
+    CHECK(n && !strcmp(out, "GET /x HTTP/1.1\r\nHost: 127.0.0.1:40001\r\nAccept: */*\r\nConnection: close\r\n\r\n"), "rewrite: %s", out);
+    CHECK(webguard_rewrite(in, strlen(in), out, 30) == 0, "rewrite: too small");
+
+    /* the replies and the address */
+    n = webguard_open_reply(&k, out, sizeof out);
+    out[n] = 0;
+    CHECK(n && strstr(out, "HTTP/1.1 302 ") == out && strstr(out, "\r\nLocation: /\r\n")
+          && strstr(out, "\r\nSet-Cookie: lordos-inspect-40001=" GCOOKIE "; HttpOnly; SameSite=Strict; Path=/\r\n") && strstr(out, "\r\n\r\n") == out + n - 4,
+          "open reply: %s", out);
+    CHECK(!strstr(out, GSECRET), "open reply: no secret");
+    n = webguard_deny_reply(out, sizeof out);
+    out[n] = 0;
+    CHECK(n && strstr(out, "HTTP/1.1 403 ") == out, "deny reply");
+    CHECK(!webguard_open_url(&k, out, sizeof out) && !strcmp(out, "http://127.0.0.1:40001/" GSECRET "/"), "open url: %s", out);
+    CHECK(webguard_open_url(&used, out, sizeof out) == -1 && !out[0], "open url: no secret");
+    CHECK(webguard_open_url(&k, out, 20) == -1 && !out[0], "open url: too small");
+
+    /* did WebKit switch protocols? */
+    CHECK(webguard_switched("HTTP/1.1 101 Switching Protocols\r\n", 34) == 1, "101");
+    CHECK(webguard_switched("HTTP/1.1 10", 11) == -1, "101: too few bytes yet");
+    CHECK(webguard_switched("HTTP/1.1 404 Not Found\r\n", 24) == 0 && webguard_switched("HTTP/1.1 1010", 13) == 0 && webguard_switched("X", 1) == 0, "not 101");
+}
+
 int main(void) {
+    test_guard();
     test_offline();
     test_scheme();
     test_edit();

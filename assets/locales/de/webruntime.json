@@ -10,6 +10,7 @@
   "offline.body": "Diese App konnte ihre Website nicht erreichen. Sie versucht es von selbst erneut, sobald das Netzwerk wieder da ist.",
   "offline.hint": "Drücken Sie Strg+R, um es jetzt zu versuchen.",
   "inspect.title": "Entwicklertools sind an",
-  "inspect.body": "Bis du dieses Fenster schließt. Adresse:",
+  "inspect.body": "Sie wurden in deinem Browser geöffnet und bleiben an, bis du dieses Fenster schließt.",
+  "inspect.open": "Im Browser öffnen",
   "inspect.failed": "Die Entwicklertools konnten nicht starten"
 }

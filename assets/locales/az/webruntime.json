@@ -10,6 +10,7 @@
   "offline.body": "Bu tətbiq öz saytına çata bilmədi. Şəbəkə qayıdan kimi özü yenidən cəhd edəcək.",
   "offline.hint": "İndi cəhd etmək üçün Ctrl+R düymələrini basın.",
   "inspect.title": "Tərtibatçı alətləri aktivdir",
-  "inspect.body": "Bu pəncərəni bağlayana qədər. Ünvan:",
+  "inspect.body": "Brauzerinizdə açıldı və bu pəncərəni bağlayana qədər aktiv qalır.",
+  "inspect.open": "Brauzerdə aç",
   "inspect.failed": "Tərtibatçı alətləri başlamadı"
 }

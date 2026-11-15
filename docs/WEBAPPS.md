@@ -815,31 +815,88 @@ person's browser.
   `lord-web --app <app> --profile <profile> --inspect`; one that already has them is only brought forward. lord-web:
   - refuses `--inspect` unless the switch's file says on (it reads it itself, so a start by anything else gets
     nothing more), after taking the profile's lock;
-  - binds a TCP socket on `127.0.0.1` port 0 to learn a free port from the kernel, closes it and sets
-    `WEBKIT_INSPECTOR_HTTP_SERVER=127.0.0.1:<port>` before the web context exists (it drops every `WEBKIT_*`
+  - sets `WEBKIT_INSPECTOR_HTTP_SERVER=127.0.0.1:<port>` before the web context exists, with the first port of
+    `WEBGUARD_BACKEND_PORTS` it can bind on `127.0.0.1` (it closes that test socket at once; it drops every `WEBKIT_*`
     variable it was started with first, so nothing else can turn the inspector on); the view gets
-    `enable-developer-extras`;
+    `enable-developer-extras`. Those ports (6665–6669, 6697, 10080, 1719, 1720, 1723, 3659, 4045, 5060, 5061, 6566)
+    are on the browsers' "bad port" list (WHATWG Fetch): Chrome, Chromium and Firefox refuse every navigation,
+    `fetch`, image and WebSocket to them, whatever a page asks, so no web page can reach WebKit's own server. X11's
+    6000 and NFS's 2049 are left out; 4190 and 6679, on the spec's list, reached Chromium 156 in our test and are left
+    out too. With all of them taken it doesn't start;
   - every half second for up to 20 s, checks `/proc/self/net/tcp` against its own sockets (`/proc/self/fd`):
     `webinspect_listening` answers 1 only when the listening socket on that port is one of lord-web's and on
     127.0.0.1, -1 when another process listens on that port (the port was taken between the check and WebKit's bind)
-    or ours listens on another address. Then it opens `http://127.0.0.1:<port>/` through OpenURI and sends a
-    notification ("Developer tools are on", "Until you close this window. Address:" and the address); on -1 or after
-    20 s only "Developer tools couldn't start".
-  - WebKit also starts its own inspector server (a D-Bus protocol over TCP) on another random port of 127.0.0.1 inside
-    lord-web; the web content process can't reach it from its sandbox and only logs that.
+    or ours listens on another address;
+  - then starts its gate (below) and opens the gate's one-time address through OpenURI, and sends a notification
+    ("Developer tools are on", "They opened in your browser and stay on until you close this window.") whose action,
+    *Open in browser*, opens them again with a new one-time address. The address is never in the notification, which
+    other programs of the session can read. On -1, a gate that can't listen, or after 20 s, only "Developer tools
+    couldn't start".
+  - WebKit also starts its own inspector server on another random port of 127.0.0.1 inside lord-web, which WebKit
+    2.48 picks itself (`WEBKIT_INSPECTOR_SERVER` doesn't move it while the HTTP server is on: tried, nothing listened).
+    It speaks WebKit's own socket protocol, not HTTP: each message starts with its length as 4 bytes. A browser's
+    request can't be one: it starts with `GET /`, `HEAD` or `POST`, read as a length of about 1.2 GB, so the server
+    waits for the rest and answers nothing (checked: no answer, lord-web's memory unchanged after such requests), and
+    a page controls none of the first bytes. The web content process doesn't reach it (it only logs that). A program
+    on this computer that speaks the protocol can (the residual risk below).
+- **The gate** (`webproxy.c`, its checks in `webguard.c`, tests in `webapp-test`): lord-web's own listening socket on
+  127.0.0.1 (a port the kernel picks), in its GLib loop (no thread, no other process, no new library). It forwards to
+  WebKit's port only one HTTP request per connection, or one WebSocket upgrade, and only when:
+  - the request head is complete within 10 s and at most 16 KB, every line ends in CRLF, no control byte, no folded
+    line, a `GET` of an origin-form target in HTTP/1.1, no body (`Content-Length` other than 0, `Transfer-Encoding`);
+  - `Host` is exactly `127.0.0.1:<gate port>` or `localhost:<gate port>`, once (DNS rebinding: a name that resolves to
+    127.0.0.1 carries its own name);
+  - `Origin`, when present, is `http://127.0.0.1:<gate port>` or `http://localhost:<gate port>`, once (another site's
+    `fetch` or WebSocket; a WebSocket isn't bound by CORS, so this check is what stops it);
+  - `Sec-Fetch-Site`, when present, is `same-origin` or `none`: a page on another port of this computer is the same
+    *site* as the gate for cookies, and its frames and `no-cors` requests carry no `Origin`;
+  - and it carries the cookie `lordos-inspect-<gate port>` with this window's value: 32 random bytes (`getrandom`) in
+    base64url, compared in constant time.
+
+  The only way to get the cookie is the one-time address `http://127.0.0.1:<gate port>/<secret>/`, the one OpenURI is
+  handed: another 32 random bytes, checked the same way (with the same Host, Origin and Sec-Fetch-Site checks). It
+  answers a redirect to `/` with `Set-Cookie: ...; HttpOnly; SameSite=Strict; Path=/` and is then forgotten: it works
+  once, so the address in the browser's history is dead; the notification's action makes a new one. The cookie lasts
+  as long as the window (a new opening keeps it, so a tab already open goes on working). A cookie rather than the
+  secret in every path because WebKit's pages build the WebSocket's address from `location.host` and an absolute
+  path (the target list's `window.open('Main.html?ws=' + window.location.host + '/socket/1/1/WebPage')`), and the
+  browser sends the cookie on that WebSocket too. Anything else is a `403` and the connection closes. A plain request
+  is forwarded without its `Connection`, `Keep-Alive`, `Proxy-Connection` and `Upgrade` lines and with
+  `Connection: close`, and nothing the browser sends after its head reaches WebKit: a browser may reuse a connection
+  for another page's request, so every request is checked on its own connection. A WebSocket's bytes go both ways only
+  after WebKit answered `101`; anything the browser sends before that ends it. At most 16 connections; a plain answer
+  must end within 60 s; a WebSocket has no time limit.
 - **Window lifetime:** closing that window ends its lord-web even for an app that runs in the background (no hiding
-  behind the tray), so the inspector goes with it; the next start is a normal one.
-- **What anyone on this computer can do while it is on:** WebKit's inspector server has no token, password or secret
-  path. Any process that can reach 127.0.0.1, of any user of this computer, can connect, read the page and its storage
-  and run script in it. Nothing outside the computer can (127.0.0.1 only). That is why it is off by default, asked
-  every time, per window, ends with the window and with the switch, and why the question says so.
+  behind the tray), so the inspector and its gate go with it; the next start is a normal one.
+- **What a web page can't do while it is on:** reach WebKit's port (a bad port), reach the inspector server (not
+  HTTP, above), or pass the gate: another site gets no cookie (SameSite=Strict) and is refused for its `Origin`,
+  `Sec-Fetch-Site` or, through DNS rebinding, its `Host`; a page on another port of this computer is refused for its
+  `Origin` or `Sec-Fetch-Site`. Checked with Chromium 156 and Chrome 157 (Firefox's list has the same ports; not
+  tested).
+- **What a program on this computer can still do (the residual risk):** WebKit's own HTTP port and its inspector
+  server have no token, password or secret path, and WPE 2.48 takes only `<ip>:<port>` for them (no unix socket). Any
+  process that can reach 127.0.0.1, of any user of this computer, can connect to them directly, read the page and its
+  storage and run script in it, as before the gate. A browser can't. Nothing outside the computer can (127.0.0.1
+  only). That is why it is off by default, asked every time, per window, ends with the window and with the switch,
+  and why the question says so ("any program on this computer can connect to them").
 - **What the page can't do:** turn it on. No D-Bus method was added to lord-web; the menu item, the question and the
   switch are the shell's, and lord-server and lord-web each check the switch.
 - **Checked** (2026-11-15, development machine, a headless lord-server and a local page): the switch off refuses
   (`exit 2`); with it on, lord-web listens only on 127.0.0.1, the HTTP port's target list names the page with its
   `socket/1/1/WebPage` link, `Main.html` loads, the WebSocket upgrade answers 101 and the check opens it; without
-  `--inspect` nothing listens. The menu, the question, Settings and the browser opening on a real session are still to
-  be checked on screen.
+  `--inspect` nothing listens. The gate, end to end (a private session bus with a stand-in portal and notification
+  server, a headless lord-server, lord-web with WPE 2.48.3, headless Chromium 156 over the DevTools protocol, and
+  curl): the opened address is the gate's with a 43-character secret and the notification carries none; without the
+  cookie `/`, `Main.html` and the WebSocket are `403`; the one-time address redirects to `/` with the cookie, the
+  target list and `Main.html` load through the gate, the inspector's WebSocket opens and runs script in the app's
+  page (it read the page's text and a variable); the cookie isn't readable by the page; the address then answers
+  `403`, and so does the one before after the notification's action made a new one; `rebind.test` (mapped to
+  127.0.0.1) gets `403`; a page on another port of 127.0.0.1 opened no WebSocket to the gate nor to WebKit's port,
+  read nothing and couldn't read its frame; another `Host`, `Origin`, `Sec-Fetch-Site: same-site`, `POST`, a wrong
+  cookie, a pipelined second request, a 20 KB head, a head that never ends (closed after 10 s) and 20 connections at
+  once (16 held) are refused or bounded, and the gate answers afterwards. curl reaches WebKit's own port directly (the
+  residual risk). Chrome 157 and Chromium 156 refused all 15 backend ports (`fetch`, image and WebSocket). The menu,
+  the question, Settings and the browser opening on a real session are still to be checked on screen.
 
 ## No network (issue #144; in development after 0.8.8.8, the latest release)
 

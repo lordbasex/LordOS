@@ -10,6 +10,7 @@
   "offline.body": "Aplikasi ini tidak dapat mencapai lamannya. Ia akan mencuba lagi dengan sendiri sebaik sahaja rangkaian kembali.",
   "offline.hint": "Tekan Ctrl+R untuk mencuba sekarang.",
   "inspect.title": "Alat pembangun dihidupkan",
-  "inspect.body": "Sehingga anda menutup tetingkap ini. Alamat:",
+  "inspect.body": "Ia dibuka dalam pelayar anda dan kekal aktif sehingga anda menutup tetingkap ini.",
+  "inspect.open": "Buka dalam pelayar",
   "inspect.failed": "Alat pembangun tidak dapat dimulakan"
 }

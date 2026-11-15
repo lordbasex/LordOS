@@ -10,6 +10,7 @@
   "offline.body": "Deze app kon zijn website niet bereiken. Hij probeert het vanzelf opnieuw zodra het netwerk terug is.",
   "offline.hint": "Druk op Ctrl+R om het nu te proberen.",
   "inspect.title": "Ontwikkelaarstools staan aan",
-  "inspect.body": "Tot je dit venster sluit. Adres:",
+  "inspect.body": "Ze zijn geopend in je browser en blijven aan tot je dit venster sluit.",
+  "inspect.open": "Openen in browser",
   "inspect.failed": "De ontwikkelaarstools konden niet starten"
 }

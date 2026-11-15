@@ -6,7 +6,9 @@
  *     shouldn't play its own sound (webpage_sound_suppress: the page plays one, or the registry's "notifySound");
  *   - the page's unread count: org.lordos.WebApps1.SetBadge(app, profile, count) on lord-server, only when it changes
  *     (0: none), not waiting for an answer;
- *   - links outside the app's scope: the OpenURI portal, so they open in the person's browser;
+ *   - links outside the app's scope: the OpenURI portal, so they open in the person's browser; with --inspect, the
+ *     developer tools' one-time address too, and their notification, whose action opens them again (webguard.h: the
+ *     address is never shown in the notification, which other programs may read);
  *   - the page's file chooser: the FileChooser portal;
  *   - a permission the registry says to ask about: org.lordos.WebApps1.Ask(app, profile, kind) on lord-server, which
  *     shows the dialog and stores the answer. Anything but "allow", "deny" or "once", an error or no lord-server is
@@ -59,6 +61,7 @@ static void on_notify_signal(GDBusConnection *c, const char *sender, const char 
     } else if (!strcmp(sig, "ActionInvoked") && g_variant_is_of_type(p, G_VARIANT_TYPE("(us)"))) {
         const char *action = NULL;
         g_variant_get(p, "(u&s)", &id, &action);
+        if (id && id == web->inspect_note) { web_inspect_open(web); return; }
         Note *nt = note_by_id(id);
         if (!nt) return;
         char token[sizeof nt->token];
@@ -70,6 +73,7 @@ static void on_notify_signal(GDBusConnection *c, const char *sender, const char 
     } else if (!strcmp(sig, "NotificationClosed") && g_variant_is_of_type(p, G_VARIANT_TYPE("(uu)"))) {
         guint32 reason = 0;
         g_variant_get(p, "(uu)", &id, &reason);
+        if (id && id == web->inspect_note) web->inspect_note = 0;
         Note *nt = note_by_id(id);
         if (nt) note_drop(nt);
     }
@@ -89,7 +93,7 @@ void webbus_init(Web *w) {
 
 /* ---- notifications ---- */
 
-typedef struct { WebKitNotification *n; } NotifyCall;
+typedef struct { WebKitNotification *n; int inspect; } NotifyCall;
 
 static void on_page_closed(WebKitNotification *n, gpointer d) {
     (void)d;
@@ -114,22 +118,25 @@ static void on_notified(GObject *src, GAsyncResult *res, gpointer d) {
         call->n = NULL;
         g_signal_connect(slot->n, "closed", G_CALLBACK(on_page_closed), NULL);
     }
+    if (r && call->inspect) g_variant_get(r, "(u)", &web->inspect_note);
     if (r) g_variant_unref(r);
     if (call->n) g_object_unref(call->n);
     g_free(call);
 }
 
-static void send_notify(Web *w, const char *summary, const char *body, WebKitNotification *n, guint32 replaces, int quiet) {
+static void send_notify(Web *w, const char *summary, const char *body, WebKitNotification *n, guint32 replaces, int quiet, int inspect) {
     if (!w->bus) return;
     GVariantBuilder actions, hints;
     g_variant_builder_init(&actions, G_VARIANT_TYPE("as"));
     if (n) { g_variant_builder_add(&actions, "s", "default"); g_variant_builder_add(&actions, "s", weblang("notify.open")); }
+    if (inspect) { g_variant_builder_add(&actions, "s", "default"); g_variant_builder_add(&actions, "s", weblang("inspect.open")); }
     g_variant_builder_init(&hints, G_VARIANT_TYPE("a{sv}"));
     if (w->icon_path[0]) g_variant_builder_add(&hints, "{sv}", "image-path", g_variant_new_string(w->icon_path));
     g_variant_builder_add(&hints, "{sv}", "desktop-entry", g_variant_new_string(w->window_id));
     if (quiet) g_variant_builder_add(&hints, "{sv}", "suppress-sound", g_variant_new_boolean(TRUE));
     NotifyCall *call = g_new0(NotifyCall, 1);
     call->n = n ? g_object_ref(n) : NULL;
+    call->inspect = inspect;
     char name[2 * WEBREG_NAME_MAX + 8];
     if (w->app.nprofiles > 1 && w->profile) snprintf(name, sizeof name, "%s (%s)", w->app.name, w->profile->name);
     else snprintf(name, sizeof name, "%s", w->app.name);
@@ -154,10 +161,12 @@ void webbus_notify(Web *w, WebKitNotification *n) {
         web_state_save(w);
     }
     w->note_ms = quiet ? -1 : now;                  /* audio right after this one teaches the same (webengine.c) */
-    send_notify(w, webkit_notification_get_title(n), webkit_notification_get_body(n), n, replaces, quiet);
+    send_notify(w, webkit_notification_get_title(n), webkit_notification_get_body(n), n, replaces, quiet, 0);
 }
 
-void webbus_notify_text(Web *w, const char *summary, const char *body) { send_notify(w, summary, body, NULL, 0, 0); }
+void webbus_notify_text(Web *w, const char *summary, const char *body) { send_notify(w, summary, body, NULL, 0, 0, 0); }
+
+void webbus_notify_inspect(Web *w, const char *summary, const char *body) { send_notify(w, summary, body, NULL, w->inspect_note, 0, 1); }
 
 void webbus_set_badge(Web *w, unsigned count) {
     if (!w->bus || !w->profile) return;

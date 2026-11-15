@@ -7,12 +7,15 @@
  *   - WPE WebKit 2.48 has no inspector of its own in the window and can't turn remote inspection on for a view that
  *     already runs: its remote inspector starts only with the process, from WEBKIT_INSPECTOR_HTTP_SERVER=<ip>:<port>
  *     (read once, when the first web context is made; port 0 is refused). So "Inspect" starts that app and profile's
- *     lord-web again with --inspect (webargs.h), which lord-web accepts only while developer mode is on. It then binds
- *     a free port on 127.0.0.1 to learn its number, hands it to WebKit as 127.0.0.1:<port>, turns the view's developer
- *     extras on, and once that port listens from one of its own sockets (/proc/self/net/tcp against /proc/self/fd),
- *     opens http://127.0.0.1:<port>/ in the person's browser through OpenURI. It ends with the window.
- *   - WebKit's inspector server has no token or secret path: while it is on, any process on this computer that can
- *     reach 127.0.0.1 can connect to it. That is why it is per window, after asking, and ends with the window. */
+ *     lord-web again with --inspect (webargs.h), which lord-web accepts only while developer mode is on. It then hands
+ *     WebKit 127.0.0.1:<port> with the first free port of WEBGUARD_BACKEND_PORTS (ports every browser refuses to
+ *     reach), turns the view's developer extras on, and once that port listens from one of its own sockets
+ *     (/proc/self/net/tcp against /proc/self/fd), starts its gate in front of it (webproxy.c, webguard.h) and opens the
+ *     gate's one-time address in the person's browser through OpenURI. It ends with the window.
+ *   - WebKit's inspector server has no token or secret path. Web pages can't reach it (the port) and the gate lets
+ *     through only the tab that opened the one-time address; but any process on this computer that can reach
+ *     127.0.0.1 can still connect to WebKit's port itself. That is why it is per window, after asking, and ends with
+ *     the window. */
 #ifndef LORD_WEB_WEBINSPECT_H
 #define LORD_WEB_WEBINSPECT_H
 
@@ -30,10 +33,9 @@ size_t webinspect_write(int on, char *out, size_t n);
 
 /* a port lord-web may hand to WebKit: 1024..65535 */
 int webinspect_port_ok(unsigned port);
-/* "127.0.0.1:<port>" (WEBINSPECT_ENV's value) and "http://127.0.0.1:<port>/" (what the browser opens); 0, or -1 for a
- * port that isn't webinspect_port_ok or a buffer too small */
+/* "127.0.0.1:<port>" (WEBINSPECT_ENV's value); 0, or -1 for a port that isn't webinspect_port_ok or a buffer too
+ * small */
 int webinspect_address(unsigned port, char *out, size_t n);
-int webinspect_url(unsigned port, char *out, size_t n);
 
 /* Who listens on 127.0.0.1:port in /proc/net/tcp's text (len bytes)? inodes: the sockets of this process (n of them).
  *   1   a listening socket on that port, every one of them ours, and at least one on 127.0.0.1

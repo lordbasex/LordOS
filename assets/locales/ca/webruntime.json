@@ -10,6 +10,7 @@
   "offline.body": "Aquesta aplicació no ha pogut arribar al seu lloc. Ho tornarà a provar sola tan bon punt torni la xarxa.",
   "offline.hint": "Premeu Ctrl+R per provar-ho ara.",
   "inspect.title": "Eines per a desenvolupadors activades",
-  "inspect.body": "Fins que tanquis aquesta finestra. Adreça:",
+  "inspect.body": "S'han obert al navegador i continuen actives fins que tanquis aquesta finestra.",
+  "inspect.open": "Obre al navegador",
   "inspect.failed": "No s'han pogut iniciar les eines per a desenvolupadors"
 }
