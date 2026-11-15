@@ -1,0 +1,21 @@
+{
+  "search": "Αναζήτηση emoji",
+  "results": {
+    "one": "{count} αποτέλεσμα",
+    "other": "{count} αποτελέσματα"
+  },
+  "none": "Δεν βρέθηκε τίποτα",
+  "noRecent": "Όσα χρησιμοποιείτε θα εμφανίζονται εδώ",
+  "copied": "Αντιγράφηκε: {text} — επικολλήστε με Ctrl+V",
+  "more": "Περισσότερα…",
+  "group.recent": "Πρόσφατα",
+  "group.smileys": "Φατσούλες και συναισθήματα",
+  "group.people": "Άνθρωποι και σώμα",
+  "group.animals": "Ζώα και φύση",
+  "group.food": "Φαγητό και ποτό",
+  "group.travel": "Ταξίδια και μέρη",
+  "group.activities": "Δραστηριότητες",
+  "group.objects": "Αντικείμενα",
+  "group.symbols": "Σύμβολα",
+  "group.flags": "Σημαίες"
+}
