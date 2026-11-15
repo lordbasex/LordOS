@@ -1,0 +1,22 @@
+{
+  "folder": "录音",
+  "name": "录音 {date} {time}",
+  "all": "所有录音",
+  "empty": "还没有录音",
+  "hint": "按红色按钮（或 R 键）用麦克风录音",
+  "denied": "录音机未获准使用麦克风",
+  "play": "播放",
+  "pause": "暂停",
+  "rename": "重新命名",
+  "trim": "修剪",
+  "cancelTrim": "取消修剪",
+  "saveTrim": "保存修剪后的副本",
+  "trimmed": "已修剪",
+  "export": "导出为",
+  "exportBtn": "导出",
+  "working": "正在导出…",
+  "exported": "已保存“{name}”",
+  "exportError": "无法导出",
+  "renameError": "无法重新命名（该名称是否已存在？）",
+  "emptyTitle": "选择或新建一段录音"
+}

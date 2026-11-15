@@ -1,0 +1,66 @@
+{
+  "archiveName": "归档",
+  "archiveSummary": {
+    "other": "{count} 个文件，{size}"
+  },
+  "compressOne": "压缩“{name}”",
+  "compressMany": {
+    "other": "压缩 {count} 个项目"
+  },
+  "compressing": "正在压缩“{name}”…",
+  "compressProgress": "正在压缩“{name}”：{files} 个文件",
+  "compressed": {
+    "other": "“{name}”已就绪（{count} 个文件）"
+  },
+  "compressError": "无法压缩“{name}”（{error}）",
+  "extractHere": "解压到此处",
+  "extractSelected": {
+    "other": "解压 {count} 个项目"
+  },
+  "extracting": "正在解压“{name}”…",
+  "extractProgress": "正在解压“{name}”：{files} 个文件（{pct}%）",
+  "extracted": {
+    "other": "已解压到“{name}”（{count} 个文件）"
+  },
+  "extractedSkipped": {
+    "other": "已解压到“{name}”（{count} 个文件）；出于安全考虑跳过了 {skipped} 个"
+  },
+  "extractError": "无法解压“{name}”（{error}）",
+  "opening": "正在打开“{name}”…",
+  "loading": "正在载入…",
+  "locked": "受密码保护",
+  "pages": {
+    "other": "{count} 页"
+  },
+  "more": {
+    "other": "以及另外 {count} 个"
+  },
+  "err.invalid": "不是归档文件，或已损坏",
+  "err.missing-volume": "分卷归档缺少一部分：“{name}”",
+  "err.disk-full": "磁盘已满",
+  "err.too-big": "文件太大",
+  "err.too-many": "文件数量太多",
+  "err.corrupt": "文件已损坏",
+  "err.write": "无法写入",
+  "err.unavailable": "文稿助手不可用",
+  "err.cancelled": "已取消",
+  "err.crash": "文稿助手意外停止",
+  "err.timeout": "耗时过长",
+  "err.protocol": "文稿助手发送了无效的回复",
+  "err.spawn": "无法启动文稿助手",
+  "err.closed": "文稿已关闭",
+  "err.bad-request": "请求无效",
+  "err.bad-field": "表单字段无效",
+  "err.bad-page": "页面无效",
+  "err.busy": "文稿助手正忙",
+  "err.memory": "内存不足",
+  "err.no-fonts": "没有可用的字体",
+  "err.not-open": "文稿未打开",
+  "err.nothing": "没有需要保存的内容",
+  "err.read-only": "文稿为只读",
+  "err.save": "无法保存",
+  "err.unknown-op": "未知操作",
+  "err.image": "图像无效",
+  "err.blob": "数据无效",
+  "err.password": "文稿受密码保护"
+}
