@@ -202,6 +202,7 @@
   "appearance.lightHint": "Le site reçoit toujours « clair », quel que soit le mode de LordOS.",
   "appearance.darkHint": "Le site reçoit toujours « sombre », quel que soit le mode de LordOS.",
   "appearance.footer": "Seule change la préférence claire ou sombre que lit le site ; LordOS ne modifie jamais le site lui-même. Certains sites restent clairs malgré tout, et un site qui a son propre réglage de thème suit ce réglage.",
+  "appearance.later": "Le clair et le sombre par app arrivent avec le nouveau moteur web de LordOS (WPEPlatform), vers lequel nous migrons. Pour l’instant, chaque app web suit le mode de LordOS, et un site qui a son propre réglage de thème (WhatsApp, par exemple) le garde.",
   "identity.title": "Identité du navigateur",
   "identity.label": "S’identifier comme",
   "identity.chrome": "Chrome sous Linux + LordOS",

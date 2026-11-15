@@ -200,6 +200,7 @@
   "appearance.lightHint": "LordOS のモードにかかわらず、サイトには常にライトと伝えます。",
   "appearance.darkHint": "LordOS のモードにかかわらず、サイトには常にダークと伝えます。",
   "appearance.footer": "変わるのはサイトが読み取るライト/ダークの設定だけで、LordOS がサイト自体を変更することはありません。それでもライトのままのサイトもあり、独自のテーマ設定を持つサイトはその設定に従います。",
+  "appearance.later": "アプリごとのライト/ダークは、移行中の LordOS の新しい Web エンジン (WPEPlatform) で使えるようになります。それまでは各 Web アプリが LordOS のモードに従い、独自のテーマ設定を持つサイト (WhatsApp など) はその設定のままです。",
   "identity.title": "ブラウザの識別",
   "identity.label": "識別名",
   "identity.chrome": "Linux 上の Chrome + LordOS",

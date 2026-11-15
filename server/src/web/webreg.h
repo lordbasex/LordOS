@@ -17,7 +17,8 @@
  *     missing) a boolean: the app's tray icon (StatusNotifierItem, Open and Quit); background mode does not need it;
  *     notifySound (optional, "auto" when missing) auto|app|system|none: whose sound a notification makes;
  *     colorScheme (optional, "auto" when missing) auto|light|dark: the light or dark preference the page is told
- *     (auto: the desktop's mode; lord-server sends it, webscheme.h);
+ *     (auto: the desktop's mode; lord-server sends it, webscheme.h; light and dark are kept but read as auto until
+ *     WPEPlatform, WEBSCHEME_PER_APP);
  *     a profile is { id, name } plus, optionally, color (red, orange, yellow, green, blue, purple, gray or none) and
  *     userAgent (chrome, edge, firefox, lordos or experimental; "chrome" when missing and never written): the browser the profile's pages
  *     are told it is ("Browser identity"; webpage_user_agent maps the word to the string, in C)

@@ -261,7 +261,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and warns about a LordOS kernel whose source isn't kept. The files were fetched and verified on
     2026-11-15 (`apt-repo.sh rpi-fetch`, and an offline build with a throwaway key) and are published at
     https://lordos.org/apt/pool/rpi/source/ (checked the same day: the `SOURCE` file and the three `.dsc` files answer).
-- **A web app's own Appearance: Automatic, Light or Dark** (maintainer's approval, 2026-11-15). Each web app has
+- **A web app's own Appearance: Automatic, Light or Dark — shipped hidden until WPEPlatform** (maintainer's
+  approval, 2026-11-15; held back the same day by the maintainer's decision: "when we move to WPEPlatform we'll have
+  dark mode"). **What ships now:** the code and the registry key stay, but Light and Dark are unavailable. WPE 2.48's
+  legacy API can't set `prefers-color-scheme` for CSS, so a site that picks its theme with CSS (WhatsApp, for
+  example) never saw the choice and it only half worked. Settings → Web Apps → the app's page shows Appearance with
+  Automatic selected and Light and Dark dimmed (`Segmented` options can now be marked unavailable: `[value, label,
+  true]`, not chosen by click or key), and the note "Light and dark per app arrive with LordOS's new web engine
+  (WPEPlatform), which we're moving to. For now each web app follows LordOS's mode, and a site with its own theme
+  setting (WhatsApp, for example) keeps it." (`webapps.appearance.later`, all 35 languages). The Appearance submenu
+  is gone from Lord Flow's app menu (`webAppearanceItem` stays in `sdk/appcontrol.js` for then). lord-server reads a
+  stored `light` or `dark` as Automatic (`WEBSCHEME_PER_APP 0` in `server/src/web/webscheme.h`; `webscheme_for_app`
+  gives the desktop's mode for every value), so an app already set to Dark doesn't keep a half-working state; the
+  key is still parsed, accepted by `lord.webapps.setColorScheme` and written back, and no user file is rewritten.
+  `sdk/webappsmodel.js` gains `COLOR_SCHEMES_AVAILABLE` (`['auto']`) and `shownColorScheme`. Bringing it back is
+  `WEBSCHEME_PER_APP 1`, `'light'` and `'dark'` in `COLOR_SCHEMES_AVAILABLE` and the menu item; it is part of the
+  WPEPlatform item in docs/ROADMAP.md (#142). Tests: `build/webapp-test` (a stored light or dark follows the desktop),
+  `build/webreg-test` (an app stored as Dark or Light starts with the desktop's word, and with none while the desktop's
+  is unknown; the stored value is kept) and `tests/webapps_model_test.mjs` (`shownColorScheme`). **As designed,
+  for when it returns:** each web app has
   its own choice of the light or dark preference its pages are told (`prefers-color-scheme` through `matchMedia`,
   and the dark background while a page loads): Automatic, the default, follows LordOS's mode as before; Light and
   Dark keep that one whatever the desktop does, so a messaging app can stay dark on a light desktop. It is in
@@ -623,7 +641,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - docs/WEBAPPS.md: the registry's `colorScheme`, the start environment for an app set to Light or Dark, "Each app's
   Appearance" under Light and dark (how lord-server picks the word, the live change, where it is, the tests), the app
   menu item and the More registry keys list. docs/PAPER-VALIDATION.md: a 0.8.8.9 section (in development) with the
-  Appearance claim.
+  Appearance claim. Then, with Appearance held back until WPEPlatform: docs/WEBAPPS.md says so under "Each app's
+  Appearance" (what ships, how to bring it back), in the registry's `colorScheme`, the start environment, the app
+  menu, the More registry keys list and the limits; docs/ROADMAP.md's WPEPlatform item (#142) now includes real dark
+  mode for web apps and bringing the per-app Appearance back; the PAPER-VALIDATION claim says it is held back.
+- Site and paper (en, es, pt): the Web Runtime feature page's "Each app's own Appearance" paragraph says it waits for
+  LordOS's new web engine (WPEPlatform) and that each web app follows LordOS's mode for now; the FAQ's web apps answer
+  no longer lists Appearance as in development and adds the same note; the paper's §5.4 sentence says the per-app
+  Appearance is built but held back until `lord-web` moves to WPEPlatform (#142, before 1.0), and §10's in-development
+  list, limitations and the changelog table no longer list it.
 - docs/LANGUAGES.md: the 26 new languages (ids, names, regions, plural rules, direction, digits, script fonts),
   how they were chosen, the core set, the plural rules table, native digits, what a translator must keep
   (variables, plural forms, LordOS's own names, no other system's brands), and what is still pending for them (the

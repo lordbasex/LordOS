@@ -20,8 +20,9 @@ const char *webscheme_name(int scheme) {
 int webscheme_from_env(const char *value) { return webscheme_parse(value) == WEBSCHEME_DARK ? WEBSCHEME_DARK : WEBSCHEME_LIGHT; }
 
 int webscheme_for_app(int pref, int desktop) {
-    if (pref == WEBREG_SCHEME_LIGHT) return WEBSCHEME_LIGHT;
-    if (pref == WEBREG_SCHEME_DARK) return WEBSCHEME_DARK;
+    /* off until WPEPlatform (WEBSCHEME_PER_APP): a stored light or dark counts as auto, the file stays as it is */
+    if (WEBSCHEME_PER_APP && pref == WEBREG_SCHEME_LIGHT) return WEBSCHEME_LIGHT;
+    if (WEBSCHEME_PER_APP && pref == WEBREG_SCHEME_DARK) return WEBSCHEME_DARK;
     return desktop == WEBSCHEME_LIGHT || desktop == WEBSCHEME_DARK ? desktop : -1;
 }
 

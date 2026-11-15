@@ -865,13 +865,19 @@ static void test_edit(void) {
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
 
-/* which word lord-server tells an app: its Appearance, or the desktop's for auto */
+/* which word lord-server tells an app: its Appearance, or the desktop's for auto; until WPEPlatform
+ * (WEBSCHEME_PER_APP 0) a stored light or dark is auto too */
 static void test_scheme_for_app(void) {
     const int desk[] = { -1, WEBSCHEME_LIGHT, WEBSCHEME_DARK };
     for (int d = 0; d < 3; d++) {
         CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, desk[d]) == desk[d], "auto follows the desktop (%d)", desk[d]);
+#if WEBSCHEME_PER_APP
         CHECK(webscheme_for_app(WEBREG_SCHEME_LIGHT, desk[d]) == WEBSCHEME_LIGHT, "light whatever the desktop (%d)", desk[d]);
         CHECK(webscheme_for_app(WEBREG_SCHEME_DARK, desk[d]) == WEBSCHEME_DARK, "dark whatever the desktop (%d)", desk[d]);
+#else
+        CHECK(webscheme_for_app(WEBREG_SCHEME_LIGHT, desk[d]) == desk[d], "a stored light follows the desktop (%d)", desk[d]);
+        CHECK(webscheme_for_app(WEBREG_SCHEME_DARK, desk[d]) == desk[d], "a stored dark follows the desktop (%d)", desk[d]);
+#endif
     }
     CHECK(webscheme_for_app(7, WEBSCHEME_DARK) == WEBSCHEME_DARK && webscheme_for_app(-3, WEBSCHEME_LIGHT) == WEBSCHEME_LIGHT, "a bad value is auto");
     CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, 5) == -1 && webscheme_for_app(WEBREG_SCHEME_AUTO, -2) == -1, "a bad desktop value is not known");

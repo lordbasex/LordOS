@@ -1,7 +1,7 @@
 // appcontrol.js — what a theme offers for the app in front and for every app at once (0.8.5):
 //
 //   appGroup(winId)        { key, name, windows } of the app that owns a window (grouped as the Dock does)
-//   appMenuItems(winId)    the app menu: About <app>, Settings…, (a web app's Appearance and Browser identity),
+//   appMenuItems(winId)    the app menu: About <app>, Settings…, (a web app's Browser identity),
 //                          Hide <app>, Hide Others, Show All, Quit <app>
 //   runningApps()          every app with a window, for Force Quit
 //   forceQuit(key)         ends an app that stopped answering (see below)
@@ -74,7 +74,8 @@ export function webHelpItems(winId) {
 }
 
 // A web app's Appearance (Automatic, Light, Dark): the light or dark preference its pages are told; open windows follow
-// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps.
+// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps. Not in the app menu until
+// WPEPlatform brings light and dark per app (webappsmodel.js, COLOR_SCHEMES_AVAILABLE); kept for then.
 export function webAppearanceItem(winId) {
   const web = webAppOfWindow(wm.get(winId));
   if (!web) return null;
@@ -118,13 +119,12 @@ export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
   const settingsItem = appSettingsItem(winId);
-  const appearance = webAppearanceItem(winId);
+  // the Appearance submenu (webAppearanceItem) comes back with WPEPlatform
   const identity = webUserAgentItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
-    ...(appearance ? [appearance] : []),
     ...(identity ? [identity] : []),
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },

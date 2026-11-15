@@ -63,6 +63,7 @@ export function Toggle({ on, onChange, small, focusable = true }) {
 // (view switcher: a raised neutral segment). small: 22 px high instead of 28. fill: the
 // segments share the full width of the control.
 // One Tab stop: ← → (Home, End) choose the segment, in the row's order (swapped in right to left).
+// An option [value, label, true] is shown dimmed and can't be chosen (by click or key).
 export function Segmented({ options, value, onChange, appearance = 'accent', small, fill, style, focusable = true }) {
   const t = useTheme();
   const neutral = appearance === 'neutral';
@@ -70,16 +71,16 @@ export function Segmented({ options, value, onChange, appearance = 'accent', sma
   const onKey = (e) => {
     const i = choiceKey(e, { index: options.findIndex(([v]) => v === value), count: options.length, rtl: direction() === 'rtl' });
     if (i == null) return false;
-    if (options[i][0] !== value) onChange(options[i][0]);
+    if (options[i][0] !== value && !options[i][2]) onChange(options[i][0]);
     return true;
   };
   return (
     <View focusable={focusable && options.length > 0} onKeyDown={onKey} style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
-      {options.map(([v, label]) => {
+      {options.map(([v, label, disabled]) => {
         const on = value === v;
         return (
-          <View key={v} onClick={() => onChange(v)} style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
-            justifyContent: 'center', alignItems: 'center', flexGrow: fill ? 1 : 0,
+          <View key={v} onClick={disabled ? undefined : () => onChange(v)} style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
+            justifyContent: 'center', alignItems: 'center', flexGrow: fill ? 1 : 0, opacity: disabled ? 0.4 : 1,
             backgroundColor: on ? (neutral ? raised : t.accent) : 'transparent',
             boxShadow: on && neutral ? '0 1px 2px rgba(0,0,0,0.18)' : 'none' }}>
             <Text style={{ fontSize: small ? 11 : 12, fontWeight: on && neutral ? 600 : neutral ? 500 : 600, whiteSpace: 'nowrap',

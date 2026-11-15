@@ -204,6 +204,7 @@
   "appearance.lightHint": "Site-ului i se spune mereu luminos, indiferent de modul LordOS.",
   "appearance.darkHint": "Site-ului i se spune mereu întunecat, indiferent de modul LordOS.",
   "appearance.footer": "Se schimbă doar preferința luminos sau întunecat pe care o citește site-ul; LordOS nu modifică niciodată site-ul în sine. Unele site-uri rămân totuși luminoase, iar un site cu propria setare de temă urmează acea setare.",
+  "appearance.later": "Luminos și întunecat pentru fiecare aplicație vin odată cu noul motor web al LordOS (WPEPlatform), la care migrăm. Deocamdată fiecare aplicație web urmează modul LordOS, iar un site cu propria setare de temă (WhatsApp, de exemplu) o păstrează.",
   "identity.title": "Identitatea browserului",
   "identity.label": "Identificare ca",
   "identity.chrome": "Chrome pe Linux + LordOS",

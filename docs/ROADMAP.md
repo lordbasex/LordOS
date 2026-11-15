@@ -877,7 +877,11 @@ Besides the two items below, the work in development is listed in `CHANGELOG.md`
   decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
   upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
   WPEPlatform keeping our buffer path (dmabuf, shm), input, IME, clipboard, drag and drop and fractional scale, and
-  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then.
+  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then. With it comes real
+  dark mode for web apps (maintainer, 2026-11-15): set `prefers-color-scheme` through the new API so CSS `@media`
+  rules follow too, then bring back each app's Appearance (Light and Dark), held back until then (`WEBSCHEME_PER_APP`
+  in `server/src/web/webscheme.h`, `COLOR_SCHEMES_AVAILABLE` in `sdk/webappsmodel.js`, `webAppearanceItem` in the app
+  menu; docs/WEBAPPS.md, "Each app's Appearance").
 - [ ] **Each session in its own systemd unit** ([#140](https://github.com/lordbasex/LordOS/issues/140), maintainer's decision
   2026-11-15: before 1.0 and before Debian 14). With systemd 258 or later, `systemctl restart lordos` fails while
   sessions are alive (EBUSY): move each session out of `lordos.service` into a delegated `lordos-session-<uid>.scope`

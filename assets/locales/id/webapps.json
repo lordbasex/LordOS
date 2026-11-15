@@ -200,6 +200,7 @@
   "appearance.lightHint": "Situs selalu diberi tahu terang, apa pun mode LordOS.",
   "appearance.darkHint": "Situs selalu diberi tahu gelap, apa pun mode LordOS.",
   "appearance.footer": "Hanya preferensi terang atau gelap yang dibaca situs yang berubah; LordOS tidak pernah mengubah situs itu sendiri. Beberapa situs tetap terang, dan situs yang punya pengaturan tema sendiri mengikuti pengaturan tersebut.",
+  "appearance.later": "Terang dan gelap per aplikasi hadir bersama mesin web baru LordOS (WPEPlatform), yang sedang kami tuju. Untuk saat ini setiap aplikasi web mengikuti mode LordOS, dan situs dengan pengaturan temanya sendiri (misalnya WhatsApp) tetap memakainya.",
   "identity.title": "Identitas browser",
   "identity.label": "Kenali sebagai",
   "identity.chrome": "Chrome di Linux + LordOS",

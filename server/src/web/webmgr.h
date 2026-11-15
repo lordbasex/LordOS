@@ -58,7 +58,8 @@ const char *webmgr_uninstall(const char *app, int delete_data);
 void webmgr_set_scheme(int scheme);
 int  webmgr_scheme(void);                       /* -1 until set */
 /* The scheme app's lord-web is told: its Appearance (registry colorScheme) light or dark, else the desktop's (-1 not
- * known yet, or an app that can't be read and the desktop's not known). */
+ * known yet, or an app that can't be read and the desktop's not known). Until WPEPlatform always the desktop's
+ * (webscheme.h, WEBSCHEME_PER_APP). */
 int  webmgr_scheme_of(const char *app);
 /* A profile's Browser identity (registry userAgent, WEBREG_UA_*), or -1 when the app or the profile can't be read. */
 int  webmgr_user_agent_of(const char *app, const char *profile);
