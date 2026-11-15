@@ -1,0 +1,21 @@
+{
+  "search": "Maghanap ng emoji",
+  "results": {
+    "one": "{count} resulta",
+    "other": "{count} resulta"
+  },
+  "none": "Walang nahanap",
+  "noRecent": "Lalabas dito ang mga ginagamit mo",
+  "copied": "Nakopya ang {text}: i-paste ito gamit ang Ctrl+V",
+  "more": "Higit pa…",
+  "group.recent": "Kamakailan",
+  "group.smileys": "Mga smiley at emosyon",
+  "group.people": "Mga tao at katawan",
+  "group.animals": "Mga hayop at kalikasan",
+  "group.food": "Pagkain at inumin",
+  "group.travel": "Paglalakbay at mga lugar",
+  "group.activities": "Mga aktibidad",
+  "group.objects": "Mga bagay",
+  "group.symbols": "Mga simbolo",
+  "group.flags": "Mga watawat"
+}

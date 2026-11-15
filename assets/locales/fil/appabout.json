@@ -1,0 +1,9 @@
+{
+  "isolated": "Tumatakbo nang hiwalay, sa sarili nitong process",
+  "linux": "Linux app",
+  "lordos": "LordOS app",
+  "package": "Naka-install na app (.lpk)",
+  "system": "App ng system — bahagi ng LordOS, na-verify kasama nito",
+  "title": "Tungkol sa {app}",
+  "version": "Bersyon {v}"
+}

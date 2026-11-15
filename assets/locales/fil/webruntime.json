@@ -1,0 +1,9 @@
+{
+  "tray.open": "Buksan",
+  "tray.quit": "Umalis",
+  "notify.open": "Buksan",
+  "download.done": "Tapos na ang download",
+  "download.failed": "Nabigo ang download",
+  "chooser.open": "Pumili ng file",
+  "chooser.openMany": "Pumili ng mga file"
+}

@@ -1,0 +1,19 @@
+{
+  "bootTest": "Sinusukat ang oras ng boot: tapos na ang boot {k} sa {n}. Magre-restart sa loob ng {s} s. Ihihinto rin ng pag-log in ang test.",
+  "bootTestCancel": "Ihinto ang test",
+  "busy": "Sandali lang…",
+  "cancel": "Kanselahin",
+  "confirmRestart": "May mga bukas na session: mawawala ang hindi na-save na gawa. I-restart pa rin?",
+  "confirmShutdown": "May mga bukas na session: mawawala ang hindi na-save na gawa. I-shut down pa rin?",
+  "error": "Hindi mabuksan ang session.",
+  "locked": "Naka-lock ang screen",
+  "noUsers": "Walang user",
+  "password": "Password",
+  "restart": "I-restart",
+  "shutdown": "I-shut down",
+  "wait": {
+    "one": "Masyadong maraming pagsubok. Maghintay ng {count} segundo.",
+    "other": "Masyadong maraming pagsubok. Maghintay ng {count} segundo."
+  },
+  "wrong": "Mali ang password."
+}

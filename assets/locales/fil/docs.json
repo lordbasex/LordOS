@@ -1,0 +1,74 @@
+{
+  "archiveName": "Archive",
+  "archiveSummary": {
+    "one": "{count} file, {size}",
+    "other": "{count} na file, {size}"
+  },
+  "compressOne": "I-compress ang “{name}”",
+  "compressMany": {
+    "one": "I-compress ang {count} item",
+    "other": "I-compress ang {count} na item"
+  },
+  "compressing": "Kino-compress ang “{name}”…",
+  "compressProgress": "Kino-compress ang “{name}”: {files} file",
+  "compressed": {
+    "one": "Handa na ang “{name}” ({count} file)",
+    "other": "Handa na ang “{name}” ({count} na file)"
+  },
+  "compressError": "Hindi ma-compress ang “{name}” ({error})",
+  "extractHere": "I-extract dito",
+  "extractSelected": {
+    "one": "I-extract ang {count} item",
+    "other": "I-extract ang {count} na item"
+  },
+  "extracting": "Ine-extract ang “{name}”…",
+  "extractProgress": "Ine-extract ang “{name}”: {files} file ({pct}%)",
+  "extracted": {
+    "one": "Na-extract sa “{name}” ({count} file)",
+    "other": "Na-extract sa “{name}” ({count} na file)"
+  },
+  "extractedSkipped": {
+    "one": "Na-extract sa “{name}” ({count} file); {skipped} ang nilaktawan para sa kaligtasan",
+    "other": "Na-extract sa “{name}” ({count} na file); {skipped} ang nilaktawan para sa kaligtasan"
+  },
+  "extractError": "Hindi ma-extract ang “{name}” ({error})",
+  "opening": "Binubuksan ang “{name}”…",
+  "loading": "Naglo-load…",
+  "locked": "protektado ng password",
+  "pages": {
+    "one": "{count} pahina",
+    "other": "{count} na pahina"
+  },
+  "more": {
+    "one": "at {count} pa",
+    "other": "at {count} pa"
+  },
+  "err.invalid": "hindi archive, o sira ito",
+  "err.missing-volume": "nawawala ang isang bahagi ng hinating archive: “{name}”",
+  "err.disk-full": "puno na ang disk",
+  "err.too-big": "masyadong malaki ito",
+  "err.too-many": "masyadong marami ang file nito",
+  "err.corrupt": "sira ito",
+  "err.write": "hindi makasulat",
+  "err.unavailable": "hindi available ang document helper",
+  "err.cancelled": "kinansela",
+  "err.crash": "biglang huminto ang document helper",
+  "err.timeout": "masyadong natagalan",
+  "err.protocol": "nagpadala ang document helper ng hindi wastong sagot",
+  "err.spawn": "hindi masimulan ang document helper",
+  "err.closed": "isinara ang dokumento",
+  "err.bad-request": "hindi wastong kahilingan",
+  "err.bad-field": "hindi wastong field ng form",
+  "err.bad-page": "hindi wastong pahina",
+  "err.busy": "abala ang document helper",
+  "err.memory": "naubusan ng memory",
+  "err.no-fonts": "walang available na font",
+  "err.not-open": "hindi nakabukas ang dokumento",
+  "err.nothing": "walang ise-save",
+  "err.read-only": "read-only ang dokumento",
+  "err.save": "hindi ma-save",
+  "err.unknown-op": "hindi kilalang operasyon",
+  "err.image": "hindi wastong larawan",
+  "err.blob": "hindi wastong data",
+  "err.password": "protektado ng password ang dokumento"
+}

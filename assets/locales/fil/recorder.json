@@ -1,0 +1,22 @@
+{
+  "folder": "Mga Recording",
+  "name": "Recording {date} {time}",
+  "all": "Lahat ng recording",
+  "empty": "Wala pang mga recording",
+  "hint": "Pindutin ang pulang button (o R) para mag-record gamit ang mikropono",
+  "denied": "Hindi pinapayagan ang Voice Recorder na gamitin ang mikropono",
+  "play": "I-play",
+  "pause": "I-pause",
+  "rename": "Palitan ang pangalan",
+  "trim": "I-trim",
+  "cancelTrim": "Kanselahin ang pag-trim",
+  "saveTrim": "I-save ang na-trim na kopya",
+  "trimmed": "na-trim",
+  "export": "I-export bilang",
+  "exportBtn": "I-export",
+  "working": "Ine-export…",
+  "exported": "Na-save ang “{name}”",
+  "exportError": "Hindi ma-export",
+  "renameError": "Hindi mapalitan ang pangalan (mayroon na bang ganoong pangalan?)",
+  "emptyTitle": "Pumili o gumawa ng recording"
+}
