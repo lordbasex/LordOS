@@ -69,6 +69,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [SECURITY-REVIEW-0.8.0.md](SECURITY-REVIEW-0.8.0.md) | Security review before 0.8.0-beta: every finding and its status |
 | [PASSWORDS.md](PASSWORDS.md) | Passwords and the system keyring |
 | [COMPLIANCE.md](COMPLIANCE.md) | Licence compliance, the SBOM, and the standards our processes align with |
+| [SOURCE-OFFER.md](SOURCE-OFFER.md) | The written offer for the source of the GPL programs in the images, and each image's list of source packages |
 | [../SECURITY.md](../SECURITY.md) | How to report a vulnerability |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md), [../CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) | How to contribute, and the code of conduct |
 

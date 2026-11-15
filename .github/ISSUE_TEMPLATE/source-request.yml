@@ -1,0 +1,32 @@
+name: Source code request
+description: Ask for the source code of a GPL or other copyleft program in a LordOS image or package (docs/SOURCE-OFFER.md).
+title: "Source request: "
+labels: ["source-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        LordOS offers the complete corresponding source of every copyleft program in the files it publishes, for at
+        least three years after it last published that file: https://lordos.org/legal/source-code/
+        Most of it is already online: each image's `.sources.tsv` file on its release page links every Debian source
+        package and version. Ask here when a link doesn't work or you want us to send it. Don't include personal data.
+  - type: input
+    id: file
+    attributes:
+      label: Which file
+      description: The image or package you got from LordOS, as named on the release page.
+      placeholder: lordos-live-0.8.8-amd64.iso
+    validations:
+      required: true
+  - type: textarea
+    id: packages
+    attributes:
+      label: Which source
+      description: The program or the source packages and versions (from the `.sources.tsv` list), or "all of it".
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: For example, a link that didn't work.

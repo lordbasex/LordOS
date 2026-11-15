@@ -742,6 +742,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       return `<div class="laptop" id="hero-show" role="region" aria-roledescription="carousel" aria-label="${esc(H.carousel)}"><div class="lp-screen"><span class="lp-cam" aria-hidden="true"></span><div class="lp-display">${slides}</div></div><div class="lp-base" aria-hidden="true"><span class="lp-notch"></span></div>${ctl}</div><ul class="stats">${pills}</ul>`;
     })(),
     fingerprint: FINGERPRINT, banner: l === 'en' ? banner() : '',
+    sourceUrl: builtPages().has('legal/source-code') ? pageUrl(l, 'legal/source-code') : `${GITHUB}/blob/main/docs/SOURCE-OFFER.md`,
     writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: MEDIA_VERSION, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
     imagerMac: `${IMAGER_DL}_universal.dmg`, imagerWin: `${IMAGER_DL}_x64_setup.exe`, imagerLinux: `${IMAGER_DL}_amd64.deb`,
     faqServer: HAS_FAQ ? pageUrl(l, 'faq') + '#server-vps' : `${GITHUB}/blob/main/docs/INSTALL-DEBIAN.md#servers-and-vps`,

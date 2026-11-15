@@ -17,6 +17,11 @@ materials (SBOM) published with each release. The website summary is at
   (`assets/fonts/*-LICENSE.txt`). The Noto subsets built into `lord-bench` have no files of their own:
   their license is `usr/share/doc/lordos/OFL-Noto.txt`.
 - Debian packages keep their own `/usr/share/doc/<package>/copyright` on the installed system.
+- **The images' source packages** (in development after 0.8.8.8; [SOURCE-OFFER.md](SOURCE-OFFER.md)): each image is
+  published with `<image>.sources.tsv`, every source package and version in it with where that exact source is
+  (snapshot.debian.org for Debian's, LordOS's copy or Raspberry Pi's archive for the Pi's, this repository at the tag
+  for LordOS's own packages and its Raspberry Pi kernel), written by `tools/release/image-sources.sh`, under a
+  written offer valid for three years.
 - **Raspberry Pi packages mirrored in the LordOS APT repository** (arm64, since 0.8.4.1;
   `tools/release/rpi-mirror.list`, [UPDATES.md](UPDATES.md), "Raspberry Pi firmware packages") are
   copied byte for byte, each with its own `copyright` inside: `rpi-eeprom` (scripts BSD-3-Clause;
@@ -106,7 +111,8 @@ what is still missing is listed on [lordos.org/legal/standards](https://lordos.o
 
 Gaps today: no formal OpenChain conformance self-certification, no automated matching of the SBOM
 against vulnerability databases, no SBOM for the ISO and Raspberry Pi images as a whole (only for
-the `.deb` and what it depends on), no third-party audit, lord-tts's libraries (audio.cpp, ggml,
+the `.deb` and what it depends on; the images have a list of their source packages, `<image>.sources.tsv`, not an
+SPDX document), no third-party audit, lord-tts's libraries (audio.cpp, ggml,
 SentencePiece, cJSON and libyaml, in `/usr/lib/lordos/lib/tts`; listed in `THIRD_PARTY.md`) not yet in
 the SBOM. (The source gap for the AGPL-3.0 RustDesk binaries no longer applies: RustDesk is not
 distributed.)

@@ -103,6 +103,8 @@
   "imgLinux": "Descargar para Linux",
   "imgNote": "También viene con LordOS (Apps → Sistema). Libre y de código abierto, no recopila nada.",
   "dlNote": "Las descargas se publican en GitHub Releases con sumas SHA-256.",
+  "dlSource": "Cada imagen viene con la lista de los paquetes fuente que contiene, y el código fuente de cada programa GPL que trae se ofrece durante tres años.",
+  "dlSourceLink": "Código fuente",
   "verifyTitle": "Verificá tu descarga",
   "verifyText": "Cada versión está firmada con la clave de publicación de LordOS. Comprobá la firma antes de instalar. Huella de la clave (SHA-256):",
   "verifyKey": "Descargar la clave pública",

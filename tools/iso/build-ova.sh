@@ -8,7 +8,8 @@
 # Needs: gdisk, dosfstools, e2fsprogs >= 1.47.1 with libarchive13t64, mtools, squashfs-tools, qemu-utils,
 # util-linux (losetup, it needs root and loop devices), tar.
 #
-# Result: <work>/out/lordos-<version>-amd64.ova and its .sha256
+# Result: <work>/out/lordos-<version>-amd64.ova, its .sha256 and lordos-<version>-amd64.sources.tsv (the image's
+# source packages, tools/release/image-sources.sh)
 #
 # It takes the ISO's own system (image/live/filesystem.squashfs) and does what the disk installer does
 # with it (server/src/install/install.c, install-run in mode erase), minus the person's account: same
@@ -35,7 +36,7 @@ NAME="lordos-$VERSION-amd64"
 OVA="$OUT/$NAME.ova"
 DISK_GB=32
 [ -f "$SQ" ] || { echo "build-ova.sh: no $SQ: run tools/iso/build.sh first" >&2; exit 1; }
-for t in sgdisk mkfs.vfat mke2fs e2fsck mcopy unsquashfs qemu-img losetup tar; do
+for t in sgdisk mkfs.vfat mke2fs e2fsck mcopy unsquashfs qemu-img losetup tar dpkg-query python3; do
     command -v "$t" >/dev/null || { echo "build-ova.sh: missing $t (see the top of this file)" >&2; exit 1; }
 done
 [ -e /usr/lib/x86_64-linux-gnu/libarchive.so.13 ] || { echo "build-ova.sh: missing libarchive13t64 (mke2fs -d with a tar)" >&2; exit 1; }
@@ -148,6 +149,9 @@ in_t chage -d "$(date -u -d "@$EPOCH" +%F)" lordos
 rm -f "$T/etc/passwd-" "$T/etc/shadow-"
 # without these every boot would redo ldconfig and systemd-update-done (build.sh explains it)
 printf 'TIMESTAMP_NSEC=%s000000000\n' "$EPOCH" | tee "$T/etc/.updated" > "$T/var/.updated"
+# the image's source packages and versions, published next to it (docs/SOURCE-OFFER.md): the ISO's list
+# without live-boot, purged above
+SOURCE_DATE_EPOCH="$EPOCH" sh tools/release/image-sources.sh "$T" "$OUT/$NAME.sources.tsv"
 
 for m in run sys proc dev/pts dev; do umount -l "$T/$m"; done
 

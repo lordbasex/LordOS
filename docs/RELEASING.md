@@ -88,8 +88,11 @@ The releases page is the project's public changelog: every release is documented
      `lordos-hwdata_<date>_all.deb` and both `lordos-rclone` packages: `install.sh` installs them from the release
      together with `lordos`, since a Debian system has no LordOS repository yet; `sign-release.sh` refuses a folder
      without them, unless `ALLOW_NO_HWDATA=1` or `ALLOW_NO_RCLONE=1` says that `lordos` doesn't depend on them).
-4. **SBOM.** On each build VM, `tools/release/make-sbom.sh lordos_<v>_<arch>.deb`, and put the
-   `.spdx.json` files in the release folder ([COMPLIANCE.md](COMPLIANCE.md)).
+4. **SBOM and source lists.** On each build VM, `tools/release/make-sbom.sh lordos_<v>_<arch>.deb`, and put the
+   `.spdx.json` files in the release folder ([COMPLIANCE.md](COMPLIANCE.md)). Every image goes with its source
+   list: `build.sh`, `build-ova.sh` and `build-img.sh` write `<image>.sources.tsv` next to it (below, "Source
+   code"); put each one in the release folder with its image, so `SHA256SUMS` covers it too. A release with no new
+   images has none.
 5. **Sign.** On the maintainer's machine, `tools/release/sign-release.sh <release-dir>`: it writes
    `SHA256SUMS` and `SHA256SUMS.sig` and checks them against the public key
    ([SIGNING.md](SIGNING.md), "Release files"). Then copy `tools/release/lordos-release.pub.pem`
@@ -154,6 +157,47 @@ The releases page is the project's public changelog: every release is documented
 10. **Check:** download from the release page and run the verification commands from the notes;
    run `curl -fsSL https://lordos.org/install.sh | sh` on a clean Debian 13; update the website if
    it names the current version.
+
+## Source code
+
+The images carry GPL and other copyleft binaries (Debian's packages, the Raspberry Pi archive's kernel and
+FFmpeg, LordOS's own Raspberry Pi kernel), so each one is published with the list of the exact source packages
+it contains and where each source is, under the written offer in [SOURCE-OFFER.md](SOURCE-OFFER.md)
+([lordos.org/legal/source-code](https://lordos.org/legal/source-code/)). For every image of a release:
+
+1. **The list comes from the build.** `tools/iso/build.sh` writes `lordos-live-<version>-<arch>.sources.tsv`,
+   `tools/iso/build-ova.sh` `lordos-<version>-amd64.sources.tsv` and `tools/rpi/build-img.sh`
+   `lordos-<version>-rpi5-arm64.sources.tsv`, all with `tools/release/image-sources.sh` on the image's system before
+   the APT lists are removed, so each package's origin (Debian or Raspberry Pi) is exact. Read what it prints:
+   a `warning:` (a package in no APT list, a kernel with no known commit) is fixed before publishing, and the
+   `note:` names the Raspberry Pi sources LordOS keeps no copy of. A copyleft one there (a newer FFmpeg, the
+   archive's own kernel for a board LordOS has no kernel for) gets its `source` line in
+   `tools/release/rpi-mirror.list` and is published with `apt-repo.sh` before the image is.
+2. **The kernel's commit.** `build-img.sh` passes `$KERNEL_DEBS/SOURCE` (written by `tools/rpi/build-kernel.sh`)
+   so the Pi kernel's line names the exact commit. A kernel built from a commit `image-sources.sh` doesn't know
+   yet (its `KNOWN_KERNELS`) also goes into [RASPBERRY.md](RASPBERRY.md), "The LordOS kernel".
+3. **Publish it with the image**, in the release folder before `sign-release.sh` (step 4 above), so it is in
+   `SHA256SUMS`, and keep it there: the offer runs for three years after the image was last published.
+4. **Requests** arrive as GitHub issues from the "Source code request" form (`.github/ISSUE_TEMPLATE/source-request.yml`,
+   label `source-request`; create the label once with `gh label create source-request --repo lordbasex/LordOS`).
+   Answer each one with the source asked for: a Debian source that snapshot.debian.org no longer serves, or a
+   Raspberry Pi one the archive dropped, is uploaded to the release or to `lordos.org/apt/pool/`, and the answer
+   links it.
+
+**Images published before the lists** (0.8.8 and earlier): their versions are only in the images. On a Debian
+machine with the published files (no root needed; [SOURCE-OFFER.md](SOURCE-OFFER.md) lists the tools):
+
+```sh
+tools/release/image-sources.sh lordos-live-0.8.8-amd64.iso
+tools/release/image-sources.sh lordos-live-0.8.8-arm64.iso
+tools/release/image-sources.sh lordos-0.8.8-amd64.ova
+TMPDIR=<a folder with room for the uncompressed image> tools/release/image-sources.sh lordos-0.8.8-rpi5-arm64.img.xz
+gh release upload v0.8.8-beta lordos-live-0.8.8-amd64.sources.tsv lordos-live-0.8.8-arm64.sources.tsv \
+    lordos-0.8.8-amd64.sources.tsv lordos-0.8.8-rpi5-arm64.sources.tsv --repo lordbasex/LordOS
+```
+
+They are added to the release as they are, outside its signed `SHA256SUMS` (which stays as published); the
+images they describe are covered by it, and the lists only name public sources.
 
 ## The labels of hardware reports
 

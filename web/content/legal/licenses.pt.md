@@ -48,4 +48,4 @@ Desde a 0.8.8 o `lordos` também depende do polkit (`polkitd` e `pkexec`, LGPL-2
 
 ## Código-fonte
 
-O código-fonte do LordOS está em [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). Se você precisar do código-fonte correspondente de um componente GPL que distribuímos e não o encontrar, escreva pelo [nosso formulário de contato](https://www.iperfex.com/contacto/?lang=pt).
+O código-fonte do LordOS está em [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). Cada imagem é publicada com a lista dos pacotes-fonte que contém e um link para cada código-fonte exato, e o código-fonte de cada programa GPL ou outro copyleft das nossas imagens e pacotes é oferecido por pelo menos três anos: veja [Código-fonte](/legal/source-code/). Se você precisar de um e não o encontrar, abra um [pedido de código-fonte](https://github.com/lordbasex/LordOS/issues/new?template=source-request.yml) no GitHub ou escreva pelo [nosso formulário de contato](https://www.iperfex.com/contacto/?lang=pt).

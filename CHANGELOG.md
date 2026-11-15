@@ -74,6 +74,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     VM 127: no chooser, the main display shown, the pointer, clicks, the wheel, Ctrl+A, End and Enter, and " ñandú
     ÁÉ ¿€? 日本" into Notes and into GTK 4's Print Editor on a US layout. **Not tested:** switching to a second
     display, because VM 127 has one (a QEMU `std` VGA); the pointer on a scaled or rotated second display.
+- **The source of every image, listed and offered** (GPL compliance, maintainer's decision, 2026-11-15). Each image
+  (both live ISOs, the OVA and the Raspberry Pi image) is published with `<image>.sources.tsv`: one line per source
+  package and version in it, the binary packages built from it, and where that exact source is:
+  `https://snapshot.debian.org/package/<source>/<version>/` for Debian's, LordOS's own copy in
+  `lordos.org/apt/pool/rpi/source/` or Raspberry Pi's archive for the Pi's (FFmpeg, firmware, utilities), this
+  repository at the release tag for LordOS's packages (with a note that `lord-doc` and `lord-media` link
+  GPL-2.0-or-later builds of Poppler and FFmpeg), Raspberry Pi's kernel tree at the exact commit plus
+  `tools/rpi/build-kernel.sh` and `/boot/config-<release>` for the LordOS Raspberry Pi kernel (6.18.57: commit
+  `234188315037`), and rclone's tag for `lordos-rclone`. `tools/release/image-sources.sh` writes it from the image's
+  own dpkg database (`dpkg-query --admindir`, `${source:Package}` and `${source:Version}`), deduplicated by source;
+  `tools/iso/build.sh`, `build-ova.sh` and `tools/rpi/build-img.sh` run it on the image's system before the APT lists
+  are removed, so each package's origin (Debian or Raspberry Pi) comes from the lists, and the OVA's list is dated
+  with its build clock like the rest of the OVA. It also reads a published file without root, a mount or a loop
+  device: an ISO's `live/filesystem.squashfs` in place (`unsquashfs -o`, its offset found in the ISO 9660 and Rock
+  Ridge directory), the Pi image's or the OVA's ext4 system partition with `debugfs` at its offset (MBR or GPT)
+  after `xz` or `qemu-img` into `$TMPDIR`. It warns about a package in no APT list or a Pi kernel with no known
+  commit, and names the Raspberry Pi sources LordOS keeps no copy of. Tested on synthetic MBR and GPT images
+  (`.img.xz`, an OVA with a stream-optimized VMDK) and on a real xorriso-made live ISO; not yet run on a LordOS
+  image. The written offer is new: [docs/SOURCE-OFFER.md](docs/SOURCE-OFFER.md) and
+  [lordos.org/legal/source-code](https://lordos.org/legal/source-code/) offer the complete corresponding source of
+  any copyleft program in any image or package LordOS has published since 0.8.0, for at least three years after it
+  was last published, free as a download, asked for through a new "Source code request" issue form
+  (`.github/ISSUE_TEMPLATE/source-request.yml`) or the iPERFEX contact form. The 0.8.8 images, published before the
+  lists, get theirs from the published files (docs/RELEASING.md, "Source code"). The ISO and arm64 build chroots
+  need `python3` (docs/ISO.md).
 
 ### Changed
 
@@ -140,6 +165,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   page, and the sites run unmodified. §3.5 and §10.2 say the RX 580 PC is the author's daily machine and cite the
   community hardware reports (laptop panels on Intel graphics and an RX 9060 XT working; Nvidia, other AMD cards,
   DisplayPort hubs and suspend untested). `docs/PAPER-VALIDATION.md` has rows for both.
+
+- **Source code, for releases**: `docs/SOURCE-OFFER.md` (new; the lists' columns, where each origin's source is, the
+  written offer, the 0.8.8 images), `docs/RELEASING.md` (step 4 puts each image's `.sources.tsv` in the release folder
+  before signing; a new "Source code" section: reading the script's warnings, pinning a copyleft Raspberry Pi source
+  in `rpi-mirror.list`, the kernel's commit, the `source-request` label, answering requests, and the commands for the
+  0.8.8 images) and `docs/COMPLIANCE.md`.
 
 ### Website
 
@@ -278,6 +309,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `docs/WEBAPPS.md` drops "in development" for 0.8.8.8, describes the current memory pressure limits, lists the
   `theme` limitation and says "Settings → Web Apps" as the English UI does (so does the English paper); the roadmap
   and `docs/PAPER-VALIDATION.md` lose stale version notes; an unused diagram is removed from the web apps page's data.
+
+- **Source code notice.** The download section says, in English, Spanish and Portuguese, that each image comes with
+  the list of its source packages and links the new legal page *Source code* (`/legal/source-code/`), the written
+  offer: what is offered, where each source is, for how long, and how to ask. *Licenses and open-source notices*
+  points its "Source code" section there and to GitHub's source code request form.
 
 ### Fixed
 
