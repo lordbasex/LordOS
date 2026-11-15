@@ -264,10 +264,3 @@ int browser_prefs_apply_all(const char *root) {
     }
     return bad ? -1 : n;
 }
-
-int browser_prefs_main(int argc, char **argv) {
-    const char *root = argc > 2 ? argv[2] : "";
-    if (argc > 3 || (*root && root[0] != '/')) { fprintf(stderr, "usage: %s --browser-prefs [<absolute root>]\n", argv[0]); return 2; }
-    browser_prefs_apply_all(root);
-    return 0;                                           /* a browser default never fails an upgrade */
-}

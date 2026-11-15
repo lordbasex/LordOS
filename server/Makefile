@@ -294,7 +294,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -312,7 +312,12 @@ PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx
 build/pkg-test: tests/pkg_test.c $(PKG_SRC) src/pkg/sources_admin.c src/sec/cgroup.c build/obj/ui/stb.o src/admin.h $(wildcard src/pkg/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_test.c $(PKG_SRC) src/pkg/sources_admin.c src/sec/cgroup.c build/obj/ui/stb.o -lm
-# (0.8.8.9) LordOS's initial preferences for the Chromium-based browsers from the Store (src/pkg/browserprefs.c)
+# (0.8.8.9) LordOS's initial preferences for the Chromium-based browsers from the Store (src/pkg/browserprefs.c).
+# lord-browser-prefs: the root tool only migration 009 runs, built from browserprefs.c and json.c alone (libc)
+all: build/lord-browser-prefs
+build/lord-browser-prefs: src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/sec/json.c -lm
 build/browserprefs-test: tests/browserprefs_test.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/browserprefs_test.c src/pkg/browserprefs.c src/sec/json.c -lm

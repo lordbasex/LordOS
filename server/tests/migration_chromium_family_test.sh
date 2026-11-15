@@ -1,7 +1,7 @@
 #!/bin/sh
 # migration_chromium_family_test.sh — packaging/migrations/009-0.8.8.9-chromium-family.sh over a fake
 # system tree (LORDOS_MIGRATION_ROOT), with build/browserprefs-test standing in for
-# `lord-server --browser-prefs` (the same C function): installed browsers get the file, a vendor file is
+# lord-browser-prefs (the same C function, over a fixture root): installed browsers get the file, a vendor file is
 # merged, others are left alone, and a second run changes nothing. Run from server/ by tests/run_suites.sh.
 set -u
 M=$(cd "$(dirname "$0")/../.." && pwd)/packaging/migrations/009-0.8.8.9-chromium-family.sh
@@ -16,7 +16,7 @@ mkdir -p "$R/opt/google/chrome" "$R/opt/microsoft/msedge" "$R/home/user/.config/
 printf '{\n  "distribution": {"do_not_create_desktop_shortcut": true},\n  "browser": {"custom_chrome_frame": false}\n}\n' \
     > "$R/opt/microsoft/msedge/master_preferences"
 printf '{"profile": "untouched"}\n' > "$R/home/user/.config/google-chrome/Local State"
-run() { LORDOS_MIGRATION_ROOT=$R LORDOS_BROWSER_PREFS_BIN=$BIN sh -eu "$M" > "$T/out" 2>&1 || fail "the migration exited with $?"; }
+run() { LORDOS_MIGRATION_ROOT=$R LORDOS_BROWSER_PREFS_TEST=$BIN sh -eu "$M" > "$T/out" 2>&1 || fail "the migration exited with $?"; }
 run
 C=$R/opt/google/chrome/initial_preferences
 [ -f "$C" ] || fail "chrome: no initial_preferences"
@@ -35,7 +35,17 @@ cmp -s "$C" "$T/c1" && cmp -s "$E" "$T/e1" || fail "the second run changed a fil
 printf 'garbage' > "$C"
 run
 [ "$(cat "$C")" = garbage ] || fail "a non-JSON file was rewritten"
-# without the binary (a tree without lord-server) it does nothing and succeeds
-LORDOS_MIGRATION_ROOT=$R LORDOS_BROWSER_PREFS_BIN=$T/missing sh -eu "$M" || fail "no binary: exited with $?"
+# without the tool it does nothing and succeeds
+LORDOS_MIGRATION_ROOT=$R LORDOS_BROWSER_PREFS_TEST=$T/missing sh -eu "$M" || fail "no binary: exited with $?"
+# the shipped tool takes no argument: with one it refuses (2) and writes nothing
+TOOL=$(pwd)/build/lord-browser-prefs
+if [ -x "$TOOL" ]; then
+    rm -rf "$R/opt/google/chrome"; mkdir -p "$R/opt/google/chrome"
+    "$TOOL" "$R" > /dev/null 2>&1; rc=$?
+    [ "$rc" -eq 2 ] || fail "lord-browser-prefs with an argument: exit $rc"
+    [ ! -e "$R/opt/google/chrome/initial_preferences" ] || fail "lord-browser-prefs with an argument wrote a file"
+else
+    fail "build/lord-browser-prefs is missing"
+fi
 [ "$fails" -eq 0 ] && echo "migration 009 chromium-family: ok"
 [ "$fails" -eq 0 ]

@@ -1,6 +1,6 @@
 /* browserprefs_test.c — LordOS's initial preferences for the Chromium-based browsers from the Store
  * (src/pkg/browserprefs.c): the merge rule over vendor files and the file handling in fixture roots.
- * With --browser-prefs it is the same command as `lord-server --browser-prefs`, for
+ * With --root <dir> it does what lord-browser-prefs (src/pkg/browserprefs_tool.c) does on /, in <dir>, for
  * tests/migration_chromium_family_test.sh. */
 #include "../src/pkg/browserprefs.h"
 #include "../src/sec/json.h"
@@ -196,7 +196,8 @@ static void test_files(void) {
 }
 
 int main(int argc, char **argv) {
-    if (argc > 1 && !strcmp(argv[1], "--browser-prefs")) return browser_prefs_main(argc, argv);
+    /* lord-browser-prefs over a fixture root (the real tool takes no argument and works on /) */
+    if (argc == 3 && !strcmp(argv[1], "--root") && argv[2][0] == '/') { browser_prefs_apply_all(argv[2]); return 0; }
     test_merge();
     test_files();
     printf("browserprefs-test: %d checks, %d failed\n", n, fails);

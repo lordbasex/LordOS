@@ -154,11 +154,13 @@ GTK theme. So after `dpkg` installs or upgrades one of them, the same `pkg-insta
   Settings → Appearance → Theme → GTK (and «Use system title bar and borders» off). Settings → Appearance's
   browser switch (`hw/brframe.c`) writes Chromium's and Brave's profiles, not Chrome's or Edge's.
 - **Already installed.** Migration `009-0.8.8.9-chromium-family` runs the same code once for every browser
-  of the list that is installed (`lord-server --browser-prefs`, as root from the lordos package's
-  postinst; it always exits 0).
+  of the list that is installed, as root from the lordos package's postinst, through
+  `/usr/lib/lordos/bin/lord-browser-prefs` (`src/pkg/browserprefs_tool.c`): a separate tool built from
+  `browserprefs.c` and `sec/json.c` only (libc), with no arguments (it refuses any), no environment, nothing
+  executed; it always exits 0. lord-server, which runs without root, has no entry point for it.
 - **Tests.** `build/browserprefs-test` (the merge rule over vendor files, and the files in a fixture root:
   not installed, a new file, `master_preferences` only, both files, not JSON, symlinks, a second run) and
-  `tests/migration_chromium_family_test.sh` (migration 009 over a fake system tree). Not yet checked with
+  `tests/migration_chromium_family_test.sh` (migration 009 over a fake system tree, and `lord-browser-prefs` refusing an argument). Not yet checked with
   the real browsers on the VM.
 
 ### Confirmations

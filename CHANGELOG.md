@@ -43,12 +43,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   renamed over the old one, a second run changes nothing, and a failure is a line in the helper's log, never a
   failed installation. Debian's `chromium` keeps `/etc/chromium`; Vivaldi isn't in the list (its interface is its
   own). Migration `009-0.8.8.9-chromium-family` does the same once for a browser already installed, with the same
-  C code (`lord-server --browser-prefs`, run as root by the postinst; it always exits 0). These are initial
+  C code: `/usr/lib/lordos/bin/lord-browser-prefs`, a small root tool built from `browserprefs.c` and the JSON
+  reader alone (libc), which takes no arguments, reads no environment, runs nothing and always exits 0; only the
+  migration runs it, from the postinst (lord-server, which runs without root, has no such mode). These are initial
   preferences: only profiles created afterwards get them, and home folders are never touched; an existing profile
   switches in the browser's Settings → Appearance → Theme → GTK. Tests: `build/browserprefs-test` (the merge rule
   over vendor files: other keys, the vendor's own values, other shapes, tricky strings, escaped keys, duplicate
   keys, not JSON; and the files in a fixture root) and `tests/migration_chromium_family_test.sh` (migration 009
-  over a fake system tree, run twice). Not yet checked with the real browsers on the VM. Docs: `docs/PACKAGES.md`
+  over a fake system tree, run twice; `lord-browser-prefs` refuses an argument). Not yet checked with the real browsers on the VM. Docs: `docs/PACKAGES.md`
   ("Browser defaults") and `docs/WAYLAND.md` ("The browsers by default").
 
 - **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),

@@ -8,7 +8,8 @@
  * (Chromium's InitialPreferences::Path: <dir of the executable>/initial_preferences, or
  * master_preferences when that one isn't readable); there is no /etc location and no policy for the
  * GTK theme. After the package engine installs or upgrades one of them, the root helper calls
- * browser_prefs_apply_pkg; migration 009 calls browser_prefs_apply_all (lord-server --browser-prefs).
+ * browser_prefs_apply_pkg; migration 009 runs /usr/lib/lordos/bin/lord-browser-prefs (browserprefs_tool.c,
+ * built from this file and sec/json.c only, no arguments), which calls browser_prefs_apply_all.
  *
  * The rules:
  * - a closed list in C maps a package name to its fixed directory; nothing comes from the caller but
@@ -35,9 +36,7 @@ int browser_prefs_merge(const char *text, size_t len, char **out, size_t *outlen
 int browser_prefs_apply_dir(const char *root, const char *dir);
 int browser_prefs_apply_pkg(const char *root, const char *pkg);
 /* Every known browser that is installed under root; returns how many files were written, -1 if any failed. */
+/* One line per file written or left alone on standard output (lord-browser-prefs, migration 009). */
 int browser_prefs_apply_all(const char *root);
-/* `lord-server --browser-prefs [<root>]`, run as root only by migration 009: browser_prefs_apply_all,
- * one line per file written or left alone; always exits 0 (2 on a bad usage). */
-int browser_prefs_main(int argc, char **argv);
 
 #endif
