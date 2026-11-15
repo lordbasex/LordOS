@@ -1,0 +1,22 @@
+{
+  "folder": "Opnamen",
+  "name": "Opname {date} {time}",
+  "all": "Alle opnamen",
+  "empty": "Er zijn nog geen opnamen",
+  "hint": "Druk op de rode knop (of R) om met de microfoon op te nemen",
+  "denied": "Spraakrecorder mag de microfoon niet gebruiken",
+  "play": "Speel af",
+  "pause": "Pauzeer",
+  "rename": "Wijzig naam",
+  "trim": "Knip bij",
+  "cancelTrim": "Annuleer bijknippen",
+  "saveTrim": "Bewaar bijgeknipte kopie",
+  "trimmed": "bijgeknipt",
+  "export": "Exporteer als",
+  "exportBtn": "Exporteer",
+  "working": "Exporteren…",
+  "exported": "“{name}” bewaard",
+  "exportError": "Kon niet exporteren",
+  "renameError": "Kon de naam niet wijzigen (bestaat die naam al?)",
+  "emptyTitle": "Kies of maak een opname"
+}

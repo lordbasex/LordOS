@@ -1,0 +1,74 @@
+{
+  "archiveName": "Archief",
+  "archiveSummary": {
+    "one": "{count} bestand, {size}",
+    "other": "{count} bestanden, {size}"
+  },
+  "compressOne": "Comprimeer “{name}”",
+  "compressMany": {
+    "one": "Comprimeer {count} item",
+    "other": "Comprimeer {count} items"
+  },
+  "compressing": "“{name}” comprimeren…",
+  "compressProgress": "“{name}” comprimeren: {files} bestanden",
+  "compressed": {
+    "one": "“{name}” klaar ({count} bestand)",
+    "other": "“{name}” klaar ({count} bestanden)"
+  },
+  "compressError": "Kon “{name}” niet comprimeren ({error})",
+  "extractHere": "Pak hier uit",
+  "extractSelected": {
+    "one": "Pak {count} item uit",
+    "other": "Pak {count} items uit"
+  },
+  "extracting": "“{name}” uitpakken…",
+  "extractProgress": "“{name}” uitpakken: {files} bestanden ({pct}%)",
+  "extracted": {
+    "one": "Uitgepakt naar “{name}” ({count} bestand)",
+    "other": "Uitgepakt naar “{name}” ({count} bestanden)"
+  },
+  "extractedSkipped": {
+    "one": "Uitgepakt naar “{name}” ({count} bestand); {skipped} overgeslagen voor de veiligheid",
+    "other": "Uitgepakt naar “{name}” ({count} bestanden); {skipped} overgeslagen voor de veiligheid"
+  },
+  "extractError": "Kon “{name}” niet uitpakken ({error})",
+  "opening": "“{name}” openen…",
+  "loading": "Laden…",
+  "locked": "met wachtwoord beveiligd",
+  "pages": {
+    "one": "{count} pagina",
+    "other": "{count} pagina's"
+  },
+  "more": {
+    "one": "en nog {count}",
+    "other": "en nog {count}"
+  },
+  "err.invalid": "geen archief, of het is beschadigd",
+  "err.missing-volume": "een deel van het gesplitste archief ontbreekt: “{name}”",
+  "err.disk-full": "de schijf is vol",
+  "err.too-big": "het is te groot",
+  "err.too-many": "het heeft te veel bestanden",
+  "err.corrupt": "het is beschadigd",
+  "err.write": "kon niet schrijven",
+  "err.unavailable": "de documenthulp is niet beschikbaar",
+  "err.cancelled": "geannuleerd",
+  "err.crash": "de documenthulp is onverwacht gestopt",
+  "err.timeout": "het duurde te lang",
+  "err.protocol": "de documenthulp stuurde een ongeldig antwoord",
+  "err.spawn": "kon de documenthulp niet starten",
+  "err.closed": "het document is gesloten",
+  "err.bad-request": "ongeldig verzoek",
+  "err.bad-field": "ongeldig formulierveld",
+  "err.bad-page": "ongeldige pagina",
+  "err.busy": "de documenthulp is bezet",
+  "err.memory": "onvoldoende geheugen",
+  "err.no-fonts": "geen lettertypen beschikbaar",
+  "err.not-open": "het document is niet geopend",
+  "err.nothing": "er is niets om te bewaren",
+  "err.read-only": "het document is alleen-lezen",
+  "err.save": "kon niet bewaren",
+  "err.unknown-op": "onbekende bewerking",
+  "err.image": "ongeldige afbeelding",
+  "err.blob": "ongeldige gegevens",
+  "err.password": "het document is met een wachtwoord beveiligd"
+}

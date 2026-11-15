@@ -1,0 +1,14 @@
+{
+  "folder": "Camera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Spiegel",
+  "none": "Er is geen camera gevonden",
+  "denied": "Camera mag de camera niet gebruiken. Wijzig dit in Instellingen → Privacy.",
+  "error": "Kon de camera niet gebruiken: {error}",
+  "noneHint": "Sluit een USB-camera aan: hij verschijnt hier vanzelf, zonder de app te herstarten.",
+  "deniedTitle": "Geen toegang tot de camera",
+  "errorTitle": "De camera kon niet worden geopend"
+}
