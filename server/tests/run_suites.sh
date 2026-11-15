@@ -177,6 +177,9 @@ EOF
     run "net-test wifi-saved" build/net-test wifi-saved
     run "net-test wireless" build/net-test wireless
     run "pkg-test" build/pkg-test
+    # (0.8.8.9) lordos + lordos-web updated together: the engine's dpkg order against a real dpkg in a throwaway root
+    if have dpkg && have dpkg-deb; then run "pkg-breaks-dpkg-test (lordos + lordos-web, dpkg --root)" sh tests/pkg_breaks_dpkg_test.sh
+    else skip "pkg-breaks-dpkg-test" "dpkg and dpkg-deb"; fi
     run "fsops-test" build/fsops-test
     run "portal-check-test" build/portal-check-test
     if have dbus-run-session; then run "portal-gs-test (GlobalShortcuts over a private bus)" dbus-run-session -- build/portal-gs-test
