@@ -1169,7 +1169,7 @@ ${(c.items || []).map((it) => {
       const f = cc && path.join(WEB, 'src/flags', cc.toLowerCase() + '.svg');
       return f && fs.existsSync(f) ? `<img class="lg-fl" src="${asset(f, 'flags/' + cc.toLowerCase())}" alt="" aria-hidden="true" width="20" height="15" loading="lazy" decoding="async">` : '';
     };
-    // where the visitors come from (VISITS): a donut drawn here as inline SVG, the top 20 countries by page views and
+    // where the visitors come from (VISITS): a donut drawn here as inline SVG, the top 20 countries by visitors (distinct addresses) and
     // one "other countries" slice. Each country has its own colour from the classic 20-colour categorical palette
     // (the one CloudWatch uses; .lg-c0 to .lg-c19 in site.css, the same in light and dark), "other" is the neutral
     // --chip-line token, and a 1px stroke in the page background separates thin slices. The legend's swatches use
@@ -1180,31 +1180,31 @@ ${(c.items || []).map((it) => {
       const nf = new Intl.NumberFormat(l, { useGrouping: 'always' });
       const pct = new Intl.NumberFormat(l, { style: 'percent', maximumFractionDigits: 1 });
       const regions = new Intl.DisplayNames([l], { type: 'region' });
-      const rows = [...VISITS.rows].sort((a, b) => b.views - a.views);
-      const total = rows.reduce((n, x) => n + x.views, 0);
+      const rows = [...VISITS.rows].sort((a, b) => b.visitors - a.visitors);
+      const total = rows.reduce((n, x) => n + x.visitors, 0);
       const top = rows.slice(0, 20), rest = rows.slice(20);
       const slices = top.map((x, i) => ({ cc: x.cc, name: regions.of(x.cc) || x.cc, views: x.views, visitors: x.visitors, cls: 'lg-c' + i }));
-      if (rest.length) slices.push({ other: true, name: L.visitsOther.replace('{n}', nf.format(rest.length)), views: rest.reduce((n, x) => n + x.views, 0), visitors: rest.reduce((n, x) => n + x.visitors, 0) });
+      if (rest.length) slices.push({ other: true, name: L.visitsOther.replace('{n}', nf.format(rest.length)), views: rest.reduce((n, x) => n + x.visitors, 0), visitors: rest.reduce((n, x) => n + x.visitors, 0) });
       const C = 120, RO = 112, RI = 72;
       const pt = (r, a) => `${(C + r * Math.sin(a)).toFixed(2)} ${(C - r * Math.cos(a)).toFixed(2)}`;
       let a0 = 0;
       const arcs = slices.map((x) => {
-        const a1 = a0 + (x.views / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
+        const a1 = a0 + (x.visitors / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
         const d = `M${pt(RO, a0)}A${RO} ${RO} 0 ${big} 1 ${pt(RO, a1)}L${pt(RI, a1)}A${RI} ${RI} 0 ${big} 0 ${pt(RI, a0)}Z`;
         a0 = a1;
-        return `<path class="${x.other ? 'lg-v-o' : x.cls}" d="${d}"><title>${esc(`${x.name}: ${nf.format(x.views)} (${pct.format(x.views / total)})`)}</title></path>`;
+        return `<path class="${x.other ? 'lg-v-o' : x.cls}" d="${d}"><title>${esc(`${x.name}: ${nf.format(x.visitors)} (${pct.format(x.visitors / total)})`)}</title></path>`;
       }).join('');
-      const label = L.visitsAria.replace('{top}', slices.filter((x) => !x.other).slice(0, 5).map((x) => `${x.name} ${nf.format(x.views)}`).join(', '))
+      const label = L.visitsAria.replace('{top}', slices.filter((x) => !x.other).slice(0, 5).map((x) => `${x.name} ${nf.format(x.visitors)}`).join(', '))
         .replace('{n}', nf.format(rest.length + top.length - 5)).replace('{total}', nf.format(total));
       const svg = `<svg class="lg-donut" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="${esc(label)}">${arcs}` +
         `<text class="lg-v-n" x="120" y="122" text-anchor="middle">${esc(nf.format(total))}</text>` +
         `<text class="lg-v-l" x="120" y="146" text-anchor="middle">${esc(L.visitsTotal)}</text></svg>`;
       const legend = slices.map((x) => `<li><svg class="lg-sw" viewBox="0 0 12 12" width="12" height="12"><rect class="${x.other ? 'lg-v-o' : x.cls}" width="12" height="12" rx="3"/></svg>` +
-        `${(!x.other && flag(x.cc)) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(x.name)}</span><span class="lg-v-v">${esc(nf.format(x.views))}</span></li>`).join('');
+        `${(!x.other && flag(x.cc)) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(x.name)}</span><span class="lg-v-v">${esc(nf.format(x.visitors))}</span></li>`).join('');
       // every country, not only the chart's 20: a visible list that opens with no script (<details>), in columns that
       // wrap on a phone; a flag only where web/src/flags has one
-      const all = `<details class="lg-all"><summary>${esc(L.visitsAll.replace('{n}', nf.format(rows.length)))}</summary><ol>` +
-        rows.map((x) => `<li>${flag(x.cc) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(regions.of(x.cc) || x.cc)}</span><span class="lg-v-v">${esc(nf.format(x.views))}</span></li>`).join('') +
+      const all = `<details class="lg-all" open><summary>${esc(L.visitsAll.replace('{n}', nf.format(rows.length)))}</summary><ol>` +
+        rows.map((x) => `<li>${flag(x.cc) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(regions.of(x.cc) || x.cc)}</span><span class="lg-v-v">${esc(nf.format(x.visitors))}</span></li>`).join('') +
         '</ol></details>';
       const day = (s) => new Date(s + 'T12:00:00Z');
       const dates = new Intl.DateTimeFormat(l === 'en' ? 'en-GB' : l, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).formatRange(day(VISITS.since), day(VISITS.taken));

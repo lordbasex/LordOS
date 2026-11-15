@@ -635,6 +635,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **The Languages page's visits chart counts visitors, not page views** (maintainer's request, 2026-11-15, to match the
+  "Países" table of the statistics dashboard): the donut, its legend and the centre total use distinct visitors per
+  country (distinct addresses, a rough count of people, bots excluded), and the list of all 153 countries below it is
+  open by default and sorted by visitors, so every country (South Korea included) shows without a click.
+
 - **The Languages page lists every language in one place** (maintainer's request, 2026-11-15, ahead of 0.8.8.9): one
   "35 complete languages" grid (en, es, pt) instead of the released six plus a separate "new in the next pre-release"
   group; the languages that arrive with 0.8.8.9 carry a "new in 0.8.8.9" tag on their card, and one sentence under the
