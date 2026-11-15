@@ -727,6 +727,31 @@ static void ime_commit(const char *text) {
     for (int i = 2; i < 5; i++) JS_FreeValue(ctx, args[i]);
 }
 
+int js_text_input_app(void) { return wl_has_key_focus() && wl_textinput_composing(); }
+
+int js_commit_text(const char *text) {
+    if (!ctx || !text || !text[0]) return 0;
+    if (wl_has_key_focus()) {
+        if (!wl_textinput_composing()) return 0;            /* an app without text input (X11, a terminal) takes only keys */
+        /* a commit holds 511 bytes at most (wl_textinput.c): longer text goes in pieces, cut at a code point */
+        for (size_t n = strlen(text); n;) {
+            size_t k = n < 511 ? n : 511;
+            while (k < n && k && ((unsigned char)text[k] & 0xc0) == 0x80) k--;
+            if (!k) break;
+            char piece[512];
+            memcpy(piece, text, k);
+            piece[k] = 0;
+            wl_textinput_send("", 0, 0, piece);
+            text += k;
+            n -= k;
+        }
+        return 1;
+    }
+    ime_commit(text);
+    drain_jobs();
+    return 1;
+}
+
 /* A Linux app's field composes (zwp_text_input_v3, wl/wl_textinput.c): the key goes through the input
  * method before the app. The composition and the finished text go to the app, the candidates to the
  * shell's window. 1 if the input method used the key: the app never sees it, nor its release. */

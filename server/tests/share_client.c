@@ -8,6 +8,7 @@
  *   text S | clip S | raw TYPE N (a message of N zero bytes) | junk (a wrong length)
  *   wait MS (reads for that long) | until TYPE MS (until that type has arrived since the last reset; exit 3 if it doesn't)
  *   none TYPE MS (exit 4 if that type arrives within MS) | reset (counters) | expect-end REASON MS | expect-ref REASON MS
+ *   pick ID (SHARE_DISPLAY) | shown ID MS (until a SHARE_DISPLAYS says ID is shown, since the last reset; exit 3 if not)
  *   mirror only: seat | hello S | video C K | undisplay | display
  * The count of type 255 is the keyframes among RP_VFRAME.
  * "gone" as a word means: exit 0 only if the server closed the connection within 2 s. */
@@ -34,6 +35,30 @@ static uint8_t *in;
 static size_t in_len;
 static int last_reason = -1, last_type = -1;
 static int cur_x = -1, cur_y = -1;
+static long long shown_id = -1;         /* the current of the last SHARE_DISPLAYS, -1 none since the reset */
+
+/* SHARE_DISPLAYS, printed as the client sees it (checked against its own lengths) */
+static void on_displays(const uint8_t *d, uint32_t n) {
+    if (n < 5) { printf("displays: short (%u bytes)\n", n); return; }
+    uint32_t cur;
+    memcpy(&cur, d, 4);
+    int count = d[4];
+    size_t k = 5;
+    printf("displays: current %u, %d:", cur, count);
+    for (int i = 0; i < count; i++) {
+        if (k + 22 > n || k + 22 + d[k + 21] > n) { printf(" (cut)\n"); return; }
+        uint32_t id;
+        int32_t xy[2];
+        uint16_t sz[4];
+        memcpy(&id, d + k, 4);
+        memcpy(xy, d + k + 4, 8);
+        memcpy(sz, d + k + 12, 8);
+        printf(" [%u %d,%d %ux%u px %ux%u f%u \"%.*s\"]", id, xy[0], xy[1], sz[0], sz[1], sz[2], sz[3], d[k + 20], d[k + 21], (const char *)d + k + 22);
+        k += 22 + d[k + 21];
+    }
+    printf("%s\n", k == n ? "" : " (extra bytes)");
+    shown_id = cur;
+}
 
 static double now_ms(void) {
     struct timespec t;
@@ -70,6 +95,7 @@ static void pump(int ms) {
         if (t == SHARE_END || t == SHARE_REFUSED) { last_type = t; last_reason = in[off + 5]; }
         if (t == SHARE_STATE) { last_type = t; last_reason = in[off + 5]; }
         if (t == RP_VFRAME && l >= 3 && in[off + 6]) seen[255]++;       /* keyframes, counted apart */
+        if (t == SHARE_DISPLAYS) on_displays(in + off + 5, l - 1);
         if (t == RP_CURSOR && l >= 6) { int16_t x, y; memcpy(&x, in + off + 5, 2); memcpy(&y, in + off + 7, 2); cur_x = x; cur_y = y; }
         off += 4 + (size_t)l;
     }
@@ -147,7 +173,15 @@ int main(int argc, char **argv) {
             wait_ms(N(2));
             if (seen[N(1)] != was) { printf("%ld messages of type %d arrived\n", seen[N(1)] - was, N(1)); return 4; }
             i += 3;
-        } else if (!strcmp(w, "reset")) { memset(seen, 0, sizeof seen); memset(seen_bytes, 0, sizeof seen_bytes); i++; }
+        } else if (!strcmp(w, "reset")) { memset(seen, 0, sizeof seen); memset(seen_bytes, 0, sizeof seen_bytes); shown_id = -1; i++; }
+        else if (!strcmp(w, "pick")) { uint32_t id = (uint32_t)strtoul(W(1), NULL, 0); out(SHARE_DISPLAY, &id, 4); i += 2; }
+        else if (!strcmp(w, "shown")) {
+            long long want = strtoll(W(1), NULL, 0);
+            double end = now_ms() + N(2);
+            while (shown_id != want && now_ms() < end && !closed) pump(20);
+            if (shown_id != want) { printf("display %lld not shown in %d ms (last: %lld)\n", want, N(2), shown_id); return 3; }
+            i += 3;
+        }
         else if (!strcmp(w, "expect-end") || !strcmp(w, "expect-ref")) {
             int t = w[7] == 'e' ? SHARE_END : SHARE_REFUSED, r = reason_of(W(1));
             double end = now_ms() + N(2);

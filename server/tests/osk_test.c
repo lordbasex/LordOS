@@ -73,8 +73,10 @@ static void test_queue(void) {
     CHECK(!osk_push(KEY_LEFTMETA, 0));
     CHECK(!osk_push(KEY_A, 4));
     CHECK(!osk_pop(&t));
+    CHECK(osk_room() == OSK_QUEUE_MAX);
     for (int i = 0; i < OSK_QUEUE_MAX; i++) CHECK(osk_push(KEY_A + i % 3, 1));
     CHECK(!osk_push(KEY_A, 0));
+    CHECK(osk_room() == 0);
     for (int i = 0; i < OSK_QUEUE_MAX; i++) { CHECK(osk_pop(&t)); CHECK(t.code == KEY_A + i % 3 && t.level == 1); }
     CHECK(!osk_pop(&t));
     /* it wraps around */

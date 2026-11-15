@@ -22,6 +22,8 @@ enum {
     SHARE_LOCK = 54,    /* no data: locks the session, which ends the share */
     SHARE_TEXT = 55,    /* UTF-8, at most SW_TEXT_MAX bytes, typed through the active keyboard layout */
     SHARE_HEAR = 56,    /* u8 on: RP_AFRAME is sent, or dropped, from now on */
+    SHARE_DISPLAY = 57, /* u32 id: show this display (an id of SHARE_DISPLAYS), SW_DISPLAY_ALL every display in one
+                         * picture, 0 the default (Settings → Displays, "Screenshots and sharing") */
 };
 
 /* system → client, besides RP_SIZE, RP_VFRAME, RP_AFRAME, RP_CURSOR, RP_SHAPE, RP_CLIP and RP_VINFO */
@@ -30,7 +32,24 @@ enum {
                          * H.264, bit 1 VP8), u8 0, u16 w, u16 h, u16 hz */
     SHARE_REFUSED = 61, /* u8 reason */
     SHARE_END = 62,     /* u8 reason */
+    SHARE_DISPLAYS = 63,/* u32 current (the id shown now), u8 n, then n × { u32 id, i32 x, i32 y, u16 w, u16 h (logical),
+                         * u16 pw, u16 ph (the picture's pixels), u8 flags (SW_DF_*), u8 name length, name (UTF-8) } */
 };
+
+/* The displays a share can show (SHARE_DISPLAY, SHARE_DISPLAYS). An id is the display's connector, stable while it
+ * stays plugged; a session with no monitor has one display, id 1. With more than one display the list ends with
+ * SW_DISPLAY_ALL: the whole logical space at 100 %, as the "all displays" setting gives. */
+#define SW_DISPLAY_ALL 0xffffffffu
+#define SW_DISPLAYS_MAX 8               /* real displays in the list (OUT_MAX); the "all" entry comes on top */
+#define SW_DISPLAY_NAME 64              /* bytes of a name, cut at a code point */
+enum { SW_DF_MAIN = 1, SW_DF_ALL = 2 };
+typedef struct { uint32_t id; int x, y, w, h, pw, ph, flags; char name[SW_DISPLAY_NAME + 1]; } SwDisplay;
+/* SHARE_DISPLAYS' data for n entries (at most SW_DISPLAYS_MAX + 1): the bytes written, 0 if it doesn't fit in cap.
+ * Names are cleaned on the way: control characters and invalid UTF-8 become nothing, and they're cut to
+ * SW_DISPLAY_NAME bytes at a code point. */
+size_t sw_displays_encode(uint8_t *out, size_t cap, uint32_t current, const SwDisplay *d, int n);
+/* Is id one a client may ask for, given that list? (0, the default, always is.) */
+int sw_display_known(uint32_t id, const SwDisplay *d, int n);
 
 enum { SW_F_VIDEO = 1, SW_F_AUDIO = 2, SW_F_INPUT = 4, SW_F_CLIPBOARD = 8, SW_F_ALL = 15 };
 
@@ -53,6 +72,7 @@ typedef struct {
     int flags, codec, hz;               /* SHARE_START */
     unsigned kbps;                      /* SHARE_START, RP_RATE */
     int on;                             /* SHARE_AWAKE, SHARE_HEAR */
+    uint32_t display;                   /* SHARE_DISPLAY */
     int x, y;                           /* RP_PTR (0..32767), RP_RESIZE (w, h) */
     int button, down;                   /* RP_BTN */
     int steps;                          /* RP_WHEEL */
@@ -66,6 +86,11 @@ int sw_parse(const SwFrame *f, SwMsg *m);   /* 0, or -1: the connection must end
 int sw_utf8_valid(const char *s, size_t n);
 /* The next code point of valid text: returns its length in bytes (s[0..n) must be valid). */
 int sw_utf8_next(const char *s, size_t n, uint32_t *cp);
+
+/* SHARE_TEXT on a layout with dead keys: a precomposed Latin letter (á, Ñ, ü, ç, å…) as its base letter (UTF-8, in
+ * base) and the dead key's mark ("´", "`", "^", "~", "¨", "¸", "°", the labels kb_label gives dead keys). 1 if it has
+ * one, 0 if not. The session types the dead key and then the letter, and the layout's own compose makes the letter. */
+int sw_dead_split(uint32_t cp, char base[8], const char **mark);
 
 /* The keys one remote client holds down (RP_KEY codes 1..0x2fe), so that each key goes down once and up once
  * whatever the client sends. xkbcommon counts the presses of a modifier: a second "pressed" without a release

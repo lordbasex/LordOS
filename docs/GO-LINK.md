@@ -129,10 +129,12 @@ The listener isn't created for the login screen's `lord-server`.
 
 **Client to system:** `SHARE_START {video, audio, input, clipboard}`, `RP_KEYFRAME`, `RP_RATE`, `RP_RESIZE`, `SHARE_AWAKE {on}`, `SHARE_LOCK`,
 `SHARE_STOP`, the input messages, and one new one, `SHARE_TEXT` (UTF-8, at most 1 KB), because go-link's text packet
-(go-link:`docs/protocol.md:185`) has no equivalent today.
+(go-link:`docs/protocol.md:185`) has no equivalent today. Later, `SHARE_DISPLAY {id}`: the visitor's `display_select`
+(go-link:`docs/protocol.md:113`), section 4.6.
 
 **System to client:** `SHARE_STATE {granted, codecs, w, h, hz}`, `SHARE_REFUSED {reason}`, `SHARE_END {reason}`, `RP_SIZE`,
-`RP_VFRAME`, `RP_AFRAME`, `RP_CURSOR`, `RP_SHAPE`, `RP_CLIP`, `RP_VINFO`.
+`RP_VFRAME`, `RP_AFRAME`, `RP_CURSOR`, `RP_SHAPE`, `RP_CLIP`, `RP_VINFO`, and later `SHARE_DISPLAYS {current, list}`, which go-link
+turns into its own `displays` message.
 
 `proto.h:57` documents `RP_VIDEO`'s third field as `u16 0`, but it carries the refresh rate (`mirror.c:304-306`). Fix the comment
 when this is written.
@@ -203,8 +205,12 @@ at 96 kbit/s (go-link:`docs/protocol.md:155`). Mono in a stereo-negotiated track
 | Logged out | no | the socket closes |
 
 Protected windows stay black because the API takes the frame after `media_composed` (`main.c:1500`) or the GPU's read-back. With a
-protected window on screen, that means the CPU path (`main.c:655-658`). On the "main display" setting, viewers get the main display
-(`docs/DISPLAYS.md:198`); two displays with a browser were never tested (`docs/DISPLAYS.md:253`).
+protected window on screen, that means the CPU path (`main.c:655-658`). A share starts, with no chooser, on what
+Settings → Displays → "Screenshots and sharing" says: the main display by default (`docs/DISPLAYS.md:198`). The visitor can then
+pick another one, or all of them, from the viewer's display menu: go-link's `display_select` becomes `SHARE_DISPLAY`, and LordOS
+answers with `SHARE_DISPLAYS`, which has the last word ([SCREEN-SHARING.md](SCREEN-SHARING.md), "Displays"). The engine sends
+`SHARE_DISPLAY` only to a LordOS that listed its displays, since an older one ends the connection over an unknown type. Switching
+between two displays has not been tested: VM 127 has one.
 
 ### 4.7 Input
 
@@ -387,7 +393,10 @@ The stages run in order except where noted. Percentages are of what each stage's
 | **5. Measurements and review** | Section 6's numbers, review, attack run | 40 % | A real GPU with VA-API, which the lab hasn't got; an attack run like REMOTE.md's; a protected window; go/no-go on claims |
 | **6. Delivery** | Section 9, privacy page, Store text | 15 % | Everything that needs real keys and a release. Built locally: both `.deb`s with throwaway keys, the Store section, the catalog entry as a draft |
 
-**The generic Linux build on LordOS.** go-link Desk's Linux package (`go-link-desk`, `org.go-link.desk.desktop`), not the
+**The generic Linux build on LordOS.** Since go-link's commit `6bc650c` (branch `feat/lordos-build`, merged into
+`feat/lordos-app`), that build shares a desktop with only the ScreenCast portal view-only: on LordOS it asks for a screen through
+the portal's chooser at every session and gives the visitor no mouse or keyboard, by the portal's design. What follows was true
+before it. go-link Desk's Linux package (`go-link-desk`, `org.go-link.desk.desktop`), not the
 LordOS build this document designs, captures a Wayland session only through the RemoteDesktop portal and the ScreenCast
 portal together (go-link:`pkg/portal/portal_linux.go`, `Available` reads `RemoteDesktop.AvailableDeviceTypes` and
 `ScreenCast.AvailableSourceTypes`), and never tries X11 there (go-link:`pkg/capture/capture_linux.go`, `Problem`). LordOS
@@ -408,7 +417,18 @@ itself was not, since it isn't in LordOS's Store catalog.
 - `server/tests/live_helper.py`, on VM 116 and the Pi: real decoding in the real sandbox, H.264 and VP8, damage, bad lengths, 40 damaged streams with no crash. `companion_e2e.sh` 132 passed, `share_e2e.sh` 55 passed, on VM 116. `share-test`, `pkgapp-test`, `remote-sec-test` and the broker's tests passed; the full `make test` stopped at the time limit in `engine-test`, a long test this work doesn't touch, so it isn't a full pass.
 - `.deb`: install, `dpkg -r` leaving nothing, install again, VM 125.
 
-**Not tested:** a protected window through the share (the step was refused by a permission of the tool in this session, and no other way around it was tried); the sound the microphone sends, beyond the visitor's track carrying sound of unknown origin; revoking the camera or microphone during a call; a fullscreen surface already up when a share starts; a fullscreen surface on the Pi's GPU path; the viewer against a real computer rather than the test host, and VP8 in the viewer on screen; the viewer on a session that changes size; the audible sound of a session at speakers; arm64 in `companion_e2e.sh`.
+**Tested on 2026-11-12, VM 127** (an installed LordOS with this branch's `lord-server`, one display, a US layout), go-link's
+`feat/lordos-app` at `6768e20` as `go-link-desk-lordos_1.8.1~test8_amd64.deb`, signed with throwaway keys, the author listed in a
+catalog signed by a throwaway official key that only that test `lord-server` trusts. The visitor was headless Chromium on the
+development machine at desk.go-link.org (website 1.8.0), through the public signaling server; ICE chose a direct path on the LAN.
+The app opened from Applications with its `network` and `status-item` prompts; the first visitor got go-link's request, then the
+system's `screen-share` and `remote-input` prompts, and never a chooser; the second and third visitors only go-link's request. The
+picture was the main display, 1280×800. The visitor's pointer landed where aimed, a click on the Dock raised Notes, the wheel
+scrolled Monitor, Ctrl+A selected all, End, Ctrl+End and Enter worked, typing went into Notes, and " ñandú ÁÉ ¿€? 日本" from the
+input method went into Notes and into GTK 4's Print Editor (before this branch's `SHARE_TEXT` change it came out " and  ?").
+Stop on the indicator ended it, and the website said the person ended the session. The screenshots are kept outside the repository.
+
+**Not tested:** switching displays (VM 127 has one); a protected window through the share (the step was refused by a permission of the tool in this session, and no other way around it was tried); the sound the microphone sends, beyond the visitor's track carrying sound of unknown origin; revoking the camera or microphone during a call; a fullscreen surface already up when a share starts; a fullscreen surface on the Pi's GPU path; the viewer against a real computer rather than the test host, and VP8 in the viewer on screen; the viewer on a session that changes size; the audible sound of a session at speakers; arm64 in `companion_e2e.sh`.
 
 **Needs the maintainer:** the 5673 refusal with a real bridge sign-in; the pixel comparison on their Mac; signing with real keys; publishing; the website's `in_use` text.
 

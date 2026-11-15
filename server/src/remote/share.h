@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "sharewire.h"
+
 /* What main.c gives the API. Coordinates are the frame's pixels; the checks answer for right now. */
 typedef struct {
     void (*pointer)(int x, int y);
@@ -25,6 +27,10 @@ typedef struct {
     int  (*key_protected)(void);        /* a key now would go to a protected window */
     int  (*point_protected)(void);      /* a click now would land on a protected window */
     int  (*restricted)(const char *id); /* the firewall forbids this app the screen */
+    /* the displays a share can show (at most SW_DISPLAYS_MAX + 1, the "all" entry included) and, in *current, the id
+     * of the one the picture is of now; and a repaint of everything, after the picture moved to another display */
+    int  (*displays)(SwDisplay *d, int max, uint32_t *current);
+    void (*refresh)(void);
 } ShareHost;
 
 /* A connection for a packaged app's companion (id without "lpk:"): the descriptor to hand it, as fd 4, or -1. There
@@ -58,6 +64,11 @@ void share_size(int w, int h);
 void share_vinfo(int codec, const void *m, size_t n);
 void share_changed(void);               /* the screen changed (keyframe limit) */
 void share_clipboard(const char *text, unsigned gen, int sensitive);
+
+/* main.c: the display the running share asked for (SHARE_DISPLAY), SW_DISPLAY_ALL, or 0 for the default; and the
+ * displays changed (plugged, unplugged, rearranged), so the holder hears the new list */
+uint32_t share_display(void);
+void share_displays_changed(void);
 
 /* the shell (lord.share) */
 void share_shown(unsigned token);       /* the indicator is on screen */

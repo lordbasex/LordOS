@@ -544,8 +544,47 @@ static Server *remote_server;
  * every display (Settings → Displays, "capture all": the capture view, the global space at 100 %). */
 static Out *feed_out(Server *s) {
     if (s->headless) return &s->out[0];
+    /* a running share may have asked for another display (SHARE_DISPLAY); one door at a time, so no 5673 viewer
+     * sees this choice, only a recording made while the share runs would follow it */
+    uint32_t want = share_display();
+    if (want == SW_DISPLAY_ALL && out_count(s) > 1) return &s->cap;
+    if (want && want != SW_DISPLAY_ALL)
+        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].kms.conn_id == want) return &s->out[i];
     if (display_capture_all() && out_count(s) > 1) return &s->cap;
     return main_out(s);
+}
+
+/* The displays the screen-sharing API offers (share.c), the "all displays" picture last, and the one shown now. A
+ * session with no monitor has one, id 1. Sizes: logical, and the picture's pixels (what RP_PTR is in). */
+static int share_displays_of(SwDisplay *d, int max, uint32_t *current) {
+    Server *s = remote_server;
+    const Out *feed = feed_out(s);
+    int n = 0;
+    *current = 0;
+    for (int i = 0; i < OUT_MAX && n < max && n < SW_DISPLAYS_MAX; i++) {
+        const Out *o = &s->out[i];
+        if (!o->on) continue;
+        SwDisplay *e = &d[n++];
+        memset(e, 0, sizeof *e);
+        e->id = s->headless ? 1 : o->kms.conn_id;
+        e->x = o->v.x;
+        e->y = o->v.y;
+        e->w = o->v.w;
+        e->h = o->v.h;
+        e->pw = o->v.pw;
+        e->ph = o->v.ph;
+        e->flags = i == s->main_out || s->headless ? SW_DF_MAIN : 0;
+        snprintf(e->name, sizeof e->name, "%s", s->headless ? "LordOS" : o->d.name[0] ? o->d.name : o->d.connector);
+        if (o == feed) *current = e->id;
+        if (s->headless) break;
+    }
+    if (!s->headless && n > 1 && n < max) {
+        SwDisplay *e = &d[n++];
+        memset(e, 0, sizeof *e);
+        *e = (SwDisplay){ SW_DISPLAY_ALL, 0, 0, s->W, s->H, s->W, s->H, SW_DF_ALL, "" };
+        if (feed == &s->cap) *current = SW_DISPLAY_ALL;
+    }
+    return n;
 }
 
 static void remote_settle(Server *s) {
@@ -645,6 +684,7 @@ static void publish_displays(Server *s) {
     snprintf(json + len, sizeof json - (size_t)len, "]}");
     wl_set_outputs(wo, n, main_i);
     js_set_displays(json);
+    share_displays_changed();               /* a share's list, and its display if that one left */
 }
 
 /* Another size of the global logical space: the arrangement changed, or the browser window's
@@ -691,8 +731,12 @@ static void remote_resize(int w, int h) {
 
 /* ---- the screen-sharing API (remote/share.c): the same injection as the remote desktop, with its own checks ---- */
 
-/* Text for SHARE_TEXT waits here and goes as on-screen keyboard taps, through the active layout: what no key of
- * the layout can type is dropped. The queue is checked at each step, so it stops the moment a prompt opens. */
+/* Text for SHARE_TEXT waits here and goes as on-screen keyboard taps, through the active layout: a character a key
+ * types goes as that key; a Latin letter with a mark the layout has as a dead key (á on Spanish, ü on German) goes as
+ * the dead key and then the letter, which the layout's compose joins; anything else (ñ on a US layout, €, emoji) goes as
+ * an input method's finished text to the field that has the keyboard (js_commit_text), and is dropped where no field
+ * takes text (an X11 app, a terminal). A Linux app's field with text input gets all of it as one commit
+ * (js_text_input_app). The queue is checked at each step, so it stops the moment a prompt opens. */
 static char share_text_buf[SW_TEXT_MAX];
 static unsigned share_text_len, share_text_off;
 static void share_no_taps(void) { share_text_len = share_text_off = 0; osk_clear(); }
@@ -722,24 +766,53 @@ static int share_point_protected(void) {
     for (const Node *n = hit_test(ui.root, (float)s->cx, (float)s->cy); n; n = n->parent) if (n->protect || share_is_holder(wl_node_app(n->id))) return 1;
     return 0;
 }
+/* The key and level of the active layout that types `label` (kb_label's text, "dead:´" for a dead key). */
+static int share_key_of(const char *label, int *code, int *level) {
+    char got[32];
+    for (size_t i = 0; i < osk_label_count; i++)
+        for (int lv = 0; lv < 3; lv++) {
+            kb_label(osk_label_codes[i], lv, got, sizeof got);
+            if (!strcmp(got, label)) { *code = osk_label_codes[i]; *level = lv; return 1; }
+        }
+    return 0;
+}
 static void share_text_pump(void) {
     if (!share_text_len) return;
     if (share_surface_up() || share_key_protected()) { share_no_taps(); return; }
+    if (js_text_input_app()) {
+        /* a Linux app's field with text input: all of it as one input method's commit, after what is still queued */
+        char t[SW_TEXT_MAX + 1];
+        unsigned n = share_text_len - share_text_off;
+        memcpy(t, share_text_buf + share_text_off, n);
+        t[n] = 0;
+        js_input_flush();
+        if (!pkagent_blocks_injected(1)) js_commit_text(t);
+        share_text_len = share_text_off = 0;
+        return;
+    }
     if (!kb_labels_begin()) { share_no_taps(); return; }
     while (share_text_off < share_text_len) {
         uint32_t cp = 0;
         int l = sw_utf8_next(share_text_buf + share_text_off, share_text_len - share_text_off, &cp);
         if (l <= 0) { share_text_off = share_text_len; break; }
-        char want[8] = "", got[32];
+        char want[8] = "";
         memcpy(want, share_text_buf + share_text_off, (size_t)l);
-        int found = 0, full = 0;
-        for (size_t i = 0; i < osk_label_count && !found; i++)
-            for (int lv = 0; lv < 3 && !found; lv++) {
-                kb_label(osk_label_codes[i], lv, got, sizeof got);
-                if (strcmp(got, want)) continue;
-                found = 1;
-                if (!osk_push(osk_label_codes[i], lv)) full = 1;
+        int code, lv, full = 0;
+        if (share_key_of(want, &code, &lv)) full = !osk_push(code, lv);
+        else {
+            char base[8], dead[16];
+            const char *mark;
+            int dcode, dlv;
+            if (sw_dead_split(cp, base, &mark) && (size_t)snprintf(dead, sizeof dead, "dead:%s", mark) < sizeof dead &&
+                share_key_of(dead, &dcode, &dlv) && share_key_of(base, &code, &lv)) {
+                if (osk_room() < 2) full = 1;   /* both or neither: a dead key alone would change the next letter */
+                else { osk_push(dcode, dlv); osk_push(code, lv); }
+            } else if (!pkagent_blocks_injected(1)) {
+                /* no key types it: what came before goes first, then this as an input method's text */
+                js_input_flush();
+                js_commit_text(want);
             }
+        }
         if (full) break;                /* the next pass of the loop */
         share_text_off += (unsigned)l;
     }
@@ -2503,7 +2576,7 @@ int main(int argc, char **argv) {
     /* never for the login screen: that session has no share socket at all */
     static const ShareHost share_host = { remote_pointer, remote_button, remote_wheel, remote_scroll, remote_key, remote_clip, remote_resize, share_activity,
                                           share_text, js_share_event, share_no_taps, share_person, share_surface_up, share_key_protected,
-                                          share_point_protected, share_restricted };
+                                          share_point_protected, share_restricted, share_displays_of, remote_refresh };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */

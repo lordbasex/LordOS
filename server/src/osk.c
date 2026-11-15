@@ -47,6 +47,8 @@ int osk_pop(OskTap *t) {
     return 1;
 }
 
+int osk_room(void) { return OSK_QUEUE_MAX - qlen; }
+
 void osk_clear(void) {
     memset(queue, 0, sizeof queue);
     qhead = qlen = 0;
