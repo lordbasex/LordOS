@@ -65,7 +65,7 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
        src/term/vt.c src/term/pty.c src/term/term.c src/term/termapp.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
        src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/forti.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/net/ifwatch.c src/net/wake.c \
-       src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
+       src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/browserprefs.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
        $(SEC_SRC) $(APP_SRC) $(MON_SRC) $(MEDIA_SRC)
 # Documents and printing (M9): lord-doc helper sessions and our own IPP/mDNS/eSCL client
 # (src/doc, src/print; see docs/DOCUMENTS.md and docs/PRINTING.md). No Poppler or libarchive here.
@@ -294,7 +294,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -308,11 +308,15 @@ build/wasm-js-test: tests/wasm_js_test.c src/ui/js_wasm.c src/ui/js_wasm.h $(WAS
 build/wasm-test: tests/wasm_test.c $(WASM_SRC) src/wasm/wasm.h src/wasm/wasm_int.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wasm_test.c $(WASM_SRC) -lm
-PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/sec/json.c
+PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/browserprefs.c src/sec/json.c
 build/pkg-test: tests/pkg_test.c $(PKG_SRC) src/pkg/sources_admin.c src/sec/cgroup.c build/obj/ui/stb.o src/admin.h $(wildcard src/pkg/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_test.c $(PKG_SRC) src/pkg/sources_admin.c src/sec/cgroup.c build/obj/ui/stb.o -lm
-PKG_READ_SRC := src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/crypto.c
+# (0.8.8.9) LordOS's initial preferences for the Chromium-based browsers from the Store (src/pkg/browserprefs.c)
+build/browserprefs-test: tests/browserprefs_test.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/browserprefs_test.c src/pkg/browserprefs.c src/sec/json.c -lm
+PKG_READ_SRC :=src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/crypto.c
 build/pkg-js-test: tests/pkg_js_test.c src/ui/js_pkg.c $(PKG_READ_SRC) $(QJS_OBJ) $(wildcard src/pkg/*.h)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_js_test.c src/ui/js_pkg.c $(PKG_READ_SRC) $(QJS_OBJ) -lm -lpthread
 build/thbrk-test: tests/thbrk_test.c src/ui/thbrk.c src/ui/thbrk.h

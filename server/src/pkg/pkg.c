@@ -15,6 +15,7 @@
  * (phases: lists, index, download, unpack, configure, remove) and "plan <action> <package>
  * <version> <bytes>" before starting; the rest of the LOGs are text to display. */
 #include "pkg.h"
+#include "browserprefs.h"
 #include "../sec/json.h"
 #include "crypto.h"
 #include "deb.h"
@@ -974,8 +975,19 @@ static int file_sha_ok(const char *path, const uint8_t *sha, uint64_t size) {
     return r == 0 && !memcmp(out, sha, 32);
 }
 
-/* Downloads, verifies and installs the plan's contents; extra: local .deb to add at the end (or NULL). */
-static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_deb) {
+/* (0.8.8.9) After a Chromium-based browser from the closed list (browserprefs.c) was installed or
+ * upgraded: LordOS's initial preferences next to its binary, merged into the vendor's if it ships one
+ * (docs/PACKAGES.md, "Browser defaults"). Only the package name selects the entry; a failure is logged
+ * and never fails the installation. */
+static void browser_defaults(const char *name) {
+    int r = browser_prefs_apply_pkg("", name);
+    if (r > 0) fprintf(stderr, "pkg: %s: LordOS's initial preferences written in %s\n", name, browser_prefs_dir(name));
+    else if (r < 0) fprintf(stderr, "pkg: %s: initial preferences in %s left as they are\n", name, browser_prefs_dir(name));
+}
+
+/* Downloads, verifies and installs the plan's contents; extra: local .deb to add at the end (or NULL),
+ * extra_name: its package name. */
+static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_deb, const char *extra_name) {
     int ninst = 0, nrem = 0;
     for (int i = 0; i < p->n; i++) { if (p->items[i].rec >= 0) ninst++; else if (p->items[i].action == PA_REMOVE) nrem++; }
     if (!ninst && !nrem && !extra_deb) { admin_ok("pkg.nothingToDo", NULL); return 0; }
@@ -1069,6 +1081,8 @@ static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_
         return -1;
     }
     auto_update(p);
+    for (int i = 0; i < p->n; i++) if (p->items[i].rec >= 0 && browser_prefs_dir(p->items[i].name)) browser_defaults(p->items[i].name);
+    if (extra_deb && browser_prefs_dir(extra_name)) browser_defaults(extra_name);
     for (int i = 0; i < p->n; i++) if (p->items[i].rec >= 0) unlink(files[i]);   /* the cache isn't kept */
     free(files);
     int ni = 0, nu = 0, nr = 0;
@@ -1131,7 +1145,7 @@ static void run_plan_action(const char *const *ins, int ni, const char *const *r
     else if (!p.n && o->orphans && !ni && !nr) admin_ok("pkg.nothingToRemove", NULL);
     else {
         admin_say("LOG", "plan total %llu %lld", (unsigned long long)p.download, (long long)p.isize_delta);   /* i18n-ok: protocol line parsed by apps/store */
-        apply_plan(&x, &p, purge, NULL);
+        apply_plan(&x, &p, purge, NULL, NULL);
     }
     plan_free(&p);
     status_free(&st);
@@ -1390,7 +1404,7 @@ void pkg_act_install_file(const AdminReq *r, const char *arg, size_t len) {
         say_plan(&p, &x);
         admin_say("LOG", "plan install %s %s %llu", dc.name, dc.version, (unsigned long long)dl);   /* i18n-ok: protocol line parsed by apps/store */
         if (!p.ok) admin_say("ERR", "%s", p.err);   /* i18n-ok: already a code line */
-        else apply_plan(&x, &p, 0, dest);
+        else apply_plan(&x, &p, 0, dest, dc.name);
         plan_free(&p);
     }
     unlink(dest);

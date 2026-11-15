@@ -76,6 +76,7 @@
 #include "outputs.h"
 #include "monitor/netrec.h"
 #include "sec/codesig.h"
+#include "pkg/browserprefs.h"
 #include "lpk.h"
 #include "sec/pkgapp.h"
 #include "sec/pkgstate.h"
@@ -2428,6 +2429,9 @@ int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-code")) return check_code(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-apps")) return check_apps();
+    /* (0.8.8.9) migration 009, as root: LordOS's initial preferences for the installed Chromium-based
+     * browsers of a closed list (pkg/browserprefs.h); no display, no input */
+    if (argc > 1 && !strcmp(argv[1], "--browser-prefs")) return browser_prefs_main(argc, argv);
     /* a packaged app's companion (app/companion.c): checks the signed package, then becomes it, in its sandbox */
     if (argc > 1 && !strcmp(argv[1], "--companion")) return companion_main(argc, argv);
     /* «modo app»: lord-server --app <id> corre una app .lpk como cliente Wayland aislado

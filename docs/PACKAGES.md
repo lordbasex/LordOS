@@ -83,6 +83,7 @@ The code is in `server/src/pkg/`:
 | `/var/lib/lordos/pkg/sources` | SHA-256 of the list files the index was built from: when a component or source is added or removed, the next `pkg-update` rebuilds the index even if no signed release file changed |
 | `/var/lib/lordos/pkg/notes` | The verified `main/notes/ReleaseNotes` of every source that has one (LordOS's; [UPDATES.md](UPDATES.md)); world-readable |
 | `/var/cache/lordos/pkg/` | `.deb` files while they're being installed (deleted when done) |
+| `/opt/google/chrome/initial_preferences` and the others of "Browser defaults" | LordOS's initial preferences for a Chromium-based browser, merged into the vendor's file if it ships one (0.8.8.9) |
 
 ## Helper actions (`admin.run`)
 
@@ -113,6 +114,52 @@ file exists, the catalog's `optout` makes `pkg-source-add` create it empty (only
 `pkg-source-remove` delete it only while it is still empty. Removing the last installed app of a
 repository removes that repository. The catalog itself is described in `UPDATES.md`, "Mirrored apps
 (catalog)".
+
+### Browser defaults (0.8.8.9, in development)
+
+Debian's Chromium starts new profiles with its own bar and the GTK theme because LordOS writes
+`/etc/chromium/master_preferences` (WAYLAND.md, "The browsers by default"). The Chromium-based browsers
+from the Store and the vendors' repositories don't read `/etc/chromium`: Chromium looks for its initial
+preferences only next to its binary (`InitialPreferences::Path`: `<binary's directory>/initial_preferences`,
+or `master_preferences` when that one isn't readable), and there is no `/etc` location and no policy for the
+GTK theme. So after `dpkg` installs or upgrades one of them, the same `pkg-install`, `pkg-upgrade` or
+`pkg-install-file` action writes LordOS's two keys there (`server/src/pkg/browserprefs.c`, called from
+`apply_plan` in `pkg.c`):
+
+| Package | Directory |
+|---|---|
+| `google-chrome-stable`, `google-chrome-beta`, `google-chrome-unstable` | `/opt/google/chrome`, `chrome-beta`, `chrome-unstable` |
+| `brave-browser`, `brave-browser-beta`, `brave-browser-nightly` | `/opt/brave.com/brave`, `brave-beta`, `brave-nightly` |
+| `microsoft-edge-stable`, `microsoft-edge-beta`, `microsoft-edge-dev` | `/opt/microsoft/msedge`, `msedge-beta`, `msedge-dev` |
+
+- **Closed list.** The table is compiled in; a package name only selects a row and nothing else comes from
+  the caller. Debian's `chromium` is not in it (it has `/etc/chromium`), nor Vivaldi (its interface is its
+  own, and neither key changes it).
+- **What is written.** `"browser": {"custom_chrome_frame": true}` and
+  `"extensions": {"theme": {"system_theme": 1}}` (1 = GTK), the same as Chromium's file. With no file, a new
+  `initial_preferences` (0644) with exactly those keys. A file the vendor ships (`initial_preferences`, or
+  `master_preferences` when that is the one the browser reads, so LordOS never creates a file that would
+  hide it) is **merged**: it must be a JSON object (`json_parse`), the vendor's keys and values stay, and
+  each of LordOS's keys is inserted as text only where it is absent; a key the vendor already sets, or a
+  parent that isn't an object, is the vendor's and is kept. A file that isn't JSON, a symlink or any other
+  type is left alone, and so is a directory that is a symlink or doesn't exist (the browser isn't
+  installed: nothing is created). The write is a temporary file in the same directory renamed over the
+  old one; running it again changes nothing.
+- **Why after every upgrade.** A file the package doesn't own survives upgrades, but a vendor may start
+  shipping one, which dpkg would put back without LordOS's keys.
+- **Never fails an installation.** A file left alone or a failed write is a line in the helper's log
+  (`pkg: <package>: …`), not an error.
+- **Only new profiles.** These are initial preferences: Chrome, Brave and Edge copy them into a profile
+  when it is created. Home folders are never touched; an existing profile changes in the browser's
+  Settings → Appearance → Theme → GTK (and «Use system title bar and borders» off). Settings → Appearance's
+  browser switch (`hw/brframe.c`) writes Chromium's and Brave's profiles, not Chrome's or Edge's.
+- **Already installed.** Migration `009-0.8.8.9-chromium-family` runs the same code once for every browser
+  of the list that is installed (`lord-server --browser-prefs`, as root from the lordos package's
+  postinst; it always exits 0).
+- **Tests.** `build/browserprefs-test` (the merge rule over vendor files, and the files in a fixture root:
+  not installed, a new file, `master_preferences` only, both files, not JSON, symlinks, a second run) and
+  `tests/migration_chromium_family_test.sh` (migration 009 over a fake system tree). Not yet checked with
+  the real browsers on the VM.
 
 ### Confirmations
 

@@ -588,7 +588,8 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   the buttons keep LordOS's order and side but are Chromium's own.
 - **Brave and other Chromium-based browsers** (0.8.8.4, #39). They don't read Debian
   Chromium's `/etc/chromium/master_preferences`, where LordOS puts its defaults (a new Brave profile
-  has neither key; LordOS doesn't write into the vendor's `/opt/brave.com/brave`), so it starts with
+  had neither key; until 0.8.8.9 LordOS didn't write into the vendor's `/opt/brave.com/brave`, see the
+  next item), so it starts with
   Chromium's defaults for a desktop it doesn't know (`XDG_CURRENT_DESKTOP=LordOS`): its own bar
   (`custom_chrome_frame` on) with the **Classic** theme, whose window buttons are Chromium's own
   (minimize, maximize and close glyphs, on LordOS's side and in its order), not LordOS's traffic
@@ -606,6 +607,17 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   |---|---|
   | ![brave classic](brave-classic-theme.png) | ![brave gtk](brave-gtk-theme.png) |
   | A new Brave profile: its own bar with the Classic theme's buttons | After the switch («Change them»): the same profile with LordOS's traffic lights |
+- **Google Chrome, Brave and Microsoft Edge from the Store** (0.8.8.9, in development; the maintainer saw
+  Chrome drawing its own minimize, maximize and close buttons next to Chromium's traffic lights). They get
+  Chromium's two defaults in the only place they read initial preferences: next to their binary
+  (`/opt/google/chrome/initial_preferences`, `/opt/brave.com/brave/…`, `/opt/microsoft/msedge/…`; Chromium's
+  `InitialPreferences::Path`, which has no `/etc` location, and there is no policy for the GTK theme). The
+  Store's package engine writes them after it installs or upgrades one of these packages, and migration
+  `009-0.8.8.9-chromium-family` once for one already installed. Chrome 157's package ships no such file
+  (checked on the dev machine); a file a vendor ships is merged, keeping its keys and values, never
+  replaced (PACKAGES.md, "Browser defaults"). Only **new profiles** get them: an existing profile switches
+  in the browser's Settings → Appearance → Theme → **GTK**. Not yet checked with the real browsers on
+  the VM.
 - **Firefox ESR.** `/etc/firefox-esr/lordos.js` has `pref("browser.tabs.inTitlebar", 1)`: its own
   bar, with the window buttons in LordOS's order and side (it reads the same `button-layout`), drawn
   in Firefox's own style: Firefox draws those buttons itself, not with the GTK theme, so they aren't
