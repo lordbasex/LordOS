@@ -430,7 +430,7 @@ A cloud glyph by the clock while at least one account exists: still when idle, w
 badge for errors or waiting changes. Its panel: each account's state (up to date, syncing with the file and percentage, paused,
 needs sign-in), the last changes (file, account, up or down, time) with **Show in Files**, **Pause All** / **Resume**, and
 **Cloud Settings…**. Following the Lord Classic rule (#29), the panel opens toward the middle of the screen.
-Since 0.8.8.9 (#145) it never runs past its display: it is at most as tall as the room between the item and the far
+Since #145 (in development after 0.8.8.8, the latest release) it never runs past its display: it is at most as tall as the room between the item and the far
 edge of the display's work area (the Dock or a Classic taskbar left out, less 8 px; `panelRoom` in
 `sdk/statusplace.js`, `statusPanelRoom` in `sdk/statusitems.js`). The title and the buttons (Pause All, Show in Files,
 Cloud Settings…) always show; the accounts and the recent files scroll between them.

@@ -8,7 +8,8 @@ keywords: language, region, format, date, time, time zone, translation
 
 In [Settings → Language & Region](settings:language):
 
-- **Interface language:** Spanish, English or Portuguese (and any language packs you add). It
+- **Interface language:** any of the 35 built in (English, Spanish, Portuguese, French, Italian,
+  Lithuanian, German, Japanese, Chinese, Arabic and more), and any language pack you add. It
   changes live, without restarting.
 - **Region:** the format of dates, time (24 or 12 hours) and numbers.
 - The computer's **time zone** (requires an administrator). Other cities' times are shown in

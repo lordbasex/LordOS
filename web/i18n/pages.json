@@ -126,7 +126,9 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Tested hardware",
-      "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people share with System Information and from the project's own reference machines. So far it holds only the reference machines.",
+      "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people share with System Information and from the project's own reference machines. So far it holds the reference machines and the first accepted community report.",
+      "compareText": "Every machine reported on GitHub, accepted here or not (22 so far: 14 with Intel graphics, 4 with AMD, none with NVIDIA), is compared in",
+      "compareLink": "the hardware reports",
       "machinesTitle": "Machines",
       "gpusTitle": "Graphics cards and drivers",
       "problemsTitle": "Known problems",
@@ -373,7 +375,9 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Hardware probado",
-      "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente comparte con Información del Sistema y de las máquinas de referencia del propio proyecto. Por ahora tiene solo las máquinas de referencia.",
+      "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente comparte con Información del Sistema y de las máquinas de referencia del propio proyecto. Por ahora tiene las máquinas de referencia y el primer reporte aceptado de la comunidad.",
+      "compareText": "Todas las máquinas reportadas en GitHub, aceptadas acá o no (22 hasta ahora: 14 con gráficos Intel, 4 con AMD, ninguna con NVIDIA), se comparan en",
+      "compareLink": "los reportes de hardware",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Tarjetas gráficas y drivers",
       "problemsTitle": "Problemas conocidos",
@@ -620,7 +624,9 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Hardware testado",
-      "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilham com as Informações do Sistema e das máquinas de referência do próprio projeto. Por enquanto tem só as máquinas de referência.",
+      "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilham com as Informações do Sistema e das máquinas de referência do próprio projeto. Por enquanto tem as máquinas de referência e o primeiro relatório aceito da comunidade.",
+      "compareText": "Todas as máquinas relatadas no GitHub, aceitas aqui ou não (22 até agora: 14 com gráficos Intel, 4 com AMD, nenhuma com NVIDIA), são comparadas",
+      "compareLink": "nos relatórios de hardware",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Placas de vídeo e drivers",
       "problemsTitle": "Problemas conhecidos",

@@ -13,7 +13,7 @@ algo falha.
 ## Fontes
 
 - **Meus registros:** o seu journal do systemd (seus apps e serviços), lido com as suas permissões.
-- **Sistema** e **Kernel:** o journal do sistema. Os administradores (grupo sudo) o veem pelo
+- **Sistema** e **Kernel:** o journal do sistema. Os administradores (grupo sudo, admin ou wheel) o veem pelo
   assistente de administração, assim como quem estiver no grupo de leitura do journal.
 - **LordOS:** os registros da sua sessão (`compositor`, `shell`, `xwayland`…; "sessão anterior" é a de
   antes deste login), e abaixo o registro de cada **app** e de cada **app web**. Ficam em

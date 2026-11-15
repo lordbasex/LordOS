@@ -518,6 +518,9 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
   - right click by long press on the touchscreen.
 - **Palm by size:** only works on devices that report `TOUCH_MAJOR` in the same units as the
   position. The others rely on pressure and edges.
-- **Tested only in the VM**, with the simulated touchpad and screen, a simulated bcm5974 and the
-  `hid-alps` report sequence (`t_alps` in `tests/tp_test.c`, written from the driver, not recorded). Real
-  hardware is still missing (the checklist above), the 2015 laptop of issue #34 included.
+- **Tested by us only in the VM**, with the simulated touchpad and screen, a simulated bcm5974 and the
+  `hid-alps` report sequence (`t_alps` in `tests/tp_test.c`, written from the driver, not recorded).
+- **Real hardware:** the Alps I2C fix was confirmed on a Dell Latitude 7480 (#67), Apple trackpads work on two 2015
+  laptops (#136, #155) and the touchscreen with automatic rotation on a Chuwi Hi12 (#60)
+  ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)). Still missing: a recording from the bcm5974 laptop of issue #34 (the
+  checklist above), and drawing tablets.

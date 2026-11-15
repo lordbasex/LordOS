@@ -534,7 +534,7 @@ that was probed.
   the engine ("LordOS Web (WPE WebKit <version>)", the installed `libwpewebkit-2.0-1` from the package index, no
   program run), the permissions with their state (a link to Settings → Web Apps), the profiles (each one's data and
   memory, Open, New profile), background mode and the known limitations.
-- **The trademark notice** (0.8.8.9, in development; `apps/store/trademark.js`, `tests/store_trademark_scene.mjs`):
+- **The trademark notice** (in development after 0.8.8.8; `apps/store/trademark.js`, `tests/store_trademark_scene.mjs`):
   under the Web apps section's catalog and at the end of every app's page, a dimmed note in the person's language
   (`webapps.store.trademark`): the product names, logos and icons shown are trademarks of their owners, used only to
   identify the services; LordOS is not affiliated with, endorsed or sponsored by them; and LordOS doesn't change the
@@ -764,7 +764,7 @@ Notification sound and, when LordOS's sound plays, which one.
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
 
-## No network (since issue #144)
+## No network (issue #144; in development after 0.8.8.8, the latest release)
 
 When the app's own page (an address inside its `scope`) can't load for lack of network, `lord-web`
 (`webengine.c`, `weboffline.h`) shows its own page instead of WebKit's error page:

@@ -16,4 +16,5 @@ Este app. Ele tem um artigo para cada app e função do LordOS.
 - **Bem-vindo ao LordOS:** o tour do primeiro login. Pode ser visto de novo pela barra lateral ou
   pelo menu **Ajuda** da barra de menus.
 
-Os artigos estão em espanhol, inglês e português, conforme o idioma da interface.
+Os artigos estão em inglês, espanhol e português, conforme o idioma da interface; nos outros
+idiomas da interface eles aparecem em inglês.

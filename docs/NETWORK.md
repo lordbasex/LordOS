@@ -92,7 +92,7 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
 
 Some Wi-Fi radios lose their association while the computer sleeps and come back with the link
 "up": the kernel and wpa_supplicant never notice, there is no carrier change, and nothing reconnects
-until the card is turned off and on by hand (reported with the built-in card of a 2015 laptop).
+until the card is turned off and on by hand (reported with the Broadcom BCM43602 of a 2015 laptop, issue #14; [HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 `lord-netd` now does what the person had to do:
 
 - **How it hears the wake.** logind's `PrepareForSleep(b)` signal on the system bus (`true` before
@@ -174,7 +174,7 @@ enabled. `lordos.service` now has `DelegateSubgroup=supervisor`.
 | DNS | With systemd-resolved: `resolvectl` per interface. Without resolved: `/etc/resolv.conf`. | ✅ resolved |
 | Coexistence with systemd-networkd | System interfaces are shown but not touched. `net-manage` hands them to LordOS and `net-unmanage` gives them back. | ✅ with a test interface |
 | Coexistence with NetworkManager | Interfaces with `managed=true` in `/run/NetworkManager/devices/<ifindex>` (read without D-Bus) are system interfaces too: lord-netd doesn't start DHCP or wpa_supplicant on them. `net-manage` only knows how to take them from systemd-networkd. | ✅ code; found on a Raspberry Pi OS board (2026-10-18), where lord-netd had started a second DHCP client and wpa_supplicant |
-| Wi-Fi WPA2-Personal and open networks | wpa_supplicant (Debian) through its control socket. The PSK is computed with PBKDF2. | ✅ scan, wrong key, connection and DHCP, reconnection on restart, forget (with mac80211_hwsim + hostapd) |
+| Wi-Fi WPA2-Personal and open networks | wpa_supplicant (Debian) through its control socket. The PSK is computed with PBKDF2. | ✅ scan, wrong key, connection and DHCP, reconnection on restart, forget (with mac80211_hwsim + hostapd); on real laptops Broadcom BCM43602, Intel 3165 and Intel 8265 ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)) |
 | Wi-Fi WPA3 (SAE) | `sae_password` and `key_mgmt WPA-PSK SAE` | ⚠️ untested: the test hostapd is WPA2 |
 | WireGuard | Our own generic netlink (`WG_CMD_SET_DEVICE`/`GET_DEVICE`) and our own X25519 keys | ✅ against the official `wg`: split and full tunnel (0.0.0.0/0 with fwmark and rules like wg-quick), DNS, status |
 | OpenVPN | Debian's program, with the config filtered by a list of allowed options and the management interface | ✅ against an openvpn 2.6 server: inline certificates, username and password (including the wrong password), pushed routes and DNS |

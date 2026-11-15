@@ -31,7 +31,7 @@
   "features": [
     [
       "A desktop of its own",
-      "Its own display server and Wayland compositor in C and its own interface engine, on a solid Debian base. Smooth on any 64-bit PC (amd64), and light enough for the Raspberry Pi 5 (arm64)."
+      "Its own display server and Wayland compositor in C and its own interface engine, on a solid Debian base. Runs on 64-bit PCs (amd64), 22 of them reported so far, and is light enough for the Raspberry Pi 5 (arm64)."
     ],
     [
       "Private by design",

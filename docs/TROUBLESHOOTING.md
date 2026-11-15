@@ -235,6 +235,13 @@ lag: [open-vm-tools#696](https://github.com/vmware/open-vm-tools/issues/696) was
 VMware Workstation bug. The VMware report above was the GPU presentation bug, and it reproduced
 on Proxmox, where `open-vm-tools` is inactive.
 
+## Hardware
+
+What has been run and what was found, machine by machine, is in [HARDWARE-REPORT.md](HARDWARE-REPORT.md) (22
+machines). Known workarounds from it: Intel HD 620 hard lockups soon after login with `firmware-intel-graphics` →
+boot with `i915.enable_dc=0` (#42); Cherry Trail tablets' sound needs the audio driver installed by hand (#137, #60);
+a Wi-Fi card blocked by the laptop's wireless key is turned on with that key, not Settings (#106).
+
 ## Known issues in 0.8.5
 
 From the release notes (`CHANGELOG.md`, 0.8.5-beta, "Known issues and limitations"):
@@ -249,5 +256,7 @@ From the release notes (`CHANGELOG.md`, 0.8.5-beta, "Known issues and limitation
 - **Searching "displays"** lists the Help article on touchpads and touch screens before Settings →
   Displays; **Settings → Displays** cuts the name of a small display in the arrangement without an
   ellipsis.
+- **A cloud account signed in with a password and a device code may ask for the code again after a logout or
+  restart** (0.8.8.7 and later; rclone's issues 9658 and 9966; `CLOUD.md`).
 - **Steam** isn't in the Store: it needs i386 multiarch, which LordOS's package engine doesn't do yet
   ([ROADMAP.md](ROADMAP.md)).

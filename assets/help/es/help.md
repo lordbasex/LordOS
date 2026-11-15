@@ -17,4 +17,5 @@ Esta app. Tiene un artículo por cada app y función de LordOS.
 - **Bienvenido a LordOS:** el recorrido del primer ingreso. Se vuelve a ver desde la barra lateral
   o desde el menú **Ayuda** de la barra de menú.
 
-Los artículos están en español, inglés y portugués, según el idioma de la interfaz.
+Los artículos están en inglés, español y portugués, según el idioma de la interfaz; en los demás
+idiomas de la interfaz se muestran en inglés.

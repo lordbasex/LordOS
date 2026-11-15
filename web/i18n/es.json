@@ -31,7 +31,7 @@
   "features": [
     [
       "Un escritorio propio",
-      "Su propio servidor gráfico y compositor Wayland en C y su propio motor de interfaz, sobre una base Debian sólida. Fluido en cualquier PC de 64 bits (amd64) y liviano para la Raspberry Pi 5 (arm64)."
+      "Su propio servidor gráfico y compositor Wayland en C y su propio motor de interfaz, sobre una base Debian sólida. Corre en PC de 64 bits (amd64), 22 reportadas hasta ahora, y es liviano para la Raspberry Pi 5 (arm64)."
     ],
     [
       "Privado por diseño",

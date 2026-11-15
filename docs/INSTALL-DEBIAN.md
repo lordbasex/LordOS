@@ -55,9 +55,10 @@ this works even though the script itself comes through a pipe.
      can't install or update without an administrator. Otherwise it does **not** add anyone to `sudo`.
      A system installed before this (the Store refuses with "<user> is not an administrator" and nobody is one)
      is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
-     the session user to `sudo`, effective after a reboot;
+     the session user to `sudo` (or to `wheel` on a system with no `sudo` group), effective after a reboot;
    - generates the `en_US`, `es_ES`, `pt_BR`, `fr_FR` and `it_IT` UTF-8 locales. The interface also ships
-     Lithuanian (`lt`), but the script doesn't generate `lt_LT.UTF-8`; add it with `dpkg-reconfigure locales` if you need it.
+     Lithuanian (`lt`) and, in development after 0.8.8.8, 29 more languages; the script generates none of their
+     locales: add the one you need with `dpkg-reconfigure locales` (or Settings → Language & Region).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
      login (Settings → Users changes it). An existing file is kept;
@@ -295,9 +296,10 @@ Done on 2026-10-18 on the development Mac with Docker (`debian:trixie`, amd64) a
 | Release files signed with the real key (`LORDOS_BASE_URL=file://…`, `--version 0.8.0-beta --remote-desktop`) | "valid Ed25519 signature", SHA-256 OK, installed, remote desktop listening |
 | `--remote-desktop` on VM 120 (LordOS installed from the ISO) | reload path: port 5673 listening, login from another machine accepted |
 
-### Still to test on a real Debian 13 machine
+### Still to test on a fresh Debian 13 machine
 
-No free Debian 13 VM was available (the ISO work uses VMs 116, 117 and 120). Manual plan, on a fresh
+The plan below has not been run as a whole. On real hardware, `install.sh` over Debian 13 has been used on an HP
+ZBook 17 G2 (0.8.8.4 to 0.8.8.6, GPU composition; `HARDWARE-REPORT.md`, #40, #57, #94). Manual plan, on a fresh
 Debian 13 VM with a desktop (GNOME, which brings GDM and NetworkManager) and one without (server
 install, ifupdown):
 
@@ -307,7 +309,8 @@ install, ifupdown):
 2. `sudo reboot`: the LordOS login screen appears on tty1; log in with your Debian password. Check:
    sound (Settings → Sound, `pw-cli info 0`), network unchanged (`nmcli device` still shows
    NetworkManager managing the interface; no second DHCP client: `ps aux | grep -i dhcp`), Settings →
-   Sharing shows remote desktop off, `ss -ltn | grep 5673` is empty, Ctrl+Alt+F2 gives a text login.
+   Sharing shows remote desktop off, `ss -ltn | grep 5673` is empty; before LordOS starts (or after `systemctl stop lordos`), Ctrl+Alt+F2
+   gives a text login (while LordOS runs it doesn't switch consoles, `SESSIONS.md`).
 3. `systemctl status lordos lord-netperm lord-fand` are active; `journalctl -b -u lordos` has no errors.
 4. On the server install: run the installer from tty1 over the console, then `sudo systemctl start
    lordos` without rebooting; then reboot and check ifupdown still owns `eth0`.

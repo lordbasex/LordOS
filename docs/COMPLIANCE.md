@@ -22,10 +22,10 @@ materials (SBOM) published with each release. The website summary is at
   (snapshot.debian.org for Debian's, LordOS's copy or Raspberry Pi's archive for the Pi's, this repository at the tag
   for LordOS's own packages, LordOS's copy for its Raspberry Pi kernel), written by `tools/release/image-sources.sh`,
   under a written offer valid for three years.
-- **The kernel sources of the Raspberry Pi images, kept by LordOS** (in development after 0.8.8.8; maintainer's
+- **The kernel sources of the Raspberry Pi images, kept by LordOS** (maintainer's
   decision, 2026-11-15; [SOURCE-OFFER.md](SOURCE-OFFER.md)). The GPL-2 sources the 0.8.8 Pi image needs that only
-  third parties served are pinned in `tools/release/rpi-mirror.list` and go to https://lordos.org/apt/pool/rpi/source/
-  with the next APT update: Raspberry Pi's `linux 1:6.18.50-1+rpt1` (the Pi 4 kernel `linux-image-6.18.50+rpt-rpi-v8`),
+  third parties served are pinned in `tools/release/rpi-mirror.list` and published at
+  https://lordos.org/apt/pool/rpi/source/: Raspberry Pi's `linux 1:6.18.50-1+rpt1` (the Pi 4 kernel `linux-image-6.18.50+rpt-rpi-v8`),
   `firmware-nonfree 1:20260519-1~bpo13+1+rpt1` (`firmware-brcm80211`: Broadcom's binary-only firmware, no source of
   its own, kept with its packaging for completeness) and `raspi-firmware 1:1.20260915-1` (boot firmware under
   Raspberry Pi's binary licence, the kernel hook GPL-2+), and the LordOS kernel `linux-lordos-rpi-2712
@@ -69,7 +69,7 @@ materials (SBOM) published with each release. The website summary is at
   `whisper.cpp` (MIT), built from the upstream source tarball pinned by URL and SHA-256 in the
   catalog, and `codex-cli` (Apache-2.0), OpenAI's static binary with its sigstore signature checked.
   RustDesk (AGPL-3.0) was offered in Store → Remote access from 0.8.8.6 as a mirrored `.deb` and is
-  removed from the catalog in the next update (0.8.8.9; maintainer's decision, 2026-11-12): LordOS doesn't
+  removed from the catalog in the update in development after 0.8.8.8 (the latest release; maintainer's decision, 2026-11-12): LordOS doesn't
   redistribute it, so it carries no AGPL source obligation. It was never published in lordos.org/apt's pool.
   People who want it can get it from its maker.
 

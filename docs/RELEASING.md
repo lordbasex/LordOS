@@ -48,7 +48,7 @@ The releases page is the project's public changelog: every release is documented
 
    Also bump `package.json` (`version`, `lordos.channel`) and commit both.
 
-   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
+   **Web apps' Browser identity** (in development after 0.8.8.8): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
    in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
    from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
    changelog entry if they changed. A stale major is what makes sites treat a browser as outdated. `build/webapp-test`
@@ -269,7 +269,8 @@ systems without a LordOS release: the daily update check notices one available u
 runs on the maintainer's Mac except building the `.deb` (it needs `dpkg-deb`: a build VM, or a `debian:trixie`
 container):
 
-1. **Accept the reports.** Commit them to `web/content/hardware/reports/` (and `index.json`) on `main`.
+1. **Accept the reports.** Commit them to `web/content/hardware/reports/` (and `index.json`) on `main`, and add the
+   machine to [HARDWARE-REPORT.md](HARDWARE-REPORT.md) (its table, the comparison counts and "Last updated").
 2. **Sign.** On the Mac: `tools/release/sign-hwsnapshot.sh`. It rebuilds `assets/hwreport/snapshot.json` from
    the reports, signs it with the release key into `snapshot.json.sig` and prints the package version: the date
    of the newest report as `YYYY.MM.DD`. If that version is already in the repository with another snapshot

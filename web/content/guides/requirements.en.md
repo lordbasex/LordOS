@@ -14,9 +14,9 @@ What each LordOS image needs. If a figure here and another page disagree, this p
 
 - **Processor:** any 64-bit Intel or AMD processor. There is no 32-bit version.
 - **Memory:** 4 GB minimum; 8 GB recommended, 16 GB with many apps open.
-- **Storage:** installing needs a disk of at least 8 GB (the installer's limit is 8 GiB); 32 GB or more is recommended. Installing next to another system needs a GPT disk with an EFI partition, the computer started in UEFI mode, and at least 8 GB of free space. That option has never been run to the end yet, so back up first. In development for the next ISO: choosing the partitions yourself (/, /home, the EFI partition, swap), which needs the same GPT disk and UEFI start; / needs at least 8 GB.
+- **Storage:** installing needs a disk of at least 8 GB (the installer's limit is 8 GiB); 32 GB or more is recommended. Installing next to another system needs a GPT disk with an EFI partition, the computer started in UEFI mode, and at least 8 GB of free space. That option ran to the end in a virtual machine, and a community laptop runs LordOS next to another system on one disk ([hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md)); back up first anyway. In development for the next ISO: choosing the partitions yourself (/, /home, the EFI partition, swap), which needs the same GPT disk and UEFI start; / needs at least 8 GB.
 - **Firmware:** UEFI or legacy BIOS. Turn Secure Boot off.
-- **Graphics:** any. With a supported graphics card (through Mesa: AMD, Intel and others) the desktop is composed on the GPU; without one, the CPU path always works.
+- **Graphics:** any. With a supported graphics card (through Mesa: AMD, Intel and others) the desktop is composed on the GPU; without one, the CPU path always works. Reported so far on 22 machines, with Intel and AMD graphics and none with NVIDIA: see the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md).
 - **To start it:** a USB stick of 2 GB or more; the ISO is about 1.1 GB. The live system can also be copied to memory at start (an entry in the boot menu); give the computer 4 GB or more for that.
 
 ## arm64 ISO

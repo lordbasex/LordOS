@@ -582,5 +582,5 @@ whose only verification is built in (fingerprint) are not implemented/tested.
 | `server/mk/vault*.mk` | build and test rules |
 | `sdk/vault.js` | `vaultRequest`, `keyring`, `autofill`, `<AutofillButton>`, `<KeyringPrompt>` |
 | `apps/passwords/` | the app |
-| `assets/locales/{en,es,pt}/passwords.json` | texts |
+| `assets/locales/<lang>/passwords.json` (35 languages) | texts |
 | `tests/fido-soft/` | software FIDO2 authenticator |

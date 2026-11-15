@@ -14,15 +14,25 @@ Tudo o que se configura no LordOS está nos Ajustes. O campo no alto busca entre
 | [Geral](settings:general) | Este computador: nome, software e armazenamento |
 | [Aparência](settings:appearance) | Estilo da área de trabalho (Lord Flow ou Lord Classic), modo escuro ou claro, cor de destaque, transparências |
 | [Fundo de tela](settings:wallpaper) | O fundo da área de trabalho |
+| [Mesa e Dock](settings:dock) | O Dock, as áreas de trabalho e os botões das janelas |
 | [Telas](settings:displays) | Resolução, escala, disposição de várias telas, Luz noturna |
 | [Rede](settings:network) | Cabo, Wi-Fi e VPN (veja [Rede](help:network)) |
+| [Bluetooth](settings:bluetooth) | Parear e conectar dispositivos |
 | [Som](settings:sound) | Saídas, entradas, volume por app (veja [Som](help:sound)) |
+| [Notificações](settings:notifications) | Notificações por app e Não perturbe (veja [Notificações](help:notifications)) |
 | [Impressoras e scanners](settings:printers) | Veja [Imprimir](help:printing) |
 | [Área de transferência](settings:clipboard) | Histórico e privacidade (veja [Área de transferência](help:clipboard)) |
 | [Compartilhar](settings:sharing) | Desktop remoto (veja [Desktop remoto](help:remote-desktop)) |
+| [Nuvem](settings:cloud) | Contas de armazenamento na nuvem |
 | [Idioma e região](settings:language) | Idioma, formatos, fuso horário (veja [Idioma e região](help:language)) |
+| [Data e hora](settings:datetime) | Hora automática ou manual, 12 ou 24 horas |
 | [Teclado](settings:keyboard) | Layouts e métodos de entrada (veja [Teclado](help:keyboard)) |
 | [Trackpad](settings:trackpad) | Se houver touchpad (veja [Touchpad](help:trackpad)) |
+| [Apps padrão](settings:defaultapps) | Qual app abre cada tipo de arquivo |
+| [Apps web](settings:webapps) | Os apps web instalados, seus perfis e permissões |
+| [Inteligência artificial](settings:ai) | Vozes e leitura em voz alta |
+| [Energia](settings:power) | Bateria, desligar a tela, suspender, o botão de energia e a tampa |
+| [Resfriamento](settings:cooling) | Ventoinhas |
 | [Privacidade](settings:privacy) | Permissões dos apps (veja [Privacidade](help:privacy)) |
 | [Usuários](settings:users) | Contas e login automático (veja [Usuários e sessões](help:users)) |
 | [Atualizações](settings:updates) | Pacotes do Debian (veja [Atualizações](help:updates)) |

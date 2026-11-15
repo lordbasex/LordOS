@@ -320,8 +320,10 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
 User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
-menu. Before, they were only on the login screen. Sleep is not offered: suspend and resume with the
-card lent to a session has not been tested on real hardware yet.
+menu. Before, they were only on the login screen. Sleep is not in the menu; the computer sleeps from the lid, the power
+button (a tap on tablets, in development after 0.8.8.8) and the idle timers in Settings → Energy. Suspend and resume
+is unchecked in every hardware report; the only report after waking is #14's Wi-Fi on a laptop, handled since 0.8.8.3
+([HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 
 | | |
 |---|---|
@@ -585,10 +587,13 @@ session. Everything that changes something goes through closed `admin.c` actions
   (`display_attach` → `outputs_apply` in `main.c`, see [DISPLAYS.md](DISPLAYS.md)). The lend/revoke
   cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
   it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
-  CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Other cards and laptop
-  panels are untested.
+  CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Sessions on real hardware are
+  known from 22 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
+  Cherry Trail and Gemini Lake, four AMD generations, laptop panels, three laptops with an external monitor and two
+  monitors at 120 Hz (RX 7800 XT). Untested: NVIDIA, AMD integrated graphics, Intel newer than Whiskey Lake,
+  DisplayPort MST hubs.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
 - **Testing with more real cards:** in the VMs the GPU is tested only with `LORD_GPU=1` and llvmpipe; on
-  real hardware only the Radeon RX 580 above (amdgpu). Other AMD, Intel and NVIDIA cards and the live USB on
-  them are untested.
+  real hardware see [HARDWARE-REPORT.md](HARDWARE-REPORT.md) (14 Intel, 4 AMD, 0 NVIDIA; a live USB on one laptop).
+  NVIDIA cards, AMD APUs and Intel graphics newer than Whiskey Lake are untested.

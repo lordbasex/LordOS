@@ -408,7 +408,7 @@ and `assets/` of each theme (`tools/iso/mkdeb.sh`), so keep your files there.
 
 Visible text goes through `t('namespace.key')` ([LANGUAGES.md](LANGUAGES.md)); app names through
 `appName(app)`, dates and times through `formatDate`/`formatTime`. The bundled themes' strings are in
-the `shell` catalog (`assets/locales/{en,es,pt}/shell.json`). A theme of your own can reuse existing
+the `shell` catalog (`assets/locales/<lang>/shell.json`, in every one of the 35 languages). A theme of your own can reuse existing
 `shell.*` keys (the example does) or bring its own namespace: `lord.locale.catalog` reads
 `<lang>/<namespace>.json` from `~/.local/share/lordos/locales/` first and then LordOS's
 `assets/locales/` (`f_locale_catalog` in `js_sys.c`). A missing key shows the key itself. Inside the
@@ -537,8 +537,8 @@ Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.
 - **Light and dark**, every accent, transparency on and off.
 - **Right to left:** with the Arabic test pack (`docs/packs/lordos-lang-ar.json`): rows mirrored,
   `textAlign: 'start'`, menus opening inwards, mouse-driven pieces in `direction: 'ltr'`.
-- **Translations:** no hard-coded text; en, es and pt at least; long translations truncate with an
-  ellipsis instead of overflowing.
+- **Translations:** no hard-coded text; every key in all 35 languages (`node tools/i18n-check.mjs` shows each one
+  complete); long translations truncate with an ellipsis instead of overflowing.
 - **Accessibility:** readable contrast of `text` and `textDim` on `windowBg`, `sidebarBg` and your
   bars in both modes; reduce motion respected; everything opened from the keyboard can be closed
   with Escape; targets big enough to hit with a touchpad.

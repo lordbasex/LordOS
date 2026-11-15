@@ -1339,7 +1339,6 @@
     "category": "thirdparty",
     "vendor": "VSCodium (community project)",
     "homepage": "https://vscodium.com",
-    "upcoming": "0.8.8.4",
     "screenshot": "docs/screenshots/store-third-party-apps.png",
     "name": {
       "en": "VSCodium",
@@ -1353,19 +1352,19 @@
     },
     "features": {
       "en": [
-        "Coming in 0.8.8.4, in Store → Third-party apps (#38)",
+        "Since 0.8.8.4, in Store → Third-party apps (#38)",
         "Installed and updated from its makers' signed repository, with the key LordOS pins",
         "Extensions from the Open VSX registry",
         "MIT, for amd64 and arm64"
       ],
       "es": [
-        "Llega en 0.8.8.4, en Store → Apps de terceros (#38)",
+        "Desde la 0.8.8.4, en Store → Apps de terceros (#38)",
         "Se instala y actualiza desde el repositorio firmado de sus autores, con la clave que LordOS fija",
         "Extensiones del registro Open VSX",
         "MIT, para amd64 y arm64"
       ],
       "pt": [
-        "Chega na 0.8.8.4, em Store → Apps de terceiros (#38)",
+        "Desde a 0.8.8.4, em Store → Apps de terceiros (#38)",
         "Instalado e atualizado a partir do repositório assinado dos seus autores, com a chave que o LordOS fixa",
         "Extensões do registro Open VSX",
         "MIT, para amd64 e arm64"
@@ -1376,7 +1375,6 @@
     "category": "thirdparty",
     "vendor": "Brave Software",
     "homepage": "https://brave.com/linux/",
-    "upcoming": "0.8.8.4",
     "screenshot": "docs/brave-gtk-theme.png",
     "name": {
       "en": "Brave Browser",
@@ -1390,19 +1388,19 @@
     },
     "features": {
       "en": [
-        "Coming in 0.8.8.4, in Store → Third-party apps (#39)",
+        "Since 0.8.8.4, in Store → Third-party apps (#39)",
         "Installed and updated from its maker's signed repository, with the key LordOS pins",
         "LordOS's window buttons in its tab bar with Settings → Appearance → \"Browsers: tabs in the title bar\"",
         "MPL-2.0, for amd64 and arm64"
       ],
       "es": [
-        "Llega en 0.8.8.4, en Store → Apps de terceros (#39)",
+        "Desde la 0.8.8.4, en Store → Apps de terceros (#39)",
         "Se instala y actualiza desde el repositorio firmado de su autor, con la clave que LordOS fija",
         "Los botones de ventana de LordOS en su barra de pestañas con Configuración → Apariencia → «Navegadores: pestañas en la barra de título»",
         "MPL-2.0, para amd64 y arm64"
       ],
       "pt": [
-        "Chega na 0.8.8.4, em Store → Apps de terceiros (#39)",
+        "Desde a 0.8.8.4, em Store → Apps de terceiros (#39)",
         "Instalado e atualizado a partir do repositório assinado do seu autor, com a chave que o LordOS fixa",
         "Os botões de janela do LordOS na barra de abas com Configurações → Aparência → «Navegadores: abas na barra de título»",
         "MPL-2.0, para amd64 e arm64"

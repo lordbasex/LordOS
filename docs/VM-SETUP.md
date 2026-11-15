@@ -633,7 +633,7 @@ sudo apt-get install -y libpipewire-0.3-dev
 Without `libpipewire-0.3-dev`, `make -C server` skips `build/lord-screencast` (`SCREENCAST=0`) and the portal offers no
 source types.
 
-**To build `lord-web`** (the Web Runtime, web apps, 0.8.8.8 in development; docs/WEBAPPS.md; already installed on the
+**To build `lord-web`** (the Web Runtime, web apps, since 0.8.8.8; docs/WEBAPPS.md; already installed on the
 main machine on 2026-11-10, nothing new installed for it):
 
 ```sh

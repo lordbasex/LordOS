@@ -20,7 +20,9 @@
 LordOS is a free GNU/Linux distribution based on Debian, with its own desktop environment:
 a display server and Wayland compositor written in C, its own interface engine, and native apps
 made to feel calm, clear and private. It runs on 64-bit PCs and on the Raspberry Pi 5, and the
-Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside the native ones.
+Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside the native ones. The machines it has
+been reported on (22 so far: 14 with Intel graphics, 4 with AMD, none with NVIDIA yet) are listed in
+[`docs/HARDWARE-REPORT.md`](docs/HARDWARE-REPORT.md).
 
 <p align="center">
   <img src="docs/screenshots/desktop-overview-light.png#gh-light-mode-only" alt="The LordOS desktop" width="860">
@@ -31,7 +33,7 @@ Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside th
 
 | | |
 |---|---|
-| **[A desktop of its own](https://lordos.org/features/own-desktop/)** | Its own display server and Wayland compositor in C and its own interface engine, on a solid Debian base. Smooth on any 64-bit PC (amd64), and light enough for the Raspberry Pi 5 (arm64). |
+| **[A desktop of its own](https://lordos.org/features/own-desktop/)** | Its own display server and Wayland compositor in C and its own interface engine, on a solid Debian base. Smooth on 64-bit PCs (amd64; [what it has been run on](docs/HARDWARE-REPORT.md)), and light enough for the Raspberry Pi 5 (arm64). |
 | **[Private by design](https://lordos.org/features/private-by-design/)** | Installable LordOS apps run isolated and ask before using your camera, microphone, files or network. You decide. |
 | **[A firewall you can see](https://lordos.org/features/visible-firewall/)** | Watch every connection on a live world map, then allow or block it per app, by domain, address or network, and restrict camera, microphone, files and more. Subscribe to public blocklists of ads, trackers and malware, or deny everything a rule doesn't allow. |
 | **[Passwords built in](https://lordos.org/features/passwords/)** | A vault for passwords, 2FA codes and cards that unlocks with a password or a USB key. |
@@ -39,7 +41,7 @@ Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside th
 | **[LordOS Web Runtime](https://lordos.org/features/web-apps/)** | Web apps installed as LordOS apps, with their own window, Dock icon and unread count. Each app and each profile runs in its own sandboxed process, and the Store offers a catalog of 37. |
 | **[Your Linux apps too](https://lordos.org/features/linux-apps/)** | Chromium, Firefox and GTK apps fit right in, with the same window frame and dark mode. |
 | **AI apps in the Store** | A curated catalog: Claude Code, Claude Desktop, Visual Studio Code, Cursor, Codex CLI, goose, opencode, and llama.cpp and whisper.cpp to run models on your own computer, each from a pinned, verified source. The Store downloads over HTTPS. |
-| **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. Community hardware reports: share yours on GitHub with your own account (LordOS sends nothing), and the Compatibility panel shows what others confirmed. |
+| **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. Community hardware reports: share yours on GitHub with your own account (LordOS sends nothing); the Compatibility panel shows the accepted ones, and [`docs/HARDWARE-REPORT.md`](docs/HARDWARE-REPORT.md) compares every machine reported so far (22). |
 | **Cleaner** | See what uses the disk and remove what can safely go. A scan only reads, and nothing changes until you review and confirm a plan. |
 | **Remote Desk** | One app for RDP and VNC, drawn by LordOS itself, with no client window or toolkit. Files connects to servers too: SMB, NFS, SFTP, FTP and WebDAV open as folders. |
 | **Moving wallpapers** | Short loops behind the desktop and the login screen, for a compatible GPU with hardware decoding, with no software mode. They pause when nobody sees them. |

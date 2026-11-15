@@ -181,9 +181,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `SOURCE` and scripts are served as text; without `gpgv` (this Debian host has none) Raspberry Pi's `InRelease` is
     checked with `gpg` in an empty home holding only Raspberry Pi's key, requiring its fingerprint in `VALIDSIG`.
     `tools/release/image-sources.sh` points these sources and the LordOS kernel at `lordos.org/apt/pool/rpi/source/`
-    and warns about a LordOS kernel whose source isn't kept. **Not yet published:** the files were fetched and
-    verified on 2026-11-15 (`apt-repo.sh rpi-fetch`, and an offline build with a throwaway key), and go to
-    lordos.org with the next signed `apt-repo.sh build … --rpi` and `publish` on the maintainer's machine.
+    and warns about a LordOS kernel whose source isn't kept. The files were fetched and verified on
+    2026-11-15 (`apt-repo.sh rpi-fetch`, and an offline build with a throwaway key) and are published at
+    https://lordos.org/apt/pool/rpi/source/ (checked the same day: the `SOURCE` file and the three `.dsc` files answer).
 - **A web app's own Appearance: Automatic, Light or Dark** (maintainer's approval, 2026-11-15). Each web app has
   its own choice of the light or dark preference its pages are told (`prefers-color-scheme` through `matchMedia`,
   and the dark background while a page loads): Automatic, the default, follows LordOS's mode as before; Light and
@@ -340,7 +340,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Light and Dark Mode in one click, three slider moves send one `display-brightness intel_backlight 650`, each new
   tile and Log Out hidden from Settings while CPU/memory and Settings stay) and `tests/classic_taskbar_test.mjs` (the
   Quick Settings brightness row only with a backlight). Not checked on screen and not tested on hardware: there was
-  no VM access for this change, and the brightness path is still untested on a real backlight.
+  no VM access for this change. The `display-brightness` action behind the slider already drives real backlights
+  through the brightness keys (two laptops in `docs/HARDWARE-REPORT.md`, #12); the slider itself has not been tried
+  on one.
 
 ### Changed
 
@@ -421,6 +423,60 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `.deb` and checks the pinned SHA-256.
 
 ### Documentation
+
+- **Docs, paper and help synced with what is built and with the hardware reports** (maintainer's request, 2026-11-15:
+  no claim that isn't true or that has been overtaken, and the hardware comparison referenced wherever hardware is
+  discussed). Every statement about real hardware now points to `docs/HARDWARE-REPORT.md` (22 physical machines:
+  14 Intel and 4 AMD GPUs, none NVIDIA):
+  - **The paper** (en, es, pt; edition 0.8.8.9 Beta, 2026-11-15): it now says it describes the repository on
+    15 November (it said 12 November) and that in-development work is marked; every "after 0.8.8.8 (in development,
+    not released yet)" and "0.8.8.9 in development" became "in development after 0.8.8.8 (the latest release)".
+    §3.2 and §7.3 no longer say real AMD cards are untested: GPU composition runs on the author's RX 580 every day
+    and, in community reports, on 14 Intel machines and three more AMD cards; what is still missing is a measurement of
+    its benefit there, and Nvidia. §7.5 names the two community LordBench quick runs (#136, #156) and the 17 installed
+    machines instead of "testing on a real AMD machine is planned". Overtaken limitations corrected: the on-screen
+    keyboard was used on a real tablet (#127), the Bluetooth high-fidelity profile was confirmed with a real headset on
+    three laptops (#78), the brightness and keyboard-light keys on two laptops (#12), the OVA also passed in VMware
+    Fusion, Databases has had its SSH tunnel since 0.8.8.8, install in free space ran to the end in a virtual machine
+    (#7) and a community laptop runs LordOS next to another system (#129), `install.sh` runs over Debian 13 on a real
+    laptop (#40), and the Raspberry Pi 500 is a supported board too. New in-development text: Files and Disks
+    mounting a free partition of the system disk with hibernated NTFS read-only (#122) and Files' read-only notice
+    (#139) in §5.1; a web app's offline page and automatic reload (#144) in §5.4; `disk-mount`/`disk-unmount` on the
+    system disk and the `power-buttons` hold value (#131) in §6.3, with the shared administrator list in
+    `server/src/users/admingroups.c`; the full list of work in development in §10.1, its untested parts in §10.2, a
+    changelog row for it and the 0.8.8.8 row's release-notes link. §2.2 lists `lord-screencast`, `lord-web`,
+    `lord-vm` and `lord-vmdisplay`; the glossary's helpers gain `lord-screencast` and `lord-vmdisplay`; §14 adds
+    HARDWARE-REPORT.md, TRANSLATING.md, WEBAPPS.md and a row for §12 (SOURCE-OFFER.md, COMPLIANCE.md). 12,460 keys per
+    language. `docs/PAPER-VALIDATION.md` merges the two in-development sections, refreshes the hardware rows (§3.2,
+    §3.5, §7.3, §7.5, §10.2, the on-screen keyboard, `install.sh`, the Alps touchpads, 300 %, the cursor plane), marks
+    the first 2026-11-15 hardware row superseded, says the Pi kernel sources are published, and adds rows for #144,
+    #122, #139, #131, the shared administrator list, the tablet volume and mouse side buttons, the trademark notice and
+    this sync.
+  - **Hardware in the docs:** README, CONTRIBUTING (Ctrl+Alt+F2 only helps when the desktop didn't start),
+    ARCHITECTURE (the x86-64 row; the scale is 100–300 %), GPU (NVIDIA is the untested vendor; the FirePro cursor fix
+    was confirmed), ISO, BENCHMARK (no longer titled a proposal), DISPLAYS, SESSIONS (sessions on 22 machines; how the
+    computer sleeps), SETTINGS (battery, brightness keys, lid and Bluetooth confirmed by reports; power profiles and
+    suspend still unchecked), SOUND, NETWORK (the Wi-Fi cards reported), TRACKPAD, ON-SCREEN-KEYBOARD (the
+    administrator prompt takes only a physical keyboard), INSTALL-DEBIAN (`install.sh` on a real laptop; the admin
+    rescue's `wheel`; the 29 languages' locales), RASPBERRY, RELEASING (an accepted report also goes into
+    HARDWARE-REPORT.md), ROADMAP (the first community reports done; real laptops' battery, backlight, lid and
+    Bluetooth done) and TROUBLESHOOTING (a Hardware section with the reports' workarounds, and the cloud sign-in known
+    issue).
+  - **Versions and languages:** no document calls unreleased work "0.8.8.9" any more (CLOUD, COMPLIANCE, PACKAGES,
+    UPDATES, SYSTEM, RELEASING, WEBAPPS, WAYLAND, SCREEN-SHARING's display messages); ROADMAP's 0.8.8.9 section lists
+    what is done in development; FIREWALL's Machines downloads are 0.8.8.5's; VIRTUALIZATION and GO-LINK rows in
+    `docs/README.md` give the releases they shipped in; LANGUAGES (12,460 keys, 583 error codes, 1,058 core keys,
+    **+** offers every bundled language), TRANSLATING, IMAGER (LordOS's Imager has every interface language, the
+    desktop app and the first-run file five), SETTINGS, PASSWORDS, THEMES-GUIDE and DISK-HEALTH name all 35
+    languages; LANGUAGES, UPDATES and the Logs help name `sudo`, `admin` and `wheel`; COMPLIANCE, SOURCE-OFFER and
+    this changelog say the Raspberry Pi kernel sources are published at lordos.org/apt/pool/rpi/source/ (checked on
+    2026-11-15), and SOURCE-OFFER gives 0.8.8's release date as 2026-11-02; FILES says an AppImage is a program
+    (#159). The Control Center entry above no longer says the brightness path is untested on a real backlight: the
+    same action behind the brightness keys works on two laptops; only the new slider is untried.
+  - **Help** (en, es, pt): the interface languages are the 35 built in; articles in other languages show in English;
+    the Store also installs web apps; Settings' table lists Desktop & Dock, Bluetooth, Notifications, Cloud, Date &
+    Time, Default Apps, Web Apps, AI, Energy and Cooling; About says how to share a hardware report and where they
+    are compared.
 
 - **ROADMAP from GitHub decisions (2026-11-15):** "Before 1.0" now lists lord-web's move to the new WPE API
   (WPEPlatform, #142) and each session in its own systemd unit (#140, needed for systemd 258 and Debian 14); "Release
@@ -537,6 +593,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   0.8.8 images) and `docs/COMPLIANCE.md`.
 
 ### Website
+
+- **lordos.org synced with the hardware reports and with what is in development** (2026-11-15), in English, Spanish
+  and Portuguese. The hardware page says it holds the reference machines and the first accepted community report,
+  and links the comparison of every reported machine (new `compareText` and `compareLink` in `web/i18n/pages.json`,
+  shown by `web/src/hardware.html`). The FAQ's answers on everyday use, processors (the Raspberry Pi 500 too), dual
+  boot (run to the end in a virtual machine, #7, and a community laptop next to another system, #129), NVIDIA,
+  several monitors and HiDPI give what was reported and link `docs/HARDWARE-REPORT.md`; the disk and dual-boot
+  answers and the own-desktop page add the in-development mount of the other system's partition (#122); the web
+  apps answer adds the in-development Appearance, Browser identity and offline reload; the languages answer says Help
+  is in English, Spanish and Portuguese only and that the new languages await native review, and labels them "in
+  development after 0.8.8.8 (the latest release)". The own-desktop page's "Real PC GPUs are not verified yet" became
+  "NVIDIA cards are not verified yet", with the Intel and AMD generations that compose on the GPU, and its numbers
+  point to the 22 reported machines; the requirements guide links the reports for graphics and for installing next
+  to another system; the LordOS Web Runtime page lists the five Browser identities and a "No network at start" limit
+  (#144); the Linux apps page warns about Electron apps on 0.8.8.8 (#150, with the workaround). The home card says
+  "Runs on 64-bit PCs (amd64), 22 of them reported so far" instead of "Smooth on any 64-bit PC". VSCodium and Brave
+  Browser no longer show "Coming in 0.8.8.4 (in development)": they shipped in 0.8.8.4.
 
 - **lordos.org: Catalan, Filipino and Swahili, 35 languages**, in English, Spanish and Portuguese (in development
   after 0.8.8.8, the latest release). `web/content/languages.json` "next" adds Català, Filipino and Kiswahili, so the

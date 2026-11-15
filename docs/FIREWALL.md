@@ -1165,10 +1165,10 @@ row's rules. Making the sockets in lord-server was rejected too: the traffic wou
 same fixed-size requests, no new request type, used by `lan.c` only for one unconnected UDP socket per link
 (`sendto` 224.0.0.251:5353, kept by lord-server) and TCP to ports 445, 2049, 111, 22 and mountd's on addresses
 `on_link` accepts. Connectors can't tell ports apart; `lan.c` is what bounds them. The change is `NC_LAN`, the name in
-`NAMES`, `FW_COMPONENTS` and `netconn_test`, a row in `sdk/netmodel.js` with its text in three languages, and
+`NAMES`, `FW_COMPONENTS` and `netconn_test`, a row in `sdk/netmodel.js` with its text in every language (now 35), and
 `lan_socket` calling `netconn_socket`.
 
-### Machines' downloads (0.8.9)
+### Machines' downloads (0.8.8.5)
 
 The New Machine assistant downloads systems (`VIRTUALIZATION.md`, 3.9, "The Linux download cards"). They are a
 component of their own, `machines` (firewall app `lordos:machines`, scope `lordos-net-machines.scope`), so they show as
@@ -1176,7 +1176,7 @@ component of their own, `machines` (firewall app `lordos:machines`, scope `lordo
 downloads go through the Store's downloader (`pkg/http.c`), whose child enters a component's scope before dropping to
 `nobody`; `fetch_batch_in` takes the scope (the Store keeps `lordos-net-store.scope`), and the closed actions
 `vm-image-list` and `vm-image-get` pass `lordos-net-machines.scope`. The change is the name in `FW_COMPONENTS`, a row in
-`sdk/netmodel.js` with its text in five languages, and that parameter.
+`sdk/netmodel.js` with its text in every language (now 35), and that parameter.
 
 **The running machines' traffic (0.8.8.6).** A running machine's QEMU and passt (its user-mode network) live in
 `app-lordos-lordos-vm-<id>.scope` (`vm/lordvm.c`; the prefix is reserved, `app_scope_reserved`), so the guest's
