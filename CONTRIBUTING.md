@@ -71,10 +71,10 @@ Pull requests with unsigned commits can't be merged.
 ## Rules
 
 - **English only** in code, comments, commit messages and documentation. Interface text goes in
-  `assets/locales/{en,es,pt,fr}/`, never hard-coded.
-- **Translations** of the interface into a new language, or finishing a partial one, follow
-  [docs/TRANSLATING.md](docs/TRANSLATING.md): start from `assets/locales/en/`, run `node tools/i18n-check.mjs`, open a
-  pull request.
+  `assets/locales/<language>/` for every language in the same change (all of them complete), never hard-coded.
+- **Translations** of the interface into a new language follow [docs/TRANSLATING.md](docs/TRANSLATING.md): start from
+  `assets/locales/en/`, run `node tools/i18n-check.mjs`, open a pull request. A language ships only when it is
+  complete, and every new or changed English text goes to every language in the same release.
 - **Tests must pass:** `make -C server test` (and `make -C server test-full` when you touch the
   helpers or the sandbox), plus `node tools/i18n-check.mjs`, which also runs
   `tools/brand-check.mjs` and `tools/err-check.mjs`.

@@ -185,6 +185,7 @@ body:has(.nav-cb:checked){overflow:hidden}
 .lg-p{margin:0 0 16px;max-width:760px;font-size:17px;line-height:1.65;color:var(--muted)}
 .lg-p a{color:var(--brand)}
 .lg-note{margin:16px 0 0;max-width:760px;font-size:15px;color:var(--subtle)}
+.lg-sub{margin:36px 0 12px;font-size:clamp(18px,2vw,22px);letter-spacing:-.01em}
 .lg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:20px 0 0;padding:0;list-style:none}
 .lg-small{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 @media (max-width:520px){.lg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lg-card{padding:14px}.lg-card strong{font-size:18px}}

@@ -12,21 +12,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
-- **26 new interface languages, partial for now** (maintainer's request, 2026-11-12): Indonesian (`id`), Japanese (`ja`),
+- **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),
   German (`de`), Hindi (`hi`), Malay (`ms`), Bengali (`bn`), Simplified Chinese (`zh-Hans`), Traditional Chinese
   (`zh-Hant`), Ukrainian (`uk`), Polish (`pl`), Arabic (`ar`), Vietnamese (`vi`), Swedish (`sv`), Greek (`el`), Dutch
   (`nl`), Turkish (`tr`), Hungarian (`hu`), Persian (`fa`), Russian (`ru`), Romanian (`ro`), Finnish (`fi`), Urdu
   (`ur`), Bulgarian (`bg`), Korean (`ko`), Thai (`th`) and Azerbaijani (`az`). They were chosen from lordos.org's own
   visit statistics (CloudWatch, the 30 days to 2026-11-12): every language spoken in a country with at least 5
-  distinct visitors. Each is an `assets/locales/<id>/` folder with `meta.json` (`"partial": true`, its name in its
+  distinct visitors. Each is an `assets/locales/<id>/` folder with `meta.json` (its name in its
   own language, the main region, `rtl` for Arabic, Persian and Urdu) and `format.json` for that region: month and
   day names from glibc 2.41 or CLDR 45's format forms (the genitive or partitive months a date needs: «12 ноября
   2026 г.», «torstai 12. marraskuuta 2026»), CLDR 45's full-date patterns («2026年11月12日木曜日», «الخميس، ١٢ نوفمبر
-  ٢٠٢٦»), separators, and the 12- or 24-hour clock glibc has for the region. Their texts arrive namespace by
-  namespace; until then they show the next preferred language or English, Settings marks them "partly translated",
-  and a computer whose LANG is one of them starts in it only once its desktop texts (`shell`) exist, the login
-  screen once its `greeter` texts do. Settings → Language & Region, the installer and the login screen list them
-  from their `meta.json`, with no code list to edit.
+  ٢٠٢٦»), separators, and the 12- or 24-hour clock glibc has for the region. Every one of them is complete: all
+  12,436 keys of every app, window and message, the emoji names and keywords and the country names included, with
+  its own plural forms (`node tools/i18n-check.mjs` shows `12436/12436 keys` for each and no partial language). They
+  began on 2026-11-12 as partial languages (`"partial": true`) with the core set below; on 2026-11-15 the rest was
+  translated, under the maintainer's business rule that a language ships complete, never partial, and that every
+  text changed in English reaches every language in the same release or pre-release, and `"partial"` was dropped from
+  their `meta.json`. A computer whose LANG is one of them starts in it, on the desktop and on the login screen.
+  Settings → Language & Region, the installer and the login screen list them from their `meta.json`, with no code
+  list to edit.
 - **The core set** a new language translates first, in `tools/i18n-core.json` (Lithuanian's first part, 1,052 of
   12,415 English keys): the login screen, the desktop, Files, the installer, About, the app names, the file dialogs,
   the force-quit and calculator texts, and Settings' sections, Language & Region and Date & Time formats.
@@ -115,7 +119,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   site. The same limit as before holds: sites whose dark mode is only CSS `@media` rules stay light. New:
   `lord.webapps.setColorScheme(app, value)` (desktop only, not in the broker; a bad value is `sys.badArgument`),
   `colorSchemeOf` and `COLOR_SCHEMES` in `sdk/webappsmodel.js`, `webAppearanceItem` in `sdk/appcontrol.js`, and the
-  `webapps.appearance.*` texts (8 keys) in all 32 languages (the 26 partial ones get their first `webapps.json`).
+  `webapps.appearance.*` texts (8 keys) in all 32 languages (the 26 new ones get their first `webapps.json`).
   Tests: `build/webapp-test` (the key read and written back, the defaults not written, seven bad forms refused,
   `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
   word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
@@ -196,6 +200,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Every language is complete, and the docs say so** (maintainer's business rule, 2026-11-15: a language is never
+  partial, and every change reaches every language in each release or pre-release). docs/LANGUAGES.md's introduction
+  names the 32 languages as complete (12,436 keys each) and states the rule, the `i18n-check` count is 12,436 keys
+  complete in all 32 (2026-11-12's 12,415 with 26 partial kept as history), "Partial languages" says `"partial"` is
+  only how a new language gets there before it is released, the 26 languages' section says they started partial on
+  2026-11-12 and were completed on 2026-11-15, Settings no longer marks them "partly translated" and a computer whose
+  LANG is one of them starts in it, and the pending list calls them "the 26 new languages". docs/TRANSLATING.md: a
+  language ships only at 100 % (`"partial"` marks it while under way), step 2 goes on from the core set to every key,
+  and a new step 6, "Keeping every language complete": a new or changed English text reaches every language in the
+  same release or pre-release, and every language must be at `N/N keys` before a release. CONTRIBUTING.md: interface
+  text goes to every language in the same change, and the same rule for translations. docs/PAPER-VALIDATION.md: the
+  0.8.8.9 section's languages claim (§4.4, §10.2).
+- **The paper's languages (2026-11-15 edition)**, in English, Spanish and Portuguese: §4.4 adds the 26 languages in development
+  after 0.8.8.8, complete (12,436 keys, their plural rules and date formats, native digits for Arabic, Persian and
+  Bengali, right to left for Arabic, Persian and Urdu), 32 in all, and the rule that a language ships complete; the
+  Help articles' sentence and §10.2's limitations add that the 26 have no Help articles and no native review yet, and
+  that Persian and Thai dates are Gregorian.
 - docs/WEBAPPS.md: Browser identity (the registry's per-profile `userAgent`, the five strings, `SetUserAgent` and
   the reload, why a linked device keeps the old name, where it is, the tests) under "The page", the registry's rules
   and the More registry keys list. docs/RELEASING.md: a step to bump the Chrome, Edge and Firefox majors each release.
@@ -204,18 +225,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Appearance" under Light and dark (how lord-server picks the word, the live change, where it is, the tests), the app
   menu item and the More registry keys list. docs/PAPER-VALIDATION.md: a 0.8.8.9 section (in development) with the
   Appearance claim.
-- docs/LANGUAGES.md: the 26 partial languages (ids, names, regions, plural rules, direction, digits, script fonts),
+- docs/LANGUAGES.md: the 26 new languages (ids, names, regions, plural rules, direction, digits, script fonts),
   how they were chosen, the core set, the plural rules table, native digits, what a translator must keep
   (variables, plural forms, LordOS's own names, no other system's brands), and what is still pending for them (the
   Raspberry Pi first-run file takes only en, es, pt, fr and it; home folders named in English; Solar Hijri and
   Buddhist calendars, Indian digit grouping, Finnish's «21.05» clock; Urdu's interface font is Noto Sans Arabic).
-  The introduction no longer calls Lithuanian partial.
-- **A translators' guide, `docs/TRANSLATING.md`.** How to add a language or finish a partial one without writing
+  The introduction no longer calls Lithuanian partial, and (2026-11-15) no longer calls the 26 new languages
+  partial either: it says all 32 are complete (12,436 keys each) and states the project's rule that a language ships
+  complete and every English change reaches every language in the same release; "Partial languages" now says
+  `"partial"` is only how a new language gets there before it is released.
+- **A translators' guide, `docs/TRANSLATING.md`.** How to add a language without writing
   code: the `assets/locales/<code>/` layout, `meta.json` (native name, plural rule, region, direction, `"partial"`) and
   `format.json` (names, date patterns, separators, clock), the core set to translate first (`tools/i18n-core.json`,
   1,052 of about 12,400 English keys), `{placeholders}`, the plural forms of every rule, style and naming rules (no
   third-party brand names, LordOS's own names kept), checking with `node tools/i18n-check.mjs`, trying it on LordOS
   as a pack (`i18n-pack.mjs export`, Settings → Language & Region → Add) and opening a signed-off pull request.
+  It states the project's rule (2026-11-15): a new language is released only when it reaches 100 % of the keys
+  (`"partial"` marks it only while it is under way), and a new section, "Keeping every language complete", says
+  every new or changed English text goes to every language in the same release or pre-release.
   `CONTRIBUTING.md`, `docs/LANGUAGES.md` and the documentation index point to it. A new GitHub issue form,
   `.github/ISSUE_TEMPLATE/language-request.yml`, asks for a language: the language, the country, how many people
   would use it and whether the person can help translate.
@@ -248,6 +275,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **lordos.org says the languages are complete, in English, Spanish and Portuguese** (in development after 0.8.8.8,
+  the latest release). The Languages page (`/language/`) lists the six released languages under "Complete languages"
+  and the 26 new ones under "New in the next pre-release", complete like them, instead of a "Partial languages"
+  section (`web/build.mjs`: a bundled language still marked `"partial"` is not listed, since it is not released; the
+  new group shows only while `web/content/languages.json` names languages; the `next` text and the `partial*` keys of
+  `web/i18n/pages.json` became `newTitle` and `newText`, and `.lg-sub` styles the group's heading). Its status line,
+  description, "How new languages are chosen", "Ask for your language" and the second translation step say a
+  language ships only when every text is translated and every change reaches every language in the same release.
+  The FAQ "Which languages does LordOS speak?" names the 26 as complete, 32 in all, with the same rule; Cleaner's
+  feature page says it works in every LordOS language instead of "six languages"; and Contributing
+  (`/legal/contributing/`) no longer says LordOS ships in four languages: six complete in 0.8.8.8, 26 more in
+  development, the rule, and a link to the translators' guide.
 - **The home page's badge names the latest release (0.8.8.8)** instead of a fixed "0.8.8": `web/i18n/{en,es,pt}.json`
   hold `{version}`, and `web/build.mjs` fills it with the newest dated release in `CHANGELOG.md` (package.json's version
   when there is none), so it follows each release by itself.
@@ -289,21 +328,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   embassy with flagpoles (`web/lib/embassy.mjs`, our own drawing from plain shapes that follows the light and dark
   themes; the flags wave with CSS and stand still with reduced motion). The page lists the languages LordOS ships by
   their own names, with the site language's name under each and a "right to left" tag for Arabic, Persian and Urdu:
-  the six complete ones (English, the default, Español, Português, Français, Italiano, Lietuvių) and the 26 partial
-  languages of the next pre-release, in development (Bahasa Indonesia, 日本語, Deutsch, हिन्दी, Bahasa Melayu, বাংলা,
+  the six released ones (English, the default, Español, Português, Français, Italiano, Lietuvių) and, under "New in
+  the next pre-release", the 26 new languages, complete like them and in development (Bahasa Indonesia, 日本語, Deutsch, हिन्दी, Bahasa Melayu, বাংলা,
   简体中文, 繁體中文, Українська, Polski, العربية, Tiếng Việt, Svenska, Ελληνικά, Nederlands, Türkçe, Magyar, فارسی,
-  Русский, Română, Suomi, اردو, Български, 한국어, ไทย, Azərbaycan). It says what a partial language covers (the core
-  set, 1,052 of about 12,400 texts, with its own plurals, dates and numbers) and that the rest shows in the next
-  preferred language or in English, and that a language is not a country (the flags are decoration). It explains how
+  Русский, Română, Suomi, اردو, Български, 한국어, ไทย, Azərbaycan). It says every language LordOS ships is complete
+  (about 12,400 texts, with its own plurals, dates and numbers; native digits for Arabic, Persian and Bengali; right
+  to left for Arabic, Persian and Urdu), that a language ships only when it is complete and every change reaches
+  every language in the same release, and that a language is not a country (the flags are decoration). (Until
+  2026-11-15 the page listed the 26 as "partial languages" with the core set; `web/build.mjs` now lists a bundled
+  language marked `"partial"` nowhere, since it is not released, and shows the "next pre-release" group only while
+  `web/content/languages.json` names languages.) It explains how
   new languages are chosen: at least 5 people from a country where the language is spoken visiting lordos.org in 30
   days, from the site's private statistics (linked to Cookies and statistics; no numbers are published), or a
   community request. Two calls to action: "Request a language" (the new GitHub issue form) and "Translate LordOS"
-  (four steps and the translators' guide on GitHub), and a note that the site itself is in English, Spanish and
+  (four steps, the second saying a language ships only when every text is translated, and the translators' guide on
+  GitHub), and a note that the site itself is in English, Spanish and
   Portuguese. The list is built from every `assets/locales/<id>/meta.json` plus `web/content/languages.json` ("next":
   the languages new in the next pre-release, listed before their files are bundled; emptied when it ships). The page
   is linked from the footer (Project → Languages), from a "More languages" row at the end of the language picker,
   from the "Which languages does LordOS speak?" and "Can I contribute code or translations?" FAQ answers (which now
-  name the 26 partial languages as coming in the next pre-release and link the guide), and from the site search.
+  name the 26 new languages, complete, as coming in the next pre-release and link the guide), and from the site
+  search.
 
 - **Explore → Apps: cards of one height, Databases and Machines with screenshots, and the web apps listed**, in
   English, Spanish and Portuguese. Each app card lists at most four features (five when only one would be left over);
