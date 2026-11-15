@@ -1,0 +1,74 @@
+{
+  "archiveName": "Arşiv",
+  "archiveSummary": {
+    "one": "{count} dosya, {size}",
+    "other": "{count} dosya, {size}"
+  },
+  "compressOne": "“{name}” öğesini sıkıştır",
+  "compressMany": {
+    "one": "{count} öğeyi sıkıştır",
+    "other": "{count} öğeyi sıkıştır"
+  },
+  "compressing": "“{name}” sıkıştırılıyor…",
+  "compressProgress": "“{name}” sıkıştırılıyor: {files} dosya",
+  "compressed": {
+    "one": "“{name}” hazır ({count} dosya)",
+    "other": "“{name}” hazır ({count} dosya)"
+  },
+  "compressError": "“{name}” sıkıştırılamadı ({error})",
+  "extractHere": "Buraya çıkar",
+  "extractSelected": {
+    "one": "{count} öğeyi çıkar",
+    "other": "{count} öğeyi çıkar"
+  },
+  "extracting": "“{name}” çıkarılıyor…",
+  "extractProgress": "“{name}” çıkarılıyor: {files} dosya (%{pct})",
+  "extracted": {
+    "one": "“{name}” konumuna çıkarıldı ({count} dosya)",
+    "other": "“{name}” konumuna çıkarıldı ({count} dosya)"
+  },
+  "extractedSkipped": {
+    "one": "“{name}” konumuna çıkarıldı ({count} dosya); güvenlik nedeniyle {skipped} tanesi atlandı",
+    "other": "“{name}” konumuna çıkarıldı ({count} dosya); güvenlik nedeniyle {skipped} tanesi atlandı"
+  },
+  "extractError": "“{name}” çıkarılamadı ({error})",
+  "opening": "“{name}” açılıyor…",
+  "loading": "Yükleniyor…",
+  "locked": "parola korumalı",
+  "pages": {
+    "one": "{count} sayfa",
+    "other": "{count} sayfa"
+  },
+  "more": {
+    "one": "ve {count} tane daha",
+    "other": "ve {count} tane daha"
+  },
+  "err.invalid": "bir arşiv değil veya hasarlı",
+  "err.missing-volume": "bölünmüş arşivin bir parçası eksik: “{name}”",
+  "err.disk-full": "disk dolu",
+  "err.too-big": "çok büyük",
+  "err.too-many": "çok fazla dosya içeriyor",
+  "err.corrupt": "hasarlı",
+  "err.write": "yazılamadı",
+  "err.unavailable": "belge yardımcısı kullanılamıyor",
+  "err.cancelled": "iptal edildi",
+  "err.crash": "belge yardımcısı beklenmedik şekilde durdu",
+  "err.timeout": "çok uzun sürdü",
+  "err.protocol": "belge yardımcısı geçersiz bir yanıt gönderdi",
+  "err.spawn": "belge yardımcısı başlatılamadı",
+  "err.closed": "belge kapatıldı",
+  "err.bad-request": "geçersiz istek",
+  "err.bad-field": "geçersiz form alanı",
+  "err.bad-page": "geçersiz sayfa",
+  "err.busy": "belge yardımcısı meşgul",
+  "err.memory": "bellek yetersiz",
+  "err.no-fonts": "kullanılabilir yazı tipi yok",
+  "err.not-open": "belge açık değil",
+  "err.nothing": "kaydedilecek bir şey yok",
+  "err.read-only": "belge salt okunur",
+  "err.save": "kaydedilemedi",
+  "err.unknown-op": "bilinmeyen işlem",
+  "err.image": "geçersiz görüntü",
+  "err.blob": "geçersiz veri",
+  "err.password": "belge parolayla korunuyor"
+}
