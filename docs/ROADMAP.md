@@ -1014,7 +1014,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak
   would add complexity (bubblewrap, OSTree, portals, seven new exceptions to `AGENTS.md`) and future problems. The
   design review is kept as documentation (`FLATPAK.md`); nothing is built until the maintainer decides whether to
-  do it at all.
+  do it at all. On 2026-11-15 (GitHub #164) the maintainer confirmed: no Flatpak support for now; it may be
+  considered for 1.0.0, not before.
   2026-10-27) and waits for approval. Today LordOS neither uses nor integrates
   Flatpak, and its rules keep isolation as LordOS's own code (no bubblewrap/flatpak for `.lpk`). What
   has to be solved so Flatpak apps follow LordOS's security model:

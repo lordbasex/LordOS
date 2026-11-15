@@ -2,7 +2,7 @@
 
 **Status (2026-10-27): design review kept for the future; not planned for any release.** On 2026-10-27 the
 maintainer decided not to implement Flatpak for now, to keep the system stable and avoid the complexity and
-future problems it would add; this document stays as the reference if that is ever reconsidered. No Flathub or Flatpak launcher integration has been built. Since 0.8.8.8 lord-server does recognise
+future problems it would add; this document stays as the reference if that is ever reconsidered (2026-11-15, GitHub #164: it may be looked at for 1.0.0, not before). No Flathub or Flatpak launcher integration has been built. Since 0.8.8.8 lord-server does recognise
 Flatpak clients (security contexts, and the `/.flatpak-info` identity used for the shortcuts permission and for
 drag and drop) and serves the portals listed below; that code is shipped but not yet checked with a real Flatpak. The roadmap item ([ROADMAP.md](ROADMAP.md), "Flatpak and Flathub (future, undecided; not planned for
 any release)"; when it was written it was planned for 0.8.6) asks for a Flathub section in the
