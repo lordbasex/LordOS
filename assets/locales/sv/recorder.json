@@ -1,0 +1,22 @@
+{
+  "folder": "Inspelningar",
+  "name": "Inspelning {date} {time}",
+  "all": "Alla inspelningar",
+  "empty": "Det finns inga inspelningar än",
+  "hint": "Tryck på den röda knappen (eller R) för att spela in med mikrofonen",
+  "denied": "Röstinspelning får inte använda mikrofonen",
+  "play": "Spela upp",
+  "pause": "Pausa",
+  "rename": "Byt namn",
+  "trim": "Trimma",
+  "cancelTrim": "Avbryt trimning",
+  "saveTrim": "Spara trimmad kopia",
+  "trimmed": "trimmad",
+  "export": "Exportera som",
+  "exportBtn": "Exportera",
+  "working": "Exporterar…",
+  "exported": "Sparade ”{name}”",
+  "exportError": "Kunde inte exportera",
+  "renameError": "Kunde inte byta namn (finns namnet redan?)",
+  "emptyTitle": "Välj eller gör en inspelning"
+}

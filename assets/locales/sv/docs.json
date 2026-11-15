@@ -1,0 +1,74 @@
+{
+  "archiveName": "Arkiv",
+  "archiveSummary": {
+    "one": "{count} fil, {size}",
+    "other": "{count} filer, {size}"
+  },
+  "compressOne": "Komprimera ”{name}”",
+  "compressMany": {
+    "one": "Komprimera {count} objekt",
+    "other": "Komprimera {count} objekt"
+  },
+  "compressing": "Komprimerar ”{name}”…",
+  "compressProgress": "Komprimerar ”{name}”: {files} filer",
+  "compressed": {
+    "one": "”{name}” klar ({count} fil)",
+    "other": "”{name}” klar ({count} filer)"
+  },
+  "compressError": "Kunde inte komprimera ”{name}” ({error})",
+  "extractHere": "Packa upp här",
+  "extractSelected": {
+    "one": "Packa upp {count} objekt",
+    "other": "Packa upp {count} objekt"
+  },
+  "extracting": "Packar upp ”{name}”…",
+  "extractProgress": "Packar upp ”{name}”: {files} filer ({pct} %)",
+  "extracted": {
+    "one": "Uppackad till ”{name}” ({count} fil)",
+    "other": "Uppackad till ”{name}” ({count} filer)"
+  },
+  "extractedSkipped": {
+    "one": "Uppackad till ”{name}” ({count} fil); {skipped} hoppades över av säkerhetsskäl",
+    "other": "Uppackad till ”{name}” ({count} filer); {skipped} hoppades över av säkerhetsskäl"
+  },
+  "extractError": "Kunde inte packa upp ”{name}” ({error})",
+  "opening": "Öppnar ”{name}”…",
+  "loading": "Läser in…",
+  "locked": "lösenordsskyddad",
+  "pages": {
+    "one": "{count} sida",
+    "other": "{count} sidor"
+  },
+  "more": {
+    "one": "och {count} till",
+    "other": "och {count} till"
+  },
+  "err.invalid": "inte ett arkiv, eller så är det skadat",
+  "err.missing-volume": "en del av det delade arkivet saknas: ”{name}”",
+  "err.disk-full": "disken är full",
+  "err.too-big": "det är för stort",
+  "err.too-many": "det har för många filer",
+  "err.corrupt": "det är skadat",
+  "err.write": "kunde inte skriva",
+  "err.unavailable": "dokumenthjälpen är inte tillgänglig",
+  "err.cancelled": "avbrutet",
+  "err.crash": "dokumenthjälpen stoppade oväntat",
+  "err.timeout": "det tog för lång tid",
+  "err.protocol": "dokumenthjälpen skickade ett ogiltigt svar",
+  "err.spawn": "kunde inte starta dokumenthjälpen",
+  "err.closed": "dokumentet stängdes",
+  "err.bad-request": "ogiltig begäran",
+  "err.bad-field": "ogiltigt formulärfält",
+  "err.bad-page": "ogiltig sida",
+  "err.busy": "dokumenthjälpen är upptagen",
+  "err.memory": "slut på minne",
+  "err.no-fonts": "inga typsnitt tillgängliga",
+  "err.not-open": "dokumentet är inte öppet",
+  "err.nothing": "det finns inget att spara",
+  "err.read-only": "dokumentet är skrivskyddat",
+  "err.save": "kunde inte spara",
+  "err.unknown-op": "okänd åtgärd",
+  "err.image": "ogiltig bild",
+  "err.blob": "ogiltiga data",
+  "err.password": "dokumentet är skyddat med ett lösenord"
+}
