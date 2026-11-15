@@ -733,21 +733,36 @@ static void t_state(void) {
     CHECK(!exists(".cache/lordos/cloud/vfs/cab12cd34/Dir/Sub/two.bin") && !exists(".cache/lordos/cloud/vfs/cab12cd34/open.txt"));
     CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/dirty.txt") && exists(".cache/lordos/cloud/vfs/cab12cd34/queued.txt"));
     CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/Kept/k.bin") && exists(".cache/lordos/cloud/vfsMeta/cab12cd34/Kept/k.bin"));
-    /* a file open right now: rclone says something is in use, and a process of this user has it open */
+    /* a file open right now: a process of this user has it open (found in /proc, whatever rclone's inUse says) */
     meta("busy.bin", 64, 0, "2026-11-06T14:51:51Z");
     put("Cloud/Work/busy.bin", "");
     snprintf(p, sizeof p, "%s/Cloud/Work/busy.bin", home);
+    CHECK(cf_open_count("Work") == 0);
     int fd = open(p, O_RDWR);
     CHECK(fd >= 0);
-    pthread_mutex_lock(&cl_mu);
-    if (a) a->in_use = 1;
-    pthread_mutex_unlock(&cl_mu);
     const char *bp[] = { p };
     s = cloud_free(bp, 1);
     CHECK(s && strstr(s, "\"reason\":\"open\"") && strstr(s, "\"freed\":0"));
     free(s);
     CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/busy.bin"));
+    /* #146: turning an account off counts the files really open under its folder, not rclone's inUse (1 while mounted) */
+    CHECK(cf_open_count("Work") == 1);
+    CHECK(cf_open_count("Other") == 0 && cf_open_count("..") == 0 && cf_open_count("Work/..") == 0 && cf_open_count("") == 0 && cf_open_count(NULL) == 0);
+    pthread_mutex_lock(&cl_mu);
+    if (a) a->mounted = 1;
+    pthread_mutex_unlock(&cl_mu);
+    s = cloud_set_enabled("cab12cd34", 0, CS_ASK);
+    CHECK(s && strstr(s, "\"error\":\"busy\"") && strstr(s, "\"open\":1,"));
+    free(s);
     close(fd);
+    CHECK(cf_open_count("Work") == 0);
+    /* nothing open: only the change waiting to go up (queued.txt) keeps it busy, with no "open" file */
+    s = cloud_set_enabled("cab12cd34", 0, CS_ASK);
+    CHECK(s && strstr(s, "\"error\":\"busy\"") && strstr(s, "\"files\":1,") && strstr(s, "\"open\":0,"));
+    free(s);
+    pthread_mutex_lock(&cl_mu);
+    if (a) { CHECK(!a->disabled && !a->off_wait); a->mounted = 0; }
+    pthread_mutex_unlock(&cl_mu);
     s = cloud_free(bp, 1);
     CHECK(s && !strstr(s, "\"reason\":\"open\"") && !strstr(s, "\"freed\":0"));
     free(s);

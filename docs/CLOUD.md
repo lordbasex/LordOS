@@ -271,7 +271,12 @@ Turning it off saves the session rclone holds first (`token_check`), unmounts it
 drops the remote from rclone's memory (`config/delete`; rclone keeps no file, `--config ""`). While files are open,
 changes wait to go up or transfers run, the switch answers `{ error: 'busy', files, open, moving }` and Settings asks:
 **Wait** (it turns off as soon as nothing is open, waiting or moving; switching it on again cancels that) or **Turn Off
-Now**. The pure rules are `cloud_switch`, `cloud_busy` and `cloud_off_due` (tests/cloud_test.c); the end-to-end run is
+Now**. "Open" counts this user's file descriptors under the account's folder in `~/Cloud`, read from `/proc/*/fd`
+(`cf_open_count` in `cloud_files.c`), when the switch is used and once a second while it waits. Up to 0.8.8.8 it was
+rclone's `vfs/stats` `inUse`, which is not a count of open files but the VFS's reference count, 1 for as long as the
+mount exists: every mounted account answered "1 file in it is open" and Wait never ended (#146). The pure rules are
+`cloud_switch`, `cloud_busy` and `cloud_off_due` (tests/cloud_test.c, which also opens a file under an account and
+checks the count and the switch's answer); the end-to-end run is
 `tests/cloud_signin_fake.sh`, parts 6 and 7. `accounts.json` only gained two fields, read as "on" when missing, so no
 migration is needed.
 
@@ -425,6 +430,10 @@ A cloud glyph by the clock while at least one account exists: still when idle, w
 badge for errors or waiting changes. Its panel: each account's state (up to date, syncing with the file and percentage, paused,
 needs sign-in), the last changes (file, account, up or down, time) with **Show in Files**, **Pause All** / **Resume**, and
 **Cloud Settings…**. Following the Lord Classic rule (#29), the panel opens toward the middle of the screen.
+Since 0.8.8.9 (#145) it never runs past its display: it is at most as tall as the room between the item and the far
+edge of the display's work area (the Dock or a Classic taskbar left out, less 8 px; `panelRoom` in
+`sdk/statusplace.js`, `statusPanelRoom` in `sdk/statusitems.js`). The title and the buttons (Pause All, Show in Files,
+Cloud Settings…) always show; the accounts and the recent files scroll between them.
 
 Since 0.8.8.7 (#83), each account's row has a small button: **Pause** or **Resume** for that account alone (its own
 pause, the same as Settings → Cloud → the account → Pause syncing), **Unlock Keyring…** for a locked keyring, **Sign In
@@ -478,7 +487,7 @@ results on both architectures unless a number says otherwise.
 | Every rc call in section 5 | **Measured, all present**, plus `vfs/list` and `sync/bisync`. `core/command` and `config/dump` are present too, as expected: 4.2's closed table is what keeps them out |
 | `config/create` for WebDAV with `obscure` | **Measured**: the password lands obscured in `rclone.conf`; 4.3 still moves it to the keyring |
 | `mount/mount` over rc with `CacheMode full`, no age or size limit | **Measured, works**; first read of a 5 MB file 63 ms (amd64), 36 ms (Pi) over loopback |
-| Eviction while mounted (7.2) | **Measured, works**: removing a clean file's cache data and its `vfsMeta` entry while the mount runs, then reading it again, fetches it again with the right content (sha256 equal), also after `vfs/forget`. Phase 1 adds the cases this didn't cover: a file open while evicted (must be refused by the manager: `vfs/stats` `inUse`), and eviction racing a write |
+| Eviction while mounted (7.2) | **Measured, works**: removing a clean file's cache data and its `vfsMeta` entry while the mount runs, then reading it again, fetches it again with the right content (sha256 equal), also after `vfs/forget`. Phase 1 adds the cases this didn't cover: a file open while evicted (must be refused by the manager: this user's descriptors in `/proc`, since `vfs/stats` `inUse` is only the VFS's reference count, #146), and eviction racing a write |
 | Upload queue | **Measured**: a write through the mount shows in `vfs/queue` (name, size, delay, tries) and reaches the server after `WriteBack` (5 s) |
 | `operations/about` | WebDAV without quota answers `{}`: section 8's "used only" case |
 | `operations/publiclink` | WebDAV: "doesn't support public links", the error 9 turns into **Open on Website** |
@@ -499,7 +508,7 @@ and `_arm64.deb`, 21 MB and 18 MB, built on VM 116 in 4 min 17 s for both). Meas
 |---|---|
 | `cloud_test` (unit, ASan and UBSan) | 1526 checks pass on both: the 21-method table and that 30 dangerous names (`core/command`, `config/dump`, `options/set`, `operations/delete`, `sync/sync`…) are not in it, header injection refused, HTTP answers (length, chunked, cut short), names and paths under `~/Cloud` (`..`, `//`, C1 controls, bad UTF-8, a sibling `~/Cloudy`), the provider and website tables (no other operating system's names; `https` only for an account's own address), `authorize`'s address and token, the status merge, eviction (LRU, never kept, changed, waiting or open), and on a real cache tree in a throwaway home: Free Up Space, a file open by a process refused, links and keep files read back without bad entries, files 0600 in a 0700 folder |
 | `tests/cloud_integration.sh` against `rclone serve webdav` | 70 checks pass on amd64 and on the Pi: no TCP listener of `rcd`, the rc folder 0700 and socket for the user only, no password or `RCLONE_RC_*` on the command line or in the environment, 401 for `config/dump`, `core/command` and `operations/list` without credentials, another local user can't connect, `rclone.conf` and every file in `~/.config/lordos/cloud` without the password; add, mount, a 5 MB file read whole, Free Up Space while closed and refused while open, a write going up and refused as pending, Pause holding an upload 11 s and Resume sending it, Keep bringing a freed file down, WebDAV links answered `unsupported`, Restart and a `kill -9` restarted by itself (files read after both), add with the same name updating the account, rename, remove (unmounted, cache and keyring item gone, nothing deleted on the server), `rclone` gone with the session |
-| Eviction while a file is open | Refused (`reason: open`): rclone's `vfs/stats` `inUse` > 0 makes `lord-server` look for the file among this user's open descriptors (`/proc/*/fd`), and also treats a file used in the last 10 s as open, because rclone keeps a closed file's handle 5 s (`HandleCaching`) |
+| Eviction while a file is open | Refused (`reason: open`): `lord-server` looks for the file among this user's open descriptors (`/proc/*/fd`), and, while the account is mounted, also treats a file used in the last 10 s as open, because rclone keeps a closed file's handle 5 s (`HandleCaching`). rclone's `vfs/stats` `inUse` is not used: it is the VFS's reference count, 1 while mounted, not a count of open files (#146) |
 | Pause per account | rclone has no per-remote pause: what waits in `vfs/queue` gets its expiry pushed to 10⁹ s (`vfs/queue-set-expiry`) every second while paused, and back to 0 on Resume. Downloads of files being opened are never paused; Keep's downloads are |
 | A sign-in's address | `rclone authorize` prints it on stderr within milliseconds; `beginSignIn` waits for it up to 2 s, so `url` is there at once in practice |
 | An own client ID | `RCLONE_<KIND>_CLIENT_ID`/`_CLIENT_SECRET` in `authorize`'s environment: **measured**, the provider's address carries that `client_id` |

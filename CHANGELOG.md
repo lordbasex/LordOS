@@ -614,6 +614,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   window after the menu had been open for a few seconds, and "Quit" quits; pasystray's menu and About work as before.
   The several-display part is covered by the model tests only: VM 127 has one display and a headless lord-server has
   only one output.
+- **Settings → Cloud: turning an account off no longer says "1 file in it is open" when nothing is open** (issue
+  [#146](https://github.com/lordbasex/LordOS/issues/146), thanks to pct06). The switch counted open files with
+  rclone's `vfs/stats` `inUse`, which is not a count of open files: it is the VFS's reference count, set to 1 when the
+  mount is made and kept there while it lasts (rclone's `vfs/vfs.go`, `inUse`, `AddRef`). So every mounted account was
+  "busy" with one open file, the sheet asked Cancel / Turn Off Now / Wait each time, and **Wait never ended**, because
+  the count never went down to 0. `lord-server` now counts the files really open: this user's file descriptors that
+  point under the account's folder in `~/Cloud`, read from `/proc/*/fd` (`cf_open_count` in
+  `server/src/cloud/cloud_files.c`, the same walk Free Up Space already used, only the processes of the same user),
+  when the switch is used and once a second while an account waits to turn off. A change waiting to go up or a
+  transfer still asks first, as before. `vfs/stats` is no longer called every second for each account. Free Up Space
+  and the automatic pass looked in `/proc` only when `inUse` was above 0, which was always the case while mounted;
+  they now always look, and treat a file used in the last 10 s as open only while its account is mounted (rclone
+  keeps a closed handle 5 s), which is what they did in practice. Tests: `build/cloud-test` opens a file under an
+  account and checks the count (1, then 0 once closed; another account, `..` and an empty name count 0), the switch's
+  answer with the file open (`"open":1`) and with only a change waiting (`"open":0`), and Free Up Space refusing the
+  open file with no `inUse` set. Not checked on screen or with a real rclone mount (no VM access for this change).
+- **The Cloud menu's panel no longer runs off the screen** (issue
+  [#145](https://github.com/lordbasex/LordOS/issues/145), thanks to pct06). With many accounts and recent files (8
+  accounts and 5 recent files at 150% scale) the panel grew taller than the display, and Pause All, Show in Files and
+  Cloud Settings… ended below its edge or under the Dock, out of reach. The panel had no height limit and its list no
+  scrolling. It now gets the room between its item and the far edge of the display's work area, so the Dock or a
+  Classic taskbar on that side is left out, less an 8 px margin, and never less than 160 px (`panelRoom` in
+  `sdk/statusplace.js`, pure; `statusPanelRoom(button)` in `sdk/statusitems.js` for any status item's panel). The
+  title and the buttons always show, and the accounts and the recent files scroll between them (`sdk/cloudstatus.jsx`).
+  It works the same in Lord Flow (menu bar at the top, panel opening down) and in Lord Classic (taskbar at the bottom
+  by default, panel opening up; at the top, down). Tests: `server/tests/statusplace_test.mjs` (a 1280×720 logical
+  screen, which is 1920×1080 at 150%: under the menu bar down to the Dock, with no Dock, with no work area, a work area
+  larger than its display, above a bottom taskbar, on a second display, a tiny display). Not checked on screen (no
+  VM access for this change); the other status panels (network, cleaner, an app's menu) keep their behavior.
 
 ## [0.8.8.8-beta] - 2026-11-12
 

@@ -14,7 +14,8 @@ import { t } from './i18n.js';
 import { formatBytes } from './system.js';
 import { wm } from './windows.js';
 import { Overlay } from './layers.js';
-import { registerStatusItem, statusPanelAt } from './statusitems.js';
+import { registerStatusItem, statusPanelAt, statusPanelRoom } from './statusitems.js';
+import { ScrollView } from './components.jsx';
 import { notify } from './notify.js';
 import { openUrl } from './sysopen.js';
 import { cloud, cloudState } from './cloud.js';
@@ -47,8 +48,9 @@ function RowBtn({ label, title, primary, onClick }) {
 }
 
 // only: the accounts whose recent files the panel shows (#83), [] for all; setOnly changes it (CloudItem keeps it while
-// the session runs, so the panel opens again as it was left)
-function Panel({ st, onClose, only, setOnly }) {
+// the session runs, so the panel opens again as it was left). room: the most height the panel may take on its display
+// (statusPanelRoom, #145): the head and the buttons always show, the accounts and recent files scroll between them.
+function Panel({ st, onClose, only, setOnly, room }) {
   const th = useTheme();
   const accs = liveAccounts(st.accounts);       // an account turned off isn't in the menu bar
   const tr = transfers(accs);
@@ -65,10 +67,12 @@ function Panel({ st, onClose, only, setOnly }) {
     if (kind === 'resume') return h(RowBtn, { primary: true, label: t('cloud.menu.resume'), title: t('cloud.menu.resumeHint', { name: a.name }), onClick: () => cloud.resume(a.id) });
     return null;
   };
-  return h(View, { style: { width: 380, borderRadius: 14, overflow: 'hidden', backgroundColor: popupBg(th), border: `1px solid ${th.separator}`, boxShadow: '0 24px 70px rgba(0,0,0,0.45)' } },
-    h(View, { style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 } },
+  return h(View, { style: { width: 380, ...(room ? { maxHeight: room } : null), borderRadius: 14, overflow: 'hidden', backgroundColor: popupBg(th), border: `1px solid ${th.separator}`, boxShadow: '0 24px 70px rgba(0,0,0,0.45)' } },
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', flexShrink: 0, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 } },
       h(Text, { style: { flex: 1, fontSize: 14, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('cloud.title')),
       head ? h(Text, { style: { fontSize: 12, color: th.textDim } }, head) : null),
+    // the accounts and the recent files: they take what is left of room and scroll (#145)
+    h(ScrollView, { style: { minHeight: 0 } },
     h(View, { style: { paddingHorizontal: 10, paddingBottom: 8, gap: 2 } },
       ...sortAccounts(accs).map((a) => {
         const line = stateLine(a, st.service);
@@ -95,8 +99,8 @@ function Panel({ st, onClose, only, setOnly }) {
         h(Text, { style: { fontSize: 12, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, r.name),
         h(Text, { style: { fontSize: 12, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.where)),
       h(Text, { style: { width: 54, fontSize: 12, color: th.textDim, textAlign: 'end' } }, t(r.ago.key, r.ago.vars)))))
-      : sel.length ? h(Text, { style: { fontSize: 12, color: th.textDim, paddingHorizontal: 16, paddingBottom: 10, textAlign: 'start' } }, t('cloud.menu.noRecent')) : null,
-    h(View, { style: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, borderTopWidth: 1, borderTopColor: th.separator } },
+      : sel.length ? h(Text, { style: { fontSize: 12, color: th.textDim, paddingHorizontal: 16, paddingBottom: 10, textAlign: 'start' } }, t('cloud.menu.noRecent')) : null),
+    h(View, { style: { flexDirection: 'row', flexShrink: 0, gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, borderTopWidth: 1, borderTopColor: th.separator } },
       h(Btn, { label: t(paused ? 'cloud.resumeAll' : 'cloud.pauseAll'), onClick: () => (paused ? cloud.resume(null) : cloud.pause(null)) }),
       // the one account chosen (or the only one), else the Cloud folder that holds them all
       h(Btn, { label: t('cloud.showInFiles'), onClick: () => { onClose(); openFiles(one ? one.mount : `${(lord.fs && lord.fs.home()) || ''}/Cloud`); } }),
@@ -124,7 +128,7 @@ function CloudItem({ height, color }) {
     g.badge != null ? h(View, { style: { position: 'absolute', top: 1, insetInlineEnd: 0, minWidth: 12, height: 12, borderRadius: 6, paddingHorizontal: 3,
       backgroundColor: g.badge === '!' ? '#ff9f0a' : '#ff453a', alignItems: 'center', justifyContent: 'center' } },
     h(Text, { style: { fontSize: 8, fontWeight: 700, color: '#fff' } }, String(g.badge === '!' ? '!' : g.badge > 99 ? '99+' : g.badge))) : null,
-    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Panel, { st, onClose: () => setOpen(false), only, setOnly }))) : null);
+    open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Panel, { st, onClose: () => setOpen(false), only, setOnly, room: statusPanelRoom(btn) }))) : null);
 }
 
 // ---- notifications ----
