@@ -151,7 +151,7 @@ Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg
   notes, the first lines with "Show all") and **Update**. Update shows the plan first
   (`lord.pkg.plan({ install: ['lordos'] })`: lordos and any new dependency), then runs
   `pkg-install lordos` through the administration helper, with the same progress bar as any
-  install. Only administrators (the `sudo` group) can update.
+  install. Only administrators (members of `sudo`, `admin` or `wheel`; `SESSIONS.md`, "Who is an administrator") can update.
 - **Debian updates** are listed below with "Update all" (`pkg-upgrade`, which also takes lordos if
   it is pending).
 - **"Restart required"** appears when an installed update needs it: the running `lord-server` is
@@ -441,8 +441,8 @@ only. What was checked on 2026-11-08 (`apt/build.sh check`, on the development m
 index for both architectures. It hasn't been installed on a LordOS system yet.
 
 RustDesk (#66) was offered in the same section from 0.8.8.6, as its maker's `.deb` mirrored in
-LordOS's repository, and is removed from the catalog in the next update (0.8.8.9; maintainer's
-decision, 2026-11-12). LordOS doesn't redistribute it; people who want it can get it from its maker.
+LordOS's repository, and is removed from the catalog in the update in development after 0.8.8.8 (the latest
+release; maintainer's decision, 2026-11-12). LordOS doesn't redistribute it; people who want it can get it from its maker.
 It was never published in lordos.org/apt's pool, so no installed system has it from LordOS and no
 migration is needed. How it could come back (a direct `.deb` delivery): `ROADMAP.md`, 0.8.8.9.
 

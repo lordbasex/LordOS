@@ -32,7 +32,7 @@ Where the source is, by origin:
   `https://archive.raspberrypi.com/debian/pool/main/<letter>/<source>/`. For the copyleft ones whose binaries
   LordOS ships, LordOS keeps its own copy of the exact source in `https://lordos.org/apt/pool/rpi/source/<letter>/<source>/`,
   pinned by SHA-256 in `tools/release/rpi-mirror.list`: FFmpeg since 0.8.7, kms++ since 0.8.4.1, and (in development
-  after 0.8.8.8, published with the next APT update) the 0.8.8 image's kernel `linux 1:6.18.50-1+rpt1` (the Pi 4
+  after 0.8.8.8, published at lordos.org on 2026-11-15) the 0.8.8 image's kernel `linux 1:6.18.50-1+rpt1` (the Pi 4
   kernel), `firmware-nonfree 1:20260519-1~bpo13+1+rpt1` and `raspi-firmware 1:1.20260915-1`. The list then points
   at that copy's `.dsc` (what `dget` takes; the files it names are next to it). The pool has no folder listings, and
   a `+` in a file name must be written `%2B` in the URL (`linux_6.18.50-1%2Brpt1.dsc`). Raspberry Pi's signed index
@@ -51,7 +51,7 @@ Where the source is, by origin:
   `-3+lordos`, 0.8.0 to today) are `github.com/raspberrypi/linux` commit
   `234188315037848e5b07d65b85d38edc64095caa` ([RASPBERRY.md](RASPBERRY.md), "The LordOS kernel");
   `build-kernel.sh` writes the commit of each build to `SOURCE` next to its packages, and `build-img.sh` passes it
-  on. **LordOS keeps this source itself** (in development after 0.8.8.8, published with the next APT update), in
+  on. **LordOS keeps this source itself** (in development after 0.8.8.8, published at lordos.org on 2026-11-15), in
   `https://lordos.org/apt/pool/rpi/source/l/linux-lordos-rpi-2712/`: `linux-lordos-rpi-2712_6.18.57.orig.tar.gz`
   (Raspberry Pi's tree at that commit, GitHub's tarball of it, SHA-256
   `d56a9ef72764b5a9af7eb77ef9a5d3866a2b6068ec35700b43e1df0eb6a2fdf3`; uncompressed, byte for byte
@@ -80,7 +80,7 @@ with the same information. Answers go to the issue (or the form's reply), never 
 ## Images published before the lists (0.8.8 and earlier)
 
 The 0.8.8 images (`lordos-live-0.8.8-amd64.iso`, `lordos-live-0.8.8-arm64.iso`, `lordos-0.8.8-amd64.ova`,
-`lordos-0.8.8-rpi5-arm64.img.xz`, release `v0.8.8-beta`, 2026-11-03) were built before `image-sources.sh`. Their
+`lordos-0.8.8-rpi5-arm64.img.xz`, release `v0.8.8-beta`, 2026-11-02) were built before `image-sources.sh`. Their
 exact package versions can't be recovered from the repository: the builders install whatever Debian's mirror
 served that day, with no snapshot date. They are in each image's dpkg database, so the list is made from the
 published file itself, with no root and no mount, on a Debian machine:

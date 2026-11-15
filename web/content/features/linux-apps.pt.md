@@ -103,6 +103,7 @@ Ausente de propósito: qualquer protocolo que permita a um app capturar a tela o
 - **Ícones só em SVG:** até a 0.8.8.7 o LordOS não desenha SVG e usa os ícones PNG que o Debian publica para a maioria dos apps, ou a inicial; desde a 0.8.8.8 o `lord-media` desenha os ícones SVG no seu sandbox.
 - **Apps de terminal** com arquivo `.desktop` não aparecem no lançador de apps até a 0.8.8.7; inicie-os pelo Terminal. Desde a 0.8.8.8 eles abrem numa aba do Terminal.
 - **Os apps GTK 3 mantêm o próprio destaque azul;** a leitura do esquema de cores pelo portal no Qt 6 não foi testada.
+- **Apps Electron na 0.8.8.8** podem fechar ao abrir ([#150](https://github.com/lordbasex/LordOS/issues/150)); abra-os pelo Terminal com `env -u GTK_IM_MODULE <app>`. Está corrigido em desenvolvimento depois da 0.8.8.8 (o último lançamento), que também faz os botões voltar e avançar do mouse funcionarem nos apps Linux.
 
 ## Leia o código
 

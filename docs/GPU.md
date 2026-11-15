@@ -2,7 +2,7 @@
 
 lord-server has two paths for building the screen:
 
-- **CPU** (the usual one): the UI and the app windows are copied into the canvas and a dumb
+- **CPU** (always available; used when the card has no 3D driver, with a software renderer, or with `LORD_GPU=0`): the UI and the app windows are copied into the canvas and a dumb
   buffer is sent with a page flip. It needs nothing besides the kernel.
 - **GPU** (new, `server/src/gpu/gpu.c`): Mesa's GBM + EGL + GLES2. The user approved it on
   2026-10-16 for games and GPU apps on AMD and Nvidia. See "Dependency policy" in
@@ -122,7 +122,7 @@ milliseconds no longer turns 60 frames a second into 57.
   `DRM_CAP_CURSOR_WIDTH/HEIGHT` (0.8.8.6). amdgpu on an RX 580 (cap 128) scanned a 64×64 buffer as
   128×128: a squashed arrow with colored stripes under it. The same picture came from a FirePro
   W6150M (Bonaire, Sea Islands) on the radeon driver (#57), which also gives 128 from Sea Islands on;
-  not yet confirmed on that card. The log gives the size: `gpu: cursor by hardware (cursor plane, 128x128)`.
+  the reporter confirmed the fix on that card (`HARDWARE-REPORT.md`). The log gives the size: `gpu: cursor by hardware (cursor plane, 128x128)`.
   A pointer larger than the plane (96 px at a 300 % display on a 64 px plane, or a Linux app's large cursor) is
   drawn as the quad while it lasts, and goes back to the plane when it fits again (`update_cursor`, 0.8.8.6, #47):
   `gpu: a 96x96 pointer is larger than the cursor plane (64x64): drawn in the composition`.
@@ -630,13 +630,16 @@ With llvmpipe the GPU isn't worth it; that's why CPU is the default. With a real
 compositing is the GPU's work, and the CPU only uploads what changed in the UI.
 
 **Untested:**
-- **Real AMD and Nvidia:** pending the live ISO on the user's PC (AMD).
+- **NVIDIA:** no report on any NVIDIA card (`HARDWARE-REPORT.md`); Mesa's nouveau and NVK are included, the
+  proprietary driver is not supported. Real AMD and Intel cards compose on the GPU on every reported machine: an RX 580
+  every day since 2026-11-07, a FirePro W6150M, an RX 7800 XT, an RX 9060 XT and 14 Intel GPUs from Ironlake to
+  Whiskey Lake (`HARDWARE-REPORT.md`, "By GPU vendor").
 - **Importing a GPU dmabuf via EGL:** virtio-gpu doesn't accept dmabufs from another source, so in
   the VM that import fails (`EGL_BAD_ALLOC`) and udmabufs are mapped.
 - **Direct scanout:** in the VM it fails for the same reason. The code is there and falls back to
   compositing if it fails.
 
-To test it on the AMD PC (live ISO):
+To check it on a real card:
 1. Boot.
 2. In the LordOS Terminal, `grep gpu: /var/log/lordos/users/$USER/compositor.log` (or System Information →
    Hardware → Graphics, 0.8.5): it must say
@@ -664,7 +667,8 @@ sudo apt-get install -y --no-install-recommends libgbm-dev libegl-dev libgles-de
 ```
 
 At runtime: `libgbm1`, `libegl1`, `libgles2`, `libegl-mesa0` and the driver
-(`libgl1-mesa-dri`: radeonsi/AMD, iris/Intel, nouveau; Nvidia: its driver with GBM, or NVK).
+(`libgl1-mesa-dri`: radeonsi/AMD, iris/Intel, nouveau; NVK for Vulkan. NVIDIA is untested and its proprietary
+driver is not supported, `HARDWARE-REPORT.md`).
 
 Only for testing in VM 116: `mesa-utils`, `mesa-utils-bin`, `mesa-vulkan-drivers`,
 `vulkan-tools`, `glmark2-es2-wayland` and `neverball`. The user `lord` was added to the `kvm`
@@ -688,7 +692,8 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   window was not looked into.
 - GPU drag measured with another GPU than V3D and SVGA3D: only the self-test guards those.
 - PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30); not done in it.
-- Test on real AMD (live ISO) and on Nvidia.
+- Test on an NVIDIA card (no report yet, `HARDWARE-REPORT.md`), on AMD integrated graphics (APUs) and on Intel
+  graphics newer than Whiskey Lake.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
 - `linux-drm-syncobj` (explicit sync, the one Nvidia prefers), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.

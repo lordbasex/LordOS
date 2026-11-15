@@ -117,7 +117,10 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   creation, modification and access dates, permissions and owner, tags and «Open with».
 - **Open with:** the Text Editor (text and code), the Store (`.lpk`, `.deb`) and the Linux apps
   whose `.desktop` declares the type in `MimeType`. The latter are launched with
-  `lord.apps.launchWith(id, path)` (see below).
+  `lord.apps.launchWith(id, path)` (see below). An AppImage is a program, not text: the Text Editor is not
+  offered for it, an app that declares `application/vnd.appimage` still is, and with none Files says that it is a
+  program and that Files doesn't run programs (in development after 0.8.8.8, #159; `isProgram` in
+  `sdk/filekinds.js`).
 - **Recents:** the files in the home folder modified in the last 30 days. It is a bounded walk: 5
   levels, 60,000 entries, no hidden files and no `node_modules`.
 - **Applications:** those from `useLauncherApps()` (LordOS, packages, Linux and, since 0.8.8.8, web apps); double-click

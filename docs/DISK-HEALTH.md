@@ -123,5 +123,5 @@ condition word.
 - [ ] Monitor → Disks: heart per disk and the Life summary.
 - [ ] Disks: the Life card with the curve; the SD card wording fix.
 - [ ] Notifications.
-- [ ] i18n (en, es, pt, fr, it, lt) and docs (DISKS section of the user docs, MONITOR.md).
+- [ ] i18n (every interface language, 35 today) and docs (DISKS section of the user docs, MONITOR.md).
 - [ ] Tests (parsers, model) and the hardware checks of section 7.

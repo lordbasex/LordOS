@@ -2,9 +2,11 @@
  *
  * One closed list, fixed here and never read from JS, a file or any input: sudo (Debian, Ubuntu),
  * admin (old Ubuntu) and wheel (Arch, Fedora). admin.c's is_admin, the admin rescue
- * (users_admin.c, admin_rescue.c), Settings → Users (user-add, user-del, user-admin) and
- * lordos-firstrun all use it, so "administrator" means the same thing everywhere: a member of any
- * group in the list, primary or supplementary, by the system's files right now.
+ * (users_admin.c, admin_rescue.c), Settings → Users (user-add, user-del, user-admin),
+ * lordos-firstrun, lord-sessiond (the login screen's list, the shutdown check), lord-fand (who may
+ * change the fans), lord-netd and lord-server's lord.sys.info().admin and lord.users.list() all use
+ * it, and no other file carries its own copy, so "administrator" means the same thing everywhere: a
+ * member of any group in the list, primary or supplementary, by the system's files right now.
  *
  * The decisions (which group a new administrator joins, who counts, which groups a revoke leaves)
  * are pure and tested in build/admin-groups-test; admin_membership_load() is the only part that
@@ -56,6 +58,13 @@ int admin_membership_counts_person(const AdminMembership *m);
 #define ADMIN_REVOKE_PRIMARY (-1)
 #define ADMIN_REVOKE_UNREADABLE (-2)
 int admin_revoke_plan(const AdminMembership *m, const char *out[ADMIN_GROUP_COUNT]);
+
+/* Is any of these group ids an administrator group? name_of answers a gid's group name (NULL when
+ * it has none): admin_gid_name for the system's /etc/group, a table in the tests. For a check by a
+ * process's own credentials (getgroups), where there is no account to look up. */
+int admin_gids_any(const gid_t *gids, int n, const char *(*name_of)(gid_t gid));
+/* getgrgid's name for a gid, or NULL. */
+const char *admin_gid_name(gid_t gid);
 
 /* user_is_admin: the rule of admin.c's is_admin, by the system's files right now (an unreadable
  * list is not an administrator). */

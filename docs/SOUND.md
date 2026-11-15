@@ -156,7 +156,8 @@ switched the headset to SCO audio, which that adapter can't carry.
 
 `build/sound-cli profile <card> <profile>` switches one by hand.
 
-**Not tested with a real headset** (no Bluetooth audio device at hand): the profile rules are covered
+**Tested with a real headset by the people who reported it:** a Bose QuietComfort 35 plays on three laptops since
+0.8.8.7 (#78, confirmed; [HARDWARE-REPORT.md](HARDWARE-REPORT.md)); not by us (no Bluetooth audio device at hand): the profile rules are covered
 by `tests/bt_audio_model_test.mjs`, the card reply parser by `build/sound-test` (built like
 PulseAudio's `card_fill_tagstruct` for protocol 32), and the WirePlumber setting was read in
 WirePlumber 0.5.8's own scripts (`monitors/bluez.lua`, `device/autoswitch-bluetooth-profile.lua`) and

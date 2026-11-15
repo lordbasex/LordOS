@@ -8,8 +8,9 @@ keywords: idioma, região, formato, data, hora, fuso horário, tradução
 
 Em [Ajustes → Idioma e região](settings:language):
 
-- **Idioma da interface:** espanhol, inglês ou português (e os pacotes de idioma que você
-  adicionar). Muda na hora, sem reiniciar.
+- **Idioma da interface:** qualquer um dos 35 incluídos (inglês, espanhol, português, francês,
+  italiano, lituano, alemão, japonês, chinês, árabe e outros), e os pacotes de idioma que você
+  adicionar. Muda na hora, sem reiniciar.
 - **Região:** o formato das datas, da hora (24 ou 12 horas) e dos números.
 - **Fuso horário** do computador (exige ser administrador). A hora de outras cidades aparece no
   [Relógio](help:clock).

@@ -103,6 +103,7 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 - **SVG-only icons:** up to 0.8.8.7 LordOS doesn't draw SVG and uses the PNG icons Debian publishes for most apps, or the initial; since 0.8.8.8 `lord-media` draws SVG icons in its sandbox.
 - **Terminal apps** with a `.desktop` file aren't shown in the app launcher up to 0.8.8.7; start them from the Terminal. Since 0.8.8.8 they open in a Terminal tab.
 - **GTK 3 apps keep their own blue accent;** Qt 6's reading of the colour scheme from the portal hasn't been tested.
+- **Electron apps on 0.8.8.8** can crash at start ([#150](https://github.com/lordbasex/LordOS/issues/150)); start them from the Terminal with `env -u GTK_IM_MODULE <app>`. Fixed in development after 0.8.8.8 (the latest release), which also makes a mouse's back and forward buttons work in Linux apps.
 
 ## Read the source
 

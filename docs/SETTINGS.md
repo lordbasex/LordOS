@@ -31,7 +31,7 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 
 Shared pieces: `apps/settings/ui.jsx` (a row with a hint, a pop-up button, the page header) on top of
 the SDK's `GroupBox` (`docs/DESIGN.md`). All text goes through `t()` in the `prefs` namespace
-(`assets/locales/{en,es,pt,fr,it,lt}/prefs.json`); `node tools/i18n-check.mjs` passes. Pages use
+(`assets/locales/<lang>/prefs.json`, in all 35 languages); `node tools/i18n-check.mjs` passes with every language complete. Pages use
 `textAlign: 'start'` and leading/trailing layout, so they mirror in Arabic and Hebrew; sliders and
 the time fields keep `direction: 'ltr'`.
 
@@ -270,8 +270,8 @@ Tested with `btvirt -l2` (bluez-test-tools) on VM 118: two virtual controllers o
 radio. hci1 plays a headset (class 0x240404, discoverable, a `bluetoothctl` agent fed through a
 FIFO); from Settings on hci0: discovery, pairing with the numeric-comparison prompt, connection,
 the HFP output and input in Sound, disconnect and forget. Unit tests: `build/bt-test` (managed
-objects, property dictionaries, battery, truncated input, removal, paths, state JSON). **Not tested
-with real hardware** (no controller in the VMs). The reconnection at boot (issue #75) is checked
+objects, property dictionaries, battery, truncated input, removal, paths, state JSON). **Not tested by us
+with real hardware** (no controller in the VMs); on real laptops a Bluetooth headset pairs and plays on three machines (#78, confirmed on 0.8.8.7; [HARDWARE-REPORT.md](HARDWARE-REPORT.md)). The reconnection at boot (issue #75) is checked
 against BlueZ 5.82's source and the unit tests above; **not yet with a real Magic Mouse**.
 
 ## Energy (Battery)
@@ -283,8 +283,9 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   `time_to_*_now` when present), health (`full / full_design`), cycles, watts, model and
   technology. Device batteries (mice, keyboards: `scope = Device`) are listed but not counted.
   Refreshed on `power_supply` uevents and, since many batteries send none while they discharge, read again
-  every 30 s while there is a battery (`hw_timeout` in the poll timeout; sent only when it changed). Unit-tested over a fake sysfs tree; **untested on a real
-  laptop** (the VMs have no battery and the Debian kernel has no `test_power` module).
+  every 30 s while there is a battery (`hw_timeout` in the poll timeout; sent only when it changed). Unit-tested over a fake sysfs tree (the VMs have no battery and the Debian kernel has no
+  `test_power` module); on real laptops the percentage and health are read in the hardware reports (#25 led to the
+  30 s re-read; #42, #129 and #149 show a worn battery; [HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 - **Low battery.** A notification at 20 %, 10 % and 5 % (sticky at 5 %) while discharging.
 - **Menu bar.** A battery item with the percentage (optional) through `registerStatusItem`, so
   every theme that draws `<StatusItems />` shows it; hidden without a system battery.
@@ -612,7 +613,10 @@ The validators are unit-tested in `build/settings-hw-test`.
 
 - Several displays and HiDPI on real monitors (tested with two virtio-gpu heads; see `DISPLAYS.md`).
 - Night Light on the GPU path when the card has no gamma LUT.
-- Brightness, battery, lid and power profiles on real laptops; Bluetooth with real controllers.
+- Power profiles on real laptops. Battery, brightness keys, the lid and Bluetooth have been confirmed on real laptops by
+  hardware reports (the battery percentage #25, the brightness and keyboard-light keys #12, the lid with an external
+  monitor #97, a Bluetooth headset on three laptops #78; [HARDWARE-REPORT.md](HARDWARE-REPORT.md)); suspend and resume
+  is still unchecked in every report.
 - Notifications on the lock screen; a notification center listing the history.
 
 ## ISO packages

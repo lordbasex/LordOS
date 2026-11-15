@@ -39,7 +39,7 @@ La Tienda tiene una sección **Apps web**, un banner y un estante en Descubrir, 
 
 [[shot:2]]
 
-Cada app web tiene su página en la Tienda, como cualquier otra app: siempre al día (es la web), el día en que LordOS la probó, lo que ocupa en el disco, su memoria (la cifra típica medida, o la real mientras corre), quién la hace, el sitio verificado, el motor, los permisos que puede pedir, sus perfiles, el modo en segundo plano y sus límites conocidos.
+Cada app web tiene su página en la Tienda, como cualquier otra app: siempre al día (es la web), el día en que LordOS la probó, lo que ocupa en el disco, su memoria (la cifra típica medida, o la real mientras corre), quién la hace, el sitio verificado, el motor, los permisos que puede pedir, sus perfiles, el modo en segundo plano y sus límites conocidos. Debajo de la sección Apps web y al final de la página de cada app, la Tienda muestra el mismo aviso de marcas que esta página, en tu idioma, y dice que LordOS no modifica los sitios: los ejecuta tal como los sirven (*en desarrollo*, después de 0.8.8.8).
 
 [[shot:3]]
 
@@ -101,7 +101,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 ## Ajustes → Apps web
 
-Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), la Apariencia (Automático, Claro u Oscuro; en desarrollo), la Identidad del navegador de cada perfil (Chrome en Linux + LordOS, Edge, Firefox o LordOS; en desarrollo), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
+Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), la Apariencia (Automático, Claro u Oscuro; en desarrollo), la Identidad del navegador de cada perfil (Chrome en Linux + LordOS, Edge en Linux, Firefox en Linux, LordOS (WebKit) o LordOS (experimental); en desarrollo), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
 
 [[shot:10]]
 
@@ -114,6 +114,7 @@ Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles
 - **Sin video ni música con DRM** (Widevine no está disponible para WPE en Linux), así que los catálogos protegidos de los servicios de música y video no se reproducen.
 - **Las llamadas** dependen del WebRTC de WPE WebKit y del servicio; puede que todavía no anden y no se probaron.
 - **El modo oscuro solo por CSS** queda claro, como arriba.
+- **Sin red al abrir.** En la 0.8.8.8 una app abierta antes de que haya red se queda con la página de error del motor; en desarrollo después de la 0.8.8.8 (el último lanzamiento) muestra su propia página *Sin conexión* y carga sola cuando vuelve la red, o con Ctrl+R.
 - **Deshacer** funciona solo en páginas con su propio historial (un editor enriquecido); un campo de texto simple no puede deshacer.
 - **El contador de no leídos** sale del título de la página ("(3) …"), la única fuente que da WPE; no se muestra la foto de quien manda la notificación.
 - Algunos servicios se pasan a otra dirección después de iniciar sesión; la página funciona, pero sus enlaces pueden abrirse entonces en tu navegador.

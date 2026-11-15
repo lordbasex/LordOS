@@ -429,7 +429,8 @@ reaches the app, nor its release. GTK 3 on Wayland chooses its text-input-v3 mod
 module from the Settings portal's `org.gnome.desktop.interface` `gtk-im-module` before it looks for one itself,
 and uses `simple` (no input method) when the portal leaves that key out, so LordOS's portal serves it as
 `wayland` (`server/src/ui/portal.c`, checked by `build/portal-gs-test`). An IBus or Fcitx user's own
-`GTK_IM_MODULE` still wins over the setting. lord-server doesn't export `GTK_IM_MODULE` (0.8.8.8 did): every GTK
+`GTK_IM_MODULE` still wins over the setting. In development after 0.8.8.8, lord-server no longer exports `GTK_IM_MODULE` (0.8.8.8 does; until the next release
+`env -u GTK_IM_MODULE <app>` from the Terminal works around it): every GTK
 reads the variable, also GTK 3 running on X11 inside Electron and Chromium, which then loaded the Wayland module
 on an X11 display and crashed (GitHub #150). In 0.8.8.8, checked on VM 127 with the variable: a GTK 4 field got
 the Hangul composition (ㅎ as preedit) and then 한글; the portal route is not yet checked on a screen. What it

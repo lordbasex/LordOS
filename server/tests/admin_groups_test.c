@@ -1,6 +1,6 @@
 /* admin_groups_test.c — who is an administrator (src/users/admingroups.c): the one closed list of
  * groups, the group a new administrator joins, who counts towards the last administrator and which
- * groups a revoke leaves. */
+ * groups a revoke leaves, and a check by a process's own group ids. */
 #include "../src/users/admingroups.h"
 
 #include <stdio.h>
@@ -28,6 +28,21 @@ static AdminMembership account(uid_t uid, const char *primary, const char *const
 static int has(const char *const *out, int n, const char *g) {
     for (int i = 0; i < n; i++) if (!strcmp(out[i], g)) return 1;
     return 0;
+}
+
+/* a system's /etc/group by gid, for admin_gids_any */
+static const char *gid_name(gid_t g) {
+    switch (g) {
+    case 0: return "root";
+    case 4: return "adm";
+    case 10: return "wheel";
+    case 27: return "sudo";
+    case 29: return "audio";
+    case 115: return "admin";
+    case 1000: return "ana";
+    case 1001: return "sudoers";
+    default: return NULL;           /* a gid with no group */
+    }
 }
 
 int main(void) {
@@ -127,6 +142,17 @@ int main(void) {
     for (size_t i = 0; i < sizeof lone / sizeof *lone; i++) count += admin_membership_counts_person(&lone[i]);
     CHECK(count == 1);
     CHECK(admin_membership_is_admin(&lone[1], 0));
+
+    /* by a process's own group ids (lord.sys.info().admin): any of the list, by name, never by number */
+    CHECK(admin_gids_any((const gid_t[]){ 1000, 29, 27 }, 3, gid_name));
+    CHECK(admin_gids_any((const gid_t[]){ 10 }, 1, gid_name));
+    CHECK(admin_gids_any((const gid_t[]){ 115, 1000 }, 2, gid_name));
+    CHECK(!admin_gids_any((const gid_t[]){ 1000, 29, 4, 0 }, 4, gid_name));    /* adm and root are not */
+    CHECK(!admin_gids_any((const gid_t[]){ 1001 }, 1, gid_name));              /* nor sudoers */
+    CHECK(!admin_gids_any((const gid_t[]){ 4242, 1000 }, 2, gid_name));        /* a gid with no name */
+    CHECK(!admin_gids_any((const gid_t[]){ 27 }, 0, gid_name));                /* nothing read */
+    CHECK(!admin_gids_any((const gid_t[]){ 27 }, -1, gid_name));               /* getgroups failed */
+    CHECK(!admin_gids_any(NULL, 3, gid_name));
 
     printf("admin-groups-test: %d/%d\n", run - bad, run);
     return bad != 0;

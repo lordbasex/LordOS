@@ -3,8 +3,8 @@
 An image to boot LordOS from a USB stick or a CD on any 64-bit PC (and, since 0.8.7, on
 UEFI arm64 machines and virtual machines: "The arm64 ISO" below), without installing anything. It
 is the LordOS distribution itself (a minimal Debian 13 with the LordOS desktop environment) and
-it boots straight into the desktop. It's for testing real hardware: the GPU (AMD or Nvidia),
-sound, Wi-Fi and displays. It is the first step of M8 (the
+it boots straight into the desktop. It's for testing real hardware: the GPU (Intel, AMD; NVIDIA has no report yet),
+sound, Wi-Fi and displays. What it has been run on so far is in `HARDWARE-REPORT.md`. It is the first step of M8 (the
 installable image).
 
 | | |
@@ -1177,8 +1177,9 @@ It boots from the CD first.
 - **Keyboard:** `lordos-live-prep` sets the live user's layout from the boot entry's language
   (English: US, Español: Latin American, Português: Brazilian, Français: French) and it's changed in Settings →
   Keyboard. A selector on first boot is missing.
-- **Real GPU (AMD/Nvidia):** to be tested with the ISO on real hardware. The GPU path is built
-  (`GPU.md`); the ISO ships Mesa and the firmware, and the "safe mode" entry passes `LORD_GPU=0`.
+- **NVIDIA GPUs:** no report yet (`HARDWARE-REPORT.md`, "Untested combinations"); Intel and AMD cards compose on
+  the GPU on every machine reported. The ISO ships Mesa and the firmware, and the "safe mode" entry passes
+  `LORD_GPU=0`.
 - **Network robustness:** `net/state.c` takes `/etc/network/interfaces` as a sign of ifupdown even
   when ifupdown isn't installed. It should also check that `/sbin/ifup` exists. Today the ISO works
   around it in `lordos-live-prep`.

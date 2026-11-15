@@ -2,7 +2,9 @@
 
 A keyboard drawn on the screen for a computer or Raspberry Pi with no physical keyboard: a touchscreen,
 a mouse alone, or a remote pointer. It types everywhere a physical keyboard does, including the login
-screen and the lock screen, because someone with no keyboard has to be able to log in.
+screen and the lock screen, because someone with no keyboard has to be able to log in. The one exception is LordOS's
+administrator password prompt, which takes keys only from a physical keyboard so that no program in the session can
+type the password (issue #127, [HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 
 ## What it looks like
 

@@ -70,7 +70,7 @@ This document gathers what's needed to build the image, write it, develop on the
 | Board | Status | Notes |
 |---|---|---|
 | **Raspberry Pi 5** (4, 8 or 16 GB) | **supported** | BCM2712, 4× Cortex-A76 at 2.4 GHz, V3D 7.1 (OpenGL ES 3.1, Vulkan 1.3), kernel with 16K pages |
-| **Raspberry Pi 500** (8 GB) | **supported** | the same image; tested by the community. No fan header: the Imager offers no fan, case or overclock for it (see [IMAGER.md](IMAGER.md)) |
+| **Raspberry Pi 500** (8 GB) | **supported** | the same image; tested by a community member (no GitHub hardware report yet, `HARDWARE-REPORT.md`). No fan header: the Imager offers no fan, case or overclock for it (see [IMAGER.md](IMAGER.md)) |
 | Compute Module 5 | not supported | same SoC, so it may work; untested |
 | Raspberry Pi 4 / 400 / CM4 | not supported | BCM2711; the image still carries a `rpi-v8` kernel, but it is untested |
 | Pi 3 and earlier, Zero 2 | no | too little RAM and an old vc4 GPU (GLES 2 without modern dmabuf) |

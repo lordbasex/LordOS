@@ -22,7 +22,7 @@ It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your Lo
 displays, input devices, network, sound, drivers, an integrity check (LordOS's signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware messages, the session's log, what the Linux apps you opened printed and Xwayland's log, and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
 It asks for your password to read the kernel log and every package file; without it, the report is shorter. **Read the file before posting it**, since issues are public. Paste it in the **Logs** box of the form.
 
-If the problem stops you from using the desktop, press **Ctrl+Alt+F2** to get a text console, sign in and run it there. On the live
+If the desktop doesn't start, press **Ctrl+Alt+F2** to get a text console, sign in and run it there (while the LordOS desktop is running, Ctrl+Alt+F2 doesn't switch consoles). On the live
 system it works the same way. If `lordos-issue` isn't there (before 0.8.7.1), send the output of these:
 
 ```sh
@@ -40,7 +40,9 @@ tail -n 60 /var/log/lordos/users/$USER/compositor.log
 
 ### 3. Share how your hardware runs
 
-If everything works, a hardware report helps too: **System Information → Report → Share on GitHub**.
+If everything works, a hardware report helps too: **System Information → Report → Share on GitHub**. What has been
+reported so far, and which machines nobody has reported yet (NVIDIA cards, recent Intel graphics, AMD APUs…), is in
+[docs/HARDWARE-REPORT.md](docs/HARDWARE-REPORT.md).
 
 ## Ideas
 

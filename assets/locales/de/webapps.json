@@ -112,6 +112,7 @@
   "store.seeMore": "Mehr anzeigen",
   "store.engineTitle": "Die Web-Engine von LordOS ist noch nicht installiert",
   "store.engineBody": "Web-Apps laufen in der eigenen Web-Engine von LordOS (dem Paket lordos-web). Die erste App, die du lädst, installiert sie einmalig mit; der Rest von LordOS funktioniert auch ohne sie genauso.",
+  "store.trademark": "Die gezeigten Produktnamen, Logos und Symbole sind Marken ihrer jeweiligen Inhaber und dienen nur dazu, die Dienste zu kennzeichnen. LordOS ist nicht mit ihnen verbunden und wird von ihnen weder unterstützt noch gesponsert. LordOS verändert die Websites nicht: Es führt sie so aus, wie sie ausgeliefert werden.",
   "get.engineTitle": "Die Web-Engine von LordOS wird einmalig benötigt",
   "get.engineBody": "{name} läuft in der eigenen Web-Engine von LordOS (dem Paket lordos-web), die noch nicht installiert ist. Sie wird einmalig zusammen mit dieser App installiert; weitere Web-Apps brauchen das nicht.",
   "get.engineSizes": "Download: {download} · Auf dem Datenträger: {disk}",

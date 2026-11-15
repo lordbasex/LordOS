@@ -112,6 +112,7 @@
   "store.seeMore": "Toon meer",
   "store.engineTitle": "De webengine van LordOS is nog niet geïnstalleerd",
   "store.engineBody": "Webapps draaien in de eigen webengine van LordOS (het pakket lordos-web). De eerste app die je haalt, installeert die ook, één keer; de rest van LordOS werkt hetzelfde zonder.",
+  "store.trademark": "De getoonde productnamen, logo’s en pictogrammen zijn handelsmerken van hun respectieve eigenaars en worden alleen gebruikt om de diensten aan te duiden. LordOS is niet aan hen gelieerd en wordt niet door hen onderschreven of gesponsord. LordOS wijzigt de sites niet: het voert ze uit zoals ze worden aangeboden.",
   "get.engineTitle": "De webengine van LordOS is één keer nodig",
   "get.engineBody": "{name} draait in de eigen webengine van LordOS (het pakket lordos-web), die nog niet is geïnstalleerd. Die wordt één keer geïnstalleerd, met deze app; de volgende webapps hebben hem niet nodig.",
   "get.engineSizes": "Download: {download} · Op schijf: {disk}",

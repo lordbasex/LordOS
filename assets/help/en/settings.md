@@ -14,15 +14,25 @@ Everything you can configure in LordOS is in Settings. The field at the top sear
 | [General](settings:general) | This computer: name, software and storage |
 | [Appearance](settings:appearance) | Desktop style (Lord Flow or Lord Classic), dark or light mode, accent color, transparency |
 | [Wallpaper](settings:wallpaper) | The desktop background |
+| [Desktop & Dock](settings:dock) | The Dock, desktops and window buttons |
 | [Displays](settings:displays) | Resolution, scale, arrangement of several displays, Night Light |
 | [Network](settings:network) | Wired, Wi-Fi and VPN (see [Network](help:network)) |
+| [Bluetooth](settings:bluetooth) | Pairing and connecting devices |
 | [Sound](settings:sound) | Outputs, inputs, per-app volume (see [Sound](help:sound)) |
+| [Notifications](settings:notifications) | Per-app notifications and Do Not Disturb (see [Notifications](help:notifications)) |
 | [Printers & Scanners](settings:printers) | See [Printing](help:printing) |
 | [Clipboard](settings:clipboard) | History and privacy (see [Clipboard](help:clipboard)) |
 | [Sharing](settings:sharing) | Remote desktop (see [Remote desktop](help:remote-desktop)) |
+| [Cloud](settings:cloud) | Cloud storage accounts |
 | [Language & Region](settings:language) | Language, formats, time zone (see [Language & Region](help:language)) |
+| [Date & Time](settings:datetime) | Automatic or manual time, 12 or 24 hours |
 | [Keyboard](settings:keyboard) | Layouts and input methods (see [Keyboard](help:keyboard)) |
 | [Trackpad](settings:trackpad) | When there is a touchpad (see [Touchpad](help:trackpad)) |
+| [Default Apps](settings:defaultapps) | Which app opens each kind of file |
+| [Web Apps](settings:webapps) | Installed web apps, their profiles and permissions |
+| [AI](settings:ai) | Voices and reading aloud |
+| [Energy](settings:power) | Battery, screen off, sleep, the power button and the lid |
+| [Cooling](settings:cooling) | Fans |
 | [Privacy](settings:privacy) | App permissions (see [Privacy](help:privacy)) |
 | [Users](settings:users) | Accounts and automatic login (see [Users and sessions](help:users)) |
 | [Updates](settings:updates) | Debian packages (see [Updates](help:updates)) |

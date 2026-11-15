@@ -39,7 +39,7 @@ The Store has a **Web apps** section, a banner and a shelf in Discover, and web 
 
 [[shot:2]]
 
-Each web app has a page in the Store, like any other app: always up to date (it is the web), the day LordOS tested it, its size on disk, its memory (the measured typical figure, or the live one while it runs), who makes it, the verified site, the engine, the permissions it may ask for, its profiles, background mode and its known limitations.
+Each web app has a page in the Store, like any other app: always up to date (it is the web), the day LordOS tested it, its size on disk, its memory (the measured typical figure, or the live one while it runs), who makes it, the verified site, the engine, the permissions it may ask for, its profiles, background mode and its known limitations. Under the Web apps section and at the end of each app's page, the Store shows the same trademark notice as this page, in your language, and says that LordOS doesn't change the sites: it runs them as they serve them (*in development*, after 0.8.8.8).
 
 [[shot:3]]
 
@@ -101,7 +101,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 ## Settings → Web Apps
 
-Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the Appearance (Automatic, Light or Dark; in development), each profile's Browser identity (Chrome on Linux + LordOS, Edge, Firefox or LordOS; in development), the icon (the site's own or LordOS's letter tile) and Uninstall.
+Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the Appearance (Automatic, Light or Dark; in development), each profile's Browser identity (Chrome on Linux + LordOS, Edge on Linux, Firefox on Linux, LordOS (WebKit) or LordOS (experimental); in development), the icon (the site's own or LordOS's letter tile) and Uninstall.
 
 [[shot:10]]
 
@@ -114,6 +114,7 @@ Every installed web app has its page: its site and where it came from, its profi
 - **No DRM video or music** (Widevine is not available for WPE on Linux), so protected catalogs of music and video services won't play.
 - **Calls** depend on WebRTC in WPE WebKit and on the service; they may not work yet and were not checked.
 - **CSS-only dark mode** stays light, as above.
+- **No network at start.** In 0.8.8.8 an app opened before the network is up keeps the engine's error page; in development after 0.8.8.8 (the latest release) it shows its own *No connection* page and loads by itself once the network is back, or at Ctrl+R.
 - **Undo** works only in pages with their own history (a rich editor); a plain text field can't undo.
 - **The unread count** comes from the page's title ("(3) …"), the only source WPE gives; the notifications' sender photo is not shown.
 - Some services move to another address after you sign in; the page works, but its links may then open in your browser.

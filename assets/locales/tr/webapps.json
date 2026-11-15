@@ -112,6 +112,7 @@
   "store.seeMore": "Daha Fazla Gör",
   "store.engineTitle": "LordOS’un web motoru henüz yüklü değil",
   "store.engineBody": "Web uygulamaları LordOS’un kendi web motorunda (lordos-web paketi) çalışır. Edindiğiniz ilk uygulama onu da bir kez yükler; LordOS’un geri kalanı onsuz da aynı şekilde çalışır.",
+  "store.trademark": "Gösterilen ürün adları, logolar ve simgeler ilgili sahiplerinin ticari markalarıdır ve yalnızca hizmetleri tanıtmak için kullanılır. LordOS onlarla bağlantılı değildir; onlar tarafından onaylanmaz veya desteklenmez. LordOS siteleri değiştirmez: onları sunuldukları gibi çalıştırır.",
   "get.engineTitle": "LordOS’un web motoru bir kez gerekiyor",
   "get.engineBody": "{name}, henüz yüklü olmayan LordOS’un kendi web motorunda (lordos-web paketi) çalışır. Bu uygulamayla birlikte bir kez yüklenir; sonraki web uygulamalarının buna ihtiyacı olmaz.",
   "get.engineSizes": "İndirme: {download} · Diskte: {disk}",

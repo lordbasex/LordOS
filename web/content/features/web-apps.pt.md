@@ -39,7 +39,7 @@ A Loja tem uma seção **Apps web**, um banner e uma prateleira em Descobrir, e 
 
 [[shot:2]]
 
-Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas.
+Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas. Abaixo da seção Apps web e no fim da página de cada app, a Loja mostra o mesmo aviso de marcas desta página, no seu idioma, e diz que o LordOS não modifica os sites: executa-os como eles os servem (*em desenvolvimento*, depois do 0.8.8.8).
 
 [[shot:3]]
 
@@ -101,7 +101,7 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 ## Ajustes → Apps web
 
-Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux + LordOS, Edge, Firefox ou LordOS; em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar.
+Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux + LordOS, Edge no Linux, Firefox no Linux, LordOS (WebKit) ou LordOS (experimental); em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar.
 
 [[shot:10]]
 
@@ -114,6 +114,7 @@ Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir,
 - **Sem vídeo nem música com DRM** (o Widevine não está disponível para o WPE no Linux), então os catálogos protegidos dos serviços de música e vídeo não tocam.
 - **As chamadas** dependem do WebRTC do WPE WebKit e do serviço; podem ainda não funcionar e não foram testadas.
 - **O modo escuro só por CSS** fica claro, como acima.
+- **Sem rede ao abrir.** Na 0.8.8.8 um app aberto antes de haver rede fica com a página de erro do motor; em desenvolvimento depois da 0.8.8.8 (o último lançamento) ele mostra a própria página *Sem conexão* e carrega sozinho quando a rede volta, ou com Ctrl+R.
 - **Desfazer** funciona só em páginas com histórico próprio (um editor rico); um campo de texto simples não consegue desfazer.
 - **O contador de não lidas** vem do título da página ("(3) …"), a única fonte que o WPE dá; a foto de quem manda a notificação não aparece.
 - Alguns serviços passam para outro endereço depois do login; a página funciona, mas os links dela podem então abrir no seu navegador.

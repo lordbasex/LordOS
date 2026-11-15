@@ -71,7 +71,7 @@ like React Native but on top of our display server.
 | `server/src/ui/tzif.c`, `js_help.c`, `sdk/{notify,alarms,statusitems,help}.js`, `apps/{clock,help}` | **M9** | Clock (our own TZif reader, session alarms with the app closed), session notifications, menu-bar status items, Help (markdown articles in es/en/pt, welcome tour, Search source) (see `SYSTEM.md`) |
 | `server/src/ui/grab.c`, `cursor.c`, `sdk/windowshell.jsx` | **M8** | Windows: moving and resizing in C (one event per frame, no JS), a layer for the window being moved, edges on all 4 sides and corners, our own cursors and `cursor-shape-v1` (see `WINDOWS.md`) |
 | `server/src/outputs.c`, `kms.c`, `hw/display.c`, `ui/paint.c` (`paint_view`) | **M9** | Several displays (extend and mirror, arrangement by EDID identity, hotplug) and sharp HiDPI at 100–300 % per display: one logical space, each display painted at its own resolution; one `wl_output` per display, xdg-output, fractional-scale-v1 (see `DISPLAYS.md`) |
-| `server/src/hw/`, `ui/js_hw.c`, `sdk/hardware.jsx`, `sdk/defaults.js` | **M9** | Settings' hardware pages: displays (EDID, live modes with a 15 s revert, per-display persistence, software rotation and 200 % scale, Night Light on the gamma LUT or by software), Bluetooth (BlueZ over our own D-Bus client, pairing agent), battery and power profiles, idle (DPMS, lock, sleep), date and time, notifications from Linux apps (`org.freedesktop.Notifications`) and default apps (`mimeapps.list`); kernel uevents and D-Bus signals, no polling (see `SETTINGS.md`) |
+| `server/src/hw/`, `ui/js_hw.c`, `sdk/hardware.jsx`, `sdk/defaults.js` | **M9** | Settings' hardware pages: displays (EDID, live modes with a 15 s revert, per-display persistence, software rotation and 100–300 % scale, Night Light on the gamma LUT or by software), Bluetooth (BlueZ over our own D-Bus client, pairing agent), battery and power profiles, idle (DPMS, lock, sleep), date and time, notifications from Linux apps (`org.freedesktop.Notifications`) and default apps (`mimeapps.list`); kernel uevents and D-Bus signals, no polling (see `SETTINGS.md`) |
 
 ### Flow of a frame
 
@@ -323,7 +323,7 @@ sandbox. Vendored = copied as source code into `third_party/`.
 
 | Architecture | Machines | Status | Image |
 |---|---|---|---|
-| x86-64 (amd64) | PC with UEFI or BIOS; AMD, Intel or Nvidia GPU, or no 3D GPU (CPU) | primary, tested on VM | live ISO with installer (`ISO.md`) |
+| x86-64 (amd64) | PC with UEFI or BIOS; Intel or AMD GPU, or no 3D GPU (CPU); Nvidia only through Mesa (nouveau, NVK), untested | primary: tested on VMs and on 22 physical machines (14 Intel GPUs, 4 AMD, none NVIDIA; `HARDWARE-REPORT.md`) | live ISO with installer (`ISO.md`) |
 | ARM64 (aarch64) | **Raspberry Pi 5** (the only supported board) | tested on the board (`RASPBERRY.md`, release tests in `ISO.md`) | SD/NVMe image, `tools/rpi/build-img.sh` (`RASPBERRY.md`) |
 | ARM64 (aarch64) | generic UEFI machines and virtual machines | new in 0.8.7: tested on emulated QEMU only (`ISO.md`, "The arm64 ISO") | live ISO with installer |
 

@@ -107,9 +107,9 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
   in empty space, corner-only, three displays, and a sweep of about 25,000 drops that must all touch and
   never overlap; run by `make -C server test` through `run_suites.sh` when node exists) and the
   `out_fits`/`out_valid`/chain checks in `build/outputs-test`.
-- **Untested on real hardware:** the identify badges and the drag were not run on two displays yet
-  (no multi-display machine where this was written); VM 118's two virtio-gpu heads are the
-  intended check.
+- **Not recorded on real hardware:** no check of the identify badges and the drag on real monitors is
+  written down yet, though the maintainer's three-monitor RX 580 PC and community machines with two
+  displays exist (`HARDWARE-REPORT.md`); VM 118's two virtio-gpu heads are the recorded check.
 
 ## How it is drawn
 

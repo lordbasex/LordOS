@@ -320,8 +320,10 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
 User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
-menu. Before, they were only on the login screen. Sleep is not offered: suspend and resume with the
-card lent to a session has not been tested on real hardware yet.
+menu. Before, they were only on the login screen. Sleep is not in the menu; the computer sleeps from the lid, the power
+button (a tap on tablets, in development after 0.8.8.8) and the idle timers in Settings → Energy. Suspend and resume
+is unchecked in every hardware report; the only report after waking is #14's Wi-Fi on a laptop, handled since 0.8.8.3
+([HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 
 | | |
 |---|---|
@@ -487,7 +489,10 @@ session. Everything that changes something goes through closed `admin.c` actions
   supplementary one, by the system's files right now. It's one closed list, fixed in
   `server/src/users/admingroups.h` and never configurable from JS or any input, used by every
   root-side check: `admin.c` (who may run the administrator actions), `user-add`, `user-del`,
-  `user-admin`, the admin rescue and `lordos-firstrun`.
+  `user-admin`, the admin rescue, `lordos-firstrun`, `lord-sessiond` (the login screen's list and
+  who may restart or shut down with other sessions open) and `lord-fand` (who may change the fans);
+  lord-server's `lord.users.list()` and `lord.sys.info().admin` show it from the same list (the
+  latter by the session's own groups). No other file keeps its own copy of the list.
   - Making someone an administrator (`user-add` with admin, `user-admin name 1`, the rescue,
     the Raspberry Pi first run) adds them to `sudo`, or to `wheel` where there is no `sudo` group
     (Arch, Fedora); never to `admin`. With neither group it fails with `users.groupFailed` and, for
@@ -582,10 +587,13 @@ session. Everything that changes something goes through closed `admin.c` actions
   (`display_attach` → `outputs_apply` in `main.c`, see [DISPLAYS.md](DISPLAYS.md)). The lend/revoke
   cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
   it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
-  CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Other cards and laptop
-  panels are untested.
+  CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Sessions on real hardware are
+  known from 22 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
+  Cherry Trail and Gemini Lake, four AMD generations, laptop panels, three laptops with an external monitor and two
+  monitors at 120 Hz (RX 7800 XT). Untested: NVIDIA, AMD integrated graphics, Intel newer than Whiskey Lake,
+  DisplayPort MST hubs.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
 - **Testing with more real cards:** in the VMs the GPU is tested only with `LORD_GPU=1` and llvmpipe; on
-  real hardware only the Radeon RX 580 above (amdgpu). Other AMD, Intel and NVIDIA cards and the live USB on
-  them are untested.
+  real hardware see [HARDWARE-REPORT.md](HARDWARE-REPORT.md) (14 Intel, 4 AMD, 0 NVIDIA; a live USB on one laptop).
+  NVIDIA cards, AMD APUs and Intel graphics newer than Whiskey Lake are untested.

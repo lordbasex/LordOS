@@ -16,4 +16,5 @@ This app. It has an article for every LordOS app and feature.
 - **Welcome to LordOS:** the first-login tour. Watch it again from the sidebar or from the
   **Help** menu in the menu bar.
 
-Articles are in Spanish, English and Portuguese, following the interface language.
+Articles are in English, Spanish and Portuguese, following the interface language; in the other
+interface languages they are shown in English.

@@ -461,10 +461,11 @@ Details in `SETTINGS.md`. Tested on VM 118 (`settings-*.png`), Bluetooth with a 
   12/24 h, menu bar clock format.
 - [x] **Default Apps:** `mimeapps.list` and `xdg-terminals.list`; Files' "Open With" and
   `lord.apps.launchWith('', path)` honor them.
-- [ ] **Pending:** Night Light on the GPU path without a LUT; real laptops (battery, backlight, lid)
-  and real Bluetooth controllers; notifications on the lock screen and a notification center.
-  (Done since: extend/mirror across displays and sharp HiDPI at 100–200 %, `DISPLAYS.md`; Wayland
-  idle inhibit in 0.8.5.)
+- [ ] **Pending:** Night Light on the GPU path without a LUT; suspend and resume and power profiles on real laptops;
+  notifications on the lock screen and a notification center.
+  (Done since: extend/mirror across displays and sharp HiDPI at 100–200 % (300 % since 0.8.8.6), `DISPLAYS.md`;
+  Wayland idle inhibit in 0.8.5; battery, brightness keys, the lid and a Bluetooth headset confirmed on real laptops
+  by hardware reports #25, #12, #97 and #78, `HARDWARE-REPORT.md`.)
 
 ## M9 — Mail, Calendar, Contacts and Reminders ✅ (2026-10-18)
 
@@ -783,13 +784,30 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   [#128](https://github.com/lordbasex/LordOS/issues/128), [#130](https://github.com/lordbasex/LordOS/issues/130) and
   [#64](https://github.com/lordbasex/LordOS/issues/64); the rest in `CHANGELOG.md`.
 
-## Release 0.8.8.9 (planned)
+## Release 0.8.8.9 (in development after 0.8.8.8, the latest release)
 
-- [ ] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
-  the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all six
-  languages, saying that the product names, logos and icons shown belong to their owners, are used only to identify the
-  services, and that LordOS is not affiliated with, endorsed or sponsored by them. The website already carries the same
-  notice (the LordOS Web Runtime feature page, the paper's §5.4 and the legal pages).
+Besides the two items below, the work in development is listed in `CHANGELOG.md` under [Unreleased]:
+
+- [x] 35 interface languages, each complete (12,460 keys; `LANGUAGES.md`, `TRANSLATING.md`).
+- [x] Web apps: each app's Appearance and each profile's Browser identity; a web app opened without network loads by
+  itself when it is back (#144) (`WEBAPPS.md`).
+- [x] Files and Disks mount a free partition of the system disk; NTFS left hibernated is mounted read-only (#122,
+  `SYSTEM.md`).
+- [x] The power button held for 5 s; a tablet sleeps on a tap and shuts down on a hold (#131, migration
+  `008-0.8.8.9-tablet-power`).
+- [x] Administrators are `sudo`, `admin` or `wheel` everywhere: every check uses `server/src/users/admingroups.c`
+  (`sessiond.c`, `fand.c` and `js_sys.c` moved to it on 2026-11-15), and turning Administrator off really removes the
+  rights.
+- [x] Each image's source list and the written source offer (`SOURCE-OFFER.md`); the Pi kernel sources kept on
+  lordos.org.
+- [x] Hardware reports compared in `HARDWARE-REPORT.md` (22 machines, every issue up to #159).
+- [x] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
+  the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all 35
+  interface languages, saying that the product names, logos and icons shown belong to their owners, are used only to
+  identify the services, that LordOS is not affiliated with, endorsed or sponsored by them, and that LordOS runs the
+  sites unmodified. The website already carries the same notice (the LordOS Web Runtime feature page, the paper's §5.4
+  and the legal pages). Done 2026-11-15: `apps/store/trademark.js` (string `webapps.store.trademark`), tested by
+  `store-trademark-scene`.
 - [x] **RustDesk removed from the Store catalog** ([#66](https://github.com/lordbasex/LordOS/issues/66); maintainer,
   2026-11-12: not distributed for now). If it comes back, it should be delivered directly from its maker: the Store
   downloads the maker's `.deb` from its own release URL and checks the pinned SHA-256 on the person's computer, and
@@ -1055,7 +1073,9 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   - [x] The signed snapshot (release key, signed on the maintainer's machine), verified in C before the
     Compatibility panel shows it as community data (`lord.sysinfo.community()`).
   - [x] The repository's labels (`RELEASING.md`).
-  - [ ] The first community reports and a captured Raspberry Pi 5 report.
+  - [x] The first community reports: nine with the report file and twelve more machines from other issues, 22 in all,
+    #42 accepted into the catalogue (`HARDWARE-REPORT.md`).
+  - [ ] A captured Raspberry Pi 5 report (no ARM machine has been reported).
   - [x] A newer snapshot between releases (approved 2026-10-29): the snapshot is its own `Architecture: all`
     package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`, version = the snapshot's date), which `lordos` depends
     on; the ISO, the Pi image and `install.sh` install it, `apt-repo.sh` checks its signature, and a newer one is
