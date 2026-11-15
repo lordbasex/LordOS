@@ -662,6 +662,7 @@
   "users.deleteSelf": "لا يمكنك حذف الحساب الذي تستخدمه",
   "users.exists": "«{name}» موجود بالفعل",
   "users.groupFailed": "تعذّر تغيير المجموعة",
+  "users.adminPrimaryGroup": "المجموعة الرئيسية لهذا الحساب هي مجموعة مسؤولين، لذا لا يمكن إزالتها من هنا. بصفتك root، غيّر مجموعته الرئيسية أولًا (usermod -g)",
   "users.invalid": "مستخدم غير صالح",
   "users.lastAdmin": "هذا هو المسؤول الوحيد",
   "users.passwordNotAllowed": "يمكن للمسؤول فقط تغيير كلمة سر مستخدم آخر",

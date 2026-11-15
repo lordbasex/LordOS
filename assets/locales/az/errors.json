@@ -658,6 +658,7 @@
   "users.deleteSelf": "İstifadə etdiyiniz hesabı silə bilməzsiniz",
   "users.exists": "“{name}” artıq mövcuddur",
   "users.groupFailed": "Qrupu dəyişmək mümkün olmadı",
+  "users.adminPrimaryGroup": "Bu hesabın əsas qrupu administrator qrupudur, ona görə də burada çıxarıla bilməz. root olaraq əvvəlcə onun əsas qrupunu dəyişin (usermod -g)",
   "users.invalid": "Yararsız istifadəçi",
   "users.lastAdmin": "Bu, yeganə administratordur",
   "users.passwordNotAllowed": "Başqa istifadəçinin parolunu yalnız administrator dəyişə bilər",

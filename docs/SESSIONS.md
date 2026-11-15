@@ -470,10 +470,26 @@ session. Everything that changes something goes through closed `admin.c` actions
 | `user-add`        | name, full name, password, admin           | administrator                                 |
 | `user-del`        | name, keep folder (0/1)                    | administrator; not one's own nor the last admin |
 | `user-passwd`     | name, new, current                         | one's own, with the current one; someone else's, an administrator |
-| `user-admin`      | name, 0/1 (`sudo` group)                   | administrator; not the last admin             |
+| `user-admin`      | name, 0/1 (see "Who is an administrator")  | administrator; not the last admin             |
 | `user-avatar`     | name, color `#rrggbb`, image               | one's own, or an administrator                |
 | `user-autologin`  | name or empty                              | administrator                                 |
 
+- **Who is an administrator:** a member of `sudo`, `admin` or `wheel`, as the primary group or a
+  supplementary one, by the system's files right now. It's one closed list, fixed in
+  `server/src/users/admingroups.h` and never configurable from JS or any input, used by every
+  root-side check: `admin.c` (who may run the administrator actions), `user-add`, `user-del`,
+  `user-admin`, the admin rescue and `lordos-firstrun`.
+  - Making someone an administrator (`user-add` with admin, `user-admin name 1`, the rescue,
+    the Raspberry Pi first run) adds them to `sudo`, or to `wheel` where there is no `sudo` group
+    (Arch, Fedora); never to `admin`. With neither group it fails with `users.groupFailed` and, for
+    `user-add`, creates nothing.
+  - Removing it (`user-admin name 0`) takes the user out of **every** group of the list they are in
+    (`/usr/bin/gpasswd --delete`, one per group) and then checks that they no longer are one;
+    otherwise `users.groupFailed`. A user whose **primary** group is one of them can't be taken out
+    with `gpasswd`: it's refused before anything changes (`users.adminPrimaryGroup`); as root,
+    change their primary group (`usermod -g`) first.
+  - "The last administrator" (`user-del`, `user-admin name 0`) counts people's accounts (uid
+    1000–59999) by the same rule, so someone only in `wheel` or `admin` counts too.
 - **Passwords:**
   - they're written with `chpasswd` through standard input, never in argv;
   - the helper wipes the argument from memory after using it;

@@ -657,6 +657,7 @@
   "users.deleteSelf": "Anda tidak boleh memadam akaun yang sedang anda gunakan",
   "users.exists": "“{name}” sudah wujud",
   "users.groupFailed": "Tidak dapat mengubah kumpulan",
+  "users.adminPrimaryGroup": "Kumpulan utama akaun ini ialah kumpulan pentadbir, jadi ia tidak boleh dialih keluar di sini. Sebagai root, tukar dahulu kumpulan utamanya (usermod -g)",
   "users.invalid": "Pengguna tidak sah",
   "users.lastAdmin": "Ini satu-satunya pentadbir",
   "users.passwordNotAllowed": "Hanya pentadbir boleh mengubah kata laluan pengguna lain",

@@ -658,6 +658,7 @@
   "users.deleteSelf": "Kullandığınız hesabı silemezsiniz",
   "users.exists": "“{name}” zaten var",
   "users.groupFailed": "Grup değiştirilemedi",
+  "users.adminPrimaryGroup": "Bu hesabın birincil grubu bir yönetici grubu olduğundan buradan kaldırılamaz. root olarak önce birincil grubunu değiştirin (usermod -g)",
   "users.invalid": "Geçersiz kullanıcı",
   "users.lastAdmin": "Bu, tek yönetici",
   "users.passwordNotAllowed": "Başka bir kullanıcının parolasını yalnızca bir yönetici değiştirebilir",

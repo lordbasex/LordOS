@@ -657,6 +657,7 @@
   "users.deleteSelf": "使用中のアカウントは削除できません",
   "users.exists": "「{name}」はすでに存在します",
   "users.groupFailed": "グループを変更できませんでした",
+  "users.adminPrimaryGroup": "このアカウントのメイングループは管理者グループのため、ここでは外せません。root で先にメイングループを変更してください (usermod -g)",
   "users.invalid": "無効なユーザー",
   "users.lastAdmin": "これが唯一の管理者です",
   "users.passwordNotAllowed": "他のユーザーのパスワードを変更できるのは管理者だけです",

@@ -658,6 +658,7 @@
   "users.deleteSelf": "Huwezi kufuta akaunti unayotumia",
   "users.exists": "“{name}” tayari ipo",
   "users.groupFailed": "Haikuweza kubadilisha kikundi",
+  "users.adminPrimaryGroup": "Kikundi kikuu cha akaunti hii ni kikundi cha wasimamizi, kwa hivyo hakiwezi kuondolewa hapa. Kama root, badilisha kwanza kikundi chake kikuu (usermod -g)",
   "users.invalid": "Mtumiaji si sahihi",
   "users.lastAdmin": "Huyu ndiye msimamizi pekee",
   "users.passwordNotAllowed": "Msimamizi pekee ndiye anayeweza kubadilisha nenosiri la mtumiaji mwingine",

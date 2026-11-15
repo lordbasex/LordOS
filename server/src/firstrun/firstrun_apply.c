@@ -19,6 +19,7 @@
  * Exit status: 0 applied with a user; 2 applied without a user (the board stays in setup mode);
  * 1 invalid file (nothing applied); 3 the user could not be created (system settings applied). */
 #include "firstrun.h"
+#include "../users/admingroups.h"
 #include "../users/homedirs.h"
 
 #include <dirent.h>
@@ -407,11 +408,12 @@ static int apply_user(const FirstRun *fr) {
         const char *const b[] = { "/usr/sbin/usermod", "--password", fr->hash, fr->user, NULL };
         if (run(TEST ? t : b)) { say("could not set the password"); return 3; }
     }
-    /* administrator: sudo, or wheel where there is no sudo group (Arch, Fedora; users_admin.c does the same) */
+    /* administrator: sudo, or wheel where there is no sudo group (Arch, Fedora): the same choice as
+     * Settings → Users, from the one list of administrator groups (users/admingroups.h) */
     static const char *const GROUPS[] = { "audio", "video", "input", "render", "pipewire", "plugdev", "lpadmin", "bluetooth", "netdev" };
     char groups[160] = "";
-    if (group_exists("sudo")) strcat(groups, "sudo");
-    else if (group_exists("wheel")) strcat(groups, "wheel");
+    const char *admin = admin_group_for_new(group_exists);
+    if (admin) strcat(groups, admin);
     for (size_t i = 0; i < sizeof GROUPS / sizeof *GROUPS; i++)
         if (group_exists(GROUPS[i])) { if (groups[0]) strcat(groups, ","); strcat(groups, GROUPS[i]); }
     if (groups[0]) {

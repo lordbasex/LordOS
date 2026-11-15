@@ -658,6 +658,7 @@
   "users.deleteSelf": "Du kan inte radera kontot som du använder",
   "users.exists": "”{name}” finns redan",
   "users.groupFailed": "Kunde inte ändra gruppen",
+  "users.adminPrimaryGroup": "Kontots huvudgrupp är en administratörsgrupp, så den kan inte tas bort här. Byt först dess huvudgrupp som root (usermod -g)",
   "users.invalid": "Ogiltig användare",
   "users.lastAdmin": "Det här är den enda administratören",
   "users.passwordNotAllowed": "Bara en administratör kan ändra en annan användares lösenord",

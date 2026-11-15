@@ -657,6 +657,7 @@
   "users.deleteSelf": "사용 중인 계정은 삭제할 수 없습니다",
   "users.exists": "“{name}”이(가) 이미 있습니다",
   "users.groupFailed": "그룹을 변경할 수 없습니다",
+  "users.adminPrimaryGroup": "이 계정의 기본 그룹이 관리자 그룹이므로 여기서 제거할 수 없습니다. root로 먼저 기본 그룹을 변경하세요 (usermod -g)",
   "users.invalid": "잘못된 사용자",
   "users.lastAdmin": "유일한 관리자입니다",
   "users.passwordNotAllowed": "관리자만 다른 사용자의 비밀번호를 바꿀 수 있습니다",

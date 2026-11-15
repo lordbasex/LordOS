@@ -658,6 +658,7 @@
   "users.deleteSelf": "Não é possível excluir a conta que você está usando",
   "users.exists": "“{name}” já existe",
   "users.groupFailed": "Não foi possível alterar o grupo",
+  "users.adminPrimaryGroup": "O grupo principal desta conta é um grupo de administradores, então não dá para removê-lo aqui. Como root, mude primeiro o grupo principal dela (usermod -g)",
   "users.invalid": "Usuário inválido",
   "users.lastAdmin": "É o único administrador",
   "users.passwordNotAllowed": "Só um administrador pode alterar a senha de outro usuário",

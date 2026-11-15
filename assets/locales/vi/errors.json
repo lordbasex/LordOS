@@ -657,6 +657,7 @@
   "users.deleteSelf": "Bạn không thể xóa tài khoản đang sử dụng",
   "users.exists": "“{name}” đã tồn tại",
   "users.groupFailed": "Không thể thay đổi nhóm",
+  "users.adminPrimaryGroup": "Nhóm chính của tài khoản này là nhóm quản trị viên nên không thể gỡ ở đây. Với quyền root, hãy đổi nhóm chính của tài khoản trước (usermod -g)",
   "users.invalid": "Người dùng không hợp lệ",
   "users.lastAdmin": "Đây là quản trị viên duy nhất",
   "users.passwordNotAllowed": "Chỉ quản trị viên mới có thể thay đổi mật khẩu của người dùng khác",

@@ -657,6 +657,7 @@
   "users.deleteSelf": "Anda tidak dapat menghapus akun yang sedang Anda gunakan",
   "users.exists": "“{name}” sudah ada",
   "users.groupFailed": "Tidak dapat mengubah grup",
+  "users.adminPrimaryGroup": "Grup utama akun ini adalah grup administrator, jadi tidak dapat dihapus di sini. Sebagai root, ubah dulu grup utamanya (usermod -g)",
   "users.invalid": "Pengguna tidak valid",
   "users.lastAdmin": "Ini adalah satu-satunya administrator",
   "users.passwordNotAllowed": "Hanya administrator yang dapat mengubah kata sandi pengguna lain",
