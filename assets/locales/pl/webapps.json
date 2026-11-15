@@ -114,6 +114,7 @@
   "store.seeMore": "Zobacz więcej",
   "store.engineTitle": "Silnik webowy LordOS nie jest jeszcze zainstalowany",
   "store.engineBody": "Aplikacje webowe działają we własnym silniku webowym LordOS (pakiet lordos-web). Pierwsza pobrana aplikacja instaluje go jednorazowo; reszta LordOS działa bez niego tak samo.",
+  "store.trademark": "Pokazane nazwy produktów, logo i ikony są znakami towarowymi ich właścicieli i służą wyłącznie do wskazania usług. LordOS nie jest z nimi powiązany ani przez nich popierany czy sponsorowany. LordOS nie zmienia stron: uruchamia je tak, jak są udostępniane.",
   "get.engineTitle": "Silnik webowy LordOS jest potrzebny jednorazowo",
   "get.engineBody": "{name} działa we własnym silniku webowym LordOS (pakiet lordos-web), który nie jest jeszcze zainstalowany. Instaluje się go raz, razem z tą aplikacją; kolejne aplikacje webowe go nie potrzebują.",
   "get.engineSizes": "Pobieranie: {download} · Na dysku: {disk}",

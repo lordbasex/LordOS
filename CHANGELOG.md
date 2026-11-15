@@ -25,6 +25,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (see "A tablet sleeps on a tap of the power button" under Changed). Tested in `build/settings-hw-test`; not
   yet tried on a tablet, where the power chip may cut the power by itself after a longer hold.
 
+- **Trademark notice in the Store's Web apps** (maintainer's request, 2026-11-12; left out of 0.8.8.8 so the release
+  wasn't delayed): the Web apps section, under the catalog, and every web app's page, at its end (a catalog app or one
+  added from an address), carry a short note saying that the product names, logos and icons shown are trademarks of
+  their respective owners, used only to identify the services; that LordOS is not affiliated with, endorsed or
+  sponsored by them; and that LordOS doesn't change the sites: it runs them as they serve them. It is the same notice
+  lordos.org already carries (the LordOS Web Runtime page, the paper's §5.4 and the trademark policy), now inside the
+  system, as one new string, `webapps.store.trademark`, translated into all 35 interface languages. The note is
+  `apps/store/trademark.js`, used by `webapps.js` and `webdetail.js`; caption size, dimmed, aligned to the start of the
+  line so it follows right-to-left languages. Tested by the new `store-trademark-scene`
+  (`server/tests/store_trademark_scene.mjs`, in `make -C server test`): the note renders the catalog's text, the
+  English text makes each of the four statements, and it is aligned to the start.
+
 - **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),
   German (`de`), Hindi (`hi`), Malay (`ms`), Bengali (`bn`), Simplified Chinese (`zh-Hans`), Traditional Chinese
   (`zh-Hant`), Ukrainian (`uk`), Polish (`pl`), Arabic (`ar`), Vietnamese (`vi`), Swedish (`sv`), Greek (`el`), Dutch

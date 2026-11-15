@@ -785,11 +785,13 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
 
 ## Release 0.8.8.9 (planned)
 
-- [ ] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
-  the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all six
-  languages, saying that the product names, logos and icons shown belong to their owners, are used only to identify the
-  services, and that LordOS is not affiliated with, endorsed or sponsored by them. The website already carries the same
-  notice (the LordOS Web Runtime feature page, the paper's §5.4 and the legal pages).
+- [x] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
+  the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all 35
+  interface languages, saying that the product names, logos and icons shown belong to their owners, are used only to
+  identify the services, that LordOS is not affiliated with, endorsed or sponsored by them, and that LordOS runs the
+  sites unmodified. The website already carries the same notice (the LordOS Web Runtime feature page, the paper's §5.4
+  and the legal pages). Done 2026-11-15: `apps/store/trademark.js` (string `webapps.store.trademark`), tested by
+  `store-trademark-scene`.
 - [x] **RustDesk removed from the Store catalog** ([#66](https://github.com/lordbasex/LordOS/issues/66); maintainer,
   2026-11-12: not distributed for now). If it comes back, it should be delivered directly from its maker: the Store
   downloads the maker's `.deb` from its own release URL and checks the pinned SHA-256 on the person's computer, and

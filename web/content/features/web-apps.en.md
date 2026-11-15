@@ -39,7 +39,7 @@ The Store has a **Web apps** section, a banner and a shelf in Discover, and web 
 
 [[shot:2]]
 
-Each web app has a page in the Store, like any other app: always up to date (it is the web), the day LordOS tested it, its size on disk, its memory (the measured typical figure, or the live one while it runs), who makes it, the verified site, the engine, the permissions it may ask for, its profiles, background mode and its known limitations.
+Each web app has a page in the Store, like any other app: always up to date (it is the web), the day LordOS tested it, its size on disk, its memory (the measured typical figure, or the live one while it runs), who makes it, the verified site, the engine, the permissions it may ask for, its profiles, background mode and its known limitations. Under the Web apps section and at the end of each app's page, the Store shows the same trademark notice as this page, in your language, and says that LordOS doesn't change the sites: it runs them as they serve them (*in development*, after 0.8.8.8).
 
 [[shot:3]]
 

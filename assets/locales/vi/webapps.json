@@ -111,6 +111,7 @@
   "store.seeMore": "Xem thêm",
   "store.engineTitle": "Công cụ web của LordOS chưa được cài",
   "store.engineBody": "Ứng dụng web chạy trong công cụ web riêng của LordOS (gói lordos-web). Ứng dụng đầu tiên bạn tải sẽ cài nó luôn, một lần duy nhất; phần còn lại của LordOS vẫn hoạt động như cũ khi không có nó.",
+  "store.trademark": "Tên sản phẩm, logo và biểu tượng hiển thị là nhãn hiệu của chủ sở hữu tương ứng, chỉ được dùng để nhận diện dịch vụ. LordOS không liên kết với, không được chứng thực hay tài trợ bởi họ. LordOS không sửa đổi các trang web: nó chạy chúng đúng như chúng được cung cấp.",
   "get.engineTitle": "Cần công cụ web của LordOS một lần",
   "get.engineBody": "{name} chạy trong công cụ web riêng của LordOS (gói lordos-web), hiện chưa được cài. Nó được cài một lần cùng ứng dụng này; các ứng dụng web sau không cần nữa.",
   "get.engineSizes": "Tải về: {download} · Trên đĩa: {disk}",

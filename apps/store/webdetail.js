@@ -2,7 +2,8 @@
 // (debian.Details): the header (icon, name, description, Install / Open / Remove and the "Web app" tag), the facts row
 // (version: always the site's own; when LordOS tested it; its data on disk; its memory), the description, and the
 // information: publisher, the verified https origin, where it came from, the test, the engine, the permissions it may
-// ask for and their state, its profiles, background mode and what doesn't work in LordOS's engine. A catalog app or one
+// ask for and their state, its profiles, background mode, what doesn't work in LordOS's engine and, at the end, the
+// trademark notice (trademark.js). A catalog app or one
 // added from an address (webappsmodel.detailOf); the catalog's data is webappsmodel.catalogFacts.
 import { createElement as h, useEffect, useState } from 'react';
 import {
@@ -14,6 +15,7 @@ import { Facts, Tag } from './ui.js';
 import { open } from './addweb.js';
 import { GetSteps, useGetWebApp } from './getweb.js';
 import { CatalogIcon, webCatalogData } from './webapps.js';
+import { TrademarkNote } from './trademark.js';
 
 const InfoRow = ({ th, label, value, children }) => h(View, { style: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: 4 } },
   h(Text, { style: { fontSize: typeScale.body, color: th.text, whiteSpace: 'nowrap', textAlign: 'start' } }, label),
@@ -172,5 +174,6 @@ export function WebAppDetail({ id }) {
       h(Header, { th }, t('webapps.detail.limitations')),
       h(GroupBox, null,
         ...(facts.limitations.length ? facts.limitations.map((k) => h(Text, { key: k, style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.4, paddingVertical: 8, textAlign: 'start' } }, `• ${t(`webapps.limit.${k}`)}`))
-          : [h(Text, { key: 'none', style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.4, paddingVertical: 8, textAlign: 'start' } }, t(a ? 'webapps.detail.noLimits' : 'webapps.detail.limitsUnknown'))]))));
+          : [h(Text, { key: 'none', style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.4, paddingVertical: 8, textAlign: 'start' } }, t(a ? 'webapps.detail.noLimits' : 'webapps.detail.limitsUnknown'))]))),
+    h(TrademarkNote));
 }

@@ -298,7 +298,7 @@ Las dos primeras columnas describen esos tipos de apps en general, no un product
 
 [[figure:web-runtime]]
 
-Los nombres de servicios del catálogo (y el de la figura) son marcas de sus titulares y se usan solo para identificar los servicios; LordOS no está afiliado a ellos ni cuenta con su respaldo o patrocinio.
+Los nombres de servicios del catálogo (y el de la figura) son marcas de sus titulares y se usan solo para identificar los servicios; LordOS no está afiliado a ellos ni cuenta con su respaldo o patrocinio. En desarrollo después de 0.8.8.8 (la última versión), la Tienda muestra el mismo aviso en los 35 idiomas de la interfaz, debajo de su sección Apps web y en la página de cada app web, junto con el hecho de que LordOS ejecuta los sitios sin modificarlos.
 
 ### 5.5 WebAssembly
 

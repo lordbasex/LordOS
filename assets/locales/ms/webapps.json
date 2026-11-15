@@ -111,6 +111,7 @@
   "store.seeMore": "Lihat Lagi",
   "store.engineTitle": "Enjin web LordOS belum dipasang",
   "store.engineBody": "Apl web berjalan dalam enjin web LordOS sendiri (pakej lordos-web). Apl pertama yang anda dapatkan turut memasangnya, sekali sahaja; LordOS yang lain berfungsi sama tanpanya.",
+  "store.trademark": "Nama produk, logo dan ikon yang ditunjukkan ialah tanda dagangan pemilik masing-masing, digunakan hanya untuk mengenal pasti perkhidmatan. LordOS tidak bergabung dengan, disokong atau ditaja oleh mereka. LordOS tidak mengubah tapak: ia menjalankannya seperti yang disajikan.",
   "get.engineTitle": "Enjin web LordOS diperlukan sekali",
   "get.engineBody": "{name} berjalan dalam enjin web LordOS sendiri (pakej lordos-web), yang belum dipasang. Ia dipasang sekali, bersama apl ini; apl web seterusnya tidak memerlukannya.",
   "get.engineSizes": "Muat turun: {download} · Pada cakera: {disk}",

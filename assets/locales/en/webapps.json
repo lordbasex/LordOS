@@ -112,6 +112,7 @@
   "store.seeMore": "See More",
   "store.engineTitle": "LordOS's web engine isn't installed yet",
   "store.engineBody": "Web apps run in LordOS's own web engine (the lordos-web package). The first app you get installs it too, once; the rest of LordOS works the same without it.",
+  "store.trademark": "The product names, logos and icons shown are trademarks of their respective owners, used only to identify the services. LordOS is not affiliated with, endorsed or sponsored by them. LordOS doesn't change the sites: it runs them as they serve them.",
   "get.engineTitle": "LordOS's web engine is needed once",
   "get.engineBody": "{name} runs in LordOS's own web engine (the lordos-web package), which isn't installed yet. It's installed once, with this app; the next web apps don't need it.",
   "get.engineSizes": "Download: {download} · On disk: {disk}",

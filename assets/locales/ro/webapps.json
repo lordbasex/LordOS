@@ -113,6 +113,7 @@
   "store.seeMore": "Vezi mai multe",
   "store.engineTitle": "Motorul web al LordOS nu este încă instalat",
   "store.engineBody": "Aplicațiile web rulează în motorul web propriu al LordOS (pachetul lordos-web). Prima aplicație pe care o obțineți îl instalează și pe el, o singură dată; restul LordOS funcționează la fel și fără el.",
+  "store.trademark": "Numele de produse, siglele și pictogramele afișate sunt mărci ale proprietarilor lor, folosite doar pentru a identifica serviciile. LordOS nu este afiliat cu aceștia și nu este aprobat sau sponsorizat de ei. LordOS nu modifică site-urile: le rulează așa cum sunt servite.",
   "get.engineTitle": "Motorul web al LordOS este necesar o singură dată",
   "get.engineBody": "{name} rulează în motorul web propriu al LordOS (pachetul lordos-web), care nu este încă instalat. Se instalează o singură dată, cu această aplicație; următoarele aplicații web nu au nevoie de el.",
   "get.engineSizes": "Descărcare: {download} · Pe disc: {disk}",

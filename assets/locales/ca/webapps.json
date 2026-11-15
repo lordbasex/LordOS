@@ -112,6 +112,7 @@
   "store.seeMore": "Mostra’n més",
   "store.engineTitle": "El motor web de LordOS encara no està instal·lat",
   "store.engineBody": "Les apps web funcionen amb el motor web propi de LordOS (el paquet lordos-web). La primera app que aconsegueixis també l’instal·la, un sol cop; la resta de LordOS funciona igual sense ell.",
+  "store.trademark": "Els noms de productes, logotips i icones que es mostren són marques dels seus respectius titulars i s’utilitzen només per identificar els serveis. LordOS no hi està afiliat ni compta amb el seu suport o patrocini. LordOS no modifica els llocs: els executa tal com els serveixen.",
   "get.engineTitle": "Cal el motor web de LordOS un sol cop",
   "get.engineBody": "{name} funciona amb el motor web propi de LordOS (el paquet lordos-web), que encara no està instal·lat. S’instal·la un sol cop, amb aquesta app; les apps web següents no el necessiten.",
   "get.engineSizes": "Baixada: {download} · Al disc: {disk}",

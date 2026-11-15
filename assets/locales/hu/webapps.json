@@ -112,6 +112,7 @@
   "store.seeMore": "Továbbiak",
   "store.engineTitle": "A LordOS webmotorja még nincs telepítve",
   "store.engineBody": "A webalkalmazások a LordOS saját webmotorjában futnak (a lordos-web csomag). Az első beszerzett alkalmazás egyszer ezt is telepíti; a LordOS többi része nélküle is ugyanúgy működik.",
+  "store.trademark": "A megjelenített terméknevek, logók és ikonok a tulajdonosaik védjegyei, és csak a szolgáltatások azonosítására szolgálnak. A LordOS nem áll kapcsolatban velük, és nem támogatják vagy szponzorálják. A LordOS nem módosítja a webhelyeket: úgy futtatja őket, ahogy azok kiszolgálják magukat.",
   "get.engineTitle": "Egyszer szükség van a LordOS webmotorjára",
   "get.engineBody": "A(z) {name} a LordOS saját webmotorjában fut (a lordos-web csomag), amely még nincs telepítve. Egyszer települ, ezzel az alkalmazással; a következő webalkalmazásoknak már nincs rá szükségük.",
   "get.engineSizes": "Letöltés: {download} · Lemezen: {disk}",

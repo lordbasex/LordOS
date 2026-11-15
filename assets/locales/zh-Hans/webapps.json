@@ -111,6 +111,7 @@
   "store.seeMore": "查看更多",
   "store.engineTitle": "尚未安装 LordOS 网页引擎",
   "store.engineBody": "网页应用运行在 LordOS 自己的网页引擎中（lordos-web 软件包）。获取第一个应用时会一并安装它，只需一次；没有它，LordOS 的其他部分照常工作。",
+  "store.trademark": "所显示的产品名称、标志和图标均为其各自所有者的商标，仅用于标识相应服务。LordOS 与它们没有关联，也未获得它们的认可或赞助。LordOS 不修改这些网站，只按网站提供的原样运行它们。",
   "get.engineTitle": "需要安装一次 LordOS 网页引擎",
   "get.engineBody": "{name} 运行在 LordOS 自己的网页引擎中（lordos-web 软件包），该引擎尚未安装。它会随此应用安装一次；之后的网页应用不再需要。",
   "get.engineSizes": "下载：{download} · 磁盘占用：{disk}",
