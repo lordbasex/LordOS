@@ -448,6 +448,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **lord-server no longer aborts at start when built with `_FORTIFY_SOURCE`** (pull request
+  [#138](https://github.com/lordbasex/LordOS/pull/138), thanks to Kiisanz). `realpath()` may write up to `PATH_MAX`
+  bytes, but the Terminal's shell-integration folder (`server/src/term/pty.c`, 1,024 bytes) and the fan helper's device
+  paths (`server/src/fan/fanhw.c`, 320 bytes) were smaller: with fortify (the default of several distributions'
+  compilers) glibc's `__realpath_chk` aborted lord-server before the login screen, and without it a very long path
+  could overflow those buffers. Both now use `PATH_MAX` buffers (the fan helper copies the result cut to its field).
+  Built with `-D_FORTIFY_SOURCE=3`: no warnings; `fan-test` 4,224 checks.
+- **The administrator group is `wheel` where a system has no `sudo` group** (pull request
+  [#141](https://github.com/lordbasex/LordOS/pull/141), thanks to Kiisanz): Settings → Users (`users_admin.c`) and the
+  first run (`firstrun_apply.c`) gave administrators only `sudo`, so on such a system nobody could be made one, though
+  `admin.c`'s `is_admin` and the admin rescue already accepted `sudo`, `admin` and `wheel`. Nothing changes where a
+  `sudo` group exists (Debian, the ISO and the Raspberry Pi image); LordOS still supports only Debian 13.
+
 - **Choosing an entry in the tray menu of go-link Desk (and other fyne.io/systray apps) did nothing.** These apps build
   their com.canonical.dbusmenu menu anew, with new ids, every time they change it: go-link Desk refreshes its menu at
   each status update, about every 1 to 2 seconds (`ResetMenu` and `AddMenuItem`, 21 `LayoutUpdated` signals each
