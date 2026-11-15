@@ -156,6 +156,24 @@
       "name": "Azərbaycan",
       "english": "Azerbaijani",
       "direction": "ltr"
+    },
+    {
+      "id": "ca",
+      "name": "Català",
+      "english": "Catalan",
+      "direction": "ltr"
+    },
+    {
+      "id": "fil",
+      "name": "Filipino",
+      "english": "Filipino",
+      "direction": "ltr"
+    },
+    {
+      "id": "sw",
+      "name": "Kiswahili",
+      "english": "Swahili",
+      "direction": "ltr"
     }
   ]
 }

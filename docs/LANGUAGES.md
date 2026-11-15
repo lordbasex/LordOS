@@ -1,11 +1,12 @@
 # Language and region in LordOS
 
 LordOS handles language across the whole system, not just in the interface. It ships complete in
-**English, Spanish, Portuguese, French, Italian and Lithuanian**, and, in development for the release after 0.8.8.8-beta, in 26 more
-languages, each one complete too (every one of the 12,436 keys; see "26 languages from lordos.org's visitors":
+**English, Spanish, Portuguese, French, Italian and Lithuanian**, and, in development for the release after 0.8.8.8-beta, in 29 more
+languages, each one complete too (every one of the 12,436 keys; see "26 languages from lordos.org's visitors" and
+"Catalan, Filipino and Swahili":
 Indonesian, Japanese, German, Hindi, Malay, Bengali, Simplified and Traditional Chinese, Ukrainian, Polish, Arabic,
 Vietnamese, Swedish, Greek, Dutch, Turkish, Hungarian, Persian, Russian, Romanian, Finnish, Urdu, Bulgarian, Korean,
-Thai and Azerbaijani): 32 languages. The project's rule (maintainer's business rule, 2026-11-15) is that a language
+Thai and Azerbaijani; then Catalan, Filipino and Swahili): 35 languages. The project's rule (maintainer's business rule, 2026-11-15) is that a language
 ships complete, never partial, and that every text added or changed in English reaches every language in the same
 release or pre-release. More languages are added with packs, without touching code.
 
@@ -175,7 +176,7 @@ Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, test
 `node tools/i18n-pack.mjs export pt` exports an existing language in the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (in development after 0.8.8.8-beta): 12,436 keys, complete in all 32 languages (en, es, pt, fr, it, lt and the 26 new ones, since 2026-11-15), and 577 error codes from the server (earlier: 2026-11-12, 12,415 keys with 26 partial languages; 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (in development after 0.8.8.8-beta): 12,436 keys, complete in all 35 languages (en, es, pt, fr, it, lt, the 26 new ones and ca, fil and sw, since 2026-11-15), and 577 error codes from the server (earlier: 2026-11-12, 12,415 keys with 26 partial languages; 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
@@ -594,10 +595,10 @@ translates the desktop, Settings, Files, About and the Calculator; the Terminal 
 - The installer lists only the regions of the chosen language (English with `lt_LT` is chosen afterwards
   in Settings → Language & Region), and the first-run file of the Raspberry Pi image takes only en, es,
   pt, fr and it (`firstrun.c` checks a closed list, and the image generates only those regions): a Pi set up in
-  Lithuanian or one of the 26 new languages starts in English and changes it in Settings.
+  Lithuanian or one of the 29 new languages starts in English and changes it in Settings.
 - The home folders (Desktop, Documents, Downloads…) are named in English for every language but es, pt, fr and
   it (`server/src/users/homedirs.c`).
-- Formats the 26 new languages still lack: the Solar Hijri calendar for Persian and the Buddhist era for Thai
+- Formats the 29 new languages still lack: the Solar Hijri calendar for Persian and the Buddhist era for Thai
   (dates are Gregorian), Indian digit grouping for Hindi and Bengali («12,34,567»; LordOS groups by three), and
   Finnish's «21.05» clock (the clock always uses «:»).
 
