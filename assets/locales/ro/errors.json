@@ -659,6 +659,7 @@
   "users.deleteSelf": "Nu puteți șterge contul pe care îl folosiți",
   "users.exists": "„{name}” există deja",
   "users.groupFailed": "Grupul nu a putut fi modificat",
+  "users.adminPrimaryGroup": "Grupul principal al acestui cont este un grup de administratori, deci nu poate fi eliminat de aici. Ca root, schimbați mai întâi grupul său principal (usermod -g)",
   "users.invalid": "Utilizator nevalid",
   "users.lastAdmin": "Acesta este singurul administrator",
   "users.passwordNotAllowed": "Doar un administrator poate schimba parola altui utilizator",

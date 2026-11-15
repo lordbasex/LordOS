@@ -658,6 +658,7 @@
   "users.deleteSelf": "No pots eliminar el compte que estàs fent servir",
   "users.exists": "«{name}» ja existeix",
   "users.groupFailed": "No s’ha pogut canviar el grup",
+  "users.adminPrimaryGroup": "El grup principal d’aquest compte és un grup d’administradors, així que no es pot treure des d’aquí. Com a root, canvieu primer el seu grup principal (usermod -g)",
   "users.invalid": "Usuari no vàlid",
   "users.lastAdmin": "Aquest és l’únic administrador",
   "users.passwordNotAllowed": "Només un administrador pot canviar la contrasenya d’un altre usuari",

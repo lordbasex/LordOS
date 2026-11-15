@@ -658,6 +658,7 @@
   "users.deleteSelf": "Du kannst das Konto, das du gerade verwendest, nicht löschen",
   "users.exists": "„{name}“ existiert bereits",
   "users.groupFailed": "Die Gruppe konnte nicht geändert werden",
+  "users.adminPrimaryGroup": "Die Hauptgruppe dieses Kontos ist eine Administratorgruppe und kann hier nicht entfernt werden. Ändern Sie als root zuerst seine Hauptgruppe (usermod -g)",
   "users.invalid": "Ungültiger Benutzer",
   "users.lastAdmin": "Das ist der einzige Administrator",
   "users.passwordNotAllowed": "Nur ein Administrator kann das Passwort eines anderen Benutzers ändern",

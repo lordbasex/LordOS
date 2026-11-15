@@ -658,6 +658,7 @@
   "users.deleteSelf": "Et voi poistaa käyttämääsi tiliä",
   "users.exists": "”{name}” on jo olemassa",
   "users.groupFailed": "Ryhmää ei voitu muuttaa",
+  "users.adminPrimaryGroup": "Tämän tilin pääryhmä on järjestelmänvalvojien ryhmä, joten sitä ei voi poistaa täältä. Vaihda root-käyttäjänä ensin sen pääryhmä (usermod -g)",
   "users.invalid": "Virheellinen käyttäjä",
   "users.lastAdmin": "Tämä on ainoa järjestelmänvalvoja",
   "users.passwordNotAllowed": "Vain järjestelmänvalvoja voi vaihtaa toisen käyttäjän salasanan",

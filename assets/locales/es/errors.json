@@ -658,6 +658,7 @@
   "users.deleteSelf": "No se puede borrar la cuenta con la que estás",
   "users.exists": "Ya existe «{name}»",
   "users.groupFailed": "No se pudo cambiar el grupo",
+  "users.adminPrimaryGroup": "El grupo principal de esta cuenta es un grupo de administradores, así que no se puede quitar desde aquí. Como root, cambiá primero su grupo principal (usermod -g)",
   "users.invalid": "Usuario inválido",
   "users.lastAdmin": "Es el único administrador",
   "users.passwordNotAllowed": "Solo un administrador cambia la contraseña de otro usuario",

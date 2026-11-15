@@ -658,6 +658,7 @@
   "users.deleteSelf": "You can't delete the account you are using",
   "users.exists": "“{name}” already exists",
   "users.groupFailed": "Could not change the group",
+  "users.adminPrimaryGroup": "This account's main group is an administrator group, so it can't be removed here. As root, change its main group first (usermod -g)",
   "users.invalid": "Invalid user",
   "users.lastAdmin": "This is the only administrator",
   "users.passwordNotAllowed": "Only an administrator can change another user's password",

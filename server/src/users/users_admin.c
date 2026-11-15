@@ -5,7 +5,8 @@
  *   user-del       name \n keep the home folder (0|1)
  *   user-passwd    name \n new password \n current password
  *                  (your own: anyone, with the current one; someone else's: only an administrator)
- *   user-admin     name \n 0|1                         (sudo group, or wheel without one)
+ *   user-admin     name \n 0|1                         (1: joins sudo, or wheel without one;
+ *                                                       0: leaves every administrator group)
  *   user-avatar    name \n color (#rrggbb or empty) \n image ("" unchanged, "-" remove, or a path
  *                  in the requester's home folder; PNG or JPEG up to 4 MB)
  *                  (your own: anyone; someone else's: only an administrator)
@@ -19,6 +20,7 @@
  * (read by the login screen, which can't get into home folders). */
 #include "users_admin.h"
 #include "admin_rescue.h"
+#include "admingroups.h"
 #include "homedirs.h"
 
 #include <crypt.h>
@@ -39,10 +41,10 @@
 
 #define USERS_DIR "/var/lib/lordos/users"
 #define SESSION_CONF "/etc/lordos/session.conf"
-/* The group that makes someone an administrator: sudo (Debian, Ubuntu), or wheel where there is no
- * sudo group (Arch, Fedora). admin.c's is_admin and admin_rescue.c already accept either. */
-static const char *admin_group(void) { return getgrnam("sudo") || !getgrnam("wheel") ? "sudo" : "wheel"; }
-#define ADMIN_GROUP admin_group()
+/* Who is an administrator, and which group a new one joins: admingroups.h (sudo, admin or wheel; a
+ * new administrator joins sudo, or wheel where there is no sudo group). */
+static int group_exists(const char *g) { return getgrnam(g) != NULL; }
+static const char *admin_group_new(void) { return admin_group_for_new(group_exists); }
 #define SUDO_BIN "/usr/bin/sudo"
 #define RUN_DIR "/run/lordos"
 #define RESCUE_LOCK RUN_DIR "/admin-rescue.lock"
@@ -115,14 +117,36 @@ static int in_group(const char *user, const char *group) {
     return 0;
 }
 
+/* People's accounts that are administrators by admin.c's rule (any group in admingroups.h) */
 static int admins(void) {
     int n = 0;
     setpwent();
     struct passwd *pw;
-    while ((pw = getpwent()))
-        if (pw->pw_uid >= 1000 && pw->pw_uid < 60000 && in_group(pw->pw_name, ADMIN_GROUP)) n++;
+    AdminMembership m;
+    while ((pw = getpwent())) {
+        admin_membership_read(pw->pw_name, pw->pw_uid, pw->pw_gid, &m);
+        if (admin_membership_counts_person(&m)) n++;
+    }
     endpwent();
     return n;
+}
+
+/* Takes the account out of every administrator group it is in, then checks it isn't one any more.
+ * Its primary group can't be left with gpasswd: refused before anything changes. NULL when done,
+ * else the error code. */
+static const char *admin_revoke(const char *name) {
+    AdminMembership m;
+    const char *groups[ADMIN_GROUP_COUNT];
+    if (admin_membership_load(name, &m)) return "users.invalid";
+    int n = admin_revoke_plan(&m, groups);
+    if (n == ADMIN_REVOKE_PRIMARY) return "users.adminPrimaryGroup";
+    if (n < 0) return "users.groupFailed";
+    int failed = 0;
+    for (int i = 0; i < n; i++) {
+        const char *const del[] = { "/usr/bin/gpasswd", "--delete", name, groups[i], NULL };
+        if (admin_run(del)) failed = 1;
+    }
+    return failed || user_is_admin(name) ? "users.groupFailed" : NULL;
 }
 
 static int set_password(const char *user, const char *pass) {
@@ -221,15 +245,17 @@ void users_act_add(const AdminReq *r, const char *arg, size_t len) {
     if (!buf || !split(buf, f, 4)) { admin_err("admin.invalidArgument", NULL); free(buf); return; }
     const char *name = f[0], *full = f[1], *pass = f[2];
     int adm = !strcmp(f[3], "1");
+    const char *group = admin_group_new();
     if (!valid_name(name) || !valid_full(full) || !valid_pass(pass)) admin_err("users.badNameOrPassword", NULL);
     else if (getpwnam(name) || getgrnam(name)) admin_err("users.exists", "name", name, NULL);
+    else if (adm && !group) admin_err("users.groupFailed", NULL);
     else {
         const char *const a[] = { "/usr/sbin/useradd", "--create-home", "--shell", "/bin/bash", "--user-group", "--comment", full, name, NULL };
         struct passwd *pw;
         if (admin_run(a) || !(pw = getpwnam(name))) admin_err("sys.programError", "program", "useradd", NULL);
         else if (set_password(name, pass)) admin_err("users.setPasswordFailed", NULL);
         else {
-            if (adm) { const char *const g[] = { "/usr/sbin/usermod", "--append", "--groups", ADMIN_GROUP, name, NULL }; admin_run(g); print_group(name, 1); }
+            if (adm) { const char *const g[] = { "/usr/sbin/usermod", "--append", "--groups", group, name, NULL }; admin_run(g); print_group(name, 1); }
             if (getgrnam("pipewire")) { const char *const g[] = { "/usr/sbin/usermod", "--append", "--groups", "pipewire", name, NULL }; admin_run(g); }   /* real-time sound (docs/SOUND.md) */
             if (getgrnam("plugdev")) { const char *const g[] = { "/usr/sbin/usermod", "--append", "--groups", "plugdev", name, NULL }; admin_run(g); }   /* FIDO2 security keys (docs/PASSWORDS.md) */
             /* sound card, camera and GPU render node: lord-sessiond sessions have no logind seat, so
@@ -253,7 +279,7 @@ void users_act_del(const AdminReq *r, const char *arg, size_t len) {
     struct passwd *pw = person(name);
     if (!pw) admin_err("users.invalid", NULL);
     else if (!strcmp(name, r->user)) admin_err("users.deleteSelf", NULL);
-    else if (in_group(name, ADMIN_GROUP) && admins() <= 1) admin_err("users.lastAdmin", NULL);
+    else if (user_is_admin(name) && admins() <= 1) admin_err("users.lastAdmin", NULL);
     else {
         /* their session (and everything of theirs) ends first */
         const char *const k[] = { "/usr/bin/pkill", "--signal", "KILL", "--uid", name, NULL };
@@ -297,13 +323,17 @@ void users_act_admin(const AdminReq *r, const char *arg, size_t len) {
     int on = !strcmp(f[1], "1");
     (void)r;
     if (!person(name) || (strcmp(f[1], "0") && strcmp(f[1], "1"))) admin_err("admin.invalidArgument", NULL);
-    else if (!on && in_group(name, ADMIN_GROUP) && admins() <= 1) admin_err("users.lastAdmin", NULL);
-    else {
-        const char *const add[] = { "/usr/sbin/usermod", "--append", "--groups", ADMIN_GROUP, name, NULL };
-        const char *const del[] = { "/usr/bin/gpasswd", "--delete", name, ADMIN_GROUP, NULL };
-        if (on == in_group(name, ADMIN_GROUP)) admin_ok("users.unchanged", NULL);
-        else if (admin_run(on ? add : del)) admin_err("users.groupFailed", NULL);
-        else { print_group(name, on); admin_ok(on ? "users.nowAdmin" : "users.noLongerAdmin", "name", name, NULL); }
+    else if (on == user_is_admin(name)) admin_ok("users.unchanged", NULL);
+    else if (!on && admins() <= 1) admin_err("users.lastAdmin", NULL);
+    else if (on) {
+        const char *group = admin_group_new();
+        const char *const add[] = { "/usr/sbin/usermod", "--append", "--groups", group ? group : "", name, NULL };
+        if (!group || admin_run(add) || !user_is_admin(name)) admin_err("users.groupFailed", NULL);
+        else { print_group(name, 1); admin_ok("users.nowAdmin", "name", name, NULL); }
+    } else {
+        const char *refused = admin_revoke(name);
+        if (refused) admin_err(refused, NULL);
+        else { print_group(name, 0); admin_ok("users.noLongerAdmin", "name", name, NULL); }
     }
     free(buf);
 }
@@ -374,14 +404,9 @@ void users_act_autologin(const AdminReq *r, const char *arg, size_t len) {
 /* Member of sudo, admin or wheel by the system's files right now, as admin.c's is_admin. Fails
  * closed: a list of groups too long to read counts as an administrator. */
 static int admin_member(const struct passwd *pw) {
-    gid_t groups[256];
-    int n = 256;
-    if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &n) < 0) return 1;
-    for (int i = 0; i < n; i++) {
-        struct group *g = getgrgid(groups[i]);
-        if (g && rescue_group_is_admin(g->gr_name)) return 1;
-    }
-    return 0;
+    AdminMembership m;
+    admin_membership_read(pw->pw_name, pw->pw_uid, pw->pw_gid, &m);
+    return admin_membership_is_admin(&m, 1);
 }
 
 static int any_admin(void) {
@@ -395,7 +420,7 @@ static int any_admin(void) {
 
 static int sudo_ready(void) {
     struct stat st;
-    return getgrnam(ADMIN_GROUP) && !stat(SUDO_BIN, &st) && S_ISREG(st.st_mode) && st.st_uid == 0;
+    return admin_group_new() && !stat(SUDO_BIN, &st) && S_ISREG(st.st_mode) && st.st_uid == 0;
 }
 
 /* Always read again as root: nothing here comes from the UI. */
@@ -434,11 +459,12 @@ void users_act_rescue(const AdminReq *r, const char *arg, size_t len) {
         sleep(RESCUE_FAIL_DELAY);
         admin_err("users.rescueWrongPassword", NULL);
     } else {
-        const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", ADMIN_GROUP, r->user, NULL };
-        if (admin_run(a) || !in_group(r->user, ADMIN_GROUP)) admin_err("users.groupFailed", NULL);
+        const char *group = admin_group_new();          /* there is one: sudo_ready() said so */
+        const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", group ? group : "", r->user, NULL };
+        if (!group || admin_run(a) || !in_group(r->user, group)) admin_err("users.groupFailed", NULL);
         else {
             print_group(r->user, 1);
-            syslog(LOG_AUTHPRIV | LOG_NOTICE, "lord-admin: admin-rescue: %s added to the %s group", r->user, ADMIN_GROUP);
+            syslog(LOG_AUTHPRIV | LOG_NOTICE, "lord-admin: admin-rescue: %s added to the %s group", r->user, group);
             admin_ok("users.rescueDone", "name", r->user, NULL);
         }
     }

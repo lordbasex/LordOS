@@ -658,6 +658,7 @@
   "users.deleteSelf": "Hindi mo mabubura ang account na ginagamit mo",
   "users.exists": "Umiiral na ang “{name}”",
   "users.groupFailed": "Hindi mapalitan ang grupo",
+  "users.adminPrimaryGroup": "Ang pangunahing grupo ng account na ito ay grupo ng mga administrator, kaya hindi ito maaalis dito. Bilang root, palitan muna ang pangunahing grupo nito (usermod -g)",
   "users.invalid": "Di-wastong user",
   "users.lastAdmin": "Ito lang ang administrator",
   "users.passwordNotAllowed": "Isang administrator lang ang makakapagpalit ng password ng ibang user",

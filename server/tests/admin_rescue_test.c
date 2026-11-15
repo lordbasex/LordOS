@@ -61,12 +61,7 @@ int main(void) {
     CHECK(!strcmp(rescue_refusal(RESCUE_ROOT_LOCKED), "users.rescueRootLocked"));
 
     /* who counts as an administrator */
-    CHECK(rescue_group_is_admin("sudo"));
-    CHECK(rescue_group_is_admin("admin"));
-    CHECK(rescue_group_is_admin("wheel"));
-    CHECK(!rescue_group_is_admin("sudoers"));
-    CHECK(!rescue_group_is_admin("adm"));
-    CHECK(!rescue_group_is_admin(""));
+    /* (which groups: build/admin-groups-test) */
     CHECK(!rescue_account_counts(0, 1));          /* root in sudo is still "nobody" */
     CHECK(rescue_account_counts(1000, 1));
     CHECK(rescue_account_counts(120, 1));         /* a system account in sudo does count */

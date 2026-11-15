@@ -543,6 +543,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   first run (`firstrun_apply.c`) gave administrators only `sudo`, so on such a system nobody could be made one, though
   `admin.c`'s `is_admin` and the admin rescue already accepted `sudo`, `admin` and `wheel`. Nothing changes where a
   `sudo` group exists (Debian, the ISO and the Raspberry Pi image); LordOS still supports only Debian 13.
+- **Turning "Administrator" off in Settings → Users now really takes the user's administrator rights away** (a
+  follow-up to pull request [#141](https://github.com/lordbasex/LordOS/pull/141) by Kiisanz). LordOS treats as an
+  administrator anyone in `sudo`, `admin` or `wheel` (`admin.c`'s `is_admin`, the admin rescue), but Settings → Users
+  looked at a single group: `user-admin name 0` removed the user only from `sudo` (or `wheel`), so someone also in
+  another of them stayed an administrator for LordOS while Settings said they weren't; and the last-administrator
+  protection (`user-del`, `user-admin`) and the "already an administrator" check counted only that one group, a
+  different rule from `is_admin`. There is now one closed list of administrator groups and one rule, in
+  `server/src/users/admingroups.{h,c}`, fixed in the code and never configurable from JS or any input, used by
+  `admin.c`, `users_admin.c` (Settings → Users and the rescue) and `lordos-firstrun`:
+  - a new administrator joins `sudo`, or `wheel` where there is no `sudo` group (#141's choice; never `admin`). With
+    neither group, `user-add` with "Administrator" refuses before creating the account (`users.groupFailed`) instead
+    of creating it silently without the right;
+  - `user-admin name 0` runs `/usr/bin/gpasswd --delete` for **every** administrator group the user is in, then
+    reads the system again and fails with `users.groupFailed` if they still are one. A user whose primary group is an
+    administrator group can't be taken out with `gpasswd`: refused before anything changes, with the new error
+    `users.adminPrimaryGroup` ("…as root, change its main group first (usermod -g)"), in all 35 languages;
+  - "the last administrator" counts people's accounts (uid 1000–59999) that are in any of the groups, primary or
+    supplementary, as `is_admin` does.
+  New suite `build/admin-groups-test` (36 checks: the closed list, the group for a new administrator on Debian,
+  Fedora-style and bare systems, a user in `sudo` and `wheel` revoked from both, the last administrator counted across
+  groups, a `wheel`-only system, the primary-group refusal, an unreadable group list). Built with
+  `-D_FORTIFY_SOURCE=3`: no warnings. Documented in docs/SESSIONS.md ("Who is an administrator").
 
 - **Choosing an entry in the tray menu of go-link Desk (and other fyne.io/systray apps) did nothing.** These apps build
   their com.canonical.dbusmenu menu anew, with new ids, every time they change it: go-link Desk refreshes its menu at

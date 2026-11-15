@@ -657,6 +657,7 @@
   "users.deleteSelf": "你無法刪除正在使用的帳號",
   "users.exists": "「{name}」已存在",
   "users.groupFailed": "無法變更群組",
+  "users.adminPrimaryGroup": "此帳號的主要群組是管理者群組，因此無法在這裡移除。請先以 root 身分變更其主要群組 (usermod -g)",
   "users.invalid": "無效的使用者",
   "users.lastAdmin": "這是唯一的管理者",
   "users.passwordNotAllowed": "只有管理者可以變更其他使用者的密碼",

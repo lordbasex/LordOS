@@ -659,6 +659,7 @@
   "users.deleteSelf": "Negalite ištrinti paskyros, kurią naudojate",
   "users.exists": "„{name}“ jau yra",
   "users.groupFailed": "Nepavyko pakeisti grupės",
+  "users.adminPrimaryGroup": "Šios paskyros pagrindinė grupė yra administratorių grupė, todėl čia jos pašalinti negalima. Kaip root pirmiausia pakeiskite jos pagrindinę grupę (usermod -g)",
   "users.invalid": "Netinkamas naudotojas",
   "users.lastAdmin": "Tai vienintelis administratorius",
   "users.passwordNotAllowed": "Kito naudotojo slaptažodį keisti gali tik administratorius",

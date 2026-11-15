@@ -1,7 +1,7 @@
 /* admin_rescue.c — the decision of admin_rescue.h. */
 #include "admin_rescue.h"
 
-#include <string.h>
+#include <stddef.h>
 
 RescueState rescue_state(const RescueFacts *f) {
     if (!f->person) return RESCUE_NOT_ALLOWED;
@@ -29,10 +29,6 @@ const char *rescue_refusal(RescueState s) {
     case RESCUE_ROOT_LOCKED: return "users.rescueRootLocked";
     default: return "users.rescueNotAllowed";
     }
-}
-
-int rescue_group_is_admin(const char *group) {
-    return !strcmp(group, "sudo") || !strcmp(group, "admin") || !strcmp(group, "wheel");
 }
 
 int rescue_account_counts(uid_t uid, int member) {

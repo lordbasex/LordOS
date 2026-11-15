@@ -658,6 +658,7 @@
   "users.deleteSelf": "Nem törölheti az éppen használt fiókot",
   "users.exists": "„{name}” már létezik",
   "users.groupFailed": "Nem sikerült módosítani a csoportot",
+  "users.adminPrimaryGroup": "Ennek a fióknak az elsődleges csoportja rendszergazdai csoport, ezért itt nem távolítható el. Rootként előbb módosítsa az elsődleges csoportját (usermod -g)",
   "users.invalid": "Érvénytelen felhasználó",
   "users.lastAdmin": "Ez az egyetlen rendszergazda",
   "users.passwordNotAllowed": "Más felhasználó jelszavát csak rendszergazda módosíthatja",

@@ -658,6 +658,7 @@
   "users.deleteSelf": "Je kunt het account dat je gebruikt niet verwijderen",
   "users.exists": "“{name}” bestaat al",
   "users.groupFailed": "De groep kon niet worden gewijzigd",
+  "users.adminPrimaryGroup": "De hoofdgroep van dit account is een beheerdersgroep, dus die kan hier niet worden verwijderd. Wijzig als root eerst de hoofdgroep (usermod -g)",
   "users.invalid": "Ongeldige gebruiker",
   "users.lastAdmin": "Dit is de enige beheerder",
   "users.passwordNotAllowed": "Alleen een beheerder kan het wachtwoord van een andere gebruiker wijzigen",

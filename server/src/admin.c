@@ -36,6 +36,7 @@
 #include "remote/ssh_admin.h"
 #include "remote/ssh_root.h"
 #include "users/users_admin.h"
+#include "users/admingroups.h"
 #include "disk/disk.h"
 #include "imager/imager_admin.h"
 #include "logs/logs_admin.h"
@@ -125,18 +126,9 @@ void admin_event(const char *fmt, ...) {
     va_end(ap);
 }
 
-static int is_admin(const char *user) {
-    struct passwd *pw = getpwnam(user);
-    if (!pw) return 0;
-    gid_t groups[256];
-    int n = 256;
-    if (getgrouplist(user, pw->pw_gid, groups, &n) < 0) return 0;
-    for (int i = 0; i < n; i++) {
-        struct group *g = getgrgid(groups[i]);
-        if (g && (!strcmp(g->gr_name, "sudo") || !strcmp(g->gr_name, "admin") || !strcmp(g->gr_name, "wheel"))) return 1;
-    }
-    return 0;
-}
+/* A member of sudo, admin or wheel (primary or supplementary) by the system's files right now; the
+ * one list and rule shared with Settings → Users and the rescue: users/admingroups.h. */
+static int is_admin(const char *user) { return user_is_admin(user); }
 
 static char *const clean_env[] = { "PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8", "DEBIAN_FRONTEND=noninteractive", NULL };
 
