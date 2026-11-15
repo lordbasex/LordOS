@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} lazima iwe na toleo moja kwa biti 64 na 32, na badiliko hili lingeyatenganisha",
   "pkg.multiarchConflict": "{name} haiwezi kusakinishwa kwa biti 64 na 32 kwa wakati mmoja",
   "pkg.foreignArchUnsupported": "Vifurushi vya biti 32 vinaweza kuwezeshwa tu kwenye kompyuta ya biti 64 (amd64); mfumo huu ni {arch}",
-  "pkg.foreignArchFailed": "Vifurushi vya biti 32 ({arch}) havikuweza kuwezeshwa (dpkg ilitoka kwa msimbo {code})"
+  "pkg.foreignArchFailed": "Vifurushi vya biti 32 ({arch}) havikuweza kuwezeshwa (dpkg ilitoka kwa msimbo {code})",
+  "webapps.developerOff": "Hali ya msanidi imezimwa katika Mipangilio → Programu za Wavuti"
 }

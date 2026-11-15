@@ -8,5 +8,8 @@
   "chooser.openMany": "Pilih berkas-berkas",
   "offline.title": "Tidak ada koneksi",
   "offline.body": "Aplikasi ini tidak dapat menjangkau situsnya. Aplikasi akan mencoba lagi sendiri begitu jaringan kembali.",
-  "offline.hint": "Tekan Ctrl+R untuk mencoba sekarang."
+  "offline.hint": "Tekan Ctrl+R untuk mencoba sekarang.",
+  "inspect.title": "Alat developer aktif",
+  "inspect.body": "Sampai Anda menutup jendela ini. Alamat:",
+  "inspect.failed": "Alat developer tidak dapat dimulai"
 }

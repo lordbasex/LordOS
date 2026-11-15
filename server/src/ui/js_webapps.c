@@ -37,7 +37,7 @@
  *   icons()                             { [app]: path } of the cached icons (list() and get() already use them)
  *   badges()                            [{ app, profile, count }]: the unread counts lord-web set (SetBadge, webask.c)
  *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
- *   running()                           [{ app, profile, pid }]
+ *   running()                           [{ app, profile, pid, inspect }] (inspect: started with developer tools on)
  *   memory(app)                         null when none of its profiles runs; else { kb, processes, unreadable,
  *                                       profiles: [{ profile, kb, processes }] }: the Pss of each running lord-web of
  *                                       the app and of its WebKit processes (web/webmem.c; read-only, bounded)
@@ -46,7 +46,13 @@
  *   asks()                              the questions still waiting
  *   edit(app, profile, command)         the Edit menu on that web app's window: undo|redo|cut|copy|paste|selectAll, to its
  *                                       lord-web (org.lordos.WebApp1.Edit, which checks the caller is lord-server)
- *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or "" */
+ *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or ""
+ *   developerMode() · setDeveloperMode(on)  Settings → Web Apps → Developer mode (~/.config/lordos/web/developer.json);
+ *                                       off ends every window that has developer tools on
+ *   inspect(app, profile)               → 'started' or 'running': that window again with WebKit's remote inspector on
+ *                                       127.0.0.1 (lord-web --inspect, webinspect.h), only while developer mode is on
+ *                                       ("webapps.developerOff"); the shell asks the person first. lord-web opens the
+ *                                       inspector in the person's browser itself. */
 #include "js_webapps.h"
 #include "js_err.h"
 #include "js_sys.h"
@@ -561,6 +567,7 @@ static JSValue f_running(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, o, "app", JS_NewString(c, r[i].app));
         JS_SetPropertyStr(c, o, "profile", JS_NewString(c, r[i].profile));
         JS_SetPropertyStr(c, o, "pid", JS_NewInt32(c, (int32_t)r[i].pid));
+        JS_SetPropertyStr(c, o, "inspect", JS_NewBool(c, r[i].inspect));
         JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
     }
     return arr;
@@ -648,6 +655,35 @@ static JSValue f_menu_answer(JSContext *c, JSValueConst t, int argc, JSValueCons
     return JS_NewBool(c, r == 0);
 }
 
+/* ---- developer tools (docs/WEBAPPS.md, "Developer tools") ---- */
+
+static JSValue f_developer_mode(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewBool(c, webmgr_developer());
+}
+
+static JSValue f_set_developer_mode(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsBool(argv[0])) return js_throw_code(c, "sys.badArgument", NULL);
+    return done(c, webmgr_set_developer(JS_ToBool(c, argv[0]) == 1), JS_TRUE);
+}
+
+/* the shell asked the person first (<WebAppInspectPrompt />); the window starts again with the inspector on */
+static JSValue f_inspect(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
+    int already = 0;
+    const char *err = !app || !prof ? "sys.badArgument" : webmgr_inspect(app, prof, &already);
+    if (!err && already) {
+        char wid[2 * WEBREG_ID_MAX + 16];
+        snprintf(wid, sizeof wid, "lordos-web.%s.%s", app, prof);
+        webask_show(app, prof, xact_issue(xact_now(), XACT_LAUNCH_MS, 1, wid));
+    }
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    return done(c, err, JS_NewString(c, already ? "running" : "started"));
+}
+
 static JSValue f_asks(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     char *j = webask_pending();
@@ -687,6 +723,9 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("asks", 0, f_asks),
     JS_CFUNC_DEF("edit", 3, f_edit),
     JS_CFUNC_DEF("menuAnswer", 2, f_menu_answer),
+    JS_CFUNC_DEF("developerMode", 0, f_developer_mode),
+    JS_CFUNC_DEF("setDeveloperMode", 1, f_set_developer_mode),
+    JS_CFUNC_DEF("inspect", 2, f_inspect),
 };
 
 /* notifyd's question: is pid one of our lord-web processes (and whose)? */

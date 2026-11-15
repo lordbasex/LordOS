@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name}-এর ৬৪ ও ৩২ বিটের সংস্করণ একই হতে হবে, আর এই পরিবর্তন সেগুলোকে আলাদা করে দেবে",
   "pkg.multiarchConflict": "{name} একসাথে ৬৪ ও ৩২ বিটের জন্য ইনস্টল করা যায় না",
   "pkg.foreignArchUnsupported": "৩২-বিট প্যাকেজ শুধু ৬৪-বিট পিসিতে (amd64) চালু করা যায়; এই সিস্টেমটি {arch}",
-  "pkg.foreignArchFailed": "৩২-বিট ({arch}) প্যাকেজ চালু করা যায়নি (dpkg কোড {code} দিয়ে বন্ধ হয়েছে)"
+  "pkg.foreignArchFailed": "৩২-বিট ({arch}) প্যাকেজ চালু করা যায়নি (dpkg কোড {code} দিয়ে বন্ধ হয়েছে)",
+  "webapps.developerOff": "সেটিংস → ওয়েব অ্যাপ-এ ডেভেলপার মোড বন্ধ আছে"
 }

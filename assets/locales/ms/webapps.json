@@ -211,5 +211,14 @@
   "identity.edgeHint": "Laman melihat Edge di Linux. Untuk laman pejabat, mel dan sembang pasukan milik pembuat Edge sendiri, yang menjangkakannya.",
   "identity.firefoxHint": "Laman melihat Firefox di Linux.",
   "identity.lordosHint": "Laman melihat enjin LordOS sendiri. Untuk laman yang bermasalah dengan pilihan lain.",
-  "identity.footer": "Pelayar yang diakui oleh setiap profil kepada laman; tetingkap yang terbuka memuatkan semula halamannya. LordOS masih menggunakan enjinnya sendiri (WebKit); Chrome, Edge dan Firefox ialah nama milik pemiliknya. Sesetengah laman memeriksa pelayar dan menolaknya jika ada yang tidak sepadan; jika laman menolak atau bermasalah, pilih identiti lain, seperti LordOS (WebKit). Laman yang sudah memautkan peranti ini, seperti aplikasi pemesejan, mengekalkan nama yang dilihatnya sehingga dipautkan semula."
+  "identity.footer": "Pelayar yang diakui oleh setiap profil kepada laman; tetingkap yang terbuka memuatkan semula halamannya. LordOS masih menggunakan enjinnya sendiri (WebKit); Chrome, Edge dan Firefox ialah nama milik pemiliknya. Sesetengah laman memeriksa pelayar dan menolaknya jika ada yang tidak sepadan; jika laman menolak atau bermasalah, pilih identiti lain, seperti LordOS (WebKit). Laman yang sudah memautkan peranti ini, seperti aplikasi pemesejan, mengekalkan nama yang dilihatnya sehingga dipautkan semula.",
+  "inspect.menu": "Periksa (alat pembangun)",
+  "inspect.title": "Alat pembangun untuk {app}",
+  "inspect.warning": "Alat pembangun boleh melihat segala-galanya dalam apl ini, termasuk mesej dan sesi. Hidupkan untuk tetingkap ini?",
+  "inspect.detail": "Tetingkap dibuka semula dengan alat itu dihidupkan, dan alat itu dibuka dalam pelayar anda. Alat kekal hidup sehingga anda menutup tetingkap. Sementara itu, mana-mana program pada komputer ini boleh bersambung kepadanya.",
+  "inspect.turnOn": "Hidupkan",
+  "settings.developerTitle": "Pembangun",
+  "settings.developer": "Mod pembangun",
+  "settings.developerHint": "Menambah Periksa (alat pembangun) pada menu Tetingkap setiap apl web",
+  "settings.developerFooter": "Untuk pembangun web. Alat pembangun melihat segala-galanya dalam apl yang diperiksanya; alat hanya dibuka selepas anda memilih Periksa dalam tetingkap dan mengesahkannya, dan hanya pada komputer ini. Mematikannya menutup mana-mana tetingkap yang alatnya hidup."
 }

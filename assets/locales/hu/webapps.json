@@ -213,5 +213,14 @@
   "identity.edgeHint": "A webhelyek Edge-et látnak Linuxon. Az Edge saját gyártójának irodai, levelezési és csapatcsevegő webhelyeihez, amelyek ezt várják.",
   "identity.firefoxHint": "A webhelyek Firefoxot látnak Linuxon.",
   "identity.lordosHint": "A webhelyek a LordOS saját motorját látják. Olyan webhelyhez, amely a többivel rosszul működik.",
-  "identity.footer": "Az a böngésző, aminek az egyes profilok a webhelyek felé mondják magukat; a nyitott ablak újratölti az oldalát. A LordOS továbbra is a saját motorját (WebKit) használja; a Chrome, az Edge és a Firefox a tulajdonosaik nevei. Egyes webhelyek ellenőrzik a böngészőt, és elutasítják, ha valami nem egyezik; ha egy webhely elutasítja vagy rosszul működik, válasszon másik identitást, például a LordOS (WebKit) lehetőséget. Az a webhely, amely már összekapcsolta ezt az eszközt, például egy üzenetküldő alkalmazás, az újbóli összekapcsolásig megtartja a látott nevet."
+  "identity.footer": "Az a böngésző, aminek az egyes profilok a webhelyek felé mondják magukat; a nyitott ablak újratölti az oldalát. A LordOS továbbra is a saját motorját (WebKit) használja; a Chrome, az Edge és a Firefox a tulajdonosaik nevei. Egyes webhelyek ellenőrzik a böngészőt, és elutasítják, ha valami nem egyezik; ha egy webhely elutasítja vagy rosszul működik, válasszon másik identitást, például a LordOS (WebKit) lehetőséget. Az a webhely, amely már összekapcsolta ezt az eszközt, például egy üzenetküldő alkalmazás, az újbóli összekapcsolásig megtartja a látott nevet.",
+  "inspect.menu": "Vizsgálat (fejlesztői eszközök)",
+  "inspect.title": "Fejlesztői eszközök – {app}",
+  "inspect.warning": "A fejlesztői eszközök mindent látnak ebben az alkalmazásban, az üzeneteket és a munkameneteket is. Bekapcsolja ehhez az ablakhoz?",
+  "inspect.detail": "Az ablak bekapcsolt eszközökkel nyílik meg újra, és ezek a böngészőjében nyílnak meg. Bekapcsolva maradnak, amíg be nem zárja az ablakot. Eközben a számítógép bármely programja csatlakozhat hozzájuk.",
+  "inspect.turnOn": "Bekapcsolás",
+  "settings.developerTitle": "Fejlesztő",
+  "settings.developer": "Fejlesztői mód",
+  "settings.developerHint": "Hozzáadja a Vizsgálat (fejlesztői eszközök) parancsot minden webalkalmazás Ablak menüjéhez",
+  "settings.developerFooter": "Webfejlesztőknek. A fejlesztői eszközök mindent látnak a vizsgált alkalmazásban; csak akkor nyílnak meg, ha egy ablakban a Vizsgálatot választja és megerősíti, és csak ezen a számítógépen. A kikapcsolás bezár minden ablakot, amelyben be vannak kapcsolva."
 }

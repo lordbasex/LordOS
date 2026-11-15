@@ -2,6 +2,9 @@
  * and nothing else:
  *
  *   lord-web --app <app> --profile <profile>    one app and profile, both ids checked again against the registry
+ *   lord-web --app <app> --profile <profile> --inspect
+ *                                               the same with WebKit's remote inspector on 127.0.0.1, only while
+ *                                               developer mode is on (webinspect.h)
  *   lord-web --probe                            one address on fd 3; answers the manifest on fd 3
  *   lord-web --probe-icon                       one icon address on fd 3; answers its bytes on fd 3
  *
@@ -19,9 +22,10 @@ typedef struct {
     int mode;
     char app[WEBREG_ID_MAX + 1];
     char profile[WEBREG_ID_MAX + 1];
+    int inspect;                        /* WEBARGS_APP with --inspect */
 } WebArgs;
 
-/* The mode of argv (WEBARGS_BAD for anything but the three forms above, in that exact order). */
+/* The mode of argv (WEBARGS_BAD for anything but the forms above, in that exact order). */
 int webargs_parse(int argc, char *const *argv, WebArgs *out);
 
 #define WEBARGS_LINE_MAX 2048

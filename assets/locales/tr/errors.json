@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} için 64 ve 32 bit sürümleri aynı olmalı; bu değişiklik onları ayırır",
   "pkg.multiarchConflict": "{name} aynı anda hem 64 hem 32 bit için kurulamaz",
   "pkg.foreignArchUnsupported": "32 bit paketler yalnızca 64 bit bir PC'de (amd64) etkinleştirilebilir; bu sistem {arch}",
-  "pkg.foreignArchFailed": "32 bit ({arch}) paketler etkinleştirilemedi (dpkg {code} koduyla çıktı)"
+  "pkg.foreignArchFailed": "32 bit ({arch}) paketler etkinleştirilemedi (dpkg {code} koduyla çıktı)",
+  "webapps.developerOff": "Geliştirici modu Ayarlar → Web Uygulamaları’nda kapalı"
 }

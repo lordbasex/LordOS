@@ -213,5 +213,14 @@
   "identity.edgeHint": "Els llocs veuen Edge a Linux. Per als llocs d’ofimàtica, correu i xat d’equip del mateix fabricant d’Edge, que l’esperen.",
   "identity.firefoxHint": "Els llocs veuen Firefox a Linux.",
   "identity.lordosHint": "Els llocs veuen el motor propi de LordOS. Per a un lloc que no funciona bé amb els altres.",
-  "identity.footer": "El navegador que cada perfil diu als llocs que és; una finestra oberta torna a carregar la pàgina. LordOS continua fent servir el seu propi motor (WebKit); Chrome, Edge i Firefox són noms dels seus propietaris. Alguns llocs comproven el navegador i el rebutgen si alguna cosa no quadra; si un lloc el rebutja o no funciona bé, tria una altra identitat, com LordOS (WebKit). Un lloc que ja ha vinculat aquest dispositiu, com una app de missatgeria, conserva el nom que va veure fins que el tornis a vincular."
+  "identity.footer": "El navegador que cada perfil diu als llocs que és; una finestra oberta torna a carregar la pàgina. LordOS continua fent servir el seu propi motor (WebKit); Chrome, Edge i Firefox són noms dels seus propietaris. Alguns llocs comproven el navegador i el rebutgen si alguna cosa no quadra; si un lloc el rebutja o no funciona bé, tria una altra identitat, com LordOS (WebKit). Un lloc que ja ha vinculat aquest dispositiu, com una app de missatgeria, conserva el nom que va veure fins que el tornis a vincular.",
+  "inspect.menu": "Inspecciona (eines per a desenvolupadors)",
+  "inspect.title": "Eines per a desenvolupadors de {app}",
+  "inspect.warning": "Les eines per a desenvolupadors poden veure-ho tot en aquesta app, inclosos els missatges i les sessions. Les vols activar per a aquesta finestra?",
+  "inspect.detail": "La finestra s'obre de nou amb les eines activades, i s'obren al teu navegador. Continuen actives fins que tanquis la finestra. Mentrestant, qualsevol programa d'aquest ordinador s'hi pot connectar.",
+  "inspect.turnOn": "Activa",
+  "settings.developerTitle": "Desenvolupament",
+  "settings.developer": "Mode de desenvolupador",
+  "settings.developerHint": "Afegeix Inspecciona (eines per a desenvolupadors) al menú Finestra de cada app web",
+  "settings.developerFooter": "Per a desenvolupadors web. Les eines per a desenvolupadors ho veuen tot en l'app que inspeccionen; només s'obren després que triïs Inspecciona en una finestra i ho confirmis, i només en aquest ordinador. Desactivar-ho tanca qualsevol finestra que les tingui actives."
 }

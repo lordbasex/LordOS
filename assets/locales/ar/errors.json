@@ -879,5 +879,6 @@
   "pkg.multiarchSplit": "يجب أن يكون لـ {name} الإصدار نفسه في 64 و32 بت، وهذا التغيير سيجعلهما مختلفين",
   "pkg.multiarchConflict": "لا يمكن تثبيت {name} لـ 64 و32 بت في الوقت نفسه",
   "pkg.foreignArchUnsupported": "لا يمكن تفعيل حزم 32 بت إلا على حاسوب 64 بت (amd64)؛ هذا النظام {arch}",
-  "pkg.foreignArchFailed": "تعذّر تفعيل حزم 32 بت ({arch}) (انتهى dpkg بالرمز {code})"
+  "pkg.foreignArchFailed": "تعذّر تفعيل حزم 32 بت ({arch}) (انتهى dpkg بالرمز {code})",
+  "webapps.developerOff": "وضع المطور متوقف في الإعدادات ← تطبيقات الويب"
 }

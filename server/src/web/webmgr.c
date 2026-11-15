@@ -1,5 +1,6 @@
 /* webmgr.c — see webmgr.h. */
 #include "webmgr.h"
+#include "webinspect.h"
 #include "webscheme.h"
 #include "../sec/json.h"
 #include "../lordlog.h"
@@ -154,9 +155,10 @@ static int open_log(const char *name, char *const argv[]) {
     if (lordlog_path("web", name, p, sizeof p)) return -1;
     int fd = lordlog_open(p);
     if (fd < 0) return -1;
-    lordlog_write(fd, "INFO", "webapps", "starting lord-web %s%s%s%s%s", argv[1] ? argv[1] : "", argv[1] && argv[2] ? " " : "",
+    int five = argv[1] && argv[2] && argv[3] && argv[4] && argv[5];
+    lordlog_write(fd, "INFO", "webapps", "starting lord-web %s%s%s%s%s%s", argv[1] ? argv[1] : "", argv[1] && argv[2] ? " " : "",
                   argv[1] && argv[2] ? argv[2] : "", argv[1] && argv[2] && argv[3] && argv[4] ? " " : "",
-                  argv[1] && argv[2] && argv[3] && argv[4] ? argv[4] : "");
+                  argv[1] && argv[2] && argv[3] && argv[4] ? argv[4] : "", five ? " --inspect" : "");
     int hi = fcntl(fd, F_DUPFD_CLOEXEC, 10);
     close(fd);
     return hi;
@@ -188,7 +190,7 @@ static pid_t spawn(char *const argv[], int chan, const char *logname, int s) {
 
 /* ---- the processes ---- */
 
-typedef struct { int used; pid_t pid; char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; } Kid;
+typedef struct { int used, inspect; pid_t pid; char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; } Kid;
 static Kid kids[WEB_MAX_RUNNING];
 
 static void reap(void) {
@@ -237,6 +239,7 @@ int webmgr_running(WebRunning *out, int max) {
         snprintf(out[n].app, sizeof out[n].app, "%s", kids[i].app);
         snprintf(out[n].profile, sizeof out[n].profile, "%s", kids[i].profile);
         out[n].pid = kids[i].pid;
+        out[n].inspect = kids[i].inspect;
         n++;
     }
     return n;
@@ -837,7 +840,7 @@ const char *webmgr_uninstall(const char *app, int delete_data) {
 
 /* ---- starting ---- */
 
-const char *webmgr_launch(const char *app, const char *profile, int *raised) {
+static const char *start(const char *app, const char *profile, int inspect, int *raised) {
     *raised = 0;
     if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
     WebApp *a;
@@ -857,14 +860,65 @@ const char *webmgr_launch(const char *app, const char *profile, int *raised) {
     char a_arg[WEBREG_ID_MAX + 1], p_arg[WEBREG_ID_MAX + 1];
     snprintf(a_arg, sizeof a_arg, "%s", app);
     snprintf(p_arg, sizeof p_arg, "%s", profile);
-    char *const argv[] = { "lord-web", "--app", a_arg, "--profile", p_arg, NULL };
+    char *const argv[] = { "lord-web", "--app", a_arg, "--profile", p_arg, inspect ? "--inspect" : NULL, NULL };
     char logname[2 * WEBREG_ID_MAX + 2];
     snprintf(logname, sizeof logname, "%s-%s", app, profile);
     pid_t pid = spawn(argv, -1, logname, s);
     if (pid < 0) return "webapps.startFailed";
     k->used = 1;
+    k->inspect = inspect;
     k->pid = pid;
     snprintf(k->app, sizeof k->app, "%s", app);
     snprintf(k->profile, sizeof k->profile, "%s", profile);
     return NULL;
+}
+
+const char *webmgr_launch(const char *app, const char *profile, int *raised) { return start(app, profile, 0, raised); }
+
+/* ---- developer tools (webinspect.h) ---- */
+
+static int developer_file(char *out, size_t n) {
+    int w = snprintf(out, n, "%s/" WEBINSPECT_FILE, webmgr_config_dir());
+    return w < 0 || (size_t)w >= n ? -1 : 0;
+}
+
+int webmgr_developer(void) {
+    char path[PATH_MAX];
+    size_t len = 0;
+    if (developer_file(path, sizeof path)) return 0;
+    char *t = webreg_read_file(path, WEBINSPECT_FILE_MAX, &len);
+    int on = t && webinspect_parse(t, len);
+    free(t);
+    return on;
+}
+
+const char *webmgr_set_developer(int on) {
+    char path[PATH_MAX], text[64];
+    size_t n = webinspect_write(on != 0, text, sizeof text);
+    if (!n || mkdirs(webmgr_config_dir()) || developer_file(path, sizeof path) || webreg_write_file(path, text, n)) return "webapps.writeFailed";
+    if (!on) {
+        /* off now: the windows that have developer tools lose them (and close) */
+        reap();
+        for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used && kids[i].inspect) end_kid(&kids[i]);
+    }
+    return NULL;
+}
+
+const char *webmgr_inspect(const char *app, const char *profile, int *already) {
+    *already = 0;
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    if (!webmgr_developer()) return "webapps.developerOff";
+    reap();
+    Kid *k = kid_of(app, profile);
+    if (k && k->inspect) { *already = 1; return NULL; }
+    WebApp *a;
+    const char *e = with_app(app, &a);              /* the app and profile are there before anything ends */
+    if (e) return e;
+    int known = webreg_profile_index(a, profile) >= 0;
+    free(a);
+    if (!known) return "webapps.noProfile";
+    if (!webmgr_available()) return "webapps.noRuntime";
+    if (k) end_kid(k);                              /* WPE 2.48 turns its inspector on only as the process starts */
+    int raised = 0;
+    return start(app, profile, 1, &raised);
 }

@@ -8,5 +8,8 @@
   "chooser.openMany": "Alegeți fișiere",
   "offline.title": "Nicio conexiune",
   "offline.body": "Această aplicație nu și-a putut accesa site-ul. Va încerca din nou singură imediat ce rețeaua revine.",
-  "offline.hint": "Apăsați Ctrl+R pentru a încerca acum."
+  "offline.hint": "Apăsați Ctrl+R pentru a încerca acum.",
+  "inspect.title": "Instrumentele pentru dezvoltatori sunt active",
+  "inspect.body": "Până închideți această fereastră. Adresă:",
+  "inspect.failed": "Instrumentele pentru dezvoltatori nu au putut porni"
 }

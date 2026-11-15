@@ -92,6 +92,14 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 **Each profile's Browser identity** (*in development*, after 0.8.8.8): sites decide what to show from the browser they think they talk to, so each profile can tell them Chrome on Linux, exactly as Chrome says it (the default), Edge on Linux (for its maker's office, mail and team chat sites), Firefox on Linux, or LordOS's own WebKit name (the one every app used before). You pick it from a short list in Settings → Web Apps or in the app menu's *Browser identity* (Lord Flow), never by typing it, and an open window loads its page again with it. LordOS still uses its own engine whatever the name says. Some sites check the browser and refuse it when something doesn't match; if a site refuses or misbehaves, choose another identity, such as LordOS (WebKit). A site that already linked your computer, such as a messaging app, keeps the name it saw until you link it again.
 
+## Developer tools for web developers
+
+*In development*, after 0.8.8.8, the latest release. Turn on **Developer mode** in Settings → Web Apps (one switch for every web app, off by default) and each web app window's Window menu gets **Inspect (developer tools)**. Choose it and LordOS asks first, every time: developer tools can see everything in that app, including messages and sessions. Say yes and that window opens again with WebKit's Web Inspector on, which opens in your browser: elements, console, network and storage of that one window.
+
+- **Only on your computer, only while the window lives.** The inspector listens on 127.0.0.1 only, on a free port picked each time, and ends when you close the window (even for an app that runs in the background) or turn Developer mode off. The next start is a normal one.
+- **Honest limit:** WebKit's inspector has no password, so while it is on any program on your computer can connect to it. That is why it is off by default, asked every time and limited to one window.
+- **The page can't turn it on.** Only the menu, the question and the switch, which are LordOS's own, can.
+
 ## Performance
 
 - **Hidden windows pause.** A window that is minimized, on another desktop, closed into the background or wholly covered by another window tells its page it is hidden: the page stops painting, its animations pause and its timers run at most once a second, while its network, audio and notifications go on. Measured on our development virtual machine with a busy test page: **from 115 % of a CPU to 0.4 %** while minimized, and the compositor from 5 % to 0.3 %. Shown again, it paints at once.
@@ -101,7 +109,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 ## Settings → Web Apps
 
-Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the Appearance (Automatic, Light or Dark; in development), each profile's Browser identity (Chrome on Linux, Edge on Linux, Firefox on Linux or LordOS (WebKit); in development), the icon (the site's own or LordOS's letter tile) and Uninstall.
+Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the Appearance (Automatic, Light or Dark; in development), each profile's Browser identity (Chrome on Linux, Edge on Linux, Firefox on Linux or LordOS (WebKit); in development), the icon (the site's own or LordOS's letter tile) and Uninstall. Below the apps, *Developer mode* adds Inspect (developer tools) to every web app window (in development).
 
 [[shot:10]]
 

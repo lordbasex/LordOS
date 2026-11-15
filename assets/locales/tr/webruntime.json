@@ -8,5 +8,8 @@
   "chooser.openMany": "Dosyaları seçin",
   "offline.title": "Bağlantı yok",
   "offline.body": "Bu uygulama sitesine ulaşamadı. Ağ geri gelir gelmez kendiliğinden yeniden deneyecek.",
-  "offline.hint": "Şimdi denemek için Ctrl+R tuşlarına basın."
+  "offline.hint": "Şimdi denemek için Ctrl+R tuşlarına basın.",
+  "inspect.title": "Geliştirici araçları açık",
+  "inspect.body": "Bu pencereyi kapatana kadar. Adres:",
+  "inspect.failed": "Geliştirici araçları başlatılamadı"
 }

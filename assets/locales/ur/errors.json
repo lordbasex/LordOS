@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} کا 64 اور 32 بٹ کے لیے ایک ہی ورژن ہونا چاہیے، اور یہ تبدیلی انہیں الگ کر دے گی",
   "pkg.multiarchConflict": "{name} کو بیک وقت 64 اور 32 بٹ کے لیے انسٹال نہیں کیا جا سکتا",
   "pkg.foreignArchUnsupported": "32 بٹ پیکیجز صرف 64 بٹ پی سی (amd64) پر فعال کیے جا سکتے ہیں؛ یہ سسٹم {arch} ہے",
-  "pkg.foreignArchFailed": "32 بٹ ({arch}) پیکیجز فعال نہیں کیے جا سکے (dpkg کوڈ {code} کے ساتھ بند ہوا)"
+  "pkg.foreignArchFailed": "32 بٹ ({arch}) پیکیجز فعال نہیں کیے جا سکے (dpkg کوڈ {code} کے ساتھ بند ہوا)",
+  "webapps.developerOff": "ترتیبات → ویب ایپس میں ڈویلپر موڈ بند ہے"
 }

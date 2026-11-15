@@ -213,5 +213,14 @@
   "identity.edgeHint": "Os sites veem o Edge no Linux. Para os sites de escritório, e-mail e chat de equipe do próprio fabricante do Edge, que o esperam.",
   "identity.firefoxHint": "Os sites veem o Firefox no Linux.",
   "identity.lordosHint": "Os sites veem o motor próprio do LordOS. Para um site que falha com os outros.",
-  "identity.footer": "O navegador que cada perfil diz ser aos sites; uma janela aberta carrega a página de novo. O LordOS continua usando seu próprio motor (WebKit); Chrome, Edge e Firefox são nomes de seus donos. Alguns sites verificam o navegador e o recusam se algo não confere; se um site recusar ou falhar, prefira outra identidade, como LordOS (WebKit). Um site que já vinculou este dispositivo, como um app de mensagens, mantém o nome que viu até ser vinculado de novo."
+  "identity.footer": "O navegador que cada perfil diz ser aos sites; uma janela aberta carrega a página de novo. O LordOS continua usando seu próprio motor (WebKit); Chrome, Edge e Firefox são nomes de seus donos. Alguns sites verificam o navegador e o recusam se algo não confere; se um site recusar ou falhar, prefira outra identidade, como LordOS (WebKit). Um site que já vinculou este dispositivo, como um app de mensagens, mantém o nome que viu até ser vinculado de novo.",
+  "inspect.menu": "Inspecionar (ferramentas de desenvolvedor)",
+  "inspect.title": "Ferramentas de desenvolvedor de {app}",
+  "inspect.warning": "As ferramentas de desenvolvedor podem ver tudo neste app, incluindo mensagens e sessões. Ativar para esta janela?",
+  "inspect.detail": "A janela abre de novo com elas ativadas, e elas abrem no seu navegador. Ficam ativas até você fechar a janela. Enquanto isso, qualquer programa deste computador pode se conectar a elas.",
+  "inspect.turnOn": "Ativar",
+  "settings.developerTitle": "Desenvolvimento",
+  "settings.developer": "Modo desenvolvedor",
+  "settings.developerHint": "Adiciona Inspecionar (ferramentas de desenvolvedor) ao menu Janela de cada app web",
+  "settings.developerFooter": "Para desenvolvedores web. As ferramentas de desenvolvedor veem tudo no app que inspecionam; só abrem depois que você escolhe Inspecionar em uma janela e confirma, e só neste computador. Desativar fecha qualquer janela que as tenha ativadas."
 }

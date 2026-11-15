@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "Paketin {name} 64- ja 32-bittisillä versioilla täytyy olla sama versio, ja tämä muutos erottaisi ne",
   "pkg.multiarchConflict": "Pakettia {name} ei voi asentaa 64- ja 32-bittisenä samaan aikaan",
   "pkg.foreignArchUnsupported": "32-bittiset paketit voi ottaa käyttöön vain 64-bittisessä PC:ssä (amd64); tämä järjestelmä on {arch}",
-  "pkg.foreignArchFailed": "32-bittisiä ({arch}) paketteja ei voitu ottaa käyttöön (dpkg päättyi koodilla {code})"
+  "pkg.foreignArchFailed": "32-bittisiä ({arch}) paketteja ei voitu ottaa käyttöön (dpkg päättyi koodilla {code})",
+  "webapps.developerOff": "Kehittäjätila on pois päältä kohdassa Asetukset → Verkkosovellukset"
 }

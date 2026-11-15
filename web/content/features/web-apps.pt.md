@@ -92,6 +92,14 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 **A Identidade do navegador de cada perfil** (*em desenvolvimento*, depois da 0.8.8.8): os sites decidem o que mostrar pelo navegador com que acham que falam, então cada perfil pode dizer a eles Chrome no Linux, exatamente como o Chrome diz (o padrão), Edge no Linux (para os sites de escritório, e-mail e chat de equipe do seu fabricante), Firefox no Linux ou o nome próprio de WebKit do LordOS (o que todos os apps usavam). Você escolhe de uma lista curta em Ajustes → Apps web ou em *Identidade do navegador* no menu do app (Lord Flow), nunca digitando, e uma janela aberta carrega a página de novo com ele. O LordOS continua usando seu próprio motor, diga o nome o que disser. Alguns sites verificam o navegador e o recusam se algo não confere; se um site recusar ou falhar, escolha outra identidade, como LordOS (WebKit). Um site que já vinculou seu computador, como um app de mensagens, mantém o nome que viu até você vincular de novo.
 
+## Ferramentas para desenvolvedores web
+
+*Em desenvolvimento*, depois da 0.8.8.8, a versão mais recente. Ative o **Modo desenvolvedor** em Ajustes → Apps web (um só botão para todos os apps web, desligado de início) e o menu Janela de cada app web ganha **Inspecionar (ferramentas de desenvolvedor)**. Ao escolher, o LordOS pergunta antes, toda vez: as ferramentas de desenvolvedor podem ver tudo nesse app, incluindo mensagens e sessões. Se você disser sim, essa janela abre de novo com o Web Inspector do WebKit ativado, que abre no seu navegador: elementos, console, rede e armazenamento só dessa janela.
+
+- **Só no seu computador, só enquanto a janela existir.** O inspetor escuta só em 127.0.0.1, numa porta livre escolhida a cada vez, e termina quando você fecha a janela (mesmo num app que roda em segundo plano) ou desliga o Modo desenvolvedor. O próximo início é normal.
+- **Limite honesto:** o inspetor do WebKit não tem senha, então enquanto está ativo qualquer programa do seu computador pode se conectar a ele. Por isso vem desligado, é perguntado toda vez e fica limitado a uma janela.
+- **A página não pode ativá-lo.** Só o menu, a pergunta e o botão, que são do próprio LordOS, podem.
+
 ## Desempenho
 
 - **Janelas ocultas pausam.** Uma janela minimizada, em outro desktop, fechada para o segundo plano ou totalmente coberta por outra janela avisa à página que está oculta: a página para de desenhar, as animações pausam e os temporizadores rodam no máximo uma vez por segundo, enquanto rede, áudio e notificações continuam. Medido na nossa máquina virtual de desenvolvimento com uma página de teste pesada: **de 115 % de uma CPU para 0,4 %** minimizada, e o compositor de 5 % para 0,3 %. Mostrada de novo, desenha na hora.
@@ -101,7 +109,7 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 ## Ajustes → Apps web
 
-Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux, Edge no Linux, Firefox no Linux ou LordOS (WebKit); em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar.
+Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux, Edge no Linux, Firefox no Linux ou LordOS (WebKit); em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar. Abaixo dos apps, o *Modo desenvolvedor* adiciona Inspecionar (ferramentas de desenvolvedor) a cada janela de app web (em desenvolvimento).
 
 [[shot:10]]
 

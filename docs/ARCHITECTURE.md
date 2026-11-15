@@ -227,7 +227,8 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   or `exec`) before the connection speaks. See `WAYLAND.md`, "Sharing a screen or a window".
 - **`lord-web`** (0.8.8.8, the optional package `lordos-web`): the LordOS Web Runtime, one process per web app and
   profile and the only binary that links WPE WebKit. Only lord-server starts it, from the fixed path next to it with
-  exactly `--app <app> --profile <profile>`, both checked against the registry; it is a Wayland client of the
+  exactly `--app <app> --profile <profile>` (plus `--inspect`, only while developer mode is on: WebKit's inspector on
+  127.0.0.1 for that window, `WEBAPPS.md` "Developer tools"), both checked against the registry; it is a Wayland client of the
   compositor, and WebKit's own sandbox runs its web and network processes. See `WEBAPPS.md`.
 - **The `lord-log` child** (0.8.8.8): a small child of lord-server and of each root daemon that stamps the lines of
   its stderr pipe into its log file under `/var/log/lordos` and caps the files. See `SYSTEM.md`, "Log files".

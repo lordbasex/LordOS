@@ -213,5 +213,14 @@
   "identity.edgeHint": "Nakikita ng mga site ang Edge sa Linux. Para sa mga site ng opisina, mail at team chat ng gumawa mismo ng Edge, na umaasa rito.",
   "identity.firefoxHint": "Nakikita ng mga site ang Firefox sa Linux.",
   "identity.lordosHint": "Nakikita ng mga site ang sariling engine ng LordOS. Para sa site na hindi maayos ang kilos sa iba.",
-  "identity.footer": "Ang browser na sinasabi ng bawat profile sa mga site; nilo-load muli ng nakabukas na window ang pahina nito. Ginagamit pa rin ng LordOS ang sarili nitong engine (WebKit); ang Chrome, Edge at Firefox ay mga pangalan ng kani-kanilang may-ari. May mga site na sumusuri sa browser at tumatanggi kapag may hindi tugma; kung tumanggi o hindi maayos ang isang site, pumili ng ibang pagkakakilanlan, gaya ng LordOS (WebKit). Ang site na naka-link na sa device na ito, gaya ng messaging app, ay mananatili sa pangalang nakita nito hanggang sa i-link mo itong muli."
+  "identity.footer": "Ang browser na sinasabi ng bawat profile sa mga site; nilo-load muli ng nakabukas na window ang pahina nito. Ginagamit pa rin ng LordOS ang sarili nitong engine (WebKit); ang Chrome, Edge at Firefox ay mga pangalan ng kani-kanilang may-ari. May mga site na sumusuri sa browser at tumatanggi kapag may hindi tugma; kung tumanggi o hindi maayos ang isang site, pumili ng ibang pagkakakilanlan, gaya ng LordOS (WebKit). Ang site na naka-link na sa device na ito, gaya ng messaging app, ay mananatili sa pangalang nakita nito hanggang sa i-link mo itong muli.",
+  "inspect.menu": "Inspect (mga tool ng developer)",
+  "inspect.title": "Mga tool ng developer para sa {app}",
+  "inspect.warning": "Nakikita ng mga tool ng developer ang lahat sa app na ito, kasama ang mga mensahe at session. I-on para sa window na ito?",
+  "inspect.detail": "Bubukas muli ang window na naka-on ang mga ito, at bubukas ang mga ito sa iyong browser. Mananatili silang naka-on hanggang isara mo ang window. Habang ganoon, puwedeng kumonekta sa kanila ang anumang program sa computer na ito.",
+  "inspect.turnOn": "I-on",
+  "settings.developerTitle": "Developer",
+  "settings.developer": "Developer mode",
+  "settings.developerHint": "Idinadagdag ang Inspect (mga tool ng developer) sa Window menu ng bawat web app",
+  "settings.developerFooter": "Para sa mga web developer. Nakikita ng mga tool ng developer ang lahat sa app na ini-inspect nila; bubukas lang ang mga ito pagkatapos mong piliin ang Inspect sa isang window at kumpirmahin, at sa computer na ito lang. Kapag in-off ito, isasara ang anumang window na naka-on ang mga ito."
 }

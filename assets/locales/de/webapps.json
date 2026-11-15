@@ -213,5 +213,14 @@
   "identity.edgeHint": "Websites sehen Edge unter Linux. Für die Büro-, Mail- und Team-Chat-Websites des Edge-Herstellers selbst, die ihn erwarten.",
   "identity.firefoxHint": "Websites sehen Firefox unter Linux.",
   "identity.lordosHint": "Websites sehen die eigene Engine von LordOS. Für eine Website, die mit den anderen nicht richtig funktioniert.",
-  "identity.footer": "Der Browser, als der sich jedes Profil gegenüber Websites ausgibt; ein offenes Fenster lädt seine Seite neu. LordOS verwendet weiterhin seine eigene Engine (WebKit); Chrome, Edge und Firefox sind Namen ihrer Inhaber. Manche Websites prüfen den Browser und lehnen ihn ab, wenn etwas nicht passt; lehnt eine Website ab oder funktioniert nicht richtig, wähle eine andere Identität, etwa LordOS (WebKit). Eine Website, die dieses Gerät bereits verknüpft hat, etwa eine Messaging-App, behält den gesehenen Namen, bis du es neu verknüpfst."
+  "identity.footer": "Der Browser, als der sich jedes Profil gegenüber Websites ausgibt; ein offenes Fenster lädt seine Seite neu. LordOS verwendet weiterhin seine eigene Engine (WebKit); Chrome, Edge und Firefox sind Namen ihrer Inhaber. Manche Websites prüfen den Browser und lehnen ihn ab, wenn etwas nicht passt; lehnt eine Website ab oder funktioniert nicht richtig, wähle eine andere Identität, etwa LordOS (WebKit). Eine Website, die dieses Gerät bereits verknüpft hat, etwa eine Messaging-App, behält den gesehenen Namen, bis du es neu verknüpfst.",
+  "inspect.menu": "Untersuchen (Entwicklertools)",
+  "inspect.title": "Entwicklertools für {app}",
+  "inspect.warning": "Entwicklertools können alles in dieser App sehen, auch Nachrichten und Sitzungen. Für dieses Fenster einschalten?",
+  "inspect.detail": "Das Fenster öffnet sich mit eingeschalteten Tools neu, und sie öffnen sich in deinem Browser. Sie bleiben an, bis du das Fenster schließt. In dieser Zeit kann sich jedes Programm auf diesem Computer mit ihnen verbinden.",
+  "inspect.turnOn": "Einschalten",
+  "settings.developerTitle": "Entwickler",
+  "settings.developer": "Entwicklermodus",
+  "settings.developerHint": "Fügt „Untersuchen (Entwicklertools)“ zum Menü „Fenster“ jeder Web-App hinzu",
+  "settings.developerFooter": "Für Webentwickler. Entwicklertools sehen alles in der App, die sie untersuchen; sie öffnen sich erst, wenn du in einem Fenster „Untersuchen“ wählst und bestätigst, und nur auf diesem Computer. Ausschalten schließt jedes Fenster, in dem sie an sind."
 }

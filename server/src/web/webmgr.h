@@ -14,6 +14,10 @@
  *     LORDOS_WEB_SCHEME=light|dark once the theme has told the desktop's mode (webscheme.h).
  *     One process per app and profile; a second launch only says it is running (the shell
  *     raises its window).
+ *   - Developer tools (docs/WEBAPPS.md, "Developer tools"; webinspect.h): developer mode is one switch,
+ *     ~/.config/lordos/web/developer.json, written only here. webmgr_inspect ends that app and profile's lord-web and
+ *     starts it again as "lord-web --app <app> --profile <profile> --inspect", only while the switch is on (lord-web
+ *     checks the file too); turning the switch off ends every lord-web started that way.
  *   - The probe, the runtime's two steps (docs/WEBAPPS.md): "lord-web --probe", the address as one line on fd 3
  *     (https: only, under 2 KB), one JSON line back ({"ok":false,"error":"web.probe.…"} passes its code on to JS);
  *     then, when the page listed one, "lord-web --probe-icon" with the icon webreg_probe_parse chose, which answers
@@ -66,10 +70,19 @@ int  webmgr_user_agent_of(const char *app, const char *profile);
 
 /* *raised = 1 when it was already running (nothing started). */
 const char *webmgr_launch(const char *app, const char *profile, int *raised);
-typedef struct { char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; pid_t pid; } WebRunning;
+typedef struct { char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; pid_t pid; int inspect; } WebRunning;
 int  webmgr_running(WebRunning *out, int max);  /* the live processes (the ended ones are reaped first) */
 /* The app and profile of the lord-web process that pid is, or descends from; 0 found, -1 not one of ours. */
 int  webmgr_owner(pid_t pid, char *app, char *profile);
+
+/* Developer mode (Settings → Web Apps): 1 on, 0 off (no file, or one that isn't valid). Turning it off ends every
+ * lord-web started with --inspect. */
+int  webmgr_developer(void);
+const char *webmgr_set_developer(int on);
+/* That app and profile's window with developer tools on: its lord-web, if it runs without them, is ended, then started
+ * again with --inspect. "webapps.developerOff" while developer mode is off; *already = 1 when it runs with them
+ * (nothing started). */
+const char *webmgr_inspect(const char *app, const char *profile, int *already);
 
 /* A probe of url: its id (> 0), or 0 with *err set. */
 int  webmgr_probe(const char *url, const char **err);

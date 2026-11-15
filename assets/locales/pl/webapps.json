@@ -217,5 +217,14 @@
   "identity.edgeHint": "Witryny widzą Edge w systemie Linux. Dla witryn biurowych, poczty i czatu zespołowego samego producenta Edge, które go oczekują.",
   "identity.firefoxHint": "Witryny widzą Firefoksa w systemie Linux.",
   "identity.lordosHint": "Witryny widzą własny silnik LordOS. Dla witryny, która źle działa z innymi.",
-  "identity.footer": "Przeglądarka, za którą każdy profil podaje się witrynom; otwarte okno wczytuje swoją stronę ponownie. LordOS nadal używa własnego silnika (WebKit); Chrome, Edge i Firefox to nazwy ich właścicieli. Niektóre witryny sprawdzają przeglądarkę i odrzucają ją, gdy coś się nie zgadza; jeśli witryna odmawia lub działa źle, wybierz inną tożsamość, np. LordOS (WebKit). Witryna, która już połączyła to urządzenie, np. komunikator, zachowuje widzianą nazwę do ponownego połączenia."
+  "identity.footer": "Przeglądarka, za którą każdy profil podaje się witrynom; otwarte okno wczytuje swoją stronę ponownie. LordOS nadal używa własnego silnika (WebKit); Chrome, Edge i Firefox to nazwy ich właścicieli. Niektóre witryny sprawdzają przeglądarkę i odrzucają ją, gdy coś się nie zgadza; jeśli witryna odmawia lub działa źle, wybierz inną tożsamość, np. LordOS (WebKit). Witryna, która już połączyła to urządzenie, np. komunikator, zachowuje widzianą nazwę do ponownego połączenia.",
+  "inspect.menu": "Zbadaj (narzędzia deweloperskie)",
+  "inspect.title": "Narzędzia deweloperskie dla {app}",
+  "inspect.warning": "Narzędzia deweloperskie widzą wszystko w tej aplikacji, w tym wiadomości i sesje. Włączyć je dla tego okna?",
+  "inspect.detail": "Okno otworzy się ponownie z włączonymi narzędziami, a one otworzą się w przeglądarce. Pozostaną włączone, dopóki nie zamkniesz okna. W tym czasie dowolny program na tym komputerze może się z nimi połączyć.",
+  "inspect.turnOn": "Włącz",
+  "settings.developerTitle": "Dla deweloperów",
+  "settings.developer": "Tryb dewelopera",
+  "settings.developerHint": "Dodaje Zbadaj (narzędzia deweloperskie) do menu Okno każdej aplikacji webowej",
+  "settings.developerFooter": "Dla twórców stron. Narzędzia deweloperskie widzą wszystko w badanej aplikacji; otwierają się dopiero po wybraniu Zbadaj w oknie i potwierdzeniu, i tylko na tym komputerze. Wyłączenie zamyka każde okno, w którym są włączone."
 }

@@ -8,5 +8,8 @@
   "chooser.openMany": "Tria fitxers",
   "offline.title": "Sense connexió",
   "offline.body": "Aquesta aplicació no ha pogut arribar al seu lloc. Ho tornarà a provar sola tan bon punt torni la xarxa.",
-  "offline.hint": "Premeu Ctrl+R per provar-ho ara."
+  "offline.hint": "Premeu Ctrl+R per provar-ho ara.",
+  "inspect.title": "Eines per a desenvolupadors activades",
+  "inspect.body": "Fins que tanquis aquesta finestra. Adreça:",
+  "inspect.failed": "No s'han pogut iniciar les eines per a desenvolupadors"
 }

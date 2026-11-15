@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} باید برای ۶۴ و ۳۲ بیت یک نسخه داشته باشد و این تغییر آن‌ها را از هم جدا می‌کند",
   "pkg.multiarchConflict": "{name} را نمی‌توان هم‌زمان برای ۶۴ و ۳۲ بیت نصب کرد",
   "pkg.foreignArchUnsupported": "بسته‌های ۳۲ بیتی فقط روی رایانهٔ ۶۴ بیتی (amd64) فعال می‌شوند؛ این سیستم {arch} است",
-  "pkg.foreignArchFailed": "بسته‌های ۳۲ بیتی ({arch}) فعال نشدند (dpkg با کد {code} پایان یافت)"
+  "pkg.foreignArchFailed": "بسته‌های ۳۲ بیتی ({arch}) فعال نشدند (dpkg با کد {code} پایان یافت)",
+  "webapps.developerOff": "حالت توسعه‌دهنده در تنظیمات ← برنامه‌های وب خاموش است"
 }

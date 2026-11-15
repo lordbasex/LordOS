@@ -8,5 +8,8 @@
   "chooser.openMany": "Kies bestanden",
   "offline.title": "Geen verbinding",
   "offline.body": "Deze app kon zijn website niet bereiken. Hij probeert het vanzelf opnieuw zodra het netwerk terug is.",
-  "offline.hint": "Druk op Ctrl+R om het nu te proberen."
+  "offline.hint": "Druk op Ctrl+R om het nu te proberen.",
+  "inspect.title": "Ontwikkelaarstools staan aan",
+  "inspect.body": "Tot je dit venster sluit. Adres:",
+  "inspect.failed": "De ontwikkelaarstools konden niet starten"
 }

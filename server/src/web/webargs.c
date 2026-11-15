@@ -9,9 +9,11 @@ int webargs_parse(int argc, char *const *argv, WebArgs *a) {
     a->mode = WEBARGS_BAD;
     if (argc == 2 && !strcmp(argv[1], "--probe")) a->mode = WEBARGS_PROBE;
     else if (argc == 2 && !strcmp(argv[1], "--probe-icon")) a->mode = WEBARGS_PROBE_ICON;
-    else if (argc == 5 && !strcmp(argv[1], "--app") && !strcmp(argv[3], "--profile") && webreg_id_ok(argv[2]) && webreg_id_ok(argv[4])) {
+    else if ((argc == 5 || (argc == 6 && !strcmp(argv[5], "--inspect"))) && !strcmp(argv[1], "--app") && !strcmp(argv[3], "--profile")
+             && webreg_id_ok(argv[2]) && webreg_id_ok(argv[4])) {
         memcpy(a->app, argv[2], strlen(argv[2]) + 1);
         memcpy(a->profile, argv[4], strlen(argv[4]) + 1);
+        a->inspect = argc == 6;
         a->mode = WEBARGS_APP;
     }
     return a->mode;

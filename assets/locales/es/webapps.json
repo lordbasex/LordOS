@@ -213,5 +213,14 @@
   "identity.edgeHint": "Los sitios ven Edge en Linux. Para los sitios de oficina, correo y chat de equipo del propio fabricante de Edge, que lo esperan.",
   "identity.firefoxHint": "Los sitios ven Firefox en Linux.",
   "identity.lordosHint": "Los sitios ven el motor propio de LordOS. Para un sitio que falla con los otros.",
-  "identity.footer": "El navegador que cada perfil dice ser a los sitios; una ventana abierta vuelve a cargar su página. LordOS sigue usando su propio motor (WebKit); Chrome, Edge y Firefox son nombres de sus dueños. Algunos sitios revisan el navegador y lo rechazan si algo no coincide; si un sitio lo rechaza o falla, conviene otra identidad, como LordOS (WebKit). Un sitio que ya vinculó este dispositivo, como una app de mensajería, conserva el nombre que vio hasta que se vincule de nuevo."
+  "identity.footer": "El navegador que cada perfil dice ser a los sitios; una ventana abierta vuelve a cargar su página. LordOS sigue usando su propio motor (WebKit); Chrome, Edge y Firefox son nombres de sus dueños. Algunos sitios revisan el navegador y lo rechazan si algo no coincide; si un sitio lo rechaza o falla, conviene otra identidad, como LordOS (WebKit). Un sitio que ya vinculó este dispositivo, como una app de mensajería, conserva el nombre que vio hasta que se vincule de nuevo.",
+  "inspect.menu": "Inspeccionar (herramientas para desarrolladores)",
+  "inspect.title": "Herramientas para desarrolladores de {app}",
+  "inspect.warning": "Las herramientas para desarrolladores pueden ver todo en esta app, incluidos los mensajes y las sesiones. ¿Activarlas para esta ventana?",
+  "inspect.detail": "La ventana se abre de nuevo con ellas activadas y se abren en tu navegador. Siguen activas hasta que cerrás la ventana. Mientras tanto, cualquier programa de esta computadora puede conectarse a ellas.",
+  "inspect.turnOn": "Activar",
+  "settings.developerTitle": "Desarrollo",
+  "settings.developer": "Modo desarrollador",
+  "settings.developerHint": "Agrega Inspeccionar (herramientas para desarrolladores) al menú Ventana de cada app web",
+  "settings.developerFooter": "Para desarrolladores web. Las herramientas para desarrolladores ven todo en la app que inspeccionan; se abren solo después de elegir Inspeccionar en una ventana y confirmar, y solo en esta computadora. Desactivarlo cierra cualquier ventana que las tenga activadas."
 }

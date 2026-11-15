@@ -874,5 +874,6 @@
   "pkg.multiarchSplit": "{name} 的 64 位和 32 位必须是同一版本，而此更改会让它们不一致",
   "pkg.multiarchConflict": "{name} 不能同时以 64 位和 32 位安装",
   "pkg.foreignArchUnsupported": "只能在 64 位电脑（amd64）上启用 32 位软件包；本系统为 {arch}",
-  "pkg.foreignArchFailed": "无法启用 32 位（{arch}）软件包（dpkg 以代码 {code} 退出）"
+  "pkg.foreignArchFailed": "无法启用 32 位（{arch}）软件包（dpkg 以代码 {code} 退出）",
+  "webapps.developerOff": "“设置 → 网页应用”中的开发者模式已关闭"
 }

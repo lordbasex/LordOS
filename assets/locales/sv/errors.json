@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} måste ha samma version för 64 och 32 bitar, och den här ändringen skulle skilja dem åt",
   "pkg.multiarchConflict": "{name} kan inte installeras för 64 och 32 bitar samtidigt",
   "pkg.foreignArchUnsupported": "32-bitarspaket kan bara aktiveras på en 64-bitars dator (amd64); det här systemet är {arch}",
-  "pkg.foreignArchFailed": "32-bitarspaket ({arch}) kunde inte aktiveras (dpkg avslutades med kod {code})"
+  "pkg.foreignArchFailed": "32-bitarspaket ({arch}) kunde inte aktiveras (dpkg avslutades med kod {code})",
+  "webapps.developerOff": "Utvecklarläget är avstängt i Inställningar → Webbappar"
 }

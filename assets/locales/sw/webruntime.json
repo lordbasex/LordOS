@@ -8,5 +8,8 @@
   "chooser.openMany": "Chagua faili",
   "offline.title": "Hakuna muunganisho",
   "offline.body": "Programu hii haikuweza kufikia tovuti yake. Itajaribu tena yenyewe mara mtandao utakaporudi.",
-  "offline.hint": "Bonyeza Ctrl+R ili kujaribu sasa."
+  "offline.hint": "Bonyeza Ctrl+R ili kujaribu sasa.",
+  "inspect.title": "Zana za msanidi zimewashwa",
+  "inspect.body": "Hadi utakapofunga dirisha hili. Anwani:",
+  "inspect.failed": "Zana za msanidi hazikuweza kuanza"
 }

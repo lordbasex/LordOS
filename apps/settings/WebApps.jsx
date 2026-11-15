@@ -5,11 +5,12 @@
 // a typed string), and uninstall. Each profile has a color (the tag colors of Files): a dot on its windows, its
 // notifications and its tray icon. Also: the tray icon while the window shows, the unread count on the Dock, one Dock
 // icon per profile, whose sound a notification makes, and the site's own icon fetched again. Every change goes through lord.webapps, which validates it and writes the
-// registry (the folder is closed to lord.fs). Apps come from the Store's Web apps section.
+// registry (the folder is closed to lord.fs). Apps come from the Store's Web apps section. Developer mode, one switch for
+// every web app, adds Inspect (developer tools) to each web app window's Window menu (docs/WEBAPPS.md, "Developer tools").
 import {
   View, Text, useLocale, useTheme, useAppWindow, useWebApps, webAppsAvailable, webAppCall, webAppIcon, webAppsModel as M, launchWebApp,
   Button, Toggle, Segmented, TextInput, ConfirmDialog, Layer, fs, formatBytes, errorText, wm, spacing, typeScale, useSettings,
-  webRunning, refreshSiteIcon, siteIconBusy, webProfileIcon, webBadges, useStore,
+  webRunning, refreshSiteIcon, siteIconBusy, webProfileIcon, webBadges, useStore, webDeveloper, setWebDeveloperMode,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message, PopUp } from './ui.jsx';
@@ -241,6 +242,9 @@ export function WebAppsSettings() {
   const available = webAppsAvailable();
   const store = () => wm.open('store', { args: { page: 'webapps', nonce: Date.now() } });
   const entry = list.find((e) => e.id === sel) || null;
+  const developer = useStore(webDeveloper);
+  const [devErr, setDevErr] = useState(null);
+  const setDeveloper = (on) => { try { setWebDeveloperMode(on); setDevErr(null); } catch (e) { setDevErr({ ok: false, text: errorText(e) }); } };
   return (
     <Stack>
       {!available ? <Note tone="warn">{tr('webapps.settings.noRuntime')}</Note> : null}
@@ -258,6 +262,12 @@ export function WebAppsSettings() {
         })}
       </Section>
       {entry ? <AppDetails key={entry.id} entry={entry} /> : null}
+      <Section title={tr('webapps.settings.developerTitle')} footer={tr('webapps.settings.developerFooter')}>
+        <SettingRow label={tr('webapps.settings.developer')} hint={tr('webapps.settings.developerHint')}>
+          <Toggle on={developer} onChange={setDeveloper} />
+        </SettingRow>
+      </Section>
+      {devErr ? <Message msg={devErr} /> : null}
     </Stack>
   );
 }

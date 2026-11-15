@@ -8,5 +8,8 @@
   "chooser.openMany": "Escolha arquivos",
   "offline.title": "Sem conexão",
   "offline.body": "Este app não conseguiu acessar o site. Ele tentará de novo sozinho assim que a rede voltar.",
-  "offline.hint": "Pressione Ctrl+R para tentar agora."
+  "offline.hint": "Pressione Ctrl+R para tentar agora.",
+  "inspect.title": "Ferramentas de desenvolvedor ativadas",
+  "inspect.body": "Até você fechar esta janela. Endereço:",
+  "inspect.failed": "Não foi possível iniciar as ferramentas de desenvolvedor"
 }

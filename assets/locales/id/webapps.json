@@ -211,5 +211,14 @@
   "identity.edgeHint": "Situs melihat Edge di Linux. Untuk situs perkantoran, email, dan obrolan tim milik pembuat Edge sendiri, yang mengharapkannya.",
   "identity.firefoxHint": "Situs melihat Firefox di Linux.",
   "identity.lordosHint": "Situs melihat mesin milik LordOS sendiri. Untuk situs yang bermasalah dengan pilihan lain.",
-  "identity.footer": "Browser yang diakui setiap profil kepada situs; jendela yang terbuka memuat ulang halamannya. LordOS tetap memakai mesinnya sendiri (WebKit); Chrome, Edge dan Firefox adalah nama milik pemiliknya. Beberapa situs memeriksa browser dan menolaknya jika ada yang tidak cocok; jika situs menolak atau bermasalah, pilih identitas lain, misalnya LordOS (WebKit). Situs yang sudah menautkan perangkat ini, seperti aplikasi pesan, tetap memakai nama yang dilihatnya sampai ditautkan lagi."
+  "identity.footer": "Browser yang diakui setiap profil kepada situs; jendela yang terbuka memuat ulang halamannya. LordOS tetap memakai mesinnya sendiri (WebKit); Chrome, Edge dan Firefox adalah nama milik pemiliknya. Beberapa situs memeriksa browser dan menolaknya jika ada yang tidak cocok; jika situs menolak atau bermasalah, pilih identitas lain, misalnya LordOS (WebKit). Situs yang sudah menautkan perangkat ini, seperti aplikasi pesan, tetap memakai nama yang dilihatnya sampai ditautkan lagi.",
+  "inspect.menu": "Periksa (alat developer)",
+  "inspect.title": "Alat developer untuk {app}",
+  "inspect.warning": "Alat developer dapat melihat semua hal di aplikasi ini, termasuk pesan dan sesi. Aktifkan untuk jendela ini?",
+  "inspect.detail": "Jendela terbuka lagi dengan alat tersebut aktif, dan alat itu terbuka di browser Anda. Alat tetap aktif sampai Anda menutup jendela. Selama itu, program apa pun di komputer ini dapat terhubung ke alat tersebut.",
+  "inspect.turnOn": "Aktifkan",
+  "settings.developerTitle": "Developer",
+  "settings.developer": "Mode developer",
+  "settings.developerHint": "Menambahkan Periksa (alat developer) ke menu Jendela setiap aplikasi web",
+  "settings.developerFooter": "Untuk developer web. Alat developer melihat semua hal di aplikasi yang diperiksanya; alat hanya terbuka setelah Anda memilih Periksa di sebuah jendela dan mengonfirmasi, dan hanya di komputer ini. Menonaktifkannya menutup setiap jendela yang alatnya aktif."
 }

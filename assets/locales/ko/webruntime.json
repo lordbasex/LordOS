@@ -8,5 +8,8 @@
   "chooser.openMany": "파일 선택(여러 개)",
   "offline.title": "연결 없음",
   "offline.body": "이 앱이 사이트에 연결하지 못했습니다. 네트워크가 돌아오면 자동으로 다시 시도합니다.",
-  "offline.hint": "지금 다시 시도하려면 Ctrl+R을 누르세요."
+  "offline.hint": "지금 다시 시도하려면 Ctrl+R을 누르세요.",
+  "inspect.title": "개발자 도구가 켜져 있음",
+  "inspect.body": "이 윈도우를 닫을 때까지. 주소:",
+  "inspect.failed": "개발자 도구를 시작할 수 없습니다"
 }

@@ -215,5 +215,14 @@
   "identity.edgeHint": "Site-urile văd Edge pe Linux. Pentru site-urile de birou, e-mail și chat de echipă ale producătorului Edge, care îl așteaptă.",
   "identity.firefoxHint": "Site-urile văd Firefox pe Linux.",
   "identity.lordosHint": "Site-urile văd motorul propriu al LordOS. Pentru un site care nu merge bine cu celelalte.",
-  "identity.footer": "Browserul drept care se prezintă fiecare profil site-urilor; o fereastră deschisă își reîncarcă pagina. LordOS folosește în continuare propriul motor (WebKit); Chrome, Edge și Firefox sunt nume ale proprietarilor lor. Unele site-uri verifică browserul și îl refuză dacă ceva nu se potrivește; dacă un site refuză sau nu merge bine, alege altă identitate, de exemplu LordOS (WebKit). Un site care a asociat deja acest dispozitiv, cum ar fi o aplicație de mesagerie, păstrează numele văzut până îl asociezi din nou."
+  "identity.footer": "Browserul drept care se prezintă fiecare profil site-urilor; o fereastră deschisă își reîncarcă pagina. LordOS folosește în continuare propriul motor (WebKit); Chrome, Edge și Firefox sunt nume ale proprietarilor lor. Unele site-uri verifică browserul și îl refuză dacă ceva nu se potrivește; dacă un site refuză sau nu merge bine, alege altă identitate, de exemplu LordOS (WebKit). Un site care a asociat deja acest dispozitiv, cum ar fi o aplicație de mesagerie, păstrează numele văzut până îl asociezi din nou.",
+  "inspect.menu": "Inspectează (instrumente pentru dezvoltatori)",
+  "inspect.title": "Instrumente pentru dezvoltatori pentru {app}",
+  "inspect.warning": "Instrumentele pentru dezvoltatori pot vedea tot în această aplicație, inclusiv mesajele și sesiunile. Le activați pentru această fereastră?",
+  "inspect.detail": "Fereastra se redeschide cu instrumentele active, iar acestea se deschid în browserul dvs. Rămân active până închideți fereastra. Între timp, orice program de pe acest computer se poate conecta la ele.",
+  "inspect.turnOn": "Activează",
+  "settings.developerTitle": "Dezvoltator",
+  "settings.developer": "Mod dezvoltator",
+  "settings.developerHint": "Adaugă Inspectează (instrumente pentru dezvoltatori) în meniul Fereastră al fiecărei aplicații web",
+  "settings.developerFooter": "Pentru dezvoltatorii web. Instrumentele pentru dezvoltatori văd tot în aplicația pe care o inspectează; se deschid doar după ce alegeți Inspectează într-o fereastră și confirmați, și doar pe acest computer. Dezactivarea închide orice fereastră în care sunt active."
 }

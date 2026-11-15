@@ -8,5 +8,8 @@
   "chooser.openMany": "ファイルを選択",
   "offline.title": "接続されていません",
   "offline.body": "このアプリはサイトに接続できませんでした。ネットワークが戻りしだい自動的に再試行します。",
-  "offline.hint": "今すぐ再試行するには Ctrl+R を押してください。"
+  "offline.hint": "今すぐ再試行するには Ctrl+R を押してください。",
+  "inspect.title": "デベロッパツールがオンです",
+  "inspect.body": "このウインドウを閉じるまで。アドレス：",
+  "inspect.failed": "デベロッパツールを開始できませんでした"
 }

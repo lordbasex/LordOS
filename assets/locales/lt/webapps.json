@@ -215,5 +215,14 @@
   "identity.edgeHint": "Svetainės mato Edge sistemoje Linux. Paties Edge kūrėjo biuro, pašto ir komandos pokalbių svetainėms, kurios jos tikisi.",
   "identity.firefoxHint": "Svetainės mato Firefox sistemoje Linux.",
   "identity.lordosHint": "Svetainės mato paties LordOS variklį. Svetainei, kuri su kitais veikia blogai.",
-  "identity.footer": "Naršyklė, kuria kiekvienas profilis prisistato svetainėms; atidarytas langas iš naujo įkelia savo puslapį. LordOS ir toliau naudoja savo variklį (WebKit); Chrome, Edge ir Firefox yra jų savininkų pavadinimai. Kai kurios svetainės tikrina naršyklę ir ją atmeta, jei kas nors nesutampa; jei svetainė atmeta ar veikia blogai, rinkitės kitą tapatybę, pavyzdžiui, LordOS (WebKit). Svetainė, kuri jau susiejo šį įrenginį, pavyzdžiui, pokalbių programa, išlaiko matytą pavadinimą, kol susiesite iš naujo."
+  "identity.footer": "Naršyklė, kuria kiekvienas profilis prisistato svetainėms; atidarytas langas iš naujo įkelia savo puslapį. LordOS ir toliau naudoja savo variklį (WebKit); Chrome, Edge ir Firefox yra jų savininkų pavadinimai. Kai kurios svetainės tikrina naršyklę ir ją atmeta, jei kas nors nesutampa; jei svetainė atmeta ar veikia blogai, rinkitės kitą tapatybę, pavyzdžiui, LordOS (WebKit). Svetainė, kuri jau susiejo šį įrenginį, pavyzdžiui, pokalbių programa, išlaiko matytą pavadinimą, kol susiesite iš naujo.",
+  "inspect.menu": "Tikrinti (kūrėjo įrankiai)",
+  "inspect.title": "{app} kūrėjo įrankiai",
+  "inspect.warning": "Kūrėjo įrankiai gali matyti viską šioje programoje, įskaitant žinutes ir seansus. Įjungti šiam langui?",
+  "inspect.detail": "Langas vėl atsidaro su įjungtais įrankiais, o jie atsidaro jūsų naršyklėje. Jie lieka įjungti, kol uždarysite langą. Tuo metu bet kuri šio kompiuterio programa gali prie jų prisijungti.",
+  "inspect.turnOn": "Įjungti",
+  "settings.developerTitle": "Kūrėjams",
+  "settings.developer": "Kūrėjo režimas",
+  "settings.developerHint": "Prideda „Tikrinti (kūrėjo įrankiai)“ prie kiekvienos žiniatinklio programos meniu „Langas“",
+  "settings.developerFooter": "Žiniatinklio kūrėjams. Kūrėjo įrankiai mato viską programoje, kurią tikrina; jie atsidaro tik lange pasirinkus „Tikrinti“ ir patvirtinus, ir tik šiame kompiuteryje. Išjungus uždaromas kiekvienas langas, kuriame jie įjungti."
 }
