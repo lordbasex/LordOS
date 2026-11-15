@@ -203,15 +203,13 @@
   "appearance.later": "Terang dan gelap per aplikasi hadir bersama mesin web baru LordOS (WPEPlatform), yang sedang kami tuju. Untuk saat ini setiap aplikasi web mengikuti mode LordOS, dan situs dengan pengaturan temanya sendiri (misalnya WhatsApp) tetap memakainya.",
   "identity.title": "Identitas browser",
   "identity.label": "Kenali sebagai",
-  "identity.chrome": "Chrome di Linux + LordOS",
+  "identity.chrome": "Chrome di Linux",
   "identity.edge": "Edge di Linux",
   "identity.firefox": "Firefox di Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (eksperimental)",
-  "identity.chromeHint": "Situs melihat browser yang paling umum di Linux, ditambah nama dan versi LordOS. Bawaan.",
+  "identity.chromeHint": "Situs melihat browser yang paling umum di Linux, persis seperti cara browser itu memperkenalkan diri. Bawaan.",
   "identity.edgeHint": "Situs melihat Edge di Linux. Untuk situs perkantoran, email, dan obrolan tim milik pembuat Edge sendiri, yang mengharapkannya.",
   "identity.firefoxHint": "Situs melihat Firefox di Linux.",
   "identity.lordosHint": "Situs melihat mesin milik LordOS sendiri. Untuk situs yang bermasalah dengan pilihan lain.",
-  "identity.experimentalHint": "Situs hanya melihat LordOS dan versinya. Banyak situs, termasuk aplikasi pesan, mungkin menolaknya atau bermasalah; jika begitu, pilih yang lain.",
-  "identity.footer": "Browser yang diakui setiap profil kepada situs; jendela yang terbuka memuat ulang halamannya. LordOS tetap memakai mesinnya sendiri (WebKit); Chrome, Edge dan Firefox adalah nama milik pemiliknya. Jika situs bermasalah, pilih LordOS (WebKit). Situs yang sudah menautkan perangkat ini, seperti aplikasi pesan, tetap memakai nama yang dilihatnya sampai ditautkan lagi."
+  "identity.footer": "Browser yang diakui setiap profil kepada situs; jendela yang terbuka memuat ulang halamannya. LordOS tetap memakai mesinnya sendiri (WebKit); Chrome, Edge dan Firefox adalah nama milik pemiliknya. Beberapa situs memeriksa browser dan menolaknya jika ada yang tidak cocok; jika situs menolak atau bermasalah, pilih identitas lain, misalnya LordOS (WebKit). Situs yang sudah menautkan perangkat ini, seperti aplikasi pesan, tetap memakai nama yang dilihatnya sampai ditautkan lagi."
 }

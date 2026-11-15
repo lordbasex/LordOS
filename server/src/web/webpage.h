@@ -13,12 +13,11 @@ int  webpage_title_badge(const char *title);
 
 /* lord-web's user agent for a profile's "Browser identity" (the registry's userAgent, webreg.h WEBREG_UA_*). The page
  * never names it: lord-web maps the registry's word to one of these, here. <version> is always the caller's (lord-web
- * passes LORD_VERSION); a version that isn't [A-Za-z0-9.+~-] drops "/<version>" (and the whole LordOS token where
- * another browser's string carries it).
+ * passes LORD_VERSION); a version that isn't [A-Za-z0-9.+~-] drops the LordOS token.
  *   chrome        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/<M>.0.0.0
- *                 Safari/537.36 LordOS/<version>": what desktop Chrome on Linux sends, plus LordOS's own token as
- *                 Edge's Edg/ and Opera's OPR/ are. Chrome's reduced user agent says "Linux x86_64" on every Linux,
- *                 an ARM one too, so machine is not used.
+ *                 Safari/537.36": exactly what desktop Chrome on Linux sends, nothing added (a messaging site
+ *                 refused it with LordOS's token after "Safari/537.36"). Chrome's reduced user agent says "Linux
+ *                 x86_64" on every Linux, an ARM one too, so machine and version are not used.
  *   edge          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/<E>.0.0.0
  *                 Safari/537.36 Edg/<E>.0.0.0": what desktop Edge on Linux sends (its Chromium major is its own);
  *                 machine is not used, as for Chrome.
@@ -27,8 +26,6 @@ int  webpage_title_badge(const char *title);
  *   lordos        "Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0
  *                 Safari/605.1.15 LordOS/<version>": WebKit's own (frozen) tokens and LordOS's; a machine that isn't
  *                 [A-Za-z0-9_] is left out ("(X11; Linux)").
- *   experimental  "Mozilla/5.0 (X11; Linux <machine>) LordOS/<version>": LordOS alone, no other browser's tokens
- *                 (many sites refuse it); "LordOS" without a version when the version is strange.
  * The majors are the current stable releases; RELEASING.md bumps them each release. 0, or -1 for an unknown kind or
  * when out is too short. */
 #define WEBPAGE_CHROME_MAJOR  157

@@ -207,7 +207,7 @@ int webreg_scheme_value(const char *name) {
     return -1;
 }
 
-static const char *const ua_names[WEBREG_UA_N] = { "chrome", "edge", "firefox", "lordos", "experimental" };
+static const char *const ua_names[WEBREG_UA_N] = { "chrome", "edge", "firefox", "lordos" };
 const char *webreg_ua_name(int v) { return v >= 0 && v < WEBREG_UA_N ? ua_names[v] : NULL; }
 int webreg_ua_value(const char *name) {
     for (int i = 0; name && i < WEBREG_UA_N; i++) if (!strcmp(name, ua_names[i])) return i;
@@ -256,7 +256,7 @@ int webreg_check(const WebApp *a, char *why, size_t wn) {
     for (int i = 0; i < a->nprofiles; i++) {
         if (!webreg_id_ok(a->profiles[i].id) || !webreg_name_ok(a->profiles[i].name)) return bad(why, wn, "profiles: bad id or name");
         if (a->profiles[i].color[0] && !webreg_color_ok(a->profiles[i].color)) return bad(why, wn, "profiles: a bad color");
-        if (a->profiles[i].user_agent < WEBREG_UA_CHROME || a->profiles[i].user_agent >= WEBREG_UA_N) return bad(why, wn, "profiles: userAgent is not chrome, edge, firefox, lordos or experimental");
+        if (a->profiles[i].user_agent < WEBREG_UA_CHROME || a->profiles[i].user_agent >= WEBREG_UA_N) return bad(why, wn, "profiles: userAgent is not chrome, edge, firefox or lordos");
         for (int j = 0; j < i; j++) if (!strcmp(a->profiles[i].id, a->profiles[j].id)) return bad(why, wn, "profiles: %s twice", a->profiles[i].id);
     }
     for (int i = 0; i < WEBREG_PERM_N; i++) if (a->perms[i] < WEBREG_ALLOW || a->perms[i] > WEBREG_DENY) return bad(why, wn, "permissions: a bad value");
@@ -284,7 +284,10 @@ static int parse_profiles(const JVal *arr, WebApp *a, char *why, size_t wn) {
         if (take_str(json_get(p, "id"), w->id, sizeof w->id) || take_str(json_get(p, "name"), w->name, sizeof w->name) ||
             (col && (take_str(col, w->color, sizeof w->color) || !webreg_color_ok(w->color))))
             return bad(why, wn, "profiles: each is { id, name, color?, userAgent? } and nothing else");
-        if (ua && (ua->type != J_STR || (w->user_agent = webreg_ua_value(ua->str)) < 0)) return bad(why, wn, "profiles: userAgent is not chrome, edge, firefox, lordos or experimental");
+        /* "experimental" (removed) is still accepted and read as the default, so an old file still loads */
+        if (ua && ua->type == J_STR && !strcmp(ua->str, "experimental")) w->user_agent = WEBREG_UA_CHROME;
+        else if (ua && (ua->type != J_STR || (w->user_agent = webreg_ua_value(ua->str)) < 0))
+            return bad(why, wn, "profiles: userAgent is not chrome, edge, firefox or lordos");
     }
     return 0;
 }

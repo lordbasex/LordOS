@@ -203,15 +203,13 @@
   "appearance.later": "Sáng và tối cho từng ứng dụng sẽ có cùng công cụ web mới của LordOS (WPEPlatform) mà chúng tôi đang chuyển sang. Hiện tại mỗi ứng dụng web theo chế độ của LordOS, và trang có cài đặt giao diện riêng (ví dụ WhatsApp) vẫn giữ cài đặt đó.",
   "identity.title": "Danh tính trình duyệt",
   "identity.label": "Nhận diện là",
-  "identity.chrome": "Chrome trên Linux + LordOS",
+  "identity.chrome": "Chrome trên Linux",
   "identity.edge": "Edge trên Linux",
   "identity.firefox": "Firefox trên Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (thử nghiệm)",
-  "identity.chromeHint": "Trang web thấy trình duyệt phổ biến nhất trên Linux, kèm tên và phiên bản của LordOS. Mặc định.",
+  "identity.chromeHint": "Trang web thấy trình duyệt phổ biến nhất trên Linux, đúng như cách nó tự giới thiệu. Mặc định.",
   "identity.edgeHint": "Trang web thấy Edge trên Linux. Dành cho các trang văn phòng, thư và trò chuyện nhóm của chính nhà sản xuất Edge, vốn mong đợi nó.",
   "identity.firefoxHint": "Trang web thấy Firefox trên Linux.",
   "identity.lordosHint": "Trang web thấy công cụ riêng của LordOS. Dành cho trang web chạy không đúng với các lựa chọn khác.",
-  "identity.experimentalHint": "Trang web chỉ thấy LordOS và phiên bản của nó. Nhiều trang web, kể cả ứng dụng nhắn tin, có thể từ chối hoặc chạy không đúng; khi đó hãy chọn lựa chọn khác.",
-  "identity.footer": "Trình duyệt mà mỗi hồ sơ xưng với trang web; cửa sổ đang mở sẽ tải lại trang. LordOS vẫn dùng công cụ riêng (WebKit); Chrome, Edge và Firefox là tên thuộc về chủ sở hữu của chúng. Nếu trang web chạy không đúng, hãy chọn LordOS (WebKit). Trang web đã liên kết thiết bị này, như một ứng dụng nhắn tin, vẫn giữ tên đã thấy cho đến khi bạn liên kết lại."
+  "identity.footer": "Trình duyệt mà mỗi hồ sơ xưng với trang web; cửa sổ đang mở sẽ tải lại trang. LordOS vẫn dùng công cụ riêng (WebKit); Chrome, Edge và Firefox là tên thuộc về chủ sở hữu của chúng. Một số trang web kiểm tra trình duyệt và từ chối nếu có gì không khớp; nếu trang web từ chối hoặc chạy không đúng, hãy chọn danh tính khác, chẳng hạn LordOS (WebKit). Trang web đã liên kết thiết bị này, như một ứng dụng nhắn tin, vẫn giữ tên đã thấy cho đến khi bạn liên kết lại."
 }

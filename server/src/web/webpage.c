@@ -30,12 +30,12 @@ static int all_of(const char *s, const char *extra) {
 int webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n) {
     char plat[64], tail[64] = "";
     int k;
-    /* LordOS's own token, as Edge's Edg/ and Opera's OPR/: " LordOS/<version>", left out for a strange version */
+    /* LordOS's own token on its WebKit string: " LordOS/<version>", left out for a strange version */
     if (all_of(version, ".+~-")) snprintf(tail, sizeof tail, " LordOS/%s", version);
     if (kind == WEBREG_UA_CHROME) {
-        /* Chrome's reduced user agent: the same platform on every Linux, whatever the processor */
-        k = snprintf(out, n, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36%s",
-                     WEBPAGE_CHROME_MAJOR, tail);
+        /* Chrome's reduced user agent exactly as Chrome sends it, nothing added: the same platform on every Linux */
+        k = snprintf(out, n, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36",
+                     WEBPAGE_CHROME_MAJOR);
     } else if (kind == WEBREG_UA_EDGE) {
         /* desktop Edge on Linux: Chrome's reduced string with Edge's own token */
         k = snprintf(out, n, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36 Edg/%d.0.0.0",
@@ -44,12 +44,10 @@ int webpage_user_agent(int kind, const char *machine, const char *version, char 
         /* Firefox names the processor it runs on */
         k = snprintf(out, n, "Mozilla/5.0 (X11; Linux %s; rv:%d.0) Gecko/20100101 Firefox/%d.0", all_of(machine, "_") ? machine : "x86_64",
                      WEBPAGE_FIREFOX_MAJOR, WEBPAGE_FIREFOX_MAJOR);
-    } else if (kind == WEBREG_UA_LORDOS || kind == WEBREG_UA_EXPERIMENTAL) {
+    } else if (kind == WEBREG_UA_LORDOS) {
         if (all_of(machine, "_")) snprintf(plat, sizeof plat, "X11; Linux %s", machine);
         else snprintf(plat, sizeof plat, "X11; Linux");
-        if (kind == WEBREG_UA_LORDOS)
-            k = snprintf(out, n, "Mozilla/5.0 (%s) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15%s", plat, tail);
-        else k = snprintf(out, n, "Mozilla/5.0 (%s)%s", plat, tail[0] ? tail : " LordOS");
+        k = snprintf(out, n, "Mozilla/5.0 (%s) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15%s", plat, tail);
     } else return -1;
     return k < 0 || (size_t)k >= n ? -1 : 0;
 }

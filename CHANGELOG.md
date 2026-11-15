@@ -300,44 +300,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
   word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
   Automatic. Not yet checked on screen on the development VM.
-- **A web app profile's Browser identity: five Linux browsers to choose from** (maintainer's request,
+- **A web app profile's Browser identity: four Linux browsers to choose from** (maintainer's request,
   2026-11-15). Which browser a profile's pages are told it is, chosen from a closed list, never typed, per profile
   (two accounts of one messaging app can differ), Linux identities only. Settings → Web Apps has a *Browser identity*
   section on the app's page, one pop-up per profile with a hint for each choice and a footer that says LordOS still
-  uses its own engine (WebKit), that Chrome, Edge and Firefox are names of their owners, to choose LordOS (WebKit) if
-  a site misbehaves, and that a site that already linked the device keeps the name it saw until it is linked again;
-  in Lord Flow the web app window's app menu has *Browser identity ▸* the five, for that window's profile. The
+  uses its own engine (WebKit), that Chrome, Edge and Firefox are names of their owners, that some sites check the
+  browser and refuse it when something doesn't match (then choose another identity, such as LordOS (WebKit)), and
+  that a site that already linked the device keeps the name it saw until it is linked again;
+  in Lord Flow the web app window's app menu has *Browser identity ▸* the four, for that window's profile. The
   strings (lord-web's `webpage_user_agent`, in C; JS and the page never pass one; `<version>` is always the installed
   `LORD_VERSION`; quoted in full in docs/WEBAPPS.md), in the list's order:
-  - Chrome on Linux + LordOS (the default): desktop Chrome 157's reduced string (`X11; Linux x86_64` with its
-    `AppleWebKit/537.36` and `Chrome/157.0.0.0` tokens, also on ARM, as Chrome itself sends there) followed by
-    LordOS's own token, `LordOS/<version>`, as other browsers built on it add theirs;
+  - Chrome on Linux (the default): exactly what desktop Chrome 157 on Linux sends, nothing added: its reduced
+    string (`X11; Linux x86_64` with its `AppleWebKit/537.36` and `Chrome/157.0.0.0` tokens and the closing
+    WebKit-era token, also on ARM, as Chrome itself sends there);
   - Edge on Linux: the same reduced string followed by `Edg/157.0.0.0`, what desktop Edge on Linux sends, for the
     office, mail and team chat sites of its own maker;
   - Firefox on Linux: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0` (`x86_64`,
     `aarch64`);
   - LordOS (WebKit): the string every app had until now, `X11; Linux <machine>` with WebKit's own frozen
     `AppleWebKit/605.1.15` tokens and `LordOS/<version>`;
-  - LordOS (experimental): `Mozilla/5.0 (X11; Linux <machine>) LordOS/<version>`, LordOS alone; its hint warns that
-    many sites, messaging apps included, may refuse it or misbehave, and to switch back then.
+  The maintainer tested each with a messaging web app on 2026-11-15: LordOS (WebKit), Firefox on Linux and Edge on
+  Linux link (the phone lists each under its browser's name, on Linux). Two first versions were refused and
+  changed before any release: Chrome's string with LordOS's token after Chrome's last token ("works with Chrome
+  100 or later"; the site reads the last token as the browser, since Edge's `Edg/` token there works),
+  so Chrome is now sent exactly as Chrome sends it; and a fifth identity, *LordOS (experimental)* (`Mozilla/5.0
+  (X11; Linux <machine>) LordOS/<version>`, LordOS alone; "browser not supported"), removed from the UI, both C
+  lists, `lord.webapps.setUserAgent` and the model. A profile that stored `experimental` is read as Chrome on Linux
+  (the registry parser still accepts the word, so the file loads; it isn't rewritten).
   The majors are constants (`WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR`, `WEBPAGE_FIREFOX_MAJOR` in
   `server/src/web/webpage.h`) that docs/RELEASING.md now bumps each release. It applies **at once**: a change writes
-  the profile's new optional `userAgent` key in the registry (`chrome`, `edge`, `firefox`, `lordos`, `experimental`;
-  written only when not `chrome`, anything else refused, also at the app's level) and lord-server sends that
+  the profile's new optional `userAgent` key in the registry (`chrome`, `edge`, `firefox`, `lordos`; written only
+  when not `chrome`; an old `experimental` read as `chrome`; anything else refused, also at the app's level) and lord-server sends that
   profile's running `lord-web` a new closed D-Bus call, `org.lordos.WebApp1.SetUserAgent(word)` with one of those
-  five words, which lord-web runs only when the bus says the caller is the lord-server that started it (as `Edit` and
+  four words, which lord-web runs only when the bus says the caller is the lord-server that started it (as `Edit` and
   `SetColorScheme`); lord-web sets WebKit's user agent and loads the app's page again, since a document keeps the
   `navigator.userAgent` it started with (a sign-in on another site in the window is left alone and gets it with its
   next load). lord-server sends it again when a lord-web's bus name appears, so a change made while it was starting
   is not lost; the same word is ignored. WebKit's site-specific quirks keep today's rule (off on the app's own pages,
   on for other sites). New: `lord.webapps.setUserAgent(app, profile, value)` (desktop only, not in the broker; a bad
   value is `sys.badArgument`), `USER_AGENTS` and `userAgentOf` in `sdk/webappsmodel.js`, `webUserAgentItem` in
-  `sdk/appcontrol.js`, the `webapps.identity.*` texts (13 keys) in all 35 languages; they name no company or service
-  beyond the three browsers. Tests: `build/webapp-test` (the five strings, Chrome's and Edge's on every machine, the
-  LordOS token from the version given, Firefox's processor, experimental without other browsers' tokens, unknown
-  kinds refused, the key per profile read, written only when not `chrome`, ten bad forms refused; 518 checks),
-  `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 345 checks) and
-  `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
+  `sdk/appcontrol.js`, the `webapps.identity.*` texts (11 keys) in all 35 languages; they name no company or service
+  beyond the three browsers. Tests: `build/webapp-test` (the four strings, Chrome's exactly Chrome's with no LordOS
+  token on every machine and version, Edge's on every machine, the LordOS token from the version given, Firefox's
+  processor, unknown kinds and the word `experimental` refused as identities, the key per profile read, written only
+  when not `chrome`, `experimental` read as `chrome` and not written back, twelve bad forms refused; 600 checks),
+  `build/webreg-test` (`webmgr_user_agent_of`, an old file with `experimental` still loads as Chrome and isn't
+  rewritten, a new profile is Chrome again; 352 checks) and `tests/webapps_model_test.mjs` (`experimental` shown as
+  Chrome). Not yet checked on screen on the development VM.
 - **Files and Disks mount a free partition of the system disk** ([#122](https://github.com/lordbasex/LordOS/issues/122),
   thanks to pct06, approved by the maintainer on 2026-11-15 as "only mount by hand"). In a dual boot on one disk the
   other installed system's partition (its NTFS volume, say) never showed up, because Files skipped the whole system
@@ -484,7 +493,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   The lists of reserved user names in the installer, the first run and the VM installer still name these groups:
   they are names an account can't take, not an administrator check.
 
-- **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,
+- **Web apps tell sites they are Chrome on Linux, exactly as Chrome says it, by default** (maintainer's request,
   2026-11-15), instead of LordOS's WebKit string, whose browser token made a messaging app's phone list the linked computer under another system's
   browser. Every existing profile changes too (no stored key is the default; no migration). A profile set to *LordOS
   (WebKit)* in Browser identity (above) gets the old string back. A device a site linked before keeps the name the
@@ -634,7 +643,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Bengali, right to left for Arabic, Persian and Urdu), 32 in all, and the rule that a language ships complete; the
   Help articles' sentence and §10.2's limitations add that the 26 have no Help articles and no native review yet, and
   that Persian and Thai dates are Gregorian.
-- docs/WEBAPPS.md: Browser identity (the registry's per-profile `userAgent`, the five strings, `SetUserAgent` and
+- docs/WEBAPPS.md: Browser identity (the registry's per-profile `userAgent`, the four strings, the maintainer's tests
+  with a messaging web app and why Chrome is sent exactly and experimental was removed, `SetUserAgent` and
   the reload, why a linked device keeps the old name, where it is, the tests) under "The page", the registry's rules
   and the More registry keys list. docs/RELEASING.md: a step to bump the Chrome, Edge and Firefox majors each release.
   docs/PAPER-VALIDATION.md: the Browser identity claim in the 0.8.8.9 section.
@@ -853,8 +863,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   reported RX 9060 XT) and links to the reports; "How do I share how LordOS runs on my computer?" no longer says the
   tested-hardware page has only the reference machines (it also has #42) and links to the comparison.
 
-- **LordOS Web Runtime page** (en, es, pt): each profile's Browser identity (Chrome on Linux + LordOS by default,
-  Edge on Linux, Firefox on Linux, LordOS (WebKit), LordOS (experimental)), marked in development, in a new paragraph and in Settings → Web Apps. The paper (en, es, pt)
+- **LordOS Web Runtime page** (en, es, pt): each profile's Browser identity (Chrome on Linux by default,
+  Edge on Linux, Firefox on Linux, LordOS (WebKit)), marked in development, in a new paragraph and in Settings → Web Apps. The paper (en, es, pt)
   says it in its web apps paragraph.
 - **LordOS Web Runtime page** (en, es, pt): each app's Appearance (Automatic, Light, Dark), marked in development
   after 0.8.8.8, the latest release, under Light and dark and in Settings → Web Apps. The paper (en, es, pt, edition
@@ -999,6 +1009,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A web app set to Chrome on Linux is no longer refused by a messaging site** (maintainer's test, 2026-11-15, in
+  development, never released). The site read the last token of the user agent as the browser, and Chrome's
+  string ended with `LordOS/<version>`: it answered that it works with Chrome 100 or later. `chrome` now sends
+  exactly what desktop Chrome on Linux sends, nothing after its last token. *LordOS
+  (experimental)*, which the same site refused as an unsupported browser, is gone; a profile that chose it is
+  Chrome on Linux again, read so without rewriting its file.
 - **A web app with Appearance set to Light or Dark didn't open when only `lordos` was updated** (found testing
   0.8.8.9 on the maintainer's PC, 2026-11-15): the web runtime is its own package, `lordos-web`, and a 0.8.8.8
   `lord-web` refused the app's registry entry with the new `colorScheme` key ("unknown key colorScheme"), and kept

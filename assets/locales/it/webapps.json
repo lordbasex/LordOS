@@ -205,15 +205,13 @@
   "appearance.later": "Chiaro e scuro per app arrivano con il nuovo motore web di LordOS (WPEPlatform), verso cui stiamo migrando. Per ora ogni app web segue la modalità di LordOS, e un sito con una propria impostazione del tema (WhatsApp, ad esempio) la mantiene.",
   "identity.title": "Identità del browser",
   "identity.label": "Identificati come",
-  "identity.chrome": "Chrome su Linux + LordOS",
+  "identity.chrome": "Chrome su Linux",
   "identity.edge": "Edge su Linux",
   "identity.firefox": "Firefox su Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (sperimentale)",
-  "identity.chromeHint": "I siti vedono il browser più comune su Linux, più il nome e la versione di LordOS. Predefinito.",
+  "identity.chromeHint": "I siti vedono il browser più comune su Linux, esattamente come si presenta. Predefinito.",
   "identity.edgeHint": "I siti vedono Edge su Linux. Per i siti di ufficio, posta e chat di team del produttore di Edge, che se lo aspettano.",
   "identity.firefoxHint": "I siti vedono Firefox su Linux.",
   "identity.lordosHint": "I siti vedono il motore di LordOS. Per un sito che non funziona bene con gli altri.",
-  "identity.experimentalHint": "I siti vedono solo LordOS e la sua versione. Molti siti, app di messaggistica comprese, possono rifiutarlo o non funzionare bene; in quel caso scegli un’altra opzione.",
-  "identity.footer": "Il browser che ogni profilo dichiara ai siti; una finestra aperta ricarica la sua pagina. LordOS usa sempre il proprio motore (WebKit); Chrome, Edge e Firefox sono nomi dei rispettivi proprietari. Se un sito non funziona bene, scegli LordOS (WebKit). Un sito che ha già collegato questo dispositivo, come un’app di messaggistica, mantiene il nome che ha visto finché non lo colleghi di nuovo."
+  "identity.footer": "Il browser che ogni profilo dichiara ai siti; una finestra aperta ricarica la sua pagina. LordOS usa sempre il proprio motore (WebKit); Chrome, Edge e Firefox sono nomi dei rispettivi proprietari. Alcuni siti controllano il browser e lo rifiutano se qualcosa non corrisponde; se un sito lo rifiuta o non funziona bene, scegli un’altra identità, come LordOS (WebKit). Un sito che ha già collegato questo dispositivo, come un’app di messaggistica, mantiene il nome che ha visto finché non lo colleghi di nuovo."
 }

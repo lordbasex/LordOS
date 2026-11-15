@@ -205,15 +205,13 @@
   "appearance.later": "El clar i el fosc per app arriben amb el nou motor web de LordOS (WPEPlatform), al qual estem migrant. De moment cada app web segueix el mode de LordOS, i un lloc amb el seu propi ajust de tema (WhatsApp, per exemple) el manté.",
   "identity.title": "Identitat del navegador",
   "identity.label": "Identifica’t com a",
-  "identity.chrome": "Chrome a Linux + LordOS",
+  "identity.chrome": "Chrome a Linux",
   "identity.edge": "Edge a Linux",
   "identity.firefox": "Firefox a Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (experimental)",
-  "identity.chromeHint": "Els llocs veuen el navegador més habitual a Linux, més el nom i la versió de LordOS. L’opció per defecte.",
+  "identity.chromeHint": "Els llocs veuen el navegador més habitual a Linux, tal com s’identifica ell mateix. L’opció per defecte.",
   "identity.edgeHint": "Els llocs veuen Edge a Linux. Per als llocs d’ofimàtica, correu i xat d’equip del mateix fabricant d’Edge, que l’esperen.",
   "identity.firefoxHint": "Els llocs veuen Firefox a Linux.",
   "identity.lordosHint": "Els llocs veuen el motor propi de LordOS. Per a un lloc que no funciona bé amb els altres.",
-  "identity.experimentalHint": "Els llocs només veuen LordOS i la seva versió. Molts llocs, incloses les apps de missatgeria, poden rebutjar-lo o no funcionar bé; si passa, tria’n un altre.",
-  "identity.footer": "El navegador que cada perfil diu als llocs que és; una finestra oberta torna a carregar la pàgina. LordOS continua fent servir el seu propi motor (WebKit); Chrome, Edge i Firefox són noms dels seus propietaris. Si un lloc no funciona bé, tria LordOS (WebKit). Un lloc que ja ha vinculat aquest dispositiu, com una app de missatgeria, conserva el nom que va veure fins que el tornis a vincular."
+  "identity.footer": "El navegador que cada perfil diu als llocs que és; una finestra oberta torna a carregar la pàgina. LordOS continua fent servir el seu propi motor (WebKit); Chrome, Edge i Firefox són noms dels seus propietaris. Alguns llocs comproven el navegador i el rebutgen si alguna cosa no quadra; si un lloc el rebutja o no funciona bé, tria una altra identitat, com LordOS (WebKit). Un lloc que ja ha vinculat aquest dispositiu, com una app de missatgeria, conserva el nom que va veure fins que el tornis a vincular."
 }

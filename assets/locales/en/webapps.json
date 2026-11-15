@@ -205,15 +205,13 @@
   "appearance.later": "Light and dark per app arrive with LordOS’s new web engine (WPEPlatform), which we’re moving to. For now each web app follows LordOS’s mode, and a site with its own theme setting (WhatsApp, for example) keeps it.",
   "identity.title": "Browser identity",
   "identity.label": "Identify as",
-  "identity.chrome": "Chrome on Linux + LordOS",
+  "identity.chrome": "Chrome on Linux",
   "identity.edge": "Edge on Linux",
   "identity.firefox": "Firefox on Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (experimental)",
-  "identity.chromeHint": "Sites see the most common browser on Linux, plus LordOS’s own name and version. The default.",
+  "identity.chromeHint": "Sites see the most common browser on Linux, exactly as it identifies itself. The default.",
   "identity.edgeHint": "Sites see Edge on Linux. For the office, mail and team chat sites of Edge’s own maker, which expect it.",
   "identity.firefoxHint": "Sites see Firefox on Linux.",
   "identity.lordosHint": "Sites see LordOS’s own engine. For a site that misbehaves with the others.",
-  "identity.experimentalHint": "Sites see only LordOS and its version. Many sites, messaging apps included, may refuse it or misbehave; if so, choose another one.",
-  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome, Edge and Firefox are names of their owners. If a site misbehaves, choose LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again."
+  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome, Edge and Firefox are names of their owners. Some sites check the browser and refuse it when something doesn’t match; if a site refuses or misbehaves, choose another identity, such as LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again."
 }

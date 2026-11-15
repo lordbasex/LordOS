@@ -203,15 +203,13 @@
   "appearance.later": "依應用程式設定淺色和深色將隨 LordOS 正在遷移的新網頁引擎（WPEPlatform）推出。目前每個網頁應用程式都跟隨 LordOS 的模式，而有自己主題設定的網站（例如 WhatsApp）會保留其設定。",
   "identity.title": "瀏覽器識別",
   "identity.label": "識別為",
-  "identity.chrome": "Linux 上的 Chrome + LordOS",
+  "identity.chrome": "Linux 上的 Chrome",
   "identity.edge": "Linux 上的 Edge",
   "identity.firefox": "Linux 上的 Firefox",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS（實驗性）",
-  "identity.chromeHint": "網站看到的是 Linux 上最常見的瀏覽器，加上 LordOS 的名稱和版本。預設選項。",
+  "identity.chromeHint": "網站看到的是 Linux 上最常見的瀏覽器，與它自己的標識完全一致。預設選項。",
   "identity.edgeHint": "網站看到的是 Linux 上的 Edge。適用於 Edge 開發商自己的辦公、郵件和團隊聊天網站，它們期望使用它。",
   "identity.firefoxHint": "網站看到的是 Linux 上的 Firefox。",
   "identity.lordosHint": "網站看到的是 LordOS 自己的引擎。適用於在其他選項下運作不正常的網站。",
-  "identity.experimentalHint": "網站只看到 LordOS 及其版本。許多網站（包括即時通訊 App）可能會拒絕或運作不正常；如果這樣，請選擇其他選項。",
-  "identity.footer": "每個設定檔向網站聲稱的瀏覽器；開啟的視窗會重新載入其頁面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名稱。如果網站運作不正常，請選擇 LordOS (WebKit)。已經連結此裝置的網站（例如即時通訊 App）在重新連結之前會保留它看到的名稱。"
+  "identity.footer": "每個設定檔向網站聲稱的瀏覽器；開啟的視窗會重新載入其頁面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名稱。有些網站會檢查瀏覽器，發現不一致就拒絕；如果網站拒絕或運作不正常，請選擇其他身分，例如 LordOS (WebKit)。已經連結此裝置的網站（例如即時通訊 App）在重新連結之前會保留它看到的名稱。"
 }

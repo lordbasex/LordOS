@@ -205,15 +205,13 @@
   "appearance.later": "Uygulama başına açık ve koyu, geçiş yaptığımız LordOS’un yeni web motoru (WPEPlatform) ile geliyor. Şimdilik her web uygulaması LordOS’un modunu izler, kendi tema ayarı olan bir site (örneğin WhatsApp) ise onu korur.",
   "identity.title": "Tarayıcı kimliği",
   "identity.label": "Şu olarak tanıt",
-  "identity.chrome": "Linux'ta Chrome + LordOS",
+  "identity.chrome": "Linux'ta Chrome",
   "identity.edge": "Linux'ta Edge",
   "identity.firefox": "Linux'ta Firefox",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (deneysel)",
-  "identity.chromeHint": "Siteler Linux'taki en yaygın tarayıcıyı, ayrıca LordOS'un adını ve sürümünü görür. Varsayılan.",
+  "identity.chromeHint": "Siteler Linux'taki en yaygın tarayıcıyı, kendini tanıttığı biçimiyle aynen görür. Varsayılan.",
   "identity.edgeHint": "Siteler Linux'ta Edge'i görür. Edge'in kendi üreticisinin bunu bekleyen ofis, e-posta ve ekip sohbeti siteleri için.",
   "identity.firefoxHint": "Siteler Linux'ta Firefox'u görür.",
   "identity.lordosHint": "Siteler LordOS'un kendi motorunu görür. Diğerleriyle düzgün çalışmayan bir site için.",
-  "identity.experimentalHint": "Siteler yalnızca LordOS'u ve sürümünü görür. Mesajlaşma uygulamaları dahil birçok site bunu reddedebilir veya düzgün çalışmayabilir; öyleyse başka bir seçenek seçin.",
-  "identity.footer": "Her profilin sitelere kendini tanıttığı tarayıcı; açık bir pencere sayfasını yeniden yükler. LordOS kendi motorunu (WebKit) kullanmaya devam eder; Chrome, Edge ve Firefox sahiplerine ait adlardır. Bir site düzgün çalışmazsa LordOS (WebKit) seçin. Bu cihazı zaten bağlamış bir site, örneğin bir mesajlaşma uygulaması, yeniden bağlayana kadar gördüğü adı korur."
+  "identity.footer": "Her profilin sitelere kendini tanıttığı tarayıcı; açık bir pencere sayfasını yeniden yükler. LordOS kendi motorunu (WebKit) kullanmaya devam eder; Chrome, Edge ve Firefox sahiplerine ait adlardır. Bazı siteler tarayıcıyı denetler ve bir şey uyuşmazsa reddeder; bir site reddederse veya düzgün çalışmazsa LordOS (WebKit) gibi başka bir kimlik seçin. Bu cihazı zaten bağlamış bir site, örneğin bir mesajlaşma uygulaması, yeniden bağlayana kadar gördüğü adı korur."
 }
