@@ -426,3 +426,4 @@ body:has(.nav-cb:checked) .totop,body:has(.lb[open]) .totop{display:none}
 #search-list mark{background:rgba(255,214,10,.45);color:inherit;border-radius:3px}
 .search-none{margin:8px;color:var(--muted)}
 .search-foot{margin:0;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--subtle)}
+.lg-review{margin-top:24px}

@@ -1228,7 +1228,7 @@ ${(c.items || []).map((it) => {
       complete: langList.filter((x) => !x.partial).map(card).join('\n'),
       completeTitle: esc(L.completeTitle.replace('{count}', String(langList.filter((x) => !x.partial).length))),
       fresh: langList.some((x) => x.next && !x.partial)
-        ? `<p class="lg-p">${esc(L.reviewText.replace('{next}', NEXT_LANG_VERSION))} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n`
+        ? `<p class="lg-p lg-review">${esc(L.reviewText.replace('{next}', NEXT_LANG_VERSION))} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n`
         : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
       visits,
