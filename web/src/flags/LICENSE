@@ -1,7 +1,7 @@
 The country flags in this folder (one SVG per ISO 3166-1 alpha-2 code) are copied unchanged from flag-icons,
 https://github.com/lipis/flag-icons (flags/4x3), under the MIT license below. The lordos.org Languages page
-(/language/) shows one on each language card, as decoration; the build publishes this notice at
-/licenses/flag-icons-MIT.txt.
+(/language/) shows one on each language card and next to each country of the visits chart, as decoration; the build
+publishes this notice at /licenses/flag-icons-MIT.txt.
 
 The MIT License (MIT)
 

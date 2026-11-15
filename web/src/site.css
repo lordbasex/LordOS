@@ -201,14 +201,25 @@ body:has(.nav-cb:checked){overflow:hidden}
 .lg-visits{display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px;align-items:center;margin:20px 0 0}
 @media (max-width:700px){.lg-visits{grid-template-columns:minmax(0,1fr);gap:20px}}
 .lg-donut{display:block;width:100%;max-width:240px;height:auto;margin:0 auto}
-.lg-v-s{fill:var(--brand)}.lg-v-o{fill:var(--chip-line)}
-.lg-donut path{stroke:var(--bg);stroke-width:2;stroke-linejoin:round}
+/* the visits donut: the classic 20-colour categorical palette (as in CloudWatch), one colour per country, the same in
+   light and dark; "other countries" is the neutral --chip-line token; a 1px page-background stroke between slices */
+.lg-c0{fill:#1f77b4}.lg-c1{fill:#ff7f0e}.lg-c2{fill:#2ca02c}.lg-c3{fill:#d62728}.lg-c4{fill:#9467bd}.lg-c5{fill:#8c564b}.lg-c6{fill:#e377c2}.lg-c7{fill:#7f7f7f}.lg-c8{fill:#bcbd22}.lg-c9{fill:#17becf}
+.lg-c10{fill:#aec7e8}.lg-c11{fill:#ffbb78}.lg-c12{fill:#98df8a}.lg-c13{fill:#ff9896}.lg-c14{fill:#c5b0d5}.lg-c15{fill:#c49c94}.lg-c16{fill:#f7b6d2}.lg-c17{fill:#c7c7c7}.lg-c18{fill:#dbdb8d}.lg-c19{fill:#9edae5}
+.lg-v-o{fill:var(--chip-line)}
+.lg-donut path{stroke:var(--bg);stroke-width:1;stroke-linejoin:round}
 .lg-v-n{fill:var(--ink);font-size:30px;font-weight:800}.lg-v-l{fill:var(--subtle);font-size:13px}
 .lg-legend{columns:2 210px;column-gap:40px;max-width:660px;margin:0;padding:0;list-style:none}
 .lg-legend li{display:flex;align-items:center;gap:8px;padding:3px 0;break-inside:avoid;font-size:14px;min-width:0}
 .lg-sw{flex:none}.lg-fl-x{flex:none;width:20px}.lg-legend .lg-fl{margin-top:0}
 .lg-v-c{flex:1;min-width:0;color:var(--ink-2);overflow-wrap:anywhere}
 .lg-v-v{color:var(--subtle);font-variant-numeric:tabular-nums}
+/* every visiting country, below the chart: a <details> list in columns that wrap on a phone */
+.lg-all{margin:24px 0 0}
+.lg-all summary{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--chip-line);color:var(--ink-2);font:600 15px/1.2 var(--ff);cursor:pointer}
+.lg-all summary:hover{color:var(--brand)}
+.lg-all ol{columns:4 180px;column-gap:32px;margin:16px 0 0;padding:0;list-style:none}
+.lg-all li{display:flex;align-items:center;gap:8px;padding:3px 0;break-inside:avoid;font-size:14px;min-width:0}
+.lg-all .lg-fl{margin-top:0}
 .lg-card[dir=rtl] strong,.lg-card strong[dir=rtl]{text-align:start}
 .lg-en{font-size:14px;color:var(--subtle)}
 .lg-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
