@@ -1,5 +1,5 @@
 // Settings → Energy (Battery on laptops): battery state and health, power mode, screen off / lock /
-// sleep after N minutes, what the power button and the lid do (logind, closed admin action
+// sleep after N minutes, what the power button (pressed, and held 5 s) and the lid do (logind, closed admin action
 // power-buttons), the low-battery notice and the percentage in the menu bar. See docs/SETTINGS.md.
 import {
   View, Text, useTheme, useLocale, useSettings, Toggle, Segmented, admin, useBattery, usePowerProfiles, onPowerProfileResult,
@@ -52,13 +52,17 @@ function Buttons({ hasLid, tr }) {
   const acts = () => ['suspend', 'hibernate', 'poweroff', 'ignore'].map((a) => [a, tr(`prefs.power.act.${a}`)]);
   const save = (x) => {
     const n = { ...b, ...x };
-    admin.run('power-buttons', `${n.power} ${n.lid} ${n.lidAC}`).then(() => { setB(lord.power.buttons()); setErr(''); }, (e) => setErr(e.message));
+    // the fourth value: the power button held 5 s (logind's HandlePowerKeyLongPress, #131)
+    admin.run('power-buttons', `${n.power} ${n.lid} ${n.lidAC} ${n.powerHold || 'ignore'}`).then(() => { setB(lord.power.buttons()); setErr(''); }, (e) => setErr(e.message));
     setB(n);
   };
   return (
     <GroupBox title={tr('prefs.power.buttons')} footer={err || (isAdmin ? tr('prefs.power.buttonsHint') : tr('prefs.power.needAdmin'))}>
       <SettingRow label={tr('prefs.power.powerKey')} disabled={!isAdmin}>
         <PopUp value={b.power} options={acts(false)} onChange={(power) => save({ power })} disabled={!isAdmin} />
+      </SettingRow>
+      <SettingRow label={tr('prefs.power.powerKeyHold')} disabled={!isAdmin}>
+        <PopUp value={b.powerHold || 'ignore'} options={acts(false)} onChange={(powerHold) => save({ powerHold })} disabled={!isAdmin} />
       </SettingRow>
       {hasLid && (
         <SettingRow label={tr('prefs.power.lid')} disabled={!isAdmin}>

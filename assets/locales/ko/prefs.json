@@ -222,6 +222,7 @@
   "power.onBattery": "배터리 사용 중",
   "power.onPower": "전원 어댑터",
   "power.powerKey": "전원 버튼을 눌렀을 때",
+  "power.powerKeyHold": "전원 버튼을 5초 동안 누르고 있을 때",
   "power.profile.balanced": "균형",
   "power.profile.performance": "성능",
   "power.profile.power-saver": "저전력",

@@ -309,6 +309,7 @@
   "net.kind.rdp": "Távoli asztal",
   "net.connectAs": "Csatlakozás mint",
   "net.nothing": "Ezen a számítógépen innen semmi sem nyitható meg.",
+  "programNoOpener": "Egy app sem nyitja meg ezt: „{name}”. Ez egy program (AppImage), a Fájlok pedig nem futtat programokat.",
   "net.sharedFolder": "Megosztott mappa",
   "connect.err.tlsName": "A szerver tanúsítványa nem tartalmazza ezt a nevet: {name}, ezért nem ellenőrizhető. A rendszergazdája hozzáadhatja a nevet a tanúsítványhoz.",
   "disk.formatsTitle": "{name} kereskedelmi lemezformátumot használ",

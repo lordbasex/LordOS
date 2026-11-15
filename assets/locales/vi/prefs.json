@@ -222,6 +222,7 @@
   "power.onBattery": "Đang dùng pin",
   "power.onPower": "Bộ đổi nguồn",
   "power.powerKey": "Khi nhấn nút nguồn",
+  "power.powerKeyHold": "Khi giữ nút nguồn trong 5 giây",
   "power.profile.balanced": "Cân bằng",
   "power.profile.performance": "Hiệu năng",
   "power.profile.power-saver": "Tiết kiệm điện",

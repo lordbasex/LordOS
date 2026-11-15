@@ -223,6 +223,7 @@
   "power.onBattery": "Batteriebetrieb",
   "power.onPower": "Netzteil",
   "power.powerKey": "Beim Drücken der Ein-/Aus-Taste",
+  "power.powerKeyHold": "Beim Gedrückthalten der Ein-/Aus-Taste für 5 Sekunden",
   "power.profile.balanced": "Ausgewogen",
   "power.profile.performance": "Leistung",
   "power.profile.power-saver": "Stromsparmodus",

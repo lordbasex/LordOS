@@ -267,11 +267,11 @@ static JSValue f_power_set_profile(JSContext *c, JSValueConst t, int argc, JSVal
     return JS_NewBool(c, ppd_set(p) == 0);
 }
 
-/* What logind does with the power button and the lid: our drop-in if it exists, else logind's
- * defaults (poweroff, suspend, suspend). Read-only; changed by the power-buttons action. */
+/* What logind does with the power button (pressed, and held 5 s: powerHold, issue #131) and the lid: our drop-in if
+ * it exists, else logind's defaults (poweroff, ignore, suspend, suspend). Read-only; changed by the power-buttons action. */
 static JSValue f_power_buttons(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
-    char power[16] = "poweroff", lid[16] = "suspend", lidac[16] = "", buf[1024];
+    char power[16] = "poweroff", hold[16] = "ignore", lid[16] = "suspend", lidac[16] = "", buf[1024];
     const char *files[] = { "/etc/systemd/logind.conf", "/etc/systemd/logind.conf.d/lordos.conf" };
     for (int f = 0; f < 2; f++) {
         int fd = open(files[f], O_RDONLY | O_CLOEXEC);
@@ -283,6 +283,7 @@ static JSValue f_power_buttons(JSContext *c, JSValueConst t, int argc, JSValueCo
         for (char *line = strtok(buf, "\n"); line; line = strtok(NULL, "\n")) {
             char v[16];
             if (sscanf(line, "HandlePowerKey=%15s", v) == 1) snprintf(power, sizeof power, "%s", v);
+            else if (sscanf(line, "HandlePowerKeyLongPress=%15s", v) == 1) snprintf(hold, sizeof hold, "%s", v);
             else if (sscanf(line, "HandleLidSwitchExternalPower=%15s", v) == 1) snprintf(lidac, sizeof lidac, "%s", v);
             else if (sscanf(line, "HandleLidSwitch=%15s", v) == 1) snprintf(lid, sizeof lid, "%s", v);
         }
@@ -290,6 +291,7 @@ static JSValue f_power_buttons(JSContext *c, JSValueConst t, int argc, JSValueCo
     if (!lidac[0]) snprintf(lidac, sizeof lidac, "%s", lid);     /* logind: unset = same as HandleLidSwitch */
     JSValue o = JS_NewObject(c);
     JS_SetPropertyStr(c, o, "power", JS_NewString(c, power));
+    JS_SetPropertyStr(c, o, "powerHold", JS_NewString(c, hold));
     JS_SetPropertyStr(c, o, "lid", JS_NewString(c, lid));
     JS_SetPropertyStr(c, o, "lidAC", JS_NewString(c, lidac));
     return o;

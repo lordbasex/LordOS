@@ -317,6 +317,7 @@
   "net.kind.rdp": "Pulpit zdalny",
   "net.connectAs": "Połącz jako",
   "net.nothing": "Na tym komputerze nie ma niczego, co można stąd otworzyć.",
+  "programNoOpener": "Żadna aplikacja nie otwiera „{name}”: to program (AppImage), a Pliki nie uruchamiają programów.",
   "net.sharedFolder": "Folder udostępniony",
   "connect.err.tlsName": "Certyfikat tego serwera nie zawiera nazwy {name}, więc nie można go zweryfikować. Jego administrator może dodać tę nazwę do certyfikatu.",
   "disk.formatsTitle": "{name} używa komercyjnego formatu dysku",

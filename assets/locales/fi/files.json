@@ -309,6 +309,7 @@
   "net.kind.rdp": "Etätyöpöytä",
   "net.connectAs": "Yhdistä nimellä",
   "net.nothing": "Tästä tietokoneesta ei voi avata mitään täältä.",
+  "programNoOpener": "Mikään sovellus ei avaa kohdetta ”{name}”: se on ohjelma (AppImage), eikä Tiedostot suorita ohjelmia.",
   "net.sharedFolder": "Jaettu kansio",
   "connect.err.tlsName": "Tämän palvelimen varmenteessa ei mainita nimeä {name}, joten sitä ei voi varmentaa. Sen ylläpitäjä voi lisätä nimen varmenteeseen.",
   "disk.formatsTitle": "{name} käyttää kaupallista levymuotoa",

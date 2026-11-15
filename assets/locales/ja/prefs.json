@@ -222,6 +222,7 @@
   "power.onBattery": "バッテリー使用中",
   "power.onPower": "電源アダプタ",
   "power.powerKey": "電源ボタンを押したとき",
+  "power.powerKeyHold": "電源ボタンを5秒間押し続けたとき",
   "power.profile.balanced": "バランス",
   "power.profile.performance": "パフォーマンス",
   "power.profile.power-saver": "低電力",

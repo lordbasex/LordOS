@@ -223,6 +223,7 @@
   "power.onBattery": "Pilde",
   "power.onPower": "Güç adaptörü",
   "power.powerKey": "Güç düğmesine basıldığında",
+  "power.powerKeyHold": "Güç düğmesi 5 saniye basılı tutulduğunda",
   "power.profile.balanced": "Dengeli",
   "power.profile.performance": "Performans",
   "power.profile.power-saver": "Düşük Güç",

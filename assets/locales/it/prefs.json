@@ -223,6 +223,7 @@
   "power.onBattery": "A batteria",
   "power.onPower": "Alimentatore",
   "power.powerKey": "Quando si preme il pulsante di accensione",
+  "power.powerKeyHold": "Quando si tiene premuto il pulsante di accensione per 5 secondi",
   "power.profile.balanced": "Bilanciata",
   "power.profile.performance": "Prestazioni",
   "power.profile.power-saver": "Basso consumo",

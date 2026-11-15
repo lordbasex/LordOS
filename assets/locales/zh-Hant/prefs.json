@@ -222,6 +222,7 @@
   "power.onBattery": "使用電池",
   "power.onPower": "電源轉換器",
   "power.powerKey": "按下電源按鈕時",
+  "power.powerKeyHold": "按住電源按鈕 5 秒時",
   "power.profile.balanced": "平衡",
   "power.profile.performance": "效能",
   "power.profile.power-saver": "低耗電",

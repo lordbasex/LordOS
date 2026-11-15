@@ -222,6 +222,7 @@
   "power.onBattery": "使用电池",
   "power.onPower": "电源适配器",
   "power.powerKey": "按下电源按钮时",
+  "power.powerKeyHold": "按住电源按钮 5 秒时",
   "power.profile.balanced": "平衡",
   "power.profile.performance": "性能",
   "power.profile.power-saver": "低功耗",

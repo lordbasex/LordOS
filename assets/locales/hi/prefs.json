@@ -223,6 +223,7 @@
   "power.onBattery": "बैटरी पर",
   "power.onPower": "पावर एडेप्टर",
   "power.powerKey": "पावर बटन दबाने पर",
+  "power.powerKeyHold": "पावर बटन को 5 सेकंड तक दबाए रखने पर",
   "power.profile.balanced": "संतुलित",
   "power.profile.performance": "प्रदर्शन",
   "power.profile.power-saver": "कम ऊर्जा",

@@ -57,6 +57,7 @@ const MIME = {
   xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   yaml: 'application/x-yaml', toml: 'application/toml',
+  appimage: 'application/vnd.appimage',
 };
 
 export function mimeOf(e) {
@@ -91,6 +92,9 @@ export function appOpens(mimeTypes, mime) {
 }
 
 export const isTextual = (e) => ['text', 'code'].includes(kindOf(e));
+// A program downloaded as an AppImage (issue #159): not text, so it never opens in TextEdit; an app that declares its
+// type (application/vnd.appimage) may still open it. Files doesn't run programs.
+export const isProgram = (e) => !e.dir && !e.app && extOf(e.name) === 'appimage';
 export const isImage = (e) => kindOf(e) === 'image' && !/\.(svg|heic|avif|tiff?|webp)$/i.test(e.name);   // the ones stb_image draws (the rest: lord-media thumbnail)
 
 // The src of a picture shown small (Files' icons and preview): "thumb:<px>:<path>", which lord-server decodes off the

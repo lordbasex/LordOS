@@ -223,6 +223,7 @@
   "power.onBattery": "Kwenye betri",
   "power.onPower": "Adapta ya umeme",
   "power.powerKey": "Kitufe cha nishati kinapobonyezwa",
+  "power.powerKeyHold": "Kitufe cha nishati kinaposhikiliwa kwa sekunde 5",
   "power.profile.balanced": "Uwiano",
   "power.profile.performance": "Utendaji",
   "power.profile.power-saver": "Nishati Ndogo",

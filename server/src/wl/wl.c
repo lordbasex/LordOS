@@ -47,6 +47,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <linux/input-event-codes.h>
+#include "../inputkind.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 
@@ -3972,7 +3973,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
             wl_pointer_send_motion(p, t, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
         for (int i = 0; i < nbuttons; i++) {
             if (held && down[i]) continue;
-            uint32_t b = button[i] == 0 ? BTN_LEFT : button[i] == 1 ? BTN_MIDDLE : BTN_RIGHT;
+            uint32_t b = input_evdev_button(button[i]);     /* back and forward too (issue #159) */
             uint32_t serial = input_serial(target->client);
             if (down[i] && npress < (int)(sizeof press_serials / sizeof *press_serials)) press_serials[npress++] = serial;
             wl_pointer_send_button(p, serial, t, b, down[i] ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);

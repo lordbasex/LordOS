@@ -223,6 +223,7 @@
   "power.onBattery": "On battery",
   "power.onPower": "Power adapter",
   "power.powerKey": "When the power button is pressed",
+  "power.powerKeyHold": "When the power button is held for 5 seconds",
   "power.profile.balanced": "Balanced",
   "power.profile.performance": "Performance",
   "power.profile.power-saver": "Low Power",

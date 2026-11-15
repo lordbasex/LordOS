@@ -223,6 +223,7 @@
   "power.onBattery": "ব্যাটারিতে",
   "power.onPower": "পাওয়ার অ্যাডাপ্টার",
   "power.powerKey": "পাওয়ার বোতাম চাপলে",
+  "power.powerKeyHold": "পাওয়ার বোতাম ৫ সেকেন্ড চেপে ধরে রাখলে",
   "power.profile.balanced": "ভারসাম্যপূর্ণ",
   "power.profile.performance": "পারফরম্যান্স",
   "power.profile.power-saver": "কম শক্তি",

@@ -223,6 +223,7 @@
   "power.onBattery": "بیٹری پر",
   "power.onPower": "پاور اڈاپٹر",
   "power.powerKey": "جب پاور بٹن دبایا جائے",
+  "power.powerKeyHold": "جب پاور بٹن کو 5 سیکنڈ تک دبائے رکھا جائے",
   "power.profile.balanced": "متوازن",
   "power.profile.performance": "کارکردگی",
   "power.profile.power-saver": "کم توانائی",

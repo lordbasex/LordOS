@@ -514,6 +514,18 @@ static void test_admin(void) {
     CHECK(!hw_time_valid("2026-10-18 03:15:0;") && !hw_time_valid("") && !hw_time_valid(NULL));
     CHECK(hw_button_action_valid("suspend", 1) && hw_button_action_valid("poweroff", 0) && hw_button_action_valid("ignore", 1));
     CHECK(!hw_button_action_valid("lock", 1) && !hw_button_action_valid("kexec", 0) && !hw_button_action_valid("suspend\n", 0));
+    {   /* power-buttons: three values as before, or a fourth for the power button held 5 s (issue #131) */
+        char txt[400];
+        CHECK(!hw_buttons_conf("suspend suspend ignore", txt, sizeof txt) && strstr(txt, "\nHandlePowerKey=suspend\n") &&
+              !strstr(txt, "LongPress") && strstr(txt, "\nHandleLidSwitchExternalPower=ignore\n"));
+        CHECK(!hw_buttons_conf("suspend suspend suspend poweroff", txt, sizeof txt) &&
+              strstr(txt, "[Login]\nHandlePowerKey=suspend\nHandlePowerKeyLongPress=poweroff\nHandleLidSwitch=suspend\n"));
+        CHECK(!hw_buttons_conf("poweroff suspend suspend ignore", txt, sizeof txt) && strstr(txt, "\nHandlePowerKeyLongPress=ignore\n"));
+        CHECK(hw_buttons_conf("suspend suspend suspend reboot", txt, sizeof txt));          /* not in the list */
+        CHECK(hw_buttons_conf("suspend suspend suspend poweroff extra", txt, sizeof txt));  /* nothing after the fourth */
+        CHECK(hw_buttons_conf("suspend suspend", txt, sizeof txt) && hw_buttons_conf("", txt, sizeof txt) && hw_buttons_conf(NULL, txt, sizeof txt));
+        CHECK(hw_buttons_conf("suspend suspend suspend poweroff", txt, 40));               /* never cut */
+    }
     /* rpi-case: only the known cases, fixed text with the host-mode USB line for the Argon ONE V5 */
     CHECK(hw_rpi_case_text("none") && !strstr(hw_rpi_case_text("none"), "dtoverlay"));
     CHECK(hw_rpi_case_text("argon-one-v5") && strstr(hw_rpi_case_text("argon-one-v5"), "\n[pi5]\ndtoverlay=dwc2,dr_mode=host\n[all]\n"));

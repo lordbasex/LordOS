@@ -309,6 +309,7 @@
   "net.kind.rdp": "Remote desktop",
   "net.connectAs": "Kumonekta bilang",
   "net.nothing": "Walang mabubuksan mula rito sa computer na ito.",
+  "programNoOpener": "Walang app na nagbubukas ng “{name}”: isa itong program (AppImage), at hindi nagpapatakbo ng mga program ang Mga File.",
   "net.sharedFolder": "Shared folder",
   "connect.err.tlsName": "Hindi binabanggit ng certificate ng server na ito ang {name}, kaya hindi ito ma-verify. Puwedeng idagdag ng administrator nito ang pangalang iyon sa certificate.",
   "disk.formatsTitle": "Gumagamit ang {name} ng komersyal na disk format",

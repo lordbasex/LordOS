@@ -301,6 +301,7 @@
   "net.kind.rdp": "遠端桌面",
   "net.connectAs": "連線身分",
   "net.nothing": "這台電腦上沒有可從這裡打開的內容。",
+  "programNoOpener": "沒有可開啟「{name}」的 App：它是一個程式（AppImage），而「檔案」不執行程式。",
   "net.sharedFolder": "分享資料夾",
   "connect.err.tlsName": "此伺服器的憑證中沒有 {name}，因此無法驗證。其管理者可以將該名稱加入憑證。",
   "disk.formatsTitle": "{name} 使用商用磁碟格式",

@@ -309,6 +309,7 @@
   "net.kind.rdp": "Entfernter Schreibtisch",
   "net.connectAs": "Verbinden als",
   "net.nothing": "Auf diesem Computer kann von hier aus nichts geöffnet werden.",
+  "programNoOpener": "Keine App öffnet „{name}“: Es ist ein Programm (AppImage), und Dateien führt keine Programme aus.",
   "net.sharedFolder": "Freigegebener Ordner",
   "connect.err.tlsName": "Das Zertifikat dieses Servers nennt {name} nicht und kann daher nicht überprüft werden. Sein Administrator kann diesen Namen zum Zertifikat hinzufügen.",
   "disk.formatsTitle": "{name} verwendet ein kommerzielles Datenträgerformat",

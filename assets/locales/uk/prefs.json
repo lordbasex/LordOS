@@ -224,6 +224,7 @@
   "power.onBattery": "Від акумулятора",
   "power.onPower": "Адаптер живлення",
   "power.powerKey": "Коли натиснуто кнопку живлення",
+  "power.powerKeyHold": "Коли кнопку живлення утримують 5 секунд",
   "power.profile.balanced": "Збалансований",
   "power.profile.performance": "Продуктивність",
   "power.profile.power-saver": "Енергозбереження",

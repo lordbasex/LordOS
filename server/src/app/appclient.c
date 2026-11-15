@@ -19,6 +19,7 @@
 #include "../ui/js_broker.h"
 #include "../canvas.h"
 #include "../keyboard.h"
+#include "../inputkind.h"
 #include "../lpk.h"
 #include "../sec/pkgapp.h"
 #include "../sec/sandbox.h"
@@ -326,7 +327,7 @@ static void p_motion(void *d, struct wl_pointer *p, uint32_t t, wl_fixed_t x, wl
 }
 static void p_button(void *d, struct wl_pointer *p, uint32_t s, uint32_t t, uint32_t b, uint32_t st) {
     (void)d; (void)p; (void)s; (void)t;
-    int button = b == BTN_LEFT ? 0 : b == BTN_MIDDLE ? 1 : b == BTN_RIGHT ? 2 : -1;
+    int button = input_dom_button((int)b);        /* 3 and 4: back and forward (issue #159) */
     if (button >= 0 && nptr < 8) { ptr_down[nptr] = st == WL_POINTER_BUTTON_STATE_PRESSED; ptr_btn[nptr] = button; nptr++; }
     dispatch_pointer();
 }

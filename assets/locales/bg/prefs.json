@@ -223,6 +223,7 @@
   "power.onBattery": "На батерия",
   "power.onPower": "Захранващ адаптер",
   "power.powerKey": "При натискане на бутона за захранване",
+  "power.powerKeyHold": "При задържане на бутона за захранване 5 секунди",
   "power.profile.balanced": "Балансиран",
   "power.profile.performance": "Производителност",
   "power.profile.power-saver": "Пестене на енергия",

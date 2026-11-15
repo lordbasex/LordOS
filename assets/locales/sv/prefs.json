@@ -223,6 +223,7 @@
   "power.onBattery": "På batteri",
   "power.onPower": "Nätadapter",
   "power.powerKey": "När strömknappen trycks in",
+  "power.powerKeyHold": "När strömknappen hålls in i 5 sekunder",
   "power.profile.balanced": "Balanserat",
   "power.profile.performance": "Prestanda",
   "power.profile.power-saver": "Strömsparläge",

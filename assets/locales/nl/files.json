@@ -309,6 +309,7 @@
   "net.kind.rdp": "Extern bureaublad",
   "net.connectAs": "Verbind als",
   "net.nothing": "Niets op deze computer kan hiervandaan worden geopend.",
+  "programNoOpener": "Geen app opent ‘{name}’: het is een programma (AppImage) en Bestanden voert geen programma’s uit.",
   "net.sharedFolder": "Gedeelde map",
   "connect.err.tlsName": "Het certificaat van deze server noemt {name} niet, dus het kan niet worden geverifieerd. De beheerder kan die naam aan het certificaat toevoegen.",
   "disk.formatsTitle": "{name} gebruikt een commercieel schijfformaat",

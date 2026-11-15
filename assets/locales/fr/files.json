@@ -309,6 +309,7 @@
   "net.kind.rdp": "Bureau à distance",
   "net.connectAs": "Se connecter en tant que",
   "net.nothing": "Rien sur cet ordinateur ne peut être ouvert depuis ici.",
+  "programNoOpener": "Aucune app n’ouvre « {name} » : c’est un programme (AppImage), et Fichiers n’exécute pas de programmes.",
   "net.sharedFolder": "Dossier partagé",
   "connect.err.tlsName": "Le certificat de ce serveur ne mentionne pas {name} : il ne peut donc pas être vérifié. Son administrateur peut ajouter ce nom au certificat.",
   "disk.formatsTitle": "{name} utilise un format de disque commercial",

@@ -301,6 +301,7 @@
   "net.kind.rdp": "Màn hình từ xa",
   "net.connectAs": "Kết nối với tư cách",
   "net.nothing": "Không có gì trên máy tính này mở được từ đây.",
+  "programNoOpener": "Không có ứng dụng nào mở “{name}”: đây là một chương trình (AppImage) và Tệp không chạy chương trình.",
   "net.sharedFolder": "Thư mục dùng chung",
   "connect.err.tlsName": "Chứng chỉ của máy chủ này không có tên {name}, nên không thể xác minh. Quản trị viên có thể thêm tên đó vào chứng chỉ.",
   "disk.formatsTitle": "{name} dùng định dạng ổ đĩa thương mại",

@@ -1,7 +1,7 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
 import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate } from '@lordos/sdk';
-import { kindOf, mimesOf, appOpens, isTextual, isImage } from './kinds.js';
+import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
 
@@ -155,7 +155,7 @@ function openersOf(e, linuxApps, t) {
   // media (M9): images in Photos; audio and video in the Player (the defaults)
   if (k === 'image') all.push({ id: 'photos', label: t('apps.photos'), run: () => wm.open('photos', { new: true, args: { path: e.path } }) });
   if (k === 'audio' || k === 'video') all.push({ id: 'player', label: t('apps.player'), run: () => wm.open('player', { args: { path: e.path } }) });
-  if (isTextual(e) || k === 'other') all.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
+  if (isTextual(e) || (k === 'other' && !isProgram(e))) all.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
   // the system's MIME database's type first (lord.mime.guess), then Files' own table: an app that
   // declares either one opens the file (issue #49: an .xlsx had no type of its own here, so WPS and
   // GridCraft, which declare it, were never offered)
@@ -188,5 +188,6 @@ export function openEntry(e, ctx) {
   if (off.length && !list.some((o) => o.id !== 'editor')) { offerActivate(off[0], () => openEntry(e, ctx)); return; }
   if (isImage(e) && !list.some((o) => o.id !== 'editor')) { ctx.quickLook(e); return; }    // no viewer: Quick Preview
   if (list.length) list[0].run();
+  else if (isProgram(e) && ctx.say) ctx.say(ctx.t('files.programNoOpener', { name: e.name }));  // not TextEdit (#159)
   else ctx.quickLook(e);
 }

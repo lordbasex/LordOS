@@ -301,6 +301,7 @@
   "net.kind.rdp": "リモートデスクトップ",
   "net.connectAs": "接続ユーザー",
   "net.nothing": "このコンピュータにはここから開けるものがありません。",
+  "programNoOpener": "「{name}」を開けるアプリはありません。これはプログラム（AppImage）で、ファイルはプログラムを実行しません。",
   "net.sharedFolder": "共有フォルダ",
   "connect.err.tlsName": "このサーバの証明書に {name} が含まれていないため、検証できません。サーバの管理者がその名前を証明書に追加できます。",
   "disk.formatsTitle": "{name} は商用のディスクフォーマットを使っています",

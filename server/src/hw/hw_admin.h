@@ -7,7 +7,8 @@
  *   power-profile <p>                  performance|balanced|power-saver: powerprofilesctl if
  *                                      installed, else the cpufreq governor (and EPP)         anyone
  *   power-suspend                      systemctl suspend                                      anyone
- *   power-buttons <power> <lid> <lidac> /etc/systemd/logind.conf.d/lordos.conf + reload logind admin
+ *   power-buttons <power> <lid> <lidac> [<hold>]  /etc/systemd/logind.conf.d/lordos.conf + reload logind; <hold>:
+ *                                      the power button held 5 s (HandlePowerKeyLongPress, issue #131)  admin
  *   time-ntp on|off                    timedatectl set-ntp                                    admin
  *   time-set YYYY-MM-DD HH:MM:SS       timedatectl set-time (automatic time must be off)       admin
  *   bt-unblock                         rfkill: unblock Bluetooth (/dev/rfkill)               anyone
@@ -115,6 +116,8 @@ int hw_video_files(const char *arg, char *chromium, size_t cn, char *firefox, si
  * serial; -1 for anything else, the placeholders firmware leaves in these fields included. */
 int hw_serial_clean(const char *raw, size_t n, char *out, size_t size);
 int hw_button_action_valid(const char *a, int lid);
+/* "<power> <lid> <lidac> [<hold>]", each from hw_button_action_valid's list, into the drop-in's text. 0 if valid. */
+int hw_buttons_conf(const char *a, char *text, size_t n);
 int hw_time_valid(const char *t);       /* "YYYY-MM-DD HH:MM:SS", a real date from 2000 to 2099 */
 int hw_backlight_name_valid(const char *n);
 int hw_kbdlight_name_valid(const char *n);

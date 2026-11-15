@@ -309,6 +309,7 @@
   "net.kind.rdp": "Escriptori remot",
   "net.connectAs": "Connecta com a",
   "net.nothing": "Des d’aquí no es pot obrir res d’aquest ordinador.",
+  "programNoOpener": "Cap app obre «{name}»: és un programa (AppImage) i Fitxers no executa programes.",
   "net.sharedFolder": "Carpeta compartida",
   "connect.err.tlsName": "El certificat d’aquest servidor no esmenta {name}, així que no es pot verificar. El seu administrador pot afegir aquest nom al certificat.",
   "disk.formatsTitle": "{name} fa servir un format de disc comercial",

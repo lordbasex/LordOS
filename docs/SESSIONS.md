@@ -79,10 +79,17 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
 1. **It opens the devices:**
    - the card, `/dev/dri/card0`, again for each session, and makes it DRM master;
    - keyboards, mice, tablets, touchpads and touchscreens, `/dev/input/event*` (touchpads are
-     handled by the session's own driver, `server/src/tp`; see `TRACKPAD.md`).
+     handled by the session's own driver, `server/src/tp`; see `TRACKPAD.md`);
+   - since issue #131, devices of system keys: sound or player keys and no letters or pointer buttons, such as a
+     tablet's volume buttons (`gpio-keys` on a Chuwi Hi12 or a Teclast X98 Pro) or a keyboard's separate "Consumer
+     Control" node (`input_is_system_keys` in `server/src/inputkind.h`). The session doesn't grab these, because
+     logind reads the power key from the same `gpio-keys` node, and passes on only the keys
+     `keygrab_system_key` lists (volume, mute, player, brightness, keyboard light, Print Screen), never
+     `KEY_POWER`. A "Power Button" (power key only) or a "Video Bus" (brightness only, which the kernel's ACPI
+     video driver may change by itself) is still left alone.
 2. **It passes them to the session** with `RP_DISPLAY`, over its socket (`SCM_RIGHTS`). The
    session prepares the output (`kms_attach`), takes the input (`input_open_fds` and
-   `EVIOCGRAB`) and resizes live to the monitor's resolution:
+   `EVIOCGRAB`, except devices of system keys) and resizes live to the monitor's resolution:
    - the work area and the windows adjust;
    - Wayland apps receive the new mode.
 3. **To switch sessions:**

@@ -401,7 +401,7 @@ build/textinput-test: tests/textinput_test.c src/wl/tiutf8.c src/wl/tiutf8.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/textinput_test.c src/wl/tiutf8.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/keygrab-test
-build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
+build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h src/inputkind.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/keygrab_test.c src/wl/keygrab.c
 	./$@

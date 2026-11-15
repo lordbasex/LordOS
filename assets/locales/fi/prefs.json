@@ -223,6 +223,7 @@
   "power.onBattery": "Akkuvirralla",
   "power.onPower": "Virtalähde",
   "power.powerKey": "Kun virtapainiketta painetaan",
+  "power.powerKeyHold": "Kun virtapainiketta pidetään pohjassa 5 sekuntia",
   "power.profile.balanced": "Tasapainoinen",
   "power.profile.performance": "Suorituskyky",
   "power.profile.power-saver": "Virransäästö",

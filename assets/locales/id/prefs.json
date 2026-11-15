@@ -222,6 +222,7 @@
   "power.onBattery": "Dengan baterai",
   "power.onPower": "Adaptor daya",
   "power.powerKey": "Saat tombol daya ditekan",
+  "power.powerKeyHold": "Saat tombol daya ditahan selama 5 detik",
   "power.profile.balanced": "Seimbang",
   "power.profile.performance": "Kinerja",
   "power.profile.power-saver": "Daya Rendah",

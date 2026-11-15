@@ -301,6 +301,7 @@
   "net.kind.rdp": "Desktop jarak jauh",
   "net.connectAs": "Hubungkan sebagai",
   "net.nothing": "Tidak ada isi komputer ini yang dapat dibuka dari sini.",
+  "programNoOpener": "Tidak ada app yang membuka “{name}”: ini adalah program (AppImage), dan Berkas tidak menjalankan program.",
   "net.sharedFolder": "Folder bersama",
   "connect.err.tlsName": "Sertifikat server ini tidak menyebut {name}, jadi tidak dapat diverifikasi. Administratornya dapat menambahkan nama itu ke sertifikat.",
   "disk.formatsTitle": "{name} memakai format disk komersial",

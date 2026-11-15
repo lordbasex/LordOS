@@ -48,7 +48,7 @@ static size_t rlen, rcap, skip;        /* skip: bytes of a large message being d
 #include "../inputkind.h"
 #define HAS(bits, n) (((bits)[(n) / LONG_BITS] >> ((n) % LONG_BITS)) & 1UL)
 
-/* keyboard, mouse or tablet (same as input.c) */
+/* keyboard, mouse, tablet, or a device of system keys such as a tablet's volume buttons (same as input.c) */
 static int useful(int fd) {
     unsigned long ev[NLONGS(EV_MAX + 1)] = {0}, keys[NLONGS(KEY_MAX + 1)] = {0}, abs[NLONGS(ABS_MAX + 1)] = {0};
     ioctl(fd, EVIOCGBIT(0, sizeof ev), ev);
@@ -57,7 +57,7 @@ static int useful(int fd) {
     unsigned long props[NLONGS(INPUT_PROP_MAX + 1)] = {0};
     ioctl(fd, EVIOCGPROP(sizeof props), props);
     return (HAS(ev, EV_KEY) && HAS(keys, KEY_A) && HAS(keys, KEY_ENTER)) || (HAS(ev, EV_REL) && HAS(keys, BTN_LEFT)) ||
-           input_is_abs_pointer(ev, abs, keys, props);
+           input_is_abs_pointer(ev, abs, keys, props) || input_is_system_keys(ev, keys);
 }
 
 /* Nothing can be shown. The caller reports it on tty1 (sessiond.c tell_no_display); the file makes the

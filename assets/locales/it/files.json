@@ -309,6 +309,7 @@
   "net.kind.rdp": "Desktop remoto",
   "net.connectAs": "Connetti come",
   "net.nothing": "Niente su questo computer può essere aperto da qui.",
+  "programNoOpener": "Nessuna app apre «{name}»: è un programma (AppImage) e File non esegue programmi.",
   "net.sharedFolder": "Cartella condivisa",
   "connect.err.tlsName": "Il certificato di questo server non riporta {name}, quindi non può essere verificato. Il suo amministratore può aggiungere quel nome al certificato.",
   "disk.formatsTitle": "{name} usa un formato di disco commerciale",
