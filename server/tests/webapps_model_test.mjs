@@ -119,8 +119,13 @@ eq('catalog: none', M.catalogApps(null, []), []);
 // ---- LordOS's own catalog: valid, its icons real PNGs, its texts in every language ----
 const shipped = JSON.parse(fs.readFileSync(path.join(root, 'assets/webapps/catalog.json'), 'utf8'));
 const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
-const langs = fs.readdirSync(path.join(root, 'assets/locales')).filter((l) => fs.existsSync(path.join(root, 'assets/locales', l, 'webapps.json')));
-eq('the six languages have webapps.json', langs.sort(), ['en', 'es', 'fr', 'it', 'lt', 'pt']);
+// every complete language (meta.json without "partial") carries the catalog's texts; a partial one may still lack them
+const langs = fs.readdirSync(path.join(root, 'assets/locales')).filter((l) => {
+  try { return !JSON.parse(fs.readFileSync(path.join(root, 'assets/locales', l, 'meta.json'), 'utf8')).partial; } catch { return false; }
+}).sort();
+eq('the first six languages are complete', ['en', 'es', 'fr', 'it', 'lt', 'pt'].every((l) => langs.includes(l)), true);
+eq('every complete language has webapps.json and store.json', langs.filter((l) => !['webapps', 'store'].every((ns) =>
+  fs.existsSync(path.join(root, 'assets/locales', l, `${ns}.json`)))), []);
 const loc = (l, ns) => JSON.parse(fs.readFileSync(path.join(root, 'assets/locales', l, `${ns}.json`), 'utf8'));
 eq('shipped catalog: every entry valid', shipped.apps.filter((a) => !M.catalogEntryOk(a)).map((a) => a.id), []);
 eq('shipped catalog: ids unique', new Set(shipped.apps.map((a) => a.id)).size, shipped.apps.length);
@@ -335,7 +340,7 @@ eq('unknown names and repeats are left out', M.webMenuItems(['selectAll', 'rm -r
 eq('nothing', [M.webMenuItems(null, (x) => x, () => {}), M.webMenuItems([], (x) => x, () => {})], [[], []]);
 const cSrc = fs.readFileSync(path.join(root, 'server/src/web/webedit.c'), 'utf8');
 eq('the menu\'s names are lord-server\'s', M.WEB_MENU_ITEMS.every((x) => cSrc.includes(`"${x}"`)) && M.WEB_EDIT_ROWS.filter((r) => r !== '-').every((r) => cSrc.includes(`"${r[0]}"`)), true);
-for (const lang of ['en', 'es', 'pt', 'fr', 'it', 'lt']) {
+for (const lang of langs) {
   const sh = JSON.parse(fs.readFileSync(path.join(root, `assets/locales/${lang}/shell.json`), 'utf8'));
   const missing = [...M.WEB_MENU_ITEMS, 'undo', 'redo'].filter((k) => !sh[`edit.${k}`]);
   eq(`edit words in ${lang}`, missing, []);
