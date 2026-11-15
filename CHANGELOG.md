@@ -635,6 +635,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **The visits chart shows every country** (maintainer's request, 2026-11-15: "si supuestamente son 153 paises quiero
+  que los muestres"): the donut has a slice for each of the 153 countries, with no "other countries" slice (the
+  20-colour palette repeats by rank), and below it every country has a bar in its slice's colour, in proportion to the
+  country with the most visitors (at least a sliver, so a country with one visitor still shows), with its flag, name and
+  visitors. The flags are flag-icons' (MIT), now 153 of them, fetched one by one and checked (no scripts or external
+  references). The centre's total (11,205) adds each country's distinct visitors, so an address seen from two
+  countries counts in both; the statistics' overall distinct count is 11,044.
+
 - **The Languages page's visits chart counts visitors, not page views** (maintainer's request, 2026-11-15, to match the
   "Países" table of the statistics dashboard): the donut, its legend and the centre total use distinct visitors per
   country (distinct addresses, a rough count of people, bots excluded), and the list of all 153 countries below it is

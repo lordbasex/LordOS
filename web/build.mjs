@@ -1182,9 +1182,8 @@ ${(c.items || []).map((it) => {
       const regions = new Intl.DisplayNames([l], { type: 'region' });
       const rows = [...VISITS.rows].sort((a, b) => b.visitors - a.visitors);
       const total = rows.reduce((n, x) => n + x.visitors, 0);
-      const top = rows.slice(0, 20), rest = rows.slice(20);
-      const slices = top.map((x, i) => ({ cc: x.cc, name: regions.of(x.cc) || x.cc, views: x.views, visitors: x.visitors, cls: 'lg-c' + i }));
-      if (rest.length) slices.push({ other: true, name: L.visitsOther.replace('{n}', nf.format(rest.length)), views: rest.reduce((n, x) => n + x.visitors, 0), visitors: rest.reduce((n, x) => n + x.visitors, 0) });
+      // every country is a slice (no "other"): the 20-colour palette repeats by rank, so neighbours always differ
+      const slices = rows.map((x, i) => ({ cc: x.cc, name: regions.of(x.cc) || x.cc, visitors: x.visitors, cls: 'lg-c' + (i % 20) }));
       const C = 120, RO = 112, RI = 72;
       const pt = (r, a) => `${(C + r * Math.sin(a)).toFixed(2)} ${(C - r * Math.cos(a)).toFixed(2)}`;
       let a0 = 0;
@@ -1192,24 +1191,24 @@ ${(c.items || []).map((it) => {
         const a1 = a0 + (x.visitors / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
         const d = `M${pt(RO, a0)}A${RO} ${RO} 0 ${big} 1 ${pt(RO, a1)}L${pt(RI, a1)}A${RI} ${RI} 0 ${big} 0 ${pt(RI, a0)}Z`;
         a0 = a1;
-        return `<path class="${x.other ? 'lg-v-o' : x.cls}" d="${d}"><title>${esc(`${x.name}: ${nf.format(x.visitors)} (${pct.format(x.visitors / total)})`)}</title></path>`;
+        return `<path class="${x.cls}" d="${d}"><title>${esc(`${x.name}: ${nf.format(x.visitors)} (${pct.format(x.visitors / total)})`)}</title></path>`;
       }).join('');
-      const label = L.visitsAria.replace('{top}', slices.filter((x) => !x.other).slice(0, 5).map((x) => `${x.name} ${nf.format(x.visitors)}`).join(', '))
-        .replace('{n}', nf.format(rest.length + top.length - 5)).replace('{total}', nf.format(total));
+      const label = L.visitsAria.replace('{top}', slices.slice(0, 5).map((x) => `${x.name} ${nf.format(x.visitors)}`).join(', '))
+        .replace('{n}', nf.format(slices.length - 5)).replace('{total}', nf.format(total));
       const svg = `<svg class="lg-donut" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="${esc(label)}">${arcs}` +
         `<text class="lg-v-n" x="120" y="122" text-anchor="middle">${esc(nf.format(total))}</text>` +
         `<text class="lg-v-l" x="120" y="146" text-anchor="middle">${esc(L.visitsTotal)}</text></svg>`;
-      const legend = slices.map((x) => `<li><svg class="lg-sw" viewBox="0 0 12 12" width="12" height="12"><rect class="${x.other ? 'lg-v-o' : x.cls}" width="12" height="12" rx="3"/></svg>` +
-        `${(!x.other && flag(x.cc)) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(x.name)}</span><span class="lg-v-v">${esc(nf.format(x.visitors))}</span></li>`).join('');
-      // every country, not only the chart's 20: a visible list that opens with no script (<details>), in columns that
-      // wrap on a phone; a flag only where web/src/flags has one
-      const all = `<details class="lg-all" open><summary>${esc(L.visitsAll.replace('{n}', nf.format(rows.length)))}</summary><ol>` +
-        rows.map((x) => `<li>${flag(x.cc) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(regions.of(x.cc) || x.cc)}</span><span class="lg-v-v">${esc(nf.format(x.visitors))}</span></li>`).join('') +
-        '</ol></details>';
+      // and every country again as a bar, in the donut's colour, its length in proportion to the country with the most
+      // visitors (at least 2 px, so a country with one visitor still shows); a flag only where web/src/flags has one
+      const max = slices[0].visitors;
+      const bars = `<ol class="lg-bars">` + slices.map((x) => `<li><span class="lg-b-h">${flag(x.cc) || '<span class="lg-fl-x"></span>'}` +
+        `<span class="lg-v-c">${esc(x.name)}</span><span class="lg-v-v">${esc(nf.format(x.visitors))}</span></span>` +
+        `<svg class="lg-b-t" viewBox="0 0 1000 8" preserveAspectRatio="none" aria-hidden="true"><rect class="${x.cls}" width="${Math.max(4, Math.round(x.visitors / max * 1000))}" height="8" rx="2"/></svg></li>`).join('') + '</ol>';
+      const head = `<p class="lg-p lg-b-sum">${esc(L.visitsAll.replace('{n}', nf.format(rows.length)))}</p>`;
       const day = (s) => new Date(s + 'T12:00:00Z');
       const dates = new Intl.DateTimeFormat(l === 'en' ? 'en-GB' : l, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).formatRange(day(VISITS.since), day(VISITS.taken));
       return `<section class="hw-sec" aria-labelledby="lg-v">\n<h2 id="lg-v">${esc(L.visitsTitle)}</h2>\n<p class="lg-p">${esc(L.visitsThanks)}</p>\n` +
-        `<div class="lg-visits">${svg}<ol class="lg-legend" aria-hidden="true">${legend}</ol></div>\n${all}\n` +
+        `<div class="lg-visits">${svg}<div>${head}</div></div>\n${bars}\n` +
         `<p class="lg-note">${esc(L.visitsSource.replace('{dates}', dates))}</p>\n</section>`;
     })();
     const card = (x) => {
