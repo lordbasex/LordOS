@@ -8,7 +8,7 @@ files.
 released only when every key is translated (`node tools/i18n-check.mjs` shows `N/N keys`), and every text that is
 added or changed in English goes to every language in the same release or pre-release. All 35 languages LordOS has
 today (English, Spanish, Portuguese, French, Italian, Lithuanian and the 29 new in 0.8.8.9) are
-complete, 12,460 keys each. A language can be built in several pull requests, marked partial while it is under way
+complete, 12,486 keys each. A language can be built in several pull requests, marked partial while it is under way
 (step 2), but it is not released until it is whole.
 
 The languages LordOS ships, and how new ones are chosen, are on [lordos.org/language](https://lordos.org/language/).

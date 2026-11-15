@@ -1144,6 +1144,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The arm64 build has no compiler warnings again.** `lord-media`'s SVG check read nanosvg's dash count, a plain
+  `char`, as if it were signed; on arm64 `char` is unsigned, so the "negative count" check could never fire and gcc
+  warned. It is now read as signed on both architectures, so a corrupt count is refused the same way everywhere.
+
 - **A web app set to Chrome on Linux is no longer refused by a messaging site** (maintainer's test, 2026-11-15, in
   development, never released). The site read the last token of the user agent as the browser, and Chrome's
   string ended with `LordOS/<version>`: it answered that it works with Chrome 100 or later. `chrome` now sends

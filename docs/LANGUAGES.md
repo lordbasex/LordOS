@@ -2,7 +2,7 @@
 
 LordOS handles language across the whole system, not just in the interface. It ships complete in
 **English, Spanish, Portuguese, French, Italian and Lithuanian**, and, since 0.8.8.9-beta, in 29 more
-languages, each one complete too (every one of the 12,460 keys; see "26 languages from lordos.org's visitors" and
+languages, each one complete too (every one of the 12,486 keys; see "26 languages from lordos.org's visitors" and
 "Catalan, Filipino and Swahili":
 Indonesian, Japanese, German, Hindi, Malay, Bengali, Simplified and Traditional Chinese, Ukrainian, Polish, Arabic,
 Vietnamese, Swedish, Greek, Dutch, Turkish, Hungarian, Persian, Russian, Romanian, Finnish, Urdu, Bulgarian, Korean,
@@ -176,7 +176,7 @@ Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, test
 `node tools/i18n-pack.mjs export pt` exports an existing language in the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.8.9-beta): 12,460 keys, complete in all 35 languages (en, es, pt, fr, it, lt, the 26 new ones and ca, fil and sw, since 2026-11-15), and 583 error codes from the server (earlier: 2026-11-15, 12,436 keys and 577 codes; 2026-11-12, 12,415 keys with 26 partial languages; 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.8.9-beta): 12,486 keys, complete in all 35 languages (en, es, pt, fr, it, lt, the 26 new ones and ca, fil and sw, since 2026-11-15), and 583 error codes from the server (earlier: 2026-11-15, 12,436 keys and 577 codes; 2026-11-12, 12,415 keys with 26 partial languages; 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
@@ -204,7 +204,7 @@ part had set (Debesis, Parduotuvė, šiukšlinė, programų juosta…).
 #### The core set
 
 Lithuanian's first part is now the **core set** every new language translates first, kept in
-`tools/i18n-core.json` (1,058 of 12,460 English keys today): the whole `greeter`, `shell`, `files`,
+`tools/i18n-core.json` (1,058 of 12,486 English keys today): the whole `greeter`, `shell`, `files`,
 `installer`, `about`, `appabout`, `apps`, `powerbox`, `forcequit` and `calculator` namespaces, and in
 `settings.json` only `section.*`, `lang.*`, `region.*`, `pack.*`, `system.*`, `tz.*`, `admin.*`, `change`, `light`,
 `dark`, `mode`, `noResults` and `search`, and in `prefs.json` only `time.*`. For a partial language
@@ -219,8 +219,8 @@ language spoken in a country with at least 5 distinct visitors. Each one has its
 months a date needs: «12 ноября», «12. marraskuuta»; date patterns from CLDR 45's full dates; the 12- or 24-hour
 clock as glibc has it for the region, so the region test agrees). They started on 2026-11-12 as partial languages
 (`"partial": true`) with the core set; on 2026-11-15 the rest of their texts were translated, under the
-maintainer's rule that a language ships complete, and `"partial"` was dropped: each one has all 12,460 keys today, and
-`node tools/i18n-check.mjs` shows `12460/12460` for every one of them.
+maintainer's rule that a language ships complete, and `"partial"` was dropped: each one has all 12,486 keys today, and
+`node tools/i18n-check.mjs` shows `12486/12486` for every one of them.
 
 | Id | Name | Region | Plural | Direction | Digits | Script font |
 |---|---|---|---|---|---|---|

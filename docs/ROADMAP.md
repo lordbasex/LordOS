@@ -788,7 +788,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
 
 An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new ISO, the images stay 0.8.8's.
 
-- [x] 35 interface languages, each complete (12,460 keys; `LANGUAGES.md`, `TRANSLATING.md`).
+- [x] 35 interface languages, each complete (12,486 keys; `LANGUAGES.md`, `TRANSLATING.md`).
 - [x] Web apps: each profile's Browser identity and developer tools (Developer mode); a web app opened without network
   loads by itself when it is back (#144) (`WEBAPPS.md`). Each app's Appearance is built but held back until
   WPEPlatform.
