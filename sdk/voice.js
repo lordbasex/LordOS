@@ -33,7 +33,7 @@ import { webEditMenu } from './webapps.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.voice) || null;
 // for a text too short to tell its language (say_language in server/src/tts/saytext.c): the interface's
-const uiLang = () => String(locale.get().lang || '').slice(0, 2);
+const uiLang = () => String(locale.get().lang || '').split('-')[0];        // fil, not fi
 const isLinux = (wid) => String(wid || '').startsWith('linux#');
 const providers = new Map();          // window id → () => selected text
 export const speaking = createStore(false);

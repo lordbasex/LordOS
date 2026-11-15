@@ -159,7 +159,7 @@ Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, test
 
 | Rule | Forms | Languages |
 |---|---|---|
-| `one-other` | one (1), other | en, es, it, de, nl, sv, el, tr, hu, fi, bg, az, ur |
+| `one-other` | one (1), other | en, es, it, de, nl, sv, el, tr, hu, fi, bg, az, ur, ca, sw |
 | `zero-one-other` | one (0, 1), other | pt, fr, hi, bn, fa |
 | `none` | other | ja, zh-Hans, zh-Hant, ko, th, vi, id, ms |
 | `east-slavic` | one (1, 21), few (2–4, 22), many (0, 5–20) | ru, uk |
@@ -168,6 +168,7 @@ Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, test
 | `lithuanian` | one (1, 21), few (2–9, 22), other (0, 10–20) | lt |
 | `romanian` | one (1), few (0, 2–19, 101–119), other (20–100) | ro |
 | `arabic` | zero, one, two, few (3–10), many (11–99), other (100–102) | ar |
+| `filipino` | one (0–3, 5, 7, 8, 10–13, 21…), other (ending in 4, 6, 9: 4, 14, 26, 104) | fil |
 
 `node tools/i18n-pack.mjs export pt` exports an existing language in the same format.
 
@@ -262,6 +263,30 @@ shown in the next preferred language or English.
   where the language keeps product names (LordOS, Lord Flow, Lord Classic, Lumo) and use generic words for the
   rest, never another system's brand (`tools/brand-check.mjs`); `textAlign: 'start'` is already handled by the
   code, so a right-to-left translation needs nothing special; and run `node tools/i18n-check.mjs <id>`.
+
+#### Catalan, Filipino and Swahili (in development)
+
+Chosen from lordos.org's visits too (2026-11-15): Spain (Catalan), the Philippines (Filipino) and Kenya (Swahili).
+Same folder as the others: `meta.json`, `format.json` (glibc 2.41 and CLDR 45), and the texts.
+
+| Id | Name | Region | Plural | Direction | Digits | Script font |
+|---|---|---|---|---|---|---|
+| `ca` | Català | ca_ES | one-other | ltr | 0–9 | Inter |
+| `fil` | Filipino | fil_PH | filipino | ltr | 0–9 | Inter |
+| `sw` | Kiswahili | sw_KE | one-other | ltr | 0–9 | Inter |
+
+- **Formats.** Catalan writes the months with their «de» («diumenge, 15 de novembre de 2026», «d’abril»), 24 hours,
+  «1.234.567,89». Filipino puts the month first («Linggo, Nobyembre 15, 2026», 11/15/2026), 12 hours with AM/PM,
+  «1,234,567.89». Swahili: «Jumapili, 15 Novemba 2026», 15/11/2026, 12 hours as glibc has it for sw_KE and sw_TZ,
+  «1,234,567.89»; its short days are glibc's J1–J5, Alh, Ij (Jumamosi is J1, Jumapili J2).
+- **Filipino plurals** (`filipino`, CLDR 45 for whole numbers): `other` only for numbers ending in 4, 6 or 9 (4,
+  14, 26, 109); `one` for the rest (0–3, 5, 7, 8, 10–13, 21, 100).
+- **A three-letter id.** `fil` is the first language whose ISO 639 code has three letters, as glibc names its
+  region (`fil_PH`). `languageOfLocale`, the folder names, `i18n-pack`, Settings, the installer and the login screen
+  already took two or three letters; `lord-web` (`weblang.c`) took only the first two letters of `LANG`
+  (`fil_PH` read as `fi`, Finnish) and now takes the whole language part, and Chinese by script as
+  `languageOfLocale` does (`weblang_id` in `server/src/web/weblangid.h`, tested in `server/tests/webapp_test.c`).
+- **Fonts.** All three use the Latin script: Inter.
 
 ## Privileged helper (`lord-admin`)
 

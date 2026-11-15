@@ -1,0 +1,59 @@
+{
+  "months": [
+    "Enero",
+    "Pebrero",
+    "Marso",
+    "Abril",
+    "Mayo",
+    "Hunyo",
+    "Hulyo",
+    "Agosto",
+    "Setyembre",
+    "Oktubre",
+    "Nobyembre",
+    "Disyembre"
+  ],
+  "monthsShort": [
+    "Ene",
+    "Peb",
+    "Mar",
+    "Abr",
+    "May",
+    "Hun",
+    "Hul",
+    "Ago",
+    "Set",
+    "Okt",
+    "Nob",
+    "Dis"
+  ],
+  "weekdays": [
+    "Linggo",
+    "Lunes",
+    "Martes",
+    "Miyerkules",
+    "Huwebes",
+    "Biyernes",
+    "Sabado"
+  ],
+  "weekdaysShort": [
+    "Lin",
+    "Lun",
+    "Mar",
+    "Miy",
+    "Huw",
+    "Biy",
+    "Sab"
+  ],
+  "date": {
+    "short": "{wd}, {mon} {day}",
+    "long": "{weekday}, {month} {day}, {yyyy}",
+    "dayMonth": "{weekday}, {month} {day}",
+    "numeric": "{mm}/{dd}/{yyyy}"
+  },
+  "decimal": ".",
+  "group": ",",
+  "hour12": true,
+  "am": "AM",
+  "pm": "PM"
+}

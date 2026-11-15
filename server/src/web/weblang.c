@@ -1,8 +1,9 @@
 /* weblang.c — the few words lord-web shows itself (the tray menu, download notifications, the file chooser's title),
  * from LordOS's catalogs: assets/locales/<lang>/webruntime.json next to the binary (/usr/lib/lordos/assets, or the
  * source tree's assets/ for a development build), in the language of LC_ALL, LC_MESSAGES or LANG, English for a key
- * the language doesn't have. */
+ * the language doesn't have (the folder: weblangid.h). */
 #include "web.h"
+#include "weblangid.h"
 #include "../sec/json.h"
 
 #include <stdio.h>
@@ -30,8 +31,8 @@ void weblang_init(void) {
     const char *l = getenv("LC_ALL");
     if (!l || !*l) l = getenv("LC_MESSAGES");
     if (!l || !*l) l = getenv("LANG");
-    char lang[8] = "en";
-    if (l && l[0] >= 'a' && l[0] <= 'z' && l[1] >= 'a' && l[1] <= 'z') { lang[0] = l[0]; lang[1] = l[1]; lang[2] = 0; }
+    char lang[WEBLANG_ID_MAX];
+    weblang_id(l, lang);                /* "fil_PH.UTF-8" → "fil", not "fi"; "zh_TW" → "zh-Hant" (weblangid.h) */
     load("en", &en_doc);
     if (strcmp(lang, "en")) load(lang, &lang_doc);
 }

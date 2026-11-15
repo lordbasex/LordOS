@@ -5,7 +5,7 @@
 // sdk/i18n.js picks the form with the rule of the language the text came from, falling back to
 // "other". Pure: no lord.*; tests in server/tests/plurals_test.mjs, docs/LANGUAGES.md.
 export const PLURALS = {
-  'one-other': (n) => (n === 1 ? 'one' : 'other'),                   // en, es, it, de, nl, sv, el, tr, hu, fi, bg, az, ur
+  'one-other': (n) => (n === 1 ? 'one' : 'other'),                   // en, es, it, de, nl, sv, el, tr, hu, fi, bg, az, ur, ca, sw
   'zero-one-other': (n) => (n === 0 || n === 1 ? 'one' : 'other'),   // pt, fr, hi, bn, fa
   none: () => 'other',                                               // ja, zh, ko, th, vi, id, ms
   'east-slavic': (n) => {                                            // ru, uk, be
@@ -42,6 +42,10 @@ export const PLURALS = {
     if (m100 >= 3 && m100 <= 10) return 'few';
     if (m100 >= 11) return 'many';
     return 'other';
+  },
+  filipino: (n) => {                                                 // fil: other only for 4, 6, 9 last (4, 14, 26, 109); one for the rest (0–3, 5, 10, 21)
+    const m10 = n % 10;
+    return m10 === 4 || m10 === 6 || m10 === 9 ? 'other' : 'one';
   },
 };
 

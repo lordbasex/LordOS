@@ -8,7 +8,7 @@
 // The pack is installed in LordOS by copying it to ~/Downloads and using Settings → Language and
 // region → "Add"; it ends up in ~/.local/share/lordos/locales/<id>/. Available plural
 // rules: one-other, zero-one-other, none, east-slavic, polish, czech-slovak, lithuanian, romanian,
-// arabic (see sdk/plurals.js). The direction ("rtl" for Arabic, Hebrew, Persian, Urdu…) comes from the id.
+// arabic, filipino (see sdk/plurals.js). The direction ("rtl" for Arabic, Hebrew, Persian, Urdu…) comes from the id.
 // Check it with: node tools/i18n-check.mjs lordos-lang-fr.json
 import fs from 'node:fs';
 import path from 'node:path';
