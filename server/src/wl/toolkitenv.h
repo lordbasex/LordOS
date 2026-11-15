@@ -19,10 +19,10 @@ static inline void toolkit_env(void) {
     setenv("GDK_BACKEND", TOOLKITENV_GDK, 1);
     setenv("QT_QPA_PLATFORM", TOOLKITENV_QT, 1);
     setenv("MOZ_ENABLE_WAYLAND", "1", 1);
-    /* GTK 4.18 doesn't pick its text-input-v3 module by itself here (no input-method framework running), and the
-     * keys then reach the app raw: LordOS's input methods compose only through it. Not overwritten when the person
-     * set another one (an IBus or Fcitx user) */
-    setenv("GTK_IM_MODULE", "wayland", 0);
+    /* No GTK_IM_MODULE here: every GTK reads it, also GTK 3 running on X11 inside Electron and Chromium, which then
+     * loaded the Wayland input-method module on an X11 display and crashed (GitHub #150). GTK 4 on Wayland gets
+     * "wayland" from the Settings portal's gtk-im-module instead (ui/portal.c), and an IBus or Fcitx user's own
+     * GTK_IM_MODULE passes through untouched. */
 }
 
 #endif

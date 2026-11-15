@@ -575,6 +575,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/webapp_test.c` (`build/webapp-test`: which errors are the network's, the delays, the page's escaping,
   no script, both color schemes, a buffer too small); the GIO and WebKit codes the header mirrors are checked against
   GLib's at compile time. Not yet checked on screen or on hardware. Docs: docs/WEBAPPS.md, "No network".
+- **Electron apps no longer crash at start (GitHub #150), and probably Steam's window loop (GitHub #157).** Since
+  0.8.8.8 lord-server exported `GTK_IM_MODULE=wayland` to every app it starts (`server/src/wl/toolkitenv.h`), so
+  GTK 4 on Wayland would use LordOS's text-input-v3 input methods. Every GTK reads that variable, also the GTK 3 that
+  Electron and Chromium load while they run on X11 (Xwayland): it loaded the Wayland input-method module on an X11
+  display, failed `gdk_wayland_display_get_wl_display: assertion 'GDK_IS_WAYLAND_DISPLAY (display)'` and crashed,
+  and forcing X11 didn't help. The variable is gone. Instead LordOS's Settings portal (`server/src/ui/portal.c`)
+  serves `org.gnome.desktop.interface` `gtk-im-module` = `wayland`: GTK 4 on Wayland reads it from the portal before
+  it chooses a module itself (when the key was missing it used its default, `simple`, which is why 0.8.8.8 needed the
+  variable), and GTK on X11 never reads the portal, so Electron and Chromium go back to GTK's own default. GTK 3 on
+  Wayland already chooses text-input-v3 by itself. An IBus or Fcitx user's own `GTK_IM_MODULE` still wins, and is
+  passed through untouched. Steam's web helper is Chromium on X11 too; a helper that crashes and is started again
+  matches the window JrocMD saw recreated every ten seconds, but that is not confirmed. Tests: `build/toolkitenv-test`
+  checks the variable is not exported and a person's own value is kept; `build/portal-gs-test` (over a private session
+  bus) reads `gtk-im-module` with `ReadOne` and with `ReadAll("org.gnome.*")`, the call GTK 4 makes, and checks it is
+  not in another namespace. Not checked on a screen yet: the GTK 4 Hangul field of 0.8.8.8 and an Electron app on X11
+  still need a run on VM 127. Until the next release, `env -u GTK_IM_MODULE <app>` from the Terminal works around it.
+  Thanks to Irh18 for the report with the exact assertion and the variables that fixed it, and to JrocMD for the
+  Steam report and its log. Documented in `docs/WAYLAND.md` ("How to open an app", "Input methods").
 - **lord-web picks the right language for three-letter ids and for Chinese.** The LordOS Web Runtime's own texts
   (`server/src/web/weblang.c`) took only the first two letters of `LC_ALL`, `LC_MESSAGES` or `LANG`, so `fil_PH.UTF-8`
   loaded Finnish (`fi`) and any `zh_*` looked for a `zh` folder that does not exist and fell back to English. It now

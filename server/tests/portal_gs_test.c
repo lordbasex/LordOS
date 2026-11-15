@@ -201,6 +201,63 @@ static void bind(const char *session, char *err, int n, const char *const *ids, 
     dw_free(&b);
 }
 
+/* The Settings portal's gtk-im-module (GitHub #150): GTK 4 on Wayland reads it with ReadAll("org.gnome.*") and
+ * takes "wayland" (text-input-v3) from it; without it GTK uses its default, "simple". out gets the value ReadOne
+ * gives ("" none); the return value is how many times ReadAll(pattern) gave the key, and with which value (in all). */
+static int settings_im(const char *pattern, char *out, size_t n, char *all, size_t an) {
+    out[0] = all[0] = 0;
+    int seen = 0;
+    for (int which = 0; which < 2; which++) {
+        DBuf b;
+        dw_init(&b);
+        if (which == 0) { dw_str(&b, "org.gnome.desktop.interface"); dw_str(&b, "gtk-im-module"); }
+        else { size_t a = dw_arr_begin(&b, 4); dw_str(&b, pattern); dw_arr_end(&b, a); }
+        DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/portal/desktop", .iface = "org.freedesktop.portal.Settings",
+                   .member = which == 0 ? "ReadOne" : "ReadAll", .dest = "org.freedesktop.portal.Desktop", .sig = which == 0 ? "ss" : "as" };
+        uint32_t s = dbus_send(&app, &h, &b);
+        dw_free(&b);
+        dbus_flush(&app);
+        int done = 0;
+        for (int left = 2000; left > 0 && !done; left -= 10) {
+            struct pollfd p[2] = { { portal_fd(), POLLIN | (portal_wants_write() ? POLLOUT : 0), 0 }, { app.fd, POLLIN, 0 } };
+            poll(p, 2, 10);
+            portal_dispatch();
+            DMsg m;
+            while (dbus_next(&app, &m) == 1) {
+                if (m.type == DBUS_RETURN && m.reply_serial == s) {
+                    DRd r;
+                    dr_init(&r, &m);
+                    if (which == 0 && m.sig && !strcmp(m.sig, "v")) {
+                        const char *sig = dr_variant(&r);
+                        if (!r.err && !strcmp(sig, "s")) snprintf(out, n, "%s", dr_str(&r, NULL));
+                    } else if (which == 1 && m.sig && !strcmp(m.sig, "a{sa{sv}}")) {
+                        size_t end = dr_arr(&r, 8);
+                        while (!r.err && dr_more(&r, end)) {
+                            dr_struct(&r);
+                            const char *ns = dr_str(&r, NULL);
+                            size_t ie = dr_arr(&r, 8);
+                            while (!r.err && dr_more(&r, ie)) {
+                                dr_struct(&r);
+                                const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
+                                if (!r.err && !strcmp(sig, "s")) {
+                                    const char *v = dr_str(&r, NULL);
+                                    if (!strcmp(ns, "org.gnome.desktop.interface") && !strcmp(k, "gtk-im-module")) { seen++; snprintf(all, an, "%s", v); }
+                                } else dr_skip(&r, sig);
+                            }
+                        }
+                        if (r.err) seen = -1;
+                    }
+                    done = 1;
+                }
+                if (m.type == DBUS_ERROR && m.reply_serial == s) done = 1;
+                dbus_msg_free(&m);
+            }
+        }
+        if (!done) return -1;
+    }
+    return seen;
+}
+
 int main(void) {
     char home[] = "/tmp/portal-gs-XXXXXX";
     if (!mkdtemp(home)) return 2;
@@ -209,6 +266,15 @@ int main(void) {
     int fd = dbus_connect_session();
     CHECK(fd >= 0 && dbus_open(&app, fd, 2000) == 0);
     add_match();
+
+    /* GTK's input-method module goes through the Settings portal, not the environment (GitHub #150) */
+    {
+        char one[64], all[64];
+        CHECK(settings_im("org.gnome.*", one, sizeof one, all, sizeof all) == 1);   /* what GTK 4 asks for */
+        CHECK(!strcmp(one, "wayland") && !strcmp(all, "wayland"));
+        CHECK(settings_im("org.gnome.desktop.interface", one, sizeof one, all, sizeof all) == 1 && !strcmp(all, "wayland"));
+        CHECK(settings_im("org.freedesktop.appearance", one, sizeof one, all, sizeof all) == 0);  /* only in its namespace */
+    }
 
     char session[400], err[128];
     create(session, "s1");
