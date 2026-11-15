@@ -2,7 +2,8 @@
 // Classic taskbar's tray read these choices; Settings → Desktop & Dock → Menu Bar (or Taskbar) writes them. Tested by
 // server/tests/menubar_model_test.mjs.
 //
-//   menuBarPrefs(settings)        { keyboard, osk, bell, calendar, ccSystem, ccNetwork, ccWifi, ccBluetooth }
+//   menuBarPrefs(settings)        { keyboard, osk, bell, calendar, ccSystem, ccNetwork, ccWifi, ccBluetooth, ccDnd, ccNight,
+//                                   ccBrightness, ccLogout }
 //   menuBarPatch(settings, k, v)  the settings change that turns one of them on or off
 //   outputChoices(soundState)     the outputs a sound panel offers, the default one marked
 //   monthCells(year, month, first) the days of a month calendar, padded to whole weeks
@@ -33,6 +34,10 @@ export const MENUBAR_DEFAULTS = {
   ccNetwork: true,      //   the network and VPN tile
   ccWifi: true,         //   the Wi-Fi tile (only with a Wi-Fi radio)
   ccBluetooth: true,    //   the Bluetooth tile (only with an adapter)
+  ccDnd: true,          //   (issue #114) the Do Not Disturb tile
+  ccNight: true,        //   the Night Light tile
+  ccBrightness: true,   //   the brightness slider (only with a screen whose backlight LordOS can set)
+  ccLogout: true,       //   the Log Out button (the L menu has it too)
 };
 
 export function menuBarPrefs(s) {
@@ -71,6 +76,27 @@ export function outputChoices(st) {
   const sinks = (st && Array.isArray(st.sinks) ? st.sinks : []).filter((x) => x && x.name);
   const def = sinks.find((x) => x.default) || sinks[0] || null;
   return sinks.map((x) => ({ index: x.index, name: x.name, label: x.description || x.name, default: x === def }));
+}
+
+// The bars a Wi-Fi icon lights (issue #114), from the level in dBm that lord.net.interfaces() gives as "signal" (read
+// from /proc/net/wireless): 4 from -55 dBm up, 3 to -67, 2 to -78, 1 below, the steps Settings → Network → Wi-Fi uses.
+// With no reading (an older lord-server, a driver that doesn't say) all four are lit, as the icon was before.
+export function wifiBars(dbm) {
+  if (typeof dbm !== 'number' || !Number.isFinite(dbm)) return 4;
+  return dbm >= -55 ? 4 : dbm >= -67 ? 3 : dbm >= -78 ? 2 : 1;
+}
+
+// The brightness slider of the Control Center and Quick Settings (issue #114): the first screen whose backlight LordOS
+// can set (lord.display.list().backlight, a laptop's or tablet's own panel), or null, and then there is no slider.
+export function backlightOf(list) {
+  const b = (list && Array.isArray(list.backlight) ? list.backlight : []).find((x) => x && x.name && x.max > 0);
+  return b ? { name: b.name, value: Math.min(b.max, Math.max(0, Number(b.value) || 0)), max: b.max } : null;
+}
+// A slider position (0..1) as a backlight value: never 0, which turns some panels fully off (Settings → Displays).
+export function backlightValue(fraction, max) {
+  if (!(max > 0)) return 0;
+  const f = Math.min(1, Math.max(0, Number(fraction) || 0));
+  return Math.max(1, Math.min(max, Math.round(f * max)));
 }
 
 // The week starts on Sunday in English and on Monday elsewhere (the Classic clock panel's rule).

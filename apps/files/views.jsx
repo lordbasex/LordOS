@@ -1,7 +1,7 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
 // columns (Miller, with a preview) and gallery. Their scroll views are no Tab stops (focusable={false}): the arrows
 // move the selection (index.jsx), not the view.
-import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
+import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, Disclosure, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
 import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
@@ -191,9 +191,8 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
       <View key={e.path} {...itemHandlers(e, ctx)}
         style={[listRowStyle(t, sel || ctx.dropTarget === e.path, odd), { height: m.row, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
         <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
-          <View onMouseDown={(ev) => { ev.stopPropagation(); if (e.dir && !e.trash) ctx.onToggleExpand(e.path); }} style={{ width: 14, alignItems: 'center' }}>
-            {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
-          </View>
+          <Disclosure state={e.dir && !e.trash ? (open ? 'open' : 'closed') : 'none'} color={sel ? '#fff' : t.textDim} onDown height={m.row}
+            onToggle={() => ctx.onToggleExpand(e.path)} />
           {/* thumbnails from 32 px up, as in the icon view */}
           <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32 && !ctx.cloudOnly?.(e)} tint={tagTint(tagsOf(e.path))} />
           {/* the tag dots right after the name (not at the column's end); the name keeps the room when renamed */}

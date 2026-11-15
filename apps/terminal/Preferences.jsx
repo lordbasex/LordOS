@@ -4,7 +4,7 @@
 // form with a right-aligned label column that stacks the labels above the controls when the window is narrow.
 import {
   View, Text, TextInput, TextArea, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, Hairline, GroupBox, ToolbarButton, ToolbarGroup, SearchField, Overlay,
-  useStore, useTheme, fs, spacing, typeScale, direction, FilePicker, revealPath, errorText, formatNumber, t as T,
+  useStore, useTheme, fs, spacing, typeScale, FilePicker, revealPath, errorText, formatNumber, DisclosureGlyph, t as T,
 } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName, profileGroups } from './profiles.js';
@@ -800,7 +800,7 @@ export function Preferences({ wid, onClose }) {
                 <View key={g.tag ?? ''}>
                   {g.tag !== null && (
                     <View onClick={() => setClosed((c) => ({ ...c, [g.tag]: !shut }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 6, marginTop: 4 }}>
-                      <Text style={{ width: 10, fontSize: 9, color: t.textDim }}>{shut ? (direction() === 'rtl' ? '◀' : '▶') : '▼'}</Text>
+                      <DisclosureGlyph open={!shut} color={t.textDim} />
                       <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{g.tag.toUpperCase()}</Text>
                       <Text style={{ fontSize: 11, color: t.textDim }}>{g.items.length}</Text>
                     </View>

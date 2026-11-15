@@ -219,6 +219,60 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 345 checks) and
   `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
 
+- **Bigger disclosure triangles and accounts gear in Mail, and the same triangles in Files, Monitor and Terminal**
+  (issue [#143](https://github.com/lordbasex/LordOS/issues/143), thanks to pct06 for the suggestion; approved by the
+  maintainer on 2026-11-15). Mail's folder and account triangles were a font's ▸ ▾ at 10 px in a 12 × 20 box, hard to
+  see next to 13 px folder names and hard to hit; the gear next to «Add account» was the font's ⚙ at 13 px. The SDK
+  now has one drawn disclosure triangle: `Disclosure` (a 12 px chevron made of two borders of a rotated square, so it
+  no longer depends on a font, in a 16 px hit box whose click does not reach the row; `state` `'open'`, `'closed'` or
+  `'none'`, an empty box that keeps rows lined up; `onDown` for a row whose press selects, as in Files) and
+  `DisclosureGlyph` (the chevron alone, for a header whose whole row folds), in `sdk/controls.jsx`, with the
+  geometry in `sdk/controlmodel.js` (`disclosureDir`, `chevronGeometry`: the square moves back by side / (2√2) so the
+  visible strokes, not the square, are centred). Open it points down; closed it points toward the text, right in left
+  to right and left in right to left. Mail's folders and account headers use it (the box overlaps the gap before the
+  icon by 6 px, so the folders move only 2 px), and so do Files' list view (it was ▶ ▼ at 9 px, and pointed
+  right in right to left too), Monitor → Network's app rows, connection tree and folding sections, Monitor's
+  firewall rules per app and Terminal's profile groups (Preferences and the Profiles window, ▶ ▼ at 9 px). The
+  accounts gear is drawn at 16 px. Tests: `tests/control_model_test.mjs` (the four directions, right and left and
+  up and down mirror each other, the tip and both arm ends inside the box and centred for 10, 12 and 13 px; 90
+  checks). Not checked on screen: there was no VM access for this change.
+- **Control Center: Do Not Disturb, Night Light and brightness, one-click switch tiles, Wi-Fi signal bars, and Log
+  Out can be hidden** (issue [#114](https://github.com/lordbasex/LordOS/issues/114), thanks to pct06 for the
+  proposal; the maintainer approved the recommended part on 2026-11-15). In Lord Flow's Control Center
+  (`themes/default/components/ControlCenter.jsx`): new **Do Not Disturb** and **Night Light** tiles (the same
+  `settings.notifications.dnd` and `setNightManual` as the notifications panel and Lord Classic's Quick Settings);
+  Dark Mode, Transparency, Bluetooth, Do Not Disturb and Night Light are switch tiles that a click anywhere turns on
+  or off, with their state in the tile (the accent color and white when on, grey when off, and «On» or «Off» under
+  the name), while the name and the › at the end open the tile's Settings page (Appearance, Bluetooth,
+  Notifications, Displays); a **brightness slider** under the volume when LordOS can set a backlight (a laptop's or
+  tablet's own panel), through the same closed admin action as the brightness keys and Settings → Displays
+  (`display-brightness`, validated on the root side: no new root action), sent at most every 120 ms with the
+  slider's last position (`setBacklight`, `useBacklight` in `sdk/hwkeys.js`); and the **Wi-Fi tile's icon shows the
+  signal's bars**. The panel is 340 px wide (was 320) and scrolls when a short screen can't hold it. CPU and memory
+  and Log Out stay by default; Settings → Desktop & Dock → Control Center can now turn off Do Not Disturb, Night
+  Light, the brightness slider and **Log Out** (`ccDnd`, `ccNight`, `ccBrightness`, `ccLogout` in
+  `sdk/menubarmodel.js`, all on unless turned off, so a settings.json from before shows the same panel plus the new
+  tiles: no migration). Lord Classic's Quick Settings (`themes/classic/components/QuickSettings.jsx`), which already
+  had one-click Do Not Disturb and Night Light tiles, gets the same brightness row (with a › to Settings → Displays)
+  and the signal's bars on its network glyph, in the tray too. The signal comes from lord-server:
+  `lord.net.interfaces()` gives a Wi-Fi interface a `signal` in dBm read from `/proc/net/wireless` (readable by
+  anyone; `net_wireless_level` in `server/src/net/state.c`, only a real reading from -110 to -1 dBm, never past its
+  line), and `wifiBars` (`sdk/menubarmodel.js`) lights 4 bars from -55 dBm, 3 to -67, 2 to -78 and 1 below, the steps
+  of Settings → Network → Wi-Fi; with no reading all four stay lit, as before. The moon, sun, contrast, layers,
+  Bluetooth and signal glyphs moved from Lord Classic to the SDK (`sdk/quickglyphs.jsx`), so both themes draw the same
+  ones. Not done, as recommended: CPU/Memory and Log Out are not removed by default, there is no one-second On/Off
+  notice, and Settings stays a text button. Brightness over DDC/CI (external monitors) does not exist in LordOS yet,
+  so the slider shows only with a backlight. New texts in all 35 languages: `shell.cc.openSettings`,
+  `shell.cc.displaySettings`, `settings.dock.cc.{dnd,night,brightness,brightnessHint,logout,logoutHint}`. Tests:
+  `build/net-test wireless` (16 cases: dBm with and without the update mark, not associated, -256, a cut line, a name
+  that is only a prefix, no reading past the line, out of range), `tests/menubar_model_test.mjs` (the new choices on by
+  default, Log Out hidden alone, the bars' steps, the backlight picked and never set to 0), `tests/menubar_test.mjs`
+  (the new tiles and slider shown, a click turns Do Not Disturb on and off and changes its tile to the accent, Night
+  Light and Dark Mode in one click, three slider moves send one `display-brightness intel_backlight 650`, each new
+  tile and Log Out hidden from Settings while CPU/memory and Settings stay) and `tests/classic_taskbar_test.mjs` (the
+  Quick Settings brightness row only with a backlight). Not checked on screen and not tested on hardware: there was
+  no VM access for this change, and the brightness path is still untested on a real backlight.
+
 ### Changed
 
 - **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,

@@ -80,6 +80,13 @@ The media symbols (⏮ ⏸ ⏭ 🔁 🔊 💬 🎙 📷) are color emoji too: th
 glyphs (`PlayGlyph`, `PauseGlyph`, `SkipGlyph`, `SpeakerGlyph`, `CaptionsGlyph`), the Camera and
 the Recorder draw their empty-state icons. `↻ ⤮ ♪ ◫ ▣ ☺ ≡` render monochrome.
 
+Disclosure triangles (issue #143) are drawn, not typed: `Disclosure` (a 12 px chevron in a 16 px hit box, its own
+click; `state` `'open'`, `'closed'` or `'none'` for an empty box that keeps rows lined up) and `DisclosureGlyph` (the
+chevron alone, for a header whose whole row folds) in `sdk/controls.jsx`, geometry in `sdk/controlmodel.js`
+(`chevronGeometry`). Open points down; closed points toward the text, right in left to right and left in right to
+left. Mail's folders, Files' list, Monitor's trees and groups and Terminal's profile groups use them; don't put ▸ ▾
+in a `Text` for this.
+
 ## Layout patterns
 
 - **Sidebar (source list):** 200–240 px, `sidebarBg`, a hairline on its trailing edge,
@@ -226,7 +233,9 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
   the panel material with a 1 px border, 28 px side insets in the start menu, a footer band
   (`panelFoot`) for the user and power or the battery and Settings.
 - **Quick settings tiles:** 48 px high, accent fill when on, a chevron segment that opens the
-  matching Settings page.
+  matching Settings page. The glyphs (moon, sun, contrast, layers, Bluetooth, signal bars) are the SDK's
+  (`sdk/quickglyphs.jsx`), shared with Lord Flow's Control Center (issue #114). A brightness row appears above the
+  volume when LordOS can set a backlight.
 - **Shortcuts:** Super alone opens the start menu; Super+arrows snap the window in front; Super+Tab
   is the Overview; Super+A quick settings; Super+N notifications; Alt+F4 closes the window in front.
 

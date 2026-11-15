@@ -1,7 +1,7 @@
 // control_model_test.mjs — (0.8.8.8) the keys of the SDK's choice controls (sdk/controlmodel.js): Tabs and a radio
 // group (going round, skipping disabled ones, right to left), a Dropdown open and closed, the wheel on a slider or a
 // stepper, where a tooltip goes so it never covers the pointer, and the band of an indeterminate progress bar.
-import { groupKey, dropdownKey, wheelValue, tipSide, progressSpan } from '../../sdk/controlmodel.js';
+import { groupKey, dropdownKey, wheelValue, tipSide, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from '../../sdk/controlmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -77,6 +77,40 @@ eq('halfway the band is in the middle', [+mid.from.toFixed(2), +mid.to.toFixed(2
 eq('it comes round again', progressSpan(null, 1500 + 750, { period: 1500 }), mid);
 eq('reduced motion: still over the bar', progressSpan(null, 750, { reduceMotion: true }), { from: 0, to: 1, still: true });
 eq('NaN counts as not known', progressSpan(NaN, 0).to, 0);
+
+// ---- the disclosure triangle (issue #143) ----
+eq('open points down', [disclosureDir(true), disclosureDir(true, true)], ['down', 'down']);
+eq('closed points toward the text', [disclosureDir(false), disclosureDir(false, true)], ['right', 'left']);
+{
+  const g = chevronGeometry('right');
+  eq('a 12 px chevron: a square of 8 rotated', [g.side, g.deg], [8, -45]);
+  eq('the default box is 16 px', DISCLOSURE_BOX, 16);
+  eq('the chevron is bigger than the old 10 px glyph', Math.round(g.side * Math.SQRT2) >= DISCLOSURE_SIZE - 1, true);
+  // right and left are mirror images in the box
+  const l = chevronGeometry('left');
+  eq('left mirrors right', +(g.left + l.left + g.side).toFixed(2), DISCLOSURE_BOX);
+  eq('same height either way', g.top, l.top);
+  // down and up are mirror images vertically, and centred horizontally
+  const d = chevronGeometry('down', 12, 16, 20), u = chevronGeometry('up', 12, 16, 20);
+  eq('down is centred across', d.left, (16 - d.side) / 2);
+  eq('up mirrors down', +(d.top + u.top + d.side).toFixed(2), 20);
+  eq('down moves up toward its strokes', d.top < (20 - d.side) / 2, true);
+  eq('right moves back from its tip', g.left < (DISCLOSURE_BOX - g.side) / 2, true);
+  eq('rotations', ['down', 'left', 'up'].map((x) => chevronGeometry(x).deg), [45, 135, -135]);
+  eq('an unknown direction draws right', chevronGeometry('sideways').deg, -45);
+  eq('a tiny one keeps a 4 px square and a thin stroke', [chevronGeometry('down', 3).side, chevronGeometry('down', 8).stroke], [4, 1.5]);
+  // the drawn strokes (the tip and both arm ends) stay inside the box, and their middle is the box's middle
+  const ink = (c) => {
+    const a = (c.deg * Math.PI) / 180, cx = c.left + c.side / 2, cy = c.top + c.side / 2, h = c.side / 2;
+    return [[h, h], [h, -h], [-h, h]].map(([x, y]) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)]);
+  };
+  for (const sz of [10, 12, 13]) for (const dir of ['right', 'down', 'left', 'up']) {
+    const pts = ink(chevronGeometry(dir, sz, 16, 20));
+    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+    eq(`${dir} ${sz} inside`, Math.min(...xs) >= 0 && Math.max(...xs) <= 16 && Math.min(...ys) >= 0 && Math.max(...ys) <= 20, true);
+    eq(`${dir} ${sz} centred`, [Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 8) < 0.6, Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 10) < 0.6], [true, true]);
+  }
+}
 
 console.log(`control-model: ${ok} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);

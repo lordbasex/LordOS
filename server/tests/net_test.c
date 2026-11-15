@@ -8,6 +8,7 @@
  *   net-test ifwatch                 an interface gets its saved state once, whenever it appears
  *   net-test wake                    Wi-Fi after waking from sleep: checked, re-associated, turned off and on
  *   net-test wifi-saved              a saved network's key file: what a join without a password keeps
+ *   net-test wireless                the Wi-Fi level in /proc/net/wireless (the Control Center's bars, #114)
  *   sudo net-test health <if>        the after-sleep check of one Wi-Fi interface (needs its wpa_supplicant)
  *   sudo net-test arp <if> <src> <ip> does ip answer an ARP request from src (the after-sleep gateway check)
  *   sudo net-test dhcp <if>          the DHCP client in the foreground (SIGUSR2: confirm the lease, as after sleep)
@@ -428,6 +429,42 @@ static int test_wifi_saved(void) {
     return bad;
 }
 
+/* GitHub #114: the bars on the Control Center's Wi-Fi icon come from the level in /proc/net/wireless, which
+ * lord.net.interfaces() passes on as "signal" (dBm). Only a real reading counts: a radio that is not associated
+ * says 0 or -256, and a line that is cut short or names another interface gives nothing. */
+static int test_wireless(void) {
+    int bad = 0, d = 0;
+#define WL(x) do { if (!(x)) { printf("FAIL wireless:%d: %s\n", __LINE__, #x); bad++; } } while (0)
+    const char *proc =
+        "Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE\n"
+        " face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22\n"
+        "wlp2s0: 0000   54.  -56.  -256        0      0      0      0     40        0\n"
+        " wlan0: 0000   70   -40   -256        0      0      0      0      0        0\n"
+        "wlan1: 0000    0.    0.  -256        0      0      0      0      0        0\n"
+        "wlan2: 0000    0    -256.  -256       0      0      0      0      0        0\n"
+        "wlan3: 0000   12.  -95*  -256        0      0      0      0      0        0\n"
+        "wlan4: 0000   12.\n";
+    WL(net_wireless_level(proc, "wlp2s0", &d) == 1 && d == -56);
+    WL(net_wireless_level(proc, "wlan0", &d) == 1 && d == -40);      /* leading spaces, no '.' */
+    WL(net_wireless_level(proc, "wlan1", &d) == 0);                  /* not associated: 0 */
+    WL(net_wireless_level(proc, "wlan2", &d) == 0);                  /* -256: no reading */
+    WL(net_wireless_level(proc, "wlan3", &d) == 1 && d == -95);      /* the invalid mark is skipped */
+    WL(net_wireless_level(proc, "wlan4", &d) == 0);                  /* cut short: no level */
+    WL(net_wireless_level(proc, "wlan", &d) == 0);                   /* a prefix of a name is not that name */
+    WL(net_wireless_level(proc, "wlp2s", &d) == 0);
+    WL(net_wireless_level(proc, "eth0", &d) == 0);
+    WL(net_wireless_level(proc, "", &d) == 0);
+    WL(net_wireless_level(NULL, "wlan0", &d) == 0);
+    WL(net_wireless_level("", "wlan0", &d) == 0);
+    WL(net_wireless_level("wlan0: 0000 54. -56.", "wlan0", &d) == 1 && d == -56);   /* no newline at the end */
+    WL(net_wireless_level("wlan0: zz", "wlan0", &d) == 0);
+    WL(net_wireless_level("wlan0:\nwlan5: 0000 1. -60.\n", "wlan0", &d) == 0);    /* never reads the next line */
+    WL(net_wireless_level("wlan0: 0000 54. -500.\n", "wlan0", &d) == 0);           /* out of range */
+#undef WL
+    printf("wireless: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: net-test crypto | errors | state | monitor <s> | act <action> <arg> | daemons\n"); return 2; }
     if (!strcmp(argv[1], "crypto")) return test_crypto() ? 1 : 0;
@@ -435,6 +472,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "ifwatch")) return test_ifwatch() ? 1 : 0;
     if (!strcmp(argv[1], "wake")) return test_wake() ? 1 : 0;
     if (!strcmp(argv[1], "wifi-saved")) return test_wifi_saved() ? 1 : 0;
+    if (!strcmp(argv[1], "wireless")) return test_wireless() ? 1 : 0;
     if (!strcmp(argv[1], "dhcp") && argc > 2) { dhcp_run(argv[2], 0); return 0; }
     if (!strcmp(argv[1], "arp") && argc > 4) {
         int fam;

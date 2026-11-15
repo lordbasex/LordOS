@@ -30,7 +30,8 @@ for (const d of ['sdk', 'runtime', 'themes/default', 'themes/default/components'
 }
 
 // A stub lord: nodes, their styles and texts (and which ones left the tree); two sound outputs whose
-// lord.sound.setDefault calls are recorded; a Wi-Fi radio and a Bluetooth adapter; any other native call is a no-op.
+// lord.sound.setDefault calls are recorded; a Wi-Fi radio and a Bluetooth adapter; a backlight (issue #114) whose
+// lord.admin requests are recorded; any other native call is a no-op.
 const MOCK = `globalThis.__lordTest = (() => {
   const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), calls = [];
   let nextId = 1;
@@ -57,9 +58,14 @@ const MOCK = `globalThis.__lordTest = (() => {
     },
     net: { interfaces: () => [
       { name: 'lo', type: 'loopback', up: true, addresses: [] },
-      { name: 'wlan0', type: 'wifi', up: true, addresses: [{ family: 4, scope: 'global', address: '192.168.1.5' }] },
+      { name: 'wlan0', type: 'wifi', up: true, signal: -70, addresses: [{ family: 4, scope: 'global', address: '192.168.1.5' }] },
     ] },
     bt: { state: () => ({ adapter: { powered: true }, devices: [] }) },
+    // (issue #114) a laptop's panel whose brightness LordOS can set; the admin requests are recorded (and refused)
+    display: new Proxy({ list: () => ({ outputs: [], backlight: [{ name: 'intel_backlight', value: 400, max: 1000 }] }) },
+      { get: (o, k) => (k in o ? o[k] : () => undefined) }),
+    admin: new Proxy({ request: (action, arg) => { calls.push('admin:' + action + ':' + arg); return 0; } },
+      { get: (o, k) => (k in o ? o[k] : () => undefined) }),
   };
   for (const ns of ${JSON.stringify([...NS])}) if (!(ns in base)) base[ns] = undefined;
   const noop = () => undefined;

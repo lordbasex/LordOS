@@ -93,3 +93,24 @@ export function progressSpan(value, ms = 0, { period = 1500, band = 0.3, reduceM
   const head = f * (1 + band);
   return { from: Math.max(0, head - band), to: Math.min(1, head) };
 }
+
+// ---- the disclosure triangle (issue #143) ----
+// One drawn chevron for every app's folders and groups (Mail, Files, Monitor, Terminal), so it no longer depends on a
+// font's small ▸ ▾. Open: it points down; closed: toward the text, right in left to right and left in right to left.
+export const DISCLOSURE_SIZE = 12;      // the chevron's long side, in px
+export const DISCLOSURE_BOX = 16;       // the hit box's width
+export const disclosureDir = (open, rtl = false) => (open ? 'down' : rtl ? 'left' : 'right');
+
+// The square whose two borders (right and bottom) draw the chevron in a width × height box: its side, stroke,
+// rotation and top-left corner. Rotated, the strokes sit off the square's centre by side / (2√2) toward the tip, so
+// the square moves back by that much and the visible chevron is the one centred in the box.
+export function chevronGeometry(dir, size = DISCLOSURE_SIZE, width = DISCLOSURE_BOX, height = DISCLOSURE_BOX) {
+  const side = Math.max(4, Math.round(size / Math.SQRT2));
+  const stroke = size >= 11 ? 1.75 : 1.5;
+  const off = side / (2 * Math.SQRT2);
+  const deg = { right: -45, down: 45, left: 135, up: -135 }[dir] ?? -45;
+  const dx = dir === 'right' ? -off : dir === 'left' ? off : 0;
+  const dy = dir === 'down' ? -off : dir === 'up' ? off : 0;
+  const r = (v) => Math.round(v * 100) / 100;
+  return { side, stroke, deg, left: r(width / 2 + dx - side / 2), top: r(height / 2 + dy - side / 2) };
+}

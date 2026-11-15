@@ -21,7 +21,7 @@ import {
   View, Text, Layer, useSettings, useWindows, wm, windowTitle, formatTime, formatDate, t as tr, settings, sharedTicker,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
-  mainDisplay, toggleShowDesktop, menuBarPrefs, statusItems, useIndicators,
+  mainDisplay, toggleShowDesktop, menuBarPrefs, statusItems, useIndicators, wifiBars,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
@@ -39,12 +39,14 @@ export const TASKBAR_DEFAULT = ['files', 'terminal', 'store', 'settings'];
 // settings (a shared ticker: it polls only while one of them is shown, and they re-render only when it changes).
 const VPN = (i) => ['wireguard', 'tun', 'xfrm', 'ppp'].includes(i.type) || /^(wg|ovpn|ips|ppp|oc|fvpn)-/.test(i.name);
 export function readNet() {
-  if (typeof lord === 'undefined' || !lord.net) return { online: false, wifi: false, name: '', ip: '', vpn: 0 };
+  if (typeof lord === 'undefined' || !lord.net) return { online: false, wifi: false, name: '', ip: '', vpn: 0, bars: 4 };
   let ifs = [];
   try { ifs = lord.net.interfaces(); } catch (e) { ifs = []; }
   const main = ifs.find((i) => !VPN(i) && i.type !== 'loopback' && i.addresses.some((a) => a.scope === 'global' && a.family === 4));
   return {
     online: !!main, wifi: main?.type === 'wifi', name: main?.name || '', vpn: ifs.filter((i) => VPN(i) && i.up).length,
+    // Wi-Fi's strength as the bars the glyph lights (issue #114); a cable lights them all
+    bars: main?.type === 'wifi' ? wifiBars(main.signal) : 4,
     ip: main?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address || '',
   };
 }
@@ -255,7 +257,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
   const level = out ? (out.mute || out.level === 0 ? 0 : out.level < 0.5 ? 1 : 2) : 2;
   const qsGlyphs = (
     <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: vert ? 6 : 8, direction: 'ltr' }}>
-      <NetworkGlyph color={t.text} size={15} off={!net.online} />
+      <NetworkGlyph color={t.text} size={15} level={net.bars} off={!net.online} />
       {out ? <SpeakerGlyph color={t.text} size={16} level={level} muted={out.mute} /> : null}
     </View>
   );

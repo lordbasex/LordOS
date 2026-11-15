@@ -15,7 +15,7 @@ import { Lumo } from './mascot.js';
 import { Overlay, shellLayers } from './layers.js';
 import { menuStep, within } from './focusmodel.js';
 import { focusRingColor, useFocusScope, keyFocused, onFocusMove } from './focus.js';
-import { groupKey, dropdownKey, tipSide, progressSpan } from './controlmodel.js';
+import { groupKey, dropdownKey, tipSide, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from './controlmodel.js';
 import { typeAhead, matchIndex, TYPE_MS } from './menunav.js';
 import { findChar } from './listmodel.js';
 
@@ -98,6 +98,35 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
       {/* in the tooltip layer (sdk/layers.js): zIndex only orders siblings, so a bubble drawn in place went
           under whatever the window draws after the toolbar (the picture in Photos, issue #72) */}
       {tip && title ? <Overlay anchor={ref} layer="tooltip"><TooltipBubble text={title} end={nearEnd(winId, ref.current)} top={h + 6} /></Overlay> : null}
+    </View>
+  );
+}
+
+// A disclosure triangle (issue #143): a chevron drawn with two borders, so its size does not depend on a font's small
+// ▸ ▾. open: points down; closed: toward the text (◂ in right to left). size: the chevron's long side (12 px).
+// The glyph alone, for a row whose whole surface folds and unfolds (a group header).
+export function DisclosureGlyph({ open, color, size = DISCLOSURE_SIZE, width = DISCLOSURE_BOX, height = DISCLOSURE_BOX }) {
+  const t = useTheme();
+  const g = chevronGeometry(disclosureDir(!!open, direction() === 'rtl'), size, width, height);
+  return (
+    <View style={{ width, height, direction: 'ltr' }}>
+      <View style={{ position: 'absolute', left: g.left, top: g.top, width: g.side, height: g.side, borderRightWidth: g.stroke, borderBottomWidth: g.stroke,
+        borderColor: color || t.textDim, transform: `rotate(${g.deg}deg)` }} />
+    </View>
+  );
+}
+
+// The triangle with its own hit box (16 px wide), for a row whose click does something else (opens the folder).
+// state: 'open', 'closed' or 'none' (an empty box of the same size, so rows with and without one line up).
+// onToggle: the click on the triangle; it does not reach the row. onDown: toggle on the press instead, for a row whose
+// press selects or starts a drag (Files' list).
+export function Disclosure({ state, color, onToggle, onDown = false, size = DISCLOSURE_SIZE, width = DISCLOSURE_BOX, height = 20, style }) {
+  const box = [{ width, height, alignItems: 'center', justifyContent: 'center' }, style];
+  if (state !== 'open' && state !== 'closed') return <View style={box} />;
+  const press = (e) => { e?.stopPropagation?.(); onToggle?.(); };
+  return (
+    <View {...(onDown ? { onMouseDown: press } : { onClick: press })} style={box}>
+      <DisclosureGlyph open={state === 'open'} color={color} size={size} width={width} height={Math.min(height, width + 4)} />
     </View>
   );
 }

@@ -1,7 +1,8 @@
 // What the bar shows (sdk/menubarmodel.js, issue #58): the choices' defaults, the settings patch, the outputs a sound
 // panel offers and the month calendar's cells. node server/tests/menubar_model_test.mjs
 import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, cleanerPanelAction, outputChoices, monthCells, weekStartFor,
-  menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from '../../sdk/menubarmodel.js';
+  menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay,
+  wifiBars, backlightOf, backlightValue } from '../../sdk/menubarmodel.js';
 import { sharedTicker } from '../../sdk/ticker.js';
 
 let ok = 0;
@@ -149,4 +150,24 @@ eq('menu: no display', insideDisplay(5, 6, 1, 1, null), { x: 5, y: 6 });
   eq('ticker: every bar hears a change once', seen.slice(0, 2), ['a', 'b']);
   eq('ticker: unchanged values notify nobody', seen.length, 2);
 }
+
+// ---- the Control Center (issue #114) ----
+// the new tiles and Log Out are there unless turned off: a settings.json from before shows the same panel plus the
+// new tiles, so no migration
+for (const k of ['ccDnd', 'ccNight', 'ccBrightness', 'ccLogout', 'ccSystem']) eq(`${k} on by default`, menuBarPrefs({})[k], true);
+eq('Log Out can be hidden', menuBarPrefs({ menuBar: { ccLogout: false } }).ccLogout, false);
+eq('hiding Log Out keeps the metrics', menuBarPrefs({ menuBar: { ccLogout: false } }).ccSystem, true);
+eq('Log Out patch', menuBarPatch({ menuBar: { ccSystem: false } }, 'ccLogout', false), { menuBar: { ccSystem: false, ccLogout: false } });
+// the Wi-Fi bars, the steps of Settings → Network → Wi-Fi
+eq('wifi bars', [-40, -55, -56, -67, -68, -78, -79, -95].map(wifiBars), [4, 4, 3, 3, 2, 2, 1, 1]);
+eq('no reading: all bars', [undefined, null, NaN, '-50'].map(wifiBars), [4, 4, 4, 4]);
+// the brightness slider: only with a backlight, never at 0
+eq('no displays', backlightOf(null), null);
+eq('no backlight (a desktop, a VM)', backlightOf({ outputs: [], backlight: [] }), null);
+eq('a broken entry is skipped', backlightOf({ backlight: [{ name: 'x', value: 3, max: 0 }, { name: 'intel_backlight', value: 400, max: 1000 }] }),
+  { name: 'intel_backlight', value: 400, max: 1000 });
+eq('a value out of range is kept inside', backlightOf({ backlight: [{ name: 'a', value: 5000, max: 255 }] }).value, 255);
+eq('slider to value', [backlightValue(0.5, 1000), backlightValue(1, 255), backlightValue(2, 255)], [500, 255, 255]);
+eq('never 0', [backlightValue(0, 1000), backlightValue(-1, 7), backlightValue(0.0001, 100)], [1, 1, 1]);
+eq('no max: nothing', backlightValue(0.5, 0), 0);
 console.log(`menubar-model-test: ${ok} ok`);

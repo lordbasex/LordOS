@@ -12,7 +12,7 @@
 // The rules are saved by lord-server (lord.fw); this screen writes no files.
 import {
   View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, fwRule,
-  spacing, typeScale, formatDate, formatTime, direction, netModel,
+  spacing, typeScale, formatDate, formatTime, netModel, DisclosureGlyph,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { RuleSheet, destKind, RED, GREEN } from './RuleSheet.jsx';
@@ -107,7 +107,7 @@ function AppRules({ id, apps, open, onToggle }) {
           <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{label}</Text>
           <Text style={{ fontSize: typeScale.caption, color: blocked ? RED : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{summary}</Text>
         </View>
-        <Text style={{ fontSize: 11, color: t.textDim }}>{open ? '▾' : direction() === 'rtl' ? '◂' : '▸'}</Text>
+        <DisclosureGlyph open={open} color={t.textDim} />
       </View>
       {open && (
         <View style={{ gap: spacing.m, paddingBottom: spacing.m, paddingInlineStart: 32 }}>

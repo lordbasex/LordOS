@@ -175,6 +175,7 @@ EOF
     run "net-test ifwatch" build/net-test ifwatch
     run "net-test wake" build/net-test wake
     run "net-test wifi-saved" build/net-test wifi-saved
+    run "net-test wireless" build/net-test wireless
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "portal-check-test" build/portal-check-test

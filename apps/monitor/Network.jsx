@@ -14,7 +14,7 @@
 import {
   View, Text, ScrollView, useTheme, useLocale, useStore, monitor, monitorConnections, useMonitor,
   formatBytes, formatNumber, tOptional, useSystemInfo, wm, direction, firewall, firewallState, useLauncherApps, Lumo, Button, useAppWindow, useSettings,
-  netModel, ConfirmDialog,
+  netModel, ConfirmDialog, Disclosure, DisclosureGlyph,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { C, fmt, AppGlyph, useCardStyle } from './index.jsx';
@@ -266,9 +266,7 @@ function AppRow({ g, node, ctx, open, selected, onToggle, onSelect, maxBytes, tr
     <View>
       <View onClick={onSelect} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8,
         backgroundColor: selected ? t.accent : 'transparent' }}>
-        <View onClick={(e) => { e.stopPropagation(); onToggle(); }} style={{ width: 14, alignItems: 'center' }}>
-          <Text style={{ fontSize: 10, color: selected ? '#fff' : t.textDim }}>{kids || g.listen.length ? (open ? '▾' : direction() === 'rtl' ? '◂' : '▸') : ''}</Text>
-        </View>
+        <Disclosure state={kids || g.listen.length ? (open ? 'open' : 'closed') : 'none'} color={selected ? '#fff' : t.textDim} onToggle={onToggle} />
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mapColor || 'transparent' }} />
         <AppGlyph item={g.item} size={20} />
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -444,7 +442,7 @@ function Section({ id, title, children }) {
     <View style={{ gap: 6 }}>
       <View onClick={toggle} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 18, paddingBottom: folded ? 0 : 2,
         borderBottomWidth: 1, borderBottomColor: t.separator }}>
-        <Text style={{ width: 12, fontSize: 9, color: t.textDim }}>{folded ? (direction() === 'rtl' ? '◂' : '▸') : '▾'}</Text>
+        <DisclosureGlyph open={!folded} color={t.textDim} size={10} width={14} height={16} />
         <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{title}</Text>
       </View>
       {folded ? null : children}

@@ -246,11 +246,47 @@ char *net_if_config_json(const char *ifname) {
     return b.p;
 }
 
+/* The signal level (dBm) of a Wi-Fi interface in /proc/net/wireless (issue #114: the bars on the Control Center's Wi-Fi
+ * icon). A line is "  wlan0: 0000   54.  -56.  -256 ..." (status, link quality, level, noise); the kernel prints the level
+ * in dBm, a '.' after it when it was updated. Returns 1 and *dbm when the line is there and the level is a real reading
+ * (-110..-1 dBm: an interface that is not associated says 0 or -256); 0 otherwise. Never reads past the line. */
+int net_wireless_level(const char *text, const char *ifname, int *dbm) {
+    size_t nl = ifname ? strlen(ifname) : 0;
+    if (!text || !nl || nl >= IFNAMSIZ) return 0;
+    for (const char *l = text; *l;) {
+        const char *e = strchr(l, '\n');
+        const char *end_line = e ? e : l + strlen(l);
+        const char *p = l;
+        while (p < end_line && *p == ' ') p++;
+        if ((size_t)(end_line - p) > nl && !strncmp(p, ifname, nl) && p[nl] == ':') {
+            p += nl + 1;
+            long v[3];
+            for (int i = 0; i < 3; i++) {            /* status (hex), link quality, level */
+                while (p < end_line && *p == ' ') p++;
+                if (p >= end_line) return 0;
+                char *end;
+                v[i] = strtol(p, &end, i == 0 ? 16 : 10);
+                if (end == p || end > end_line) return 0;
+                p = end;
+                if (p < end_line && (*p == '.' || *p == '*')) p++;     /* updated / invalid marks */
+            }
+            if (v[2] < -110 || v[2] > -1) return 0;
+            *dbm = (int)v[2];
+            return 1;
+        }
+        if (!e) break;
+        l = e + 1;
+    }
+    return 0;
+}
+
 char *net_interfaces_json(void) {
     Links l = {0};
     if (dump_links(&l) < 0) { free(l.v); return NULL; }
     int fd = nl_open(NETLINK_ROUTE, 0);
     Buf b = {0};
+    char *wireless = NULL;                  /* /proc/net/wireless, read once when there is a Wi-Fi interface */
+    int wireless_read = 0;
     buf_printf(&b, "[");
     for (int i = 0; i < l.n; i++) {
         Link *k = &l.v[i];
@@ -279,10 +315,17 @@ char *net_interfaces_json(void) {
                    (unsigned long long)k->st.rx_errors, (unsigned long long)k->st.tx_errors);
         if (fd >= 0) dump_addrs(fd, &b, k->index);
         char *cfg = net_if_config_json(k->name);
-        buf_printf(&b, "],\"config\":%s}", cfg ? cfg : "null");
+        buf_printf(&b, "],\"config\":%s", cfg ? cfg : "null");
         free(cfg);
+        int dbm;
+        if (!strcmp(type, "wifi")) {
+            if (!wireless_read) { wireless = read_file("/proc/net/wireless", 16384, NULL); wireless_read = 1; }
+            if (net_wireless_level(wireless, k->name, &dbm)) buf_printf(&b, ",\"signal\":%d", dbm);
+        }
+        buf_printf(&b, "}");
     }
     buf_printf(&b, "]");
+    free(wireless);
     if (fd >= 0) close(fd);
     free(l.v);
     if (b.oom) { buf_free(&b); return NULL; }
