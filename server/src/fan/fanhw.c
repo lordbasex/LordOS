@@ -226,7 +226,7 @@ int fanhw_scan(FanHw *h, const char *root) {
                 GpuFan *g = &h->g[h->ng++];
                 snprintf(g->dir, sizeof g->dir, "%s", dir);
                 pathf(p, sizeof p, "%s/device", dir);
-                if (!realpath(p, g->dev)) snprintf(g->dev, sizeof g->dev, "%s", dir);
+                { char r[PATH_MAX]; snprintf(g->dev, sizeof g->dev, "%.*s", (int)sizeof g->dev - 1, realpath(p, r) ? r : dir); }
                 const char *b = strrchr(g->dev, '/');
                 snprintf(g->slot, sizeof g->slot, "%s", b ? b + 1 : g->dev);
                 for (char *q = g->slot; *q; q++) if (*q != ':') { char c1[2] = { *q, 0 }; clean(c1); *q = c1[0]; }
@@ -244,7 +244,7 @@ int fanhw_scan(FanHw *h, const char *root) {
                 snprintf(t->chip, sizeof t->chip, "%s", chip);
                 snprintf(t->dir, sizeof t->dir, "%s", dir);
                 pathf(p, sizeof p, "%s/device", dir);
-                if (!realpath(p, t->dev)) snprintf(t->dev, sizeof t->dev, "%s", dir);
+                { char r[PATH_MAX]; snprintf(t->dev, sizeof t->dev, "%.*s", (int)sizeof t->dev - 1, realpath(p, r) ? r : dir); }
                 t->ch = ch;
                 t->has_rpm = exists(rpm);
                 t->orig_enable = -1;
