@@ -49,7 +49,14 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
                                        // (Steam in Games): AudioVideo, Development, Education, Game, Graphics,
                                        // Network, Office, Science, System, Utility
     "with": ["steam-libs-i386:i386"],  // optional (0.8.8.9): packages the Store installs and removes with it
-                                       // (Debian names, or name:i386)
+                                       // (Debian names, or name:i386 for a source with "multiarch": ["i386"]);
+                                       // each must be in the vendor's index for its architecture or in Debian
+                                       // trixie's signed main index (apt/build.sh check). Use it for the
+                                       // Recommends the app needs: the Store installs no Recommends (Steam's
+                                       // mesa-vulkan-drivers:i386, libasound2-plugins:i386). An installed app
+                                       // missing one of them shows Update on its page
+    "keep": ["mesa-vulkan-drivers"],   // optional (0.8.8.9): "with" packages removing the app leaves installed
+                                       // (the system may need them too: the amd64 Vulkan driver)
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
                                        // (Chrome, Edge, Spotify); "remote" = third-party remote access
                                        // (Tailscale);

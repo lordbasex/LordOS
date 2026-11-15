@@ -944,6 +944,140 @@ static void test_multiarch(const char *dir) {
     idx_close(&x);
 }
 
+/* (0.8.8.9) Steam's 32-bit Vulkan drivers. Valve's steam-libs-i386 only recommends mesa-vulkan-drivers and
+ * libasound2-plugins, and an install takes no Recommends (docs/PACKAGES.md, "Confirmations"), so the first Store
+ * builds left 32-bit games on Lavapipe. The catalog's "with" now names them (mesa-vulkan-drivers:i386 and
+ * libasound2-plugins:i386 from Debian's i386 list, mesa-vulkan-drivers for amd64): they resolve in i386, and the
+ * Multi-Arch: same pairs stay at one version, also when the Store adds them to a Steam installed before. */
+static const char *SV_AMD64 =
+    "Package: libc6\nVersion: 2.41-12\nArchitecture: amd64\nMulti-Arch: same\nFilename: pool/l/c_a.deb\nSize: 1\n" Z64 "Description: c\n\n"
+    "Package: libvulkan1\nVersion: 1.4\nArchitecture: amd64\nMulti-Arch: same\nDepends: libc6\nFilename: pool/l/v_a.deb\nSize: 1\n" Z64 "Description: v\n\n"
+    "Package: mesa-vulkan-drivers\nVersion: 25.0.7-2\nArchitecture: amd64\nMulti-Arch: same\nDepends: libvulkan1, libc6\nFilename: pool/m/m1_a.deb\nSize: 1\n" Z64 "Description: m\n\n"
+    "Package: mesa-vulkan-drivers\nVersion: 25.0.7-2+deb13u1\nArchitecture: amd64\nMulti-Arch: same\nDepends: libvulkan1, libc6\nFilename: pool/m/m2_a.deb\nSize: 1\n" Z64 "Description: m\n\n"
+    "Package: libpulse0\nVersion: 17\nArchitecture: amd64\nMulti-Arch: same\nDepends: libc6\nFilename: pool/l/p_a.deb\nSize: 1\n" Z64 "Description: p\n\n"
+    "Package: libasound2-plugins\nVersion: 1.2.12-2\nArchitecture: amd64\nMulti-Arch: same\nDepends: libpulse0, libc6\nFilename: pool/l/a_a.deb\nSize: 1\n" Z64 "Description: a\n\n"
+    "Package: dbus-user-session\nVersion: 1\nArchitecture: amd64\nMulti-Arch: foreign\nProvides: default-dbus-session-bus, dbus-session-bus\nFilename: pool/d/d.deb\nSize: 1\n" Z64 "Description: d\n\n";
+static const char *SV_I386 =
+    "Package: libc6\nVersion: 2.41-12\nArchitecture: i386\nMulti-Arch: same\nFilename: pool/l/c_i.deb\nSize: 1\n" Z64 "Description: c\n\n"
+    "Package: libvulkan1\nVersion: 1.4\nArchitecture: i386\nMulti-Arch: same\nDepends: libc6\nFilename: pool/l/v_i.deb\nSize: 1\n" Z64 "Description: v\n\n"
+    "Package: mesa-vulkan-drivers\nVersion: 25.0.7-2\nArchitecture: i386\nMulti-Arch: same\nDepends: libvulkan1, libc6\nFilename: pool/m/m1_i.deb\nSize: 1\n" Z64 "Description: m\n\n"
+    "Package: mesa-vulkan-drivers\nVersion: 25.0.7-2+deb13u1\nArchitecture: i386\nMulti-Arch: same\nDepends: libvulkan1, libc6\nFilename: pool/m/m2_i.deb\nSize: 1\n" Z64 "Description: m\n\n"
+    "Package: libpulse0\nVersion: 17\nArchitecture: i386\nMulti-Arch: same\nDepends: libc6\nFilename: pool/l/p_i.deb\nSize: 1\n" Z64 "Description: p\n\n"
+    "Package: libasound2-plugins\nVersion: 1.2.12-2\nArchitecture: i386\nMulti-Arch: same\nDepends: libpulse0, libc6\nFilename: pool/l/a_i.deb\nSize: 1\n" Z64 "Description: a\n\n";
+/* Valve's repository: steam-libs-i386 in its i386 list, the rest in its amd64 one */
+static const char *SV_VALVE_AMD64 =
+    "Package: steam-launcher\nVersion: 1:1.0.0.87\nArchitecture: amd64\nMulti-Arch: foreign\nDepends: libc6\nRecommends: steam-libs-amd64, steam-libs-i386\nFilename: pool/s/sl.deb\nSize: 1\n" Z64 "Description: s\n\n"
+    "Package: steam-libs-amd64\nVersion: 1:1.0.0.87\nArchitecture: amd64\nMulti-Arch: foreign\nDepends: libc6, libvulkan1\nRecommends: libasound2-plugins, mesa-vulkan-drivers\nFilename: pool/s/sla.deb\nSize: 1\n" Z64 "Description: s\n\n";
+static const char *SV_VALVE_I386 =
+    "Package: steam-libs-i386\nVersion: 1:1.0.0.87\nArchitecture: i386\nMulti-Arch: foreign\nDepends: libc6, libvulkan1, default-dbus-session-bus | dbus-session-bus\nRecommends: libasound2-plugins, mesa-vulkan-drivers\nFilename: pool/s/sli.deb\nSize: 1\n" Z64 "Description: s\n\n";
+/* i386 on, libc6 pair, the amd64 driver from the ISO at the older version */
+static const char *SV_STATUS =
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41-12\nArchitecture: amd64\nMulti-Arch: same\nDescription: c\n\n"
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41-12\nArchitecture: i386\nMulti-Arch: same\nDescription: c\n\n"
+    "Package: libvulkan1\nStatus: install ok installed\nVersion: 1.4\nArchitecture: amd64\nMulti-Arch: same\nDepends: libc6\nDescription: v\n\n"
+    "Package: mesa-vulkan-drivers\nStatus: install ok installed\nVersion: 25.0.7-2\nArchitecture: amd64\nMulti-Arch: same\nDepends: libvulkan1, libc6\nDescription: m\n\n"
+    "Package: dbus-user-session\nStatus: install ok installed\nVersion: 1\nArchitecture: amd64\nMulti-Arch: foreign\nProvides: default-dbus-session-bus, dbus-session-bus\nDescription: d\n\n";
+/* what a 0.8.8.9 test build left: Steam and its two library packages, no i386 Vulkan driver */
+static const char *SV_STEAM_STATUS =
+    "Package: steam-launcher\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: amd64\nMulti-Arch: foreign\nDepends: libc6\nRecommends: steam-libs-amd64, steam-libs-i386\nDescription: s\n\n"
+    "Package: steam-libs-amd64\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: amd64\nMulti-Arch: foreign\nDepends: libc6, libvulkan1\nRecommends: libasound2-plugins, mesa-vulkan-drivers\nDescription: s\n\n"
+    "Package: steam-libs-i386\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: i386\nMulti-Arch: foreign\nDepends: libc6, libvulkan1, default-dbus-session-bus | dbus-session-bus\nRecommends: libasound2-plugins, mesa-vulkan-drivers\nDescription: s\n\n"
+    "Package: libvulkan1\nStatus: install ok installed\nVersion: 1.4\nArchitecture: i386\nMulti-Arch: same\nDepends: libc6\nDescription: v\n\n";
+
+/* the version of a package after the plan: the plan's, else the installed one, else "" */
+static const char *ver_after(const Plan *p, const Status *st, const char *key) {
+    int i = item_at(p, key);
+    if (i >= 0) return p->items[i].version;
+    const StPkg *s = status_find(st, key, strlen(key));
+    return s ? s->version : "";
+}
+
+static void test_steam_vulkan(const char *dir) {
+    char md[600], sp[700], err[200];
+    snprintf(md, sizeof md, "%s/sv", dir);
+    mkdir(md, 0755);
+    IdxBuilder *b = idxb_new();
+    int deb = idxb_source(b, "http://deb", "trixie", "main", "trixie", "Debian", "Debian", 0, 0, 500);
+    idxb_packages(b, deb, SV_AMD64, strlen(SV_AMD64), "amd64");
+    idxb_packages_foreign(b, deb, SV_I386, strlen(SV_I386), "i386");
+    int valve = idxb_source(b, "https://repo.steampowered.com/steam", "stable", "steam", "stable", "Valve", "Valve", 0, 0, 500);
+    idxb_packages(b, valve, SV_VALVE_AMD64, strlen(SV_VALVE_AMD64), "amd64");
+    idxb_packages_foreign(b, valve, SV_VALVE_I386, strlen(SV_VALVE_I386), "i386");
+    CHECK(!idxb_write(b, md, "amd64", err, sizeof err), "sv: index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, md), "sv: open");
+    snprintf(sp, sizeof sp, "%s/status", md);
+    write_text(sp, SV_STATUS);
+    Status st = { 0 };
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 5, "sv: status %d", st.n);
+
+    Plan p;
+    PlanOpts o = { 0 };
+    /* the first Store builds: the three packages alone; Valve's Recommends are not taken, so no i386 driver */
+    const char *old[] = { "steam-launcher", "steam-libs-amd64", "steam-libs-i386:i386" };
+    plan_make(&x, &st, old, 3, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "steam-libs-i386:i386") && has(&p, PA_INSTALL, "libvulkan1:i386") &&
+          item_at(&p, "mesa-vulkan-drivers:i386") < 0 && item_at(&p, "libasound2-plugins:i386") < 0,
+          "sv: an install without Recommends leaves out the i386 Vulkan driver (the bug): %s", p.err);
+    plan_free(&p);
+    /* with --recommends, steam-libs-i386's Recommends resolve in its own architecture */
+    const char *sli[] = { "steam-libs-i386:i386" };
+    o.recommends = 1;
+    plan_make(&x, &st, sli, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "mesa-vulkan-drivers:i386") && has(&p, PA_INSTALL, "libasound2-plugins:i386") &&
+          has(&p, PA_INSTALL, "libpulse0:i386") && item_at(&p, "libasound2-plugins") < 0 && item_at(&p, "libpulse0") < 0,
+          "sv: Recommends of an i386 package are i386 ones: %s", p.err);
+    CHECK(!strcmp(ver_after(&p, &st, "mesa-vulkan-drivers:i386"), ver_after(&p, &st, "mesa-vulkan-drivers")),
+          "sv: --recommends: the mesa pair at one version (%s, %s)", ver_after(&p, &st, "mesa-vulkan-drivers:i386"), ver_after(&p, &st, "mesa-vulkan-drivers"));
+    plan_free(&p);
+    o.recommends = 0;
+    /* the catalog's "with" now (apt/catalog.json): the drivers come without --recommends */
+    const char *with[] = { "steam-launcher", "steam-libs-amd64", "steam-libs-i386:i386", "mesa-vulkan-drivers",
+                           "mesa-vulkan-drivers:i386", "libasound2-plugins:i386" };
+    plan_make(&x, &st, with, 6, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "mesa-vulkan-drivers:i386") && has(&p, PA_INSTALL, "libasound2-plugins:i386") &&
+          has(&p, PA_INSTALL, "libpulse0:i386") && has(&p, PA_INSTALL, "libvulkan1:i386") && item_at(&p, "libasound2-plugins") < 0,
+          "sv: Steam with its 32-bit Vulkan driver and ALSA plugins: %s", p.err);
+    {
+        const char *a = ver_after(&p, &st, "mesa-vulkan-drivers"), *i = ver_after(&p, &st, "mesa-vulkan-drivers:i386");
+        CHECK(*a && !strcmp(a, i), "sv: mesa-vulkan-drivers and :i386 at one version (%s, %s)", a, i);
+        a = ver_after(&p, &st, "libvulkan1"); i = ver_after(&p, &st, "libvulkan1:i386");
+        CHECK(*a && !strcmp(a, i), "sv: libvulkan1 pair at one version (%s, %s)", a, i);
+        CHECK(item_at(&p, "libc6") < 0 && item_at(&p, "libc6:i386") < 0, "sv: libc6 pair untouched");
+    }
+    plan_free(&p);
+    status_free(&st);
+
+    /* a Steam installed by a 0.8.8.9 test build */
+    {
+        FILE *f = fopen(sp, "w");
+        if (f) { fputs(SV_STATUS, f); fputs(SV_STEAM_STATUS, f); fclose(f); }
+    }
+    memset(&st, 0, sizeof st);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 9, "sv: status with Steam %d", st.n);
+    /* Update All never brings them: the installed steam-libs-i386 already recommended them (as apt's full upgrade) */
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && item_at(&p, "mesa-vulkan-drivers:i386") < 0 && item_at(&p, "libasound2-plugins:i386") < 0,
+          "sv: Update All leaves the old Steam without the driver: %s", p.err);
+    plan_free(&p);
+    /* the Store's Update on the Steam page asks for the missing "with" packages: the i386 driver joins the amd64
+     * one, and the pair ends at one version (the amd64 one moves up with it, never down) */
+    const char *missing[] = { "mesa-vulkan-drivers:i386", "libasound2-plugins:i386" };
+    o = (PlanOpts){ 0 };
+    plan_make(&x, &st, missing, 2, NULL, 0, &o, &p);
+    {
+        const char *a = ver_after(&p, &st, "mesa-vulkan-drivers"), *i = ver_after(&p, &st, "mesa-vulkan-drivers:i386");
+        CHECK(p.ok && has(&p, PA_INSTALL, "mesa-vulkan-drivers:i386") && has(&p, PA_INSTALL, "libasound2-plugins:i386") &&
+              has(&p, PA_INSTALL, "libpulse0:i386") && item_at(&p, "libvulkan1:i386") < 0 && *a && !strcmp(a, i) &&
+              ver_cmp(a, "25.0.7-2") >= 0, "sv: the missing parts added to an installed Steam, pair at %s/%s: %s", a, i, p.err);
+    }
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+}
+
 /* (0.8.8.9) A vendor package that owns its own source (Valve's steam-launcher): LordOS's bootstrap files go
  * only once the package is installed with its own list naming the repository and its own keyring holding
  * the pinned key. A fixture system tree and catalog, owned by whoever runs the test. */
@@ -1067,6 +1201,7 @@ int main(int argc, char **argv) {
     test_pins(dir);
     test_dpkg_owner(dir);
     test_multiarch(dir);
+    test_steam_vulkan(dir);
     test_handover(dir);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", dir);

@@ -481,7 +481,8 @@
       "kind": "games",
       "section": "commercial",
       "categories": ["Game"],
-      "with": ["steam-libs-amd64", "steam-libs-i386:i386"],
+      "with": ["steam-libs-amd64", "steam-libs-i386:i386", "mesa-vulkan-drivers", "mesa-vulkan-drivers:i386", "libasound2-plugins:i386"],
+      "keep": ["mesa-vulkan-drivers"],
       "source": {
         "type": "apt",
         "delivery": "direct",

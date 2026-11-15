@@ -124,7 +124,8 @@ function PlanView({ plan }) {
 // ---- package page ----
 
 // extras: packages installed with it (a catalog app's "with": Steam's steam-libs-i386:i386); withRemove: those
-// removed with it, when installed.
+// removed with it, when installed. When the app is installed and some extras are not (a catalog entry that gained
+// "with" packages after it was installed: Steam's 32-bit Vulkan drivers), Update installs the missing ones.
 function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
@@ -138,12 +139,16 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
   // the matching installed desktop app (for "Open")
   const desk = app && launcher.find((a) => a.kind === 'linux' && (`${a.desktopId}.desktop` === app.id || a.desktopId === app.id));
   const ask = (p) => setPlan(p);
-  const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name, ...extras] }) });
+  const missing = info.installed ? extras.filter((p) => !lord.pkg.info(p, {})?.installed) : [];
+  const doInstall = () => {
+    const names = info.installed && !info.upgradable ? missing : [name, ...extras];
+    ask({ kind: 'install', names, p: lord.pkg.plan({ install: names }) });
+  };
   const alsoRemove = withRemove.filter((p) => !!lord.pkg.info(p, {})?.installed);
   const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name, ...alsoRemove] }) });
   const confirm = () => {
     const extra = plan.p.items.some((i) => i.action === 'remove' && !i.requested);
-    if (plan.kind === 'install') runJob('pkg-install', [name, ...extras, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
+    if (plan.kind === 'install') runJob('pkg-install', [...plan.names, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
     else runJob('pkg-remove', [name, ...alsoRemove, ...(extra ? ['--cascade'] : [])].join(' '), t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
     setPlan(null);
   };
@@ -163,7 +168,7 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
         h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, app?.summary || info.summary),
         h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, marginTop: spacing.s } },
           primary,
-          info.upgradable && h(Button, { label: t('store.upgrade'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() }),
+          (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() }),
           info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doRemove() }),
           info.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158', marginLeft: spacing.xs } }, t('store.installedBadge')) : null))),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),

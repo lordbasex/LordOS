@@ -440,7 +440,10 @@ their cron job):
   as soon as `steam-launcher` is installed with its own list (naming the same URL and suite) and its own keyring
   (holding the pinned key), so only Valve's entry remains (`docs/PACKAGES.md`, "A vendor package that owns its own
   source"). Its source also says `"multiarch": ["i386"]`: the client is 32-bit, and Valve's repository serves
-  `steam-libs-i386` for i386 (`docs/PACKAGES.md`, "Multiarch"). The key LordOS pins is Valve's 2025 repository key
+  `steam-libs-i386` for i386 (`docs/PACKAGES.md`, "Multiarch"). Its `"with"` also names Debian's
+  `mesa-vulkan-drivers:i386`, `libasound2-plugins:i386` and `mesa-vulkan-drivers`, which Valve's library packages only
+  recommend (32-bit Vulkan games otherwise run on Lavapipe), and `"keep"` leaves the amd64 driver installed when Steam
+  is removed; `apt/build.sh check` finds those three in Debian trixie's signed index. The key LordOS pins is Valve's 2025 repository key
   (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, RSA 4096); Valve's `InRelease` is signed with it and with the
   2012 key (`BA18 16EF …`), and the engine needs one valid signature from a pinned key (checked with the real
   `InRelease` of 2026-07-15). Not yet installed on a LordOS system.

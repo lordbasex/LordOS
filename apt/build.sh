@@ -132,8 +132,17 @@ validate() {
         for c in $(jf "$id" '(.categories // [])[]'); do
             case "$c" in AudioVideo|Development|Education|Game|Graphics|Network|Office|Science|System|Utility) ;; *) die "$id: unknown category $c" ;; esac
         done
-        # optional packages the Store installs with it (0.8.8.9): Debian names, or name:i386 (multiarch)
-        for p in $(jf "$id" '(.with // [])[]'); do is_name "${p%:i386}" || die "$id: bad package $p in with"; done
+        # optional packages the Store installs with it (0.8.8.9): Debian names, or name:i386 (multiarch, only for a
+        # source that says "multiarch": ["i386"]); "keep": those of them removing the app leaves installed
+        for p in $(jf "$id" '(.with // [])[]'); do
+            is_name "${p%:i386}" || die "$id: bad package $p in with"
+            case "$p" in *:i386) jq -e --arg id "$id" '.apps[] | select(.id == $id) | (.source.multiarch // []) | index("i386") != null' "$CAT" >/dev/null \
+                || die "$id: $p in with needs \"multiarch\": [\"i386\"] in its source" ;; esac
+        done
+        for p in $(jf "$id" '(.keep // [])[]'); do
+            jq -e --arg id "$id" --arg p "$p" '.apps[] | select(.id == $id) | (.with // []) | index($p) != null' "$CAT" >/dev/null \
+                || die "$id: $p in keep is not in with"
+        done
         arches=$(jf "$id" '.arches[]')
         [ -n "$arches" ] || die "$id: no arches"
         for a in $arches; do case "$a" in amd64|arm64) ;; *) die "$id: unsupported arch $a" ;; esac; done
@@ -236,22 +245,77 @@ apt_release() {
 
 # apt_packages <id> <dir> <component> <arch>: verified, decompressed $dir/Packages.<component>.<arch>
 apt_packages() {
-    id=$1; t=$2; comp=$3; a=$4
-    url=$(jf "$id" .source.url); suite=$(jf "$id" .source.suite)
-    out=$t/Packages.$comp.$a
+    apt_index "$1" "$(jf "$1" .source.url)" "$(jf "$1" .source.suite)" "$2" "$3" "$4"
+}
+
+# apt_index <label> <url> <suite> <dir> <component> <arch>: $dir/Packages.<component>.<arch>, checked against the
+# SHA-256 and size in the verified $dir/Release (kept: a second call for the same list reuses it)
+apt_index() {
+    ai_l=$1; ai_u=$2; ai_s=$3; ai_t=$4; ai_c=$5; ai_a=$6
+    out=$ai_t/Packages.$ai_c.$ai_a
+    [ -f "$out" ] && return 0
     for ext in .xz .gz ""; do
-        p=$comp/binary-$a/Packages$ext
-        line=$(awk -v p="$p" '/^SHA256:/ { s = 1; next } /^[^ ]/ { s = 0 } s && $3 == p { print $1, $2; exit }' "$t/Release")
+        p=$ai_c/binary-$ai_a/Packages$ext
+        line=$(awk -v p="$p" '/^SHA256:/ { s = 1; next } /^[^ ]/ { s = 0 } s && $3 == p { print $1, $2; exit }' "$ai_t/Release")
         [ -n "$line" ] || continue
         want=${line%% *}; size=${line#* }
-        is_sha "$want" || die "$id: bad SHA-256 for $p in InRelease"
-        curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$t/raw" "$url/dists/$suite/$p" || die "$id: cannot download $p"
-        [ "$(sha256 "$t/raw")" = "$want" ] && [ "$(fsize "$t/raw")" = "$size" ] || die "$id: $p does not match InRelease"
-        case "$ext" in .xz) xz -dc "$t/raw" > "$out" ;; .gz) gzip -dc "$t/raw" > "$out" ;; *) mv "$t/raw" "$out" ;; esac
-        rm -f "$t/raw"
+        is_sha "$want" || die "$ai_l: bad SHA-256 for $p in InRelease"
+        curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$ai_t/raw" "$ai_u/dists/$ai_s/$p" || die "$ai_l: cannot download $p"
+        [ "$(sha256 "$ai_t/raw")" = "$want" ] && [ "$(fsize "$ai_t/raw")" = "$size" ] || die "$ai_l: $p does not match InRelease"
+        case "$ext" in .xz) xz -dc "$ai_t/raw" > "$out" ;; .gz) gzip -dc "$ai_t/raw" > "$out" ;; *) mv "$ai_t/raw" "$out" ;; esac
+        rm -f "$ai_t/raw"
         return 0
     done
-    die "$id: InRelease lists no $comp/binary-$a/Packages"
+    die "$ai_l: InRelease lists no $ai_c/binary-$ai_a/Packages"
+}
+
+# (0.8.8.9) Debian's own archive, for the "with" packages a vendor's repository doesn't serve (Steam's
+# mesa-vulkan-drivers:i386 and libasound2-plugins:i386, which Valve's steam-libs-i386 only recommends): trixie's
+# InRelease must carry a good signature by a key of Debian's archive keyring (this machine's
+# /usr/share/keyrings/debian-archive-keyring.gpg, $LORDOS_DEBIAN_KEYRING, or the tools container's), as on a
+# LordOS system; then the index is checked against it like a vendor's.
+DEBIAN_URL=https://deb.debian.org/debian
+DEBIAN_SUITE=trixie
+debian_release() {
+    dr_t=$1
+    [ -f "$dr_t/Release" ] && return 0
+    kr=${LORDOS_DEBIAN_KEYRING:-/usr/share/keyrings/debian-archive-keyring.gpg}
+    if [ -f "$kr" ]; then cp "$kr" "$dr_t/debian.gpg"
+    else
+        command -v docker >/dev/null 2>&1 || die "needs $kr (debian-archive-keyring) or docker"
+        tools_image
+        docker run --rm --platform linux/amd64 --network none "$TOOLS_IMAGE" cat /usr/share/keyrings/debian-archive-keyring.gpg > "$dr_t/debian.gpg" \
+            || die "cannot read Debian's archive keyring from $TOOLS_IMAGE"
+    fi
+    curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$dr_t/InRelease" "$DEBIAN_URL/dists/$DEBIAN_SUITE/InRelease" \
+        || die "cannot download Debian's $DEBIAN_SUITE InRelease"
+    gpgv --status-fd 3 --keyring "$dr_t/debian.gpg" --output "$dr_t/Release.new" "$dr_t/InRelease" 3> "$dr_t/status" 2>/dev/null \
+        || die "Debian's $DEBIAN_SUITE InRelease does not verify with Debian's archive keyring"
+    grep -q '^\[GNUPG:\] VALIDSIG ' "$dr_t/status" || die "Debian's $DEBIAN_SUITE InRelease has no valid signature"
+    [ "$(sed -n 's/^Origin: *//p' "$dr_t/Release.new" | head -n 1)" = Debian ] || die "Debian's InRelease is not Origin: Debian"
+    [ "$(sed -n 's/^Codename: *//p' "$dr_t/Release.new" | head -n 1)" = "$DEBIAN_SUITE" ] || die "Debian's InRelease is not for $DEBIAN_SUITE"
+    vu=$(sed -n 's/^Valid-Until: *//p' "$dr_t/Release.new" | head -n 1)
+    if [ -n "$vu" ]; then
+        e=$(epoch_of "$vu") || die "cannot read Valid-Until '$vu' of Debian's InRelease"
+        [ "$e" -gt "$(date -u +%s)" ] || die "Debian's $DEBIAN_SUITE InRelease expired ($vu)"
+    fi
+    mv "$dr_t/Release.new" "$dr_t/Release"
+}
+
+# with_record <Packages file> <name> <arch> <foreign>: true when it has the package for that architecture (or
+# "all", for a native one); a foreign (i386) one must be built for it and be Multi-Arch same, foreign or allowed,
+# as the engine needs to install it next to amd64 packages
+with_record() {
+    awk -v n="$2" -v a="$3" -v f="$4" 'BEGIN { RS = "" } {
+        pn = pa = pm = ""; k = split($0, L, "\n")
+        for (i = 1; i <= k; i++) {
+            if (L[i] ~ /^Package: /) pn = substr(L[i], 10); else if (L[i] ~ /^Architecture: /) pa = substr(L[i], 15)
+            else if (L[i] ~ /^Multi-Arch: /) pm = substr(L[i], 13)
+        }
+        if (pn != n) next
+        if (f) { if (pa == a && (pm == "same" || pm == "foreign" || pm == "allowed")) ok = 1 }
+        else if (pa == a || pa == "all") ok = 1
+    } END { exit !ok }' "$1"
 }
 
 # apt_newest <id> <Packages file> <arch>: "<version> <sha256> <size> <filename>" of the newest $package
@@ -304,17 +368,30 @@ do_apt() {
         done
         [ "$found" = 1 ] || die "$id: no $pkg for $a in any component"
     done
-    # (0.8.8.9) the i386 packages the Store installs with it ("with": name:i386) are in the vendor's i386 index
-    for m in $(jf "$id" '(.source.multiarch // [])[]'); do
-        for w in $(jf "$id" '(.with // [])[]'); do
-            case "$w" in *:"$m") n=${w%:*} ;; *) continue ;; esac
-            found=0
+    # (0.8.8.9) every package the Store installs with it ("with": name, or name:i386) is in the vendor's index for
+    # that architecture (each of the source's arches for a plain name), or else in Debian trixie's signed main index
+    mkdir -p "$t/debian"
+    for w in $(jf "$id" '(.with // [])[]'); do
+        case "$w" in
+            *:*) n=${w%:*}; was=${w#*:}; foreign=1 ;;
+            *) n=$w; was=$(jf "$id" '.source.arches[]'); foreign= ;;
+        esac
+        for m in $was; do
+            found=
             for comp in $(jf "$id" '.source.components[]'); do
                 apt_packages "$id" "$t" "$comp" "$m"
-                awk -v n="$n" 'BEGIN { RS = "" } $0 ~ ("(^|\n)Package: " n "\n") { f = 1 } END { exit !f }' "$t/Packages.$comp.$m" && { found=1; break; }
+                with_record "$t/Packages.$comp.$m" "$n" "$m" "$foreign" && { found=vendor; break; }
             done
-            [ "$found" = 1 ] || die "$id: no $n for $m in the vendor's index"
-            say "  ok $id: $n ($m) in the vendor's index"
+            if [ -z "$found" ]; then
+                debian_release "$t/debian"
+                apt_index "Debian $DEBIAN_SUITE" "$DEBIAN_URL" "$DEBIAN_SUITE" "$t/debian" main "$m"
+                with_record "$t/debian/Packages.main.$m" "$n" "$m" "$foreign" && found=debian
+            fi
+            case "$found" in
+                vendor) say "  ok $id: with $n ($m) in the vendor's index" ;;
+                debian) say "  ok $id: with $n ($m) in Debian $DEBIAN_SUITE's signed index" ;;
+                *) die "$id: with $w: no $n for $m in the vendor's index or Debian $DEBIAN_SUITE's main${foreign:+ (built for $m, Multi-Arch same, foreign or allowed)}" ;;
+            esac
         done
     done
     rm -rf "$t"
