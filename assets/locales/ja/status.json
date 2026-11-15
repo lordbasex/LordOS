@@ -4,6 +4,8 @@
   "disk.cancelling": "キャンセルしています",
   "disk.ejected": "取り出しました",
   "disk.erased": "消去しました",
+  "disk.readOnlyHibernated": "{name} を読み取り専用でマウントしました：もう一方のオペレーティングシステムが完全にシャットダウンされていません（高速スタートアップまたは休止状態）。書き込むには完全にシャットダウンしてください。",
+  "disk.readOnlyUnchecked": "{name} を読み取り専用でマウントしました：別のオペレーティングシステムが休止状態のままにしたかどうかを確認できませんでした。",
   "disk.rereadWarning": "警告: カーネルがパーティションテーブルを再読み込みしませんでした ({errno})",
   "disk.unmounted": "マウント解除しました",
   "disk.unmountedPath": "{path} をマウント解除しました",

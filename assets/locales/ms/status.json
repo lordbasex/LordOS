@@ -4,6 +4,8 @@
   "disk.cancelling": "Membatalkan",
   "disk.ejected": "Dikeluarkan",
   "disk.erased": "Dipadam",
+  "disk.readOnlyHibernated": "{name} dilekapkan baca sahaja: sistem pengendalian yang lain tidak dimatikan sepenuhnya (permulaan pantas atau hibernasi). Matikannya sepenuhnya untuk menulis padanya.",
+  "disk.readOnlyUnchecked": "{name} dilekapkan baca sahaja: tidak dapat disemak sama ada sistem pengendalian lain meninggalkannya dalam hibernasi.",
   "disk.rereadWarning": "Amaran: kernel tidak membaca semula jadual partition ({errno})",
   "disk.unmounted": "Dinyahlekap",
   "disk.unmountedPath": "{path} dinyahlekap",

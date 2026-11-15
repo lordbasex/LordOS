@@ -7,7 +7,7 @@
   "images": "Ảnh đĩa",
   "systemShort": "hệ thống",
   "systemBadge": "Ổ đĩa hệ thống",
-  "systemNote": "Đây là ổ đĩa hệ thống: LordOS không cho phép định dạng, xóa hay tháo gắn kết nó từ đây.",
+  "systemNote": "Đây là ổ đĩa hệ thống: LordOS không cho phép định dạng hay xóa nó. Quản trị viên có thể gắn kết các phân vùng trống của nó.",
   "adminNote": "Chỉ quản trị viên mới có thể thay đổi ổ đĩa bên trong.",
   "readOnlyNote": "Thiết bị chỉ đọc.",
   "partNumber": "Phân vùng {n}",

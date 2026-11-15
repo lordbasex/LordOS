@@ -7,7 +7,7 @@
   "images": "Obrazy",
   "systemShort": "systemowy",
   "systemBadge": "Dysk systemowy",
-  "systemNote": "To dysk systemowy: LordOS nie pozwala go stąd formatować, wymazywać ani odmontowywać.",
+  "systemNote": "To dysk systemowy: LordOS nie pozwala go formatować ani wymazywać. Administrator może zamontować jego wolne partycje.",
   "adminNote": "Tylko administrator może zmieniać dyski wewnętrzne.",
   "readOnlyNote": "Urządzenie jest tylko do odczytu.",
   "partNumber": "Partycja {n}",

@@ -32,5 +32,11 @@ To inspect and prepare disks and USB sticks, like GNOME Disks.
 
 Before erasing anything, a dialog shows exactly what will be lost (disk, partitions, where they
 are mounted and how much data they hold) and you have to type the disk's name. **The system disk
-cannot be formatted, erased or unmounted** from here. Internal disks can only be changed by an
+cannot be formatted or erased** from here. Internal disks can only be changed by an
 administrator; USB sticks by any user.
+
+An administrator can mount a **free partition of the system disk**, such as another operating
+system's partition when both are installed on the same disk. Partitions in use (mounted, encrypted,
+swap) and the ones the system keeps for itself (EFI, boot, reserved or recovery) are never offered.
+If the other operating system was not shut down completely (fast startup or hibernation), its
+partition is mounted read-only: shut it down fully to write to it.

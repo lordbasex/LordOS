@@ -7,7 +7,7 @@
   "images": "Immagini",
   "systemShort": "sistema",
   "systemBadge": "Disco di sistema",
-  "systemNote": "Questo è il disco di sistema: LordOS non ti permette di formattarlo, cancellarlo o smontarlo da qui.",
+  "systemNote": "Questo è il disco di sistema: LordOS non ti permette di formattarlo o cancellarlo. Un amministratore può montare le sue partizioni libere.",
   "adminNote": "Solo un amministratore può modificare i dischi interni.",
   "readOnlyNote": "Il dispositivo è di sola lettura.",
   "partNumber": "Partizione {n}",

@@ -4,6 +4,8 @@
   "disk.cancelling": "Atšaukiama",
   "disk.ejected": "Išstumta",
   "disk.erased": "Ištrinta",
+  "disk.readOnlyHibernated": "{name} prijungtas tik skaitymui: kita operacinė sistema nebuvo visiškai išjungta (greitasis paleidimas ar užmigdymas). Visiškai ją išjunkite, kad galėtumėte į jį rašyti.",
+  "disk.readOnlyUnchecked": "{name} prijungtas tik skaitymui: nepavyko patikrinti, ar kita operacinė sistema jo nepaliko užmigdyto.",
   "disk.rereadWarning": "Įspėjimas: branduolys iš naujo nenuskaitė skaidinių lentelės ({errno})",
   "disk.unmounted": "Atjungta",
   "disk.unmountedPath": "Atjungta {path}",

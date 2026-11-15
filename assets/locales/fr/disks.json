@@ -7,7 +7,7 @@
   "images": "Images",
   "systemShort": "système",
   "systemBadge": "Disque système",
-  "systemNote": "C’est le disque système : LordOS ne permet pas de le formater, de l’effacer ni de le démonter depuis cette app.",
+  "systemNote": "C’est le disque système : LordOS ne permet pas de le formater ni de l’effacer. Un administrateur peut monter ses partitions libres.",
   "adminNote": "Seul un administrateur peut modifier les disques internes.",
   "readOnlyNote": "L’appareil est en lecture seule.",
   "partNumber": "Partition {n}",

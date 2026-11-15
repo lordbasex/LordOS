@@ -20,7 +20,12 @@
  *     read-only (iso9660 and udf are read-only in DISK_KINDS) and never formatted, erased, renamed,
  *     written or asked for SMART;
  *   - never the system disk (disk_is_system: /, /usr, /var, /home, /boot, swap, live…), except
- *     to read its SMART;
+ *     to read its SMART, and for disk-mount and disk-unmount of one of its partitions (#122), by an
+ *     administrator: disk-mount takes only a partition that is free (disk_part_use: not mounted
+ *     anywhere, not held by LUKS/LVM/RAID, not an active swap, not opened exclusively by anyone) and
+ *     whose table entry is not one the system keeps (ESP, BIOS boot, MSR, Windows recovery…);
+ *   - NTFS is first mounted read-only in a private folder to read hiberfil.sys: a volume Windows left
+ *     hibernated (Fast Startup) is mounted read-only, never read-write (ntfs3 doesn't check it);
  *   - internal disks only for an administrator; removable ones (USB, cards) for any session user,
  *     like udisks;
  *   - only what is mounted under /media or /run/media is unmounted; anything else is refused;
@@ -66,6 +71,7 @@ typedef struct {
     int part;                           /* is a partition */
     int removable;
     int optical;                        /* an optical drive (sr*) */
+    int syspart;                        /* a partition of the system disk (disk-mount, disk-unmount) */
     uint64_t size;
 } Target;
 
@@ -93,14 +99,17 @@ static int known_kind(const char *n) {
 }
 
 /* want: 0 any, 1 whole disk only, 2 partition only; | OPTICAL_OK: an optical drive is accepted (mount,
- * unmount, eject; everything else refuses it). allow_system: read-only use (SMART): also allowed on the
- * system disk and for any user. */
+ * unmount, eject; everything else refuses it); | SYSPART_OK: a partition of the system disk is accepted
+ * (mount, unmount; an administrator only, and disk-mount checks it is free). allow_system: read-only use
+ * (SMART): also allowed on the system disk and for any user. */
 #define OPTICAL_OK 4
+#define SYSPART_OK 8
 static int target(const AdminReq *r, const char *name, int want, int allow_system, Target *t) {
     memset(t, 0, sizeof *t);
     if (!disk_valid_name(name) || !known_kind(name)) { admin_err("disk.badDevice", NULL); return -1; }
     t->optical = !strncmp(name, "sr", 2);
     if (t->optical && !(want & OPTICAL_OK)) { admin_err("disk.opticalReadOnly", "name", name, NULL); return -1; }
+    int syspart_ok = want & SYSPART_OK;
     want &= 3;
     char p[PATH_MAX], devno[32];
     snprintf(p, sizeof p, "/sys/class/block/%s/dev", name);
@@ -120,9 +129,13 @@ static int target(const AdminReq *r, const char *name, int want, int allow_syste
         admin_err("disk.notBlock", "name", t->dev, NULL);
         return -1;
     }
-    if (!allow_system && disk_is_system(t->disk)) { admin_err("disk.systemDisk", "name", t->disk, NULL); return -1; }
+    if (!allow_system && disk_is_system(t->disk)) {
+        if (!syspart_ok || !t->part) { admin_err("disk.systemDisk", "name", t->disk, NULL); return -1; }
+        t->syspart = 1;
+    }
     t->removable = disk_is_removable(t->disk);
-    if (!allow_system && !t->removable && !r->admin) { admin_err("disk.internalNeedsAdmin", NULL); return -1; }
+    /* the system disk's partitions are an administrator's even when it is removable (a live stick) */
+    if (!allow_system && (t->syspart || !t->removable) && !r->admin) { admin_err("disk.internalNeedsAdmin", NULL); return -1; }
     t->size = disk_size(name);
     return 0;
 }
@@ -225,6 +238,39 @@ static int unmount_disk(const Target *t) {
     return rc;
 }
 
+/* Refuses a device that is in use or (system disk) kept by its table; then asks the kernel itself: an
+ * O_EXCL open fails with EBUSY while anything has the device claimed (a mount, swap, dm, md, btrfs). */
+static int free_to_mount(const Target *t) {
+    switch (disk_part_use("", t->name, t->syspart)) {
+    case DISK_USE_FREE: break;
+    case DISK_USE_MOUNTED: admin_err("disk.alreadyMounted", "name", t->name, NULL); return -1;
+    case DISK_USE_HELD: case DISK_USE_SWAP: admin_err("disk.partInUse", "name", t->name, NULL); return -1;
+    case DISK_USE_RESERVED: admin_err("disk.partReserved", "name", t->name, NULL); return -1;
+    default: admin_err("disk.partUnknown", "name", t->name, NULL); return -1;
+    }
+    int fd = open(t->dev, O_RDONLY | O_EXCL | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0 && errno == EBUSY) { admin_err("disk.partInUse", "name", t->name, NULL); return -1; }
+    if (fd >= 0) close(fd);
+    return 0;
+}
+
+/* NTFS: whether Windows left the volume hibernated (Fast Startup). The kernel's ntfs3 mounts such a volume
+ * read-write without a word, and Windows then resumes over a file system changed under it. So the volume is
+ * first mounted read-only, nosuid, nodev, noexec in a folder only root can enter, hiberfil.sys's first bytes
+ * are read through it (nothing is parsed here), and it is unmounted. 1 hibernated, 0 not, -1 can't tell. */
+static int ntfs_hibernated(const Target *t) {
+    mkdir("/run/lordos", 0755);
+    char probe[] = "/run/lordos/disk-probe-XXXXXX";
+    if (!mkdtemp(probe)) return -1;
+    if (mount(t->dev, probe, "ntfs3", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL)) { rmdir(probe); return -1; }
+    int dfd = open(probe, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    int h = dfd >= 0 ? disk_ntfs_hibernated(dfd) : -1;
+    if (dfd >= 0) close(dfd);
+    if (umount2(probe, UMOUNT_NOFOLLOW)) umount2(probe, MNT_DETACH | UMOUNT_NOFOLLOW);
+    rmdir(probe);
+    return h;
+}
+
 static void sanitize_dir(const char *in, char *out, size_t n) {
     size_t o = 0;
     for (const unsigned char *p = (const unsigned char *)in; *p && o + 1 < n; p++) out[o++] = (*p < 0x20 || *p == '/' || *p == 0x7f) ? '_' : (char)*p;
@@ -235,8 +281,9 @@ static void sanitize_dir(const char *in, char *out, size_t n) {
 void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     (void)len;
     Target t;
-    if (target(r, arg, OPTICAL_OK, 0, &t)) return;
+    if (target(r, arg, OPTICAL_OK | SYSPART_OK, 0, &t)) return;
     if (disk_mounts(t.name, NULL, 0)) { admin_err("disk.alreadyMounted", "name", t.name, NULL); return; }
+    if (!t.optical && free_to_mount(&t)) return;
     char fs[32], label[256], uuid[96];
     disk_udev_prop(t.name, "ID_FS_TYPE", fs, sizeof fs);
     disk_fs_label(t.name, label, sizeof label);                      /* sanitize_dir removes / and control characters */
@@ -270,6 +317,9 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     if (f) { if (!fgets(ro, sizeof ro, f)) ro[0] = '0'; fclose(f); }
     /* a disc is always mounted read-only, whatever it holds */
     unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME | ((DISK_KINDS[k].ro || ro[0] == '1' || t.optical) ? MS_RDONLY : 0);
+    /* NTFS that Windows left hibernated, or that can't be checked: read-only, never read-write (#122) */
+    int hib = 0;
+    if (!strcmp(fs, "ntfs") && !(flags & MS_RDONLY) && (hib = ntfs_hibernated(&t))) flags |= MS_RDONLY;
     if (mount(t.dev, dir, DISK_KINDS[k].kernel, flags, opts[0] ? opts : NULL)) {
         int e = errno;
         rmdir(dir);
@@ -278,13 +328,15 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
         admin_err("disk.mountFailed", "name", t.name, "errno", lerr_errno(e), NULL);
         return;
     }
+    if (hib) admin_log(hib > 0 ? "disk.readOnlyHibernated" : "disk.readOnlyUnchecked", "name", t.name, NULL);
     admin_say("OK", "%s", dir);   /* i18n-ok */
 }
 
 void disk_act_unmount(const AdminReq *r, const char *arg, size_t len) {
     (void)len;
     Target t;
-    if (target(r, arg, OPTICAL_OK, 0, &t)) return;
+    /* a system disk's partition: only its mounts under /media (unmount_dev refuses anything mounted elsewhere) */
+    if (target(r, arg, OPTICAL_OK | SYSPART_OK, 0, &t)) return;
     if (t.part && !disk_mounts(t.name, NULL, 0)) { admin_err("disk.notMounted", "name", t.name, NULL); return; }
     if (t.part ? unmount_dev(t.name) : unmount_disk(&t)) return;
     admin_ok("disk.unmounted", NULL);

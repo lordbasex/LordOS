@@ -4,6 +4,8 @@
   "disk.cancelling": "正在取消",
   "disk.ejected": "已推出",
   "disk.erased": "已抹掉",
+  "disk.readOnlyHibernated": "{name} 已以只读方式装载：另一个操作系统没有完全关机（快速启动或休眠）。请将其完全关机后才能写入。",
+  "disk.readOnlyUnchecked": "{name} 已以只读方式装载：无法检查另一个操作系统是否让它处于休眠状态。",
   "disk.rereadWarning": "警告：内核未重新读取分区表（{errno}）",
   "disk.unmounted": "已卸载",
   "disk.unmountedPath": "已卸载 {path}",

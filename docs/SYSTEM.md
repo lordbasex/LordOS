@@ -35,7 +35,9 @@ The LordOS disk utility, like GNOME Disks.
 |---|---|
 | `server/src/disk/disk.c` | The list, without root, from three sources. **`/sys/block`:** size, removable, read-only, rotational, model. **The udev database** (`/run/udev/data/b<major>:<minor>`): file system, label, UUID, partition table and bus; udev already probed them, so the device is never opened. **`/proc/self/mountinfo`:** where each one is mounted. It also recognizes the system disk and watches for changes. |
 | `server/src/disk/smart.c` | ATA SMART and NVMe health log parsers: pure functions, no I/O |
+| `server/src/disk/diskuse.c` | Whether one partition is free to mount (0.8.8.9 in development, #122): mounted anywhere, held by a dm/md, an active swap, or (system disk) a table entry the system keeps; and the NTFS hibernation check. Used by `disk-mount` as root and by the list (`inuse`, `reserved`) |
 | `server/src/disk/disk_admin.c` | The helper's `disk-*` actions (root) |
+| `sdk/diskplaces.js` | What Files and Disks offer to mount or unmount, from the list (pure; `server/tests/diskplaces_test.mjs`) |
 | `server/src/disk/smartctl_admin.c`, `smartctl.c` | The helper's `smart-*` actions (smartmontools, root) and their pure checks |
 | `sdk/smart.js`, `sdk/smartparse.js` | `smart.info/health/test/abort/install`, the summaries the Monitor shows, and smartctl's JSON turned into one model |
 | `server/src/ui/js_disk.c`, `sdk/disks.js` | `lord.disks.list()`, `tools()`, `watch(on)`; in the SDK, `useDisks()` and `disks` |
@@ -61,10 +63,10 @@ All are in the closed table of `admin.c` (macro `DISK_ADMIN_ACTIONS` in `disk/di
 | Action | Argument | What it does |
 |---|---|---|
 | `disk-smart` | `disk` | Reads health. `LOG smart {…}` (summary), one `LOG attr {…}` per ATA attribute and `OK <ms>` |
-| `disk-mount` | `device` | Mounts at `/media/<user>/<label>` with `mount(2)`: `nosuid,nodev`, and on FAT, exFAT and NTFS (`ntfs3`) with the user's `uid=`/`gid=`. ISO 9660 and UDF are read-only, and a disc in an optical drive (`sr*`) always is. `OK <folder>` |
+| `disk-mount` | `device` | Mounts at `/media/<user>/<label>` with `mount(2)`: `nosuid,nodev`, and on FAT, exFAT and NTFS (`ntfs3`) with the user's `uid=`/`gid=`. ISO 9660 and UDF are read-only, and a disc in an optical drive (`sr*`) always is. A free partition of the system disk is accepted too, for an administrator (see "Partitions of the system disk"). NTFS that another operating system left hibernated is mounted read-only, with `LOG disk.readOnlyHibernated`. `OK <folder>` |
 | `share-mount` | `smb\|nfs`, private IPv4, share or export path, user, domain, password (one per line; the UI sends it with `{ quiet: true }`) | anyone. Mounts a network share at `/media/<user>/<share> on <address>` with the kernel's `cifs` or `nfs` client through `fsopen`/`fsconfig`/`fsmount`/`move_mount`, one call per option: `nosuid,nodev`, soft, short timeouts, SMB 2 or later. Everything is validated as root (`lan/lanaddr.c`); no names, no program, no shell. `OK <folder>` (`FILES.md`, "Network") |
 | `share-unmount` | folder | anyone. Only `/media/<user>/<one folder>`, and only if `/proc/self/mountinfo` says the last mount there is `cifs`, `smb3`, `nfs` or `nfs4` |
-| `disk-unmount` | `device` or `disk` | Unmounts whatever is under `/media` or `/run/media` (`umount2`) and removes the empty folder |
+| `disk-unmount` | `device` or `disk` | Unmounts whatever is under `/media` or `/run/media` (`umount2`) and removes the empty folder. On the system disk, only one of its partitions, by an administrator |
 | `disk-eject` | `disk` | Unmounts everything, flushes caches (`BLKFLSBUF`) and sends `START STOP UNIT` (eject). Over USB it also powers the device off (`/sys/block/<d>/device/delete`), like "Power Off" in GNOME Disks. An optical drive gets its door unlocked and `CDROMEJECT` (the tray opens; in a virtual machine the image is removed) |
 | `disk-format` | `device\nfat32\|exfat\|ext4\|ntfs\nlabel` | **Whole disk:** wipes the signatures (first and last MiB) and writes our own MBR table with one partition from 1 MiB. A `loop` image without `partscan` gets it turned on. Then the fixed-path `mkfs` runs. On ext4 the root belongs to the user (`-E root_owner=uid:gid`) |
 | `disk-label` | `partition\nlabel` | `fatlabel`, `exfatlabel`, `e2label` or `ntfslabel`. FAT, exFAT and NTFS must be unmounted |
@@ -94,11 +96,43 @@ and `disk-eject` or `disk-unmount` from its ⏏ (`FILES.md`).
     `transport: "optical"` and `ro: true`;
   - `/dev/<name>` is checked with `lstat`: a block device with the same major:minor as sysfs;
   - a "whole disk" action refuses partitions, and vice versa.
-- **The system disk is never touched** (`disk_is_system`). It is the disk of any partition that
+- **The system disk is never changed** (`disk_is_system`). It is the disk of any partition that
   holds `/`, `/usr`, `/var`, `/home`, `/boot`, `/boot/efi`, `/efi`, the live medium
   (`/run/live/medium`…) or an active swap. For a dm/md (LVM, LUKS, RAID), `slaves/` is followed
-  down to the real disks. Only `disk-smart` and the `smart-*` actions accept it: they only read,
-  or start the disk's own self-test, which does not change data.
+  down to the real disks. Format, rename, erase, eject, the image copy and the Imager refuse it.
+  `disk-smart` and the `smart-*` actions accept it: they only read, or start the disk's own
+  self-test, which does not change data. `disk-mount` and `disk-unmount` accept one of its free
+  partitions, below.
+- **Partitions of the system disk** (0.8.8.9 in development, #122). In a dual boot on one disk, the
+  other system's partition (NTFS, say) can be mounted under `/media/<user>/<label>` like any internal
+  disk. Root decides partition by partition (`target()` with `SYSPART_OK`, then `diskuse.c`), from the
+  kernel and the udev database, never from what the app sends:
+  - an administrator only, even when the system disk is removable (a live stick);
+  - never the whole disk, only a partition (`disk.systemDisk`);
+  - not mounted anywhere (mountinfo by major:minor; btrfs by its source, and a multi-device btrfs by
+    `/sys/fs/btrfs/<UUID>`), not held by anything (`holders/`: LUKS, LVM, RAID, bcache), not an active
+    swap (`disk.alreadyMounted`, `disk.partInUse`); then the kernel itself is asked: an `O_EXCL` open
+    that fails with `EBUSY` means something has it claimed (`disk.partInUse`);
+  - not a table entry the system keeps (`disk.partReserved`): GPT types EFI System, BIOS boot,
+    Microsoft Reserved, Windows Recovery, LDM metadata and data, XBOOTLDR, Linux swap, LVM, RAID and
+    LUKS, or a GPT entry with attribute bit 0 ("required", OEM recovery partitions); MBR types `0x05`,
+    `0x0f`, `0x85` (extended), `0xef`, `0x27`, `0x42`, `0x82`, `0x8e`, `0xfd` and `0xee`;
+  - an entry udev can't name (no `ID_PART_ENTRY_SCHEME`/`TYPE`, or a table other than GPT and MBR)
+    is refused (`disk.partUnknown`);
+  - `disk-unmount` takes only what is under `/media` or `/run/media`, as for any disk.
+  Other disks keep their rules: only "in use" is checked there, so another disk's EFI partition can
+  still be mounted. Nothing is mounted at boot; that would be a new action (later).
+- **NTFS left hibernated** (0.8.8.9 in development, #122). Debian 13's `ntfs3` (kernel 6.12) refuses a
+  dirty volume read-write unless `force` is given (never given here) and replays the journal, but it
+  does not look at `hiberfil.sys`: a volume that another operating system hibernated or left with
+  fast startup is mounted read-write, and that system then resumes over a file system changed under
+  it. So `disk-mount` first mounts every NTFS read-only, `nosuid,nodev,noexec`, in a folder only root
+  can enter (`/run/lordos/disk-probe-XXXXXX`), opens `hiberfil.sys` there (`O_NOFOLLOW`, a regular file
+  only, 4 bytes read: nothing is parsed by the helper), and unmounts it. `hibr` in any case means
+  hibernated; a link, a folder, a FIFO or a read error means it can't tell. In both cases the real
+  mount is read-only, never read-write, with a `LOG` line the apps show
+  (`disk.readOnlyHibernated`, `disk.readOnlyUnchecked`). No `hiberfil.sys`, an empty one, or another
+  header (`wake`) mounts read-write as before.
 - **Who can:**
   - internal disks, only an administrator (groups `sudo`, `admin` or `wheel`);
   - removable ones (USB, `removable=1`, `mmc` cards), any session user, like udisks with active
@@ -278,6 +312,8 @@ and runs `systemctl start smartmontools`.
 
 ```sh
 make -C server build/smart-test && ./server/build/smart-test   # `make -C server test` runs it too
+make -C server build/disk-test && (cd server && ./build/disk-test)   # #122: which partitions disk-mount takes
+node server/tests/diskplaces_test.mjs                # #122: what Files and Disks offer
 make -C server build/disk-cli
 ./server/build/disk-cli list                         # the same as lord.disks.list()
 sudo ./server/build/disk-cli -u lord -n disk-format 'sdc\nexfat\nPendrive'   # -n: as a non-administrator
@@ -329,6 +365,10 @@ modules. Since 0.8.7 `disk-mount` refuses FAT, exFAT, NTFS, HFS+ and APFS withou
 
 - **Disks over 2 TiB:** our table is MBR. GPT has to be written (with its CRC32 and the backup
   at the end).
+- **The system disk's partitions on real hardware** (#122): `disk-test` checks every refusal on a fake
+  tree, and the NTFS check on real folders, but a dual boot with a real NTFS volume left by fast
+  startup has not been mounted through the action yet (no VM with it). Mounting at boot (fstab or a
+  `.mount` unit, a new closed action) and a read-only/read-write choice are for later.
 - **Manual partitioning:** create, delete and resize partitions. Today the whole disk is
   formatted with one partition, or an existing partition without changing its type in the table.
 - **LUKS, LVM and RAID:**

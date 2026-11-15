@@ -4,6 +4,8 @@
   "disk.cancelling": "Ləğv edilir",
   "disk.ejected": "Çıxarıldı",
   "disk.erased": "Silindi",
+  "disk.readOnlyHibernated": "{name} yalnız oxumaq üçün qoşuldu: digər əməliyyat sistemi tam söndürülməyib (sürətli başlatma və ya qış yuxusu). Ona yazmaq üçün onu tam söndürün.",
+  "disk.readOnlyUnchecked": "{name} yalnız oxumaq üçün qoşuldu: başqa əməliyyat sisteminin onu qış yuxusunda qoyub-qoymadığını yoxlamaq mümkün olmadı.",
   "disk.rereadWarning": "Xəbərdarlıq: nüvə bölmə cədvəlini yenidən oxumadı ({errno})",
   "disk.unmounted": "Ayrıldı",
   "disk.unmountedPath": "{path} ayrıldı",

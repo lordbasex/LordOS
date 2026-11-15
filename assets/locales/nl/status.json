@@ -4,6 +4,8 @@
   "disk.cancelling": "Bezig met annuleren",
   "disk.ejected": "Uitgeworpen",
   "disk.erased": "Gewist",
+  "disk.readOnlyHibernated": "{name} is alleen-lezen gekoppeld: het andere besturingssysteem is niet volledig afgesloten (snel opstarten of sluimerstand). Sluit het volledig af om erop te kunnen schrijven.",
+  "disk.readOnlyUnchecked": "{name} is alleen-lezen gekoppeld: er kon niet worden gecontroleerd of een ander besturingssysteem het in sluimerstand heeft achtergelaten.",
   "disk.rereadWarning": "Waarschuwing: de kernel heeft de partitietabel niet opnieuw ingelezen ({errno})",
   "disk.unmounted": "Ontkoppeld",
   "disk.unmountedPath": "{path} ontkoppeld",

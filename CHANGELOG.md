@@ -218,6 +218,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   kinds refused, the key per profile read, written only when not `chrome`, ten bad forms refused; 518 checks),
   `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 345 checks) and
   `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
+- **Files and Disks mount a free partition of the system disk** ([#122](https://github.com/lordbasex/LordOS/issues/122),
+  thanks to pct06, approved by the maintainer on 2026-11-15 as "only mount by hand"). In a dual boot on one disk the
+  other operating system's partition (its NTFS volume, say) never showed up, because Files skipped the whole system
+  disk and the root side refused any partition on it. Now an administrator can mount and unmount it from Files' sidebar
+  or from Disks, under `/media/<user>/<label>` with `nosuid,nodev`, like any internal disk. Root decides partition by
+  partition, from the kernel and the udev database, never from what the app sends (`target()` in
+  `server/src/disk/disk_admin.c` with the new `SYSPART_OK`, and the new `server/src/disk/diskuse.c`): only
+  `disk-mount` and `disk-unmount` accept the system disk, only one of its partitions, only for an administrator (also
+  when the system disk is a removable live stick), and `disk-mount` refuses a partition that is mounted anywhere (by
+  major:minor; a btrfs by its source or, for a multi-device one, by `/sys/fs/btrfs/<UUID>`), held by anything
+  (`holders/`: LUKS, LVM, RAID, bcache), an active swap, or claimed by anyone in the kernel (an `O_EXCL` open answers
+  `EBUSY`), and on the system disk a table entry the system keeps for itself: the GPT types EFI System, BIOS boot,
+  the other system's Reserved, Recovery and LDM partitions, XBOOTLDR, Linux swap, LVM, RAID and LUKS, any GPT entry
+  with attribute bit 0 ("required", OEM recovery partitions), the MBR types `0x05`, `0x0f`, `0x85`, `0xef`, `0x27`,
+  `0x42`, `0x82`, `0x8e`, `0xfd` and `0xee`, and an entry udev can't name (fail closed). New codes
+  `disk.partInUse`, `disk.partReserved` and `disk.partUnknown`. Format, rename, erase, eject, the image copy and the
+  Imager still refuse the system disk, and another disk keeps its rules (only "in use" is checked there, so another
+  disk's EFI partition still mounts). Nothing is mounted at boot; that, and a read-only or read-write choice, are for
+  later. **NTFS left hibernated is never mounted read-write**: Debian 13's `ntfs3` (kernel 6.12) refuses a dirty volume
+  read-write but never looks at `hiberfil.sys`, so a volume left by fast startup or hibernation was mounted read-write
+  and the other system then resumed over a file system changed under it. `disk-mount` now mounts every NTFS read-only,
+  `nosuid,nodev,noexec`, in a folder only root can enter, reads 4 bytes of `hiberfil.sys` there (`O_NOFOLLOW`, a regular
+  file only; the helper parses nothing), and unmounts it; `hibr` in any case, a link, a folder, a FIFO or a read error
+  make the real mount read-only, with a `LOG` line that Files and Disks show (`disk.readOnlyHibernated`,
+  `disk.readOnlyUnchecked`). This applies to NTFS on any disk. `lord.disks.list()` gives each partition `inuse` and
+  `reserved` from the same check, and the new `sdk/diskplaces.js` decides what Files and Disks offer (Files' own copy
+  of that logic moved there). Disks' note on the system disk, the three new errors and the two new statuses are in all
+  35 languages; the Disks help article (en, es, pt), `docs/SYSTEM.md` and `docs/FILES.md` describe it. Tests: the new
+  `build/disk-test` (every refusal and the allowed case on a fake sysfs, udev and `/proc` tree of a dual-boot NVMe disk
+  and an MBR disk, the GPT and MBR type table, and the `hiberfil.sys` check on real folders; 82 checks) and
+  `tests/diskplaces_test.mjs`. Not checked on screen or on real hardware: no development VM has a dual boot or a
+  hibernated NTFS volume.
 
 ### Changed
 

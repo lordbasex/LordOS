@@ -7,7 +7,7 @@
   "images": "Images",
   "systemShort": "system",
   "systemBadge": "System disk",
-  "systemNote": "This is the system disk: LordOS does not let you format, erase or unmount it from here.",
+  "systemNote": "This is the system disk: LordOS does not let you format or erase it. An administrator can mount its free partitions.",
   "adminNote": "Only an administrator can change internal disks.",
   "readOnlyNote": "The device is read-only.",
   "partNumber": "Partition {n}",

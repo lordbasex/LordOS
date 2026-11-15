@@ -36,9 +36,28 @@ int  disk_identity(const char *name, char *model, size_t mn, char *serial, size_
 /* Mount points of the device (separated by \n) from mountinfo; returns how many. */
 int  disk_mounts(const char *name, char *out, size_t n);
 
+/* ---- what a partition is used for (diskuse.c, issue #122; tests/disk_test.c) ---- */
+enum { DISK_USE_FREE = 0, DISK_USE_MOUNTED, DISK_USE_HELD, DISK_USE_SWAP, DISK_USE_RESERVED, DISK_USE_UNKNOWN };
+/* 1 if the partition table entry is one the system keeps for itself: scheme "gpt" (type GUID, flags
+ * "0x…" with attribute bit 0 "required") or "dos" (type "0xNN"), as udev's ID_PART_ENTRY_* give them:
+ * ESP, BIOS boot, MSR, Windows recovery and LDM, XBOOTLDR, swap, LVM, RAID, LUKS, extended. */
+int  disk_part_type_reserved(const char *scheme, const char *type, const char *flags);
+/* Whether the device may be mounted under /media: DISK_USE_FREE, or MOUNTED (anywhere), HELD (holders:
+ * dm/md/bcache on top), SWAP (active). system: it is on the system disk, so its partition table entry
+ * must also be known (UNKNOWN) and not reserved (RESERVED). root: "" for the real system, a fake tree
+ * in tests (sys/, proc/, run/udev/data/ under it). */
+int  disk_part_use(const char *root, const char *name, int system);
+/* hiberfil.sys's first bytes: 1 if Windows hibernated (Fast Startup or hibernation: "hibr", any case). */
+int  disk_hiber_header(const unsigned char *b, size_t n);
+/* dirfd: the root of a mounted NTFS volume. 1 if hiberfil.sys says hibernated or can't be read (a
+ * link, not a file, an I/O error), 0 if there is none or it is not hibernated. */
+int  disk_ntfs_hibernated(int dirfd);
+
 /* List for JS: [{ name, model, vendor, serial, size, removable, transport, rotational, ro,
  * system, table, fstype, label, uuid, mountpoint, used, avail, partitions: [{ name, number, size,
- * fstype, label, uuid, partlabel, mountpoint, used, avail, start }] }]. malloc'd; NULL on failure.
+ * fstype, label, uuid, partlabel, parttype, mountpoint, used, avail, start, inuse, reserved }] }].
+ * inuse: mounted, held or swap (disk_part_use); reserved: an entry the system disk keeps, or unknown.
+ * malloc'd; NULL on failure.
  * An optical drive (sr*) is listed only while it holds a disc, with transport "optical" and ro true. */
 char *disk_list_json(void);
 /* Format and rename programs present on this machine: {"fat32":1,"exfat":1,"ext4":1,"ntfs":0} */

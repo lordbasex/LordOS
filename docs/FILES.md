@@ -47,7 +47,9 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
     `/run/media/$USER` (checked every 4 s; ⏏ on hover ejects a removable disk with `disk-eject` and
     unmounts another disk's partition with `disk-unmount`), every other disk with a file system that isn't mounted, a CD or DVD
     in an optical drive among them (dimmed; a click mounts it with `disk-mount` and opens it, a disc read-only; an internal one asks for an
-    administrator, as in Disks; the disk the system runs from is left out) and the Trash;
+    administrator, as in Disks; of the disk the system runs from, only a free partition, such as another operating system's NTFS in a dual
+    boot, is listed, and only an administrator can mount it: never one that is mounted, held by LUKS, LVM or RAID, a swap, or an EFI, boot,
+    reserved or recovery partition, #122; ⏏ unmounts it) and the Trash;
   - Color tags (they filter).
 
   A disc put in an optical drive during the session (a VirtualBox Guest Additions image, an install

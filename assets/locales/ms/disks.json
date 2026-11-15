@@ -7,7 +7,7 @@
   "images": "Imej",
   "systemShort": "sistem",
   "systemBadge": "Cakera sistem",
-  "systemNote": "Ini ialah cakera sistem: LordOS tidak membenarkan anda memformat, memadam atau menyahlekap cakera ini dari sini.",
+  "systemNote": "Ini ialah cakera sistem: LordOS tidak membenarkan anda memformat atau memadamnya. Pentadbir boleh melekapkan partisinya yang bebas.",
   "adminNote": "Hanya pentadbir boleh menukar cakera dalaman.",
   "readOnlyNote": "Peranti ini baca sahaja.",
   "partNumber": "Partisi {n}",

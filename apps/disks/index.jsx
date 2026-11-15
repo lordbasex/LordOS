@@ -5,10 +5,11 @@
 //
 // lord-server reads the list without root (lord.disks, refreshed by itself on mount and udev
 // events). Anything that changes something goes through the helper with the closed disk-*
-// actions, which validate again on the root side: never the system disk, and internal disks only
-// for an administrator.
+// actions, which validate again on the root side: never the system disk, except mounting and unmounting
+// one of its free partitions (#122: Windows' NTFS in a dual boot), and internal disks only for an
+// administrator.
 import {
-  needsDiskFormats, openDiskFormats, View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
+  partMountable, partUnmountable, statusText, needsDiskFormats, openDiskFormats, View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
   Toolbar as Bar, ToolbarButton, ToolbarSpacer, MenuButton, Hairline, GroupBox, FormRow, EmptyState, spacing, typeScale,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -167,15 +168,16 @@ function Sidebar({ list, sel, onSel }) {
 function DiskToolbar({ disk, part, onDialog, run, busy }) {
   const { t: tr } = useLocale();
   const t = useTheme();
-  const { can, use } = useCanTouch();
+  const { can, use, isAdmin } = useCanTouch();
   const box = useRef(null);
   const width = useWidth(box, 700);
-  const ok = can(disk), io = use(disk);
+  const ok = can(disk);
+  // the system disk: an administrator mounts and unmounts its free partitions, nothing else (#122)
+  const io = use(disk) || (disk.system && !!part && isAdmin);
   const target = part || disk;
-  const mountable = target.fstype && target.fstype !== 'swap' && target.fstype !== 'crypto_LUKS';
   const actions = [];
-  if (io && mountable && !target.mountpoint) actions.push(['mount', tr('disks.mount'), () => run('disk-mount', target.name, tr('disks.mounted'))]);
-  if (io && target.mountpoint) actions.push(['unmount', tr('disks.unmount'), () => run('disk-unmount', target.name, tr('disks.unmounted'))]);
+  if (io && partMountable(disk, target)) actions.push(['mount', tr('disks.mount'), () => run('disk-mount', target.name, tr('disks.mounted'))]);
+  if (io && partUnmountable(disk, target)) actions.push(['unmount', tr('disks.unmount'), () => run('disk-unmount', target.name, tr('disks.unmounted'))]);
   if (io && !part && disk.removable) actions.push(['eject', tr('disks.eject'), () => run('disk-eject', disk.name, tr('disks.ejected'))]);
   if (ok) actions.push(['format', tr('disks.format'), () => onDialog({ kind: 'format' })]);
   if (ok && part && ['vfat', 'exfat', 'ext2', 'ext3', 'ext4', 'ntfs'].includes(part.fstype)) actions.push(['label', tr('disks.rename'), () => onDialog({ kind: 'label' })]);
@@ -217,8 +219,10 @@ function Details({ disk, part, onDialog, autoCheck }) {
   const run = (action, arg, okText) => {
     setBusy(true);
     setMsg(null);
-    return admin.run(action, arg, null, { quiet: true }).then(
-      (r) => { setMsg({ ok: true, text: action === 'disk-mount' ? tr('disks.mountedAt', { path: r }) : okText }); },
+    // a LOG line says a mount is read-only (NTFS that Windows left hibernated)
+    let note = null;
+    return admin.run(action, arg, (line) => { note = statusText(line); }, { quiet: true }).then(
+      (r) => { setMsg({ ok: true, text: action === 'disk-mount' ? [tr('disks.mountedAt', { path: r }), note].filter(Boolean).join(' ') : okText }); },
       (e) => setMsg({ ok: false, text: e.message, formats: action === 'disk-mount' && needsDiskFormats((part || disk).fstype) })).finally(() => setBusy(false));
   };
   const target = part || disk;

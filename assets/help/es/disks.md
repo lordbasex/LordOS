@@ -32,5 +32,11 @@ Para ver y preparar los discos y pendrives, como GNOME Discos.
 
 Antes de borrar nada, un diálogo muestra exactamente qué se pierde (disco, particiones, dónde están
 montadas y cuántos datos tienen) y hay que escribir el nombre del disco. **El disco del sistema no
-se puede formatear, borrar ni desmontar** desde acá. Los discos internos solo los cambia un
+se puede formatear ni borrar** desde acá. Los discos internos solo los cambia un
 administrador; los pendrives, cualquier usuario.
+
+Un administrador puede montar una **partición libre del disco del sistema**, como la de otro
+sistema operativo instalado en el mismo disco. Nunca se ofrecen las particiones en uso (montadas,
+cifradas, swap) ni las que el sistema se reserva (EFI, arranque, reservadas o de recuperación). Si el
+otro sistema operativo no se apagó del todo (inicio rápido o hibernación), su partición se monta en
+solo lectura: apagalo por completo para poder escribir.

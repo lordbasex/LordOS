@@ -4,6 +4,8 @@
   "disk.cancelling": "Peruutetaan",
   "disk.ejected": "Poistettu asemasta",
   "disk.erased": "Tyhjennetty",
+  "disk.readOnlyHibernated": "{name} liitettiin vain luku -tilassa: toista käyttöjärjestelmää ei sammutettu kokonaan (nopea käynnistys tai horrostila). Sammuta se kokonaan, jotta voit kirjoittaa siihen.",
+  "disk.readOnlyUnchecked": "{name} liitettiin vain luku -tilassa: ei voitu tarkistaa, jättikö toinen käyttöjärjestelmä sen horrostilaan.",
   "disk.rereadWarning": "Varoitus: ydin ei lukenut osiotaulua uudelleen ({errno})",
   "disk.unmounted": "Irrotettu",
   "disk.unmountedPath": "{path} irrotettu",

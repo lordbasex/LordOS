@@ -4,6 +4,8 @@
   "disk.cancelling": "Membatalkan",
   "disk.ejected": "Dikeluarkan",
   "disk.erased": "Dihapus",
+  "disk.readOnlyHibernated": "{name} di-mount hanya-baca: sistem operasi lain tidak dimatikan sepenuhnya (startup cepat atau hibernasi). Matikan sepenuhnya untuk dapat menulis ke sana.",
+  "disk.readOnlyUnchecked": "{name} di-mount hanya-baca: tidak dapat diperiksa apakah sistem operasi lain meninggalkannya dalam keadaan hibernasi.",
   "disk.rereadWarning": "Peringatan: kernel tidak membaca ulang tabel partisi ({errno})",
   "disk.unmounted": "Dilepas",
   "disk.unmountedPath": "{path} dilepas",

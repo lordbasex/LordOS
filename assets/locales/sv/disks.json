@@ -7,7 +7,7 @@
   "images": "Avbilder",
   "systemShort": "system",
   "systemBadge": "Systemskiva",
-  "systemNote": "Det här är systemskivan: LordOS låter dig inte formatera, radera eller avmontera den härifrån.",
+  "systemNote": "Det här är systemskivan: LordOS låter dig inte formatera eller radera den. En administratör kan montera dess lediga partitioner.",
   "adminNote": "Bara en administratör kan ändra interna skivor.",
   "readOnlyNote": "Enheten är skrivskyddad.",
   "partNumber": "Partition {n}",

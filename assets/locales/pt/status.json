@@ -4,6 +4,8 @@
   "disk.cancelling": "Cancelando",
   "disk.ejected": "Ejetado",
   "disk.erased": "Apagado",
+  "disk.readOnlyHibernated": "{name} foi montado somente leitura: o outro sistema operacional não desligou por completo (inicialização rápida ou hibernação). Desligue-o por completo para gravar nele.",
+  "disk.readOnlyUnchecked": "{name} foi montado somente leitura: não foi possível verificar se outro sistema operacional o deixou hibernado.",
   "disk.rereadWarning": "Aviso: o kernel não releu a tabela de partições ({errno})",
   "disk.unmounted": "Desmontado",
   "disk.unmountedPath": "Desmontado {path}",

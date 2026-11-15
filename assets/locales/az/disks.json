@@ -7,7 +7,7 @@
   "images": "Obrazlar",
   "systemShort": "sistem",
   "systemBadge": "Sistem diski",
-  "systemNote": "Bu, sistem diskidir: LordOS onu buradan formatlamağa, silməyə və ya ayırmağa icazə vermir.",
+  "systemNote": "Bu, sistem diskidir: LordOS onu formatlamağa və ya silməyə icazə vermir. İnzibatçı onun boş bölmələrini qoşa bilər.",
   "adminNote": "Daxili diskləri yalnız administrator dəyişə bilər.",
   "readOnlyNote": "Cihaz yalnız oxumaq üçündür.",
   "partNumber": "Bölmə {n}",

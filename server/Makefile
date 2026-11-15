@@ -106,7 +106,7 @@ HDR += $(wildcard src/backup/*.h)
 # optional encryption uses Monocypher (vendored in third_party/monocypher; the object comes from mk/vault.mk)
 build/obj/backup/%.o: CPPFLAGS += -isystem ../third_party/monocypher
 # Disks (docs/SYSTEM.md): disks, partitions and mounts without root, our own SMART and the disk-* actions
-DISK_SRC := src/disk/disk.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/ui/js_disk.c
+DISK_SRC := src/disk/disk.c src/disk/diskuse.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/ui/js_disk.c
 SRC += $(DISK_SRC)
 HDR += $(wildcard src/disk/*.h)
 # LordOS Imager (docs/IMAGER.md): the imager-* actions (verified image → removable disk, downloads
@@ -1076,8 +1076,15 @@ build/disktemp-test: tests/disktemp_test.c src/monitor/disktemp.c src/monitor/di
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/disktemp_test.c src/monitor/disktemp.c
 	./$@ || { rm -f $@; exit 1; }
+# which partitions disk-mount may mount (src/disk/diskuse.c, #122): in use (mounted, held, swap, btrfs),
+# the system disk's reserved table entries (GPT and MBR), and Windows' hibernation file, on a fake tree
+test: build/disk-test
+build/disk-test: tests/disk_test.c src/disk/diskuse.c src/disk/disk.c src/disk/disk.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/disk_test.c src/disk/diskuse.c src/disk/disk.c
+	./$@ || { rm -f $@; exit 1; }
 # manual test of the disk-* actions (root and real devices; not part of `test`)
-DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/pkg/crypto.c \
+DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/diskuse.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/pkg/crypto.c \
                src/imager/imgverify.c src/imager/imager_admin.c tests/imager_key.c
 build/disk-cli: $(DISKCLI_SRC) src/disk/disk.h src/imager/imager_admin.h
 	@mkdir -p build

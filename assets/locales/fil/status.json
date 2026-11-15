@@ -4,6 +4,8 @@
   "disk.cancelling": "Kinakansela",
   "disk.ejected": "Na-eject",
   "disk.erased": "Nabura",
+  "disk.readOnlyHibernated": "Na-mount ang {name} bilang read-only: hindi ganap na nag-shut down ang ibang operating system (fast startup o hibernation). I-shut down ito nang buo para makasulat dito.",
+  "disk.readOnlyUnchecked": "Na-mount ang {name} bilang read-only: hindi masuri kung iniwan ito ng ibang operating system na naka-hibernate.",
   "disk.rereadWarning": "Babala: hindi muling binasa ng kernel ang partition table ({errno})",
   "disk.unmounted": "Na-unmount",
   "disk.unmountedPath": "Na-unmount ang {path}",

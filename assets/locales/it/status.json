@@ -4,6 +4,8 @@
   "disk.cancelling": "Annullamento in corso",
   "disk.ejected": "Espulso",
   "disk.erased": "Cancellato",
+  "disk.readOnlyHibernated": "{name} è stato montato in sola lettura: l’altro sistema operativo non si è spento del tutto (avvio rapido o ibernazione). Spegnilo completamente per poterci scrivere.",
+  "disk.readOnlyUnchecked": "{name} è stato montato in sola lettura: non è stato possibile verificare se un altro sistema operativo lo ha lasciato in ibernazione.",
   "disk.rereadWarning": "Attenzione: il kernel non ha riletto la tabella delle partizioni ({errno})",
   "disk.unmounted": "Smontato",
   "disk.unmountedPath": "{path} smontato",

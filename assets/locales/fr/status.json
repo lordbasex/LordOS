@@ -4,6 +4,8 @@
   "disk.cancelling": "Annulation",
   "disk.ejected": "Éjecté",
   "disk.erased": "Effacé",
+  "disk.readOnlyHibernated": "{name} a été monté en lecture seule : l’autre système d’exploitation ne s’est pas complètement arrêté (démarrage rapide ou veille prolongée). Arrêtez-le complètement pour pouvoir y écrire.",
+  "disk.readOnlyUnchecked": "{name} a été monté en lecture seule : impossible de vérifier si un autre système d’exploitation l’a laissé en veille prolongée.",
   "disk.rereadWarning": "Avertissement : le noyau n’a pas relu la table de partitions ({errno})",
   "disk.unmounted": "Démonté",
   "disk.unmountedPath": "{path} démonté",

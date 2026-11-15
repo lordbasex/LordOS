@@ -4,6 +4,8 @@
   "disk.cancelling": "S’està cancel·lant",
   "disk.ejected": "Expulsat",
   "disk.erased": "Esborrat",
+  "disk.readOnlyHibernated": "{name} s’ha muntat només de lectura: l’altre sistema operatiu no s’ha apagat del tot (inici ràpid o hibernació). Apaga’l del tot per poder-hi escriure.",
+  "disk.readOnlyUnchecked": "{name} s’ha muntat només de lectura: no s’ha pogut comprovar si un altre sistema operatiu el va deixar en hibernació.",
   "disk.rereadWarning": "Avís: el nucli no ha tornat a llegir la taula de particions ({errno})",
   "disk.unmounted": "Desmuntat",
   "disk.unmountedPath": "{path} desmuntat",

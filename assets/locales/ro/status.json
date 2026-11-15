@@ -4,6 +4,8 @@
   "disk.cancelling": "Se anulează",
   "disk.ejected": "Scos",
   "disk.erased": "Șters",
+  "disk.readOnlyHibernated": "{name} a fost montat doar în citire: celălalt sistem de operare nu s-a oprit complet (pornire rapidă sau hibernare). Opriți-l complet pentru a putea scrie pe el.",
+  "disk.readOnlyUnchecked": "{name} a fost montat doar în citire: nu s-a putut verifica dacă un alt sistem de operare l-a lăsat în hibernare.",
   "disk.rereadWarning": "Atenție: nucleul nu a recitit tabela de partiții ({errno})",
   "disk.unmounted": "Demontat",
   "disk.unmountedPath": "{path} a fost demontat",
