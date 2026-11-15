@@ -1,0 +1,44 @@
+name: Translation review
+description: You speak one of LordOS's languages natively? Tell us whether a translation reads right, or report a text that is wrong.
+title: "Translation review: "
+labels: ["translation-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for checking LordOS in your language. Many languages were translated quickly and have had no review by native speakers yet, so your eyes help. Confirming that a language reads well is as useful as reporting mistakes.
+
+        If you prefer to fix texts yourself, the [translators' guide](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md) shows how to edit the files in `assets/locales/<code>/` and open a pull request. This issue is public.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: Its name and code as LordOS shows it (for example "Deutsch, de").
+      placeholder: Deutsch, de
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: What is this review?
+      options:
+        - It reads well (a confirmation)
+        - Some texts are wrong or unnatural
+        - Many texts are wrong: the language needs a full review
+    validations:
+      required: true
+  - type: textarea
+    id: texts
+    attributes:
+      label: Texts to fix (optional for a confirmation)
+      description: For each one, where you saw it (app and screen), what it says, and what it should say. A screenshot helps.
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you help further?
+      options:
+        - Yes, I can review more of this language
+        - Yes, I can fix texts and open a pull request
+        - Not right now
+    validations:
+      required: true

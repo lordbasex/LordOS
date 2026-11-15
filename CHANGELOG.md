@@ -200,6 +200,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Translation review, asked of native speakers** (maintainer's decision, 2026-11-15: be honest that the new languages
+  have had no native review, and invite people to confirm or report): a new GitHub issue form, "Translation review"
+  (`.github/ISSUE_TEMPLATE/translation-review.yml`, label `translation-review`), to confirm that a language reads well or
+  to list texts to fix; docs/TRANSLATING.md's new section 7, the paper's limitations (en, es, pt) and the Languages
+  page's new-languages text link to it.
+
 - **Every language is complete, and the docs say so** (maintainer's business rule, 2026-11-15: a language is never
   partial, and every change reaches every language in each release or pre-release). docs/LANGUAGES.md's introduction
   names the 32 languages as complete (12,436 keys each) and states the rule, the `i18n-check` count is 12,436 keys

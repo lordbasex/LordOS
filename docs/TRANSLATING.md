@@ -200,3 +200,12 @@ pre-release: whoever adds or changes `assets/locales/en/` adds or updates the sa
 that piece of work, and `node tools/i18n-check.mjs` must show every language at `N/N keys` before a release. A
 reworded English text gets the same rewording in every language, not just a new key. If you speak one of the
 languages, reviews of these texts are welcome as pull requests too.
+
+## 7. Native review
+
+The 26 languages added on 2026-11-12 were completed quickly (2026-11-15) and have had no review by native speakers
+yet; the same holds for French. Native speakers are invited to confirm that a language reads well, or to report texts
+that are wrong or unnatural, through the
+[Translation review](https://github.com/lordbasex/LordOS/issues/new?template=translation-review.yml) issue form
+(label `translation-review`), or to fix them directly with a pull request as above. A confirmation is as useful as a
+correction: it is how a language stops being "not reviewed" in the paper and on the site.

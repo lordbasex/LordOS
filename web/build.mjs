@@ -1169,7 +1169,7 @@ ${(c.items || []).map((it) => {
       complete: langList.filter((x) => !x.partial && !x.next).map(card).join('\n'),
       // the next pre-release's languages, complete like the rest (a language ships only when complete); none once it ships
       fresh: langList.some((x) => x.next && !x.partial)
-        ? `<h3 class="lg-sub">${esc(L.newTitle)}</h3>\n<p class="lg-p">${esc(L.newText)}</p>\n` +
+        ? `<h3 class="lg-sub">${esc(L.newTitle)}</h3>\n<p class="lg-p">${esc(L.newText)} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n` +
           `<ul class="lg-grid lg-small">\n${langList.filter((x) => x.next && !x.partial).map(card).join('\n')}\n</ul>\n`
         : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
