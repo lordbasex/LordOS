@@ -61,6 +61,13 @@ static const Key keys[] = {
     { "org.gnome.desktop.interface", "accent-color", V_S },
     { "org.gnome.desktop.interface", "gtk-theme", V_S },
     { "org.gnome.desktop.wm.preferences", "button-layout", V_S },
+    /* GTK 4 on Wayland takes its input-method module from this setting before it looks for one itself, and when the
+     * portal leaves it out GTK uses its own default, "simple": LordOS's input methods then never reach a GTK 4 field.
+     * Served here instead of GTK_IM_MODULE in the environment, so only GTK on Wayland reads it: the variable also
+     * reached GTK 3 running on X11 (Electron, Chromium), which loaded the Wayland module on an X11 display and
+     * crashed (GitHub #150). An IBus or Fcitx user's own GTK_IM_MODULE still wins. A fixed value, never written to
+     * the GSettings keyfile: GTK 3 on Wayland picks text-input-v3 by itself. */
+    { "org.gnome.desktop.interface", "gtk-im-module", V_S },
 };
 #define NKEYS (sizeof keys / sizeof keys[0])
 
@@ -70,6 +77,7 @@ static const char *str_of(int i) {
     case 4: return acc_name;
     case 5: return gtk_theme;
     case 6: return buttons;
+    case 7: return "wayland";
     }
     return "";
 }

@@ -65,7 +65,8 @@ allows only X11 (see "VMware Tools"), Qt for an app whose Wayland platform plugi
 (Debian's `qtwayland5` or `qt6-wayland`, which no Qt app depends on). Until 0.8.8.7 Qt got `wayland` alone, and
 such an app (MusicBrainz Picard from the Store) stopped at start with "Could not find the Qt platform plugin
 \"wayland\"" (GitHub #96). The values are set in `server/src/wl/toolkitenv.h` and checked by
-`tests/toolkitenv_test.c`. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
+`tests/toolkitenv_test.c`. `GTK_IM_MODULE` is not set: GTK on Wayland takes its input-method module from the
+Settings portal (see "Input methods"). Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
 They also appear in the **app launcher**, in the Lord Classic theme's start menu and in the Store (see
@@ -424,10 +425,15 @@ LordOS's Korean, Japanese and Chinese input methods (`server/src/ime.c`) compose
 text field as they do in LordOS's own. The app enables its field with `zwp_text_input_v3` (GTK 3 and 4,
 Qt 6); while it is enabled on the window with the keyboard and an input method is on, each key goes
 through `ime.c` before the app (`ime_to_app` in `server/src/ui/js.c`), and a key the method uses never
-reaches the app, nor its release. GTK 4.18 doesn't choose its text-input module by itself when no input-method
-framework runs, so lord-server sets `GTK_IM_MODULE=wayland` for what it starts, unless the person set another
-(an IBus or Fcitx user keeps theirs). Checked on VM 127: a GTK 4 field got the Hangul composition (ㅎ as preedit)
-and then 한글. What it composes goes to the app (`wl_textinput.c`):
+reaches the app, nor its release. GTK 3 on Wayland chooses its text-input-v3 module by itself. GTK 4.18 reads its
+module from the Settings portal's `org.gnome.desktop.interface` `gtk-im-module` before it looks for one itself,
+and uses `simple` (no input method) when the portal leaves that key out, so LordOS's portal serves it as
+`wayland` (`server/src/ui/portal.c`, checked by `build/portal-gs-test`). An IBus or Fcitx user's own
+`GTK_IM_MODULE` still wins over the setting. lord-server doesn't export `GTK_IM_MODULE` (0.8.8.8 did): every GTK
+reads the variable, also GTK 3 running on X11 inside Electron and Chromium, which then loaded the Wayland module
+on an X11 display and crashed (GitHub #150). In 0.8.8.8, checked on VM 127 with the variable: a GTK 4 field got
+the Hangul composition (ㅎ as preedit) and then 한글; the portal route is not yet checked on a screen. What it
+composes goes to the app (`wl_textinput.c`):
 
 - `preedit_string` with the composition; the cursor (bytes) covers the focused segment of a Japanese
   conversion, otherwise it sits at the end. The app draws it in its own font, underlined.

@@ -1,7 +1,8 @@
 /* toolkitenv_test.c — the toolkit variables the session gives Linux apps (src/wl/toolkitenv.h):
  * Wayland first for GTK and Qt, each with X11 as a fallback, so a Qt app without Qt's Wayland
  * plugin opens through Xwayland instead of stopping at start (GitHub #96), and a GTK program that
- * allows only x11 still opens (GitHub #76); GTK_IM_MODULE is kept when the person set one. */
+ * allows only x11 still opens (GitHub #76). GTK_IM_MODULE is never exported, since GTK on X11 read it too
+ * (GitHub #150), and is kept when the person set one. */
 #include "wl/toolkitenv.h"
 
 #include <stdio.h>
@@ -33,10 +34,11 @@ int main(void) {
     CHECK("GTK: Wayland first", gdk && !strncmp(gdk, "wayland,", 8));
     CHECK("GTK: x11 as the fallback (#76)", gdk && has(gdk, ',', "x11"));
     CHECK("Firefox on Wayland", getenv("MOZ_ENABLE_WAYLAND") && !strcmp(getenv("MOZ_ENABLE_WAYLAND"), "1"));
-    CHECK("GTK_IM_MODULE set when unset", getenv("GTK_IM_MODULE") && !strcmp(getenv("GTK_IM_MODULE"), "wayland"));
+    /* the Settings portal gives GTK on Wayland its module; the environment would reach GTK on X11 too (#150) */
+    CHECK("GTK_IM_MODULE not exported (#150)", !getenv("GTK_IM_MODULE"));
     setenv("GTK_IM_MODULE", "ibus", 1);
     toolkit_env();
-    CHECK("GTK_IM_MODULE kept when the person set one", !strcmp(getenv("GTK_IM_MODULE"), "ibus"));
+    CHECK("GTK_IM_MODULE kept when the person set one", getenv("GTK_IM_MODULE") && !strcmp(getenv("GTK_IM_MODULE"), "ibus"));
     printf(bad ? "toolkitenv: %d of %d failed\n" : "toolkitenv: %d/%d ok\n", bad ? bad : n, n);
     return bad ? 1 : 0;
 }
