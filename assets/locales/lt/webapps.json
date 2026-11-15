@@ -113,6 +113,7 @@
   "store.seeMore": "Daugiau",
   "store.engineTitle": "LordOS žiniatinklio variklis dar neįdiegtas",
   "store.engineBody": "Žiniatinklio programos veikia LordOS žiniatinklio variklyje (paketas lordos-web). Pirmoji gauta programa jį įdiegia, tik vieną kartą; likusi LordOS dalis be jo veikia taip pat.",
+  "store.trademark": "Rodomi produktų pavadinimai, logotipai ir piktogramos yra atitinkamų savininkų prekių ženklai ir naudojami tik paslaugoms nurodyti. LordOS nėra su jais susijusi, jų nepatvirtinta ir neremiama. LordOS nekeičia svetainių: paleidžia jas tokias, kokias jos pateikiamos.",
   "get.engineTitle": "LordOS žiniatinklio variklio reikia vieną kartą",
   "get.engineBody": "{name} veikia LordOS žiniatinklio variklyje (paketas lordos-web), kuris dar neįdiegtas. Jis įdiegiamas vieną kartą, kartu su šia programa; kitoms žiniatinklio programoms jo nebereikės.",
   "get.engineSizes": "Atsisiuntimas: {download} · Diske: {disk}",

@@ -112,6 +112,7 @@
   "store.seeMore": "Daha çox gör",
   "store.engineTitle": "LordOS veb mühərriki hələ quraşdırılmayıb",
   "store.engineBody": "Veb tətbiqlər LordOS-un öz veb mühərrikində (lordos-web paketi) işləyir. Əldə etdiyiniz ilk tətbiq onu da bir dəfə quraşdırır; LordOS-un qalan hissəsi onsuz da eyni işləyir.",
+  "store.trademark": "Göstərilən məhsul adları, loqolar və ikonlar müvafiq sahiblərinin ticarət nişanlarıdır və yalnız xidmətləri tanıtmaq üçün istifadə olunur. LordOS onlarla əlaqəli deyil, onlar tərəfindən dəstəklənmir və sponsorluq edilmir. LordOS saytları dəyişmir: onları təqdim olunduğu kimi işə salır.",
   "get.engineTitle": "LordOS veb mühərriki bir dəfə lazımdır",
   "get.engineBody": "{name} LordOS-un hələ quraşdırılmamış öz veb mühərrikində (lordos-web paketi) işləyir. O, bu tətbiqlə birlikdə bir dəfə quraşdırılır; növbəti veb tətbiqlərə lazım olmur.",
   "get.engineSizes": "Endirmə: {download} · Diskdə: {disk}",

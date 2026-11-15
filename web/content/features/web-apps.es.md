@@ -39,7 +39,7 @@ La Tienda tiene una sección **Apps web**, un banner y un estante en Descubrir, 
 
 [[shot:2]]
 
-Cada app web tiene su página en la Tienda, como cualquier otra app: siempre al día (es la web), el día en que LordOS la probó, lo que ocupa en el disco, su memoria (la cifra típica medida, o la real mientras corre), quién la hace, el sitio verificado, el motor, los permisos que puede pedir, sus perfiles, el modo en segundo plano y sus límites conocidos.
+Cada app web tiene su página en la Tienda, como cualquier otra app: siempre al día (es la web), el día en que LordOS la probó, lo que ocupa en el disco, su memoria (la cifra típica medida, o la real mientras corre), quién la hace, el sitio verificado, el motor, los permisos que puede pedir, sus perfiles, el modo en segundo plano y sus límites conocidos. Debajo de la sección Apps web y al final de la página de cada app, la Tienda muestra el mismo aviso de marcas que esta página, en tu idioma, y dice que LordOS no modifica los sitios: los ejecuta tal como los sirven (*en desarrollo*, después de 0.8.8.8).
 
 [[shot:3]]
 

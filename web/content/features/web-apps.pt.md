@@ -39,7 +39,7 @@ A Loja tem uma seção **Apps web**, um banner e uma prateleira em Descobrir, e 
 
 [[shot:2]]
 
-Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas.
+Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas. Abaixo da seção Apps web e no fim da página de cada app, a Loja mostra o mesmo aviso de marcas desta página, no seu idioma, e diz que o LordOS não modifica os sites: executa-os como eles os servem (*em desenvolvimento*, depois do 0.8.8.8).
 
 [[shot:3]]
 

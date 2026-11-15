@@ -112,6 +112,7 @@
   "store.seeMore": "En savoir plus",
   "store.engineTitle": "Le moteur web de LordOS n'est pas encore installé",
   "store.engineBody": "Les apps web s'exécutent dans le moteur web de LordOS (le paquet lordos-web). La première app que vous obtenez l'installe aussi, une seule fois ; le reste de LordOS fonctionne de la même façon sans lui.",
+  "store.trademark": "Les noms de produits, logos et icônes affichés sont des marques de leurs propriétaires respectifs, utilisées uniquement pour identifier les services. LordOS n’est ni affilié à eux, ni approuvé, ni parrainé par eux. LordOS ne modifie pas les sites : il les exécute tels qu’ils sont servis.",
   "get.engineTitle": "Le moteur web de LordOS est nécessaire une seule fois",
   "get.engineBody": "{name} s'exécute dans le moteur web de LordOS (le paquet lordos-web), qui n'est pas encore installé. Il est installé une seule fois, avec cette app ; les prochaines apps web n'en ont pas besoin.",
   "get.engineSizes": "Téléchargement : {download} · Sur le disque : {disk}",

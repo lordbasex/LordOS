@@ -111,6 +111,7 @@
   "store.seeMore": "查看更多",
   "store.engineTitle": "尚未安裝 LordOS 的網頁引擎",
   "store.engineBody": "網頁 App 在 LordOS 自己的網頁引擎（lordos-web 套件）中執行。你取得的第一個 App 也會一併安裝它，只需一次；沒有它，LordOS 的其他部分運作方式不變。",
+  "store.trademark": "所顯示的產品名稱、標誌和圖示均為其各自所有者的商標，僅用於識別相應服務。LordOS 與它們沒有關聯，也未獲得它們的認可或贊助。LordOS 不修改這些網站，只按網站提供的原樣執行它們。",
   "get.engineTitle": "需要安裝一次 LordOS 的網頁引擎",
   "get.engineBody": "{name} 在 LordOS 自己的網頁引擎（lordos-web 套件）中執行，該引擎尚未安裝。它會隨這個 App 安裝一次；之後的網頁 App 不再需要。",
   "get.engineSizes": "下載：{download} · 磁碟空間：{disk}",

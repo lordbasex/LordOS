@@ -112,6 +112,7 @@
   "store.seeMore": "Tingnan Pa",
   "store.engineTitle": "Hindi pa naka-install ang web engine ng LordOS",
   "store.engineBody": "Tumatakbo ang mga web app sa sariling web engine ng LordOS (ang package na lordos-web). Ini-install din ito ng unang app na kukunin mo, minsan lang; gumagana pa rin nang pareho ang natitirang bahagi ng LordOS kahit wala ito.",
+  "store.trademark": "Ang mga pangalan ng produkto, logo at icon na ipinapakita ay mga trademark ng kani-kanilang may-ari, ginagamit lamang para tukuyin ang mga serbisyo. Ang LordOS ay hindi kaanib, inendorso o itinataguyod nila. Hindi binabago ng LordOS ang mga site: pinapatakbo nito ang mga ito kung paano nila ito inihahatid.",
   "get.engineTitle": "Kailangan ang web engine ng LordOS nang isang beses",
   "get.engineBody": "Tumatakbo ang {name} sa sariling web engine ng LordOS (ang package na lordos-web), na hindi pa naka-install. Isang beses lang itong ini-install, kasama ng app na ito; hindi na ito kailangan ng mga susunod na web app.",
   "get.engineSizes": "Download: {download} · Sa disk: {disk}",

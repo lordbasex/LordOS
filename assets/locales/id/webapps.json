@@ -111,6 +111,7 @@
   "store.seeMore": "Lihat Lainnya",
   "store.engineTitle": "Mesin web LordOS belum terinstal",
   "store.engineBody": "Aplikasi web berjalan di mesin web milik LordOS sendiri (paket lordos-web). Aplikasi pertama yang Anda dapatkan juga akan menginstalnya, sekali saja; bagian lain LordOS tetap berfungsi sama tanpanya.",
+  "store.trademark": "Nama produk, logo, dan ikon yang ditampilkan adalah merek dagang milik pemiliknya masing-masing, digunakan hanya untuk mengenali layanan. LordOS tidak berafiliasi dengan, didukung, atau disponsori oleh mereka. LordOS tidak mengubah situs: LordOS menjalankannya seperti yang disajikan.",
   "get.engineTitle": "Mesin web LordOS diperlukan sekali",
   "get.engineBody": "{name} berjalan di mesin web milik LordOS sendiri (paket lordos-web), yang belum terinstal. Mesin ini diinstal sekali, bersama aplikasi ini; aplikasi web berikutnya tidak memerlukannya lagi.",
   "get.engineSizes": "Unduhan: {download} · Di disk: {disk}",

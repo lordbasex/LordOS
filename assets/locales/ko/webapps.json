@@ -111,6 +111,7 @@
   "store.seeMore": "더 보기",
   "store.engineTitle": "LordOS 웹 엔진이 아직 설치되지 않았습니다",
   "store.engineBody": "웹 앱은 LordOS 자체 웹 엔진(lordos-web 패키지)에서 실행됩니다. 처음 받는 앱과 함께 한 번 설치되며, 엔진이 없어도 LordOS의 나머지 부분은 똑같이 작동합니다.",
+  "store.trademark": "표시된 제품 이름, 로고, 아이콘은 각 소유자의 상표이며 서비스를 식별하는 용도로만 사용됩니다. LordOS는 이들과 제휴하지 않았으며 이들의 보증이나 후원을 받지 않습니다. LordOS는 사이트를 수정하지 않고 제공되는 그대로 실행합니다.",
   "get.engineTitle": "LordOS 웹 엔진이 한 번 필요합니다",
   "get.engineBody": "{name}은(는) 아직 설치되지 않은 LordOS 자체 웹 엔진(lordos-web 패키지)에서 실행됩니다. 이 앱과 함께 한 번만 설치되며, 다음 웹 앱부터는 필요하지 않습니다.",
   "get.engineSizes": "다운로드: {download} · 디스크 사용량: {disk}",

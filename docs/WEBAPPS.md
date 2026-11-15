@@ -534,6 +534,11 @@ that was probed.
   the engine ("LordOS Web (WPE WebKit <version>)", the installed `libwpewebkit-2.0-1` from the package index, no
   program run), the permissions with their state (a link to Settings → Web Apps), the profiles (each one's data and
   memory, Open, New profile), background mode and the known limitations.
+- **The trademark notice** (0.8.8.9, in development; `apps/store/trademark.js`, `tests/store_trademark_scene.mjs`):
+  under the Web apps section's catalog and at the end of every app's page, a dimmed note in the person's language
+  (`webapps.store.trademark`): the product names, logos and icons shown are trademarks of their owners, used only to
+  identify the services; LordOS is not affiliated with, endorsed or sponsored by them; and LordOS doesn't change the
+  sites, it runs them as they serve them. The same notice as lordos.org's.
 - **The catalog's data for that page** (all optional, checked by `tests/webapps_model_test.mjs`): `publisher`;
   `verified` (`YYYY-MM-DD`, the day LordOS last checked the app on lord-web: left out until it is, and the page says
   "not tested yet"); `typicalMemoryMB` (one profile's Pss measured on LordOS: WhatsApp's 810 MB from the first check);

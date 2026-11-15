@@ -298,7 +298,7 @@ The first two columns describe those kinds of apps in general, not any product.
 
 [[figure:web-runtime]]
 
-Service names in the catalog (and the one in the figure) are trademarks of their owners, used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them.
+Service names in the catalog (and the one in the figure) are trademarks of their owners, used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them. In development after 0.8.8.8 (the latest release), the Store shows the same notice in all 35 interface languages, under its Web apps section and on each web app's page, together with the fact that LordOS runs the sites unmodified.
 
 ### 5.5 WebAssembly
 

@@ -112,6 +112,7 @@
   "store.seeMore": "Näytä lisää",
   "store.engineTitle": "LordOS:n verkkomoottoria ei ole vielä asennettu",
   "store.engineBody": "Verkkosovellukset toimivat LordOS:n omassa verkkomoottorissa (lordos-web-paketti). Ensimmäinen hakemasi sovellus asentaa myös sen, kerran; muu LordOS toimii samoin ilman sitä.",
+  "store.trademark": "Näytetyt tuotenimet, logot ja kuvakkeet ovat omistajiensa tavaramerkkejä, ja niitä käytetään vain palvelujen tunnistamiseen. LordOS ei ole sidoksissa niihin eivätkä ne tue tai sponsoroi sitä. LordOS ei muuta sivustoja: se ajaa ne sellaisina kuin ne tarjotaan.",
   "get.engineTitle": "LordOS:n verkkomoottori tarvitaan kerran",
   "get.engineBody": "{name} toimii LordOS:n omassa verkkomoottorissa (lordos-web-paketti), jota ei ole vielä asennettu. Se asennetaan kerran tämän sovelluksen mukana; seuraavat verkkosovellukset eivät sitä tarvitse.",
   "get.engineSizes": "Lataus: {download} · Levyllä: {disk}",

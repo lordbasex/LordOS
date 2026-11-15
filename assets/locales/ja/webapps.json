@@ -111,6 +111,7 @@
   "store.seeMore": "さらに表示",
   "store.engineTitle": "LordOS の Web エンジンはまだインストールされていません",
   "store.engineBody": "Web アプリは LordOS 独自の Web エンジン（lordos-web パッケージ）で動きます。最初にアプリを入手するときに一度だけ一緒にインストールされます。エンジンがなくても LordOS のほかの部分は同じように動きます。",
+  "store.trademark": "表示されている製品名、ロゴ、アイコンはそれぞれの所有者の商標であり、サービスを識別するためにのみ使用しています。LordOS はそれらの所有者と提携しておらず、承認や後援も受けていません。LordOS はサイトを改変せず、配信されたとおりに実行します。",
   "get.engineTitle": "LordOS の Web エンジンが一度だけ必要です",
   "get.engineBody": "{name} は LordOS 独自の Web エンジン（lordos-web パッケージ）で動きますが、まだインストールされていません。このアプリと一緒に一度だけインストールされ、次からの Web アプリには不要です。",
   "get.engineSizes": "ダウンロード：{download} · ディスク上：{disk}",

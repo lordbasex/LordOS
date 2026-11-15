@@ -112,6 +112,7 @@
   "store.seeMore": "Ona Zaidi",
   "store.engineTitle": "Injini ya wavuti ya LordOS bado haijasakinishwa",
   "store.engineBody": "Programu za wavuti huendeshwa katika injini ya wavuti ya LordOS yenyewe (kifurushi cha lordos-web). Programu ya kwanza unayopata huisakinisha pia, mara moja; sehemu nyingine ya LordOS hufanya kazi vile vile bila hiyo.",
+  "store.trademark": "Majina ya bidhaa, nembo na aikoni zinazoonyeshwa ni alama za biashara za wamiliki wake, zinatumika tu kutambulisha huduma. LordOS haihusiani nao, wala haijaidhinishwa au kufadhiliwa nao. LordOS haibadilishi tovuti: huziendesha jinsi zinavyotolewa.",
   "get.engineTitle": "Injini ya wavuti ya LordOS inahitajika mara moja",
   "get.engineBody": "{name} huendeshwa katika injini ya wavuti ya LordOS yenyewe (kifurushi cha lordos-web), ambayo bado haijasakinishwa. Husakinishwa mara moja, pamoja na programu hii; programu za wavuti zinazofuata hazihitaji.",
   "get.engineSizes": "Upakuaji: {download} · Kwenye diski: {disk}",

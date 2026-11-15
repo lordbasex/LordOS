@@ -14,6 +14,7 @@ import { debian } from './debian.js';
 import { Card, CardGrid, Featured, Pill, Shelf } from './ui.js';
 import { AddFromAddress, Origin, box, open } from './addweb.js';
 import { GetSteps, useGetWebApp } from './getweb.js';
+import { TrademarkNote } from './trademark.js';
 
 export const webCatalog = () => M.catalogApps(catalog, []);
 export const webCatalogData = catalog;
@@ -126,5 +127,6 @@ export function WebAppsPage({ query, onOpen }) {
         h(Button, { small: true, label: t('webapps.store.manage'), onClick: () => wm.open('settings', { args: { section: 'webapps', app: e.id, nonce: Date.now() } }) }),
         h(Button, { small: true, label: t('store.open'), onClick: () => open(e.id) }))))) : null,
     h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs, marginBottom: 6 } }, t('webapps.store.catalogTitle')),
-    h(CardGrid, null, ...list.map((a) => h(WebCard, { key: a.id, a, onOpen, onGet: setSheet }))));
+    h(CardGrid, null, ...list.map((a) => h(WebCard, { key: a.id, a, onOpen, onGet: setSheet }))),
+    h(TrademarkNote, { style: { marginTop: spacing.xl } }));
 }

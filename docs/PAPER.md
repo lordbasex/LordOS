@@ -399,7 +399,7 @@ lord-server (LordOS's display server, C): the web app registry, permissions aske
 
 *One lord-web process per app and profile, each with its own WPE WebKit processes and data; one scope per app, so its profiles share a firewall row and limits. LordOS doesn't change the site: the page is the service's own web interface, as the site serves it, and it never gets a LordOS API.*
 
-Service names in the catalog (and the one in the figure) are trademarks of their owners, used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them.
+Service names in the catalog (and the one in the figure) are trademarks of their owners, used only to identify the services; LordOS is not affiliated with, endorsed or sponsored by them. In development after 0.8.8.8 (the latest release), the Store shows the same notice in all 35 interface languages, under its Web apps section and on each web app's page, together with the fact that LordOS runs the sites unmodified.
 
 ### 5.5 WebAssembly
 

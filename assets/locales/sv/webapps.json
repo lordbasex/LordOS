@@ -112,6 +112,7 @@
   "store.seeMore": "Visa fler",
   "store.engineTitle": "LordOS webbmotor är inte installerad än",
   "store.engineBody": "Webbappar körs i LordOS egen webbmotor (paketet lordos-web). Den första appen du hämtar installerar den också, en gång; resten av LordOS fungerar likadant utan den.",
+  "store.trademark": "De produktnamn, logotyper och symboler som visas är varumärken som tillhör sina respektive ägare och används bara för att identifiera tjänsterna. LordOS är inte knutet till, godkänt eller sponsrat av dem. LordOS ändrar inte webbplatserna: det kör dem så som de levereras.",
   "get.engineTitle": "LordOS webbmotor behövs en gång",
   "get.engineBody": "{name} körs i LordOS egen webbmotor (paketet lordos-web), som inte är installerad än. Den installeras en gång, med den här appen; nästa webbappar behöver den inte.",
   "get.engineSizes": "Hämtning: {download} · På disken: {disk}",
