@@ -258,5 +258,9 @@ From the release notes (`CHANGELOG.md`, 0.8.5-beta, "Known issues and limitation
   ellipsis.
 - **A cloud account signed in with a password and a device code may ask for the code again after a logout or
   restart** (0.8.8.7 and later; rclone's issues 9658 and 9966; `CLOUD.md`).
-- **Steam** isn't in the Store: it needs i386 multiarch, which LordOS's package engine doesn't do yet
-  ([ROADMAP.md](ROADMAP.md)).
+- **Steam** (in development for 0.8.8.9, after 0.8.8.8, the latest release) is in Store → Commercial and Store → Games:
+  its page enables 32-bit (i386) packages first and then installs it with its 32-bit libraries
+  ([PACKAGES.md](PACKAGES.md), "Multiarch"). It hasn't been tried on a LordOS system yet. On its first start Valve's
+  `steamdeps` may open a terminal asking to update apt's lists (LordOS's engine doesn't use apt's cache); Steam starts
+  anyway when that is closed. A Steam installed by hand with apt before this keeps working: its i386 packages are now
+  upgraded with their amd64 pairs.

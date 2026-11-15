@@ -12,6 +12,56 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Steam in the Store, with i386 multiarch in the package engine** (maintainer's decision, 2026-11-15: "lo podria en
+  esta version que estamos validando v0.8.8.9"). Steam's client is 32-bit, so the engine now installs i386 packages
+  next to the amd64 ones, as apt does after `dpkg --add-architecture i386`; only that pair, only on amd64.
+  - *Enabling it:* a new closed admin action, `pkg-foreign-arch i386` (administrators only, `pkg.c`): exactly the value
+    `i386`, refused on any native architecture but amd64, runs only the fixed `/usr/bin/dpkg --add-architecture i386`
+    under the engine's lock and dpkg's frontend lock, and does nothing when i386 is already in dpkg's list. There is no
+    action to remove it. `lord.pkg.multiarch()` (read-only) says whether it is on.
+  - *Lists:* with i386 on, `pkg-update` also fetches each component's `binary-i386/Packages`, verified against the
+    signed `InRelease` like every list, only from a source that names i386 (`arch=`/`Architectures:`, as Valve's does) or
+    from Debian's own archive (`Origin: Debian`, no architectures named, i386 in its signed Release): Debian 13 serves the
+    ~70 libraries, and a vendor repository LordOS adds (it always names its architectures) never brings i386 unasked.
+    The i386 list's `all` records are left out.
+  - *Index and status:* an i386 package is its own `name:i386` entry in the index (`idxb_packages_foreign`) and in
+    dpkg's status (`StPkg.key`, from `Architecture`), so the two never mix; Provides keep their plain names; apt's pins
+    match `libc6:i386` as `libc6`. Search leaves the i386 libraries out; Installed and Updates list them, and the Store
+    labels them "(32-bit)" in Updates and in plans.
+  - *Resolver* (`resolve.c`): every relation is read in its owner's architecture, as dpkg does: an unqualified Depends
+    by the same architecture or by any architecture's `Multi-Arch: foreign` package (a foreign owner takes the native
+    one first), `name:any` also by `Multi-Arch: allowed`, `name:native` and `name:i386` by that architecture;
+    unqualified Conflicts and Breaks apply to every architecture except the owner's own package. A request may name
+    `name:i386`. The two architectures of one package can only be present together when both are `Multi-Arch: same`
+    (`pkg.multiarchConflict`), and then always at one version: changing one moves the other in the same plan ("Same
+    version as …"), a new i386 package takes the installed amd64 version when its candidate is older, the other is
+    never moved down, and a plan that would split a changed pair is refused (`pkg.multiarchSplit`); Update All moves
+    `libc6` and `libc6:i386` together or holds both. The pair goes side by side to one `dpkg --install` run, and a
+    native package whose i386 one is installed is removed as `name:amd64` (dpkg refuses the ambiguous name).
+  - *Valve's source:* `steam-launcher` ships its APT source as its own files (the conffile
+    `/etc/apt/sources.list.d/steam-stable.list`, `/usr/share/keyrings/steam.gpg`), so the catalog entry says so
+    (`"files": {"list", "keyring", "ownedBy"}`): `pkg-source-add steam` writes the usual `lordos-steam` bootstrap source
+    and key, and after every dpkg run and before every `pkg-update` the engine removes those two files once
+    `steam-launcher` is installed with its own list (root's, naming the same URL and suite) and keyring (holding the
+    pinned key), so apt never sees two entries for the repository; `pkg-source-remove` removes Valve's list only when
+    its package is gone and the list names nothing but that repository. A catalog source may say
+    `"multiarch": ["i386"]` (only that value, only for an amd64 entry): its `.sources` then lists `amd64 i386`.
+  - *The Store:* the `steam` catalog entry (Commercial; vendor Valve; "Proprietary (Steam Subscriber Agreement)";
+    Valve's 2025 repository key `DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB` pinned in `apt/keys/steam.asc`)
+    opens with "Steam needs 32-bit system libraries; LordOS will enable them" and **Enable and continue**, which runs
+    `pkg-foreign-arch i386`, `pkg-source-add steam` and `pkg-update`; the usual plan then installs `steam-launcher`,
+    `steam-libs-amd64` and `steam-libs-i386:i386` together, and removing Steam removes the three. A new optional catalog
+    field, `"categories": ["Game"]`, makes a Debian category's page list the catalog apps that declare it, and the
+    sidebar count them: Steam is in Commercial and in Games. New texts in all 35 languages. `apt/build.sh check`
+    validates the new fields and that Valve's i386 index has `steam-libs-i386`.
+  - *Tests:* `build/pkg-test` (207 checks, 43 new): request names, `:any`/`:native`/`:i386`, dpkg's architecture list,
+    an index from amd64 and i386 lists, status keys, Steam's libraries with their i386 dependencies and the native
+    D-Bus, `python3:any`, `Multi-Arch: allowed` and `no` refused twice, Update All moving the libc6 pair and holding a
+    pair whose i386 version is missing (also with no i386 lists at all), a split refused, removing `libc6:i386` alone,
+    Conflicts across architectures, the dpkg order of a pair, and the source handover over a fixture tree. Valve's real
+    `InRelease` verifies with `apt/keys/steam.asc` (`pkg-test pgp`). **Not yet tried on a LordOS system**
+    (`docs/PACKAGES.md`, "Multiarch").
+
 - **What the power button does when held for 5 seconds** (issue [#131](https://github.com/lordbasex/LordOS/issues/131),
   thanks to Touchgg): Settings → Energy (Battery on laptops) → Power button and lid has a second power-button row,
   "When the power button is held for 5 seconds", with the same choices (sleep, hibernate, shut down, do nothing), so a
@@ -451,6 +501,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Multiarch and Steam in the docs, the paper and the site** (2026-11-15): `docs/PACKAGES.md` ("Multiarch", "A vendor
+  package that owns its own source", the new action and `lord.pkg.multiarch()`), `docs/UPDATES.md` (Steam's catalog
+  entry), `apt/README.md` (`categories`, `with`, `multiarch`, `files.list`/`ownedBy`), `docs/ROADMAP.md` (the Steam
+  item built), `docs/TROUBLESHOOTING.md`, the paper (Commercial and the limits, en/es/pt) and
+  `docs/PAPER-VALIDATION.md`.
+
 - **Languages that already meet the visits rule, and the Store's Chromium-based browsers, in the docs and the
   paper** (2026-11-15). With lordos.org's statistics up to 15 November 2026 (people only), 96 countries have at least
   5 distinct visitors, and 16 of them speak a main language LordOS doesn't have: Norwegian (`nb`), Czech (`cs`),
@@ -634,6 +690,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   0.8.8 images) and `docs/COMPLIANCE.md`.
 
 ### Website
+
+- **Steam on the site** (2026-11-15): the Linux apps feature page and the games answer of the FAQ say Steam comes to
+  Store → Commercial and Games in 0.8.8.9 (in development, after 0.8.8.8, the latest release) with the 32-bit
+  libraries it needs, not yet tried on a LordOS system (en/es/pt).
 
 - **The visits chart shows every country** (maintainer's request, 2026-11-15: "si supuestamente son 153 paises quiero
   que los muestres"): the donut has a slice for each of the 153 countries, with no "other countries" slice (the
@@ -912,6 +972,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   points its "Source code" section there and to GitHub's source code request form.
 
 ### Fixed
+
+- **A one-line APT source with `arch=` before `signed-by=` lost its `signed-by`** (found while adding Steam, 2026-11-15):
+  the engine split the options with `strtok` and the inner split of the `arch=` list reset it, so Valve's
+  `deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] …` line was read without its keyring and verified with
+  apt's trusted keys instead (and failed). Both splits use `strtok_r` now (`parse_list` in `server/src/pkg/pkg.c`).
 
 - **The web apps model test covered only six languages** (`server/tests/webapps_model_test.mjs`): it expected exactly
   en, es, fr, it, lt and pt to have `webapps.json` and crashed on a language with no `store.json`. It now checks the

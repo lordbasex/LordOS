@@ -1027,7 +1027,12 @@ Besides the two items below, the work in development is listed in `CHANGELOG.md`
     its key, and its signed appstream data (not the website's API) as the Store's catalog, through a
     network path that needs approval like `lord-fetch`.
 
-- [ ] **Steam in the Store's Commercial section (needs multiarch)** — Debian 13's `steam-installer`
+- [x] **Steam in the Store's Commercial section (needs multiarch)** — *Built for 0.8.8.9 (in development, approved by
+  the maintainer on 2026-11-15; not yet tried on a LordOS system):* the closed admin action `pkg-foreign-arch i386`,
+  i386 lists from Debian and from Valve's repository, the index and dpkg's status keyed by (name, architecture), the
+  Multi-Arch rules in the resolver with `Multi-Arch: same` pairs kept at one version, a catalog entry whose vendor
+  package owns its source, and Steam in Store → Commercial and Store → Games (`PACKAGES.md`, "Multiarch").
+  The original item: Debian 13's `steam-installer`
   (contrib) depends on `steam-libs-i386`: 72 i386 packages with `--no-install-recommends`, after
   `dpkg --add-architecture i386` (checked in a `debian:trixie` container, 2026-10-27). LordOS's package
   engine is native-architecture only today (`binary-<native>` and `binary-all` indexes, foreign

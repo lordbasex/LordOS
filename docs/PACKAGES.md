@@ -97,6 +97,7 @@ The code is in `server/src/pkg/`:
 | `pkg-install-file` | `/home/user/…/file.deb [--allow-remove]` |
 | `pkg-source-add` | `<id>` (0.8.5): a catalog entry's vendor repository |
 | `pkg-source-remove` | `<id>` (0.8.5) |
+| `pkg-foreign-arch` | `i386` (0.8.8.9): lets dpkg install i386 packages, on amd64 only (see "Multiarch") |
 
 All of them run in a separate process (`A_FORK`) and require an administrator user.
 
@@ -112,7 +113,26 @@ same text, so the package's write changes nothing (two entries for one repositor
 Signed-By would make apt refuse every source); for Spotify, whose package adds `spotify.list` unless that
 file exists, the catalog's `optout` makes `pkg-source-add` create it empty (only when missing) and
 `pkg-source-remove` delete it only while it is still empty. Removing the last installed app of a
-repository removes that repository. The catalog itself is described in `UPDATES.md`, "Mirrored apps
+repository removes that repository.
+
+**A vendor package that owns its own source (0.8.8.9, in development; Steam).** Valve's `steam-launcher` ships its
+source as one of its own files: the conffile `/etc/apt/sources.list.d/steam-stable.list`
+(`deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam`) and
+the keyring `/usr/share/keyrings/steam.gpg`. LordOS can't write those names first (dpkg would find files it doesn't own),
+so the catalog entry says the package owns them: `"files": {"list": "steam-stable.list", "keyring": "steam.gpg",
+"ownedBy": "steam-launcher"}`. `pkg-source-add steam` writes the usual `lordos-steam.sources` and `lordos-steam.asc`
+as a bootstrap for the first installation (or nothing, when the package is already installed with its own source).
+After every `dpkg` run of the engine and before `pkg-update` reads the sources, `pkg_sources_handover()`
+(`sources_admin.c`) removes LordOS's two bootstrap files once, and only once, the owning package is installed, its list
+is a root-owned file not writable by others with an active `deb` line for the catalog's URL and suite, and its keyring
+holds a primary key with the catalog's fingerprint; so apt never sees two entries for one repository with different
+`Signed-By`. `pkg-source-remove steam` removes the bootstrap files if they are still there, and the vendor's list only
+when the package is gone (dpkg keeps a removed package's conffile while its keyring goes with it) and the list names
+nothing but that repository. Every name and field comes from the root-owned catalog and is checked root-side
+(`good_listname`: `[a-z0-9._-]`, ending in `.list`, never `lordos*`; the keyring as for `files`; the package a Debian
+name); nothing comes from the caller but the id. A catalog source may also say `"multiarch": ["i386"]` (the only value,
+only for an amd64-only entry): its `.sources` then lists `Architectures: amd64 i386`. One-line `.list` files are now
+read with `strtok_r`, so options after `arch=` (`signed-by=` in Valve's line) are no longer lost. The catalog itself is described in `UPDATES.md`, "Mirrored apps
 (catalog)".
 
 ### Browser defaults (0.8.8.9, in development)
@@ -295,7 +315,14 @@ Discover, the first install and an app's page".
   Edge, Spotify), from their makers' signed repositories with the key LordOS pins. The page says before
   anything is installed that LordOS can't review or fix what they do. Tested on the VMware machine:
   the three sources added, the three apps installed, `apt update` and the engine's update clean
-  afterwards. Steam needs i386 multiarch, which the engine doesn't do yet (see "Pending").
+  afterwards. **Steam** (0.8.8.9, in development; amd64) comes from Valve's signed repository
+  (`https://repo.steampowered.com/steam`, suite `stable`, component `steam`) with Valve's 2025 key pinned
+  (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, `apt/keys/steam.asc`). Its client is 32-bit, so its page first
+  says that it needs 32-bit system libraries and that LordOS will enable them; **Enable and continue** runs
+  `pkg-foreign-arch i386`, `pkg-source-add steam` and `pkg-update`, and the usual plan then installs `steam-launcher`,
+  `steam-libs-amd64` and `steam-libs-i386:i386` (about 70 i386 libraries from Debian 13) together; removing Steam
+  removes the three. Steam's entry also says `"categories": ["Game"]`, so Store → Games lists it (and counts it) next
+  to Debian's games. Not yet tried on a LordOS system (see "Multiarch").
 - **Third-party apps** (until 0.8.8.3 "Third-party suites") lists open source apps and suites from
   other projects: ArtCraft (0.8.8.1, its maker's `.deb` with a pinned SHA-256), and since 0.8.8.4
   VSCodium (#38) and Brave Browser (#39), both from their makers' signed repositories (amd64 and arm64)
@@ -469,6 +496,7 @@ lord.pkg.icon(name)             // path of the 64×64 PNG or null
 lord.pkg.releaseNotes(name, version)   // Markdown release notes a source published for that version, or null
 lord.pkg.featured()             // (0.8.5) the Store's banner from the signed LordOS repository, or null
 lord.pkg.rebootRequired()       // null, or the packages that asked for a restart (/run/reboot-required.pkgs)
+lord.pkg.multiarch()            // (0.8.8.9) { native, supported (amd64), i386 (enabled in dpkg's list) }; read-only
 lord.pkg.ownerOfApp(desktopId)  // (0.8.8.8) { name, essential } | null: the installed package whose files include
                                 //   that launcher app's .desktop file. Only the id comes from JS: lord-server finds the
                                 //   file the way the launcher does (apps.c apps_system_file, /usr/share/applications
@@ -619,14 +647,61 @@ sudo build/pkg-test run pkg-install "cowsay sl"
 
 - `Suggests` don't count for orphans (apt does by default); apt's `extended_states` is not
   touched.
-- **Packages from other architectures.** Today only the native one and `all` are used. What is
-  installed from another architecture (i386) is ignored when resolving.
+- **Other foreign architectures.** Since 0.8.8.9 the engine does i386 next to amd64 (below); no other pair
+  (armhf on arm64, say) is fetched or offered, though such packages already installed are read and kept.
 - **Versions or suites on request.** `package=version` or `package/backports` can't be requested
   yet.
 - **Flat repositories.** Those whose suite ends in `/` are not accepted.
 - **`control.tar.zst`** in local `.deb` files (Ubuntu); Debian's use xz.
 - **Incremental index diffs** (`Packages.diff`). Today the whole index is downloaded when it
   changes.
+
+## Multiarch (0.8.8.9, in development)
+
+Steam's client is 32-bit, so the engine installs i386 packages next to the amd64 ones, as apt does after
+`dpkg --add-architecture i386`. Only that pair: i386 is the one foreign architecture, and only on amd64.
+
+- **Enabling it.** The admin action `pkg-foreign-arch i386` (administrators only) takes exactly `i386`, refuses any
+  other value and any native architecture but amd64 (`pkg.foreignArchUnsupported`), and runs only the fixed
+  `/usr/bin/dpkg --add-architecture i386`, holding the engine's lock and dpkg's frontend lock; with i386 already in
+  dpkg's list (`/var/lib/dpkg/arch`) it does nothing (`pkg.foreignArchPresent`). There is no action to remove it.
+  `lord.pkg.multiarch()` says whether it is on.
+- **Which lists.** With i386 enabled, `pkg-update` also fetches `<component>/binary-i386/Packages`, verified against
+  the signed `InRelease` like every list, but only from a source that names i386 in its architectures (`arch=` or
+  `Architectures:`, as Valve's does) or, naming none, is Debian's own archive (`Origin: Debian`) whose signed Release
+  lists i386: so Debian's trixie, updates and security serve the ~70 libraries, and a vendor repository the catalog
+  adds (it always names its architectures) never brings i386 unasked. The i386 list's `Architecture: all` records are
+  left out (they come with the native list).
+- **The index and dpkg's status.** An i386 package is its own entry, named `name:i386` (`libc6:i386`), in the index
+  (`idxb_packages_foreign`) and in what is installed (`StPkg.key`, from the status `Architecture`), so the two
+  architectures never mix; Provides keep their plain names. Searches leave the i386 libraries out; Installed and
+  Updates list them, labelled "(32-bit)" in the Store. apt's pins name them as `libc6` (or `libc6:i386`).
+- **The resolver** (`resolve.c`) reads every relation in its owner's architecture, as dpkg does: an unqualified
+  Depends is satisfied by the same architecture, or by any architecture's package that is `Multi-Arch: foreign`
+  (so `steam-libs-i386:i386` uses the installed amd64 D-Bus, and amd64 `steam-launcher` can recommend the i386-only
+  `steam-libs-i386`); `name:any` also by a `Multi-Arch: allowed` one; `name:native` and `name:i386` name one
+  architecture; a foreign owner takes a native `Multi-Arch: foreign` package first. Unqualified Conflicts and Breaks
+  apply to every architecture, except the owner's own package in the other one. A request may name `name:i386`.
+- **`Multi-Arch: same` pairs.** The two architectures of one package can be installed together only when both are
+  `Multi-Arch: same` (else `pkg.multiarchConflict`), and then always at the same version: installing or upgrading one
+  moves the other to the same version in the same plan (reason "Same version as …"); a new i386 package takes the
+  installed amd64 version when its candidate is older; the other one is never moved down; and a plan that would leave
+  a changed pair at two versions is refused (`pkg.multiarchSplit`). Update All upgrades `libc6` and `libc6:i386`
+  together, or holds both when the i386 version isn't in the lists (i386 packages installed but no i386 lists): never
+  one without the other. `plan_order` puts the two side by side, never across a Pre-Depends cut, so one
+  `dpkg --install` unpacks both.
+- **dpkg.** Installs pass the `.deb` files; removals pass `name:i386`, and `name:amd64` for a native package whose
+  i386 one is installed too (dpkg refuses an ambiguous name).
+- **Tests** (`build/pkg-test`): request names; `:any`/`:native`/`:i386` qualifiers; dpkg's architecture list; an index
+  from an amd64 and an i386 list (the i386 `all` records left out, Provides of both architectures); status keys;
+  Steam's libraries resolved with their i386 dependencies and the native D-Bus; a native Recommends of an i386-only
+  foreign package; `python3:any` by `python3:i386`; `python3` (allowed) refused twice; Update All moving the libc6
+  pair together and holding a pair whose i386 version is missing; libc6 alone bringing libc6:i386; a split refused;
+  removing `libc6:i386` without touching libc6; unqualified Conflicts across architectures; a `Multi-Arch: no`
+  package refused in the other architecture; a new `libc6:i386` at the installed amd64 version; no i386 lists at all;
+  the dpkg order of a pair; and the vendor source handover over a fixture tree. Valve's real `InRelease` verifies with
+  `apt/keys/steam.asc`. **Not yet tried on a LordOS system**: enabling i386, `pkg-update` with Debian's and Valve's
+  i386 lists, installing Steam and running it, Update All with the pair, removing it.
 
 ## HTTPS (0.8.5)
 
