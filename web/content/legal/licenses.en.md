@@ -32,6 +32,7 @@ These components live in the LordOS repository (`third_party/` and `assets/`) an
 | JetBrains Mono | terminal and code text | SIL Open Font License 1.1 |
 | DB-IP Lite Country | offline IP-to-country lookup in Monitor | CC BY 4.0, IP geolocation by [DB-IP](https://db-ip.com) |
 | Natural Earth | the world map in Monitor | public domain |
+| flag-icons (35 country flags) | the language cards on this website's Languages page | MIT ([license text](/licenses/flag-icons-MIT.txt)) |
 | Unicode Character Database and CLDR | text layout, bidirectional text, emoji names | Unicode License v3 |
 
 ## Debian packages

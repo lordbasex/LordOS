@@ -12,8 +12,9 @@
 <div class="lg-txt">
 <p class="kicker">{{t.pages.language.kicker}}</p>
 <h1 id="lg-h">{{t.pages.language.title}}</h1>
+<p class="lg-welcome">{{{welcome}}}</p>
 <p class="g-lead">{{t.pages.language.lead}}</p>
-<p class="hw-note">{{{status}}}</p>
+<p class="hw-note">{{{status}}} {{t.pages.language.siteOnly}}</p>
 <div class="ctas">
 <a class="btn btn-primary" href="{{{requestUrl}}}" rel="noopener">{{t.pages.language.request}}</a>
 <a class="btn btn-ghost" href="#lg-help">{{t.pages.language.translate}}</a>
@@ -23,6 +24,8 @@
 {{{embassy}}}
 </figure>
 </section>
+
+{{{visits}}}
 
 <section class="hw-sec" aria-labelledby="lg-c">
 <h2 id="lg-c">{{t.pages.language.completeTitle}}</h2>

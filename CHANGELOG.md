@@ -512,6 +512,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **lordos.org: the Languages page welcomes visitors to the LordOS embassy, names 0.8.8.9 and puts a flag on every
+  card**, in English, Spanish and Portuguese (in development after 0.8.8.8, the latest release). `/language/` opens
+  with "Welcome to the LordOS embassy. People from 153 countries have already visited us, and we want LordOS to speak
+  their language: from 0.8.8.9 it ships 35 languages, complete." (the number of countries comes from the new
+  `web/content/visits-by-country.json`, the site's private statistics, people only, bots excluded: 153 countries,
+  page views and visitors per country from 11 to 15 November 2026; the version is the new `languages.json`
+  "nextVersion" and the 35 is counted from the listed languages). Under the welcome a new section, "Where our
+  visitors come from", thanks the communities forming in each of these countries ("they are the reason LordOS speaks
+  their language") and shows a donut drawn by the build as inline SVG (no script, no library): the top 20 countries
+  by page views plus "Other countries (133)", the total (23,559 page views, in each language's number format) in
+  the centre, one brand hue fading by rank so the ring's order matches the legend's, "other" in a neutral tone, each
+  slice's name and share as a hover title; the legend names each country in the page's language (`Intl.DisplayNames`)
+  with a flag when the page already has one and wraps under the chart on a phone; the SVG is `role="img"` with a
+  summary of the top five, the legend is `aria-hidden` and a visually hidden table holds the same numbers with each
+  country's visitors; a small line gives the source and dates. Updating the numbers is replacing that file. The
+  status line now
+  says 0.8.8.9 is in development, the next pre-release, and adds that these are the languages of LordOS, the system,
+  while the website itself is only in English, Spanish and Portuguese; the second group is titled "New in 0.8.8.9,
+  the next pre-release" (the six released languages and the 29 new ones keep their split, the new-languages text
+  keeps its note that native speakers have not reviewed them and its "Review a translation" link). Each card shows a
+  small country flag (20×15, `alt=""` and `aria-hidden`, before the name in a `.lg-head` row; the name keeps its
+  `lang` and `dir` and stays the identifier): the country of the language's `meta.json` "region" (the locale most of
+  its speakers use), so English shows the United States, Spanish Argentina, Portuguese Brazil, French France, Italian
+  Italy, Lithuanian Lithuania, Indonesian Indonesia, Japanese Japan, German Germany, Hindi India, Malay Malaysia,
+  Bengali Bangladesh, Simplified Chinese China, Traditional Chinese Taiwan, Ukrainian Ukraine, Polish Poland, Arabic
+  Egypt, Vietnamese Vietnam, Swedish Sweden, Greek Greece, Dutch the Netherlands, Turkish Turkey, Hungarian Hungary,
+  Persian Iran, Russian Russia, Romanian Romania, Finnish Finland, Urdu Pakistan, Bulgarian Bulgaria, Korean South
+  Korea, Thai Thailand, Azerbaijani Azerbaijan, Catalan Spain (its region is `ca_ES`; the senyera is not a country
+  flag), Filipino the Philippines and Swahili Kenya. The note under the lists says so: a language is not a country,
+  the flag is the one of the regional settings LordOS uses first for it, decoration like the picture's. The flags are
+  the 35 needed SVGs of flag-icons (MIT), copied unchanged into `web/src/flags/` (reviewed: no scripts, no external
+  references) with its notice in `web/src/flags/LICENSE`, published by the build as content-hashed
+  `/assets/flags/<cc>.<hash>.svg` and the notice as `/licenses/flag-icons-MIT.txt`, listed in Licenses and
+  open-source notices (`/legal/licenses/`, a new "flag-icons" row); no emoji flags (some systems show them as two
+  letters) and no CDN. `web/src/site.css`: `.lg-head` (the flag aligned with the name's first line), `.lg-fl` (a
+  hairline in the theme's `--chip-line`, light and dark) and `.lg-welcome`; `web/lib/embassy.mjs`'s comment says the
+  cards' flags are decoration too.
 - **lordos.org: Catalan, Filipino and Swahili, 35 languages**, in English, Spanish and Portuguese (in development
   after 0.8.8.8, the latest release). `web/content/languages.json` "next" adds Català, Filipino and Kiswahili, so the
   Languages page (`/language/`) lists them under "New in the next pre-release" after the 26 (their `meta.json` gives
