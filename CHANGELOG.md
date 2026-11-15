@@ -256,6 +256,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **ROADMAP from GitHub decisions (2026-11-15):** "Before 1.0" now lists lord-web's move to the new WPE API
+  (WPEPlatform, #142) and each session in its own systemd unit (#140, needed for systemd 258 and Debian 14); "Release
+  0.8.9" lists the suggestions the maintainer put off for later: a display scale below 100 % (#158), Lord Flow
+  personalisation (#151), copy and paste with a VMware host (#76) and mounting other systems' partitions at startup
+  (#122's second step).
+- **The paper's admin rescue** (en, es, pt): the rescue adds the session user to `sudo`, or to `wheel` on a system with
+  no `sudo` group, and who counts as an administrator is the one shared list `sudo`, `admin`, `wheel`.
+
 - **Catalan, Filipino and Swahili in the docs and the paper, 35 languages** (2026-11-15). docs/LANGUAGES.md: the
   introduction counts 35 languages (the 26 and then ca, fil and sw), the `i18n-check` count is 12,436 keys complete in
   all 35, and the pending list says "the 29 new languages"; its new section "Catalan, Filipino and Swahili" (ids,
@@ -540,6 +548,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   points its "Source code" section there and to GitHub's source code request form.
 
 ### Fixed
+
+- **The web apps model test covered only six languages** (`server/tests/webapps_model_test.mjs`): it expected exactly
+  en, es, fr, it, lt and pt to have `webapps.json` and crashed on a language with no `store.json`. It now checks the
+  catalog's texts and the Edit words in every complete language (no `"partial"` in `meta.json`), so a new language
+  can't ship without them.
 
 - **A web app opened without network loads by itself once the network is back** (issue
   [#144](https://github.com/lordbasex/LordOS/issues/144), thanks to pct06). WhatsApp opened before the Wi-Fi was
