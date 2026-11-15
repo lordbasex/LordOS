@@ -1,0 +1,22 @@
+{
+  "folder": "Bản ghi âm",
+  "name": "Bản ghi {date} {time}",
+  "all": "Tất cả bản ghi",
+  "empty": "Chưa có bản ghi nào",
+  "hint": "Nhấn nút đỏ (hoặc R) để ghi âm bằng micrô",
+  "denied": "Ghi âm không được phép dùng micrô",
+  "play": "Phát",
+  "pause": "Tạm dừng",
+  "rename": "Đổi tên",
+  "trim": "Cắt bớt",
+  "cancelTrim": "Hủy cắt bớt",
+  "saveTrim": "Lưu bản sao đã cắt",
+  "trimmed": "đã cắt",
+  "export": "Xuất thành",
+  "exportBtn": "Xuất",
+  "working": "Đang xuất…",
+  "exported": "Đã lưu “{name}”",
+  "exportError": "Không thể xuất",
+  "renameError": "Không thể đổi tên (tên đó đã tồn tại chưa?)",
+  "emptyTitle": "Chọn hoặc tạo một bản ghi"
+}

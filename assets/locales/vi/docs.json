@@ -1,0 +1,66 @@
+{
+  "archiveName": "Lưu trữ",
+  "archiveSummary": {
+    "other": "{count} tệp, {size}"
+  },
+  "compressOne": "Nén “{name}”",
+  "compressMany": {
+    "other": "Nén {count} mục"
+  },
+  "compressing": "Đang nén “{name}”…",
+  "compressProgress": "Đang nén “{name}”: {files} tệp",
+  "compressed": {
+    "other": "“{name}” đã sẵn sàng ({count} tệp)"
+  },
+  "compressError": "Không thể nén “{name}” ({error})",
+  "extractHere": "Giải nén tại đây",
+  "extractSelected": {
+    "other": "Giải nén {count} mục"
+  },
+  "extracting": "Đang giải nén “{name}”…",
+  "extractProgress": "Đang giải nén “{name}”: {files} tệp ({pct}%)",
+  "extracted": {
+    "other": "Đã giải nén vào “{name}” ({count} tệp)"
+  },
+  "extractedSkipped": {
+    "other": "Đã giải nén vào “{name}” ({count} tệp); bỏ qua {skipped} tệp vì lý do an toàn"
+  },
+  "extractError": "Không thể giải nén “{name}” ({error})",
+  "opening": "Đang mở “{name}”…",
+  "loading": "Đang tải…",
+  "locked": "được bảo vệ bằng mật khẩu",
+  "pages": {
+    "other": "{count} trang"
+  },
+  "more": {
+    "other": "và {count} mục khác"
+  },
+  "err.invalid": "không phải tệp lưu trữ, hoặc tệp bị hỏng",
+  "err.missing-volume": "thiếu một phần của tệp lưu trữ bị chia nhỏ: “{name}”",
+  "err.disk-full": "ổ đĩa đã đầy",
+  "err.too-big": "quá lớn",
+  "err.too-many": "có quá nhiều tệp",
+  "err.corrupt": "tệp bị hỏng",
+  "err.write": "không thể ghi",
+  "err.unavailable": "trình trợ giúp tài liệu không khả dụng",
+  "err.cancelled": "đã hủy",
+  "err.crash": "trình trợ giúp tài liệu dừng đột ngột",
+  "err.timeout": "mất quá nhiều thời gian",
+  "err.protocol": "trình trợ giúp tài liệu gửi câu trả lời không hợp lệ",
+  "err.spawn": "không thể khởi động trình trợ giúp tài liệu",
+  "err.closed": "tài liệu đã bị đóng",
+  "err.bad-request": "yêu cầu không hợp lệ",
+  "err.bad-field": "trường biểu mẫu không hợp lệ",
+  "err.bad-page": "trang không hợp lệ",
+  "err.busy": "trình trợ giúp tài liệu đang bận",
+  "err.memory": "hết bộ nhớ",
+  "err.no-fonts": "không có phông chữ nào",
+  "err.not-open": "tài liệu chưa được mở",
+  "err.nothing": "không có gì để lưu",
+  "err.read-only": "tài liệu chỉ đọc",
+  "err.save": "không thể lưu",
+  "err.unknown-op": "thao tác không xác định",
+  "err.image": "hình ảnh không hợp lệ",
+  "err.blob": "dữ liệu không hợp lệ",
+  "err.password": "tài liệu được bảo vệ bằng mật khẩu"
+}

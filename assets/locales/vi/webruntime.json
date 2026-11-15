@@ -1,0 +1,9 @@
+{
+  "tray.open": "Mở",
+  "tray.quit": "Thoát",
+  "notify.open": "Mở",
+  "download.done": "Tải xuống hoàn tất",
+  "download.failed": "Tải xuống thất bại",
+  "chooser.open": "Chọn một tệp",
+  "chooser.openMany": "Chọn các tệp"
+}

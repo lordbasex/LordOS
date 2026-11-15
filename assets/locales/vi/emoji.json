@@ -1,0 +1,20 @@
+{
+  "search": "Tìm biểu tượng cảm xúc",
+  "results": {
+    "other": "{count} kết quả"
+  },
+  "none": "Không tìm thấy gì",
+  "noRecent": "Những biểu tượng bạn dùng sẽ hiện ở đây",
+  "copied": "Đã sao chép {text}: dán bằng Ctrl+V",
+  "more": "Thêm…",
+  "group.recent": "Gần đây",
+  "group.smileys": "Mặt cười & cảm xúc",
+  "group.people": "Con người & cơ thể",
+  "group.animals": "Động vật & thiên nhiên",
+  "group.food": "Đồ ăn & thức uống",
+  "group.travel": "Du lịch & địa điểm",
+  "group.activities": "Hoạt động",
+  "group.objects": "Đồ vật",
+  "group.symbols": "Ký hiệu",
+  "group.flags": "Cờ"
+}
