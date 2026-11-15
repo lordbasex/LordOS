@@ -14,6 +14,7 @@
  * lord.themes only accepts simple names. */
 #include "../hw/display.h"
 #include "../hw/hw_admin.h"
+#include "../users/admingroups.h"
 #include "../hw/sleeplock.h"
 #include "../hw/logindlock.h"
 #include "js_sys.h"
@@ -336,14 +337,11 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     char full[128] = "";
     if (pw && pw->pw_gecos) { snprintf(full, sizeof full, "%s", pw->pw_gecos); full[strcspn(full, ",")] = 0; }
     JS_SetPropertyStr(c, o, "fullName", JS_NewString(c, full));
-    int is_admin = 0;
+    /* by this process's own groups (getgrouplist's are the files', this session's are what it got
+     * at login), against the shared list (src/users/admingroups.c) */
     gid_t groups[256];
     int ng = getgroups(256, groups);
-    for (int i = 0; i < ng && !is_admin; i++) {
-        struct group *g = getgrgid(groups[i]);
-        if (g && (!strcmp(g->gr_name, "sudo") || !strcmp(g->gr_name, "admin") || !strcmp(g->gr_name, "wheel"))) is_admin = 1;
-    }
-    JS_SetPropertyStr(c, o, "admin", JS_NewBool(c, is_admin));
+    JS_SetPropertyStr(c, o, "admin", JS_NewBool(c, admin_gids_any(groups, ng, admin_gid_name)));
     /* the board, where Settings has a page for it: "pi5" for a BCM2712 board (Pi 5, 500, CM5:
      * Settings → Board firmware), "" otherwise */
     size_t clen = 0;
@@ -2279,21 +2277,16 @@ static const JSCFunctionListEntry ssh_funcs[] = {
 
 /* ---- lord.users: accounts of the people on the machine (Settings → Users; read-only) ---- */
 
-static int user_in_group(const struct passwd *pw, const char *const *names) {
-    gid_t groups[256];
-    int n = 256;
-    if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &n) < 0) return 0;
-    for (int k = 0; names[k]; k++) {
-        struct group *g = getgrnam(names[k]);
-        if (g) for (int i = 0; i < n; i++) if (groups[i] == g->gr_gid) return 1;
-    }
-    return 0;
+/* an administrator by the shared list (src/users/admingroups.c); an unreadable list is not one */
+static int user_is_admin_pw(const struct passwd *pw) {
+    AdminMembership m;
+    admin_membership_read(pw->pw_name, pw->pw_uid, pw->pw_gid, &m);
+    return admin_membership_is_admin(&m, 0);
 }
 
 /* lord.users.list() → { users: [{ name, full, uid, admin, color, image, self }], autologin } */
 static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
-    static const char *const admin_groups[] = { "sudo", "admin", "wheel", NULL };
     JSValue o = JS_NewObject(c), arr = JS_NewArray(c);
     uint32_t n = 0;
     uid_t me = getuid();
@@ -2309,7 +2302,7 @@ static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, u, "name", JS_NewString(c, pw->pw_name));
         JS_SetPropertyStr(c, u, "full", JS_NewString(c, full));
         JS_SetPropertyStr(c, u, "uid", JS_NewInt32(c, (int32_t)pw->pw_uid));
-        JS_SetPropertyStr(c, u, "admin", JS_NewBool(c, user_in_group(pw, admin_groups)));
+        JS_SetPropertyStr(c, u, "admin", JS_NewBool(c, user_is_admin_pw(pw)));
         JS_SetPropertyStr(c, u, "self", JS_NewBool(c, pw->pw_uid == me));
         char p[160], color[16] = "";
         snprintf(p, sizeof p, "/var/lib/lordos/users/%s.json", pw->pw_name);

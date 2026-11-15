@@ -220,13 +220,14 @@ build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # lord-fand (src/fan, docs/FANS.md): the root service that drives the fans by temperature. libc
-# only; it executes nothing and has no network. tests/fan_test.c: curves, fan.json, requests and a
+# only; it executes nothing and has no network. Who may change the fans: the shared administrator
+# list (src/users/admingroups.c). tests/fan_test.c: curves, fan.json, requests and a
 # fake sysfs (run by tests/run_suites.sh).
 FAN_SRC := src/fan/fancurve.c src/fan/fanhw.c src/sec/json.c
 ALL += build/lord-fand
-build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h
+build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h src/users/admingroups.c src/users/admingroups.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
 # the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
 test: build/toolkitenv-test
 build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
@@ -915,7 +916,7 @@ build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \
                 build/obj/remote/rsec.o build/obj/remote/ipnet.o build/obj/remote/lockout.o build/obj/remote/rtcwire.o build/obj/remote/rtc.o \
-                build/obj/bench/boottest.o build/obj/lordlog.o
+                build/obj/bench/boottest.o build/obj/lordlog.o build/obj/users/admingroups.o
 # The remote desktop shows the screen only over WebRTC (docs/REMOTE.md, "Video (WebRTC)"): our own peer in
 # the bridge, on Debian's libsrtp2 and usrsctp (and OpenSSL's DTLS). lord-sessiond can't be built without
 # them (libsrtp2-dev, libusrsctp-dev).

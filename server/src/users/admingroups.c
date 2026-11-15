@@ -65,6 +65,17 @@ int admin_revoke_plan(const AdminMembership *m, const char *out[ADMIN_GROUP_COUN
     return m->n;
 }
 
+int admin_gids_any(const gid_t *gids, int n, const char *(*name_of)(gid_t gid)) {
+    for (int i = 0; gids && i < n; i++)
+        if (admin_group_is(name_of(gids[i]))) return 1;
+    return 0;
+}
+
+const char *admin_gid_name(gid_t gid) {
+    struct group *g = getgrgid(gid);
+    return g ? g->gr_name : NULL;
+}
+
 int user_is_admin(const char *user) {
     AdminMembership m;
     return !admin_membership_load(user, &m) && admin_membership_is_admin(&m, 0);

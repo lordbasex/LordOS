@@ -487,7 +487,10 @@ session. Everything that changes something goes through closed `admin.c` actions
   supplementary one, by the system's files right now. It's one closed list, fixed in
   `server/src/users/admingroups.h` and never configurable from JS or any input, used by every
   root-side check: `admin.c` (who may run the administrator actions), `user-add`, `user-del`,
-  `user-admin`, the admin rescue and `lordos-firstrun`.
+  `user-admin`, the admin rescue, `lordos-firstrun`, `lord-sessiond` (the login screen's list and
+  who may restart or shut down with other sessions open) and `lord-fand` (who may change the fans);
+  lord-server's `lord.users.list()` and `lord.sys.info().admin` show it from the same list (the
+  latter by the session's own groups). No other file keeps its own copy of the list.
   - Making someone an administrator (`user-add` with admin, `user-admin name 1`, the rescue,
     the Raspberry Pi first run) adds them to `sudo`, or to `wheel` where there is no `sudo` group
     (Arch, Fedora); never to `admin`. With neither group it fails with `users.groupFailed` and, for

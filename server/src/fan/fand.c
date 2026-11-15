@@ -22,6 +22,7 @@
 #include "fan/fancurve.h"
 #include "fan/fanhw.h"
 #include "lordlog.h"
+#include "users/admingroups.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -192,16 +193,10 @@ static int peer_is_admin(int fd, unsigned *uid) {
     struct passwd pw, *pp = NULL;
     char pbuf[2048];
     if (getpwuid_r(uc.uid, &pw, pbuf, sizeof pbuf, &pp) || !pp) return 0;
-    gid_t groups[64];
-    int n = 64;
-    if (getgrouplist(pp->pw_name, pp->pw_gid, groups, &n) < 0) return 0;
-    for (int i = 0; i < n; i++) {
-        struct group gr, *gp = NULL;
-        char gbuf[4096];
-        if (getgrgid_r(groups[i], &gr, gbuf, sizeof gbuf, &gp) || !gp) continue;
-        if (!strcmp(gp->gr_name, "sudo") || !strcmp(gp->gr_name, "admin") || !strcmp(gp->gr_name, "wheel")) return 1;
-    }
-    return 0;
+    /* the shared list (src/users/admingroups.c); an unreadable list is not an administrator */
+    AdminMembership m;
+    admin_membership_read(pp->pw_name, pp->pw_uid, pp->pw_gid, &m);
+    return admin_membership_is_admin(&m, 0);
 }
 
 static void reply(int fd, const char *s, size_t n) {
