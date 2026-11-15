@@ -1,0 +1,9 @@
+{
+  "tray.open": "Відкрити",
+  "tray.quit": "Вийти",
+  "notify.open": "Відкрити",
+  "download.done": "Завантаження завершено",
+  "download.failed": "Завантаження не вдалося",
+  "chooser.open": "Виберіть файл",
+  "chooser.openMany": "Виберіть файли"
+}
