@@ -96,8 +96,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   image, tested by the community), the build refusing missing helpers (and `libsystemd-dev`), nanosvg and the mirrored
   artcraft-launcher package, X11 apps run as root and web
   app logs, and four documents missing from the index (Cloud, Databases, Disk life, Voice).
+- **Hardware reports, `docs/HARDWARE-REPORT.md`** (maintainer's request, 2026-11-15): the maintainer's daily PC (Intel
+  i9-10900, Radeon RX 580, three monitors with DisplayPort among them, LordOS on bare metal since 2026-11-07) and what
+  was fixed on it, then a table of the nine community hardware reports on GitHub (#42, #105, #129, #135, #136, #137,
+  #149, #155, #156: machine, kind, CPU, GPU, boot medium, version and result, with links to the related bug issues;
+  #149 marked incomplete), a comparison by GPU vendor (8 Intel, 2 AMD with the maintainer's, no NVIDIA), CPU, kind,
+  boot medium and version with what is known good, the known problems and the untested combinations, and thanks to
+  each of the eight reporters. Listed in the documentation index; `docs/DISPLAYS.md` points to it.
+- **The paper (2026-11-15 edition)**: apps come in four kinds, not three (§2.1): web apps and PWAs run by the LordOS
+  Web Runtime in `lord-web`, one process per app and profile under WebKit's sandbox, with no LordOS API reaching the
+  page, and the sites run unmodified. §3.5 and §10.2 say the RX 580 PC is the author's daily machine and cite the
+  community hardware reports (laptop panels on Intel graphics and an RX 9060 XT working; Nvidia, other AMD cards,
+  DisplayPort hubs and suspend untested). `docs/PAPER-VALIDATION.md` has rows for both.
 
 ### Website
+
+- **The home page's badge names the latest release (0.8.8.8)** instead of a fixed "0.8.8": `web/i18n/{en,es,pt}.json`
+  hold `{version}`, and `web/build.mjs` fills it with the newest dated release in `CHANGELOG.md` (package.json's version
+  when there is none), so it follows each release by itself.
+- **Hardware on the site.** The own-desktop feature page (en, es, pt) says the RX 580 PC is the author's daily LordOS
+  machine on bare metal since November 2026 and links to the nine community hardware reports (Intel and AMD graphics,
+  no NVIDIA yet). The FAQ's "Which graphics cards work?" says LordOS already runs on real AMD cards (the RX 580 and a
+  reported RX 9060 XT) and links to the reports; "How do I share how LordOS runs on my computer?" no longer says the
+  tested-hardware page has only the reference machines (it also has #42) and links to the comparison.
 
 - **Cookies and statistics: LordOS's update checks are counted from 2026-11-12.** Until 2026-11-11 the requests
   LordOS makes to `lordos.org/apt` were left out of every count. The policy (Cookies and statistics and the Privacy

@@ -252,7 +252,19 @@ const cardCut = (n) => (n > CARD_FEATURES + 1 ? CARD_FEATURES : n);   // a singl
 const team = JSON.parse(fs.readFileSync(path.join(WEB, 'i18n/team.json'), 'utf8'));
 const today = new Date().toISOString().slice(0, 10);
 const pagesStrings = JSON.parse(fs.readFileSync(path.join(WEB, 'i18n/pages.json'), 'utf8'));
-const dict = Object.fromEntries(LANGS.map((l) => [l, { ...JSON.parse(fs.readFileSync(path.join(WEB, 'i18n', l + '.json'), 'utf8')), pages: pagesStrings[l] }]));
+// the home badge names the latest release: the newest dated "## [x.y.z-beta] - date" heading of CHANGELOG.md
+// (package.json's version when there is none), so it changes by itself with each release
+const LATEST_RELEASE = (() => {
+  try {
+    const m = fs.readFileSync(path.join(REPO, 'CHANGELOG.md'), 'utf8').match(/^## \[(\d+(?:\.\d+)+)(?:-[a-z]+)?\] - \d{4}-\d{2}-\d{2}/m);
+    return m ? m[1] : PKG.version;
+  } catch { return PKG.version; }
+})();
+const dict = Object.fromEntries(LANGS.map((l) => {
+  const d = JSON.parse(fs.readFileSync(path.join(WEB, 'i18n', l + '.json'), 'utf8'));
+  if (typeof d.badge === 'string') d.badge = d.badge.replace('{version}', LATEST_RELEASE);
+  return [l, { ...d, pages: pagesStrings[l] }];
+}));
 const loc = (v, l) => (v == null ? '' : typeof v === 'string' ? v : v[l] ?? v.en ?? '');
 
 // ---------- feature pages and paper (web/content) ----------

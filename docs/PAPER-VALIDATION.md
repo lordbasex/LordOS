@@ -2,8 +2,8 @@
 
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
-0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12, the paper's
-current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
+0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12; the paper's
+current edition is of 2026-11-15), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
 memory from a process's RSS (§7.1) and points to versioned results (§11.5, `docs/RESULTS.md`).
@@ -208,7 +208,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 2.4 | Updates bring only the Recommends a new version adds | Test (`build/pkg-test`: the new Recommends come with the upgrade) | Holds in the test; the update against the signed repository not recorded here |
 | 5.1 | Four more verified Cloud providers | `assets/cloud/providers.json` (evidence per provider), `docs/CLOUD.md` §19 | Holds as recorded evidence |
 
-## 0.8.8.8 (released on 2026-11-12 as 0.8.8.8-beta; the paper's editions of 2026-11-10, 2026-11-11 and 2026-11-12)
+## 0.8.8.8 (released on 2026-11-12 as 0.8.8.8-beta; the paper's editions of 2026-11-10, 2026-11-11, 2026-11-12 and 2026-11-15)
 
 | § | Claim | How | State |
 |---|---|---|---|
@@ -271,6 +271,8 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1, 2.4 | Store → Installed removes a packaged Linux app found through dpkg's own lists, never an Essential, Protected or required package nor one that would take `lordos`; 21 built-in apps can be deactivated | Test (`test_dpkg_owner` in `build/pkg-test`, `tests/apps_off_model_test.mjs`) | Holds in the tests; on VM 127 only that the Store opens was recorded |
 | 5.1 | A Cloud account turned off is never given to rclone and keeps its settings and sign-in | Test (`t_onoff` in `build/cloud-test`, `tests/cloud_signin_fake.sh`, `tests/cloud_model_test.mjs`) | Holds in the tests |
 | 5.1 | The GitHub fixes of this round (#94, #96, #97, #99, #100, #101, #103, #104, #107, #109, #110, #111, #112, #117, #118, #123, #124, #125, #128, #130) | Each has its test named in `CHANGELOG.md`, 0.8.8.8-beta; #96, #107 and #124 also checked on VM 127 | Holds in the tests; #101 not tried against the reporter's kind of server |
+| 2.1 | (2026-11-15 edition) Apps come in four kinds: built-in apps and the theme, `.lpk` apps, Linux apps, and web apps and PWAs run by `lord-web`, one process per app and profile, under WebKit's sandbox, with no `lord.*` or broker reaching the page and the sites run unmodified | Design (`docs/WEBAPPS.md`, "What a page never gets"; `AGENTS.md`, `lord-web`); the §5.4 rows above | Design |
+| 3.5, 10.2 | (2026-11-15 edition) The RX 580 PC is the author's daily machine on bare metal since November 2026; nine community hardware reports (Intel and AMD graphics) add laptop panels and an RX 9060 XT, all working; Nvidia, other AMD cards, DisplayPort hubs and suspend are untested | The reports themselves (GitHub issues labelled `hardware-report`, validated by `tools/hwreport/validate.mjs`), listed and compared in `docs/HARDWARE-REPORT.md` | Reported by users, not repeated by a test; suspend **Untested** (unchecked in every report) |
 
 ## What the paper must change for 0.8.5
 

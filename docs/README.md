@@ -31,6 +31,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [VM-SETUP.md](VM-SETUP.md) | The development VM, step by step |
 | [UPDATES.md](UPDATES.md) | Updating an installed system in place from the signed APT repository, and migrations |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known problems and how to fix them (for example a modified system component) |
+| [HARDWARE-REPORT.md](HARDWARE-REPORT.md) | The machines LordOS was run on: the maintainer's PC and every community hardware report on GitHub, compared by GPU, CPU, kind and boot medium |
 | [RELEASING.md](RELEASING.md) | How a release is made: changelog, tag, build, sign, SBOM and the GitHub release notes |
 | [../CHANGELOG.md](../CHANGELOG.md) | What changed in each version (also the body of each GitHub release) |
 
