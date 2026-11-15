@@ -872,5 +872,9 @@
   "webapps.badSound": "Sunet de notificare necunoscut",
   "webapps.badColor": "Culoare de profil necunoscută",
   "webapps.iconOrigin": "Site-ul s-a mutat la altă adresă, așa că pictograma sa nu a fost păstrată",
-  "webapps.noIcon": "Site-ul nu oferă nicio pictogramă pe care LordOS să o poată folosi"
+  "webapps.noIcon": "Site-ul nu oferă nicio pictogramă pe care LordOS să o poată folosi",
+  "pkg.multiarchSplit": "{name} trebuie să aibă aceeași versiune pe 64 și pe 32 de biți, iar această schimbare le-ar despărți",
+  "pkg.multiarchConflict": "{name} nu poate fi instalat pe 64 și pe 32 de biți în același timp",
+  "pkg.foreignArchUnsupported": "Pachetele pe 32 de biți pot fi activate doar pe un PC pe 64 de biți (amd64); acest sistem este {arch}",
+  "pkg.foreignArchFailed": "Pachetele pe 32 de biți ({arch}) nu au putut fi activate (dpkg s-a încheiat cu codul {code})"
 }

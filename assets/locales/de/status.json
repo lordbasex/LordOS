@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Image gelöscht",
   "vm.downloadResumed": "Ein angehaltener Download wird fortgesetzt ({from} Bytes behalten)",
   "vm.kvmReady": "Erlaubt: Maschinen können jetzt Hardwarevirtualisierung verwenden",
-  "vm.kvmNextLogin": "Ab deiner nächsten Anmeldung erlaubt"
+  "vm.kvmNextLogin": "Ab deiner nächsten Anmeldung erlaubt",
+  "pkg.foreignArchAdded": "32-Bit-Pakete ({arch}) aktiviert",
+  "pkg.foreignArchPresent": "32-Bit-Pakete ({arch}) waren bereits aktiviert",
+  "pkg.why.multiarchPair": "Gleiche Version wie {name}"
 }

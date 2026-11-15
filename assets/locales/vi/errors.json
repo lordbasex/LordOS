@@ -870,5 +870,9 @@
   "webapps.badSound": "Âm thanh thông báo không xác định",
   "webapps.badColor": "Màu hồ sơ không xác định",
   "webapps.iconOrigin": "Trang web đã chuyển sang địa chỉ khác, nên biểu tượng của nó không được giữ lại",
-  "webapps.noIcon": "Trang web không cung cấp biểu tượng nào mà LordOS có thể dùng"
+  "webapps.noIcon": "Trang web không cung cấp biểu tượng nào mà LordOS có thể dùng",
+  "pkg.multiarchSplit": "{name} phải có cùng phiên bản cho 64 và 32 bit, và thay đổi này sẽ khiến chúng khác nhau",
+  "pkg.multiarchConflict": "Không thể cài {name} cho cả 64 và 32 bit cùng lúc",
+  "pkg.foreignArchUnsupported": "Chỉ có thể bật các gói 32 bit trên PC 64 bit (amd64); hệ thống này là {arch}",
+  "pkg.foreignArchFailed": "Không thể bật các gói 32 bit ({arch}) (dpkg kết thúc với mã {code})"
 }

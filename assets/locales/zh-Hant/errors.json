@@ -870,5 +870,9 @@
   "webapps.badSound": "未知的通知聲音",
   "webapps.badColor": "未知的設定檔顏色",
   "webapps.iconOrigin": "網站已移至其他位址，因此未保留其圖示",
-  "webapps.noIcon": "網站沒有提供 LordOS 可使用的圖示"
+  "webapps.noIcon": "網站沒有提供 LordOS 可使用的圖示",
+  "pkg.multiarchSplit": "{name} 的 64 位元與 32 位元必須是同一版本，而此變更會讓它們不一致",
+  "pkg.multiarchConflict": "{name} 不能同時以 64 位元和 32 位元安裝",
+  "pkg.foreignArchUnsupported": "只能在 64 位元電腦（amd64）上啟用 32 位元套件；本系統為 {arch}",
+  "pkg.foreignArchFailed": "無法啟用 32 位元（{arch}）套件（dpkg 以代碼 {code} 結束）"
 }

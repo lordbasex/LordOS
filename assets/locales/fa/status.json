@@ -160,5 +160,8 @@
   "vm.imageRemoved": "ایمیج حذف شد",
   "vm.downloadResumed": "ادامهٔ بارگیری متوقف‌شده ({from} بایت حفظ شد)",
   "vm.kvmReady": "مجاز شد: ماشین‌ها اکنون می‌توانند از مجازی‌سازی سخت‌افزاری استفاده کنند",
-  "vm.kvmNextLogin": "از ورود بعدی شما مجاز است"
+  "vm.kvmNextLogin": "از ورود بعدی شما مجاز است",
+  "pkg.foreignArchAdded": "بسته‌های ۳۲ بیتی ({arch}) فعال شدند",
+  "pkg.foreignArchPresent": "بسته‌های ۳۲ بیتی ({arch}) از قبل فعال بودند",
+  "pkg.why.multiarchPair": "همان نسخهٔ {name}"
 }

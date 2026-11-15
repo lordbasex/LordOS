@@ -710,6 +710,312 @@ static void test_dpkg_owner(const char *dir) {
     CHECK(dpkg_owner(info, "/usr/share/applications/vlc.desktop", out, sizeof out), "removed package: no owner");
 }
 
+/* (0.8.8.9) i386 multiarch (docs/PACKAGES.md, "Multiarch"): the i386 lists as their own "name:i386"
+ * packages, dpkg's status by (name, architecture), the Multi-Arch rules of the resolver, the
+ * "Multi-Arch: same" pairs kept at one version, and the order dpkg gets them in. Valve's
+ * steam-libs-i386 (an i386 package, "Multi-Arch: foreign") stands in for the real case. */
+#define Z64 "SHA256: 0000000000000000000000000000000000000000000000000000000000000000\n"
+static const char *MA_AMD64 =
+    "Package: libc6\nVersion: 2.41-12\nArchitecture: amd64\nMulti-Arch: same\nPriority: optional\nFilename: pool/l/libc6_a1.deb\nSize: 10\n" Z64 "Description: c\n\n"
+    "Package: libc6\nVersion: 2.41-12+deb13u1\nArchitecture: amd64\nMulti-Arch: same\nPriority: optional\nFilename: pool/l/libc6_a2.deb\nSize: 11\n" Z64 "Description: c\n\n"
+    "Package: libgcc-s1\nVersion: 14\nArchitecture: amd64\nMulti-Arch: same\nDepends: libc6 (>= 2.35)\nFilename: pool/l/gcc_a.deb\nSize: 1\n" Z64 "Description: g\n\n"
+    "Package: dbus-user-session\nVersion: 1\nArchitecture: amd64\nMulti-Arch: foreign\nProvides: default-dbus-session-bus, dbus-session-bus\nFilename: pool/d/dus.deb\nSize: 1\n" Z64 "Description: d\n\n"
+    "Package: steam-launcher\nVersion: 1:1.0.0.87\nArchitecture: amd64\nMulti-Arch: foreign\nDepends: libc6 (>= 2.15)\nRecommends: steam-libs-i386\nFilename: pool/s/sl.deb\nSize: 5\n" Z64 "Description: s\n\n"
+    "Package: python3\nVersion: 3.13\nArchitecture: amd64\nMulti-Arch: allowed\nDepends: libc6\nFilename: pool/p/py_a.deb\nSize: 1\n" Z64 "Description: p\n\n"
+    "Package: tool-any\nVersion: 1\nArchitecture: amd64\nDepends: python3:any (>= 3)\nFilename: pool/t/ta.deb\nSize: 1\n" Z64 "Description: t\n\n"
+    "Package: tool-plain\nVersion: 1\nArchitecture: amd64\nDepends: python3\nFilename: pool/t/tp.deb\nSize: 1\n" Z64 "Description: t\n\n"
+    "Package: libplain\nVersion: 1\nArchitecture: amd64\nFilename: pool/l/lp_a.deb\nSize: 1\n" Z64 "Description: l\n\n"
+    "Package: conf-a\nVersion: 1\nArchitecture: amd64\nConflicts: libplain\nFilename: pool/c/ca.deb\nSize: 1\n" Z64 "Description: c\n\n"
+    "Package: libsplit\nVersion: 1\nArchitecture: amd64\nMulti-Arch: same\nFilename: pool/l/ls1_a.deb\nSize: 1\n" Z64 "Description: l\n\n"
+    "Package: libsplit\nVersion: 2\nArchitecture: amd64\nMulti-Arch: same\nFilename: pool/l/ls2_a.deb\nSize: 1\n" Z64 "Description: l\n\n";
+static const char *MA_I386 =
+    "Package: libc6\nVersion: 2.41-12\nArchitecture: i386\nMulti-Arch: same\nPriority: optional\nFilename: pool/l/libc6_i1.deb\nSize: 10\n" Z64 "Description: c\n\n"
+    "Package: libc6\nVersion: 2.41-12+deb13u1\nArchitecture: i386\nMulti-Arch: same\nPriority: optional\nFilename: pool/l/libc6_i2.deb\nSize: 11\n" Z64 "Description: c\n\n"
+    "Package: libgcc-s1\nVersion: 14\nArchitecture: i386\nMulti-Arch: same\nDepends: libc6 (>= 2.35)\nFilename: pool/l/gcc_i.deb\nSize: 1\n" Z64 "Description: g\n\n"
+    "Package: steam-libs-i386\nVersion: 1:1.0.0.87\nArchitecture: i386\nMulti-Arch: foreign\nDepends: libc6 (>= 2.15), libgcc-s1, default-dbus-session-bus | dbus-session-bus, libplain\nFilename: pool/s/sli.deb\nSize: 2\n" Z64 "Description: s\n\n"
+    "Package: libplain\nVersion: 1\nArchitecture: i386\nFilename: pool/l/lp_i.deb\nSize: 1\n" Z64 "Description: l\n\n"
+    "Package: python3\nVersion: 3.13\nArchitecture: i386\nMulti-Arch: allowed\nDepends: libc6\nFilename: pool/p/py_i.deb\nSize: 1\n" Z64 "Description: p\n\n"
+    "Package: libsplit\nVersion: 1\nArchitecture: i386\nMulti-Arch: same\nFilename: pool/l/ls1_i.deb\nSize: 1\n" Z64 "Description: l\n\n"
+    "Package: fonts-x\nVersion: 1\nArchitecture: all\nFilename: pool/f/fx.deb\nSize: 1\n" Z64 "Description: f\n\n"
+    "Package: dbus-user-session\nVersion: 1\nArchitecture: i386\nMulti-Arch: foreign\nProvides: default-dbus-session-bus, dbus-session-bus\nFilename: pool/d/dus_i.deb\nSize: 1\n" Z64 "Description: d\n\n";
+static const char *MA_STATUS =
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41-12\nArchitecture: amd64\nMulti-Arch: same\nDescription: c\n\n"
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41-12\nArchitecture: i386\nMulti-Arch: same\nDescription: c\n\n"
+    "Package: libsplit\nStatus: install ok installed\nVersion: 1\nArchitecture: amd64\nMulti-Arch: same\nDescription: l\n\n"
+    "Package: libsplit\nStatus: install ok installed\nVersion: 1\nArchitecture: i386\nMulti-Arch: same\nDescription: l\n\n"
+    "Package: dbus-user-session\nStatus: install ok installed\nVersion: 1\nArchitecture: amd64\nMulti-Arch: foreign\nProvides: default-dbus-session-bus, dbus-session-bus\nDescription: d\n\n"
+    "Package: python3\nStatus: install ok installed\nVersion: 3.13\nArchitecture: i386\nMulti-Arch: allowed\nDepends: libc6\nDescription: p\n\n"
+    "Package: dpkg\nStatus: install ok installed\nVersion: 1.22\nArchitecture: amd64\nEssential: yes\nDescription: d\n\n";
+
+static int item_at(const Plan *p, const char *name) {
+    for (int i = 0; i < p->n; i++) if (!strcmp(p->items[i].name, name)) return i;
+    return -1;
+}
+
+static void ma_status(const char *path, const char *extra) {
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fputs(MA_STATUS, f);
+    if (extra) fputs(extra, f);
+    fclose(f);
+}
+
+static void test_multiarch(const char *dir) {
+    /* names and relations */
+    CHECK(deb_valid_pkgarg("libc6:i386", 10) && deb_valid_pkgarg("libc6", 5) && !deb_valid_pkgarg("libc6:amd64", 11) &&
+          !deb_valid_pkgarg("libc6:", 6) && !deb_valid_pkgarg(":i386", 5) && !deb_valid_pkgarg("lib/c:i386", 10), "ma: request names");
+    CHECK(deb_base_len("libc6:i386", 10) == 5 && deb_base_len("libc6", 5) == 5, "ma: base length");
+    {
+        const char *t = "python3:any (>= 3.11), libc6:native | foo:i386", *p = t, *e = t + strlen(t);
+        DebRel r[4];
+        int k = deb_next_group(&p, e, r, 4);
+        CHECK(k == 1 && r[0].nlen == 7 && r[0].alen == 3 && !memcmp(r[0].arch, "any", 3) && r[0].op == REL_GE && r[0].vlen == 4, "ma: python3:any (>= 3.11)");
+        k = deb_next_group(&p, e, r, 4);
+        CHECK(k == 2 && r[0].alen == 6 && r[1].nlen == 3 && r[1].alen == 4 && !memcmp(r[1].arch, "i386", 4), "ma: libc6:native | foo:i386");
+        p = "plain (= 1)"; e = p + strlen(p);
+        CHECK(deb_next_group(&p, e, r, 4) == 1 && !r[0].arch && !r[0].alen, "ma: no qualifier");
+    }
+    /* dpkg's architecture list */
+    char af[600];
+    snprintf(af, sizeof af, "%s/dpkg-arch", dir);
+    pkg_dpkg_arch_file = af;
+    CHECK(!pkg_arch_listed("amd64", "i386") && pkg_arch_listed("amd64", "amd64"), "ma: no list file: native only");
+    write_text(af, "amd64\ni386\n");
+    CHECK(pkg_arch_listed("amd64", "i386") && !pkg_arch_listed("amd64", "armhf"), "ma: i386 listed");
+    write_text(af, "amd64\n");
+    CHECK(!pkg_arch_listed("amd64", "i386"), "ma: i386 not listed");
+    pkg_dpkg_arch_file = DPKG_ARCH_FILE;
+
+    /* the index: i386 records as "name:i386", the i386 list's "all" ones left out */
+    char md[600], sp[700];
+    snprintf(md, sizeof md, "%s/ma", dir);
+    mkdir(md, 0755);
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "http://deb", "trixie", "main", "trixie", "Debian", "Debian", 0, 0, 500);
+    idxb_packages(b, s, MA_AMD64, strlen(MA_AMD64), "amd64");
+    idxb_packages_foreign(b, s, MA_I386, strlen(MA_I386), "i386");
+    char err[200];
+    CHECK(!idxb_write(b, md, "amd64", err, sizeof err), "ma: index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, md) && x.h->npkg == 12 + 8, "ma: 12 amd64 + 8 i386 records: %u", x.map ? x.h->npkg : 0);
+    long li = idx_find(&x, "libc6:i386", 10), ln = idx_find(&x, "libc6", 5);
+    CHECK(li >= 0 && ln >= 0 && li != ln && !strcmp(idx_s(&x, x.pkg[li].arch), "i386") && !strcmp(idx_s(&x, x.pkg[ln].arch), "amd64") &&
+          (x.pkg[li].flags & IF_MA_SAME), "ma: libc6 and libc6:i386 apart");
+    CHECK(idx_find(&x, "fonts-x:i386", 12) < 0 && idx_find(&x, "fonts-x", 7) < 0, "ma: an all package in the i386 list is not taken");
+    long plo, phi;
+    idx_providers(&x, "dbus-session-bus", 16, &plo, &phi);
+    CHECK(phi - plo == 2, "ma: provides of both architectures under the plain name: %ld", phi - plo);
+
+    /* dpkg's status by (name, architecture) */
+    snprintf(sp, sizeof sp, "%s/status", md);
+    ma_status(sp, NULL);
+    Status st = { 0 };
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 7, "ma: status %d", st.n);
+    const StPkg *ci = status_find(&st, "libc6:i386", 10), *cn = status_find(&st, "libc6", 5);
+    CHECK(ci && cn && ci != cn && !strcmp(ci->arch, "i386") && !ci->native && cn->native && !strcmp(ci->name, "libc6") && !strcmp(ci->key, "libc6:i386"),
+          "ma: status keys");
+    CHECK(!status_find(&st, "python3", 7) && status_find(&st, "python3:i386", 12), "ma: python3 only as i386");
+
+    Plan p;
+    PlanOpts o = { 0 };
+    /* Steam's 32-bit libraries: their i386 dependencies, the native dbus (Multi-Arch: foreign) */
+    const char *sli[] = { "steam-libs-i386:i386" };
+    plan_make(&x, &st, sli, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "steam-libs-i386:i386") && has(&p, PA_INSTALL, "libgcc-s1:i386") && has(&p, PA_INSTALL, "libplain:i386"),
+          "ma: steam-libs-i386 with its i386 libraries: %s", p.err);
+    CHECK(!has(&p, PA_INSTALL, "dbus-user-session:i386") && !has(&p, PA_INSTALL, "libgcc-s1") && !has(&p, PA_INSTALL, "libplain") &&
+          item_at(&p, "libc6") < 0 && item_at(&p, "libc6:i386") < 0 && p.n == 3,
+          "ma: nothing native, the installed amd64 dbus serves it, libc6:i386 stays (%d items)", p.n);
+    {
+        int ord[16], grp[16];
+        int n = plan_order(&x, &p, ord, grp);
+        CHECK(n == 3 && !strcmp(p.items[ord[n - 1]].name, "steam-libs-i386:i386"), "ma: order: its libraries first");
+    }
+    plan_free(&p);
+    /* a native package recommending an i386-only, Multi-Arch: foreign one */
+    const char *sl[] = { "steam-launcher" };
+    o.recommends = 1;
+    plan_make(&x, &st, sl, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_INSTALL, "steam-launcher") && has(&p, PA_INSTALL, "steam-libs-i386:i386"), "ma: Recommends steam-libs-i386 (foreign) from amd64: %s", p.err);
+    plan_free(&p);
+    o.recommends = 0;
+    /* "python3:any": the installed i386 python3 (Multi-Arch: allowed) satisfies it */
+    const char *ta[] = { "tool-any" };
+    plan_make(&x, &st, ta, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 1 && has(&p, PA_INSTALL, "tool-any"), "ma: python3:any by python3:i386: %s (%d)", p.err, p.n);
+    plan_free(&p);
+    /* a plain "python3" from amd64 needs the amd64 one, which can't sit next to python3:i386 (allowed, not same) */
+    const char *tp[] = { "tool-plain" };
+    plan_make(&x, &st, tp, 1, NULL, 0, &o, &p);
+    CHECK(!p.ok && lerr_has(p.err, "pkg.multiarchConflict") && !has(&p, PA_INSTALL, "python3"), "ma: python3 (allowed) not installed twice: %s", p.err);
+    plan_free(&p);
+    /* every Multi-Arch: same pair moves together; one that can't (libsplit 2 has no i386) is held, both of it */
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    int a = item_at(&p, "libc6"), i = item_at(&p, "libc6:i386");
+    CHECK(p.ok && a >= 0 && i >= 0 && p.items[a].action == PA_UPGRADE && p.items[i].action == PA_UPGRADE &&
+          !strcmp(p.items[a].version, "2.41-12+deb13u1") && !strcmp(p.items[i].version, "2.41-12+deb13u1"),
+          "ma: upgrade: libc6 and libc6:i386 to the same version: %s", p.err);
+    CHECK(item_at(&p, "libsplit") < 0 && item_at(&p, "libsplit:i386") < 0, "ma: upgrade: libsplit not split");
+    int held = 0;
+    for (int k = 0; k < p.nheld; k++) if (!strcmp(p.held[k], "libsplit")) held = 1;
+    CHECK(held, "ma: upgrade: libsplit held");
+    {
+        int ord[16], grp[16];
+        int n = plan_order(&x, &p, ord, grp), pa = -1, pi = -1;
+        for (int k = 0; k < n; k++) { if (ord[k] == a) pa = k; if (ord[k] == i) pi = k; }
+        CHECK(pa >= 0 && pi >= 0 && (pa - pi == 1 || pi - pa == 1) && grp[pa] == grp[pi], "ma: order: the pair side by side, one dpkg run");
+    }
+    plan_free(&p);
+    /* asking for the amd64 one alone still moves the pair */
+    const char *lc[] = { "libc6" };
+    o = (PlanOpts){ 0 };
+    plan_make(&x, &st, lc, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_UPGRADE, "libc6") && has(&p, PA_UPGRADE, "libc6:i386"), "ma: libc6 alone brings libc6:i386: %s", p.err);
+    plan_free(&p);
+    /* a split is refused: libsplit 2 for amd64 only */
+    const char *ls[] = { "libsplit" };
+    plan_make(&x, &st, ls, 1, NULL, 0, &o, &p);
+    CHECK(!p.ok && lerr_has(p.err, "pkg.multiarchSplit"), "ma: libsplit 2 alone is refused: %s", p.err);
+    plan_free(&p);
+    /* removing the i386 libc6 takes what needs it (python3:i386), never the native one */
+    const char *rc[] = { "libc6:i386" };
+    o = (PlanOpts){ .cascade = 1 };
+    plan_make(&x, &st, NULL, 0, rc, 1, &o, &p);
+    CHECK(p.ok && has(&p, PA_REMOVE, "libc6:i386") && has(&p, PA_REMOVE, "python3:i386") && item_at(&p, "libc6") < 0 && p.n == 2,
+          "ma: removing libc6:i386: %s (%d)", p.err, p.n);
+    plan_free(&p);
+    /* unqualified Conflicts apply to every architecture: conf-a against libplain:i386 */
+    const char *both[] = { "steam-libs-i386:i386", "conf-a" };
+    o = (PlanOpts){ 0 };
+    plan_make(&x, &st, both, 2, NULL, 0, &o, &p);
+    CHECK(!p.ok && lerr_has(p.err, "pkg.conflict"), "ma: conf-a conflicts with libplain:i386: %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+
+    /* libplain installed for amd64 (Multi-Arch: no): its i386 one can't be added next to it */
+    ma_status(sp, "Package: libplain\nStatus: install ok installed\nVersion: 1\nArchitecture: amd64\nDescription: l\n\n");
+    memset(&st, 0, sizeof st);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 8, "ma: status with libplain");
+    plan_make(&x, &st, sli, 1, NULL, 0, &o, &p);
+    CHECK(!p.ok && lerr_has(p.err, "pkg.multiarchConflict") && !has(&p, PA_INSTALL, "libplain:i386"), "ma: libplain:i386 can't join libplain (Multi-Arch: no): %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+
+    /* a pair already split on the system (amd64 newer): installing the i386 package's dependents picks the
+     * i386 version that matches, never moves amd64 down */
+    ma_status(sp, NULL);
+    {
+        FILE *f = fopen(sp, "w");
+        fputs("Package: libc6\nStatus: install ok installed\nVersion: 2.41-12+deb13u1\nArchitecture: amd64\nMulti-Arch: same\nDescription: c\n\n"
+              "Package: dbus-user-session\nStatus: install ok installed\nVersion: 1\nArchitecture: amd64\nMulti-Arch: foreign\nProvides: dbus-session-bus\nDescription: d\n\n", f);
+        fclose(f);
+    }
+    memset(&st, 0, sizeof st);
+    status_load(&st, sp, "amd64");
+    plan_make(&x, &st, sli, 1, NULL, 0, &o, &p);
+    int c6 = item_at(&p, "libc6:i386");
+    CHECK(p.ok && c6 >= 0 && !strcmp(p.items[c6].version, "2.41-12+deb13u1") && item_at(&p, "libc6") < 0,
+          "ma: a new libc6:i386 at the amd64 version: %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+
+    /* i386 packages installed but no i386 lists (i386 left out of the sources): libc6 is held, never split */
+    char nd2[700];
+    snprintf(nd2, sizeof nd2, "%s/ma-native", dir);
+    mkdir(nd2, 0755);
+    b = idxb_new();
+    s = idxb_source(b, "http://deb", "trixie", "main", "trixie", "Debian", "Debian", 0, 0, 500);
+    idxb_packages(b, s, MA_AMD64, strlen(MA_AMD64), "amd64");
+    CHECK(!idxb_write(b, nd2, "amd64", err, sizeof err), "ma: native index: %s", err);
+    idxb_free(b);
+    ma_status(sp, NULL);
+    memset(&st, 0, sizeof st);
+    CHECK(!idx_open(&x, nd2) && !status_load(&st, sp, "amd64"), "ma: native-only index");
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    held = 0;
+    for (int k = 0; k < p.nheld; k++) if (!strcmp(p.held[k], "libc6")) held = 1;
+    CHECK(p.ok && item_at(&p, "libc6") < 0 && item_at(&p, "libc6:i386") < 0 && held, "ma: no i386 lists: libc6 held with its i386 pair: %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+}
+
+/* (0.8.8.9) A vendor package that owns its own source (Valve's steam-launcher): LordOS's bootstrap files go
+ * only once the package is installed with its own list naming the repository and its own keyring holding
+ * the pinned key. A fixture system tree and catalog, owned by whoever runs the test. */
+static void mkpath(const char *root, const char *rel) {
+    char p[800];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    for (char *c = p + strlen(root) + 1; *c; c++) if (*c == '/') { *c = 0; mkdir(p, 0755); *c = '/'; }
+    mkdir(p, 0755);
+}
+static void put(const char *root, const char *rel, const char *text) {
+    char p[800];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    write_text(p, text);
+}
+static int exists_in(const char *root, const char *rel) {
+    char p[800];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    return !access(p, F_OK);
+}
+
+static void test_handover(const char *dir) {
+    FILE *kf = fopen("../apt/keys/steam.asc", "r");
+    if (!kf) { printf("skipped: handover (needs ../apt/keys/steam.asc)\n"); return; }
+    static char key[64 * 1024];
+    size_t kl = fread(key, 1, sizeof key - 1, kf);
+    fclose(kf);
+    key[kl] = 0;
+    char root[600], cat[600];
+    snprintf(root, sizeof root, "%s/ho-root", dir);
+    snprintf(cat, sizeof cat, "%s/ho-lordos", dir);
+    mkdir(root, 0755);
+    mkdir(cat, 0755);
+    mkpath(root, "etc/apt/sources.list.d");
+    mkpath(root, "usr/share/keyrings");
+    mkpath(root, "var/lib/dpkg");
+    mkpath(cat, "apt/keys");
+    put(cat, "apt/keys/steam.asc", key);
+    put(cat, "apt/catalog.json",
+        "{\"schema\":1,\"apps\":[{\"id\":\"steam\",\"package\":\"steam-launcher\",\"name\":\"Steam\",\"arches\":[\"amd64\"],"
+        "\"source\":{\"type\":\"apt\",\"delivery\":\"direct\",\"url\":\"https://repo.steampowered.com/steam\",\"suite\":\"stable\","
+        "\"components\":[\"steam\"],\"arches\":[\"amd64\"],\"multiarch\":[\"i386\"],\"key\":\"keys/steam.asc\","
+        "\"fingerprint\":\"DB23C56BF0F377FD02970A2A84706F31879D59CB\",\"package\":\"steam-launcher\","
+        "\"files\":{\"list\":\"steam-stable.list\",\"keyring\":\"steam.gpg\",\"ownedBy\":\"steam-launcher\"}}}]}");
+    pkg_sources_owner = getuid();
+    const char *boot = "etc/apt/sources.list.d/lordos-steam.sources", *bkey = "usr/share/keyrings/lordos-steam.asc";
+    const char *vlist = "etc/apt/sources.list.d/steam-stable.list", *vkey = "usr/share/keyrings/steam.gpg";
+    const char *good = "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam\n"
+                       "deb-src [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam\n";
+    put(root, boot, "Types: deb\n");
+    put(root, bkey, key);
+    put(root, "var/lib/dpkg/status", "Package: dpkg\nStatus: install ok installed\nVersion: 1.22\nArchitecture: amd64\nDescription: d\n\n");
+    CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: steam-launcher not installed: the bootstrap stays");
+    put(root, "var/lib/dpkg/status", "Package: steam-launcher\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: amd64\nDescription: s\n\n");
+    CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: installed, no list of its own yet: stays");
+    put(root, vlist, "deb [signed-by=/usr/share/keyrings/steam.gpg] https://example.com/steam/ stable steam\n");
+    put(root, vkey, key);
+    CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: a list for another repository: stays");
+    put(root, vlist, good);
+    put(root, vkey, "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n-----END PGP PUBLIC KEY BLOCK-----\n");
+    CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: a keyring without the pinned key: stays");
+    put(root, vkey, key);
+    char lp[800];
+    snprintf(lp, sizeof lp, "%s/%s", root, vlist);
+    chmod(lp, 0666);
+    CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: a list others may write: stays");
+    chmod(lp, 0644);
+    CHECK(pkg_sources_handover_in(root, cat) == 1 && !exists_in(root, boot) && !exists_in(root, bkey) && exists_in(root, vlist) && exists_in(root, vkey),
+          "handover: the vendor's own source in place: LordOS's two files removed, the vendor's kept");
+    CHECK(pkg_sources_handover_in(root, cat) == 0, "handover: a second run changes nothing");
+    pkg_sources_owner = 0;
+}
+
 int main(int argc, char **argv) {
     if (argc >= 4 && !strcmp(argv[1], "pgp")) {
         PgpKeyring kr = { 0 };
@@ -760,6 +1066,8 @@ int main(int argc, char **argv) {
     test_hwdata(dir);
     test_pins(dir);
     test_dpkg_owner(dir);
+    test_multiarch(dir);
+    test_handover(dir);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
     if (system(cmd)) {}

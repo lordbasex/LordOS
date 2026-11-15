@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Image supprimée",
   "vm.downloadResumed": "Reprise d’un téléchargement arrêté ({from} octets gardés)",
   "vm.kvmReady": "C’est fait : les machines peuvent utiliser la virtualisation matérielle",
-  "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion"
+  "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion",
+  "pkg.foreignArchAdded": "Paquets 32 bits ({arch}) activés",
+  "pkg.foreignArchPresent": "Les paquets 32 bits ({arch}) étaient déjà activés",
+  "pkg.why.multiarchPair": "Même version que {name}"
 }

@@ -151,5 +151,8 @@
   "vm.imageRemoved": "イメージを削除しました",
   "vm.downloadResumed": "停止したダウンロードを再開しています ({from} バイトは保持)",
   "vm.kvmReady": "許可しました: 仮想マシンでハードウェア仮想化を使用できるようになりました",
-  "vm.kvmNextLogin": "次回のログインから許可されます"
+  "vm.kvmNextLogin": "次回のログインから許可されます",
+  "pkg.foreignArchAdded": "32 ビット ({arch}) パッケージを有効にしました",
+  "pkg.foreignArchPresent": "32 ビット ({arch}) パッケージはすでに有効です",
+  "pkg.why.multiarchPair": "{name} と同じバージョン"
 }

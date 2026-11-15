@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Avbilden raderad",
   "vm.downloadResumed": "Fortsätter en stoppad nedladdning ({from} byte behållna)",
   "vm.kvmReady": "Tillåtet: maskiner kan nu använda hårdvaruvirtualisering",
-  "vm.kvmNextLogin": "Tillåtet från din nästa inloggning"
+  "vm.kvmNextLogin": "Tillåtet från din nästa inloggning",
+  "pkg.foreignArchAdded": "32-bitarspaket ({arch}) aktiverade",
+  "pkg.foreignArchPresent": "32-bitarspaket ({arch}) var redan aktiverade",
+  "pkg.why.multiarchPair": "Samma version som {name}"
 }

@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Imatge eliminada",
   "vm.downloadResumed": "Es continua una baixada aturada ({from} bytes conservats)",
   "vm.kvmReady": "Permès: ara les màquines poden fer servir la virtualització per maquinari",
-  "vm.kvmNextLogin": "Permès a partir del proper inici de sessió"
+  "vm.kvmNextLogin": "Permès a partir del proper inici de sessió",
+  "pkg.foreignArchAdded": "Paquets de 32 bits ({arch}) habilitats",
+  "pkg.foreignArchPresent": "Els paquets de 32 bits ({arch}) ja estaven habilitats",
+  "pkg.why.multiarchPair": "La mateixa versió que {name}"
 }

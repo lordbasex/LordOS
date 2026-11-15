@@ -90,6 +90,17 @@ int deb_valid_name(const char *s, size_t n) {
     return 1;
 }
 
+size_t deb_base_len(const char *s, size_t n) {
+    const char *c = memchr(s, ':', n);
+    return c ? (size_t)(c - s) : n;
+}
+
+int deb_valid_pkgarg(const char *s, size_t n) {
+    size_t b = deb_base_len(s, n);
+    if (b == n) return deb_valid_name(s, n);
+    return deb_valid_name(s, b) && n - b - 1 == strlen(DEB_FOREIGN_ARCH) && !memcmp(s + b + 1, DEB_FOREIGN_ARCH, n - b - 1);
+}
+
 int deb_valid_version(const char *s, size_t n) {
     if (!n || n > 128) return 0;
     for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)s[i]) && !strchr(".+-~:", s[i])) return 0;
@@ -176,7 +187,14 @@ int deb_next_group(const char **pp, const char *end, DebRel *alts, int max) {
             r->name = a;
             while (a < ge && !is_space(*a) && *a != '(' && *a != '|' && *a != '[' && *a != '<' && *a != ':') a++;
             r->nlen = (size_t)(a - r->name);
-            if (a < ge && *a == ':') while (a < ge && !is_space(*a) && *a != '(' && *a != '|' && *a != '[' && *a != '<') a++;   /* :any, :native */
+            r->arch = NULL;
+            r->alen = 0;
+            if (a < ge && *a == ':') {          /* :any, :native, :i386 */
+                r->arch = ++a;
+                while (a < ge && !is_space(*a) && *a != '(' && *a != '|' && *a != '[' && *a != '<') a++;
+                r->alen = (size_t)(a - r->arch);
+                if (!r->alen) r->arch = NULL;
+            }
             r->op = REL_NONE;
             r->ver = NULL;
             r->vlen = 0;

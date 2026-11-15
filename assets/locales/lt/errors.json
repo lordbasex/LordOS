@@ -872,5 +872,9 @@
   "webapps.badSound": "Nežinomas pranešimo garsas",
   "webapps.badColor": "Nežinoma profilio spalva",
   "webapps.iconOrigin": "Svetainė perėjo kitu adresu, todėl jos piktograma neišsaugota",
-  "webapps.noIcon": "Svetainė nesiūlo piktogramos, kurią LordOS galėtų naudoti"
+  "webapps.noIcon": "Svetainė nesiūlo piktogramos, kurią LordOS galėtų naudoti",
+  "pkg.multiarchSplit": "{name} 64 ir 32 bitų versijos turi sutapti, o šis pakeitimas jas išskirtų",
+  "pkg.multiarchConflict": "{name} negalima įdiegti 64 ir 32 bitų vienu metu",
+  "pkg.foreignArchUnsupported": "32 bitų paketus galima įjungti tik 64 bitų kompiuteryje (amd64); ši sistema yra {arch}",
+  "pkg.foreignArchFailed": "Nepavyko įjungti 32 bitų ({arch}) paketų (dpkg baigė darbą su kodu {code})"
 }

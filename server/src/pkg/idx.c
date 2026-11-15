@@ -268,7 +268,7 @@ static int prio_of(const char *v, size_t n) {
 
 #define FIELD(name) (d822_is(&f, name))
 
-int idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch) {
+static int packages(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch, int foreign) {
     const char *pos = buf, *end = buf + len, *st, *se;
     size_t archlen = strlen(arch);
     uint32_t count = 0;
@@ -288,7 +288,7 @@ int idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const cha
             size_t n = f.vlen;
             switch (f.name[0] | 0x20) {
             case 'a':
-                if (FIELD("Architecture")) { p.arch = intern(b, v, n); ok_arch = (n == archlen && !strncmp(v, arch, n)) || (n == 3 && !strncmp(v, "all", 3)); }
+                if (FIELD("Architecture")) { p.arch = intern(b, v, n); ok_arch = (n == archlen && !strncmp(v, arch, n)) || (!foreign && n == 3 && !strncmp(v, "all", 3)); }
                 break;
             case 'b':
                 if (FIELD("Breaks")) p.breaks = intern(b, v, n);
@@ -347,7 +347,14 @@ int idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const cha
         /* names with a slash or .. in Filename are rejected: they're downloaded to a fixed name, but still */
         const char *fn = b->str + p.filename;
         if (strstr(fn, "..") || fn[0] == '/') continue;
-        p.name = intern(b, name, namelen);
+        if (foreign) {                  /* (multiarch) another architecture's package: "name:arch" */
+            char q[200];
+            if (namelen + archlen + 2 > sizeof q) continue;
+            memcpy(q, name, namelen);
+            q[namelen] = ':';
+            memcpy(q + namelen + 1, arch, archlen);
+            p.name = intern(b, q, namelen + 1 + archlen);
+        } else p.name = intern(b, name, namelen);
         if (desc) {
             const char *nl = memchr(desc, '\n', desclen);
             size_t sl = nl ? (size_t)(nl - desc) : desclen;
@@ -374,6 +381,9 @@ int idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const cha
     b->src[src].npkgs += count;
     return 0;
 }
+
+int idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch) { return packages(b, src, buf, len, arch, 0); }
+int idxb_packages_foreign(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch) { return packages(b, src, buf, len, arch, 1); }
 
 static uint32_t md5h(const uint8_t *m) { return (uint32_t)m[0] | (uint32_t)m[1] << 8 | (uint32_t)m[2] << 16 | (uint32_t)m[3] << 24; }
 

@@ -871,5 +871,9 @@
   "webapps.badSound": "Ismeretlen értesítési hang",
   "webapps.badColor": "Ismeretlen profilszín",
   "webapps.iconOrigin": "A webhely másik címre költözött, ezért az ikonja nem lett megtartva",
-  "webapps.noIcon": "A webhely nem kínál a LordOS által használható ikont"
+  "webapps.noIcon": "A webhely nem kínál a LordOS által használható ikont",
+  "pkg.multiarchSplit": "A(z) {name} 64 és 32 bites változatának azonos verziójúnak kell lennie, ez a módosítás pedig szétválasztaná őket",
+  "pkg.multiarchConflict": "A(z) {name} nem telepíthető egyszerre 64 és 32 bitesként",
+  "pkg.foreignArchUnsupported": "32 bites csomagokat csak 64 bites PC-n (amd64) lehet engedélyezni; ez a rendszer: {arch}",
+  "pkg.foreignArchFailed": "Nem sikerült engedélyezni a 32 bites ({arch}) csomagokat (a dpkg {code} kóddal lépett ki)"
 }

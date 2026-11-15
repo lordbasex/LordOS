@@ -151,5 +151,8 @@
   "vm.imageRemoved": "Đã xóa ảnh đĩa",
   "vm.downloadResumed": "Đang tiếp tục bản tải xuống bị dừng (giữ lại {from} byte)",
   "vm.kvmReady": "Đã cho phép: máy ảo giờ có thể dùng ảo hóa phần cứng",
-  "vm.kvmNextLogin": "Được cho phép từ lần đăng nhập tiếp theo"
+  "vm.kvmNextLogin": "Được cho phép từ lần đăng nhập tiếp theo",
+  "pkg.foreignArchAdded": "Đã bật các gói 32 bit ({arch})",
+  "pkg.foreignArchPresent": "Các gói 32 bit ({arch}) đã được bật từ trước",
+  "pkg.why.multiarchPair": "Cùng phiên bản với {name}"
 }

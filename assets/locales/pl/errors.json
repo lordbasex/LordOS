@@ -872,5 +872,9 @@
   "webapps.badSound": "Nieznany dźwięk powiadomienia",
   "webapps.badColor": "Nieznany kolor profilu",
   "webapps.iconOrigin": "Witryna przeniosła się pod inny adres, więc jej ikona nie została zachowana",
-  "webapps.noIcon": "Witryna nie oferuje ikony, której LordOS mógłby użyć"
+  "webapps.noIcon": "Witryna nie oferuje ikony, której LordOS mógłby użyć",
+  "pkg.multiarchSplit": "{name} musi mieć tę samą wersję dla 64 i 32 bitów, a ta zmiana by je rozdzieliła",
+  "pkg.multiarchConflict": "Nie można zainstalować {name} jednocześnie dla 64 i 32 bitów",
+  "pkg.foreignArchUnsupported": "Pakiety 32-bitowe można włączyć tylko na 64-bitowym komputerze (amd64); ten system to {arch}",
+  "pkg.foreignArchFailed": "Nie udało się włączyć pakietów 32-bitowych ({arch}) (dpkg zakończył się kodem {code})"
 }

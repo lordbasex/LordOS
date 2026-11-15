@@ -871,5 +871,9 @@
   "webapps.badSound": "Naməlum bildiriş səsi",
   "webapps.badColor": "Naməlum profil rəngi",
   "webapps.iconOrigin": "Sayt başqa ünvana köçüb, ona görə onun ikonu saxlanılmadı",
-  "webapps.noIcon": "Sayt LordOS-un istifadə edə biləcəyi ikon təklif etmir"
+  "webapps.noIcon": "Sayt LordOS-un istifadə edə biləcəyi ikon təklif etmir",
+  "pkg.multiarchSplit": "{name} 64 və 32 bit üçün eyni versiyada olmalıdır, bu dəyişiklik isə onları ayırardı",
+  "pkg.multiarchConflict": "{name} eyni anda 64 və 32 bit üçün quraşdırıla bilməz",
+  "pkg.foreignArchUnsupported": "32 bitlik paketlər yalnız 64 bitlik kompüterdə (amd64) aktivləşdirilə bilər; bu sistem {arch}-dir",
+  "pkg.foreignArchFailed": "32 bitlik ({arch}) paketlər aktivləşdirilə bilmədi (dpkg {code} kodu ilə başa çatdı)"
 }

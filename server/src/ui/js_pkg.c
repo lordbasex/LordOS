@@ -179,6 +179,7 @@ static JSValue f_search(JSContext *c, JSValueConst this_val, int argc, JSValueCo
     for (long i = 0; hits && X.map && i < (long)X.h->npkg; i++) {
         if (i && X.pkg[i].name == X.pkg[i - 1].name) continue;        /* once per name */
         const IdxPkg *p = &X.pkg[i];
+        if (strchr(idx_s(&X, p->name), ':')) continue;              /* (multiarch) i386 libraries aren't searched */
         const IdxApp *a = p->app != UINT32_MAX && p->app < X.h->napp ? &X.app[p->app] : NULL;
         if (apps_only && (!a || strcmp(idx_s(&X, a->type), "desktop-application"))) continue;
         if (section[0] && strcmp(idx_s(&X, p->section), section)) continue;
@@ -213,7 +214,7 @@ static JSValue f_search(JSContext *c, JSValueConst this_val, int argc, JSValueCo
 static int arg_name(JSContext *c, JSValueConst v, char *out, size_t n) {
     const char *s = JS_ToCString(c, v);
     if (!s) return -1;
-    int ok = strlen(s) < n && deb_valid_name(s, strlen(s));
+    int ok = strlen(s) < n && deb_valid_pkgarg(s, strlen(s));       /* a name, or "name:i386" (multiarch) */
     if (ok) snprintf(out, n, "%s", s);
     JS_FreeCString(c, s);
     return ok ? 0 : -1;
@@ -276,11 +277,10 @@ static JSValue f_installed(JSContext *c, JSValueConst this_val, int argc, JSValu
     refresh();
     JSValue arr = JS_NewArray(c);
     uint32_t n = 0;
-    for (int i = 0; i < ST.n; i++) {
+    for (int i = 0; i < ST.n; i++) {                /* every architecture: "libc6:i386" by its key */
         const StPkg *p = &ST.p[i];
-        if (!p->native) continue;
-        long rec = idx_find(&X, p->name, strlen(p->name));
-        JS_SetPropertyUint32(c, arr, n++, summary_obj(c, p->name, rec, p, lang_of(lang)));
+        long rec = idx_find(&X, p->key, strlen(p->key));
+        JS_SetPropertyUint32(c, arr, n++, summary_obj(c, p->key, rec, p, lang_of(lang)));
     }
     return arr;
 }
@@ -292,11 +292,10 @@ static JSValue f_upgrades(JSContext *c, JSValueConst this_val, int argc, JSValue
     uint32_t n = 0;
     for (int i = 0; X.map && i < ST.n; i++) {
         const StPkg *p = &ST.p[i];
-        if (!p->native) continue;
-        long cand = pkg_candidate(&X, p->name, strlen(p->name), p);
+        long cand = pkg_candidate(&X, p->key, strlen(p->key), p);
         if (cand < 0 || ver_cmp(idx_s(&X, X.pkg[cand].version), p->version) <= 0) continue;
         JSValue o = JS_NewObject(c);
-        set_s(c, o, "name", p->name);
+        set_s(c, o, "name", p->key);                /* "libc6:i386" for an i386 package (multiarch) */
         set_s(c, o, "from", p->version);
         set_s(c, o, "to", idx_s(&X, X.pkg[cand].version));
         set_s(c, o, "summary", idx_s(&X, X.pkg[cand].summary));
@@ -500,6 +499,18 @@ static JSValue f_sources(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return arr;
 }
 
+/* (0.8.8.9) i386 multiarch: { native, supported (an amd64 system), i386 (enabled in dpkg) }. Read-only;
+ * enabling it is the admin action pkg-foreign-arch. */
+static JSValue f_multiarch(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    JSValue o = JS_NewObject(c);
+    const char *n = pkg_native_arch();
+    set_s(c, o, "native", n);
+    JS_SetPropertyStr(c, o, "supported", JS_NewBool(c, !strcmp(n, "amd64")));
+    JS_SetPropertyStr(c, o, "i386", JS_NewBool(c, pkg_i386_enabled()));
+    return o;
+}
+
 static JSValue f_last_update(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
     refresh();
@@ -648,6 +659,7 @@ static const JSCFunctionListEntry pkg_funcs[] = {
     JS_CFUNC_DEF("rebootRequired", 0, f_reboot_required),
     JS_CFUNC_DEF("available", 0, f_available),
     JS_CFUNC_DEF("lastUpdate", 0, f_last_update),
+    JS_CFUNC_DEF("multiarch", 0, f_multiarch),
     JS_CFUNC_DEF("sources", 0, f_sources),
     JS_CFUNC_DEF("search", 2, f_search),
     JS_CFUNC_DEF("info", 2, f_info),

@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Image verwijderd",
   "vm.downloadResumed": "Een gestopte download wordt hervat ({from} bytes behouden)",
   "vm.kvmReady": "Toegestaan: machines kunnen nu hardwarevirtualisatie gebruiken",
-  "vm.kvmNextLogin": "Toegestaan vanaf je volgende aanmelding"
+  "vm.kvmNextLogin": "Toegestaan vanaf je volgende aanmelding",
+  "pkg.foreignArchAdded": "32-bits pakketten ({arch}) ingeschakeld",
+  "pkg.foreignArchPresent": "32-bits pakketten ({arch}) waren al ingeschakeld",
+  "pkg.why.multiarchPair": "Dezelfde versie als {name}"
 }

@@ -48,14 +48,42 @@ const char *pkg_native_arch(void) {
     return arch;
 }
 
+const char *pkg_dpkg_arch_file = DPKG_ARCH_FILE;
+
+/* Is arch in dpkg's list (one name per line, written by dpkg --add-architecture together with the native
+ * one)? The native architecture always counts. */
+int pkg_arch_listed(const char *native, const char *arch) {
+    if (!strcmp(native, arch)) return 1;
+    FILE *f = fopen(pkg_dpkg_arch_file, "re");
+    char line[64];
+    int found = 0;
+    while (f && !found && fgets(line, sizeof line, f)) {
+        line[strcspn(line, " \t\r\n")] = 0;
+        if (!strcmp(line, arch)) found = 1;
+    }
+    if (f) fclose(f);
+    return found;
+}
+
+int pkg_i386_enabled(void) {
+    const char *n = pkg_native_arch();
+    return !strcmp(n, "amd64") && pkg_arch_listed(n, "i386");
+}
+
 static int st_cmp(const void *pa, const void *pb) {
     const StPkg *a = pa, *b = pb;
-    int c = strcmp(a->name, b->name);
+    int c = strcmp(a->key, b->key);
     if (c) return c;
     return (int)b->native - (int)a->native;
 }
 
+static void keys_free(char **keys, int n) {
+    for (int i = 0; i < n; i++) free(keys[i]);
+    free(keys);
+}
+
 void status_free(Status *s) {
+    keys_free(s->keys, s->nkeys);
     free(s->p);
     free(s->buf);
     memset(s, 0, sizeof *s);
@@ -74,7 +102,8 @@ int status_load(Status *s, const char *path, const char *arch) {
     fclose(f);
     buf[len] = 0;
     StPkg *v = NULL;
-    int n = 0, vcap = 0;
+    int n = 0, vcap = 0, nkeys = 0;
+    char **keys = NULL;
     const char *pos = buf, *end = buf + len, *sa, *se;
     size_t archlen = strlen(arch);
     while (d822_next_stanza(&pos, end, &sa, &se)) {
@@ -135,11 +164,21 @@ int status_load(Status *s, const char *path, const char *arch) {
         }
         if (!p.name || !p.version) continue;
         if (!p.arch) p.arch = "";
-        p.native = (strlen(p.arch) == archlen && !strcmp(p.arch, arch)) || !strcmp(p.arch, "all");
+        p.native = (strlen(p.arch) == archlen && !strcmp(p.arch, arch)) || !strcmp(p.arch, "all") || !p.arch[0];
+        p.key = p.name;
+        if (!p.native) {                /* another architecture's package: its own key, "name:arch" */
+            size_t kl = strlen(p.name) + strlen(p.arch) + 2;
+            char *k = malloc(kl), **nk = realloc(keys, sizeof *nk * (size_t)(nkeys + 1));
+            if (nk) keys = nk;
+            if (!k || !nk) { free(k); keys_free(keys, nkeys); free(v); free(buf); return -1; }
+            snprintf(k, kl, "%s:%s", p.name, p.arch);
+            keys[nkeys++] = k;
+            p.key = k;
+        }
         if (n == vcap) {
             vcap = vcap ? vcap * 2 : 1024;
             StPkg *nv = realloc(v, sizeof *nv * (size_t)vcap);
-            if (!nv) { free(v); free(buf); return -1; }
+            if (!nv) { keys_free(keys, nkeys); free(v); free(buf); return -1; }
             v = nv;
         }
         v[n++] = p;
@@ -149,6 +188,8 @@ int status_load(Status *s, const char *path, const char *arch) {
     s->p = v;
     s->n = n;
     s->buf = buf;
+    s->keys = keys;
+    s->nkeys = nkeys;
     s->mtime = (long)st.st_mtime;
     s->size = (long)st.st_size;
     return 0;
@@ -158,15 +199,11 @@ const StPkg *status_find(const Status *s, const char *name, size_t n) {
     int lo = 0, hi = s->n;
     while (lo < hi) {
         int mid = (lo + hi) / 2;
-        int c = strncmp(s->p[mid].name, name, n);
-        if (!c && s->p[mid].name[n]) c = 1;
+        int c = strncmp(s->p[mid].key, name, n);
+        if (!c && s->p[mid].key[n]) c = 1;
         if (c < 0) lo = mid + 1; else hi = mid;
     }
-    for (int i = lo; i < s->n; i++) {
-        if (strncmp(s->p[i].name, name, n) || s->p[i].name[n]) break;
-        if (s->p[i].native) return &s->p[i];
-    }
-    return NULL;
+    return lo < s->n && !strncmp(s->p[lo].key, name, n) && !s->p[lo].key[n] ? &s->p[lo] : NULL;
 }
 
 /* ---- who owns a launcher's .desktop file (dpkg's file lists) ---- */

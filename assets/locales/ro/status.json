@@ -169,5 +169,8 @@
   "vm.imageRemoved": "Imagine ștearsă",
   "vm.downloadResumed": "Se continuă o descărcare oprită ({from} octeți păstrați)",
   "vm.kvmReady": "Permis: mașinile pot folosi acum virtualizarea hardware",
-  "vm.kvmNextLogin": "Permis de la următoarea autentificare"
+  "vm.kvmNextLogin": "Permis de la următoarea autentificare",
+  "pkg.foreignArchAdded": "Pachetele pe 32 de biți ({arch}) au fost activate",
+  "pkg.foreignArchPresent": "Pachetele pe 32 de biți ({arch}) erau deja activate",
+  "pkg.why.multiarchPair": "Aceeași versiune ca {name}"
 }

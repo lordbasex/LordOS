@@ -871,5 +871,9 @@
   "webapps.badSound": "Onbekend meldingsgeluid",
   "webapps.badColor": "Onbekende profielkleur",
   "webapps.iconOrigin": "De site is naar een ander adres verhuisd, dus het pictogram is niet behouden",
-  "webapps.noIcon": "De site biedt geen pictogram dat LordOS kan gebruiken"
+  "webapps.noIcon": "De site biedt geen pictogram dat LordOS kan gebruiken",
+  "pkg.multiarchSplit": "{name} moet voor 64 en 32 bits dezelfde versie hebben, en deze wijziging zou ze uit elkaar halen",
+  "pkg.multiarchConflict": "{name} kan niet tegelijk voor 64 en 32 bits worden geïnstalleerd",
+  "pkg.foreignArchUnsupported": "32-bits pakketten kunnen alleen worden ingeschakeld op een 64-bits pc (amd64); dit systeem is {arch}",
+  "pkg.foreignArchFailed": "32-bits pakketten ({arch}) konden niet worden ingeschakeld (dpkg stopte met code {code})"
 }

@@ -875,5 +875,9 @@
   "webapps.badSound": "صوت إشعار غير معروف",
   "webapps.badColor": "لون ملف شخصي غير معروف",
   "webapps.iconOrigin": "انتقل الموقع إلى عنوان آخر، لذلك لم يُحتفظ بأيقونته",
-  "webapps.noIcon": "لا يقدّم الموقع أيقونة يمكن لـ LordOS استخدامها"
+  "webapps.noIcon": "لا يقدّم الموقع أيقونة يمكن لـ LordOS استخدامها",
+  "pkg.multiarchSplit": "يجب أن يكون لـ {name} الإصدار نفسه في 64 و32 بت، وهذا التغيير سيجعلهما مختلفين",
+  "pkg.multiarchConflict": "لا يمكن تثبيت {name} لـ 64 و32 بت في الوقت نفسه",
+  "pkg.foreignArchUnsupported": "لا يمكن تفعيل حزم 32 بت إلا على حاسوب 64 بت (amd64)؛ هذا النظام {arch}",
+  "pkg.foreignArchFailed": "تعذّر تفعيل حزم 32 بت ({arch}) (انتهى dpkg بالرمز {code})"
 }

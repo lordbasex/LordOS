@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Kalıp silindi",
   "vm.downloadResumed": "Durdurulan indirme sürdürülüyor ({from} bayt korundu)",
   "vm.kvmReady": "İzin verildi: makineler artık donanım sanallaştırmasını kullanabilir",
-  "vm.kvmNextLogin": "Bir sonraki oturum açışınızdan itibaren izin verildi"
+  "vm.kvmNextLogin": "Bir sonraki oturum açışınızdan itibaren izin verildi",
+  "pkg.foreignArchAdded": "32 bit ({arch}) paketler etkinleştirildi",
+  "pkg.foreignArchPresent": "32 bit ({arch}) paketler zaten etkindi",
+  "pkg.why.multiarchPair": "{name} ile aynı sürüm"
 }

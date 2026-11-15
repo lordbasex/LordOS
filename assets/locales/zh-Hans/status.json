@@ -151,5 +151,8 @@
   "vm.imageRemoved": "映像已删除",
   "vm.downloadResumed": "正在继续已停止的下载（已保留 {from} 字节）",
   "vm.kvmReady": "已允许：虚拟机现在可以使用硬件虚拟化",
-  "vm.kvmNextLogin": "将从你下次登录时起允许"
+  "vm.kvmNextLogin": "将从你下次登录时起允许",
+  "pkg.foreignArchAdded": "已启用 32 位（{arch}）软件包",
+  "pkg.foreignArchPresent": "32 位（{arch}）软件包已经启用",
+  "pkg.why.multiarchPair": "与 {name} 版本相同"
 }
