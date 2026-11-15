@@ -1,0 +1,22 @@
+{
+  "folder": "Felvételek",
+  "name": "Felvétel {date} {time}",
+  "all": "Összes felvétel",
+  "empty": "Még nincsenek felvételek",
+  "hint": "Nyomja meg a piros gombot (vagy az R billentyűt) a mikrofonos felvételhez",
+  "denied": "A Diktafon nem használhatja a mikrofont",
+  "play": "Lejátszás",
+  "pause": "Szünet",
+  "rename": "Átnevezés",
+  "trim": "Vágás",
+  "cancelTrim": "Vágás megszakítása",
+  "saveTrim": "Vágott másolat mentése",
+  "trimmed": "vágott",
+  "export": "Exportálás mint",
+  "exportBtn": "Exportálás",
+  "working": "Exportálás…",
+  "exported": "„{name}” mentve",
+  "exportError": "Nem sikerült exportálni",
+  "renameError": "Nem sikerült átnevezni (talán már létezik ilyen nevű?)",
+  "emptyTitle": "Válasszon vagy készítsen felvételt"
+}

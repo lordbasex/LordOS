@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Fotó {date}",
+  "videoName": "Videó {date}",
+  "photo": "Fotó",
+  "video": "Videó",
+  "mirror": "Tükrözés",
+  "none": "Nem található kamera",
+  "denied": "A Kamera alkalmazás nem használhatja a kamerát. Módosítsa a Beállítások → Adatvédelem részben.",
+  "error": "Nem sikerült használni a kamerát: {error}",
+  "noneHint": "Csatlakoztasson egy USB-kamerát: magától megjelenik itt, az alkalmazás újraindítása nélkül.",
+  "deniedTitle": "Nincs hozzáférés a kamerához",
+  "errorTitle": "A kamerát nem sikerült megnyitni"
+}
