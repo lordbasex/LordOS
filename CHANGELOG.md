@@ -31,6 +31,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   their `meta.json`. A computer whose LANG is one of them starts in it, on the desktop and on the login screen.
   Settings → Language & Region, the installer and the login screen list them from their `meta.json`, with no code
   list to edit.
+- **Catalan, Filipino and Swahili, each one complete** (maintainer's request, 2026-11-15; added and completed the same
+  day): Catalan (`ca`, Català, region `ca_ES`), Filipino (`fil`, Filipino, `fil_PH`) and Swahili (`sw`, Kiswahili,
+  `sw_KE`), chosen from lordos.org's visits as the 26 were: Spain, the Philippines and Kenya. That makes 35 interface
+  languages, every one with all 12,436 keys (`node tools/i18n-check.mjs`: `12436/12436 keys` for `ca`, `fil` and
+  `sw`), the emoji names and keywords and the country names included. All three are left to right, write 0–9 and use
+  Inter. Their `format.json` comes from glibc 2.41 and CLDR 45: Catalan writes its months with «de» («diumenge, 15 de
+  novembre de 2026», «d’abril»), a 24-hour clock and «1.234.567,89»; Filipino puts the month first («Linggo, Nobyembre
+  15, 2026», 11/15/2026), a 12-hour clock with AM/PM and «1,234,567.89»; Swahili writes «Jumapili, 15 Novemba 2026»,
+  15/11/2026, the 12-hour clock glibc has for `sw_KE` and `sw_TZ`, «1,234,567.89», and glibc's short days (J1–J5,
+  Alh, Ij). Catalan and Swahili use the `one-other` plural rule; Filipino brings a **new plural rule, `filipino`**
+  (`sdk/plurals.js`, CLDR 45 for whole numbers): `other` only for numbers ending in 4, 6 or 9 (4, 14, 26, 109), `one`
+  for every other (0–3, 5, 7, 8, 10–13, 21, 100), checked against CLDR's samples in `server/tests/locales_test.mjs`
+  and accepted by `tools/i18n-pack.mjs new`. `fil` is the **first language with a three-letter ISO 639 code**, as glibc
+  names its region; the folders, `languageOfLocale`, `i18n-pack`, Settings, the installer and the login screen
+  already took two or three letters, and Read aloud's fallback language for a text too short to tell (`uiLang` in
+  `sdk/voice.js`) now takes the whole id instead of its first two letters (`fil`, not `fi`). `tools/brand-check.mjs`
+  allows two Swahili words that are spelled like brand names: the word for March (the month in glibc `sw_KE` and
+  CLDR `sw`) and the word for journey (in the wallpaper names). Like the 26, they have had no review by native
+  speakers yet (the Translation review issue form asks for one). Docs: docs/LANGUAGES.md's section "Catalan, Filipino
+  and Swahili", the plural rules table and the count of 35 languages; docs/TRANSLATING.md.
 - **The core set** a new language translates first, in `tools/i18n-core.json` (Lithuanian's first part, 1,052 of
   12,415 English keys): the login screen, the desktop, Files, the installer, About, the app names, the file dialogs,
   the force-quit and calculator texts, and Settings' sections, Language & Region and Date & Time formats.
@@ -119,7 +139,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   site. The same limit as before holds: sites whose dark mode is only CSS `@media` rules stay light. New:
   `lord.webapps.setColorScheme(app, value)` (desktop only, not in the broker; a bad value is `sys.badArgument`),
   `colorSchemeOf` and `COLOR_SCHEMES` in `sdk/webappsmodel.js`, `webAppearanceItem` in `sdk/appcontrol.js`, and the
-  `webapps.appearance.*` texts (8 keys) in all 32 languages (the 26 new ones get their first `webapps.json`).
+  `webapps.appearance.*` texts (8 keys) in all 35 languages (the 29 new ones get their first `webapps.json`).
   Tests: `build/webapp-test` (the key read and written back, the defaults not written, seven bad forms refused,
   `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
   word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
@@ -156,7 +176,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   is not lost; the same word is ignored. WebKit's site-specific quirks keep today's rule (off on the app's own pages,
   on for other sites). New: `lord.webapps.setUserAgent(app, profile, value)` (desktop only, not in the broker; a bad
   value is `sys.badArgument`), `USER_AGENTS` and `userAgentOf` in `sdk/webappsmodel.js`, `webUserAgentItem` in
-  `sdk/appcontrol.js`, the `webapps.identity.*` texts (13 keys) in all 32 languages; they name no company or service
+  `sdk/appcontrol.js`, the `webapps.identity.*` texts (13 keys) in all 35 languages; they name no company or service
   beyond the three browsers. Tests: `build/webapp-test` (the five strings, Chrome's and Edge's on every machine, the
   LordOS token from the version given, Firefox's processor, experimental without other browsers' tokens, unknown
   kinds refused, the key per profile read, written only when not `chrome`, ten bad forms refused; 518 checks),
@@ -200,6 +220,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Catalan, Filipino and Swahili in the docs and the paper, 35 languages** (2026-11-15). docs/LANGUAGES.md: the
+  introduction counts 35 languages (the 26 and then ca, fil and sw), the `i18n-check` count is 12,436 keys complete in
+  all 35, and the pending list says "the 29 new languages"; its new section "Catalan, Filipino and Swahili" (ids,
+  regions, formats, the `filipino` plural rule, the three-letter id, `weblang_id`) and the plural rules table came with
+  the languages. docs/TRANSLATING.md: all 35 languages are complete, and section 7 (native review) says Catalan,
+  Filipino and Swahili have had no native review either. The paper (en, es, pt, edition 0.8.8.9 Beta of 2026-11-15)
+  and docs/PAPER.md: §4.4 adds Catalan (Spain), Filipino (the Philippines) and Swahili (Kenya), chosen the same way on
+  2026-11-15, Filipino's new plural rule, and 35 languages in all; the Help articles' sentence and §10.2's limitations
+  say "the 29 new languages" (no Help articles, no native review yet). docs/PAPER-VALIDATION.md: the 0.8.8.9 languages
+  row says 29 more, 35 in all, checked by `i18n-check` for all 35 and `locales_test.mjs` for the `filipino` rule.
 - **Translation review, asked of native speakers** (maintainer's decision, 2026-11-15: be honest that the new languages
   have had no native review, and invite people to confirm or report): a new GitHub issue form, "Translation review"
   (`.github/ISSUE_TEMPLATE/translation-review.yml`, label `translation-review`), to confirm that a language reads well or
@@ -281,6 +311,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **lordos.org: Catalan, Filipino and Swahili, 35 languages**, in English, Spanish and Portuguese (in development
+  after 0.8.8.8, the latest release). `web/content/languages.json` "next" adds Català, Filipino and Kiswahili, so the
+  Languages page (`/language/`) lists them under "New in the next pre-release" after the 26 (their `meta.json` gives
+  the names; the picture's flags are decoration with no per-language mapping, so it is unchanged). The page's status
+  line and new-languages text say 29 new languages, the text still saying they were translated quickly, have had no
+  native review and asking native speakers for a translation review; "How new languages are chosen" says 26 came from
+  the visits of the 30 days to 12 November 2026 and Catalan, Filipino and Swahili (Spain, the Philippines and Kenya) on
+  15 November 2026. The FAQ "Which languages does LordOS speak?" says 29 more, names Català, Filipino and Kiswahili
+  among them and counts 35 languages; Contributing (`/legal/contributing/`) says 29 more in development; Cleaner's
+  feature page says "the 29 more in development".
 - **lordos.org says the languages are complete, in English, Spanish and Portuguese** (in development after 0.8.8.8,
   the latest release). The Languages page (`/language/`) lists the six released languages under "Complete languages"
   and the 26 new ones under "New in the next pre-release", complete like them, instead of a "Partial languages"
@@ -448,6 +488,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **lord-web picks the right language for three-letter ids and for Chinese.** The LordOS Web Runtime's own texts
+  (`server/src/web/weblang.c`) took only the first two letters of `LC_ALL`, `LC_MESSAGES` or `LANG`, so `fil_PH.UTF-8`
+  loaded Finnish (`fi`) and any `zh_*` looked for a `zh` folder that does not exist and fell back to English. It now
+  uses `weblang_id()` (`server/src/web/weblangid.h`, pure): the whole language part, two or three lowercase letters
+  (`fil_PH` → `fil`), and Chinese by the script its country writes, as `languageOfLocale` in `sdk/localename.js` does
+  (`zh_TW`, `zh_HK`, `zh_MO` → `zh-Hant`; any other `zh` → `zh-Hans`); anything else (`C.UTF-8`, `POSIX`, empty,
+  `Fil_PH`) is English. Tested in `server/tests/webapp_test.c` (`build/webapp-test`).
 - **lord-server no longer aborts at start when built with `_FORTIFY_SOURCE`** (pull request
   [#138](https://github.com/lordbasex/LordOS/pull/138), thanks to Kiisanz). `realpath()` may write up to `PATH_MAX`
   bytes, but the Terminal's shell-integration folder (`server/src/term/pty.c`, 1,024 bytes) and the fan helper's device

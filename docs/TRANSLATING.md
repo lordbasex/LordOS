@@ -6,8 +6,8 @@ files.
 
 **A language ships complete.** That is the project's rule (maintainer's business rule, 2026-11-15): a new language is
 released only when every key is translated (`node tools/i18n-check.mjs` shows `N/N keys`), and every text that is
-added or changed in English goes to every language in the same release or pre-release. All 32 languages LordOS has
-today (English, Spanish, Portuguese, French, Italian, Lithuanian and the 26 in development after 0.8.8.8) are
+added or changed in English goes to every language in the same release or pre-release. All 35 languages LordOS has
+today (English, Spanish, Portuguese, French, Italian, Lithuanian and the 29 in development after 0.8.8.8) are
 complete, 12,436 keys each. A language can be built in several pull requests, marked partial while it is under way
 (step 2), but it is not released until it is whole.
 
@@ -204,8 +204,9 @@ languages, reviews of these texts are welcome as pull requests too.
 
 ## 7. Native review
 
-The 26 languages added on 2026-11-12 were completed quickly (2026-11-15) and have had no review by native speakers
-yet; the same holds for French. Native speakers are invited to confirm that a language reads well, or to report texts
+The 26 languages added on 2026-11-12 were completed quickly (2026-11-15), and so were Catalan, Filipino and Swahili
+(added and completed on 2026-11-15); none of them has had a review by native speakers yet, and the same holds for
+French. Native speakers are invited to confirm that a language reads well, or to report texts
 that are wrong or unnatural, through the
 [Translation review](https://github.com/lordbasex/LordOS/issues/new?template=translation-review.yml) issue form
 (label `translation-review`), or to fix them directly with a pull request as above. A confirmation is as useful as a

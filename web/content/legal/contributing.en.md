@@ -49,7 +49,7 @@ Use your real name (or the name you are publicly known by). Pull requests with c
 
 ## Translations
 
-LordOS 0.8.8.8 ships in six languages, each one complete: English, Spanish, Portuguese, French, Italian and Lithuanian; 26 more, also complete, are in development for the next pre-release (the [Languages](/language/) page lists them). A language ships only when every text is translated, and a change to an English text goes to every language in the same release. To add a language, follow the [translators' guide](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md); the technical reference is [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Corrections to the existing translations are welcome too.
+LordOS 0.8.8.8 ships in six languages, each one complete: English, Spanish, Portuguese, French, Italian and Lithuanian; 29 more, also complete, are in development for the next pre-release (the [Languages](/language/) page lists them). A language ships only when every text is translated, and a change to an English text goes to every language in the same release. To add a language, follow the [translators' guide](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md); the technical reference is [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Corrections to the existing translations are welcome too.
 
 ## Code of conduct
 
