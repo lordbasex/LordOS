@@ -1,0 +1,21 @@
+{
+  "search": "جستجوی ایموجی",
+  "results": {
+    "one": "{count} نتیجه",
+    "other": "{count} نتیجه"
+  },
+  "none": "چیزی پیدا نشد",
+  "noRecent": "ایموجی‌هایی که استفاده می‌کنید اینجا نمایش داده می‌شوند",
+  "copied": "{text} کپی شد: با Ctrl+V جای‌گذاری کنید",
+  "more": "بیشتر…",
+  "group.recent": "اخیر",
+  "group.smileys": "شکلک‌ها و احساسات",
+  "group.people": "افراد و بدن",
+  "group.animals": "حیوانات و طبیعت",
+  "group.food": "غذا و نوشیدنی",
+  "group.travel": "سفر و مکان‌ها",
+  "group.activities": "فعالیت‌ها",
+  "group.objects": "اشیا",
+  "group.symbols": "نمادها",
+  "group.flags": "پرچم‌ها"
+}

@@ -1,0 +1,74 @@
+{
+  "archiveName": "بایگانی",
+  "archiveSummary": {
+    "one": "{count} فایل، {size}",
+    "other": "{count} فایل، {size}"
+  },
+  "compressOne": "فشرده‌سازی «{name}»",
+  "compressMany": {
+    "one": "فشرده‌سازی {count} مورد",
+    "other": "فشرده‌سازی {count} مورد"
+  },
+  "compressing": "در حال فشرده‌سازی «{name}»…",
+  "compressProgress": "در حال فشرده‌سازی «{name}»: {files} فایل",
+  "compressed": {
+    "one": "«{name}» آماده است ({count} فایل)",
+    "other": "«{name}» آماده است ({count} فایل)"
+  },
+  "compressError": "«{name}» فشرده نشد ({error})",
+  "extractHere": "استخراج در اینجا",
+  "extractSelected": {
+    "one": "استخراج {count} مورد",
+    "other": "استخراج {count} مورد"
+  },
+  "extracting": "در حال استخراج «{name}»…",
+  "extractProgress": "در حال استخراج «{name}»: {files} فایل ({pct}%)",
+  "extracted": {
+    "one": "در «{name}» استخراج شد ({count} فایل)",
+    "other": "در «{name}» استخراج شد ({count} فایل)"
+  },
+  "extractedSkipped": {
+    "one": "در «{name}» استخراج شد ({count} فایل)؛ {skipped} مورد برای ایمنی رد شد",
+    "other": "در «{name}» استخراج شد ({count} فایل)؛ {skipped} مورد برای ایمنی رد شد"
+  },
+  "extractError": "«{name}» استخراج نشد ({error})",
+  "opening": "در حال باز کردن «{name}»…",
+  "loading": "در حال بارگیری…",
+  "locked": "محافظت‌شده با گذرواژه",
+  "pages": {
+    "one": "{count} صفحه",
+    "other": "{count} صفحه"
+  },
+  "more": {
+    "one": "و {count} مورد دیگر",
+    "other": "و {count} مورد دیگر"
+  },
+  "err.invalid": "بایگانی نیست یا آسیب دیده است",
+  "err.missing-volume": "بخشی از بایگانی چندتکه وجود ندارد: «{name}»",
+  "err.disk-full": "دیسک پر است",
+  "err.too-big": "بیش از حد بزرگ است",
+  "err.too-many": "فایل‌های بیش از حدی دارد",
+  "err.corrupt": "آسیب دیده است",
+  "err.write": "نوشته نشد",
+  "err.unavailable": "دستیار اسناد در دسترس نیست",
+  "err.cancelled": "لغو شد",
+  "err.crash": "دستیار اسناد به‌طور غیرمنتظره متوقف شد",
+  "err.timeout": "بیش از حد طول کشید",
+  "err.protocol": "دستیار اسناد پاسخ نامعتبری فرستاد",
+  "err.spawn": "دستیار اسناد شروع نشد",
+  "err.closed": "سند بسته شد",
+  "err.bad-request": "درخواست نامعتبر",
+  "err.bad-field": "فیلد فرم نامعتبر",
+  "err.bad-page": "صفحهٔ نامعتبر",
+  "err.busy": "دستیار اسناد مشغول است",
+  "err.memory": "حافظه تمام شد",
+  "err.no-fonts": "قلمی در دسترس نیست",
+  "err.not-open": "سند باز نیست",
+  "err.nothing": "چیزی برای ذخیره نیست",
+  "err.read-only": "سند فقط‌خواندنی است",
+  "err.save": "ذخیره نشد",
+  "err.unknown-op": "عملیات ناشناخته",
+  "err.image": "تصویر نامعتبر",
+  "err.blob": "دادهٔ نامعتبر",
+  "err.password": "سند با گذرواژه محافظت شده است"
+}
