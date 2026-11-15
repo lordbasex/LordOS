@@ -91,9 +91,12 @@ static int check_image(NSVGimage *img, float scale, int side) {
             !finite_all(s->bounds, 4) || !finite_all(s->xform, 6) || !paint_ok(&s->fill) || !paint_ok(&s->stroke))
             return -1;
         if (s->strokeWidth * scale > side) s->strokeWidth = side / scale;
-        if (s->strokeDashCount < 0 || s->strokeDashCount > 8) return -1;
-        int dashes = s->strokeDashCount > 0;
-        for (int i = 0; i < s->strokeDashCount; i++)
+        /* nanosvg stores the count in a plain char: signed on x86, unsigned on arm64. Read it as signed on both,
+         * so a corrupt count is refused the same way everywhere (and arm64 builds without -Wtype-limits noise). */
+        int dash_count = (signed char)s->strokeDashCount;
+        if (dash_count < 0 || dash_count > 8) return -1;
+        int dashes = dash_count > 0;
+        for (int i = 0; i < dash_count; i++)
             if (!isfinite(s->strokeDashArray[i]) || s->strokeDashArray[i] < 0 || s->strokeDashArray[i] * scale < 0.25f) dashes = 0;
         if (!isfinite(s->strokeDashOffset)) dashes = 0;
         if (!dashes) s->strokeDashCount = 0;
