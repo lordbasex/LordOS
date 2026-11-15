@@ -327,5 +327,8 @@
   "zoom.reset": "Ukubwa Halisi",
   "zoom.label": "Ukubwa wa aikoni na maandishi",
   "markup": "Alama",
-  "markupHint": "Fungua katika kihariri cha alama"
+  "markupHint": "Fungua katika kihariri cha alama",
+  "readOnly.title": "Faili haziwezi kubadilisha “{name}”",
+  "readOnly.outside": "Faili zinaweza tu kuonyesha folda hii: iko nje ya folda yako ya nyumbani na diski zako. Ili kuibadilisha, tumia Terminal au programu nyingine.",
+  "readOnly.denied": "Folda hii ni ya kusoma tu: ruhusa zake hazikuruhusu kuibadilisha. Ili kuibadilisha, tumia Terminal au programu nyingine."
 }

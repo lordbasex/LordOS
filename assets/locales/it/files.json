@@ -327,5 +327,8 @@
   "zoom.reset": "Dimensioni reali",
   "zoom.label": "Dimensione di icone e testo",
   "markup": "Annota",
-  "markupHint": "Apri nell’editor di annotazioni"
+  "markupHint": "Apri nell’editor di annotazioni",
+  "readOnly.title": "File non può modificare “{name}”",
+  "readOnly.outside": "File può solo mostrare questa cartella: è fuori dalla tua cartella Inizio e dai tuoi dischi. Per modificarla, usa il Terminale o un'altra app.",
+  "readOnly.denied": "Questa cartella è di sola lettura: i suoi permessi non ti consentono di modificarla. Per modificarla, usa il Terminale o un'altra app."
 }

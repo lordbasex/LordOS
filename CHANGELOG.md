@@ -219,6 +219,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 345 checks) and
   `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
 
+- **Files says why it can't change a folder, and where to change it**
+  ([#139](https://github.com/lordbasex/LordOS/issues/139), thanks to Irh18; the maintainer chose to improve the
+  notice only). Files writes only in the home folder and the user's disks (`lord.fs`, `fsops_allowed`); elsewhere,
+  such as `/opt/lampp/htdocs` even after `chown` to the user, it only browses, and New Folder, Paste, Rename,
+  Duplicate, Move to Trash and Cut were greyed out or did nothing, which looked like a bug. A folder Files only browses
+  now shows a bar under the toolbar: "Files can only view this folder: it is outside your home folder and your disks.
+  To change it, use the Terminal or another app.", or, for a folder inside them whose permissions don't allow changes
+  (or a read-only disk), that the folder is read-only, with an Open in Terminal button. Those actions stay in the menus
+  and the toolbar, and using one, or its key (Delete, ❖⌫, ❖X, Ctrl+V, ❖D, ↵, ❖⇧N), opens a sheet that says the same
+  with Open in Terminal at that folder. `lord.fs`'s write rules are unchanged. Pure logic in `apps/files/colview.js`
+  (`readOnlyWhy`), tested in `server/tests/files_colview_test.mjs`; three new texts (`files.readOnly.*`) in all 35
+  languages. Not checked on screen yet.
+
 ### Changed
 
 - **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,
@@ -593,6 +606,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   still need a run on VM 127. Until the next release, `env -u GTK_IM_MODULE <app>` from the Terminal works around it.
   Thanks to Irh18 for the report with the exact assertion and the variables that fixed it, and to JrocMD for the
   Steam report and its log. Documented in `docs/WAYLAND.md` ("How to open an app", "Input methods").
+- **Files: New Folder goes in the selected folder in the column and list views**
+  ([#134](https://github.com/lordbasex/LordOS/issues/134), thanks to MacNB). The toolbar button, File → New Folder,
+  the empty-space menu and ❖⇧N always made the folder in the place shown (the first column, or the list's top
+  folder), even with a folder picked in a deeper column or selected inside an unfolded one. Now it goes where Finder
+  puts it: in the column view, in the last column's folder (the folder picked there, or the folder of the file
+  picked); in the list, in the selected folder (unfolded so its name can be typed) or in the folder the selected items
+  are in; in the icon and gallery views, which show one folder, and with nothing selected, in the folder shown. It is
+  never outside the folder shown, and a target Files can't write in says why (#139 below). Checked in every view: the
+  list also counted only its top folder's items as the selection, so what was selected inside an unfolded folder had
+  nothing for Copy, Rename, Duplicate or Move to Trash to act on (the list view's side of #100); those items are part
+  of the selection now (`listEntries`). Pure logic in `apps/files/colview.js` (`newFolderDir`, `listEntries`), tested
+  in `server/tests/files_colview_test.mjs`. Not checked on screen yet.
+- **Files: the column view keeps every column, and Back goes back up the columns**
+  ([#133](https://github.com/lordbasex/LordOS/issues/133), thanks to MacNB). Since 0.8.8.8 (#99) the column view
+  showed only the last columns that fit next to the preview, so widening a column or opening a subfolder dropped the
+  first ones out of the view with no way to reach them. Every column is now drawn, side by side, and when they don't
+  fit they scroll sideways, as in Finder: a sideways swipe or tilt of the wheel, or the bar along the bottom edge.
+  Opening a deeper folder scrolls to it with the preview in sight; widening a column keeps the scroll, so the first
+  columns stay where they are. The preview takes what is left of the view, at least 200 px (`colStrip`, replacing
+  `colsThatFit`). Back also left the column view: a click in a column was no step in the history, so Back went to the
+  place before in that place's own view (Home in icons). Each folder opened down the columns is now a step: Back and
+  Forward walk the columns and stay in the column view, and only a step to another place opens it in its own view
+  (`chainStep`, `historyStep`; leaving a place keeps its columns for Back). The view stays left to right in every
+  language. Tested in `server/tests/files_colview_test.mjs` and in the scene `server/tests/files_colview_scene.mjs`
+  (five columns drawn where 0.8.8.8 kept one). Not checked on screen yet. MacNB's other suggestion in
+  the issue (← → to the parent or child folder and ↑ ↓ in the column, as in Finder) is not part of this change.
 - **lord-web picks the right language for three-letter ids and for Chinese.** The LordOS Web Runtime's own texts
   (`server/src/web/weblang.c`) took only the first two letters of `LC_ALL`, `LC_MESSAGES` or `LANG`, so `fil_PH.UTF-8`
   loaded Finnish (`fi`) and any `zh_*` looked for a `zh` folder that does not exist and fell back to English. It now

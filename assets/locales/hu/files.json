@@ -327,5 +327,8 @@
   "zoom.reset": "Eredeti méret",
   "zoom.label": "Ikon- és szövegméret",
   "markup": "Jelölés",
-  "markupHint": "Megnyitás a jelölésszerkesztőben"
+  "markupHint": "Megnyitás a jelölésszerkesztőben",
+  "readOnly.title": "A Fájlok nem tudja módosítani a(z) „{name}” elemet",
+  "readOnly.outside": "A Fájlok csak megjeleníteni tudja ezt a mappát: a saját mappádon és a lemezeiden kívül van. A módosításához használd a Terminált vagy egy másik appot.",
+  "readOnly.denied": "Ez a mappa írásvédett: a jogosultságai nem engedik, hogy módosítsd. A módosításához használd a Terminált vagy egy másik appot."
 }

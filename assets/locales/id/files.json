@@ -319,5 +319,8 @@
   "zoom.reset": "Ukuran Sebenarnya",
   "zoom.label": "Ukuran ikon dan teks",
   "markup": "Markah",
-  "markupHint": "Buka di editor markah"
+  "markupHint": "Buka di editor markah",
+  "readOnly.title": "Berkas tidak dapat mengubah “{name}”",
+  "readOnly.outside": "Berkas hanya dapat melihat folder ini: folder ini berada di luar folder rumah dan disk Anda. Untuk mengubahnya, gunakan Terminal atau aplikasi lain.",
+  "readOnly.denied": "Folder ini hanya-baca: izinnya tidak memperbolehkan Anda mengubahnya. Untuk mengubahnya, gunakan Terminal atau aplikasi lain."
 }

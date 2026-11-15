@@ -319,5 +319,8 @@
   "zoom.reset": "實際大小",
   "zoom.label": "圖像與文字大小",
   "markup": "標示",
-  "markupHint": "在標示編輯器中打開"
+  "markupHint": "在標示編輯器中打開",
+  "readOnly.title": "「檔案」無法更改「{name}」",
+  "readOnly.outside": "「檔案」只能檢視此資料夾：它位於你的個人資料夾和磁碟之外。若要更改它，請使用「終端機」或其他 App。",
+  "readOnly.denied": "此資料夾為唯讀：其權限不允許你更改它。若要更改它，請使用「終端機」或其他 App。"
 }

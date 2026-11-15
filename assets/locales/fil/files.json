@@ -327,5 +327,8 @@
   "zoom.reset": "Aktuwal na Laki",
   "zoom.label": "Laki ng icon at teksto",
   "markup": "Markup",
-  "markupHint": "Buksan sa markup editor"
+  "markupHint": "Buksan sa markup editor",
+  "readOnly.title": "Hindi mababago ng Mga File ang “{name}”",
+  "readOnly.outside": "Matitingnan lang ng Mga File ang folder na ito: nasa labas ito ng iyong home folder at ng iyong mga disk. Para baguhin ito, gamitin ang Terminal o ibang app.",
+  "readOnly.denied": "Read-only ang folder na ito: hindi ka pinapayagan ng mga pahintulot nito na baguhin ito. Para baguhin ito, gamitin ang Terminal o ibang app."
 }

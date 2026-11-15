@@ -327,5 +327,8 @@
   "zoom.reset": "Originalgröße",
   "zoom.label": "Größe von Symbolen und Text",
   "markup": "Markierungen",
-  "markupHint": "Im Markierungseditor öffnen"
+  "markupHint": "Im Markierungseditor öffnen",
+  "readOnly.title": "Dateien kann „{name}“ nicht ändern",
+  "readOnly.outside": "Dateien kann diesen Ordner nur anzeigen: Er liegt außerhalb deines Benutzerordners und deiner Laufwerke. Verwende zum Ändern das Terminal oder eine andere App.",
+  "readOnly.denied": "Dieser Ordner ist schreibgeschützt: Seine Zugriffsrechte erlauben dir keine Änderungen. Verwende zum Ändern das Terminal oder eine andere App."
 }

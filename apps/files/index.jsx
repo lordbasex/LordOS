@@ -26,7 +26,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
-import { columnEntries, columnRange, byFolder, folderReadOnly, colWidthsWith } from './colview.js';
+import { columnEntries, columnRange, byFolder, folderReadOnly, colWidthsWith, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from './colview.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
@@ -79,6 +79,9 @@ function startLoc(k) {
   const d = userDirs().find((x) => x.label === k);
   return d ? { type: 'dir', path: d.path } : homeLoc();
 }
+// the session's user, for the disks Files writes on (/media/$USER, /run/media/$USER): asked once
+let userOnce = null;
+const userName = () => { if (userOnce === null) { try { userOnce = String(systemInfo().user || ''); } catch (e) { userOnce = ''; } } return userOnce; };
 // This computer is named after the machine
 const computerName = () => { try { return systemInfo().hostname || tr('files.place.computer'); } catch (e) { return tr('files.place.computer'); } };
 // Partitions (or whole disks without a table) that hold a file system and aren't mounted, off the
@@ -357,6 +360,9 @@ export default function Files() {
     return folderReadOnly(curDir, fs.home(), fs.stat);         // the home folder takes changes (apps/files/colview.js)
   }, [curDir, version, curRemote, remoteInfo]);
   const wDir = readOnly ? null : curDir;
+  // why it is only browsed (GitHub #139): a bar says so, and an action that would change it says why instead of doing
+  // nothing; lord.fs's rules are not widened (server/src/fsops.c)
+  const roWhy = readOnlyWhy(curDir, readOnly, fs.home(), userName());
   const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
 
   const viewOf = (l) => { const k = viewKey(l); return { ...viewFor(filesPrefs(), l), sortChosen: !!k && !!filesPrefs().folderViews[k] }; };
@@ -367,10 +373,13 @@ export default function Files() {
     if (tab.loc.type === 'network') netExpanded.current = expanded;      // back in Network, what was unfolded stays
     setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(next.type === 'network' ? netExpanded.current : new Set());
     if (next.type === 'dir') noteFolder(next.path);
-    patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [], ...viewOf(next) }));
+    patchTab((x) => ({ loc: next, back: push ? [...x.back, { ...x.loc, chain: x.chain || [] }].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [], ...viewOf(next) }));
   }
-  const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(prev), loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
-  const goForward = () => { if (!tab.fwd.length) return; const nxt = tab.fwd[0]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(nxt), loc: nxt, back: [...x.back, x.loc], fwd: x.fwd.slice(1), chain: [] })); };
+  // in the column view each folder opened down the columns is a step too (GitHub #133: Back left the column view for the
+  // place before, in its own view); in the same place only the columns change (apps/files/colview.js)
+  const goHistory = (d) => { if (!(d < 0 ? tab.back : tab.fwd).length) return; setSelected(new Set()); patchTab((x) => historyStep(x, d, viewOf, sameLoc) || {}); };
+  const goBack = () => goHistory(-1);
+  const goForward = () => goHistory(1);
   const goUp = () => {
     if (baseLoc.type === 'archive') { navigate(baseLoc.inner ? { type: 'archive', path: baseLoc.path, inner: baseLoc.inner.split('/').slice(0, -1).join('/') } : { type: 'dir', path: fs.parent(baseLoc.path) || '/' }); return; }
     if (curDir && curDir !== '/' && curDir !== fs.home()) navigate({ type: 'dir', path: fs.parent(curDir) || '/' });
@@ -390,9 +399,14 @@ export default function Files() {
   // the column view shows the folders down its chain too: what is picked in a deeper column is part of the selection
   // (GitHub #100: it was looked up only among the first column's items, so Copy, Move to Trash… had nothing to act on)
   const colView = tab.view === 'columns' && loc.type === 'dir';
+  const shownView = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
   const colItems = useMemo(() => (colView ? columnEntries(curDir || fs.home(), tab.chain, (d) => sortEntries(entriesOf(d), tab.sort, sortOpts)) : null),
     [colView, curDir, tab.chain, tab.sort.by, tab.sort.desc, prefs.foldersFirst, hidden, version, remoteVer]);
-  const sel = (colItems || flat).filter((e) => selected.has(e.path));
+  // the list shows the unfolded folders' items too: what is selected in one is part of the selection (GitHub #134)
+  const listItems = useMemo(() => (shownView === 'list' && expanded.size && loc.type !== 'network'
+    ? listEntries(flat, expanded, (e) => (e.trash || e.app || e.arc || e.netHost ? null : sortEntries(entriesOf(e.path), sortBy, sortOpts))) : null),
+  [shownView, flat, expanded, loc.type, hidden, version, remoteVer, sortBy.by, sortBy.desc, prefs.foldersFirst]);
+  const sel = (colItems || listItems || flat).filter((e) => selected.has(e.path));
   const selPaths = sel.map((e) => e.path);
   const first = sel[0];
   const local = (ev) => (root.current ? ev.local(root.current) : { x: ev.x, y: ev.y });
@@ -400,9 +414,23 @@ export default function Files() {
 
   // ---- actions ----
   const report = (e) => { console.log(`files: ${e?.message || e}`); setMsg(String(e?.message || e)); };
-  // at: the folder it goes in (the shown one; in the column view, the one the selection is in)
-  const newFolder = (withPaths, at = wDir) => {
+  // the read-only notice (GitHub #139): an action that would change a folder Files only browses says why, with the way
+  // to change it (the Terminal there), instead of being greyed out or doing nothing. true when it was shown.
+  const blocked = (why = roWhy, dir = curDir) => {
+    if (!why || !dir) return false;
+    setConfirm({ text: tr('files.readOnly.title', { name: fs.basename(dir) }), detail: tr(`files.readOnly.${why}`), ok: tr('files.menu.openTerminal'),
+      run: () => openTerminal(dir) });
+    return true;
+  };
+  // at: the folder it goes in; left out, where New Folder puts it (GitHub #134: in the column view the last column's
+  // folder, in the list the selected folder or the selected items' folder, else the folder shown; colview.js)
+  const newFolder = (withPaths, at) => {
+    if (at === undefined) at = curDir ? newFolderDir({ view: shownView, dir: curDir, chain: tab.chain, selected: selPaths, isDir: (p) => viewCtx.isDir(p) }) : null;
     if (!at) return;
+    const ro = at === curDir ? readOnly : !fs.isRemote(at) && folderReadOnly(at, fs.home(), fs.stat);
+    if (ro) { blocked(readOnlyWhy(at, true, fs.home(), userName()), at); return; }
+    // in the list a folder made inside a folded one is shown: the folder is unfolded, so its name can be typed
+    if (shownView === 'list' && at !== curDir) setExpanded((x) => (x.has(at) ? x : new Set([...x, at])));
     if (fs.isRemote(at)) {
       // a slow folder: the names it shows, and the folder made off the thread (the field opens when it exists)
       const dir = at;
@@ -425,7 +453,7 @@ export default function Files() {
       setRenaming({ path: `${at}/${name}`, value: name });
     } catch (e) { report(e); }
   };
-  const startRename = (e = first) => { if (e && !e.app && !e.trash && wDir !== null) { setSelected(new Set([e.path])); setRenaming({ path: e.path, value: e.name }); } };
+  const startRename = (e = first) => { if (e && !e.app && !e.trash && blocked()) return; if (e && !e.app && !e.trash && wDir !== null) { setSelected(new Set([e.path])); setRenaming({ path: e.path, value: e.name }); } };
   const commitRename = () => {
     const r = renaming;
     setRenaming(null);
@@ -507,6 +535,7 @@ export default function Files() {
     return null;
   };
   const toTrash = (paths = selPaths) => {
+    if (paths.length && blocked()) return;
     if (!paths.length || readOnly || loc.type === 'network') return;
     if (loc.type === 'trash') { askDelete(paths); return; }
     // Cloud (docs/CLOUD.md 17.2): what is in a cloud account is deleted there, after asking, and never moved into a
@@ -550,6 +579,7 @@ export default function Files() {
   };
   const trashRef = useRef(toTrash);
   trashRef.current = toTrash;
+  const cutSel = (paths = selPaths) => { if (!paths.length || blocked()) return; if (!readOnly) cutFiles(paths); };
   const restore = (paths = selPaths) => { let n = 0; for (const p of paths) { try { fs.restore(p); n++; } catch (err) { report(err); } } if (n) { setMsg(tr('files.restored', { count: n })); bump(); } };
   // disks: the same closed actions as the Disks app (an internal disk asks for an administrator)
   const mount = (p) => {
@@ -569,10 +599,11 @@ export default function Files() {
       (e) => setMsg(e.message));
   };
   // next to each item: in the column view one picked in a deeper column stays in its own folder
-  const duplicate = (paths = selPaths) => { if (wDir && paths.length) for (const g of byFolder(paths)) transfer(g.paths, g.dir, false, knownNames(g.dir)); };
+  const duplicate = (paths = selPaths) => { if (paths.length && blocked()) return; if (wDir && paths.length) for (const g of byFolder(paths)) transfer(g.paths, g.dir, false, knownNames(g.dir)); };
   // Files another app copied are copied for real: a sheet first says how many, from which app and which ones
   // (Enter cancels), so a list put on the clipboard behind the person's back is never pasted unseen.
   const doPaste = () => {
+    if (canPaste(clip) && blocked()) return;
     if (!wDir) return;
     const c = pastePlan();
     const ask = pasteAsk(c);
@@ -618,7 +649,6 @@ export default function Files() {
   };
   const setView = (view) => { patchTab({ view }); keepView(view, tab.sort); };
   // zoom (issue #33): icon and text size of the icon and list views, a step per view, kept with the place
-  const shownView = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
   const zoomable = ZOOM_VIEWS.includes(shownView);
   const zoom = zoomOf(tab.zoom, shownView);
   const setZoom = (z) => {
@@ -751,27 +781,28 @@ export default function Files() {
           archive.extract(e.arc.file, `${dir}/${name}`, { only: list.map((x) => x.arc.inner) }).then((r) => { bump(); setMsg(tr('docs.extracted', { name, count: r.files })); }).catch((err) => setMsg(tr('docs.extractError', { name, error: err.message }))); } }];
     }
     const openers = openersFor(e, launcherApps, tr);
-    // where Compress and New Folder with Selection put what they make: next to the item (a deeper column's own folder)
-    const here = wDir && colItems ? fs.parent(e.path) || wDir : wDir;
+    // where Compress and New Folder with Selection put what they make: next to the item (a deeper column's own folder,
+    // an unfolded folder's in the list)
+    const here = wDir && (colItems || listItems) ? fs.parent(e.path) || wDir : wDir;
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
       ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
       ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
       ...(() => { const ci = cloudMenuItems(list, cf, { onShare: setSharing, onMsg: setMsg }); return ci.length ? ['-', ...ci] : []; })(),
       '-',
-      { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
+      { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly && !roWhy },
       '-',
       // compress and extract (M9, lord-doc)
       ...(wDir && list.length === 1 && isArchiveFile(e) ? [{ label: tr('docs.extractHere'), onClick: () => extractHere(e, arcReport, tr) }] : []),
       ...(wDir ? [{ label: list.length === 1 ? tr('docs.compressOne', { name: e.name }) : tr('docs.compressMany', { count: list.length }), onClick: () => compress(paths, here, arcReport, tr) }] : []),
       '-',
       { label: tr('files.menu.getInfo'), hint: '❖I', onClick: () => setInfo(true) },
-      { label: tr('files.menu.rename'), hint: '↵', onClick: () => startRename(e), disabled: paths.length > 1 || !wDir },
-      { label: tr('files.menu.duplicate'), hint: '❖D', onClick: () => duplicate(paths), disabled: !wDir },
+      { label: tr('files.menu.rename'), hint: '↵', onClick: () => startRename(e), disabled: paths.length > 1 || (!wDir && !roWhy) },
+      { label: tr('files.menu.duplicate'), hint: '❖D', onClick: () => duplicate(paths), disabled: !wDir && !roWhy },
       { label: tr('files.menu.quickLook'), hint: '␣', onClick: () => setQuick(true) },
       '-',
       { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(paths) },
-      { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutFiles(paths), disabled: readOnly },
+      { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutSel(paths), disabled: readOnly && !roWhy },
       { label: tr('files.menu.copyPath'), onClick: () => clipboard.set(paths.join('\n')) },
       ...(wDir ? [{ label: tr('files.menu.newFolderWith', { count: paths.length }), onClick: () => newFolder(paths, here) }] : []),
       '-',
@@ -789,7 +820,8 @@ export default function Files() {
     }
     if (loc.type === 'trash') return [{ label: tr('files.menu.emptyTrash'), danger: true, onClick: askEmpty, disabled: !entries.length }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
     return [
-      ...(wDir ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) }, '-'] : []),
+      // on the empty space: the folder shown (the selection the click cleared doesn't count); the last column's in columns
+      ...(wDir || roWhy ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null, shownView === 'columns' ? undefined : curDir) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) }, '-'] : []),
       { label: tr('files.menu.view'), submenu: viewItems },
       { label: tr('files.menu.sortBy'), submenu: sortItems },
       { label: tr('files.menu.groupBy'), submenu: groupItems },
@@ -870,7 +902,7 @@ export default function Files() {
     if (mod && b === 'i') { setInfo((v) => !v); return; }
     if (mod && b === 'd') { duplicate(); return; }
     if (mod && b === 'c') { if (selPaths.length) copyFiles(selPaths); return; }
-    if (mod && b === 'x') { if (selPaths.length && !readOnly) cutFiles(selPaths); return; }
+    if (mod && b === 'x') { cutSel(); return; }
     if (e.ctrl && b === 'v') { doPaste(); return; }
     if (mod && b === 'a') { setSelected(new Set(flat.map((x) => x.path))); return; }
     // [ and ] need a modifier on many layouts: the character itself counts, and ⌥← and ⌥→ work on all of them
@@ -906,18 +938,18 @@ export default function Files() {
       { label: tr('files.menu.file'), items: [
         { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true }) },
         { label: tr('files.menu.newTab'), hint: '❖T', onClick: () => newTabAt() },
-        { label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null), disabled: !wDir }, '-',
+        { label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null), disabled: !wDir && !roWhy }, '-',
         { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(), disabled: !sel.length },
         { label: tr('files.menu.getInfo'), hint: '❖I', onClick: () => setInfo(true) },
-        { label: tr('files.menu.rename'), hint: '↵', onClick: () => startRename(), disabled: sel.length !== 1 || !wDir },
-        { label: tr('files.menu.duplicate'), hint: '❖D', onClick: () => duplicate(), disabled: !sel.length || !wDir },
-        { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(), disabled: !sel.length || readOnly }, '-',
+        { label: tr('files.menu.rename'), hint: '↵', onClick: () => startRename(), disabled: sel.length !== 1 || (!wDir && !roWhy) },
+        { label: tr('files.menu.duplicate'), hint: '❖D', onClick: () => duplicate(), disabled: !sel.length || (!wDir && !roWhy) },
+        { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(), disabled: !sel.length || (readOnly && !roWhy) }, '-',
         { label: tr('files.menu.closeTab'), hint: '❖W', onClick: () => closeTab(active) },
       ] },
       { label: tr('files.menu.edit'), items: [
         { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(selPaths), disabled: !sel.length },
-        { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutFiles(selPaths), disabled: !sel.length || readOnly },
-        { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) || !wDir },
+        { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutSel(), disabled: !sel.length || (readOnly && !roWhy) },
+        { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) || (!wDir && !roWhy) },
         { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => setSelected(new Set(flat.map((x) => x.path))) },
       ] },
       { label: tr('files.menu.view'), items: [
@@ -944,7 +976,7 @@ export default function Files() {
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
     ]));
-  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
+  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, tab.chain, hidden, selected, sel.length, clip, curDir, readOnly, roWhy, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
 
   // ---- view ----
   const columns = columnsOf(prefs);
@@ -1100,7 +1132,7 @@ export default function Files() {
             <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
             <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
           </ToolbarGroup>
-          <ToolbarButton icon={<NewFolderGlyph />} title={tr('files.menu.newFolder')} onClick={() => newFolder(null)} disabled={!wDir} />
+          <ToolbarButton icon={<NewFolderGlyph />} title={tr('files.menu.newFolder')} onClick={() => newFolder(null)} disabled={!wDir && !roWhy} />
           {/* the folder's name is in the window's title bar, every theme draws it there */}
           <View style={{ flex: 1, minWidth: 0 }} />
           {curAcc && !tight ? <TransfersPill t={t} accounts={cf.accounts} acc={curAcc} /> : null}
@@ -1132,6 +1164,15 @@ export default function Files() {
             ) : null}
           </View>
         )}
+        {/* a folder Files only browses says so, and how to change it (GitHub #139) */}
+        {roWhy && loc.type === 'dir' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, paddingVertical: 5, minHeight: 32,
+            backgroundColor: t.mode === 'dark' ? 'rgba(255,214,10,0.10)' : 'rgba(255,204,0,0.13)' }}>
+            <Hairline edge="bottom" />
+            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr(`files.readOnly.${roWhy}`)}</Text>
+            {!tight ? <Button label={tr('files.menu.openTerminal')} onClick={() => openTerminal()} /> : null}
+          </View>
+        ) : null}
         {/* tabs */}
         {tabs.length > 1 && (
           <View style={{ flexDirection: 'row', height: 28, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.045)' }}>
@@ -1159,7 +1200,7 @@ export default function Files() {
           {...(curDir ? { dropPath: curDir } : {})}>
             {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
             {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
-            {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort}
+            {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab((x) => chainStep(x, chain, viewCtx.isDir))} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort}
               widths={prefs.colWidths} onWidth={onColWidth} />}
             {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
         </View>

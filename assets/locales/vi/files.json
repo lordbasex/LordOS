@@ -319,5 +319,8 @@
   "zoom.reset": "Kích thước thực",
   "zoom.label": "Kích thước biểu tượng và chữ",
   "markup": "Đánh dấu",
-  "markupHint": "Mở trong trình chỉnh sửa đánh dấu"
+  "markupHint": "Mở trong trình chỉnh sửa đánh dấu",
+  "readOnly.title": "Tệp không thể thay đổi “{name}”",
+  "readOnly.outside": "Tệp chỉ có thể xem thư mục này: thư mục nằm ngoài thư mục chính và các ổ đĩa của bạn. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác.",
+  "readOnly.denied": "Thư mục này chỉ đọc: quyền của thư mục không cho phép bạn thay đổi. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác."
 }

@@ -327,5 +327,8 @@
   "zoom.reset": "Taille réelle",
   "zoom.label": "Taille des icônes et du texte",
   "markup": "Annoter",
-  "markupHint": "Ouvrir dans l’éditeur d’annotation"
+  "markupHint": "Ouvrir dans l’éditeur d’annotation",
+  "readOnly.title": "Fichiers ne peut pas modifier « {name} »",
+  "readOnly.outside": "Fichiers peut seulement afficher ce dossier : il se trouve hors de votre dossier personnel et de vos disques. Pour le modifier, utilisez le Terminal ou une autre app.",
+  "readOnly.denied": "Ce dossier est en lecture seule : ses autorisations ne vous permettent pas de le modifier. Pour le modifier, utilisez le Terminal ou une autre app."
 }
