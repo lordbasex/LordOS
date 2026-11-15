@@ -1,0 +1,21 @@
+{
+  "search": "इमोजी खोजें",
+  "results": {
+    "one": "{count} परिणाम",
+    "other": "{count} परिणाम"
+  },
+  "none": "कुछ नहीं मिला",
+  "noRecent": "जिन्हें आप इस्तेमाल करेंगे, वे यहाँ दिखेंगे",
+  "copied": "{text} कॉपी किया गया: Ctrl+V से पेस्ट करें",
+  "more": "और…",
+  "group.recent": "हाल के",
+  "group.smileys": "स्माइली और भावनाएँ",
+  "group.people": "लोग और शरीर",
+  "group.animals": "जानवर और प्रकृति",
+  "group.food": "खाना और पेय",
+  "group.travel": "यात्रा और स्थान",
+  "group.activities": "गतिविधियाँ",
+  "group.objects": "वस्तुएँ",
+  "group.symbols": "प्रतीक",
+  "group.flags": "झंडे"
+}
