@@ -1,0 +1,21 @@
+{
+  "search": "Cerca emojis",
+  "results": {
+    "one": "{count} resultat",
+    "other": "{count} resultats"
+  },
+  "none": "No s’ha trobat res",
+  "noRecent": "Aquí apareixeran els que facis servir",
+  "copied": "{text} copiat: enganxa’l amb Ctrl+V",
+  "more": "Més…",
+  "group.recent": "Recents",
+  "group.smileys": "Cares i emocions",
+  "group.people": "Persones i cos",
+  "group.animals": "Animals i natura",
+  "group.food": "Menjar i beguda",
+  "group.travel": "Viatges i llocs",
+  "group.activities": "Activitats",
+  "group.objects": "Objectes",
+  "group.symbols": "Símbols",
+  "group.flags": "Banderes"
+}

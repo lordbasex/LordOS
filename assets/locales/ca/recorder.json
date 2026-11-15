@@ -1,0 +1,22 @@
+{
+  "folder": "Enregistraments",
+  "name": "Enregistrament {date} {time}",
+  "all": "Tots els enregistraments",
+  "empty": "Encara no hi ha cap enregistrament",
+  "hint": "Prem el botó vermell (o R) per gravar amb el micròfon",
+  "denied": "Gravadora de veu no té permís per fer servir el micròfon",
+  "play": "Reprodueix",
+  "pause": "Pausa",
+  "rename": "Canvia el nom",
+  "trim": "Retalla",
+  "cancelTrim": "Cancel·la el retall",
+  "saveTrim": "Desa una còpia retallada",
+  "trimmed": "retallat",
+  "export": "Exporta com a",
+  "exportBtn": "Exporta",
+  "working": "S’està exportant…",
+  "exported": "S’ha desat «{name}»",
+  "exportError": "No s’ha pogut exportar",
+  "renameError": "No s’ha pogut canviar el nom (potser ja existeix aquest nom?)",
+  "emptyTitle": "Tria o fes un enregistrament"
+}

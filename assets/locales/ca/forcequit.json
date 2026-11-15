@@ -1,0 +1,7 @@
+{
+  "intro": "Si una app deixa de respondre durant una estona, tria-la i fes clic a Força la sortida. Es tanca sense desar.",
+  "none": "No hi ha cap app oberta",
+  "quit": "Força la sortida",
+  "shortcut": "També al menú de la corona: Força la sortida…",
+  "windows": "{count} finestres"
+}

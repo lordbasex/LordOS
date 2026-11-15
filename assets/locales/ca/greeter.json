@@ -1,0 +1,19 @@
+{
+  "bootTest": "Mesurant el temps d’arrencada: arrencada {k} de {n} feta. Es reinicia d’aquí a {s} s. Iniciar la sessió també atura la prova.",
+  "bootTestCancel": "Atura la prova",
+  "busy": "Un moment…",
+  "cancel": "Cancel·la",
+  "confirmRestart": "Hi ha sessions obertes: es perdrà la feina no desada. Vols reiniciar igualment?",
+  "confirmShutdown": "Hi ha sessions obertes: es perdrà la feina no desada. Vols apagar igualment?",
+  "error": "No s’ha pogut obrir la sessió.",
+  "locked": "Pantalla bloquejada",
+  "noUsers": "No hi ha usuaris",
+  "password": "Contrasenya",
+  "restart": "Reinicia",
+  "shutdown": "Apaga",
+  "wait": {
+    "one": "Massa intents. Espera {count} segon.",
+    "other": "Massa intents. Espera {count} segons."
+  },
+  "wrong": "Contrasenya incorrecta."
+}
