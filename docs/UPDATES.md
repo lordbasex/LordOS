@@ -289,7 +289,7 @@ system by LordOS's packages.
   against it, and takes a file only when its SHA-256 matches both the index and the pinned line.
   Verified files are kept in `~/.local/share/lordos-apt/rpi-cache`, so a pinned version can still be
   published after Raspberry Pi's archive keeps only a newer one (it keeps one version per package).
-  (In development after 0.8.8.8.) A pinned file missing from the cache is also taken from the published pool
+  (Since 0.8.8.9.) A pinned file missing from the cache is also taken from the published pool
   that `build` syncs first, when its SHA-256 is the pinned one, so the build works on any machine with the key;
   without `gpgv` the script checks Raspberry Pi's `InRelease` with `gpg` in an empty home holding only that key.
   `apt-repo.sh rpi-fetch <target>` only fetches and verifies. A new upstream version is a new line
@@ -433,7 +433,7 @@ their cron job):
   configured multiple times") and `apt-get update` succeeds; with an empty `spotify.list` created
   before the install (Spotify's documented opt-out) there is no warning, but `pkg-source-add` doesn't
   write that file yet. Spotify's key goes into `trusted.gpg.d` in both cases.
-- **Steam** (0.8.8.9, in development) can't use `files` the same way: `steam-launcher` owns its source as package
+- **Steam** (0.8.8.9) can't use `files` the same way: `steam-launcher` owns its source as package
   files (the conffile `steam-stable.list` and `/usr/share/keyrings/steam.gpg`), so dpkg would find LordOS's copies in
   its way. Its entry uses `"files": {"list": "steam-stable.list", "keyring": "steam.gpg", "ownedBy":
   "steam-launcher"}`: `pkg-source-add` writes the `lordos-steam` bootstrap source and key, and the engine removes them
@@ -446,7 +446,8 @@ their cron job):
   is removed; `apt/build.sh check` finds those three in Debian trixie's signed index. The key LordOS pins is Valve's 2025 repository key
   (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, RSA 4096); Valve's `InRelease` is signed with it and with the
   2012 key (`BA18 16EF …`), and the engine needs one valid signature from a pinned key (checked with the real
-  `InRelease` of 2026-07-15). Not yet installed on a LordOS system.
+  `InRelease` of 2026-07-15). Installed on one LordOS system so far, the maintainer's PC (Intel Core i9-10900, AMD Radeon RX 580, Vulkan through RADV, Mesa 25.0.7), with
+  0.8.8.9 test builds, where Lost Ark, a Windows game, runs through Proton.
 
 ### Remote access: Tailscale (0.8.8.6, #68)
 
@@ -455,8 +456,8 @@ only. What was checked on 2026-11-08 (`apt/build.sh check`, on the development m
 index for both architectures. It hasn't been installed on a LordOS system yet.
 
 RustDesk (#66) was offered in the same section from 0.8.8.6, as its maker's `.deb` mirrored in
-LordOS's repository, and is removed from the catalog in the update in development after 0.8.8.8 (the latest
-release; maintainer's decision, 2026-11-12). LordOS doesn't redistribute it; people who want it can get it from its maker.
+LordOS's repository, and is removed from the catalog in 0.8.8.9 (maintainer's
+decision, 2026-11-12). LordOS doesn't redistribute it; people who want it can get it from its maker.
 It was never published in lordos.org/apt's pool, so no installed system has it from LordOS and no
 migration is needed. How it could come back (a direct `.deb` delivery): `ROADMAP.md`, 0.8.8.9.
 

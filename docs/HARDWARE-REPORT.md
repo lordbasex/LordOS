@@ -35,8 +35,8 @@ GitHub report issue; what it brought is in `CHANGELOG.md`, `docs/DISPLAYS.md`, `
 |---|---|
 | Machine | Desktop PC |
 | CPU | Intel Core i9-10900 |
-| GPU | AMD Radeon RX 580 (`amdgpu`), GPU composition |
-| Displays | Three monitors (Samsung S27F350), DisplayPort among them |
+| GPU | AMD Radeon RX 580 (`amdgpu`), GPU composition; Mesa 25.0.7 (`radeonsi`, Vulkan through RADV) |
+| Displays | Three 1080p monitors (Samsung S27F350) on DP-2, DP-3 and HDMI-A-1 |
 | Boot | Internal disk, installed |
 | LordOS | Each release since 0.8.8.5 (2026-11-07) |
 
@@ -55,6 +55,11 @@ What it found and what was fixed on it:
   framebuffers while they were on screen; amdgpu refused ("atomic remove_fb failed with -22") and the displays went
   dark, and a DisplayPort monitor put to sleep that way might not wake until unplugged. Every lit display now gets a
   black frame of its own mode first, let go with CLOSEFB.
+- **0.8.8.9** (test builds, 2026-11-15): Steam installed from the Store (Commercial and Games, with the engine's i386
+  multiarch), and Lost Ark, a Windows game, runs through Proton. The first try showed Steam's processes on "Vulkan
+  (Lavapipe)", the software renderer: Valve's `steam-libs-i386` only recommends `mesa-vulkan-drivers:i386`, so Steam's
+  Store entry now brings the 32-bit Vulkan drivers with it (`docs/PACKAGES.md`, "Multiarch"). This is the only
+  machine Steam from the Store has been tried on.
 
 ## Community reports with the report file
 
@@ -67,7 +72,7 @@ says "reported as desktop".
 | [#42](https://github.com/lordbasex/LordOS/issues/42) | Dell Latitude 7480 | laptop | Intel Core i5-7300U, 4 threads | Intel HD Graphics 620 (i915) | internal | 0.8.8.4 | All works; power *limits* (the battery holds 48 % of its design capacity: wear, not LordOS). The touchpad problem ([#43](https://github.com/lordbasex/LordOS/issues/43)) was fixed in 0.8.8.6. Later, after `firmware-intel-graphics` reached the initrd, the reporter needed `i915.enable_dc=0` to stop hard lockups soon after login (DMC firmware); no separate issue yet. Accepted into the tested-hardware catalogue. |
 | [#105](https://github.com/lordbasex/LordOS/issues/105) | ASUS K72F | laptop | Intel Pentium P6200, 2 threads | Intel Core Processor Integrated Graphics, Ironlake (i915) | internal | 0.8.8.7 | All works. Software problems in Files, SMB and archives were reported separately ([#101](https://github.com/lordbasex/LordOS/issues/101)–[#104](https://github.com/lordbasex/LordOS/issues/104)); #101, #103 and #104 are fixed, #102 (long file names) is open. |
 | [#129](https://github.com/lordbasex/LordOS/issues/129) | HP EliteBook 840 G6 | laptop | Intel Core i5-8365U, 8 threads | Intel UHD Graphics 620, WhiskeyLake-U GT2 (i915) | internal | 0.8.8.7 | All works; power *limits*. Installed next to Windows 11. The same person's Bose QuietComfort 35 headset works on it ([#78](https://github.com/lordbasex/LordOS/issues/78), 0.8.8.7). |
-| [#135](https://github.com/lordbasex/LordOS/issues/135) | TECLAST X98Pro | reported as desktop (the reporter calls it a tablet in [#131](https://github.com/lordbasex/LordOS/issues/131)) | Intel Atom x5-Z8500, 4 threads | Intel Atom x5-E8000/J3xxx/N3xxx integrated, Cherry Trail (i915) | eMMC | 0.8.8.7 | GPU *limits*: the 1536×2048 panel is rotated, and a rotated display is composed on the CPU. Everything else works. The tablet's power and volume buttons: [#131](https://github.com/lordbasex/LordOS/issues/131) (a fix in development, not yet tried on the tablet). |
+| [#135](https://github.com/lordbasex/LordOS/issues/135) | TECLAST X98Pro | reported as desktop (the reporter calls it a tablet in [#131](https://github.com/lordbasex/LordOS/issues/131)) | Intel Atom x5-Z8500, 4 threads | Intel Atom x5-E8000/J3xxx/N3xxx integrated, Cherry Trail (i915) | eMMC | 0.8.8.7 | GPU *limits*: the 1536×2048 panel is rotated, and a rotated display is composed on the CPU. Everything else works. The tablet's power and volume buttons: [#131](https://github.com/lordbasex/LordOS/issues/131) (a fix in 0.8.8.9, not yet tried on the tablet). |
 | [#136](https://github.com/lordbasex/LordOS/issues/136) | Apple MacBookPro11,4 (2015) | laptop | Intel Core i7-4770HQ, 8 threads | Intel Crystal Well integrated, Haswell (i915) | internal | 0.8.8.8 | All works. Includes a LordBench quick run. The same person's earlier issues on this MacBook: the battery percentage that stopped updating ([#25](https://github.com/lordbasex/LordOS/issues/25), fixed in 0.8.8.3), the volume, brightness and keyboard light keys (confirmed working on 0.8.8 in [#12](https://github.com/lordbasex/LordOS/issues/12)), the QuietComfort 35 headset (confirmed on 0.8.8.7 in #78) and an LG wide monitor with no screenshot offset ([#98](https://github.com/lordbasex/LordOS/issues/98)). |
 | [#137](https://github.com/lordbasex/LordOS/issues/137) | Hampoo P02BD6_HI-122LP | reported as desktop (see #135) | Intel Atom x5-Z8350, 4 threads | Intel Atom x5-E8000/J3xxx/N3xxx integrated, Cherry Trail (i915) | eMMC | 0.8.8.7 | All works in the report, but sound needed the Cherry Trail audio driver installed by hand. The same reporter's Chuwi Hi12 threads (same CPU; the report does not say whether it is this machine) cover automatic rotation, fixed in 0.8.8.6 and confirmed working with the touchscreen, sound (`snd_soc_sst_bytcr_rt5651`) and charging (AXP288) in [#60](https://github.com/lordbasex/LordOS/issues/60), and the buttons in [#131](https://github.com/lordbasex/LordOS/issues/131). |
 | [#149](https://github.com/lordbasex/LordOS/issues/149) | ASUS K84L | laptop | Intel Celeron B830, 2 threads | Intel 2nd Generation Core integrated, HD Graphics 2000, Sandy Bridge (i915) | internal | 0.8.8.7 | **Incomplete** (`report:missing`: the file's text was pasted instead of attached). From that text: GPU composition works; network *limits* (Ethernet not connected), no Wi-Fi adapter detected, power *limits* (worn battery). The same person's [#132](https://github.com/lordbasex/LordOS/issues/132) (open, titled "Asus X44H"; its log names the same K84L firmware model) shows no wireless card on the PCI bus and no wireless driver loaded: the card is missing or turned off below the operating system, not a missing driver. |
@@ -94,7 +99,7 @@ not say. Two other issues are about machines already above: [#132](https://githu
 | [#127](https://github.com/lordbasex/LordOS/issues/127) | Tablet PC (model not given) | tablet | not given | not given | not given | 0.8.8.7 | The on-screen keyboard can't type into the administrator password prompt. That is on purpose: the prompt only takes keys from a physical keyboard, so no program in the session can type the password. |
 | [#153](https://github.com/lordbasex/LordOS/issues/153) | ASUS (model not given), 2 GB of memory | not given | Intel Celeron N4000, Gemini Lake | Intel UHD Graphics 600 (i915) | installed | 0.8.8 | Smooth on a low-end machine, about 400 MB of memory in use when idle, PPSSPP without tearing. Open: the Caps Lock light stays off (LordOS writes the keyboard lights since 0.8.8.6; the exact version and a log are missing), and there is no on-screen indicator when the volume keys change the volume. |
 | [#157](https://github.com/lordbasex/LordOS/issues/157) | Dell Latitude 5590 | laptop | Intel Core i7-8650U, 8 threads, Kaby Lake R | Intel UHD Graphics 620 (i915) | installed | 0.8.8.8 | Steam no longer opens after the upgrade (open; a software problem, the system report itself is clean). |
-| [#159](https://github.com/lordbasex/LordOS/issues/159) | Desktop PC, two monitors (2560×1440 and 1920×1080, both 120 Hz) | desktop (the reporter's main PC) | AMD Ryzen 7 7800X3D | AMD Radeon RX 7800 XT, RDNA 3 (amdgpu) | not given | 0.8.8 | Runs as a daily test machine. Open: dragging a window is sometimes less smooth than 120 Hz and its text blurry, then recovers by itself; the Logitech MX Master 2S's back and forward buttons did nothing (lord-server passed only the left, middle and right buttons; fixed in development, untested on the reporter's mouse); AppImages start from a terminal but not from Files (Files no longer opens them in TextEdit); some GTK4 dropdowns freeze on native Wayland and work under Xwayland; a polkit agent fails with "No session for pid". |
+| [#159](https://github.com/lordbasex/LordOS/issues/159) | Desktop PC, two monitors (2560×1440 and 1920×1080, both 120 Hz) | desktop (the reporter's main PC) | AMD Ryzen 7 7800X3D | AMD Radeon RX 7800 XT, RDNA 3 (amdgpu) | not given | 0.8.8 | Runs as a daily test machine. Open: dragging a window is sometimes less smooth than 120 Hz and its text blurry, then recovers by itself; the Logitech MX Master 2S's back and forward buttons did nothing (lord-server passed only the left, middle and right buttons; fixed in 0.8.8.9, untested on the reporter's mouse); AppImages start from a terminal but not from Files (Files no longer opens them in TextEdit); some GTK4 dropdowns freeze on native Wayland and work under Xwayland; a polkit agent fails with "No session for pid". |
 
 ### Virtual machines
 
@@ -175,11 +180,11 @@ touchpad and Caps Lock light), #78 (Bluetooth headset, on three machines), #97 (
 (Wi-Fi, after the wireless key).
 
 **Known problems, open**: Cherry Trail tablets' audio and charging, which need a driver or a fix by hand, and their
-buttons (#60, #131; the volume buttons and a power-button hold have a fix in development, not yet tried on a tablet); DMC lockups on one HD 620 laptop after an Intel firmware update (#42, workaround); no wireless
+buttons (#60, #131; the volume buttons and a power-button hold have a fix in 0.8.8.9, not yet tried on a tablet); DMC lockups on one HD 620 laptop after an Intel firmware update (#42, workaround); no wireless
 card visible on the ASUS K84L (#132, below the operating system); the screenshot selection offset on a ThinkPad with
 two displays (#98); the Caps Lock light and a volume indicator on an ASUS Celeron N4000 (#153); window drag
 smoothness at 120 Hz, AppImages from Files, GTK4 dropdowns on native Wayland and polkit agents on a Ryzen and RX 7800 XT
-desktop (#159; its mouse back and forward buttons have a fix in development); Steam on a Latitude 5590 (#157); the FaceTime HD camera, which needs a
+desktop (#159; its mouse back and forward buttons have a fix in 0.8.8.9, not yet confirmed there); Steam on a Latitude 5590 (#157); the FaceTime HD camera, which needs a
 driver LordOS can't ship (#21).
 
 **Untested combinations**: any NVIDIA card; AMD integrated graphics (APUs) on bare metal (a Radeon 780M only as a

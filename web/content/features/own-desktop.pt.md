@@ -83,7 +83,7 @@ Tudo na 0.8.7.
 
 - **Conectar a um servidor.** Rede lista cada computador como uma pasta, e seus compartilhamentos se abrem ali mesmo; você entra com usuário e senha ou como convidado, o que passou contra uma pasta compartilhada real e um servidor de teste. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ftp, ftps e WebDAV, e todos abrem como pastas no Arquivos, com chaves SSH e certificados verificados antes.
 - **Telas remotas.** Remote Desk, um só app para RDP e VNC, vem com o sistema e desenha com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit. Os dois protocolos foram testados contra uma máquina de teste descartável; RDP para uma sessão de desktop real e as pastas compartilhadas do RDP ainda não foram verificados.
-- **Discos de outros sistemas.** Disk Formats, um único item da Loja, abre NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64 como parte opcional, APFS somente leitura. São formatos comerciais; os drivers são software livre e sem custo. Em desenvolvimento depois da 0.8.8.8 (o último lançamento): com dois sistemas no mesmo disco, um administrador pode montar a partição do outro sistema pelo Arquivos ou pelo Discos, e um volume NTFS que ficou hibernado abre somente leitura.
+- **Discos de outros sistemas.** Disk Formats, um único item da Loja, abre NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64 como parte opcional, APFS somente leitura. São formatos comerciais; os drivers são software livre e sem custo. Desde a 0.8.8.9 (o último lançamento): com dois sistemas no mesmo disco, um administrador pode montar a partição do outro sistema pelo Arquivos ou pelo Discos, e um volume NTFS que ficou hibernado abre somente leitura.
 - **Do seu jeito.** Escolha, reordene e ajuste as colunas da lista, aumente ou diminua os ícones e a lista (o controle deslizante da barra de status, Ctrl e + ou −, ou Ctrl e a roda) com cada pasta lembrando o próprio tamanho, use os Ajustes próprios do Arquivos e abra o Terminal na pasta onde você está.
 
 ## Teclas, teclado na tela e voltar para onde você estava
@@ -101,7 +101,7 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 
 ## Novo na 0.8.8.8
 
-Lançada em 12 de novembro de 2026, o último lançamento.
+Lançada em 12 de novembro de 2026.
 
 - **O Terminal trabalha pelo `ssh` da aba.** Redirecionamentos de porta a partir de um perfil (um selo na aba, Abrir no navegador, Copiar, Fechar), arquivos arrastados do Arquivos para um painel com `ssh` enviados à pasta do shell remoto, ❖ + clique num nome da saída do `ls` para baixá-lo, e Abrir, Abrir com e Editar para um arquivo do servidor no modo Arquivos, onde cada salvamento volta ao servidor. Tudo pela mesma conexão, sem um segundo login e sem executar programa nenhum.
 - **Os campos de texto selecionam como em qualquer desktop,** em todos os apps do LordOS: Ctrl/⌘+A, Shift com as setas, um arraste com o mouse, um duplo clique numa palavra, digitar sobre a seleção, copiar e recortar (nunca de um campo de senha).

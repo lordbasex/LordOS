@@ -49,7 +49,7 @@ Use o seu nome real (ou o nome pelo qual você é conhecido publicamente). Pull 
 
 ## Traduções
 
-O LordOS 0.8.8.8 vem em seis idiomas, todos completos: inglês, espanhol, português, francês, italiano e lituano; mais 29, também completos, estão em desenvolvimento para o próximo pré-lançamento (a página [Idiomas](/language/) mostra todos). Um idioma só sai quando todos os textos estão traduzidos, e uma mudança num texto em inglês chega a todos os idiomas na mesma versão. Para trazer um idioma, siga o [guia para tradutores](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md); a referência técnica é o [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Correções nas traduções existentes também são bem-vindas.
+O LordOS 0.8.8.9 vem em 35 idiomas, todos completos: inglês, espanhol, português, francês, italiano e lituano, e mais 29 que são novos na 0.8.8.9 (a página [Idiomas](/language/) mostra todos). Um idioma só sai quando todos os textos estão traduzidos, e uma mudança num texto em inglês chega a todos os idiomas na mesma versão. Para trazer um idioma, siga o [guia para tradutores](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md); a referência técnica é o [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Correções nas traduções existentes também são bem-vindas.
 
 ## Código de conduta
 

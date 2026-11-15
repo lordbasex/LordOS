@@ -296,7 +296,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
     load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
     itself, and nothing goes from the page to lord-web or lord-server.
-  - **Each app's Appearance** (`colorScheme` in the registry; in development after 0.8.8.8): **held back until
+  - **Each app's Appearance** (`colorScheme` in the registry; 0.8.8.9): **held back until
     WPEPlatform** (maintainer's decision, 2026-11-15). WPE 2.48's legacy API can't set `prefers-color-scheme` for CSS,
     so a site that picks its theme with CSS (WhatsApp, for example) never saw the choice, and it only half worked.
     For now: Settings → Web Apps shows Appearance with Automatic selected and Light and Dark unavailable, with a note
@@ -347,7 +347,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     and listed queries, `media`, listeners and `onchange`, no event when the answer stays, frames, an engine that
     already answers dark, `once` and `signal` listeners let go) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent
     until the theme tells the mode, `dark` and `light` after it, absent again for any other value).
-- **Browser identity** (`webpage_user_agent`; the registry's per-profile `userAgent`; in development after 0.8.8.8):
+- **Browser identity** (`webpage_user_agent`; the registry's per-profile `userAgent`; 0.8.8.9):
   the browser a profile's pages are told it is, one of four, all Linux ones (the maintainer's choice: no other
   system's identity), picked from a closed list in Settings (never typed), in this order. `<version>` is always
   `LORD_VERSION`, the installed LordOS's, never written by hand.
@@ -553,7 +553,7 @@ that was probed.
   the engine ("LordOS Web (WPE WebKit <version>)", the installed `libwpewebkit-2.0-1` from the package index, no
   program run), the permissions with their state (a link to Settings → Web Apps), the profiles (each one's data and
   memory, Open, New profile), background mode and the known limitations.
-- **The trademark notice** (in development after 0.8.8.8; `apps/store/trademark.js`, `tests/store_trademark_scene.mjs`):
+- **The trademark notice** (0.8.8.9; `apps/store/trademark.js`, `tests/store_trademark_scene.mjs`):
   under the Web apps section's catalog and at the end of every app's page, a dimmed note in the person's language
   (`webapps.store.trademark`): the product names, logos and icons shown are trademarks of their owners, used only to
   identify the services; LordOS is not affiliated with, endorsed or sponsored by them; and LordOS doesn't change the
@@ -784,7 +784,7 @@ Notification sound and, when LordOS's sound plays, which one.
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
 
-## Developer tools (in development after 0.8.8.8, the latest release)
+## Developer tools (0.8.8.9)
 
 Approved by the maintainer on 2026-11-15. For web developers: WebKit's Web Inspector for one web app window, in the
 person's browser.
@@ -898,7 +898,7 @@ person's browser.
   residual risk). Chrome 157 and Chromium 156 refused all 15 backend ports (`fetch`, image and WebSocket). The menu,
   the question, Settings and the browser opening on a real session are still to be checked on screen.
 
-## No network (issue #144; in development after 0.8.8.8, the latest release)
+## No network (issue #144; 0.8.8.9)
 
 When the app's own page (an address inside its `scope`) can't load for lack of network, `lord-web`
 (`webengine.c`, `weboffline.h`) shows its own page instead of WebKit's error page:

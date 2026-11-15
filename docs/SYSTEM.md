@@ -35,7 +35,7 @@ The LordOS disk utility, like GNOME Disks.
 |---|---|
 | `server/src/disk/disk.c` | The list, without root, from three sources. **`/sys/block`:** size, removable, read-only, rotational, model. **The udev database** (`/run/udev/data/b<major>:<minor>`): file system, label, UUID, partition table and bus; udev already probed them, so the device is never opened. **`/proc/self/mountinfo`:** where each one is mounted. It also recognizes the system disk and watches for changes. |
 | `server/src/disk/smart.c` | ATA SMART and NVMe health log parsers: pure functions, no I/O |
-| `server/src/disk/diskuse.c` | Whether one partition is free to mount (in development after 0.8.8.8, #122): mounted anywhere, held by a dm/md, an active swap, or (system disk) a table entry the system keeps; and the NTFS hibernation check. Used by `disk-mount` as root and by the list (`inuse`, `reserved`) |
+| `server/src/disk/diskuse.c` | Whether one partition is free to mount (0.8.8.9, #122): mounted anywhere, held by a dm/md, an active swap, or (system disk) a table entry the system keeps; and the NTFS hibernation check. Used by `disk-mount` as root and by the list (`inuse`, `reserved`) |
 | `server/src/disk/disk_admin.c` | The helper's `disk-*` actions (root) |
 | `sdk/diskplaces.js` | What Files and Disks offer to mount or unmount, from the list (pure; `server/tests/diskplaces_test.mjs`) |
 | `server/src/disk/smartctl_admin.c`, `smartctl.c` | The helper's `smart-*` actions (smartmontools, root) and their pure checks |
@@ -103,7 +103,7 @@ and `disk-eject` or `disk-unmount` from its ⏏ (`FILES.md`).
   `disk-smart` and the `smart-*` actions accept it: they only read, or start the disk's own
   self-test, which does not change data. `disk-mount` and `disk-unmount` accept one of its free
   partitions, below.
-- **Partitions of the system disk** (in development after 0.8.8.8, #122). In a dual boot on one disk, the
+- **Partitions of the system disk** (0.8.8.9, #122). In a dual boot on one disk, the
   other system's partition (NTFS, say) can be mounted under `/media/<user>/<label>` like any internal
   disk. Root decides partition by partition (`target()` with `SYSPART_OK`, then `diskuse.c`), from the
   kernel and the udev database, never from what the app sends:
@@ -122,7 +122,7 @@ and `disk-eject` or `disk-unmount` from its ⏏ (`FILES.md`).
   - `disk-unmount` takes only what is under `/media` or `/run/media`, as for any disk.
   Other disks keep their rules: only "in use" is checked there, so another disk's EFI partition can
   still be mounted. Nothing is mounted at boot; that would be a new action (later).
-- **NTFS left hibernated** (in development after 0.8.8.8, #122). Debian 13's `ntfs3` (kernel 6.12) refuses a
+- **NTFS left hibernated** (0.8.8.9, #122). Debian 13's `ntfs3` (kernel 6.12) refuses a
   dirty volume read-write unless `force` is given (never given here) and replays the journal, but it
   does not look at `hiberfil.sys`: a volume that another operating system hibernated or left with
   fast startup is mounted read-write, and that system then resumes over a file system changed under

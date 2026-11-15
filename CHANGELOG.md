@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.9-beta] - 2026-11-15
+
 ### Added
 
 - **Steam in the Store, with i386 multiarch in the package engine** (maintainer's decision, 2026-11-15: "lo podria en
@@ -86,8 +88,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     32-bit Vulkan drivers (the old install leaving them out, `--recommends` resolving `steam-libs-i386`'s Recommends in
     i386, the new `"with"` bringing them with the `mesa-vulkan-drivers` and `libvulkan1` pairs at one version, Update
     All not adding them to an old Steam, the Store's Update adding them and moving the amd64 driver up). Valve's real
-    `InRelease` verifies with `apt/keys/steam.asc` (`pkg-test pgp`). **Not yet tried on a LordOS system**
-    (`docs/PACKAGES.md`, "Multiarch").
+    `InRelease` verifies with `apt/keys/steam.asc` (`pkg-test pgp`).
+  - *Tried on one machine:* the maintainer's PC (Intel Core i9-10900, AMD Radeon RX 580, Vulkan through RADV, Mesa
+    25.0.7), with 0.8.8.9 test builds, 2026-11-15: Steam installed from the Store, and Lost Ark ran
+    through Proton. That is the only system it has been tried on (`docs/PACKAGES.md`, "Multiarch";
+    `docs/HARDWARE-REPORT.md`).
 
 - **What the power button does when held for 5 seconds** (issue [#131](https://github.com/lordbasex/LordOS/issues/131),
   thanks to Touchgg): Settings → Energy (Battery on laptops) → Power button and lid has a second power-button row,
@@ -633,6 +638,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **The paper and the docs call 0.8.8.9 released** (2026-11-15). Paper (en, es, pt; edition 0.8.8.9 Beta, 2026-11-15):
+  the abstract and §10.1 name 0.8.8.9 Beta the latest release (no new ISO, the images stay 0.8.8's), the "In
+  development after 0.8.8.8" paragraph of §10.1 becomes "In 0.8.8.9" with Steam added, the Changelog table has a
+  0.8.8.9 Beta row dated 2026-11-15, and every "in development after 0.8.8.8" label in §3.4, §4.4, §5.1, §5.3, §5.4,
+  §6.3, §6.9, §10 and §12 names 0.8.8.9; the untested parts stay listed as untested in §10.2. §5.3 and §10.2 say Steam
+  was tried on one LordOS system, the maintainer's PC (Intel Core i9-10900, AMD Radeon RX 580, Vulkan through RADV,
+  Mesa 25.0.7), where Lost Ark ran through Proton. `docs/HARDWARE-REPORT.md` adds that result to the
+  maintainer's machine (its three 1080p monitors on DP-2, DP-3 and HDMI-A-1, Mesa 25.0.7). `docs/PAPER-VALIDATION.md`
+  has a 0.8.8.9 section (released) and the Steam row records that machine. `docs/ROADMAP.md` marks 0.8.8.9-beta
+  released, with Steam, and each app's Appearance as held back; README.md, `docs/INSTALL-DEBIAN.md`, `LANGUAGES.md`,
+  `TRANSLATING.md`, `PACKAGES.md`, `UPDATES.md`, `TROUBLESHOOTING.md`, `WAYLAND.md`, `WEBAPPS.md`, `SCREEN-SHARING.md`,
+  `SYSTEM.md`, `SESSIONS.md`, `CLOUD.md`, `FILES.md`, `COMPLIANCE.md`, `SOURCE-OFFER.md`, `IMAGER.md`, `IMMUTABLE.md`
+  and `RELEASING.md` follow.
+
 - **Multiarch and Steam in the docs, the paper and the site** (2026-11-15): `docs/PACKAGES.md` ("Multiarch", "A vendor
   package that owns its own source", the new action and `lord.pkg.multiarch()`), `docs/UPDATES.md` (Steam's catalog
   entry), `apt/README.md` (`categories`, `with`, `multiarch`, `files.list`/`ownedBy`), `docs/ROADMAP.md` (the Steam
@@ -831,6 +850,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   0.8.8 images) and `docs/COMPLIANCE.md`.
 
 ### Website
+
+- **lordos.org calls 0.8.8.9 released on 15 November 2026, the latest release** (en, es, pt). The home badge reads
+  0.8.8.9 by itself (the newest dated heading of this file). The features pages (Linux apps, Our own desktop, Web apps,
+  Cleaner), the FAQ (latest release, dual boot, Disk Formats, web apps, games, languages), Contributing and Source code
+  drop "in development after 0.8.8.8" and name 0.8.8.9; the games answer and the Linux apps page say Steam has been
+  tried on one machine, the maintainer's PC with an AMD Radeon RX 580, where Lost Ark runs through Proton. Each web
+  app's Appearance still says Light and Dark wait for the new web engine. `/language/`: `web/content/languages.json`
+  "next" is empty, so the 35 languages are one list with no "new in" tags and no "in development" line; "nextVersion"
+  stays 0.8.8.9 for the welcome ("from 0.8.8.9 it ships 35 languages"), and a new text, `reviewShipped`, keeps the
+  request for a native review of the 29 new languages (`web/build.mjs`). The downloads (`downloads.json`) are left for
+  the build's refresh from GitHub once the release is published; the images stay 0.8.8's.
 
 - **Steam on the site** (2026-11-15): the Linux apps feature page and the games answer of the FAQ say Steam comes to
   Store → Commercial and Games in 0.8.8.9 (in development, after 0.8.8.8, the latest release) with the 32-bit
@@ -1191,7 +1221,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   checks the variable is not exported and a person's own value is kept; `build/portal-gs-test` (over a private session
   bus) reads `gtk-im-module` with `ReadOne` and with `ReadAll("org.gnome.*")`, the call GTK 4 makes, and checks it is
   not in another namespace. Not checked on a screen yet: the GTK 4 Hangul field of 0.8.8.8 and an Electron app on X11
-  still need a run on VM 127. Until the next release, `env -u GTK_IM_MODULE <app>` from the Terminal works around it.
+  still need a run on VM 127. On 0.8.8.8, `env -u GTK_IM_MODULE <app>` from the Terminal works around it.
   Thanks to Irh18 for the report with the exact assertion and the variables that fixed it, and to JrocMD for the
   Steam report and its log. Documented in `docs/WAYLAND.md` ("How to open an app", "Input methods").
 - **Files: New Folder goes in the selected folder in the column and list views**
@@ -6347,7 +6377,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...HEAD
+[0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta
 [0.8.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...v0.8.8.8-beta
 [0.8.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...v0.8.8.7-beta
 [0.8.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.5-beta...v0.8.8.6-beta

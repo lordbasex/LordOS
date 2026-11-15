@@ -62,7 +62,7 @@ The interface imports only View, Text, Image, ScrollView, TextInput, Button, Lum
 useKeyboard, t, typeScale, spacing and a store from `@lordos/sdk`; in the desktop build those come
 from `web/sdk.jsx`, which draws them with HTML and Lord Flow's colors (light, dark or automatic).
 The texts are the same catalogs (`assets/locales/<lang>/imager.json`, plus errors, status, mascot
-and countries), so the desktop app speaks English, Spanish, Portuguese, French and Italian exactly as LordOS's Imager does (which, inside LordOS, also has every other interface language: 35 in development after 0.8.8.8). The desktop app's language is the globe at the bottom of its sidebar (English, Español and Português first, then the others, then the computer's language).
+and countries), so the desktop app speaks English, Spanish, Portuguese, French and Italian exactly as LordOS's Imager does (which, inside LordOS, also has every other interface language: 35 since 0.8.8.9). The desktop app's language is the globe at the bottom of its sidebar (English, Español and Português first, then the others, then the computer's language).
 
 The writing rules exist twice, in C for LordOS (`server/src/imager/`) and in Rust for the desktop
 (`desktop/imager/core/`), and are tested against the same fixtures (a real signed `SHA256SUMS`, the
@@ -170,7 +170,7 @@ user's folders). It writes nothing and runs nothing.
 |---|---|---|
 | `version` | `1` | first |
 | `hostname` | RFC 1123 label | `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`, not only digits, not `localhost` |
-| `lang` | `en` \| `es` \| `pt` \| `fr` \| `it` | five of the languages LordOS ships (the first-run program doesn't take `lt` or the 29 languages in development after 0.8.8.8 yet); `fr` from 0.8.8 images, `it` from 0.8.9 images (an older first-run program refuses the whole file, so the Imager only offers what the chosen image knows) |
+| `lang` | `en` \| `es` \| `pt` \| `fr` \| `it` | five of the languages LordOS ships (the first-run program doesn't take `lt` or the 29 languages new in 0.8.8.9 yet); `fr` from 0.8.8 images, `it` from 0.8.9 images (an older first-run program refuses the whole file, so the Imager only offers what the chosen image knows) |
 | `timezone` | `Area/City` | `[A-Za-z0-9_+-/]`, starts with a capital, no `..`; must exist in the image's zoneinfo |
 | `keyboard`, `keyboard_variant` | xkb layout and variant | `[a-z]{2,10}`; variant `[A-Za-z0-9_-]{0,32}`; the layout must exist in the image |
 | `wifi_country` | two capital letters | `cfg80211.ieee80211_regdom=` in `cmdline.txt` |

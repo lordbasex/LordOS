@@ -1,6 +1,6 @@
 # An immutable LordOS (A/B system images): design study
 
-**Status (0.8.2; unchanged through 0.8.8.8-beta): design study plus an experimental prototype.** Nothing here changes the regular
+**Status (0.8.2; unchanged through 0.8.8.9-beta): design study plus an experimental prototype.** Nothing here changes the regular
 ISO, the Raspberry Pi image, `install.sh` or the in-place APT updates of [UPDATES.md](UPDATES.md).
 The prototype (`tools/immutable/`) builds a separate disk image that boots in a virtual machine; it
 is a minimal Debian 13, not the LordOS desktop yet. Every statement below is marked as one of:

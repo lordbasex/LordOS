@@ -12,7 +12,7 @@ curl -fsSL https://lordos.org/install.sh | sh
 The script asks before changing anything. It reads the answers from the terminal (`/dev/tty`), so
 this works even though the script itself comes through a pipe.
 
-> **Status (2026-11-12):** the latest release is 0.8.8.8-beta, and the GitHub repository is public, so
+> **Status (2026-11-15):** the latest release is 0.8.8.9-beta, and the GitHub repository is public, so
 > the installer can look up and download its release files. Without access to GitHub, use `--deb` with a
 > package you already have (see [Testing](#testing)).
 
@@ -57,7 +57,7 @@ this works even though the script itself comes through a pipe.
      is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
      the session user to `sudo` (or to `wheel` on a system with no `sudo` group), effective after a reboot;
    - generates the `en_US`, `es_ES`, `pt_BR`, `fr_FR` and `it_IT` UTF-8 locales. The interface also ships
-     Lithuanian (`lt`) and, in development after 0.8.8.8, 29 more languages; the script generates none of their
+     Lithuanian (`lt`) and, since 0.8.8.9, 29 more languages; the script generates none of their
      locales: add the one you need with `dpkg-reconfigure locales` (or Settings → Language & Region).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
