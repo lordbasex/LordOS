@@ -31,6 +31,7 @@
   "install.rebooting": "正在重新启动",
   "install.stepFailed": "{program} 失败（代码 {code}）",
   "install.timezoneWarning": "警告：无法设置时区",
+  "install.tabletPowerWarning": "警告：无法为平板电脑设置电源按钮",
   "lang.installed": {
     "other": "已为“{lang}”安装 {count} 个软件包"
   },

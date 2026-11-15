@@ -183,6 +183,8 @@ EOF
     else skip "portal-gs-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
+    # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
+    run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
     run "imgops-test" build/imgops-test

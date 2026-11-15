@@ -86,7 +86,9 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
      logind reads the power key from the same `gpio-keys` node, and passes on only the keys
      `keygrab_system_key` lists (volume, mute, player, brightness, keyboard light, Print Screen), never
      `KEY_POWER`. A "Power Button" (power key only) or a "Video Bus" (brightness only, which the kernel's ACPI
-     video driver may change by itself) is still left alone.
+     video driver may change by itself) is still left alone. What logind does with the power key is Settings →
+     Energy's choice; on a tablet (SMBIOS chassis 30 or 32) a tap sleeps and a 5 s hold shuts down by default,
+     elsewhere a press shuts down (SETTINGS.md, "Power button and lid").
 2. **It passes them to the session** with `RP_DISPLAY`, over its socket (`SCM_RIGHTS`). The
    session prepares the output (`kms_attach`), takes the input (`input_open_fds` and
    `EVIOCGRAB`, except devices of system keys) and resizes live to the monitor's resolution:

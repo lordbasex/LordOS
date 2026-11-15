@@ -31,6 +31,7 @@
   "install.rebooting": "در حال راه‌اندازی مجدد",
   "install.stepFailed": "{program} ناموفق بود (کد {code})",
   "install.timezoneWarning": "هشدار: تنظیم منطقهٔ زمانی ممکن نشد",
+  "install.tabletPowerWarning": "هشدار: تنظیم دکمهٔ روشن/خاموش برای تبلت ممکن نشد",
   "lang.installed": {
     "one": "{count} بسته برای «{lang}» نصب شد",
     "other": "{count} بسته برای «{lang}» نصب شد"

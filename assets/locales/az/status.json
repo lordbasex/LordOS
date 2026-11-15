@@ -31,6 +31,7 @@
   "install.rebooting": "Yenidən başladılır",
   "install.stepFailed": "{program} uğursuz oldu (kod {code})",
   "install.timezoneWarning": "Xəbərdarlıq: saat qurşağını təyin etmək mümkün olmadı",
+  "install.tabletPowerWarning": "Xəbərdarlıq: planşet üçün qidalanma düyməsini təyin etmək mümkün olmadı",
   "lang.installed": {
     "one": "“{lang}” üçün {count} paket quraşdırıldı",
     "other": "“{lang}” üçün {count} paket quraşdırıldı"

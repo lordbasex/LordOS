@@ -31,6 +31,7 @@
   "install.rebooting": "Neustart",
   "install.stepFailed": "{program} ist fehlgeschlagen (Code {code})",
   "install.timezoneWarning": "Warnung: Die Zeitzone konnte nicht festgelegt werden",
+  "install.tabletPowerWarning": "Warnung: Der Ein-/Aus-Schalter konnte nicht für ein Tablet eingestellt werden",
   "lang.installed": {
     "one": "{count} Paket für „{lang}“ installiert",
     "other": "{count} Pakete für „{lang}“ installiert"

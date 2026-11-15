@@ -31,6 +31,7 @@
   "install.rebooting": "Memulai ulang",
   "install.stepFailed": "{program} gagal (kode {code})",
   "install.timezoneWarning": "Peringatan: tidak dapat mengatur zona waktu",
+  "install.tabletPowerWarning": "Peringatan: tidak dapat mengatur tombol daya untuk tablet",
   "lang.installed": {
     "other": "{count} paket diinstal untuk “{lang}”"
   },

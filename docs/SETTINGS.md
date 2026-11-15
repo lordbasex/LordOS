@@ -339,7 +339,19 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   unset or `ignore` by default). With a hold action set, logind runs the short-press action when the
   key is released before 5 s; so a tablet can sleep on a tap and shut down cleanly on a hold. On some
   tablets (Cherry Trail) the power chip cuts the power by itself after a longer hold; that hasn't been
-  checked on one. The three-value form still works and leaves the hold unset. LordOS never grabs the
+  checked on one. The three-value form still works and leaves the hold unset.
+  **Defaults on a tablet** (maintainer's decision, 2026-11-15): a tap sleeps and a 5 s hold shuts down
+  (`HandlePowerKey=suspend`, `HandlePowerKeyLongPress=poweroff`); everywhere else a press shuts down and a hold
+  does nothing (logind's defaults). A tablet is SMBIOS chassis type 30 (Tablet) or 32 (Detachable) in
+  `/sys/class/dmi/id/chassis_type` (`tablet_chassis`, `server/src/hw/tabletpower.c`); 31 (Convertible) keeps a
+  laptop's defaults, and a missing or odd value means "not a tablet". The disk installer writes those values into
+  the new system's `lordos.conf` (`tablet_power_install`), and migration `008-0.8.8.9-tablet-power` writes them on
+  systems installed before ([UPDATES.md](UPDATES.md)) where nobody chose: no `lordos.conf`, or an older Settings'
+  file with the short press on shut down and no hold line. Neither ever replaces a choice: a file with a hold line,
+  another short press, or an administrator's `HandlePowerKey`/`HandlePowerKeyLongPress` in `logind.conf` (or, for
+  the migration, another `/etc` drop-in) stays. Since both write the same file as the action, the rows above show
+  the values in effect. The live session keeps logind's defaults. Tested in `build/settings-hw-test` and
+  `tests/migration_tablet_power_test.sh`. LordOS never grabs the
   power button: the ACPI "Power Button" isn't opened, and a tablet's `gpio-keys` node is opened for
   its volume keys without a grab and with `KEY_POWER` dropped (`server/src/inputkind.h`), so logind
   sees every press and the desktop none. Lid rows only show with a battery.

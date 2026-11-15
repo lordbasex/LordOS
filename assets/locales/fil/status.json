@@ -31,6 +31,7 @@
   "install.rebooting": "Nagre-restart",
   "install.stepFailed": "Pumalya ang {program} (code {code})",
   "install.timezoneWarning": "Babala: hindi maitakda ang time zone",
+  "install.tabletPowerWarning": "Babala: hindi maitakda ang power button para sa tablet",
   "lang.installed": {
     "one": "{count} package ang na-install para sa “{lang}”",
     "other": "{count} package ang na-install para sa “{lang}”"

@@ -31,6 +31,7 @@
   "install.rebooting": "Paleidžiama iš naujo",
   "install.stepFailed": "{program} nepavyko (kodas {code})",
   "install.timezoneWarning": "Įspėjimas: nepavyko nustatyti laiko juostos",
+  "install.tabletPowerWarning": "Įspėjimas: nepavyko nustatyti planšetės maitinimo mygtuko",
   "lang.installed": {
     "one": "Kalbai „{lang}“ įdiegtas {count} paketas",
     "few": "Kalbai „{lang}“ įdiegti {count} paketai",

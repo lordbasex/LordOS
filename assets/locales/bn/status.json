@@ -31,6 +31,7 @@
   "install.rebooting": "রিস্টার্ট হচ্ছে",
   "install.stepFailed": "{program} ব্যর্থ হয়েছে (কোড {code})",
   "install.timezoneWarning": "সতর্কতা: টাইম জোন সেট করা যায়নি",
+  "install.tabletPowerWarning": "সতর্কতা: ট্যাবলেটের জন্য পাওয়ার বোতাম সেট করা যায়নি",
   "lang.installed": {
     "one": "“{lang}”-এর জন্য {count}টি প্যাকেজ ইনস্টল করা হয়েছে",
     "other": "“{lang}”-এর জন্য {count}টি প্যাকেজ ইনস্টল করা হয়েছে"

@@ -31,6 +31,7 @@
   "install.rebooting": "पुनः आरंभ किया जा रहा है",
   "install.stepFailed": "{program} विफल रहा (कोड {code})",
   "install.timezoneWarning": "चेतावनी: समय क्षेत्र सेट नहीं किया जा सका",
+  "install.tabletPowerWarning": "चेतावनी: टैबलेट के लिए पावर बटन सेट नहीं किया जा सका",
   "lang.installed": {
     "one": "“{lang}” के लिए {count} पैकेज इंस्टॉल किया गया",
     "other": "“{lang}” के लिए {count} पैकेज इंस्टॉल किए गए"

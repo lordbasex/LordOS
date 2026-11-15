@@ -31,6 +31,7 @@
   "install.rebooting": "S’està reiniciant",
   "install.stepFailed": "{program} ha fallat (codi {code})",
   "install.timezoneWarning": "Avís: no s’ha pogut establir el fus horari",
+  "install.tabletPowerWarning": "Avís: no s’ha pogut configurar el botó d’engegada per a una tauleta",
   "lang.installed": {
     "one": "{count} paquet instal·lat per a «{lang}»",
     "other": "{count} paquets instal·lats per a «{lang}»"

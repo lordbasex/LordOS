@@ -31,6 +31,7 @@
   "install.rebooting": "Рестартиране",
   "install.stepFailed": "{program} се провали (код {code})",
   "install.timezoneWarning": "Внимание: часовата зона не можа да бъде зададена",
+  "install.tabletPowerWarning": "Внимание: бутонът за захранване не можа да бъде настроен за таблет",
   "lang.installed": {
     "one": "{count} пакет е инсталиран за „{lang}“",
     "other": "{count} пакета са инсталирани за „{lang}“"

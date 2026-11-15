@@ -31,6 +31,7 @@
   "install.rebooting": "Reiniciando",
   "install.stepFailed": "{program} falló (código {code})",
   "install.timezoneWarning": "Aviso: no se pudo poner la zona horaria",
+  "install.tabletPowerWarning": "Aviso: no se pudo configurar el botón de encendido para una tableta",
   "lang.installed": {
     "one": "{count} paquete instalado para «{lang}»",
     "other": "{count} paquetes instalados para «{lang}»"

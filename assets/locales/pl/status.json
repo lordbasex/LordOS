@@ -31,6 +31,7 @@
   "install.rebooting": "Ponowne uruchamianie",
   "install.stepFailed": "{program} zakończył się błędem (kod {code})",
   "install.timezoneWarning": "Ostrzeżenie: nie udało się ustawić strefy czasowej",
+  "install.tabletPowerWarning": "Ostrzeżenie: nie udało się ustawić przycisku zasilania dla tabletu",
   "lang.installed": {
     "one": "Zainstalowano {count} pakiet dla „{lang}”",
     "few": "Zainstalowano {count} pakiety dla „{lang}”",
