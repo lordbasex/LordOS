@@ -49,7 +49,6 @@ typedef struct {
     int nq;
     TItem t[T_MAX];
     int nt;
-    int in_use;
     int links_supported;            /* -1 not known yet */
     int trash_supported;            /* operations/cleanup (rclone's CleanUp feature); -1 not known yet */
     long long measured_bytes, measured_count, measured_at;   /* Measure (17.2 item 5); at in ms, 0 never */
@@ -129,6 +128,7 @@ void  cf_kick(void);                                    /* a kept folder changed
 void  cf_browse(const char *path);                      /* a folder Files shows (7.3): the browser thread takes the last one */
 char *cf_status(const char *const *paths, int n);
 char *cf_free(const char *const *paths, int n);
+int   cf_open_count(const char *name);               /* this user's descriptors open under ~/Cloud/<name> (/proc) */
 void  cf_measure(void);                                 /* cache and kept bytes of every account (thread) */
 void  cf_auto_free(int below_gb);                       /* the automatic pass (thread) */
 long long cf_rm_tree(const char *path);                 /* removes a cache folder: bytes */

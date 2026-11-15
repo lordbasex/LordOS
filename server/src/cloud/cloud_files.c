@@ -3,8 +3,10 @@
  *
  * rclone never evicts (the mounts have no age or size limit); LordOS does, by removing a file's cached data and its
  * vfsMeta entry while the mount runs (measured in Phase 0: the next read fetches it again). A file goes only if it
- * is clean: not open (no process of this user has it open under ~/Cloud, and rclone isn't holding it — vfs/stats
- * inUse plus the 5 s rclone keeps a closed handle), not changed here and not waiting in vfs/queue, and not kept. */
+ * is clean: not open (no process of this user has it open under ~/Cloud, and, while mounted, not used in the last
+ * 10 s, since rclone keeps a closed handle 5 s), not changed here and not waiting in vfs/queue, and not kept.
+ * rclone's vfs/stats "inUse" is not a count of open files: it is the VFS's reference count, 1 for as long as the mount
+ * exists (#146), so the open files are always looked up in /proc. */
 #include "cloud_int.h"
 #include "../doc/wire.h"
 #include "../sec/json.h"
@@ -33,7 +35,7 @@
 /* what one account looks like, copied out from under cl_mu */
 typedef struct {
     char id[16], name[CLOUD_NAME_MAX + 1];
-    int in_use, mounted, paused, offline;
+    int mounted, paused, offline;
     char **keep;
     int nkeep;
     char **q;
@@ -47,7 +49,6 @@ static int snap(const char *name, const char *id, Snap *s) {
     if (!a) { pthread_mutex_unlock(&cl_mu); return -1; }
     cl_pf(s->id, sizeof s->id, "%s", a->id);
     cl_pf(s->name, sizeof s->name, "%s", a->name);
-    s->in_use = a->in_use;
     s->mounted = a->mounted;
     s->paused = cl_paused(a);
     s->offline = cloud_err_offline(a->err) || a->keeper_wait;      /* or not checked yet since it was mounted or resumed */
@@ -87,11 +88,12 @@ typedef struct { char **p; int n, cap; } OpenSet;
 
 static int cmp_str(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
 
-static void open_scan(OpenSet *o) {
+/* the files this user's processes have open under dir (an absolute folder, no trailing slash) */
+static void open_scan_in(OpenSet *o, const char *dir) {
     memset(o, 0, sizeof *o);
     DIR *pd = opendir("/proc");
     if (!pd) return;
-    size_t rl = strlen(cl_root);
+    size_t rl = strlen(dir);
     uid_t me = getuid();
     for (struct dirent *e; (e = readdir(pd)) && o->n < 65536; ) {
         if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
@@ -108,7 +110,7 @@ static void open_scan(OpenSet *o) {
             ssize_t n = readlink(lp, t, sizeof t - 1);
             if (n <= 0) continue;
             t[n] = 0;
-            if (strncmp(t, cl_root, rl) || t[rl] != '/') continue;
+            if (strncmp(t, dir, rl) || t[rl] != '/') continue;
             if (o->n == o->cap) {
                 int nc = o->cap ? o->cap * 2 : 64;
                 char **np = realloc(o->p, sizeof *np * (size_t)nc);
@@ -124,12 +126,25 @@ static void open_scan(OpenSet *o) {
     if (o->n) qsort(o->p, (size_t)o->n, sizeof *o->p, cmp_str);
 }
 
+static void open_scan(OpenSet *o) { open_scan_in(o, cl_root); }
+
 static int open_has(const OpenSet *o, const char *path) {
     const char *k = path;
     return o->n && bsearch(&k, o->p, (size_t)o->n, sizeof *o->p, cmp_str) != NULL;
 }
 
 static void open_free(OpenSet *o) { for (int i = 0; i < o->n; i++) free(o->p[i]); free(o->p); memset(o, 0, sizeof *o); }
+
+int cf_open_count(const char *name) {
+    if (!name || !*name || strchr(name, '/') || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
+    char dir[PATH_MAX];
+    if (snprintf(dir, sizeof dir, "%s/%s", cl_root, name) >= (int)sizeof dir) return 0;
+    OpenSet o;
+    open_scan_in(&o, dir);
+    int n = o.n;
+    open_free(&o);
+    return n;
+}
 
 /* the candidate for eviction that rel is */
 static void judge(const Snap *s, const OpenSet *o, const char *rel, CloudCand *c, CloudMeta *m) {
@@ -145,7 +160,7 @@ static void judge(const Snap *s, const OpenSet *o, const char *rel, CloudCand *c
     c->kept = cloud_kept((const char *const *)s->keep, s->nkeep, rel);
     c->dirty = have && m->dirty;
     c->queued = queued(s, rel);
-    c->open = open_has(o, full) || (s->in_use > 0 && have && m->atime >= 0 && time(NULL) - m->atime < HANDLE_HOLD_S);
+    c->open = open_has(o, full) || (s->mounted && have && m->atime >= 0 && time(NULL) - m->atime < HANDLE_HOLD_S);
 }
 
 /* drops one clean file's cached copy: bytes freed, or -1 */
@@ -294,7 +309,7 @@ char *cf_free(const char *const *paths, int n) {
         if (!paths[i] || cloud_split(cl_root, paths[i], name, sizeof name, rel, sizeof rel)) continue;
         Snap s;
         if (snap(name, NULL, &s)) continue;
-        if (!scanned && s.in_use > 0) { open_scan(&o); scanned = 1; }   /* rclone says something is open: who */
+        if (!scanned) { open_scan(&o); scanned = 1; }   /* who has what open under ~/Cloud, once */
         char base[PATH_MAX];
         cl_pf(base, sizeof base, "%s/vfsMeta/%s", cl_cache, s.id);
         FreeCtx f = { &s, &o, 0, &skip, nskip };
@@ -386,7 +401,7 @@ void cf_auto_free(int below_gb) {
     AutoCtx x = { NULL, &o, c, rel, who, 0, 0 };
     for (int i = 0; i < na; i++) {
         if (snap(NULL, ids[i], &ss[ns])) continue;
-        if (!scanned && ss[ns].in_use > 0) { open_scan(&o); scanned = 1; }
+        if (!scanned) { open_scan(&o); scanned = 1; }
         char base[PATH_MAX];
         cl_pf(base, sizeof base, "%s/vfsMeta/%s", cl_cache, ss[ns].id);
         x.s = &ss[ns];

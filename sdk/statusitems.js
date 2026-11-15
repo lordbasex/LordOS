@@ -13,9 +13,10 @@
 import { createElement as h } from 'react';
 import { View, displayAt } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
-import { panelPlacement } from './statusplace.js';
+import { workAreaOf } from './windows.js';
+import { panelPlacement, panelRoom } from './statusplace.js';
 
-export { panelPlacement };
+export { panelPlacement, panelRoom };
 
 export const statusItems = createStore([]);          // [{ id, Component, order }]
 
@@ -38,4 +39,17 @@ export function statusPanelAt(button, gap = 4) {
   try { box = n ? lord.getLayout(n.id) : null; } catch (e) { box = null; }
   if (!box) return { position: 'absolute', top: 26, right: 0 };
   return panelPlacement(box, displayAt(box[0] + box[2] / 2, box[1] + box[3] / 2), gap);
+}
+
+// The most height that panel may take on its display, the Dock or taskbar left out (statusplace.js, panelRoom; #145).
+// A panel whose rows can outgrow the screen sets it as its maxHeight and scrolls the rows.
+export function statusPanelRoom(button, gap = 4) {
+  const n = button && typeof button === 'object' && 'current' in button ? button.current : button;
+  let box = null;
+  try { box = n ? lord.getLayout(n.id) : null; } catch (e) { box = null; }
+  if (!box) return undefined;
+  const d = displayAt(box[0] + box[2] / 2, box[1] + box[3] / 2);
+  let area = null;
+  try { area = workAreaOf(d); } catch (e) { area = null; }
+  return panelRoom(box, d, area, gap);
 }

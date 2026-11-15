@@ -622,7 +622,7 @@ static void daemon_gone(void) {
     pthread_mutex_lock(&cl_mu);
     cl_running = 0;
     dmn.pid = 0;
-    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) { cl_acc[i].configured = cl_acc[i].mounted = cl_acc[i].held = 0; cl_acc[i].in_use = 0; acc_free_live(&cl_acc[i]); }
+    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) { cl_acc[i].configured = cl_acc[i].mounted = cl_acc[i].held = 0; acc_free_live(&cl_acc[i]); }
     pthread_mutex_unlock(&cl_mu);
     for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) { char d[PATH_MAX]; mount_dir(&cl_acc[i], d, sizeof d); clear_stale(d); }
 }
@@ -1418,7 +1418,7 @@ static void acc_off(Acc *a, const char *reason, int keep_session) {
     pthread_mutex_lock(&cl_mu);
     a->disabled = 1;
     a->off_wait = 0;
-    a->configured = a->mounted = a->held = a->in_use = a->locked = 0;
+    a->configured = a->mounted = a->held = a->locked = 0;
     a->err[0] = a->message[0] = a->fp_old[0] = a->fp_new[0] = 0;
     a->retry_at = 0;
     acc_free_live(a);
@@ -2454,12 +2454,7 @@ static void poll_acc(Acc *a) {
         pthread_mutex_unlock(&cl_mu);
     }
     if (d.root) json_free(&d);
-    if (rcj(RCM_VFS_STATS, body, &d, NULL, 0, RC_SHORT) == 200 && d.root) {
-        pthread_mutex_lock(&cl_mu);
-        a->in_use = (int)json_num(d.root, "inUse", 0);
-        pthread_mutex_unlock(&cl_mu);
-    }
-    if (d.root) json_free(&d);
+    /* not vfs/stats: its "inUse" is the VFS's reference count (1 while mounted), not the files open (#146) */
     /* Pause holds what waits to go up; otherwise each changed file is looked at once before it goes (the conflict rule):
      * held, compared with the cloud's object (the cloud's version copied aside on a conflict), then let go */
     int hold = cl_paused(a);
@@ -2903,7 +2898,14 @@ static void *worker(void *arg) {
                     if (!a->used) continue;
                     time_t t = time(NULL);
                     /* turned off while busy, with Wait: once nothing is open, waiting or moving */
-                    if (a->off_wait && cloud_off_due(1, cloud_busy(a->nq, a->in_use, a->nt + !!a->rcjob_kind))) { a->disabled = 1; acc_off(a, "", 1); }
+                    if (a->off_wait) {
+                        char nm[CLOUD_NAME_MAX + 1] = "";
+                        pthread_mutex_lock(&cl_mu);
+                        if (a->mounted) cl_pf(nm, sizeof nm, "%s", a->name);
+                        pthread_mutex_unlock(&cl_mu);
+                        int open = nm[0] ? cf_open_count(nm) : 0;
+                        if (cloud_off_due(1, cloud_busy(a->nq, open, a->nt + !!a->rcjob_kind))) { a->disabled = 1; acc_off(a, "", 1); }
+                    }
                     if (a->disabled) {
                         /* off: nothing of rclone's; a sign-in that waits for the keyring is still saved */
                         if (a->pending_secret && t >= a->retry_at) { char *s = strdup(a->pending_secret); a->retry_at = t + 30; if (s) store_secret(a, s); }
@@ -3501,12 +3503,19 @@ char *cloud_set_options(const char *json) {
 }
 
 char *cloud_set_enabled(const char *id, int on, int how) {
+    /* the files open under the account's folder, looked up in /proc outside the lock (#146) */
+    char name[CLOUD_NAME_MAX + 1] = "";
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find(id);
+    if (a && a->mounted && !on) cl_pf(name, sizeof name, "%s", a->name);
+    pthread_mutex_unlock(&cl_mu);
+    int open = name[0] ? cf_open_count(name) : 0;
+    pthread_mutex_lock(&cl_mu);
+    a = cl_find(id);
     if (!a) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.notFound"); }
     /* an account still being added or answering a question: its setup ends first */
     if (a->pending_req || a->new_acc) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.settingUp"); }
-    int busy = a->mounted && cloud_busy(a->nq, a->in_use, a->nt + !!a->rcjob_kind);
+    int busy = a->mounted && cloud_busy(a->nq, open, a->nt + !!a->rcjob_kind);
     int r = cloud_switch(a->disabled, a->off_wait, on, how, busy);
     char *res = NULL;
     if (r == CS_ON) turn_on(a);
@@ -3516,7 +3525,7 @@ char *cloud_set_enabled(const char *id, int on, int how) {
     } else if (r == CS_WAIT) a->off_wait = 1;
     else if (r == CS_BUSY) {
         char b[96];
-        cl_pf(b, sizeof b, "{\"error\":\"busy\",\"files\":%d,\"open\":%d,\"moving\":%d}", a->nq, a->in_use, a->nt + !!a->rcjob_kind);
+        cl_pf(b, sizeof b, "{\"error\":\"busy\",\"files\":%d,\"open\":%d,\"moving\":%d}", a->nq, open, a->nt + !!a->rcjob_kind);
         res = strdup(b);
     }
     pthread_mutex_unlock(&cl_mu);
