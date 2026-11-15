@@ -202,7 +202,9 @@ export function AiDetail({ pkg }) {
     const sameRepo = (catalog.apps || []).some((x) => x.id !== a.id && x.source && x.source.url === a.source.url && installed(x.package));
     if (!sameRepo) admin.run('pkg-source-remove', a.id).catch(() => {});
   };
-  const details = h(debian.Details, { name: pkg, onRemoved, extras: [...(allowed || []), ...withPkgs], withRemove: withPkgs });
+  // "keep": "with" packages the system may also need (Steam's amd64 mesa-vulkan-drivers): installed with it, never removed with it
+  const keep = (a && Array.isArray(a.keep)) ? a.keep : [];
+  const details = h(debian.Details, { name: pkg, onRemoved, extras: [...(allowed || []), ...withPkgs], withRemove: withPkgs.filter((p) => !keep.includes(p)) });
   return a?.drivers && installed(pkg) ? h(View, { style: { gap: spacing.l } }, h(MoreDrivers, { a }), details) : details;
 }
 

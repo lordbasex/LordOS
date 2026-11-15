@@ -186,7 +186,9 @@ GTK theme. So after `dpkg` installs or upgrades one of them, the same `pkg-insta
 ### Confirmations
 
 - Recommended packages are not installed by default. `--recommends` adds them, and if one of them
-  can't be installed it doesn't stop the rest.
+  can't be installed it doesn't stop the rest. The Store never passes it (it would also take the Recommends of every
+  new dependency, recursively); a catalog app that needs some of its packages' Recommends names them in its `"with"`
+  instead (Steam's 32-bit Vulkan drivers, see "Multiarch").
 - (0.8.8.7) **An upgrade brings the Recommends the new version adds**, as apt's full upgrade does. This holds for
   Update All (`pkg-upgrade`) and for upgrading one package. A group is added only if none of its names were
   recommended by the installed version, so a recommended package the user removed stays removed. They are optional:
@@ -320,8 +322,10 @@ Discover, the first install and an app's page".
   (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, `apt/keys/steam.asc`). Its client is 32-bit, so its page first
   says that it needs 32-bit system libraries and that LordOS will enable them; **Enable and continue** runs
   `pkg-foreign-arch i386`, `pkg-source-add steam` and `pkg-update`, and the usual plan then installs `steam-launcher`,
-  `steam-libs-amd64` and `steam-libs-i386:i386` (about 70 i386 libraries from Debian 13) together; removing Steam
-  removes the three. Steam's entry also says `"categories": ["Game"]`, so Store → Games lists it (and counts it) next
+  `steam-libs-amd64` and `steam-libs-i386:i386` (about 70 i386 libraries from Debian 13) together, with Debian's
+  `mesa-vulkan-drivers:i386`, `libasound2-plugins:i386` and `mesa-vulkan-drivers` (see "Steam's 32-bit Vulkan
+  drivers" under "Multiarch"); removing Steam removes them all but the amd64 `mesa-vulkan-drivers` (the catalog's
+  `"keep"`: the system's own Vulkan driver). Steam's entry also says `"categories": ["Game"]`, so Store → Games lists it (and counts it) next
   to Debian's games. Not yet tried on a LordOS system (see "Multiarch").
 - **Third-party apps** (until 0.8.8.3 "Third-party suites") lists open source apps and suites from
   other projects: ArtCraft (0.8.8.1, its maker's `.deb` with a pinned SHA-256), and since 0.8.8.4
@@ -710,6 +714,23 @@ Steam's client is 32-bit, so the engine installs i386 packages next to the amd64
   `dpkg --install` unpacks both.
 - **dpkg.** Installs pass the `.deb` files; removals pass `name:i386`, and `name:amd64` for a native package whose
   i386 one is installed too (dpkg refuses an ambiguous name).
+- **Steam's 32-bit Vulkan drivers** (found on the maintainer's PC, 2026-11-15, with a 0.8.8.9 test build): Valve's
+  `steam-libs-i386` only *recommends* `mesa-vulkan-drivers` and `libasound2-plugins`, and an install takes no
+  Recommends (see "Confirmations"), so the Store installed `libvulkan1:i386` and `libgl1-mesa-dri:i386` (Depends) but
+  no 32-bit Vulkan driver: 32-bit games and DXVK fell back to Lavapipe (software), as the Monitor showed for Steam's
+  processes, while 64-bit Proton games (with the amd64 driver) were fine. The resolver itself was right: with
+  `--recommends`, an i386 package's unqualified Recommends resolve in i386 (`mesa-vulkan-drivers:i386`, never the amd64
+  one). The fix is in the catalog: Steam's `"with"` names `mesa-vulkan-drivers:i386` and `libasound2-plugins:i386`
+  (Debian's own i386 list, `Multi-Arch: same`) and `mesa-vulkan-drivers` (amd64; the ISO installs it, a Debian system
+  set up with `tools/install/install.sh` may not have it), and `"keep": ["mesa-vulkan-drivers"]` leaves the amd64
+  driver in place when Steam is removed. The `Multi-Arch: same` rules keep each pair at one version: a new
+  `mesa-vulkan-drivers:i386` moves the installed amd64 driver up to its version in the same plan, never down.
+  **Steam installed before** (0.8.8.9 test builds): Update All doesn't bring them (the installed `steam-libs-i386`
+  already recommended them, so they aren't "new" Recommends), but Steam's Store page, which comes with the new
+  catalog in the next LordOS update, shows **Update** while any of its `"with"` packages is missing; the plan installs
+  only the missing ones. `apt/build.sh check` accepts a `"with"` package that the vendor's index for its
+  architecture lacks when Debian trixie's `main` index has it (InRelease verified with Debian's archive keyring, the
+  index with its SHA-256; an i386 one must be built for i386 and `Multi-Arch: same`, `foreign` or `allowed`).
 - **Tests** (`build/pkg-test`): request names; `:any`/`:native`/`:i386` qualifiers; dpkg's architecture list; an index
   from an amd64 and an i386 list (the i386 `all` records left out, Provides of both architectures); status keys;
   Steam's libraries resolved with their i386 dependencies and the native D-Bus; a native Recommends of an i386-only
@@ -717,7 +738,12 @@ Steam's client is 32-bit, so the engine installs i386 packages next to the amd64
   pair together and holding a pair whose i386 version is missing; libc6 alone bringing libc6:i386; a split refused;
   removing `libc6:i386` without touching libc6; unqualified Conflicts across architectures; a `Multi-Arch: no`
   package refused in the other architecture; a new `libc6:i386` at the installed amd64 version; no i386 lists at all;
-  the dpkg order of a pair; and the vendor source handover over a fixture tree. Valve's real `InRelease` verifies with
+  the dpkg order of a pair; the vendor source handover over a fixture tree; and Steam's 32-bit Vulkan drivers (a
+  Debian and a Valve source, each with amd64 and i386 lists): the old three-package install leaves the i386 driver
+  out, `--recommends` resolves `steam-libs-i386`'s Recommends in i386, the catalog's `"with"` brings
+  `mesa-vulkan-drivers:i386`, `libasound2-plugins:i386` and their i386 dependencies with the `mesa-vulkan-drivers` and
+  `libvulkan1` pairs at one version and `libc6` untouched, Update All leaves an old Steam without them, and asking for
+  the missing ones (the Store's Update) adds them with the amd64 driver moved up to the same version. Valve's real `InRelease` verifies with
   `apt/keys/steam.asc`. **Not yet tried on a LordOS system**: enabling i386, `pkg-update` with Debian's and Valve's
   i386 lists, installing Steam and running it, Update All with the pair, removing it.
 
