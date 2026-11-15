@@ -301,6 +301,7 @@
   "net.kind.rdp": "远程桌面",
   "net.connectAs": "连接身份",
   "net.nothing": "这台电脑上没有可以从这里打开的内容。",
+  "programNoOpener": "没有可打开“{name}”的应用：它是一个程序（AppImage），而“文件”不运行程序。",
   "net.sharedFolder": "共享文件夹",
   "connect.err.tlsName": "此服务器的证书中没有 {name}，因此无法验证。其管理员可以将该名称添加到证书中。",
   "disk.formatsTitle": "{name} 使用商业磁盘格式",

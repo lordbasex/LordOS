@@ -223,6 +223,7 @@
   "power.onBattery": "Con batería",
   "power.onPower": "Corriente eléctrica",
   "power.powerKey": "Al apretar el botón de encendido",
+  "power.powerKeyHold": "Al mantener apretado el botón de encendido 5 segundos",
   "power.profile.balanced": "Equilibrado",
   "power.profile.performance": "Rendimiento",
   "power.profile.power-saver": "Ahorro",

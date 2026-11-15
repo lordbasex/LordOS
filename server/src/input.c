@@ -15,7 +15,8 @@
 #include "inputkind.h"
 #define HAS(bits, n) (((bits)[(n) / LONG_BITS] >> ((n) % LONG_BITS)) & 1UL)
 
-/* Adds the device if it is a keyboard, mouse or tablet (and grabs it); otherwise closes it. */
+/* Adds the device if it is a keyboard, mouse or tablet (and grabs it), or a device of system keys (not grabbed,
+ * inputkind.h); otherwise closes it. */
 static void add_device(Input *in, int fd, const char *path) {
     unsigned long ev[NLONGS(EV_MAX + 1)] = {0};
     unsigned long keys[NLONGS(KEY_MAX + 1)] = {0};
@@ -29,7 +30,8 @@ static void add_device(Input *in, int fd, const char *path) {
     int keyboard = HAS(ev, EV_KEY) && HAS(keys, KEY_A) && HAS(keys, KEY_ENTER);
     int mouse    = HAS(ev, EV_REL) && HAS(keys, BTN_LEFT);
     int tablet   = input_is_abs_pointer(ev, abs, keys, props);
-    if ((!keyboard && !mouse && !tablet) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
+    int syskeys  = !keyboard && !mouse && !tablet && input_is_system_keys(ev, keys);
+    if ((!keyboard && !mouse && !tablet && !syskeys) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
 
     InputDevice *d = &in->dev[in->count++];
     memset(d, 0, sizeof *d);                /* the slot may have belonged to one that was unplugged */
@@ -38,6 +40,14 @@ static void add_device(Input *in, int fd, const char *path) {
     struct input_id id = {0};
     ioctl(fd, EVIOCGID, &id);
     d->bus = id.bustype;
+    if (syskeys) {
+        /* Not grabbed: logind reads the power key from the same gpio-keys node (issue #131). Not a keyboard either, so
+         * a tablet still gets the on-screen one. */
+        d->syskeys = 1;
+        d->led_state = -1;
+        fprintf(stderr, "input: %s -> %s [system keys]\n", path, d->name);
+        return;
+    }
     d->keyboard = keyboard && osk_full_keyboard(keys, NLONGS(KEY_MAX + 1), d->name);
     unsigned long rel[NLONGS(REL_MAX + 1)] = {0};
     ioctl(fd, EVIOCGBIT(EV_REL, sizeof rel), rel);
@@ -120,6 +130,7 @@ void input_dispatch(Input *in, int idx, InputHandler cb, void *ud) {
         ssize_t n = read(d->fd, evs, sizeof evs);
         if (n <= 0) break;
         for (size_t i = 0; i < (size_t)n / sizeof evs[0]; i++) {
+            if (d->syskeys && !input_syskeys_event(evs[i].type, evs[i].code)) continue;
             if (d->keyboard && evs[i].type == EV_KEY && evs[i].value == 1 && evs[i].code >= KEY_Q && evs[i].code <= KEY_M) d->typed = 1;
             cb(ud, d, &evs[i]);
         }

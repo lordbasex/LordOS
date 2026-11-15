@@ -223,6 +223,7 @@
   "power.onBattery": "Na bateria",
   "power.onPower": "Energia da tomada",
   "power.powerKey": "Ao pressionar o botão liga/desliga",
+  "power.powerKeyHold": "Ao manter pressionado o botão liga/desliga por 5 segundos",
   "power.profile.balanced": "Equilibrado",
   "power.profile.performance": "Desempenho",
   "power.profile.power-saver": "Economia",

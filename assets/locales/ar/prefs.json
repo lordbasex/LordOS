@@ -227,6 +227,7 @@
   "power.onBattery": "على البطارية",
   "power.onPower": "محوّل الطاقة",
   "power.powerKey": "عند الضغط على زر الطاقة",
+  "power.powerKeyHold": "عند الضغط مطولًا على زر الطاقة لمدة 5 ثوانٍ",
   "power.profile.balanced": "متوازن",
   "power.profile.performance": "الأداء",
   "power.profile.power-saver": "طاقة منخفضة",

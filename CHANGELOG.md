@@ -12,6 +12,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **What the power button does when held for 5 seconds** (issue [#131](https://github.com/lordbasex/LordOS/issues/131),
+  thanks to Touchgg): Settings → Energy (Battery on laptops) → Power button and lid has a second power-button row,
+  "When the power button is held for 5 seconds", with the same choices (sleep, hibernate, shut down, do nothing), so a
+  tablet can sleep on a tap and shut down cleanly on a hold. The closed admin action `power-buttons` takes an
+  optional fourth value from the same short list, validated on the root side (`hw_buttons_conf` in
+  `server/src/hw/hw_admin.c`: nothing after it, nothing outside the list), and writes logind's
+  `HandlePowerKeyLongPress=` into `/etc/systemd/logind.conf.d/lordos.conf`; the three-value form still works.
+  `lord.power.buttons()` reads it back as `powerHold` (`ignore` when unset, logind's default). With a hold action set,
+  logind runs the short-press action when the key is released before 5 s. The short press could already be set to
+  sleep; the defaults are unchanged (shut down on a press, nothing on a hold). Tested in `build/settings-hw-test`; not
+  yet tried on a tablet, where the power chip may cut the power by itself after a longer hold.
+
 - **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),
   German (`de`), Hindi (`hi`), Malay (`ms`), Bengali (`bn`), Simplified Chinese (`zh-Hans`), Traditional Chinese
   (`zh-Hant`), Ukrainian (`uk`), Polish (`pl`), Arabic (`ar`), Vietnamese (`vi`), Swedish (`sv`), Greek (`el`), Dutch
@@ -632,6 +644,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   language. Tested in `server/tests/files_colview_test.mjs` and in the scene `server/tests/files_colview_scene.mjs`
   (five columns drawn where 0.8.8.8 kept one). Not checked on screen yet. MacNB's other suggestion in
   the issue (← → to the parent or child folder and ↑ ↓ in the column, as in Finder) is not part of this change.
+- **A tablet's volume buttons change the volume** (issue [#131](https://github.com/lordbasex/LordOS/issues/131),
+  thanks to Touchgg, on a Chuwi Hi12 and a Teclast X98 Pro). lord-sessiond and lord-server opened only full
+  keyboards (with A and Enter), mice and tablets, so the `gpio-keys` node that carries a Cherry Trail tablet's volume
+  buttons (`soc_button_array`) was closed unread, and so was a keyboard's separate "Consumer Control" node. A third
+  kind of device, **system keys**, now opens too (`input_is_system_keys` in `server/src/inputkind.h`, used by
+  `useful()` in `server/src/remote/monitor.c` and `add_device()` in `server/src/input.c`): sound or player keys and no
+  letters or pointer buttons. It is not grabbed, because logind reads the power key from the same `gpio-keys` node,
+  and only the keys `keygrab_system_key` lists pass on (volume, mute, player, brightness, keyboard light, Print
+  Screen; the list now lives in `input_system_key`, shared by both), never `KEY_POWER`, so the power button is never
+  acted on twice. A "Power Button" (power key only) and a "Video Bus" (brightness only, which the kernel's ACPI video
+  driver may already change) are still left alone. These devices are not keyboards, so the tablet's on-screen
+  keyboard still appears, and they don't count as a way to answer a password prompt. Tested in
+  `build/inputkind-test` (a Hi12's `gpio-keys`, an ACPI Power Button, a Video Bus, a Consumer Control node, a keyboard
+  and a mouse with volume keys, and what passes); not yet tried on a tablet.
+- **A mouse's back and forward buttons work in Linux apps** (issue
+  [#159](https://github.com/lordbasex/LordOS/issues/159), thanks to getsugah, with a Logitech MX Master 2S).
+  `server/src/main.c` turned only BTN_LEFT, BTN_MIDDLE and BTN_RIGHT into buttons, and BTN_SIDE and BTN_EXTRA (codes
+  above the keyboard's range) were dropped; the Wayland side (`wl.c`) and isolated apps (`appclient.c`) knew only three
+  buttons too. `input_dom_button` (`server/src/inputkind.h`) now numbers them as the DOM does, 3 back (BTN_SIDE,
+  BTN_BACK) and 4 forward (BTN_EXTRA, BTN_FORWARD), and `input_evdev_button` gives a Wayland app BTN_SIDE and
+  BTN_EXTRA, as libinput does: GTK, Qt and the browsers go back and forward, Xwayland makes them X buttons 8 and 9, and
+  LordOS's web apps (`webwin.c`, which already handled them) now get them. The desktop's own press handlers don't see
+  buttons 3 and 4 (`runtime/events.js`): most of them don't look at the button, and a thumb press must not drag a
+  window or press a control. The remote desktop still sends three buttons. Tested in `build/inputkind-test` and
+  `tests/side_buttons_test.mjs`; not yet tried with a real mouse.
+- **Files no longer opens an AppImage in TextEdit** (issue [#159](https://github.com/lordbasex/LordOS/issues/159),
+  thanks to getsugah). A file with no known kind was offered to TextEdit, so double-clicking a program showed its
+  bytes. `isProgram` (`sdk/filekinds.js`) marks `*.AppImage` files: TextEdit is no longer offered, an app that declares
+  `application/vnd.appimage` still is, and with none Files says that no app opens it, that it is a program and that
+  Files doesn't run programs (`files.programNoOpener`, in all 35 languages). Running AppImages from Files is a
+  separate decision, not made here. Tested in `tests/filekinds_test.mjs`.
+
 - **lord-web picks the right language for three-letter ids and for Chinese.** The LordOS Web Runtime's own texts
   (`server/src/web/weblang.c`) took only the first two letters of `LC_ALL`, `LC_MESSAGES` or `LANG`, so `fil_PH.UTF-8`
   loaded Finnish (`fi`) and any `zh_*` looked for a `zh` folder that does not exist and fell back to English. It now

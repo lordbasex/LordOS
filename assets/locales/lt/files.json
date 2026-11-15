@@ -317,6 +317,7 @@
   "net.kind.rdp": "Nuotolinis darbalaukis",
   "net.connectAs": "Prisijungti kaip",
   "net.nothing": "Nieko šiame kompiuteryje negalima atidaryti iš čia.",
+  "programNoOpener": "Jokia programa neatidaro „{name}“: tai programa (AppImage), o Failai programų nepaleidžia.",
   "net.sharedFolder": "Bendrinamas aplankas",
   "connect.err.tlsName": "Šio serverio sertifikate nenurodytas pavadinimas {name}, todėl jo patikrinti negalima. Administratorius gali įrašyti šį pavadinimą į sertifikatą.",
   "disk.formatsTitle": "{name} naudoja komercinį disko formatą",

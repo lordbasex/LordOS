@@ -3,7 +3,7 @@
 // (issue #49: .xlsx and the other office documents had no type, so no app was ever offered).
 //
 //   node tests/filekinds_test.mjs        (from server/; run_suites.sh runs it when node exists)
-import { kindOf, mimeOf, mimesOf, appOpens, thumbSrc } from '../../sdk/filekinds.js';
+import { kindOf, mimeOf, mimesOf, appOpens, thumbSrc, isProgram, isTextual } from '../../sdk/filekinds.js';
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -15,6 +15,14 @@ const f = (name) => ({ name, path: `/home/u/${name}`, dir: false });
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 // ---- the table ----
+// an AppImage is a program, not text: it never opens in TextEdit (issue #159), and its type finds an app that declares it
+eq('AppImage is a program', isProgram(f('Krita-5.2.x86_64.AppImage')), true);
+eq('AppImage case', isProgram(f('tool.appimage')), true);
+eq('AppImage is not text', isTextual(f('Krita-5.2.x86_64.AppImage')), false);
+eq('AppImage type', mimeOf(f('Krita.AppImage')), 'application/vnd.appimage');
+eq('a folder named like one is not', isProgram({ name: 'x.AppImage', dir: true }), false);
+eq('a text file is not', isProgram(f('notes.txt')), false);
+eq('an unknown file is not', isProgram(f('a.qqq')), false);
 eq('xlsx kind', kindOf(f('a.xlsx')), 'doc');
 // split archive volumes are archives (GitHub #103)
 eq('zip.001 kind', kindOf(f('DOCUMENTS.zip.001')), 'archive');

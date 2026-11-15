@@ -223,6 +223,7 @@
   "power.onBattery": "Sur batterie",
   "power.onPower": "Adaptateur secteur",
   "power.powerKey": "À l’appui sur le bouton d’alimentation",
+  "power.powerKeyHold": "Au maintien du bouton d’alimentation pendant 5 secondes",
   "power.profile.balanced": "Équilibré",
   "power.profile.performance": "Performances",
   "power.profile.power-saver": "Économie d’énergie",

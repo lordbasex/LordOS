@@ -317,6 +317,7 @@
   "net.kind.rdp": "Desktop la distanță",
   "net.connectAs": "Conectare ca",
   "net.nothing": "Nimic de pe acest computer nu poate fi deschis de aici.",
+  "programNoOpener": "Nicio aplicație nu deschide „{name}”: este un program (AppImage), iar Fișiere nu rulează programe.",
   "net.sharedFolder": "Dosar partajat",
   "connect.err.tlsName": "Certificatul acestui server nu numește {name}, așa că nu poate fi verificat. Administratorul îl poate adăuga în certificat.",
   "disk.formatsTitle": "{name} folosește un format de disc comercial",

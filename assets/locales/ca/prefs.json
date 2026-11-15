@@ -223,6 +223,7 @@
   "power.onBattery": "Amb bateria",
   "power.onPower": "Adaptador de corrent",
   "power.powerKey": "Quan es prem el botó d’engegada",
+  "power.powerKeyHold": "Quan es manté premut el botó d’engegada 5 segons",
   "power.profile.balanced": "Equilibrat",
   "power.profile.performance": "Rendiment",
   "power.profile.power-saver": "Baix consum",

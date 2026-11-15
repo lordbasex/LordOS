@@ -32,6 +32,7 @@
 #include "canvas.h"
 #include "par.h"
 #include "input.h"
+#include "inputkind.h"
 #include "kms.h"
 #include "drmcard.h"
 #include "term/term.h"
@@ -632,7 +633,9 @@ static int remote_typed;
 static void keyboards_check(Server *s) {
     static int last = -1;
     int now = input_has_keyboard(&s->input) || remote_typed;
-    pkagent_set_local(s->input.count > 0);                 /* whether a PS/2 keyboard is real is unknown until it types */
+    int local = 0;                                         /* volume buttons alone are not a way to answer it */
+    for (int i = 0; i < s->input.count; i++) if (!s->input.dev[i].syskeys) local = 1;
+    pkagent_set_local(local);                              /* whether a PS/2 keyboard is real is unknown until it types */
     js_input_set_keyboard(now);
     if (now != last) { last = now; js_keyboards_event(now); }
 }
@@ -1223,8 +1226,8 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
          * the remote desktop injects doesn't pass through on_input (docs/SHORTCUTS.md) */
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
-        /* Botones con la numeración del DOM: 0 izquierdo, 1 medio, 2 derecho. */
-        int button = ev->code == BTN_LEFT ? 0 : ev->code == BTN_MIDDLE ? 1 : ev->code == BTN_RIGHT ? 2 : -1;
+        /* Buttons in the DOM's numbering: 0 left, 1 middle, 2 right, 3 back, 4 forward (inputkind.h, issue #159) */
+        int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
         if ((button == 0 || button == 2) && !d->tp && d->fd >= 0 && tp_config()->mouse_left_handed) button = 2 - button;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)

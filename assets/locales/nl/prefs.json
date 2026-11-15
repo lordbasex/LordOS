@@ -223,6 +223,7 @@
   "power.onBattery": "Op batterij",
   "power.onPower": "Netadapter",
   "power.powerKey": "Als de aan/uit-knop wordt ingedrukt",
+  "power.powerKeyHold": "Als de aan/uit-knop 5 seconden wordt ingedrukt gehouden",
   "power.profile.balanced": "Gebalanceerd",
   "power.profile.performance": "Prestaties",
   "power.profile.power-saver": "Energiebesparing",

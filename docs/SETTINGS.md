@@ -330,10 +330,17 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   its frame in memory standing for the screen; `lord-sessiond` never sets it). A real lid on a laptop
   hasn't been tried.
 - **Power button and lid.** What systemd-logind does (sleep, hibernate, shut down, do nothing). The
-  admin action `power-buttons <power> <lid> <lid-on-ac>` writes
-  `/etc/systemd/logind.conf.d/lordos.conf` (a short list of values, validated) and runs
-  `systemctl reload systemd-logind`. LordOS never grabs the ACPI power button (only keyboards, mice
-  and tablets are grabbed), so logind sees it. Lid rows only show with a battery.
+  admin action `power-buttons <power> <lid> <lid-on-ac> [<hold>]` writes
+  `/etc/systemd/logind.conf.d/lordos.conf` (a short list of values, validated on the root side,
+  `hw_buttons_conf`) and runs `systemctl reload systemd-logind`. Since issue #131 a second row, "When
+  the power button is held for 5 seconds", writes `HandlePowerKeyLongPress=` (logind's fixed 5 s;
+  unset or `ignore` by default). With a hold action set, logind runs the short-press action when the
+  key is released before 5 s; so a tablet can sleep on a tap and shut down cleanly on a hold. On some
+  tablets (Cherry Trail) the power chip cuts the power by itself after a longer hold; that hasn't been
+  checked on one. The three-value form still works and leaves the hold unset. LordOS never grabs the
+  power button: the ACPI "Power Button" isn't opened, and a tablet's `gpio-keys` node is opened for
+  its volume keys without a grab and with `KEY_POWER` dropped (`server/src/inputkind.h`), so logind
+  sees every press and the desktop none. Lid rows only show with a battery.
 
 ## Cooling
 
@@ -553,7 +560,7 @@ All in `server/src/hw/hw_admin.c`, in the `actions` table through `HW_ADMIN_ACTI
 | `keyboard-light` | `<led> <value>` | anyone | writes `/sys/class/leds/<name>/brightness`, only for a `*::kbd_backlight` under `/sys/devices` (`0..max`) |
 | `power-profile` | `performance` \| `balanced` \| `power-saver` | anyone | `/usr/bin/powerprofilesctl set`, or the cpufreq governor and EPP |
 | `power-suspend` | — | anyone | `/usr/bin/systemctl suspend` |
-| `power-buttons` | `<power> <lid> <lid-on-ac>` (`suspend`, `hibernate`, `poweroff`, `ignore`) | admin | generates `/etc/systemd/logind.conf.d/lordos.conf`, `systemctl reload systemd-logind` |
+| `power-buttons` | `<power> <lid> <lid-on-ac> [<hold>]` (`suspend`, `hibernate`, `poweroff`, `ignore`; `<hold>`: the power button held 5 s, #131) | admin | generates `/etc/systemd/logind.conf.d/lordos.conf` (`HandlePowerKey`, `HandlePowerKeyLongPress` with a fourth value, `HandleLidSwitch`, `HandleLidSwitchExternalPower`), `systemctl reload systemd-logind` |
 | `time-ntp` | `on` \| `off` | admin | `/usr/bin/timedatectl set-ntp` |
 | `time-set` | `YYYY-MM-DD HH:MM:SS` | admin | `/usr/bin/timedatectl set-time` |
 | `bt-unblock` | — | anyone | rfkill "unblock all Bluetooth" on `/dev/rfkill` |

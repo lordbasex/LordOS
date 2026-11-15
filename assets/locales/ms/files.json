@@ -301,6 +301,7 @@
   "net.kind.rdp": "Desktop jauh",
   "net.connectAs": "Sambung sebagai",
   "net.nothing": "Tiada apa-apa pada komputer ini boleh dibuka dari sini.",
+  "programNoOpener": "Tiada app yang membuka “{name}”: ia ialah program (AppImage), dan Fail tidak menjalankan program.",
   "net.sharedFolder": "Folder dikongsi",
   "connect.err.tlsName": "Sijil pelayan ini tidak menamakan {name}, jadi ia tidak dapat disahkan. Pentadbirnya boleh menambah nama itu pada sijil.",
   "disk.formatsTitle": "{name} menggunakan format cakera komersial",

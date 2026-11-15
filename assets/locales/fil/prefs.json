@@ -223,6 +223,7 @@
   "power.onBattery": "Naka-baterya",
   "power.onPower": "Power adapter",
   "power.powerKey": "Kapag pinindot ang power button",
+  "power.powerKeyHold": "Kapag pinindot nang matagal ang power button nang 5 segundo",
   "power.profile.balanced": "Balanse",
   "power.profile.performance": "Performance",
   "power.profile.power-saver": "Low Power",

@@ -225,6 +225,7 @@
   "power.onBattery": "Na baterii",
   "power.onPower": "Zasilacz",
   "power.powerKey": "Po naciśnięciu przycisku zasilania",
+  "power.powerKeyHold": "Po przytrzymaniu przycisku zasilania przez 5 sekund",
   "power.profile.balanced": "Zrównoważony",
   "power.profile.performance": "Wydajność",
   "power.profile.power-saver": "Oszczędzanie energii",

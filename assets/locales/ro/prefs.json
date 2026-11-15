@@ -224,6 +224,7 @@
   "power.onBattery": "Pe baterie",
   "power.onPower": "Adaptor de alimentare",
   "power.powerKey": "Când este apăsat butonul de pornire",
+  "power.powerKeyHold": "Când butonul de pornire este ținut apăsat 5 secunde",
   "power.profile.balanced": "Echilibrat",
   "power.profile.performance": "Performanță",
   "power.profile.power-saver": "Consum redus",

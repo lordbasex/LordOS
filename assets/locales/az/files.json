@@ -309,6 +309,7 @@
   "net.kind.rdp": "Uzaq iş masası",
   "net.connectAs": "Bu kimi qoşul",
   "net.nothing": "Bu kompüterdə buradan açıla biləcək heç nə yoxdur.",
+  "programNoOpener": "“{name}” faylını açan tətbiq yoxdur: bu proqramdır (AppImage), Fayllar isə proqram işə salmır.",
   "net.sharedFolder": "Paylaşılan qovluq",
   "connect.err.tlsName": "Bu serverin sertifikatında {name} adı yoxdur, ona görə də onu yoxlamaq olmur. Onun administratoru bu adı sertifikata əlavə edə bilər.",
   "disk.formatsTitle": "{name} kommersiya disk formatından istifadə edir",

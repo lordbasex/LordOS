@@ -472,6 +472,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
     else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
+    # (#159) a mouse's back and forward buttons go to the Linux app, never to the desktop's own press handlers
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "side-buttons-test (runtime/events.js)" node tests/side_buttons_test.mjs
+    else skip "side-buttons-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6, #58) what the bar shows: Lord Flow's Control Center tiles, the output list, the clock's calendar
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menubar-test (themes/default ControlCenter, NotificationCenter, MenuBars on every display, sdk/soundoutputs.js)" node tests/menubar_test.mjs

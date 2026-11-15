@@ -223,6 +223,7 @@
   "power.onBattery": "با باتری",
   "power.onPower": "آداپتور برق",
   "power.powerKey": "هنگام فشردن دکمهٔ روشن/خاموش",
+  "power.powerKeyHold": "هنگام نگه داشتن دکمهٔ روشن/خاموش به مدت ۵ ثانیه",
   "power.profile.balanced": "متعادل",
   "power.profile.performance": "کارایی",
   "power.profile.power-saver": "کم‌مصرف",

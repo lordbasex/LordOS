@@ -223,6 +223,7 @@
   "power.onBattery": "Akkumulátorról",
   "power.onPower": "Hálózati adapter",
   "power.powerKey": "A bekapcsológomb megnyomásakor",
+  "power.powerKeyHold": "A bekapcsológomb 5 másodperces nyomva tartásakor",
   "power.profile.balanced": "Kiegyensúlyozott",
   "power.profile.performance": "Teljesítmény",
   "power.profile.power-saver": "Energiatakarékos",

@@ -224,6 +224,7 @@
   "power.onBattery": "От аккумулятора",
   "power.onPower": "Адаптер питания",
   "power.powerKey": "При нажатии кнопки питания",
+  "power.powerKeyHold": "При удержании кнопки питания 5 секунд",
   "power.profile.balanced": "Сбалансированный",
   "power.profile.performance": "Производительность",
   "power.profile.power-saver": "Энергосбережение",

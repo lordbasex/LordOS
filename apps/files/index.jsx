@@ -614,7 +614,7 @@ export default function Files() {
     setConfirm({ text: tr('files.confirm.pasteFrom', { count: ask.count, app }), detail: lines.join('\n'), ok: tr('files.menu.paste'), cautious: true,
       run: () => paste(dir, knownNames(dir), c) });
   };
-  const ctx = { navigate, linuxApps: launcherApps, t: tr, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
+  const ctx = { navigate, linuxApps: launcherApps, t: tr, say: setMsg, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
   // a computer: its best way in; connected shares open as folders

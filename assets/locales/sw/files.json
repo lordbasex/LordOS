@@ -309,6 +309,7 @@
   "net.kind.rdp": "Eneo-kazi la mbali",
   "net.connectAs": "Unganisha kama",
   "net.nothing": "Hakuna kitu kwenye kompyuta hii kinachoweza kufunguliwa kutoka hapa.",
+  "programNoOpener": "Hakuna programu inayofungua “{name}”: ni programu tumizi (AppImage), na Faili haziendeshi programu.",
   "net.sharedFolder": "Folda iliyoshirikiwa",
   "connect.err.tlsName": "Cheti cha seva hii hakitaji {name}, kwa hiyo hakiwezi kuthibitishwa. Msimamizi wake anaweza kuongeza jina hilo kwenye cheti.",
   "disk.formatsTitle": "{name} inatumia muundo wa diski wa kibiashara",

@@ -223,6 +223,7 @@
   "power.onBattery": "Batareyada",
   "power.onPower": "Qidalanma adapteri",
   "power.powerKey": "Qidalanma düyməsi basılanda",
+  "power.powerKeyHold": "Qidalanma düyməsi 5 saniyə basılı saxlananda",
   "power.profile.balanced": "Balanslaşdırılmış",
   "power.profile.performance": "Performans",
   "power.profile.power-saver": "Enerjiyə qənaət",

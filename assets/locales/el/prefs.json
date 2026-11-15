@@ -223,6 +223,7 @@
   "power.onBattery": "Με μπαταρία",
   "power.onPower": "Τροφοδοτικό",
   "power.powerKey": "Όταν πατιέται το κουμπί λειτουργίας",
+  "power.powerKeyHold": "Όταν το κουμπί λειτουργίας κρατιέται πατημένο για 5 δευτερόλεπτα",
   "power.profile.balanced": "Ισορροπημένη",
   "power.profile.performance": "Επιδόσεις",
   "power.profile.power-saver": "Χαμηλή κατανάλωση",

@@ -224,6 +224,7 @@
   "power.onBattery": "Veikia iš akumuliatoriaus",
   "power.onPower": "Maitinimo adapteris",
   "power.powerKey": "Paspaudus maitinimo mygtuką",
+  "power.powerKeyHold": "Palaikius maitinimo mygtuką 5 sekundes",
   "power.profile.balanced": "Subalansuotas",
   "power.profile.performance": "Našumas",
   "power.profile.power-saver": "Mažos energijos",

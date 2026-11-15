@@ -76,6 +76,9 @@ function run(p, fn) {
 }
 
 globalThis.__lordEvent = (type, id, x, y, button) => {
+  // A mouse's back and forward buttons (3 and 4, issue #159) go to the Linux app under the pointer, not to the
+  // desktop's own handlers: most onMouseDown handlers (title bars, buttons, sliders) don't look at ev.button.
+  if ((type === 'down' || type === 'up') && button > 2) return;
   const chain = chainOf(id);
   const target = chain[0] || null;
   const fire = (set, ev) => { for (const fn of listeners[set]) fn(ev); };

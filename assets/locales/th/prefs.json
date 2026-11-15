@@ -222,6 +222,7 @@
   "power.onBattery": "ใช้แบตเตอรี่",
   "power.onPower": "อแดปเตอร์ไฟ",
   "power.powerKey": "เมื่อกดปุ่มเปิดปิด",
+  "power.powerKeyHold": "เมื่อกดปุ่มเปิดปิดค้างไว้ 5 วินาที",
   "power.profile.balanced": "สมดุล",
   "power.profile.performance": "ประสิทธิภาพ",
   "power.profile.power-saver": "ประหยัดพลังงาน",

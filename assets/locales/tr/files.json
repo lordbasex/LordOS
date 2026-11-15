@@ -309,6 +309,7 @@
   "net.kind.rdp": "Uzak masaüstü",
   "net.connectAs": "Bağlanma biçimi",
   "net.nothing": "Bu bilgisayardaki hiçbir şey buradan açılamaz.",
+  "programNoOpener": "“{name}” dosyasını açan uygulama yok: bu bir program (AppImage) ve Dosyalar program çalıştırmaz.",
   "net.sharedFolder": "Paylaşılan klasör",
   "connect.err.tlsName": "Bu sunucunun sertifikasında {name} adı geçmiyor, bu yüzden doğrulanamıyor. Yöneticisi bu adı sertifikaya ekleyebilir.",
   "disk.formatsTitle": "{name} ticari bir disk biçimi kullanıyor",

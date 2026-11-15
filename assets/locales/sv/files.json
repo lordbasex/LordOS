@@ -309,6 +309,7 @@
   "net.kind.rdp": "Fjärrskrivbord",
   "net.connectAs": "Anslut som",
   "net.nothing": "Inget på den här datorn kan öppnas härifrån.",
+  "programNoOpener": "Ingen app öppnar ”{name}”: det är ett program (AppImage), och Filer kör inte program.",
   "net.sharedFolder": "Delad mapp",
   "connect.err.tlsName": "Den här serverns certifikat nämner inte {name}, så det kan inte verifieras. Dess administratör kan lägga till det namnet i certifikatet.",
   "disk.formatsTitle": "{name} använder ett kommersiellt skivformat",

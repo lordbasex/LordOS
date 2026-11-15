@@ -180,19 +180,30 @@ int hw_button_action_valid(const char *a, int lid) {
     return 0;
 }
 
+int hw_buttons_conf(const char *a, char *text, size_t n) {
+    char power[16], lid[16], lidac[16], hold[16] = "";
+    int end = 0, k = a ? sscanf(a, "%15s %15s %15s%n %15s%n", power, lid, lidac, &end, hold, &end) : 0;
+    if (k < 3 || a[end] || !hw_button_action_valid(power, 0) || !hw_button_action_valid(lid, 1) || !hw_button_action_valid(lidac, 1) ||
+        (k == 4 && !hw_button_action_valid(hold, 0)))
+        return -1;
+    /* the hold: logind's HandlePowerKeyLongPress, a press of 5 s or more (issue #131); without it the short press acts
+     * as soon as the key goes down, as before */
+    char line[48] = "";
+    if (k == 4) snprintf(line, sizeof line, "HandlePowerKeyLongPress=%s\n", hold);
+    int w = snprintf(text, n,
+                     "# Written by LordOS (Settings → Battery). Changes here are overwritten.\n"
+                     "[Login]\nHandlePowerKey=%s\n%sHandleLidSwitch=%s\nHandleLidSwitchExternalPower=%s\n", power, line, lid, lidac);
+    return w < 0 || (size_t)w >= n ? -1 : 0;
+}
+
 void hw_act_buttons(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
-    char a[128], power[16], lid[16], lidac[16];
-    if (arg_copy(arg, len, a, sizeof a) || sscanf(a, "%15s %15s %15s", power, lid, lidac) != 3 ||
-        !hw_button_action_valid(power, 0) || !hw_button_action_valid(lid, 1) || !hw_button_action_valid(lidac, 1)) {
+    char a[128], text[400];
+    if (arg_copy(arg, len, a, sizeof a) || hw_buttons_conf(a, text, sizeof text)) {
         admin_err("admin.invalidArgument", NULL);
         return;
     }
     mkdir("/etc/systemd/logind.conf.d", 0755);
-    char text[400];
-    snprintf(text, sizeof text,
-             "# Written by LordOS (Settings → Battery). Changes here are overwritten.\n"
-             "[Login]\nHandlePowerKey=%s\nHandleLidSwitch=%s\nHandleLidSwitchExternalPower=%s\n", power, lid, lidac);
     const char *tmp = "/etc/systemd/logind.conf.d/.lordos.conf.tmp", *dst = "/etc/systemd/logind.conf.d/lordos.conf";
     int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
     int ok = fd >= 0 && write(fd, text, strlen(text)) == (ssize_t)strlen(text);
@@ -201,7 +212,7 @@ void hw_act_buttons(const AdminReq *r, const char *arg, size_t len) {
     const char *const argv[] = { "/usr/bin/systemctl", "reload", "systemd-logind", NULL };
     int code = admin_run(argv);
     if (code) admin_err("hw.logindFailed", "code", lerr_int(code), NULL);
-    else admin_say("OK", "%s %s %s", power, lid, lidac);   /* i18n-ok */
+    else admin_say("OK", "%s", a);   /* i18n-ok */
 }
 
 /* ---- date and time ---- */

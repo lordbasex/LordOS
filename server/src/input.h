@@ -18,6 +18,7 @@ typedef struct {
     int typed;                    /* a letter key was pressed on it since it appeared */
     int leds;                     /* the lock lights it has (bits LED_NUML, LED_CAPSL, LED_SCROLLL) */
     int led_state;                /* the lights last written to it, -1 none yet */
+    int syskeys;                  /* only system keys (a tablet's volume buttons): not grabbed, filtered (inputkind.h) */
 } InputDevice;
 
 typedef struct {
