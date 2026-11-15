@@ -31,6 +31,7 @@
   "install.rebooting": "Käynnistetään uudelleen",
   "install.stepFailed": "{program} epäonnistui (koodi {code})",
   "install.timezoneWarning": "Varoitus: aikavyöhykettä ei voitu asettaa",
+  "install.tabletPowerWarning": "Varoitus: virtapainiketta ei voitu asettaa tabletille",
   "lang.installed": {
     "one": "{count} paketti asennettu kielelle ”{lang}”",
     "other": "{count} pakettia asennettu kielelle ”{lang}”"

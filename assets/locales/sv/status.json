@@ -31,6 +31,7 @@
   "install.rebooting": "Startar om",
   "install.stepFailed": "{program} misslyckades (kod {code})",
   "install.timezoneWarning": "Varning: kunde inte ställa in tidszonen",
+  "install.tabletPowerWarning": "Varning: kunde inte ställa in strömknappen för en surfplatta",
   "lang.installed": {
     "one": "{count} paket installerat för ”{lang}”",
     "other": "{count} paket installerade för ”{lang}”"

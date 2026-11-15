@@ -1,6 +1,7 @@
 /* hw_admin.c — Settings' admin actions (see hw_admin.h). Runs as root in the admin helper. */
 #include "hw_admin.h"
 #include "hwscan.h"
+#include "tabletpower.h"
 #include "../sysreport/smbios.h"
 #include "../bench/boottest.h"
 
@@ -187,13 +188,8 @@ int hw_buttons_conf(const char *a, char *text, size_t n) {
         (k == 4 && !hw_button_action_valid(hold, 0)))
         return -1;
     /* the hold: logind's HandlePowerKeyLongPress, a press of 5 s or more (issue #131); without it the short press acts
-     * as soon as the key goes down, as before */
-    char line[48] = "";
-    if (k == 4) snprintf(line, sizeof line, "HandlePowerKeyLongPress=%s\n", hold);
-    int w = snprintf(text, n,
-                     "# Written by LordOS (Settings → Battery). Changes here are overwritten.\n"
-                     "[Login]\nHandlePowerKey=%s\n%sHandleLidSwitch=%s\nHandleLidSwitchExternalPower=%s\n", power, line, lid, lidac);
-    return w < 0 || (size_t)w >= n ? -1 : 0;
+     * as soon as the key goes down, as before. The same text as a tablet's defaults (tabletpower.c) */
+    return logind_buttons_text(text, n, power, k == 4 ? hold : NULL, lid, lidac);
 }
 
 void hw_act_buttons(const AdminReq *r, const char *arg, size_t len) {

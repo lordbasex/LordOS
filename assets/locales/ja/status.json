@@ -31,6 +31,7 @@
   "install.rebooting": "再起動しています",
   "install.stepFailed": "{program} が失敗しました (コード {code})",
   "install.timezoneWarning": "警告: タイムゾーンを設定できませんでした",
+  "install.tabletPowerWarning": "警告: タブレット用に電源ボタンを設定できませんでした",
   "lang.installed": {
     "other": "「{lang}」用に {count} 個のパッケージをインストールしました"
   },

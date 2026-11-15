@@ -31,6 +31,7 @@
   "install.rebooting": "Újraindítás",
   "install.stepFailed": "A(z) {program} sikertelen (kód: {code})",
   "install.timezoneWarning": "Figyelem: az időzónát nem sikerült beállítani",
+  "install.tabletPowerWarning": "Figyelem: a bekapcsológombot nem sikerült táblagéphez beállítani",
   "lang.installed": {
     "one": "{count} csomag telepítve ehhez: „{lang}”",
     "other": "{count} csomag telepítve ehhez: „{lang}”"

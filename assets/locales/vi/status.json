@@ -31,6 +31,7 @@
   "install.rebooting": "Đang khởi động lại",
   "install.stepFailed": "{program} thất bại (mã {code})",
   "install.timezoneWarning": "Cảnh báo: không thể đặt múi giờ",
+  "install.tabletPowerWarning": "Cảnh báo: không thể đặt nút nguồn cho máy tính bảng",
   "lang.installed": {
     "other": "Đã cài {count} gói cho “{lang}”"
   },

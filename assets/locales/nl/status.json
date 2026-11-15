@@ -31,6 +31,7 @@
   "install.rebooting": "Bezig met herstarten",
   "install.stepFailed": "{program} is mislukt (code {code})",
   "install.timezoneWarning": "Waarschuwing: de tijdzone kon niet worden ingesteld",
+  "install.tabletPowerWarning": "Waarschuwing: de aan/uit-knop kon niet voor een tablet worden ingesteld",
   "lang.installed": {
     "one": "{count} pakket geïnstalleerd voor ‘{lang}’",
     "other": "{count} pakketten geïnstalleerd voor ‘{lang}’"

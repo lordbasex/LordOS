@@ -31,6 +31,7 @@
   "install.rebooting": "Inawasha upya",
   "install.stepFailed": "{program} imeshindwa (msimbo {code})",
   "install.timezoneWarning": "Onyo: haikuweza kuweka saa za eneo",
+  "install.tabletPowerWarning": "Onyo: haikuweza kuweka kitufe cha kuwasha kwa kompyuta kibao",
   "lang.installed": {
     "one": "Kifurushi {count} kimesakinishwa kwa “{lang}”",
     "other": "Vifurushi {count} vimesakinishwa kwa “{lang}”"

@@ -31,6 +31,7 @@
   "install.rebooting": "Redémarrage",
   "install.stepFailed": "{program} a échoué (code {code})",
   "install.timezoneWarning": "Avertissement : impossible de définir le fuseau horaire",
+  "install.tabletPowerWarning": "Avertissement : impossible de régler le bouton d’alimentation pour une tablette",
   "lang.installed": {
     "one": "{count} paquet installé pour « {lang} »",
     "other": "{count} paquets installés pour « {lang} »"

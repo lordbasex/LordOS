@@ -31,6 +31,7 @@
   "install.rebooting": "Reiniciando",
   "install.stepFailed": "{program} falhou (código {code})",
   "install.timezoneWarning": "Aviso: não foi possível definir o fuso horário",
+  "install.tabletPowerWarning": "Aviso: não foi possível configurar o botão de energia para um tablet",
   "lang.installed": {
     "one": "{count} pacote instalado para “{lang}”",
     "other": "{count} pacotes instalados para “{lang}”"

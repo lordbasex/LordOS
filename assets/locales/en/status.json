@@ -31,6 +31,7 @@
   "install.rebooting": "Restarting",
   "install.stepFailed": "{program} failed (code {code})",
   "install.timezoneWarning": "Warning: could not set the time zone",
+  "install.tabletPowerWarning": "Warning: could not set the power button for a tablet",
   "lang.installed": {
     "one": "{count} package installed for “{lang}”",
     "other": "{count} packages installed for “{lang}”"

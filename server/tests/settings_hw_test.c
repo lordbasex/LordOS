@@ -1,13 +1,14 @@
 /* settings_hw_test.c — tests for the pure parts of Settings' hardware pages (src/hw):
  * EDID parsing, KMS mode selection, the Night Light math (temperature, gamma ramp, sunrise and
  * sunset, schedule), mimeapps.list editing and globs2, and the power_supply reader over a fake
- * sysfs tree. Run by `make test` (mk/settings.mk). */
+ * sysfs tree, and a tablet's power-button defaults (tabletpower.c) over a fake sysfs and /etc. Run by `make test` (mk/settings.mk). */
 #include "hw/edid.h"
 #include "hw/hw_admin.h"
 #include "hw/mimeapps.h"
 #include "hw/modes.h"
 #include "hw/night.h"
 #include "hw/power.h"
+#include "hw/tabletpower.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -549,6 +550,96 @@ static void test_admin(void) {
     CHECK(hw_video_files("", cr, sizeof cr, ff, sizeof ff) && hw_video_files(NULL, cr, sizeof cr, ff, sizeof ff));
 }
 
+/* a file under root, with its folders */
+static void tp_put(const char *root, const char *rel, const char *text) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    for (char *s = p + strlen(root) + 1; (s = strchr(s, '/')); s++) { *s = 0; mkdir(p, 0755); *s = '/'; }
+    FILE *f = fopen(p, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+static int tp_read(const char *root, const char *rel, char *buf, size_t n) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    FILE *f = fopen(p, "r");
+    if (!f) return -1;
+    size_t r = fread(buf, 1, n - 1, f);
+    buf[r] = 0;
+    fclose(f);
+    return 0;
+}
+
+/* issue #131: chassis 30 (Tablet) and 32 (Detachable) get tap = suspend, hold = poweroff in a new system */
+static void test_tablet_power(void) {
+    char dir[] = "/tmp/lord-tablet-test-XXXXXX";
+    if (!mkdtemp(dir)) { CHECK(0); return; }
+    char sys[64], tgt[64], buf[600], p[128], away[64];
+    snprintf(sys, sizeof sys, "%s/live", dir);
+    snprintf(tgt, sizeof tgt, "%s/target", dir);
+    snprintf(p, sizeof p, "%s/etc/systemd/logind.conf.d/lordos.conf", tgt);
+    snprintf(away, sizeof away, "%s/away", dir);
+    mkdir(sys, 0755);
+    mkdir(tgt, 0755);
+    CHECK(!tablet_chassis(sys));                                       /* no DMI (a Raspberry Pi, a VM without SMBIOS) */
+    static const struct { const char *v; int tablet; } cases[] = {
+        { "30\n", 1 }, { "32\n", 1 }, { "32", 1 }, { "31\n", 0 }, { "9\n", 0 }, { "10\n", 0 }, { "3\n", 0 }, { "1\n", 0 },
+        { "\n", 0 }, { "", 0 }, { "30x\n", 0 }, { "-30\n", 0 }, { " 30\n", 0 }, { "300\n", 0 }, { "3030303030303\n", 0 },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        tp_put(sys, "sys/class/dmi/id/chassis_type", cases[i].v);
+        CHECK(tablet_chassis(sys) == cases[i].tablet);
+    }
+    const char *want = "# Written by LordOS (Settings → Battery). Changes here are overwritten.\n[Login]\nHandlePowerKey=suspend\n"
+                       "HandlePowerKeyLongPress=poweroff\nHandleLidSwitch=suspend\nHandleLidSwitchExternalPower=suspend\n";
+    /* not a tablet: nothing written */
+    tp_put(sys, "sys/class/dmi/id/chassis_type", "31\n");
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\n#HandlePowerKey=poweroff\n");
+    CHECK(tablet_power_install(sys, tgt) == 0 && access(p, F_OK));
+    /* a tablet, Debian's logind.conf (all commented): logind's lid defaults */
+    tp_put(sys, "sys/class/dmi/id/chassis_type", "30\n");
+    CHECK(tablet_power_install(sys, tgt) == 1 && !tp_read(tgt, "etc/systemd/logind.conf.d/lordos.conf", buf, sizeof buf) && !strcmp(buf, want));
+    /* the same text the power-buttons action writes for these values, so Settings reads it back */
+    char txt[400];
+    CHECK(!hw_buttons_conf("suspend suspend suspend poweroff", txt, sizeof txt) && !strcmp(txt, want));
+    /* never replaces what is there (a second run, or a choice) */
+    tp_put(tgt, "etc/systemd/logind.conf.d/lordos.conf", "[Login]\nHandlePowerKey=ignore\n");
+    CHECK(tablet_power_install(sys, tgt) == 0 && !tp_read(tgt, "etc/systemd/logind.conf.d/lordos.conf", buf, sizeof buf) &&
+          !strcmp(buf, "[Login]\nHandlePowerKey=ignore\n"));
+    unlink(p);
+    /* the lid values of the target's logind.conf are kept; AC unset = the same as the lid */
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\nHandleLidSwitch=ignore\n");
+    CHECK(tablet_power_install(sys, tgt) == 1 && !tp_read(tgt, "etc/systemd/logind.conf.d/lordos.conf", buf, sizeof buf) &&
+          strstr(buf, "\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\n"));
+    unlink(p);
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\nHandleLidSwitchExternalPower=ignore\nHandleLidSwitch=hibernate\n");
+    CHECK(tablet_power_install(sys, tgt) == 1 && !tp_read(tgt, "etc/systemd/logind.conf.d/lordos.conf", buf, sizeof buf) &&
+          strstr(buf, "\nHandleLidSwitch=hibernate\nHandleLidSwitchExternalPower=ignore\n"));
+    unlink(p);
+    /* an administrator's own power key, or a lid value Settings can't show: left alone */
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\nHandlePowerKey=poweroff\n");
+    CHECK(tablet_power_install(sys, tgt) == 0 && access(p, F_OK));
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\nHandlePowerKeyLongPress=reboot\n");
+    CHECK(tablet_power_install(sys, tgt) == 0 && access(p, F_OK));
+    tp_put(tgt, "etc/systemd/logind.conf", "[Login]\nHandleLidSwitch=lock\n");
+    CHECK(tablet_power_install(sys, tgt) == 0 && access(p, F_OK));
+    /* a link where the file goes is never followed */
+    tp_put(tgt, "etc/systemd/logind.conf", "");
+    CHECK(symlink(away, p) == 0 && tablet_power_install(sys, tgt) == 0 && access(away, F_OK));
+    unlink(p);
+    /* no logind.conf at all and no logind.conf.d yet: made */
+    snprintf(buf, sizeof buf, "%s/etc/systemd/logind.conf", tgt);
+    unlink(buf);
+    snprintf(buf, sizeof buf, "%s/etc/systemd/logind.conf.d", tgt);
+    rmdir(buf);
+    CHECK(tablet_power_install(sys, tgt) == 1 && !tp_read(tgt, "etc/systemd/logind.conf.d/lordos.conf", buf, sizeof buf) && !strcmp(buf, want));
+    /* sysroot NULL reads this machine's; whatever it is, a bad target only fails */
+    CHECK(tablet_chassis(NULL) == 0 || tablet_chassis(NULL) == 1);
+    char cmd[128];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+    if (system(cmd)) { /* a leftover in /tmp */ }
+}
+
 int main(void) {
     test_admin();
     test_eeprom();
@@ -558,6 +649,7 @@ int main(void) {
     test_mimeapps();
     test_power();
     test_serial_clean();
+    test_tablet_power();
     printf("settings-hw: %d/%d passed\n", checks - fails, checks);
     return fails != 0;
 }

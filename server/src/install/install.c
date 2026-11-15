@@ -47,6 +47,7 @@
 #include "freepart.h"
 #include "manualpart.h"
 #include "../users/homedirs.h"
+#include "../hw/tabletpower.h"
 #include "../localename.h"
 
 #include <crypt.h>
@@ -947,6 +948,11 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     unlink(TARGET "/etc/sysctl.d/50-lordos-ping.conf.dpkg-old");
     { const char *const a[] = { "/usr/bin/dpkg", "--purge", "live-boot", "live-boot-initramfs-tools", NULL }; in_target(a); }
     { const char *const a[] = { "/usr/sbin/userdel", "-r", "lordos", NULL }; in_target(a); }
+    /* a tablet (chassis 30 or 32, read from this machine: the live system runs on it): a tap on the power
+     * button sleeps and a 5 s hold shuts down (issue #131, src/hw/tabletpower.h); Settings shows and
+     * changes it. Migration 008 does the same for systems installed before, and is already recorded as
+     * applied in the image, so it is done here. */
+    if (tablet_power_install(NULL, TARGET) < 0) admin_log("install.tabletPowerWarning", NULL);
     /* mode manual: /home goes on its partition only now, after the live user's folder is gone, so
      * that removal can never reach a kept /home */
     if (manual && mres.dev[MP_HOME][0]) {

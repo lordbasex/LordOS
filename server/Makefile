@@ -245,8 +245,8 @@ test: build/freespace-test build/install-plan-test
 build/freespace-test: tests/freespace_test.c src/install/freespace.c src/install/freespace.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/freespace_test.c src/install/freespace.c
-INSTALL_DISK_SRC := src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c
-INSTALL_DISK_HDR := src/install/install.h src/install/freepart.h src/install/freespace.h src/install/manual.h src/install/manualpart.h
+INSTALL_DISK_SRC := src/hw/tabletpower.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c
+INSTALL_DISK_HDR := src/hw/tabletpower.h src/install/install.h src/install/freepart.h src/install/freespace.h src/install/manual.h src/install/manualpart.h
 build/install-plan-test: tests/install_plan_test.c src/install/install.c $(INSTALL_DISK_SRC) src/users/homedirs.c $(INSTALL_DISK_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/install_plan_test.c $(INSTALL_DISK_SRC) src/users/homedirs.c -lcrypt

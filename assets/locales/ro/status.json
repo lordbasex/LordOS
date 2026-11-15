@@ -31,6 +31,7 @@
   "install.rebooting": "Se repornește",
   "install.stepFailed": "{program} a eșuat (cod {code})",
   "install.timezoneWarning": "Atenție: nu s-a putut seta fusul orar",
+  "install.tabletPowerWarning": "Atenție: nu s-a putut configura butonul de pornire pentru o tabletă",
   "lang.installed": {
     "one": "{count} pachet instalat pentru „{lang}”",
     "few": "{count} pachete instalate pentru „{lang}”",

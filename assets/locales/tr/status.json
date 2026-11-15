@@ -31,6 +31,7 @@
   "install.rebooting": "Yeniden başlatılıyor",
   "install.stepFailed": "{program} başarısız oldu (kod {code})",
   "install.timezoneWarning": "Uyarı: saat dilimi ayarlanamadı",
+  "install.tabletPowerWarning": "Uyarı: güç düğmesi tablet için ayarlanamadı",
   "lang.installed": {
     "one": "“{lang}” için {count} paket kuruldu",
     "other": "“{lang}” için {count} paket kuruldu"

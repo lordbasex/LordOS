@@ -31,6 +31,7 @@
   "install.rebooting": "دوبارہ شروع ہو رہا ہے",
   "install.stepFailed": "{program} ناکام ہوا (کوڈ {code})",
   "install.timezoneWarning": "انتباہ: ٹائم زون سیٹ نہیں ہو سکا",
+  "install.tabletPowerWarning": "انتباہ: ٹیبلیٹ کے لیے پاور بٹن سیٹ نہیں ہو سکا",
   "lang.installed": {
     "one": "“{lang}” کے لیے {count} پیکج انسٹال ہوا",
     "other": "“{lang}” کے لیے {count} پیکج انسٹال ہوئے"

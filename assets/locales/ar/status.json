@@ -31,6 +31,7 @@
   "install.rebooting": "جارٍ إعادة التشغيل",
   "install.stepFailed": "فشل {program} (الرمز {code})",
   "install.timezoneWarning": "تحذير: تعذّر ضبط المنطقة الزمنية",
+  "install.tabletPowerWarning": "تحذير: تعذّر ضبط زر التشغيل للجهاز اللوحي",
   "lang.installed": {
     "zero": "لم تُثبَّت أي حزمة للغة «{lang}»",
     "one": "تم تثبيت حزمة واحدة للغة «{lang}»",

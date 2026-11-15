@@ -31,6 +31,7 @@
   "install.rebooting": "Επανεκκίνηση",
   "install.stepFailed": "Το {program} απέτυχε (κωδικός {code})",
   "install.timezoneWarning": "Προειδοποίηση: δεν ήταν δυνατός ο ορισμός της ζώνης ώρας",
+  "install.tabletPowerWarning": "Προειδοποίηση: δεν ήταν δυνατή η ρύθμιση του κουμπιού λειτουργίας για tablet",
   "lang.installed": {
     "one": "Εγκαταστάθηκε {count} πακέτο για «{lang}»",
     "other": "Εγκαταστάθηκαν {count} πακέτα για «{lang}»"

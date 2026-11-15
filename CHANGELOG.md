@@ -21,7 +21,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `HandlePowerKeyLongPress=` into `/etc/systemd/logind.conf.d/lordos.conf`; the three-value form still works.
   `lord.power.buttons()` reads it back as `powerHold` (`ignore` when unset, logind's default). With a hold action set,
   logind runs the short-press action when the key is released before 5 s. The short press could already be set to
-  sleep; the defaults are unchanged (shut down on a press, nothing on a hold). Tested in `build/settings-hw-test`; not
+  sleep. Outside tablets the defaults are unchanged (shut down on a press, nothing on a hold); tablets get new ones
+  (see "A tablet sleeps on a tap of the power button" under Changed). Tested in `build/settings-hw-test`; not
   yet tried on a tablet, where the power chip may cut the power by itself after a longer hold.
 
 - **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),
@@ -330,6 +331,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   no VM access for this change, and the brightness path is still untested on a real backlight.
 
 ### Changed
+
+- **A tablet sleeps on a tap of the power button and shuts down on a 5-second hold** (issue
+  [#131](https://github.com/lordbasex/LordOS/issues/131), thanks to Touchgg; maintainer's decision, 2026-11-15). Before,
+  a tap shut a tablet down, as on any computer, and each person had to change it in Settings. A tablet is a machine
+  whose SMBIOS chassis type (`/sys/class/dmi/id/chassis_type`) is 30 (Tablet) or 32 (Detachable), read on the root
+  side (`tablet_chassis` in the new `server/src/hw/tabletpower.c`); a missing file or anything else is not a tablet.
+  31 (Convertible, a laptop whose screen folds back) keeps a laptop's defaults: it is used with its keyboard most of
+  the time and its lid already decides sleep. Nothing else changed in how it is stored: the same
+  `/etc/systemd/logind.conf.d/lordos.conf` the closed `power-buttons` action writes, with `HandlePowerKey=suspend`
+  and `HandlePowerKeyLongPress=poweroff`, so Settings → Energy (Battery) → Power button and lid shows the values in
+  effect and changes them as before. No new admin action.
+  - **New installs:** the disk installer writes that file into the new system when the machine it runs on is a
+    tablet (`tablet_power_install`), with the lid values of the new system's `logind.conf` (logind's defaults:
+    sleep). It never replaces a `lordos.conf` already there, and leaves everything alone when `logind.conf` sets
+    `HandlePowerKey` or `HandlePowerKeyLongPress` itself. If it can't write the file the install goes on, with a
+    warning (`install.tabletPowerWarning`, in all 35 languages).
+  - **Systems already installed:** migration `packaging/migrations/008-0.8.8.9-tablet-power.sh` (root, once,
+    idempotent) does the same on a tablet only where the person hasn't chosen: no `lordos.conf`, or one written by an
+    older Settings with the short press on shut down (the old default) and no hold line, whose lid values it keeps.
+    A `lordos.conf` with a hold line (every Settings since #131 writes one), another short-press choice, a link
+    where the file goes, an administrator's `HandlePowerKey`/`HandlePowerKeyLongPress` in `logind.conf` or another
+    `/etc` drop-in, or a lid value Settings can't show are all left as they are. It reloads `systemd-logind`. It
+    does nothing in the chroot where the live image is built (no systemd there; the installer covers new installs).
+  - **Tests:** `build/settings-hw-test` (fake sysfs and `/etc` trees: chassis 30 and 32 are tablets, 31, 9, 10, 3,
+    1, empty, junk, ` 30` and `300` are not; the file the installer writes is byte for byte what `power-buttons
+    suspend suspend suspend poweroff` writes; never replaces a file, never follows a link, keeps the lid values,
+    defers to an administrator) and `tests/migration_tablet_power_test.sh` in `make test` (20 cases over fake
+    system trees, each migrated twice: the second run must change nothing). Not yet tried on a real tablet; the
+    live session on a tablet still shuts down on a tap until it is installed.
 
 - **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,
   2026-11-15), instead of LordOS's WebKit string, whose browser token made a messaging app's phone list the linked computer under another system's

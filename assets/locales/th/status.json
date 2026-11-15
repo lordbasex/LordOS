@@ -31,6 +31,7 @@
   "install.rebooting": "กำลังรีสตาร์ท",
   "install.stepFailed": "{program} ล้มเหลว (รหัส {code})",
   "install.timezoneWarning": "คำเตือน: ไม่สามารถตั้งค่าเขตเวลาได้",
+  "install.tabletPowerWarning": "คำเตือน: ไม่สามารถตั้งค่าปุ่มเปิดปิดสำหรับแท็บเล็ตได้",
   "lang.installed": {
     "other": "ติดตั้ง {count} แพ็กเกจสำหรับ “{lang}” แล้ว"
   },

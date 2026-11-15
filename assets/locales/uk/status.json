@@ -31,6 +31,7 @@
   "install.rebooting": "Перезапуск",
   "install.stepFailed": "Помилка {program} (код {code})",
   "install.timezoneWarning": "Попередження: не вдалося встановити часовий пояс",
+  "install.tabletPowerWarning": "Попередження: не вдалося налаштувати кнопку живлення для планшета",
   "lang.installed": {
     "one": "Для «{lang}» встановлено {count} пакет",
     "few": "Для «{lang}» встановлено {count} пакети",

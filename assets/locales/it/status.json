@@ -31,6 +31,7 @@
   "install.rebooting": "Riavvio in corso",
   "install.stepFailed": "{program} non riuscito (codice {code})",
   "install.timezoneWarning": "Attenzione: impossibile impostare il fuso orario",
+  "install.tabletPowerWarning": "Attenzione: impossibile impostare il pulsante di accensione per un tablet",
   "lang.installed": {
     "one": "{count} pacchetto installato per «{lang}»",
     "other": "{count} pacchetti installati per «{lang}»"
