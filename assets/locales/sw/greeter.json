@@ -1,0 +1,19 @@
+{
+  "bootTest": "Inapima muda wa kuwasha: uwashaji {k} kati ya {n} umekamilika. Inawasha upya baada ya sekunde {s}. Kuingia pia kunasimamisha jaribio.",
+  "bootTestCancel": "Simamisha jaribio",
+  "busy": "Subiri kidogo…",
+  "cancel": "Ghairi",
+  "confirmRestart": "Kuna vipindi vilivyofunguliwa: kazi ambayo haijahifadhiwa itapotea. Uwashe upya hata hivyo?",
+  "confirmShutdown": "Kuna vipindi vilivyofunguliwa: kazi ambayo haijahifadhiwa itapotea. Uzime hata hivyo?",
+  "error": "Kipindi hakikuweza kufunguliwa.",
+  "locked": "Skrini imefungwa",
+  "noUsers": "Hakuna watumiaji",
+  "password": "Nenosiri",
+  "restart": "Washa upya",
+  "shutdown": "Zima",
+  "wait": {
+    "one": "Majaribio mengi mno. Subiri sekunde {count}.",
+    "other": "Majaribio mengi mno. Subiri sekunde {count}."
+  },
+  "wrong": "Nenosiri si sahihi."
+}

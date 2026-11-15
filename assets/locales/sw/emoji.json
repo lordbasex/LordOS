@@ -1,0 +1,21 @@
+{
+  "search": "Tafuta emoji",
+  "results": {
+    "one": "Tokeo {count}",
+    "other": "Matokeo {count}"
+  },
+  "none": "Hakuna kilichopatikana",
+  "noRecent": "Unazozitumia zitaonekana hapa",
+  "copied": "{text} imenakiliwa: ibandike kwa Ctrl+V",
+  "more": "Zaidi…",
+  "group.recent": "Za hivi karibuni",
+  "group.smileys": "Vicheshi na hisia",
+  "group.people": "Watu na mwili",
+  "group.animals": "Wanyama na mazingira",
+  "group.food": "Chakula na vinywaji",
+  "group.travel": "Usafiri na maeneo",
+  "group.activities": "Shughuli",
+  "group.objects": "Vitu",
+  "group.symbols": "Alama",
+  "group.flags": "Bendera"
+}
