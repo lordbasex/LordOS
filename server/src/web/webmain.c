@@ -116,7 +116,8 @@ void web_registry_refresh(Web *w) {
 /* ---- one process per app and profile ---- */
 
 /* Show(token): anyone may (a second start of the app does); Edit(command), SetColorScheme("light" | "dark") and
- * SetUserAgent("chrome" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c) */
+ * SetUserAgent("chrome" | "edge" | "firefox" | "lordos" |
+ * "experimental"): only lord-server, checked by pid (webbus.c) */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
     if (!strcmp(method, "Show")) {
@@ -146,7 +147,7 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
         g_variant_get(p, "(&s)", &word);
         int k = webreg_ua_value(word);
         if (k < 0 || !sender) {
-            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "chrome, firefox or lordos");
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "chrome, edge, firefox, lordos or experimental");
             return;
         }
         webbus_user_agent(d, sender, k);

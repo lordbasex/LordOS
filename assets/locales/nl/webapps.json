@@ -9,11 +9,15 @@
   "appearance.footer": "Alleen de licht- of donkervoorkeur die de site leest verandert; LordOS wijzigt de site zelf nooit. Sommige sites blijven toch licht, en een site met een eigen thema-instelling volgt die instelling.",
   "identity.title": "Browseridentiteit",
   "identity.label": "Identificeren als",
-  "identity.chrome": "Chrome op Linux",
+  "identity.chrome": "Chrome op Linux + LordOS",
+  "identity.edge": "Edge op Linux",
   "identity.firefox": "Firefox op Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Websites zien de meest gebruikte browser op Linux. Standaard.",
+  "identity.experimental": "LordOS (experimenteel)",
+  "identity.chromeHint": "Websites zien de meest gebruikte browser op Linux, plus de naam en versie van LordOS. Standaard.",
+  "identity.edgeHint": "Websites zien Edge op Linux. Voor de kantoor-, mail- en teamchatwebsites van de maker van Edge zelf, die het verwachten.",
   "identity.firefoxHint": "Websites zien Firefox op Linux.",
   "identity.lordosHint": "Websites zien de eigen engine van LordOS. Voor een website die met de andere niet goed werkt.",
-  "identity.footer": "De browser die elk profiel tegenover websites opgeeft; een open venster laadt zijn pagina opnieuw. LordOS gebruikt nog steeds zijn eigen engine (WebKit); Chrome en Firefox zijn namen van hun eigenaars. Werkt een website niet goed, kies dan LordOS (WebKit). Een website die dit apparaat al heeft gekoppeld, zoals een berichtenapp, houdt de naam die hij zag tot je opnieuw koppelt."
+  "identity.experimentalHint": "Websites zien alleen LordOS en de versie. Veel websites, ook berichtenapps, kunnen dit weigeren of niet goed werken; kies dan een andere optie.",
+  "identity.footer": "De browser die elk profiel tegenover websites opgeeft; een open venster laadt zijn pagina opnieuw. LordOS gebruikt nog steeds zijn eigen engine (WebKit); Chrome, Edge en Firefox zijn namen van hun eigenaars. Werkt een website niet goed, kies dan LordOS (WebKit). Een website die dit apparaat al heeft gekoppeld, zoals een berichtenapp, houdt de naam die hij zag tot je opnieuw koppelt."
 }

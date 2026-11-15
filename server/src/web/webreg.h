@@ -19,7 +19,7 @@
  *     colorScheme (optional, "auto" when missing) auto|light|dark: the light or dark preference the page is told
  *     (auto: the desktop's mode; lord-server sends it, webscheme.h);
  *     a profile is { id, name } plus, optionally, color (red, orange, yellow, green, blue, purple, gray or none) and
- *     userAgent (chrome, firefox or lordos; "chrome" when missing and never written): the browser the profile's pages
+ *     userAgent (chrome, edge, firefox, lordos or experimental; "chrome" when missing and never written): the browser the profile's pages
  *     are told it is ("Browser identity"; webpage_user_agent maps the word to the string, in C)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
@@ -47,8 +47,10 @@ enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NO
 /* "colorScheme": auto (the desktop's light or dark mode), light, dark: what the page's prefers-color-scheme says */
 enum { WEBREG_SCHEME_AUTO, WEBREG_SCHEME_LIGHT, WEBREG_SCHEME_DARK, WEBREG_SCHEME_N };
 /* a profile's "userAgent": which browser its pages are told it is (webpage_user_agent). chrome (the default: Chrome on
- * Linux), firefox (Firefox on Linux), lordos (LordOS's own WebKit string, for a site that misbehaves with the others) */
-enum { WEBREG_UA_CHROME, WEBREG_UA_FIREFOX, WEBREG_UA_LORDOS, WEBREG_UA_N };
+ * Linux with LordOS's token), edge (Edge on Linux, for its maker's own office and chat sites), firefox (Firefox on
+ * Linux), lordos (LordOS's own WebKit string, for a site that misbehaves with the others), experimental (LordOS alone,
+ * no other browser's tokens). Linux identities only. */
+enum { WEBREG_UA_CHROME, WEBREG_UA_EDGE, WEBREG_UA_FIREFOX, WEBREG_UA_LORDOS, WEBREG_UA_EXPERIMENTAL, WEBREG_UA_N };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
 
@@ -100,7 +102,7 @@ const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "n
 int  webreg_sound_value(const char *name);     /* -1 if unknown */
 const char *webreg_scheme_name(int v);         /* "auto" / "light" / "dark"; NULL out of range */
 int  webreg_scheme_value(const char *name);    /* -1 if unknown */
-const char *webreg_ua_name(int v);             /* "chrome" / "firefox" / "lordos"; NULL out of range */
+const char *webreg_ua_name(int v);             /* "chrome" / "edge" / "firefox" / "lordos" / "experimental"; NULL */
 int  webreg_ua_value(const char *name);        /* -1 if unknown */
 
 /* ---- the file ---- */

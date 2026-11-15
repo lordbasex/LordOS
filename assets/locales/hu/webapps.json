@@ -9,11 +9,15 @@
   "appearance.footer": "Csak a webhely által olvasott világos vagy sötét beállítás változik; a LordOS soha nem módosítja magát a webhelyet. Egyes webhelyek így is világosak maradnak, a saját témabeállítással rendelkező webhely pedig azt követi.",
   "identity.title": "Böngészőazonosító",
   "identity.label": "Azonosítás mint",
-  "identity.chrome": "Chrome Linuxon",
+  "identity.chrome": "Chrome Linuxon + LordOS",
+  "identity.edge": "Edge Linuxon",
   "identity.firefox": "Firefox Linuxon",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "A webhelyek a Linux leggyakoribb böngészőjét látják. Alapértelmezett.",
+  "identity.experimental": "LordOS (kísérleti)",
+  "identity.chromeHint": "A webhelyek a Linux leggyakoribb böngészőjét látják, a LordOS nevével és verziójával. Alapértelmezett.",
+  "identity.edgeHint": "A webhelyek Edge-et látnak Linuxon. Az Edge saját gyártójának irodai, levelezési és csapatcsevegő webhelyeihez, amelyek ezt várják.",
   "identity.firefoxHint": "A webhelyek Firefoxot látnak Linuxon.",
   "identity.lordosHint": "A webhelyek a LordOS saját motorját látják. Olyan webhelyhez, amely a többivel rosszul működik.",
-  "identity.footer": "Az a böngésző, aminek az egyes profilok a webhelyek felé mondják magukat; a nyitott ablak újratölti az oldalát. A LordOS továbbra is a saját motorját (WebKit) használja; a Chrome és a Firefox a tulajdonosaik nevei. Ha egy webhely rosszul működik, válassza a LordOS (WebKit) lehetőséget. Az a webhely, amely már összekapcsolta ezt az eszközt, például egy üzenetküldő alkalmazás, az újbóli összekapcsolásig megtartja a látott nevet."
+  "identity.experimentalHint": "A webhelyek csak a LordOS-t és a verzióját látják. Sok webhely, az üzenetküldő alkalmazások is, elutasíthatja vagy rosszul működhet vele; ilyenkor válasszon másikat.",
+  "identity.footer": "Az a böngésző, aminek az egyes profilok a webhelyek felé mondják magukat; a nyitott ablak újratölti az oldalát. A LordOS továbbra is a saját motorját (WebKit) használja; a Chrome, az Edge és a Firefox a tulajdonosaik nevei. Ha egy webhely rosszul működik, válassza a LordOS (WebKit) lehetőséget. Az a webhely, amely már összekapcsolta ezt az eszközt, például egy üzenetküldő alkalmazás, az újbóli összekapcsolásig megtartja a látott nevet."
 }

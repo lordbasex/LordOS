@@ -422,14 +422,28 @@ static void test_user_agent(void) {
     CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, NULL, NULL, ua, sizeof ua) && strstr(ua, "(X11; Linux) ") && !strstr(ua, "LordOS"), "nothing known: %s", ua);
     CHECK(webpage_user_agent(WEBREG_UA_LORDOS, "x86_64", "1.0", ua, 20) < 0, "too short");
 
-    /* Chrome on Linux (the default): desktop Chrome's reduced string, x86_64 on every machine, no LordOS token */
+    /* Chrome on Linux + LordOS (the default): desktop Chrome's reduced string, x86_64 on every machine, then LordOS's
+     * token with the version given (lord-web's LORD_VERSION) */
     char want[256];
-    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36", WEBPAGE_CHROME_MAJOR);
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36 LordOS/0.8.8.9", WEBPAGE_CHROME_MAJOR);
     const char *machines[] = { "x86_64", "aarch64", "armv7l", "x86 64; evil)", NULL };
     for (int i = 0; i < 5; i++)
         CHECK(!webpage_user_agent(WEBREG_UA_CHROME, machines[i], "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "chrome on %s: %s", machines[i] ? machines[i] : "(null)", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "0.9.0~rc1", ua, sizeof ua) && strstr(ua, "Safari/537.36 LordOS/0.9.0~rc1") &&
+          !strcmp(ua + strlen(ua) - strlen("LordOS/0.9.0~rc1"), "LordOS/0.9.0~rc1"), "chrome: the version given, last: %s", ua);
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36", WEBPAGE_CHROME_MAJOR);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "1.0 (evil)", ua, sizeof ua) && !strcmp(ua, want), "chrome: a strange version drops the token: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", NULL, ua, sizeof ua) && !strcmp(ua, want), "chrome: no version, no token: %s", ua);
     CHECK(WEBPAGE_CHROME_MAJOR >= 157 && WEBPAGE_CHROME_MAJOR < 1000, "a plausible Chrome major");
     CHECK(webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "1.0", ua, 40) < 0, "chrome: too short");
+
+    /* Edge on Linux: Chrome's reduced string with Edge's token, x86_64 on every machine, no LordOS token */
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36 Edg/%d.0.0.0",
+             WEBPAGE_EDGE_MAJOR, WEBPAGE_EDGE_MAJOR);
+    for (int i = 0; i < 5; i++)
+        CHECK(!webpage_user_agent(WEBREG_UA_EDGE, machines[i], "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "edge on %s: %s", machines[i] ? machines[i] : "(null)", ua);
+    CHECK(WEBPAGE_EDGE_MAJOR >= 157 && WEBPAGE_EDGE_MAJOR < 1000, "a plausible Edge major");
+    CHECK(webpage_user_agent(WEBREG_UA_EDGE, "x86_64", "1.0", ua, 60) < 0, "edge: too short");
 
     /* Firefox on Linux: names the processor */
     snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64; rv:%d.0) Gecko/20100101 Firefox/%d.0", WEBPAGE_FIREFOX_MAJOR, WEBPAGE_FIREFOX_MAJOR);
@@ -439,9 +453,18 @@ static void test_user_agent(void) {
     CHECK(!webpage_user_agent(WEBREG_UA_FIREFOX, "aarch64", "0.8.8.9", ua, sizeof ua) && strstr(ua, "(X11; Linux aarch64; rv:") && !strstr(ua, "LordOS"), "firefox on arm: %s", ua);
     CHECK(WEBPAGE_FIREFOX_MAJOR >= 160 && WEBPAGE_FIREFOX_MAJOR < 1000, "a plausible Firefox major");
 
-    /* only the three: anything else makes nothing */
+    /* LordOS (experimental): LordOS alone, no other browser's tokens */
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86_64", "0.8.8.9", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux x86_64) LordOS/0.8.8.9"), "experimental: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "aarch64", "0.9.0~rc1", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux aarch64) LordOS/0.9.0~rc1"), "experimental on arm: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86 64; evil)", "1.0 (evil)", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux) LordOS"), "experimental, strange: %s", ua);
+    CHECK(!strstr(ua, "Safari") && !strstr(ua, "Chrome") && !strstr(ua, "Gecko") && !strstr(ua, "AppleWebKit"), "experimental: no other browser's tokens");
+    CHECK(webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86_64", "0.8.8.9", ua, 30) < 0, "experimental: too short");
+
+    /* only the four: anything else makes nothing */
     CHECK(webpage_user_agent(-1, "x86_64", "1.0", ua, sizeof ua) < 0 && webpage_user_agent(WEBREG_UA_N, "x86_64", "1.0", ua, sizeof ua) < 0, "unknown kinds");
     CHECK(webreg_ua_value("chrome") == WEBREG_UA_CHROME && webreg_ua_value("firefox") == WEBREG_UA_FIREFOX && webreg_ua_value("lordos") == WEBREG_UA_LORDOS &&
+          webreg_ua_value("experimental") == WEBREG_UA_EXPERIMENTAL && webreg_ua_value("edge") == WEBREG_UA_EDGE && webreg_ua_value("Edge") < 0 &&
+          webreg_ua_value("edge-windows") < 0 && webreg_ua_value("Experimental") < 0 && webreg_ua_value("lordos-only") < 0 &&
           webreg_ua_value("Chrome") < 0 && webreg_ua_value("safari") < 0 && webreg_ua_value("") < 0 && webreg_ua_value(NULL) < 0 &&
           webreg_ua_value("Mozilla/5.0 (X11; Linux x86_64)") < 0, "the words");
     CHECK(!strcmp(webreg_ua_name(WEBREG_UA_LORDOS), "lordos") && !webreg_ua_name(-1) && !webreg_ua_name(WEBREG_UA_N), "the names");
@@ -748,8 +771,8 @@ static void test_registry_options(void) {
     CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.profiles[0].user_agent == WEBREG_UA_CHROME && a.profiles[1].user_agent == WEBREG_UA_CHROME, "userAgent chrome when missing");
     n = webreg_write(&a, out, sizeof out);
     CHECK(n && !strstr(out, "userAgent"), "userAgent chrome isn't written");
-    const char *uas[] = { "chrome", "firefox", "lordos" };
-    for (int i = 0; i < 3; i++) {
+    const char *uas[] = { "chrome", "edge", "firefox", "lordos", "experimental" };
+    for (int i = 0; i < 5; i++) {
         char v[64];
         snprintf(v, sizeof v, ", \"userAgent\": \"%s\"", uas[i]);
         snprintf(j, sizeof j, pbase, v);

@@ -9,11 +9,15 @@
   "appearance.footer": "Bara den ljusa eller mörka preferensen som webbplatsen läser ändras; LordOS ändrar aldrig själva webbplatsen. Vissa webbplatser förblir ljusa ändå, och en webbplats med en egen temainställning följer den.",
   "identity.title": "Webbläsaridentitet",
   "identity.label": "Identifiera som",
-  "identity.chrome": "Chrome på Linux",
+  "identity.chrome": "Chrome på Linux + LordOS",
+  "identity.edge": "Edge på Linux",
   "identity.firefox": "Firefox på Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Webbplatser ser den vanligaste webbläsaren på Linux. Standard.",
+  "identity.experimental": "LordOS (experimentell)",
+  "identity.chromeHint": "Webbplatser ser den vanligaste webbläsaren på Linux, plus LordOS namn och version. Standard.",
+  "identity.edgeHint": "Webbplatser ser Edge på Linux. För kontors-, e-post- och teamchattwebbplatser från Edges egen tillverkare, som förväntar sig den.",
   "identity.firefoxHint": "Webbplatser ser Firefox på Linux.",
   "identity.lordosHint": "Webbplatser ser LordOS egen motor. För en webbplats som inte fungerar med de andra.",
-  "identity.footer": "Webbläsaren som varje profil uppger sig vara för webbplatser; ett öppet fönster läser in sin sida igen. LordOS använder fortfarande sin egen motor (WebKit); Chrome och Firefox är namn som tillhör sina ägare. Om en webbplats inte fungerar, välj LordOS (WebKit). En webbplats som redan har länkat den här enheten, till exempel en meddelandeapp, behåller namnet den såg tills du länkar den igen."
+  "identity.experimentalHint": "Webbplatser ser bara LordOS och dess version. Många webbplatser, även meddelandeappar, kan neka den eller inte fungera; välj i så fall ett annat alternativ.",
+  "identity.footer": "Webbläsaren som varje profil uppger sig vara för webbplatser; ett öppet fönster läser in sin sida igen. LordOS använder fortfarande sin egen motor (WebKit); Chrome, Edge och Firefox är namn som tillhör sina ägare. Om en webbplats inte fungerar, välj LordOS (WebKit). En webbplats som redan har länkat den här enheten, till exempel en meddelandeapp, behåller namnet den såg tills du länkar den igen."
 }

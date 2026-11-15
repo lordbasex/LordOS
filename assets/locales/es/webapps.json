@@ -203,11 +203,15 @@
   "appearance.footer": "Solo cambia la preferencia de claro u oscuro que lee el sitio; LordOS nunca modifica el sitio. Algunos sitios quedan claros igual, y un sitio con su propio ajuste de tema sigue ese ajuste.",
   "identity.title": "Identidad del navegador",
   "identity.label": "Identificarse como",
-  "identity.chrome": "Chrome en Linux",
+  "identity.chrome": "Chrome en Linux + LordOS",
+  "identity.edge": "Edge en Linux",
   "identity.firefox": "Firefox en Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Los sitios ven el navegador más común en Linux. Es el predeterminado.",
+  "identity.experimental": "LordOS (experimental)",
+  "identity.chromeHint": "Los sitios ven el navegador más común en Linux, más el nombre y la versión de LordOS. Es el predeterminado.",
+  "identity.edgeHint": "Los sitios ven Edge en Linux. Para los sitios de oficina, correo y chat de equipo del propio fabricante de Edge, que lo esperan.",
   "identity.firefoxHint": "Los sitios ven Firefox en Linux.",
   "identity.lordosHint": "Los sitios ven el motor propio de LordOS. Para un sitio que falla con los otros.",
-  "identity.footer": "El navegador que cada perfil dice ser a los sitios; una ventana abierta vuelve a cargar su página. LordOS sigue usando su propio motor (WebKit); Chrome y Firefox son nombres de sus dueños. Si un sitio falla, conviene LordOS (WebKit). Un sitio que ya vinculó este dispositivo, como una app de mensajería, conserva el nombre que vio hasta que se vincule de nuevo."
+  "identity.experimentalHint": "Los sitios ven solo LordOS y su versión. Muchos sitios, incluidas las apps de mensajería, pueden rechazarlo o fallar; si pasa, conviene otra opción.",
+  "identity.footer": "El navegador que cada perfil dice ser a los sitios; una ventana abierta vuelve a cargar su página. LordOS sigue usando su propio motor (WebKit); Chrome, Edge y Firefox son nombres de sus dueños. Si un sitio falla, conviene LordOS (WebKit). Un sitio que ya vinculó este dispositivo, como una app de mensajería, conserva el nombre que vio hasta que se vincule de nuevo."
 }

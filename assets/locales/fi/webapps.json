@@ -9,11 +9,15 @@
   "appearance.footer": "Vain sivuston lukema vaalean tai tumman tilan valinta muuttuu; LordOS ei koskaan muokkaa itse sivustoa. Jotkin sivustot pysyvät silti vaaleina, ja sivusto, jolla on oma teema-asetus, noudattaa sitä.",
   "identity.title": "Selaimen tunniste",
   "identity.label": "Esittäydy nimellä",
-  "identity.chrome": "Chrome Linuxissa",
+  "identity.chrome": "Chrome Linuxissa + LordOS",
+  "identity.edge": "Edge Linuxissa",
   "identity.firefox": "Firefox Linuxissa",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Sivustot näkevät Linuxin yleisimmän selaimen. Oletus.",
+  "identity.experimental": "LordOS (kokeellinen)",
+  "identity.chromeHint": "Sivustot näkevät Linuxin yleisimmän selaimen sekä LordOS:n nimen ja version. Oletus.",
+  "identity.edgeHint": "Sivustot näkevät Edgen Linuxissa. Edgen oman valmistajan toimisto-, sähköposti- ja tiimikeskustelusivustoille, jotka odottavat sitä.",
   "identity.firefoxHint": "Sivustot näkevät Firefoxin Linuxissa.",
   "identity.lordosHint": "Sivustot näkevät LordOS:n oman moottorin. Sivustolle, joka ei toimi muilla oikein.",
-  "identity.footer": "Selain, joksi kukin profiili esittäytyy sivustoille; avoin ikkuna lataa sivunsa uudelleen. LordOS käyttää edelleen omaa moottoriaan (WebKit); Chrome ja Firefox ovat omistajiensa nimiä. Jos sivusto ei toimi oikein, valitse LordOS (WebKit). Sivusto, joka on jo yhdistänyt tämän laitteen, kuten viestisovellus, pitää näkemänsä nimen, kunnes yhdistät sen uudelleen."
+  "identity.experimentalHint": "Sivustot näkevät vain LordOS:n ja sen version. Monet sivustot, myös viestisovellukset, voivat hylätä sen tai toimia väärin; valitse silloin jokin muu.",
+  "identity.footer": "Selain, joksi kukin profiili esittäytyy sivustoille; avoin ikkuna lataa sivunsa uudelleen. LordOS käyttää edelleen omaa moottoriaan (WebKit); Chrome, Edge ja Firefox ovat omistajiensa nimiä. Jos sivusto ei toimi oikein, valitse LordOS (WebKit). Sivusto, joka on jo yhdistänyt tämän laitteen, kuten viestisovellus, pitää näkemänsä nimen, kunnes yhdistät sen uudelleen."
 }

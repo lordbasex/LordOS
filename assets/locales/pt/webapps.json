@@ -203,11 +203,15 @@
   "appearance.footer": "Só muda a preferência de claro ou escuro que o site lê; o LordOS nunca modifica o site. Alguns sites ficam claros mesmo assim, e um site com um ajuste de tema próprio segue esse ajuste.",
   "identity.title": "Identidade do navegador",
   "identity.label": "Identificar-se como",
-  "identity.chrome": "Chrome no Linux",
+  "identity.chrome": "Chrome no Linux + LordOS",
+  "identity.edge": "Edge no Linux",
   "identity.firefox": "Firefox no Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Os sites veem o navegador mais comum no Linux. É o padrão.",
+  "identity.experimental": "LordOS (experimental)",
+  "identity.chromeHint": "Os sites veem o navegador mais comum no Linux, mais o nome e a versão do LordOS. É o padrão.",
+  "identity.edgeHint": "Os sites veem o Edge no Linux. Para os sites de escritório, e-mail e chat de equipe do próprio fabricante do Edge, que o esperam.",
   "identity.firefoxHint": "Os sites veem o Firefox no Linux.",
   "identity.lordosHint": "Os sites veem o motor próprio do LordOS. Para um site que falha com os outros.",
-  "identity.footer": "O navegador que cada perfil diz ser aos sites; uma janela aberta carrega a página de novo. O LordOS continua usando seu próprio motor (WebKit); Chrome e Firefox são nomes de seus donos. Se um site falhar, prefira LordOS (WebKit). Um site que já vinculou este dispositivo, como um app de mensagens, mantém o nome que viu até ser vinculado de novo."
+  "identity.experimentalHint": "Os sites veem só o LordOS e sua versão. Muitos sites, inclusive apps de mensagens, podem recusá-lo ou falhar; se acontecer, escolha outra opção.",
+  "identity.footer": "O navegador que cada perfil diz ser aos sites; uma janela aberta carrega a página de novo. O LordOS continua usando seu próprio motor (WebKit); Chrome, Edge e Firefox são nomes de seus donos. Se um site falhar, prefira LordOS (WebKit). Um site que já vinculou este dispositivo, como um app de mensagens, mantém o nome que viu até ser vinculado de novo."
 }

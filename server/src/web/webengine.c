@@ -11,8 +11,8 @@
  *     takes the page outside (a sign-in on another site) stays, and the title then starts with that site's host;
  *   - permissions: answered from the registry, asking lord-server when it says "ask" (webbus.c);
  *   - downloads: only to the XDG Downloads folder, under a unique, cleaned name (webdl.c), with a notification;
- *   - the user agent is the profile's "Browser identity" (the registry's userAgent: Chrome on Linux by default,
- *     Firefox on Linux, or LordOS's own WebKit string; webpage_user_agent maps the word, the page never names one).
+ *   - the user agent is the profile's "Browser identity" (the registry's userAgent: Chrome on Linux with LordOS's
+ *     token by default, Edge on Linux, Firefox on Linux, LordOS's own WebKit string, or LordOS alone (experimental); webpage_user_agent maps the word, the page never names one).
  *     lord-server can change it while the app runs (SetUserAgent, webbus.c): the page then loads again, since a
  *     document keeps the navigator.userAgent it started with. WebKit's site-specific quirks are off on the app's own
  *     pages, because one of them hands some sites another system's user agent whatever the setting (a messaging web

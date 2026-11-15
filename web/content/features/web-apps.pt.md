@@ -90,7 +90,7 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 [[shot:12]]
 
-**A Identidade do navegador de cada perfil** (*em desenvolvimento*, depois da 0.8.8.8): os sites decidem o que mostrar pelo navegador com que acham que falam, então cada perfil pode dizer a eles Chrome no Linux (o padrão), Firefox no Linux, ou o nome próprio de WebKit do LordOS, o que todos os apps usavam. Você escolhe de uma lista curta em Ajustes → Apps web ou em *Identidade do navegador* no menu do app (Lord Flow), nunca digitando, e uma janela aberta carrega a página de novo com ele. O LordOS continua usando seu próprio motor, diga o nome o que disser; se um site falhar, escolha LordOS (WebKit). Um site que já vinculou seu computador, como um app de mensagens, mantém o nome que viu até você vincular de novo.
+**A Identidade do navegador de cada perfil** (*em desenvolvimento*, depois da 0.8.8.8): os sites decidem o que mostrar pelo navegador com que acham que falam, então cada perfil pode dizer a eles Chrome no Linux com o nome do LordOS acrescentado (o padrão), Edge no Linux (para os sites de escritório, e-mail e chat de equipe do seu fabricante), Firefox no Linux, o nome próprio de WebKit do LordOS (o que todos os apps usavam) ou, como experimento, o LordOS sozinho, que muitos sites recusam. Você escolhe de uma lista curta em Ajustes → Apps web ou em *Identidade do navegador* no menu do app (Lord Flow), nunca digitando, e uma janela aberta carrega a página de novo com ele. O LordOS continua usando seu próprio motor, diga o nome o que disser; se um site falhar, escolha LordOS (WebKit). Um site que já vinculou seu computador, como um app de mensagens, mantém o nome que viu até você vincular de novo.
 
 ## Desempenho
 
@@ -101,7 +101,7 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 ## Ajustes → Apps web
 
-Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux, Firefox no Linux ou LordOS; em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar.
+Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux + LordOS, Edge, Firefox ou LordOS; em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar.
 
 [[shot:10]]
 

@@ -27,7 +27,7 @@
  * menu (webask_edit); lord-web runs it only when the caller is the lord-server that started it. And
  * org.lordos.WebApp1.SetColorScheme(s scheme), "light" or "dark" only (web/webscheme.h), when the desktop's mode
  * changes (webask_scheme) or the app's own Appearance does (webask_app_scheme), with the same check. And
- * org.lordos.WebApp1.SetUserAgent(s identity), "chrome", "firefox" or "lordos" only (webreg.h WEBREG_UA_*), when a
+ * org.lordos.WebApp1.SetUserAgent(s identity), "chrome", "edge", "firefox", "lordos" or "experimental" only (webreg.h WEBREG_UA_*), when a
  * profile's Browser identity changes (webask_user_agent), with the same check; lord-web maps the word to the string. */
 #ifndef LORD_UI_WEBASK_H
 #define LORD_UI_WEBASK_H

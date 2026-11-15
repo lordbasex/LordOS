@@ -649,6 +649,10 @@ static void test_manager(void) {
         size_t tl = webreg_write(&c, text, sizeof text);
         CHECK(tl && strstr(text, "\"userAgent\": \"lordos\"") && !webreg_write_file(rp, text, tl), "userAgent written");
         CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_LORDOS, "lordos read back");
+        c.profiles[i].user_agent = WEBREG_UA_EXPERIMENTAL;
+        tl = webreg_write(&c, text, sizeof text);
+        CHECK(tl && strstr(text, "\"userAgent\": \"experimental\"") && !webreg_write_file(rp, text, tl), "experimental written");
+        CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_EXPERIMENTAL, "experimental read back");
         CHECK(webmgr_user_agent_of("chat", "work") == WEBREG_UA_CHROME, "another profile keeps its own");
         CHECK(webmgr_user_agent_of("chat", "nothere") < 0 && webmgr_user_agent_of("nothere", "agent") < 0 && webmgr_user_agent_of("../x", "agent") < 0 &&
               webmgr_user_agent_of(NULL, NULL) < 0, "unknown: -1");

@@ -203,11 +203,15 @@
   "appearance.footer": "Only the light or dark preference the site reads changes; LordOS never modifies the site itself. Some sites stay light anyway, and a site with a theme setting of its own follows that setting.",
   "identity.title": "Browser identity",
   "identity.label": "Identify as",
-  "identity.chrome": "Chrome on Linux",
+  "identity.chrome": "Chrome on Linux + LordOS",
+  "identity.edge": "Edge on Linux",
   "identity.firefox": "Firefox on Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Sites see the most common browser on Linux. The default.",
+  "identity.experimental": "LordOS (experimental)",
+  "identity.chromeHint": "Sites see the most common browser on Linux, plus LordOS’s own name and version. The default.",
+  "identity.edgeHint": "Sites see Edge on Linux. For the office, mail and team chat sites of Edge’s own maker, which expect it.",
   "identity.firefoxHint": "Sites see Firefox on Linux.",
   "identity.lordosHint": "Sites see LordOS’s own engine. For a site that misbehaves with the others.",
-  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome and Firefox are names of their owners. If a site misbehaves, choose LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again."
+  "identity.experimentalHint": "Sites see only LordOS and its version. Many sites, messaging apps included, may refuse it or misbehave; if so, choose another one.",
+  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome, Edge and Firefox are names of their owners. If a site misbehaves, choose LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again."
 }

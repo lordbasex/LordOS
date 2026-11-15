@@ -294,11 +294,11 @@ eq('appearance choices', M.COLOR_SCHEMES, ['auto', 'light', 'dark']);
 
 // ---- browser identity (a profile's registry userAgent) ----
 const ua = { id: 'chat', profiles: [{ id: 'personal', name: 'P' }, { id: 'work', name: 'W', userAgent: 'firefox' }, { id: 'x', name: 'X', userAgent: 'lordos' },
-  { id: 'y', name: 'Y', userAgent: 'Chrome' }, { id: 'z', name: 'Z', userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' }] };
-eq('browser identity', [M.userAgentOf(ua, 'personal'), M.userAgentOf(ua, 'work'), M.userAgentOf(ua, 'x'), M.userAgentOf(ua, 'y'), M.userAgentOf(ua, 'z'),
+  { id: 'e', name: 'E', userAgent: 'experimental' }, { id: 'g', name: 'G', userAgent: 'edge' }, { id: 'y', name: 'Y', userAgent: 'Chrome' }, { id: 'z', name: 'Z', userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' }] };
+eq('browser identity', [M.userAgentOf(ua, 'personal'), M.userAgentOf(ua, 'work'), M.userAgentOf(ua, 'x'), M.userAgentOf(ua, 'e'), M.userAgentOf(ua, 'g'), M.userAgentOf(ua, 'y'), M.userAgentOf(ua, 'z'),
   M.userAgentOf(ua, 'ghost'), M.userAgentOf(null, 'work'), M.userAgentOf({}, 'work'), M.userAgentOf({ profiles: [null] }, 'work')],
-  ['chrome', 'firefox', 'lordos', 'chrome', 'chrome', 'chrome', 'chrome', 'chrome', 'chrome']);
-eq('browser identity choices', M.USER_AGENTS, ['chrome', 'firefox', 'lordos']);
+  ['chrome', 'firefox', 'lordos', 'experimental', 'edge', 'chrome', 'chrome', 'chrome', 'chrome', 'chrome', 'chrome']);
+eq('browser identity choices', M.USER_AGENTS, ['chrome', 'edge', 'firefox', 'lordos', 'experimental']);
 
 // ---- profile colors, window titles ----
 const colored = { ...chat, profiles: [{ id: 'personal', name: 'Personal' }, { id: 'work', name: 'trabajo', color: 'blue' }, { id: 'x', name: 'X', color: 'none' }, { id: 'y', name: 'Y' }] };

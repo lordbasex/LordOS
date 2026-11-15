@@ -9,11 +9,15 @@
   "appearance.footer": "Yalnız saytın oxuduğu işıqlı və ya qaranlıq üstünlük dəyişir; LordOS saytın özünü heç vaxt dəyişmir. Bəzi saytlar yenə də işıqlı qalır, öz mövzu ayarı olan sayt isə həmin ayarı izləyir.",
   "identity.title": "Brauzer kimliyi",
   "identity.label": "Belə tanıt",
-  "identity.chrome": "Linux-da Chrome",
+  "identity.chrome": "Linux-da Chrome + LordOS",
+  "identity.edge": "Linux-da Edge",
   "identity.firefox": "Linux-da Firefox",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Saytlar Linux-da ən geniş yayılmış brauzeri görür. Defolt.",
+  "identity.experimental": "LordOS (eksperimental)",
+  "identity.chromeHint": "Saytlar Linux-da ən geniş yayılmış brauzeri, üstəlik LordOS-un adını və versiyasını görür. Defolt.",
+  "identity.edgeHint": "Saytlar Linux-da Edge görür. Edge-in öz istehsalçısının bunu gözləyən ofis, poçt və komanda söhbəti saytları üçün.",
   "identity.firefoxHint": "Saytlar Linux-da Firefox-u görür.",
   "identity.lordosHint": "Saytlar LordOS-un öz mühərrikini görür. Digərləri ilə düzgün işləməyən sayt üçün.",
-  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome və Firefox sahiblərinə məxsus adlardır. Sayt düzgün işləməsə, LordOS (WebKit) seçin. Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
+  "identity.experimentalHint": "Saytlar yalnız LordOS-u və onun versiyasını görür. Mesajlaşma tətbiqləri də daxil olmaqla bir çox sayt onu rədd edə və ya düzgün işləməyə bilər; belə olsa, başqa seçim edin.",
+  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome, Edge və Firefox sahiblərinə məxsus adlardır. Sayt düzgün işləməsə, LordOS (WebKit) seçin. Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
 }

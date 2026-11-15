@@ -9,11 +9,15 @@
   "appearance.footer": "変わるのはサイトが読み取るライト/ダークの設定だけで、LordOS がサイト自体を変更することはありません。それでもライトのままのサイトもあり、独自のテーマ設定を持つサイトはその設定に従います。",
   "identity.title": "ブラウザの識別",
   "identity.label": "識別名",
-  "identity.chrome": "Linux 上の Chrome",
+  "identity.chrome": "Linux 上の Chrome + LordOS",
+  "identity.edge": "Linux 上の Edge",
   "identity.firefox": "Linux 上の Firefox",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.chromeHint": "Linux で最も一般的なブラウザとしてサイトに伝えます。デフォルトです。",
+  "identity.experimental": "LordOS (実験的)",
+  "identity.chromeHint": "Linux で最も一般的なブラウザに、LordOS の名前とバージョンを加えてサイトに伝えます。デフォルトです。",
+  "identity.edgeHint": "Linux 上の Edge としてサイトに伝えます。Edge の開発元によるオフィス、メール、チームチャットのサイト向けです。",
   "identity.firefoxHint": "Linux 上の Firefox としてサイトに伝えます。",
   "identity.lordosHint": "LordOS 独自のエンジンとしてサイトに伝えます。ほかの選択でうまく動かないサイト向けです。",
-  "identity.footer": "各プロファイルがサイトに名乗るブラウザです。開いているウインドウはページを読み込み直します。LordOS は引き続き独自のエンジン (WebKit) を使います。Chrome と Firefox は各所有者の名称です。サイトがうまく動かない場合は LordOS (WebKit) を選んでください。メッセージアプリなど、すでにこのデバイスをリンクしたサイトは、リンクし直すまで以前の名前を表示し続けます。"
+  "identity.experimentalHint": "LordOS とそのバージョンだけをサイトに伝えます。メッセージアプリを含む多くのサイトが拒否したり、うまく動かなかったりすることがあります。その場合はほかの選択にしてください。",
+  "identity.footer": "各プロファイルがサイトに名乗るブラウザです。開いているウインドウはページを読み込み直します。LordOS は引き続き独自のエンジン (WebKit) を使います。Chrome、Edge と Firefox は各所有者の名称です。サイトがうまく動かない場合は LordOS (WebKit) を選んでください。メッセージアプリなど、すでにこのデバイスをリンクしたサイトは、リンクし直すまで以前の名前を表示し続けます。"
 }
