@@ -1,0 +1,74 @@
+{
+  "archiveName": "Kifurushi",
+  "archiveSummary": {
+    "one": "Faili {count}, {size}",
+    "other": "Faili {count}, {size}"
+  },
+  "compressOne": "Bana “{name}”",
+  "compressMany": {
+    "one": "Bana kipengee {count}",
+    "other": "Bana vipengee {count}"
+  },
+  "compressing": "Inabana “{name}”…",
+  "compressProgress": "Inabana “{name}”: faili {files}",
+  "compressed": {
+    "one": "“{name}” iko tayari (faili {count})",
+    "other": "“{name}” iko tayari (faili {count})"
+  },
+  "compressError": "Imeshindwa kubana “{name}” ({error})",
+  "extractHere": "Toa hapa",
+  "extractSelected": {
+    "one": "Toa kipengee {count}",
+    "other": "Toa vipengee {count}"
+  },
+  "extracting": "Inatoa “{name}”…",
+  "extractProgress": "Inatoa “{name}”: faili {files} ({pct}%)",
+  "extracted": {
+    "one": "Imetolewa kwenda “{name}” (faili {count})",
+    "other": "Imetolewa kwenda “{name}” (faili {count})"
+  },
+  "extractedSkipped": {
+    "one": "Imetolewa kwenda “{name}” (faili {count}); {skipped} zimerukwa kwa usalama",
+    "other": "Imetolewa kwenda “{name}” (faili {count}); {skipped} zimerukwa kwa usalama"
+  },
+  "extractError": "Imeshindwa kutoa “{name}” ({error})",
+  "opening": "Inafungua “{name}”…",
+  "loading": "Inapakia…",
+  "locked": "imelindwa kwa nenosiri",
+  "pages": {
+    "one": "Ukurasa {count}",
+    "other": "Kurasa {count}"
+  },
+  "more": {
+    "one": "na {count} zaidi",
+    "other": "na {count} zaidi"
+  },
+  "err.invalid": "si faili iliyobanwa, au imeharibika",
+  "err.missing-volume": "sehemu ya faili iliyobanwa na kugawanywa haipo: “{name}”",
+  "err.disk-full": "diski imejaa",
+  "err.too-big": "ni kubwa mno",
+  "err.too-many": "ina faili nyingi mno",
+  "err.corrupt": "imeharibika",
+  "err.write": "imeshindwa kuandika",
+  "err.unavailable": "kisaidizi cha nyaraka hakipatikani",
+  "err.cancelled": "imeghairiwa",
+  "err.crash": "kisaidizi cha nyaraka kimesimama ghafla",
+  "err.timeout": "imechukua muda mrefu mno",
+  "err.protocol": "kisaidizi cha nyaraka kimetuma jibu batili",
+  "err.spawn": "imeshindwa kuanzisha kisaidizi cha nyaraka",
+  "err.closed": "hati imefungwa",
+  "err.bad-request": "ombi batili",
+  "err.bad-field": "sehemu ya fomu batili",
+  "err.bad-page": "ukurasa batili",
+  "err.busy": "kisaidizi cha nyaraka kina shughuli",
+  "err.memory": "kumbukumbu ya mfumo imeisha",
+  "err.no-fonts": "hakuna fonti zinazopatikana",
+  "err.not-open": "hati haijafunguliwa",
+  "err.nothing": "hakuna cha kuhifadhi",
+  "err.read-only": "hati ni ya kusoma tu",
+  "err.save": "imeshindwa kuhifadhi",
+  "err.unknown-op": "operesheni isiyojulikana",
+  "err.image": "picha batili",
+  "err.blob": "data batili",
+  "err.password": "hati imelindwa kwa nenosiri"
+}

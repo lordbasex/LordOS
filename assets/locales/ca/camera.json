@@ -1,0 +1,14 @@
+{
+  "folder": "Càmera",
+  "photoName": "Foto {date}",
+  "videoName": "Vídeo {date}",
+  "photo": "Foto",
+  "video": "Vídeo",
+  "mirror": "Mirall",
+  "none": "No s’ha trobat cap càmera",
+  "denied": "Càmera no té permís per fer servir la càmera. Canvia-ho a Configuració → Privadesa.",
+  "error": "No s’ha pogut fer servir la càmera: {error}",
+  "noneHint": "Connecta una càmera USB: apareixerà aquí sola, sense reiniciar l’app.",
+  "deniedTitle": "Sense accés a la càmera",
+  "errorTitle": "No s’ha pogut obrir la càmera"
+}

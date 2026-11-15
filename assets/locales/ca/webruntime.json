@@ -1,0 +1,9 @@
+{
+  "tray.open": "Obre",
+  "tray.quit": "Surt",
+  "notify.open": "Obre",
+  "download.done": "Baixada completada",
+  "download.failed": "No s’ha pogut baixar",
+  "chooser.open": "Tria un fitxer",
+  "chooser.openMany": "Tria fitxers"
+}

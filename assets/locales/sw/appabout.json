@@ -1,0 +1,9 @@
+{
+  "isolated": "Inaendeshwa ikiwa imetengwa, katika mchakato wake yenyewe",
+  "linux": "Programu ya Linux",
+  "lordos": "Programu ya LordOS",
+  "package": "Programu iliyosakinishwa (.lpk)",
+  "system": "Programu ya mfumo — sehemu ya LordOS, imethibitishwa pamoja nayo",
+  "title": "Kuhusu {app}",
+  "version": "Toleo {v}"
+}

@@ -1,0 +1,74 @@
+{
+  "archiveName": "Arxiu",
+  "archiveSummary": {
+    "one": "{count} fitxer, {size}",
+    "other": "{count} fitxers, {size}"
+  },
+  "compressOne": "Comprimeix «{name}»",
+  "compressMany": {
+    "one": "Comprimeix {count} element",
+    "other": "Comprimeix {count} elements"
+  },
+  "compressing": "S’està comprimint «{name}»…",
+  "compressProgress": "S’està comprimint «{name}»: {files} fitxers",
+  "compressed": {
+    "one": "«{name}» a punt ({count} fitxer)",
+    "other": "«{name}» a punt ({count} fitxers)"
+  },
+  "compressError": "No s’ha pogut comprimir «{name}» ({error})",
+  "extractHere": "Extreu aquí",
+  "extractSelected": {
+    "one": "Extreu {count} element",
+    "other": "Extreu {count} elements"
+  },
+  "extracting": "S’està extraient «{name}»…",
+  "extractProgress": "S’està extraient «{name}»: {files} fitxers ({pct}%)",
+  "extracted": {
+    "one": "Extret a «{name}» ({count} fitxer)",
+    "other": "Extret a «{name}» ({count} fitxers)"
+  },
+  "extractedSkipped": {
+    "one": "Extret a «{name}» ({count} fitxer); se n’han omès {skipped} per seguretat",
+    "other": "Extret a «{name}» ({count} fitxers); se n’han omès {skipped} per seguretat"
+  },
+  "extractError": "No s’ha pogut extreure «{name}» ({error})",
+  "opening": "S’està obrint «{name}»…",
+  "loading": "S’està carregant…",
+  "locked": "protegit amb contrasenya",
+  "pages": {
+    "one": "{count} pàgina",
+    "other": "{count} pàgines"
+  },
+  "more": {
+    "one": "i {count} més",
+    "other": "i {count} més"
+  },
+  "err.invalid": "no és un arxiu o està malmès",
+  "err.missing-volume": "falta una part de l’arxiu dividit: «{name}»",
+  "err.disk-full": "el disc és ple",
+  "err.too-big": "és massa gran",
+  "err.too-many": "té massa fitxers",
+  "err.corrupt": "està malmès",
+  "err.write": "no s’ha pogut escriure",
+  "err.unavailable": "l’ajudant de documents no està disponible",
+  "err.cancelled": "cancel·lat",
+  "err.crash": "l’ajudant de documents s’ha aturat inesperadament",
+  "err.timeout": "ha trigat massa",
+  "err.protocol": "l’ajudant de documents ha enviat una resposta no vàlida",
+  "err.spawn": "no s’ha pogut iniciar l’ajudant de documents",
+  "err.closed": "el document s’ha tancat",
+  "err.bad-request": "sol·licitud no vàlida",
+  "err.bad-field": "camp de formulari no vàlid",
+  "err.bad-page": "pàgina no vàlida",
+  "err.busy": "l’ajudant de documents està ocupat",
+  "err.memory": "no queda memòria",
+  "err.no-fonts": "no hi ha cap tipus de lletra disponible",
+  "err.not-open": "el document no està obert",
+  "err.nothing": "no hi ha res per desar",
+  "err.read-only": "el document és només de lectura",
+  "err.save": "no s’ha pogut desar",
+  "err.unknown-op": "operació desconeguda",
+  "err.image": "imatge no vàlida",
+  "err.blob": "dades no vàlides",
+  "err.password": "el document està protegit amb contrasenya"
+}

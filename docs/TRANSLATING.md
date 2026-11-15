@@ -122,7 +122,7 @@ Give exactly the forms of your language's rule (`meta.json` → `plural`); `othe
 
 | Rule | Forms | Languages (examples) |
 |---|---|---|
-| `one-other` | `one` (1), `other` | English, Spanish, Italian, German, Dutch, Swedish, Greek, Turkish, Hungarian, Finnish, Bulgarian |
+| `one-other` | `one` (1), `other` | English, Spanish, Italian, German, Dutch, Swedish, Greek, Turkish, Hungarian, Finnish, Bulgarian, Catalan, Swahili |
 | `zero-one-other` | `one` (0 and 1), `other` | Portuguese, French, Hindi, Bengali, Persian |
 | `none` | `other` only | Japanese, Chinese, Korean, Thai, Vietnamese, Indonesian, Malay |
 | `east-slavic` | `one` (1, 21), `few` (2–4, 22), `many` (0, 5–20) | Russian, Ukrainian |
@@ -131,6 +131,7 @@ Give exactly the forms of your language's rule (`meta.json` → `plural`); `othe
 | `lithuanian` | `one` (1, 21), `few` (2–9, 22), `other` (0, 10–20) | Lithuanian |
 | `romanian` | `one` (1), `few` (0, 2–19), `other` (20, 100) | Romanian |
 | `arabic` | `zero`, `one`, `two`, `few` (3–10), `many` (11–99), `other` (100) | Arabic |
+| `filipino` | `one` (0–3, 5, 7, 8, 10, 21…), `other` (ending in 4, 6 or 9: 4, 14, 26, 109) | Filipino |
 
 If your language needs a rule that isn't there, say so in the pull request: rules are code (`sdk/plurals.js`, with
 tests) and we add them.

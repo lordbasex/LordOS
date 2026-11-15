@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Picha {date}",
+  "videoName": "Video {date}",
+  "photo": "Picha",
+  "video": "Video",
+  "mirror": "Kioo",
+  "none": "Hakuna kamera iliyopatikana",
+  "denied": "Kamera hairuhusiwi kutumia kamera. Badilisha hili katika Mipangilio → Faragha.",
+  "error": "Imeshindwa kutumia kamera: {error}",
+  "noneHint": "Chomeka kamera ya USB: itaonekana hapa yenyewe, bila kuanzisha upya programu.",
+  "deniedTitle": "Hakuna ruhusa ya kufikia kamera",
+  "errorTitle": "Kamera haikuweza kufunguliwa"
+}

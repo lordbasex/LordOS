@@ -1,0 +1,22 @@
+{
+  "folder": "Rekodi",
+  "name": "Rekodi {date} {time}",
+  "all": "Rekodi zote",
+  "empty": "Bado hakuna rekodi",
+  "hint": "Bonyeza kitufe chekundu (au R) kurekodi kwa maikrofoni",
+  "denied": "Kinasa Sauti hakiruhusiwi kutumia maikrofoni",
+  "play": "Cheza",
+  "pause": "Sitisha",
+  "rename": "Badilisha jina",
+  "trim": "Punguza",
+  "cancelTrim": "Ghairi kupunguza",
+  "saveTrim": "Hifadhi nakala iliyopunguzwa",
+  "trimmed": "imepunguzwa",
+  "export": "Hamisha kama",
+  "exportBtn": "Hamisha",
+  "working": "Inahamisha…",
+  "exported": "Imehifadhiwa “{name}”",
+  "exportError": "Imeshindwa kuhamisha",
+  "renameError": "Imeshindwa kubadilisha jina (je, jina hilo tayari lipo?)",
+  "emptyTitle": "Chagua au tengeneza rekodi"
+}

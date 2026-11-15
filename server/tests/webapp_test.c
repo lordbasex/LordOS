@@ -5,7 +5,7 @@
  * paste takes from the session's clipboard (webclip.c: the text type, its charset, the file list) and
  * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
  * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
- * page (webscheme.c). The rest of the registry file (webreg.c,
+ * page (webscheme.c), and the catalog folder for its own words (weblangid.h). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
@@ -16,6 +16,7 @@
 #include "../src/web/webedit.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
+#include "../src/web/weblangid.h"
 #include "../src/web/webmanifest.h"
 #include "../src/web/webreg.h"
 #include "../src/web/webscheme.h"
@@ -32,6 +33,24 @@
 
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
+
+/* the language of lord-web's own words: two or three letters (fil_PH → fil, not fi), Chinese by script, English otherwise */
+static void test_lang_id(void) {
+    static const char *const cases[][2] = {
+        { "pt_BR.UTF-8", "pt" }, { "fil_PH.UTF-8", "fil" }, { "fil_PH", "fil" }, { "fi_FI.UTF-8", "fi" },
+        { "ca_ES.UTF-8@valencia", "ca" }, { "sw", "sw" }, { "lt.UTF-8", "lt" }, { "zh_TW.UTF-8", "zh-Hant" },
+        { "zh_HK", "zh-Hant" }, { "zh_MO.UTF-8", "zh-Hant" }, { "zh_CN.UTF-8", "zh-Hans" }, { "zh_SG", "zh-Hans" },
+        { "zh", "zh-Hans" }, { "C.UTF-8", "en" }, { "C", "en" }, { "POSIX", "en" }, { "", "en" }, { "e", "en" },
+        { "filx_PH", "en" }, { "Fil_PH", "en" }, { "pt-BR", "en" }, { "../x", "en" }, { "en_US.UTF-8", "en" },
+    };
+    char out[WEBLANG_ID_MAX];
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        weblang_id(cases[i][0], out);
+        CHECK(!strcmp(out, cases[i][1]), "weblang_id(%s) = %s, want %s", cases[i][0], out, cases[i][1]);
+    }
+    weblang_id(NULL, out);
+    CHECK(!strcmp(out, "en"), "weblang_id(NULL)");
+}
 
 static void test_url(void) {
     WebUrl u;
@@ -908,6 +927,7 @@ int main(void) {
     test_args();
     test_manifest();
     test_downloads();
+    test_lang_id();
     printf("webapp-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

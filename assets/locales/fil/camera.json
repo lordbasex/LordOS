@@ -1,0 +1,14 @@
+{
+  "folder": "Camera",
+  "photoName": "Larawan {date}",
+  "videoName": "Video {date}",
+  "photo": "Larawan",
+  "video": "Video",
+  "mirror": "Salamin",
+  "none": "Walang nakitang camera",
+  "denied": "Hindi pinapayagan ang Camera na gamitin ang camera. Baguhin ito sa Mga Setting → Privacy.",
+  "error": "Hindi magamit ang camera: {error}",
+  "noneHint": "Magsaksak ng USB camera: kusa itong lalabas dito, nang hindi nire-restart ang app.",
+  "deniedTitle": "Walang access sa camera",
+  "errorTitle": "Hindi mabuksan ang camera"
+}
