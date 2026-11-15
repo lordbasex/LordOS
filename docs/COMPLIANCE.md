@@ -20,8 +20,22 @@ materials (SBOM) published with each release. The website summary is at
 - **The images' source packages** (in development after 0.8.8.8; [SOURCE-OFFER.md](SOURCE-OFFER.md)): each image is
   published with `<image>.sources.tsv`, every source package and version in it with where that exact source is
   (snapshot.debian.org for Debian's, LordOS's copy or Raspberry Pi's archive for the Pi's, this repository at the tag
-  for LordOS's own packages and its Raspberry Pi kernel), written by `tools/release/image-sources.sh`, under a
-  written offer valid for three years.
+  for LordOS's own packages, LordOS's copy for its Raspberry Pi kernel), written by `tools/release/image-sources.sh`,
+  under a written offer valid for three years.
+- **The kernel sources of the Raspberry Pi images, kept by LordOS** (in development after 0.8.8.8; maintainer's
+  decision, 2026-11-15; [SOURCE-OFFER.md](SOURCE-OFFER.md)). The GPL-2 sources the 0.8.8 Pi image needs that only
+  third parties served are pinned in `tools/release/rpi-mirror.list` and go to https://lordos.org/apt/pool/rpi/source/
+  with the next APT update: Raspberry Pi's `linux 1:6.18.50-1+rpt1` (the Pi 4 kernel `linux-image-6.18.50+rpt-rpi-v8`),
+  `firmware-nonfree 1:20260519-1~bpo13+1+rpt1` (`firmware-brcm80211`: Broadcom's binary-only firmware, no source of
+  its own, kept with its packaging for completeness) and `raspi-firmware 1:1.20260915-1` (boot firmware under
+  Raspberry Pi's binary licence, the kernel hook GPL-2+), and the LordOS kernel `linux-lordos-rpi-2712
+  6.18.57-3+lordos`: Raspberry Pi's tree at commit `234188315037848e5b07d65b85d38edc64095caa` (a `tarball` line: URL
+  and SHA-256, checked to be byte for byte that commit's `git archive`), the image's exact `.config` and the build
+  script, from `tools/rpi/kernel/`. Raspberry Pi's signed index had already dropped `linux 6.18.50` and
+  `firmware-nonfree +rpt1` (it lists only the newest version); they are pinned as `source-pool` by the SHA-256 of
+  their `.dsc` read from Raspberry Pi's pool on 2026-11-15, and linux's `.orig.tar.xz` matches kernel.org's
+  `linux-6.18.50.tar.xz`. Every new LordOS kernel gets its `tarball` line and folder before its image is
+  published (docs/RELEASING.md, "Source code").
 - **Raspberry Pi packages mirrored in the LordOS APT repository** (arm64, since 0.8.4.1;
   `tools/release/rpi-mirror.list`, [UPDATES.md](UPDATES.md), "Raspberry Pi firmware packages") are
   copied byte for byte, each with its own `copyright` inside: `rpi-eeprom` (scripts BSD-3-Clause;

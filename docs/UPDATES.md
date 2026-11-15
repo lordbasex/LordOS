@@ -287,6 +287,9 @@ system by LordOS's packages.
   against it, and takes a file only when its SHA-256 matches both the index and the pinned line.
   Verified files are kept in `~/.local/share/lordos-apt/rpi-cache`, so a pinned version can still be
   published after Raspberry Pi's archive keeps only a newer one (it keeps one version per package).
+  (In development after 0.8.8.8.) A pinned file missing from the cache is also taken from the published pool
+  that `build` syncs first, when its SHA-256 is the pinned one, so the build works on any machine with the key;
+  without `gpgv` the script checks Raspberry Pi's `InRelease` with `gpg` in an empty home holding only that key.
   `apt-repo.sh rpi-fetch <target>` only fetches and verifies. A new upstream version is a new line
   in the list, reviewed like code; the pool only grows.
 - **Only on arm64.** They live under `pool/rpi/` and only the `binary-arm64` index lists them (most
@@ -298,7 +301,12 @@ system by LordOS's packages.
   version, is published next to the binaries: https://lordos.org/apt/pool/rpi/source/k/kms++/ (the
   `.dsc`, `.orig.tar.xz` and `.debian.tar.xz`, pinned in `rpi-mirror.list` with architecture `source`
   and checked against Raspberry Pi's signed `Sources` index; not indexed for `apt source`)
-  ([COMPLIANCE.md](COMPLIANCE.md)).
+  ([COMPLIANCE.md](COMPLIANCE.md)). The same folder, `pool/rpi/source/`, keeps the sources of the
+  copyleft Raspberry Pi packages in the Pi image and of the LordOS Raspberry Pi kernel, with two more
+  kinds of line ([SOURCE-OFFER.md](SOURCE-OFFER.md)): `source-pool`, a source version Raspberry Pi's
+  signed index has dropped but its pool keeps (the `.dsc` by the SHA-256 recorded in the list, the rest by
+  the `.dsc`'s checksums), and `tarball`, an upstream tree by https URL and SHA-256, published with
+  `tools/rpi/kernel/<name>_<version>/`. The storage reads `+` in a path as a space: links write it `%2B`.
 - **Which source wins.** On the LordOS Pi image, which also lists Raspberry Pi's archive with
   priority 990 for these packages (`/etc/apt/preferences.d/raspberrypi`), apt takes the newest
   version among the 990 sources; ours mirrors the same files, so it only matters when a newer version

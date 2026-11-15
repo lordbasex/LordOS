@@ -178,10 +178,28 @@ it contains and where each source is, under the written offer in [SOURCE-OFFER.m
    a `warning:` (a package in no APT list, a kernel with no known commit) is fixed before publishing, and the
    `note:` names the Raspberry Pi sources LordOS keeps no copy of. A copyleft one there (a newer FFmpeg, the
    archive's own kernel for a board LordOS has no kernel for) gets its `source` line in
-   `tools/release/rpi-mirror.list` and is published with `apt-repo.sh` before the image is.
-2. **The kernel's commit.** `build-img.sh` passes `$KERNEL_DEBS/SOURCE` (written by `tools/rpi/build-kernel.sh`)
-   so the Pi kernel's line names the exact commit. A kernel built from a commit `image-sources.sh` doesn't know
-   yet (its `KNOWN_KERNELS`) also goes into [RASPBERRY.md](RASPBERRY.md), "The LordOS kernel".
+   `tools/release/rpi-mirror.list` and is published with `apt-repo.sh` before the image is. Raspberry Pi's signed
+   index keeps only the newest version of each source: when the image's version is already gone from it, the line
+   is `source-pool` instead, with the SHA-256 of the `.dsc` from Raspberry Pi's pool
+   (`curl -fsS https://archive.raspberrypi.com/debian/pool/main/<letter>/<source>/<file>.dsc | sha256sum`), and
+   whatever else can be checked independently (an `.orig.tar.xz` that kernel.org or the signed index also lists)
+   goes in the list's comment.
+2. **The kernel's commit and its source.** `build-img.sh` passes `$KERNEL_DEBS/SOURCE` (written by
+   `tools/rpi/build-kernel.sh`) so the Pi kernel's line names the exact commit. A kernel built from a commit
+   `image-sources.sh` doesn't know yet (its `KNOWN_KERNELS`) also goes into [RASPBERRY.md](RASPBERRY.md), "The LordOS
+   kernel". LordOS keeps each kernel's source itself (`image-sources.sh` warns when it doesn't):
+   `build-kernel.sh` leaves `out/source/linux-lordos-rpi-<flavour>_<version>/` (the exact `.config`, the script,
+   `SOURCE` with the tree's `tar_sha256`); commit it as `tools/rpi/kernel/linux-lordos-rpi-<flavour>_<version>/`
+   and add the `tarball` line, with the SHA-256 of GitHub's tarball of the commit after checking it is that tree:
+
+   ```sh
+   curl -fsSL -o tree.tar.gz https://codeload.github.com/raspberrypi/linux/tar.gz/<commit>
+   gzip -dc tree.tar.gz | sha256sum      # must be SOURCE's tar_sha256
+   sha256sum tree.tar.gz                 # the tarball line's SHA-256
+   ```
+
+   `apt-repo.sh build <target> --rpi` publishes it in `pool/rpi/source/l/linux-lordos-rpi-<flavour>/` before the
+   image goes out.
 3. **Publish it with the image**, in the release folder before `sign-release.sh` (step 4 above), so it is in
    `SHA256SUMS`, and keep it there: the offer runs for three years after the image was last published.
 4. **Requests** arrive as GitHub issues from the "Source code request" form (`.github/ISSUE_TEMPLATE/source-request.yml`,
