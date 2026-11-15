@@ -1,0 +1,22 @@
+{
+  "folder": "Rekaman",
+  "name": "Rekaman {date} {time}",
+  "all": "Semua rekaman",
+  "empty": "Belum ada rekaman",
+  "hint": "Tekan tombol merah (atau R) untuk merekam dengan mikrofon",
+  "denied": "Perekam Suara tidak diizinkan menggunakan mikrofon",
+  "play": "Putar",
+  "pause": "Jeda",
+  "rename": "Ganti Nama",
+  "trim": "Pangkas",
+  "cancelTrim": "Batalkan pemangkasan",
+  "saveTrim": "Simpan salinan yang dipangkas",
+  "trimmed": "dipangkas",
+  "export": "Ekspor sebagai",
+  "exportBtn": "Ekspor",
+  "working": "Mengekspor…",
+  "exported": "“{name}” disimpan",
+  "exportError": "Tidak dapat mengekspor",
+  "renameError": "Tidak dapat mengganti nama (apakah nama itu sudah ada?)",
+  "emptyTitle": "Pilih atau buat rekaman"
+}

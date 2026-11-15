@@ -1,0 +1,9 @@
+{
+  "tray.open": "Buka",
+  "tray.quit": "Keluar",
+  "notify.open": "Buka",
+  "download.done": "Unduhan selesai",
+  "download.failed": "Unduhan gagal",
+  "chooser.open": "Pilih berkas",
+  "chooser.openMany": "Pilih berkas-berkas"
+}

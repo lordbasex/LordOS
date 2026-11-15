@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Cermin",
+  "none": "Tidak ada kamera yang ditemukan",
+  "denied": "Kamera tidak diizinkan menggunakan kamera. Ubah di Pengaturan → Privasi.",
+  "error": "Tidak dapat menggunakan kamera: {error}",
+  "noneHint": "Colokkan kamera USB: kamera akan muncul di sini dengan sendirinya, tanpa memulai ulang aplikasi.",
+  "deniedTitle": "Tidak ada akses ke kamera",
+  "errorTitle": "Kamera tidak dapat dibuka"
+}

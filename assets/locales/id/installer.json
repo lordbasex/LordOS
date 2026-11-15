@@ -47,7 +47,7 @@
   "manual.act.esp": "Partisi EFI: pertahankan, tambahkan LordOS",
   "manual.act.espFormat": "Partisi EFI: format (menghapus semua boot loader di dalamnya)",
   "manual.act.home": "/home: pertahankan berkasnya",
-  "manual.act.homeFormat": "/home: format (ext4)",
+  "manual.act.homeFormat": "/home: format ulang (ext4)",
   "manual.act.keep": "Biarkan seperti semula",
   "manual.act.root": "/ (sistem): format (ext4)",
   "manual.act.swap": "Swap: format",

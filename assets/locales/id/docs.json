@@ -1,0 +1,66 @@
+{
+  "archiveName": "Arsip",
+  "archiveSummary": {
+    "other": "{count} berkas, {size}"
+  },
+  "compressOne": "Kompres “{name}”",
+  "compressMany": {
+    "other": "Kompres {count} item"
+  },
+  "compressing": "Mengompres “{name}”…",
+  "compressProgress": "Mengompres “{name}”: {files} berkas",
+  "compressed": {
+    "other": "“{name}” siap ({count} berkas)"
+  },
+  "compressError": "Tidak dapat mengompres “{name}” ({error})",
+  "extractHere": "Ekstrak di sini",
+  "extractSelected": {
+    "other": "Ekstrak {count} item"
+  },
+  "extracting": "Mengekstrak “{name}”…",
+  "extractProgress": "Mengekstrak “{name}”: {files} berkas ({pct}%)",
+  "extracted": {
+    "other": "Diekstrak ke “{name}” ({count} berkas)"
+  },
+  "extractedSkipped": {
+    "other": "Diekstrak ke “{name}” ({count} berkas); {skipped} dilewati demi keamanan"
+  },
+  "extractError": "Tidak dapat mengekstrak “{name}” ({error})",
+  "opening": "Membuka “{name}”…",
+  "loading": "Memuat…",
+  "locked": "dilindungi kata sandi",
+  "pages": {
+    "other": "{count} halaman"
+  },
+  "more": {
+    "other": "dan {count} lainnya"
+  },
+  "err.invalid": "bukan arsip, atau arsip rusak",
+  "err.missing-volume": "satu bagian dari arsip terpisah hilang: “{name}”",
+  "err.disk-full": "disk penuh",
+  "err.too-big": "ukurannya terlalu besar",
+  "err.too-many": "berkasnya terlalu banyak",
+  "err.corrupt": "berkas rusak",
+  "err.write": "tidak dapat menulis",
+  "err.unavailable": "pembantu dokumen tidak tersedia",
+  "err.cancelled": "dibatalkan",
+  "err.crash": "pembantu dokumen berhenti secara tak terduga",
+  "err.timeout": "terlalu lama",
+  "err.protocol": "pembantu dokumen mengirim balasan yang tidak valid",
+  "err.spawn": "tidak dapat memulai pembantu dokumen",
+  "err.closed": "dokumen telah ditutup",
+  "err.bad-request": "permintaan tidak valid",
+  "err.bad-field": "kolom formulir tidak valid",
+  "err.bad-page": "halaman tidak valid",
+  "err.busy": "pembantu dokumen sedang sibuk",
+  "err.memory": "memori habis",
+  "err.no-fonts": "tidak ada fon yang tersedia",
+  "err.not-open": "dokumen tidak terbuka",
+  "err.nothing": "tidak ada yang perlu disimpan",
+  "err.read-only": "dokumen hanya-baca",
+  "err.save": "tidak dapat menyimpan",
+  "err.unknown-op": "operasi tidak dikenal",
+  "err.image": "gambar tidak valid",
+  "err.blob": "data tidak valid",
+  "err.password": "dokumen dilindungi kata sandi"
+}
