@@ -30,6 +30,7 @@ const ALLOW = [
   [/^assets\/locales\/fr\/(countries|emojikw)\.json$/, 'Macédoine', 'the country in French: the check reads "Mac" before an é as a whole word'],
   [/^assets\/locales\/ms\/(format|calendar|photos)\.json$/, '"Mac"', 'March in Malay (glibc ms_MY, CLDR ms): a month name, not the computer'],
   [/^assets\/locales\/sw\/(format|calendar|photos)\.json$/, '"Mac"', 'March in Swahili (glibc sw_KE, CLDR sw): a month name, not the computer'],
+  [/^assets\/locales\/sw\/shell\.json$/, '"Safari ya', 'the Swahili word for journey (wallpaper names "Odyssey", "Voyage"), not the browser'],
 ];
 
 function files() {
