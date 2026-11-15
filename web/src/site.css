@@ -190,7 +190,7 @@ body:has(.nav-cb:checked){overflow:hidden}
 .lg-small{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 @media (max-width:520px){.lg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lg-card{padding:14px}.lg-card strong{font-size:18px}}
 .lg-card{display:flex;flex-direction:column;gap:4px;min-width:0;padding:16px 18px;border-radius:16px;background:var(--surface);border:1px solid var(--line-2)}
-.lg-card strong{font-size:20px;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
+.lg-card strong{font-size:20px;line-height:1.3;color:var(--ink);overflow-wrap:break-word;word-break:normal}
 .lg-head{display:flex;align-items:flex-start;gap:10px;min-width:0}
 .lg-head strong{min-width:0}
 /* the card's flag (decoration, web/src/flags): a hairline so white stripes show on a light or dark card */
