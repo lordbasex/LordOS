@@ -4,6 +4,8 @@
   "disk.cancelling": "Cancelling",
   "disk.ejected": "Ejected",
   "disk.erased": "Erased",
+  "disk.readOnlyHibernated": "{name} was mounted read-only: the other operating system did not shut down completely (fast startup or hibernation). Shut it down fully to write to it.",
+  "disk.readOnlyUnchecked": "{name} was mounted read-only: it could not be checked whether another operating system left it hibernated.",
   "disk.rereadWarning": "Warning: the kernel did not reread the partition table ({errno})",
   "disk.unmounted": "Unmounted",
   "disk.unmountedPath": "Unmounted {path}",

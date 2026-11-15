@@ -4,6 +4,8 @@
   "disk.cancelling": "Cancelando",
   "disk.ejected": "Expulsado",
   "disk.erased": "Borrado",
+  "disk.readOnlyHibernated": "{name} se montó en solo lectura: el otro sistema operativo no se apagó del todo (inicio rápido o hibernación). Apagalo por completo para poder escribir.",
+  "disk.readOnlyUnchecked": "{name} se montó en solo lectura: no se pudo comprobar si otro sistema operativo lo dejó hibernado.",
   "disk.rereadWarning": "Aviso: el kernel no releyó la tabla de particiones ({errno})",
   "disk.unmounted": "Desmontado",
   "disk.unmountedPath": "Desmontado {path}",

@@ -4,6 +4,8 @@
   "disk.cancelling": "Avbryter",
   "disk.ejected": "Utmatad",
   "disk.erased": "Raderad",
+  "disk.readOnlyHibernated": "{name} monterades skrivskyddad: det andra operativsystemet stängdes inte av helt (snabbstart eller viloläge). Stäng av det helt för att kunna skriva till den.",
+  "disk.readOnlyUnchecked": "{name} monterades skrivskyddad: det gick inte att kontrollera om ett annat operativsystem lämnade den i viloläge.",
   "disk.rereadWarning": "Varning: kärnan läste inte om partitionstabellen ({errno})",
   "disk.unmounted": "Avmonterad",
   "disk.unmountedPath": "{path} avmonterad",

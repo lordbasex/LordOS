@@ -7,7 +7,7 @@
   "images": "Atvaizdai",
   "systemShort": "sistema",
   "systemBadge": "Sistemos diskas",
-  "systemNote": "Tai sistemos diskas: LordOS neleidžia jo čia formatuoti, ištrinti ar atjungti.",
+  "systemNote": "Tai sistemos diskas: LordOS neleidžia jo formatuoti ar ištrinti. Administratorius gali prijungti jo laisvus skaidinius.",
   "adminNote": "Vidinius diskus keisti gali tik administratorius.",
   "readOnlyNote": "Įrenginys skirtas tik skaityti.",
   "partNumber": "{n} skaidinys",

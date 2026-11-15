@@ -7,7 +7,7 @@
   "images": "Levykuvat",
   "systemShort": "järjestelmä",
   "systemBadge": "Järjestelmälevy",
-  "systemNote": "Tämä on järjestelmälevy: LordOS ei anna alustaa, tyhjentää tai irrottaa sitä täältä.",
+  "systemNote": "Tämä on järjestelmälevy: LordOS ei anna alustaa tai tyhjentää sitä. Järjestelmänvalvoja voi liittää sen vapaat osiot.",
   "adminNote": "Vain järjestelmänvalvoja voi muuttaa sisäisiä levyjä.",
   "readOnlyNote": "Laite on vain luku -tilassa.",
   "partNumber": "Osio {n}",

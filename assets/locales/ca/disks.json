@@ -7,7 +7,7 @@
   "images": "Imatges",
   "systemShort": "sistema",
   "systemBadge": "Disc del sistema",
-  "systemNote": "Aquest és el disc del sistema: LordOS no et deixa formatar-lo, esborrar-lo ni desmuntar-lo des d’aquí.",
+  "systemNote": "Aquest és el disc del sistema: LordOS no et deixa formatar-lo ni esborrar-lo. Un administrador pot muntar-ne les particions lliures.",
   "adminNote": "Només un administrador pot canviar els discos interns.",
   "readOnlyNote": "El dispositiu és només de lectura.",
   "partNumber": "Partició {n}",

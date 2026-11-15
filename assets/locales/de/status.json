@@ -4,6 +4,8 @@
   "disk.cancelling": "Wird abgebrochen",
   "disk.ejected": "Ausgeworfen",
   "disk.erased": "Gelöscht",
+  "disk.readOnlyHibernated": "{name} wurde schreibgeschützt eingehängt: Das andere Betriebssystem wurde nicht vollständig heruntergefahren (Schnellstart oder Ruhezustand). Fahre es vollständig herunter, um darauf zu schreiben.",
+  "disk.readOnlyUnchecked": "{name} wurde schreibgeschützt eingehängt: Es ließ sich nicht prüfen, ob ein anderes Betriebssystem es im Ruhezustand hinterlassen hat.",
   "disk.rereadWarning": "Warnung: Der Kernel hat die Partitionstabelle nicht neu eingelesen ({errno})",
   "disk.unmounted": "Ausgehängt",
   "disk.unmountedPath": "{path} ausgehängt",

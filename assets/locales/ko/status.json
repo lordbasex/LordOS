@@ -4,6 +4,8 @@
   "disk.cancelling": "취소하는 중",
   "disk.ejected": "꺼냄",
   "disk.erased": "지움",
+  "disk.readOnlyHibernated": "{name}을(를) 읽기 전용으로 마운트했습니다: 다른 운영 체제가 완전히 종료되지 않았습니다(빠른 시작 또는 최대 절전 모드). 쓰려면 그 운영 체제를 완전히 종료하세요.",
+  "disk.readOnlyUnchecked": "{name}을(를) 읽기 전용으로 마운트했습니다: 다른 운영 체제가 최대 절전 상태로 남겨 두었는지 확인할 수 없었습니다.",
   "disk.rereadWarning": "경고: 커널이 파티션 테이블을 다시 읽지 못했습니다({errno})",
   "disk.unmounted": "마운트 해제됨",
   "disk.unmountedPath": "{path} 마운트 해제됨",

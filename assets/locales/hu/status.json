@@ -4,6 +4,8 @@
   "disk.cancelling": "Megszakítás",
   "disk.ejected": "Kiadva",
   "disk.erased": "Törölve",
+  "disk.readOnlyHibernated": "{name} csak olvashatóan lett csatolva: a másik operációs rendszer nem állt le teljesen (gyors rendszerindítás vagy hibernálás). Állítsa le teljesen, hogy írni tudjon rá.",
+  "disk.readOnlyUnchecked": "{name} csak olvashatóan lett csatolva: nem sikerült ellenőrizni, hogy egy másik operációs rendszer hibernálva hagyta-e.",
   "disk.rereadWarning": "Figyelem: a kernel nem olvasta be újra a partíciós táblát ({errno})",
   "disk.unmounted": "Leválasztva",
   "disk.unmountedPath": "{path} leválasztva",

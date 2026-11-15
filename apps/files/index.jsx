@@ -7,7 +7,7 @@ import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
-  wayland, linuxAppFor, shortAppName,
+  wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -84,30 +84,15 @@ let userOnce = null;
 const userName = () => { if (userOnce === null) { try { userOnce = String(systemInfo().user || ''); } catch (e) { userOnce = ''; } } return userOnce; };
 // This computer is named after the machine
 const computerName = () => { try { return systemInfo().hostname || tr('files.place.computer'); } catch (e) { return tr('files.place.computer'); } };
-// Partitions (or whole disks without a table) that hold a file system and aren't mounted, off the
-// disk the system runs from: the sidebar offers them, mounted with the Disks app's disk-mount.
-const NO_MOUNT = ['', 'swap', 'crypto_LUKS', 'LVM2_member', 'linux_raid_member'];
-function unmountedDisks(list) {
-  const out = [];
-  for (const d of list || []) {
-    if (d.system) continue;
-    for (const p of d.partitions?.length ? d.partitions : [d]) {
-      if (!NO_MOUNT.includes(p.fstype || '') && !p.mountpoint) out.push({ name: p.name, label: p.label, size: p.size, removable: d.removable, fstype: p.fstype });
-    }
-  }
-  return out;
-}
+// Partitions (or whole disks without a table) that hold a file system and aren't mounted, and a system
+// disk's free partitions (#122: Windows' NTFS in a dual boot): the sidebar offers them, mounted with the
+// Disks app's disk-mount (sdk/diskplaces.js).
 // What ⏏ does for a mounted volume: a removable disk is ejected whole (disk-eject), another disk's
-// partition is unmounted (disk-unmount); nothing on the disk the system runs from.
+// partition, or a system disk's partition mounted under /media, is unmounted (disk-unmount).
 function volumeRelease(list, path, fstype) {
   if (fstype === 'fuse.rclone') return { remote: true, name: path };
   if (isShareFs(fstype)) return { action: 'share-unmount', name: path };
-  for (const d of list || []) {
-    if (d.system) continue;
-    const p = (d.partitions?.length ? d.partitions : [d]).find((x) => x.mountpoint === path);
-    if (p) return d.removable ? { action: 'disk-eject', name: d.name } : { action: 'disk-unmount', name: p.name };
-  }
-  return null;
+  return diskRelease(list, path);
 }
 function argLoc(args) {
   if (args?.place === 'trash') return { type: 'trash' };
@@ -588,8 +573,10 @@ export default function Files() {
       return;
     }
     setMsg(tr('files.disk.mounting', { name: p.label || p.name }));
-    admin.run('disk-mount', p.name, null, { quiet: true }).then(
-      (path) => { setVolumes(fs.volumes()); setMsg(null); const at = String(path || '').trim(); if (at.startsWith('/')) navigate(dirLoc(at)); },
+    // a LOG line says it was mounted read-only (NTFS that Windows left hibernated): it stays on screen
+    let note = null;
+    admin.run('disk-mount', p.name, (line) => { note = statusText(line); }, { quiet: true }).then(
+      (path) => { setVolumes(fs.volumes()); setMsg(note); const at = String(path || '').trim(); if (at.startsWith('/')) navigate(dirLoc(at)); },
       (e) => setMsg(e.message));
   };
   const release = (r, path) => {

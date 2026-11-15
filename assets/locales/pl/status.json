@@ -4,6 +4,8 @@
   "disk.cancelling": "Anulowanie",
   "disk.ejected": "Wysunięto",
   "disk.erased": "Wymazano",
+  "disk.readOnlyHibernated": "{name} zamontowano tylko do odczytu: drugi system operacyjny nie został całkowicie zamknięty (szybkie uruchamianie lub hibernacja). Zamknij go całkowicie, aby móc na nim zapisywać.",
+  "disk.readOnlyUnchecked": "{name} zamontowano tylko do odczytu: nie udało się sprawdzić, czy inny system operacyjny nie pozostawił go w hibernacji.",
   "disk.rereadWarning": "Ostrzeżenie: jądro nie odczytało ponownie tablicy partycji ({errno})",
   "disk.unmounted": "Odmontowano",
   "disk.unmountedPath": "Odmontowano {path}",

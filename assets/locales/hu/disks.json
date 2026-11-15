@@ -7,7 +7,7 @@
   "images": "Lemezképek",
   "systemShort": "rendszer",
   "systemBadge": "Rendszerlemez",
-  "systemNote": "Ez a rendszerlemez: a LordOS innen nem engedi formázni, törölni vagy leválasztani.",
+  "systemNote": "Ez a rendszerlemez: a LordOS nem engedi formázni vagy törölni. Egy rendszergazda csatolhatja a szabad partícióit.",
   "adminNote": "Belső lemezeket csak rendszergazda módosíthat.",
   "readOnlyNote": "Az eszköz csak olvasható.",
   "partNumber": "{n}. partíció",

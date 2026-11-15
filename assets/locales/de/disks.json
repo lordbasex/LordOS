@@ -7,7 +7,7 @@
   "images": "Images",
   "systemShort": "System",
   "systemBadge": "Systemdatenträger",
-  "systemNote": "Dies ist der Systemdatenträger: LordOS lässt dich ihn hier nicht formatieren, löschen oder aushängen.",
+  "systemNote": "Dies ist der Systemdatenträger: LordOS lässt dich ihn nicht formatieren oder löschen. Ein Administrator kann seine freien Partitionen einhängen.",
   "adminNote": "Nur ein Administrator kann interne Datenträger ändern.",
   "readOnlyNote": "Das Gerät ist schreibgeschützt.",
   "partNumber": "Partition {n}",

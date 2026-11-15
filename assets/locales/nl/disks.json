@@ -7,7 +7,7 @@
   "images": "Images",
   "systemShort": "systeem",
   "systemBadge": "Systeemschijf",
-  "systemNote": "Dit is de systeemschijf: LordOS laat je hem hier niet formatteren, wissen of ontkoppelen.",
+  "systemNote": "Dit is de systeemschijf: LordOS laat je hem niet formatteren of wissen. Een beheerder kan de vrije partities ervan koppelen.",
   "adminNote": "Alleen een beheerder kan interne schijven wijzigen.",
   "readOnlyNote": "Het apparaat is alleen-lezen.",
   "partNumber": "Partitie {n}",

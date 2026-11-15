@@ -7,7 +7,7 @@
   "images": "이미지",
   "systemShort": "시스템",
   "systemBadge": "시스템 디스크",
-  "systemNote": "시스템 디스크입니다. LordOS에서는 여기에서 포맷, 지우기 또는 마운트 해제를 할 수 없습니다.",
+  "systemNote": "시스템 디스크입니다. LordOS에서는 포맷하거나 지울 수 없습니다. 관리자는 비어 있는 파티션을 마운트할 수 있습니다.",
   "adminNote": "관리자만 내장 디스크를 변경할 수 있습니다.",
   "readOnlyNote": "읽기 전용 장치입니다.",
   "partNumber": "파티션 {n}",

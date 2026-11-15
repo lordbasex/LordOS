@@ -6,7 +6,8 @@
  *                                        partition table, bus (without opening the device)
  *   /proc/self/mountinfo                 where each one is mounted
  * None of this needs root: the system disk is recognized right here, and the helper checks it
- * again with the same functions before touching anything. */
+ * again with the same functions before touching anything. Whether one partition is free to mount
+ * (in use, or kept by the system disk's table) is diskuse.c's. */
 #include "disk.h"
 
 #include <ctype.h>
@@ -451,6 +452,10 @@ char *disk_list_json(void) {
             char sp[PATH_MAX];
             snprintf(sp, sizeof sp, "/sys/block/%.31s/%.31s/start", n, pn);
             long long start = read_num(sp);
+            /* the same check disk-mount makes as root (#122): Files and Disks offer only a free partition */
+            int use = disk_part_use("", pn, 1);
+            bput(&b, "\"inuse\":%s,\"reserved\":%s,", use == DISK_USE_MOUNTED || use == DISK_USE_HELD || use == DISK_USE_SWAP ? "true" : "false",
+                 use == DISK_USE_RESERVED || use == DISK_USE_UNKNOWN ? "true" : "false");
             bput(&b, "\"number\":%d,\"size\":%llu,\"start\":%lld}", parts[i].number, (unsigned long long)disk_size(pn), start < 0 ? 0 : start * 512);
         }
         bput(&b, "]}");

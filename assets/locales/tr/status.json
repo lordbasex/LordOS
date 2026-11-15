@@ -4,6 +4,8 @@
   "disk.cancelling": "İptal ediliyor",
   "disk.ejected": "Çıkarıldı",
   "disk.erased": "Silindi",
+  "disk.readOnlyHibernated": "{name} salt okunur bağlandı: diğer işletim sistemi tamamen kapatılmamış (hızlı başlangıç veya hazırda bekletme). Üzerine yazmak için onu tamamen kapatın.",
+  "disk.readOnlyUnchecked": "{name} salt okunur bağlandı: başka bir işletim sisteminin onu hazırda bekletmede bırakıp bırakmadığı denetlenemedi.",
   "disk.rereadWarning": "Uyarı: çekirdek bölüm tablosunu yeniden okumadı ({errno})",
   "disk.unmounted": "Bağlantı kaldırıldı",
   "disk.unmountedPath": "{path} bağlantısı kaldırıldı",

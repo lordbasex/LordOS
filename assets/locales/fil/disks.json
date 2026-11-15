@@ -7,7 +7,7 @@
   "images": "Mga Image",
   "systemShort": "system",
   "systemBadge": "Disk ng system",
-  "systemNote": "Ito ang disk ng system: hindi ka pinapayagan ng LordOS na i-format, burahin o i-unmount ito mula rito.",
+  "systemNote": "Ito ang disk ng system: hindi ka pinapayagan ng LordOS na i-format o burahin ito. Maaaring i-mount ng administrator ang mga bakanteng partition nito.",
   "adminNote": "Administrator lang ang makakapagbago ng mga internal disk.",
   "readOnlyNote": "Read-only ang device.",
   "partNumber": "Partition {n}",

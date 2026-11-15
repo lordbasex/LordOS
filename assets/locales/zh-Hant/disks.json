@@ -7,7 +7,7 @@
   "images": "映像檔",
   "systemShort": "系統",
   "systemBadge": "系統磁碟",
-  "systemNote": "這是系統磁碟：LordOS 不允許你從這裡將它格式化、清除或卸載。",
+  "systemNote": "這是系統磁碟：LordOS 不允許你將它格式化或清除。管理員可以掛載它的空閒分割區。",
   "adminNote": "只有管理者才能更改內接磁碟。",
   "readOnlyNote": "此裝置為唯讀。",
   "partNumber": "分割區 {n}",

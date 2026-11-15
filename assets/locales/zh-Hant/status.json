@@ -4,6 +4,8 @@
   "disk.cancelling": "正在取消",
   "disk.ejected": "已退出",
   "disk.erased": "已清除",
+  "disk.readOnlyHibernated": "{name} 已以唯讀方式掛載：另一個作業系統沒有完全關機（快速啟動或休眠）。請將其完全關機後才能寫入。",
+  "disk.readOnlyUnchecked": "{name} 已以唯讀方式掛載：無法檢查另一個作業系統是否讓它處於休眠狀態。",
   "disk.rereadWarning": "警告：核心未重新讀取分割表（{errno}）",
   "disk.unmounted": "已卸載",
   "disk.unmountedPath": "已卸載 {path}",

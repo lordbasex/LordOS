@@ -211,6 +211,7 @@ EOF
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
+    if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi

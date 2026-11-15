@@ -4,6 +4,8 @@
   "disk.cancelling": "Đang hủy",
   "disk.ejected": "Đã đẩy ra",
   "disk.erased": "Đã xóa sạch",
+  "disk.readOnlyHibernated": "{name} đã được gắn kết chỉ đọc: hệ điều hành kia chưa tắt hẳn (khởi động nhanh hoặc ngủ đông). Hãy tắt hẳn hệ điều hành đó để có thể ghi vào đó.",
+  "disk.readOnlyUnchecked": "{name} đã được gắn kết chỉ đọc: không thể kiểm tra hệ điều hành khác có để nó ở trạng thái ngủ đông hay không.",
   "disk.rereadWarning": "Cảnh báo: nhân hệ điều hành không đọc lại bảng phân vùng ({errno})",
   "disk.unmounted": "Đã gỡ gắn kết",
   "disk.unmountedPath": "Đã gỡ gắn kết {path}",

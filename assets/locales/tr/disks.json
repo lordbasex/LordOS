@@ -7,7 +7,7 @@
   "images": "Görüntüler",
   "systemShort": "sistem",
   "systemBadge": "Sistem diski",
-  "systemNote": "Bu sistem diskidir: LordOS onu buradan biçimlendirmenize, silmenize veya bağlantısını kesmenize izin vermez.",
+  "systemNote": "Bu sistem diskidir: LordOS onu biçimlendirmenize veya silmenize izin vermez. Bir yönetici boş bölümlerini bağlayabilir.",
   "adminNote": "Dahili diskleri yalnızca bir yönetici değiştirebilir.",
   "readOnlyNote": "Aygıt salt okunur.",
   "partNumber": "Bölüm {n}",

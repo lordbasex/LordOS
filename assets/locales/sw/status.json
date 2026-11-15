@@ -4,6 +4,8 @@
   "disk.cancelling": "Inaghairi",
   "disk.ejected": "Imetolewa",
   "disk.erased": "Imefutwa",
+  "disk.readOnlyHibernated": "{name} imepachikwa kwa kusoma tu: mfumo mwingine wa uendeshaji haukuzimwa kabisa (uwashaji wa haraka au hali ya kulala). Uzime kabisa ili uweze kuandika humo.",
+  "disk.readOnlyUnchecked": "{name} imepachikwa kwa kusoma tu: haikuwezekana kuangalia kama mfumo mwingine wa uendeshaji uliiacha katika hali ya kulala.",
   "disk.rereadWarning": "Onyo: kerneli haikusoma upya jedwali la vigawanyo ({errno})",
   "disk.unmounted": "Imeondolewa",
   "disk.unmountedPath": "{path} imeondolewa",

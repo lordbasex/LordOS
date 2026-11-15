@@ -7,7 +7,7 @@
   "images": "Image",
   "systemShort": "sistem",
   "systemBadge": "Disk sistem",
-  "systemNote": "Ini adalah disk sistem: LordOS tidak mengizinkan Anda memformat, menghapus, atau melepas kaitannya dari sini.",
+  "systemNote": "Ini adalah disk sistem: LordOS tidak mengizinkan Anda memformat atau menghapusnya. Administrator dapat me-mount partisinya yang bebas.",
   "adminNote": "Hanya administrator yang dapat mengubah disk internal.",
   "readOnlyNote": "Perangkat ini hanya-baca.",
   "partNumber": "Partisi {n}",

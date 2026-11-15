@@ -7,7 +7,7 @@
   "images": "Imagini",
   "systemShort": "sistem",
   "systemBadge": "Disc de sistem",
-  "systemNote": "Acesta este discul de sistem: LordOS nu vă permite să-l formatați, să-l ștergeți sau să-l demontați de aici.",
+  "systemNote": "Acesta este discul de sistem: LordOS nu vă permite să-l formatați sau să-l ștergeți. Un administrator poate monta partițiile lui libere.",
   "adminNote": "Doar un administrator poate modifica discurile interne.",
   "readOnlyNote": "Dispozitivul este doar în citire.",
   "partNumber": "Partiția {n}",
