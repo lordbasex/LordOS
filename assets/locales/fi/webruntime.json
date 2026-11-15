@@ -10,6 +10,7 @@
   "offline.body": "Tämä sovellus ei tavoittanut sivustoaan. Se yrittää itse uudelleen heti, kun verkko palaa.",
   "offline.hint": "Yritä nyt painamalla Ctrl+R.",
   "inspect.title": "Kehittäjätyökalut ovat päällä",
-  "inspect.body": "Kunnes suljet tämän ikkunan. Osoite:",
+  "inspect.body": "Ne avautuivat selaimeesi ja pysyvät päällä, kunnes suljet tämän ikkunan.",
+  "inspect.open": "Avaa selaimessa",
   "inspect.failed": "Kehittäjätyökaluja ei voitu käynnistää"
 }

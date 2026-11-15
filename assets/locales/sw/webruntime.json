@@ -10,6 +10,7 @@
   "offline.body": "Programu hii haikuweza kufikia tovuti yake. Itajaribu tena yenyewe mara mtandao utakaporudi.",
   "offline.hint": "Bonyeza Ctrl+R ili kujaribu sasa.",
   "inspect.title": "Zana za msanidi zimewashwa",
-  "inspect.body": "Hadi utakapofunga dirisha hili. Anwani:",
+  "inspect.body": "Zimefunguka kwenye kivinjari chako na zitaendelea kuwaka hadi utakapofunga dirisha hili.",
+  "inspect.open": "Fungua kwenye kivinjari",
   "inspect.failed": "Zana za msanidi hazikuweza kuanza"
 }

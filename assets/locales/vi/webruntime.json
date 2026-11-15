@@ -10,6 +10,7 @@
   "offline.body": "Ứng dụng này không thể truy cập trang của nó. Ứng dụng sẽ tự thử lại ngay khi mạng trở lại.",
   "offline.hint": "Nhấn Ctrl+R để thử ngay.",
   "inspect.title": "Công cụ nhà phát triển đang bật",
-  "inspect.body": "Cho đến khi bạn đóng cửa sổ này. Địa chỉ:",
+  "inspect.body": "Công cụ đã mở trong trình duyệt của bạn và vẫn bật cho đến khi bạn đóng cửa sổ này.",
+  "inspect.open": "Mở trong trình duyệt",
   "inspect.failed": "Không thể khởi động công cụ nhà phát triển"
 }

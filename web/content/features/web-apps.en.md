@@ -96,8 +96,9 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 *In development*, after 0.8.8.8, the latest release. Turn on **Developer mode** in Settings → Web Apps (one switch for every web app, off by default) and each web app window's Window menu gets **Inspect (developer tools)**. Choose it and LordOS asks first, every time: developer tools can see everything in that app, including messages and sessions. Say yes and that window opens again with WebKit's Web Inspector on, which opens in your browser: elements, console, network and storage of that one window.
 
-- **Only on your computer, only while the window lives.** The inspector listens on 127.0.0.1 only, on a free port picked each time, and ends when you close the window (even for an app that runs in the background) or turn Developer mode off. The next start is a normal one.
-- **Honest limit:** WebKit's inspector has no password, so while it is on any program on your computer can connect to it. That is why it is off by default, asked every time and limited to one window.
+- **Only on your computer, only while the window lives.** The inspector listens on 127.0.0.1 only and ends when you close the window (even for an app that runs in the background) or turn Developer mode off. The next start is a normal one.
+- **Only your own tab gets in.** Your browser opens a one-time address with a long random secret, which LordOS never shows in the notification; it gives that tab a private cookie and stops working. Every later request goes through a small gate in the app's process that checks the cookie and that the request comes from that same tab, so a web page open in your browser can't reach the inspector, not by scanning ports, over a WebSocket or by DNS rebinding. WebKit's own port is one that browsers refuse to open. If you close the tab, the notification's *Open in browser* opens it again.
+- **Honest limit:** WebKit's inspector itself has no password, so while it is on a program running on your computer (not a web page) can still connect to it directly. That is why it is off by default, asked every time and limited to one window.
 - **The page can't turn it on.** Only the menu, the question and the switch, which are LordOS's own, can.
 
 ## Performance

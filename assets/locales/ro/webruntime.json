@@ -10,6 +10,7 @@
   "offline.body": "Această aplicație nu și-a putut accesa site-ul. Va încerca din nou singură imediat ce rețeaua revine.",
   "offline.hint": "Apăsați Ctrl+R pentru a încerca acum.",
   "inspect.title": "Instrumentele pentru dezvoltatori sunt active",
-  "inspect.body": "Până închideți această fereastră. Adresă:",
+  "inspect.body": "S-au deschis în browser și rămân active până închideți această fereastră.",
+  "inspect.open": "Deschide în browser",
   "inspect.failed": "Instrumentele pentru dezvoltatori nu au putut porni"
 }

@@ -133,22 +133,33 @@ static int inspect_prepare(Web *w) {
     int on = text && webinspect_parse(text, len);
     free(text);
     if (!on) { fprintf(stderr, "lord-web: --inspect needs developer mode (Settings, Web Apps): not started\n"); return -1; }
-    /* WebKit refuses port 0: the kernel picks a free one, which WebKit binds right after (webinspect_listening checks
-     * that the socket on it is ours before the browser opens it) */
-    int s = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    struct sockaddr_in a = { .sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
-    socklen_t al = sizeof a;
+    /* WebKit refuses port 0, and its server has no authentication: the first free one of the ports every browser
+     * refuses to reach (webguard.h), which WebKit binds right after (webinspect_listening checks that the socket on it
+     * is ours before the browser is pointed at the proxy in front of it). WebKit's inspector server behind it takes
+     * a port of its own choosing (WEBKIT_INSPECTOR_SERVER doesn't move it in 2.48): docs/WEBAPPS.md says why a
+     * browser can't use it. */
     unsigned port = 0;
-    if (s >= 0 && !bind(s, (struct sockaddr *)&a, sizeof a) && !getsockname(s, (struct sockaddr *)&a, &al)) port = ntohs(a.sin_port);
-    if (s >= 0) close(s);
+    for (size_t i = 0; !port && i < WEBGUARD_BACKEND_NPORTS; i++) {
+        int s = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+        struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons((uint16_t)WEBGUARD_BACKEND_PORTS[i]), .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
+        if (s >= 0 && !bind(s, (struct sockaddr *)&a, sizeof a)) port = WEBGUARD_BACKEND_PORTS[i];
+        if (s >= 0) close(s);
+    }
     char addr[64];
-    if (webinspect_address(port, addr, sizeof addr) || setenv(WEBINSPECT_ENV, addr, 1)) {
+    if (!webguard_backend_port_ok(port) || webinspect_address(port, addr, sizeof addr) || setenv(WEBINSPECT_ENV, addr, 1)) {
         fprintf(stderr, "lord-web: no free port on " WEBINSPECT_HOST " for the developer tools: not started\n");
         return -1;
     }
     w->inspect_port = port;
-    fprintf(stderr, "lord-web: developer tools on %s for this window only\n", addr);
+    fprintf(stderr, "lord-web: developer tools: WebKit's inspector on %s for this window only\n", addr);
     return 0;
+}
+
+void web_inspect_open(Web *w) {
+    char url[128];
+    if (!w->inspect_proxy || webproxy_open_url(w->inspect_proxy, url, sizeof url)) return;
+    webbus_open_uri(w, url);
+    explicit_bzero(url, sizeof url);
 }
 
 #define INSPECT_TICK_MS 500
@@ -185,15 +196,13 @@ static gboolean inspect_tick(gpointer d) {
     g_free(tcp);
     if (r == 0 && ++w->inspect_tries < INSPECT_TRIES) return G_SOURCE_CONTINUE;
     w->inspect_timer = 0;
-    char url[64];
-    if (r == 1 && !webinspect_url(w->inspect_port, url, sizeof url)) {
-        fprintf(stderr, "lord-web: developer tools listen on %s: opened in the browser\n", url);
-        webbus_open_uri(w, url);
-        char body[256];
-        snprintf(body, sizeof body, "%s %s", weblang("inspect.body"), url);
-        webbus_notify_text(w, weblang("inspect.title"), body);
+    if (r == 1 && (w->inspect_proxy = webproxy_start(w->inspect_port))) {
+        fprintf(stderr, "lord-web: developer tools listen: opened in the browser\n");
+        web_inspect_open(w);
+        webbus_notify_inspect(w, weblang("inspect.title"), weblang("inspect.body"));
     } else {
-        fprintf(stderr, "lord-web: the developer tools' port %u %s: not opened\n", w->inspect_port, r < 0 ? "is someone else's" : "never listened");
+        fprintf(stderr, "lord-web: the developer tools' port %u %s: not opened\n", w->inspect_port,
+                r < 0 ? "is someone else's" : r == 1 ? "listens, but the gate in front of it couldn't" : "never listened");
         webbus_notify_text(w, weblang("inspect.failed"), "");
     }
     return G_SOURCE_REMOVE;

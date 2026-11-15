@@ -33,7 +33,6 @@ static int fmt(unsigned port, char *out, size_t n, const char *f) {
 }
 
 int webinspect_address(unsigned port, char *out, size_t n) { return fmt(port, out, n, WEBINSPECT_HOST ":%u"); }
-int webinspect_url(unsigned port, char *out, size_t n) { return fmt(port, out, n, "http://" WEBINSPECT_HOST ":%u/"); }
 
 static int ours(unsigned long inode, const unsigned long *inodes, int n) {
     for (int i = 0; inode && i < n; i++) if (inodes[i] == inode) return 1;

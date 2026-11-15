@@ -10,6 +10,7 @@
   "offline.body": "Ši programa nepasiekė savo svetainės. Ji bandys dar kartą pati, kai tik vėl atsiras tinklas.",
   "offline.hint": "Paspauskite Ctrl+R, kad bandytumėte dabar.",
   "inspect.title": "Kūrėjo įrankiai įjungti",
-  "inspect.body": "Kol uždarysite šį langą. Adresas:",
+  "inspect.body": "Jie atsidarė jūsų naršyklėje ir veiks, kol uždarysite šį langą.",
+  "inspect.open": "Atidaryti naršyklėje",
   "inspect.failed": "Nepavyko paleisti kūrėjo įrankių"
 }

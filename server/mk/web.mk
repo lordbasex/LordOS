@@ -10,11 +10,12 @@ WEB ?= $(shell pkg-config --exists $(WEB_PKGS) 2>/dev/null && echo 1 || echo 0)
 
 # the pure checks: argv, the registry, addresses and scope, the probe's answer, the icon check, download names, the wheel,
 # the unread count, the user agent, the notification sound, dropped files, pasted text and file lists, the Edit commands and context menu items, the color scheme,
-# the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page)
+# the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page),
+# the gate in front of the developer tools (webguard.h: the request head, Host, Origin, the one-time address and the cookie)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/web/webinspect.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/weblangid.h src/web/weboffline.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/sec/json.h
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)
@@ -39,7 +40,7 @@ WEB_CLIENT_C := $(filter %/xdg-shell-protocol.c %/xdg-decoration-unstable-v1-pro
                 $(filter %.c,$(WEB_GEN))
 
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c src/web/webshm.c src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
 WEB_HDR := src/web/web.h src/web/webwin.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only

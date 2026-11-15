@@ -460,17 +460,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     is refused, "invalid address"). So `lord.webapps.inspect(app, profile)` (desktop only, not in the broker) has
     lord-server end that app and profile's `lord-web` and start it again as `lord-web --app <app> --profile <profile>
     --inspect` (`webmgr_inspect`; `webargs.c` accepts `--inspect` only last, once, with an app). lord-web refuses
-    `--inspect` unless developer mode is on (it reads the file itself), has the kernel pick a free port on
-    `127.0.0.1`, hands WebKit `127.0.0.1:<port>`, turns the view's developer extras on, and checks that the port
-    listens from one of its own sockets (`/proc/self/net/tcp` against `/proc/self/fd`, `webinspect_listening`) before
-    it opens `http://127.0.0.1:<port>/` in the person's browser through OpenURI, with a notification that says the
-    tools are on and the address. The page lists that window's page; *Inspect* there opens WebKit's Web Inspector over
-    a WebSocket. Checked on the development machine against a headless lord-server: the off switch refuses
-    (`exit 2`), with it on lord-web listens only on 127.0.0.1 (the HTTP port and WebKit's own inspector server on
-    another random port), the target list names the page, `Main.html` loads, the WebSocket upgrade answers 101, and a
-    start without `--inspect` listens on nothing.
-  - *Limits:* WebKit's inspector server has no token or secret path, so while it is on any process on this computer
-    that can reach 127.0.0.1 can connect; that is why it is per window, asked every time, and ends with the window:
+    `--inspect` unless developer mode is on (it reads the file itself), hands WebKit `127.0.0.1:<port>` with a port
+    browsers refuse to reach (below), turns the view's developer extras on, and checks that the port listens from one
+    of its own sockets (`/proc/self/net/tcp` against `/proc/self/fd`, `webinspect_listening`) before it opens its gate's
+    one-time address in the person's browser through OpenURI, with a notification that says the tools are on, without
+    the address, and whose action (*Open in browser*) opens them again. The page lists that window's page; *Inspect*
+    there opens WebKit's Web Inspector over a WebSocket. Checked on the development machine against a headless
+    lord-server: the off switch refuses (`exit 2`), with it on lord-web listens only on 127.0.0.1 (the gate, WebKit's
+    HTTP port and WebKit's own inspector server on another random port), the target list names the page, `Main.html`
+    loads, the WebSocket upgrade answers 101, and a start without `--inspect` listens on nothing.
+  - *The gate* (after a security review: WebKit's inspector server has no authentication, and a web page open in
+    the person's browser could have reached `127.0.0.1:<port>` by scanning ports, over a WebSocket, which no CORS rule
+    stops, or through DNS rebinding, then read the web app's page, for example its messages, and run script in it):
+    - WebKit's HTTP server now listens on one of 15 ports of the browsers' "bad port" list (WHATWG Fetch: 6665–6669,
+      6697, 10080, 1719, 1720, 1723, 3659, 4045, 5060, 5061, 6566; `WEBGUARD_BACKEND_PORTS`). Chrome, Chromium and
+      Firefox refuse every navigation, `fetch`, image and WebSocket to them, so no page reaches it. X11's 6000 and NFS's
+      2049 are left out, and 4190 and 6679 too: on the spec's list, but Chromium 156 connected to them in our test.
+    - The browser is pointed only at lord-web's own gate (`server/src/web/webproxy.c`, checks in `webguard.c`): a
+      listening socket on another port of 127.0.0.1 in lord-web's GLib loop (no thread, no other process, no new
+      library, nothing executed). It forwards one request per connection, or one WebSocket upgrade, to WebKit only when
+      the head is complete within 10 s, at most 16 KB, well formed (CRLF lines, no control bytes, no folded lines, a
+      `GET` in HTTP/1.1 with no body); `Host` is exactly `127.0.0.1:<port>` or `localhost:<port>` (DNS rebinding);
+      `Origin`, if any, is the gate's own (`http://127.0.0.1:<port>` or `http://localhost:<port>`); `Sec-Fetch-Site`,
+      if any, is `same-origin` or `none` (a page on another port of this computer is the same *site* for cookies); and
+      the request carries the window's cookie `lordos-inspect-<port>`. Anything else is a 403 and the connection closes.
+    - The cookie (32 random bytes from `getrandom`, base64url, compared in constant time) is set only by the one-time
+      address `http://127.0.0.1:<port>/<secret>/` (another 32 random bytes) that OpenURI is handed: it answers a
+      redirect to `/` with `HttpOnly; SameSite=Strict; Path=/` and then no longer works, so the address in the
+      browser's history is dead; the notification's action makes a new one. A cookie, not the secret in every path,
+      because WebKit's inspector pages build their WebSocket address from `location.host` and an absolute path
+      (`Main.html?ws=` + `location.host` + `/socket/1/1/WebPage`), and the browser sends the cookie on it too.
+    - A plain request goes to WebKit with `Connection: close` and nothing the browser sends after it (a browser may
+      reuse a connection for another page's request, so each one is checked on a connection of its own); a WebSocket's
+      bytes go both ways only after WebKit answers 101. At most 16 connections; a plain answer must end within 60 s.
+    - Checked end to end with lord-web, WPE 2.48.3 and headless Chromium 156 driven over the DevTools protocol: the
+      one-time address leads to the target list, the inspector's WebSocket opens through the gate and runs script in
+      the app's page; the address then answers 403; a page on another port of 127.0.0.1 opened no WebSocket to the gate
+      or to WebKit's port and read nothing; a rebinding name (`rebind.test` mapped to 127.0.0.1) got 403; curl
+      confirmed every refusal, the bounds and the 16-connection limit. The notification no longer shows any address.
+  - *Limits:* WebKit's own ports still have no token or secret path, and WPE 2.48 accepts only `<ip>:<port>` for them
+    (no unix socket), so while it is on any process on this computer that can reach 127.0.0.1 can connect to them
+    directly (a browser page can't: above); WebKit's second listener, its inspector server on a random port, speaks
+    its own length-prefixed protocol, not HTTP, so a browser's request can't be a message there (no answer, no memory
+    growth, checked). That is why it is per window, asked every time, and ends with the window:
     closing a window with developer tools on ends its lord-web even for an app that runs in the background, the next
     start is a normal one, and turning developer mode off ends every window that has them. A second *Inspect* on that
     window only brings it forward (the item is checked and unavailable while they are on). The page never gets a way
@@ -480,10 +512,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `lord.webapps.setDeveloperMode` (the folder is in `fsops_protected`); a missing or invalid file is off. New
     `lord.webapps` calls: `developerMode()`, `setDeveloperMode(on)`, `inspect(app, profile)`; `running()` says which
     windows have developer tools (`inspect`). New error code `webapps.developerOff`.
-  - *Texts:* `webapps.inspect.*`, `webapps.settings.developer*`, lord-web's own `inspect.title`, `inspect.body` and
-    `inspect.failed`, in all 35 languages.
+  - *Texts:* `webapps.inspect.*`, `webapps.settings.developer*`, lord-web's own `inspect.title`, `inspect.body` ("They
+    opened in your browser and stay on until you close this window.", no address), `inspect.open` (the notification's
+    *Open in browser*) and `inspect.failed`, in all 35 languages.
   - *Tests:* `tests/webapp_test.c` (argv with `--inspect`, the switch's file, the address, who listens on the port:
-    ours, nobody yet, another process's socket, ours on every address, another listener on the same port),
+    ours, nobody yet, another process's socket, ours on every address, another listener on the same port; the gate:
+    the backend ports, base64url, the head's end and its 16 KB bound, the one-time address (exact, once, a letter off at
+    either end), the cookie among others and every wrong form of it, Host, Origin and Sec-Fetch-Site in all their
+    refused forms, the WebSocket upgrade, POST, bodies, HTTP/1.0, bare LF, folded lines, control and NUL bytes, the
+    rewritten head, the replies and the 101 check),
     `tests/webreg_test.c` (refused while off or with an invalid file, the profile checked first, the old process
     ended and a new one started with `--inspect`, a second Inspect only shows it, off ends it and not the other
     profile) and `tests/webapps_model_test.mjs` (the Window menu item: only with developer mode on, checked while on,

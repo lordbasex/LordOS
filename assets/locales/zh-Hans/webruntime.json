@@ -10,6 +10,7 @@
   "offline.body": "此应用无法访问其网站。网络恢复后它会自动重试。",
   "offline.hint": "按 Ctrl+R 立即重试。",
   "inspect.title": "开发者工具已打开",
-  "inspect.body": "直到你关闭此窗口。地址：",
+  "inspect.body": "已在你的浏览器中打开，在你关闭此窗口前一直保持开启。",
+  "inspect.open": "在浏览器中打开",
   "inspect.failed": "无法启动开发者工具"
 }

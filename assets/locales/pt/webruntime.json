@@ -10,6 +10,7 @@
   "offline.body": "Este app não conseguiu acessar o site. Ele tentará de novo sozinho assim que a rede voltar.",
   "offline.hint": "Pressione Ctrl+R para tentar agora.",
   "inspect.title": "Ferramentas de desenvolvedor ativadas",
-  "inspect.body": "Até você fechar esta janela. Endereço:",
+  "inspect.body": "Elas abriram no seu navegador e ficam ativas até você fechar esta janela.",
+  "inspect.open": "Abrir no navegador",
   "inspect.failed": "Não foi possível iniciar as ferramentas de desenvolvedor"
 }

@@ -8,7 +8,8 @@
  *                 shared memory), keyboard, pointer, touch, the clipboard, the input method (webshm.c: the pieces that
  *                 read wpebackend-fdo's own buffers)
  *   webbus.c      the session bus: notifications, the OpenURI and FileChooser portals, org.lordos.WebApps1.Ask
- *   webmain.c     also --inspect: WebKit's remote inspector on 127.0.0.1 for this window only (webinspect.h)
+ *   webmain.c     also --inspect: WebKit's remote inspector on 127.0.0.1 for this window only (webinspect.h), behind
+ *                 webproxy.c's gate (webguard.h: a one-time address, then a cookie; Host and Origin checked)
  *   webtray.c     the StatusNotifierItem of an app that keeps running in the background (when its "tray" is on)
  *   webdark.c     the desktop's light or dark mode: the page's prefers-color-scheme through matchMedia (webscheme.js),
  *                 the view's background while a page loads
@@ -36,6 +37,7 @@
 #include "webedit.h"
 #include "webscheme.h"
 #include "webinspect.h"
+#include "webguard.h"
 
 #include <limits.h>
 #include <sys/types.h>
@@ -45,6 +47,7 @@
 
 typedef struct WebWin WebWin;
 typedef struct WebTray WebTray;
+typedef struct WebProxy WebProxy;
 
 typedef struct {
     WebArgs args;
@@ -80,9 +83,11 @@ typedef struct {
     guint offline_timer;                /* the next try, or 0 */
     int offline_retrying;               /* a try's load is under way */
     int offline_page;                   /* lord-web's own "No connection" page is in the window */
-    unsigned inspect_port;              /* --inspect: WebKit's inspector on 127.0.0.1:<port> (webinspect.h), else 0 */
+    unsigned inspect_port;              /* --inspect: WebKit's inspector on 127.0.0.1:<port>, a port browsers refuse (webguard.h), else 0 */
     guint inspect_timer;                /* waiting for that port to listen before the browser opens it, or 0 */
     int inspect_tries;
+    WebProxy *inspect_proxy;            /* the gate the browser goes through (webproxy.c), once WebKit's port listens */
+    guint32 inspect_note;               /* the "Developer tools are on" notification (its action opens them again), or 0 */
     int quitting;
     int exit_code;
 } Web;
@@ -154,6 +159,8 @@ void webbus_ask(Web *w, int kind, WebAskDone cb, void *data);
 void webbus_open_uri(Web *w, const char *uri);
 void webbus_notify(Web *w, WebKitNotification *n);
 void webbus_notify_text(Web *w, const char *summary, const char *body);
+/* the developer tools' notification: its action ("default") calls web_inspect_open; its id in w->inspect_note */
+void webbus_notify_inspect(Web *w, const char *summary, const char *body);
 void webbus_set_badge(Web *w, unsigned count);           /* org.lordos.WebApps1.SetBadge, no answer awaited */
 void webbus_choose_files(Web *w, WebKitFileChooserRequest *req);
 /* org.lordos.WebApp1.Edit(command) from sender: run only once the bus says sender is w->server_pid's */
@@ -181,6 +188,13 @@ int webprobe_icon_run(Web *w);
 /* webmain.c */
 /* --inspect: once WebKit's inspector listens on w->inspect_port from this process, the person's browser opens it */
 void web_inspect_watch(Web *w);
+/* opens the developer tools in the person's browser through OpenURI with a new one-time address (webguard.h) */
+void web_inspect_open(Web *w);
+
+/* webproxy.c: the gate in front of WebKit's inspector on 127.0.0.1:<backend> (webguard.h); NULL when it can't listen */
+WebProxy *webproxy_start(unsigned backend);
+/* a new one-time secret and its address, http://127.0.0.1:<proxy port>/<secret>/; 0, or -1 */
+int webproxy_open_url(WebProxy *px, char *out, size_t n);
 const char *web_self_dir(void);                          /* the folder of /proc/self/exe */
 /* reads the app's registry file again (lord-server stores a permission's answer there); kept as it was when the new
  * file isn't valid or is for another app or profile */

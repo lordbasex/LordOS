@@ -10,6 +10,7 @@
   "offline.body": "Aplikasi ini tidak dapat menjangkau situsnya. Aplikasi akan mencoba lagi sendiri begitu jaringan kembali.",
   "offline.hint": "Tekan Ctrl+R untuk mencoba sekarang.",
   "inspect.title": "Alat developer aktif",
-  "inspect.body": "Sampai Anda menutup jendela ini. Alamat:",
+  "inspect.body": "Alat ini terbuka di browser Anda dan tetap aktif sampai Anda menutup jendela ini.",
+  "inspect.open": "Buka di browser",
   "inspect.failed": "Alat developer tidak dapat dimulai"
 }

@@ -10,6 +10,7 @@
   "offline.body": "This app couldn't reach its site. It will try again by itself as soon as the network is back.",
   "offline.hint": "Press Ctrl+R to try now.",
   "inspect.title": "Developer tools are on",
-  "inspect.body": "Until you close this window. Address:",
+  "inspect.body": "They opened in your browser and stay on until you close this window.",
+  "inspect.open": "Open in browser",
   "inspect.failed": "Developer tools couldn't start"
 }
