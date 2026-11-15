@@ -282,7 +282,9 @@ head: `screendump file.ppm vga 1` in `qm monitor 118`.
   with a Radeon RX 580 (amdgpu) and three monitors, DisplayPort among them. That PC brought 0.8.8.6's
   fixes (the login screen on the chosen main display, the cursor plane at the driver's size, `GPU.md`) and
   0.8.8.7's hand-off with a black frame and CLOSEFB, so the displays keep their signal across lock,
-  logout and login (`SESSIONS.md`). Other cards, laptop panels with EDID sizes (the recommended scale),
+  logout and login (`SESSIONS.md`). That PC has been the author's daily LordOS machine since 2026-11-07.
+  The community hardware reports (`HARDWARE-REPORT.md`) add laptop panels and one HDMI monitor on a
+  Radeon RX 9060 XT. Other cards, laptop panels with EDID sizes (the recommended scale),
   DisplayPort MST and cards with fewer CRTCs than connectors are untested.
 - **Mirror with one CRTC driving two connectors** (hardware cloning) is not used: each mirrored
   display has its own CRTC and frame.

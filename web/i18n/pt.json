@@ -20,7 +20,7 @@
   "navCommunity": "Comunidade",
   "navBlog": "Blog",
   "navAbout": "Sobre",
-  "badge": "Versão 0.8.8 · Beta",
+  "badge": "Versão {version} · Beta",
   "heroTitle": "O desktop Linux livre, rápido e seguro.",
   "heroLead": "LordOS é uma distribuição GNU/Linux livre baseada no Debian com ambiente de desktop, servidor gráfico e compositor Wayland próprios, escritos em C, motor de interface próprio e apps nativos pensados para ser calmos, claros e privados.",
   "ctaDownload": "Baixar LordOS",
