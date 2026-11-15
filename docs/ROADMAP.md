@@ -828,6 +828,15 @@ Besides the two items below, the work in development is listed in `CHANGELOG.md`
   - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
     second step after mounting by hand).
 
+- [ ] **Later: languages of countries that already meet the visits rule (November 2026)** (`LANGUAGES.md`,
+  "Languages that already meet the rule"): Norwegian Bokmål (`nb`), Czech (`cs`), Sinhala (`si`), Hebrew (`he`),
+  Serbian (`sr`), Slovak (`sk`), Nepali (`ne`), Burmese (`my`), Croatian (`hr`), Kinyarwanda (`rw`), Khmer (`km`),
+  Slovenian (`sl`), Danish (`da`), Estonian (`et`), Uzbek (`uz`), Kazakh (`kk`) and Tamil (`ta`: India, Sri Lanka,
+  Singapore). Added when people ask for them or in coming pre-releases (maintainer's decision 2026-11-15, no release
+  fixed), each one complete at 100 % (every key, `meta.json`, plural rule, `format.json`), never partial. Hebrew is
+  right to left; Burmese, Khmer, Sinhala and Tamil need their script, font and shaping checked in the engine
+  (fallback fonts, `shape-test` and `tests/hb_compare.py` against HarfBuzz, line breaking) with real screenshots.
+
 - [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
   instead of reading each frame back and converting it.
 - [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint

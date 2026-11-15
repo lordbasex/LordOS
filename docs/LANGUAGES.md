@@ -296,6 +296,19 @@ Same folder as the others: `meta.json`, `format.json` (glibc 2.41 and CLDR 45), 
   `languageOfLocale` does (`weblang_id` in `server/src/web/weblangid.h`, tested in `server/tests/webapp_test.c`).
 - **Fonts.** All three use the Latin script: Inter.
 
+#### Languages that already meet the rule (later)
+
+With lordos.org's visits up to 2026-11-15 (people only; the statistics start on 2026-11-11), 96 countries had at
+least 5 distinct visitors, and 16 of them speak a main language LordOS doesn't have yet: Norway (`nb`, 21), Czechia
+(`cs`, 18), Sri Lanka (`si`, 16, and Tamil), Israel (`he`, 15), Serbia (`sr`, 13), Slovakia (`sk`, 10), Nepal (`ne`,
+9), Myanmar (`my`, 8), Croatia (`hr`, 8), Rwanda (`rw`, 8), Cambodia (`km`, 7), Slovenia (`sl`, 7), Denmark (`da`, 6),
+Estonia (`et`, 6), Uzbekistan (`uz`, 6) and Kazakhstan (`kk`, 5). Tamil (`ta`) is spoken in India, Sri Lanka and
+Singapore. The maintainer's decision (2026-11-15): the 35 languages already done stay as they are, and these 17 are
+added when people ask for them or in coming pre-releases, comparing the countries that visit with the languages
+LordOS has, each one complete (`ROADMAP.md`). The Languages page on lordos.org lists every visiting country and
+says more languages come that way. Hebrew is right to left; Burmese, Khmer, Sinhala and Tamil need their script,
+font and shaping checked first.
+
 ## Privileged helper (`lord-admin`)
 
 Whatever needs root is done by a small process that `lord-server` creates before dropping

@@ -32,7 +32,7 @@ Estos componentes están en el repositorio de LordOS (`third_party/` y `assets/`
 | JetBrains Mono | texto de la terminal y del código | SIL Open Font License 1.1 |
 | DB-IP Lite Country | búsqueda de IP a país sin conexión en Monitor | CC BY 4.0, geolocalización IP de [DB-IP](https://db-ip.com) |
 | Natural Earth | el mapa del mundo de Monitor | dominio público |
-| flag-icons (35 banderas de países) | las tarjetas de idioma de la página Idiomas de este sitio | MIT ([texto de la licencia](/licenses/flag-icons-MIT.txt)) |
+| flag-icons (42 banderas de países) | las tarjetas de idioma y el gráfico de visitas de la página Idiomas de este sitio | MIT ([texto de la licencia](/licenses/flag-icons-MIT.txt)) |
 | Unicode Character Database y CLDR | composición de texto, texto bidireccional, nombres de emoji | Unicode License v3 |
 
 ## Paquetes de Debian

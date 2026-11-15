@@ -451,6 +451,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Languages that already meet the visits rule, and the Store's Chromium-based browsers, in the docs and the
+  paper** (2026-11-15). With lordos.org's statistics up to 15 November 2026 (people only), 96 countries have at least
+  5 distinct visitors, and 16 of them speak a main language LordOS doesn't have: Norwegian (`nb`), Czech (`cs`),
+  Sinhala (`si`), Hebrew (`he`), Serbian (`sr`), Slovak (`sk`), Nepali (`ne`), Burmese (`my`), Croatian (`hr`),
+  Kinyarwanda (`rw`), Khmer (`km`), Slovenian (`sl`), Danish (`da`), Estonian (`et`), Uzbek (`uz`) and Kazakh (`kk`),
+  plus Tamil (`ta`: India, Sri Lanka, Singapore). By the maintainer's decision they are added when people ask for
+  them or in coming pre-releases, each one complete, with no release fixed: `docs/LANGUAGES.md` ("Languages that
+  already meet the rule") lists them with each country's visitors, and `docs/ROADMAP.md` has a "Later" item under
+  0.8.9 (Hebrew is right to left; Burmese, Khmer, Sinhala and Tamil need their script, font and shaping checked in
+  the engine). The paper (en, es, pt; still edition 0.8.8.9 Beta, 2026-11-15) says so in §4.4, and §5.3, the
+  in-development summary and the version table say that Chrome, Brave and Edge from the Store start new profiles
+  with LordOS's GTK theme and their own title bar (`docs/PACKAGES.md`, "Browser defaults"), tested with fixtures,
+  not yet with the real browsers. `docs/PAPER-VALIDATION.md` has a row for each.
+
 - **Docs, paper and help synced with what is built and with the hardware reports** (maintainer's request, 2026-11-15:
   no claim that isn't true or that has been overtaken, and the hardware comparison referenced wherever hardware is
   discussed). Every statement about real hardware now points to `docs/HARDWARE-REPORT.md` (22 physical machines:
@@ -620,6 +634,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   0.8.8 images) and `docs/COMPLIANCE.md`.
 
 ### Website
+
+- **lordos.org's Languages page: a colour per country, every visiting country, and more languages to come**
+  (maintainer's decisions, 2026-11-15), in English, Spanish and Portuguese.
+  - **Chart colours.** The visits donut (`web/build.mjs`, `web/src/site.css`) gives each of the 20 countries its own
+    colour from the classic 20-colour categorical palette, the one CloudWatch's charts use (`.lg-c0` … `.lg-c19`:
+    #1f77b4, #ff7f0e, #2ca02c, #d62728, #9467bd, #8c564b, #e377c2, #7f7f7f, #bcbd22, #17becf and their ten light
+    pairs), the same in light and dark, instead of one brand hue fading by rank; "Other countries" keeps the neutral
+    `--chip-line` token; a 1px stroke in the page background (`--bg`, light and dark) separates the slices, so the
+    thin and the pale ones stay apart from each other and from the page. The legend's swatches use the same classes.
+  - **Every country.** Below the chart, "All 153 countries, by page views" (new `visitsAll` in
+    `web/i18n/pages.json`) opens a `<details>` list, with no script, of every country in
+    `web/content/visits-by-country.json`: its flag where `web/src/flags` has one, its name in the page's language
+    (`Intl.DisplayNames`) and its page views, in columns that wrap on a phone (`.lg-all`). It replaces the visually
+    hidden table, which held only the chart's 21 rows (`visitsCountry`, `visitsViews` and `visitsVisitors` removed).
+    The donut stays the top 20 and one "Other countries (133)" slice.
+  - **Seven more flags.** Mexico, Portugal, the United Kingdom, Canada, Colombia, Chile and Singapore, among the top
+    20 by visits, had no flag in the legend: their SVGs come from the same flag-icons set (MIT, `flags/4x3`),
+    downloaded one by one into an empty folder, reviewed (no scripts, no external references: only `#id` links
+    inside each file and the SVG namespaces) and copied unchanged into `web/src/flags/` (42 now). Every country with
+    a flag file shows it, in the legend and in the full list. `web/src/flags/LICENSE` and the Licenses page's
+    flag-icons row (en, es, pt) say 42 flags, used by the cards and the visits chart.
+  - **More languages.** The rule stays as published (5 people from a country where a language is spoken within 30
+    days, or the community asks). "How new languages are chosen" (`chooseText2`) now ends saying more languages will
+    be added when people ask for them, or in coming pre-releases, comparing the countries that visit lordos.org with
+    the languages LordOS has; the "Request a language" link stays as it was.
+  - **Chromium-based browsers from the Store.** The Linux apps feature page (`web/content/features/linux-apps.*.md`)
+    says that in development for 0.8.8.9, Chrome, Brave and Edge installed from the Store start like the
+    preinstalled Chromium, with LordOS's GTK theme and their own title bar, only in new profiles.
 
 - **lordos.org synced with the hardware reports and with what is in development** (2026-11-15), in English, Spanish
   and Portuguese. The hardware page says it holds the reference machines and the first accepted community report,
