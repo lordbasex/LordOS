@@ -706,7 +706,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Files: New Folder goes in the selected folder in the column and list views**
   ([#134](https://github.com/lordbasex/LordOS/issues/134), thanks to MacNB). The toolbar button, File → New Folder,
   the empty-space menu and ❖⇧N always made the folder in the place shown (the first column, or the list's top
-  folder), even with a folder picked in a deeper column or selected inside an unfolded one. Now it goes where Finder
+  folder), even with a folder picked in a deeper column or selected inside an unfolded one. Now it goes where a desktop file manager
   puts it: in the column view, in the last column's folder (the folder picked there, or the folder of the file
   picked); in the list, in the selected folder (unfolded so its name can be typed) or in the folder the selected items
   are in; in the icon and gallery views, which show one folder, and with nothing selected, in the folder shown. It is
@@ -719,7 +719,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ([#133](https://github.com/lordbasex/LordOS/issues/133), thanks to MacNB). Since 0.8.8.8 (#99) the column view
   showed only the last columns that fit next to the preview, so widening a column or opening a subfolder dropped the
   first ones out of the view with no way to reach them. Every column is now drawn, side by side, and when they don't
-  fit they scroll sideways, as in Finder: a sideways swipe or tilt of the wheel, or the bar along the bottom edge.
+  fit they scroll sideways, as in other column views: a sideways swipe or tilt of the wheel, or the bar along the bottom edge.
   Opening a deeper folder scrolls to it with the preview in sight; widening a column keeps the scroll, so the first
   columns stay where they are. The preview takes what is left of the view, at least 200 px (`colStrip`, replacing
   `colsThatFit`). Back also left the column view: a click in a column was no step in the history, so Back went to the
@@ -728,7 +728,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`chainStep`, `historyStep`; leaving a place keeps its columns for Back). The view stays left to right in every
   language. Tested in `server/tests/files_colview_test.mjs` and in the scene `server/tests/files_colview_scene.mjs`
   (five columns drawn where 0.8.8.8 kept one). Not checked on screen yet. MacNB's other suggestion in
-  the issue (← → to the parent or child folder and ↑ ↓ in the column, as in Finder) is not part of this change.
+  the issue (← → to the parent or child folder and ↑ ↓ in the column, as other column views do) is not part of this change.
 - **A tablet's volume buttons change the volume** (issue [#131](https://github.com/lordbasex/LordOS/issues/131),
   thanks to Touchgg, on a Chuwi Hi12 and a Teclast X98 Pro). lord-sessiond and lord-server opened only full
   keyboards (with A and Enter), mice and tablets, so the `gpio-keys` node that carries a Cherry Trail tablet's volume
