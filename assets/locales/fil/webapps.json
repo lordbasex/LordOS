@@ -202,6 +202,7 @@
   "appearance.lightHint": "Laging light ang sinasabi sa site, anuman ang mode ng LordOS.",
   "appearance.darkHint": "Laging dark ang sinasabi sa site, anuman ang mode ng LordOS.",
   "appearance.footer": "Ang light o dark na kagustuhang binabasa ng site lang ang nagbabago; hindi kailanman binabago ng LordOS ang site mismo. May ilang site na nananatiling light pa rin, at sinusunod ng site na may sariling theme setting ang setting na iyon.",
+  "appearance.later": "Darating ang light at dark bawat app kasama ang bagong web engine ng LordOS (WPEPlatform), na nililipatan namin. Sa ngayon, sinusunod ng bawat web app ang mode ng LordOS, at pinapanatili ng site na may sariling setting ng tema (gaya ng WhatsApp) ang setting nito.",
   "identity.title": "Pagkakakilanlan ng browser",
   "identity.label": "Magpakilala bilang",
   "identity.chrome": "Chrome sa Linux + LordOS",

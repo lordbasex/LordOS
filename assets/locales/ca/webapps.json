@@ -202,6 +202,7 @@
   "appearance.lightHint": "Al lloc sempre se li diu clar, sigui quin sigui el mode de LordOS.",
   "appearance.darkHint": "Al lloc sempre se li diu fosc, sigui quin sigui el mode de LordOS.",
   "appearance.footer": "Només canvia la preferència de clar o fosc que llegeix el lloc; LordOS no modifica mai el lloc en si. Alguns llocs es queden clars igualment, i un lloc amb un ajust de tema propi segueix aquest ajust.",
+  "appearance.later": "El clar i el fosc per app arriben amb el nou motor web de LordOS (WPEPlatform), al qual estem migrant. De moment cada app web segueix el mode de LordOS, i un lloc amb el seu propi ajust de tema (WhatsApp, per exemple) el manté.",
   "identity.title": "Identitat del navegador",
   "identity.label": "Identifica’t com a",
   "identity.chrome": "Chrome a Linux + LordOS",

@@ -114,7 +114,9 @@ function AppDetails({ entry }) {
     const id = setInterval(() => { if (!siteIconBusy(entry.id)) { clearInterval(id); setIconBusy(false); } }, 1000);
   };
   const sounds = M.NOTIFY_SOUNDS.map((v) => [v, tr(`webapps.sound.${v}`)]);
-  const schemes = M.COLOR_SCHEMES.map((v) => [v, tr(`webapps.appearance.${v}`)]);
+  // Light and Dark are shown but unavailable until WPEPlatform (webappsmodel.js, COLOR_SCHEMES_AVAILABLE)
+  const schemes = M.COLOR_SCHEMES.map((v) => [v, tr(`webapps.appearance.${v}`), !M.COLOR_SCHEMES_AVAILABLE.includes(v)]);
+  const scheme = M.shownColorScheme(entry);
   const identities = M.USER_AGENTS.map((v) => [v, tr(`webapps.identity.${v}`)]);
   const one = entry.profiles.length < 2;
   const [msg, setMsg] = useState(null);
@@ -169,9 +171,9 @@ function AppDetails({ entry }) {
           <Toggle on={!!entry.tray} onChange={(on) => call('setTray', entry.id, on)} />
         </SettingRow>
       </Section>
-      <Section footer={tr('webapps.appearance.footer')}>
-        <SettingRow label={tr('webapps.appearance.title')} hint={tr(`webapps.appearance.${M.colorSchemeOf(entry)}Hint`)}>
-          <Segmented small value={M.colorSchemeOf(entry)} options={schemes} onChange={(v) => call('setColorScheme', entry.id, v)} />
+      <Section footer={tr(M.COLOR_SCHEMES_AVAILABLE.length < M.COLOR_SCHEMES.length ? 'webapps.appearance.later' : 'webapps.appearance.footer')}>
+        <SettingRow label={tr('webapps.appearance.title')} hint={tr(`webapps.appearance.${scheme}Hint`)}>
+          <Segmented small value={scheme} options={schemes} onChange={(v) => call('setColorScheme', entry.id, v)} />
         </SettingRow>
       </Section>
       <Section title={tr('webapps.identity.title')} footer={tr('webapps.identity.footer')}>

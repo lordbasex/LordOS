@@ -15,7 +15,13 @@
  *
  * Each app's "Appearance" (the registry's colorScheme, webreg.h: auto, light or dark; Settings → Web apps and the app
  * menu) picks which of the two words lord-server sends that app: the desktop's for auto, else always its own. lord-web
- * itself never reads that key for this: it only applies the word it gets, so a change reaches open windows at once. */
+ * itself never reads that key for this: it only applies the word it gets, so a change reaches open windows at once.
+ *
+ * For now that per-app choice is off (WEBSCHEME_PER_APP 0): WPE 2.48's legacy API can't set prefers-color-scheme for
+ * CSS, so a site that picks its theme with CSS (WhatsApp) never saw it and the choice only half worked. Until the move
+ * to WPEPlatform (docs/ROADMAP.md, "Before 1.0") every app gets the desktop's word: a stored light or dark is read as
+ * auto (the key is still parsed, kept and written; nothing rewrites the user's file), and Settings shows Automatic
+ * with Light and Dark unavailable. Setting WEBSCHEME_PER_APP to 1 brings it back. */
 #ifndef LORD_WEB_WEBSCHEME_H
 #define LORD_WEB_WEBSCHEME_H
 
@@ -34,8 +40,12 @@ enum { WEBSCHEME_LIGHT = 0, WEBSCHEME_DARK = 1 };
 int         webscheme_parse(const char *name);      /* WEBSCHEME_LIGHT or WEBSCHEME_DARK for exactly "light" or "dark", else -1 */
 const char *webscheme_name(int scheme);             /* "light" or "dark", NULL for anything else */
 int         webscheme_from_env(const char *value);  /* the environment's value: dark only for exactly "dark" */
+/* Per-app light and dark (the registry's colorScheme): 0 until WPEPlatform, see above. */
+#define WEBSCHEME_PER_APP 0
+
 /* The scheme lord-server tells one app: pref is its WEBREG_SCHEME_* (auto, light, dark), desktop the desktop's
- * WEBSCHEME_* or -1 when not known yet. auto (or anything else) gives desktop as it is, light and dark themselves. */
+ * WEBSCHEME_* or -1 when not known yet. auto (or anything else) gives desktop as it is; light and dark themselves
+ * only with WEBSCHEME_PER_APP, else they are auto too. */
 int         webscheme_for_app(int pref, int desktop);
 /* the user script: js (webscheme.js, a function expression) called with the hook's name and the scheme. key must be
  * WEBSCHEME_KEY_LEN lowercase hex digits. Malloc'd, or NULL for a bad key or scheme. */

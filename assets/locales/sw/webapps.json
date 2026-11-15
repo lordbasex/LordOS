@@ -202,6 +202,7 @@
   "appearance.lightHint": "Tovuti huambiwa angavu kila wakati, bila kujali hali ya LordOS.",
   "appearance.darkHint": "Tovuti huambiwa nyeusi kila wakati, bila kujali hali ya LordOS.",
   "appearance.footer": "Ni mapendeleo ya angavu au nyeusi ambayo tovuti husoma pekee yanayobadilika; LordOS haibadilishi kamwe tovuti yenyewe. Baadhi ya tovuti hubaki angavu hata hivyo, na tovuti yenye mpangilio wake wa mandhari hufuata mpangilio huo.",
+  "appearance.later": "Mwanga na giza kwa kila programu vitakuja na injini mpya ya wavuti ya LordOS (WPEPlatform), tunayohamia. Kwa sasa kila programu ya wavuti hufuata hali ya LordOS, na tovuti yenye mpangilio wake wa mandhari (kwa mfano WhatsApp) huubaki nao.",
   "identity.title": "Utambulisho wa kivinjari",
   "identity.label": "Jitambulishe kama",
   "identity.chrome": "Chrome kwenye Linux + LordOS",

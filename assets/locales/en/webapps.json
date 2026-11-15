@@ -202,6 +202,7 @@
   "appearance.lightHint": "The site is always told light, whatever LordOS’s mode.",
   "appearance.darkHint": "The site is always told dark, whatever LordOS’s mode.",
   "appearance.footer": "Only the light or dark preference the site reads changes; LordOS never modifies the site itself. Some sites stay light anyway, and a site with a theme setting of its own follows that setting.",
+  "appearance.later": "Light and dark per app arrive with LordOS’s new web engine (WPEPlatform), which we’re moving to. For now each web app follows LordOS’s mode, and a site with its own theme setting (WhatsApp, for example) keeps it.",
   "identity.title": "Browser identity",
   "identity.label": "Identify as",
   "identity.chrome": "Chrome on Linux + LordOS",

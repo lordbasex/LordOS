@@ -86,7 +86,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 **The honest limit:** WPE WebKit 2.48 gives LordOS no way to set the page's color scheme itself, so a page that chooses its colors only through CSS (`@media (prefers-color-scheme: dark)` rules) stays light until a newer WebKit allows it. Such sites usually have a theme setting of their own: choose Dark there. The Store's page of an app says so when it is known.
 
-**Each app's own Appearance** (*in development*, after 0.8.8.8, the latest release): Automatic (the default, it follows LordOS as above), Light or Dark, chosen per web app in Settings → Web Apps or in the app menu's *Appearance* while its window is in front (Lord Flow). It applies at once to the app's open windows, every profile. It only changes the light or dark preference the page reads, never the site: the same `matchMedia` answer and the same no-white-flash background, so a site that follows its "System" theme can stay dark on a light desktop or the other way round, and the same limit holds (a CSS-only site stays light; use its own theme setting).
+**Each app's own Appearance** (Light or Dark per app instead of following LordOS) is built, but it waits for LordOS's new web engine (WPEPlatform), which we're moving to before 1.0: today's WPE WebKit 2.48 can't tell a page's CSS the scheme, so the choice only half worked. *In development*, after 0.8.8.8, the latest release: Settings → Web Apps shows Appearance with Automatic selected and Light and Dark unavailable, and an app already set to Light or Dark follows LordOS's mode again. For now each web app follows LordOS's mode, and a site with its own theme setting (WhatsApp, for example) keeps it.
 
 [[shot:12]]
 

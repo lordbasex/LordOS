@@ -206,6 +206,7 @@
   "appearance.lightHint": "Witryna zawsze otrzymuje tryb jasny, niezależnie od trybu LordOS.",
   "appearance.darkHint": "Witryna zawsze otrzymuje tryb ciemny, niezależnie od trybu LordOS.",
   "appearance.footer": "Zmienia się tylko preferencja jasnego lub ciemnego trybu, którą odczytuje witryna; LordOS nigdy nie modyfikuje samej witryny. Niektóre witryny i tak pozostają jasne, a witryna z własnym ustawieniem motywu stosuje się do niego.",
+  "appearance.later": "Jasny i ciemny tryb dla każdej aplikacji pojawi się z nowym silnikiem WWW LordOS (WPEPlatform), na który przechodzimy. Na razie każda aplikacja webowa podąża za trybem LordOS, a witryna z własnym ustawieniem motywu (na przykład WhatsApp) je zachowuje.",
   "identity.title": "Tożsamość przeglądarki",
   "identity.label": "Przedstawiaj się jako",
   "identity.chrome": "Chrome w systemie Linux + LordOS",

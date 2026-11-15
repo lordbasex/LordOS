@@ -202,6 +202,7 @@
   "appearance.lightHint": "Sivustolle kerrotaan aina vaalea, oli LordOSin tila mikä tahansa.",
   "appearance.darkHint": "Sivustolle kerrotaan aina tumma, oli LordOSin tila mikä tahansa.",
   "appearance.footer": "Vain sivuston lukema vaalean tai tumman tilan valinta muuttuu; LordOS ei koskaan muokkaa itse sivustoa. Jotkin sivustot pysyvät silti vaaleina, ja sivusto, jolla on oma teema-asetus, noudattaa sitä.",
+  "appearance.later": "Vaalea ja tumma sovelluskohtaisesti tulevat LordOS:n uuden verkkomoottorin (WPEPlatform) myötä, johon olemme siirtymässä. Toistaiseksi jokainen verkkosovellus seuraa LordOS:n tilaa, ja sivusto, jolla on oma teema-asetuksensa (esimerkiksi WhatsApp), pitää sen.",
   "identity.title": "Selaimen tunniste",
   "identity.label": "Esittäydy nimellä",
   "identity.chrome": "Chrome Linuxissa + LordOS",

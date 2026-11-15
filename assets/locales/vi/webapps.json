@@ -200,6 +200,7 @@
   "appearance.lightHint": "Trang web luôn được báo là sáng, bất kể LordOS đang ở chế độ nào.",
   "appearance.darkHint": "Trang web luôn được báo là tối, bất kể LordOS đang ở chế độ nào.",
   "appearance.footer": "Chỉ thay đổi tùy chọn sáng hoặc tối mà trang web đọc; LordOS không bao giờ sửa đổi chính trang web. Một số trang vẫn giữ màu sáng, và trang có cài đặt giao diện riêng sẽ theo cài đặt đó.",
+  "appearance.later": "Sáng và tối cho từng ứng dụng sẽ có cùng công cụ web mới của LordOS (WPEPlatform) mà chúng tôi đang chuyển sang. Hiện tại mỗi ứng dụng web theo chế độ của LordOS, và trang có cài đặt giao diện riêng (ví dụ WhatsApp) vẫn giữ cài đặt đó.",
   "identity.title": "Danh tính trình duyệt",
   "identity.label": "Nhận diện là",
   "identity.chrome": "Chrome trên Linux + LordOS",

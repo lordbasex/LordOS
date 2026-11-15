@@ -202,6 +202,7 @@
   "appearance.lightHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə işıqlı bildirilir.",
   "appearance.darkHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə qaranlıq bildirilir.",
   "appearance.footer": "Yalnız saytın oxuduğu işıqlı və ya qaranlıq üstünlük dəyişir; LordOS saytın özünü heç vaxt dəyişmir. Bəzi saytlar yenə də işıqlı qalır, öz mövzu ayarı olan sayt isə həmin ayarı izləyir.",
+  "appearance.later": "Hər tətbiq üçün açıq və tünd rejim LordOS-un yeni veb mühərriki (WPEPlatform) ilə gəlir, ona keçirik. Hələlik hər veb tətbiq LordOS-un rejiminə uyğunlaşır, öz mövzu ayarı olan sayt (məsələn, WhatsApp) isə onu saxlayır.",
   "identity.title": "Brauzer kimliyi",
   "identity.label": "Belə tanıt",
   "identity.chrome": "Linux-da Chrome + LordOS",

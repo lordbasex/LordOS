@@ -202,6 +202,7 @@
   "appearance.lightHint": "Der Website wird immer „Hell“ gemeldet, egal in welchem Modus LordOS ist.",
   "appearance.darkHint": "Der Website wird immer „Dunkel“ gemeldet, egal in welchem Modus LordOS ist.",
   "appearance.footer": "Geändert wird nur die Hell-/Dunkel-Einstellung, die die Website liest; LordOS verändert die Website selbst nie. Manche Websites bleiben trotzdem hell, und eine Website mit eigener Design-Einstellung folgt dieser.",
+  "appearance.later": "Hell und Dunkel pro App kommen mit der neuen Web-Engine von LordOS (WPEPlatform), auf die wir umsteigen. Bis dahin folgt jede Web-App dem Modus von LordOS, und eine Website mit eigener Design-Einstellung (zum Beispiel WhatsApp) behält diese.",
   "identity.title": "Browser-Identität",
   "identity.label": "Ausgeben als",
   "identity.chrome": "Chrome unter Linux + LordOS",

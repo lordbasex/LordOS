@@ -359,6 +359,14 @@ export const appOfNotifyKey = (key) => {
 // What the app's pages are told about light and dark (prefers-color-scheme): auto follows LordOS's mode.
 export const COLOR_SCHEMES = ['auto', 'light', 'dark'];
 export const colorSchemeOf = (entry) => (entry && COLOR_SCHEMES.includes(entry.colorScheme) ? entry.colorScheme : 'auto');
+// Light and dark per app wait for the WPEPlatform engine (docs/ROADMAP.md, "Before 1.0"): WPE 2.48 can't tell a
+// page's CSS, so they only half worked. Until then only auto can be chosen and a stored light or dark shows (and acts,
+// lord-server's webscheme.c) as auto; the registry keeps the value. Add 'light' and 'dark' back here to bring them back.
+export const COLOR_SCHEMES_AVAILABLE = ['auto'];
+export const shownColorScheme = (entry) => {
+  const v = colorSchemeOf(entry);
+  return COLOR_SCHEMES_AVAILABLE.includes(v) ? v : 'auto';
+};
 
 // ---- browser identity (Settings → Web apps and the app menu: a profile's registry "userAgent") ----
 
