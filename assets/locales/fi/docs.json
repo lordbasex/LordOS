@@ -1,0 +1,74 @@
+{
+  "archiveName": "Arkisto",
+  "archiveSummary": {
+    "one": "{count} tiedosto, {size}",
+    "other": "{count} tiedostoa, {size}"
+  },
+  "compressOne": "Pakkaa ”{name}”",
+  "compressMany": {
+    "one": "Pakkaa {count} kohde",
+    "other": "Pakkaa {count} kohdetta"
+  },
+  "compressing": "Pakataan ”{name}”…",
+  "compressProgress": "Pakataan ”{name}”: {files} tiedostoa",
+  "compressed": {
+    "one": "”{name}” valmis ({count} tiedosto)",
+    "other": "”{name}” valmis ({count} tiedostoa)"
+  },
+  "compressError": "Kohdetta ”{name}” ei voitu pakata ({error})",
+  "extractHere": "Pura tähän",
+  "extractSelected": {
+    "one": "Pura {count} kohde",
+    "other": "Pura {count} kohdetta"
+  },
+  "extracting": "Puretaan ”{name}”…",
+  "extractProgress": "Puretaan ”{name}”: {files} tiedostoa ({pct} %)",
+  "extracted": {
+    "one": "Purettu kohteeseen ”{name}” ({count} tiedosto)",
+    "other": "Purettu kohteeseen ”{name}” ({count} tiedostoa)"
+  },
+  "extractedSkipped": {
+    "one": "Purettu kohteeseen ”{name}” ({count} tiedosto); {skipped} ohitettu turvallisuussyistä",
+    "other": "Purettu kohteeseen ”{name}” ({count} tiedostoa); {skipped} ohitettu turvallisuussyistä"
+  },
+  "extractError": "Kohdetta ”{name}” ei voitu purkaa ({error})",
+  "opening": "Avataan ”{name}”…",
+  "loading": "Ladataan…",
+  "locked": "suojattu salasanalla",
+  "pages": {
+    "one": "{count} sivu",
+    "other": "{count} sivua"
+  },
+  "more": {
+    "one": "ja {count} muu",
+    "other": "ja {count} muuta"
+  },
+  "err.invalid": "ei ole arkisto, tai se on vioittunut",
+  "err.missing-volume": "jaetusta arkistosta puuttuu osa: ”{name}”",
+  "err.disk-full": "levy on täynnä",
+  "err.too-big": "se on liian suuri",
+  "err.too-many": "siinä on liian monta tiedostoa",
+  "err.corrupt": "se on vioittunut",
+  "err.write": "kirjoittaminen epäonnistui",
+  "err.unavailable": "asiakirja-apuri ei ole käytettävissä",
+  "err.cancelled": "peruttu",
+  "err.crash": "asiakirja-apuri pysähtyi odottamatta",
+  "err.timeout": "se kesti liian kauan",
+  "err.protocol": "asiakirja-apuri lähetti virheellisen vastauksen",
+  "err.spawn": "asiakirja-apuria ei voitu käynnistää",
+  "err.closed": "asiakirja suljettiin",
+  "err.bad-request": "virheellinen pyyntö",
+  "err.bad-field": "virheellinen lomakekenttä",
+  "err.bad-page": "virheellinen sivu",
+  "err.busy": "asiakirja-apuri on varattu",
+  "err.memory": "muisti loppui",
+  "err.no-fonts": "fontteja ei ole käytettävissä",
+  "err.not-open": "asiakirja ei ole auki",
+  "err.nothing": "ei mitään tallennettavaa",
+  "err.read-only": "asiakirja on vain luku -tilassa",
+  "err.save": "tallennus epäonnistui",
+  "err.unknown-op": "tuntematon toiminto",
+  "err.image": "virheellinen kuva",
+  "err.blob": "virheelliset tiedot",
+  "err.password": "asiakirja on suojattu salasanalla"
+}

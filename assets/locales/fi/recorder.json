@@ -1,0 +1,22 @@
+{
+  "folder": "Äänitykset",
+  "name": "Äänitys {date} {time}",
+  "all": "Kaikki äänitykset",
+  "empty": "Äänityksiä ei ole vielä",
+  "hint": "Äänitä mikrofonilla painamalla punaista painiketta (tai R)",
+  "denied": "Äänitys-sovelluksella ei ole lupaa käyttää mikrofonia",
+  "play": "Toista",
+  "pause": "Tauko",
+  "rename": "Nimeä uudelleen",
+  "trim": "Leikkaa",
+  "cancelTrim": "Peru leikkaus",
+  "saveTrim": "Tallenna leikattu kopio",
+  "trimmed": "leikattu",
+  "export": "Vie muodossa",
+  "exportBtn": "Vie",
+  "working": "Viedään…",
+  "exported": "Tallennettu ”{name}”",
+  "exportError": "Vienti epäonnistui",
+  "renameError": "Uudelleennimeäminen epäonnistui (onko nimi jo käytössä?)",
+  "emptyTitle": "Valitse tai tee äänitys"
+}

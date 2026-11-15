@@ -1,0 +1,21 @@
+{
+  "search": "Etsi emojia",
+  "results": {
+    "one": "{count} tulos",
+    "other": "{count} tulosta"
+  },
+  "none": "Mitään ei löytynyt",
+  "noRecent": "Käyttämäsi emojit näkyvät tässä",
+  "copied": "{text} kopioitu: liitä se näppäimillä Ctrl+V",
+  "more": "Lisää…",
+  "group.recent": "Viimeisimmät",
+  "group.smileys": "Hymiöt ja tunteet",
+  "group.people": "Ihmiset ja keho",
+  "group.animals": "Eläimet ja luonto",
+  "group.food": "Ruoka ja juoma",
+  "group.travel": "Matkailu ja paikat",
+  "group.activities": "Toiminta",
+  "group.objects": "Esineet",
+  "group.symbols": "Symbolit",
+  "group.flags": "Liput"
+}
