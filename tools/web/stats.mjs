@@ -102,7 +102,7 @@ const Q = {
   porDia: `${HUMAN_PAGES} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by bin(1d)`,
   porSemana: `${HUMAN_PAGES} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by bin(1w)`,
   porMes: `${HUMAN_PAGES} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by bin(1mo)`,
-  paises: `${HUMAN_PAGES} | ${COUNTRY} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by ${BY_COUNTRY} | sort visitantes desc | limit 50`,
+  paises: `${HUMAN_PAGES} | ${COUNTRY} | stats count(*) as paginas_vistas, count_distinct(\`c-ip\`) as visitantes by ${BY_COUNTRY} | sort visitantes desc | limit 300`,
   // the page views as a pie: one slice per country (its Spanish name), the 20 with the most views
   paisesTorta: `${HUMAN_PAGES} | ${COUNTRY} | stats count(*) as paginas_vistas by c_name | sort paginas_vistas desc | limit 20`,
   sistemas: `${HUMAN_PAGES} | ${OS} | stats count_distinct(\`c-ip\`) as visitantes by sistema | sort visitantes desc`,
@@ -217,7 +217,7 @@ const DASHBOARDS = {
     metric('Pedidos a CloudFront (todo, incluido apt)', [['Requests']], 8, 2, 8, 3),
     metric('Errores (% de pedidos)', [['4xxErrorRate', { stat: 'Average' }], ['5xxErrorRate', { stat: 'Average' }]], 16, 2, 8, 3),
     log('Páginas vistas y visitantes por hora', Q.porHora, 'timeSeries', 0, 5, 24, 6),
-    log('Países', Q.paises, 'table', 0, 11, 8, 9),
+    log('Países (todos)', Q.paises, 'table', 0, 11, 8, 9),
     log('Países (torta, páginas vistas)', Q.paisesTorta, 'pie', 8, 11, 8, 9),
     log('Sistema operativo (visitantes)', Q.sistemas, 'pie', 16, 11, 8, 9),
     log('Dispositivo (visitantes)', Q.dispositivos, 'pie', 0, 20, 8, 9),
