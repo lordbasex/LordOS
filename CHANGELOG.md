@@ -103,6 +103,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`.github/ISSUE_TEMPLATE/source-request.yml`) or the iPERFEX contact form. The 0.8.8 images, published before the
   lists, get theirs from the published files (docs/RELEASING.md, "Source code"). The ISO and arm64 build chroots
   need `python3` (docs/ISO.md).
+- **LordOS keeps the kernel sources of its Raspberry Pi images itself** (GPL compliance, maintainer's decision,
+  2026-11-15: "si, guarda la copia del kernel"). The 0.8.8 Pi image's GPL sources that only third parties served are
+  now pinned for lordos.org's APT pool, `pool/rpi/source/` (unindexed, append-only, next to FFmpeg and kms++), so the
+  offer no longer depends on Raspberry Pi's archive or GitHub keeping them:
+  - **Raspberry Pi's kernel** `linux 1:6.18.50-1+rpt1` (`linux-image-6.18.50+rpt-rpi-v8`, the Pi 4 kernel, and
+    `linux-image-rpi-v8`, `linux-base-*`), **`firmware-nonfree 1:20260519-1~bpo13+1+rpt1`** (`firmware-brcm80211`)
+    and **`raspi-firmware 1:1.20260915-1`** (the boot firmware and the kernel hook), in
+    `tools/release/rpi-mirror.list`. Raspberry Pi's signed `Sources` index keeps only the newest version of each
+    source (on 2026-11-15: `linux 1:6.18.60-1+rpt1`, `firmware-nonfree …+rpt2`), so `linux 6.18.50` and
+    `firmware-nonfree +rpt1` are no longer in any of its signed indexes (trixie, bookworm, forky; main, beta,
+    untested), though its pool still has the files. A new line kind, `source-pool`, pins such a version: the `.dsc`
+    from the pool over https, accepted only with the SHA-256 recorded in the list, then every file it names by the
+    `.dsc`'s own `Checksums-Sha256`. Checked independently: `linux_6.18.50.orig.tar.xz` is kernel.org's
+    `linux-6.18.50.tar.xz` (SHA-256 `d2fc041d…`) and `firmware-nonfree_20260519.orig.tar.xz` is the one Raspberry Pi's
+    signed index lists for `+rpt2`; only the two `.dsc` and `.debian.tar.xz` files rest on the recorded pin (the
+    `.dsc` are signed by Raspberry Pi's uploaders, whose keys LordOS doesn't pin). `raspi-firmware 1.20260915-1` is
+    still in the signed index and is an ordinary `source` line.
+  - **The LordOS Raspberry Pi kernel** `linux-lordos-rpi-2712 6.18.57-3+lordos`: another new line kind, `tarball`,
+    pins Raspberry Pi's tree at commit `234188315037848e5b07d65b85d38edc64095caa` by URL (GitHub's tarball of the
+    commit) and SHA-256 (`d56a9ef7…`, 257,630,958 bytes). Uncompressed it is byte for byte `git archive
+    --format=tar` of that commit (SHA-256 `688210f7…`, checked with git 2.47.3; its pax header names the commit),
+    and `apt-repo.sh` checks that too when it downloads it. It is published with the new
+    `tools/rpi/kernel/linux-lordos-rpi-2712_6.18.57-3+lordos/`: the exact `.config` of the 0.8.8 image's kernel
+    (`/boot/config-6.18.57-lordos.3-rpi-2712`, read from the published image; SHA-256 `65f4a3ed…`), `build-kernel.sh`
+    as it built revision 3 (LordOS commit `ee1f03f4`, unchanged since) and `SOURCE` (the commit, the hashes, the build
+    command). `tools/rpi/build-kernel.sh` now writes the tree's `tar_sha256` into `out/SOURCE` and prepares that
+    folder for every future kernel in `out/source/`.
+  - `tools/release/apt-repo.sh`: `rpi_src_import` handles `source-pool`, and a `.dsc` already in the cache with the
+    pinned SHA-256 no longer needs Raspberry Pi's index (before, a pinned source dropped from the index stopped every
+    `--rpi` build); the new `rpi_tar_import`; only each pinned version's files are copied to the pool; the `.config`,
+    `SOURCE` and scripts are served as text; without `gpgv` (this Debian host has none) Raspberry Pi's `InRelease` is
+    checked with `gpg` in an empty home holding only Raspberry Pi's key, requiring its fingerprint in `VALIDSIG`.
+    `tools/release/image-sources.sh` points these sources and the LordOS kernel at `lordos.org/apt/pool/rpi/source/`
+    and warns about a LordOS kernel whose source isn't kept. **Not yet published:** the files were fetched and
+    verified on 2026-11-15 (`apt-repo.sh rpi-fetch`, and an offline build with a throwaway key), and go to
+    lordos.org with the next signed `apt-repo.sh build … --rpi` and `publish` on the maintainer's machine.
 - **A web app's own Appearance: Automatic, Light or Dark** (maintainer's approval, 2026-11-15). Each web app has
   its own choice of the light or dark preference its pages are told (`prefers-color-scheme` through `matchMedia`,
   and the dark background while a page loads): Automatic, the default, follows LordOS's mode as before; Light and

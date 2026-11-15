@@ -25,3 +25,24 @@ kms++-utils          0~git20250807.1813ada-1      arm64  a4c2cfe1d6e9458d43c5083
 libkms++0            0~git20250807.1813ada-1      arm64  1a22a36750d8133c1f30868c18c22ab3d5ac526f4183bfb050a34ee1c46da8db  MPL-2.0 (source: archive.raspberrypi.com deb-src kms++)
 kms++                0~git20250807.1813ada-1      source a450a5140a582b7d6c720af2b131b589f9a30064aa8529927b3feba69e028413  MPL-2.0 (the source of kms++-utils and libkms++0 above)
 ffmpeg               8:7.1.5-0+deb13u1+rpt2       source e19eb40b717da1ebdee3ed7aba72f19a7d01fd613cf75058ef20ab24334c022d  LGPL-2.1+ / GPL-2+ (Pi image, source offer)
+#
+# The GPL sources of the Raspberry Pi image (0.8.8; docs/SOURCE-OFFER.md): Raspberry Pi's kernel (the Pi 4
+# kernel linux-image-6.18.50+rpt-rpi-v8 and its modules), the firmware the kernel loads, and the kernel hook.
+# Raspberry Pi's signed index keeps only the newest version of each source; "source-pool" pins an older one
+# its pool still has: the .dsc's SHA-256 below was read on 2026-11-15 from the pool over https, and every
+# other file is accepted by the .dsc's own checksums. Checked independently on 2026-11-15: linux's
+# .orig.tar.xz is kernel.org's linux-6.18.50.tar.xz (d2fc041d…, cdn.kernel.org sha256sums.asc), and
+# firmware-nonfree's is the one Raspberry Pi's signed index lists for +rpt2 (210af28f…); only the two .dsc
+# and .debian.tar.xz files rest on the recorded pin (the .dsc are signed by Raspberry Pi's uploaders, whose
+# keys LordOS doesn't pin).
+linux                1:6.18.50-1+rpt1             source-pool 3d49184a38ee5c6dab095ef583c6397e3cb2149ceb102d58f81950969f03b252  GPL-2 (the Raspberry Pi kernel in the 0.8.8 Pi image)
+firmware-nonfree     1:20260519-1~bpo13+1+rpt1    source-pool 0992ac52b89c996788902686eb0a02ba91eee232d706fd57b85d9e2b6169bf70  firmware under each vendor's licence, some GPL-2 (debian/copyright; 0.8.8 Pi image)
+raspi-firmware       1:1.20260915-1               source be84cbd9a4ea1601ed70f6c7e318b1679f7b4b0658a570931cb177b6d091ab9f  boot/* Raspberry Pi/Broadcom binary licence, debian/* GPL-2+ (kernel hook; 0.8.8 Pi image)
+#
+# Architecture "tarball": the LordOS Raspberry Pi kernel (tools/rpi/build-kernel.sh), Raspberry Pi's tree at
+# the commit it was built from, pinned by URL and SHA-256, published with tools/rpi/kernel/<name>_<version>/
+# (the exact .config, the build script, SOURCE) as pool/rpi/source/l/<name>/. One line per kernel revision;
+# revisions built from the same commit share the tarball (same file, same SHA-256).
+#
+# package              version            arch    sha256 (of the tarball)                                            url  licence
+linux-lordos-rpi-2712  6.18.57-3+lordos   tarball d56a9ef72764b5a9af7eb77ef9a5d3866a2b6068ec35700b43e1df0eb6a2fdf3  https://codeload.github.com/raspberrypi/linux/tar.gz/234188315037848e5b07d65b85d38edc64095caa  GPL-2.0 (raspberrypi/linux 234188315037, 0.8.4 to 0.8.8 Pi images)

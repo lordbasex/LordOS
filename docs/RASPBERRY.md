@@ -207,7 +207,10 @@ than 10 GB free on its SD card.
   `RPI_KERNEL_REF=<commit>` pins one). The first build (2026-10-18) used commit `234188315037`,
   kernel **6.18.57**; the archive shipped 6.18.50 at the time. The 0.8.1 rebuild (`-2+lordos`, BPF
   LSM and BTF) and the 0.8.4 one (`-3+lordos`, sock_diag `SOCK_DESTROY`) use the same commit.
-  `out/SOURCE` records it.
+  `out/SOURCE` records it. LordOS publishes each kernel's corresponding source itself (the tree at the commit,
+  the exact `.config`, this script) in `lordos.org/apt/pool/rpi/source/l/linux-lordos-rpi-<flavour>/`, from
+  `out/source/` and `tools/rpi/kernel/` ([SOURCE-OFFER.md](SOURCE-OFFER.md), [RELEASING.md](RELEASING.md),
+  "Source code").
 - **Config:** `bcm2712_defconfig` (Pi 5, 16K pages) or `bcm2711_defconfig` (Pi 4, 4K pages), then
   `scripts/config` and `olddefconfig`. The whole diff against the defconfig (`out/config-*.diff`):
 

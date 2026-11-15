@@ -30,10 +30,16 @@ Where the source is, by origin:
   Debian's packages.
 - **`raspberrypi`** (the Pi image only): Raspberry Pi's archive,
   `https://archive.raspberrypi.com/debian/pool/main/<letter>/<source>/`. For the copyleft ones whose binaries
-  LordOS ships, LordOS keeps its own copy of the exact source in `https://lordos.org/apt/pool/rpi/source/`, pinned by
-  SHA-256 in `tools/release/rpi-mirror.list` (FFmpeg since 0.8.7, kms++ since 0.8.4.1); the list then points there.
-  `image-sources.sh` names the Raspberry Pi sources LordOS doesn't keep, so a new copyleft one gets its `source`
-  line before the release.
+  LordOS ships, LordOS keeps its own copy of the exact source in `https://lordos.org/apt/pool/rpi/source/<letter>/<source>/`,
+  pinned by SHA-256 in `tools/release/rpi-mirror.list`: FFmpeg since 0.8.7, kms++ since 0.8.4.1, and (in development
+  after 0.8.8.8, published with the next APT update) the 0.8.8 image's kernel `linux 1:6.18.50-1+rpt1` (the Pi 4
+  kernel), `firmware-nonfree 1:20260519-1~bpo13+1+rpt1` and `raspi-firmware 1:1.20260915-1`. The list then points
+  at that copy's `.dsc` (what `dget` takes; the files it names are next to it). The pool has no folder listings, and
+  a `+` in a file name must be written `%2B` in the URL (`linux_6.18.50-1%2Brpt1.dsc`). Raspberry Pi's signed index
+  keeps only the newest version of each source; an older one its pool still has is pinned as `source-pool` (the
+  `.dsc` by a SHA-256 recorded in the list, every other file by the `.dsc`'s own checksums; linux 6.18.50's
+  `.orig.tar.xz` is also kernel.org's `linux-6.18.50.tar.xz`). `image-sources.sh` names the Raspberry Pi sources
+  LordOS doesn't keep, so a new copyleft one gets its line before the release.
 - **`lordos`**: this repository at the release tag (`https://github.com/lordbasex/LordOS/tree/v<version>-beta`):
   `lordos`, `lordos-hwdata` and the other LordOS packages are built from it. `lord-doc` links Poppler and
   `lord-media` Debian's FFmpeg, both GPL-2.0-or-later as Debian builds them, so those two binaries as
@@ -45,7 +51,16 @@ Where the source is, by origin:
   `-3+lordos`, 0.8.0 to today) are `github.com/raspberrypi/linux` commit
   `234188315037848e5b07d65b85d38edc64095caa` ([RASPBERRY.md](RASPBERRY.md), "The LordOS kernel");
   `build-kernel.sh` writes the commit of each build to `SOURCE` next to its packages, and `build-img.sh` passes it
-  on.
+  on. **LordOS keeps this source itself** (in development after 0.8.8.8, published with the next APT update), in
+  `https://lordos.org/apt/pool/rpi/source/l/linux-lordos-rpi-2712/`: `linux-lordos-rpi-2712_6.18.57.orig.tar.gz`
+  (Raspberry Pi's tree at that commit, GitHub's tarball of it, SHA-256
+  `d56a9ef72764b5a9af7eb77ef9a5d3866a2b6068ec35700b43e1df0eb6a2fdf3`; uncompressed, byte for byte
+  `git archive --format=tar --prefix=linux-<commit>/ <commit>`), `config-6.18.57-lordos.3-rpi-2712` (the 0.8.8
+  image's complete `.config`), `build-kernel.sh` as it built revision 3, and `SOURCE`, which lists them with their
+  hashes and the build command. They come from `tools/rpi/kernel/linux-lordos-rpi-2712_6.18.57-3+lordos/` and the
+  `tarball` line of `rpi-mirror.list`; `build-kernel.sh` prepares that folder for every new kernel
+  (`out/source/`), and the list then points at its `SOURCE`. The earlier revisions (`-1`, `-2`, 0.8.0 to 0.8.3) are
+  the same tree with the script at their tags and the `.config` in their images' `/boot`; they are sent on request.
 - **`vendor`**: `lordos-rclone` is rclone's own signed release binary, unmodified (MIT): its source is
   `https://github.com/rclone/rclone` at that version's tag.
 

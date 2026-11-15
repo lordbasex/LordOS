@@ -26,7 +26,8 @@
 # origin is debian (the source is on snapshot.debian.org, which keeps every version Debian ever published),
 # raspberrypi (Raspberry Pi's archive; LordOS's own copy of the source when tools/release/rpi-mirror.list pins
 # it), lordos (built by LordOS from this repository at the release tag; the Raspberry Pi kernel from
-# Raspberry Pi's tree at a fixed commit plus tools/rpi/build-kernel.sh) or vendor (an upstream binary
+# Raspberry Pi's tree at a fixed commit plus tools/rpi/build-kernel.sh, pointing at LordOS's copy of the tree,
+# .config and script in lordos.org/apt/pool/rpi/source/ when a "tarball" line pins it) or vendor (an upstream binary
 # repackaged by LordOS, with its upstream source). Lines starting with # are comments.
 #
 # Environment: LORDOS_TAG (the release tag; default v<lordos version>-<channel>, the channel from this
@@ -206,7 +207,9 @@ root, tmp, out = E["IS_ROOT"], E["IS_TMP"], E["IS_OUT"]
 REPO = "https://github.com/lordbasex/LordOS"
 SNAPSHOT = "https://snapshot.debian.org/package/{}/{}/"
 RPI_POOL = "https://archive.raspberrypi.com/debian/pool/main/{}/{}/"
-RPI_MIRROR = "https://lordos.org/apt/pool/rpi/source/{}/{}/"
+# LordOS's copy: the pool has no folder listings, so the link is a file in it (the .dsc, which `dget` takes,
+# or the kernel's SOURCE, which lists its files); "+" must be %2B there (the storage reads "+" as a space)
+RPI_MIRROR = "https://lordos.org/apt/pool/rpi/source/{}/{}/{}"
 # the LordOS Raspberry Pi kernel's source commit by upstream version, when no SOURCE file is given
 # (docs/RASPBERRY.md, "The LordOS kernel": every revision of 6.18.57 is commit 2341883150378...)
 KNOWN_KERNELS = {"6.18.57": ("https://github.com/raspberrypi/linux.git", "rpi-6.18.y",
@@ -257,12 +260,16 @@ for stanza in re.split(r"\n\s*\n", read(os.path.join(root, "etc/apt/preferences.
         rpi_globs += fields.get("Package", "").split()
 is_pi = bool(rpi_globs) or os.path.exists(os.path.join(root, "etc/apt/sources.list.d/raspberrypi.list"))
 
-# the Raspberry Pi sources LordOS keeps a copy of (tools/release/rpi-mirror.list, architecture "source")
-mirrored = set()
+# the Raspberry Pi sources LordOS keeps a copy of (tools/release/rpi-mirror.list, architecture "source" or
+# "source-pool"), and the LordOS kernels whose source it keeps ("tarball": the tree, .config and build script)
+mirrored, kept_kernels = set(), set()
 for line in read(os.path.join(E["IS_REPO"], "tools/release/rpi-mirror.list")).splitlines():
     f = line.split()
-    if len(f) >= 3 and not line.startswith("#") and f[2] == "source":
-        mirrored.add((f[0], f[1]))
+    if len(f) >= 3 and not line.startswith("#"):
+        if f[2] in ("source", "source-pool"):
+            mirrored.add((f[0], f[1]))
+        elif f[2] == "tarball":
+            kept_kernels.add((f[0], f[1]))
 
 lordos_ver = next((p["ver"] for p in pkgs if p["name"] == "lordos"), "")
 tag = E.get("IS_TAG") or (("v" + lordos_ver + ("-" + E["IS_CHANNEL"] if E.get("IS_CHANNEL") else "")) if lordos_ver else "")
@@ -285,10 +292,14 @@ def classify(p):
         else:
             url = "https://github.com/raspberrypi/linux"
             warnings.append(f"kernel {name}: source commit unknown (pass KERNEL_SOURCE=<work>/out/SOURCE)")
+        kept = (src, sver) in kept_kernels
+        if kept:
+            url = RPI_MIRROR.format(src[0], q(src), "SOURCE")
         return ("lordos", url,
                 f"Linux {upstream} from Raspberry Pi's tree ({branch or 'rpi-' + '.'.join(upstream.split('.')[:2]) + '.y'}"
                 f"{', commit ' + commit if commit else ''}); configured and built by tools/rpi/build-kernel.sh "
-                f"at {tag_url}; the complete configuration is /boot/config-{rel} in the image")
+                f"at {tag_url}; the complete configuration is /boot/config-{rel} in the image"
+                + ("; LordOS keeps this source: the tree at that commit, the .config and the build script" if kept else ""))
     if p["maint"].startswith("LordOS ") or name.startswith("lordos"):
         if name == "lordos-rclone":
             up = re.sub(r"-[^-]*$", "", p["ver"])
@@ -309,7 +320,8 @@ def classify(p):
                 warnings.append(f"{name} {p['ver']}: in no APT list of the build; listed as Debian")
     if org == "raspberrypi":
         if (src, sver) in mirrored:
-            return ("raspberrypi", RPI_MIRROR.format(src[0], q(src)), "Raspberry Pi's archive; this exact source is kept by LordOS")
+            return ("raspberrypi", RPI_MIRROR.format(src[0], q(src), q(f"{src}_{sver.split(':', 1)[-1]}.dsc")),
+                    "Raspberry Pi's archive; this exact source is kept by LordOS (the .dsc and the files it lists, in the same folder)")
         prefix = src[:4] if src.startswith("lib") and len(src) > 3 else src[0]
         return ("raspberrypi", RPI_POOL.format(prefix, q(src)), "Raspberry Pi's archive")
     return ("debian", SNAPSHOT.format(q(src), q(sver)), "")
@@ -349,7 +361,12 @@ print(f"wrote {out}: {len(pkgs)} binary packages from {len(rows)} source package
 not_kept = sorted(f"{s} {v}" for (o, s, v), _ in rows if o == "raspberrypi" and (s, v) not in mirrored)
 if not_kept:
     print("note: Raspberry Pi sources LordOS keeps no copy of (pin the copyleft ones with architecture 'source' "
-          "in tools/release/rpi-mirror.list): " + ", ".join(not_kept))
+          "in tools/release/rpi-mirror.list, or 'source-pool' once Raspberry Pi's index has dropped them): "
+          + ", ".join(not_kept))
+for (o, s, v), _ in rows:
+    if o == "lordos" and s.startswith("linux-lordos-") and (s, v) not in kept_kernels:
+        warnings.append(f"kernel {s} {v}: LordOS keeps no copy of its source (a 'tarball' line in "
+                        "tools/release/rpi-mirror.list and tools/rpi/kernel/<name>_<version>/, docs/RELEASING.md)")
 for w in warnings:
     print("warning: " + w, file=sys.stderr)
 PY

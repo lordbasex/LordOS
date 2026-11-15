@@ -1,0 +1,39 @@
+The complete corresponding source of the LordOS Raspberry Pi 5 kernel package
+linux-image-6.18.57-lordos.3-rpi-2712 6.18.57-3+lordos (source package linux-lordos-rpi-2712), GPL-2.0.
+Revision 3 is the kernel of the LordOS Raspberry Pi images since 0.8.4 (lordos-<version>-rpi5-arm64.img.xz);
+the files below are those of the package in lordos-0.8.8-rpi5-arm64.img.xz.
+
+source=https://github.com/raspberrypi/linux.git
+branch=rpi-6.18.y
+commit=234188315037848e5b07d65b85d38edc64095caa
+version=6.18.57
+tar_sha256=688210f7f8e4dc182404aee8717edf522b223292368477fa09e2b1fcf28a17e5
+
+Files (lordos.org/apt/pool/rpi/source/l/linux-lordos-rpi-2712/):
+
+  linux-lordos-rpi-2712_6.18.57.orig.tar.gz
+      Raspberry Pi's kernel tree at that commit, unmodified: GitHub's tarball of the commit
+      (https://codeload.github.com/raspberrypi/linux/tar.gz/234188315037848e5b07d65b85d38edc64095caa),
+      257630958 bytes, SHA-256 d56a9ef72764b5a9af7eb77ef9a5d3866a2b6068ec35700b43e1df0eb6a2fdf3.
+      Uncompressed it is byte for byte the output of
+          git archive --format=tar --prefix=linux-234188315037848e5b07d65b85d38edc64095caa/ 234188315037848e5b07d65b85d38edc64095caa
+      (SHA-256 688210f7f8e4dc182404aee8717edf522b223292368477fa09e2b1fcf28a17e5, checked with git 2.47.3),
+      and its pax header names the commit (comment=234188315037848e5b07d65b85d38edc64095caa).
+  config-6.18.57-lordos.3-rpi-2712
+      The complete .config of the build, /boot/config-6.18.57-lordos.3-rpi-2712 in the image and in the
+      package (SHA-256 65f4a3edf89568fa7b11c2e48ec93aae78e00672553d8230119cd6a58b198bbf).
+  build-kernel.sh
+      The script that configured and built it: tools/rpi/build-kernel.sh of LordOS at commit ee1f03f4
+      (tags v0.8.4-beta and later; unchanged since). It starts from Raspberry Pi's bcm2712_defconfig, enables
+      Landlock, Yama, the BPF LSM, BTF and sock_diag SOCK_DESTROY, and builds the Debian package with the
+      kernel's own `make bindeb-pkg`. No patch is applied to the tree.
+
+How it was built (2026-10-27, cross-compiled on Debian 13 amd64, aarch64-linux-gnu-gcc (Debian 14.2.0-19) 14.2.0):
+
+  LORDOS_KREV=3 RPI_KERNEL_REF=234188315037848e5b07d65b85d38edc64095caa tools/rpi/build-kernel.sh <work folder> 2712
+
+The script adds overlays/README (from the same tree) to the package, which `make dtbs_install` leaves out.
+Every revision-3 build uses this commit and this script; one made with another compiler differs from this
+.config only in the compiler lines (CONFIG_CC_VERSION_TEXT, CONFIG_GCC_VERSION, …). The same tree and the
+script at tags v0.8.0-beta (6.18.57-1+lordos) and v0.8.1-beta to v0.8.3-beta (6.18.57-2+lordos) built the
+earlier revisions; each image carries its complete .config in /boot.

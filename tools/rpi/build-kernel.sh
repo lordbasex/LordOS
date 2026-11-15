@@ -18,7 +18,9 @@
 # The "-rpi-<flavour>" suffix is what raspi-firmware's kernel hook keys on (it copies the newest
 # vmlinuz-*-rpi-2712 to kernel_2712.img and the device trees to /boot/firmware), so the package
 # installs exactly like Raspberry Pi's own. tools/rpi/build-img.sh picks these .debs up from
-# $KERNEL_DEBS (default /var/tmp/lordos-kernel/out).
+# $KERNEL_DEBS (default /var/tmp/lordos-kernel/out). <work>/out/SOURCE names the commit; for each flavour,
+# <work>/out/source/linux-lordos-rpi-<flavour>_<version>/ holds what LordOS publishes as the kernel's
+# corresponding source with the tree (the exact .config, this script, SOURCE): docs/RELEASING.md, "Source code".
 #
 # Variables: RPI_KERNEL_REPO (default the Raspberry Pi GitHub tree), RPI_KERNEL_BRANCH (rpi-6.18.y),
 # RPI_KERNEL_REF (a commit to pin; default the branch head), LORDOS_KREV (package revision: 3 since
@@ -176,5 +178,20 @@ for FL in $FLAVOURS; do
     echo "   built in $(( (T1 - T0) / 60 )) min: $(basename "$IMGDEB") ($(du -h "$IMGDEB" | cut -f1))"
 done
 (cd "$OUT" && sha256sum linux-*.deb > SHA256SUMS)
-printf 'source=%s\nbranch=%s\ncommit=%s\nversion=%s\n' "$REPO" "$BRANCH" "$COMMIT" "$KV" > "$OUT/SOURCE"
+# the SHA-256 of the tree as `git archive` writes it: GitHub's tarball of the commit, uncompressed, is
+# byte for byte this, so tools/release/apt-repo.sh can check the copy LordOS publishes is that commit
+TARSUM=$(git -C "$SRC" archive --format=tar --prefix="linux-$COMMIT/" "$COMMIT" | sha256sum | cut -d' ' -f1)
+printf 'source=%s\nbranch=%s\ncommit=%s\nversion=%s\ntar_sha256=%s\n' "$REPO" "$BRANCH" "$COMMIT" "$KV" "$TARSUM" > "$OUT/SOURCE"
+# the corresponding source LordOS publishes next to these packages (GPL-2.0, docs/SOURCE-OFFER.md):
+# per flavour, the folder to commit as tools/rpi/kernel/<source package>_<version>/ (the exact .config,
+# this script, SOURCE), and the rpi-mirror.list "tarball" line (docs/RELEASING.md, "Source code")
+for FL in $FLAVOURS; do
+    LV="-lordos.$KREV-rpi-$FL"
+    S="$OUT/source/linux-lordos-rpi-${FL}_$KV-$KREV+lordos"
+    mkdir -p "$S"
+    cp "$OUT/config-$KV$LV" "$S/"
+    cp "$0" "$S/build-kernel.sh"
+    cp "$OUT/SOURCE" "$S/SOURCE"
+    echo "   source: $S; its tarball: $(printf %s "${REPO%.git}" | sed 's#^https://github.com/#https://codeload.github.com/#')/tar.gz/$COMMIT (gzip -dc | sha256sum must be $TARSUM)"
+done
 ls -l "$OUT"/*.deb
