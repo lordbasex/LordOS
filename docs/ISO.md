@@ -720,7 +720,7 @@ sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorri
   grub-efi-amd64-bin grub-common mtools dosfstools lintian libgbm-dev libegl-dev libgles-dev libssl-dev \
   libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
   libswresample-dev libva-dev libsrtp2-dev libusrsctp-dev libtesseract-dev libpipewire-0.3-dev libsystemd-dev \
-  clang cmake glslc libvulkan-dev spirv-headers
+  clang cmake glslc libvulkan-dev spirv-headers python3
 sh tools/tts/fetch-audiocpp.sh          # audio.cpp for lord-tts, at its pinned commit (network)
 ```
 

@@ -5,8 +5,9 @@
 # Usage (as root, on Debian 13, from the repository root with the themes already built):
 #   sudo tools/rpi/build-img.sh [work folder]          # default /var/tmp/lordos-rpi
 #
-# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256), lordos_<version>_arm64.deb and
-# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
+# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256), lordos_<version>_arm64.deb,
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on) and
+# lordos-<version>-rpi5-arm64.sources.tsv (the image's source packages, tools/release/image-sources.sh)
 #
 # - On an arm64 host (the Pi 5 itself, an ARM server) everything is native. If server/build/lord-server
 #   is already aarch64 (make -C server on the Pi) it is used; otherwise it is built in the build chroot.
@@ -416,6 +417,11 @@ printf '# lordos-case.txt: written by LordOS (Settings, Cooling). No case access
 install -m 644 "$RPI/boot/firmware/lordos-user.txt.example" "$CH/boot/firmware/lordos-user.txt.example"
 
 rm -f "$CH/usr/sbin/policy-rc.d" "$CH/usr/bin/qemu-aarch64-static"
+# the image's source packages and versions, published next to it (docs/SOURCE-OFFER.md); before the APT lists
+# go, so each package's origin (Debian or Raspberry Pi) is read from them. The LordOS kernel's exact commit
+# comes from the SOURCE file build-kernel.sh wrote next to its packages
+KERNEL_SOURCE=$( [ -f "$KERNEL_DEBS/SOURCE" ] && echo "$KERNEL_DEBS/SOURCE" || true) \
+    sh "$ROOT/tools/release/image-sources.sh" "$CH" "$OUT/$NAME.sources.tsv"
 in_root "$CH" apt-get clean
 rm -rf "$CH/var/lib/apt/lists/"* "$CH/var/cache/apt/"*.bin "$CH/tmp/"* "$CH/var/log/"*.log
 rm -f "$CH/etc/ssh/ssh_host_"*      # each board creates its own on first boot (rpi/firstboot)

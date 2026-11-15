@@ -32,7 +32,7 @@ exec unshare --mount --propagation private sh -eu -c '
         RELEASE="$REL" REQUIRE_SIGNED_CODE="$SIGNED" J="$J" sh -eu -c "
         apt-get update -q
         apt-get install -y -q --no-install-recommends debootstrap squashfs-tools xorriso grub-common openssl \
-            grub-efi-arm64-bin mtools dosfstools
+            grub-efi-arm64-bin mtools dosfstools python3
         cd /tree
         make -C server -j\$J GPU=1 RELEASE=\$RELEASE
         make -C server build/canvas-test && server/build/canvas-test

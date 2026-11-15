@@ -272,6 +272,13 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1 | A Cloud account turned off is never given to rclone and keeps its settings and sign-in | Test (`t_onoff` in `build/cloud-test`, `tests/cloud_signin_fake.sh`, `tests/cloud_model_test.mjs`) | Holds in the tests |
 | 5.1 | The GitHub fixes of this round (#94, #96, #97, #99, #100, #101, #103, #104, #107, #109, #110, #111, #112, #117, #118, #123, #124, #125, #128, #130) | Each has its test named in `CHANGELOG.md`, 0.8.8.8-beta; #96, #107 and #124 also checked on VM 127 | Holds in the tests; #101 not tried against the reporter's kind of server |
 
+## In development after 0.8.8.8 (the paper's edition of 2026-11-15)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 6.9, 12 | Each image is published with `<image>.sources.tsv`: every source package and version in it, with a link to that exact source, written from the image's dpkg database | `tools/release/image-sources.sh`, run by `build.sh`, `build-ova.sh` and `build-img.sh`; tried on synthetic MBR (`.img.xz`) and GPT (OVA with a stream-optimized VMDK) images and on a real xorriso-made live ISO (2026-11-15) | Not yet run on a LordOS image build or a published LordOS image; no automated test |
+| 12 | A written offer of the complete corresponding source, for at least three years (`docs/SOURCE-OFFER.md`, lordos.org/legal/source-code) | Design (`docs/RELEASING.md`, "Source code") | Design |
+
 ## What the paper must change for 0.8.5
 
 State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26) after each item:

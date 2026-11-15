@@ -94,9 +94,9 @@
             "pt": "Qual é a licença?"
           },
           "a": {
-            "en": "LordOS's own code is under the MIT license, so you can use, study, change and share it. Bundled components and Debian packages keep their own licenses; see [Licenses](/legal/licenses/). The name, the crown logo and Lumo follow the [Trademark policy](/legal/trademark/).",
-            "es": "El código propio de LordOS está bajo la licencia MIT: podés usarlo, estudiarlo, cambiarlo y compartirlo. Los componentes incluidos y los paquetes de Debian mantienen sus propias licencias; mirá [Licencias](/legal/licenses/). El nombre, el logo de la corona y Lumo siguen la [Política de marca](/legal/trademark/).",
-            "pt": "O código próprio do LordOS está sob a licença MIT: você pode usar, estudar, alterar e compartilhar. Os componentes incluídos e os pacotes do Debian mantêm suas próprias licenças; veja [Licenças](/legal/licenses/). O nome, o logo da coroa e o Lumo seguem a [Política de marca](/legal/trademark/)."
+            "en": "LordOS's own code is under the MIT license, so you can use, study, change and share it. Bundled components and Debian packages keep their own licenses; see [Licenses](/legal/licenses/). Each image lists the source package of everything in it, and the source of every GPL program we distribute is offered for three years: see [Source code](/legal/source-code/). The name, the crown logo and Lumo follow the [Trademark policy](/legal/trademark/).",
+            "es": "El código propio de LordOS está bajo la licencia MIT: podés usarlo, estudiarlo, cambiarlo y compartirlo. Los componentes incluidos y los paquetes de Debian mantienen sus propias licencias; mirá [Licencias](/legal/licenses/). Cada imagen lista el paquete fuente de todo lo que trae, y el código fuente de cada programa GPL que distribuimos se ofrece durante tres años: mirá [Código fuente](/legal/source-code/). El nombre, el logo de la corona y Lumo siguen la [Política de marca](/legal/trademark/).",
+            "pt": "O código próprio do LordOS está sob a licença MIT: você pode usar, estudar, alterar e compartilhar. Os componentes incluídos e os pacotes do Debian mantêm suas próprias licenças; veja [Licenças](/legal/licenses/). Cada imagem lista o pacote-fonte de tudo o que traz, e o código-fonte de cada programa GPL que distribuímos é oferecido por três anos: veja [Código-fonte](/legal/source-code/). O nome, o logo da coroa e o Lumo seguem a [Política de marca](/legal/trademark/)."
           }
         },
         {

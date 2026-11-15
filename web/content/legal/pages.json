@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12",
+  "updated": "2026-11-15",
   "pages": [
     {
       "slug": "terms",
@@ -44,7 +44,16 @@
         "es": "Licencias y avisos de código abierto",
         "pt": "Licenças e avisos de código aberto"
       },
-      "updated": "2026-11-01"
+      "updated": "2026-11-15"
+    },
+    {
+      "slug": "source-code",
+      "title": {
+        "en": "Source code",
+        "es": "Código fuente",
+        "pt": "Código-fonte"
+      },
+      "updated": "2026-11-15"
     },
     {
       "slug": "trademark",

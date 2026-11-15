@@ -8,8 +8,9 @@
 #   (the themes: npm run build on the development machine; the .bundle.js files travel with the tree)
 #   sudo tools/iso/build.sh [work folder]   # default /var/tmp/lordos-iso
 #
-# Result: <work>/out/lordos-live-<version>-<arch>.iso, lordos_<version>_<arch>.deb and
-# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
+# Result: <work>/out/lordos-live-<version>-<arch>.iso, lordos_<version>_<arch>.deb,
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on) and
+# lordos-live-<version>-<arch>.sources.tsv (the image's source packages, tools/release/image-sources.sh)
 set -eu
 
 [ "$(id -u)" = 0 ] || { echo "build.sh: run as root (sudo)" >&2; exit 1; }
@@ -36,7 +37,7 @@ ISO="$OUT/lordos-live-$VERSION-$ARCH.iso"
 DEB="$OUT/lordos_${VERSION}_$ARCH.deb"
 T0=$(date +%s)
 
-for t in debootstrap mksquashfs xorriso grub-mkrescue mformat dpkg-deb; do
+for t in debootstrap mksquashfs xorriso grub-mkrescue mformat dpkg-deb dpkg-query python3; do
     command -v "$t" >/dev/null || { echo "build.sh: missing $t (see docs/ISO.md, build packages)" >&2; exit 1; }
 done
 [ -d "/usr/lib/grub/$GRUB_DIR" ] || { echo "build.sh: missing /usr/lib/grub/$GRUB_DIR (see docs/ISO.md, build packages)" >&2; exit 1; }
@@ -189,6 +190,9 @@ in_ch systemctl mask systemd-networkd-wait-online.service > /dev/null 2>&1 || tr
 printf 'root:lordos\n' | in_ch chpasswd     # emergency console: root / lordos (documented)
 
 rm -f "$CH/usr/sbin/policy-rc.d"
+# the image's source packages and versions, published next to it (docs/SOURCE-OFFER.md); before the APT lists
+# go, so each package's origin is read from them
+sh tools/release/image-sources.sh "$CH" "$OUT/lordos-live-$VERSION-$ARCH.sources.tsv"
 in_ch apt-get clean
 rm -rf "$CH/var/lib/apt/lists/"* "$CH/var/cache/apt/"*.bin "$CH/tmp/"* "$CH/var/log/"*.log
 : > "$CH/etc/resolv.conf"
