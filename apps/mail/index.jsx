@@ -4,7 +4,7 @@
 // an offline search index, and HTML turned into our own views without running anything.
 import {
   View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, TextInput, ScrollView, t, wm, fs, monthName, formatDate, formatTime,
-  Toolbar, ToolbarButton, ToolbarSpacer, ToolbarDivider, SearchField, Hairline, direction, textDirection,
+  Toolbar, ToolbarButton, ToolbarSpacer, ToolbarDivider, SearchField, Hairline, direction, textDirection, Disclosure as SdkDisclosure,
   mailRequest, onMailEvent, mailStatus, mailConfig, mailAccounts, mailAvailable, addListener, clipboard, registerDockActions,
   trackMailStatus, isolatedPim, saveFile,
 } from '@lordos/sdk';
@@ -719,7 +719,7 @@ function MailMain() {
         <Hairline edge="end" />
         <Button small plain icon="⊕" label={t('mail.addAccount')} onClick={() => setSheet('setup')} />
         <View style={{ flex: 1 }} />
-        <ToolbarButton small icon="⚙" title={t('mail.menu.accounts')} onClick={() => setSheet('accounts')} />
+        <ToolbarButton small icon="⚙" iconSize={16} title={t('mail.menu.accounts')} onClick={() => setSheet('accounts')} />
       </View>
     </View>
   );
@@ -848,16 +848,11 @@ function CategoryDots() {
 // The unread figure a folder shows: drafts count them all, Sent and Trash none.
 const folderCount = (f) => (f.noselect ? 0 : f.special === 'drafts' ? f.total || 0 : f.special === 'sent' || f.special === 'trash' ? 0 : f.unread || 0);
 
-// A folder's disclosure triangle: points down when open, toward the text when closed.
+// A folder's disclosure triangle: the SDK's drawn chevron (issue #143, 12 px in a 16 px hit box), down when open,
+// toward the text when closed. Its box overlaps the gap before the icon by 6 px, so the folders move only 2 px.
 function Disclosure({ state, color, onClick }) {
   const rtl = direction() === 'rtl';
-  const box = { width: 12, height: 20, [rtl ? 'marginLeft' : 'marginRight']: -4, alignItems: 'center', justifyContent: 'center' };
-  if (state === 'none') return <View style={box} />;
-  return (
-    <View onClick={(e) => { e.stopPropagation?.(); onClick(); }} style={box}>
-      <Text style={{ fontSize: 10, color }}>{state === 'open' ? '▾' : rtl ? '◂' : '▸'}</Text>
-    </View>
-  );
+  return <SdkDisclosure state={state} color={color} onToggle={onClick} style={{ [rtl ? 'marginLeft' : 'marginRight']: -6 }} />;
 }
 
 // Source-list row. icon: a glyph (drawn in the accent color), { kind } for a drawn shape,

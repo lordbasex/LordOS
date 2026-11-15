@@ -7,7 +7,7 @@
 //                 groupings, each row with its sent and received bytes, a small up/down meter and,
 //                 where a rule can be written, its switch; "N more…" folds long lists
 import {
-  View, Text, SearchField, Overlay, useTheme, useLocale, useSettings, formatBytes, formatNumber, tOptional, direction, firewall, fwRule, netModel, addListener,
+  View, Text, SearchField, Overlay, useTheme, useLocale, useSettings, formatBytes, formatNumber, tOptional, direction, firewall, fwRule, netModel, addListener, Disclosure,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { C, AppGlyph } from './index.jsx';
@@ -243,9 +243,8 @@ export function Child({ node, depth, path, ctx }) {
     <View>
       <View onClick={() => ctx.onPick(node, appOf)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: depth ? 22 : 32, borderRadius: 5,
         ...(direction() === 'rtl' ? { paddingRight: inset } : { paddingLeft: inset }), backgroundColor: sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'transparent' }}>
-        <View onClick={(e) => { if (!kids.length) return; e.stopPropagation(); ctx.toggle(key); }} style={{ width: 10, alignItems: 'center' }}>
-          <Text style={{ fontSize: 8, color: t.textDim }}>{kids.length ? (open ? '▾' : direction() === 'rtl' ? '◂' : '▸') : ''}</Text>
-        </View>
+        <Disclosure state={kids.length ? (open ? 'open' : 'closed') : 'none'} color={t.textDim} size={depth ? 10 : 12} width={14} height={depth ? 20 : 28}
+          onToggle={() => ctx.toggle(key)} />
         {node.kind === 'app' ? <AppGlyph item={ctx.itemOf(node)} size={13} /> : <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dot }} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: depth ? 11 : 12, fontWeight: depth ? 400 : 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', fontFamily: node.kind === 'app' || node.kind === 'country' ? undefined : 'monospace',

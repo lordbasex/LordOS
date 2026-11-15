@@ -2,7 +2,7 @@
 // grouped by tag, and ONE CLICK OPENS the profile (no Enter, no double click) in a new tab, a new window or a split of
 // the last terminal window used. The arrows move the selection and Enter opens it. "Close this window after opening a
 // profile" and where it opens are remembered (terminal.json: profilesWindow).
-import { View, Text, SearchField, Segmented, ScrollView, Button, Hairline, useTheme, useAppWindow, useKeyboard, wm, spacing, typeScale, direction, t as T } from '@lordos/sdk';
+import { View, Text, DisclosureGlyph, SearchField, Segmented, ScrollView, Button, Hairline, useTheme, useAppWindow, useKeyboard, wm, spacing, typeScale, t as T } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { terminalSettings, saveTerminalSettings, profileGroups, profileName } from './profiles.js';
 import { addTab, split, openWindowWithProfile, lastTermWin } from './state.js';
@@ -58,7 +58,7 @@ export function ProfilesWindow({ onEdit }) {
     if (g.tag !== null) {
       rows.push(
         <View key={`g:${g.tag}`} onClick={() => setClosed((c) => ({ ...c, [g.tag]: !shut }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 8, marginTop: 4 }}>
-          <Text style={{ width: 10, fontSize: 9, color: t.textDim }}>{shut ? (direction() === 'rtl' ? '◀' : '▶') : '▼'}</Text>
+          <DisclosureGlyph open={!shut} color={t.textDim} />
           <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{g.tag.toUpperCase()}</Text>
           <Text style={{ fontSize: 11, color: t.textDim }}>{g.items.length}</Text>
         </View>,

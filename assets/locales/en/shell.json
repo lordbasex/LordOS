@@ -38,6 +38,8 @@
   "cc.output": "Output",
   "cc.soundSettings": "Sound settings",
   "cc.wifi": "Wi-Fi",
+  "cc.openSettings": "Open in Settings",
+  "cc.displaySettings": "Display settings",
   "classic.allApps": "All apps",
   "classic.back": "Back",
   "classic.bluetooth": "Bluetooth",

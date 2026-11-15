@@ -3,11 +3,13 @@
 // more than one, issue #58), what is playing, the battery and a way into Settings. Every tile with a Settings page
 // has the › half that opens it, as Network and Bluetooth always had: Do Not Disturb opens Notifications, Night Light
 // Displays, Dark mode and Transparency Appearance; the › at the end of the volume row opens Sound (issue #58).
-// Everything comes from the SDK's stores (sound, Bluetooth, battery, Night Light, notifications);
+// The brightness slider (issue #114) is there when LordOS can set the screen's backlight (a laptop's or tablet's own
+// panel), with the › to Settings → Displays; the network glyph lights the Wi-Fi signal's bars.
+// Everything comes from the SDK's stores (sound, Bluetooth, battery, Night Light, notifications, displays);
 // nothing here polls except the network glyph (every 5 s, Taskbar.jsx useNet).
 import {
   View, Text, Slider, useSettings, settings, useSound, defaultSink, sound, useBluetooth, setBluetoothPower, useBattery, BatteryGlyph, NowPlayingTile,
-  nightActive, setNightManual, notifyPrefs, dndActive, wm, addListener, t as tr, SoundOutputList, useSoundOutputs,
+  nightActive, setNightManual, notifyPrefs, dndActive, wm, addListener, t as tr, SoundOutputList, useSoundOutputs, useBacklight,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NetworkGlyph, BluetoothGlyph, MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, SpeakerGlyph, GearGlyph, Chevron } from '../glyphs.jsx';
@@ -49,6 +51,7 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
   const bt = useBluetooth();
   const bat = useBattery();
   const net = useNet();
+  const bl = useBacklight();
   const adapter = bt?.adapter;
   useEffect(() => addListener('pointerdown', (e) => {
     for (let n = e.target; n; n = n.parent) if (n === ref.current) return;
@@ -68,7 +71,7 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Toggle t={t} on={net.online} label={tr('shell.cc.network')} detail={net.online ? (net.vpn ? `${net.name} · VPN` : net.name) : tr('shell.cc.offline')}
             onClick={() => open('network')} onMore={() => open('network', net.vpn ? 'vpn' : undefined)}>
-            {(c) => <NetworkGlyph color={c} size={16} off={!net.online} />}
+            {(c) => <NetworkGlyph color={c} size={16} level={net.bars} off={!net.online} />}
           </Toggle>
           {adapter ? (
             <Toggle t={t} on={!!adapter.powered} label={tr('shell.classic.bluetooth')} onClick={() => setBluetoothPower(!adapter.powered)} onMore={() => open('bluetooth')}>
@@ -88,6 +91,19 @@ export function QuickSettings({ t, at, onClose, isOnBar }) {
             {(c) => <LayersGlyph color={c} size={16} />}
           </Toggle>
         </View>
+        {bl ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, direction: 'ltr' }}>
+            <View title={tr('prefs.display.brightness')} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+              <SunGlyph color={t.text} size={16} />
+            </View>
+            <Slider value={bl.fraction} width={W - 32 - 28 - 10 - 44 - 10 - 34} onChange={bl.set} />
+            <Text style={{ width: 44, fontSize: 12, color: t.textDim, textAlign: 'right' }}>{`${Math.round(bl.fraction * 100)} %`}</Text>
+            <View onClick={() => open('displays')} title={tr('shell.cc.displaySettings')}
+              style={{ width: 24, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
+              <Chevron color={t.text} size={5} dir="right" />
+            </View>
+          </View>
+        ) : null}
         {out && st.connected ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, direction: 'ltr' }}>
             <View onClick={() => sound.setMute('sink', out.index, !out.mute)} style={{ width: 28, height: 28, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>

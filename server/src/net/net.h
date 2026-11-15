@@ -28,6 +28,9 @@ char *net_wifi_known_json(void);
 /* [{type, available, optional, package, insecure}] of the VPN types */
 char *net_vpn_types_json(void);
 char *net_if_config_json(const char *ifname);
+/* A Wi-Fi interface's level in dBm from the text of /proc/net/wireless: 1 and *dbm, or 0 (no reading). The
+ * interfaces' JSON carries it as "signal" (issue #114). */
+int  net_wireless_level(const char *text, const char *ifname, int *dbm);
 /* Reads a user's .ovpn and embeds the files it names (ca, cert, key, tls-auth...)
  * that are in the same folder. NULL + err if it can't. */
 char *net_ovpn_inline(const char *path, char *err, size_t errn);

@@ -5,6 +5,10 @@ import { soundState, defaultSink, sound } from './sound.js';
 import { admin } from './admin.js';
 import { nextVolume, nextBacklight, nextKeyLight, levelFraction } from './hwkeymodel.js';
 import { showLevel } from './levelhud.js';
+import { useState } from 'react';
+import { useStore } from './store.js';
+import { displays } from './hardware.jsx';
+import { backlightOf, backlightValue } from './menubarmodel.js';
 
 function changeVolume(dir) {
   const out = defaultSink(soundState.get());
@@ -42,3 +46,34 @@ export const brightnessUp = () => step('display-brightness', 'backlight', nextBa
 export const brightnessDown = () => step('display-brightness', 'backlight', nextBacklight, -1, 'brightness');
 export const keyLightUp = () => step('keyboard-light', 'keyboardLight', nextKeyLight, 1, 'keylight');
 export const keyLightDown = () => step('keyboard-light', 'keyboardLight', nextKeyLight, -1, 'keylight');
+
+// The brightness slider of Lord Flow's Control Center and Lord Classic's Quick Settings (issue #114): the same closed
+// admin action as the keys and Settings → Displays (display-brightness, checked on the root side), sent at most every
+// 120 ms while the slider moves, always with its last position.
+let pending = null, timer = 0;
+export function setBacklight(name, value) {
+  sent.set(name, { value, at: Date.now() });
+  pending = { name, value };
+  if (timer) return;
+  timer = setTimeout(() => {
+    timer = 0;
+    const p = pending;
+    pending = null;
+    if (p) admin.run('display-brightness', `${p.name} ${p.value}`, undefined, { quiet: true }).catch(() => {});
+  }, 120);
+}
+
+// null without a backlight LordOS can set (a desktop's monitor, a virtual machine): then there is no slider. Else
+// { name, fraction, set(fraction) }; while it moves (and a moment after) it shows its own position, not the file's.
+export function useBacklight() {
+  const list = useStore(displays);
+  const [drag, setDrag] = useState(null);
+  const b = backlightOf(list);
+  if (!b) return null;
+  const mine = drag && drag.name === b.name && Date.now() - drag.at < 1500;
+  const value = mine ? drag.value : b.value;
+  return {
+    name: b.name, fraction: levelFraction(value, b.max),
+    set: (f) => { const v = backlightValue(f, b.max); setDrag({ name: b.name, value: v, at: Date.now() }); setBacklight(b.name, v); },
+  };
+}

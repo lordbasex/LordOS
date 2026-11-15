@@ -4,7 +4,8 @@
 // It checks a taskbar per display, each display's work area, one clock timer and one network poll for all the
 // bars, the start menu, quick settings and notifications opening on the display whose bar was clicked (and the
 // power menu's Lock still reaching the session there, #48), a pin dropped on one bar, the setting turned off,
-// mirrored displays, a monitor unplugged and plugged back, and (#111) more pins than a bar holds. Prints one line per check: "ok <name>" or
+// mirrored displays, a monitor unplugged and plugged back, (#111) more pins than a bar holds and (#114) the quick
+// settings' brightness row. Prints one line per check: "ok <name>" or
 // "FAIL <name> <detail>".
 
 // the timers alive, by interval (installed before anything starts one)
@@ -130,6 +131,13 @@ check('drag: dropped on a bar, the app is pinned', sdk.dock.isPinned('calculator
 const qsButton = [...styles].filter(([id, s]) => s.width === 64 && s.height === 40 && attached(id) && barOf(id) === R.x).map(([id]) => id)[0];
 await click(qsButton, ...onBarOf(R));
 check('quick settings: on the right display', panelAt(360).map((s) => s.left), [R.x + R.w - 12 - 360]);
+// (issue #114) the brightness row only when LordOS can set a backlight, at its level
+const shownText = (v) => [...texts].some(([id, x]) => x === v && attached(id));
+check('quick settings: no brightness row without a backlight', shownText('40 %'), false);
+sdk.displays.set({ outputs: [], backlight: [{ name: 'intel_backlight', value: 400, max: 1000 }] }); await flush();
+check('quick settings: the brightness row with a backlight', shownText('40 %'), true);
+sdk.displays.set(null); await flush();
+check('quick settings: and gone with it', shownText('40 %'), false);
 await plug([L, M]);
 check('unplugged: two taskbars', bars().map((b) => b.x), [0, 1920]);
 check('unplugged: the panel on that display closed', panelAt(360).length, 0);

@@ -110,7 +110,8 @@ function MenuBarSection({ classic }) {
   );
 }
 
-// Lord Flow's Control Center: the tiles that can go. Dark mode, transparency, sound and the wallpaper stay.
+// Lord Flow's Control Center: the tiles that can go (issue #114 added Do Not Disturb, Night Light, brightness and Log
+// Out, all shown unless turned off). Dark mode, transparency, sound and the wallpaper stay.
 function ControlCenterSection() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -126,6 +127,10 @@ function ControlCenterSection() {
       {row('ccNetwork')}
       {row('ccWifi', true)}
       {row('ccBluetooth', true)}
+      {row('ccDnd')}
+      {row('ccNight')}
+      {row('ccBrightness', true)}
+      {row('ccLogout', true)}
     </Section>
   );
 }

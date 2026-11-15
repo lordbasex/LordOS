@@ -11,9 +11,9 @@ import { SoundOutputList } from '../../sdk/soundoutputs.js';
 import { ControlCenter } from '../../themes/default/components/ControlCenter.jsx';
 import { NotificationCenter } from '../../themes/default/components/NotificationCenter.jsx';
 import { makeTheme } from '../../themes/default/tokens.js';
-import { ThemeProvider, monthName } from '../../sdk/index.js';
+import { ThemeProvider, monthName, setBacklight } from '../../sdk/index.js';
 
-const { texts, parents, removed, calls } = globalThis.__lordTest;
+const { styles, texts, parents, removed, calls } = globalThis.__lordTest;
 const h = React.createElement;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((res) => setImmediate(res)); };
 const check = (name, got, want) => console.log(got === want ? `ok ${name}` : `FAIL ${name} got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
@@ -48,6 +48,43 @@ check('cc: memory shown by default', shown('shell.cc.memory'), true);
 check('cc: network shown by default', shown('shell.cc.network'), true);
 check('cc: bluetooth tile with an adapter', shown('shell.cc.bluetooth'), true);
 check('cc: wi-fi tile with a radio', shown('shell.cc.wifi'), true);
+
+// (issue #114) Do Not Disturb, Night Light, the brightness slider (there is a backlight) and Log Out, all by default
+check('cc: do not disturb tile', shown('shell.classic.dnd'), true);
+check('cc: night light tile', shown('shell.classic.nightLight'), true);
+check('cc: brightness with a backlight', shown('prefs.display.brightness'), true);
+check('cc: the slider shows the backlight level', shown('40 %'), true);
+check('cc: log out by default', shown('shell.menu.logout'), true);
+// a switch tile turns on and off with one click anywhere on it, and its color says which
+const tileOf = (s) => parents.get(parents.get(parents.get(textNode(s))));
+const dndTile = tileOf('shell.classic.dnd');
+const accent = parseInt(`ff${t.accent.slice(1)}`, 16);      // lord.setStyle gets colors as 0xAARRGGBB
+check('cc: do not disturb off: grey', styles.get(dndTile)?.backgroundColor === accent, false);
+await click(dndTile);
+check('cc: one click turns do not disturb on', settings.get().notifications?.dnd, true);
+check('cc: do not disturb on: the accent', styles.get(tileOf('shell.classic.dnd'))?.backgroundColor, accent);
+await click(tileOf('shell.classic.dnd'));
+check('cc: another click turns it off', settings.get().notifications?.dnd, false);
+await click(tileOf('shell.classic.nightLight'));
+check('cc: one click turns night light on', settings.get().night?.manual?.on, true);
+await click(tileOf('shell.cc.dark'));
+check('cc: one click on dark mode', settings.get().mode, 'light');
+await click(tileOf('shell.cc.dark'));
+check('cc: and back', settings.get().mode, 'dark');
+// the brightness slider's writes: the closed admin action, at most one per 120 ms, with the last position
+calls.length = 0;
+setBacklight('intel_backlight', 300); setBacklight('intel_backlight', 500); setBacklight('intel_backlight', 650);
+await new Promise((res) => setTimeout(res, 200)); await flush();
+check('cc: brightness sends its last position once', calls.filter((c) => c.startsWith('admin:')).join(','), 'admin:display-brightness:intel_backlight 650');
+// Log Out and the new tiles can be hidden like the metrics; Settings stays
+settings.set({ menuBar: { ccLogout: false, ccDnd: false, ccNight: false, ccBrightness: false } });
+await flush();
+check('cc: log out hidden', shown('shell.menu.logout'), false);
+check('cc: settings stays', shown('shell.menu.settings'), true);
+check('cc: do not disturb hidden', shown('shell.classic.dnd'), false);
+check('cc: night light hidden', shown('shell.classic.nightLight'), false);
+check('cc: brightness hidden', shown('prefs.display.brightness'), false);
+check('cc: memory stays when log out is hidden', shown('shell.cc.memory'), true);
 settings.set({ menuBar: { ccSystem: false, ccNetwork: false, ccWifi: false, ccBluetooth: false } });
 await flush();
 check('cc: memory hidden', shown('shell.cc.memory'), false);

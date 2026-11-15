@@ -117,7 +117,9 @@ export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
 export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
-export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor } from './menubarmodel.js';   // what the bar shows (issue #58)
+export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from './quickglyphs.jsx';   // quick settings' glyphs (issue #114)
+export { setBacklight, useBacklight } from './hwkeys.js';   // the Control Center's brightness slider (issue #114)
+export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor, wifiBars, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)
 export { menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from './menubarmodel.js';   // a bar on every display
 export { SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex } from './menunav.js';   // menus from the keyboard
 export { sharedTicker, idleStore } from './ticker.js';
@@ -148,7 +150,7 @@ export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
 import { Layer, enableShellLayers } from './layers.js';
 export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
-  Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar,
+  Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar, Disclosure, DisclosureGlyph,
 } from './controls.jsx';
 // (0.8.8.8) lists whose rows are chosen with the pointer and the keys: Shift ranges, Ctrl toggles, type-to-find
 export { List, Table } from './lists.jsx';

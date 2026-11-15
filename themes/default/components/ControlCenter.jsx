@@ -1,12 +1,17 @@
-// Control Center: mode, transparency, the volume and its output, the network, Wi-Fi and Bluetooth, accent,
-// wallpaper and live CPU/RAM usage. The network, Wi-Fi, Bluetooth and CPU/RAM tiles can be turned off in Settings →
-// Desktop & Dock → Control Center (issue #58, sdk/menubarmodel.js).
+// Control Center: mode, transparency, Do Not Disturb and Night Light, the volume and its output, the screen's brightness,
+// the network, Wi-Fi and Bluetooth, accent, wallpaper and live CPU/RAM usage. The network, Wi-Fi, Bluetooth, Do Not
+// Disturb, Night Light, brightness, CPU/RAM tiles and Log Out can be turned off in Settings → Desktop & Dock → Control
+// Center (issues #58 and #114, sdk/menubarmodel.js).
 // A click on a tile's name (and the line under it) opens its page in Settings, as the Wi-Fi tile always did: Dark
 // Mode, Transparency and Accent open Appearance, Sound opens Sound and Wallpaper opens Wallpaper (issue #58).
+// Switch tiles (issue #114): a click anywhere on the tile turns it on or off and the tile shows which (the accent when
+// on, grey when off); its name and the › at its end open its page in Settings. Wi-Fi's icon shows the signal's bars.
+// The panel scrolls when a short screen can't hold it all.
 import {
-  View, Text, Image, Toggle, Slider, useSettings, useCpuUsage, useSystemInfo, memUsedKB, formatBytes, wm, session, addListener, t as tr,
+  View, Text, Image, Slider, useSettings, settings, useCpuUsage, useSystemInfo, memUsedKB, formatBytes, wm, session, addListener, t as tr,
   useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
-  panelLeft, inBar,
+  panelLeft, inBar, ScrollView, screen, nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, DisclosureGlyph,
+  MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -41,6 +46,47 @@ function Meter({ t, label, value, detail }) {
       <View style={{ height: 6, borderRadius: 3, backgroundColor: t.control }}>
         <View style={{ width: `${Math.round(value * 100)}%`, height: 6, borderRadius: 3, backgroundColor: t.accent }} />
       </View>
+    </View>
+  );
+}
+
+// A switch tile's parts: the round icon (white on the accent when on, the control grey when off) and the › at the end
+// that opens its page in Settings (mirrored in right to left).
+const iconBg = (t, on) => (on ? '#ffffff' : t.control);
+function TileIcon({ t, on, children }) {
+  return (
+    <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: iconBg(t, on) }}>
+      {children(on ? t.accent : t.text, iconBg(t, on))}
+    </View>
+  );
+}
+function MoreButton({ color, onClick }) {
+  return (
+    <View onClick={(e) => { e?.stopPropagation?.(); onClick(); }} title={tr('shell.cc.openSettings')}
+      style={{ width: 16, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+      <DisclosureGlyph open={false} color={color} size={9} width={12} height={12} />
+    </View>
+  );
+}
+
+// One line: the icon, the name over its state (On or Off unless detail says more) and the ›. A click on the tile turns
+// it on or off; the name and the › open its page in Settings. glyph(color, bg): the icon.
+function SwitchTile({ t, on, label, detail, glyph, onToggle, onSettings }) {
+  const [hover, setHover] = useState(false);
+  const fg = on ? '#ffffff' : t.text;
+  const dim = on ? 'rgba(255,255,255,0.8)' : t.textDim;
+  return (
+    <View onClick={onToggle} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 9, borderRadius: 12,
+        backgroundColor: on ? t.accent : t.hover, border: `1px solid ${on ? t.accent : t.separator}`, opacity: hover ? 0.9 : 1 }}>
+      <TileIcon t={t} on={on}>{glyph}</TileIcon>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <View onClick={(e) => { e?.stopPropagation?.(); onSettings(); }}>
+          <Text style={{ fontSize: 12, fontWeight: 600, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{label}</Text>
+        </View>
+        <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{detail ?? tr(on ? 'shell.cc.on' : 'shell.cc.off')}</Text>
+      </View>
+      <MoreButton color={dim} onClick={onSettings} />
     </View>
   );
 }
@@ -88,33 +134,46 @@ function SoundTile({ t, onClose }) {
   );
 }
 
-// The Wi-Fi radio (only when the computer has one): connected or not; a click opens Settings → Network → Wi-Fi.
+// The Wi-Fi radio (only when the computer has one): connected or not, with the signal's bars on its icon (the level
+// lord.net.interfaces() reads from /proc/net/wireless, issue #114); a click opens Settings → Network → Wi-Fi.
 function WifiTile({ t, onClose, radios }) {
   const on = radios.find((i) => i.addresses.some((a) => a.scope === 'global' && a.family === 4));
   const ip = on?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address;
+  const open = () => openSettings(onClose, 'network', 'wifi');
   return (
-    <Tile t={t} style={{ flex: 1, gap: 3 }}>
-      <View onClick={() => openSettings(onClose, 'network', 'wifi')} style={{ gap: 3 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.wifi')}</Text>
-        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{on ? `${on.name} · ${ip}` : tr('shell.cc.notConnected')}</Text>
+    <View onClick={open} style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 9, borderRadius: 12,
+      backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
+      <TileIcon t={t} on={false}>{(c) => <SignalGlyph color={c} size={14} level={on ? wifiBars(on.signal) : 0} off={!on} />}</TileIcon>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{tr('shell.cc.wifi')}</Text>
+        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{on ? `${on.name} · ${ip}` : tr('shell.cc.notConnected')}</Text>
       </View>
-    </Tile>
+      <MoreButton color={t.textDim} onClick={open} />
+    </View>
   );
 }
 
-// Bluetooth (only with an adapter): the switch turns it on or off; the name opens Settings → Bluetooth.
+// Bluetooth (only with an adapter): a click on the tile turns it on or off; the name opens Settings → Bluetooth.
 function BluetoothTile({ t, onClose, bt }) {
   const adapter = bt.adapter;
   const dev = (bt.devices || []).find((d) => d.connected);
   return (
-    <Tile t={t} style={{ flex: 1, gap: 6 }}>
-      <View onClick={() => openSettings(onClose, 'bluetooth')} style={{ gap: 3 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.bluetooth')}</Text>
-        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-          {!adapter.powered ? tr('shell.cc.off') : dev ? dev.name : tr('shell.cc.on')}
-        </Text>
+    <SwitchTile t={t} on={!!adapter.powered} label={tr('shell.cc.bluetooth')} detail={adapter.powered && dev ? dev.name : undefined}
+      glyph={(c) => <BluetoothGlyph color={c} size={14} />} onToggle={() => setBluetoothPower(!adapter.powered)} onSettings={() => openSettings(onClose, 'bluetooth')} />
+  );
+}
+
+// The screen's brightness (issue #114), only when LordOS can set it (a laptop's or tablet's own panel): the same
+// action as the brightness keys. The name opens Settings → Displays.
+function BrightnessTile({ t, onClose, bl }) {
+  return (
+    <Tile t={t} style={{ gap: 8 }}>
+      <TileTitle t={t} onClick={() => openSettings(onClose, 'displays')}>{tr('prefs.display.brightness')}</TileTitle>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
+        <View style={{ width: 26, alignItems: 'center' }}><SunGlyph color={t.textDim} size={13} /></View>
+        <Slider value={bl.fraction} width={196} onChange={bl.set} />
+        <Text style={{ fontSize: 11, color: t.textDim, width: 34, textAlign: 'end' }}>{`${Math.round(bl.fraction * 100)} %`}</Text>
       </View>
-      <Toggle on={!!adapter.powered} onChange={(on) => setBluetoothPower(on)} />
     </Tile>
   );
 }
@@ -145,8 +204,10 @@ const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === re
 
 // area: the display of the menu bar it opened from (global coordinates); at: the [x, width] of the bar item that
 // opened it, so it sits under that item, inside that display (sdk/menubarmodel.js panelLeft)
+const W = 340;       // (issue #114) 20 px wider than before, for a name next to each switch tile's icon
 export function ControlCenter({ t, top, onClose, area = null, at = null }) {
-  const left = panelLeft(at, 320, area), ay = area ? area.y : 0;
+  const left = panelLeft(at, W, area), ay = area ? area.y : 0;
+  const maxH = Math.max(240, (area ? area.h : screen.height) - top - 16);
   const [s, set] = useSettings();
   const p = menuBarPrefs(s);
   let ifs = [];
@@ -154,6 +215,10 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
   const radios = p.ccWifi ? ifs.filter((i) => i.type === 'wifi') : [];
   const bt = useBluetooth();
   const btShown = p.ccBluetooth && !!bt?.adapter;
+  const bl = useBacklight();
+  const dnd = dndActive();
+  const setDnd = (on) => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !!on } }));
+  const night = nightActive();
   const cpu = useCpuUsage(1500);
   const info = useSystemInfo(3000);
   const ref = useRef(null);
@@ -166,61 +231,70 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
 
   return (
     <View ref={ref} style={{
-      position: 'absolute', ...(left == null ? { right: 10 } : { left }), top: ay + top + 6, width: 320, padding: 12, gap: 10, borderRadius: 16,
+      position: 'absolute', ...(left == null ? { right: 10 } : { left }), top: ay + top + 6, width: W, borderRadius: 16, overflow: 'hidden',
       backgroundColor: t.panelBg, backdropFilter: `blur(${t.blur}px)`, border: `1px solid ${t.windowBorder}`,
       boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
     }}>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Tile t={t} style={{ flex: 1, gap: 8 }}>
-          <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.dark')}</TileTitle>
-          <Toggle on={s.mode === 'dark'} onChange={(on) => set({ mode: on ? 'dark' : 'light' })} />
-        </Tile>
-        <Tile t={t} style={{ flex: 1, gap: 8 }}>
-          <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.effects')}</TileTitle>
-          <Toggle on={s.effects} onChange={(effects) => set({ effects })} />
-        </Tile>
-      </View>
-      <SoundTile t={t} onClose={onClose} />
-      <NowPlayingTile />
-      {p.ccNetwork && typeof lord.net !== 'undefined' ? <NetTile t={t} onClose={onClose} ifs={ifs} /> : null}
-      {radios.length || btShown ? (
+      <ScrollView style={{ maxHeight: maxH }} contentStyle={{ padding: 12, gap: 10 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          {radios.length ? <WifiTile t={t} onClose={onClose} radios={radios} /> : null}
-          {btShown ? <BluetoothTile t={t} onClose={onClose} bt={bt} /> : null}
+          <SwitchTile t={t} on={s.mode === 'dark'} label={tr('shell.cc.dark')} glyph={(c) => <ContrastGlyph color={c} size={14} />}
+            onToggle={() => set({ mode: s.mode === 'dark' ? 'light' : 'dark' })} onSettings={() => openSettings(onClose, 'appearance')} />
+          <SwitchTile t={t} on={s.effects !== false} label={tr('shell.cc.effects')} glyph={(c) => <LayersGlyph color={c} size={14} />}
+            onToggle={() => set({ effects: s.effects === false })} onSettings={() => openSettings(onClose, 'appearance')} />
         </View>
-      ) : null}
-      <Tile t={t} style={{ gap: 10 }}>
-        <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.accent')}</TileTitle>
+        {p.ccDnd || p.ccNight ? (
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {p.ccDnd ? <SwitchTile t={t} on={dnd} label={tr('shell.classic.dnd')} glyph={(c, bg) => <MoonGlyph color={c} bg={bg} size={14} />}
+              onToggle={() => setDnd(!dnd)} onSettings={() => openSettings(onClose, 'notifications')} /> : null}
+            {p.ccNight ? <SwitchTile t={t} on={night} label={tr('shell.classic.nightLight')} glyph={(c) => <SunGlyph color={c} size={14} />}
+              onToggle={() => setNightManual(!night)} onSettings={() => openSettings(onClose, 'displays')} /> : null}
+          </View>
+        ) : null}
+        <SoundTile t={t} onClose={onClose} />
+        {p.ccBrightness && bl ? <BrightnessTile t={t} onClose={onClose} bl={bl} /> : null}
+        <NowPlayingTile />
+        {p.ccNetwork && typeof lord.net !== 'undefined' ? <NetTile t={t} onClose={onClose} ifs={ifs} /> : null}
+        {radios.length || btShown ? (
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {radios.length ? <WifiTile t={t} onClose={onClose} radios={radios} /> : null}
+            {btShown ? <BluetoothTile t={t} onClose={onClose} bt={bt} /> : null}
+          </View>
+        ) : null}
+        <Tile t={t} style={{ gap: 10 }}>
+          <TileTitle t={t} onClick={() => openSettings(onClose, 'appearance')}>{tr('shell.cc.accent')}</TileTitle>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {Object.entries(t.accents).map(([name, c]) => (
+              <View key={name} onClick={() => set({ accent: name })} style={{ width: 22, height: 22, borderRadius: 11,
+                backgroundColor: c, border: s.accent === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
+            ))}
+          </View>
+        </Tile>
+        <Tile t={t} style={{ gap: 8 }}>
+          <TileTitle t={t} onClick={() => openSettings(onClose, 'wallpaper')}>{tr('shell.cc.wallpaper')}</TileTitle>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {quickWallpapers(t.wallpapers, s.wallpaper).map((w) => (
+              <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ width: 62, height: 40, borderRadius: 6, overflow: 'hidden',
+                border: s.wallpaper === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
+                <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </View>
+            ))}
+          </View>
+        </Tile>
+        {p.ccSystem ? <Tile t={t} style={{ gap: 12 }}>
+          <Meter t={t} label="CPU" value={cpu} detail={tr('shell.cc.cpuDetail', { pct: Math.round(cpu * 100), count: info.cores })} />
+          <Meter t={t} label={tr('shell.cc.memory')} value={used} detail={tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
+        </Tile> : null}
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          {Object.entries(t.accents).map(([name, c]) => (
-            <View key={name} onClick={() => set({ accent: name })} style={{ width: 22, height: 22, borderRadius: 11,
-              backgroundColor: c, border: s.accent === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
-          ))}
+          <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>
+            <View onClick={() => { onClose(); wm.open('settings'); }}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.menu.settings')}</Text></View>
+          </Tile>
+          {p.ccLogout ? (
+            <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>
+              <View onClick={() => session.quit()}><Text style={{ fontSize: 12, fontWeight: 600, color: '#ff5f57' }}>{tr('shell.menu.logout')}</Text></View>
+            </Tile>
+          ) : null}
         </View>
-      </Tile>
-      <Tile t={t} style={{ gap: 8 }}>
-        <TileTitle t={t} onClick={() => openSettings(onClose, 'wallpaper')}>{tr('shell.cc.wallpaper')}</TileTitle>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {quickWallpapers(t.wallpapers, s.wallpaper).map((w) => (
-            <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ width: 62, height: 40, borderRadius: 6, overflow: 'hidden',
-              border: s.wallpaper === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
-              <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </View>
-          ))}
-        </View>
-      </Tile>
-      {p.ccSystem ? <Tile t={t} style={{ gap: 12 }}>
-        <Meter t={t} label="CPU" value={cpu} detail={tr('shell.cc.cpuDetail', { pct: Math.round(cpu * 100), count: info.cores })} />
-        <Meter t={t} label={tr('shell.cc.memory')} value={used} detail={tr('shell.cc.memDetail', { used: formatBytes(memUsedKB(info) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
-      </Tile> : null}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>
-          <View onClick={() => { onClose(); wm.open('settings'); }}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.menu.settings')}</Text></View>
-        </Tile>
-        <Tile t={t} style={{ flex: 1, alignItems: 'center' }}>
-          <View onClick={() => session.quit()}><Text style={{ fontSize: 12, fontWeight: 600, color: '#ff5f57' }}>{tr('shell.menu.logout')}</Text></View>
-        </Tile>
-      </View>
+      </ScrollView>
     </View>
   );
 }
