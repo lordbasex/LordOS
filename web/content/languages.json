@@ -1,5 +1,6 @@
 {
-  "about": "The languages page, /language/ (web/build.mjs), lists every language in assets/locales/<id>/meta.json. \"next\" holds the languages new in the next pre-release, in development: they are listed even before their files are bundled (with the data given here; a meta.json wins) and marked as coming in the next pre-release. Empty it once that release ships.",
+  "about": "The languages page, /language/ (web/build.mjs), lists every language in assets/locales/<id>/meta.json. \"next\" holds the languages new in the next pre-release, in development: they are listed even before their files are bundled (with the data given here; a meta.json wins) and marked as coming in the next pre-release. Empty it once that release ships. \"nextVersion\" is the version that ships them, named on the page and in its welcome (\"from 0.8.8.9 it ships 35 languages\"): keep it after that release, or reword the welcome. The welcome's number of countries and the visits chart come from visits-by-country.json.",
+  "nextVersion": "0.8.8.9",
   "next": [
     {
       "id": "id",

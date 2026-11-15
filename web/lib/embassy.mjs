@@ -1,6 +1,7 @@
 // The /language/ page's picture: Lumo waving in front of an embassy with flagpoles. Our own drawing, built from
 // plain shapes: the building follows the site's colours (CSS classes in site.css, light and dark), the flags are
-// simple stripes and discs (decoration only: the page names each language by its own name, never by a flag).
+// simple stripes and discs (decoration only, like the small flag on each language card: a language's own name
+// stays its identifier).
 // lumo is the URL of the hashed mascot SVG (assets/brand/mascot/lumo-wave.svg). Lumo waves a small Argentine flag in
 // its raised paw, a nod to where LordOS is made.
 

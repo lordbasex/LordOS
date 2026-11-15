@@ -191,6 +191,24 @@ body:has(.nav-cb:checked){overflow:hidden}
 @media (max-width:520px){.lg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lg-card{padding:14px}.lg-card strong{font-size:18px}}
 .lg-card{display:flex;flex-direction:column;gap:4px;min-width:0;padding:16px 18px;border-radius:16px;background:var(--surface);border:1px solid var(--line-2)}
 .lg-card strong{font-size:20px;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
+.lg-head{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.lg-head strong{min-width:0}
+/* the card's flag (decoration, web/src/flags): a hairline so white stripes show on a light or dark card */
+.lg-fl{flex:none;width:20px;height:15px;margin-top:6px;border-radius:2px;box-shadow:0 0 0 1px var(--chip-line);object-fit:cover}
+@media (max-width:520px){.lg-fl{margin-top:4px}}
+.lg-welcome{margin:0 0 14px;max-width:640px;font-size:clamp(18px,2vw,21px);line-height:1.5;font-weight:700;color:var(--brand-ink)}
+/* where the visitors come from: the build's donut (one hue fading by rank, "other" neutral) and its legend */
+.lg-visits{display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px;align-items:center;margin:20px 0 0}
+@media (max-width:700px){.lg-visits{grid-template-columns:minmax(0,1fr);gap:20px}}
+.lg-donut{display:block;width:100%;max-width:240px;height:auto;margin:0 auto}
+.lg-v-s{fill:var(--brand)}.lg-v-o{fill:var(--chip-line)}
+.lg-donut path{stroke:var(--bg);stroke-width:2;stroke-linejoin:round}
+.lg-v-n{fill:var(--ink);font-size:30px;font-weight:800}.lg-v-l{fill:var(--subtle);font-size:13px}
+.lg-legend{columns:2 210px;column-gap:40px;max-width:660px;margin:0;padding:0;list-style:none}
+.lg-legend li{display:flex;align-items:center;gap:8px;padding:3px 0;break-inside:avoid;font-size:14px;min-width:0}
+.lg-sw{flex:none}.lg-fl-x{flex:none;width:20px}.lg-legend .lg-fl{margin-top:0}
+.lg-v-c{flex:1;min-width:0;color:var(--ink-2);overflow-wrap:anywhere}
+.lg-v-v{color:var(--subtle);font-variant-numeric:tabular-nums}
 .lg-card[dir=rtl] strong,.lg-card strong[dir=rtl]{text-align:start}
 .lg-en{font-size:14px;color:var(--subtle)}
 .lg-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}

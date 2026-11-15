@@ -148,6 +148,7 @@ function font(cut) {
 const fontMedium = font('Medium');
 const fontExtraBold = font('ExtraBold');
 write('licenses/PlusJakartaSans-OFL.txt', read(r('assets/fonts/PlusJakartaSans-LICENSE.txt')));
+write('licenses/flag-icons-MIT.txt', read(path.join(WEB, 'src/flags/LICENSE')));   // the /language/ cards' flags
 
 // ---------- css / js ----------
 const css = src('site.css')
@@ -310,18 +311,26 @@ function parseChangelog(src) {
   });
 }
 const legalDir = path.join(CONTENT, 'legal');
+// content/languages.json "nextVersion": the version that ships the "next" languages, named on /language/
+const LANG_J = fs.existsSync(path.join(CONTENT, 'languages.json')) ? readJson(path.join(CONTENT, 'languages.json')) : {};
+const NEXT_LANG_VERSION = LANG_J.nextVersion || '';
+// content/visits-by-country.json: lordos.org's page views and visitors per country (the site's private statistics,
+// people only), for /language/'s welcome ("countries") and its chart; replace the file to update both
+const VISITS = fs.existsSync(path.join(CONTENT, 'visits-by-country.json')) ? readJson(path.join(CONTENT, 'visits-by-country.json')) : null;
 // UI languages for /language/: every bundled assets/locales/<id>/meta.json, plus content/languages.json "next" (new in
 // the next pre-release, listed even before their files are bundled; a meta.json wins). Released and complete first,
 // en first; then the next pre-release's in languages.json's order; a partial one (still being translated, never
 // shipped) last.
 const langList = (() => {
   const dir = path.join(REPO, 'assets/locales');
-  const nextJ = fs.existsSync(path.join(CONTENT, 'languages.json')) ? readJson(path.join(CONTENT, 'languages.json')).next || [] : [];
+  const nextJ = LANG_J.next || [];
   const nextIds = new Set(nextJ.map((x) => x.id));
   const metas = fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, 'meta.json'))).map((d) => readJson(path.join(dir, d, 'meta.json')));
   if (!metas.some((m) => m.id === 'en')) metas.unshift({ id: 'en', name: 'English', english: 'English', direction: 'ltr' });
   const all = [...metas, ...nextJ.filter((x) => !metas.some((m) => m.id === x.id))]
-    .map((m) => ({ id: m.id, name: m.name, english: m.english, direction: m.direction || 'ltr', partial: m.partial === true, next: nextIds.has(m.id) }));
+    .map((m) => ({ id: m.id, name: m.name, english: m.english, direction: m.direction || 'ltr', partial: m.partial === true, next: nextIds.has(m.id),
+      // the card's flag: the country of the locale most of its speakers use (meta.json "region", e.g. es_AR -> ar)
+      country: (/^[a-z]{2,3}_([A-Z]{2})/.exec(m.region || '') || [])[1] }));
   const order = ['en', 'es', 'pt', 'fr', 'it'];
   const rank = (x) => (order.includes(x.id) ? order.indexOf(x.id) : order.length);
   const pos = (x) => (nextIds.has(x.id) ? nextJ.findIndex((y) => y.id === x.id) : -1);
@@ -1154,10 +1163,54 @@ ${(c.items || []).map((it) => {
     const L = t.pages.language;
     const names = new Intl.DisplayNames([l], { type: 'language' });
     const cap = (s) => s.charAt(0).toLocaleUpperCase(l) + s.slice(1);
+    // a small country flag on each card, decoration only (the name is the identifier): self-hosted flag-icons SVGs in
+    // web/src/flags (MIT, web/src/flags/LICENSE), hashed like every asset; no flag when the file or region is missing
+    const flag = (cc) => {
+      const f = cc && path.join(WEB, 'src/flags', cc.toLowerCase() + '.svg');
+      return f && fs.existsSync(f) ? `<img class="lg-fl" src="${asset(f, 'flags/' + cc.toLowerCase())}" alt="" aria-hidden="true" width="20" height="15" loading="lazy" decoding="async">` : '';
+    };
+    // where the visitors come from (VISITS): a donut drawn here as inline SVG, the top 20 countries by page views and
+    // one "other countries" slice. One hue (the brand colour, light and dark) fading by rank, so a slice's place in the
+    // ring matches its place in the legend; "other" is neutral. The SVG is role="img" with a summary, the legend is
+    // aria-hidden and a visually hidden table holds the same numbers.
+    const visits = (() => {
+      if (!VISITS || !Array.isArray(VISITS.rows) || !VISITS.rows.length) return '';
+      const nf = new Intl.NumberFormat(l, { useGrouping: 'always' });
+      const pct = new Intl.NumberFormat(l, { style: 'percent', maximumFractionDigits: 1 });
+      const regions = new Intl.DisplayNames([l], { type: 'region' });
+      const rows = [...VISITS.rows].sort((a, b) => b.views - a.views);
+      const total = rows.reduce((n, x) => n + x.views, 0);
+      const top = rows.slice(0, 20), rest = rows.slice(20);
+      const slices = top.map((x, i) => ({ cc: x.cc, name: regions.of(x.cc) || x.cc, views: x.views, visitors: x.visitors, op: (1 - (i / top.length) * 0.72).toFixed(2) }));
+      if (rest.length) slices.push({ other: true, name: L.visitsOther.replace('{n}', nf.format(rest.length)), views: rest.reduce((n, x) => n + x.views, 0), visitors: rest.reduce((n, x) => n + x.visitors, 0) });
+      const C = 120, RO = 112, RI = 72;
+      const pt = (r, a) => `${(C + r * Math.sin(a)).toFixed(2)} ${(C - r * Math.cos(a)).toFixed(2)}`;
+      let a0 = 0;
+      const arcs = slices.map((x) => {
+        const a1 = a0 + (x.views / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
+        const d = `M${pt(RO, a0)}A${RO} ${RO} 0 ${big} 1 ${pt(RO, a1)}L${pt(RI, a1)}A${RI} ${RI} 0 ${big} 0 ${pt(RI, a0)}Z`;
+        a0 = a1;
+        return `<path class="${x.other ? 'lg-v-o' : 'lg-v-s'}" d="${d}"${x.other ? '' : ` fill-opacity="${x.op}"`}><title>${esc(`${x.name}: ${nf.format(x.views)} (${pct.format(x.views / total)})`)}</title></path>`;
+      }).join('');
+      const label = L.visitsAria.replace('{top}', slices.filter((x) => !x.other).slice(0, 5).map((x) => `${x.name} ${nf.format(x.views)}`).join(', '))
+        .replace('{n}', nf.format(rest.length + top.length - 5)).replace('{total}', nf.format(total));
+      const svg = `<svg class="lg-donut" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="${esc(label)}">${arcs}` +
+        `<text class="lg-v-n" x="120" y="122" text-anchor="middle">${esc(nf.format(total))}</text>` +
+        `<text class="lg-v-l" x="120" y="146" text-anchor="middle">${esc(L.visitsTotal)}</text></svg>`;
+      const legend = slices.map((x) => `<li><svg class="lg-sw" viewBox="0 0 12 12" width="12" height="12"><rect class="${x.other ? 'lg-v-o' : 'lg-v-s'}" width="12" height="12" rx="3"${x.other ? '' : ` fill-opacity="${x.op}"`}/></svg>` +
+        `${(!x.other && flag(x.cc)) || '<span class="lg-fl-x"></span>'}<span class="lg-v-c">${esc(x.name)}</span><span class="lg-v-v">${esc(nf.format(x.views))}</span></li>`).join('');
+      const table = `<table class="vh"><caption>${esc(L.visitsTitle)}</caption><thead><tr><th scope="col">${esc(L.visitsCountry)}</th><th scope="col">${esc(L.visitsViews)}</th><th scope="col">${esc(L.visitsVisitors)}</th></tr></thead><tbody>` +
+        slices.map((x) => `<tr><th scope="row">${esc(x.name)}</th><td>${esc(nf.format(x.views))}</td><td>${esc(nf.format(x.visitors))}</td></tr>`).join('') + '</tbody></table>';
+      const day = (s) => new Date(s + 'T12:00:00Z');
+      const dates = new Intl.DateTimeFormat(l === 'en' ? 'en-GB' : l, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).formatRange(day(VISITS.since), day(VISITS.taken));
+      return `<section class="hw-sec" aria-labelledby="lg-v">\n<h2 id="lg-v">${esc(L.visitsTitle)}</h2>\n<p class="lg-p">${esc(L.visitsThanks)}</p>\n` +
+        `<div class="lg-visits">${svg}<ol class="lg-legend" aria-hidden="true">${legend}</ol></div>\n${table}\n` +
+        `<p class="lg-note">${esc(L.visitsSource.replace('{dates}', dates))}</p>\n</section>`;
+    })();
     const card = (x) => {
       const tags = [x.id === 'en' ? L.default : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)   // "next" is said once, by the subsection
         .map((s) => `<span class="hw-st">${esc(s)}</span>`).join(' ');
-      return `<li class="lg-card"><strong lang="${esc(x.id)}" dir="${x.direction === 'rtl' ? 'rtl' : 'ltr'}">${esc(x.name)}</strong>` +
+      return `<li class="lg-card"><span class="lg-head">${flag(x.country)}<strong lang="${esc(x.id)}" dir="${x.direction === 'rtl' ? 'rtl' : 'ltr'}">${esc(x.name)}</strong></span>` +
         `<span class="lg-en">${esc(cap(names.of(x.id) || x.english))}</span>${tags ? `<span class="lg-tags">${tags}</span>` : ''}</li>`;
     };
     const stats = linkBuilt('/legal/cookies-and-statistics/') ? `<a href="${pageUrl(l, 'legal/cookies-and-statistics')}">${esc(L.statsLink)}</a>` : esc(L.statsLink);
@@ -1165,14 +1218,18 @@ ${(c.items || []).map((it) => {
     write(path.join(pageUrl(l, 'language'), 'index.html'), render(tpl.language, {
       ...common('language', [L.metaTitle, L.metaDescription], true),
       embassy: embassy(img.lumoWave, esc(L.figAlt)),
-      status: langList.some((x) => x.next) ? esc(L.status.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
+      status: langList.some((x) => x.next) ? esc(L.status.replace('{release}', `${PKG.version}${CHANNEL}`).replace('{next}', NEXT_LANG_VERSION)
+        .replace('{count}', String(langList.filter((x) => !x.partial).length))) : '',
       complete: langList.filter((x) => !x.partial && !x.next).map(card).join('\n'),
       // the next pre-release's languages, complete like the rest (a language ships only when complete); none once it ships
       fresh: langList.some((x) => x.next && !x.partial)
-        ? `<h3 class="lg-sub">${esc(L.newTitle)}</h3>\n<p class="lg-p">${esc(L.newText)} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n` +
+        ? `<h3 class="lg-sub">${esc(L.newTitle.replace('{next}', NEXT_LANG_VERSION))}</h3>\n<p class="lg-p">${esc(L.newText)} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n` +
           `<ul class="lg-grid lg-small">\n${langList.filter((x) => x.next && !x.partial).map(card).join('\n')}\n</ul>\n`
         : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
+      visits,
+      welcome: esc(L.welcome.replace('{countries}', String((VISITS && VISITS.countries) || '')).replace('{next}', NEXT_LANG_VERSION)
+        .replace('{count}', String(langList.filter((x) => !x.partial).length))),
       steps,
       requestUrl: `${GITHUB}/issues/new?template=language-request.yml`,
       guideUrl: `${GITHUB}/blob/main/docs/TRANSLATING.md`,

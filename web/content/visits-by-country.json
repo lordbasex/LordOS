@@ -1,0 +1,773 @@
+{
+ "source": "lordos.org CloudWatch (CloudFront logs, people only, bots excluded)",
+ "since": "2026-11-11",
+ "taken": "2026-11-15",
+ "countries": 153,
+ "rows": [
+  {
+   "cc": "ID",
+   "views": 7082,
+   "visitors": 3610
+  },
+  {
+   "cc": "BR",
+   "views": 4020,
+   "visitors": 1757
+  },
+  {
+   "cc": "US",
+   "views": 1789,
+   "visitors": 882
+  },
+  {
+   "cc": "IT",
+   "views": 1253,
+   "visitors": 157
+  },
+  {
+   "cc": "IN",
+   "views": 877,
+   "visitors": 456
+  },
+  {
+   "cc": "JP",
+   "views": 646,
+   "visitors": 374
+  },
+  {
+   "cc": "ES",
+   "views": 595,
+   "visitors": 258
+  },
+  {
+   "cc": "DE",
+   "views": 452,
+   "visitors": 235
+  },
+  {
+   "cc": "FR",
+   "views": 383,
+   "visitors": 169
+  },
+  {
+   "cc": "MX",
+   "views": 351,
+   "visitors": 213
+  },
+  {
+   "cc": "PT",
+   "views": 330,
+   "visitors": 166
+  },
+  {
+   "cc": "GB",
+   "views": 287,
+   "visitors": 134
+  },
+  {
+   "cc": "CA",
+   "views": 270,
+   "visitors": 143
+  },
+  {
+   "cc": "AR",
+   "views": 258,
+   "visitors": 113
+  },
+  {
+   "cc": "MY",
+   "views": 228,
+   "visitors": 120
+  },
+  {
+   "cc": "CO",
+   "views": 210,
+   "visitors": 109
+  },
+  {
+   "cc": "BD",
+   "views": 200,
+   "visitors": 102
+  },
+  {
+   "cc": "CL",
+   "views": 192,
+   "visitors": 76
+  },
+  {
+   "cc": "PL",
+   "views": 190,
+   "visitors": 98
+  },
+  {
+   "cc": "SG",
+   "views": 165,
+   "visitors": 96
+  },
+  {
+   "cc": "VE",
+   "views": 151,
+   "visitors": 68
+  },
+  {
+   "cc": "NL",
+   "views": 149,
+   "visitors": 63
+  },
+  {
+   "cc": "PE",
+   "views": 144,
+   "visitors": 73
+  },
+  {
+   "cc": "CH",
+   "views": 133,
+   "visitors": 41
+  },
+  {
+   "cc": "AU",
+   "views": 117,
+   "visitors": 67
+  },
+  {
+   "cc": "DO",
+   "views": 112,
+   "visitors": 57
+  },
+  {
+   "cc": "DZ",
+   "views": 110,
+   "visitors": 54
+  },
+  {
+   "cc": "VN",
+   "views": 97,
+   "visitors": 56
+  },
+  {
+   "cc": "RO",
+   "views": 97,
+   "visitors": 42
+  },
+  {
+   "cc": "UA",
+   "views": 93,
+   "visitors": 46
+  },
+  {
+   "cc": "TR",
+   "views": 92,
+   "visitors": 44
+  },
+  {
+   "cc": "CN",
+   "views": 92,
+   "visitors": 58
+  },
+  {
+   "cc": "RU",
+   "views": 90,
+   "visitors": 43
+  },
+  {
+   "cc": "HK",
+   "views": 86,
+   "visitors": 39
+  },
+  {
+   "cc": "BE",
+   "views": 78,
+   "visitors": 43
+  },
+  {
+   "cc": "EC",
+   "views": 76,
+   "visitors": 39
+  },
+  {
+   "cc": "EG",
+   "views": 72,
+   "visitors": 29
+  },
+  {
+   "cc": "PH",
+   "views": 71,
+   "visitors": 41
+  },
+  {
+   "cc": "ZA",
+   "views": 69,
+   "visitors": 37
+  },
+  {
+   "cc": "PK",
+   "views": 69,
+   "visitors": 41
+  },
+  {
+   "cc": "SE",
+   "views": 69,
+   "visitors": 33
+  },
+  {
+   "cc": "AO",
+   "views": 67,
+   "visitors": 36
+  },
+  {
+   "cc": "MA",
+   "views": 65,
+   "visitors": 27
+  },
+  {
+   "cc": "TH",
+   "views": 65,
+   "visitors": 35
+  },
+  {
+   "cc": "FI",
+   "views": 64,
+   "visitors": 23
+  },
+  {
+   "cc": "GR",
+   "views": 60,
+   "visitors": 36
+  },
+  {
+   "cc": "AT",
+   "views": 54,
+   "visitors": 22
+  },
+  {
+   "cc": "KR",
+   "views": 47,
+   "visitors": 31
+  },
+  {
+   "cc": "NO",
+   "views": 45,
+   "visitors": 21
+  },
+  {
+   "cc": "GT",
+   "views": 45,
+   "visitors": 16
+  },
+  {
+   "cc": "HU",
+   "views": 44,
+   "visitors": 24
+  },
+  {
+   "cc": "TW",
+   "views": 43,
+   "visitors": 24
+  },
+  {
+   "cc": "CU",
+   "views": 43,
+   "visitors": 25
+  },
+  {
+   "cc": "SV",
+   "views": 42,
+   "visitors": 18
+  },
+  {
+   "cc": "MZ",
+   "views": 38,
+   "visitors": 22
+  },
+  {
+   "cc": "CZ",
+   "views": 38,
+   "visitors": 18
+  },
+  {
+   "cc": "KE",
+   "views": 35,
+   "visitors": 16
+  },
+  {
+   "cc": "AE",
+   "views": 34,
+   "visitors": 15
+  },
+  {
+   "cc": "PR",
+   "views": 34,
+   "visitors": 20
+  },
+  {
+   "cc": "IR",
+   "views": 31,
+   "visitors": 24
+  },
+  {
+   "cc": "LK",
+   "views": 31,
+   "visitors": 16
+  },
+  {
+   "cc": "BO",
+   "views": 31,
+   "visitors": 21
+  },
+  {
+   "cc": "RS",
+   "views": 29,
+   "visitors": 13
+  },
+  {
+   "cc": "SA",
+   "views": 27,
+   "visitors": 19
+  },
+  {
+   "cc": "CR",
+   "views": 25,
+   "visitors": 16
+  },
+  {
+   "cc": "SK",
+   "views": 25,
+   "visitors": 10
+  },
+  {
+   "cc": "AZ",
+   "views": 24,
+   "visitors": 17
+  },
+  {
+   "cc": "BG",
+   "views": 24,
+   "visitors": 15
+  },
+  {
+   "cc": "NZ",
+   "views": 22,
+   "visitors": 14
+  },
+  {
+   "cc": "IL",
+   "views": 22,
+   "visitors": 15
+  },
+  {
+   "cc": "PA",
+   "views": 20,
+   "visitors": 10
+  },
+  {
+   "cc": "NI",
+   "views": 20,
+   "visitors": 9
+  },
+  {
+   "cc": "PY",
+   "views": 18,
+   "visitors": 8
+  },
+  {
+   "cc": "UY",
+   "views": 17,
+   "visitors": 10
+  },
+  {
+   "cc": "LT",
+   "views": 17,
+   "visitors": 9
+  },
+  {
+   "cc": "TZ",
+   "views": 17,
+   "visitors": 7
+  },
+  {
+   "cc": "IE",
+   "views": 16,
+   "visitors": 11
+  },
+  {
+   "cc": "NG",
+   "views": 15,
+   "visitors": 10
+  },
+  {
+   "cc": "MM",
+   "views": 14,
+   "visitors": 8
+  },
+  {
+   "cc": "SY",
+   "views": 14,
+   "visitors": 11
+  },
+  {
+   "cc": "SD",
+   "views": 14,
+   "visitors": 6
+  },
+  {
+   "cc": "HR",
+   "views": 13,
+   "visitors": 8
+  },
+  {
+   "cc": "KZ",
+   "views": 13,
+   "visitors": 5
+  },
+  {
+   "cc": "TN",
+   "views": 12,
+   "visitors": 6
+  },
+  {
+   "cc": "NP",
+   "views": 12,
+   "visitors": 9
+  },
+  {
+   "cc": "UZ",
+   "views": 12,
+   "visitors": 6
+  },
+  {
+   "cc": "AL",
+   "views": 11,
+   "visitors": 3
+  },
+  {
+   "cc": "KH",
+   "views": 11,
+   "visitors": 7
+  },
+  {
+   "cc": "RW",
+   "views": 11,
+   "visitors": 8
+  },
+  {
+   "cc": "MD",
+   "views": 10,
+   "visitors": 4
+  },
+  {
+   "cc": "GP",
+   "views": 10,
+   "visitors": 4
+  },
+  {
+   "cc": "CV",
+   "views": 10,
+   "visitors": 3
+  },
+  {
+   "cc": "DK",
+   "views": 10,
+   "visitors": 6
+  },
+  {
+   "cc": "CM",
+   "views": 10,
+   "visitors": 3
+  },
+  {
+   "cc": "EE",
+   "views": 9,
+   "visitors": 6
+  },
+  {
+   "cc": "CY",
+   "views": 9,
+   "visitors": 5
+  },
+  {
+   "cc": "GH",
+   "views": 9,
+   "visitors": 5
+  },
+  {
+   "cc": "HN",
+   "views": 9,
+   "visitors": 7
+  },
+  {
+   "cc": "MG",
+   "views": 8,
+   "visitors": 3
+  },
+  {
+   "cc": "IQ",
+   "views": 8,
+   "visitors": 8
+  },
+  {
+   "cc": "LV",
+   "views": 8,
+   "visitors": 3
+  },
+  {
+   "cc": "CI",
+   "views": 7,
+   "visitors": 3
+  },
+  {
+   "cc": "HT",
+   "views": 7,
+   "visitors": 3
+  },
+  {
+   "cc": "LU",
+   "views": 7,
+   "visitors": 4
+  },
+  {
+   "cc": "SI",
+   "views": 7,
+   "visitors": 7
+  },
+  {
+   "cc": "MV",
+   "views": 7,
+   "visitors": 3
+  },
+  {
+   "cc": "BW",
+   "views": 7,
+   "visitors": 2
+  },
+  {
+   "cc": "MO",
+   "views": 7,
+   "visitors": 4
+  },
+  {
+   "cc": "BT",
+   "views": 7,
+   "visitors": 1
+  },
+  {
+   "cc": "QA",
+   "views": 7,
+   "visitors": 2
+  },
+  {
+   "cc": "OM",
+   "views": 7,
+   "visitors": 3
+  },
+  {
+   "cc": "JO",
+   "views": 6,
+   "visitors": 5
+  },
+  {
+   "cc": "SZ",
+   "views": 6,
+   "visitors": 2
+  },
+  {
+   "cc": "UG",
+   "views": 6,
+   "visitors": 4
+  },
+  {
+   "cc": "SL",
+   "views": 5,
+   "visitors": 3
+  },
+  {
+   "cc": "MK",
+   "views": 5,
+   "visitors": 2
+  },
+  {
+   "cc": "PS",
+   "views": 5,
+   "visitors": 3
+  },
+  {
+   "cc": "BB",
+   "views": 4,
+   "visitors": 1
+  },
+  {
+   "cc": "MW",
+   "views": 4,
+   "visitors": 4
+  },
+  {
+   "cc": "VU",
+   "views": 4,
+   "visitors": 3
+  },
+  {
+   "cc": "KW",
+   "views": 3,
+   "visitors": 3
+  },
+  {
+   "cc": "LY",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "MQ",
+   "views": 3,
+   "visitors": 1
+  },
+  {
+   "cc": "MU",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "KG",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "IS",
+   "views": 3,
+   "visitors": 3
+  },
+  {
+   "cc": "TT",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "SC",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "ET",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "BH",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "BA",
+   "views": 2,
+   "visitors": 1
+  },
+  {
+   "cc": "TL",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "CG",
+   "views": 2,
+   "visitors": 1
+  },
+  {
+   "cc": "ZM",
+   "views": 2,
+   "visitors": 1
+  },
+  {
+   "cc": "JM",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "BY",
+   "views": 2,
+   "visitors": 1
+  },
+  {
+   "cc": "NA",
+   "views": 2,
+   "visitors": 2
+  },
+  {
+   "cc": "AF",
+   "views": 2,
+   "visitors": 1
+  },
+  {
+   "cc": "ST",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "BZ",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "LA",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "ML",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "ZW",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "GL",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "SM",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "MR",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "AX",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "RE",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "TG",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "JE",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "SO",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "GY",
+   "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "GE",
+   "views": 1,
+   "visitors": 1
+  }
+ ]
+}
