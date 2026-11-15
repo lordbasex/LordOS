@@ -1,0 +1,66 @@
+{
+  "archiveName": "アーカイブ",
+  "archiveSummary": {
+    "other": "{count} 個のファイル、{size}"
+  },
+  "compressOne": "「{name}」を圧縮",
+  "compressMany": {
+    "other": "{count} 項目を圧縮"
+  },
+  "compressing": "「{name}」を圧縮中…",
+  "compressProgress": "「{name}」を圧縮中：{files} 個のファイル",
+  "compressed": {
+    "other": "「{name}」の準備ができました（{count} 個のファイル）"
+  },
+  "compressError": "「{name}」を圧縮できませんでした（{error}）",
+  "extractHere": "ここに展開",
+  "extractSelected": {
+    "other": "{count} 項目を展開"
+  },
+  "extracting": "「{name}」を展開中…",
+  "extractProgress": "「{name}」を展開中：{files} 個のファイル（{pct}%）",
+  "extracted": {
+    "other": "「{name}」に展開しました（{count} 個のファイル）"
+  },
+  "extractedSkipped": {
+    "other": "「{name}」に展開しました（{count} 個のファイル）。安全のため {skipped} 個をスキップしました"
+  },
+  "extractError": "「{name}」を展開できませんでした（{error}）",
+  "opening": "「{name}」を開いています…",
+  "loading": "読み込み中…",
+  "locked": "パスワードで保護",
+  "pages": {
+    "other": "{count} ページ"
+  },
+  "more": {
+    "other": "ほか {count} 項目"
+  },
+  "err.invalid": "アーカイブではないか、破損しています",
+  "err.missing-volume": "分割アーカイブの一部が見つかりません：「{name}」",
+  "err.disk-full": "ディスクがいっぱいです",
+  "err.too-big": "大きすぎます",
+  "err.too-many": "ファイルが多すぎます",
+  "err.corrupt": "破損しています",
+  "err.write": "書き込めませんでした",
+  "err.unavailable": "書類ヘルパーを利用できません",
+  "err.cancelled": "キャンセルしました",
+  "err.crash": "書類ヘルパーが予期せず停止しました",
+  "err.timeout": "時間がかかりすぎました",
+  "err.protocol": "書類ヘルパーから無効な応答がありました",
+  "err.spawn": "書類ヘルパーを起動できませんでした",
+  "err.closed": "書類は閉じられました",
+  "err.bad-request": "無効な要求です",
+  "err.bad-field": "無効なフォームフィールドです",
+  "err.bad-page": "無効なページです",
+  "err.busy": "書類ヘルパーは使用中です",
+  "err.memory": "メモリが不足しています",
+  "err.no-fonts": "利用できるフォントがありません",
+  "err.not-open": "書類が開かれていません",
+  "err.nothing": "保存するものがありません",
+  "err.read-only": "書類は読み出し専用です",
+  "err.save": "保存できませんでした",
+  "err.unknown-op": "不明な操作です",
+  "err.image": "無効な画像です",
+  "err.blob": "無効なデータです",
+  "err.password": "書類はパスワードで保護されています"
+}

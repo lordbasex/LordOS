@@ -1,0 +1,20 @@
+{
+  "search": "絵文字を検索",
+  "results": {
+    "other": "{count} 件の結果"
+  },
+  "none": "見つかりませんでした",
+  "noRecent": "使った絵文字がここに表示されます",
+  "copied": "{text} をコピーしました: Ctrl+V で貼り付けられます",
+  "more": "その他…",
+  "group.recent": "最近使った項目",
+  "group.smileys": "顔文字と感情",
+  "group.people": "人と体",
+  "group.animals": "動物と自然",
+  "group.food": "食べ物と飲み物",
+  "group.travel": "旅行と場所",
+  "group.activities": "アクティビティ",
+  "group.objects": "物",
+  "group.symbols": "記号",
+  "group.flags": "旗"
+}
