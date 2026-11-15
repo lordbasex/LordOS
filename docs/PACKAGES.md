@@ -115,7 +115,7 @@ file exists, the catalog's `optout` makes `pkg-source-add` create it empty (only
 `pkg-source-remove` delete it only while it is still empty. Removing the last installed app of a
 repository removes that repository.
 
-**A vendor package that owns its own source (0.8.8.9, in development; Steam).** Valve's `steam-launcher` ships its
+**A vendor package that owns its own source (0.8.8.9; Steam).** Valve's `steam-launcher` ships its
 source as one of its own files: the conffile `/etc/apt/sources.list.d/steam-stable.list`
 (`deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam`) and
 the keyring `/usr/share/keyrings/steam.gpg`. LordOS can't write those names first (dpkg would find files it doesn't own),
@@ -135,7 +135,7 @@ only for an amd64-only entry): its `.sources` then lists `Architectures: amd64 i
 read with `strtok_r`, so options after `arch=` (`signed-by=` in Valve's line) are no longer lost. The catalog itself is described in `UPDATES.md`, "Mirrored apps
 (catalog)".
 
-### Browser defaults (0.8.8.9, in development)
+### Browser defaults (0.8.8.9)
 
 Debian's Chromium starts new profiles with its own bar and the GTK theme because LordOS writes
 `/etc/chromium/master_preferences` (WAYLAND.md, "The browsers by default"). The Chromium-based browsers
@@ -317,7 +317,7 @@ Discover, the first install and an app's page".
   Edge, Spotify), from their makers' signed repositories with the key LordOS pins. The page says before
   anything is installed that LordOS can't review or fix what they do. Tested on the VMware machine:
   the three sources added, the three apps installed, `apt update` and the engine's update clean
-  afterwards. **Steam** (0.8.8.9, in development; amd64) comes from Valve's signed repository
+  afterwards. **Steam** (0.8.8.9; amd64) comes from Valve's signed repository
   (`https://repo.steampowered.com/steam`, suite `stable`, component `steam`) with Valve's 2025 key pinned
   (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, `apt/keys/steam.asc`). Its client is 32-bit, so its page first
   says that it needs 32-bit system libraries and that LordOS will enable them; **Enable and continue** runs
@@ -326,7 +326,8 @@ Discover, the first install and an app's page".
   `mesa-vulkan-drivers:i386`, `libasound2-plugins:i386` and `mesa-vulkan-drivers` (see "Steam's 32-bit Vulkan
   drivers" under "Multiarch"); removing Steam removes them all but the amd64 `mesa-vulkan-drivers` (the catalog's
   `"keep"`: the system's own Vulkan driver). Steam's entry also says `"categories": ["Game"]`, so Store → Games lists it (and counts it) next
-  to Debian's games. Not yet tried on a LordOS system (see "Multiarch").
+  to Debian's games. Tried on one LordOS system so far, the maintainer's PC (Intel Core i9-10900, AMD Radeon RX 580, Vulkan through RADV, Mesa 25.0.7), with 0.8.8.9 test builds
+  (see "Multiarch").
 - **Third-party apps** (until 0.8.8.3 "Third-party suites") lists open source apps and suites from
   other projects: ArtCraft (0.8.8.1, its maker's `.deb` with a pinned SHA-256), and since 0.8.8.4
   VSCodium (#38) and Brave Browser (#39), both from their makers' signed repositories (amd64 and arm64)
@@ -337,7 +338,7 @@ Discover, the first install and an app's page".
   starts with the computer and isn't held to the per-app firewall; the page says so. What it does
   on LordOS, and what it can't do: `UPDATES.md`, "Remote access: Tailscale". Not installed on a
   LordOS system yet. RustDesk (#66) was offered here from 0.8.8.6 and is removed from the catalog in
-  the update in development after 0.8.8.8 (the latest release): LordOS doesn't redistribute it; people who want it can get it from its maker.
+  0.8.8.9: LordOS doesn't redistribute it; people who want it can get it from its maker.
 - **Disk Formats** (0.8.7, `lordos-disk-formats`, `tools/iso/mkdeb-diskformats.sh`) is one item in the Commercial group,
   from the LordOS repository: it depends on `ntfs-3g`, `exfatprogs` and `dosfstools`, and on amd64 suggests `apfs-dkms`,
   offered as a switch on its page. Those drivers are free software ([FILES.md](FILES.md), "Disks' file systems").
@@ -678,7 +679,7 @@ sudo build/pkg-test run pkg-install "cowsay sl"
 - **Incremental index diffs** (`Packages.diff`). Today the whole index is downloaded when it
   changes.
 
-## Multiarch (0.8.8.9, in development)
+## Multiarch (0.8.8.9)
 
 Steam's client is 32-bit, so the engine installs i386 packages next to the amd64 ones, as apt does after
 `dpkg --add-architecture i386`. Only that pair: i386 is the one foreign architecture, and only on amd64.
@@ -726,8 +727,8 @@ Steam's client is 32-bit, so the engine installs i386 packages next to the amd64
   driver in place when Steam is removed. The `Multi-Arch: same` rules keep each pair at one version: a new
   `mesa-vulkan-drivers:i386` moves the installed amd64 driver up to its version in the same plan, never down.
   **Steam installed before** (0.8.8.9 test builds): Update All doesn't bring them (the installed `steam-libs-i386`
-  already recommended them, so they aren't "new" Recommends), but Steam's Store page, which comes with the new
-  catalog in the next LordOS update, shows **Update** while any of its `"with"` packages is missing; the plan installs
+  already recommended them, so they aren't "new" Recommends), but Steam's Store page, which comes with 0.8.8.9's
+  catalog, shows **Update** while any of its `"with"` packages is missing; the plan installs
   only the missing ones. `apt/build.sh check` accepts a `"with"` package that the vendor's index for its
   architecture lacks when Debian trixie's `main` index has it (InRelease verified with Debian's archive keyring, the
   index with its SHA-256; an i386 one must be built for i386 and `Multi-Arch: same`, `foreign` or `allowed`).
@@ -744,8 +745,9 @@ Steam's client is 32-bit, so the engine installs i386 packages next to the amd64
   `mesa-vulkan-drivers:i386`, `libasound2-plugins:i386` and their i386 dependencies with the `mesa-vulkan-drivers` and
   `libvulkan1` pairs at one version and `libc6` untouched, Update All leaves an old Steam without them, and asking for
   the missing ones (the Store's Update) adds them with the amd64 driver moved up to the same version. Valve's real `InRelease` verifies with
-  `apt/keys/steam.asc`. **Not yet tried on a LordOS system**: enabling i386, `pkg-update` with Debian's and Valve's
-  i386 lists, installing Steam and running it, Update All with the pair, removing it.
+  `apt/keys/steam.asc`. **Tried on one LordOS system**, the maintainer's PC (Intel Core i9-10900, AMD Radeon RX 580, Vulkan through RADV, Mesa 25.0.7), with 0.8.8.9 test builds (2026-11-15): i386
+  enabled from the Store, Steam installed from the Store, and Lost Ark, a Windows game, running through Proton. No
+  other machine has run it, and Update All moving the pair and removing Steam have not been reported on it.
 
 ## HTTPS (0.8.5)
 

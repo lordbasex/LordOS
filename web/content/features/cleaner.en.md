@@ -37,7 +37,7 @@ Regenerable cache files beneath fixed folders can be deleted for real, as your o
 
 ## What its motion costs
 
-Cleaner comes in three looks (one of them, Noche, follows light and dark mode) and works in every LordOS language: English, Spanish, Portuguese, French, Italian and Lithuanian, and the 29 more in development after 0.8.8.8. Its layout turns for right-to-left languages, checked so far with a test language in English text. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine and on a Raspberry Pi 5 with its monitor, where the session took 4.5–7.2 % of a core with the opening screen idle, 12.2–18.0 % scanning and 0.1 % with Cleaner closed.
+Cleaner comes in three looks (one of them, Noche, follows light and dark mode) and works in every LordOS language: English, Spanish, Portuguese, French, Italian and Lithuanian, and, since 0.8.8.9, 29 more. Its layout turns for right-to-left languages, checked so far with a test language in English text. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine and on a Raspberry Pi 5 with its monitor, where the session took 4.5–7.2 % of a core with the opening screen idle, 12.2–18.0 % scanning and 0.1 % with Cleaner closed.
 
 [[shot:2]]
 

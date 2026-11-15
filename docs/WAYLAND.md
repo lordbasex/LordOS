@@ -429,7 +429,7 @@ reaches the app, nor its release. GTK 3 on Wayland chooses its text-input-v3 mod
 module from the Settings portal's `org.gnome.desktop.interface` `gtk-im-module` before it looks for one itself,
 and uses `simple` (no input method) when the portal leaves that key out, so LordOS's portal serves it as
 `wayland` (`server/src/ui/portal.c`, checked by `build/portal-gs-test`). An IBus or Fcitx user's own
-`GTK_IM_MODULE` still wins over the setting. In development after 0.8.8.8, lord-server no longer exports `GTK_IM_MODULE` (0.8.8.8 does; until the next release
+`GTK_IM_MODULE` still wins over the setting. Since 0.8.8.9, lord-server no longer exports `GTK_IM_MODULE` (0.8.8.8 does; there
 `env -u GTK_IM_MODULE <app>` from the Terminal works around it): every GTK
 reads the variable, also GTK 3 running on X11 inside Electron and Chromium, which then loaded the Wayland module
 on an X11 display and crashed (GitHub #150). In 0.8.8.8, checked on VM 127 with the variable: a GTK 4 field got
@@ -608,7 +608,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   |---|---|
   | ![brave classic](brave-classic-theme.png) | ![brave gtk](brave-gtk-theme.png) |
   | A new Brave profile: its own bar with the Classic theme's buttons | After the switch («Change them»): the same profile with LordOS's traffic lights |
-- **Google Chrome, Brave and Microsoft Edge from the Store** (0.8.8.9, in development; the maintainer saw
+- **Google Chrome, Brave and Microsoft Edge from the Store** (0.8.8.9; the maintainer saw
   Chrome drawing its own minimize, maximize and close buttons next to Chromium's traffic lights). They get
   Chromium's two defaults in the only place they read initial preferences: next to their binary
   (`/opt/google/chrome/initial_preferences`, `/opt/brave.com/brave/…`, `/opt/microsoft/msedge/…`; Chromium's

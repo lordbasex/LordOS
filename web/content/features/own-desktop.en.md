@@ -83,7 +83,7 @@ All in 0.8.7.
 
 - **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place; you sign in with a user and password or as a guest, which passed against one real shared folder and one test server. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
 - **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit. Both protocols were tried against a throwaway test machine; RDP to a real desktop session and RDP's shared folders are not verified yet.
-- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost. In development after 0.8.8.8 (the latest release): with two systems on one disk, an administrator can mount the other system's partition from Files or Disks, and an NTFS volume left hibernated opens read-only.
+- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost. Since 0.8.8.9 (the latest release): with two systems on one disk, an administrator can mount the other system's partition from Files or Disks, and an NTFS volume left hibernated opens read-only.
 - **Your way of working.** Choose, reorder and resize list columns, zoom the icons and the list (the slider in the status bar, Ctrl and + or −, or Ctrl and the wheel) with each folder remembering its own size, set Files' own Settings, and open Terminal in the folder you're in.
 
 ## Keys, the on-screen keyboard and coming back
@@ -101,7 +101,7 @@ All in 0.8.7, except the two items marked 0.8.8.
 
 ## New in 0.8.8.8
 
-Released on 12 November 2026, the latest release.
+Released on 12 November 2026.
 
 - **The Terminal works over the tab's `ssh`.** Port forwards from a profile (a badge on the tab, Open in the browser, Copy, Close), files dragged from Files onto an `ssh` pane uploaded to the remote shell's folder, ❖ + click on a name in `ls` output to download it, and Open, Open With and Edit for a server's file in Files mode, where each save goes back to the server. All over the same connection, with no second login and no program run.
 - **Text fields select as on any desktop,** in every LordOS app: Ctrl/⌘+A, Shift with the arrows, a mouse drag, a double click on a word, typing over the selection, copy and cut (never from a password field).

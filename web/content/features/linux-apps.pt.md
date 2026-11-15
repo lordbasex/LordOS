@@ -51,7 +51,7 @@ O JavaScript do LordOS não consegue escrever arquivos `.desktop`, então a inte
 
 ## Novo na 0.8.8.8
 
-Lançada em 12 de novembro de 2026, o último lançamento.
+Lançada em 12 de novembro de 2026.
 
 - **Arrastar e soltar.** Arraste arquivos do Arquivos para um app Linux (ele recebe uma cópia; segure Shift para movê-los), de um app Linux para uma pasta do Arquivos, ou entre apps Linux. Só os apps que não estão num sandbox podem entregar arquivos ao LordOS. Apps X11 (pelo Xwayland) também participam, já construído mas ainda não verificado na nossa máquina de testes.
 - **Arquivos copiados.** Copie no Arquivos e cole num gerenciador de arquivos Linux, ou o contrário. Arquivos copiados em outro app só são colados depois que o Arquivos pergunta, com Cancelar como padrão.
@@ -90,7 +90,7 @@ Ausente de propósito: qualquer protocolo que permita a um app capturar a tela o
 
 **E o Flatpak?** Hoje o LordOS não o usa nem o integra. Não está planejado para nenhuma versão: para manter o sistema estável ele não está sendo construído, e em `docs/FLATPAK.md` fica uma revisão do projeto para o futuro, com o que os apps Flatpak precisariam para seguir o modelo do LordOS (identidade própria no firewall e no Monitor, permissões em Ajustes → Privacidade e os avisos do próprio LordOS).
 
-**E apps como Chrome ou Spotify?** (desde a 0.8.5) Loja → Comerciais instala apps gratuitos cujo código-fonte não é público a partir dos repositórios assinados dos fabricantes, com a chave fixada pelo LordOS, e avisa antes de instalar qualquer coisa. Em desenvolvimento para a 0.8.8.9 (depois da 0.8.8.8, o último lançamento), Chrome, Brave e Edge instalados pela Loja começam como o Chromium pré-instalado, com o tema GTK do LordOS e a própria barra de título. Só nos perfis novos: um perfil que você já tem mantém suas configurações. Também em desenvolvimento, o **Steam** está em Comerciais e em Jogos: a página dele primeiro diz que ele precisa de bibliotecas de sistema de 32 bits e que o LordOS vai habilitá-las, e depois o instala com elas a partir do Debian e da Valve, assinadas e verificadas como qualquer pacote (ainda não testado num sistema LordOS).
+**E apps como Chrome ou Spotify?** (desde a 0.8.5) Loja → Comerciais instala apps gratuitos cujo código-fonte não é público a partir dos repositórios assinados dos fabricantes, com a chave fixada pelo LordOS, e avisa antes de instalar qualquer coisa. Desde a 0.8.8.9 (o último lançamento), Chrome, Brave e Edge instalados pela Loja começam como o Chromium pré-instalado, com o tema GTK do LordOS e a própria barra de título. Só nos perfis novos: um perfil que você já tem mantém suas configurações. Também desde a 0.8.8.9, o **Steam** está em Comerciais e em Jogos: a página dele primeiro diz que ele precisa de bibliotecas de sistema de 32 bits e que o LordOS vai habilitá-las, e depois o instala com elas a partir do Debian e da Valve, assinadas e verificadas como qualquer pacote. Por enquanto foi testado numa só máquina, o PC do mantenedor com uma AMD Radeon RX 580: o Steam foi instalado pela Loja e o Lost Ark, um jogo de Windows, roda com o Proton.
 
 **Os pacotes vêm por HTTPS?** Desde o LordOS 0.8.5, sim para as fontes `https://`: um pequeno helper isolado, o `lord-tls`, verifica o certificado e o nome do servidor e criptografa o download, então ninguém na rede consegue ver quais pacotes você baixa, e um download seguro nunca é mandado de volta para HTTP sem criptografia. Até a 0.8.4.1 eles vinham por `http://`. Nos dois casos a segurança vem das assinaturas e dos hashes: todo índice precisa ter uma assinatura válida de uma chave confiável, não pode estar expirado nem ser mais antigo que o já guardado, e cada arquivo é conferido contra seu SHA-256 antes de ser usado, então ninguém na rede consegue alterá-los.
 
@@ -103,7 +103,7 @@ Ausente de propósito: qualquer protocolo que permita a um app capturar a tela o
 - **Ícones só em SVG:** até a 0.8.8.7 o LordOS não desenha SVG e usa os ícones PNG que o Debian publica para a maioria dos apps, ou a inicial; desde a 0.8.8.8 o `lord-media` desenha os ícones SVG no seu sandbox.
 - **Apps de terminal** com arquivo `.desktop` não aparecem no lançador de apps até a 0.8.8.7; inicie-os pelo Terminal. Desde a 0.8.8.8 eles abrem numa aba do Terminal.
 - **Os apps GTK 3 mantêm o próprio destaque azul;** a leitura do esquema de cores pelo portal no Qt 6 não foi testada.
-- **Apps Electron na 0.8.8.8** podem fechar ao abrir ([#150](https://github.com/lordbasex/LordOS/issues/150)); abra-os pelo Terminal com `env -u GTK_IM_MODULE <app>`. Está corrigido em desenvolvimento depois da 0.8.8.8 (o último lançamento), que também faz os botões voltar e avançar do mouse funcionarem nos apps Linux.
+- **Apps Electron na 0.8.8.8** podem fechar ao abrir ([#150](https://github.com/lordbasex/LordOS/issues/150)); abra-os pelo Terminal com `env -u GTK_IM_MODULE <app>`. Está corrigido na 0.8.8.9 (o último lançamento), que também faz os botões voltar e avançar do mouse funcionarem nos apps Linux.
 
 ## Leia o código
 

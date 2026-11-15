@@ -48,7 +48,7 @@ The releases page is the project's public changelog: every release is documented
 
    Also bump `package.json` (`version`, `lordos.channel`) and commit both.
 
-   **Web apps' Browser identity** (in development after 0.8.8.8): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
+   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
    in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
    from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
    changelog entry if they changed. A stale major is what makes sites treat a browser as outdated. `build/webapp-test`

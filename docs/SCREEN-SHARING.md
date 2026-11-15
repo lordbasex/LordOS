@@ -31,15 +31,15 @@ connection, and so does any seat message (`RP_DISPLAY`, `RP_KEYRING`…).
 | `SHARE_QUERY` 51 | none: answers `SHARE_STATE`, prompts nobody |
 | `SHARE_STOP` 52, `SHARE_LOCK` 54 | none |
 | `SHARE_AWAKE` 53, `SHARE_HEAR` 56 | u8 on. `RP_AFRAME` is dropped until `SHARE_HEAR` 1 |
-| `SHARE_TEXT` 55 | UTF-8, 1 KB at most: typed through the active layout where it can be, otherwise (in development after 0.8.8.8) committed as an input method's text (see "Input") |
-| `SHARE_DISPLAY` 57 (in development after 0.8.8.8) | u32 id of `SHARE_DISPLAYS`, `0xffffffff` all of them in one picture, 0 the default (see "Displays") |
+| `SHARE_TEXT` 55 | UTF-8, 1 KB at most: typed through the active layout where it can be, otherwise (0.8.8.9) committed as an input method's text (see "Input") |
+| `SHARE_DISPLAY` 57 (0.8.8.9) | u32 id of `SHARE_DISPLAYS`, `0xffffffff` all of them in one picture, 0 the default (see "Displays") |
 | `RP_KEYFRAME`, `RP_RATE`, `RP_RESIZE`, `RP_PTR`, `RP_BTN`, `RP_WHEEL`, `RP_SCROLL`, `RP_KEY`, `RP_SETCLIP` | as in `proto.h`, checked exactly |
 
 | System → client | Data |
 |---|---|
 | `SHARE_STATE` 60 | u8 why a start would be refused (0 it wouldn't), u8 granted, u8 codecs, u8 0, u16 w, h, hz |
 | `SHARE_REFUSED` 61, `SHARE_END` 62 | u8 reason |
-| `SHARE_DISPLAYS` 63 (in development after 0.8.8.8) | u32 id shown, u8 n, then n × { u32 id, i32 x, i32 y, u16 w, u16 h (logical), u16 pw, u16 ph (the picture's pixels), u8 flags (1 main, 2 all), u8 name length, name } |
+| `SHARE_DISPLAYS` 63 (0.8.8.9) | u32 id shown, u8 n, then n × { u32 id, i32 x, i32 y, u16 w, u16 h (logical), u16 pw, u16 ph (the picture's pixels), u8 flags (1 main, 2 all), u8 name length, name } |
 | `RP_SIZE`, `RP_VFRAME`, `RP_AFRAME`, `RP_CURSOR`, `RP_SHAPE`, `RP_CLIP`, `RP_VINFO` | as in `proto.h` |
 
 Reasons: 1 `no_identity`, 2 `denied`, 3 `no_person`, 4 `no_indicator`, 5 `busy`, 6 `locked`, 7 `away`, 8 `remote_desktop`, 9 `restricted`,
@@ -59,7 +59,7 @@ With no decision the system draws the prompt, in the `system` layer. If no one c
 prompt only records a decision: the share goes on from what the root-owned file says. Revoking is read within a second, without the shell.
 `FW_R_NO_SCREEN` refuses without a prompt.
 
-## Displays (in development after 0.8.8.8, the latest release)
+## Displays (0.8.8.9)
 
 A share starts on the display Settings → Displays → "Screenshots and sharing" names: the main display (the default), or all of them
 in one picture at 100 %. Nobody is asked which: the app's permission and the visitor's acceptance are the only questions.

@@ -17,7 +17,8 @@ materials (SBOM) published with each release. The website summary is at
   (`assets/fonts/*-LICENSE.txt`). The Noto subsets built into `lord-bench` have no files of their own:
   their license is `usr/share/doc/lordos/OFL-Noto.txt`.
 - Debian packages keep their own `/usr/share/doc/<package>/copyright` on the installed system.
-- **The images' source packages** (in development after 0.8.8.8; [SOURCE-OFFER.md](SOURCE-OFFER.md)): each image is
+- **The images' source packages** (0.8.8.9's tooling; no image has been built with it yet, 0.8.8.9 has no new
+  images; [SOURCE-OFFER.md](SOURCE-OFFER.md)): each image is
   published with `<image>.sources.tsv`, every source package and version in it with where that exact source is
   (snapshot.debian.org for Debian's, LordOS's copy or Raspberry Pi's archive for the Pi's, this repository at the tag
   for LordOS's own packages, LordOS's copy for its Raspberry Pi kernel), written by `tools/release/image-sources.sh`,
@@ -69,7 +70,7 @@ materials (SBOM) published with each release. The website summary is at
   `whisper.cpp` (MIT), built from the upstream source tarball pinned by URL and SHA-256 in the
   catalog, and `codex-cli` (Apache-2.0), OpenAI's static binary with its sigstore signature checked.
   RustDesk (AGPL-3.0) was offered in Store → Remote access from 0.8.8.6 as a mirrored `.deb` and is
-  removed from the catalog in the update in development after 0.8.8.8 (the latest release; maintainer's decision, 2026-11-12): LordOS doesn't
+  removed from the catalog in 0.8.8.9 (maintainer's decision, 2026-11-12): LordOS doesn't
   redistribute it, so it carries no AGPL source obligation. It was never published in lordos.org/apt's pool.
   People who want it can get it from its maker.
 

@@ -784,13 +784,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   [#128](https://github.com/lordbasex/LordOS/issues/128), [#130](https://github.com/lordbasex/LordOS/issues/130) and
   [#64](https://github.com/lordbasex/LordOS/issues/64); the rest in `CHANGELOG.md`.
 
-## Release 0.8.8.9 (in development after 0.8.8.8, the latest release)
+## Release 0.8.8.9-beta ✅ (2026-11-15)
 
-Besides the two items below, the work in development is listed in `CHANGELOG.md` under [Unreleased]:
+An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new ISO, the images stay 0.8.8's.
 
 - [x] 35 interface languages, each complete (12,460 keys; `LANGUAGES.md`, `TRANSLATING.md`).
-- [x] Web apps: each app's Appearance and each profile's Browser identity; a web app opened without network loads by
-  itself when it is back (#144) (`WEBAPPS.md`).
+- [x] Web apps: each profile's Browser identity and developer tools (Developer mode); a web app opened without network
+  loads by itself when it is back (#144) (`WEBAPPS.md`). Each app's Appearance is built but held back until
+  WPEPlatform.
+- [x] **Steam in Store → Commercial and Games**, with i386 multiarch in the package engine (`PACKAGES.md`,
+  "Multiarch"); tried on the maintainer's PC (AMD Radeon RX 580, Vulkan through RADV, Mesa 25.0.7): Lost Ark, a
+  Windows game, runs through Proton (`HARDWARE-REPORT.md`).
 - [x] Files and Disks mount a free partition of the system disk; NTFS left hibernated is mounted read-only (#122,
   `SYSTEM.md`).
 - [x] The power button held for 5 s; a tablet sleeps on a tap and shuts down on a hold (#131, migration
@@ -798,8 +802,8 @@ Besides the two items below, the work in development is listed in `CHANGELOG.md`
 - [x] Administrators are `sudo`, `admin` or `wheel` everywhere: every check uses `server/src/users/admingroups.c`
   (`sessiond.c`, `fand.c` and `js_sys.c` moved to it on 2026-11-15), and turning Administrator off really removes the
   rights.
-- [x] Each image's source list and the written source offer (`SOURCE-OFFER.md`); the Pi kernel sources kept on
-  lordos.org.
+- [x] Each image's source list (written by the image builders; 0.8.8.9 has no new images) and the written source offer
+  (`SOURCE-OFFER.md`); the Pi kernel sources kept on lordos.org.
 - [x] Hardware reports compared in `HARDWARE-REPORT.md` (22 machines, every issue up to #159).
 - [x] **Trademark notice in the Store's Web apps section** (asked by the maintainer on 2026-11-12, left out of 0.8.8.8 so
   the release wasn't delayed): a short note in the Web apps section and on each web app's detail page, in all 35
@@ -1031,8 +1035,9 @@ Besides the two items below, the work in development is listed in `CHANGELOG.md`
     its key, and its signed appstream data (not the website's API) as the Store's catalog, through a
     network path that needs approval like `lord-fetch`.
 
-- [x] **Steam in the Store's Commercial section (needs multiarch)** — *Built for 0.8.8.9 (in development, approved by
-  the maintainer on 2026-11-15; not yet tried on a LordOS system):* the closed admin action `pkg-foreign-arch i386`,
+- [x] **Steam in the Store's Commercial section (needs multiarch)** — *Released in 0.8.8.9-beta (approved by the
+  maintainer on 2026-11-15; tried on one LordOS system, the maintainer's PC with an AMD Radeon RX 580, where Lost Ark,
+  a Windows game, runs through Proton):* the closed admin action `pkg-foreign-arch i386`,
   i386 lists from Debian and from Valve's repository, the index and dpkg's status keyed by (name, architecture), the
   Multi-Arch rules in the resolver with `Multi-Arch: same` pairs kept at one version, a catalog entry whose vendor
   package owns its source, and Steam in Store → Commercial and Store → Games (`PACKAGES.md`, "Multiarch").

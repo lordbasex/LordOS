@@ -1227,8 +1227,10 @@ ${(c.items || []).map((it) => {
       // one list: every complete language, the next pre-release's ones tagged "new in <next>" (a language ships only when complete)
       complete: langList.filter((x) => !x.partial).map(card).join('\n'),
       completeTitle: esc(L.completeTitle.replace('{count}', String(langList.filter((x) => !x.partial).length))),
-      fresh: langList.some((x) => x.next && !x.partial)
-        ? `<p class="lg-p lg-review">${esc(L.reviewText.replace('{next}', NEXT_LANG_VERSION))} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n`
+      // the review request stays once those languages ship ("next" emptied, "nextVersion" kept): they still lack a
+      // native review
+      fresh: (langList.some((x) => x.next && !x.partial) || (NEXT_LANG_VERSION && L.reviewShipped))
+        ? `<p class="lg-p lg-review">${esc((langList.some((x) => x.next && !x.partial) ? L.reviewText : L.reviewShipped).replace('{next}', NEXT_LANG_VERSION))} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n`
         : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
       visits,

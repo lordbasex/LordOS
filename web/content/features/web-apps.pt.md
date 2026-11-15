@@ -6,7 +6,7 @@ Não é um cliente nativo de nenhum serviço. **O LordOS não muda os sites nem 
 
 [[shot:6]]
 
-É novo no **LordOS 0.8.8.8**, lançado em 12 de novembro de 2026, a versão mais recente. Fica num pacote opcional, `lordos-web`: sem ele, o resto do LordOS funciona igual, e a Loja o instala para você com o seu primeiro app web.
+É novo no **LordOS 0.8.8.8**, lançado em 12 de novembro de 2026; a versão mais recente é a 0.8.8.9. Fica num pacote opcional, `lordos-web`: sem ele, o resto do LordOS funciona igual, e a Loja o instala para você com o seu primeiro app web.
 
 [[figure:web-runtime]]
 
@@ -39,7 +39,7 @@ A Loja tem uma seção **Apps web**, um banner e uma prateleira em Descobrir, e 
 
 [[shot:2]]
 
-Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas. Abaixo da seção Apps web e no fim da página de cada app, a Loja mostra o mesmo aviso de marcas desta página, no seu idioma, e diz que o LordOS não modifica os sites: executa-os como eles os servem (*em desenvolvimento*, depois do 0.8.8.8).
+Cada app web tem sua página na Loja, como qualquer outro app: sempre atualizado (é a web), o dia em que o LordOS o testou, o espaço em disco, a memória (o valor típico medido, ou o real enquanto roda), quem o faz, o site verificado, o motor, as permissões que pode pedir, os perfis, o modo em segundo plano e as limitações conhecidas. Abaixo da seção Apps web e no fim da página de cada app, a Loja mostra o mesmo aviso de marcas desta página, no seu idioma, e diz que o LordOS não modifica os sites: executa-os como eles os servem (desde a 0.8.8.9).
 
 [[shot:3]]
 
@@ -86,15 +86,15 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 **O limite honesto:** o WPE WebKit 2.48 não dá ao LordOS nenhuma forma de definir o esquema de cores da página, então uma página que escolhe as cores só com CSS (regras `@media (prefers-color-scheme: dark)`) fica clara até um WebKit mais novo permitir. Esses sites costumam ter um ajuste de tema próprio: escolha Escuro lá. A página do app na Loja diz isso quando se sabe.
 
-**A Aparência própria de cada app** (Claro ou Escuro por app em vez de seguir o LordOS) está pronta, mas espera o novo motor web do LordOS (WPEPlatform), para o qual estamos migrando antes da 1.0: o WPE WebKit 2.48 de hoje não consegue dizer o esquema ao CSS de uma página, então a escolha funcionava pela metade. *Em desenvolvimento*, depois da 0.8.8.8, a última versão lançada: Ajustes → Apps web mostra Aparência com Automático escolhido e Claro e Escuro indisponíveis, e um app que já estava em Claro ou Escuro volta a seguir o modo do LordOS. Por enquanto cada app web segue o modo do LordOS, e um site com seu próprio ajuste de tema (o WhatsApp, por exemplo) o mantém.
+**A Aparência própria de cada app** (Claro ou Escuro por app em vez de seguir o LordOS) está pronta, mas espera o novo motor web do LordOS (WPEPlatform), para o qual estamos migrando antes da 1.0: o WPE WebKit 2.48 de hoje não consegue dizer o esquema ao CSS de uma página, então a escolha funcionava pela metade. Desde a 0.8.8.9, a última versão lançada, Ajustes → Apps web mostra Aparência com Automático escolhido e Claro e Escuro indisponíveis, e um app que já estava em Claro ou Escuro volta a seguir o modo do LordOS. Por enquanto cada app web segue o modo do LordOS, e um site com seu próprio ajuste de tema (o WhatsApp, por exemplo) o mantém.
 
 [[shot:12]]
 
-**A Identidade do navegador de cada perfil** (*em desenvolvimento*, depois da 0.8.8.8): os sites decidem o que mostrar pelo navegador com que acham que falam, então cada perfil pode dizer a eles Chrome no Linux, exatamente como o Chrome diz (o padrão), Edge no Linux (para os sites de escritório, e-mail e chat de equipe do seu fabricante), Firefox no Linux ou o nome próprio de WebKit do LordOS (o que todos os apps usavam). Você escolhe de uma lista curta em Ajustes → Apps web ou em *Identidade do navegador* no menu do app (Lord Flow), nunca digitando, e uma janela aberta carrega a página de novo com ele. O LordOS continua usando seu próprio motor, diga o nome o que disser. Alguns sites verificam o navegador e o recusam se algo não confere; se um site recusar ou falhar, escolha outra identidade, como LordOS (WebKit). Um site que já vinculou seu computador, como um app de mensagens, mantém o nome que viu até você vincular de novo.
+**A Identidade do navegador de cada perfil** (desde a 0.8.8.9): os sites decidem o que mostrar pelo navegador com que acham que falam, então cada perfil pode dizer a eles Chrome no Linux, exatamente como o Chrome diz (o padrão), Edge no Linux (para os sites de escritório, e-mail e chat de equipe do seu fabricante), Firefox no Linux ou o nome próprio de WebKit do LordOS (o que todos os apps usavam). Você escolhe de uma lista curta em Ajustes → Apps web ou em *Identidade do navegador* no menu do app (Lord Flow), nunca digitando, e uma janela aberta carrega a página de novo com ele. O LordOS continua usando seu próprio motor, diga o nome o que disser. Alguns sites verificam o navegador e o recusam se algo não confere; se um site recusar ou falhar, escolha outra identidade, como LordOS (WebKit). Um site que já vinculou seu computador, como um app de mensagens, mantém o nome que viu até você vincular de novo.
 
 ## Ferramentas para desenvolvedores web
 
-*Em desenvolvimento*, depois da 0.8.8.8, a versão mais recente. Ative o **Modo desenvolvedor** em Ajustes → Apps web (um só botão para todos os apps web, desligado de início) e o menu Janela de cada app web ganha **Inspecionar (ferramentas de desenvolvedor)**. Ao escolher, o LordOS pergunta antes, toda vez: as ferramentas de desenvolvedor podem ver tudo nesse app, incluindo mensagens e sessões. Se você disser sim, essa janela abre de novo com o Web Inspector do WebKit ativado, que abre no seu navegador: elementos, console, rede e armazenamento só dessa janela.
+Desde a 0.8.8.9, a versão mais recente. Ative o **Modo desenvolvedor** em Ajustes → Apps web (um só botão para todos os apps web, desligado de início) e o menu Janela de cada app web ganha **Inspecionar (ferramentas de desenvolvedor)**. Ao escolher, o LordOS pergunta antes, toda vez: as ferramentas de desenvolvedor podem ver tudo nesse app, incluindo mensagens e sessões. Se você disser sim, essa janela abre de novo com o Web Inspector do WebKit ativado, que abre no seu navegador: elementos, console, rede e armazenamento só dessa janela.
 
 - **Só no seu computador, só enquanto a janela existir.** O inspetor escuta só em 127.0.0.1 e termina quando você fecha a janela (mesmo num app que roda em segundo plano) ou desliga o Modo desenvolvedor. O próximo início é normal.
 - **Só a sua própria aba entra.** O seu navegador abre um endereço de uso único com um segredo aleatório longo, que o LordOS nunca mostra na notificação; ele dá a essa aba um cookie privado e deixa de funcionar. Cada pedido seguinte passa por uma pequena porta de entrada no processo do app que confere o cookie e que o pedido vem dessa mesma aba, então uma página web aberta no seu navegador não alcança o inspetor, nem varrendo portas, nem por WebSocket, nem com DNS rebinding. A porta do próprio WebKit é uma que os navegadores se recusam a abrir. Se você fechar a aba, *Abrir no navegador* na notificação a abre de novo.
@@ -110,7 +110,7 @@ Os apps web seguem o modo claro ou escuro do desktop, ao vivo: mude o Modo escur
 
 ## Ajustes → Apps web
 
-Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático, Claro ou Escuro; em desenvolvimento), a Identidade do navegador de cada perfil (Chrome no Linux, Edge no Linux, Firefox no Linux ou LordOS (WebKit); em desenvolvimento), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar. Abaixo dos apps, o *Modo desenvolvedor* adiciona Inspecionar (ferramentas de desenvolvedor) a cada janela de app web (em desenvolvimento).
+Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir, renomear, cor, remover, com os dados que cada um guarda em disco), as permissões, *Continuar rodando em segundo plano* (fechar a janela o mantém rodando, então as notificações continuam chegando), *Mostrar na barra de menus* (um ícone ao lado do relógio com Abrir e Sair), *Mostrar não lidas no Dock*, *Cada perfil com seu próprio ícone no Dock*, o som das notificações (Automático, que toca o do LordOS só quando o site não toca um próprio; o do site; o do LordOS; ou nenhum), a Aparência (Automático; Claro e Escuro esperam o novo motor web), a Identidade do navegador de cada perfil (Chrome no Linux, Edge no Linux, Firefox no Linux ou LordOS (WebKit); desde a 0.8.8.9), o ícone (o do próprio site ou o mosaico com letra do LordOS) e Desinstalar. Abaixo dos apps, o *Modo desenvolvedor* adiciona Inspecionar (ferramentas de desenvolvedor) a cada janela de app web (desde a 0.8.8.9).
 
 [[shot:10]]
 
@@ -123,7 +123,7 @@ Cada app web instalado tem sua página: o site e de onde veio, os perfis (abrir,
 - **Sem vídeo nem música com DRM** (o Widevine não está disponível para o WPE no Linux), então os catálogos protegidos dos serviços de música e vídeo não tocam.
 - **As chamadas** dependem do WebRTC do WPE WebKit e do serviço; podem ainda não funcionar e não foram testadas.
 - **O modo escuro só por CSS** fica claro, como acima.
-- **Sem rede ao abrir.** Na 0.8.8.8 um app aberto antes de haver rede fica com a página de erro do motor; em desenvolvimento depois da 0.8.8.8 (o último lançamento) ele mostra a própria página *Sem conexão* e carrega sozinho quando a rede volta, ou com Ctrl+R.
+- **Sem rede ao abrir.** Na 0.8.8.8 um app aberto antes de haver rede fica com a página de erro do motor; desde a 0.8.8.9 (o último lançamento) ele mostra a própria página *Sem conexão* e carrega sozinho quando a rede volta, ou com Ctrl+R.
 - **Desfazer** funciona só em páginas com histórico próprio (um editor rico); um campo de texto simples não consegue desfazer.
 - **O contador de não lidas** vem do título da página ("(3) …"), a única fonte que o WPE dá; a foto de quem manda a notificação não aparece.
 - Alguns serviços passam para outro endereço depois do login; a página funciona, mas os links dela podem então abrir no seu navegador.

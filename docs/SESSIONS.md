@@ -321,7 +321,7 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
 User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
 menu. Before, they were only on the login screen. Sleep is not in the menu; the computer sleeps from the lid, the power
-button (a tap on tablets, in development after 0.8.8.8) and the idle timers in Settings → Energy. Suspend and resume
+button (a tap on tablets, since 0.8.8.9) and the idle timers in Settings → Energy. Suspend and resume
 is unchecked in every hardware report; the only report after waking is #14's Wi-Fi on a laptop, handled since 0.8.8.3
 ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 
