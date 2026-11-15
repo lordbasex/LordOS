@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Utseende",
+  "appearance.auto": "Automatiskt",
+  "appearance.light": "Ljust",
+  "appearance.dark": "Mörkt",
+  "appearance.autoHint": "Följer LordOS ljusa eller mörka läge.",
+  "appearance.lightHint": "Webbplatsen får alltid veta ljust, oavsett vilket läge LordOS har.",
+  "appearance.darkHint": "Webbplatsen får alltid veta mörkt, oavsett vilket läge LordOS har.",
+  "appearance.footer": "Bara den ljusa eller mörka preferensen som webbplatsen läser ändras; LordOS ändrar aldrig själva webbplatsen. Vissa webbplatser förblir ljusa ändå, och en webbplats med en egen temainställning följer den."
+}

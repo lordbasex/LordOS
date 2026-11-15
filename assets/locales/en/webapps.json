@@ -192,5 +192,13 @@
   "sound.autoHint": "LordOS’s sound only when the site plays none of its own.",
   "sound.appHint": "Only the sound the site plays.",
   "sound.systemHint": "Always LordOS’s sound.",
-  "sound.noneHint": "No sound from LordOS (the site may still play its own)."
+  "sound.noneHint": "No sound from LordOS (the site may still play its own).",
+  "appearance.title": "Appearance",
+  "appearance.auto": "Automatic",
+  "appearance.light": "Light",
+  "appearance.dark": "Dark",
+  "appearance.autoHint": "Follows LordOS’s light or dark mode.",
+  "appearance.lightHint": "The site is always told light, whatever LordOS’s mode.",
+  "appearance.darkHint": "The site is always told dark, whatever LordOS’s mode.",
+  "appearance.footer": "Only the light or dark preference the site reads changes; LordOS never modifies the site itself. Some sites stay light anyway, and a site with a theme setting of its own follows that setting."
 }

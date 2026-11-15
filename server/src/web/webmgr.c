@@ -109,7 +109,15 @@ static int scheme = -1;                         /* the desktop's, from the theme
 void webmgr_set_scheme(int s) { scheme = s == WEBSCHEME_DARK ? WEBSCHEME_DARK : s == WEBSCHEME_LIGHT ? WEBSCHEME_LIGHT : -1; }
 int webmgr_scheme(void) { return scheme; }
 
-static void env_build(Env *e) {
+int webmgr_scheme_of(const char *app) {
+    WebApp *a = webreg_id_ok(app) ? malloc(sizeof *a) : NULL;
+    int pref = a && !webmgr_load(app, a) ? a->color_scheme : WEBREG_SCHEME_AUTO;
+    free(a);
+    return webscheme_for_app(pref, scheme);
+}
+
+/* s: the scheme this lord-web is told (webscheme_for_app), -1 none */
+static void env_build(Env *e, int s) {
     static const char *const keep[5] = { "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "HOME", "LANG" };
     int n = 0;
     for (int i = 0; i < 5; i++) {
@@ -122,9 +130,9 @@ static void env_build(Env *e) {
     /* under lord-sessiond, lord-web is strict: no scope or no Landlock means it does not start (webmain.c) */
     if (getenv("LORDOS_SESSIOND")) e->envp[n++] = "LORDOS_SESSIOND=1";
     e->envp[n++] = "LORDOS_WEB=1";
-    /* the desktop's light or dark mode, the page's prefers-color-scheme (webscheme.h) */
-    if (scheme == WEBSCHEME_DARK) e->envp[n++] = WEBSCHEME_ENV "=dark";
-    else if (scheme == WEBSCHEME_LIGHT) e->envp[n++] = WEBSCHEME_ENV "=light";
+    /* the page's prefers-color-scheme: the desktop's light or dark mode, or the app's own Appearance (webscheme.h) */
+    if (s == WEBSCHEME_DARK) e->envp[n++] = WEBSCHEME_ENV "=dark";
+    else if (s == WEBSCHEME_LIGHT) e->envp[n++] = WEBSCHEME_ENV "=light";
     e->envp[n] = NULL;
     const char *h = home();
     e->home[0] = 0;
@@ -148,9 +156,9 @@ static int open_log(const char *name, char *const argv[]) {
 
 /* Starts lord-web with argv; chan (or -1) becomes its fd 3. Its own session (so its WebKit processes
  * can be ended with it), no signal mask, nothing else of lord-server's open. */
-static pid_t spawn(char *const argv[], int chan, const char *logname) {
+static pid_t spawn(char *const argv[], int chan, const char *logname, int s) {
     Env e;
-    env_build(&e);
+    env_build(&e, s);
     int lg = open_log(logname, argv);
     pid_t pid = fork();
     if (pid != 0) { if (lg >= 0) close(lg); return pid; }
@@ -475,7 +483,7 @@ static pid_t start_step(const char *mode, const char *url, int *fd) {
     char m[16];
     snprintf(m, sizeof m, "%s", mode);
     char *const argv[] = { "lord-web", m, NULL };
-    pid_t pid = spawn(argv, sv[1], "probe");
+    pid_t pid = spawn(argv, sv[1], "probe", scheme);
     close(sv[1]);
     if (pid < 0) { close(sv[0]); return -1; }
     /* small: it fits the socket's buffer, the write never waits */
@@ -826,7 +834,7 @@ const char *webmgr_launch(const char *app, const char *profile, int *raised) {
     WebApp *a;
     const char *e = with_app(app, &a);
     if (e) return e;
-    int known = webreg_profile_index(a, profile) >= 0;
+    int known = webreg_profile_index(a, profile) >= 0, s = webscheme_for_app(a->color_scheme, scheme);
     free(a);
     if (!known) return "webapps.noProfile";
     reap();
@@ -843,7 +851,7 @@ const char *webmgr_launch(const char *app, const char *profile, int *raised) {
     char *const argv[] = { "lord-web", "--app", a_arg, "--profile", p_arg, NULL };
     char logname[2 * WEBREG_ID_MAX + 2];
     snprintf(logname, sizeof logname, "%s-%s", app, profile);
-    pid_t pid = spawn(argv, -1, logname);
+    pid_t pid = spawn(argv, -1, logname, s);
     if (pid < 0) return "webapps.startFailed";
     k->used = 1;
     k->pid = pid;

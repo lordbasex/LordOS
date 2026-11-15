@@ -1,0 +1,10 @@
+{
+  "appearance.title": "外觀",
+  "appearance.auto": "自動",
+  "appearance.light": "淺色",
+  "appearance.dark": "深色",
+  "appearance.autoHint": "跟隨 LordOS 的淺色或深色模式。",
+  "appearance.lightHint": "無論 LordOS 處於哪種模式，一律告訴網站使用淺色。",
+  "appearance.darkHint": "無論 LordOS 處於哪種模式，一律告訴網站使用深色。",
+  "appearance.footer": "只會改變網站讀取的淺色或深色偏好；LordOS 從不修改網站本身。有些網站仍會維持淺色，而有自己主題設定的網站會依照該設定。"
+}

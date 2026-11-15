@@ -26,7 +26,7 @@
  * The other way, lord-server to lord-web: org.lordos.WebApp1.Edit(s command) on its bus name, from the shell's Edit
  * menu (webask_edit); lord-web runs it only when the caller is the lord-server that started it. And
  * org.lordos.WebApp1.SetColorScheme(s scheme), "light" or "dark" only (web/webscheme.h), when the desktop's mode
- * changes (webask_scheme), with the same check. */
+ * changes (webask_scheme) or the app's own Appearance does (webask_app_scheme), with the same check. */
 #ifndef LORD_UI_WEBASK_H
 #define LORD_UI_WEBASK_H
 
@@ -57,9 +57,13 @@ int  webask_edit(const char *app, const char *profile, const char *command);
 /* The desktop's mode, from the theme (lord.portal.set): kept for the next lord-web's environment and, when it
  * changed, told to every running one (SetColorScheme, no reply wanted). */
 void webask_scheme(int dark);
+/* App's Appearance (the registry's colorScheme) changed: each of its running lord-web gets SetColorScheme with the
+ * word it is told now (webmgr_scheme_of), so open windows follow at once. */
+void webask_app_scheme(const char *app);
 /* A well-known name got an owner (NameOwnerChanged): when it is the bus name of a running lord-web and the mode is
  * known, that lord-web gets SetColorScheme with it. A mode change between its start (the environment) and the
- * moment it took its name would otherwise be lost: the call before went to a name nobody owned. */
+ * moment it took its name would otherwise be lost: the call before went to a name nobody owned. Each app gets its own
+ * word: its Appearance light or dark, or the desktop's (webmgr_scheme_of). */
 void webask_appeared(const char *name);
 /* The counts shown now, as a JSON array [{ app, profile, count }] (malloc'd), for a new JS context. */
 char *webask_badges(void);

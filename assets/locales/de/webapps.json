@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Erscheinungsbild",
+  "appearance.auto": "Automatisch",
+  "appearance.light": "Hell",
+  "appearance.dark": "Dunkel",
+  "appearance.autoHint": "Folgt dem hellen oder dunklen Modus von LordOS.",
+  "appearance.lightHint": "Der Website wird immer „Hell“ gemeldet, egal in welchem Modus LordOS ist.",
+  "appearance.darkHint": "Der Website wird immer „Dunkel“ gemeldet, egal in welchem Modus LordOS ist.",
+  "appearance.footer": "Geändert wird nur die Hell-/Dunkel-Einstellung, die die Website liest; LordOS verändert die Website selbst nie. Manche Websites bleiben trotzdem hell, und eine Website mit eigener Design-Einstellung folgt dieser."
+}

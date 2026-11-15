@@ -200,6 +200,13 @@ int webreg_sound_value(const char *name) {
     return -1;
 }
 
+static const char *const scheme_names[WEBREG_SCHEME_N] = { "auto", "light", "dark" };
+const char *webreg_scheme_name(int v) { return v >= 0 && v < WEBREG_SCHEME_N ? scheme_names[v] : NULL; }
+int webreg_scheme_value(const char *name) {
+    for (int i = 0; name && i < WEBREG_SCHEME_N; i++) if (!strcmp(name, scheme_names[i])) return i;
+    return -1;
+}
+
 const char *webreg_perm_value_name(int v) { return v >= 0 && v < 3 ? value_names[v] : NULL; }
 int webreg_perm_value(const char *name) {
     for (int i = 0; name && i < 3; i++) if (!strcmp(name, value_names[i])) return i;
@@ -247,6 +254,7 @@ int webreg_check(const WebApp *a, char *why, size_t wn) {
     for (int i = 0; i < WEBREG_PERM_N; i++) if (a->perms[i] < WEBREG_ALLOW || a->perms[i] > WEBREG_DENY) return bad(why, wn, "permissions: a bad value");
     if (a->notify_sound < WEBREG_SOUND_AUTO || a->notify_sound >= WEBREG_SOUND_N) return bad(why, wn, "notifySound is not auto, app, system or none");
     if (a->tray != 0 && a->tray != 1) return bad(why, wn, "tray is not a boolean");
+    if (a->color_scheme < WEBREG_SCHEME_AUTO || a->color_scheme >= WEBREG_SCHEME_N) return bad(why, wn, "colorScheme is not auto, light or dark");
     return 0;
 }
 
@@ -317,6 +325,7 @@ int webreg_parse(const char *json, size_t len, WebApp *a, char *why, size_t wn) 
         else if (!strcmp(k, "background")) { e = m->type != J_BOOL; a->background = m->num != 0; }
         else if (!strcmp(k, "tray")) { e = m->type != J_BOOL; a->tray = m->num != 0; }
         else if (!strcmp(k, "notifySound")) { a->notify_sound = m->type == J_STR ? webreg_sound_value(m->str) : -1; e = a->notify_sound < 0; }
+        else if (!strcmp(k, "colorScheme")) { a->color_scheme = m->type == J_STR ? webreg_scheme_value(m->str) : -1; e = a->color_scheme < 0; }
         else if (!strcmp(k, "permissions")) { if (parse_perms(m, a, why, wn)) goto out; }
         else { bad(why, wn, "unknown key %.40s", k); goto out; }
         if (e) { bad(why, wn, "bad %s", k); goto out; }
@@ -377,6 +386,7 @@ size_t webreg_write(const WebApp *a, char *out, size_t cap) {
     put(&o, a->background ? "  \"background\": true,\n" : "  \"background\": false,\n");
     if (a->tray) put(&o, "  \"tray\": true,\n");     /* only when on: a file without it reads the same everywhere */
     if (a->notify_sound > WEBREG_SOUND_AUTO && a->notify_sound < WEBREG_SOUND_N) member(&o, "notifySound", sound_names[a->notify_sound], 0);
+    if (a->color_scheme > WEBREG_SCHEME_AUTO && a->color_scheme < WEBREG_SCHEME_N) member(&o, "colorScheme", scheme_names[a->color_scheme], 0);
     put(&o, "  \"profiles\": [");
     for (int i = 0; i < a->nprofiles; i++) {
         put(&o, i ? ", { \"id\": " : " { \"id\": ");

@@ -16,6 +16,8 @@
  *   - a permission is allow, ask or deny; source is catalog or url; background a boolean; tray (optional, false when
  *     missing) a boolean: the app's tray icon (StatusNotifierItem, Open and Quit); background mode does not need it;
  *     notifySound (optional, "auto" when missing) auto|app|system|none: whose sound a notification makes;
+ *     colorScheme (optional, "auto" when missing) auto|light|dark: the light or dark preference the page is told
+ *     (auto: the desktop's mode; lord-server sends it, webscheme.h);
  *     a profile is { id, name } or { id, name, color } (color: red, orange, yellow, green, blue, purple, gray or none)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
@@ -40,6 +42,8 @@ enum { WEBREG_ALLOW, WEBREG_ASK, WEBREG_DENY };
 /* "notifySound": auto (LordOS's sound only when the page plays none of its own), app (the page's only), system
  * (LordOS's only), none */
 enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NONE, WEBREG_SOUND_N };
+/* "colorScheme": auto (the desktop's light or dark mode), light, dark: what the page's prefers-color-scheme says */
+enum { WEBREG_SCHEME_AUTO, WEBREG_SCHEME_LIGHT, WEBREG_SCHEME_DARK, WEBREG_SCHEME_N };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
 
@@ -61,6 +65,7 @@ typedef struct {
     int  background;
     int  tray;                            /* "tray": a tray icon with Open and Quit (written only when on) */
     int  notify_sound;                    /* WEBREG_SOUND_* (written only when not auto) */
+    int  color_scheme;                    /* WEBREG_SCHEME_* (written only when not auto) */
     int  nprofiles;
     WebProfile profiles[WEBREG_PROFILES_MAX];
     int  perms[WEBREG_PERM_N];            /* WEBREG_ALLOW / WEBREG_ASK / WEBREG_DENY */
@@ -87,6 +92,8 @@ int  webreg_color_ok(const char *s);           /* one of the profile colors abov
 const char *webreg_profile_default_color(const WebApp *a);
 const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "none"; NULL out of range */
 int  webreg_sound_value(const char *name);     /* -1 if unknown */
+const char *webreg_scheme_name(int v);         /* "auto" / "light" / "dark"; NULL out of range */
+int  webreg_scheme_value(const char *name);    /* -1 if unknown */
 
 /* ---- the file ---- */
 /* Parses and checks one registry file. 0 ok; -1 refused (a zeroed), with why (optional) saying what is wrong. */

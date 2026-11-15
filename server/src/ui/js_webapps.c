@@ -22,6 +22,9 @@
  *   setTray(app, on)                    the app's tray icon, Open and Quit (registry "tray"; lord-web reads it); background
  *                                       mode (setBackground) stays its own switch
  *   setNotifySound(app, value)          auto|app|system|none (registry "notifySound": whose sound a notification makes)
+ *   setColorScheme(app, value)          auto|light|dark (registry "colorScheme": the app's Appearance, the light or dark
+ *                                       preference its pages are told; auto follows the desktop). Running profiles get
+ *                                       it at once (SetColorScheme, webask_app_scheme)
  *   fetchIcon(app)                      → probe id; the site's own icon for an installed or a catalog app: the probe
  *                                       of "Add from an address" on the app's own start address (lord-web needed)
  *   iconResult(app)                     null while it runs; { done, ok, iconPath } once the icon is kept in
@@ -256,13 +259,13 @@ static void profile_icons_of(const char *app) {
     free(a);
 }
 
-/* field: 0 tray (value 0/1), 1 notifySound (value WEBREG_SOUND_*) */
+/* field: 0 tray (value 0/1), 1 notifySound (value WEBREG_SOUND_*), 2 colorScheme (value WEBREG_SCHEME_*) */
 static const char *set_field(const char *app, int field, int value) {
     if (!webreg_id_ok(app)) return "webapps.badId";
     WebApp *a = malloc(sizeof *a);
     if (!a) return "webapps.writeFailed";
     const char *e = webmgr_load(app, a);
-    int *f = field ? &a->notify_sound : &a->tray;
+    int *f = field == 2 ? &a->color_scheme : field ? &a->notify_sound : &a->tray;
     if (!e && *f != value) { *f = value; e = save_entry(a); }
     free(a);
     return e;
@@ -314,6 +317,18 @@ static JSValue f_set_notify_sound(JSContext *c, JSValueConst t, int argc, JSValu
     const char *app = arg_str(c, argc, argv, 0), *val = arg_str(c, argc, argv, 1);
     int v = val ? webreg_sound_value(val) : -1;
     const char *err = !app || !val ? "sys.badArgument" : v < 0 ? "webapps.badSound" : set_field(app, 1, v);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, val);
+    return done(c, err, JS_TRUE);
+}
+
+/* the app's Appearance; its open windows follow at once (SetColorScheme to each running profile, webask.c) */
+static JSValue f_set_color_scheme(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *val = arg_str(c, argc, argv, 1);
+    int v = val ? webreg_scheme_value(val) : -1;
+    const char *err = !app || v < 0 ? "sys.badArgument" : set_field(app, 2, v);
+    if (!err) webask_app_scheme(app);
     JS_FreeCString(c, app);
     JS_FreeCString(c, val);
     return done(c, err, JS_TRUE);
@@ -628,6 +643,7 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("setTray", 2, f_set_tray),
     JS_CFUNC_DEF("setProfileColor", 3, f_set_profile_color),
     JS_CFUNC_DEF("setNotifySound", 2, f_set_notify_sound),
+    JS_CFUNC_DEF("setColorScheme", 2, f_set_color_scheme),
     JS_CFUNC_DEF("fetchIcon", 1, f_fetch_icon),
     JS_CFUNC_DEF("iconResult", 1, f_icon_result),
     JS_CFUNC_DEF("icons", 0, f_icons),

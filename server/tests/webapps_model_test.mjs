@@ -287,6 +287,11 @@ eq('LordOS plays its sound', [
 eq('notification keys', [M.notifyKey('chat'), M.notifyKey('../x'), M.appOfNotifyKey('lordos-web.chat'), M.appOfNotifyKey('lordos-web.chat.work'), M.appOfNotifyKey('linux:firefox')],
   ['lordos-web.chat', null, 'chat', null, null]);
 
+// ---- appearance (registry colorScheme) ----
+eq('appearance', [M.colorSchemeOf({}), M.colorSchemeOf({ colorScheme: 'dark' }), M.colorSchemeOf({ colorScheme: 'light' }), M.colorSchemeOf({ colorScheme: 'Dark' }),
+  M.colorSchemeOf({ colorScheme: 'system' }), M.colorSchemeOf(null)], ['auto', 'dark', 'light', 'auto', 'auto', 'auto']);
+eq('appearance choices', M.COLOR_SCHEMES, ['auto', 'light', 'dark']);
+
 // ---- profile colors, window titles ----
 const colored = { ...chat, profiles: [{ id: 'personal', name: 'Personal' }, { id: 'work', name: 'trabajo', color: 'blue' }, { id: 'x', name: 'X', color: 'none' }, { id: 'y', name: 'Y' }] };
 eq('a profile\'s color', [M.profileColor(colored, 'personal'), M.profileColor(colored, 'work'), M.profileColor(colored, 'x'), M.profileColor(colored, 'y'), M.profileColor(colored, 'ghost'),

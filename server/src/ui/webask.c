@@ -274,7 +274,7 @@ int webask_edit(const char *app, const char *profile, const char *command) {
 /* one running lord-web: SetColorScheme(scheme), no reply wanted */
 static int send_scheme(const char *app, const char *profile, const char *word) {
     char name[160];
-    if (!bus || webreg_bus_name(app, profile, name, sizeof name)) return -1;
+    if (!bus || !word || webreg_bus_name(app, profile, name, sizeof name)) return -1;
     DBuf b;
     dw_init(&b);
     dw_str(&b, word);
@@ -292,19 +292,31 @@ void webask_scheme(int dark) {
     if (!bus) return;
     WebRunning r[WEB_MAX_RUNNING];
     int n = webmgr_running(r, WEB_MAX_RUNNING), sent = 0;
-    for (int i = 0; i < n; i++) if (!send_scheme(r[i].app, r[i].profile, webscheme_name(s))) sent++;
+    /* each app's own word: the desktop's for Automatic; one set to Light or Dark gets the same word again, which
+     * lord-web ignores */
+    for (int i = 0; i < n; i++) if (!send_scheme(r[i].app, r[i].profile, webscheme_name(webmgr_scheme_of(r[i].app)))) sent++;
+    if (sent) dbus_flush(bus);
+}
+
+void webask_app_scheme(const char *app) {
+    if (!bus || !app) return;
+    const char *word = webscheme_name(webmgr_scheme_of(app));
+    if (!word) return;                              /* Automatic before the theme told the desktop's mode */
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING), sent = 0;
+    for (int i = 0; i < n; i++) if (!strcmp(r[i].app, app) && !send_scheme(r[i].app, r[i].profile, word)) sent++;
     if (sent) dbus_flush(bus);
 }
 
 void webask_appeared(const char *name) {
-    int s = webmgr_scheme();
-    if (!bus || !name || !webscheme_name(s) || strncmp(name, "org.lordos.WebApp.", 18)) return;
+    if (!bus || !name || strncmp(name, "org.lordos.WebApp.", 18)) return;
     WebRunning r[WEB_MAX_RUNNING];
     int n = webmgr_running(r, WEB_MAX_RUNNING);
     for (int i = 0; i < n; i++) {
         char own[160];
         if (webreg_bus_name(r[i].app, r[i].profile, own, sizeof own) || strcmp(own, name)) continue;
-        if (!send_scheme(r[i].app, r[i].profile, webscheme_name(s))) dbus_flush(bus);
+        const char *word = webscheme_name(webmgr_scheme_of(r[i].app));
+        if (word && !send_scheme(r[i].app, r[i].profile, word)) dbus_flush(bus);
         return;
     }
 }

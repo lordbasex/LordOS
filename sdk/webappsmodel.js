@@ -354,6 +354,12 @@ export const appOfNotifyKey = (key) => {
   return isWebId(s) ? s : null;
 };
 
+// ---- appearance (Settings → Web apps and the app menu: registry "colorScheme") ----
+
+// What the app's pages are told about light and dark (prefers-color-scheme): auto follows LordOS's mode.
+export const COLOR_SCHEMES = ['auto', 'light', 'dark'];
+export const colorSchemeOf = (entry) => (entry && COLOR_SCHEMES.includes(entry.colorScheme) ? entry.colorScheme : 'auto');
+
 // ---- profile colors (the tag colors of Files and Databases) ----
 
 export const PROFILE_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];

@@ -603,6 +603,37 @@ static void test_manager(void) {
         free(env);
         CHECK(webmgr_remove_profile("chat", sch[k][1], 1) == NULL, "profile %s removed", sch[k][1]);
     }
+    /* the app's own Appearance (colorScheme) wins over the desktop's mode, at start and in webmgr_scheme_of */
+    {
+        char rp[PATH_MAX], text[WEBREG_FILE_MAX];
+        snprintf(rp, sizeof rp, "%s/apps/chat.json", webmgr_config_dir());
+        const struct { int pref, desk; const char *want; } cs[] = {
+            { WEBREG_SCHEME_DARK, WEBSCHEME_LIGHT, WEBSCHEME_ENV "=dark\n" }, { WEBREG_SCHEME_LIGHT, WEBSCHEME_DARK, WEBSCHEME_ENV "=light\n" },
+            { WEBREG_SCHEME_DARK, 7, WEBSCHEME_ENV "=dark\n" }, { WEBREG_SCHEME_AUTO, WEBSCHEME_DARK, WEBSCHEME_ENV "=dark\n" } };
+        for (int k = 0; k < 4; k++) {
+            WebApp c;
+            CHECK(!webmgr_load("chat", &c), "loaded");
+            c.color_scheme = cs[k].pref;
+            size_t tl = webreg_write(&c, text, sizeof text);
+            CHECK(tl && !webreg_write_file(rp, text, tl), "colorScheme %d written", cs[k].pref);
+            webmgr_set_scheme(cs[k].desk);
+            int want = cs[k].pref == WEBREG_SCHEME_AUTO ? cs[k].desk : cs[k].pref == WEBREG_SCHEME_DARK ? WEBSCHEME_DARK : WEBSCHEME_LIGHT;
+            CHECK(webmgr_scheme_of("chat") == want, "scheme of the app %d: %d", k, webmgr_scheme_of("chat"));
+            CHECK(webmgr_scheme_of("nothere") == webmgr_scheme() && webmgr_scheme_of("../x") == webmgr_scheme(), "an unknown app: the desktop's");
+            CHECK(!webmgr_add_profile("chat", "Look", prof, sizeof prof) && !strcmp(prof, "look"), "profile look added");
+            CHECK(!webmgr_launch("chat", "look", &raised) && raised == 0, "look started");
+            snprintf(q, sizeof q, "%s/env-chat-look", root);
+            env = NULL;
+            for (int i = 0; i < 200 && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+            CHECK(env && strstr(env, cs[k].want) && (k == 1 || !strstr(env, WEBSCHEME_ENV "=light")) && (k != 1 || !strstr(env, WEBSCHEME_ENV "=dark")),
+                  "appearance %d: %s", k, env ? env : "(none)");
+            free(env);
+            unlink(q);
+            CHECK(webmgr_remove_profile("chat", "look", 1) == NULL, "profile look removed");
+        }
+        WebApp c;
+        CHECK(!webmgr_load("chat", &c) && c.color_scheme == WEBREG_SCHEME_AUTO, "back to automatic");
+    }
     snprintf(p, sizeof p, "%s/.local/share/lordos/web/chat/work", root);
     CHECK(!stat(p, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0700, "its data folder, 0700");
     snprintf(q, sizeof q, "%s/cookies.sqlite", p);

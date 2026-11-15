@@ -86,6 +86,8 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 **The honest limit:** WPE WebKit 2.48 gives LordOS no way to set the page's color scheme itself, so a page that chooses its colors only through CSS (`@media (prefers-color-scheme: dark)` rules) stays light until a newer WebKit allows it. Such sites usually have a theme setting of their own: choose Dark there. The Store's page of an app says so when it is known.
 
+**Each app's own Appearance** (*in development*, after 0.8.8.8, the latest release): Automatic (the default, it follows LordOS as above), Light or Dark, chosen per web app in Settings → Web Apps or in the app menu's *Appearance* while its window is in front (Lord Flow). It applies at once to the app's open windows, every profile. It only changes the light or dark preference the page reads, never the site: the same `matchMedia` answer and the same no-white-flash background, so a site that follows its "System" theme can stay dark on a light desktop or the other way round, and the same limit holds (a CSS-only site stays light; use its own theme setting).
+
 [[shot:12]]
 
 ## Performance
@@ -97,7 +99,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 ## Settings → Web Apps
 
-Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the icon (the site's own or LordOS's letter tile) and Uninstall.
+Every installed web app has its page: its site and where it came from, its profiles (open, rename, color, remove, with the data each one keeps on disk), its permissions, *Keep running in the background* (closing the window keeps it running, so its notifications still arrive), *Show in the menu bar* (an icon next to the clock with Open and Quit), *Show unread count on the Dock*, *Each profile has its own Dock icon*, the notification sound (Automatic, which plays LordOS's only when the site plays none of its own; the site's; LordOS's; or none), the Appearance (Automatic, Light or Dark; in development), the icon (the site's own or LordOS's letter tile) and Uninstall.
 
 [[shot:10]]
 

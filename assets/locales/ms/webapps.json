@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Penampilan",
+  "appearance.auto": "Automatik",
+  "appearance.light": "Cerah",
+  "appearance.dark": "Gelap",
+  "appearance.autoHint": "Mengikut mod cerah atau gelap LordOS.",
+  "appearance.lightHint": "Laman sentiasa diberitahu cerah, walau apa pun mod LordOS.",
+  "appearance.darkHint": "Laman sentiasa diberitahu gelap, walau apa pun mod LordOS.",
+  "appearance.footer": "Hanya pilihan cerah atau gelap yang dibaca oleh laman berubah; LordOS tidak pernah mengubah laman itu sendiri. Sesetengah laman kekal cerah juga, dan laman yang mempunyai tetapan tema sendiri mengikut tetapan itu."
+}

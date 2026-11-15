@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Görünüş",
+  "appearance.auto": "Avtomatik",
+  "appearance.light": "İşıqlı",
+  "appearance.dark": "Qaranlıq",
+  "appearance.autoHint": "LordOS-un işıqlı və ya qaranlıq rejimini izləyir.",
+  "appearance.lightHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə işıqlı bildirilir.",
+  "appearance.darkHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə qaranlıq bildirilir.",
+  "appearance.footer": "Yalnız saytın oxuduğu işıqlı və ya qaranlıq üstünlük dəyişir; LordOS saytın özünü heç vaxt dəyişmir. Bəzi saytlar yenə də işıqlı qalır, öz mövzu ayarı olan sayt isə həmin ayarı izləyir."
+}

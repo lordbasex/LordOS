@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Görünüm",
+  "appearance.auto": "Otomatik",
+  "appearance.light": "Açık",
+  "appearance.dark": "Koyu",
+  "appearance.autoHint": "LordOS’un açık veya koyu modunu izler.",
+  "appearance.lightHint": "LordOS hangi modda olursa olsun siteye her zaman açık bildirilir.",
+  "appearance.darkHint": "LordOS hangi modda olursa olsun siteye her zaman koyu bildirilir.",
+  "appearance.footer": "Yalnızca sitenin okuduğu açık veya koyu tercih değişir; LordOS sitenin kendisini asla değiştirmez. Bazı siteler yine de açık kalır ve kendi tema ayarı olan bir site o ayarı izler."
+}

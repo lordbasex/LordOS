@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Megjelenés",
+  "appearance.auto": "Automatikus",
+  "appearance.light": "Világos",
+  "appearance.dark": "Sötét",
+  "appearance.autoHint": "A LordOS világos vagy sötét módját követi.",
+  "appearance.lightHint": "A webhely mindig világosat kap, bármilyen módban van a LordOS.",
+  "appearance.darkHint": "A webhely mindig sötétet kap, bármilyen módban van a LordOS.",
+  "appearance.footer": "Csak a webhely által olvasott világos vagy sötét beállítás változik; a LordOS soha nem módosítja magát a webhelyet. Egyes webhelyek így is világosak maradnak, a saját témabeállítással rendelkező webhely pedig azt követi."
+}

@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Weergave",
+  "appearance.auto": "Automatisch",
+  "appearance.light": "Licht",
+  "appearance.dark": "Donker",
+  "appearance.autoHint": "Volgt de lichte of donkere modus van LordOS.",
+  "appearance.lightHint": "De site krijgt altijd licht te horen, welke modus LordOS ook heeft.",
+  "appearance.darkHint": "De site krijgt altijd donker te horen, welke modus LordOS ook heeft.",
+  "appearance.footer": "Alleen de licht- of donkervoorkeur die de site leest verandert; LordOS wijzigt de site zelf nooit. Sommige sites blijven toch licht, en een site met een eigen thema-instelling volgt die instelling."
+}

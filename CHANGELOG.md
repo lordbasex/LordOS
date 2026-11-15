@@ -42,6 +42,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ۲۱:۰۵», Arabic «١٬٢٣٤٬٥٦٧٫٨٩» (ar_MA, ar_DZ and ar_TN keep 0–9, as CLDR has them) and Bengali «১,২৩৪,৫৬৭.৮৯»,
   in dates, times and numbers, only when the region is of the language itself: English with region fa_IR keeps
   «1,234,567.89».
+- **A web app's own Appearance: Automatic, Light or Dark** (maintainer's approval, 2026-11-15). Each web app has
+  its own choice of the light or dark preference its pages are told (`prefers-color-scheme` through `matchMedia`,
+  and the dark background while a page loads): Automatic, the default, follows LordOS's mode as before; Light and
+  Dark keep that one whatever the desktop does, so a messaging app can stay dark on a light desktop. It is in
+  Settings → Web Apps, on the app's page (Appearance, three choices with a hint each), and in Lord Flow in the app
+  menu of the web app's window (Appearance ▸ Automatic, Light, Dark, the current one checked; Lord Classic flattens
+  submenus, so there it is in Settings only). It applies **at once to the app's open windows**, every profile: a
+  change writes the registry's new optional `colorScheme` key (`auto`, `light`, `dark`; written only when not `auto`,
+  anything else refused, `server/src/web/webreg.c`) and lord-server sends the app's running `lord-web` processes the
+  same closed `SetColorScheme("light" | "dark")` call it already sends for the desktop's mode
+  (`webask_app_scheme`). lord-server picks the word per app everywhere it tells one (`webscheme_for_app`: the app's
+  own for Light or Dark, else the desktop's): the environment at start, a desktop mode change and a lord-web's bus
+  name appearing. `lord-web` reads nothing new and the page gets no new API: only what it is told changes, never the
+  site. The same limit as before holds: sites whose dark mode is only CSS `@media` rules stay light. New:
+  `lord.webapps.setColorScheme(app, value)` (desktop only, not in the broker; a bad value is `sys.badArgument`),
+  `colorSchemeOf` and `COLOR_SCHEMES` in `sdk/webappsmodel.js`, `webAppearanceItem` in `sdk/appcontrol.js`, and the
+  `webapps.appearance.*` texts (8 keys) in all 32 languages (the 26 partial ones get their first `webapps.json`).
+  Tests: `build/webapp-test` (the key read and written back, the defaults not written, seven bad forms refused,
+  `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
+  word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
+  Automatic. Not yet checked on screen on the development VM.
 
 ### Changed
 
@@ -73,6 +94,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- docs/WEBAPPS.md: the registry's `colorScheme`, the start environment for an app set to Light or Dark, "Each app's
+  Appearance" under Light and dark (how lord-server picks the word, the live change, where it is, the tests), the app
+  menu item and the More registry keys list. docs/PAPER-VALIDATION.md: a 0.8.8.9 section (in development) with the
+  Appearance claim.
 - docs/LANGUAGES.md: the 26 partial languages (ids, names, regions, plural rules, direction, digits, script fonts),
   how they were chosen, the core set, the plural rules table, native digits, what a translator must keep
   (variables, plural forms, LordOS's own names, no other system's brands), and what is still pending for them (the
@@ -99,6 +124,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **LordOS Web Runtime page** (en, es, pt): each app's Appearance (Automatic, Light, Dark), marked in development
+  after 0.8.8.8, the latest release, under Light and dark and in Settings → Web Apps. The paper (en, es, pt, edition
+  0.8.8.9 Beta of 2026-11-15) says it in its web apps paragraph.
 - **Cookies and statistics: LordOS's update checks are counted from 2026-11-12.** Until 2026-11-11 the requests
   LordOS makes to `lordos.org/apt` were left out of every count. The policy (Cookies and statistics and the Privacy
   policy, in English, Spanish and Portuguese, both dated 2026-11-12) now says exactly what is counted from the same CDN

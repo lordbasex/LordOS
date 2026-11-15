@@ -688,6 +688,33 @@ static void test_registry_options(void) {
         CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad[i]);
     }
     CHECK(webreg_sound_value("none") == WEBREG_SOUND_NONE && webreg_sound_value("x") < 0 && !webreg_sound_name(9), "names");
+
+    /* colorScheme: the app's Appearance, auto when missing and never written as auto */
+    snprintf(j, sizeof j, base, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.color_scheme == WEBREG_SCHEME_AUTO, "colorScheme auto when missing");
+    n = webreg_write(&a, out, sizeof out);
+    CHECK(n && !strstr(out, "colorScheme"), "colorScheme auto isn't written");
+    const char *schemes[] = { "auto", "light", "dark" };
+    for (int i = 0; i < 3; i++) {
+        char v[64];
+        snprintf(v, sizeof v, "\"colorScheme\": \"%s\",", schemes[i]);
+        snprintf(j, sizeof j, base, v);
+        CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.color_scheme == i && !strcmp(webreg_scheme_name(i), schemes[i]), "colorScheme %s", schemes[i]);
+        n = webreg_write(&a, out, sizeof out);
+        CHECK(n && !webreg_parse(out, n, &b, NULL, 0) && b.color_scheme == i && (i == 0) == !strstr(out, "colorScheme"), "colorScheme %s written and read back", schemes[i]);
+    }
+    const char *bad_scheme[] = { "\"colorScheme\": \"Dark\",", "\"colorScheme\": \"system\",", "\"colorScheme\": \"\",", "\"colorScheme\": 1,",
+                                 "\"colorScheme\": true,", "\"colorScheme\": \"dark\", \"colorScheme\": \"light\",", "\"appearance\": \"dark\",", NULL };
+    for (int i = 0; bad_scheme[i]; i++) {
+        snprintf(j, sizeof j, base, bad_scheme[i]);
+        CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad_scheme[i]);
+    }
+    snprintf(j, sizeof j, base, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0), "base");
+    a.color_scheme = 3;
+    CHECK(!webreg_write(&a, out, sizeof out), "a bad colorScheme is never written");
+    CHECK(webreg_scheme_value("light") == WEBREG_SCHEME_LIGHT && webreg_scheme_value("x") < 0 && webreg_scheme_value(NULL) < 0 && !webreg_scheme_name(3) &&
+          !webreg_scheme_name(-1), "scheme names");
 }
 
 static void test_edit(void) {
@@ -731,7 +758,20 @@ static void test_edit(void) {
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
 
+/* which word lord-server tells an app: its Appearance, or the desktop's for auto */
+static void test_scheme_for_app(void) {
+    const int desk[] = { -1, WEBSCHEME_LIGHT, WEBSCHEME_DARK };
+    for (int d = 0; d < 3; d++) {
+        CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, desk[d]) == desk[d], "auto follows the desktop (%d)", desk[d]);
+        CHECK(webscheme_for_app(WEBREG_SCHEME_LIGHT, desk[d]) == WEBSCHEME_LIGHT, "light whatever the desktop (%d)", desk[d]);
+        CHECK(webscheme_for_app(WEBREG_SCHEME_DARK, desk[d]) == WEBSCHEME_DARK, "dark whatever the desktop (%d)", desk[d]);
+    }
+    CHECK(webscheme_for_app(7, WEBSCHEME_DARK) == WEBSCHEME_DARK && webscheme_for_app(-3, WEBSCHEME_LIGHT) == WEBSCHEME_LIGHT, "a bad value is auto");
+    CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, 5) == -1 && webscheme_for_app(WEBREG_SCHEME_AUTO, -2) == -1, "a bad desktop value is not known");
+}
+
 static void test_scheme(void) {
+    test_scheme_for_app();
     CHECK(webscheme_parse("light") == WEBSCHEME_LIGHT && webscheme_parse("dark") == WEBSCHEME_DARK, "scheme: the two words");
     static const char *const bad[] = { "", "Dark", "DARK", "dark ", " dark", "dark\n", "prefer-dark", "default", "1", "true", "no-preference", "darkk", "lig" };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(webscheme_parse(bad[i]) < 0, "scheme refuses '%s'", bad[i]);

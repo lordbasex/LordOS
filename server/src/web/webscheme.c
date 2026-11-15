@@ -1,5 +1,6 @@
 /* webscheme.c — see webscheme.h. */
 #include "webscheme.h"
+#include "webreg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,12 @@ const char *webscheme_name(int scheme) {
 }
 
 int webscheme_from_env(const char *value) { return webscheme_parse(value) == WEBSCHEME_DARK ? WEBSCHEME_DARK : WEBSCHEME_LIGHT; }
+
+int webscheme_for_app(int pref, int desktop) {
+    if (pref == WEBREG_SCHEME_LIGHT) return WEBSCHEME_LIGHT;
+    if (pref == WEBREG_SCHEME_DARK) return WEBSCHEME_DARK;
+    return desktop == WEBSCHEME_LIGHT || desktop == WEBSCHEME_DARK ? desktop : -1;
+}
 
 static int key_ok(const char *key) {
     if (!key || strlen(key) != WEBSCHEME_KEY_LEN) return 0;

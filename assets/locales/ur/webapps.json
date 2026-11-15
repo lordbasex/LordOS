@@ -1,0 +1,10 @@
+{
+  "appearance.title": "ظاہری شکل",
+  "appearance.auto": "خودکار",
+  "appearance.light": "لائٹ",
+  "appearance.dark": "ڈارک",
+  "appearance.autoHint": "LordOS کے لائٹ یا ڈارک موڈ کی پیروی کرتا ہے۔",
+  "appearance.lightHint": "LordOS کا موڈ کچھ بھی ہو، سائٹ کو ہمیشہ لائٹ بتایا جاتا ہے۔",
+  "appearance.darkHint": "LordOS کا موڈ کچھ بھی ہو، سائٹ کو ہمیشہ ڈارک بتایا جاتا ہے۔",
+  "appearance.footer": "صرف وہ لائٹ یا ڈارک ترجیح بدلتی ہے جو سائٹ پڑھتی ہے؛ LordOS خود سائٹ میں کبھی تبدیلی نہیں کرتا۔ کچھ سائٹیں پھر بھی لائٹ رہتی ہیں، اور جس سائٹ کی اپنی تھیم سیٹنگ ہو وہ اسی کی پیروی کرتی ہے۔"
+}

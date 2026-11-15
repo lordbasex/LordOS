@@ -2,8 +2,8 @@
 
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
-0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12, the paper's
-current edition), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
+0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12) and for 0.8.8.9 in development (the paper's
+current edition, 2026-11-15), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
 memory from a process's RSS (§7.1) and points to versioned results (§11.5, `docs/RESULTS.md`).
@@ -271,6 +271,12 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1, 2.4 | Store → Installed removes a packaged Linux app found through dpkg's own lists, never an Essential, Protected or required package nor one that would take `lordos`; 21 built-in apps can be deactivated | Test (`test_dpkg_owner` in `build/pkg-test`, `tests/apps_off_model_test.mjs`) | Holds in the tests; on VM 127 only that the Store opens was recorded |
 | 5.1 | A Cloud account turned off is never given to rclone and keeps its settings and sign-in | Test (`t_onoff` in `build/cloud-test`, `tests/cloud_signin_fake.sh`, `tests/cloud_model_test.mjs`) | Holds in the tests |
 | 5.1 | The GitHub fixes of this round (#94, #96, #97, #99, #100, #101, #103, #104, #107, #109, #110, #111, #112, #117, #118, #123, #124, #125, #128, #130) | Each has its test named in `CHANGELOG.md`, 0.8.8.8-beta; #96, #107 and #124 also checked on VM 127 | Holds in the tests; #101 not tried against the reporter's kind of server |
+
+## 0.8.8.9 (in development; the paper's edition of 2026-11-15)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 5.1, 6.7 | A web app's Appearance (Automatic, Light, Dark) picks which closed word, `light` or `dark`, `lord-server` tells its `lord-web`; Automatic is the desktop's; open windows follow at once; the site is never changed | Test (`build/webapp-test`: the registry's `colorScheme` read, written only when not `auto`, anything else refused, and `webscheme_for_app`; `build/webreg-test`: the start environment and `webmgr_scheme_of`; `tests/webapps_model_test.mjs`); Design (`webask_app_scheme`, `docs/WEBAPPS.md`) | Holds for the logic; not yet checked on screen |
 
 ## What the paper must change for 0.8.5
 

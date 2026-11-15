@@ -194,5 +194,13 @@
   "sound.autoHint": "LordOS garsas tik tada, kai svetainė negroja savo.",
   "sound.appHint": "Tik svetainės grojamas garsas.",
   "sound.systemHint": "Visada LordOS garsas.",
-  "sound.noneHint": "Jokio LordOS garso (svetainė vis tiek gali groti savo)."
+  "sound.noneHint": "Jokio LordOS garso (svetainė vis tiek gali groti savo).",
+  "appearance.title": "Išvaizda",
+  "appearance.auto": "Automatiškai",
+  "appearance.light": "Šviesus",
+  "appearance.dark": "Tamsus",
+  "appearance.autoHint": "Seka LordOS šviesųjį arba tamsųjį režimą.",
+  "appearance.lightHint": "Svetainei visada nurodomas šviesus režimas, nepriklausomai nuo LordOS režimo.",
+  "appearance.darkHint": "Svetainei visada nurodomas tamsus režimas, nepriklausomai nuo LordOS režimo.",
+  "appearance.footer": "Keičiama tik šviesaus ar tamsaus režimo nuostata, kurią skaito svetainė; LordOS niekada nekeičia pačios svetainės. Kai kurios svetainės vis tiek lieka šviesios, o svetainė su savo temos nustatymu laikosi jo."
 }

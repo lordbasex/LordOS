@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Tampilan",
+  "appearance.auto": "Otomatis",
+  "appearance.light": "Terang",
+  "appearance.dark": "Gelap",
+  "appearance.autoHint": "Mengikuti mode terang atau gelap LordOS.",
+  "appearance.lightHint": "Situs selalu diberi tahu terang, apa pun mode LordOS.",
+  "appearance.darkHint": "Situs selalu diberi tahu gelap, apa pun mode LordOS.",
+  "appearance.footer": "Hanya preferensi terang atau gelap yang dibaca situs yang berubah; LordOS tidak pernah mengubah situs itu sendiri. Beberapa situs tetap terang, dan situs yang punya pengaturan tema sendiri mengikuti pengaturan tersebut."
+}

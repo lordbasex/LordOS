@@ -1,0 +1,10 @@
+{
+  "appearance.title": "外観",
+  "appearance.auto": "自動",
+  "appearance.light": "ライト",
+  "appearance.dark": "ダーク",
+  "appearance.autoHint": "LordOS のライト/ダークモードに従います。",
+  "appearance.lightHint": "LordOS のモードにかかわらず、サイトには常にライトと伝えます。",
+  "appearance.darkHint": "LordOS のモードにかかわらず、サイトには常にダークと伝えます。",
+  "appearance.footer": "変わるのはサイトが読み取るライト/ダークの設定だけで、LordOS がサイト自体を変更することはありません。それでもライトのままのサイトもあり、独自のテーマ設定を持つサイトはその設定に従います。"
+}

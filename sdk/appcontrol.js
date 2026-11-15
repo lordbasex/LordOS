@@ -1,7 +1,8 @@
 // appcontrol.js — what a theme offers for the app in front and for every app at once (0.8.5):
 //
 //   appGroup(winId)        { key, name, windows } of the app that owns a window (grouped as the Dock does)
-//   appMenuItems(winId)    the app menu: About <app>, Settings…, Hide <app>, Hide Others, Show All, Quit <app>
+//   appMenuItems(winId)    the app menu: About <app>, Settings…, (a web app's Appearance), Hide <app>, Hide Others,
+//                          Show All, Quit <app>
 //   runningApps()          every app with a window, for Force Quit
 //   forceQuit(key)         ends an app that stopped answering (see below)
 //   recentItems(n)         the recent files as menu items (Recent Items in the crown menu)
@@ -16,7 +17,8 @@ import { windows, wm, getApp, appMenus, onActiveDesktop, activeDesktop } from '.
 import { launcherIdOf, quitApp } from './dock.js';
 import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { openFileWithApps, openUrl } from './sysopen.js';
-import { webAppOfWindow } from './webapps.js';
+import { webAppOfWindow, webAppCall } from './webapps.js';
+import { COLOR_SCHEMES, colorSchemeOf } from './webappsmodel.js';
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
 import { compareNames } from './collate.js';
@@ -71,6 +73,19 @@ export function webHelpItems(winId) {
   return [{ label: t('shell.app.webSite', { app: web.entry.name }), onClick: () => openUrl(`${web.entry.origin}/`) }, '-'];
 }
 
+// A web app's Appearance (Automatic, Light, Dark): the light or dark preference its pages are told; open windows follow
+// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps.
+export function webAppearanceItem(winId) {
+  const web = webAppOfWindow(wm.get(winId));
+  if (!web) return null;
+  const now = colorSchemeOf(web.entry);
+  return {
+    label: t('webapps.appearance.title'),
+    submenu: COLOR_SCHEMES.map((v) => ({ label: t(`webapps.appearance.${v}`), checked: v === now,
+      onClick: () => { try { webAppCall('setColorScheme', web.entry.id, v); } catch (e) { console.error('appearance:', e); } } })),
+  };
+}
+
 // The app's own Settings… item, if it has one (❖,); a web app's is its page in Settings → Web apps.
 export const appSettingsItem = (winId) => settingsItemOf(winId) || webSettingsItem(winId);
 
@@ -89,10 +104,12 @@ export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
   const settingsItem = appSettingsItem(winId);
+  const appearance = webAppearanceItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
+    ...(appearance ? [appearance] : []),
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },
     { label: t('shell.app.hideOthers'), hint: '❖⌥H', onClick: () => hideOthers(winId) },

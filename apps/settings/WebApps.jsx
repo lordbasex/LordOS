@@ -113,6 +113,7 @@ function AppDetails({ entry }) {
     const id = setInterval(() => { if (!siteIconBusy(entry.id)) { clearInterval(id); setIconBusy(false); } }, 1000);
   };
   const sounds = M.NOTIFY_SOUNDS.map((v) => [v, tr(`webapps.sound.${v}`)]);
+  const schemes = M.COLOR_SCHEMES.map((v) => [v, tr(`webapps.appearance.${v}`)]);
   const [msg, setMsg] = useState(null);
   const [adding, setAdding] = useState(null);       // the new profile's name being typed
   const [removing, setRemoving] = useState(null);   // { profile } or { app: true }
@@ -163,6 +164,11 @@ function AppDetails({ entry }) {
         </SettingRow>
         <SettingRow label={tr('webapps.settings.tray')} hint={tr('webapps.settings.trayHint')}>
           <Toggle on={!!entry.tray} onChange={(on) => call('setTray', entry.id, on)} />
+        </SettingRow>
+      </Section>
+      <Section footer={tr('webapps.appearance.footer')}>
+        <SettingRow label={tr('webapps.appearance.title')} hint={tr(`webapps.appearance.${M.colorSchemeOf(entry)}Hint`)}>
+          <Segmented small value={M.colorSchemeOf(entry)} options={schemes} onChange={(v) => call('setColorScheme', entry.id, v)} />
         </SettingRow>
       </Section>
       <Section title={tr('webapps.settings.dockTitle')}>

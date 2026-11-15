@@ -1,0 +1,10 @@
+{
+  "appearance.title": "المظهر",
+  "appearance.auto": "تلقائي",
+  "appearance.light": "فاتح",
+  "appearance.dark": "داكن",
+  "appearance.autoHint": "يتبع الوضع الفاتح أو الداكن في LordOS.",
+  "appearance.lightHint": "يُبلَّغ الموقع دائمًا بالوضع الفاتح، أيًّا كان وضع LordOS.",
+  "appearance.darkHint": "يُبلَّغ الموقع دائمًا بالوضع الداكن، أيًّا كان وضع LordOS.",
+  "appearance.footer": "لا يتغير إلا تفضيل الوضع الفاتح أو الداكن الذي يقرؤه الموقع؛ ولا يعدّل LordOS الموقع نفسه أبدًا. تبقى بعض المواقع فاتحة رغم ذلك، والموقع الذي له إعداد سمة خاص به يتبع ذلك الإعداد."
+}

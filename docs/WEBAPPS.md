@@ -67,6 +67,9 @@ LordOS's compositor, with WebKit's sandbox running. For one account it used abou
   notifications. `"auto"`: LordOS plays its sound unless the page plays its own (below); `"app"`: never LordOS's sound;
   `"system"`: always LordOS's sound; `"none"`: never LordOS's sound, and lord-web doesn't touch the page's audio
   either (a page that plays its own sound still does).
+- `colorScheme` (optional, `"auto"` when missing, written only when it isn't): the app's Appearance, the light or dark
+  preference its pages are told. `"auto"` follows the desktop's mode, `"light"` and `"dark"` always say that one
+  ("Light and dark", below).
 - Unknown keys are refused. The file is at most 64 KB.
 
 Data, per app and profile, under `~/.local/share/lordos/web/<app>/<profile>/` (also in `fsops_protected`): `data/`,
@@ -82,7 +85,8 @@ Only lord-server starts `lord-web`:
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
   `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
   its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on). Once the
-  theme has told lord-server the desktop's mode, also `LORDOS_WEB_SCHEME=light` or `dark` ("Light and dark", below).
+  theme has told lord-server the desktop's mode, also `LORDOS_WEB_SCHEME=light` or `dark` ("Light and dark", below);
+  for an app whose Appearance is Light or Dark, always that word.
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
@@ -255,7 +259,8 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
     origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
     image.
-  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; Help starts with "<app> on the Web",
+  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Lord Flow, Appearance (Automatic,
+    Light, Dark) sets the app's `colorScheme` ("Light and dark", below); Help starts with "<app> on the Web",
     the app's origin in the browser.
 - **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; since 0.8.8.8): a web app
   follows the desktop's light or dark mode as far as WPE WebKit 2.48 lets it.
@@ -284,6 +289,22 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
     load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
     itself, and nothing goes from the page to lord-web or lord-server.
+  - **Each app's Appearance** (`colorScheme` in the registry; in development after 0.8.8.8): Automatic (the default),
+    Light or Dark, per app (every profile of it). lord-server picks the word it sends each app
+    (`webscheme_for_app`: the app's own for Light or Dark, else the desktop's), in the environment at start, in
+    `SetColorScheme` when the desktop's mode changes and when a lord-web's bus name appears. lord-web reads nothing
+    new: it applies the word it gets exactly as before, so the script, the `change` events and the dark background
+    while loading all follow the app's choice, and the page's content is never changed. Changing it
+    (`lord.webapps.setColorScheme(app, value)`, desktop only, not in the broker) writes the registry and sends
+    `SetColorScheme` with the new word to each running profile of the app (`webask_app_scheme`), so **open windows
+    follow at once**; a page that only reads the scheme at load sees it on its next load. The same limit holds: Dark
+    reaches scripts that ask `matchMedia`, not CSS-only `@media` rules. Where: Settings → Web Apps, the app's page
+    (Appearance, a three-way choice with a hint for each), and in Lord Flow the app menu of the web app's window
+    (Appearance ▸ Automatic, Light, Dark, the current one checked). Lord Classic flattens submenus, so there it is only
+    in Settings. Tests: `build/webreg-test` (the start environment, `webmgr_scheme_of`), `build/webapp-test` (the key
+    read, written only when not `auto`, anything else refused;
+    `webscheme_for_app` for each pair), `tests/webapps_model_test.mjs` (`colorSchemeOf`). Not yet checked on screen
+    on the development VM.
   - **No white flash:** in dark mode the view's background is the desktop's dark window color (`#1f1f23`) from a
     load's start to its end, so nothing white shows before the page paints; then it is WebKit's white again, so a page
     without a background of its own reads as in a browser.
@@ -600,6 +621,8 @@ silently.
   `"system"` always LordOS's, `"none"` no sound from LordOS. `lord.webapps.setNotifySound(app, value)`; Settings → Web
   apps → Notification sound, and the same choice in Settings → Notifications (one value for both pages). LordOS
   controls only its own sound: to silence the page's own sound, use the site's settings.
+- `colorScheme` (`"auto"` when missing, written only when it isn't): `"auto"`, `"light"` or `"dark"`, the app's
+  Appearance. `lord.webapps.setColorScheme(app, value)`; Settings → Web Apps → Appearance and the app menu.
 - A profile is `{ id, name }` or `{ id, name, color }`, `color` one of LordOS's tag colors (Files' tags, Databases'
   favorites): `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, or `none`. A new profile gets one by
   itself (`webreg_profile_default_color`: the first none, then orange, purple, blue, green, red, yellow, gray, the

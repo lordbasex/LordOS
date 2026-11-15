@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Wygląd",
+  "appearance.auto": "Automatycznie",
+  "appearance.light": "Jasny",
+  "appearance.dark": "Ciemny",
+  "appearance.autoHint": "Podąża za jasnym lub ciemnym trybem LordOS.",
+  "appearance.lightHint": "Witryna zawsze otrzymuje tryb jasny, niezależnie od trybu LordOS.",
+  "appearance.darkHint": "Witryna zawsze otrzymuje tryb ciemny, niezależnie od trybu LordOS.",
+  "appearance.footer": "Zmienia się tylko preferencja jasnego lub ciemnego trybu, którą odczytuje witryna; LordOS nigdy nie modyfikuje samej witryny. Niektóre witryny i tak pozostają jasne, a witryna z własnym ustawieniem motywu stosuje się do niego."
+}

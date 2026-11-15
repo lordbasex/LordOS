@@ -1,0 +1,10 @@
+{
+  "appearance.title": "모양",
+  "appearance.auto": "자동",
+  "appearance.light": "라이트",
+  "appearance.dark": "다크",
+  "appearance.autoHint": "LordOS의 라이트 또는 다크 모드를 따릅니다.",
+  "appearance.lightHint": "LordOS 모드와 관계없이 사이트에 항상 라이트라고 알립니다.",
+  "appearance.darkHint": "LordOS 모드와 관계없이 사이트에 항상 다크라고 알립니다.",
+  "appearance.footer": "사이트가 읽는 라이트 또는 다크 선호 설정만 바뀌며, LordOS는 사이트 자체를 절대 수정하지 않습니다. 그래도 라이트로 남는 사이트가 있으며, 자체 테마 설정이 있는 사이트는 그 설정을 따릅니다."
+}

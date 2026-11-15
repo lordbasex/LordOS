@@ -192,5 +192,13 @@
   "sound.autoHint": "Il suono di LordOS solo quando il sito non ne riproduce uno suo.",
   "sound.appHint": "Solo il suono del sito.",
   "sound.systemHint": "Sempre il suono di LordOS.",
-  "sound.noneHint": "Nessun suono di LordOS (il sito può comunque riprodurre il suo)."
+  "sound.noneHint": "Nessun suono di LordOS (il sito può comunque riprodurre il suo).",
+  "appearance.title": "Aspetto",
+  "appearance.auto": "Automatico",
+  "appearance.light": "Chiaro",
+  "appearance.dark": "Scuro",
+  "appearance.autoHint": "Segue la modalità chiara o scura di LordOS.",
+  "appearance.lightHint": "Al sito viene sempre indicato chiaro, qualunque sia la modalità di LordOS.",
+  "appearance.darkHint": "Al sito viene sempre indicato scuro, qualunque sia la modalità di LordOS.",
+  "appearance.footer": "Cambia solo la preferenza chiara o scura che il sito legge; LordOS non modifica mai il sito. Alcuni siti restano comunque chiari, e un sito con una propria impostazione del tema segue quella."
 }

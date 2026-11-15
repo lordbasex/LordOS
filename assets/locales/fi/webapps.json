@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Ulkoasu",
+  "appearance.auto": "Automaattinen",
+  "appearance.light": "Vaalea",
+  "appearance.dark": "Tumma",
+  "appearance.autoHint": "Seuraa LordOSin vaaleaa tai tummaa tilaa.",
+  "appearance.lightHint": "Sivustolle kerrotaan aina vaalea, oli LordOSin tila mikä tahansa.",
+  "appearance.darkHint": "Sivustolle kerrotaan aina tumma, oli LordOSin tila mikä tahansa.",
+  "appearance.footer": "Vain sivuston lukema vaalean tai tumman tilan valinta muuttuu; LordOS ei koskaan muokkaa itse sivustoa. Jotkin sivustot pysyvät silti vaaleina, ja sivusto, jolla on oma teema-asetus, noudattaa sitä."
+}

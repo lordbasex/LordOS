@@ -1,0 +1,10 @@
+{
+  "appearance.title": "Aspect",
+  "appearance.auto": "Automat",
+  "appearance.light": "Luminos",
+  "appearance.dark": "Întunecat",
+  "appearance.autoHint": "Urmează modul luminos sau întunecat al LordOS.",
+  "appearance.lightHint": "Site-ului i se spune mereu luminos, indiferent de modul LordOS.",
+  "appearance.darkHint": "Site-ului i se spune mereu întunecat, indiferent de modul LordOS.",
+  "appearance.footer": "Se schimbă doar preferința luminos sau întunecat pe care o citește site-ul; LordOS nu modifică niciodată site-ul în sine. Unele site-uri rămân totuși luminoase, iar un site cu propria setare de temă urmează acea setare."
+}
