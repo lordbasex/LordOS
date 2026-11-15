@@ -635,6 +635,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **The Languages page lists every language in one place** (maintainer's request, 2026-11-15, ahead of 0.8.8.9): one
+  "35 complete languages" grid (en, es, pt) instead of the released six plus a separate "new in the next pre-release"
+  group; the languages that arrive with 0.8.8.9 carry a "new in 0.8.8.9" tag on their card, and one sentence under the
+  grid says they arrive with that pre-release, have had no native review yet and links to the translation review form.
+  The count in the heading comes from the languages listed. Language names wrap only between words.
+
 - **lordos.org's Languages page: a colour per country, every visiting country, and more languages to come**
   (maintainer's decisions, 2026-11-15), in English, Spanish and Portuguese.
   - **Chart colours.** The visits donut (`web/build.mjs`, `web/src/site.css`) gives each of the 20 countries its own

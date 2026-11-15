@@ -1213,7 +1213,7 @@ ${(c.items || []).map((it) => {
         `<p class="lg-note">${esc(L.visitsSource.replace('{dates}', dates))}</p>\n</section>`;
     })();
     const card = (x) => {
-      const tags = [x.id === 'en' ? L.default : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)   // "next" is said once, by the subsection
+      const tags = [x.id === 'en' ? L.default : '', x.next ? L.newTag.replace('{next}', NEXT_LANG_VERSION) : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)
         .map((s) => `<span class="hw-st">${esc(s)}</span>`).join(' ');
       return `<li class="lg-card"><span class="lg-head">${flag(x.country)}<strong lang="${esc(x.id)}" dir="${x.direction === 'rtl' ? 'rtl' : 'ltr'}">${esc(x.name)}</strong></span>` +
         `<span class="lg-en">${esc(cap(names.of(x.id) || x.english))}</span>${tags ? `<span class="lg-tags">${tags}</span>` : ''}</li>`;
@@ -1225,11 +1225,11 @@ ${(c.items || []).map((it) => {
       embassy: embassy(img.lumoWave, esc(L.figAlt)),
       status: langList.some((x) => x.next) ? esc(L.status.replace('{release}', `${PKG.version}${CHANNEL}`).replace('{next}', NEXT_LANG_VERSION)
         .replace('{count}', String(langList.filter((x) => !x.partial).length))) : '',
-      complete: langList.filter((x) => !x.partial && !x.next).map(card).join('\n'),
-      // the next pre-release's languages, complete like the rest (a language ships only when complete); none once it ships
+      // one list: every complete language, the next pre-release's ones tagged "new in <next>" (a language ships only when complete)
+      complete: langList.filter((x) => !x.partial).map(card).join('\n'),
+      completeTitle: esc(L.completeTitle.replace('{count}', String(langList.filter((x) => !x.partial).length))),
       fresh: langList.some((x) => x.next && !x.partial)
-        ? `<h3 class="lg-sub">${esc(L.newTitle.replace('{next}', NEXT_LANG_VERSION))}</h3>\n<p class="lg-p">${esc(L.newText)} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n` +
-          `<ul class="lg-grid lg-small">\n${langList.filter((x) => x.next && !x.partial).map(card).join('\n')}\n</ul>\n`
+        ? `<p class="lg-p">${esc(L.reviewText.replace('{next}', NEXT_LANG_VERSION))} <a href="${GITHUB}/issues/new?template=translation-review.yml">${esc(L.reviewLink)}</a></p>\n`
         : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
       visits,
