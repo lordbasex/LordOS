@@ -1084,6 +1084,58 @@ static void visit(Topo *t, int i) {
     if (pj >= 0) { t->state[pj] = 2; t->order[t->n++] = pj; }
 }
 
+/* Does item a's new version Break or Conflict with item b's installed version (b is an upgrade)? */
+static int breaks_installed(const Topo *t, int a, int b) {
+    const PlanItem *ib = &t->p->items[b];
+    if (!ib->old_version || a == b) return 0;
+    size_t bl = strlen(ib->name), bb = deb_base_len(ib->name, bl);
+    const IdxPkg *r = &t->x->pkg[t->p->items[a].rec];
+    for (int f = 0; f < 2; f++) {
+        const char *s = idx_s(t->x, f ? r->conflicts : r->breaks), *e = s + strlen(s);
+        DebRel rel[MAX_ALTS];
+        int k;
+        while ((k = deb_next_group(&s, e, rel, MAX_ALTS)) > 0)
+            for (int j = 0; j < k; j++)
+                if (rel[j].nlen == bb && !memcmp(rel[j].name, ib->name, bb) &&
+                    (rel[j].op == REL_NONE || ver_satisfies(ib->old_version, rel[j].op, rel[j].ver, rel[j].vlen))) return 1;
+    }
+    return 0;
+}
+
+/* (0.8.8.9) Inside one dpkg --install run, dpkg unpacks in argument order and checks each Breaks/Conflicts when it
+ * unpacks, against what's installed at that moment; Depends wait for the configure step, after every unpack. So a
+ * package whose installed version another one in the run breaks goes first: lordos "Breaks: lordos-web (<< V)" and
+ * lordos-web "Depends: lordos (= V)" put lordos first in dependency order, and dpkg refused it ("installing lordos
+ * would break lordos-web, and deconfiguration is not permitted"). The two architectures of a pair move together.
+ * Bounded: a cycle (each breaks the other's installed version) keeps the order it has. */
+static void breaks_first(Topo *t, int *group) {
+    int *o = t->order, n = t->n;
+    for (int start = 0; start < n;) {
+        int end = start;
+        while (end < n && group[end] == group[start]) end++;
+        int budget = (end - start) * (end - start) + 1;
+        for (int moved = 1; moved && budget-- > 0;) {
+            moved = 0;
+            for (int k = start; k < end && !moved; k++)
+                for (int m = k + 1; m < end && !moved; m++) {
+                    if (!breaks_installed(t, o[k], o[m])) continue;
+                    int lo = m, hi = m;             /* the block that moves: m, and its pair beside it */
+                    int pj = pair_item(t, o[m]);
+                    if (pj >= 0 && m > k + 1 && o[m - 1] == pj) lo = m - 1;
+                    else if (pj >= 0 && m + 1 < end && o[m + 1] == pj) hi = m + 1;
+                    int kk = k;                     /* never between the two of a pair */
+                    if (kk > start && pair_item(t, o[kk]) == o[kk - 1]) kk--;
+                    int len = hi - lo + 1, tmp[2];
+                    memcpy(tmp, &o[lo], (size_t)len * sizeof *o);
+                    memmove(&o[kk + len], &o[kk], (size_t)(lo - kk) * sizeof *o);
+                    memcpy(&o[kk], tmp, (size_t)len * sizeof *o);
+                    moved = 1;
+                }
+        }
+        start = end;
+    }
+}
+
 int plan_order(const Idx *x, const Plan *p, int *order, int *group) {
     int *state = calloc((size_t)(p->n ? p->n : 1), sizeof *state);
     if (!state) return -1;
@@ -1105,6 +1157,7 @@ int plan_order(const Idx *x, const Plan *p, int *order, int *group) {
         if (cut) { g++; start = k; }
         group[k] = g;
     }
+    breaks_first(&t, group);
     free(state);
     return t.n;
 }

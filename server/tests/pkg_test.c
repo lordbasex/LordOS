@@ -314,7 +314,9 @@ static void test_resolver(const char *dir) {
     CHECK(p.ok && has(&p, PA_UPGRADE, "libfoo") && has(&p, PA_UPGRADE, "oldtool"), "upgrade: %s", p.err);
     int ord[16], grp[16];
     int n = plan_order(&x, &p, ord, grp);
-    CHECK(n == 2 && !strcmp(p.items[ord[0]].name, "libfoo"), "order: libfoo before oldtool");
+    /* one dpkg run; libfoo 1.6 breaks the installed oldtool 2.0, so oldtool is unpacked first (dpkg checks a
+     * Breaks when it unpacks; oldtool's Depends on libfoo waits for the configure step) */
+    CHECK(n == 2 && grp[0] == grp[1] && !strcmp(p.items[ord[0]].name, "oldtool"), "order: oldtool (broken by libfoo) before libfoo");
     plan_free(&p);
     status_free(&st);
     idx_close(&x);
@@ -463,6 +465,88 @@ static void test_hwdata(const char *dir) {
     idx_close(&x);
 }
 
+/* (0.8.8.9) lordos and lordos-web (tools/iso/mkdeb.sh, mkdeb-web.sh): lordos "Breaks: lordos-web (<< its version)" and
+ * lordos-web "Depends: lordos (= its version)". Updating lordos alone, or Update all, brings lordos-web with it,
+ * and in the one dpkg run lordos-web comes first: dpkg checks a Breaks when it unpacks, against what's installed
+ * then, so lordos first refused the old lordos-web ("deconfiguration is not permitted"). With no newer
+ * lordos-web published, updating lordos asks to remove it instead of half-configuring it. */
+static const char *WEB_REPO =
+    "Package: lordos\nVersion: 0.8.8.9~test2\nArchitecture: amd64\nDepends: libc6\nBreaks: lordos-web (<< 0.8.8.9~test2)\nFilename: pool/l.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: lordos-web\nVersion: 0.8.8.9~test2\nArchitecture: amd64\nDepends: lordos (= 0.8.8.9~test2), libc6\nFilename: pool/w.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: w\n\n";
+static const char *WEB_REPO_NOWEB =
+    "Package: lordos\nVersion: 0.8.8.9~test2\nArchitecture: amd64\nDepends: libc6\nBreaks: lordos-web (<< 0.8.8.9~test2)\nFilename: pool/l.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: lordos-web\nVersion: 0.8.8.9~test1\nArchitecture: amd64\nDepends: lordos (= 0.8.8.9~test1), libc6\nFilename: pool/w1.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: w\n\n";
+static const char *WEB_STATUS =
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.8.9~test1\nArchitecture: amd64\nDepends: libc6\nBreaks: lordos-web (<< 0.8.8.9~test1)\nDescription: l\n\n"
+    "Package: lordos-web\nStatus: install ok installed\nVersion: 0.8.8.9~test1\nArchitecture: amd64\nDepends: lordos (= 0.8.8.9~test1), libc6\nDescription: w\n\n";
+
+static Idx web_index(const char *dir, const char *sub, const char *repo) {
+    char idir[700], err[200];
+    snprintf(idir, sizeof idir, "%s/%s", dir, sub);
+    mkdir(idir, 0755);
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "https://lordos.org/apt", "stable", "main", "stable", "LordOS", "LordOS", 0, 0, 500);
+    idxb_packages(b, s, repo, strlen(repo), "amd64");
+    CHECK(!idxb_write(b, idir, "amd64", err, sizeof err), "web: write index %s: %s", sub, err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, idir) && x.h->npkg == 2, "web: index %s opened", sub);
+    return x;
+}
+
+static void web_check_order(const Idx *x, const Plan *p, const char *what) {
+    int ord[16], grp[16], pl = -1, pw = -1;
+    int n = plan_order(x, p, ord, grp);
+    for (int k = 0; k < n; k++) {
+        if (!strcmp(p->items[ord[k]].name, "lordos")) pl = k;
+        if (!strcmp(p->items[ord[k]].name, "lordos-web")) pw = k;
+    }
+    CHECK(n == 2 && pl >= 0 && pw >= 0 && grp[pl] == grp[pw], "web: %s: one dpkg run (%d)", what, n);
+    CHECK(pw >= 0 && pw < pl, "web: %s: lordos-web is unpacked before lordos (%d %d)", what, pw, pl);
+}
+
+static void test_lordos_web(const char *dir) {
+    char sp[700];
+    snprintf(sp, sizeof sp, "%s/webstatus", dir);
+    write_text(sp, WEB_STATUS);
+    Status st = { 0 };
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 3, "web: status");
+    Idx x = web_index(dir, "webidx", WEB_REPO);
+    Plan p;
+    PlanOpts o = { 0 };
+    const char *lo[] = { "lordos" };
+    plan_make(&x, &st, lo, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 2 && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_UPGRADE, "lordos-web") &&
+          !strcmp(item_ver(&p, "lordos-web"), "0.8.8.9~test2"), "web: updating lordos alone brings lordos-web: %d %s", p.n, p.err);
+    web_check_order(&x, &p, "lordos alone");
+    plan_free(&p);
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 2 && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_UPGRADE, "lordos-web"), "web: update all: %d %s", p.n, p.err);
+    web_check_order(&x, &p, "update all");
+    plan_free(&p);
+    const char *wo[] = { "lordos-web" };
+    o = (PlanOpts){ 0 };
+    plan_make(&x, &st, wo, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 2 && has(&p, PA_UPGRADE, "lordos"), "web: updating lordos-web alone brings lordos: %d %s", p.n, p.err);
+    web_check_order(&x, &p, "lordos-web alone");
+    plan_free(&p);
+    idx_close(&x);
+    /* no newer lordos-web published: the plan stops and asks (never a half-configured lordos-web) */
+    x = web_index(dir, "webidx2", WEB_REPO_NOWEB);
+    plan_make(&x, &st, lo, 1, NULL, 0, &o, &p);
+    CHECK(!p.ok && has(&p, PA_REMOVE, "lordos-web"), "web: no newer lordos-web: asks to remove it: %s", p.err);
+    plan_free(&p);
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && !has(&p, PA_UPGRADE, "lordos-web") && !has(&p, PA_REMOVE, "lordos-web") &&
+          (!has(&p, PA_UPGRADE, "lordos") || p.nheld), "web: update all holds lordos back: %d held %d %s", p.n, p.nheld, p.err);
+    plan_free(&p);
+    idx_close(&x);
+    status_free(&st);
+}
+
 static void test_pins(const char *dir) {
     char root[600], path[700];
     snprintf(root, sizeof root, "%s/pins", dir);
@@ -553,6 +637,43 @@ static int cmd_plan(int argc, char **argv) {
 
 /* The search (pkg/match.c, #37): words in any order, case and accents ignored, joined or apart,
  * every word first, then some of them */
+/* order WORKDIR PACKAGES STATUS [--up | name...]: the plan's dpkg runs, one line per run with the Filename of each
+ * package in the order apply_plan passes them (tests/pkg_breaks_dpkg_test.sh feeds them to a throwaway dpkg). */
+static int cmd_order(int argc, char **argv) {
+    static char repo[1 << 16];
+    char err[200];
+    FILE *f = fopen(argv[3], "r");
+    size_t len = f ? fread(repo, 1, sizeof repo - 1, f) : 0;
+    if (f) fclose(f);
+    if (!len) { fprintf(stderr, "no Packages\n"); return 1; }
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "file:///", "test", "main", "test", "T", "T", 0, 0, 500);
+    idxb_packages(b, s, repo, len, "amd64");
+    if (idxb_write(b, argv[2], "amd64", err, sizeof err)) { fprintf(stderr, "index: %s\n", err); return 1; }
+    idxb_free(b);
+    Idx x;
+    Status st = { 0 };
+    if (idx_open(&x, argv[2]) || status_load(&st, argv[4], "amd64")) { fprintf(stderr, "could not open\n"); return 1; }
+    const char *ins[64];
+    int ni = 0;
+    PlanOpts o = { 0 };
+    for (int i = 5; i < argc && ni < 64; i++) {
+        if (!strcmp(argv[i], "--up")) o.upgrade_all = 1;
+        else ins[ni++] = argv[i];
+    }
+    Plan p;
+    plan_make(&x, &st, ins, ni, NULL, 0, &o, &p);
+    if (!p.ok) { printf("plan: %s\n", p.err); plan_free(&p); return 1; }
+    int ord[64], grp[64], n = p.n <= 64 ? plan_order(&x, &p, ord, grp) : -1;
+    for (int k = 0; k < n; k++)
+        printf("%s%s", k && grp[k] != grp[k - 1] ? "\n" : k ? " " : "", idx_s(&x, x.pkg[p.items[ord[k]].rec].filename));
+    printf("\n");
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+    return n < 0;
+}
+
 static int score_of(const char *query, const char *name, const char *app, const char *app_sum, const char *sum, int *full) {
     PkgQuery q;
     pkg_query_parse(&q, query);
@@ -1032,6 +1153,7 @@ int main(int argc, char **argv) {
         return g > 0 ? 0 : 1;
     }
     if (argc >= 4 && !strcmp(argv[1], "plan")) return cmd_plan(argc, argv);
+    if (argc >= 5 && !strcmp(argv[1], "order")) return cmd_order(argc, argv);
     if (argc >= 3 && !strcmp(argv[1], "run")) {
         const char *u = getenv("SUDO_USER");
         struct passwd *pw = getpwnam(u ? u : "root");
@@ -1064,6 +1186,7 @@ int main(int argc, char **argv) {
     test_resolver(dir);
     test_new_recommends(dir);
     test_hwdata(dir);
+    test_lordos_web(dir);
     test_pins(dir);
     test_dpkg_owner(dir);
     test_multiarch(dir);

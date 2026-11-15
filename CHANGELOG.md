@@ -1020,6 +1020,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lord-web` refused the app's registry entry with the new `colorScheme` key ("unknown key colorScheme"), and kept
   sending the old browser identity. `lordos-web` already depended on `lordos` of its exact version; now `lordos` also
   `Breaks: lordos-web (<< <its version>)`, so dpkg and the Store update both together.
+- **Updating `lordos` and `lordos-web` together failed in one dpkg run** (found installing 0.8.8.9~test2 over ~test1
+  on the maintainer's PC, 2026-11-15, in development, never released). dpkg unpacks a run's packages in the order
+  given and checks a `Breaks` when it unpacks, against what is installed at that moment; a `Depends` waits for the
+  configure step. `lordos` first was refused ("installing lordos would break lordos-web, and deconfiguration is not
+  permitted"), and `lordos-web` was left unpacked and unconfigured until `lordos` was installed again and
+  `dpkg --configure -a` ran. LordOS's package engine put `lordos` first too (dependency order, `lordos-web` depends on
+  it), so the Store's Update all and updating LordOS from Store → Updates hit the same error. Now `plan_order`
+  (`server/src/pkg/resolve.c`) unpacks, inside one `dpkg --install` run, a package whose installed version another one
+  in the run breaks or conflicts with before that one (the two architectures of a multiarch pair move together),
+  and `apply_plan` passes `--auto-deconfigure` to those runs, as apt does, for a cycle or a package broken by an
+  earlier run; a local `.deb` still installs without it, so it is refused with nothing changed. The relationships
+  stay as they are. The engine already brought `lordos-web` into an update of `lordos` alone; with no newer
+  `lordos-web` published, updating `lordos` asks to remove it and Update all holds `lordos` back. By hand:
+  `dpkg -i` with `lordos-web` first, or `dpkg --auto-deconfigure -i` in any order; `lordos` alone over an older
+  `lordos-web` is refused before anything changes (docs/PACKAGES.md, "Breaks inside one run"). Tests: `pkg-test`
+  checks the plan and the order for `lordos` alone, Update all and `lordos-web` alone, and the plan with no newer
+  `lordos-web` (the generic `libfoo` / `oldtool` order case now expects `oldtool`, the one broken, first); the new
+  `tests/pkg_breaks_dpkg_test.sh` builds two dummy packages with the relationships read from `tools/iso/mkdeb.sh`
+  and `mkdeb-web.sh`, runs the engine's order (`pkg-test order`) and both plain orders through the real dpkg in a
+  throwaway `dpkg --root`, and checks that `lordos` alone leaves both configured (skipped without dpkg-deb).
 - **A one-line APT source with `arch=` before `signed-by=` lost its `signed-by`** (found while adding Steam, 2026-11-15):
   the engine split the options with `strtok` and the inner split of the `arch=` list reset it, so Valve's
   `deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] …` line was read without its keyring and verified with

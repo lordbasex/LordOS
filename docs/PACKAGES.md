@@ -559,6 +559,24 @@ await admin.run('pkg-install', 'featherpad', (line) => …)    // line: "progres
 - **Order for dpkg.** It sorts topologically by dependencies and uses one `dpkg --install` per
   batch. A `Pre-Depends` on something in the same batch splits it, because that has to be
   configured first.
+- **Breaks inside one run (0.8.8.9).** dpkg unpacks a run's archives in the order given and checks each
+  `Breaks` and `Conflicts` when it unpacks, against what is installed at that moment; `Depends` wait for the
+  configure step, after every unpack. So inside a batch, a package whose installed version another one in the
+  batch breaks is unpacked first, even when it depends on that one. `lordos` has
+  `Breaks: lordos-web (<< its version)` and `lordos-web` has `Depends: lordos (= its version)`
+  (`tools/iso/mkdeb.sh`, `mkdeb-web.sh`): dependency order alone put `lordos` first, and dpkg refused it
+  ("installing lordos would break lordos-web, and deconfiguration is not permitted"), leaving `lordos-web`
+  unpacked and unconfigured. Updating `lordos` alone brings `lordos-web` (the conflict rule above), and Update all
+  does the same. With no newer `lordos-web` published, updating `lordos` asks to remove `lordos-web` and Update all
+  holds `lordos` back: never a half-configured `lordos-web`.
+  The batches also pass `--auto-deconfigure`, as apt does: a cycle, or a package broken by one in an earlier
+  batch, is deconfigured and configured again with its new version. A local `.deb` installs without it, so
+  `lordos` from a file over an older `lordos-web` is refused with nothing changed.
+  By hand: `sudo dpkg -i lordos-web_V.deb lordos_V.deb` (lordos-web first) or
+  `sudo dpkg --auto-deconfigure -i lordos_V.deb lordos-web_V.deb`; `dpkg -i lordos_V.deb` alone over an older
+  `lordos-web` is refused before anything changes. Tested in `pkg-test` and `tests/pkg_breaks_dpkg_test.sh`
+  (two dummy packages with the build scripts' relationships, against the real dpkg in a throwaway
+  `dpkg --root`).
 
 ## Tests
 

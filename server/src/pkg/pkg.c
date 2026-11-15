@@ -1122,6 +1122,12 @@ static int apply_plan(const Idx *x, const Status *st, const Plan *p, int purge, 
             argv[a++] = "/usr/bin/dpkg";
             argv[a++] = "--force-confdef";
             argv[a++] = "--force-confold";
+            /* (0.8.8.9) as apt does: when a package in this run Breaks an installed one, dpkg deconfigures that
+             * one instead of refusing; the resolver puts every package a Breaks hits in the plan (upgraded or
+             * removed), and plan_order already unpacks the broken one first when both are in this run, so this
+             * only acts on a cycle or on one in a later run (cut by a Pre-Depends). The local .deb below runs
+             * without it: its Breaks aren't in the plan, and dpkg refuses it cleanly with nothing changed. */
+            argv[a++] = "--auto-deconfigure";
             argv[a++] = "--install";
             for (int k = start; k < end; k++) argv[a++] = files[order[k]];
             argv[a] = NULL;
