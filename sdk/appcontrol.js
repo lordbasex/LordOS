@@ -87,7 +87,7 @@ export function webAppearanceItem(winId) {
   };
 }
 
-// A web app window's Browser identity (Chrome on Linux + LordOS, Edge on Linux, Firefox on Linux, LordOS (WebKit), LordOS (experimental)): the browser that profile's pages
+// A web app window's Browser identity (Chrome on Linux, Edge on Linux, Firefox on Linux, LordOS (WebKit)): the browser that profile's pages
 // are told it is; the window loads its page again at once (lord.webapps.setUserAgent). The same choice as in
 // Settings → Web apps, for the window's own profile.
 export function webUserAgentItem(winId) {

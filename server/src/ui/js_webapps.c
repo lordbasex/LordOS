@@ -26,7 +26,7 @@
  *                                       preference its pages are told; auto follows the desktop). Running profiles get
  *                                       it at once (SetColorScheme, webask_app_scheme). Light and dark are stored
  *                                       but act as auto until WPEPlatform (webscheme.h, WEBSCHEME_PER_APP)
- *   setUserAgent(app, profile, value)   chrome|edge|firefox|lordos|experimental (the profile's registry "userAgent": its Browser identity,
+ *   setUserAgent(app, profile, value)   chrome|edge|firefox|lordos (the profile's registry "userAgent": its Browser identity,
  *                                       the browser its pages are told it is; lord-web maps the word to the string). A
  *                                       running profile gets it at once and loads its page again (SetUserAgent,
  *                                       webask_user_agent)

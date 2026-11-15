@@ -205,15 +205,13 @@
   "appearance.later": "Hell und Dunkel pro App kommen mit der neuen Web-Engine von LordOS (WPEPlatform), auf die wir umsteigen. Bis dahin folgt jede Web-App dem Modus von LordOS, und eine Website mit eigener Design-Einstellung (zum Beispiel WhatsApp) behält diese.",
   "identity.title": "Browser-Identität",
   "identity.label": "Ausgeben als",
-  "identity.chrome": "Chrome unter Linux + LordOS",
+  "identity.chrome": "Chrome unter Linux",
   "identity.edge": "Edge unter Linux",
   "identity.firefox": "Firefox unter Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (experimentell)",
-  "identity.chromeHint": "Websites sehen den verbreitetsten Browser unter Linux, dazu Name und Version von LordOS. Standard.",
+  "identity.chromeHint": "Websites sehen den verbreitetsten Browser unter Linux, genau so, wie er sich selbst ausgibt. Standard.",
   "identity.edgeHint": "Websites sehen Edge unter Linux. Für die Büro-, Mail- und Team-Chat-Websites des Edge-Herstellers selbst, die ihn erwarten.",
   "identity.firefoxHint": "Websites sehen Firefox unter Linux.",
   "identity.lordosHint": "Websites sehen die eigene Engine von LordOS. Für eine Website, die mit den anderen nicht richtig funktioniert.",
-  "identity.experimentalHint": "Websites sehen nur LordOS und seine Version. Viele Websites, auch Messaging-Apps, lehnen das womöglich ab oder funktionieren nicht richtig; dann wähle eine andere Option.",
-  "identity.footer": "Der Browser, als der sich jedes Profil gegenüber Websites ausgibt; ein offenes Fenster lädt seine Seite neu. LordOS verwendet weiterhin seine eigene Engine (WebKit); Chrome, Edge und Firefox sind Namen ihrer Inhaber. Funktioniert eine Website nicht richtig, wähle LordOS (WebKit). Eine Website, die dieses Gerät bereits verknüpft hat, etwa eine Messaging-App, behält den gesehenen Namen, bis du es neu verknüpfst."
+  "identity.footer": "Der Browser, als der sich jedes Profil gegenüber Websites ausgibt; ein offenes Fenster lädt seine Seite neu. LordOS verwendet weiterhin seine eigene Engine (WebKit); Chrome, Edge und Firefox sind Namen ihrer Inhaber. Manche Websites prüfen den Browser und lehnen ihn ab, wenn etwas nicht passt; lehnt eine Website ab oder funktioniert nicht richtig, wähle eine andere Identität, etwa LordOS (WebKit). Eine Website, die dieses Gerät bereits verknüpft hat, etwa eine Messaging-App, behält den gesehenen Namen, bis du es neu verknüpfst."
 }

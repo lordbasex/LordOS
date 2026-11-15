@@ -205,15 +205,13 @@
   "appearance.later": "Hər tətbiq üçün açıq və tünd rejim LordOS-un yeni veb mühərriki (WPEPlatform) ilə gəlir, ona keçirik. Hələlik hər veb tətbiq LordOS-un rejiminə uyğunlaşır, öz mövzu ayarı olan sayt (məsələn, WhatsApp) isə onu saxlayır.",
   "identity.title": "Brauzer kimliyi",
   "identity.label": "Belə tanıt",
-  "identity.chrome": "Linux-da Chrome + LordOS",
+  "identity.chrome": "Linux-da Chrome",
   "identity.edge": "Linux-da Edge",
   "identity.firefox": "Linux-da Firefox",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (eksperimental)",
-  "identity.chromeHint": "Saytlar Linux-da ən geniş yayılmış brauzeri, üstəlik LordOS-un adını və versiyasını görür. Defolt.",
+  "identity.chromeHint": "Saytlar Linux-da ən geniş yayılmış brauzeri, özünü tam təqdim etdiyi kimi görür. Defolt.",
   "identity.edgeHint": "Saytlar Linux-da Edge görür. Edge-in öz istehsalçısının bunu gözləyən ofis, poçt və komanda söhbəti saytları üçün.",
   "identity.firefoxHint": "Saytlar Linux-da Firefox-u görür.",
   "identity.lordosHint": "Saytlar LordOS-un öz mühərrikini görür. Digərləri ilə düzgün işləməyən sayt üçün.",
-  "identity.experimentalHint": "Saytlar yalnız LordOS-u və onun versiyasını görür. Mesajlaşma tətbiqləri də daxil olmaqla bir çox sayt onu rədd edə və ya düzgün işləməyə bilər; belə olsa, başqa seçim edin.",
-  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome, Edge və Firefox sahiblərinə məxsus adlardır. Sayt düzgün işləməsə, LordOS (WebKit) seçin. Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
+  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome, Edge və Firefox sahiblərinə məxsus adlardır. Bəzi saytlar brauzeri yoxlayır və uyğun gəlməyəni rədd edir; sayt rədd etsə və ya düzgün işləməsə, başqa kimlik seçin, məsələn, LordOS (WebKit). Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
 }

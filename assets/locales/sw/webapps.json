@@ -205,15 +205,13 @@
   "appearance.later": "Mwanga na giza kwa kila programu vitakuja na injini mpya ya wavuti ya LordOS (WPEPlatform), tunayohamia. Kwa sasa kila programu ya wavuti hufuata hali ya LordOS, na tovuti yenye mpangilio wake wa mandhari (kwa mfano WhatsApp) huubaki nao.",
   "identity.title": "Utambulisho wa kivinjari",
   "identity.label": "Jitambulishe kama",
-  "identity.chrome": "Chrome kwenye Linux + LordOS",
+  "identity.chrome": "Chrome kwenye Linux",
   "identity.edge": "Edge kwenye Linux",
   "identity.firefox": "Firefox kwenye Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (ya majaribio)",
-  "identity.chromeHint": "Tovuti huona kivinjari kinachotumika zaidi kwenye Linux, pamoja na jina na toleo la LordOS yenyewe. Chaguo-msingi.",
+  "identity.chromeHint": "Tovuti huona kivinjari kinachotumika zaidi kwenye Linux, sawasawa kama kinavyojitambulisha. Chaguo-msingi.",
   "identity.edgeHint": "Tovuti huona Edge kwenye Linux. Kwa tovuti za ofisi, barua na gumzo la timu za mtengenezaji wa Edge mwenyewe, zinazoitarajia.",
   "identity.firefoxHint": "Tovuti huona Firefox kwenye Linux.",
   "identity.lordosHint": "Tovuti huona injini ya LordOS yenyewe. Kwa tovuti inayokosea na nyingine.",
-  "identity.experimentalHint": "Tovuti huona LordOS na toleo lake pekee. Tovuti nyingi, zikiwemo programu za ujumbe, huenda zikaikataa au kukosea; ikiwa hivyo, chagua nyingine.",
-  "identity.footer": "Kivinjari ambacho kila wasifu huziambia tovuti kuwa ndicho; dirisha lililo wazi hupakia ukurasa wake tena. LordOS bado hutumia injini yake yenyewe (WebKit); Chrome, Edge na Firefox ni majina ya wamiliki wake. Tovuti ikikosea, chagua LordOS (WebKit). Tovuti ambayo tayari iliunganisha kifaa hiki, kama programu ya ujumbe, hubaki na jina iliyoliona hadi utakapokiunganisha tena."
+  "identity.footer": "Kivinjari ambacho kila wasifu huziambia tovuti kuwa ndicho; dirisha lililo wazi hupakia ukurasa wake tena. LordOS bado hutumia injini yake yenyewe (WebKit); Chrome, Edge na Firefox ni majina ya wamiliki wake. Baadhi ya tovuti hukagua kivinjari na kukikataa kitu kisipolingana; tovuti ikikataa au ikikosea, chagua utambulisho mwingine, kama LordOS (WebKit). Tovuti ambayo tayari iliunganisha kifaa hiki, kama programu ya ujumbe, hubaki na jina iliyoliona hadi utakapokiunganisha tena."
 }

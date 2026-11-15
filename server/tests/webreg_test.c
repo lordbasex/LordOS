@@ -660,10 +660,21 @@ static void test_manager(void) {
         size_t tl = webreg_write(&c, text, sizeof text);
         CHECK(tl && strstr(text, "\"userAgent\": \"lordos\"") && !webreg_write_file(rp, text, tl), "userAgent written");
         CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_LORDOS, "lordos read back");
-        c.profiles[i].user_agent = WEBREG_UA_EXPERIMENTAL;
-        tl = webreg_write(&c, text, sizeof text);
-        CHECK(tl && strstr(text, "\"userAgent\": \"experimental\"") && !webreg_write_file(rp, text, tl), "experimental written");
-        CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_EXPERIMENTAL, "experimental read back");
+        /* an older LordOS's "experimental" (removed): the file still loads, the profile is Chrome on Linux, and
+         * reading it doesn't rewrite it */
+        char *lp = strstr(text, "\"userAgent\": \"lordos\"");
+        CHECK(lp != NULL, "the lordos word in the text");
+        char old[WEBREG_FILE_MAX + 16];
+        if (lp) {
+            snprintf(old, sizeof old, "%.*s\"userAgent\": \"experimental\"%s", (int)(lp - text), text, lp + strlen("\"userAgent\": \"lordos\""));
+            CHECK(!webreg_write_file(rp, old, strlen(old)), "an old file with experimental written");
+        }
+        WebApp o;
+        CHECK(!webmgr_load("chat", &o) && webreg_profile_index(&o, "agent") >= 0, "an old file with experimental still loads");
+        CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_CHROME, "experimental read as chrome");
+        char *again = read_text(rp);
+        CHECK(again && strstr(again, "\"userAgent\": \"experimental\""), "the old file isn't rewritten");
+        free(again);
         CHECK(webmgr_user_agent_of("chat", "work") == WEBREG_UA_CHROME, "another profile keeps its own");
         CHECK(webmgr_user_agent_of("chat", "nothere") < 0 && webmgr_user_agent_of("nothere", "agent") < 0 && webmgr_user_agent_of("../x", "agent") < 0 &&
               webmgr_user_agent_of(NULL, NULL) < 0, "unknown: -1");

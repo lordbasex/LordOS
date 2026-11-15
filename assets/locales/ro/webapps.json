@@ -207,15 +207,13 @@
   "appearance.later": "Luminos și întunecat pentru fiecare aplicație vin odată cu noul motor web al LordOS (WPEPlatform), la care migrăm. Deocamdată fiecare aplicație web urmează modul LordOS, iar un site cu propria setare de temă (WhatsApp, de exemplu) o păstrează.",
   "identity.title": "Identitatea browserului",
   "identity.label": "Identificare ca",
-  "identity.chrome": "Chrome pe Linux + LordOS",
+  "identity.chrome": "Chrome pe Linux",
   "identity.edge": "Edge pe Linux",
   "identity.firefox": "Firefox pe Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (experimental)",
-  "identity.chromeHint": "Site-urile văd cel mai comun browser pe Linux, plus numele și versiunea LordOS. Implicit.",
+  "identity.chromeHint": "Site-urile văd cel mai comun browser pe Linux, exact așa cum se prezintă el însuși. Implicit.",
   "identity.edgeHint": "Site-urile văd Edge pe Linux. Pentru site-urile de birou, e-mail și chat de echipă ale producătorului Edge, care îl așteaptă.",
   "identity.firefoxHint": "Site-urile văd Firefox pe Linux.",
   "identity.lordosHint": "Site-urile văd motorul propriu al LordOS. Pentru un site care nu merge bine cu celelalte.",
-  "identity.experimentalHint": "Site-urile văd doar LordOS și versiunea lui. Multe site-uri, inclusiv aplicațiile de mesagerie, îl pot refuza sau pot merge prost; atunci alege altă opțiune.",
-  "identity.footer": "Browserul drept care se prezintă fiecare profil site-urilor; o fereastră deschisă își reîncarcă pagina. LordOS folosește în continuare propriul motor (WebKit); Chrome, Edge și Firefox sunt nume ale proprietarilor lor. Dacă un site nu merge bine, alege LordOS (WebKit). Un site care a asociat deja acest dispozitiv, cum ar fi o aplicație de mesagerie, păstrează numele văzut până îl asociezi din nou."
+  "identity.footer": "Browserul drept care se prezintă fiecare profil site-urilor; o fereastră deschisă își reîncarcă pagina. LordOS folosește în continuare propriul motor (WebKit); Chrome, Edge și Firefox sunt nume ale proprietarilor lor. Unele site-uri verifică browserul și îl refuză dacă ceva nu se potrivește; dacă un site refuză sau nu merge bine, alege altă identitate, de exemplu LordOS (WebKit). Un site care a asociat deja acest dispozitiv, cum ar fi o aplicație de mesagerie, păstrează numele văzut până îl asociezi din nou."
 }

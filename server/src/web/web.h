@@ -155,7 +155,7 @@ void webbus_choose_files(Web *w, WebKitFileChooserRequest *req);
 void webbus_edit(Web *w, const char *sender, int cmd);
 /* org.lordos.WebApp1.SetColorScheme(scheme) from sender: the same check, then web_set_scheme */
 void webbus_scheme(Web *w, const char *sender, int scheme);
-/* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos|experimental) from sender: the same check, then web_set_user_agent */
+/* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos) from sender: the same check, then web_set_user_agent */
 void webbus_user_agent(Web *w, const char *sender, int kind);
 /* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
  * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */

@@ -14,7 +14,7 @@
  *   - the shell's Edit menu: org.lordos.WebApp1.Edit(command) from lord-server (webmain.c serves it), run only when
  *     the bus says the caller's pid is the lord-server that started this lord-web; the desktop's light or dark mode,
  *     org.lordos.WebApp1.SetColorScheme("light" | "dark"), with the same check (webscheme.h); the profile's Browser
- *     identity, org.lordos.WebApp1.SetUserAgent("chrome" | "edge" | "firefox" | "lordos" | "experimental"), with the same check (webpage.h);
+ *     identity, org.lordos.WebApp1.SetUserAgent("chrome" | "edge" | "firefox" | "lordos"), with the same check (webpage.h);
  *   - the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows LordOS's own
  *     menu with those items (names from webedit.h, never the page's text) and answers the one chosen.
  * Every call is asynchronous: nothing here waits for another program. */

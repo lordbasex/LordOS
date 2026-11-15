@@ -205,15 +205,13 @@
   "appearance.later": "Darating ang light at dark bawat app kasama ang bagong web engine ng LordOS (WPEPlatform), na nililipatan namin. Sa ngayon, sinusunod ng bawat web app ang mode ng LordOS, at pinapanatili ng site na may sariling setting ng tema (gaya ng WhatsApp) ang setting nito.",
   "identity.title": "Pagkakakilanlan ng browser",
   "identity.label": "Magpakilala bilang",
-  "identity.chrome": "Chrome sa Linux + LordOS",
+  "identity.chrome": "Chrome sa Linux",
   "identity.edge": "Edge sa Linux",
   "identity.firefox": "Firefox sa Linux",
   "identity.lordos": "LordOS (WebKit)",
-  "identity.experimental": "LordOS (pang-eksperimento)",
-  "identity.chromeHint": "Nakikita ng mga site ang pinakakaraniwang browser sa Linux, kasama ang sariling pangalan at bersyon ng LordOS. Ang default.",
+  "identity.chromeHint": "Nakikita ng mga site ang pinakakaraniwang browser sa Linux, eksakto kung paano nito ipinapakilala ang sarili. Ang default.",
   "identity.edgeHint": "Nakikita ng mga site ang Edge sa Linux. Para sa mga site ng opisina, mail at team chat ng gumawa mismo ng Edge, na umaasa rito.",
   "identity.firefoxHint": "Nakikita ng mga site ang Firefox sa Linux.",
   "identity.lordosHint": "Nakikita ng mga site ang sariling engine ng LordOS. Para sa site na hindi maayos ang kilos sa iba.",
-  "identity.experimentalHint": "LordOS at ang bersyon nito lang ang nakikita ng mga site. Maraming site, kasama ang mga messaging app, ang maaaring tumanggi rito o hindi gumana nang maayos; kung ganoon, pumili ng iba.",
-  "identity.footer": "Ang browser na sinasabi ng bawat profile sa mga site; nilo-load muli ng nakabukas na window ang pahina nito. Ginagamit pa rin ng LordOS ang sarili nitong engine (WebKit); ang Chrome, Edge at Firefox ay mga pangalan ng kani-kanilang may-ari. Kung hindi maayos ang kilos ng isang site, piliin ang LordOS (WebKit). Ang site na naka-link na sa device na ito, gaya ng messaging app, ay mananatili sa pangalang nakita nito hanggang sa i-link mo itong muli."
+  "identity.footer": "Ang browser na sinasabi ng bawat profile sa mga site; nilo-load muli ng nakabukas na window ang pahina nito. Ginagamit pa rin ng LordOS ang sarili nitong engine (WebKit); ang Chrome, Edge at Firefox ay mga pangalan ng kani-kanilang may-ari. May mga site na sumusuri sa browser at tumatanggi kapag may hindi tugma; kung tumanggi o hindi maayos ang isang site, pumili ng ibang pagkakakilanlan, gaya ng LordOS (WebKit). Ang site na naka-link na sa device na ito, gaya ng messaging app, ay mananatili sa pangalang nakita nito hanggang sa i-link mo itong muli."
 }

@@ -371,8 +371,9 @@ export const shownColorScheme = (entry) => {
 // ---- browser identity (Settings → Web apps and the app menu: a profile's registry "userAgent") ----
 
 // Which browser a profile's pages are told it is. Only these words: lord-server and lord-web map each to its string in
-// C, and nothing else is accepted. chrome (Chrome on Linux with LordOS's token) is the default and what a profile without the key gets.
-export const USER_AGENTS = ['chrome', 'edge', 'firefox', 'lordos', 'experimental'];
+// C, and nothing else is accepted. chrome (Chrome on Linux, exactly as Chrome sends it) is the default and what a
+// profile without the key gets; so does an old "experimental" (removed: lord-web reads it as chrome too).
+export const USER_AGENTS = ['chrome', 'edge', 'firefox', 'lordos'];
 export function userAgentOf(entry, profile) {
   const p = entry && Array.isArray(entry.profiles) ? entry.profiles.find((x) => x && x.id === profile) : null;
   return p && USER_AGENTS.includes(p.userAgent) ? p.userAgent : 'chrome';

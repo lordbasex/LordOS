@@ -20,7 +20,7 @@
  *     (auto: the desktop's mode; lord-server sends it, webscheme.h; light and dark are kept but read as auto until
  *     WPEPlatform, WEBSCHEME_PER_APP);
  *     a profile is { id, name } plus, optionally, color (red, orange, yellow, green, blue, purple, gray or none) and
- *     userAgent (chrome, edge, firefox, lordos or experimental; "chrome" when missing and never written): the browser the profile's pages
+ *     userAgent (chrome, edge, firefox or lordos; "chrome" when missing and never written; an old "experimental" is read as "chrome"): the browser the profile's pages
  *     are told it is ("Browser identity"; webpage_user_agent maps the word to the string, in C)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
@@ -49,9 +49,11 @@ enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NO
 enum { WEBREG_SCHEME_AUTO, WEBREG_SCHEME_LIGHT, WEBREG_SCHEME_DARK, WEBREG_SCHEME_N };
 /* a profile's "userAgent": which browser its pages are told it is (webpage_user_agent). chrome (the default: Chrome on
  * Linux with LordOS's token), edge (Edge on Linux, for its maker's own office and chat sites), firefox (Firefox on
- * Linux), lordos (LordOS's own WebKit string, for a site that misbehaves with the others), experimental (LordOS alone,
- * no other browser's tokens). Linux identities only. */
-enum { WEBREG_UA_CHROME, WEBREG_UA_EDGE, WEBREG_UA_FIREFOX, WEBREG_UA_LORDOS, WEBREG_UA_EXPERIMENTAL, WEBREG_UA_N };
+ * Linux), lordos (LordOS's own WebKit string, for a site that misbehaves with the others). Linux identities only.
+ * "experimental" (LordOS alone, no other browser's tokens) was removed after a messaging site refused it: the parser
+ * still accepts the word in an old file and reads it as chrome (the file isn't rewritten), so an old entry still
+ * loads; nothing else takes it (SetUserAgent, lord.webapps.setUserAgent). */
+enum { WEBREG_UA_CHROME, WEBREG_UA_EDGE, WEBREG_UA_FIREFOX, WEBREG_UA_LORDOS, WEBREG_UA_N };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
 
@@ -103,7 +105,7 @@ const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "n
 int  webreg_sound_value(const char *name);     /* -1 if unknown */
 const char *webreg_scheme_name(int v);         /* "auto" / "light" / "dark"; NULL out of range */
 int  webreg_scheme_value(const char *name);    /* -1 if unknown */
-const char *webreg_ua_name(int v);             /* "chrome" / "edge" / "firefox" / "lordos" / "experimental"; NULL */
+const char *webreg_ua_name(int v);             /* "chrome" / "edge" / "firefox" / "lordos"; NULL */
 int  webreg_ua_value(const char *name);        /* -1 if unknown */
 
 /* ---- the file ---- */
