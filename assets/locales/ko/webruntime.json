@@ -1,0 +1,9 @@
+{
+  "tray.open": "열기",
+  "tray.quit": "종료",
+  "notify.open": "열기",
+  "download.done": "다운로드 완료",
+  "download.failed": "다운로드 실패",
+  "chooser.open": "파일 선택",
+  "chooser.openMany": "파일 선택(여러 개)"
+}

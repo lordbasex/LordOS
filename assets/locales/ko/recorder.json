@@ -1,0 +1,22 @@
+{
+  "folder": "녹음",
+  "name": "녹음 {date} {time}",
+  "all": "모든 녹음",
+  "empty": "아직 녹음이 없습니다",
+  "hint": "빨간 버튼(또는 R)을 눌러 마이크로 녹음하세요",
+  "denied": "음성 녹음에 마이크 사용이 허용되지 않았습니다",
+  "play": "재생",
+  "pause": "일시 정지",
+  "rename": "이름 변경",
+  "trim": "다듬기",
+  "cancelTrim": "다듬기 취소",
+  "saveTrim": "다듬은 사본 저장",
+  "trimmed": "다듬음",
+  "export": "내보내기 형식",
+  "exportBtn": "내보내기",
+  "working": "내보내는 중…",
+  "exported": "“{name}” 저장됨",
+  "exportError": "내보낼 수 없습니다",
+  "renameError": "이름을 바꿀 수 없습니다(같은 이름이 이미 있나요?)",
+  "emptyTitle": "녹음을 선택하거나 새로 녹음하세요"
+}
