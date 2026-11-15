@@ -463,6 +463,48 @@
       }
     },
     {
+      "id": "steam",
+      "package": "steam-launcher",
+      "name": "Steam",
+      "keywords": ["games", "gaming", "valve", "proton", "steam launcher"],
+      "summary": {
+        "en": "Valve's game store and launcher, with your library, cloud saves and Proton for games made for other systems",
+        "es": "La tienda y el lanzador de juegos de Valve, con tu biblioteca, partidas en la nube y Proton para juegos hechos para otros sistemas",
+        "pt": "A loja e o iniciador de jogos da Valve, com a sua biblioteca, jogos salvos na nuvem e o Proton para jogos feitos para outros sistemas"
+      },
+      "license": "Proprietary (Steam Subscriber Agreement)",
+      "vendor": "Valve",
+      "homepage": "https://store.steampowered.com",
+      "arches": [
+        "amd64"
+      ],
+      "kind": "games",
+      "section": "commercial",
+      "categories": ["Game"],
+      "with": ["steam-libs-amd64", "steam-libs-i386:i386"],
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://repo.steampowered.com/steam",
+        "suite": "stable",
+        "components": [
+          "steam"
+        ],
+        "arches": [
+          "amd64"
+        ],
+        "multiarch": ["i386"],
+        "key": "keys/steam.asc",
+        "fingerprint": "DB23C56BF0F377FD02970A2A84706F31879D59CB",
+        "package": "steam-launcher",
+        "files": {
+          "list": "steam-stable.list",
+          "keyring": "steam.gpg",
+          "ownedBy": "steam-launcher"
+        }
+      }
+    },
+    {
       "id": "disk-formats",
       "package": "lordos-disk-formats",
       "name": "Disk Formats",

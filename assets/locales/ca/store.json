@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Suite ofimàtica i creativa",
   "ai.kind.coding-agent": "Agent de programació",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Jocs",
   "ai.kind.local-models": "Models locals",
   "ai.kind.music": "Música",
   "ai.kind.speech": "Veu a text",
@@ -307,5 +308,10 @@
   "formats.apfs": "Llegeix volums APFS, només lectura. Opcional.",
   "formats.allow": "Continua",
   "formats.optional": "Afegeix-hi també APFS. Compila un controlador per al teu nucli i afegeix uns 500 MB de compiladors i capçaleres.",
-  "search.catalog": "Del catàleg de LordOS"
+  "search.catalog": "Del catàleg de LordOS",
+  "multiarch.title": "Biblioteques del sistema de 32 bits",
+  "multiarch.body": "{name} necessita biblioteques del sistema de 32 bits; LordOS les habilitarà. Així el motor de paquets pot instal·lar paquets de 32 bits (i386) de Debian al costat dels de 64 bits, signats i verificats com qualsevol altre paquet. Només s’instal·la el que {name} necessita.",
+  "multiarch.enable": "Habilita i continua",
+  "multiarch.enabling": "S’està habilitant…",
+  "pkg32": "{name} (32 bits)"
 }

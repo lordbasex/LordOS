@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Pakiet biurowy i kreatywny",
   "ai.kind.coding-agent": "Agent programistyczny",
   "ai.kind.editor": "Edytor",
+  "ai.kind.games": "Gry",
   "ai.kind.local-models": "Modele lokalne",
   "ai.kind.music": "Muzyka",
   "ai.kind.speech": "Mowa na tekst",
@@ -323,5 +324,10 @@
   "formats.apfs": "Odczytuje woluminy APFS, tylko do odczytu. Opcjonalnie.",
   "formats.allow": "Dalej",
   "formats.optional": "Dodaj także APFS. Buduje sterownik dla Twojego jądra i dodaje około 500 MB kompilatorów i nagłówków.",
-  "search.catalog": "Z katalogu LordOS"
+  "search.catalog": "Z katalogu LordOS",
+  "multiarch.title": "32-bitowe biblioteki systemowe",
+  "multiarch.body": "{name} potrzebuje 32-bitowych bibliotek systemowych; LordOS je włączy. Menedżer pakietów będzie wtedy mógł instalować 32-bitowe pakiety (i386) z Debiana obok 64-bitowych, podpisane i sprawdzane jak każdy inny pakiet. Instalowane jest tylko to, czego potrzebuje {name}.",
+  "multiarch.enable": "Włącz i kontynuuj",
+  "multiarch.enabling": "Włączanie…",
+  "pkg32": "{name} (32-bitowy)"
 }

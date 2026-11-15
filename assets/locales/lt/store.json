@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Biuro ir kūrybos rinkinys",
   "ai.kind.coding-agent": "Programavimo agentas",
   "ai.kind.editor": "Rengyklė",
+  "ai.kind.games": "Žaidimai",
   "ai.kind.local-models": "Vietiniai modeliai",
   "ai.kind.music": "Muzika",
   "ai.kind.speech": "Kalba į tekstą",
@@ -315,5 +316,10 @@
   "formats.apfs": "Skaito APFS tomus, tik skaitymui. Neprivaloma.",
   "formats.allow": "Tęsti",
   "formats.optional": "Taip pat pridėti APFS. Bus sukompiliuota tvarkyklė jūsų branduoliui ir pridėta apie 500 MB kompiliatorių ir antraščių failų.",
-  "search.catalog": "Iš LordOS katalogo"
+  "search.catalog": "Iš LordOS katalogo",
+  "multiarch.title": "32 bitų sistemos bibliotekos",
+  "multiarch.body": "{name} reikia 32 bitų sistemos bibliotekų; LordOS jas įjungs. Tada paketų variklis galės diegti 32 bitų (i386) Debian paketus šalia 64 bitų, pasirašytus ir patikrintus kaip bet kurį kitą paketą. Įdiegiama tik tai, ko reikia {name}.",
+  "multiarch.enable": "Įjungti ir tęsti",
+  "multiarch.enabling": "Įjungiama…",
+  "pkg32": "{name} (32 bitų)"
 }

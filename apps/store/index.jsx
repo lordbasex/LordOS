@@ -7,7 +7,7 @@ import {
   suggestions, unseenSuggestions, refreshSuggestions,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AiDetail, AiDiscover, AiPage, CatalogResults, catalogApp, catalogApps, searchCatalog } from './ai.js';
+import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
@@ -369,7 +369,12 @@ export default function Store() {
   const sug = useStore(suggestions);
   useEffect(() => { refreshSuggestions(); }, []);                  // the hardware may have changed since the last look
   const unseen = page === 'suggested' ? 0 : unseenSuggestions(sug.list).length;    // new suggestions (the page's badge)
-  const counts = debian.categoryCounts();
+  // the Debian apps of each category, plus the catalog apps that declare it (Steam in Games)
+  const counts = (() => {
+    const c = { ...debian.categoryCounts() };
+    for (const [k, n] of Object.entries(catalogCategoryCounts())) c[k] = (c[k] || 0) + n;
+    return c;
+  })();
   const cat = page.startsWith('cat:') ? page.slice(4) : null;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
@@ -385,6 +390,7 @@ export default function Store() {
   else if (cat) {
     body = (
       <View style={{ gap: 26 }}>
+        <CatalogCategory cat={cat} query={query} onOpen={openAi} />
         <WebCategory cat={cat} query={query} onOpen={openWeb} />
         <debian.Category cat={cat} query={query} onOpen={openDeb} />
       </View>

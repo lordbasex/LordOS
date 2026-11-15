@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Office- und Kreativsuite",
   "ai.kind.coding-agent": "Programmieragent",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Spiele",
   "ai.kind.local-models": "Lokale Modelle",
   "ai.kind.music": "Musik",
   "ai.kind.speech": "Sprache zu Text",
@@ -307,5 +308,10 @@
   "formats.apfs": "Liest APFS-Volumes, nur lesend. Optional.",
   "formats.allow": "Fortfahren",
   "formats.optional": "Auch APFS hinzufügen. Dabei wird ein Treiber für deinen Kernel gebaut, und es kommen etwa 500 MB an Compilern und Headern hinzu.",
-  "search.catalog": "Aus dem LordOS-Katalog"
+  "search.catalog": "Aus dem LordOS-Katalog",
+  "multiarch.title": "32-Bit-Systembibliotheken",
+  "multiarch.body": "{name} braucht 32-Bit-Systembibliotheken; LordOS aktiviert sie. Danach kann die Paketverwaltung 32-Bit-Pakete (i386) von Debian neben den 64-Bit-Paketen installieren, signiert und geprüft wie jedes andere Paket. Installiert wird nur, was {name} braucht.",
+  "multiarch.enable": "Aktivieren und fortfahren",
+  "multiarch.enabling": "Wird aktiviert …",
+  "pkg32": "{name} (32 Bit)"
 }

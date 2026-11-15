@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Suită de birou și creativă",
   "ai.kind.coding-agent": "Agent de programare",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Jocuri",
   "ai.kind.local-models": "Modele locale",
   "ai.kind.music": "Muzică",
   "ai.kind.speech": "Vorbire în text",
@@ -315,5 +316,10 @@
   "formats.apfs": "Citește volume APFS, doar în citire. Opțional.",
   "formats.allow": "Continuă",
   "formats.optional": "Adaugă și APFS. Compilează un driver pentru kernelul dvs. și adaugă aproximativ 500 MB de compilatoare și antete.",
-  "search.catalog": "Din catalogul LordOS"
+  "search.catalog": "Din catalogul LordOS",
+  "multiarch.title": "Biblioteci de sistem pe 32 de biți",
+  "multiarch.body": "{name} are nevoie de biblioteci de sistem pe 32 de biți; LordOS le va activa. Astfel, motorul de pachete poate instala pachete pe 32 de biți (i386) din Debian lângă cele pe 64 de biți, semnate și verificate ca orice alt pachet. Se instalează doar ce are nevoie {name}.",
+  "multiarch.enable": "Activează și continuă",
+  "multiarch.enabling": "Se activează…",
+  "pkg32": "{name} (32 de biți)"
 }

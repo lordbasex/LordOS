@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "حزمة مكتبية وإبداعية",
   "ai.kind.coding-agent": "وكيل برمجة",
   "ai.kind.editor": "محرر",
+  "ai.kind.games": "ألعاب",
   "ai.kind.local-models": "نماذج محلية",
   "ai.kind.music": "موسيقى",
   "ai.kind.speech": "الكلام إلى نص",
@@ -339,5 +340,10 @@
   "formats.apfs": "يقرأ وحدات تخزين APFS، للقراءة فقط. اختياري.",
   "formats.allow": "متابعة",
   "formats.optional": "أضف APFS أيضًا. يبني برنامج تشغيل لنواتك ويضيف نحو 500 م.ب من المترجمات والترويسات.",
-  "search.catalog": "من كتالوج LordOS"
+  "search.catalog": "من كتالوج LordOS",
+  "multiarch.title": "مكتبات نظام 32 بت",
+  "multiarch.body": "يحتاج {name} إلى مكتبات نظام 32 بت، وسيفعّلها LordOS. بعدها يستطيع محرك الحزم تثبيت حزم 32 بت (i386) من Debian بجانب حزم 64 بت، موقّعة ومُتحقَّق منها مثل أي حزمة أخرى. لا يُثبَّت إلا ما يحتاجه {name}.",
+  "multiarch.enable": "تفعيل ومتابعة",
+  "multiarch.enabling": "جارٍ التفعيل…",
+  "pkg32": "{name} (32 بت)"
 }

@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "オフィス・クリエイティブスイート",
   "ai.kind.coding-agent": "コーディングエージェント",
   "ai.kind.editor": "エディタ",
+  "ai.kind.games": "ゲーム",
   "ai.kind.local-models": "ローカルモデル",
   "ai.kind.music": "音楽",
   "ai.kind.speech": "音声からテキスト",
@@ -299,5 +300,10 @@
   "formats.apfs": "APFS ボリュームを読み出し専用で読み取ります。オプション。",
   "formats.allow": "続ける",
   "formats.optional": "APFS も追加します。カーネル用のドライバをビルドするため、約 500 MB のコンパイラとヘッダが追加されます。",
-  "search.catalog": "LordOS カタログから"
+  "search.catalog": "LordOS カタログから",
+  "multiarch.title": "32 ビットのシステムライブラリ",
+  "multiarch.body": "{name} には 32 ビットのシステムライブラリが必要です。LordOS が有効にします。これでパッケージエンジンは、Debian の 32 ビット (i386) パッケージを 64 ビットのものと並べて、ほかのパッケージと同じく署名を確認してインストールできるようになります。インストールされるのは {name} に必要なものだけです。",
+  "multiarch.enable": "有効にして続ける",
+  "multiarch.enabling": "有効にしています…",
+  "pkg32": "{name} (32 ビット)"
 }

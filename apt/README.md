@@ -17,7 +17,7 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 
 - **Direct** (`"delivery": "direct"`): the vendor has its own signed APT repository (Claude Code,
   Claude Desktop, Visual Studio Code, Cursor, Google Chrome, Microsoft Edge, Spotify, VSCodium, Brave
-  Browser, Tailscale). The user's
+  Browser, Tailscale, Steam). The user's
   system adds that repository itself (a
   deb822 `.sources` file with the pinned key from `apt/keys/`) and installs and updates the package
   from the vendor. Nothing is copied to lordos.org. `apt/build.sh check` still verifies the entry.
@@ -45,6 +45,11 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
     "arches": ["amd64", "arm64"],
     "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | vpn | …
                                        // (each needs store.ai.kind.<kind> in every locale; server/tests/store_search_test.mjs)
+    "categories": ["Game"],            // optional (0.8.8.9): Debian categories whose Store page also lists it
+                                       // (Steam in Games): AudioVideo, Development, Education, Game, Graphics,
+                                       // Network, Office, Science, System, Utility
+    "with": ["steam-libs-i386:i386"],  // optional (0.8.8.9): packages the Store installs and removes with it
+                                       // (Debian names, or name:i386)
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
                                        // (Chrome, Edge, Spotify); "remote" = third-party remote access
                                        // (Tailscale);
@@ -60,7 +65,7 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 
 | type | fields | versions come from |
 |---|---|---|
-| `apt` | `delivery` (`direct`/`mirror`), `url`, `suite` (the `dists/` name: the Suite, or the Codename when Suite is empty, as Cursor's), `components` [], `arches` [], `key` (`keys/<name>.asc`), `fingerprint` (40 hex digits, the key's primary fingerprint), `package`, optional `files` (`sources`, `keyring`: the vendor's own file names, for a package that always writes its own source, as Cursor's; `docs/UPDATES.md`) | the vendor's signed index: the newest version per architecture |
+| `apt` | `delivery` (`direct`/`mirror`), `url`, `suite` (the `dists/` name: the Suite, or the Codename when Suite is empty, as Cursor's), `components` [], `arches` [], `key` (`keys/<name>.asc`), `fingerprint` (40 hex digits, the key's primary fingerprint), `package`, optional `files` (`sources`, `keyring`: the vendor's own file names, for a package that always writes its own source, as Cursor's; or, since 0.8.8.9, `list`, `keyring`, `ownedBy`: a package that ships its source as its own files, as Steam's, which replaces LordOS's bootstrap `lordos-<id>` files once installed; `docs/UPDATES.md`), optional `multiarch` (`["i386"]` only, for an amd64-only app whose repository also serves its 32-bit libraries: Steam) | the vendor's signed index: the newest version per architecture |
 | `deb` | `version`, `files.<arch>.{url, sha256}` | the catalog |
 | `build` | `recipe`, `version`, `revision`, `source_date_epoch`, `tag`, `commit`, `url` + `sha256` of the source tarball, `inputs` [{`name`, `url`, `sha256`}], `notes.<arch>` | the catalog |
 | `binary` | `recipe`, `version`, `revision`, `source_date_epoch`, `files.<arch>.{url, sha256, sigstore?}`, `sigstore.{identity, issuer}`, `inputs` [] | the catalog |

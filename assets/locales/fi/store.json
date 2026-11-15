@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Toimisto- ja luovuusohjelmisto",
   "ai.kind.coding-agent": "Koodausagentti",
   "ai.kind.editor": "Editori",
+  "ai.kind.games": "Pelit",
   "ai.kind.local-models": "Paikalliset mallit",
   "ai.kind.music": "Musiikki",
   "ai.kind.speech": "Puheesta tekstiksi",
@@ -307,5 +308,10 @@
   "formats.apfs": "Lukee APFS-taltioita, vain luku. Valinnainen.",
   "formats.allow": "Jatka",
   "formats.optional": "Lisää myös APFS. Se kääntää ajurin ytimellesi ja lisää noin 500 Mt kääntäjiä ja otsaketiedostoja.",
-  "search.catalog": "LordOS-luettelosta"
+  "search.catalog": "LordOS-luettelosta",
+  "multiarch.title": "32-bittiset järjestelmäkirjastot",
+  "multiarch.body": "{name} tarvitsee 32-bittisiä järjestelmäkirjastoja; LordOS ottaa ne käyttöön. Sen jälkeen pakettienhallinta voi asentaa Debianin 32-bittisiä (i386) paketteja 64-bittisten rinnalle, allekirjoitettuina ja tarkistettuina kuten minkä tahansa muun paketin. Vain se, mitä {name} tarvitsee, asennetaan.",
+  "multiarch.enable": "Ota käyttöön ja jatka",
+  "multiarch.enabling": "Otetaan käyttöön…",
+  "pkg32": "{name} (32-bittinen)"
 }
