@@ -1,0 +1,66 @@
+{
+  "archiveName": "Arkib",
+  "archiveSummary": {
+    "other": "{count} fail, {size}"
+  },
+  "compressOne": "Mampatkan “{name}”",
+  "compressMany": {
+    "other": "Mampatkan {count} item"
+  },
+  "compressing": "Memampatkan “{name}”…",
+  "compressProgress": "Memampatkan “{name}”: {files} fail",
+  "compressed": {
+    "other": "“{name}” sedia ({count} fail)"
+  },
+  "compressError": "Tidak dapat memampatkan “{name}” ({error})",
+  "extractHere": "Ekstrak di sini",
+  "extractSelected": {
+    "other": "Ekstrak {count} item"
+  },
+  "extracting": "Mengekstrak “{name}”…",
+  "extractProgress": "Mengekstrak “{name}”: {files} fail ({pct}%)",
+  "extracted": {
+    "other": "Diekstrak ke “{name}” ({count} fail)"
+  },
+  "extractedSkipped": {
+    "other": "Diekstrak ke “{name}” ({count} fail); {skipped} dilangkau demi keselamatan"
+  },
+  "extractError": "Tidak dapat mengekstrak “{name}” ({error})",
+  "opening": "Membuka “{name}”…",
+  "loading": "Memuatkan…",
+  "locked": "dilindungi kata laluan",
+  "pages": {
+    "other": "{count} halaman"
+  },
+  "more": {
+    "other": "dan {count} lagi"
+  },
+  "err.invalid": "bukan arkib, atau ia rosak",
+  "err.missing-volume": "sebahagian daripada arkib berbelah tiada: “{name}”",
+  "err.disk-full": "cakera penuh",
+  "err.too-big": "ia terlalu besar",
+  "err.too-many": "ia mempunyai terlalu banyak fail",
+  "err.corrupt": "ia rosak",
+  "err.write": "tidak dapat menulis",
+  "err.unavailable": "pembantu dokumen tidak tersedia",
+  "err.cancelled": "dibatalkan",
+  "err.crash": "pembantu dokumen berhenti secara tidak dijangka",
+  "err.timeout": "ia mengambil masa terlalu lama",
+  "err.protocol": "pembantu dokumen menghantar balasan yang tidak sah",
+  "err.spawn": "tidak dapat memulakan pembantu dokumen",
+  "err.closed": "dokumen telah ditutup",
+  "err.bad-request": "permintaan tidak sah",
+  "err.bad-field": "medan borang tidak sah",
+  "err.bad-page": "halaman tidak sah",
+  "err.busy": "pembantu dokumen sedang sibuk",
+  "err.memory": "kehabisan memori",
+  "err.no-fonts": "tiada fon tersedia",
+  "err.not-open": "dokumen tidak dibuka",
+  "err.nothing": "tiada apa-apa untuk disimpan",
+  "err.read-only": "dokumen ini baca sahaja",
+  "err.save": "tidak dapat menyimpan",
+  "err.unknown-op": "operasi tidak diketahui",
+  "err.image": "imej tidak sah",
+  "err.blob": "data tidak sah",
+  "err.password": "dokumen dilindungi kata laluan"
+}
