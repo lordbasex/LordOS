@@ -90,6 +90,8 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 [[shot:12]]
 
+**La Identidad del navegador de cada perfil** (*en desarrollo*, después de la 0.8.8.8): los sitios deciden qué mostrar según el navegador con el que creen hablar, así que cada perfil puede decirles Chrome en Linux (lo predeterminado), Firefox en Linux, o el nombre propio de WebKit de LordOS, el que usaban todas las apps. Se elige de una lista corta en Ajustes → Apps web o en *Identidad del navegador* del menú de la app (Lord Flow), nunca escribiéndolo, y una ventana abierta vuelve a cargar su página con él. LordOS sigue usando su propio motor diga lo que diga el nombre; si un sitio falla, elegí LordOS (WebKit). Un sitio que ya vinculó tu computadora, como una app de mensajería, conserva el nombre que vio hasta que la vincules de nuevo.
+
 ## Rendimiento
 
 - **Las ventanas ocultas se pausan.** Una ventana minimizada, en otro escritorio, cerrada al segundo plano o tapada por completo por otra ventana le avisa a su página que está oculta: la página deja de dibujar, sus animaciones se pausan y sus temporizadores corren como mucho una vez por segundo, mientras su red, su audio y sus notificaciones siguen. Medido en nuestra máquina virtual de desarrollo con una página de prueba exigente: **de 115 % de una CPU a 0,4 %** minimizada, y el compositor de 5 % a 0,3 %. Al volver a mostrarse, dibuja al instante.
@@ -99,7 +101,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 ## Ajustes → Apps web
 
-Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), la Apariencia (Automático, Claro u Oscuro; en desarrollo), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
+Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), la Apariencia (Automático, Claro u Oscuro; en desarrollo), la Identidad del navegador de cada perfil (Chrome en Linux, Firefox en Linux o LordOS; en desarrollo), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
 
 [[shot:10]]
 

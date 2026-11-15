@@ -634,6 +634,28 @@ static void test_manager(void) {
         WebApp c;
         CHECK(!webmgr_load("chat", &c) && c.color_scheme == WEBREG_SCHEME_AUTO, "back to automatic");
     }
+    /* a profile's Browser identity (userAgent): read back per profile; a profile added in a removed one's place
+     * starts as Chrome on Linux again */
+    {
+        char rp[PATH_MAX], text[WEBREG_FILE_MAX];
+        snprintf(rp, sizeof rp, "%s/apps/chat.json", webmgr_config_dir());
+        CHECK(!webmgr_add_profile("chat", "Agent", prof, sizeof prof) && !strcmp(prof, "agent"), "profile agent added");
+        CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_CHROME, "chrome by default");
+        WebApp c;
+        CHECK(!webmgr_load("chat", &c), "loaded");
+        int i = webreg_profile_index(&c, "agent");
+        CHECK(i >= 0, "agent there");
+        c.profiles[i].user_agent = WEBREG_UA_LORDOS;
+        size_t tl = webreg_write(&c, text, sizeof text);
+        CHECK(tl && strstr(text, "\"userAgent\": \"lordos\"") && !webreg_write_file(rp, text, tl), "userAgent written");
+        CHECK(webmgr_user_agent_of("chat", "agent") == WEBREG_UA_LORDOS, "lordos read back");
+        CHECK(webmgr_user_agent_of("chat", "work") == WEBREG_UA_CHROME, "another profile keeps its own");
+        CHECK(webmgr_user_agent_of("chat", "nothere") < 0 && webmgr_user_agent_of("nothere", "agent") < 0 && webmgr_user_agent_of("../x", "agent") < 0 &&
+              webmgr_user_agent_of(NULL, NULL) < 0, "unknown: -1");
+        CHECK(webmgr_remove_profile("chat", "agent", 1) == NULL, "profile agent removed");
+        CHECK(!webmgr_add_profile("chat", "Agent", prof, sizeof prof) && webmgr_user_agent_of("chat", "agent") == WEBREG_UA_CHROME, "a new profile: chrome again");
+        CHECK(webmgr_remove_profile("chat", "agent", 1) == NULL, "profile agent removed again");
+    }
     snprintf(p, sizeof p, "%s/.local/share/lordos/web/chat/work", root);
     CHECK(!stat(p, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0700, "its data folder, 0700");
     snprintf(q, sizeof q, "%s/cookies.sqlite", p);

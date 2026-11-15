@@ -11,9 +11,13 @@
  *     takes the page outside (a sign-in on another site) stays, and the title then starts with that site's host;
  *   - permissions: answered from the registry, asking lord-server when it says "ask" (webbus.c);
  *   - downloads: only to the XDG Downloads folder, under a unique, cleaned name (webdl.c), with a notification;
- *   - the user agent is a Linux one with WebKit's own Safari tokens and LordOS's (webpage_user_agent). WebKit's
- *     site-specific quirks are off on the app's own pages, because one of them hands some sites a Mac user agent
- *     (a messaging web app then offers its Mac download), and on for any other site in the window (a sign-in);
+ *   - the user agent is the profile's "Browser identity" (the registry's userAgent: Chrome on Linux by default,
+ *     Firefox on Linux, or LordOS's own WebKit string; webpage_user_agent maps the word, the page never names one).
+ *     lord-server can change it while the app runs (SetUserAgent, webbus.c): the page then loads again, since a
+ *     document keeps the navigator.userAgent it started with. WebKit's site-specific quirks are off on the app's own
+ *     pages, because one of them hands some sites another system's user agent whatever the setting (a messaging web
+ *     app then offers that system's download and names the linked device after it), and on for any other site in
+ *     the window (a sign-in);
  *   - the unread count in the page's title goes to lord-server (SetBadge) when it changes;
  *   - when the page starts playing audio, for the notification sound (webbus.c, webpage_sound_suppress). */
 #include "web.h"
@@ -81,11 +85,16 @@ static void hidden_page_throttling(WebKitSettings *st) {
     if (all) webkit_feature_list_unref(all);
 }
 
-WebKitSettings *web_settings_new(void) {
+/* the string for WEBREG_UA_* kind into ua (n bytes); "" when it can't be made (WebKit's own then) */
+static void user_agent_of(int kind, char *ua, size_t n) {
     struct utsname u;
-    char ua[256];
     if (uname(&u)) u.machine[0] = 0;
-    if (webpage_user_agent(u.machine, LORD_VERSION, ua, sizeof ua)) ua[0] = 0;
+    if (webpage_user_agent(kind, u.machine, LORD_VERSION, ua, n)) ua[0] = 0;
+}
+
+WebKitSettings *web_settings_new(int ua_kind) {
+    char ua[256];
+    user_agent_of(ua_kind, ua, sizeof ua);
     WebKitSettings *st = webkit_settings_new_with_settings(
         "user-agent", ua[0] ? ua : NULL,
         "enable-developer-extras", FALSE,
@@ -133,6 +142,18 @@ WebKitNetworkSession *web_session_new(Web *w) {
     webkit_network_session_set_persistent_credential_storage_enabled(s, FALSE);
     webkit_network_session_set_tls_errors_policy(s, WEBKIT_TLS_ERRORS_POLICY_FAIL);
     return s;
+}
+
+void web_set_user_agent(Web *w, int kind) {
+    if (!webreg_ua_name(kind) || kind == w->user_agent || !w->view) return;
+    char ua[256];
+    user_agent_of(kind, ua, sizeof ua);
+    if (!ua[0]) return;
+    w->user_agent = kind;
+    webkit_settings_set_user_agent(webkit_web_view_get_settings(w->view), ua);
+    /* navigator.userAgent stays what the document started with: load the page again (only the app's own: another
+     * site in the window, a sign-in half done, is left alone and gets the new one with its next load) */
+    if (!w->outside) webkit_web_view_reload(w->view);
 }
 
 void web_quit(Web *w, int code) {
@@ -500,7 +521,8 @@ int web_engine_start(Web *w) {
     notification_permissions(w);
     w->session = web_session_new(w);
     if (!w->session) return -1;
-    WebKitSettings *settings = web_settings_new();
+    w->user_agent = w->profile->user_agent;
+    WebKitSettings *settings = web_settings_new(w->user_agent);
     webkit_settings_set_enable_site_specific_quirks(settings, FALSE);      /* the start address is the app's own */
     WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), NULL, NULL);
     w->view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", w->context, "network-session", w->session, "settings", settings, NULL);

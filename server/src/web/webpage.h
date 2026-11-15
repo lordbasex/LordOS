@@ -11,11 +11,21 @@
  * ")" is followed by a space or ends the title; anything else (no count, "(0)", "(12345)", "(3)Chat") is 0. */
 int  webpage_title_badge(const char *title);
 
-/* lord-web's user agent: "Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
- * Version/18.0 Safari/605.1.15 LordOS/<version>". The AppleWebKit and Safari tokens are the ones WebKit itself sends
- * (frozen at 605.1.15); a machine that isn't [A-Za-z0-9_] is left out ("(X11; Linux)"), a version that isn't
- * [A-Za-z0-9.+~-] drops the LordOS token. 0, or -1 when out is too short. */
-int  webpage_user_agent(const char *machine, const char *version, char *out, size_t n);
+/* lord-web's user agent for a profile's "Browser identity" (the registry's userAgent, webreg.h WEBREG_UA_*). The page
+ * never names it: lord-web maps the registry's word to one of these, here.
+ *   chrome   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/<M>.0.0.0
+ *            Safari/537.36": what desktop Chrome on Linux sends. Chrome's reduced user agent says "Linux x86_64" on
+ *            every Linux, an ARM one too, so machine is not used.
+ *   firefox  "Mozilla/5.0 (X11; Linux <machine>; rv:<M>.0) Gecko/20100101 Firefox/<M>.0": Firefox names its
+ *            processor (x86_64 when machine isn't [A-Za-z0-9_]).
+ *   lordos   "Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0
+ *            Safari/605.1.15 LordOS/<version>": WebKit's own (frozen) tokens and LordOS's; a machine that isn't
+ *            [A-Za-z0-9_] is left out ("(X11; Linux)"), a version that isn't [A-Za-z0-9.+~-] drops the LordOS token.
+ * The majors are the current stable releases; RELEASING.md bumps them each release. 0, or -1 for an unknown kind or
+ * when out is too short. */
+#define WEBPAGE_CHROME_MAJOR  157
+#define WEBPAGE_FIREFOX_MAJOR 160
+int  webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n);
 
 /* LordOS's sound for a page's notification ("notifySound" in the registry, webreg.h WEBREG_SOUND_*):
  *   auto    LordOS plays its sound unless the page plays its own: it started audio less than WEBPAGE_SOUND_WINDOW_MS

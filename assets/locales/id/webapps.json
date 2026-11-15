@@ -6,5 +6,14 @@
   "appearance.autoHint": "Mengikuti mode terang atau gelap LordOS.",
   "appearance.lightHint": "Situs selalu diberi tahu terang, apa pun mode LordOS.",
   "appearance.darkHint": "Situs selalu diberi tahu gelap, apa pun mode LordOS.",
-  "appearance.footer": "Hanya preferensi terang atau gelap yang dibaca situs yang berubah; LordOS tidak pernah mengubah situs itu sendiri. Beberapa situs tetap terang, dan situs yang punya pengaturan tema sendiri mengikuti pengaturan tersebut."
+  "appearance.footer": "Hanya preferensi terang atau gelap yang dibaca situs yang berubah; LordOS tidak pernah mengubah situs itu sendiri. Beberapa situs tetap terang, dan situs yang punya pengaturan tema sendiri mengikuti pengaturan tersebut.",
+  "identity.title": "Identitas browser",
+  "identity.label": "Kenali sebagai",
+  "identity.chrome": "Chrome di Linux",
+  "identity.firefox": "Firefox di Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "Situs melihat browser yang paling umum di Linux. Bawaan.",
+  "identity.firefoxHint": "Situs melihat Firefox di Linux.",
+  "identity.lordosHint": "Situs melihat mesin milik LordOS sendiri. Untuk situs yang bermasalah dengan pilihan lain.",
+  "identity.footer": "Browser yang diakui setiap profil kepada situs; jendela yang terbuka memuat ulang halamannya. LordOS tetap memakai mesinnya sendiri (WebKit); Chrome dan Firefox adalah nama milik pemiliknya. Jika situs bermasalah, pilih LordOS (WebKit). Situs yang sudah menautkan perangkat ini, seperti aplikasi pesan, tetap memakai nama yang dilihatnya sampai ditautkan lagi."
 }

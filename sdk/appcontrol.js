@@ -1,8 +1,8 @@
 // appcontrol.js — what a theme offers for the app in front and for every app at once (0.8.5):
 //
 //   appGroup(winId)        { key, name, windows } of the app that owns a window (grouped as the Dock does)
-//   appMenuItems(winId)    the app menu: About <app>, Settings…, (a web app's Appearance), Hide <app>, Hide Others,
-//                          Show All, Quit <app>
+//   appMenuItems(winId)    the app menu: About <app>, Settings…, (a web app's Appearance and Browser identity),
+//                          Hide <app>, Hide Others, Show All, Quit <app>
 //   runningApps()          every app with a window, for Force Quit
 //   forceQuit(key)         ends an app that stopped answering (see below)
 //   recentItems(n)         the recent files as menu items (Recent Items in the crown menu)
@@ -18,7 +18,7 @@ import { launcherIdOf, quitApp } from './dock.js';
 import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { openFileWithApps, openUrl } from './sysopen.js';
 import { webAppOfWindow, webAppCall } from './webapps.js';
-import { COLOR_SCHEMES, colorSchemeOf } from './webappsmodel.js';
+import { COLOR_SCHEMES, colorSchemeOf, USER_AGENTS, userAgentOf } from './webappsmodel.js';
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
 import { compareNames } from './collate.js';
@@ -86,6 +86,20 @@ export function webAppearanceItem(winId) {
   };
 }
 
+// A web app window's Browser identity (Chrome on Linux, Firefox on Linux, LordOS): the browser that profile's pages
+// are told it is; the window loads its page again at once (lord.webapps.setUserAgent). The same choice as in
+// Settings → Web apps, for the window's own profile.
+export function webUserAgentItem(winId) {
+  const web = webAppOfWindow(wm.get(winId));
+  if (!web) return null;
+  const now = userAgentOf(web.entry, web.profile);
+  return {
+    label: t('webapps.identity.title'),
+    submenu: USER_AGENTS.map((v) => ({ label: t(`webapps.identity.${v}`), checked: v === now,
+      onClick: () => { try { webAppCall('setUserAgent', web.entry.id, web.profile, v); } catch (e) { console.error('identity:', e); } } })),
+  };
+}
+
 // The app's own Settings… item, if it has one (❖,); a web app's is its page in Settings → Web apps.
 export const appSettingsItem = (winId) => settingsItemOf(winId) || webSettingsItem(winId);
 
@@ -105,11 +119,13 @@ export function appMenuItems(winId) {
   if (!g) return [];
   const settingsItem = appSettingsItem(winId);
   const appearance = webAppearanceItem(winId);
+  const identity = webUserAgentItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
     ...(appearance ? [appearance] : []),
+    ...(identity ? [identity] : []),
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },
     { label: t('shell.app.hideOthers'), hint: '❖⌥H', onClick: () => hideOthers(winId) },

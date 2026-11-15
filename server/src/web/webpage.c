@@ -27,12 +27,22 @@ static int all_of(const char *s, const char *extra) {
     return 1;
 }
 
-int webpage_user_agent(const char *machine, const char *version, char *out, size_t n) {
+int webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n) {
     char plat[64], tail[64] = "";
-    if (all_of(machine, "_")) snprintf(plat, sizeof plat, "X11; Linux %s", machine);
-    else snprintf(plat, sizeof plat, "X11; Linux");
-    if (all_of(version, ".+~-")) snprintf(tail, sizeof tail, " LordOS/%s", version);
-    int k = snprintf(out, n, "Mozilla/5.0 (%s) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15%s", plat, tail);
+    int k;
+    if (kind == WEBREG_UA_CHROME) {
+        /* Chrome's reduced user agent: the same platform on every Linux, whatever the processor */
+        k = snprintf(out, n, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36", WEBPAGE_CHROME_MAJOR);
+    } else if (kind == WEBREG_UA_FIREFOX) {
+        /* Firefox names the processor it runs on */
+        k = snprintf(out, n, "Mozilla/5.0 (X11; Linux %s; rv:%d.0) Gecko/20100101 Firefox/%d.0", all_of(machine, "_") ? machine : "x86_64",
+                     WEBPAGE_FIREFOX_MAJOR, WEBPAGE_FIREFOX_MAJOR);
+    } else if (kind == WEBREG_UA_LORDOS) {
+        if (all_of(machine, "_")) snprintf(plat, sizeof plat, "X11; Linux %s", machine);
+        else snprintf(plat, sizeof plat, "X11; Linux");
+        if (all_of(version, ".+~-")) snprintf(tail, sizeof tail, " LordOS/%s", version);
+        k = snprintf(out, n, "Mozilla/5.0 (%s) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15%s", plat, tail);
+    } else return -1;
     return k < 0 || (size_t)k >= n ? -1 : 0;
 }
 

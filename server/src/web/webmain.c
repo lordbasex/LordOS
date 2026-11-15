@@ -115,8 +115,8 @@ void web_registry_refresh(Web *w) {
 
 /* ---- one process per app and profile ---- */
 
-/* Show(token): anyone may (a second start of the app does); Edit(command) and SetColorScheme("light" | "dark"): only
- * lord-server, checked by pid (webbus.c) */
+/* Show(token): anyone may (a second start of the app does); Edit(command), SetColorScheme("light" | "dark") and
+ * SetUserAgent("chrome" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c) */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
     if (!strcmp(method, "Show")) {
@@ -141,13 +141,23 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
             return;
         }
         webbus_scheme(d, sender, k);
+    } else if (!strcmp(method, "SetUserAgent")) {
+        const char *word = NULL;
+        g_variant_get(p, "(&s)", &word);
+        int k = webreg_ua_value(word);
+        if (k < 0 || !sender) {
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "chrome, firefox or lordos");
+            return;
+        }
+        webbus_user_agent(d, sender, k);
     }
     g_dbus_method_invocation_return_value(inv, NULL);
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
                                "<method name='Edit'><arg type='s' direction='in'/></method>"
-                               "<method name='SetColorScheme'><arg type='s' direction='in'/></method></interface></node>";
+                               "<method name='SetColorScheme'><arg type='s' direction='in'/></method>"
+                               "<method name='SetUserAgent'><arg type='s' direction='in'/></method></interface></node>";
 
 /* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {

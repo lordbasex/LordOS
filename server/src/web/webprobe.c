@@ -307,7 +307,7 @@ int webprobe_run(Web *w) {
     w->exportable = wpe_view_backend_exportable_fdo_create(&headless, w, 1280, 800);
     w->context = web_context_new();
     w->session = webkit_network_session_new_ephemeral();
-    WebKitSettings *settings = web_settings_new();
+    WebKitSettings *settings = web_settings_new(WEBREG_UA_CHROME);
     webkit_settings_set_enable_media_stream(settings, FALSE);
     webkit_settings_set_enable_webrtc(settings, FALSE);
     webkit_settings_set_media_playback_requires_user_gesture(settings, TRUE);

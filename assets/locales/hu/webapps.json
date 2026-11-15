@@ -6,5 +6,14 @@
   "appearance.autoHint": "A LordOS világos vagy sötét módját követi.",
   "appearance.lightHint": "A webhely mindig világosat kap, bármilyen módban van a LordOS.",
   "appearance.darkHint": "A webhely mindig sötétet kap, bármilyen módban van a LordOS.",
-  "appearance.footer": "Csak a webhely által olvasott világos vagy sötét beállítás változik; a LordOS soha nem módosítja magát a webhelyet. Egyes webhelyek így is világosak maradnak, a saját témabeállítással rendelkező webhely pedig azt követi."
+  "appearance.footer": "Csak a webhely által olvasott világos vagy sötét beállítás változik; a LordOS soha nem módosítja magát a webhelyet. Egyes webhelyek így is világosak maradnak, a saját témabeállítással rendelkező webhely pedig azt követi.",
+  "identity.title": "Böngészőazonosító",
+  "identity.label": "Azonosítás mint",
+  "identity.chrome": "Chrome Linuxon",
+  "identity.firefox": "Firefox Linuxon",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "A webhelyek a Linux leggyakoribb böngészőjét látják. Alapértelmezett.",
+  "identity.firefoxHint": "A webhelyek Firefoxot látnak Linuxon.",
+  "identity.lordosHint": "A webhelyek a LordOS saját motorját látják. Olyan webhelyhez, amely a többivel rosszul működik.",
+  "identity.footer": "Az a böngésző, aminek az egyes profilok a webhelyek felé mondják magukat; a nyitott ablak újratölti az oldalát. A LordOS továbbra is a saját motorját (WebKit) használja; a Chrome és a Firefox a tulajdonosaik nevei. Ha egy webhely rosszul működik, válassza a LordOS (WebKit) lehetőséget. Az a webhely, amely már összekapcsolta ezt az eszközt, például egy üzenetküldő alkalmazás, az újbóli összekapcsolásig megtartja a látott nevet."
 }

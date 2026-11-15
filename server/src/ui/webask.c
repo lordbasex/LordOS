@@ -271,18 +271,30 @@ int webask_edit(const char *app, const char *profile, const char *command) {
     return serial ? 0 : -1;
 }
 
-/* one running lord-web: SetColorScheme(scheme), no reply wanted */
-static int send_scheme(const char *app, const char *profile, const char *word) {
+/* one running lord-web: member(word) (SetColorScheme, SetUserAgent), no reply wanted */
+static int send_word(const char *app, const char *profile, const char *member, const char *word) {
     char name[160];
     if (!bus || !word || webreg_bus_name(app, profile, name, sizeof name)) return -1;
     DBuf b;
     dw_init(&b);
     dw_str(&b, word);
     DHdr h = { .type = DBUS_CALL, .flags = DBUS_NO_REPLY | DBUS_NO_AUTOSTART, .path = WEBREG_SHOW_PATH, .iface = WEBREG_SHOW_IFACE,
-               .member = "SetColorScheme", .dest = name, .sig = "s" };
+               .member = member, .dest = name, .sig = "s" };
     uint32_t serial = dbus_send(bus, &h, &b);
     dw_free(&b);
     return serial ? 0 : -1;
+}
+static int send_scheme(const char *app, const char *profile, const char *word) { return send_word(app, profile, "SetColorScheme", word); }
+static int send_user_agent(const char *app, const char *profile) {
+    return send_word(app, profile, "SetUserAgent", webreg_ua_name(webmgr_user_agent_of(app, profile)));
+}
+
+void webask_user_agent(const char *app, const char *profile) {
+    if (!bus || !app || !profile) return;
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING);
+    for (int i = 0; i < n; i++)
+        if (!strcmp(r[i].app, app) && !strcmp(r[i].profile, profile) && !send_user_agent(app, profile)) { dbus_flush(bus); return; }
 }
 
 void webask_scheme(int dark) {
@@ -316,7 +328,11 @@ void webask_appeared(const char *name) {
         char own[160];
         if (webreg_bus_name(r[i].app, r[i].profile, own, sizeof own) || strcmp(own, name)) continue;
         const char *word = webscheme_name(webmgr_scheme_of(r[i].app));
-        if (word && !send_scheme(r[i].app, r[i].profile, word)) dbus_flush(bus);
+        int sent = word && !send_scheme(r[i].app, r[i].profile, word);
+        /* its Browser identity too: one changed between its start (it read the registry) and now would be lost; the
+         * same one again is ignored */
+        sent += !send_user_agent(r[i].app, r[i].profile);
+        if (sent) dbus_flush(bus);
         return;
     }
 }

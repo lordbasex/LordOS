@@ -68,6 +68,7 @@ typedef struct {
     double note_ms;                     /* when its last notification went out with LordOS's sound, or -1 */
     pid_t server_pid;                   /* the lord-server that started this lord-web (its parent): Edit comes only from it */
     int menu_open;                      /* a context menu is waiting for the person (Menu on lord-server) */
+    int user_agent;                     /* the WEBREG_UA_* the view has now (the registry's at start, SetUserAgent) */
     int scheme;                         /* the desktop's WEBSCHEME_LIGHT or WEBSCHEME_DARK (LORDOS_WEB_SCHEME, SetColorScheme) */
     char scheme_key[WEBSCHEME_KEY_LEN + 1]; /* webscheme.js's hook on window, random per process ("" none: no script) */
     WebKitUserScript *scheme_script;    /* the one added for the scheme now: replaced when it changes */
@@ -79,7 +80,9 @@ typedef struct {
 /* webengine.c */
 WebKitNetworkSession *web_session_new(Web *w);           /* the profile's own folders, cookies in cookies.sqlite */
 WebKitWebContext *web_context_new(void);                 /* memory pressure, no prewarmed process, cache model */
-WebKitSettings *web_settings_new(void);                  /* developer extras off, no automatic windows */
+WebKitSettings *web_settings_new(int ua_kind);           /* the user agent (WEBREG_UA_*), developer extras off, no automatic windows */
+/* the profile's Browser identity changed (SetUserAgent): the view's user agent, then the app's page loads again */
+void web_set_user_agent(Web *w, int kind);
 int web_engine_start(Web *w);                            /* the view on w->exportable, signals, first load */
 void web_quit(Web *w, int code);
 /* the window was closed: hidden behind the tray when the app runs in the background, otherwise quit */
@@ -142,6 +145,8 @@ void webbus_choose_files(Web *w, WebKitFileChooserRequest *req);
 void webbus_edit(Web *w, const char *sender, int cmd);
 /* org.lordos.WebApp1.SetColorScheme(scheme) from sender: the same check, then web_set_scheme */
 void webbus_scheme(Web *w, const char *sender, int scheme);
+/* org.lordos.WebApp1.SetUserAgent(chrome|firefox|lordos) from sender: the same check, then web_set_user_agent */
+void webbus_user_agent(Web *w, const char *sender, int kind);
 /* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
  * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */
 void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image);

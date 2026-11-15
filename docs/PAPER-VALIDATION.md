@@ -277,6 +277,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | § | Claim | How | State |
 |---|---|---|---|
 | 5.1, 6.7 | A web app's Appearance (Automatic, Light, Dark) picks which closed word, `light` or `dark`, `lord-server` tells its `lord-web`; Automatic is the desktop's; open windows follow at once; the site is never changed | Test (`build/webapp-test`: the registry's `colorScheme` read, written only when not `auto`, anything else refused, and `webscheme_for_app`; `build/webreg-test`: the start environment and `webmgr_scheme_of`; `tests/webapps_model_test.mjs`); Design (`webask_app_scheme`, `docs/WEBAPPS.md`) | Holds for the logic; not yet checked on screen |
+| 5.1, 6.7 | Each profile's Browser identity comes from a closed list (Chrome on Linux by default, Firefox on Linux, LordOS's WebKit string); `lord-web` maps the word to the string in C and the page never names one; a change reaches a running profile through a closed call accepted only from `lord-server`, then the page loads again | Test (`build/webapp-test`: the three strings, the registry's per-profile `userAgent` read, written only when not `chrome`, anything else refused; `build/webreg-test`: `webmgr_user_agent_of`; `tests/webapps_model_test.mjs`); Design (`SetUserAgent` behind the pid check, `webask_user_agent`, `docs/WEBAPPS.md` "Browser identity") | Holds for the logic; not yet checked on screen |
 
 ## What the paper must change for 0.8.5
 

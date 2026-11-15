@@ -202,5 +202,14 @@
   "appearance.autoHint": "Seka LordOS šviesųjį arba tamsųjį režimą.",
   "appearance.lightHint": "Svetainei visada nurodomas šviesus režimas, nepriklausomai nuo LordOS režimo.",
   "appearance.darkHint": "Svetainei visada nurodomas tamsus režimas, nepriklausomai nuo LordOS režimo.",
-  "appearance.footer": "Keičiama tik šviesaus ar tamsaus režimo nuostata, kurią skaito svetainė; LordOS niekada nekeičia pačios svetainės. Kai kurios svetainės vis tiek lieka šviesios, o svetainė su savo temos nustatymu laikosi jo."
+  "appearance.footer": "Keičiama tik šviesaus ar tamsaus režimo nuostata, kurią skaito svetainė; LordOS niekada nekeičia pačios svetainės. Kai kurios svetainės vis tiek lieka šviesios, o svetainė su savo temos nustatymu laikosi jo.",
+  "identity.title": "Naršyklės tapatybė",
+  "identity.label": "Prisistatyti kaip",
+  "identity.chrome": "Chrome sistemoje Linux",
+  "identity.firefox": "Firefox sistemoje Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "Svetainės mato dažniausią Linux naršyklę. Numatytoji.",
+  "identity.firefoxHint": "Svetainės mato Firefox sistemoje Linux.",
+  "identity.lordosHint": "Svetainės mato paties LordOS variklį. Svetainei, kuri su kitais veikia blogai.",
+  "identity.footer": "Naršyklė, kuria kiekvienas profilis prisistato svetainėms; atidarytas langas iš naujo įkelia savo puslapį. LordOS ir toliau naudoja savo variklį (WebKit); Chrome ir Firefox yra jų savininkų pavadinimai. Jei svetainė veikia blogai, rinkitės LordOS (WebKit). Svetainė, kuri jau susiejo šį įrenginį, pavyzdžiui, pokalbių programa, išlaiko matytą pavadinimą, kol susiesite iš naujo."
 }

@@ -6,5 +6,14 @@
   "appearance.autoHint": "Mengikut mod cerah atau gelap LordOS.",
   "appearance.lightHint": "Laman sentiasa diberitahu cerah, walau apa pun mod LordOS.",
   "appearance.darkHint": "Laman sentiasa diberitahu gelap, walau apa pun mod LordOS.",
-  "appearance.footer": "Hanya pilihan cerah atau gelap yang dibaca oleh laman berubah; LordOS tidak pernah mengubah laman itu sendiri. Sesetengah laman kekal cerah juga, dan laman yang mempunyai tetapan tema sendiri mengikut tetapan itu."
+  "appearance.footer": "Hanya pilihan cerah atau gelap yang dibaca oleh laman berubah; LordOS tidak pernah mengubah laman itu sendiri. Sesetengah laman kekal cerah juga, dan laman yang mempunyai tetapan tema sendiri mengikut tetapan itu.",
+  "identity.title": "Identiti pelayar",
+  "identity.label": "Kenal pasti sebagai",
+  "identity.chrome": "Chrome di Linux",
+  "identity.firefox": "Firefox di Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "Laman melihat pelayar paling biasa di Linux. Lalai.",
+  "identity.firefoxHint": "Laman melihat Firefox di Linux.",
+  "identity.lordosHint": "Laman melihat enjin LordOS sendiri. Untuk laman yang bermasalah dengan pilihan lain.",
+  "identity.footer": "Pelayar yang diakui oleh setiap profil kepada laman; tetingkap yang terbuka memuatkan semula halamannya. LordOS masih menggunakan enjinnya sendiri (WebKit); Chrome dan Firefox ialah nama milik pemiliknya. Jika laman bermasalah, pilih LordOS (WebKit). Laman yang sudah memautkan peranti ini, seperti aplikasi pemesejan, mengekalkan nama yang dilihatnya sehingga dipautkan semula."
 }

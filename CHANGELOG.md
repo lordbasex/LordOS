@@ -63,9 +63,46 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
   word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
   Automatic. Not yet checked on screen on the development VM.
+- **A web app profile's Browser identity: Chrome on Linux, Firefox on Linux or LordOS (WebKit)** (maintainer's
+  request, 2026-11-15). Which browser a profile's pages are told it is, chosen from a closed list, never typed, per
+  profile (two accounts of one messaging app can differ). Settings → Web Apps has a *Browser identity* section on the
+  app's page, one pop-up per profile with a hint for each choice and a footer that says LordOS still uses its own
+  engine (WebKit), that Chrome and Firefox are names of their owners, to choose LordOS (WebKit) if a site misbehaves,
+  and that a site that already linked the device keeps the name it saw until it is linked again; in Lord Flow the web
+  app window's app menu has *Browser identity ▸* the three, for that window's profile. The strings (lord-web's
+  `webpage_user_agent`, in C; JS and the page never pass one; quoted in full in docs/WEBAPPS.md):
+  - Chrome on Linux (the default): desktop Chrome 157's reduced string, `X11; Linux x86_64` with its
+    `AppleWebKit/537.36` and `Chrome/157.0.0.0` tokens, also on ARM, as Chrome itself sends there;
+  - Firefox on Linux: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0` (`x86_64`,
+    `aarch64`);
+  - LordOS (WebKit): the string every app had until now, `X11; Linux <machine>` with WebKit's own frozen
+    `AppleWebKit/605.1.15` tokens and `LordOS/<version>`.
+  The majors are constants (`WEBPAGE_CHROME_MAJOR`, `WEBPAGE_FIREFOX_MAJOR` in `server/src/web/webpage.h`) that
+  docs/RELEASING.md now bumps each release. It applies **at once**: a change writes the profile's new optional
+  `userAgent` key in the registry (`chrome`, `firefox`, `lordos`; written only when not `chrome`, anything else
+  refused, also at the app's level) and lord-server sends that profile's running `lord-web` a new closed D-Bus call,
+  `org.lordos.WebApp1.SetUserAgent("chrome" | "firefox" | "lordos")`, which lord-web runs only when the bus says the
+  caller is the lord-server that started it (as `Edit` and `SetColorScheme`); lord-web sets WebKit's user agent and
+  loads the app's page again, since a document keeps the `navigator.userAgent` it started with (a sign-in on another
+  site in the window is left alone and gets it with its next load). lord-server sends it again when a lord-web's bus
+  name appears, so a change made while it was starting is not lost; the same word is ignored. WebKit's site-specific
+  quirks keep today's rule (off on the app's own pages, on for other sites). New: `lord.webapps.setUserAgent(app,
+  profile, value)` (desktop only, not in the broker; a bad value is `sys.badArgument`), `USER_AGENTS` and
+  `userAgentOf` in `sdk/webappsmodel.js`, `webUserAgentItem` in `sdk/appcontrol.js`, the `webapps.identity.*` texts
+  (9 keys) in all 32 languages. Tests: `build/webapp-test` (the three strings, Chrome's on every machine, Firefox's
+  processor, unknown kinds refused, the key per profile read, written only when not `chrome`, ten bad forms refused;
+  499 checks), `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 343 checks) and
+  `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
 
 ### Changed
 
+- **Web apps tell sites they are Chrome on Linux by default** (maintainer's request, 2026-11-15), instead of LordOS's
+  WebKit string, whose browser token made a messaging app's phone list the linked computer under another system's
+  browser. Every existing profile changes too (no stored key is the default; no migration). A profile set to *LordOS
+  (WebKit)* in Browser identity (above) gets the old string back. A device a site linked before keeps the name the
+  site saw then: unlink it on the phone and link it again to see the new one. Why it showed another system: WebKit's
+  site-specific quirks hand that messaging site another system's browser string whatever the setting, and lord-web
+  only turned them off on an app's own pages on 2026-11-11, after the first web apps were linked.
 - **Chinese by script.** `languageOfLocale` (`sdk/localename.js`) picks the interface language for a locale: its
   language part, or `zh-Hant` for `zh_TW`, `zh_HK` and `zh_MO` and `zh-Hans` for `zh_CN` and `zh_SG`; the first
   session and the login screen use it instead of cutting LANG to two letters. The installer keeps the full id
@@ -94,6 +131,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- docs/WEBAPPS.md: Browser identity (the registry's per-profile `userAgent`, the three strings, `SetUserAgent` and
+  the reload, why a linked device keeps the old name, where it is, the tests) under "The page", the registry's rules
+  and the More registry keys list. docs/RELEASING.md: a step to bump the Chrome and Firefox majors each release.
+  docs/PAPER-VALIDATION.md: the Browser identity claim in the 0.8.8.9 section.
 - docs/WEBAPPS.md: the registry's `colorScheme`, the start environment for an app set to Light or Dark, "Each app's
   Appearance" under Light and dark (how lord-server picks the word, the live change, where it is, the tests), the app
   menu item and the More registry keys list. docs/PAPER-VALIDATION.md: a 0.8.8.9 section (in development) with the
@@ -124,6 +165,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **LordOS Web Runtime page** (en, es, pt): each profile's Browser identity (Chrome on Linux by default, Firefox
+  on Linux, LordOS), marked in development, in a new paragraph and in Settings → Web Apps. The paper (en, es, pt)
+  says it in its web apps paragraph.
 - **LordOS Web Runtime page** (en, es, pt): each app's Appearance (Automatic, Light, Dark), marked in development
   after 0.8.8.8, the latest release, under Light and dark and in Settings → Web Apps. The paper (en, es, pt, edition
   0.8.8.9 Beta of 2026-11-15) says it in its web apps paragraph.

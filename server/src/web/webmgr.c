@@ -116,6 +116,14 @@ int webmgr_scheme_of(const char *app) {
     return webscheme_for_app(pref, scheme);
 }
 
+int webmgr_user_agent_of(const char *app, const char *profile) {
+    WebApp *a = webreg_id_ok(app) ? malloc(sizeof *a) : NULL;
+    const WebProfile *p = a && !webmgr_load(app, a) ? webreg_profile(a, profile) : NULL;
+    int ua = p ? p->user_agent : -1;
+    free(a);
+    return ua;
+}
+
 /* s: the scheme this lord-web is told (webscheme_for_app), -1 none */
 static void env_build(Env *e, int s) {
     static const char *const keep[5] = { "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "HOME", "LANG" };
@@ -743,6 +751,7 @@ const char *webmgr_add_profile(const char *app, const char *name, char *id, size
     else {
         WebProfile *p = &a->profiles[a->nprofiles++];
         snprintf(p->name, sizeof p->name, "%s", name);
+        p->user_agent = WEBREG_UA_CHROME;              /* the slot may hold a removed profile's */
         snprintf(id, n, "%s", p->id);
         e = save(a);
     }

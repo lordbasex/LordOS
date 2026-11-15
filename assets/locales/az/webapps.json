@@ -6,5 +6,14 @@
   "appearance.autoHint": "LordOS-un işıqlı və ya qaranlıq rejimini izləyir.",
   "appearance.lightHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə işıqlı bildirilir.",
   "appearance.darkHint": "LordOS hansı rejimdə olursa olsun, sayta həmişə qaranlıq bildirilir.",
-  "appearance.footer": "Yalnız saytın oxuduğu işıqlı və ya qaranlıq üstünlük dəyişir; LordOS saytın özünü heç vaxt dəyişmir. Bəzi saytlar yenə də işıqlı qalır, öz mövzu ayarı olan sayt isə həmin ayarı izləyir."
+  "appearance.footer": "Yalnız saytın oxuduğu işıqlı və ya qaranlıq üstünlük dəyişir; LordOS saytın özünü heç vaxt dəyişmir. Bəzi saytlar yenə də işıqlı qalır, öz mövzu ayarı olan sayt isə həmin ayarı izləyir.",
+  "identity.title": "Brauzer kimliyi",
+  "identity.label": "Belə tanıt",
+  "identity.chrome": "Linux-da Chrome",
+  "identity.firefox": "Linux-da Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "Saytlar Linux-da ən geniş yayılmış brauzeri görür. Defolt.",
+  "identity.firefoxHint": "Saytlar Linux-da Firefox-u görür.",
+  "identity.lordosHint": "Saytlar LordOS-un öz mühərrikini görür. Digərləri ilə düzgün işləməyən sayt üçün.",
+  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome və Firefox sahiblərinə məxsus adlardır. Sayt düzgün işləməsə, LordOS (WebKit) seçin. Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
 }

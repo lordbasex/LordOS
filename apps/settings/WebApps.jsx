@@ -1,7 +1,8 @@
 // Settings → Web apps (0.8.8.8, docs/WEBAPPS.md): each installed web app with its icon and origin, its profiles
 // (add, rename, remove, with "delete its data"), its permissions (notifications, camera, microphone, screen,
 // location: allow / ask / deny; what the person answered when asked shows here), run in background, how much each
-// profile's data takes, and uninstall. Each profile has a color (the tag colors of Files): a dot on its windows, its
+// profile's data takes, each profile's Browser identity (the browser its pages are told it is: a closed list, never
+// a typed string), and uninstall. Each profile has a color (the tag colors of Files): a dot on its windows, its
 // notifications and its tray icon. Also: the tray icon while the window shows, the unread count on the Dock, one Dock
 // icon per profile, whose sound a notification makes, and the site's own icon fetched again. Every change goes through lord.webapps, which validates it and writes the
 // registry (the folder is closed to lord.fs). Apps come from the Store's Web apps section.
@@ -114,6 +115,8 @@ function AppDetails({ entry }) {
   };
   const sounds = M.NOTIFY_SOUNDS.map((v) => [v, tr(`webapps.sound.${v}`)]);
   const schemes = M.COLOR_SCHEMES.map((v) => [v, tr(`webapps.appearance.${v}`)]);
+  const identities = M.USER_AGENTS.map((v) => [v, tr(`webapps.identity.${v}`)]);
+  const one = entry.profiles.length < 2;
   const [msg, setMsg] = useState(null);
   const [adding, setAdding] = useState(null);       // the new profile's name being typed
   const [removing, setRemoving] = useState(null);   // { profile } or { app: true }
@@ -170,6 +173,16 @@ function AppDetails({ entry }) {
         <SettingRow label={tr('webapps.appearance.title')} hint={tr(`webapps.appearance.${M.colorSchemeOf(entry)}Hint`)}>
           <Segmented small value={M.colorSchemeOf(entry)} options={schemes} onChange={(v) => call('setColorScheme', entry.id, v)} />
         </SettingRow>
+      </Section>
+      <Section title={tr('webapps.identity.title')} footer={tr('webapps.identity.footer')}>
+        {entry.profiles.map((p) => {
+          const v = M.userAgentOf(entry, p.id);
+          return (
+            <SettingRow key={p.id} label={one ? tr('webapps.identity.label') : p.name} hint={tr(`webapps.identity.${v}Hint`)}>
+              <PopUp value={v} options={identities} width={210} onChange={(x) => call('setUserAgent', entry.id, p.id, x)} />
+            </SettingRow>
+          );
+        })}
       </Section>
       <Section title={tr('webapps.settings.dockTitle')}>
         <SettingRow label={tr('webapps.settings.badge')} hint={tr('webapps.settings.badgeHint')}>

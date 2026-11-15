@@ -25,6 +25,10 @@
  *   setColorScheme(app, value)          auto|light|dark (registry "colorScheme": the app's Appearance, the light or dark
  *                                       preference its pages are told; auto follows the desktop). Running profiles get
  *                                       it at once (SetColorScheme, webask_app_scheme)
+ *   setUserAgent(app, profile, value)   chrome|firefox|lordos (the profile's registry "userAgent": its Browser identity,
+ *                                       the browser its pages are told it is; lord-web maps the word to the string). A
+ *                                       running profile gets it at once and loads its page again (SetUserAgent,
+ *                                       webask_user_agent)
  *   fetchIcon(app)                      → probe id; the site's own icon for an installed or a catalog app: the probe
  *                                       of "Add from an address" on the app's own start address (lord-web needed)
  *   iconResult(app)                     null while it runs; { done, ok, iconPath } once the icon is kept in
@@ -330,6 +334,31 @@ static JSValue f_set_color_scheme(JSContext *c, JSValueConst t, int argc, JSValu
     const char *err = !app || v < 0 ? "sys.badArgument" : set_field(app, 2, v);
     if (!err) webask_app_scheme(app);
     JS_FreeCString(c, app);
+    JS_FreeCString(c, val);
+    return done(c, err, JS_TRUE);
+}
+
+/* a profile's Browser identity; a running one follows at once (SetUserAgent, then its page loads again) */
+static const char *set_user_agent(const char *app, const char *profile, int value) {
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    WebApp *a = malloc(sizeof *a);
+    if (!a) return "webapps.writeFailed";
+    const char *e = webmgr_load(app, a);
+    int i = e ? -1 : webreg_profile_index(a, profile);
+    if (!e && i < 0) e = "webapps.noProfile";
+    if (!e && a->profiles[i].user_agent != value) { a->profiles[i].user_agent = value; e = save_entry(a); }
+    free(a);
+    return e;
+}
+
+static JSValue f_set_user_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1), *val = arg_str(c, argc, argv, 2);
+    int v = val ? webreg_ua_value(val) : -1;
+    const char *err = !app || !prof || v < 0 ? "sys.badArgument" : set_user_agent(app, prof, v);
+    if (!err) webask_user_agent(app, prof);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
     JS_FreeCString(c, val);
     return done(c, err, JS_TRUE);
 }
@@ -644,6 +673,7 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("setProfileColor", 3, f_set_profile_color),
     JS_CFUNC_DEF("setNotifySound", 2, f_set_notify_sound),
     JS_CFUNC_DEF("setColorScheme", 2, f_set_color_scheme),
+    JS_CFUNC_DEF("setUserAgent", 3, f_set_user_agent),
     JS_CFUNC_DEF("fetchIcon", 1, f_fetch_icon),
     JS_CFUNC_DEF("iconResult", 1, f_icon_result),
     JS_CFUNC_DEF("icons", 0, f_icons),

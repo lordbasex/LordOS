@@ -6,5 +6,14 @@
   "appearance.autoHint": "Theo chế độ sáng hoặc tối của LordOS.",
   "appearance.lightHint": "Trang web luôn được báo là sáng, bất kể LordOS đang ở chế độ nào.",
   "appearance.darkHint": "Trang web luôn được báo là tối, bất kể LordOS đang ở chế độ nào.",
-  "appearance.footer": "Chỉ thay đổi tùy chọn sáng hoặc tối mà trang web đọc; LordOS không bao giờ sửa đổi chính trang web. Một số trang vẫn giữ màu sáng, và trang có cài đặt giao diện riêng sẽ theo cài đặt đó."
+  "appearance.footer": "Chỉ thay đổi tùy chọn sáng hoặc tối mà trang web đọc; LordOS không bao giờ sửa đổi chính trang web. Một số trang vẫn giữ màu sáng, và trang có cài đặt giao diện riêng sẽ theo cài đặt đó.",
+  "identity.title": "Danh tính trình duyệt",
+  "identity.label": "Nhận diện là",
+  "identity.chrome": "Chrome trên Linux",
+  "identity.firefox": "Firefox trên Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "Trang web thấy trình duyệt phổ biến nhất trên Linux. Mặc định.",
+  "identity.firefoxHint": "Trang web thấy Firefox trên Linux.",
+  "identity.lordosHint": "Trang web thấy công cụ riêng của LordOS. Dành cho trang web chạy không đúng với các lựa chọn khác.",
+  "identity.footer": "Trình duyệt mà mỗi hồ sơ xưng với trang web; cửa sổ đang mở sẽ tải lại trang. LordOS vẫn dùng công cụ riêng (WebKit); Chrome và Firefox là tên thuộc về chủ sở hữu của chúng. Nếu trang web chạy không đúng, hãy chọn LordOS (WebKit). Trang web đã liên kết thiết bị này, như một ứng dụng nhắn tin, vẫn giữ tên đã thấy cho đến khi bạn liên kết lại."
 }

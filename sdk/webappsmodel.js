@@ -360,6 +360,16 @@ export const appOfNotifyKey = (key) => {
 export const COLOR_SCHEMES = ['auto', 'light', 'dark'];
 export const colorSchemeOf = (entry) => (entry && COLOR_SCHEMES.includes(entry.colorScheme) ? entry.colorScheme : 'auto');
 
+// ---- browser identity (Settings → Web apps and the app menu: a profile's registry "userAgent") ----
+
+// Which browser a profile's pages are told it is. Only these words: lord-server and lord-web map each to its string in
+// C, and nothing else is accepted. chrome (Chrome on Linux) is the default and what a profile without the key gets.
+export const USER_AGENTS = ['chrome', 'firefox', 'lordos'];
+export function userAgentOf(entry, profile) {
+  const p = entry && Array.isArray(entry.profiles) ? entry.profiles.find((x) => x && x.id === profile) : null;
+  return p && USER_AGENTS.includes(p.userAgent) ? p.userAgent : 'chrome';
+}
+
 // ---- profile colors (the tag colors of Files and Databases) ----
 
 export const PROFILE_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'];

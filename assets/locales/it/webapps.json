@@ -200,5 +200,14 @@
   "appearance.autoHint": "Segue la modalità chiara o scura di LordOS.",
   "appearance.lightHint": "Al sito viene sempre indicato chiaro, qualunque sia la modalità di LordOS.",
   "appearance.darkHint": "Al sito viene sempre indicato scuro, qualunque sia la modalità di LordOS.",
-  "appearance.footer": "Cambia solo la preferenza chiara o scura che il sito legge; LordOS non modifica mai il sito. Alcuni siti restano comunque chiari, e un sito con una propria impostazione del tema segue quella."
+  "appearance.footer": "Cambia solo la preferenza chiara o scura che il sito legge; LordOS non modifica mai il sito. Alcuni siti restano comunque chiari, e un sito con una propria impostazione del tema segue quella.",
+  "identity.title": "Identità del browser",
+  "identity.label": "Identificati come",
+  "identity.chrome": "Chrome su Linux",
+  "identity.firefox": "Firefox su Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "I siti vedono il browser più comune su Linux. Predefinito.",
+  "identity.firefoxHint": "I siti vedono Firefox su Linux.",
+  "identity.lordosHint": "I siti vedono il motore di LordOS. Per un sito che non funziona bene con gli altri.",
+  "identity.footer": "Il browser che ogni profilo dichiara ai siti; una finestra aperta ricarica la sua pagina. LordOS usa sempre il proprio motore (WebKit); Chrome e Firefox sono nomi dei rispettivi proprietari. Se un sito non funziona bene, scegli LordOS (WebKit). Un sito che ha già collegato questo dispositivo, come un’app di messaggistica, mantiene il nome che ha visto finché non lo colleghi di nuovo."
 }

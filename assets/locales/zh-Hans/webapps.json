@@ -6,5 +6,14 @@
   "appearance.autoHint": "跟随 LordOS 的浅色或深色模式。",
   "appearance.lightHint": "无论 LordOS 处于哪种模式，始终告诉网站使用浅色。",
   "appearance.darkHint": "无论 LordOS 处于哪种模式，始终告诉网站使用深色。",
-  "appearance.footer": "只改变网站读取的浅色或深色偏好；LordOS 从不修改网站本身。有些网站仍会保持浅色，而有自己主题设置的网站会遵循该设置。"
+  "appearance.footer": "只改变网站读取的浅色或深色偏好；LordOS 从不修改网站本身。有些网站仍会保持浅色，而有自己主题设置的网站会遵循该设置。",
+  "identity.title": "浏览器标识",
+  "identity.label": "标识为",
+  "identity.chrome": "Linux 上的 Chrome",
+  "identity.firefox": "Linux 上的 Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.chromeHint": "网站看到的是 Linux 上最常见的浏览器。默认选项。",
+  "identity.firefoxHint": "网站看到的是 Linux 上的 Firefox。",
+  "identity.lordosHint": "网站看到的是 LordOS 自己的引擎。适用于在其他选项下运行不正常的网站。",
+  "identity.footer": "每个配置文件向网站声称的浏览器；打开的窗口会重新载入其页面。LordOS 仍使用自己的引擎（WebKit）；Chrome 和 Firefox 是其所有者的名称。如果网站运行不正常，请选择 LordOS (WebKit)。已经关联此设备的网站（例如即时通讯应用）在重新关联之前会保留它看到的名称。"
 }
