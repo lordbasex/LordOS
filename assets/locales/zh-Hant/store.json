@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "辦公與創作套件",
   "ai.kind.coding-agent": "程式設計代理程式",
   "ai.kind.editor": "編輯器",
+  "ai.kind.games": "遊戲",
   "ai.kind.local-models": "本機模型",
   "ai.kind.music": "音樂",
   "ai.kind.speech": "語音轉文字",
@@ -299,5 +300,10 @@
   "formats.apfs": "讀取 APFS 卷宗，僅限唯讀。選用。",
   "formats.allow": "繼續",
   "formats.optional": "同時加入 APFS。它會為你的核心建置驅動程式，並加入約 500 MB 的編譯器和標頭檔。",
-  "search.catalog": "來自 LordOS 目錄"
+  "search.catalog": "來自 LordOS 目錄",
+  "multiarch.title": "32 位元系統程式庫",
+  "multiarch.body": "{name} 需要 32 位元系統程式庫，LordOS 將為其啟用。之後套件引擎就能在 64 位元套件旁邊安裝 Debian 的 32 位元（i386）套件，並像其他套件一樣經過簽章與驗證。只會安裝 {name} 需要的內容。",
+  "multiarch.enable": "啟用並繼續",
+  "multiarch.enabling": "正在啟用…",
+  "pkg32": "{name}（32 位元）"
 }

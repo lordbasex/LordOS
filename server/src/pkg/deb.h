@@ -15,6 +15,13 @@ int ver_satisfies(const char *have, int op, const char *want, size_t wantlen);
 int deb_valid_name(const char *s, size_t n);
 int deb_valid_version(const char *s, size_t n);
 
+/* (0.8.8.9, multiarch) A package as a request names it: a Debian name, or a name of the one foreign
+ * architecture LordOS supports, "name:i386" (docs/PACKAGES.md, "Multiarch"). */
+#define DEB_FOREIGN_ARCH "i386"
+int deb_valid_pkgarg(const char *s, size_t n);
+/* Length of the name without its ":arch" (the whole length when there is none). */
+size_t deb_base_len(const char *s, size_t n);
+
 /* deb822 fields: walks a paragraph (stanza). */
 typedef struct {
     const char *p, *end;
@@ -30,11 +37,14 @@ int d822_next_stanza(const char **pos, const char *end, const char **start, cons
 int d822_next_field(D822 *it, D822Field *f);
 int d822_is(const D822Field *f, const char *name);   /* case-insensitive */
 
-/* A relationship: "name[:arch] (op version)". Walks "a (>= 1) | b, c" group by group. */
+/* A relationship: "name[:arch] (op version)". Walks "a (>= 1) | b, c" group by group. arch: the
+ * qualifier after the colon ("any", "native", "i386"), alen 0 when there is none. */
 typedef struct {
     const char *name, *ver;
     size_t nlen, vlen;
     int op;
+    const char *arch;
+    size_t alen;
 } DebRel;
 
 /* Reads the next group of alternatives (up to the comma). Returns the count (0 = end). */

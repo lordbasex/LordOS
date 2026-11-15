@@ -870,5 +870,9 @@
   "webapps.badSound": "알 수 없는 알림 소리",
   "webapps.badColor": "알 수 없는 프로필 색상",
   "webapps.iconOrigin": "사이트가 다른 주소로 옮겨져 아이콘을 유지하지 않았습니다",
-  "webapps.noIcon": "사이트가 LordOS에서 사용할 수 있는 아이콘을 제공하지 않습니다"
+  "webapps.noIcon": "사이트가 LordOS에서 사용할 수 있는 아이콘을 제공하지 않습니다",
+  "pkg.multiarchSplit": "{name}은(는) 64비트와 32비트의 버전이 같아야 하는데, 이 변경은 버전을 서로 다르게 만듭니다",
+  "pkg.multiarchConflict": "{name}을(를) 64비트와 32비트로 동시에 설치할 수 없습니다",
+  "pkg.foreignArchUnsupported": "32비트 패키지는 64비트 PC(amd64)에서만 활성화할 수 있습니다. 이 시스템은 {arch}입니다",
+  "pkg.foreignArchFailed": "32비트({arch}) 패키지를 활성화하지 못했습니다(dpkg 종료 코드 {code})"
 }

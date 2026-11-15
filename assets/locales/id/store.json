@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Rangkaian kantor dan kreatif",
   "ai.kind.coding-agent": "Agen pemrograman",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Game",
   "ai.kind.local-models": "Model lokal",
   "ai.kind.music": "Musik",
   "ai.kind.speech": "Ucapan ke teks",
@@ -299,5 +300,10 @@
   "formats.apfs": "Membaca volume APFS, hanya-baca. Opsional.",
   "formats.allow": "Lanjutkan",
   "formats.optional": "Tambahkan juga APFS. Ini membangun driver untuk kernel Anda dan menambahkan sekitar 500 MB kompiler dan header.",
-  "search.catalog": "Dari katalog LordOS"
+  "search.catalog": "Dari katalog LordOS",
+  "multiarch.title": "Pustaka sistem 32-bit",
+  "multiarch.body": "{name} memerlukan pustaka sistem 32-bit; LordOS akan mengaktifkannya. Setelah itu mesin paket dapat memasang paket 32-bit (i386) dari Debian di samping paket 64-bit, ditandatangani dan diperiksa seperti paket lainnya. Hanya yang diperlukan {name} yang dipasang.",
+  "multiarch.enable": "Aktifkan dan lanjutkan",
+  "multiarch.enabling": "Mengaktifkan…",
+  "pkg32": "{name} (32-bit)"
 }

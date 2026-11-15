@@ -196,5 +196,8 @@
   "vm.imageRemoved": "تم حذف صورة القرص",
   "vm.downloadResumed": "جارٍ متابعة تنزيل متوقف (تم الاحتفاظ بـ {from} بايت)",
   "vm.kvmReady": "مسموح: يمكن للأجهزة استخدام المحاكاة الافتراضية للعتاد الآن",
-  "vm.kvmNextLogin": "مسموح بدءًا من تسجيل دخولك التالي"
+  "vm.kvmNextLogin": "مسموح بدءًا من تسجيل دخولك التالي",
+  "pkg.foreignArchAdded": "فُعّلت حزم 32 بت ({arch})",
+  "pkg.foreignArchPresent": "كانت حزم 32 بت ({arch}) مفعّلة من قبل",
+  "pkg.why.multiarchPair": "الإصدار نفسه مثل {name}"
 }

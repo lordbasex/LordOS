@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "অফিস ও সৃজনশীল স্যুট",
   "ai.kind.coding-agent": "কোডিং এজেন্ট",
   "ai.kind.editor": "এডিটর",
+  "ai.kind.games": "গেম",
   "ai.kind.local-models": "লোকাল মডেল",
   "ai.kind.music": "মিউজিক",
   "ai.kind.speech": "কথা থেকে লেখা",
@@ -307,5 +308,10 @@
   "formats.apfs": "APFS ভলিউম পড়ে, শুধু-পঠনযোগ্য। ঐচ্ছিক।",
   "formats.allow": "চালিয়ে যান",
   "formats.optional": "APFS-ও যোগ করুন। এটি আপনার কার্নেলের জন্য একটি ড্রাইভার তৈরি করে এবং প্রায় 500 MB কম্পাইলার ও হেডার যোগ করে।",
-  "search.catalog": "LordOS ক্যাটালগ থেকে"
+  "search.catalog": "LordOS ক্যাটালগ থেকে",
+  "multiarch.title": "৩২-বিট সিস্টেম লাইব্রেরি",
+  "multiarch.body": "{name}-এর ৩২-বিট সিস্টেম লাইব্রেরি দরকার; LordOS সেগুলো চালু করবে। এরপর প্যাকেজ ইঞ্জিন Debian-এর ৩২-বিট (i386) প্যাকেজ ৬৪-বিট প্যাকেজের পাশে ইনস্টল করতে পারবে, অন্য যেকোনো প্যাকেজের মতো স্বাক্ষরিত ও যাচাই করা। শুধু {name}-এর যা দরকার তা-ই ইনস্টল হয়।",
+  "multiarch.enable": "চালু করুন ও এগিয়ে যান",
+  "multiarch.enabling": "চালু করা হচ্ছে…",
+  "pkg32": "{name} (৩২-বিট)"
 }

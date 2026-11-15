@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Bộ văn phòng và sáng tạo",
   "ai.kind.coding-agent": "Tác nhân lập trình",
   "ai.kind.editor": "Trình soạn thảo",
+  "ai.kind.games": "Trò chơi",
   "ai.kind.local-models": "Mô hình cục bộ",
   "ai.kind.music": "Âm nhạc",
   "ai.kind.speech": "Giọng nói thành văn bản",
@@ -299,5 +300,10 @@
   "formats.apfs": "Đọc ổ đĩa APFS, chỉ đọc. Tùy chọn.",
   "formats.allow": "Tiếp tục",
   "formats.optional": "Thêm cả APFS. Việc này dựng một trình điều khiển cho nhân của bạn và thêm khoảng 500 MB trình biên dịch và tệp tiêu đề.",
-  "search.catalog": "Từ danh mục LordOS"
+  "search.catalog": "Từ danh mục LordOS",
+  "multiarch.title": "Thư viện hệ thống 32 bit",
+  "multiarch.body": "{name} cần thư viện hệ thống 32 bit; LordOS sẽ bật chúng. Khi đó trình quản lý gói có thể cài các gói 32 bit (i386) của Debian bên cạnh các gói 64 bit, được ký và kiểm tra như mọi gói khác. Chỉ những gì {name} cần mới được cài.",
+  "multiarch.enable": "Bật và tiếp tục",
+  "multiarch.enabling": "Đang bật…",
+  "pkg32": "{name} (32 bit)"
 }

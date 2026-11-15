@@ -3,7 +3,8 @@
  * The root helper builds it in pkg-update from the already verified Packages, Translation-en and
  * DEP-11; lord-server (no root) opens it with mmap: nothing is copied into memory until it's
  * used. Everything is 32-bit little-endian integers and offsets into the string block
- * (string 0 is ""). Packages are sorted by name and, within a name, from the newest version
+ * (string 0 is ""). A foreign architecture's packages are named "name:arch" (0.8.8.9, multiarch).
+ * Packages are sorted by name and, within a name, from the newest version
  * to the oldest. Long descriptions go in their own block at the end, in the same file (it's
  * replaced whole with rename: there's never half an index). */
 #ifndef LORD_PKG_IDX_H
@@ -87,6 +88,10 @@ int  idxb_source(IdxBuilder *b, const char *uri, const char *suite, const char *
                  const char *origin, const char *label, int64_t date, int64_t valid_until, int prio);
 /* Already decompressed Packages of source src (the index returned by idxb_source). */
 int  idxb_packages(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch);
+/* (0.8.8.9, multiarch) Packages of a foreign architecture (binary-i386): only that architecture's records
+ * ("all" ones come with the native lists), each named "name:arch" (libc6:i386), so the index keeps the
+ * two architectures apart; Provides keep their plain names. */
+int  idxb_packages_foreign(IdxBuilder *b, int src, const char *buf, size_t len, const char *arch);
 /* Translation-en: long descriptions by Description-md5. */
 int  idxb_translation(IdxBuilder *b, const char *buf, size_t len);
 /* DEP-11 Components (already decompressed YAML). */

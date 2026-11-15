@@ -8,6 +8,7 @@
  *   pkg-autoremove                  removes the dependencies left unused
  *   pkg-upgrade [--allow-remove]
  *   pkg-install-file <path.deb in the user's folder> [--allow-remove]
+ *   pkg-foreign-arch i386           (0.8.8.9) dpkg --add-architecture i386, on amd64 only
  *
  * Install = resolve (resolve.c), download the .debs (http.c, as nobody) to /var/cache/lordos/pkg,
  * verify their SHA-256 against the signed index and only then hand the files to dpkg (the only
@@ -108,6 +109,8 @@ typedef struct {
     char uri[512], suite[96];
     char comps[16][48];
     int ncomp;
+    char archs[8][16];                  /* its Architectures (arch=), when it names them */
+    int narch;
     char keys[4][512];
     int nkeys;
     char *inline_key;
@@ -151,7 +154,7 @@ static int words_sep(const char *v, size_t n, char out[][96], int max, int comma
 static int words(const char *v, size_t n, char out[][96], int max) { return words_sep(v, n, out, max, 0); }
 
 static void add_source(Source *src, int *ns, const char *uri, const char *suite, char comps[][96], int nc,
-                       const char *signed_by, size_t sblen) {
+                       const char *signed_by, size_t sblen, char archs[][96], int na) {
     if (*ns >= MAX_SOURCES) return;
     Source *s = &src[*ns];
     memset(s, 0, sizeof *s);
@@ -160,6 +163,7 @@ static void add_source(Source *src, int *ns, const char *uri, const char *suite,
     if (strchr(suite, '/') || !suite[0]) { admin_log("pkg.flatRepo", "uri", uri, "suite", suite, NULL); return; }
     snprintf(s->suite, sizeof s->suite, "%s", suite);
     for (int i = 0; i < nc && i < 16; i++) snprintf(s->comps[s->ncomp++], sizeof s->comps[0], "%s", comps[i]);
+    for (int i = 0; i < na && i < 8; i++) if (strlen(archs[i]) < sizeof s->archs[0]) snprintf(s->archs[s->narch++], sizeof s->archs[0], "%s", archs[i]);
     if (sblen) {
         if (memchr(signed_by, '\n', sblen) || (sblen > 5 && !strncmp(signed_by, "-----", 5))) {
             /* inline key (deb822): strip each line's leading space and " ." = empty line */
@@ -213,7 +217,7 @@ static void parse_deb822(const char *buf, size_t len, Source *src, int *ns, cons
         for (int i = 0; i < na; i++) if (!strcmp(archs[i], arch)) arch_ok = 1;
         if (!deb || !enabled || !arch_ok) continue;
         for (int u = 0; u < nu; u++)
-            for (int s = 0; s < nsu; s++) add_source(src, ns, uris[u], suites[s], comps, nc, sb, sbl);
+            for (int s = 0; s < nsu; s++) add_source(src, ns, uris[u], suites[s], comps, nc, sb, sbl, archs, na);
     }
 }
 
@@ -231,28 +235,31 @@ static void parse_list(const char *buf, size_t len, Source *src, int *ns, const 
         while (isspace((unsigned char)*s)) s++;
         if (strncmp(s, "deb", 3) || !isspace((unsigned char)s[3])) continue;
         s += 4;
-        char signed_by[512] = "";
-        int arch_ok = 1;
+        char signed_by[512] = "", archs[8][96];
+        int arch_ok = 1, na = 0;
         while (isspace((unsigned char)*s)) s++;
         if (*s == '[') {
             char *close = strchr(s, ']');
             if (!close) continue;
             *close = 0;
-            char *tok = strtok(s + 1, " \t");
+            char *osave = NULL, *tok = strtok_r(s + 1, " \t", &osave);
             while (tok) {
                 if (!strncmp(tok, "signed-by=", 10)) snprintf(signed_by, sizeof signed_by, "%s", tok + 10);
                 else if (!strncmp(tok, "arch=", 5)) {
                     arch_ok = 0;
-                    for (char *a = strtok(tok + 5, ","); a; a = strtok(NULL, ",")) if (!strcmp(a, arch)) arch_ok = 1;
+                    for (char *asave = NULL, *a = strtok_r(tok + 5, ",", &asave); a; a = strtok_r(NULL, ",", &asave)) {
+                        if (!strcmp(a, arch)) arch_ok = 1;
+                        if (na < 8) snprintf(archs[na++], sizeof archs[0], "%.95s", a);
+                    }
                 }
-                tok = strtok(NULL, " \t");
+                tok = strtok_r(NULL, " \t", &osave);   /* strtok_r: the arch= list no longer cuts the options after it (signed-by=) */
             }
             s = close + 1;
         }
         char w[20][96];
         int k = words(s, strlen(s), w, 20);
         if (k < 2 || !arch_ok) continue;
-        add_source(src, ns, w[0], w[1], w + 2, k - 2, signed_by, strlen(signed_by));
+        add_source(src, ns, w[0], w[1], w + 2, k - 2, signed_by, strlen(signed_by), archs, na);
     }
 }
 
@@ -295,7 +302,7 @@ typedef struct { char path[160]; uint8_t sha[32]; uint64_t size; } RelFile;
 
 typedef struct {
     char suite[96], codename[96], origin[96], label[96];
-    char comps[256];
+    char comps[256], archs[256];
     int64_t date, valid_until;
     int not_auto, but_auto, by_hash, no_all;
     RelFile *files;
@@ -314,6 +321,7 @@ static int parse_release(const char *body, size_t len, Release *r) {
         else if (d822_is(&f, "Origin")) snprintf(r->origin, sizeof r->origin, "%.95s", v);
         else if (d822_is(&f, "Label")) snprintf(r->label, sizeof r->label, "%.95s", v);
         else if (d822_is(&f, "Components")) snprintf(r->comps, sizeof r->comps, "%s", v);
+        else if (d822_is(&f, "Architectures")) snprintf(r->archs, sizeof r->archs, "%s", v);
         else if (d822_is(&f, "Date")) r->date = http_parse_date(v);
         else if (d822_is(&f, "Valid-Until")) r->valid_until = http_parse_date(v);
         else if (d822_is(&f, "NotAutomatic")) r->not_auto = !strcmp(v, "yes");
@@ -483,7 +491,7 @@ static void write_featured(const uint8_t *feat, size_t fl, const uint8_t *img, s
     write_one(PKG_DIR "/featured.png", PKG_DIR "/.featured.png.new", feat ? img : NULL, il);
 }
 
-typedef struct { char path[PATH_MAX]; char ext[4]; int kind, src; char comp[48]; } Wanted;   /* kind 0 Packages, 1 Translation, 2 DEP-11, 3 icons, 4 release notes, 5 featured, 6 banner */
+typedef struct { char path[PATH_MAX]; char ext[4]; int kind, src; char comp[48]; char farch[8]; } Wanted;   /* kind 0 Packages, 1 Translation, 2 DEP-11, 3 icons, 4 release notes, 5 featured, 6 banner; farch: a foreign architecture's Packages */
 
 static int file_ok(const char *path, uint64_t size) {
     struct stat st;
@@ -502,6 +510,8 @@ static void wanted_sum(const Wanted *w, int nw, char hex[65]) {
         sha256_update(&s, w[k].path, strlen(w[k].path));
         sha256_update(&s, " ", 1);
         sha256_update(&s, w[k].comp, strlen(w[k].comp));
+        sha256_update(&s, " ", 1);
+        sha256_update(&s, w[k].farch, strlen(w[k].farch));
         sha256_update(&s, "\n", 1);
     }
     sha256_final(&s, d);
@@ -547,12 +557,30 @@ static void gc_lists(Wanted *w, int nw, Source *src, int ns) {
     if (d) closedir(d);
 }
 
+/* (0.8.8.9, multiarch) Does source i serve i386 lists LordOS should read? Only when i386 is enabled (dpkg's
+ * list, amd64 only), and either the source names its architectures and i386 is one of them (Valve's
+ * arch=amd64,i386), or it names none and is Debian's own archive whose signed Release lists i386: a
+ * vendor repository the catalog adds always names its architectures, so it never brings i386 unasked. */
+static int wants_i386(const Source *s, const Release *r) {
+    if (s->narch) {
+        for (int i = 0; i < s->narch; i++) if (!strcmp(s->archs[i], "i386")) return 1;
+        return 0;
+    }
+    if (strcmp(r->origin, "Debian")) return 0;
+    char a[256];
+    snprintf(a, sizeof a, "%s", r->archs);
+    for (char *t = strtok(a, " \t"); t; t = strtok(NULL, " \t")) if (!strcmp(t, "i386")) return 1;
+    return 0;
+}
+
 void pkg_act_update(const AdminReq *r, const char *arg, size_t len) {
     (void)r; (void)arg; (void)len;
     int lk = lock_pkg();
     if (lk == -2) { admin_err("pkg.busy", NULL); return; }
     if (lk < 0 || mkdirs(LISTS, 0755) || mkdirs(LISTS "/partial", 0755) || mkdirs(ICONS, 0755)) { admin_err("pkg.prepareFailed", "path", PKG_DIR, NULL); return; }
+    pkg_sources_handover("");           /* a vendor's own source replaced LordOS's bootstrap one: never both */
     const char *arch = pkg_native_arch();
+    int i386 = pkg_i386_enabled();
     Source *src = calloc(MAX_SOURCES, sizeof *src);
     if (!src) { admin_err("sys.outOfMemory", NULL); return; }
     int ns = load_sources(src, arch);
@@ -663,6 +691,24 @@ void pkg_act_update(const AdminReq *r, const char *arg, size_t len) {
                         y->kind = 0;
                         y->src = i;
                         snprintf(y->comp, sizeof y->comp, "%s", src[i].comps[c]);
+                    }
+                }
+                if (k == 0 && i386 && wants_i386(&src[i], &R[i])) {   /* (multiarch) i386 Packages, verified the same way */
+                    snprintf(base, sizeof base, "%s/binary-i386/Packages", src[i].comps[c]);
+                    const RelFile *fi = rel_pick(&R[i], base, &ext);
+                    Wanted *nwi = fi ? realloc(w, sizeof *w * (size_t)(nw + 1)) : NULL;
+                    if (!fi) admin_log("pkg.sourceMissingFile", "uri", src[i].uri, "suite", src[i].suite, "file", base, NULL);
+                    if (nwi) {
+                        w = nwi;
+                        Wanted *y = &w[nw++];
+                        memset(y, 0, sizeof *y);
+                        hex_encode(fi->sha, 32, hex);
+                        snprintf(y->path, sizeof y->path, LISTS "/%s%s", hex, ext);
+                        snprintf(y->ext, sizeof y->ext, "%s", ext);
+                        y->kind = 0;
+                        y->src = i;
+                        snprintf(y->comp, sizeof y->comp, "%s", src[i].comps[c]);
+                        snprintf(y->farch, sizeof y->farch, "i386");
                     }
                 }
             }
@@ -802,7 +848,8 @@ void pkg_act_update(const AdminReq *r, const char *arg, size_t len) {
                 if (pass == 0) { pk_missing++; admin_log("pkg.componentMissing", "component", x->comp, "suite", src[x->src].suite, NULL); }
                 continue;
             }
-            if (pass == 0) { idxb_packages(b, srcid[x->src], (char *)d, dl, arch); pk_files++; }
+            if (pass == 0 && x->farch[0]) idxb_packages_foreign(b, srcid[x->src], (char *)d, dl, x->farch);
+            else if (pass == 0) { idxb_packages(b, srcid[x->src], (char *)d, dl, arch); pk_files++; }
             else if (pass == 1) idxb_translation(b, (char *)d, dl);
             else idxb_appstream(b, (char *)d, dl);
             free(d);
@@ -930,7 +977,7 @@ static int parse_names(const char *arg, size_t len, char names[][129], int max, 
         else if (!strcmp(tok, "--cascade")) *flags |= 4;
         else if (!strcmp(tok, "--purge")) *flags |= 8;
         else if (!strcmp(tok, "--keep-orphans")) *flags |= 16;
-        else if (deb_valid_name(tok, strlen(tok)) && *nn < max) snprintf(names[(*nn)++], 129, "%s", tok);
+        else if (deb_valid_pkgarg(tok, strlen(tok)) && strlen(tok) < 129 && *nn < max) snprintf(names[(*nn)++], 129, "%s", tok);
         else { { char nm[64]; snprintf(nm, sizeof nm, "%.60s", tok); admin_err("pkg.invalidName", "name", nm, NULL); } return -1; }
     }
     return 0;
@@ -987,7 +1034,7 @@ static void browser_defaults(const char *name) {
 
 /* Downloads, verifies and installs the plan's contents; extra: local .deb to add at the end (or NULL),
  * extra_name: its package name. */
-static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_deb, const char *extra_name) {
+static int apply_plan(const Idx *x, const Status *st, const Plan *p, int purge, const char *extra_deb, const char *extra_name) {
     int ninst = 0, nrem = 0;
     for (int i = 0; i < p->n; i++) { if (p->items[i].rec >= 0) ninst++; else if (p->items[i].action == PA_REMOVE) nrem++; }
     if (!ninst && !nrem && !extra_deb) { admin_ok("pkg.nothingToDo", NULL); return 0; }
@@ -1038,14 +1085,29 @@ static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_
     int rc = 0;
     if (nrem) {
         const char **argv = calloc((size_t)nrem + 4, sizeof *argv);
-        int a = 0;
+        /* (multiarch) a native package whose i386 one is installed too is named with its architecture
+         * ("libfoo:amd64"): dpkg refuses a name two installed packages share */
+        char (*qual)[160] = calloc((size_t)nrem + 1, sizeof *qual);
+        int a = 0, nq = 0;
         argv[a++] = "/usr/bin/dpkg";
         argv[a++] = purge ? "--purge" : "--remove";
-        for (int i = 0; i < p->n; i++) if (p->items[i].action == PA_REMOVE) argv[a++] = p->items[i].name;
-        argv[a] = NULL;
+        for (int i = 0; argv && qual && i < p->n; i++) {
+            if (p->items[i].action != PA_REMOVE) continue;
+            const char *nm = p->items[i].name;
+            char fk[160];
+            const StPkg *ip = strchr(nm, ':') ? NULL : status_find(st, nm, strlen(nm));
+            snprintf(fk, sizeof fk, "%s:" DEB_FOREIGN_ARCH, nm);
+            if (ip && ip->arch[0] && strcmp(ip->arch, "all") && status_find(st, fk, strlen(fk))) {
+                snprintf(qual[nq], sizeof qual[0], "%s:%s", nm, ip->arch);
+                nm = qual[nq++];
+            }
+            argv[a++] = nm;
+        }
+        if (argv) argv[a] = NULL;
         DpkgProgress rp = { 0, 0, 0, nrem };
-        rc = run_dpkg(argv, &rp);
+        rc = argv && qual ? run_dpkg(argv, &rp) : -1;
         free(argv);
+        free(qual);
         if (rc) admin_log("pkg.dpkgRemoveExit", "code", lerr_int(rc), NULL);
     }
     if (!rc && (ninst || extra_deb)) {
@@ -1075,6 +1137,7 @@ static int apply_plan(const Idx *x, const Plan *p, int purge, const char *extra_
         free(group);
     }
     close(lk);
+    pkg_sources_handover("");           /* a vendor package that now has its own source: LordOS's bootstrap one goes */
     if (rc) {
         admin_err("pkg.dpkgFailed", "code", lerr_int(rc), NULL);
         free(files);
@@ -1118,7 +1181,7 @@ static void auto_load(AutoList *a) {
     for (char *p = a->buf; a->v && p && *p;) {
         char *nl = strchr(p, '\n');
         if (nl) *nl = 0;
-        if (*p && deb_valid_name(p, strlen(p)) && a->n < cap) a->v[a->n++] = p;
+        if (*p && deb_valid_pkgarg(p, strlen(p)) && a->n < cap) a->v[a->n++] = p;
         p = nl ? nl + 1 : NULL;
     }
 }
@@ -1145,7 +1208,7 @@ static void run_plan_action(const char *const *ins, int ni, const char *const *r
     else if (!p.n && o->orphans && !ni && !nr) admin_ok("pkg.nothingToRemove", NULL);
     else {
         admin_say("LOG", "plan total %llu %lld", (unsigned long long)p.download, (long long)p.isize_delta);   /* i18n-ok: protocol line parsed by apps/store */
-        apply_plan(&x, &p, purge, NULL, NULL);
+        apply_plan(&x, &st, &p, purge, NULL, NULL);
     }
     plan_free(&p);
     status_free(&st);
@@ -1192,6 +1255,33 @@ void pkg_act_upgrade(const AdminReq *r, const char *arg, size_t len) {
     if (parse_names(arg, len, names, 0, &n, &flags)) return;
     PlanOpts o = { .upgrade_all = 1, .allow_remove = (flags & 2) != 0 };
     run_plan_action(NULL, 0, NULL, 0, &o, 0);
+}
+
+/* ---- i386 multiarch (0.8.8.9) ---- */
+
+/* pkg-foreign-arch i386: lets dpkg install i386 packages next to the amd64 ones (Steam's 32-bit libraries;
+ * docs/PACKAGES.md, "Multiarch"). The argument must be exactly "i386", on an amd64 system; it runs only the
+ * fixed /usr/bin/dpkg --add-architecture i386, under the same locks as an installation, and does nothing
+ * when i386 is already there. Removing the architecture is not offered. */
+void pkg_act_foreign_arch(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    while (len && (arg[len - 1] == '\n' || arg[len - 1] == ' ')) len--;
+    if (len != 4 || memcmp(arg, "i386", 4)) { admin_err("admin.invalidArgument", NULL); return; }
+    const char *native = pkg_native_arch();
+    if (strcmp(native, "amd64")) { admin_err("pkg.foreignArchUnsupported", "arch", native, NULL); return; }
+    if (pkg_i386_enabled()) { admin_ok("pkg.foreignArchPresent", "arch", "i386", NULL); return; }
+    int lk = lock_pkg();
+    if (lk == -2) { admin_err("pkg.busy", NULL); return; }
+    if (lk < 0) { admin_err("pkg.prepareFailed", "path", PKG_DIR, NULL); return; }
+    int dl = lock_dpkg();
+    if (dl < 0) { close(lk); admin_err(dl == -2 ? "pkg.dpkgBusy" : "pkg.dpkgLockFailed", NULL); return; }
+    const char *const argv[] = { "/usr/bin/dpkg", "--add-architecture", "i386", NULL };
+    int rc = run_dpkg(argv, NULL);
+    close(dl);
+    close(lk);
+    if (rc || !pkg_i386_enabled()) { admin_err("pkg.foreignArchFailed", "arch", "i386", "code", lerr_int(rc), NULL); return; }
+    admin_event("pkg changed");
+    admin_ok("pkg.foreignArchAdded", "arch", "i386", NULL);
 }
 
 /* ---- local .deb ---- */
@@ -1404,7 +1494,7 @@ void pkg_act_install_file(const AdminReq *r, const char *arg, size_t len) {
         say_plan(&p, &x);
         admin_say("LOG", "plan install %s %s %llu", dc.name, dc.version, (unsigned long long)dl);   /* i18n-ok: protocol line parsed by apps/store */
         if (!p.ok) admin_say("ERR", "%s", p.err);   /* i18n-ok: already a code line */
-        else apply_plan(&x, &p, 0, dest, dc.name);
+        else apply_plan(&x, &st, &p, 0, dest, dc.name);
         plan_free(&p);
     }
     unlink(dest);

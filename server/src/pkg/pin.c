@@ -305,10 +305,14 @@ int pin_priority(const PinSet *set, const Idx *x, long rec) {
     int dflt = (int)x->src[k->src].prio;
     if (!set) return dflt;
     const char *name = idx_s(x, k->name), *source = idx_s(x, k->source);
+    /* (multiarch) "libc6:i386" is pinned as "libc6", as apt does, or by its own "libc6:i386" */
+    char base[200];
+    const char *colon = strchr(name, ':');
+    snprintf(base, sizeof base, "%.*s", (int)(colon ? (size_t)(colon - name) : strlen(name)), name);
     /* the first specific pin naming the package decides, for the versions it matches */
     for (int i = 0; i < set->n; i++) {
         const Pin *p = &set->pin[i];
-        if (p->general || !pkg_matches(p, name, source)) continue;
+        if (p->general || (!pkg_matches(p, base, source) && (!colon || !pkg_matches(p, name, source)))) continue;
         if (pin_matches(p, x, rec)) return p->prio;
         break;
     }

@@ -8,7 +8,16 @@
  * a fixed budget. Conflicts (Conflicts/Breaks, in both directions) are resolved by
  * upgrading the other package if its new version no longer clashes, and otherwise removing it;
  * removals that weren't requested need confirmation (allow_remove/cascade). At the end everything
- * that changed and whatever depends on it is reviewed until nothing else changes. */
+ * that changed and whatever depends on it is reviewed until nothing else changes.
+ *
+ * (0.8.8.9) Multiarch: a foreign architecture's package is its own node, keyed "name:i386" in the index
+ * and in dpkg's status. A relation is read in its owner's architecture, as dpkg does: an unqualified
+ * Depends is satisfied by the same architecture, or by any architecture's package that is
+ * "Multi-Arch: foreign"; "name:any" also by a "Multi-Arch: allowed" one; "name:native" and "name:i386"
+ * name one architecture. Conflicts and Breaks without a qualifier apply to every architecture, except
+ * the owner's own package in the other one. The two architectures of one package can only be present
+ * together when both are "Multi-Arch: same", and then always at the same version: changing one moves
+ * the other with it, and a plan that would split them is refused (pkg.multiarchSplit). */
 #include "resolve.h"
 #include "deb.h"
 #include "../errcode.h"
@@ -23,8 +32,8 @@
 #define BUDGET 4000
 
 typedef struct {
-    const char *name;
-    size_t nlen;
+    const char *name;                   /* the key: "libc6", "libc6:i386" */
+    size_t nlen, blen;                  /* blen: without ":arch" */
     const StPkg *inst;
     long cand, target;
     uint8_t requested, remove_req, touched, orphan, mark;
@@ -52,8 +61,13 @@ typedef struct {
     Ref *prov, *rdep, *conf;            /* from what's installed: provides, depends on, conflicts with */
     int nprov, nrdep, nconf;
     int budget, may_remove;
+    int ma;                             /* multiarch in play: a foreign package is installed or indexed */
+    int pair_block;                     /* the last option gather() left out only for its other architecture, or -1 */
+    const char *native;                 /* the native architecture's name */
     char err[512];
 } S;
+
+#define FSUF ":" DEB_FOREIGN_ARCH       /* the foreign architecture's key suffix */
 
 /* ---- nodes ---- */
 
@@ -122,8 +136,9 @@ static int node_get(S *s, const char *name, size_t n) {
     Node *e = nd(s, s->nn);
     memset(e, 0, sizeof *e);
     e->inst = status_find(s->st, name, n);
-    e->name = e->inst ? e->inst->name : name;          /* a stable pointer */
+    e->name = e->inst ? e->inst->key : name;           /* a stable pointer */
     e->nlen = n;
+    e->blen = deb_base_len(name, n);
     if (!e->inst) {
         long f = idx_find(s->x, name, n);
         if (f >= 0) e->name = idx_s(s->x, s->x->pkg[f].name);
@@ -140,6 +155,106 @@ static const char *node_ver(const S *s, const Node *n) {
     if (n->target == T_KEEP) return n->inst->version;
     if (n->target >= 0) return idx_s(s->x, s->x->pkg[n->target].version);
     return NULL;
+}
+
+/* ---- multiarch ---- */
+
+/* The node's architecture suffix: "" for the native one (and "all"), ":i386" for a foreign one. */
+static const char *suffix(const S *s, int i, size_t *len) {
+    if (i < 0) { *len = 0; return ""; }
+    const Node *n = nd(s, i);
+    *len = n->nlen - n->blen;
+    return n->name + n->blen;
+}
+
+/* The node of package base in the architecture of suffix suf ("" native, ":i386"); for a foreign one,
+ * -1 when nothing installed or indexed has that name (no node is made for it). */
+static int node_in(S *s, const char *base, size_t blen, const char *suf, size_t slen) {
+    if (!slen) return node_get(s, base, blen);
+    char k[256];
+    if (blen + slen >= sizeof k) return -1;
+    memcpy(k, base, blen);
+    memcpy(k + blen, suf, slen);
+    if (!status_find(s->st, k, blen + slen) && idx_find(s->x, k, blen + slen) < 0) return -1;
+    return node_get(s, k, blen + slen);
+}
+
+/* The same package in the other architecture (native <-> i386), or -1. */
+static int sibling(S *s, int i) {
+    if (!s->ma) return -1;
+    Node *n = nd(s, i);
+    if (n->nlen > n->blen) return node_in(s, n->name, n->blen, "", 0);
+    return node_in(s, n->name, n->blen, FSUF, strlen(FSUF));
+}
+
+/* Multi-Arch flags of the version a node has in the plan (installed, or the record it goes to). */
+static uint8_t pflags(const S *s, const Node *n) {
+    if (n->target >= 0) return s->x->pkg[n->target].flags;
+    if (n->target == T_KEEP && n->inst) return n->inst->flags;
+    return 0;
+}
+
+/* Does the qualifier of r name the architecture of suffix cs? */
+static int qual_is(const S *s, const DebRel *r, const char *cs, size_t csl) {
+    if (!csl) return r->alen == strlen(s->native) && !memcmp(r->arch, s->native, r->alen);
+    return r->alen == csl - 1 && !memcmp(r->arch, cs + 1, r->alen);
+}
+
+/* May package node `cand` (whose version in question has Multi-Arch `flags`) satisfy relation r of
+ * `owner` (-1: a request, read as native)? conflicts: r is a Conflicts or Breaks (dpkg: unqualified, every
+ * architecture; never the owner's own package in another architecture). */
+static int arch_ok(const S *s, int owner, const DebRel *r, int cand, uint8_t flags, int conflicts) {
+    size_t osl, csl;
+    const char *os = suffix(s, owner, &osl), *cs = suffix(s, cand, &csl);
+    int same = osl == csl && !memcmp(os, cs, osl);
+    int any = r->alen == 3 && !memcmp(r->arch, "any", 3), nat = r->alen == 6 && !memcmp(r->arch, "native", 6);
+    if (conflicts) {
+        if (owner >= 0 && cand != owner && nd(s, owner)->blen == nd(s, cand)->blen &&
+            !memcmp(nd(s, owner)->name, nd(s, cand)->name, nd(s, cand)->blen)) return 0;
+        if (!r->alen || any) return 1;
+        return nat ? !csl : qual_is(s, r, cs, csl);
+    }
+    if (!r->alen) return same || (flags & IF_MA_FOREIGN);
+    if (any) return same || (flags & (IF_MA_ALLOWED | IF_MA_FOREIGN));
+    if (nat) return !csl;
+    return qual_is(s, r, cs, csl);
+}
+
+/* The nodes named by r's package (not its providers) for owner: its architecture's first, then the
+ * other one's (a foreign owner first takes a native "Multi-Arch: foreign" package, as apt does). */
+static int rel_nodes(S *s, int owner, const DebRel *r, int out[2]) {
+    size_t osl;
+    const char *os = suffix(s, owner, &osl);
+    int n = 0;
+    if (r->alen && !(r->alen == 3 && !memcmp(r->arch, "any", 3))) {
+        if ((r->alen == 6 && !memcmp(r->arch, "native", 6)) || (r->alen == strlen(s->native) && !memcmp(r->arch, s->native, r->alen)))
+            out[n++] = node_get(s, r->name, r->nlen);
+        else if (s->ma && r->alen == strlen(DEB_FOREIGN_ARCH) && !memcmp(r->arch, DEB_FOREIGN_ARCH, r->alen))
+            out[n++] = node_in(s, r->name, r->nlen, FSUF, strlen(FSUF));
+        return n;
+    }
+    out[n++] = node_in(s, r->name, r->nlen, os, osl);
+    if (s->ma) out[n++] = osl ? node_get(s, r->name, r->nlen) : node_in(s, r->name, r->nlen, FSUF, strlen(FSUF));
+    if (n == 2 && osl && out[1] >= 0 && nd(s, out[1])->cand >= 0 && (s->x->pkg[nd(s, out[1])->cand].flags & IF_MA_FOREIGN)) {
+        int t = out[0]; out[0] = out[1]; out[1] = t;
+    }
+    return n;
+}
+
+/* The record of node n's package at exactly version v (any source not pinned below 0), or -1. */
+static long rec_at(const S *s, const Node *n, const char *v) {
+    long first = idx_find(s->x, n->name, n->nlen);
+    for (long i = first; i >= 0 && i < (long)s->x->h->npkg && s->x->pkg[i].name == s->x->pkg[first].name; i++)
+        if (!strcmp(idx_s(s->x, s->x->pkg[i].version), v) && idx_prio(s->x, i) >= 0) return i;
+    return -1;
+}
+
+/* Could record rec of node ni sit next to its other architecture as the plan has it? Only when both are
+ * "Multi-Arch: same" (dpkg refuses any other pair). */
+static int pair_ok(S *s, int ni, long rec) {
+    int sb = sibling(s, ni);
+    if (sb < 0 || !present(nd(s, sb))) return 1;
+    return (s->x->pkg[rec].flags & IF_MA_SAME) && (pflags(s, nd(s, sb)) & IF_MA_SAME);
 }
 
 enum { F_DEPENDS, F_PREDEPENDS, F_RECOMMENDS, F_PROVIDES, F_CONFLICTS, F_BREAKS };
@@ -189,7 +304,6 @@ static int build_tables(S *s) {
     int cp = 0, cr = 0, cc = 0;
     for (int i = 0; i < s->st->n; i++) {
         const StPkg *p = &s->st->p[i];
-        if (!p->native) continue;
         if (refs_add(&s->prov, &s->nprov, &cp, p->provides, p) || refs_add(&s->rdep, &s->nrdep, &cr, p->depends, p) ||
             refs_add(&s->rdep, &s->nrdep, &cr, p->predepends, p) || refs_add(&s->conf, &s->nconf, &cc, p->conflicts, p) ||
             refs_add(&s->conf, &s->nconf, &cc, p->breaks, p)) return -1;
@@ -325,26 +439,31 @@ static int provides_match(const char *provides, const DebRel *r) {
     return 0;
 }
 
-static int rel_by_node(const S *s, const Node *n, const DebRel *r) {
-    if (!present(n)) return 0;
-    if (n->nlen == r->nlen && !memcmp(n->name, r->name, r->nlen) && ver_satisfies(node_ver(s, n), r->op, r->ver, r->vlen)) return 1;
+/* Does node ni, as the plan has it, match conflict relation r of owner? */
+static int rel_by_node(const S *s, int owner, int ni, const DebRel *r) {
+    const Node *n = nd(s, ni);
+    if (!present(n) || !arch_ok(s, owner, r, ni, pflags(s, n), 1)) return 0;
+    if (n->blen == r->nlen && !memcmp(n->name, r->name, r->nlen) && ver_satisfies(node_ver(s, n), r->op, r->ver, r->vlen)) return 1;
     return provides_match(field_of(s, n, n->target, F_PROVIDES), r);
 }
 
-/* Does any present package satisfy r? exclude: node that doesn't count (for conflicts). */
-static int who_satisfies(S *s, const DebRel *r, int exclude, int *out, int max) {
-    int found = 0;
-    int ni = node_get(s, r->name, r->nlen);
-    if (ni >= 0 && ni != exclude && present(nd(s, ni)) && ver_satisfies(node_ver(s, nd(s, ni)), r->op, r->ver, r->vlen)) {
+/* Does any present package satisfy r of owner (-1: a request)? exclude: node that doesn't count (for
+ * conflicts); conflicts: r is a Conflicts or Breaks (every architecture). */
+static int who_satisfies(S *s, int owner, const DebRel *r, int exclude, int *out, int max, int conflicts) {
+    int found = 0, c[2], nc = rel_nodes(s, owner, r, c);
+    for (int k = 0; k < nc; k++) {
+        int ni = c[k];
+        if (ni < 0 || ni == exclude || !present(nd(s, ni)) || !ver_satisfies(node_ver(s, nd(s, ni)), r->op, r->ver, r->vlen) ||
+            !arch_ok(s, owner, r, ni, pflags(s, nd(s, ni)), conflicts) || (found && out[0] == ni)) continue;
         if (found < max) out[found] = ni;
         found++;
     }
     int lo, hi;
     refs_range(s->prov, s->nprov, r->name, r->nlen, &lo, &hi);
     for (int i = lo; i < hi && found < max; i++) {
-        int pi = node_get(s, s->prov[i].p->name, strlen(s->prov[i].p->name));
-        if (pi < 0 || pi == exclude || pi == ni || nd(s, pi)->target != T_KEEP) continue;
-        if (!provides_match(nd(s, pi)->inst->provides, r)) continue;
+        int pi = node_get(s, s->prov[i].p->key, strlen(s->prov[i].p->key));
+        if (pi < 0 || pi == exclude || nd(s, pi)->target != T_KEEP) continue;
+        if (!provides_match(nd(s, pi)->inst->provides, r) || !arch_ok(s, owner, r, pi, nd(s, pi)->inst->flags, conflicts)) continue;
         int dup = 0;
         for (int k = 0; k < found; k++) if (out[k] == pi) dup = 1;
         if (!dup) out[found++] = pi;
@@ -355,8 +474,8 @@ static int who_satisfies(S *s, const DebRel *r, int exclude, int *out, int max) 
         long rec = s->x->prov[i].pkg;
         const char *pn = idx_s(s->x, s->x->pkg[rec].name);
         int pi = node_get(s, pn, strlen(pn));
-        if (pi < 0 || pi == exclude || pi == ni || nd(s, pi)->target != rec) continue;
-        if (!provides_match(idx_s(s->x, s->x->pkg[rec].provides), r)) continue;
+        if (pi < 0 || pi == exclude || nd(s, pi)->target != rec) continue;
+        if (!provides_match(idx_s(s->x, s->x->pkg[rec].provides), r) || !arch_ok(s, owner, r, pi, s->x->pkg[rec].flags, conflicts)) continue;
         int dup = 0;
         for (int k = 0; k < found; k++) if (out[k] == pi) dup = 1;
         if (!dup) out[found++] = pi;
@@ -364,9 +483,9 @@ static int who_satisfies(S *s, const DebRel *r, int exclude, int *out, int max) 
     return found;
 }
 
-static int group_ok(S *s, const DebRel *alts, int n) {
-    int who[1];
-    for (int i = 0; i < n; i++) if (who_satisfies(s, &alts[i], -1, who, 1)) return 1;
+static int group_ok(S *s, int owner, const DebRel *alts, int n) {
+    int who[2];
+    for (int i = 0; i < n; i++) if (who_satisfies(s, owner, &alts[i], -1, who, 2, 0)) return 1;
     return 0;
 }
 
@@ -389,7 +508,7 @@ static int apply_remove(S *s, int ni, const char *why) {
     const char *names[MAX_ALTS + 1];
     size_t lens[MAX_ALTS + 1];
     int nn = 0;
-    names[nn] = n->name; lens[nn++] = n->nlen;
+    names[nn] = n->name; lens[nn++] = n->blen;
     if (n->inst && n->inst->provides) {
         const char *p = n->inst->provides, *e = p + strlen(p);
         DebRel r[MAX_ALTS];
@@ -401,7 +520,7 @@ static int apply_remove(S *s, int ni, const char *why) {
         int lo, hi;
         refs_range(s->rdep, s->nrdep, names[k], lens[k], &lo, &hi);
         for (int i = lo; i < hi; i++) {
-            int di = node_get(s, s->rdep[i].p->name, strlen(s->rdep[i].p->name));
+            int di = node_get(s, s->rdep[i].p->key, strlen(s->rdep[i].p->key));
             if (di >= 0 && nd(s, di)->target == T_KEEP && enqueue_deps(s, di)) return 0;
         }
     }
@@ -417,13 +536,15 @@ static int clash(S *s, int a, long rec, int b) {
         DebRel r[MAX_ALTS];
         int k;
         while ((k = deb_next_group(&p, e, r, MAX_ALTS)) > 0)
-            for (int i = 0; i < k; i++) if (rel_by_node(s, nb, &r[i])) return 1;
+            for (int i = 0; i < k; i++) if (rel_by_node(s, a, b, &r[i])) return 1;
         /* and the other way around: what b rejects against a's version rec */
         p = field_of(s, nb, nb->target, f);
         e = p + strlen(p);
+        uint8_t af = rec == T_KEEP ? na->inst->flags : rec >= 0 ? s->x->pkg[rec].flags : 0;
         while ((k = deb_next_group(&p, e, r, MAX_ALTS)) > 0)
             for (int i = 0; i < k; i++) {
-                if (r[i].nlen == na->nlen && !memcmp(r[i].name, na->name, na->nlen)) {
+                if (!arch_ok(s, b, &r[i], a, af, 1)) continue;
+                if (r[i].nlen == na->blen && !memcmp(r[i].name, na->name, na->blen)) {
                     const char *v = rec == T_KEEP ? na->inst->version : idx_s(s->x, s->x->pkg[rec].version);
                     if (ver_satisfies(v, r[i].op, r[i].ver, r[i].vlen)) return 1;
                 }
@@ -452,13 +573,41 @@ static int fix_clash(S *s, int ni, int ti) {
     return 0;
 }
 
+/* A plan error naming a package by its name without the architecture. */
+static void err_base(S *s, const char *code, const Node *n) {
+    char b[160];
+    snprintf(b, sizeof b, "%.*s", (int)(n->blen < 150 ? n->blen : 150), n->name);
+    lerr_set(s->err, sizeof s->err, code, "name", b, NULL);
+}
+
 static int apply_install(S *s, int ni, long rec, const char *why) {
     Node *n = nd(s, ni);
     if (n->remove_req) { lerr_set(s->err, sizeof s->err, "pkg.neededButRemoved", "name", n->name, NULL); return 0; }
+    /* multiarch: the other architecture of this package, if the plan has it */
+    int sb = sibling(s, ni), cmp = 0;
+    if (sb >= 0 && present(nd(s, sb))) {
+        Node *b = nd(s, sb);
+        if (!(s->x->pkg[rec].flags & IF_MA_SAME) || !(pflags(s, b) & IF_MA_SAME)) { err_base(s, "pkg.multiarchConflict", n); return 0; }
+        const char *bv = node_ver(s, b);
+        cmp = ver_cmp(idx_s(s->x, s->x->pkg[rec].version), bv);
+        if (cmp < 0) {                  /* never moves the other one down: this one goes to its version instead */
+            long r2 = rec_at(s, n, bv);
+            if (r2 >= 0 && (!n->inst || ver_cmp(bv, n->inst->version) >= 0)) { rec = r2; cmp = 0; }
+            else { err_base(s, "pkg.multiarchSplit", n); return 0; }
+        }
+    }
     if (mark(s, ni)) return 0;
     n->target = rec;
     n->touched = 1;
     if (!n->requested && why) snprintf(n->reason, sizeof n->reason, "%s", why);
+    if (cmp > 0) {                      /* the other architecture moves up to the same version, in the same plan */
+        Node *b = nd(s, sb);
+        long r2 = rec_at(s, b, idx_s(s->x, s->x->pkg[rec].version));
+        char w[200];
+        lerr_set(w, sizeof w, "pkg.why.multiarchPair", "name", n->name, NULL);
+        if (r2 < 0 || b->remove_req) { err_base(s, "pkg.multiarchSplit", n); return 0; }
+        if (b->target != r2 && !apply_install(s, sb, r2, w)) return 0;
+    }
     if (enqueue_deps(s, ni)) return 0;
     /* conflicts with everything present named in its Conflicts/Breaks */
     for (int f = F_CONFLICTS; f <= F_BREAKS; f++) {
@@ -468,7 +617,7 @@ static int apply_install(S *s, int ni, long rec, const char *why) {
         while ((k = deb_next_group(&p, e, r, MAX_ALTS)) > 0)
             for (int i = 0; i < k; i++) {
                 int who[16];
-                int c = who_satisfies(s, &r[i], ni, who, 16);
+                int c = who_satisfies(s, ni, &r[i], ni, who, 16, 1);
                 for (int w = 0; w < c && w < 16; w++)
                     if (nd(s, ni)->target == rec && present(nd(s, who[w])) && clash(s, ni, rec, who[w]) && !fix_clash(s, ni, who[w])) return 0;
             }
@@ -477,7 +626,7 @@ static int apply_install(S *s, int ni, long rec, const char *why) {
     const char *names[MAX_ALTS + 1];
     size_t lens[MAX_ALTS + 1];
     int nn = 0;
-    names[nn] = n->name; lens[nn++] = n->nlen;
+    names[nn] = n->name; lens[nn++] = n->blen;
     {
         const char *p = idx_s(s->x, s->x->pkg[rec].provides), *e = p + strlen(p);
         DebRel r[MAX_ALTS];
@@ -489,7 +638,7 @@ static int apply_install(S *s, int ni, long rec, const char *why) {
         int lo, hi;
         refs_range(s->conf, s->nconf, names[k], lens[k], &lo, &hi);
         for (int i = lo; i < hi; i++) {
-            int ti = node_get(s, s->conf[i].p->name, strlen(s->conf[i].p->name));
+            int ti = node_get(s, s->conf[i].p->key, strlen(s->conf[i].p->key));
             if (ti < 0 || ti == ni || nd(s, ti)->target != T_KEEP) continue;
             if (nd(s, ni)->target == rec && clash(s, ni, rec, ti) && !fix_clash(s, ni, ti)) return 0;
         }
@@ -509,27 +658,35 @@ static int prov_rank(const S *s, long rec) {
     return p ? p : 9;
 }
 
-static int gather(S *s, const DebRel *alts, int n, Opt *opt, int max) {
+static int gather(S *s, int owner, const DebRel *alts, int n, Opt *opt, int max) {
     int k = 0;
     for (int a = 0; a < n && k < max; a++) {
-        int ni = node_get(s, alts[a].name, alts[a].nlen);
-        if (ni < 0) continue;
-        Node *an = nd(s, ni);
-        /* what this same operation removed isn't installed again */
-        if (an->cand >= 0 && !an->remove_req && an->target != an->cand && !(an->inst && an->target == T_NONE) &&
-            ver_satisfies(idx_s(s->x, s->x->pkg[an->cand].version), alts[a].op, alts[a].ver, alts[a].vlen))
-            opt[k++] = (Opt){ ni, an->cand };
+        int c[2], nc = rel_nodes(s, owner, &alts[a], c);
+        for (int j = 0; j < nc && k < max; j++) {
+            int ni = c[j];
+            if (ni < 0) continue;
+            Node *an = nd(s, ni);
+            /* what this same operation removed isn't installed again */
+            if (an->cand >= 0 && !an->remove_req && an->target != an->cand && !(an->inst && an->target == T_NONE) &&
+                ver_satisfies(idx_s(s->x, s->x->pkg[an->cand].version), alts[a].op, alts[a].ver, alts[a].vlen) &&
+                arch_ok(s, owner, &alts[a], ni, s->x->pkg[an->cand].flags, 0)) {
+                if (pair_ok(s, ni, an->cand)) opt[k++] = (Opt){ ni, an->cand };
+                else s->pair_block = ni;
+            }
+        }
         long lo, hi;
         idx_providers(s->x, alts[a].name, alts[a].nlen, &lo, &hi);
         int first = k;
         for (long i = lo; i < hi && k < max; i++) {
             long rec = s->x->prov[i].pkg;
             const char *pn = idx_s(s->x, s->x->pkg[rec].name);
+            if (!s->ma && strchr(pn, ':')) continue;
             int pi = node_get(s, pn, strlen(pn));
             if (pi < 0) continue;
             Node *pd = nd(s, pi);
             if (pd->cand != rec || pd->remove_req || pd->target == rec || (pd->inst && pd->target == T_NONE)) continue;
-            if (!provides_match(idx_s(s->x, s->x->pkg[rec].provides), &alts[a])) continue;
+            if (!provides_match(idx_s(s->x, s->x->pkg[rec].provides), &alts[a]) || !arch_ok(s, owner, &alts[a], pi, s->x->pkg[rec].flags, 0)) continue;
+            if (!pair_ok(s, pi, rec)) { s->pair_block = pi; continue; }
             int dup = 0;
             for (int j = 0; j < k; j++) if (opt[j].node == pi) dup = 1;
             if (!dup) opt[k++] = (Opt){ pi, rec };
@@ -565,14 +722,15 @@ static int solve(S *s, int qpos) {
         DebRel alts[MAX_ALTS];
         const char *p = it.g;
         int na = deb_next_group(&p, it.ge, alts, MAX_ALTS);
-        if (na <= 0 || group_ok(s, alts, na)) continue;
+        if (na <= 0 || group_ok(s, it.node, alts, na)) continue;
         Opt opt[MAX_ALTS + 1];
         int no = 0;
         /* something installed that was left without what it needs: first, upgrade it */
         if (owner->target == T_KEEP && owner->cand >= 0 && !owner->remove_req &&
             ver_cmp(idx_s(s->x, s->x->pkg[owner->cand].version), owner->inst->version) > 0)
             opt[no++] = (Opt){ it.node, owner->cand };
-        no += gather(s, alts, na, opt + no, MAX_ALTS);
+        s->pair_block = -1;
+        no += gather(s, it.node, alts, na, opt + no, MAX_ALTS);
         char why[200];
         lerr_set(why, sizeof why, "pkg.why.dependencyOf", "name", owner->name, NULL);
         /* if nothing works and it's something installed, it's removed too (with confirmation) */
@@ -582,7 +740,8 @@ static int solve(S *s, int qpos) {
         if (!no) {
             if (it.optional) continue;
             if (can_drop) { if (!apply_remove(s, it.node, w2)) return 0; continue; }
-            describe_missing(s, owner, it.g, it.ge);
+            if (s->pair_block >= 0) err_base(s, "pkg.multiarchConflict", nd(s, s->pair_block));   /* only its other architecture is in the way */
+            else describe_missing(s, owner, it.g, it.ge);
             return 0;
         }
         /* a single option and nothing else to try: no backtracking. If removing the owner is another
@@ -621,9 +780,9 @@ static int settle(S *s) {
             if (present(n) && enqueue_deps(s, i)) return 0;
             if (n->inst) {
                 int lo, hi;
-                refs_range(s->rdep, s->nrdep, n->name, n->nlen, &lo, &hi);
+                refs_range(s->rdep, s->nrdep, n->name, n->blen, &lo, &hi);
                 for (int k = lo; k < hi; k++) {
-                    int di = node_get(s, s->rdep[k].p->name, strlen(s->rdep[k].p->name));
+                    int di = node_get(s, s->rdep[k].p->key, strlen(s->rdep[k].p->key));
                     if (di >= 0 && nd(s, di)->target == T_KEEP && enqueue_deps(s, di)) return 0;
                 }
             }
@@ -651,8 +810,7 @@ static void mark_orphans(S *s) {
     for (int i = 0; i < s->nn; i++) nd(s, i)->mark = 0;
     for (int i = 0; i < s->st->n; i++) {
         const StPkg *p = &s->st->p[i];
-        if (!p->native) continue;
-        int k = node_get(s, p->name, strlen(p->name));
+        int k = node_get(s, p->key, strlen(p->key));
         if (k < 0) continue;
         Node *n = nd(s, k);
         if (present(n) && (!is_auto(s->o, n->name) || !removable(n) || n->target >= 0)) { n->mark = 1; stack[sp++] = k; }
@@ -669,7 +827,7 @@ static void mark_orphans(S *s) {
             while ((c = deb_next_group(&p, e, r, MAX_ALTS)) > 0)
                 for (int j = 0; j < c; j++) {
                     int who[16];
-                    int w = who_satisfies(s, &r[j], -1, who, 16);
+                    int w = who_satisfies(s, k, &r[j], -1, who, 16, 0);
                     for (int q = 0; q < w && q < 16; q++) {
                         Node *d = nd(s, who[q]);
                         if (d->mark) continue;
@@ -696,6 +854,24 @@ static void mark_orphans(S *s) {
     }
 }
 
+/* The last check before a plan is accepted: every package whose two architectures are present after it,
+ * and that this plan changes, is "Multi-Arch: same" in both at the same version. */
+static int pairs_ok(S *s) {
+    if (!s->ma) return 1;
+    int nn = s->nn;                     /* sibling() may add nodes; those aren't touched */
+    for (int i = 0; i < nn; i++) {
+        Node *n = nd(s, i);
+        if (!n->touched || !present(n)) continue;
+        int sb = sibling(s, i);
+        if (sb < 0 || !present(nd(s, sb))) continue;
+        n = nd(s, i);
+        Node *b = nd(s, sb);
+        if (!(pflags(s, n) & IF_MA_SAME) || !(pflags(s, b) & IF_MA_SAME)) { err_base(s, "pkg.multiarchConflict", n); return 0; }
+        if (strcmp(node_ver(s, n), node_ver(s, b))) { err_base(s, "pkg.multiarchSplit", n); return 0; }
+    }
+    return 1;
+}
+
 /* ---- plan ---- */
 
 static int item_cmp(const void *a, const void *b) {
@@ -719,6 +895,11 @@ int plan_make(const Idx *x, const Status *st, const char *const *install, int ni
     s.o = o;
     s.budget = BUDGET;
     s.may_remove = 1;                   /* the extra removals are computed and then confirmed */
+    s.pair_block = -1;
+    s.native = x->map && x->h->arch[0] ? x->h->arch : pkg_native_arch();
+    /* multiarch is in play when a foreign package is installed or indexed (else nothing changes) */
+    for (int i = 0; i < st->n && !s.ma; i++) if (!st->p[i].native) s.ma = 1;
+    for (long i = 0; x->map && i < (long)x->h->npkg && !s.ma; i++) if (strchr(idx_s(x, x->pkg[i].name), ':')) s.ma = 1;
     int ok = !build_tables(&s);
     if (!ok) lerr_set(s.err, sizeof s.err, "sys.outOfMemory", NULL);
     if (!x->map && (ni || o->upgrade_all)) { ok = 0; lerr_set(s.err, sizeof s.err, "pkg.noIndex", NULL); }
@@ -737,10 +918,11 @@ int plan_make(const Idx *x, const Status *st, const char *const *install, int ni
         if (k < 0) { ok = 0; break; }
         Node *n = nd(&s, k);
         if (n->cand < 0 && !n->inst) {
-            /* virtual? a single provider, or one has to be chosen */
-            DebRel r = { install[i], NULL, strlen(install[i]), 0, REL_NONE };
+            /* virtual? a single provider, or one has to be chosen ("name:i386": one of that architecture) */
+            size_t il = strlen(install[i]), bl = deb_base_len(install[i], il);
+            DebRel r = { install[i], NULL, bl, 0, REL_NONE, bl < il ? install[i] + bl + 1 : NULL, bl < il ? il - bl - 1 : 0 };
             Opt opt[MAX_ALTS];
-            int no = gather(&s, &r, 1, opt, MAX_ALTS);
+            int no = gather(&s, -1, &r, 1, opt, MAX_ALTS);
             if (no == 1) { k = opt[0].node; n = nd(&s, k); }
             else if (no > 1) {
                 char names[300] = "";
@@ -761,8 +943,7 @@ int plan_make(const Idx *x, const Status *st, const char *const *install, int ni
         s.may_remove = o->allow_remove || o->cascade;
         for (int i = 0; i < st->n; i++) {
             const StPkg *p = &st->p[i];
-            if (!p->native) continue;
-            int k = node_get(&s, p->name, strlen(p->name));
+            int k = node_get(&s, p->key, strlen(p->key));
             if (k < 0) continue;
             Node *n = nd(&s, k);
             if (n->target != T_KEEP || n->cand < 0 || ver_cmp(idx_s(x, x->pkg[n->cand].version), p->version) <= 0) continue;
@@ -771,13 +952,14 @@ int plan_make(const Idx *x, const Status *st, const char *const *install, int ni
             if (apply_install(&s, k, n->cand, "pkg.why.upgrade") && solve(&s, qm)) continue;
             undo_to(&s, lm);
             s.nq = qm;
-            if (out->nheld < 32) snprintf(out->held[out->nheld++], sizeof out->held[0], "%s", p->name);
+            if (out->nheld < 32) snprintf(out->held[out->nheld++], sizeof out->held[0], "%s", p->key);
         }
         s.err[0] = 0;
         s.may_remove = 1;
     }
     if (ok) ok = settle(&s);
     if (ok && o->orphans) mark_orphans(&s);
+    if (ok) ok = pairs_ok(&s);
 
     /* result */
     int count = 0;
@@ -836,24 +1018,45 @@ int plan_make(const Idx *x, const Status *st, const char *const *install, int ni
 
 typedef struct { const Idx *x; const Plan *p; int *state, *order, n; } Topo;
 
-static int find_item(const Topo *t, const char *name, size_t n) {
-    for (int i = 0; i < t->p->n; i++) {
-        const PlanItem *it = &t->p->items[i];
-        if (it->rec < 0) continue;
-        if (strlen(it->name) == n && !memcmp(it->name, name, n)) return i;
-    }
+/* The item a relation of item `from` names: that package in from's architecture first, then in the other
+ * one, then something in the batch that provides it. */
+static int find_item(const Topo *t, int from, const char *name, size_t n) {
+    const char *fn = from >= 0 ? t->p->items[from].name : "";
+    const char *fs = strchr(fn, ':');
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < t->p->n; i++) {
+            const PlanItem *it = &t->p->items[i];
+            if (it->rec < 0) continue;
+            size_t l = strlen(it->name), b = deb_base_len(it->name, l);
+            if (b != n || memcmp(it->name, name, n)) continue;
+            const char *is = b < l ? it->name + b : "";
+            if (pass || !strcmp(is, fs ? fs : "")) return i;
+        }
     for (int i = 0; i < t->p->n; i++) {             /* or something in the batch that provides it */
         const PlanItem *it = &t->p->items[i];
         if (it->rec < 0) continue;
-        DebRel r = { name, NULL, n, 0, REL_NONE };
+        DebRel r = { name, NULL, n, 0, REL_NONE, NULL, 0 };
         if (provides_match(idx_s(t->x, t->x->pkg[it->rec].provides), &r)) return i;
     }
     return -1;
 }
 
-static void visit(Topo *t, int i) {
-    if (t->state[i]) return;                /* 1: in progress (cycle: cut), 2: done */
-    t->state[i] = 1;
+/* The other architecture of item i's package in the plan, or -1 (a "Multi-Arch: same" pair). */
+static int pair_item(const Topo *t, int i) {
+    const char *a = t->p->items[i].name;
+    size_t al = strlen(a), ab = deb_base_len(a, al);
+    for (int j = 0; j < t->p->n; j++) {
+        const char *b = t->p->items[j].name;
+        if (j == i || t->p->items[j].rec < 0) continue;
+        size_t bl = strlen(b), bb = deb_base_len(b, bl);
+        if (ab == bb && !memcmp(a, b, ab) && (al == ab) != (bl == bb)) return j;
+    }
+    return -1;
+}
+
+static void visit(Topo *t, int i);
+
+static void visit_deps(Topo *t, int i, int skip) {
     const IdxPkg *r = &t->x->pkg[t->p->items[i].rec];
     for (int f = 0; f < 2; f++) {
         const char *s = idx_s(t->x, f ? r->depends : r->predepends), *e = s + strlen(s);
@@ -861,12 +1064,24 @@ static void visit(Topo *t, int i) {
         int k;
         while ((k = deb_next_group(&s, e, a, MAX_ALTS)) > 0)
             for (int j = 0; j < k; j++) {
-                int d = find_item(t, a[j].name, a[j].nlen);
-                if (d >= 0 && d != i) visit(t, d);
+                int d = find_item(t, i, a[j].name, a[j].nlen);
+                if (d >= 0 && d != i && d != skip) visit(t, d);
             }
     }
+}
+
+static void visit(Topo *t, int i) {
+    if (t->state[i]) return;                /* 1: in progress (cycle: cut), 2: done */
+    /* the two architectures of a package go side by side, so they're unpacked by the same dpkg run */
+    int pj = pair_item(t, i);
+    if (pj >= 0 && t->state[pj]) pj = -1;
+    t->state[i] = 1;
+    if (pj >= 0) t->state[pj] = 1;
+    visit_deps(t, i, pj);
+    if (pj >= 0) visit_deps(t, pj, i);
     t->state[i] = 2;
     t->order[t->n++] = i;
+    if (pj >= 0) { t->state[pj] = 2; t->order[t->n++] = pj; }
 }
 
 int plan_order(const Idx *x, const Plan *p, int *order, int *group) {
@@ -883,9 +1098,10 @@ int plan_order(const Idx *x, const Plan *p, int *order, int *group) {
         int n, cut = 0;
         while (!cut && (n = deb_next_group(&s, e, a, MAX_ALTS)) > 0)
             for (int j = 0; j < n && !cut; j++) {
-                int d = find_item(&t, a[j].name, a[j].nlen);
+                int d = find_item(&t, order[k], a[j].name, a[j].nlen);
                 for (int m = start; m < k && !cut; m++) if (order[m] == d) cut = 1;
             }
+        if (cut && k > start && pair_item(&t, order[k]) == order[k - 1]) cut = 0;   /* never between the two of a pair */
         if (cut) { g++; start = k; }
         group[k] = g;
     }

@@ -128,6 +128,12 @@ validate() {
         jq -e --arg id "$id" '.apps[] | select(.id == $id) | (.keywords // []) | type == "array" and length <= 12 and
             all(.[]; type == "string" and length >= 2 and length <= 40 and (explode | all(. >= 32)) and (test("[\\\\\"<>]") | not))' "$CAT" >/dev/null \
             || die "$id: keywords must be at most 12 strings of 2 to 40 characters"
+        # optional Store categories (0.8.8.9: the Debian category pages also list the app, Steam in Games)
+        for c in $(jf "$id" '(.categories // [])[]'); do
+            case "$c" in AudioVideo|Development|Education|Game|Graphics|Network|Office|Science|System|Utility) ;; *) die "$id: unknown category $c" ;; esac
+        done
+        # optional packages the Store installs with it (0.8.8.9): Debian names, or name:i386 (multiarch)
+        for p in $(jf "$id" '(.with // [])[]'); do is_name "${p%:i386}" || die "$id: bad package $p in with"; done
         arches=$(jf "$id" '.arches[]')
         [ -n "$arches" ] || die "$id: no arches"
         for a in $arches; do case "$a" in amd64|arm64) ;; *) die "$id: unsupported arch $a" ;; esac; done
@@ -147,6 +153,17 @@ validate() {
                 [ -f "$ROOT/apt/$k" ] || die "$id: no key file apt/$k"
                 printf %s "$(jf "$id" .source.fingerprint)" | grep -Eq '^[0-9A-F]{40}$' || die "$id: fingerprint must be 40 upper-case hex digits"
                 is_name "$(jf "$id" .source.package)" || die "$id: bad source.package"
+                # (0.8.8.9) "multiarch": ["i386"] only, for an amd64-only app (Steam's 32-bit libraries)
+                for m in $(jf "$id" '(.source.multiarch // [])[]'); do
+                    [ "$m" = i386 ] && [ "$arches" = amd64 ] || die "$id: multiarch can only be i386, for an amd64 app"
+                done
+                # (0.8.8.9) a vendor package that owns its own source: its list, keyring and package
+                if [ -n "$(jf "$id" '.source.files.ownedBy // empty')" ]; then
+                    is_name "$(jf "$id" .source.files.ownedBy)" || die "$id: bad files.ownedBy"
+                    printf %s "$(jf "$id" .source.files.list)" | grep -Eq '^[a-z][a-z0-9._-]*\.list$' || die "$id: bad files.list"
+                    printf %s "$(jf "$id" .source.files.keyring)" | grep -Eq '^[a-z0-9][a-z0-9._-]*\.(gpg|asc)$' || die "$id: bad files.keyring"
+                    case "$(jf "$id" .source.files.list)$(jf "$id" .source.files.keyring)" in lordos*) die "$id: files must not be named lordos*" ;; esac
+                fi
                 [ "$(jf "$id" .source.package)" = "$(jf "$id" .package)" ] || die "$id: source.package differs from package"
                 ;;
             deb|binary)
@@ -286,6 +303,19 @@ do_apt() {
             break
         done
         [ "$found" = 1 ] || die "$id: no $pkg for $a in any component"
+    done
+    # (0.8.8.9) the i386 packages the Store installs with it ("with": name:i386) are in the vendor's i386 index
+    for m in $(jf "$id" '(.source.multiarch // [])[]'); do
+        for w in $(jf "$id" '(.with // [])[]'); do
+            case "$w" in *:"$m") n=${w%:*} ;; *) continue ;; esac
+            found=0
+            for comp in $(jf "$id" '.source.components[]'); do
+                apt_packages "$id" "$t" "$comp" "$m"
+                awk -v n="$n" 'BEGIN { RS = "" } $0 ~ ("(^|\n)Package: " n "\n") { f = 1 } END { exit !f }' "$t/Packages.$comp.$m" && { found=1; break; }
+            done
+            [ "$found" = 1 ] || die "$id: no $n for $m in the vendor's index"
+            say "  ok $id: $n ($m) in the vendor's index"
+        done
     done
     rm -rf "$t"
 }

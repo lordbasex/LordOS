@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Lemezkép törölve",
   "vm.downloadResumed": "Egy leállított letöltés folytatása ({from} bájt megtartva)",
   "vm.kvmReady": "Engedélyezve: a gépek mostantól használhatják a hardveres virtualizációt",
-  "vm.kvmNextLogin": "Engedélyezve a következő bejelentkezéstől"
+  "vm.kvmNextLogin": "Engedélyezve a következő bejelentkezéstől",
+  "pkg.foreignArchAdded": "32 bites ({arch}) csomagok engedélyezve",
+  "pkg.foreignArchPresent": "A 32 bites ({arch}) csomagok már engedélyezve voltak",
+  "pkg.why.multiarchPair": "Ugyanaz a verzió, mint: {name}"
 }

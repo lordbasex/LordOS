@@ -101,6 +101,21 @@ for (const lang of locales) {
   const sections = [...new Set(catalog.apps.map((a) => a.section || 'ai'))];
   eq(`catalog: every section has a page title in ${lang}`, sections.filter((s) => !store[`page.${s}`]), []);
 }
+// (0.8.8.9) a catalog app's Debian categories (its page in Store → Games…), the packages installed with it, and
+// "multiarch" (i386 only, for an amd64-only app): Steam is in Commercial and Games, with its 32-bit libraries
+const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
+for (const a of catalog.apps) {
+  eq(`catalog: ${a.id} categories are Store categories`, (a.categories || []).filter((c) => !CATS.includes(c)), []);
+  eq(`catalog: ${a.id} "with" names packages`, (a.with || []).filter((p) => !/^[a-z0-9][a-z0-9+.-]+(:i386)?$/.test(p)), []);
+  const ma = (a.source && a.source.multiarch) || [];
+  eq(`catalog: ${a.id} multiarch is i386 for amd64 only`, ma.length === 0 || (ma.length === 1 && ma[0] === 'i386' && JSON.stringify(a.arches) === '["amd64"]'), true);
+}
+const steam = catalog.apps.find((a) => a.id === 'steam');
+eq('catalog: Steam is commercial, in Games', [steam.section, steam.categories], ['commercial', ['Game']]);
+eq('catalog: Steam brings its 32-bit libraries', steam.with.includes('steam-libs-i386:i386') && steam.source.multiarch[0] === 'i386', true);
+eq('catalog: Steam\'s own source hands over', steam.source.files, { list: 'steam-stable.list', keyring: 'steam.gpg', ownedBy: 'steam-launcher' });
+eq('catalog: "games" finds Steam', cat('games')[0], 'steam');
+
 for (const a of catalog.apps) {
   eq(`catalog: ${a.id} is found by its own name`, cat(a.name)[0], a.id);
   const k = a.keywords || [];

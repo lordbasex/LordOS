@@ -871,5 +871,9 @@
   "webapps.badSound": "Unbekannter Mitteilungston",
   "webapps.badColor": "Unbekannte Profilfarbe",
   "webapps.iconOrigin": "Die Website ist zu einer anderen Adresse umgezogen, daher wurde ihr Symbol nicht übernommen",
-  "webapps.noIcon": "Die Website bietet kein Symbol, das LordOS verwenden kann"
+  "webapps.noIcon": "Die Website bietet kein Symbol, das LordOS verwenden kann",
+  "pkg.multiarchSplit": "{name} muss für 64 und 32 Bit dieselbe Version haben, und diese Änderung würde sie trennen",
+  "pkg.multiarchConflict": "{name} kann nicht gleichzeitig für 64 und 32 Bit installiert werden",
+  "pkg.foreignArchUnsupported": "32-Bit-Pakete lassen sich nur auf einem 64-Bit-PC (amd64) aktivieren; dieses System ist {arch}",
+  "pkg.foreignArchFailed": "32-Bit-Pakete ({arch}) konnten nicht aktiviert werden (dpkg endete mit Code {code})"
 }

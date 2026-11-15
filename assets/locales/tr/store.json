@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Ofis ve yaratıcılık paketi",
   "ai.kind.coding-agent": "Kodlama ajanı",
   "ai.kind.editor": "Düzenleyici",
+  "ai.kind.games": "Oyunlar",
   "ai.kind.local-models": "Yerel modeller",
   "ai.kind.music": "Müzik",
   "ai.kind.speech": "Konuşmadan metne",
@@ -307,5 +308,10 @@
   "formats.apfs": "APFS birimlerini salt okunur olarak okur. İsteğe bağlı.",
   "formats.allow": "Devam",
   "formats.optional": "APFS de ekle. Çekirdeğiniz için bir sürücü derler ve yaklaşık 500 MB derleyici ve başlık dosyası ekler.",
-  "search.catalog": "LordOS kataloğundan"
+  "search.catalog": "LordOS kataloğundan",
+  "multiarch.title": "32 bit sistem kitaplıkları",
+  "multiarch.body": "{name} 32 bit sistem kitaplıklarına ihtiyaç duyuyor; LordOS bunları etkinleştirecek. Böylece paket motoru Debian'ın 32 bit (i386) paketlerini 64 bit olanların yanına, diğer tüm paketler gibi imzalı ve doğrulanmış olarak kurabilir. Yalnızca {name} için gerekenler kurulur.",
+  "multiarch.enable": "Etkinleştir ve devam et",
+  "multiarch.enabling": "Etkinleştiriliyor…",
+  "pkg32": "{name} (32 bit)"
 }

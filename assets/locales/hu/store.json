@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Irodai és kreatív csomag",
   "ai.kind.coding-agent": "Kódoló ügynök",
   "ai.kind.editor": "Szerkesztő",
+  "ai.kind.games": "Játékok",
   "ai.kind.local-models": "Helyi modellek",
   "ai.kind.music": "Zene",
   "ai.kind.speech": "Beszédből szöveg",
@@ -307,5 +308,10 @@
   "formats.apfs": "APFS-kötetek olvasása, csak olvasható módon. Nem kötelező.",
   "formats.allow": "Tovább",
   "formats.optional": "Az APFS hozzáadása is. Illesztőprogramot épít a kerneléhez, és mintegy 500 MB fordítót és fejlécfájlt ad hozzá.",
-  "search.catalog": "A LordOS katalógusából"
+  "search.catalog": "A LordOS katalógusából",
+  "multiarch.title": "32 bites rendszerkönyvtárak",
+  "multiarch.body": "A(z) {name} 32 bites rendszerkönyvtárakat igényel; a LordOS engedélyezi őket. Ezután a csomagkezelő a 64 bites csomagok mellé 32 bites (i386) Debian-csomagokat is telepíthet, aláírva és ellenőrizve, mint bármely más csomagot. Csak az kerül telepítésre, amire a(z) {name} igényt tart.",
+  "multiarch.enable": "Engedélyezés és folytatás",
+  "multiarch.enabling": "Engedélyezés…",
+  "pkg32": "{name} (32 bites)"
 }

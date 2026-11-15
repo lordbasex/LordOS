@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Kontors- och kreativ svit",
   "ai.kind.coding-agent": "Kodagent",
   "ai.kind.editor": "Redigerare",
+  "ai.kind.games": "Spel",
   "ai.kind.local-models": "Lokala modeller",
   "ai.kind.music": "Musik",
   "ai.kind.speech": "Tal till text",
@@ -307,5 +308,10 @@
   "formats.apfs": "Läser APFS-volymer, skrivskyddat. Valfritt.",
   "formats.allow": "Fortsätt",
   "formats.optional": "Lägg också till APFS. Det bygger en drivrutin för din kärna och lägger till ungefär 500 MB kompilatorer och headerfiler.",
-  "search.catalog": "Från LordOS katalog"
+  "search.catalog": "Från LordOS katalog",
+  "multiarch.title": "32-bitars systembibliotek",
+  "multiarch.body": "{name} behöver 32-bitars systembibliotek; LordOS aktiverar dem. Då kan pakethanteraren installera 32-bitarspaket (i386) från Debian bredvid 64-bitarspaketen, signerade och kontrollerade som alla andra paket. Bara det som {name} behöver installeras.",
+  "multiarch.enable": "Aktivera och fortsätt",
+  "multiarch.enabling": "Aktiverar…",
+  "pkg32": "{name} (32 bitar)"
 }

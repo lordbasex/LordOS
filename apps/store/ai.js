@@ -87,6 +87,44 @@ function NotListed({ a, onDone }) {
       h(Button, { primary: true, label: busy ? t('store.ai.updating') : t('store.ai.updateLists'), disabled: busy || !admin.available(), onClick: update })));
 }
 
+// (0.8.8.9) An app that needs 32-bit system libraries (Steam: "multiarch": ["i386"] in its source): before
+// anything else the page says LordOS will enable them, then enables i386 (pkg-foreign-arch, an admin action:
+// dpkg --add-architecture i386 and nothing else), adds the maker's repository if it isn't there yet and fetches
+// the lists, which then carry the i386 libraries. Nothing is installed here: the usual package page follows,
+// with its plan.
+const needs32 = (a) => !!(a && a.source && Array.isArray(a.source.multiarch) && a.source.multiarch.includes('i386'));
+const multiarch = () => { try { return typeof lord.pkg.multiarch === 'function' ? lord.pkg.multiarch() : null; } catch (e) { return null; } };
+function Enable32({ a, ma, onDone }) {
+  const th = useTheme();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [refused, setRefused] = useState(false);
+  const source = !offered(a.package);
+  const go = () => {
+    setBusy(true);
+    setErr('');
+    setRefused(false);
+    (ma.i386 ? Promise.resolve() : admin.run('pkg-foreign-arch', 'i386'))
+      .then(() => (source ? admin.run('pkg-source-add', a.id) : null))
+      .then(() => admin.run('pkg-update'))
+      .then(onDone, (e) => { setErr(e.message); setRefused(isNotAdmin(e)); })
+      .finally(() => setBusy(false));
+  };
+  return h(View, { style: { gap: spacing.l, maxWidth: 640 } },
+    h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
+    h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.multiarch.title')),
+    h(Text, { style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start' } }, t('store.multiarch.body', { name: a.name })),
+    source ? h(Text, { style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start' } },
+      t('store.ai.sourceIntro', { name: a.name, vendor: a.vendor || '', url: (a.source && a.source.url) || '' })) : null,
+    source ? h(Text, { style: { fontSize: 11, color: th.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' } },
+      `${(a.source && a.source.url) || ''}\n${(a.source && a.source.fingerprint) || ''}`) : null,
+    !ma.supported ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.ai.notForArch', { arch: ma.native || '' })) : null,
+    err ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff453a', textAlign: 'start' } }, err) : null,
+    refused ? h(AdminRescue) : null,
+    h(View, { style: { flexDirection: 'row', gap: spacing.s } },
+      h(Button, { primary: true, label: busy ? t('store.multiarch.enabling') : t('store.multiarch.enable'), disabled: busy || !ma.supported || !admin.available(), onClick: go })));
+}
+
 // An item of the Commercial group made of several parts: what is in it, each with its license and source, before anything
 // is installed. Nothing here installs: the person goes on to the usual package page.
 function Authorize({ a, onAllow }) {
@@ -149,7 +187,12 @@ export function AiDetail({ pkg }) {
   const [allowed, setAllowed] = useState(null);        // the optional packages chosen, once allowed
   const a = catalogApp(pkg);
   const direct = a && a.source && a.source.delivery === 'direct';
+  const withPkgs = (a && Array.isArray(a.with)) ? a.with : [];
   if (a?.drivers && !installed(pkg) && !allowed) return h(Authorize, { a, onAllow: setAllowed });
+  if (needs32(a) && !installed(pkg)) {
+    const ma = multiarch() || { supported: false, i386: false, native: '' };
+    if (!ma.i386 || !offered(pkg) || withPkgs.some((p) => !offered(p))) return h(Enable32, { a, ma, onDone: () => setTick((x) => x + 1) });
+  }
   if (direct && !offered(pkg)) return h(AddSource, { a, onDone: () => setTick((x) => x + 1) });
   if (a && !direct && !offered(pkg)) return h(NotListed, { a, onDone: () => setTick((x) => x + 1) });
   // removing an app from its maker's repository also removes that repository, unless another
@@ -159,7 +202,7 @@ export function AiDetail({ pkg }) {
     const sameRepo = (catalog.apps || []).some((x) => x.id !== a.id && x.source && x.source.url === a.source.url && installed(x.package));
     if (!sameRepo) admin.run('pkg-source-remove', a.id).catch(() => {});
   };
-  const details = h(debian.Details, { name: pkg, onRemoved, extras: allowed || [] });
+  const details = h(debian.Details, { name: pkg, onRemoved, extras: [...(allowed || []), ...withPkgs], withRemove: withPkgs });
   return a?.drivers && installed(pkg) ? h(View, { style: { gap: spacing.l } }, h(MoreDrivers, { a }), details) : details;
 }
 
@@ -180,6 +223,23 @@ export function AiPage({ query, onOpen, onPage, section = 'ai' }) {
     section === 'commercial' ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.s } },
       h(Text, { style: { flex: 1, fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.4, textAlign: 'start' } }, t('store.commercial.drivers')),
       h(Button, { small: true, label: t('store.commercial.openDrivers'), onClick: () => onPage && onPage('suggested') })) : null);
+}
+
+// (0.8.8.9) A Debian category's page (Games) also lists the catalog apps that declare it ("categories":
+// ["Game"]: Steam), above the Debian ones; the sidebar counts them too (catalogCategoryCounts).
+export const catalogInCategory = (cat) => (catalog.apps || []).filter((a) => Array.isArray(a.categories) && a.categories.includes(cat));
+export function catalogCategoryCounts() {
+  const n = {};
+  for (const a of catalog.apps || []) for (const c of Array.isArray(a.categories) ? a.categories : []) n[c] = (n[c] || 0) + 1;
+  return n;
+}
+export function CatalogCategory({ cat, query, onOpen }) {
+  useStore(locale);
+  const here = useHere();
+  const apps = searchCatalog(catalogInCategory(cat), query);
+  if (!apps.length) return null;
+  return h(Shelf, { title: t('store.search.catalog') },
+    h(CardGrid, null, ...apps.map((a) => h(AiCard, { key: a.id, a, here, onOpen }))));
 }
 
 // The catalog apps that match a search, best first (search.js: any word, joined or apart, case and

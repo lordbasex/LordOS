@@ -871,5 +871,9 @@
   "webapps.badSound": "Sauti ya arifa isiyojulikana",
   "webapps.badColor": "Rangi ya wasifu isiyojulikana",
   "webapps.iconOrigin": "Tovuti ilihamia anwani nyingine, kwa hivyo aikoni yake haikuhifadhiwa",
-  "webapps.noIcon": "Tovuti haitoi aikoni ambayo LordOS inaweza kutumia"
+  "webapps.noIcon": "Tovuti haitoi aikoni ambayo LordOS inaweza kutumia",
+  "pkg.multiarchSplit": "{name} lazima iwe na toleo moja kwa biti 64 na 32, na badiliko hili lingeyatenganisha",
+  "pkg.multiarchConflict": "{name} haiwezi kusakinishwa kwa biti 64 na 32 kwa wakati mmoja",
+  "pkg.foreignArchUnsupported": "Vifurushi vya biti 32 vinaweza kuwezeshwa tu kwenye kompyuta ya biti 64 (amd64); mfumo huu ni {arch}",
+  "pkg.foreignArchFailed": "Vifurushi vya biti 32 ({arch}) havikuweza kuwezeshwa (dpkg ilitoka kwa msimbo {code})"
 }

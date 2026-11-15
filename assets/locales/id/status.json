@@ -151,5 +151,8 @@
   "vm.imageRemoved": "Image dihapus",
   "vm.downloadResumed": "Melanjutkan unduhan yang terhenti ({from} byte disimpan)",
   "vm.kvmReady": "Diizinkan: mesin kini dapat menggunakan virtualisasi perangkat keras",
-  "vm.kvmNextLogin": "Diizinkan mulai login Anda berikutnya"
+  "vm.kvmNextLogin": "Diizinkan mulai login Anda berikutnya",
+  "pkg.foreignArchAdded": "Paket 32-bit ({arch}) diaktifkan",
+  "pkg.foreignArchPresent": "Paket 32-bit ({arch}) sudah aktif",
+  "pkg.why.multiarchPair": "Versi yang sama dengan {name}"
 }

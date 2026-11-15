@@ -433,6 +433,17 @@ their cron job):
   configured multiple times") and `apt-get update` succeeds; with an empty `spotify.list` created
   before the install (Spotify's documented opt-out) there is no warning, but `pkg-source-add` doesn't
   write that file yet. Spotify's key goes into `trusted.gpg.d` in both cases.
+- **Steam** (0.8.8.9, in development) can't use `files` the same way: `steam-launcher` owns its source as package
+  files (the conffile `steam-stable.list` and `/usr/share/keyrings/steam.gpg`), so dpkg would find LordOS's copies in
+  its way. Its entry uses `"files": {"list": "steam-stable.list", "keyring": "steam.gpg", "ownedBy":
+  "steam-launcher"}`: `pkg-source-add` writes the `lordos-steam` bootstrap source and key, and the engine removes them
+  as soon as `steam-launcher` is installed with its own list (naming the same URL and suite) and its own keyring
+  (holding the pinned key), so only Valve's entry remains (`docs/PACKAGES.md`, "A vendor package that owns its own
+  source"). Its source also says `"multiarch": ["i386"]`: the client is 32-bit, and Valve's repository serves
+  `steam-libs-i386` for i386 (`docs/PACKAGES.md`, "Multiarch"). The key LordOS pins is Valve's 2025 repository key
+  (`DB23 C56B F0F3 77FD 0297 0A2A 8470 6F31 879D 59CB`, RSA 4096); Valve's `InRelease` is signed with it and with the
+  2012 key (`BA18 16EF …`), and the engine needs one valid signature from a pinned key (checked with the real
+  `InRelease` of 2026-07-15). Not yet installed on a LordOS system.
 
 ### Remote access: Tailscale (0.8.8.6, #68)
 

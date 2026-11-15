@@ -871,5 +871,9 @@
   "webapps.badSound": "Hindi kilalang tunog ng notification",
   "webapps.badColor": "Hindi kilalang kulay ng profile",
   "webapps.iconOrigin": "Lumipat ang site sa ibang address, kaya hindi itinabi ang icon nito",
-  "webapps.noIcon": "Walang icon ang site na magagamit ng LordOS"
+  "webapps.noIcon": "Walang icon ang site na magagamit ng LordOS",
+  "pkg.multiarchSplit": "Dapat pareho ang bersyon ng {name} para sa 64 at 32 bit, at paghihiwalayin sila ng pagbabagong ito",
+  "pkg.multiarchConflict": "Hindi maaaring i-install ang {name} para sa 64 at 32 bit nang sabay",
+  "pkg.foreignArchUnsupported": "Maaari lang i-enable ang mga 32-bit na package sa 64-bit na PC (amd64); ang system na ito ay {arch}",
+  "pkg.foreignArchFailed": "Hindi na-enable ang mga 32-bit ({arch}) na package (lumabas ang dpkg na may code {code})"
 }

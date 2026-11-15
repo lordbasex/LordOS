@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Suite de oficina y creatividad",
   "ai.kind.coding-agent": "Agente de programación",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Juegos",
   "ai.kind.local-models": "Modelos locales",
   "ai.kind.music": "Música",
   "ai.kind.speech": "Voz a texto",
@@ -307,5 +308,10 @@
   "formats.apfs": "Opcional. Lee volúmenes APFS, solo lectura.",
   "formats.allow": "Continuar",
   "formats.optional": "Agregar también APFS. Compila un controlador para tu kernel y suma unos 500 MB de compiladores y headers.",
-  "search.catalog": "Del catálogo de LordOS"
+  "search.catalog": "Del catálogo de LordOS",
+  "multiarch.title": "Bibliotecas del sistema de 32 bits",
+  "multiarch.body": "{name} necesita bibliotecas del sistema de 32 bits; LordOS las va a habilitar. Así el motor de paquetes puede instalar paquetes de 32 bits (i386) de Debian junto a los de 64 bits, firmados y verificados como cualquier otro paquete. Solo se instala lo que {name} necesita.",
+  "multiarch.enable": "Habilitar y continuar",
+  "multiarch.enabling": "Habilitando…",
+  "pkg32": "{name} (32 bits)"
 }

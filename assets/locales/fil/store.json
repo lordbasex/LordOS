@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Office at creative suite",
   "ai.kind.coding-agent": "Coding agent",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Mga laro",
   "ai.kind.local-models": "Mga lokal na model",
   "ai.kind.music": "Musika",
   "ai.kind.speech": "Pagsasalita patungong teksto",
@@ -307,5 +308,10 @@
   "formats.apfs": "Nagbabasa ng mga APFS volume, read-only. Opsyonal.",
   "formats.allow": "Magpatuloy",
   "formats.optional": "Idagdag din ang APFS. Bumubuo ito ng driver para sa iyong kernel at nagdadagdag ng mga 500 MB na compiler at header.",
-  "search.catalog": "Mula sa catalog ng LordOS"
+  "search.catalog": "Mula sa catalog ng LordOS",
+  "multiarch.title": "Mga 32-bit na library ng system",
+  "multiarch.body": "Kailangan ng {name} ang mga 32-bit na library ng system; ie-enable ito ng LordOS. Sa gayon, makakapag-install ang package engine ng mga 32-bit (i386) na package mula sa Debian katabi ng mga 64-bit, naka-sign at sinusuri gaya ng ibang package. Ang kailangan lang ng {name} ang ini-install.",
+  "multiarch.enable": "I-enable at magpatuloy",
+  "multiarch.enabling": "Ine-enable…",
+  "pkg32": "{name} (32-bit)"
 }

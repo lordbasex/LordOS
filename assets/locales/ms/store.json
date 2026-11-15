@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Suite pejabat dan kreatif",
   "ai.kind.coding-agent": "Ejen pengekodan",
   "ai.kind.editor": "Editor",
+  "ai.kind.games": "Permainan",
   "ai.kind.local-models": "Model tempatan",
   "ai.kind.music": "Muzik",
   "ai.kind.speech": "Pertuturan ke teks",
@@ -299,5 +300,10 @@
   "formats.apfs": "Membaca volum APFS, baca sahaja. Pilihan.",
   "formats.allow": "Teruskan",
   "formats.optional": "Turut tambah APFS. Ia membina pemacu untuk kernel anda dan menambah kira-kira 500 MB pengkompil dan pengepala.",
-  "search.catalog": "Daripada katalog LordOS"
+  "search.catalog": "Daripada katalog LordOS",
+  "multiarch.title": "Pustaka sistem 32-bit",
+  "multiarch.body": "{name} memerlukan pustaka sistem 32-bit; LordOS akan mendayakannya. Selepas itu enjin pakej boleh memasang pakej 32-bit (i386) daripada Debian di sebelah pakej 64-bit, ditandatangani dan disemak seperti pakej lain. Hanya apa yang diperlukan oleh {name} dipasang.",
+  "multiarch.enable": "Dayakan dan teruskan",
+  "multiarch.enabling": "Mendayakan…",
+  "pkg32": "{name} (32-bit)"
 }

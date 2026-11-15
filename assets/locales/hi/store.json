@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "ऑफ़िस और क्रिएटिव सुइट",
   "ai.kind.coding-agent": "कोडिंग एजेंट",
   "ai.kind.editor": "संपादक",
+  "ai.kind.games": "गेम",
   "ai.kind.local-models": "स्थानीय मॉडल",
   "ai.kind.music": "संगीत",
   "ai.kind.speech": "बोली से टेक्स्ट",
@@ -307,5 +308,10 @@
   "formats.apfs": "APFS वॉल्यूम पढ़ता है, केवल पढ़ने के लिए। वैकल्पिक।",
   "formats.allow": "जारी रखें",
   "formats.optional": "APFS भी जोड़ें। यह आपके कर्नेल के लिए एक ड्राइवर बनाता है और लगभग 500 MB के कंपाइलर और हेडर जोड़ता है।",
-  "search.catalog": "LordOS कैटलॉग से"
+  "search.catalog": "LordOS कैटलॉग से",
+  "multiarch.title": "32-बिट सिस्टम लाइब्रेरी",
+  "multiarch.body": "{name} को 32-बिट सिस्टम लाइब्रेरी चाहिए; LordOS उन्हें चालू करेगा। इसके बाद पैकेज इंजन Debian के 32-बिट (i386) पैकेज 64-बिट पैकेजों के साथ इंस्टॉल कर सकेगा, किसी भी दूसरे पैकेज की तरह हस्ताक्षरित और जाँचे हुए। केवल वही इंस्टॉल होता है जो {name} को चाहिए।",
+  "multiarch.enable": "चालू करें और जारी रखें",
+  "multiarch.enabling": "चालू किया जा रहा है…",
+  "pkg32": "{name} (32-बिट)"
 }

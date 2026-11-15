@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "Kifurushi cha ofisi na ubunifu",
   "ai.kind.coding-agent": "Wakala wa msimbo",
   "ai.kind.editor": "Kihariri",
+  "ai.kind.games": "Michezo",
   "ai.kind.local-models": "Miundo ya ndani",
   "ai.kind.music": "Muziki",
   "ai.kind.speech": "Usemi kuwa maandishi",
@@ -307,5 +308,10 @@
   "formats.apfs": "Husoma juzuu za APFS, kusoma tu. Hiari.",
   "formats.allow": "Endelea",
   "formats.optional": "Ongeza pia APFS. Inajenga kiendeshi kwa ajili ya kerneli yako na kuongeza takriban MB 500 za vikusanyaji na vichwa.",
-  "search.catalog": "Kutoka katalogi ya LordOS"
+  "search.catalog": "Kutoka katalogi ya LordOS",
+  "multiarch.title": "Maktaba za mfumo za biti 32",
+  "multiarch.body": "{name} inahitaji maktaba za mfumo za biti 32; LordOS itaziwezesha. Baada ya hapo injini ya vifurushi inaweza kusakinisha vifurushi vya biti 32 (i386) kutoka Debian kando ya vile vya biti 64, vilivyotiwa sahihi na kukaguliwa kama kifurushi kingine chochote. Kinachosakinishwa ni kile tu ambacho {name} inahitaji.",
+  "multiarch.enable": "Wezesha na uendelee",
+  "multiarch.enabling": "Inawezesha…",
+  "pkg32": "{name} (biti 32)"
 }

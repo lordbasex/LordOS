@@ -870,5 +870,9 @@
   "webapps.badSound": "Suara notifikasi tidak dikenal",
   "webapps.badColor": "Warna profil tidak dikenal",
   "webapps.iconOrigin": "Situs pindah ke alamat lain, jadi ikonnya tidak disimpan",
-  "webapps.noIcon": "Situs tidak menyediakan ikon yang dapat digunakan LordOS"
+  "webapps.noIcon": "Situs tidak menyediakan ikon yang dapat digunakan LordOS",
+  "pkg.multiarchSplit": "{name} harus memiliki versi yang sama untuk 64 dan 32 bit, dan perubahan ini akan memisahkannya",
+  "pkg.multiarchConflict": "{name} tidak dapat dipasang untuk 64 dan 32 bit sekaligus",
+  "pkg.foreignArchUnsupported": "Paket 32-bit hanya dapat diaktifkan di PC 64-bit (amd64); sistem ini {arch}",
+  "pkg.foreignArchFailed": "Paket 32-bit ({arch}) tidak dapat diaktifkan (dpkg keluar dengan kode {code})"
 }

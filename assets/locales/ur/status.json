@@ -160,5 +160,8 @@
   "vm.imageRemoved": "امیج حذف کر دی گئی",
   "vm.downloadResumed": "رکا ہوا ڈاؤن لوڈ جاری ہے ({from} بائٹس محفوظ)",
   "vm.kvmReady": "اجازت مل گئی: مشینیں اب ہارڈ ویئر ورچوئلائزیشن استعمال کر سکتی ہیں",
-  "vm.kvmNextLogin": "آپ کے اگلے لاگ ان سے اجازت ہے"
+  "vm.kvmNextLogin": "آپ کے اگلے لاگ ان سے اجازت ہے",
+  "pkg.foreignArchAdded": "32 بٹ ({arch}) پیکیجز فعال کر دیے گئے",
+  "pkg.foreignArchPresent": "32 بٹ ({arch}) پیکیجز پہلے سے فعال تھے",
+  "pkg.why.multiarchPair": "{name} جیسا ہی ورژن"
 }

@@ -871,5 +871,9 @@
   "webapps.badSound": "So de notificació desconegut",
   "webapps.badColor": "Color de perfil desconegut",
   "webapps.iconOrigin": "El lloc s’ha mogut a una altra adreça, així que no se n’ha conservat la icona",
-  "webapps.noIcon": "El lloc no ofereix cap icona que LordOS pugui fer servir"
+  "webapps.noIcon": "El lloc no ofereix cap icona que LordOS pugui fer servir",
+  "pkg.multiarchSplit": "{name} ha de tenir la mateixa versió en 64 i 32 bits, i aquest canvi les deixaria diferents",
+  "pkg.multiarchConflict": "{name} no es pot instal·lar per a 64 i 32 bits alhora",
+  "pkg.foreignArchUnsupported": "Els paquets de 32 bits només es poden habilitar en un PC de 64 bits (amd64); aquest sistema és {arch}",
+  "pkg.foreignArchFailed": "No s’han pogut habilitar els paquets de 32 bits ({arch}) (dpkg ha acabat amb el codi {code})"
 }

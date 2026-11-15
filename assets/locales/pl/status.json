@@ -169,5 +169,8 @@
   "vm.imageRemoved": "Usunięto obraz",
   "vm.downloadResumed": "Wznawianie zatrzymanego pobierania (zachowano bajty: {from})",
   "vm.kvmReady": "Zezwolono: maszyny mogą już używać wirtualizacji sprzętowej",
-  "vm.kvmNextLogin": "Zezwolono od następnego logowania"
+  "vm.kvmNextLogin": "Zezwolono od następnego logowania",
+  "pkg.foreignArchAdded": "Włączono pakiety 32-bitowe ({arch})",
+  "pkg.foreignArchPresent": "Pakiety 32-bitowe ({arch}) były już włączone",
+  "pkg.why.multiarchPair": "Ta sama wersja co {name}"
 }

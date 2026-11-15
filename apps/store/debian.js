@@ -70,7 +70,12 @@ function PkgIcon({ app, name, size = 48 }) {
 
 // A package's name as the Updates list and the plans show it: LordOS's data packages in words
 // (syspkg.js), every other package by its name.
-const pkgLabel = (name) => { const k = sysPkgKey(name); return k ? t(`${k}.name`) : name; };
+// (0.8.8.9) an i386 package (multiarch: Steam's 32-bit libraries) as "libc6 (32-bit)".
+const pkgLabel = (name) => {
+  if (name.endsWith(':i386')) return t('store.pkg32', { name: name.slice(0, -5) });
+  const k = sysPkgKey(name);
+  return k ? t(`${k}.name`) : name;
+};
 // The line under it: for a data package, what it is and its date (in the user's region when the
 // version is a date); otherwise the versions and the package's summary.
 function pkgLine(u) {
@@ -118,7 +123,9 @@ function PlanView({ plan }) {
 
 // ---- package page ----
 
-function Details({ name, onBack, onRemoved, extras = [] }) {
+// extras: packages installed with it (a catalog app's "with": Steam's steam-libs-i386:i386); withRemove: those
+// removed with it, when installed.
+function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
@@ -132,11 +139,12 @@ function Details({ name, onBack, onRemoved, extras = [] }) {
   const desk = app && launcher.find((a) => a.kind === 'linux' && (`${a.desktopId}.desktop` === app.id || a.desktopId === app.id));
   const ask = (p) => setPlan(p);
   const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name, ...extras] }) });
-  const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name] }) });
+  const alsoRemove = withRemove.filter((p) => !!lord.pkg.info(p, {})?.installed);
+  const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name, ...alsoRemove] }) });
   const confirm = () => {
     const extra = plan.p.items.some((i) => i.action === 'remove' && !i.requested);
     if (plan.kind === 'install') runJob('pkg-install', [name, ...extras, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
-    else runJob('pkg-remove', extra ? `${name} --cascade` : name, t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
+    else runJob('pkg-remove', [name, ...alsoRemove, ...(extra ? ['--cascade'] : [])].join(' '), t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
     setPlan(null);
   };
   const desc = (info.appDescription || info.description || '').trim();

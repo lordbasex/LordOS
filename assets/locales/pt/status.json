@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Imagem apagada",
   "vm.downloadResumed": "Continuando um download parado ({from} bytes mantidos)",
   "vm.kvmReady": "Pronto: as máquinas já podem usar a virtualização por hardware",
-  "vm.kvmNextLogin": "Pronto a partir do seu próximo login"
+  "vm.kvmNextLogin": "Pronto a partir do seu próximo login",
+  "pkg.foreignArchAdded": "Pacotes de 32 bits ({arch}) habilitados",
+  "pkg.foreignArchPresent": "Os pacotes de 32 bits ({arch}) já estavam habilitados",
+  "pkg.why.multiarchPair": "A mesma versão que {name}"
 }

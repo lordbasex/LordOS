@@ -160,5 +160,8 @@
   "vm.imageRemoved": "Taswira imefutwa",
   "vm.downloadResumed": "Inaendeleza upakuaji uliosimamishwa (baiti {from} zimehifadhiwa)",
   "vm.kvmReady": "Imeruhusiwa: mashine sasa zinaweza kutumia uigaji wa maunzi",
-  "vm.kvmNextLogin": "Imeruhusiwa kuanzia kuingia kwako kujako"
+  "vm.kvmNextLogin": "Imeruhusiwa kuanzia kuingia kwako kujako",
+  "pkg.foreignArchAdded": "Vifurushi vya biti 32 ({arch}) vimewezeshwa",
+  "pkg.foreignArchPresent": "Vifurushi vya biti 32 ({arch}) vilikuwa vimewezeshwa tayari",
+  "pkg.why.multiarchPair": "Toleo sawa na {name}"
 }

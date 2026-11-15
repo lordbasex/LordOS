@@ -8,6 +8,7 @@
   "ai.kind.creative-suite": "دفتری اور تخلیقی سوٹ",
   "ai.kind.coding-agent": "کوڈنگ ایجنٹ",
   "ai.kind.editor": "ایڈیٹر",
+  "ai.kind.games": "گیمز",
   "ai.kind.local-models": "مقامی ماڈلز",
   "ai.kind.music": "موسیقی",
   "ai.kind.speech": "بولی سے متن",
@@ -307,5 +308,10 @@
   "formats.apfs": "APFS والیومز پڑھتا ہے، صرف پڑھنے کے لیے۔ اختیاری۔",
   "formats.allow": "جاری رکھیں",
   "formats.optional": "APFS بھی شامل کریں۔ یہ آپ کے کرنل کے لیے ایک ڈرائیور بناتا ہے اور تقریباً 500 MB کمپائلرز اور ہیڈرز شامل کرتا ہے۔",
-  "search.catalog": "LordOS کیٹلاگ سے"
+  "search.catalog": "LordOS کیٹلاگ سے",
+  "multiarch.title": "32 بٹ سسٹم لائبریریاں",
+  "multiarch.body": "{name} کو 32 بٹ سسٹم لائبریریوں کی ضرورت ہے؛ LordOS انہیں فعال کرے گا۔ اس کے بعد پیکیج انجن Debian کے 32 بٹ (i386) پیکیجز 64 بٹ پیکیجز کے ساتھ انسٹال کر سکے گا، کسی بھی دوسرے پیکیج کی طرح دستخط شدہ اور جانچے ہوئے۔ صرف وہی انسٹال ہوتا ہے جس کی {name} کو ضرورت ہے۔",
+  "multiarch.enable": "فعال کریں اور جاری رکھیں",
+  "multiarch.enabling": "فعال کیا جا رہا ہے…",
+  "pkg32": "{name} (32 بٹ)"
 }
