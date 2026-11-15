@@ -185,6 +185,9 @@ EOF
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
+    # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
+    run "browserprefs-test" build/browserprefs-test
+    run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
     run "imgops-test" build/imgops-test

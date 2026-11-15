@@ -25,6 +25,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (see "A tablet sleeps on a tap of the power button" under Changed). Tested in `build/settings-hw-test`; not
   yet tried on a tablet, where the power chip may cut the power by itself after a longer hold.
 
+- **The Chromium-based browsers from the Store start like Chromium: their own bar and the GTK theme**
+  (maintainer's request, 2026-11-15). One of them drew its own minimize, maximize and close glyphs where Debian's
+  Chromium shows LordOS's traffic lights, because LordOS's defaults live in `/etc/chromium/master_preferences` and
+  these browsers read their initial preferences only next to their binary (Chromium's
+  `InitialPreferences::Path`: `initial_preferences`, or `master_preferences` when that one isn't readable; there is
+  no `/etc` location and no policy for the GTK theme). Now, after `dpkg` installs or upgrades one of them, the
+  package engine's own action (`pkg-install`, `pkg-upgrade`, `pkg-install-file`) writes
+  `"browser": {"custom_chrome_frame": true}` and `"extensions": {"theme": {"system_theme": 1}}` there
+  (`server/src/pkg/browserprefs.c`, called from `apply_plan`). The packages and directories are a closed list in C
+  (`google-chrome-stable`/`-beta`/`-unstable` → `/opt/google/chrome*`, `brave-browser`/`-beta`/`-nightly` →
+  `/opt/brave.com/brave*`, `microsoft-edge-stable`/`-beta`/`-dev` → `/opt/microsoft/msedge*`); the package name
+  only selects a row. With no file, a new `initial_preferences` (0644) with exactly those keys; a file the vendor
+  ships is merged, never replaced: it must be a JSON object, its keys and values stay, and each of LordOS's keys is
+  inserted only where it is absent (a vendor's `master_preferences` is merged in place, so no new file hides it). A
+  file that isn't JSON, a symlink, or a missing or symlinked directory is left alone; the write is a temporary file
+  renamed over the old one, a second run changes nothing, and a failure is a line in the helper's log, never a
+  failed installation. Debian's `chromium` keeps `/etc/chromium`; Vivaldi isn't in the list (its interface is its
+  own). Migration `009-0.8.8.9-chromium-family` does the same once for a browser already installed, with the same
+  C code: `/usr/lib/lordos/bin/lord-browser-prefs`, a small root tool built from `browserprefs.c` and the JSON
+  reader alone (libc), which takes no arguments, reads no environment, runs nothing and always exits 0; only the
+  migration runs it, from the postinst (lord-server, which runs without root, has no such mode). These are initial
+  preferences: only profiles created afterwards get them, and home folders are never touched; an existing profile
+  switches in the browser's Settings → Appearance → Theme → GTK. Tests: `build/browserprefs-test` (the merge rule
+  over vendor files: other keys, the vendor's own values, other shapes, tricky strings, escaped keys, duplicate
+  keys, not JSON; and the files in a fixture root) and `tests/migration_chromium_family_test.sh` (migration 009
+  over a fake system tree, run twice; `lord-browser-prefs` refuses an argument). Not yet checked with the real browsers on the VM. Docs: `docs/PACKAGES.md`
+  ("Browser defaults") and `docs/WAYLAND.md` ("The browsers by default").
+
 - **26 new interface languages, each one complete** (maintainer's request, 2026-11-12; completed 2026-11-15): Indonesian (`id`), Japanese (`ja`),
   German (`de`), Hindi (`hi`), Malay (`ms`), Bengali (`bn`), Simplified Chinese (`zh-Hans`), Traditional Chinese
   (`zh-Hant`), Ukrainian (`uk`), Polish (`pl`), Arabic (`ar`), Vietnamese (`vi`), Swedish (`sv`), Greek (`el`), Dutch

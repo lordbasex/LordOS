@@ -8,6 +8,8 @@
 #   /usr/lib/lordos/bin/lord-netd         system networking (root; launched and watched by lord-sessiond)
 #   /usr/lib/lordos/bin/lord-fand         fan control by temperature (root, own service, enabled)
 #   /usr/lib/lordos/bin/lord-autoinstall  the live ISO's unattended install (root, lordos-autoinstall.service; docs/UNATTENDED.md)
+#   /usr/lib/lordos/bin/lord-browser-prefs  the Chromium-based browsers' initial preferences (root, run only by
+#                                         migration 009; no arguments; docs/PACKAGES.md "Browser defaults")
 #   /usr/lib/lordos/bin/lord-pkexec       /usr/bin/pkexec on LordOS, no privilege (docs/PRIVACY.md); the real one
 #                                         is diverted to /usr/bin/pkexec.distrib by postinst
 #   /usr/lib/lordos/bin/lord-server       each session's server (looks for ../themes and ../assets)
@@ -59,6 +61,7 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-netperm ] || { echo "missing server/build/lord-netperm (make -C server; clang for BPF)" >&2; exit 1; }
 [ -x server/build/lord-netd ] || { echo "missing server/build/lord-netd (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-fand ] || { echo "missing server/build/lord-fand (make -C server)" >&2; exit 1; }
+[ -x server/build/lord-browser-prefs ] || { echo "missing server/build/lord-browser-prefs (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
@@ -92,6 +95,8 @@ install -m 755 server/build/lord-fand "$L/bin/lord-fand"
 install -m 755 server/build/lord-pkexec "$L/bin/lord-pkexec"
 # the live ISO's unattended install (docs/UNATTENDED.md); its unit is enabled only on the ISO (tools/iso/build.sh)
 install -m 755 server/build/lord-autoinstall "$L/bin/lord-autoinstall"
+# migration 009's tool (src/pkg/browserprefs_tool.c): browserprefs.c and the JSON reader only, no arguments
+install -m 755 server/build/lord-browser-prefs "$L/bin/lord-browser-prefs"
 # strip for the package's architecture: the host's strip can't read another architecture's binaries
 # (an aarch64 server/build packaged on x86-64 by tools/rpi/build-img.sh), and its errors are ignored below
 STRIP=strip
@@ -135,7 +140,7 @@ if [ -x server/build/lord-tts ]; then
 fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
-"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lordos-firstrun" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
 "$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" 2>/dev/null || true
