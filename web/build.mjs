@@ -311,21 +311,23 @@ function parseChangelog(src) {
 }
 const legalDir = path.join(CONTENT, 'legal');
 // UI languages for /language/: every bundled assets/locales/<id>/meta.json, plus content/languages.json "next" (new in
-// the next pre-release, listed even before their files are bundled; a meta.json wins). Complete first, en first.
+// the next pre-release, listed even before their files are bundled; a meta.json wins). Released and complete first,
+// en first; then the next pre-release's in languages.json's order; a partial one (still being translated, never
+// shipped) last.
 const langList = (() => {
   const dir = path.join(REPO, 'assets/locales');
   const nextJ = fs.existsSync(path.join(CONTENT, 'languages.json')) ? readJson(path.join(CONTENT, 'languages.json')).next || [] : [];
   const nextIds = new Set(nextJ.map((x) => x.id));
   const metas = fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, 'meta.json'))).map((d) => readJson(path.join(dir, d, 'meta.json')));
   if (!metas.some((m) => m.id === 'en')) metas.unshift({ id: 'en', name: 'English', english: 'English', direction: 'ltr' });
-  const all = [...metas, ...nextJ.filter((x) => !metas.some((m) => m.id === x.id)).map((x) => ({ ...x, partial: true }))]
+  const all = [...metas, ...nextJ.filter((x) => !metas.some((m) => m.id === x.id))]
     .map((m) => ({ id: m.id, name: m.name, english: m.english, direction: m.direction || 'ltr', partial: m.partial === true, next: nextIds.has(m.id) }));
   const order = ['en', 'es', 'pt', 'fr', 'it'];
   const rank = (x) => (order.includes(x.id) ? order.indexOf(x.id) : order.length);
   const pos = (x) => (nextIds.has(x.id) ? nextJ.findIndex((y) => y.id === x.id) : -1);
-  const complete = all.filter((x) => !x.partial).sort((a, b) => rank(a) - rank(b) || a.english.localeCompare(b.english));
-  const partial = all.filter((x) => x.partial).sort((a, b) => pos(a) - pos(b) || a.english.localeCompare(b.english));
-  return [...complete, ...partial];
+  const shipped = all.filter((x) => !x.partial && !x.next).sort((a, b) => rank(a) - rank(b) || a.english.localeCompare(b.english));
+  const fresh = all.filter((x) => x.partial || x.next).sort((a, b) => a.partial - b.partial || pos(a) - pos(b) || a.english.localeCompare(b.english));
+  return [...shipped, ...fresh];
 })();
 const legalIndex = fs.existsSync(path.join(legalDir, 'pages.json')) ? readJson(path.join(legalDir, 'pages.json')) : null;
 // guides (0.8.8): plain how-to pages at the site root, /requirements/ and /virtual-machine/, from content/guides
@@ -1153,7 +1155,7 @@ ${(c.items || []).map((it) => {
     const names = new Intl.DisplayNames([l], { type: 'language' });
     const cap = (s) => s.charAt(0).toLocaleUpperCase(l) + s.slice(1);
     const card = (x) => {
-      const tags = [x.id === 'en' ? L.default : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)   // partial and "next" are said once, by the section
+      const tags = [x.id === 'en' ? L.default : '', x.direction === 'rtl' ? L.rtl : ''].filter(Boolean)   // "next" is said once, by the subsection
         .map((s) => `<span class="hw-st">${esc(s)}</span>`).join(' ');
       return `<li class="lg-card"><strong lang="${esc(x.id)}" dir="${x.direction === 'rtl' ? 'rtl' : 'ltr'}">${esc(x.name)}</strong>` +
         `<span class="lg-en">${esc(cap(names.of(x.id) || x.english))}</span>${tags ? `<span class="lg-tags">${tags}</span>` : ''}</li>`;
@@ -1164,9 +1166,12 @@ ${(c.items || []).map((it) => {
       ...common('language', [L.metaTitle, L.metaDescription], true),
       embassy: embassy(img.lumoWave, esc(L.figAlt)),
       status: langList.some((x) => x.next) ? esc(L.status.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
-      complete: langList.filter((x) => !x.partial).map(card).join('\n'),
-      partial: langList.filter((x) => x.partial).map(card).join('\n'),
-      partialTag: langList.some((x) => x.partial && x.next) ? ` <span class="hw-st">${esc(L.next)}</span>` : '',
+      complete: langList.filter((x) => !x.partial && !x.next).map(card).join('\n'),
+      // the next pre-release's languages, complete like the rest (a language ships only when complete); none once it ships
+      fresh: langList.some((x) => x.next && !x.partial)
+        ? `<h3 class="lg-sub">${esc(L.newTitle)}</h3>\n<p class="lg-p">${esc(L.newText)}</p>\n` +
+          `<ul class="lg-grid lg-small">\n${langList.filter((x) => x.next && !x.partial).map(card).join('\n')}\n</ul>\n`
+        : '',
       choose: L.chooseText.split('{stats}').map(esc).join(stats),
       steps,
       requestUrl: `${GITHUB}/issues/new?template=language-request.yml`,

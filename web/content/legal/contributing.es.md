@@ -49,7 +49,7 @@ Usá tu nombre real (o el nombre con el que se te conoce públicamente). Los pul
 
 ## Traducciones
 
-LordOS viene en cuatro idiomas: inglés, español, portugués y francés (desde la 0.8.8). Otros idiomas se suman como **paquetes de idioma** armados a partir de los catálogos de traducción; mirá [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Las correcciones a las traducciones que ya existen también son bienvenidas.
+LordOS 0.8.8.8 viene en seis idiomas, todos completos: inglés, español, portugués, francés, italiano y lituano; 26 más, también completos, están en desarrollo para la próxima pre-release (la página [Idiomas](/language/) los muestra). Un idioma sale solo cuando todos sus textos están traducidos, y un cambio en un texto en inglés llega a todos los idiomas en la misma versión. Para sumar un idioma, seguí la [guía para traductores](https://github.com/lordbasex/LordOS/blob/main/docs/TRANSLATING.md); la referencia técnica es [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Las correcciones a las traducciones que ya existen también son bienvenidas.
 
 ## Código de conducta
 

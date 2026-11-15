@@ -1,8 +1,15 @@
 # Translating LordOS
 
-LordOS is translated by people who speak the language. This guide shows how to add a new language, or finish a
-partial one, starting from the English files, and how to send it as a pull request. You don't need to write code:
-every text is in plain JSON files. Accepted translations ship in the next release.
+LordOS is translated by people who speak the language. This guide shows how to add a new language, starting from
+the English files, and how to send it as a pull request. You don't need to write code: every text is in plain JSON
+files.
+
+**A language ships complete.** That is the project's rule (maintainer's business rule, 2026-11-15): a new language is
+released only when every key is translated (`node tools/i18n-check.mjs` shows `N/N keys`), and every text that is
+added or changed in English goes to every language in the same release or pre-release. All 32 languages LordOS has
+today (English, Spanish, Portuguese, French, Italian, Lithuanian and the 26 in development after 0.8.8.8) are
+complete, 12,436 keys each. A language can be built in several pull requests, marked partial while it is under way
+(step 2), but it is not released until it is whole.
 
 The languages LordOS ships, and how new ones are chosen, are on [lordos.org/language](https://lordos.org/language/).
 If you'd rather ask for a language than translate it, use the
@@ -54,8 +61,8 @@ copy the English namespaces you are going to translate into it.
 - `plural` is one of the rules below. `region` is the glibc locale most of its speakers use (`de_DE`, `pt_BR`).
 - `direction` is `"rtl"` for languages written right to left (Arabic, Hebrew, Persian, Urdu…): the whole interface
   is mirrored for them.
-- `"partial": true` says the language translates only part of LordOS (see step 2). Remove it when every key is
-  translated.
+- `"partial": true` says the language translates only part of LordOS while you work (see step 2). Remove it when
+  every key is translated: a language is released only without it.
 
 `format.json` starts as a copy of `en/format.json`. Translate the month and day names (`months`, `monthsShort`,
 `weekdays`, `weekdaysShort`, starting on Sunday), reorder the date patterns (`short`, `long`, `dayMonth`,
@@ -68,10 +75,11 @@ writes «2026 m. lapkričio 8 d., sekmadienis».
 one file, `lordos-lang-de.json`, which some translators find handy as a reference; the pull request itself carries the
 folder, one file per namespace.
 
-## 2. Translate the core first
+## 2. Translate the core first, then everything else
 
-A new language starts **partial**: it translates the core of LordOS, the parts everyone sees in the first minutes,
-and the rest shows in English until it is translated. The core set is listed in `tools/i18n-core.json` (1,052 of
+A new language starts **partial**: it translates the core of LordOS first, the parts everyone sees in the first
+minutes, and while you work the rest shows in English, so you can try it on LordOS early. Then it goes on until
+every key is translated: only then is it released. The core set is listed in `tools/i18n-core.json` (1,052 of
 about 12,400 English keys):
 
 | File in `assets/locales/en/` | What it is | Scope |
@@ -88,8 +96,9 @@ about 12,400 English keys):
 | `prefs.json` | preferences | only `time.*` (Date & Time formats) |
 
 Translate `apps.json` first: the app names appear everywhere, so deciding them early keeps the rest consistent. After
-the core, any other namespace can follow in any order (`settings.json` in full, `mail.json`, `terminal.json`…), one
-pull request at a time if you like.
+the core, every other namespace follows in any order (`settings.json` in full, `mail.json`, `terminal.json`…, down to
+the emoji names and keywords and the country names), one pull request at a time if you like, until the language is
+complete.
 
 ## 3. Placeholders, plurals and style
 
@@ -180,6 +189,14 @@ of what you checked are welcome in the pull request, especially for scripts and 
    and anything you weren't sure about. Someone else who speaks the language may review it.
 
 You don't have to touch code: a language in `assets/locales/` shows up in Settings and on the login screen by itself,
-and the maintainers add it to the website's list. Once merged, the translation ships in the next release (pre-releases first), and every later release can
-complete it further. Contributions are accepted under the MIT license, following
+and the maintainers add it to the website's list. Once it is complete and merged, the language ships in the next
+release (pre-releases first). Contributions are accepted under the MIT license, following
 [CONTRIBUTING.md](../CONTRIBUTING.md) and the [Code of Conduct](../CODE_OF_CONDUCT.md).
+
+## 6. Keeping every language complete
+
+Every change to an English text, a new key or a reworded one, reaches every language in the same release or
+pre-release: whoever adds or changes `assets/locales/en/` adds or updates the same key in all the other languages in
+that piece of work, and `node tools/i18n-check.mjs` must show every language at `N/N keys` before a release. A
+reworded English text gets the same rewording in every language, not just a new key. If you speak one of the
+languages, reviews of these texts are welcome as pull requests too.

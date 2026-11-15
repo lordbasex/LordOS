@@ -1,11 +1,13 @@
 # Language and region in LordOS
 
 LordOS handles language across the whole system, not just in the interface. It ships complete in
-**English, Spanish, Portuguese, French, Italian and Lithuanian**, and, in development for the release after 0.8.8.8-beta, with 26 more
-languages as partial translations (see "Partial languages": Indonesian, Japanese, German, Hindi, Malay, Bengali,
-Simplified and Traditional Chinese, Ukrainian, Polish, Arabic, Vietnamese, Swedish, Greek, Dutch, Turkish,
-Hungarian, Persian, Russian, Romanian, Finnish, Urdu, Bulgarian, Korean, Thai and Azerbaijani). More languages
-are added with packs, without touching code.
+**English, Spanish, Portuguese, French, Italian and Lithuanian**, and, in development for the release after 0.8.8.8-beta, in 26 more
+languages, each one complete too (every one of the 12,436 keys; see "26 languages from lordos.org's visitors":
+Indonesian, Japanese, German, Hindi, Malay, Bengali, Simplified and Traditional Chinese, Ukrainian, Polish, Arabic,
+Vietnamese, Swedish, Greek, Dutch, Turkish, Hungarian, Persian, Russian, Romanian, Finnish, Urdu, Bulgarian, Korean,
+Thai and Azerbaijani): 32 languages. The project's rule (maintainer's business rule, 2026-11-15) is that a language
+ships complete, never partial, and that every text added or changed in English reaches every language in the same
+release or pre-release. More languages are added with packs, without touching code.
 
 **Settings → Language & Region → Preferred languages** lists English, Español and Português by
 default. **+** adds another one (Français, Italiano, an installed pack); it goes first and becomes
@@ -172,13 +174,17 @@ Add**. Available plural rules (`sdk/plurals.js`, CLDR 45 for whole numbers, test
 `node tools/i18n-pack.mjs export pt` exports an existing language in the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (in development after 0.8.8.8-beta): 12,415 keys, complete in en, es, pt, fr, it and lt, 26 partial languages, and 577 error codes from the server (earlier: 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (in development after 0.8.8.8-beta): 12,436 keys, complete in all 32 languages (en, es, pt, fr, it, lt and the 26 new ones, since 2026-11-15), and 577 error codes from the server (earlier: 2026-11-12, 12,415 keys with 26 partial languages; 0.8.5, 8,002 keys and 496 codes; 0.8.8.2, 9,342 keys; 0.8.8.6, 11,075 keys, lt partial with 961, and 574 codes; 0.8.8.7, 11,909 keys). It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
 `ALLOW` list.
 
 ### Partial languages
+
+A language ships only when it is complete: that is the project's rule, and every bundled language is complete
+today. `"partial"` is how a **new** language gets there: it lets a translator try the work on LordOS, and the
+check pass, while the translation is still under way. It is dropped before the language is released.
 
 A language that translates only part of LordOS says so in its `meta.json` with `"partial": true`. Its
 missing texts are shown in the next preferred language or in English, Settings lists it as "partly
@@ -196,7 +202,7 @@ part had set (Debesis, Parduotuvė, šiukšlinė, programų juosta…).
 #### The core set
 
 Lithuanian's first part is now the **core set** every new language translates first, kept in
-`tools/i18n-core.json` (1,052 of 12,415 English keys today): the whole `greeter`, `shell`, `files`,
+`tools/i18n-core.json` (1,052 of 12,436 English keys today): the whole `greeter`, `shell`, `files`,
 `installer`, `about`, `appabout`, `apps`, `powerbox`, `forcequit` and `calculator` namespaces, and in
 `settings.json` only `section.*`, `lang.*`, `region.*`, `pack.*`, `system.*`, `tz.*`, `admin.*`, `change`, `light`,
 `dark`, `mode`, `noResults` and `search`, and in `prefs.json` only `time.*`. For a partial language
@@ -206,12 +212,13 @@ core entry stops matching an English key.
 #### 26 languages from lordos.org's visitors (in development, after 0.8.8.8-beta)
 
 The languages were chosen from lordos.org's own visit statistics (CloudWatch, the 30 days to 2026-11-12): every
-language spoken in a country with at least 5 distinct visitors. Each one ships as a partial language with its
-`meta.json` (`"partial": true`), its plural rule and a `format.json` for its main region (names from glibc 2.41
-or CLDR 45's format forms, the genitive or partitive months a date needs: «12 ноября», «12. marraskuuta»; date
-patterns from CLDR 45's full dates; the 12- or 24-hour clock as glibc has it for the region, so the region test
-agrees). Its texts arrive namespace by namespace, starting with the core set; whatever isn't translated yet is
-shown in the next preferred language or English.
+language spoken in a country with at least 5 distinct visitors. Each one has its `meta.json`, its plural rule and a
+`format.json` for its main region (names from glibc 2.41 or CLDR 45's format forms, the genitive or partitive
+months a date needs: «12 ноября», «12. marraskuuta»; date patterns from CLDR 45's full dates; the 12- or 24-hour
+clock as glibc has it for the region, so the region test agrees). They started on 2026-11-12 as partial languages
+(`"partial": true`) with the core set; on 2026-11-15 the rest of their texts were translated, under the
+maintainer's rule that a language ships complete, and `"partial"` was dropped: each one has all 12,436 keys, and
+`node tools/i18n-check.mjs` shows `12436/12436` for every one of them.
 
 | Id | Name | Region | Plural | Direction | Digits | Script font |
 |---|---|---|---|---|---|---|
@@ -247,10 +254,10 @@ shown in the next preferred language or English.
   `zh_TW`): a computer with `zh_TW.UTF-8`, `zh_HK` or `zh_MO` starts in `zh-Hant` and one with `zh_CN` or `zh_SG` in
   `zh-Hans` (`languageOfLocale` in `sdk/localename.js`), the installer lists every `zh_` region for both, and
   **Install language packages** sends `zh` or the region to the root side, as before.
-- **Where they appear.** Nothing lists languages by hand: Settings → Language & Region (**+**, marked "partly
-  translated"), the installer and the login screen's language button read `assets/locales/*/meta.json`. A language
-  is picked by itself (from LANG, without a choice in Settings) only once it has its `shell` texts, and on the login
-  screen once it has `greeter`; until then such a computer shows English with its region's formats.
+- **Where they appear.** Nothing lists languages by hand: Settings → Language & Region (**+**), the installer and
+  the login screen's language button read `assets/locales/*/meta.json`. A language is picked by itself (from LANG,
+  without a choice in Settings) only once it has its `shell` texts, and on the login screen once it has `greeter`;
+  all 26 have both, so a computer whose LANG is one of them starts in it.
 - **Fonts.** Latin, Greek and Cyrillic (Vietnamese and Azerbaijani letters included) are Inter's. The others come from
   `fonts-noto-core` (Arabic for ar, fa and ur, Devanagari, Bengali, Thai) and `fonts-noto-cjk`, both in the ISO and
   the Raspberry Pi image; on a computer that lacks them, **Install language packages** adds them
@@ -562,10 +569,10 @@ translates the desktop, Settings, Files, About and the Calculator; the Terminal 
 - The installer lists only the regions of the chosen language (English with `lt_LT` is chosen afterwards
   in Settings → Language & Region), and the first-run file of the Raspberry Pi image takes only en, es,
   pt, fr and it (`firstrun.c` checks a closed list, and the image generates only those regions): a Pi set up in
-  Lithuanian or one of the 26 partial languages starts in English and changes it in Settings.
+  Lithuanian or one of the 26 new languages starts in English and changes it in Settings.
 - The home folders (Desktop, Documents, Downloads…) are named in English for every language but es, pt, fr and
   it (`server/src/users/homedirs.c`).
-- Formats the 26 partial languages still lack: the Solar Hijri calendar for Persian and the Buddhist era for Thai
+- Formats the 26 new languages still lack: the Solar Hijri calendar for Persian and the Buddhist era for Thai
   (dates are Gregorian), Indian digit grouping for Hindi and Bengali («12,34,567»; LordOS groups by three), and
   Finnish's «21.05» clock (the clock always uses «:»).
 
