@@ -27,6 +27,7 @@ int osk_level_valid(int level);
 /* 1 if it fits, 0 if the code or level is refused or the queue is full. */
 int osk_push(int code, int level);
 int osk_pop(OskTap *t);
+int osk_room(void);                     /* taps that still fit in the queue */
 void osk_clear(void);
 
 /* key_bit(code) of a device's EV_KEY capabilities: letters, space, Enter, Backspace and Shift.

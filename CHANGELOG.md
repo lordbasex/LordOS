@@ -42,6 +42,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ۲۱:۰۵», Arabic «١٬٢٣٤٬٥٦٧٫٨٩» (ar_MA, ar_DZ and ar_TN keep 0–9, as CLDR has them) and Bengali «১,২৩৪,৫৬৭.৮৯»,
   in dates, times and numbers, only when the region is of the language itself: English with region fa_IR keeps
   «1,234,567.89».
+- **Screen-sharing API: the visitor picks the display, and text no key types still arrives.** Two changes to the
+  public sharing API that Desk go-link uses (docs/SCREEN-SHARING.md):
+  - **Displays.** A share still starts on the display Settings → Displays → "Screenshots and sharing" names (the main
+    display by default, or all of them), with no chooser: the app's one-time permission and the visitor's own
+    acceptance are unchanged. New in the wire format: `SHARE_DISPLAYS` (63) lists the session's displays to the
+    holder of a running share (each one's id, the connector's, its place and logical size, the picture's pixels, a
+    main flag and its name; with more than one display, last, "all of them" as one picture, `SW_DISPLAY_ALL`) and says
+    which one the picture is of; it comes when the share starts, after each request and whenever a display is
+    plugged, unplugged or moved. `SHARE_DISPLAY` (57, a u32 id; 0 is the default again) moves the picture to another
+    display: the frame that feeds the session's encoder becomes that display's (`feed_out` in `server/src/main.c`),
+    the whole of it is painted again with a keyframe before anything that depends on the old one, and pointer
+    positions stay in the shown picture's pixels, so a click lands where it was aimed on any display. An id that is
+    gone changes nothing; a display that leaves while shown sends the picture back to the default. Viewing another
+    display needs nothing beyond `screen-share`: the indicator is on every display. A recording made while a share
+    runs follows the share's display (one door at a time, so no 5673 viewer can see the difference). A client that
+    never reads the list never sees a difference (`server/src/remote/share.c`, `sharewire.c`).
+  - **`SHARE_TEXT`.** Text from a visitor's input method (an accent, ñ on a US layout, €, Japanese) was typed only
+    where a key of the active layout types each character, and the rest was dropped: on VM 127, with a US layout,
+    " ñandú ÁÉ ¿€?" arrived as " and  ?". Now a Latin letter with a mark that the layout has as a dead key goes as
+    the dead key and then the letter (`sw_dead_split`), and anything else goes as an input method's finished text to
+    the field that has the keyboard (`js_commit_text` in `server/src/ui/js.c`): a LordOS field, or a Linux app's
+    field with text input on, which gets the whole text in one commit (GTK 4 put committed letters ahead of typed ones
+    when the two were mixed). An app without text input (X11, a terminal) still gets only what keys type. The same
+    checks as before run first (system surfaces, protected windows, the holder's windows, the authentication prompt).
+  - Tests: `share-test` 342 checks (the list byte for byte, names cleaned and cut at a code point, `SHARE_DISPLAY`'s
+    lengths, dead-key splits), `share-fuzz` with `SHARE_DISPLAY`, `osk-test` (`osk_room`), and six new checks in
+    `server/tests/share_e2e.sh` (`share-client` learned `pick` and `shown`); on VM 127 (2026-11-12) 59 of its 61
+    checks passed in isolated headless sessions, and the two that failed count `lord-media` processes of the same
+    user, which a second LordOS session on that machine had running. With a real visitor from desk.go-link.org on
+    VM 127: no chooser, the main display shown, the pointer, clicks, the wheel, Ctrl+A, End and Enter, and " ñandú
+    ÁÉ ¿€? 日本" into Notes and into GTK 4's Print Editor on a US layout. **Not tested:** switching to a second
+    display, because VM 127 has one (a QEMU `std` VGA); the pointer on a scaled or rotated second display.
 
 ### Changed
 

@@ -72,6 +72,14 @@ sleep 1.5
 check "second app: busy" app start 1 1 2000 expect-ref busy 1000
 wait $AP
 
+# ---- displays (SHARE_DISPLAY, SHARE_DISPLAYS): a session with no monitor has one, id 1, the main one
+check "displays: the list comes with the start, display 1 shown" app start 1 1 2000 until 40 4000 shown 1 1000 stop
+check "displays: an unknown id changes nothing and is answered with the list" app start 1 1 2000 until 40 4000 reset pick 99 shown 1 1000 until 40 2000 stop
+check "displays: 'all' with one display changes nothing" app start 1 1 2000 until 40 4000 reset pick 0xffffffff shown 1 1000 stop
+check "displays: back to the default" app start 1 1 2000 until 40 4000 reset pick 0 shown 1 1000 stop
+check "displays: nothing without a running share" app pick 1 none 63 600
+check "displays: input on the display shown" app start 5 1 2000 until 40 4000 pick 1 shown 1 1000 reset ptr 222 111 until 4 2000 stop
+
 # input reaches the session through a share, and not without one
 check "input: a pointer move comes back as RP_CURSOR" app start 5 1 2000 until 40 4000 wait 300 reset ptr 321 123 until 4 2000 stop
 check "input: refused with no share" app ptr 11 11 none 4 500

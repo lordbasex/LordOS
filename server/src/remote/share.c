@@ -60,6 +60,7 @@ typedef struct {
     char id[SG_ID_MAX], exe[SG_EXE_MAX];
     int flags, granted, codec, hz, hear, awake, need_key, cur_x, cur_y, cur_mode;
     int companion, may_input;           /* connected by lord-server at spawn; manifest declares remote-input */
+    uint32_t display;                   /* SHARE_DISPLAY: the display asked for, 0 the default */
     unsigned kbps, clip_gen, token;
     double since;
     SwKeyLimit keys;
@@ -238,6 +239,7 @@ static void end_share(Conn *c, int reason, int discard) {
     say(c, ran || was == C_BADGE ? SHARE_END : SHARE_REFUSED, reason);
     fprintf(stderr, "share: %s %s (%s), %ld frames, %ld inputs dropped\n", c->id, ran ? "ended" : "refused", sw_reason_name(reason), c->frames, c->dropped);
     c->granted = c->hear = c->awake = c->need_key = 0;
+    c->display = 0;                     /* the next share starts on the default display again */
     c->frames = c->dropped = 0;
     shell_event("end", NULL);
     if (ran) mirror_share_changed();    /* the encoder stops; a 5673 sign-in may come in */
@@ -315,6 +317,44 @@ static void send_state(Conn *c) {
     flush(c);
 }
 
+/* The displays and the one shown, to the holder of a running share. */
+static int list_displays(SwDisplay *d, uint32_t *cur) {
+    *cur = 0;
+    if (!h.displays) return 0;
+    int n = h.displays(d, SW_DISPLAYS_MAX + 1, cur);
+    return n < 0 ? 0 : n > SW_DISPLAYS_MAX + 1 ? SW_DISPLAYS_MAX + 1 : n;
+}
+
+static void send_displays(Conn *c) {
+    SwDisplay d[SW_DISPLAYS_MAX + 1];
+    uint32_t cur;
+    int n = list_displays(d, &cur);
+    uint8_t b[5 + (SW_DISPLAYS_MAX + 1) * (22 + SW_DISPLAY_NAME)];
+    size_t len = sw_displays_encode(b, sizeof b, cur, d, n);
+    if (!len) return;
+    msg(c, SHARE_DISPLAYS, b, len, NULL, 0);
+    flush(c);
+}
+
+/* SHARE_DISPLAY: the picture moves to another display. Viewing it is what screen-share already allows (a share is
+ * of the session, every display of it carries the indicator); the default stays what Settings says. An id that's
+ * gone (unplugged on the way) changes nothing. Either way the client hears the list with what is shown. */
+static void on_display(Conn *c, const SwMsg *m) {
+    SwDisplay d[SW_DISPLAYS_MAX + 1];
+    uint32_t cur;
+    int n = list_displays(d, &cur);
+    if (sw_display_known(m->display, d, n) && m->display != c->display) {
+        c->display = m->display;
+        fprintf(stderr, "share: %s shows display %s%u\n", c->id, m->display == SW_DISPLAY_ALL ? "all " : "", m->display == SW_DISPLAY_ALL ? 0 : m->display);
+        /* a whole picture of the new display, and a keyframe for it, before any frame that depends on the old one */
+        c->need_key = 1;
+        sw_key_changed(&c->keys);
+        sw_key_request(&c->keys);
+        if (h.refresh) h.refresh();
+    }
+    send_displays(c);
+}
+
 static void on_start(Conn *c, const SwMsg *m) {
     if (c->st != C_IDLE) { say(c, SHARE_REFUSED, SW_BAD_REQUEST); return; }
     int b = blocked_now();
@@ -389,6 +429,9 @@ static void handle(Conn *c, const SwMsg *m) {
         break;
     case SHARE_AWAKE: if (c->st == C_ACTIVE) c->awake = m->on; break;
     case SHARE_HEAR: if (c->st == C_ACTIVE) c->hear = m->on; break;
+    case SHARE_DISPLAY:
+        if (c->st == C_ACTIVE && c == holder && !session && sw_bucket_take(&c->b_other, t, OTHER_RATE, OTHER_RATE)) on_display(c, m);
+        break;
     case RP_KEYFRAME:
         if (c->st == C_ACTIVE) { sw_key_request(&c->keys); c->need_key = 1; }
         break;
@@ -638,6 +681,24 @@ void share_clipboard(const char *text, unsigned gen, int sensitive) {
     flush(c);
 }
 
+uint32_t share_display(void) { const Conn *c = running(); return c ? c->display : 0; }
+
+void share_displays_changed(void) {
+    Conn *c = running();
+    if (!c) return;
+    SwDisplay d[SW_DISPLAYS_MAX + 1];
+    uint32_t cur;
+    int n = list_displays(d, &cur);
+    if (!sw_display_known(c->display, d, n)) {
+        c->display = 0;                 /* the display it showed is gone: back to the default */
+        c->need_key = 1;
+        sw_key_changed(&c->keys);
+        sw_key_request(&c->keys);
+        if (h.refresh) h.refresh();
+    }
+    send_displays(c);
+}
+
 /* ---- the shell ---- */
 
 void share_shown(unsigned token) {
@@ -655,6 +716,7 @@ void share_shown(unsigned token) {
         msg(c, RP_SHAPE, q, 8, last_shape, (size_t)shape_w * shape_h * 4);
     }
     flush(c);
+    send_displays(c);
     recheck_at = now_ms() + RECHECK_MS;
     mirror_share_changed();
 }

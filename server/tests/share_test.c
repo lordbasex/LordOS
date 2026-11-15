@@ -87,6 +87,69 @@ static void test_messages(void) {
     CHECK(!parse(SHARE_TEXT, "h\xc3\xa9", 3, &m));
     CHECK(parse(SHARE_TEXT, "a\0b", 3, &m));
     CHECK(parse(RP_SETCLIP, "\xff", 1, &m));
+
+    /* SHARE_DISPLAY: a u32, any value (whether the display exists is the session's question) */
+    uint32_t id = 37;
+    CHECK(!parse(SHARE_DISPLAY, &id, 4, &m) && m.display == 37);
+    id = SW_DISPLAY_ALL;                CHECK(!parse(SHARE_DISPLAY, &id, 4, &m) && m.display == SW_DISPLAY_ALL);
+    id = 0;                             CHECK(!parse(SHARE_DISPLAY, &id, 4, &m) && m.display == 0);
+    CHECK(parse(SHARE_DISPLAY, &id, 3, &m));
+    CHECK(parse(SHARE_DISPLAY, s, 5, &m));
+    CHECK(parse(SHARE_DISPLAY, NULL, 0, &m));
+    CHECK(parse(SHARE_DISPLAYS, s, 8, &m));      /* the system's message is never a client's */
+}
+
+/* SHARE_TEXT's letters with a mark, split for a dead key */
+static void test_dead_split(void) {
+    char b[8];
+    const char *m = NULL;
+    CHECK(sw_dead_split(0xe1, b, &m) && !strcmp(b, "a") && !strcmp(m, "\xc2\xb4"));     /* á */
+    CHECK(sw_dead_split(0xd1, b, &m) && !strcmp(b, "N") && !strcmp(m, "~"));             /* Ñ */
+    CHECK(sw_dead_split(0xfc, b, &m) && !strcmp(b, "u") && !strcmp(m, "\xc2\xa8"));     /* ü */
+    CHECK(sw_dead_split(0x178, b, &m) && !strcmp(b, "Y") && !strcmp(m, "\xc2\xa8"));    /* Ÿ */
+    CHECK(sw_dead_split(0xe7, b, &m) && !strcmp(b, "c") && !strcmp(m, "\xc2\xb8"));     /* ç */
+    CHECK(sw_dead_split(0xc5, b, &m) && !strcmp(b, "A") && !strcmp(m, "\xc2\xb0"));     /* Å */
+    CHECK(sw_dead_split(0xf9, b, &m) && !strcmp(b, "u") && !strcmp(m, "`"));             /* ù */
+    CHECK(sw_dead_split(0x155, b, &m) && !strcmp(b, "r"));                              /* ŕ, the last of its row */
+    CHECK(!sw_dead_split('a', b, &m) && !sw_dead_split(0x20ac, b, &m) && !sw_dead_split(0xdf, b, &m));  /* a, €, ß */
+}
+
+static uint32_t rd32(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+static uint16_t rd16(const uint8_t *p) { uint16_t v; memcpy(&v, p, 2); return v; }
+
+/* SHARE_DISPLAYS as a client reads it, and the names cleaned on the way */
+static void test_displays(void) {
+    SwDisplay d[SW_DISPLAYS_MAX + 2] = {
+        { 37, 0, 0, 1280, 800, 1920, 1200, SW_DF_MAIN, "Dell U2412M" },
+        { 41, 1280, -100, 1024, 768, 1024, 768, 0, "bad\x01name\xff\xc3\xa9\n" },
+        { SW_DISPLAY_ALL, 0, 0, 2304, 900, 2304, 900, SW_DF_ALL | 8, "" },
+    };
+    uint8_t b[2048];
+    size_t n = sw_displays_encode(b, sizeof b, 41, d, 3);
+    CHECK(n == 5 + 22 + 11 + 22 + 9 + 22);
+    CHECK(rd32(b) == 41 && b[4] == 3);
+    const uint8_t *e = b + 5;
+    CHECK(rd32(e) == 37 && (int32_t)rd32(e + 4) == 0 && rd16(e + 12) == 1280 && rd16(e + 14) == 800 && rd16(e + 16) == 1920 &&
+          rd16(e + 18) == 1200 && e[20] == SW_DF_MAIN && e[21] == 11 && !memcmp(e + 22, "Dell U2412M", 11));
+    e += 22 + 11;
+    CHECK(rd32(e) == 41 && (int32_t)rd32(e + 4) == 1280 && (int32_t)rd32(e + 8) == -100 && e[20] == 0);
+    CHECK(e[21] == 9 && !memcmp(e + 22, "badname\xc3\xa9", 9));        /* control bytes and a broken byte left out */
+    e += 22 + 9;
+    CHECK(rd32(e) == SW_DISPLAY_ALL && e[20] == SW_DF_ALL && e[21] == 0);       /* unknown flags never leave */
+    /* a name cut at SW_DISPLAY_NAME bytes, never inside a code point */
+    memset(d[0].name, 0, sizeof d[0].name);
+    for (int i = 0; i < 32; i++) memcpy(d[0].name + 2 * i, "\xc3\xa9", 2);
+    d[0].name[63] = 0;                  /* 31 whole ones and half of the 32nd */
+    n = sw_displays_encode(b, sizeof b, 37, d, 1);
+    CHECK(n == 5 + 22 + 62 && b[5 + 21] == 62 && sw_utf8_valid((const char *)b + 5 + 22, 62));
+    /* too small, too many, none */
+    CHECK(sw_displays_encode(b, 26, 37, d, 1) == 0);
+    CHECK(sw_displays_encode(b, sizeof b, 37, d, SW_DISPLAYS_MAX + 2) == 0);
+    CHECK(sw_displays_encode(b, sizeof b, 0, d, 0) == 5 && b[4] == 0);
+    /* which ids a client may ask for */
+    CHECK(sw_display_known(0, d, 0));
+    CHECK(sw_display_known(41, d, 3) && sw_display_known(SW_DISPLAY_ALL, d, 3));
+    CHECK(!sw_display_known(42, d, 3) && !sw_display_known(SW_DISPLAY_ALL, d, 2));
 }
 
 static void test_utf8(void) {
@@ -281,6 +344,8 @@ static void test_grants(void) {
 int main(void) {
     test_framing();
     test_messages();
+    test_displays();
+    test_dead_split();
     test_utf8();
     test_held();
     test_limits();

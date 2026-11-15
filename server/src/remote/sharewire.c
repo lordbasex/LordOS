@@ -82,6 +82,10 @@ int sw_parse(const SwFrame *f, SwMsg *m) {
         if (n != 1 || d[0] > 1) return -1;
         m->on = d[0];
         return 0;
+    case SHARE_DISPLAY:
+        if (n != 4) return -1;
+        memcpy(&m->display, d, 4);
+        return 0;
     case SHARE_TEXT:
         if (!n || n > SW_TEXT_MAX || !sw_utf8_valid((const char *)d, n)) return -1;
         m->text = (const char *)d;
@@ -215,4 +219,79 @@ double sw_key_wait(const SwKeyLimit *k, double now) {
         }
     }
     return w < 0 ? 0 : w;
+}
+
+/* A display's name as it goes on the wire: valid UTF-8 without control characters, at most SW_DISPLAY_NAME bytes. */
+static size_t clean_name(const char *s, char *out) {
+    size_t o = 0, n = strnlen(s, 256);
+    for (size_t i = 0; i < n;) {
+        const unsigned char c = (const unsigned char)s[i];
+        int l = c < 0x80 ? 1 : c >= 0xc2 && c <= 0xdf ? 2 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+        if (!l || i + (size_t)l > n || !sw_utf8_valid(s + i, (size_t)l)) { i++; continue; }
+        if (l == 1 && (c < 0x20 || c == 0x7f)) { i++; continue; }
+        if (o + (size_t)l > SW_DISPLAY_NAME) break;
+        memcpy(out + o, s + i, (size_t)l);
+        o += (size_t)l;
+        i += (size_t)l;
+    }
+    return o;
+}
+
+static uint16_t u16_of(int v) { return (uint16_t)(v < 0 ? 0 : v > 65535 ? 65535 : v); }
+
+size_t sw_displays_encode(uint8_t *out, size_t cap, uint32_t current, const SwDisplay *d, int n) {
+    if (n < 0 || n > SW_DISPLAYS_MAX + 1 || cap < 5) return 0;
+    size_t k = 0;
+    memcpy(out, &current, 4);
+    out[4] = (uint8_t)n;
+    k = 5;
+    for (int i = 0; i < n; i++) {
+        char name[SW_DISPLAY_NAME];
+        size_t nl = clean_name(d[i].name, name);
+        if (k + 22 + nl > cap) return 0;
+        int32_t xy[2] = { d[i].x, d[i].y };
+        uint16_t sz[4] = { u16_of(d[i].w), u16_of(d[i].h), u16_of(d[i].pw), u16_of(d[i].ph) };
+        memcpy(out + k, &d[i].id, 4);
+        memcpy(out + k + 4, xy, 8);
+        memcpy(out + k + 12, sz, 8);
+        out[k + 20] = (uint8_t)(d[i].flags & (SW_DF_MAIN | SW_DF_ALL));
+        out[k + 21] = (uint8_t)nl;
+        memcpy(out + k + 22, name, nl);
+        k += 22 + nl;
+    }
+    return k;
+}
+
+int sw_display_known(uint32_t id, const SwDisplay *d, int n) {
+    if (!id) return 1;
+    for (int i = 0; i < n; i++) if (d[i].id == id) return 1;
+    return 0;
+}
+
+int sw_dead_split(uint32_t cp, char base[8], const char **mark) {
+    /* the dead keys' marks as kb_label names them: acute, grave, circumflex, tilde, diaeresis, cedilla, ring */
+    static const char *const marks[] = { "\xc2\xb4", "`", "^", "~", "\xc2\xa8", "\xc2\xb8", "\xc2\xb0" };
+    /* each letter, its base and its mark */
+    static const struct { uint32_t cp; char base; uint8_t mark; } t[] = {
+        { 0xe1, 'a', 0 }, { 0xe9, 'e', 0 }, { 0xed, 'i', 0 }, { 0xf3, 'o', 0 }, { 0xfa, 'u', 0 }, { 0xfd, 'y', 0 },
+        { 0xc1, 'A', 0 }, { 0xc9, 'E', 0 }, { 0xcd, 'I', 0 }, { 0xd3, 'O', 0 }, { 0xda, 'U', 0 }, { 0xdd, 'Y', 0 },
+        { 0x107, 'c', 0 }, { 0x106, 'C', 0 }, { 0x144, 'n', 0 }, { 0x143, 'N', 0 }, { 0x15b, 's', 0 },
+        { 0x15a, 'S', 0 }, { 0x17a, 'z', 0 }, { 0x179, 'Z', 0 }, { 0x13a, 'l', 0 }, { 0x139, 'L', 0 },
+        { 0x155, 'r', 0 }, { 0x154, 'R', 0 }, { 0xe0, 'a', 1 }, { 0xe8, 'e', 1 }, { 0xec, 'i', 1 }, { 0xf2, 'o', 1 },
+        { 0xf9, 'u', 1 }, { 0xc0, 'A', 1 }, { 0xc8, 'E', 1 }, { 0xcc, 'I', 1 }, { 0xd2, 'O', 1 }, { 0xd9, 'U', 1 },
+        { 0xe2, 'a', 2 }, { 0xea, 'e', 2 }, { 0xee, 'i', 2 }, { 0xf4, 'o', 2 }, { 0xfb, 'u', 2 }, { 0xc2, 'A', 2 },
+        { 0xca, 'E', 2 }, { 0xce, 'I', 2 }, { 0xd4, 'O', 2 }, { 0xdb, 'U', 2 }, { 0xe3, 'a', 3 }, { 0xf5, 'o', 3 },
+        { 0xf1, 'n', 3 }, { 0xc3, 'A', 3 }, { 0xd5, 'O', 3 }, { 0xd1, 'N', 3 }, { 0xe4, 'a', 4 }, { 0xeb, 'e', 4 },
+        { 0xef, 'i', 4 }, { 0xf6, 'o', 4 }, { 0xfc, 'u', 4 }, { 0xff, 'y', 4 }, { 0xc4, 'A', 4 }, { 0xcb, 'E', 4 },
+        { 0xcf, 'I', 4 }, { 0xd6, 'O', 4 }, { 0xdc, 'U', 4 }, { 0x178, 'Y', 4 }, { 0xe7, 'c', 5 }, { 0xc7, 'C', 5 },
+        { 0xe5, 'a', 6 }, { 0xc5, 'A', 6 },
+    };
+    for (size_t i = 0; i < sizeof t / sizeof t[0]; i++)
+        if (t[i].cp == cp) {
+            base[0] = t[i].base;
+            base[1] = 0;
+            *mark = marks[t[i].mark];
+            return 1;
+        }
+    return 0;
 }

@@ -13,7 +13,7 @@
 static unsigned long long st = 88172645463325252ULL;
 static unsigned rnd(void) { st ^= st << 13; st ^= st >> 7; st ^= st << 17; return (unsigned)(st >> 11); }
 
-static const int types[] = { SHARE_START, SHARE_QUERY, SHARE_STOP, SHARE_AWAKE, SHARE_LOCK, SHARE_TEXT, SHARE_HEAR, RP_KEYFRAME, RP_RATE, RP_RESIZE, RP_PTR,
+static const int types[] = { SHARE_START, SHARE_QUERY, SHARE_STOP, SHARE_AWAKE, SHARE_LOCK, SHARE_TEXT, SHARE_HEAR, SHARE_DISPLAY, RP_KEYFRAME, RP_RATE, RP_RESIZE, RP_PTR,
                              RP_BTN, RP_WHEEL, RP_SCROLL, RP_KEY, RP_SETCLIP, RP_SEAT, RP_DISPLAY, RP_KEYRING, RP_HELLO, RP_VIDEO };
 static const char *const seeds[] = {
     "{\"v\":1,\"grants\":[]}",

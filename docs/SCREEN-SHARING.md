@@ -31,13 +31,15 @@ connection, and so does any seat message (`RP_DISPLAY`, `RP_KEYRING`…).
 | `SHARE_QUERY` 51 | none: answers `SHARE_STATE`, prompts nobody |
 | `SHARE_STOP` 52, `SHARE_LOCK` 54 | none |
 | `SHARE_AWAKE` 53, `SHARE_HEAR` 56 | u8 on. `RP_AFRAME` is dropped until `SHARE_HEAR` 1 |
-| `SHARE_TEXT` 55 | UTF-8, 1 KB at most, typed through the active layout; what no key can type is dropped |
+| `SHARE_TEXT` 55 | UTF-8, 1 KB at most: typed through the active layout where it can be, otherwise committed as an input method's text (see "Input") |
+| `SHARE_DISPLAY` 57 | u32 id of `SHARE_DISPLAYS`, `0xffffffff` all of them in one picture, 0 the default (see "Displays") |
 | `RP_KEYFRAME`, `RP_RATE`, `RP_RESIZE`, `RP_PTR`, `RP_BTN`, `RP_WHEEL`, `RP_SCROLL`, `RP_KEY`, `RP_SETCLIP` | as in `proto.h`, checked exactly |
 
 | System → client | Data |
 |---|---|
 | `SHARE_STATE` 60 | u8 why a start would be refused (0 it wouldn't), u8 granted, u8 codecs, u8 0, u16 w, h, hz |
 | `SHARE_REFUSED` 61, `SHARE_END` 62 | u8 reason |
+| `SHARE_DISPLAYS` 63 | u32 id shown, u8 n, then n × { u32 id, i32 x, i32 y, u16 w, u16 h (logical), u16 pw, u16 ph (the picture's pixels), u8 flags (1 main, 2 all), u8 name length, name } |
 | `RP_SIZE`, `RP_VFRAME`, `RP_AFRAME`, `RP_CURSOR`, `RP_SHAPE`, `RP_CLIP`, `RP_VINFO` | as in `proto.h` |
 
 Reasons: 1 `no_identity`, 2 `denied`, 3 `no_person`, 4 `no_indicator`, 5 `busy`, 6 `locked`, 7 `away`, 8 `remote_desktop`, 9 `restricted`,
@@ -56,6 +58,25 @@ elsewhere can't hold a grant. Every string in the file and in the events to the 
 With no decision the system draws the prompt, in the `system` layer. If no one can answer, the answer is `no_person`, never a default. The
 prompt only records a decision: the share goes on from what the root-owned file says. Revoking is read within a second, without the shell.
 `FW_R_NO_SCREEN` refuses without a prompt.
+
+## Displays
+
+A share starts on the display Settings → Displays → "Screenshots and sharing" names: the main display (the default), or all of them
+in one picture at 100 %. Nobody is asked which: the app's permission and the visitor's acceptance are the only questions.
+
+While a share runs, `SHARE_DISPLAYS` tells its holder which displays there are and which one the picture is of. It comes when the
+share starts, after every `SHARE_DISPLAY`, and when a display is plugged, unplugged or moved. An id is the display's connector, stable
+while it stays plugged; a session with no monitor has one display, id 1. With more than one display the list ends with
+`0xffffffff`, all of them. Names are the monitor's, valid UTF-8 without control characters, 64 bytes at most.
+
+`SHARE_DISPLAY` moves the picture to another display, or back to the default with 0. The encoder is fed that display's frame
+(`feed_out` in `server/src/main.c`), the whole of it is painted again and the next frame sent is a keyframe. Pointer positions
+(`RP_PTR`) are always in the shown picture's pixels, mapped back through that display's view, so a click lands where it was
+aimed on any display, at any scale. An id that isn't in the list changes nothing; a display that leaves while it's shown sends
+the picture back to the default. Either way the answer is the list. Showing another display needs nothing beyond `screen-share`:
+the indicator is on every display. A recording made while a share runs follows the share's display. A client that never reads
+the list sees nothing new, and a client must not send `SHARE_DISPLAY` to a system that never sent it a list: an older system ends
+the connection over a type it doesn't know.
 
 ## The indicator
 
@@ -94,6 +115,14 @@ Through the same functions as 5673, with this door's own rules. Dropped: anythin
 a protected window or at a window of the app holding the share, since those are where a person accepts, sets a password or changes what the visitor may do. A release always goes, so nothing stays held. So a visitor who opens the search can't type in it or close it: the person
 at the computer has to. Limits: 1,000 pointer events and 200 keys a second.
 
+`SHARE_TEXT` is for what a visitor's input method finishes (an accent, ñ, Japanese), which has no key on their side. Each
+character a key of the active layout types goes as that key; a Latin letter with a mark that the layout has as a dead key (á on
+Spanish, ü on German) goes as the dead key and then the letter, and the layout's own compose makes it; anything else goes as an
+input method's finished text to the field that has the keyboard (`js_commit_text`, `server/src/ui/js.c`). A Linux app's field with
+text input on gets the whole text as one commit, because keys and commits mixed don't keep their order there. An app without text
+input (X11, a terminal) gets only what keys type. The checks above run first, and nothing goes while the authentication prompt
+takes only this computer's keys.
+
 ## Fullscreen
 
 A fullscreen Wayland or X11 surface is drawn over every layer, the indicator's too, on the CPU path and the GPU path. So while an app holds a share there is none: a surface asking for it stays in its window, and one already fullscreen goes back to it. A LordOS window in fullscreen stays, because it's drawn under the `notification` layer. It was found by running one on VM 125: a fullscreen `xterm` covered the indicator whole.
@@ -123,9 +152,16 @@ On VM 116 (amd64, 2026-11-01), against isolated headless sessions with a test cl
 - `remote.sock`: a process of the same user is closed at once, root is served, and a client that connects as root and then drops to the user
   stays connected, which is the bridge's order. The real `lord-sessiond` was not run.
 
+**On VM 127** (an installed LordOS, one display, 2026-11-12), with this build: `share_e2e.sh` in isolated headless sessions,
+59 of 61 checks passed, the six display checks among them; the two that failed count the `lord-media` processes of the same
+user, and another LordOS session of that user had one running. With Desk go-link and a visitor from desk.go-link.org in headless
+Chromium: no chooser, the main display shown, the pointer, clicks, the wheel, shortcuts, and text with accents, ñ, € and
+Japanese into Notes and into GTK 4's Print Editor on a US layout ([GO-LINK.md](GO-LINK.md), section 12). Switching to a second
+display was not tested: VM 127 has one.
+
 **Not tested:** the system prompt and its answer (a headless session has no person to ask); a real monitor, a real lock screen and a real
 `lord-sessiond`; the real bridge and page with `RP_BUSY`, and a browser on 5673 before and after; ⌃⌥⇧Esc; a click on the badge's Stop; protected
-windows; sensitive clipboard items; sound; `SHARE_TEXT` reaching a field; `FW_R_NO_SCREEN`; several displays; the GPU path; a badge under an
+windows; sensitive clipboard items; sound; `FW_R_NO_SCREEN`; several displays, and switching between them; the GPU path; a badge under an
 `xdg_popup`. Settings and Monitor additions were built, not looked at.
 
 Uninstalling forgets a grant: Remove calls `share-forget`, and at each session start the shell forgets the grants of apps that are gone, for what dpkg removed. The rule is in

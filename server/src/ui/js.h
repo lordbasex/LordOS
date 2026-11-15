@@ -20,6 +20,12 @@ void   js_pointer(const char *type, int target, float x, float y, int button);
  * "scroll" (dx, dy, source), "pinch" (scale, rotation, dx, dy), "swipe" (dx, dy, fingers, system). */
 void   js_gesture(const char *kind, const char *phase, int target, float x, float y, double a, double b, double c, double d);
 void   js_key(int code, int value);
+/* Finished text, as an input method commits it, to whoever has the keyboard: a Linux app's field with text input on,
+ * or a LordOS field. The screen-sharing API's text that no key of the layout types (main.c). 0: nobody can take it. */
+int    js_commit_text(const char *text);
+/* A Linux app's field with text input on has the keyboard: text for it goes whole as one commit, because its keys and
+ * commits mixed don't keep their order in the app (GTK 4 on VM 127 put the committed letters before the typed ones). */
+int    js_text_input_app(void);
 void   js_keyboards_event(int present);
 void   js_wl_event(int id, const char *type, const char *json);
 void   js_before_exit(void);             /* __lordBeforeExit(): the session's last word, once */
