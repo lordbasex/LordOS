@@ -1,0 +1,22 @@
+{
+  "folder": "Aufnahmen",
+  "name": "Aufnahme {date} {time}",
+  "all": "Alle Aufnahmen",
+  "empty": "Es gibt noch keine Aufnahmen",
+  "hint": "Drücke die rote Taste (oder R), um mit dem Mikrofon aufzunehmen",
+  "denied": "Sprachaufnahme darf das Mikrofon nicht verwenden",
+  "play": "Abspielen",
+  "pause": "Pause",
+  "rename": "Umbenennen",
+  "trim": "Kürzen",
+  "cancelTrim": "Kürzen abbrechen",
+  "saveTrim": "Gekürzte Kopie sichern",
+  "trimmed": "gekürzt",
+  "export": "Exportieren als",
+  "exportBtn": "Exportieren",
+  "working": "Wird exportiert …",
+  "exported": "„{name}“ gesichert",
+  "exportError": "Export nicht möglich",
+  "renameError": "Umbenennen nicht möglich (gibt es diesen Namen schon?)",
+  "emptyTitle": "Wähle oder erstelle eine Aufnahme"
+}
