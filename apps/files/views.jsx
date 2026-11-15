@@ -8,7 +8,7 @@ import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
-import { colWidth, clampCol, fitCol, colsThatFit } from './colview.js';
+import { colWidth, clampCol, fitCol, colStrip, chainFolder } from './colview.js';
 import { iconMetrics, listMetrics } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 
@@ -289,8 +289,10 @@ export function Preview({ e, big = false, name, noRead = false }) {
 // ---- columns (Miller) ----
 
 // Each column's divider widens it by dragging (as the list's column edges do) and fits it to its longest name with a
-// double click; the width is kept per folder (colview.js, GitHub #99). The view is laid out left to right in every
-// language, so the pointer's x needs no flip.
+// double click; the width is kept per folder (colview.js, GitHub #99). Every column is shown: when they don't fit
+// they scroll sideways (a sideways swipe or tilt of the wheel, or the bar along the bottom), and opening a deeper
+// folder scrolls to it, as in Finder (GitHub #133). The view is laid out left to right in every language, so the
+// pointer's x needs no flip.
 export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths, onWidth }) {
   const t = useTheme();
   const box = useRef(null);
@@ -322,16 +324,30 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths
     const names = items.map((e) => lord.measureText(String(ctx.shownName ? ctx.shownName(e) : e.name), 13, 400));
     onWidth?.(dir, fitCol(names, items.map((e) => tagsOf(e.path).length * 9)));
   };
-  // the ones that fit next to the preview (the last 3 until the view has been laid out)
+  // every column, side by side; what doesn't fit scrolls (the preview takes what is left, at least PREVIEW_MIN)
   const avail = box.current ? lord.getLayout(box.current.id)[2] : 0;
-  const count = colsThatFit(dirs.map(widthOf), avail);
-  const shown = dirs.slice(-count);
-  const offset = dirs.length - shown.length;
+  const strip = colStrip(dirs.map(widthOf), avail);
+  const [sx, setSx] = useState(0);
+  const x = Math.min(sx, strip.over);
+  // a deeper folder opened (or another one picked): scrolled to the end, so it and the preview are in sight; widening
+  // a column keeps the offset, so the first columns stay where they are
+  const deepest = chainFolder(chain, ctx.isDir);
+  const overNow = useRef(0);
+  overNow.current = strip.over;
+  useEffect(() => { setSx(overNow.current); }, [deepest, dirs.length]);
+  const bar = useRef(null);
+  useEffect(() => {
+    const mv = addListener('pointermove', (e) => { const b = bar.current; if (b) setSx(Math.max(0, Math.min(b.over, b.x0 + (e.x - b.at) * b.k))); });
+    const up = addListener('pointerup', () => { bar.current = null; });
+    return () => { mv(); up(); };
+  }, []);
+  const thumb = strip.over ? Math.max(40, avail * (avail / strip.total)) : 0;
   return (
-    <View ref={box} style={{ flex: 1, flexDirection: 'row', direction: 'ltr' }}>
-      {shown.map((dir, ci) => {
+    <View ref={box} onWheel={(e) => { if (strip.over && e.deltaX) setSx(Math.max(0, Math.min(strip.over, x + e.deltaX))); }}
+      style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
+    <View style={{ flex: 1, flexDirection: 'row', width: Math.max(avail, strip.total), marginLeft: -x }}>
+      {dirs.map((dir, level) => {
         const items = sortEntries(entriesOf(dir), sort, ctx.sortOpts);
-        const level = offset + ci;
         return (
           <View key={dir} dropPath={dir} style={{ width: widthOf(dir), flexDirection: 'row' }}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -365,7 +381,14 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths
           </View>
         );
       })}
-      <View style={{ flex: 1 }}>{file ? <Preview e={file} noRead={ctx.cloudOnly?.(file)} /> : null}</View>
+      <View style={{ width: strip.preview }}>{file ? <Preview e={file} noRead={ctx.cloudOnly?.(file)} /> : null}</View>
+    </View>
+    {strip.over ? (
+      <View style={{ height: 10, justifyContent: 'center', paddingHorizontal: 2 }}>
+        <View onMouseDown={(ev) => { ev.stopPropagation(); bar.current = { at: ev.x, x0: x, over: strip.over, k: strip.over / Math.max(1, avail - thumb) }; }}
+          style={{ width: thumb, height: 6, borderRadius: 3, backgroundColor: t.textDim, opacity: 0.5, marginLeft: (x / strip.over) * (avail - thumb - 4) }} />
+      </View>
+    ) : null}
     </View>
   );
 }

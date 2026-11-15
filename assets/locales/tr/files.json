@@ -327,5 +327,8 @@
   "zoom.reset": "Gerçek Boyut",
   "zoom.label": "Simge ve metin boyutu",
   "markup": "İşaretleme",
-  "markupHint": "İşaretleme düzenleyicisinde aç"
+  "markupHint": "İşaretleme düzenleyicisinde aç",
+  "readOnly.title": "Dosyalar “{name}” öğesini değiştiremez",
+  "readOnly.outside": "Dosyalar bu klasörü yalnızca görüntüleyebilir: klasör, ana klasörünüzün ve disklerinizin dışında. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın.",
+  "readOnly.denied": "Bu klasör salt okunur: izinleri onu değiştirmenize izin vermiyor. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın."
 }

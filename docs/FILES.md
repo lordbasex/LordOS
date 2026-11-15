@@ -35,8 +35,14 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 
 ## What's there
 
-- **Toolbar:** back and forward (history per tab), the name of the place, the four views, Group
-  and Sort (⇅), actions (⋯) and search.
+- **Toolbar:** back and forward (history per tab; in the column view each folder opened down the columns is a step,
+  so Back first goes back up the columns and stays in the column view, GitHub #133), New Folder, the four views,
+  Group and Sort (⇅), actions (⋯) and search.
+- **New Folder** (toolbar, File menu, ❖⇧N; GitHub #134) goes, as in Finder: in the column view, in the last column's
+  folder (the folder picked there, or the folder of the file picked); in the list, in the selected folder (it is
+  unfolded so the name can be typed), or in the folder the selected items are in (an unfolded subfolder's); in the
+  icon and gallery views, and with nothing selected, in the folder shown (`newFolderDir`, `apps/files/colview.js`).
+  What is selected inside an unfolded folder of the list is part of the selection (Copy, Rename, Move to Trash).
 - **Tabs** inside the window and **new windows** (`wm.open('files', { new: true, args:
   { path } })`). A file can be dropped onto a folder's tab.
 - **Sidebar:**
@@ -58,7 +64,9 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 - **Views** (❖1 to ❖4):
   - icons (cards, with `flexWrap`; thumbnails of PNG/JPEG up to 24 MB);
   - list (Name, Modified, Size and Kind, sorted by clicking the header);
-  - columns (the last folders that fit and the preview). Each column's divider can be dragged to widen it (140 to
+  - columns (every folder down the path and the preview; when they don't fit they scroll sideways, with a sideways
+    swipe or tilt of the wheel or the bar along the bottom, and opening a deeper folder scrolls to it, GitHub #133;
+    0.8.8.8 showed only the last ones that fit). Each column's divider can be dragged to widen it (140 to
     600 px) and double-clicked to fit its longest name; the width is kept per folder (`files.colWidths`, the 200 most
     recent, `apps/files/colview.js`, GitHub #99);
   - gallery.
@@ -459,8 +467,12 @@ on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"
   memory, environment and open files, devices, and the session's sockets; `/run/media/$USER` stays).
   Paths are resolved with `realpath` first, so a link into those is refused too; `list` refuses
   them with `fs.systemFolder` (not `fs.outsideHome`). `stat` outside the
-  writable roots answers `writable: false`, and Files then leaves out the actions that change the
-  folder (new folder, paste, rename, duplicate, Trash, cut, compress, extract). There is no root
+  writable roots answers `writable: false`, and Files then shows a bar under the toolbar that says it can only view
+  the folder (outside the home folder and the user's disks) or that the folder's permissions don't allow changes, with
+  Open in Terminal (GitHub #139). New Folder, Paste, Rename, Duplicate, Move to Trash and Cut stay in the menus, and
+  using one (or its key) explains the same in a sheet whose button opens the Terminal there, instead of being greyed
+  out or doing nothing; compress and extract are left out (`readOnlyWhy`, `apps/files/colview.js`). The rules are the
+  same: Files doesn't write there, even in a folder the user owns (such as one given with `chown`). There is no root
   mode. Isolated `.lpk` apps don't get this: their broker only reaches their own data folder.
   «Open with» and the helpers keep the home folder and the user's mounts.
 - Writing, copying to, moving and sending to the Trash reject the protected folders

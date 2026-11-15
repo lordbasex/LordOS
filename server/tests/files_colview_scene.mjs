@@ -1,6 +1,7 @@
 // files_colview_scene.mjs — the scene of tests/menubar_test.mjs files_colview_scene.mjs (GitHub #99; not run by
 // itself): Files' column view (apps/files/views.jsx ColumnView) shows a tagged item's tag dots right after its name,
-// as the list view does. Before, only a folder's icon took the tag's tint, so a tagged file showed nothing.
+// as the list view does. Before, only a folder's icon took the tag's tint, so a tagged file showed nothing. And every
+// column down the chain is drawn, none dropped to make room (GitHub #133).
 // Prints one line per check: "ok <name>" or "FAIL <name> <detail>".
 import React from 'react';
 import * as rt from '@lordos/runtime';
@@ -44,3 +45,22 @@ check('the rows are there', file && folder && plain, JSON.stringify([file, folde
 check('a tagged file shows its two dots', JSON.stringify(dotsIn(file)) === JSON.stringify([TAG_COLORS.red, TAG_COLORS.blue].map(argb)), JSON.stringify(dotsIn(file)));
 check('a tagged folder shows its dot', JSON.stringify(dotsIn(folder)) === JSON.stringify([TAG_COLORS.green].map(argb)), JSON.stringify(dotsIn(folder)));
 check('an untagged file shows none', dotsIn(plain).length === 0, JSON.stringify(dotsIn(plain)));
+
+// GitHub #133: every column down the chain is drawn (the view scrolls sideways), none dropped to make room. The test
+// host lays every node out 100 px wide, so 0.8.8.8's colsThatFit kept only the last column here.
+const deep = {
+  '/home/u': [{ name: 'Documents', dir: true }],
+  '/home/u/Documents': [{ name: 'Test', dir: true }],
+  '/home/u/Documents/Test': [{ name: 'Sub', dir: true }],
+  '/home/u/Documents/Test/Sub': [{ name: 'Deeper', dir: true }],
+  '/home/u/Documents/Test/Sub/Deeper': [{ name: 'last.txt', dir: false, size: 1 }],
+};
+const deepOf = (d) => (deep[d] || []).map((e) => ({ ...e, path: `${d}/${e.name}`, mtime: 0 }));
+const deepCtx = { ...ctx, isDir: (p) => !!deep[p], entryAt: () => null };
+const deepChain = ['/home/u/Documents', '/home/u/Documents/Test', '/home/u/Documents/Test/Sub', '/home/u/Documents/Test/Sub/Deeper'];
+rt.render(h(rt.View, { style: { width: 900, height: 500 } },
+  h(ColumnView, { root: '/home/u', chain: deepChain, setChain: () => {}, entriesOf: deepOf, ctx: deepCtx, sort: { key: 'name', asc: true } })));
+await flush();
+const names = ['Documents', 'Test', 'Sub', 'Deeper', 'last.txt'];
+const drawn = (label) => [...texts].some(([id, s]) => s === label && inTree(id));
+check('every column is drawn, the first ones too', names.every(drawn), JSON.stringify(names.map(drawn)));

@@ -335,5 +335,8 @@
   "zoom.reset": "Rzeczywisty rozmiar",
   "zoom.label": "Rozmiar ikon i tekstu",
   "markup": "Adnotacje",
-  "markupHint": "Otwórz w edytorze adnotacji"
+  "markupHint": "Otwórz w edytorze adnotacji",
+  "readOnly.title": "Pliki nie mogą zmienić „{name}”",
+  "readOnly.outside": "Pliki mogą tylko wyświetlać ten folder: znajduje się poza Twoim folderem domowym i Twoimi dyskami. Aby go zmienić, użyj Terminala lub innej aplikacji.",
+  "readOnly.denied": "Ten folder jest tylko do odczytu: jego uprawnienia nie pozwalają Ci go zmienić. Aby go zmienić, użyj Terminala lub innej aplikacji."
 }

@@ -327,5 +327,8 @@
   "zoom.reset": "Todellinen koko",
   "zoom.label": "Kuvakkeiden ja tekstin koko",
   "markup": "Merkintä",
-  "markupHint": "Avaa merkintäeditorissa"
+  "markupHint": "Avaa merkintäeditorissa",
+  "readOnly.title": "Tiedostot ei voi muuttaa kohdetta ”{name}”",
+  "readOnly.outside": "Tiedostot voi vain näyttää tämän kansion: se on kotikansiosi ja levyjesi ulkopuolella. Muuta sitä Päätteellä tai muulla apilla.",
+  "readOnly.denied": "Tämä kansio on vain luku -tilassa: sen oikeudet eivät salli sinun muuttaa sitä. Muuta sitä Päätteellä tai muulla apilla."
 }

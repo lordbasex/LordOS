@@ -319,5 +319,8 @@
   "zoom.reset": "Saiz Sebenar",
   "zoom.label": "Saiz ikon dan teks",
   "markup": "Tanda",
-  "markupHint": "Buka dalam editor tanda"
+  "markupHint": "Buka dalam editor tanda",
+  "readOnly.title": "Fail tidak dapat mengubah “{name}”",
+  "readOnly.outside": "Fail hanya boleh melihat folder ini: ia berada di luar folder rumah dan cakera anda. Untuk mengubahnya, gunakan Terminal atau apl lain.",
+  "readOnly.denied": "Folder ini baca sahaja: kebenarannya tidak membenarkan anda mengubahnya. Untuk mengubahnya, gunakan Terminal atau apl lain."
 }

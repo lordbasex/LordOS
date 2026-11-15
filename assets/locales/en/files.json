@@ -327,5 +327,8 @@
   "zoom.reset": "Actual Size",
   "zoom.label": "Icon and text size",
   "markup": "Markup",
-  "markupHint": "Open in the markup editor"
+  "markupHint": "Open in the markup editor",
+  "readOnly.title": "Files can't change “{name}”",
+  "readOnly.outside": "Files can only view this folder: it is outside your home folder and your disks. To change it, use the Terminal or another app.",
+  "readOnly.denied": "This folder is read-only: its permissions don't let you change it. To change it, use the Terminal or another app."
 }

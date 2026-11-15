@@ -476,7 +476,8 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menubar-test (themes/default ControlCenter, NotificationCenter, MenuBars on every display, sdk/soundoutputs.js)" node tests/menubar_test.mjs
     else skip "menubar-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.8, #99) Files' column view: a tagged item shows its tag dots after the name, as the list view does
+    # (0.8.8.8, #99) Files' column view: a tagged item shows its tag dots after the name, as the list view does;
+    # (#133) every column down the chain is drawn, none dropped to make room
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
     else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi

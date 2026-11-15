@@ -1,6 +1,8 @@
 // files_colview_test.mjs — the column view's items as data: what is picked in a deeper column is part of the selection
-// (apps/files/colview.js, GitHub #100).
-import { columnEntries, columnRange, byFolder, folderReadOnly, COL_W, COL_MIN, COL_MAX, COL_EXTRA, MAX_COL_WIDTHS, clampCol, colWidth, colWidthsWith, fitCol, colsThatFit } from '../../apps/files/colview.js';
+// (apps/files/colview.js, GitHub #100); every column scrolls instead of being dropped, and Back steps through the
+// columns (#133); where New Folder puts the folder (#134); why a folder is only browsed (#139).
+import { columnEntries, columnRange, byFolder, folderReadOnly, COL_W, COL_MIN, COL_MAX, COL_EXTRA, MAX_COL_WIDTHS, clampCol, colWidth, colWidthsWith, fitCol,
+  PREVIEW_MIN, colStrip, chainFolder, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from '../../apps/files/colview.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -71,11 +73,85 @@ eq('fit: tags count', fitCol([100, 90], [0, 30]), 120 + COL_EXTRA);
 eq('fit: short names keep the minimum', fitCol([10]), COL_MIN);
 eq('fit: empty folder', fitCol([]), COL_MIN);
 eq('fit: very long names', fitCol([2000]), COL_MAX);
-eq('fit: unknown avail, the last three', colsThatFit([220, 220, 220, 220], 0), 3);
-eq('fit: two of four', colsThatFit([220, 220, 220, 220], 700), 2);
-eq('fit: narrow columns, more', colsThatFit([150, 150, 150, 150], 800), 4);
-eq('fit: one too wide still shows', colsThatFit([220, 600], 500), 1);
-eq('fit: none', colsThatFit([], 900), 1);
+// ---- every column, scrolled (GitHub #133) ----
+// #99 kept only the last columns that fit: widening one, or opening a subfolder, dropped the first ones for good
+eq('strip: fits, the preview takes the rest', colStrip([220, 220], 900), { preview: 460, total: 900, over: 0 });
+eq('strip: four columns in 700 scroll, none dropped', colStrip([220, 220, 220, 220], 700), { preview: PREVIEW_MIN, total: 1080, over: 380 });
+eq('strip: widening the first one only adds to the scroll', colStrip([500, 220, 220, 220], 700).over - colStrip([220, 220, 220, 220], 700).over, 280);
+eq('strip: not laid out yet', colStrip([220, 220, 220], 0), { preview: PREVIEW_MIN, total: 860, over: 0 });
+eq('strip: no columns', colStrip([], 600), { preview: 600, total: 600, over: 0 });
+const isDirT = (p) => !/\.\w+$/.test(p);
+eq('deepest: a file ends in its folder', chainFolder(['/h/Documents', '/h/Documents/Test', '/h/Documents/Test/a.txt'], isDirT), '/h/Documents/Test');
+eq('deepest: none picked', chainFolder([], isDirT), null);
+
+// ---- Back and Forward through the columns (GitHub #133) ----
+const sameT = (a, b) => a.type === b.type && a.path === b.path;
+const viewOfT = (l) => ({ view: l.path === '/h' ? 'icons' : 'list' });
+let tab = { loc: { type: 'dir', path: '/h/Documents' }, chain: [], back: [{ type: 'dir', path: '/h' }], fwd: [], view: 'columns' };
+const apply = (p) => { tab = { ...tab, ...p }; };
+apply(chainStep(tab, ['/h/Documents/Test'], isDirT));
+eq('a folder opened in a column is a step', tab.back.length, 2);
+eq('the step keeps the columns it left', tab.back[1], { type: 'dir', path: '/h/Documents', chain: [] });
+apply(chainStep(tab, ['/h/Documents/Test', '/h/Documents/Test/a.txt'], isDirT));
+eq('a file picked is no step', tab.back.length, 2);
+apply(chainStep(tab, ['/h/Documents/Test', '/h/Documents/Test/Sub'], isDirT));
+eq('a deeper folder is another step', tab.back.length, 3);
+apply(historyStep(tab, -1, viewOfT, sameT));
+eq('Back: the columns before, still in columns', [tab.chain, tab.view, tab.loc], [['/h/Documents/Test', '/h/Documents/Test/a.txt'], 'columns', { type: 'dir', path: '/h/Documents' }]);
+apply(historyStep(tab, -1, viewOfT, sameT));
+eq('Back again: the first column alone', [tab.chain, tab.view], [[], 'columns']);
+apply(historyStep(tab, 1, viewOfT, sameT));
+eq('Forward: the column again', tab.chain, ['/h/Documents/Test', '/h/Documents/Test/a.txt']);
+apply(historyStep(tab, -1, viewOfT, sameT));
+apply(historyStep(tab, -1, viewOfT, sameT));
+eq('Back to another place: its own view, no chain on the place', [tab.loc, tab.view, tab.chain], [{ type: 'dir', path: '/h' }, 'icons', []]);
+eq('nothing left', historyStep(tab, -1, viewOfT, sameT), null);
+eq('Forward from there', historyStep(tab, 1, viewOfT, sameT).loc, { type: 'dir', path: '/h/Documents' });
+const capT = { loc: { type: 'dir', path: '/a' }, chain: [], back: Array.from({ length: 50 }, (_, i) => ({ type: 'dir', path: `/p${i}` })), fwd: [{ type: 'dir', path: '/f' }] };
+const stepped = chainStep(capT, ['/a/b'], isDirT);
+eq('steps: at most 50, Forward cleared', [stepped.back.length, stepped.fwd], [50, []]);
+
+// ---- where New Folder goes (GitHub #134) ----
+const nf = (o) => newFolderDir({ dir: '/h', isDir: isDirT, ...o });
+eq('columns: the last column\'s folder', nf({ view: 'columns', chain: ['/h/Documents', '/h/Documents/Test1'] }), '/h/Documents/Test1');
+eq('columns: a file picked, its folder', nf({ view: 'columns', chain: ['/h/Documents', '/h/Documents/a.txt'] }), '/h/Documents');
+eq('columns: nothing picked, the folder shown', nf({ view: 'columns', chain: [] }), '/h');
+eq('list: a selected folder', nf({ view: 'list', selected: ['/h/Documents'] }), '/h/Documents');
+eq('list: a selected folder in an unfolded one', nf({ view: 'list', selected: ['/h/Documents/Test1/sub-test-2'] }), '/h/Documents/Test1/sub-test-2');
+eq('list: a file in an unfolded folder', nf({ view: 'list', selected: ['/h/Documents/Test1/a.txt'] }), '/h/Documents/Test1');
+eq('list: several in one folder', nf({ view: 'list', selected: ['/h/Documents/a.txt', '/h/Documents/Test1'] }), '/h/Documents');
+eq('list: several in different folders', nf({ view: 'list', selected: ['/h/Documents/a.txt', '/h/b.txt'] }), '/h');
+eq('list: nothing selected', nf({ view: 'list', selected: [] }), '/h');
+eq('icons: always the folder shown', nf({ view: 'icons', selected: ['/h/Documents'] }), '/h');
+eq('gallery: always the folder shown', nf({ view: 'gallery', selected: ['/h/Documents'] }), '/h');
+eq('never outside the folder shown', nf({ view: 'list', selected: ['/etc'] }), '/h');
+eq('no prefix tricks', nf({ view: 'list', selected: ['/home2'], dir: '/home' }), '/home');
+eq('no folder shown (Recents)', newFolderDir({ view: 'list', dir: null, selected: ['/h/x'], isDir: isDirT }), null);
+eq('the root: a folder picked in it', newFolderDir({ view: 'columns', dir: '/', chain: ['/opt'], isDir: isDirT }), '/opt');
+eq('the root: a file picked in it', newFolderDir({ view: 'columns', dir: '/', chain: ['/a.txt'], isDir: isDirT }), '/');
+
+// ---- the list's unfolded folders (GitHub #134) ----
+const lt = { '/h/Documents': [{ path: '/h/Documents/Test1', dir: true }, { path: '/h/Documents/a.txt', dir: false }],
+  '/h/Documents/Test1': [{ path: '/h/Documents/Test1/sub-test-2', dir: true }] };
+const top = [{ path: '/h/Documents', dir: true }, { path: '/h/Music', dir: true }];
+const lp = (exp) => listEntries(top, new Set(exp), (e) => lt[e.path] || []).map((e) => e.path);
+eq('list: nothing unfolded', lp([]), ['/h/Documents', '/h/Music']);
+eq('list: unfolded, in row order', lp(['/h/Documents', '/h/Documents/Test1']),
+  ['/h/Documents', '/h/Documents/Test1', '/h/Documents/Test1/sub-test-2', '/h/Documents/a.txt', '/h/Music']);
+eq('list: a folded parent hides an unfolded child', lp(['/h/Documents/Test1']), ['/h/Documents', '/h/Music']);
+eq('list: unreadable', listEntries(top, new Set(['/h/Music']), () => null).length, 2);
+
+// ---- why a folder is only browsed (GitHub #139) ----
+eq('ro: /opt/lampp/htdocs is outside, whoever owns it', readOnlyWhy('/opt/lampp/htdocs', true, '/home/u', 'u'), 'outside');
+eq('ro: the root', readOnlyWhy('/', true, '/home/u', 'u'), 'outside');
+eq('ro: a folder in the home without permission', readOnlyWhy('/home/u/root-owned', true, '/home/u', 'u'), 'denied');
+eq('ro: a read-only disk', readOnlyWhy('/media/u/CDROM', true, '/home/u', 'u'), 'denied');
+eq('ro: /run/media too', readOnlyWhy('/run/media/u/X', true, '/home/u', 'u'), 'denied');
+eq('ro: another user\'s disk is outside', readOnlyWhy('/media/v/X', true, '/home/u', 'u'), 'outside');
+eq('ro: no prefix tricks', readOnlyWhy('/home/user2', true, '/home/u', 'u'), 'outside');
+eq('ro: no user known', readOnlyWhy('/media/u/X', true, '/home/u', ''), 'outside');
+eq('ro: takes changes', readOnlyWhy('/home/u/Documents', false, '/home/u', 'u'), null);
+eq('ro: no folder', readOnlyWhy(null, true, '/home/u', 'u'), null);
 
 console.log(`files-colview-test: ${ok} ok, ${bad} failed`);
 if (bad) process.exit(1);

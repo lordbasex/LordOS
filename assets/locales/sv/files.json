@@ -327,5 +327,8 @@
   "zoom.reset": "Verklig storlek",
   "zoom.label": "Storlek på symboler och text",
   "markup": "Markering",
-  "markupHint": "Öppna i markeringsredigeraren"
+  "markupHint": "Öppna i markeringsredigeraren",
+  "readOnly.title": "Filer kan inte ändra ”{name}”",
+  "readOnly.outside": "Filer kan bara visa den här mappen: den ligger utanför din hemmapp och dina diskar. Använd Terminal eller en annan app för att ändra den.",
+  "readOnly.denied": "Den här mappen är skrivskyddad: dess behörigheter låter dig inte ändra den. Använd Terminal eller en annan app för att ändra den."
 }

@@ -75,15 +75,92 @@ export function colWidthsWith(widths, dir, w) {
 // the width that shows the longest of these names (their measured widths, plus what tags add to each row)
 export const fitCol = (nameWidths, extras = []) =>
   clampCol(Math.ceil(nameWidths.reduce((m, w, i) => Math.max(m, (Number(w) || 0) + (Number(extras[i]) || 0)), 0)) + COL_EXTRA);
-// how many of the last columns fit in avail with at least preview left for the preview (at least one is shown);
-// avail unknown (0): the last three, as before widths could change
-export function colsThatFit(widths, avail, preview = 200) {
-  if (!(avail > 0)) return Math.min(3, widths.length);
-  let used = 0, n = 0;
-  for (let i = widths.length - 1; i >= 0; i--) {
-    if (n && used + widths[i] > avail - preview) break;
-    used += widths[i];
-    n++;
+// ---- every column, side by side (GitHub #133) ----
+// The columns are never dropped to make room (#99 showed only the last ones that fit, so widening one, or opening a
+// subfolder, pushed the first ones out of the view for good): they scroll sideways, as in Finder, with the preview
+// last. The preview takes what is left of the view, at least PREVIEW_MIN.
+export const PREVIEW_MIN = 200;
+// widths: each column's; avail: the view's width (0 before it is laid out)
+export function colStrip(widths, avail) {
+  const cols = widths.reduce((a, w) => a + (Number(w) || 0), 0);
+  const preview = avail > 0 ? Math.max(PREVIEW_MIN, avail - cols) : PREVIEW_MIN;
+  const total = cols + preview;
+  return { preview, total, over: avail > 0 ? Math.max(0, total - avail) : 0 };
+}
+// the deepest folder the columns show: the last folder picked down the chain (a file there shows its preview)
+export function chainFolder(chain, isDir) {
+  for (let i = chain.length - 1; i >= 0; i--) if (isDir(chain[i])) return chain[i];
+  return null;
+}
+
+// ---- Back and Forward in the column view (GitHub #133) ----
+// A history entry is a place and, for the column view, the items picked down its columns ({ ...loc, chain }). A click
+// in a column that opens another folder is a step Back returns to (as in Finder); it was none, so Back left the column
+// view for the place before, in that place's own view (Home in icons).
+// tab: { loc, chain, back, fwd }; returns the tab's new fields.
+export function chainStep(tab, chain, isDir) {
+  if (chainFolder(chain, isDir) === chainFolder(tab.chain || [], isDir)) return { chain };
+  return { chain, back: [...tab.back, { ...tab.loc, chain: tab.chain || [] }].slice(-50), fwd: [] };
+}
+// Back (dir -1) or Forward (+1): the entry's place and chain. In the same place only the chain changes and the view
+// stays; another place opens in its own view (viewOf). same(a, b): whether two places are the same (locations.js).
+export function historyStep(tab, d, viewOf, same) {
+  const list = d < 0 ? tab.back : tab.fwd;
+  if (!list.length) return null;
+  const entry = d < 0 ? list[list.length - 1] : list[0];
+  const { chain = [], ...loc } = entry;
+  const here = { ...tab.loc, chain: tab.chain || [] };
+  return {
+    ...(same(loc, tab.loc) ? null : viewOf(loc)),
+    loc, chain,
+    back: d < 0 ? tab.back.slice(0, -1) : [...tab.back, here],
+    fwd: d < 0 ? [here, ...tab.fwd] : tab.fwd.slice(1),
+  };
+}
+
+// ---- where New Folder puts the folder (GitHub #134) ----
+const within = (p, dir) => p === dir || p.startsWith(dir === '/' ? '/' : `${dir}/`);
+// It went in the folder shown even with another one picked. Now, as in Finder: in the column view, in the last
+// column's folder (a folder picked there, or the folder of the file picked); in the list, in the folder that is
+// selected (one folder), or in the folder the selected items are in (an unfolded subfolder's). The icon and gallery
+// views show one folder: there it is that one. Never outside the folder shown.
+// view: the view; dir: the folder shown (null: Recents, a search…); chain: the column view's; selected: the paths
+// selected; isDir(path).
+export function newFolderDir({ view, dir, chain = [], selected = [], isDir }) {
+  if (!dir) return null;
+  let at = dir;
+  if (view === 'columns') {
+    const last = chain[chain.length - 1];
+    if (last) at = isDir(last) ? last : parentOf(last);
+  } else if (view === 'list' && selected.length) {
+    if (selected.length === 1 && isDir(selected[0])) at = selected[0];
+    else {
+      const parents = new Set(selected.map((p) => parentOf(p) || '/'));
+      if (parents.size === 1) at = [...parents][0];
+    }
   }
-  return Math.max(1, n);
+  return at && within(at, dir) ? at : dir;
+}
+
+// ---- the list's unfolded folders ----
+// The items the list shows, each unfolded folder's after it (as its rows are drawn), so what is selected inside one is
+// part of the selection: Copy, Rename, Move to Trash and New Folder had nothing to act on there (as #100 in the
+// column view). itemsOf(entry): that folder's items in the order shown, or null.
+export function listEntries(items, expanded, itemsOf, depth = 0) {
+  const out = [];
+  for (const e of items) {
+    out.push(e);
+    if (e.dir && expanded.has(e.path) && depth < 32) out.push(...listEntries(itemsOf(e) || [], expanded, itemsOf, depth + 1));
+  }
+  return out;
+}
+
+// ---- why a folder is only browsed (GitHub #139) ----
+// 'outside': it is out of where Files writes (lord.fs: the home folder and the user's disks under /media/$USER and
+// /run/media/$USER), whatever its permissions say, so another app (the Terminal) has to change it; 'denied': it is in
+// there, but its own permissions don't let this user change it; null: it takes changes.
+export function readOnlyWhy(dir, readOnly, home, user) {
+  if (!dir || !readOnly) return null;
+  const roots = [home, ...(user ? [`/media/${user}`, `/run/media/${user}`] : [])];
+  return roots.some((r) => r && r.length > 1 && within(dir, r)) ? 'denied' : 'outside';
 }
