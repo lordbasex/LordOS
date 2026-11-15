@@ -799,6 +799,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
 
 ## Release 0.8.9 (planned)
 
+- [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
+  - Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)): 75 % and 80 % first, never 50 %;
+    the UI engine, pointer, captures, Wayland `int_scale`/fractional scale below 1 and Xwayland's DPI.
+  - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
+    window-button size, hiding the tiling submenu.
+  - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
+    `vmware-user` only inside VMware (a new AGENTS.md exception), then LordOS → host through an authenticated X
+    requestor; never tested on a real VMware host yet.
+  - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
+    second step after mounting by hand).
+
 - [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
   instead of reading each frame back and converting it.
 - [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint
@@ -834,6 +845,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.8-beta"); no new I
   [#22](https://github.com/lordbasex/LordOS/issues/22). Done for 0.8.8.3 (`FILES.md`, "The system file dialog").
 
 ## Before 1.0
+
+- [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
+  decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
+  upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
+  WPEPlatform keeping our buffer path (dmabuf, shm), input, IME, clipboard, drag and drop and fractional scale, and
+  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then.
+- [ ] **Each session in its own systemd unit** ([#140](https://github.com/lordbasex/LordOS/issues/140), maintainer's decision
+  2026-11-15: before 1.0 and before Debian 14). With systemd 258 or later, `systemctl restart lordos` fails while
+  sessions are alive (EBUSY): move each session out of `lordos.service` into a delegated `lordos-session-<uid>.scope`
+  (fixed `systemd-run --scope` from lord-sessiond's root child, or StartTransientUnit), and adapt the cgroup
+  delegation and the app scopes inside it.
 
 - [x] **Monitor → Network, second generation (0.8.5)** — done 2026-10-19 on VM 118, see
   `MONITOR.md` ("Network, second generation", "The menu bar network item", "Blocklists") and
