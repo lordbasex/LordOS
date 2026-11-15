@@ -144,8 +144,8 @@ card), `mode` (`auto` or `manual`), `set` (the duty asked for, -1 in automatic),
 read 0 in automatic while the fan turns), `rpm`, `temp` (the hottest sensor), `floor` (30), `backstop` (85) and
 `reverted` (`hot`, `error`, `session`, `stop` or empty: why it last went back to automatic by itself).
 
-Administrators: `SO_PEERCRED` uid 0, or a user in `sudo`, `admin` or `wheel` (the same rule as the
-admin helper). Errors are codes (`fan.notAdmin`, `fan.badRequest`, `fan.saveFailed`); the UI
+Administrators: `SO_PEERCRED` uid 0, or a user in `sudo`, `admin` or `wheel` (the shared list in
+`server/src/users/admingroups.c`, the same rule as the admin helper). Errors are codes (`fan.notAdmin`, `fan.badRequest`, `fan.saveFailed`); the UI
 translates them. A client that does not finish its line in one second is dropped; at most eight at
 a time.
 

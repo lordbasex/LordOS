@@ -34,6 +34,7 @@
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
 #include "../bench/boottest.h"
 #include "../lordlog.h"
+#include "../users/admingroups.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -375,16 +376,11 @@ static void bump(void) { rd_lock(); rd_shared->version++; rd_unlock(); }
 
 /* ---- login screen: users and host ---- */
 
+/* an administrator by the shared list (src/users/admingroups.c); an unreadable list is not one */
 static int is_admin(const struct passwd *pw) {
-    gid_t groups[256];
-    int n = 256;
-    if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &n) < 0) return 0;
-    const char *const names[] = { "sudo", "admin", "wheel", NULL };
-    for (int k = 0; names[k]; k++) {
-        struct group *g = getgrnam(names[k]);
-        if (g) for (int i = 0; i < n; i++) if (groups[i] == g->gr_gid) return 1;
-    }
-    return 0;
+    AdminMembership m;
+    admin_membership_read(pw->pw_name, pw->pw_uid, pw->pw_gid, &m);
+    return admin_membership_is_admin(&m, 0);
 }
 
 /* "#rrggbb" of the avatar (/var/lib/lordos/users/<u>.json), validated */

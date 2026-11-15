@@ -331,6 +331,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **One administrator list, everywhere.** The last three hand-written copies of the `sudo`/`admin`/`wheel` list are
+  gone: `lord-sessiond` (the login screen's users and who may restart or shut down with other sessions open),
+  `lord-fand` (who may change the fans) and lord-server's `lord.sys.info().admin` and `lord.users.list()` now ask the
+  shared list in `server/src/users/admingroups.{h,c}`, like `admin.c`, Settings → Users, the admin rescue and
+  `lordos-firstrun`. Each keeps its own rule: by account (`admin_membership_read`, primary or supplementary group, an
+  unreadable list is not an administrator) for sessiond, fand (uid 0 still counts, by `SO_PEERCRED`) and
+  `lord.users.list()`; by the session process's own groups for `lord.sys.info().admin`, through the new
+  `admin_gids_any()` (a gid list against the list, by group name). The groups are matched by name now in sessiond
+  and `lord.users.list()` (they looked up each list name's gid before), and fand reads up to 256 groups (was 64).
+  `lord-sessiond` and `lord-fand` link `admingroups.c`. `build/admin-groups-test` grows to 45 checks (a gid list:
+  each administrator group, `adm`, `root` and `sudoers` that aren't, a gid with no group, an empty or failed read).
+  The lists of reserved user names in the installer, the first run and the VM installer still name these groups:
+  they are names an account can't take, not an administrator check.
+
 - **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,
   2026-11-15), instead of LordOS's WebKit string, whose browser token made a messaging app's phone list the linked computer under another system's
   browser. Every existing profile changes too (no stored key is the default; no migration). A profile set to *LordOS
