@@ -1,0 +1,82 @@
+{
+  "archiveName": "Archiwum",
+  "archiveSummary": {
+    "one": "{count} plik, {size}",
+    "few": "{count} pliki, {size}",
+    "many": "{count} plików, {size}"
+  },
+  "compressOne": "Kompresuj „{name}”",
+  "compressMany": {
+    "one": "Kompresuj {count} element",
+    "few": "Kompresuj {count} elementy",
+    "many": "Kompresuj {count} elementów"
+  },
+  "compressing": "Kompresowanie „{name}”…",
+  "compressProgress": "Kompresowanie „{name}” (pliki: {files})",
+  "compressed": {
+    "one": "„{name}” gotowe ({count} plik)",
+    "few": "„{name}” gotowe ({count} pliki)",
+    "many": "„{name}” gotowe ({count} plików)"
+  },
+  "compressError": "Nie można skompresować „{name}” ({error})",
+  "extractHere": "Rozpakuj tutaj",
+  "extractSelected": {
+    "one": "Rozpakuj {count} element",
+    "few": "Rozpakuj {count} elementy",
+    "many": "Rozpakuj {count} elementów"
+  },
+  "extracting": "Rozpakowywanie „{name}”…",
+  "extractProgress": "Rozpakowywanie „{name}” (pliki: {files}, {pct}%)",
+  "extracted": {
+    "one": "Rozpakowano do „{name}” ({count} plik)",
+    "few": "Rozpakowano do „{name}” ({count} pliki)",
+    "many": "Rozpakowano do „{name}” ({count} plików)"
+  },
+  "extractedSkipped": {
+    "one": "Rozpakowano do „{name}” ({count} plik); pominięto ze względów bezpieczeństwa: {skipped}",
+    "few": "Rozpakowano do „{name}” ({count} pliki); pominięto ze względów bezpieczeństwa: {skipped}",
+    "many": "Rozpakowano do „{name}” ({count} plików); pominięto ze względów bezpieczeństwa: {skipped}"
+  },
+  "extractError": "Nie można rozpakować „{name}” ({error})",
+  "opening": "Otwieranie „{name}”…",
+  "loading": "Wczytywanie…",
+  "locked": "chronione hasłem",
+  "pages": {
+    "one": "{count} strona",
+    "few": "{count} strony",
+    "many": "{count} stron"
+  },
+  "more": {
+    "one": "i jeszcze {count}",
+    "few": "i jeszcze {count}",
+    "many": "i jeszcze {count}"
+  },
+  "err.invalid": "to nie jest archiwum lub jest uszkodzone",
+  "err.missing-volume": "brakuje części podzielonego archiwum: „{name}”",
+  "err.disk-full": "dysk jest pełny",
+  "err.too-big": "jest za duże",
+  "err.too-many": "zawiera za dużo plików",
+  "err.corrupt": "jest uszkodzone",
+  "err.write": "nie można zapisać",
+  "err.unavailable": "pomocnik dokumentów jest niedostępny",
+  "err.cancelled": "anulowano",
+  "err.crash": "pomocnik dokumentów nieoczekiwanie się zatrzymał",
+  "err.timeout": "trwało to zbyt długo",
+  "err.protocol": "pomocnik dokumentów wysłał nieprawidłową odpowiedź",
+  "err.spawn": "nie można uruchomić pomocnika dokumentów",
+  "err.closed": "dokument został zamknięty",
+  "err.bad-request": "nieprawidłowe żądanie",
+  "err.bad-field": "nieprawidłowe pole formularza",
+  "err.bad-page": "nieprawidłowa strona",
+  "err.busy": "pomocnik dokumentów jest zajęty",
+  "err.memory": "brak pamięci",
+  "err.no-fonts": "brak dostępnych czcionek",
+  "err.not-open": "dokument nie jest otwarty",
+  "err.nothing": "nie ma nic do zapisania",
+  "err.read-only": "dokument jest tylko do odczytu",
+  "err.save": "nie można zapisać",
+  "err.unknown-op": "nieznana operacja",
+  "err.image": "nieprawidłowy obraz",
+  "err.blob": "nieprawidłowe dane",
+  "err.password": "dokument jest chroniony hasłem"
+}
