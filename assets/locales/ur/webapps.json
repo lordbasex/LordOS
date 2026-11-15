@@ -1,0 +1,23 @@
+{
+  "appearance.title": "ظاہری شکل",
+  "appearance.auto": "خودکار",
+  "appearance.light": "لائٹ",
+  "appearance.dark": "ڈارک",
+  "appearance.autoHint": "LordOS کے لائٹ یا ڈارک موڈ کی پیروی کرتا ہے۔",
+  "appearance.lightHint": "LordOS کا موڈ کچھ بھی ہو، سائٹ کو ہمیشہ لائٹ بتایا جاتا ہے۔",
+  "appearance.darkHint": "LordOS کا موڈ کچھ بھی ہو، سائٹ کو ہمیشہ ڈارک بتایا جاتا ہے۔",
+  "appearance.footer": "صرف وہ لائٹ یا ڈارک ترجیح بدلتی ہے جو سائٹ پڑھتی ہے؛ LordOS خود سائٹ میں کبھی تبدیلی نہیں کرتا۔ کچھ سائٹیں پھر بھی لائٹ رہتی ہیں، اور جس سائٹ کی اپنی تھیم سیٹنگ ہو وہ اسی کی پیروی کرتی ہے۔",
+  "identity.title": "براؤزر کی شناخت",
+  "identity.label": "اس طور پر شناخت",
+  "identity.chrome": "Linux پر Chrome + LordOS",
+  "identity.edge": "Linux پر Edge",
+  "identity.firefox": "Linux پر Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (تجرباتی)",
+  "identity.chromeHint": "سائٹس Linux کا سب سے عام براؤزر دیکھتی ہیں، ساتھ میں LordOS کا نام اور ورژن۔ ڈیفالٹ۔",
+  "identity.edgeHint": "سائٹس Linux پر Edge دیکھتی ہیں۔ Edge کے اپنے بنانے والے کی دفتر، میل اور ٹیم چیٹ سائٹس کے لیے، جو اسی کی توقع کرتی ہیں۔",
+  "identity.firefoxHint": "سائٹس Linux پر Firefox دیکھتی ہیں۔",
+  "identity.lordosHint": "سائٹس LordOS کا اپنا انجن دیکھتی ہیں۔ اس سائٹ کے لیے جو باقی اختیارات کے ساتھ ٹھیک نہیں چلتی۔",
+  "identity.experimentalHint": "سائٹس صرف LordOS اور اس کا ورژن دیکھتی ہیں۔ بہت سی سائٹس، میسجنگ ایپس سمیت، اسے مسترد کر سکتی ہیں یا ٹھیک نہیں چلتیں؛ ایسا ہو تو کوئی اور اختیار منتخب کریں۔",
+  "identity.footer": "وہ براؤزر جو ہر پروفائل سائٹس کو اپنی پہچان بتاتا ہے؛ کھلی ونڈو اپنا صفحہ دوبارہ لوڈ کرتی ہے۔ LordOS اب بھی اپنا انجن (WebKit) استعمال کرتا ہے؛ Chrome، Edge اور Firefox ان کے مالکان کے نام ہیں۔ اگر کوئی سائٹ ٹھیک نہ چلے تو LordOS (WebKit) منتخب کریں۔ جس سائٹ نے یہ ڈیوائس پہلے ہی لنک کر لی ہے، جیسے کوئی میسجنگ ایپ، وہ دوبارہ لنک کرنے تک دیکھا ہوا نام ہی رکھتی ہے۔"
+}

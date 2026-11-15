@@ -1,0 +1,23 @@
+{
+  "appearance.title": "চেহারা",
+  "appearance.auto": "স্বয়ংক্রিয়",
+  "appearance.light": "লাইট",
+  "appearance.dark": "ডার্ক",
+  "appearance.autoHint": "LordOS-এর লাইট বা ডার্ক মোড অনুসরণ করে।",
+  "appearance.lightHint": "LordOS-এর মোড যা-ই হোক, সাইটকে সবসময় লাইট বলা হয়।",
+  "appearance.darkHint": "LordOS-এর মোড যা-ই হোক, সাইটকে সবসময় ডার্ক বলা হয়।",
+  "appearance.footer": "শুধু সাইট যে লাইট বা ডার্ক পছন্দটি পড়ে সেটিই বদলায়; LordOS কখনো সাইটটিকে বদলায় না। কিছু সাইট তবুও লাইট থাকে, আর যে সাইটের নিজস্ব থিম সেটিং আছে সেটি সেই সেটিং অনুসরণ করে।",
+  "identity.title": "ব্রাউজারের পরিচয়",
+  "identity.label": "যে পরিচয়ে",
+  "identity.chrome": "Linux-এ Chrome + LordOS",
+  "identity.edge": "Linux-এ Edge",
+  "identity.firefox": "Linux-এ Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (পরীক্ষামূলক)",
+  "identity.chromeHint": "সাইটগুলো Linux-এর সবচেয়ে প্রচলিত ব্রাউজার দেখে, সঙ্গে LordOS-এর নাম ও সংস্করণ। ডিফল্ট।",
+  "identity.edgeHint": "সাইটগুলো Linux-এ Edge দেখে। Edge-এর নিজস্ব নির্মাতার অফিস, মেইল ও টিম চ্যাট সাইটের জন্য, যেগুলো এটিই আশা করে।",
+  "identity.firefoxHint": "সাইটগুলো Linux-এ Firefox দেখে।",
+  "identity.lordosHint": "সাইটগুলো LordOS-এর নিজস্ব ইঞ্জিন দেখে। যে সাইট অন্যগুলোর সাথে ঠিকমতো চলে না, তার জন্য।",
+  "identity.experimentalHint": "সাইটগুলো শুধু LordOS ও তার সংস্করণ দেখে। মেসেজিং অ্যাপসহ অনেক সাইট এটি প্রত্যাখ্যান করতে পারে বা ঠিকমতো না চলতে পারে; তাহলে অন্য একটি বেছে নিন।",
+  "identity.footer": "প্রতিটি প্রোফাইল সাইটগুলোকে যে ব্রাউজারের পরিচয় দেয়; খোলা উইন্ডো তার পেজ আবার লোড করে। LordOS এখনও নিজস্ব ইঞ্জিন (WebKit) ব্যবহার করে; Chrome, Edge ও Firefox তাদের মালিকদের নাম। কোনো সাইট ঠিকমতো না চললে LordOS (WebKit) বেছে নিন। যে সাইট আগেই এই ডিভাইস লিংক করেছে, যেমন কোনো মেসেজিং অ্যাপ, আবার লিংক না করা পর্যন্ত আগের নামই রাখে।"
+}

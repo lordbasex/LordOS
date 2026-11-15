@@ -86,7 +86,11 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 **El límite honesto:** WPE WebKit 2.48 no le da a LordOS ninguna forma de fijar el esquema de colores de la página, así que una página que elige sus colores solo con CSS (reglas `@media (prefers-color-scheme: dark)`) queda clara hasta que un WebKit más nuevo lo permita. Esos sitios suelen tener un ajuste de tema propio: elegí Oscuro ahí. La página de la app en la Tienda lo dice cuando se sabe.
 
+**La Apariencia de cada app** (*en desarrollo*, después de la 0.8.8.8, la última versión publicada): Automático (lo predeterminado, sigue a LordOS como arriba), Claro u Oscuro, elegido por app web en Ajustes → Apps web o en *Apariencia* del menú de la app mientras su ventana está al frente (Lord Flow). Se aplica al instante en las ventanas abiertas de la app, en todos sus perfiles. Solo cambia la preferencia de claro u oscuro que lee la página, nunca el sitio: la misma respuesta de `matchMedia` y el mismo fondo sin destello blanco, así que un sitio que sigue su tema "Sistema" puede quedar oscuro en un escritorio claro o al revés, y vale el mismo límite (un sitio que usa solo CSS queda claro; usá su propio ajuste de tema).
+
 [[shot:12]]
+
+**La Identidad del navegador de cada perfil** (*en desarrollo*, después de la 0.8.8.8): los sitios deciden qué mostrar según el navegador con el que creen hablar, así que cada perfil puede decirles Chrome en Linux con el nombre de LordOS agregado (lo predeterminado), Edge en Linux (para los sitios de oficina, correo y chat de equipo de su fabricante), Firefox en Linux, el nombre propio de WebKit de LordOS (el que usaban todas las apps) o, como experimento, LordOS solo, que muchos sitios rechazan. Se elige de una lista corta en Ajustes → Apps web o en *Identidad del navegador* del menú de la app (Lord Flow), nunca escribiéndolo, y una ventana abierta vuelve a cargar su página con él. LordOS sigue usando su propio motor diga lo que diga el nombre; si un sitio falla, elegí LordOS (WebKit). Un sitio que ya vinculó tu computadora, como una app de mensajería, conserva el nombre que vio hasta que la vincules de nuevo.
 
 ## Rendimiento
 
@@ -97,7 +101,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 ## Ajustes → Apps web
 
-Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
+Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles (abrir, renombrar, color, quitar, con los datos que guarda cada uno en el disco), sus permisos, *Seguir funcionando en segundo plano* (cerrar la ventana la deja funcionando, así siguen llegando sus notificaciones), *Mostrar en la barra de menús* (un ícono junto al reloj con Abrir y Salir), *Mostrar los no leídos en el Dock*, *Cada perfil con su propio ícono en el Dock*, el sonido de las notificaciones (Automático, que pone el de LordOS solo cuando el sitio no pone uno propio; el del sitio; el de LordOS; o ninguno), la Apariencia (Automático, Claro u Oscuro; en desarrollo), la Identidad del navegador de cada perfil (Chrome en Linux + LordOS, Edge, Firefox o LordOS; en desarrollo), el ícono (el del propio sitio o el mosaico con letra de LordOS) y Desinstalar.
 
 [[shot:10]]
 

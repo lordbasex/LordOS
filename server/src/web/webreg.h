@@ -16,7 +16,11 @@
  *   - a permission is allow, ask or deny; source is catalog or url; background a boolean; tray (optional, false when
  *     missing) a boolean: the app's tray icon (StatusNotifierItem, Open and Quit); background mode does not need it;
  *     notifySound (optional, "auto" when missing) auto|app|system|none: whose sound a notification makes;
- *     a profile is { id, name } or { id, name, color } (color: red, orange, yellow, green, blue, purple, gray or none)
+ *     colorScheme (optional, "auto" when missing) auto|light|dark: the light or dark preference the page is told
+ *     (auto: the desktop's mode; lord-server sends it, webscheme.h);
+ *     a profile is { id, name } plus, optionally, color (red, orange, yellow, green, blue, purple, gray or none) and
+ *     userAgent (chrome, edge, firefox, lordos or experimental; "chrome" when missing and never written): the browser the profile's pages
+ *     are told it is ("Browser identity"; webpage_user_agent maps the word to the string, in C)
  *   - schema, id, name, startUrl, scope, origin, source and profiles (1..16, ids unique) are required;
  *     unknown keys (also in a profile or in permissions) and repeated keys are refused; at most 64 KB */
 #ifndef LORD_WEB_WEBREG_H
@@ -40,6 +44,13 @@ enum { WEBREG_ALLOW, WEBREG_ASK, WEBREG_DENY };
 /* "notifySound": auto (LordOS's sound only when the page plays none of its own), app (the page's only), system
  * (LordOS's only), none */
 enum { WEBREG_SOUND_AUTO, WEBREG_SOUND_APP, WEBREG_SOUND_SYSTEM, WEBREG_SOUND_NONE, WEBREG_SOUND_N };
+/* "colorScheme": auto (the desktop's light or dark mode), light, dark: what the page's prefers-color-scheme says */
+enum { WEBREG_SCHEME_AUTO, WEBREG_SCHEME_LIGHT, WEBREG_SCHEME_DARK, WEBREG_SCHEME_N };
+/* a profile's "userAgent": which browser its pages are told it is (webpage_user_agent). chrome (the default: Chrome on
+ * Linux with LordOS's token), edge (Edge on Linux, for its maker's own office and chat sites), firefox (Firefox on
+ * Linux), lordos (LordOS's own WebKit string, for a site that misbehaves with the others), experimental (LordOS alone,
+ * no other browser's tokens). Linux identities only. */
+enum { WEBREG_UA_CHROME, WEBREG_UA_EDGE, WEBREG_UA_FIREFOX, WEBREG_UA_LORDOS, WEBREG_UA_EXPERIMENTAL, WEBREG_UA_N };
 /* "source" */
 enum { WEBREG_SRC_CATALOG, WEBREG_SRC_URL };
 
@@ -49,6 +60,7 @@ typedef struct {
     char id[WEBREG_ID_MAX + 1];
     char name[WEBREG_NAME_MAX + 1];
     char color[WEBREG_COLOR_MAX + 1];     /* red|orange|yellow|green|blue|purple|gray|none, or "" when not set */
+    int  user_agent;                      /* WEBREG_UA_* (written only when not chrome) */
 } WebProfile;
 
 typedef struct {
@@ -61,6 +73,7 @@ typedef struct {
     int  background;
     int  tray;                            /* "tray": a tray icon with Open and Quit (written only when on) */
     int  notify_sound;                    /* WEBREG_SOUND_* (written only when not auto) */
+    int  color_scheme;                    /* WEBREG_SCHEME_* (written only when not auto) */
     int  nprofiles;
     WebProfile profiles[WEBREG_PROFILES_MAX];
     int  perms[WEBREG_PERM_N];            /* WEBREG_ALLOW / WEBREG_ASK / WEBREG_DENY */
@@ -87,6 +100,10 @@ int  webreg_color_ok(const char *s);           /* one of the profile colors abov
 const char *webreg_profile_default_color(const WebApp *a);
 const char *webreg_sound_name(int v);          /* "auto" / "app" / "system" / "none"; NULL out of range */
 int  webreg_sound_value(const char *name);     /* -1 if unknown */
+const char *webreg_scheme_name(int v);         /* "auto" / "light" / "dark"; NULL out of range */
+int  webreg_scheme_value(const char *name);    /* -1 if unknown */
+const char *webreg_ua_name(int v);             /* "chrome" / "edge" / "firefox" / "lordos" / "experimental"; NULL */
+int  webreg_ua_value(const char *name);        /* -1 if unknown */
 
 /* ---- the file ---- */
 /* Parses and checks one registry file. 0 ok; -1 refused (a zeroed), with why (optional) saying what is wrong. */

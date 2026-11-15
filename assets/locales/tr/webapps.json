@@ -1,0 +1,23 @@
+{
+  "appearance.title": "Görünüm",
+  "appearance.auto": "Otomatik",
+  "appearance.light": "Açık",
+  "appearance.dark": "Koyu",
+  "appearance.autoHint": "LordOS’un açık veya koyu modunu izler.",
+  "appearance.lightHint": "LordOS hangi modda olursa olsun siteye her zaman açık bildirilir.",
+  "appearance.darkHint": "LordOS hangi modda olursa olsun siteye her zaman koyu bildirilir.",
+  "appearance.footer": "Yalnızca sitenin okuduğu açık veya koyu tercih değişir; LordOS sitenin kendisini asla değiştirmez. Bazı siteler yine de açık kalır ve kendi tema ayarı olan bir site o ayarı izler.",
+  "identity.title": "Tarayıcı kimliği",
+  "identity.label": "Şu olarak tanıt",
+  "identity.chrome": "Linux'ta Chrome + LordOS",
+  "identity.edge": "Linux'ta Edge",
+  "identity.firefox": "Linux'ta Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (deneysel)",
+  "identity.chromeHint": "Siteler Linux'taki en yaygın tarayıcıyı, ayrıca LordOS'un adını ve sürümünü görür. Varsayılan.",
+  "identity.edgeHint": "Siteler Linux'ta Edge'i görür. Edge'in kendi üreticisinin bunu bekleyen ofis, e-posta ve ekip sohbeti siteleri için.",
+  "identity.firefoxHint": "Siteler Linux'ta Firefox'u görür.",
+  "identity.lordosHint": "Siteler LordOS'un kendi motorunu görür. Diğerleriyle düzgün çalışmayan bir site için.",
+  "identity.experimentalHint": "Siteler yalnızca LordOS'u ve sürümünü görür. Mesajlaşma uygulamaları dahil birçok site bunu reddedebilir veya düzgün çalışmayabilir; öyleyse başka bir seçenek seçin.",
+  "identity.footer": "Her profilin sitelere kendini tanıttığı tarayıcı; açık bir pencere sayfasını yeniden yükler. LordOS kendi motorunu (WebKit) kullanmaya devam eder; Chrome, Edge ve Firefox sahiplerine ait adlardır. Bir site düzgün çalışmazsa LordOS (WebKit) seçin. Bu cihazı zaten bağlamış bir site, örneğin bir mesajlaşma uygulaması, yeniden bağlayana kadar gördüğü adı korur."
+}

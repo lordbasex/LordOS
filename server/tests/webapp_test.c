@@ -412,14 +412,62 @@ static void test_scope_limits(void) {
 
 static void test_user_agent(void) {
     char ua[256];
-    CHECK(!webpage_user_agent("x86_64", "0.8.8.8", ua, sizeof ua) &&
+    /* LordOS (WebKit): the string before 0.8.8.9's Browser identity */
+    CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, "x86_64", "0.8.8.8", ua, sizeof ua) &&
           !strcmp(ua, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 LordOS/0.8.8.8"), "%s", ua);
-    CHECK(!webpage_user_agent("aarch64", "0.9.0~rc1", ua, sizeof ua) && strstr(ua, "(X11; Linux aarch64)") && strstr(ua, " LordOS/0.9.0~rc1"), "%s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, "aarch64", "0.9.0~rc1", ua, sizeof ua) && strstr(ua, "(X11; Linux aarch64)") && strstr(ua, " LordOS/0.9.0~rc1"), "%s", ua);
     CHECK(!strstr(ua, "Macintosh") && strstr(ua, "AppleWebKit/605.1.15") && strstr(ua, "Safari/605.1.15"), "WebKit's tokens, no Mac");
-    CHECK(!webpage_user_agent("x86 64; evil)", "1.0", ua, sizeof ua) && strstr(ua, "(X11; Linux) "), "a strange machine is left out: %s", ua);
-    CHECK(!webpage_user_agent("x86_64", "1.0 (evil)", ua, sizeof ua) && !strstr(ua, "LordOS"), "a strange version drops the token: %s", ua);
-    CHECK(!webpage_user_agent(NULL, NULL, ua, sizeof ua) && strstr(ua, "(X11; Linux) ") && !strstr(ua, "LordOS"), "nothing known: %s", ua);
-    CHECK(webpage_user_agent("x86_64", "1.0", ua, 20) < 0, "too short");
+    CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, "x86 64; evil)", "1.0", ua, sizeof ua) && strstr(ua, "(X11; Linux) "), "a strange machine is left out: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, "x86_64", "1.0 (evil)", ua, sizeof ua) && !strstr(ua, "LordOS"), "a strange version drops the token: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_LORDOS, NULL, NULL, ua, sizeof ua) && strstr(ua, "(X11; Linux) ") && !strstr(ua, "LordOS"), "nothing known: %s", ua);
+    CHECK(webpage_user_agent(WEBREG_UA_LORDOS, "x86_64", "1.0", ua, 20) < 0, "too short");
+
+    /* Chrome on Linux + LordOS (the default): desktop Chrome's reduced string, x86_64 on every machine, then LordOS's
+     * token with the version given (lord-web's LORD_VERSION) */
+    char want[256];
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36 LordOS/0.8.8.9", WEBPAGE_CHROME_MAJOR);
+    const char *machines[] = { "x86_64", "aarch64", "armv7l", "x86 64; evil)", NULL };
+    for (int i = 0; i < 5; i++)
+        CHECK(!webpage_user_agent(WEBREG_UA_CHROME, machines[i], "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "chrome on %s: %s", machines[i] ? machines[i] : "(null)", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "0.9.0~rc1", ua, sizeof ua) && strstr(ua, "Safari/537.36 LordOS/0.9.0~rc1") &&
+          !strcmp(ua + strlen(ua) - strlen("LordOS/0.9.0~rc1"), "LordOS/0.9.0~rc1"), "chrome: the version given, last: %s", ua);
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36", WEBPAGE_CHROME_MAJOR);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "1.0 (evil)", ua, sizeof ua) && !strcmp(ua, want), "chrome: a strange version drops the token: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_CHROME, "x86_64", NULL, ua, sizeof ua) && !strcmp(ua, want), "chrome: no version, no token: %s", ua);
+    CHECK(WEBPAGE_CHROME_MAJOR >= 157 && WEBPAGE_CHROME_MAJOR < 1000, "a plausible Chrome major");
+    CHECK(webpage_user_agent(WEBREG_UA_CHROME, "x86_64", "1.0", ua, 40) < 0, "chrome: too short");
+
+    /* Edge on Linux: Chrome's reduced string with Edge's token, x86_64 on every machine, no LordOS token */
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%d.0.0.0 Safari/537.36 Edg/%d.0.0.0",
+             WEBPAGE_EDGE_MAJOR, WEBPAGE_EDGE_MAJOR);
+    for (int i = 0; i < 5; i++)
+        CHECK(!webpage_user_agent(WEBREG_UA_EDGE, machines[i], "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "edge on %s: %s", machines[i] ? machines[i] : "(null)", ua);
+    CHECK(WEBPAGE_EDGE_MAJOR >= 157 && WEBPAGE_EDGE_MAJOR < 1000, "a plausible Edge major");
+    CHECK(webpage_user_agent(WEBREG_UA_EDGE, "x86_64", "1.0", ua, 60) < 0, "edge: too short");
+
+    /* Firefox on Linux: names the processor */
+    snprintf(want, sizeof want, "Mozilla/5.0 (X11; Linux x86_64; rv:%d.0) Gecko/20100101 Firefox/%d.0", WEBPAGE_FIREFOX_MAJOR, WEBPAGE_FIREFOX_MAJOR);
+    CHECK(!webpage_user_agent(WEBREG_UA_FIREFOX, "x86_64", "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "firefox: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_FIREFOX, "x86 64; evil)", "0.8.8.9", ua, sizeof ua) && !strcmp(ua, want), "firefox, a strange machine is x86_64: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_FIREFOX, NULL, NULL, ua, sizeof ua) && !strcmp(ua, want), "firefox, nothing known: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_FIREFOX, "aarch64", "0.8.8.9", ua, sizeof ua) && strstr(ua, "(X11; Linux aarch64; rv:") && !strstr(ua, "LordOS"), "firefox on arm: %s", ua);
+    CHECK(WEBPAGE_FIREFOX_MAJOR >= 160 && WEBPAGE_FIREFOX_MAJOR < 1000, "a plausible Firefox major");
+
+    /* LordOS (experimental): LordOS alone, no other browser's tokens */
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86_64", "0.8.8.9", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux x86_64) LordOS/0.8.8.9"), "experimental: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "aarch64", "0.9.0~rc1", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux aarch64) LordOS/0.9.0~rc1"), "experimental on arm: %s", ua);
+    CHECK(!webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86 64; evil)", "1.0 (evil)", ua, sizeof ua) && !strcmp(ua, "Mozilla/5.0 (X11; Linux) LordOS"), "experimental, strange: %s", ua);
+    CHECK(!strstr(ua, "Safari") && !strstr(ua, "Chrome") && !strstr(ua, "Gecko") && !strstr(ua, "AppleWebKit"), "experimental: no other browser's tokens");
+    CHECK(webpage_user_agent(WEBREG_UA_EXPERIMENTAL, "x86_64", "0.8.8.9", ua, 30) < 0, "experimental: too short");
+
+    /* only the four: anything else makes nothing */
+    CHECK(webpage_user_agent(-1, "x86_64", "1.0", ua, sizeof ua) < 0 && webpage_user_agent(WEBREG_UA_N, "x86_64", "1.0", ua, sizeof ua) < 0, "unknown kinds");
+    CHECK(webreg_ua_value("chrome") == WEBREG_UA_CHROME && webreg_ua_value("firefox") == WEBREG_UA_FIREFOX && webreg_ua_value("lordos") == WEBREG_UA_LORDOS &&
+          webreg_ua_value("experimental") == WEBREG_UA_EXPERIMENTAL && webreg_ua_value("edge") == WEBREG_UA_EDGE && webreg_ua_value("Edge") < 0 &&
+          webreg_ua_value("edge-windows") < 0 && webreg_ua_value("Experimental") < 0 && webreg_ua_value("lordos-only") < 0 &&
+          webreg_ua_value("Chrome") < 0 && webreg_ua_value("safari") < 0 && webreg_ua_value("") < 0 && webreg_ua_value(NULL) < 0 &&
+          webreg_ua_value("Mozilla/5.0 (X11; Linux x86_64)") < 0, "the words");
+    CHECK(!strcmp(webreg_ua_name(WEBREG_UA_LORDOS), "lordos") && !webreg_ua_name(-1) && !webreg_ua_name(WEBREG_UA_N), "the names");
 }
 
 static void test_sound(void) {
@@ -688,6 +736,71 @@ static void test_registry_options(void) {
         CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad[i]);
     }
     CHECK(webreg_sound_value("none") == WEBREG_SOUND_NONE && webreg_sound_value("x") < 0 && !webreg_sound_name(9), "names");
+
+    /* colorScheme: the app's Appearance, auto when missing and never written as auto */
+    snprintf(j, sizeof j, base, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.color_scheme == WEBREG_SCHEME_AUTO, "colorScheme auto when missing");
+    n = webreg_write(&a, out, sizeof out);
+    CHECK(n && !strstr(out, "colorScheme"), "colorScheme auto isn't written");
+    const char *schemes[] = { "auto", "light", "dark" };
+    for (int i = 0; i < 3; i++) {
+        char v[64];
+        snprintf(v, sizeof v, "\"colorScheme\": \"%s\",", schemes[i]);
+        snprintf(j, sizeof j, base, v);
+        CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.color_scheme == i && !strcmp(webreg_scheme_name(i), schemes[i]), "colorScheme %s", schemes[i]);
+        n = webreg_write(&a, out, sizeof out);
+        CHECK(n && !webreg_parse(out, n, &b, NULL, 0) && b.color_scheme == i && (i == 0) == !strstr(out, "colorScheme"), "colorScheme %s written and read back", schemes[i]);
+    }
+    const char *bad_scheme[] = { "\"colorScheme\": \"Dark\",", "\"colorScheme\": \"system\",", "\"colorScheme\": \"\",", "\"colorScheme\": 1,",
+                                 "\"colorScheme\": true,", "\"colorScheme\": \"dark\", \"colorScheme\": \"light\",", "\"appearance\": \"dark\",", NULL };
+    for (int i = 0; bad_scheme[i]; i++) {
+        snprintf(j, sizeof j, base, bad_scheme[i]);
+        CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad_scheme[i]);
+    }
+    snprintf(j, sizeof j, base, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0), "base");
+    a.color_scheme = 3;
+    CHECK(!webreg_write(&a, out, sizeof out), "a bad colorScheme is never written");
+
+    /* a profile's userAgent (its Browser identity): chrome when missing and never written as chrome */
+    static const char pbase[] =
+        "{ \"schema\": 1, \"id\": \"chat\", \"name\": \"Chat\", \"startUrl\": \"https://web.chat.example/\", \"scope\": \"https://web.chat.example/\","
+        " \"origin\": \"https://web.chat.example\", \"source\": \"catalog\", \"background\": true, \"profiles\": [ { \"id\": \"default\", \"name\": \"Default\" },"
+        " { \"id\": \"work\", \"name\": \"Work\"%s } ] }";
+    snprintf(j, sizeof j, pbase, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.profiles[0].user_agent == WEBREG_UA_CHROME && a.profiles[1].user_agent == WEBREG_UA_CHROME, "userAgent chrome when missing");
+    n = webreg_write(&a, out, sizeof out);
+    CHECK(n && !strstr(out, "userAgent"), "userAgent chrome isn't written");
+    const char *uas[] = { "chrome", "edge", "firefox", "lordos", "experimental" };
+    for (int i = 0; i < 5; i++) {
+        char v[64];
+        snprintf(v, sizeof v, ", \"userAgent\": \"%s\"", uas[i]);
+        snprintf(j, sizeof j, pbase, v);
+        CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.profiles[1].user_agent == i && a.profiles[0].user_agent == WEBREG_UA_CHROME, "userAgent %s", uas[i]);
+        n = webreg_write(&a, out, sizeof out);
+        CHECK(n && !webreg_parse(out, n, &b, NULL, 0) && b.profiles[1].user_agent == i && b.profiles[0].user_agent == WEBREG_UA_CHROME &&
+              (i == 0) == !strstr(out, "userAgent"), "userAgent %s written and read back", uas[i]);
+    }
+    snprintf(j, sizeof j, pbase, ", \"color\": \"blue\", \"userAgent\": \"firefox\"");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0) && a.profiles[1].user_agent == WEBREG_UA_FIREFOX && !strcmp(a.profiles[1].color, "blue"), "with a color");
+    const char *bad_ua[] = { ", \"userAgent\": \"Chrome\"", ", \"userAgent\": \"safari\"", ", \"userAgent\": \"\"", ", \"userAgent\": 1",
+                             ", \"userAgent\": null", ", \"userAgent\": \"Mozilla/5.0 (X11; Linux x86_64) Chrome/157.0.0.0\"",
+                             ", \"userAgent\": \"lordos\", \"userAgent\": \"firefox\"", ", \"userAgent\": \"lordos\", \"color\": \"pink\"",
+                             ", \"browser\": \"firefox\"", ", \"color\": \"blue\", \"userAgent\": \"firefox\", \"x\": 1", NULL };
+    for (int i = 0; bad_ua[i]; i++) {
+        snprintf(j, sizeof j, pbase, bad_ua[i]);
+        CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "refused: %s", bad_ua[i]);
+    }
+    snprintf(j, sizeof j, base, "\"userAgent\": \"firefox\",");
+    CHECK(webreg_parse(j, strlen(j), &a, NULL, 0) < 0, "userAgent belongs to a profile, not the app");
+    snprintf(j, sizeof j, pbase, "");
+    CHECK(!webreg_parse(j, strlen(j), &a, NULL, 0), "base");
+    a.profiles[1].user_agent = WEBREG_UA_N;
+    CHECK(!webreg_write(&a, out, sizeof out), "a bad userAgent is never written");
+    a.profiles[1].user_agent = -1;
+    CHECK(!webreg_write(&a, out, sizeof out) && webreg_check(&a, NULL, 0) < 0, "nor a negative one");
+    CHECK(webreg_scheme_value("light") == WEBREG_SCHEME_LIGHT && webreg_scheme_value("x") < 0 && webreg_scheme_value(NULL) < 0 && !webreg_scheme_name(3) &&
+          !webreg_scheme_name(-1), "scheme names");
 }
 
 static void test_edit(void) {
@@ -731,7 +844,20 @@ static void test_edit(void) {
     CHECK(!webmenu_name(WEBMENU_N) && webmenu_item("") < 0, "menu: nothing");
 }
 
+/* which word lord-server tells an app: its Appearance, or the desktop's for auto */
+static void test_scheme_for_app(void) {
+    const int desk[] = { -1, WEBSCHEME_LIGHT, WEBSCHEME_DARK };
+    for (int d = 0; d < 3; d++) {
+        CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, desk[d]) == desk[d], "auto follows the desktop (%d)", desk[d]);
+        CHECK(webscheme_for_app(WEBREG_SCHEME_LIGHT, desk[d]) == WEBSCHEME_LIGHT, "light whatever the desktop (%d)", desk[d]);
+        CHECK(webscheme_for_app(WEBREG_SCHEME_DARK, desk[d]) == WEBSCHEME_DARK, "dark whatever the desktop (%d)", desk[d]);
+    }
+    CHECK(webscheme_for_app(7, WEBSCHEME_DARK) == WEBSCHEME_DARK && webscheme_for_app(-3, WEBSCHEME_LIGHT) == WEBSCHEME_LIGHT, "a bad value is auto");
+    CHECK(webscheme_for_app(WEBREG_SCHEME_AUTO, 5) == -1 && webscheme_for_app(WEBREG_SCHEME_AUTO, -2) == -1, "a bad desktop value is not known");
+}
+
 static void test_scheme(void) {
+    test_scheme_for_app();
     CHECK(webscheme_parse("light") == WEBSCHEME_LIGHT && webscheme_parse("dark") == WEBSCHEME_DARK, "scheme: the two words");
     static const char *const bad[] = { "", "Dark", "DARK", "dark ", " dark", "dark\n", "prefer-dark", "default", "1", "true", "no-preference", "darkk", "lig" };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(webscheme_parse(bad[i]) < 0, "scheme refuses '%s'", bad[i]);

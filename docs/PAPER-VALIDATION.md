@@ -2,8 +2,8 @@
 
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
-0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12; the paper's
-current edition is of 2026-11-15), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
+0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7, and one section per 0.8.8.x release up to 0.8.8.8 (2026-11-12) and for 0.8.8.9 in development (the paper's
+current edition, 2026-11-15), so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
 memory from a process's RSS (§7.1) and points to versioned results (§11.5, `docs/RESULTS.md`).
@@ -280,6 +280,13 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 |---|---|---|---|
 | 6.9, 12 | Each image is published with `<image>.sources.tsv`: every source package and version in it, with a link to that exact source, written from the image's dpkg database | `tools/release/image-sources.sh`, run by `build.sh`, `build-ova.sh` and `build-img.sh`; tried on synthetic MBR (`.img.xz`) and GPT (OVA with a stream-optimized VMDK) images and on a real xorriso-made live ISO (2026-11-15) | Not yet run on a LordOS image build or a published LordOS image; no automated test |
 | 12 | A written offer of the complete corresponding source, for at least three years (`docs/SOURCE-OFFER.md`, lordos.org/legal/source-code) | Design (`docs/RELEASING.md`, "Source code") | Design |
+
+## 0.8.8.9 (in development; the paper's edition of 2026-11-15)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 5.1, 6.7 | A web app's Appearance (Automatic, Light, Dark) picks which closed word, `light` or `dark`, `lord-server` tells its `lord-web`; Automatic is the desktop's; open windows follow at once; the site is never changed | Test (`build/webapp-test`: the registry's `colorScheme` read, written only when not `auto`, anything else refused, and `webscheme_for_app`; `build/webreg-test`: the start environment and `webmgr_scheme_of`; `tests/webapps_model_test.mjs`); Design (`webask_app_scheme`, `docs/WEBAPPS.md`) | Holds for the logic; not yet checked on screen |
+| 5.1, 6.7 | Each profile's Browser identity comes from a closed list of Linux browsers (Chrome on Linux with LordOS's token by default, Edge on Linux, Firefox on Linux, LordOS's WebKit string, LordOS alone); `lord-web` maps the word to the string in C and the page never names one; a change reaches a running profile through a closed call accepted only from `lord-server`, then the page loads again | Test (`build/webapp-test`: the five strings, the registry's per-profile `userAgent` read, written only when not `chrome`, anything else refused; `build/webreg-test`: `webmgr_user_agent_of`; `tests/webapps_model_test.mjs`); Design (`SetUserAgent` behind the pid check, `webask_user_agent`, `docs/WEBAPPS.md` "Browser identity") | Holds for the logic; not yet checked on screen |
 
 ## What the paper must change for 0.8.5
 

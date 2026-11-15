@@ -57,6 +57,11 @@ const char *webmgr_uninstall(const char *app, int delete_data);
  * environment; webask_scheme tells the running ones. */
 void webmgr_set_scheme(int scheme);
 int  webmgr_scheme(void);                       /* -1 until set */
+/* The scheme app's lord-web is told: its Appearance (registry colorScheme) light or dark, else the desktop's (-1 not
+ * known yet, or an app that can't be read and the desktop's not known). */
+int  webmgr_scheme_of(const char *app);
+/* A profile's Browser identity (registry userAgent, WEBREG_UA_*), or -1 when the app or the profile can't be read. */
+int  webmgr_user_agent_of(const char *app, const char *profile);
 
 /* *raised = 1 when it was already running (nothing started). */
 const char *webmgr_launch(const char *app, const char *profile, int *raised);

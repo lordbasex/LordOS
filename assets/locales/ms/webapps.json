@@ -1,0 +1,23 @@
+{
+  "appearance.title": "Penampilan",
+  "appearance.auto": "Automatik",
+  "appearance.light": "Cerah",
+  "appearance.dark": "Gelap",
+  "appearance.autoHint": "Mengikut mod cerah atau gelap LordOS.",
+  "appearance.lightHint": "Laman sentiasa diberitahu cerah, walau apa pun mod LordOS.",
+  "appearance.darkHint": "Laman sentiasa diberitahu gelap, walau apa pun mod LordOS.",
+  "appearance.footer": "Hanya pilihan cerah atau gelap yang dibaca oleh laman berubah; LordOS tidak pernah mengubah laman itu sendiri. Sesetengah laman kekal cerah juga, dan laman yang mempunyai tetapan tema sendiri mengikut tetapan itu.",
+  "identity.title": "Identiti pelayar",
+  "identity.label": "Kenal pasti sebagai",
+  "identity.chrome": "Chrome di Linux + LordOS",
+  "identity.edge": "Edge di Linux",
+  "identity.firefox": "Firefox di Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (eksperimen)",
+  "identity.chromeHint": "Laman melihat pelayar paling biasa di Linux, serta nama dan versi LordOS. Lalai.",
+  "identity.edgeHint": "Laman melihat Edge di Linux. Untuk laman pejabat, mel dan sembang pasukan milik pembuat Edge sendiri, yang menjangkakannya.",
+  "identity.firefoxHint": "Laman melihat Firefox di Linux.",
+  "identity.lordosHint": "Laman melihat enjin LordOS sendiri. Untuk laman yang bermasalah dengan pilihan lain.",
+  "identity.experimentalHint": "Laman hanya melihat LordOS dan versinya. Banyak laman, termasuk aplikasi pemesejan, mungkin menolaknya atau bermasalah; jika begitu, pilih yang lain.",
+  "identity.footer": "Pelayar yang diakui oleh setiap profil kepada laman; tetingkap yang terbuka memuatkan semula halamannya. LordOS masih menggunakan enjinnya sendiri (WebKit); Chrome, Edge dan Firefox ialah nama milik pemiliknya. Jika laman bermasalah, pilih LordOS (WebKit). Laman yang sudah memautkan peranti ini, seperti aplikasi pemesejan, mengekalkan nama yang dilihatnya sehingga dipautkan semula."
+}

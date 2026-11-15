@@ -99,9 +99,75 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`.github/ISSUE_TEMPLATE/source-request.yml`) or the iPERFEX contact form. The 0.8.8 images, published before the
   lists, get theirs from the published files (docs/RELEASING.md, "Source code"). The ISO and arm64 build chroots
   need `python3` (docs/ISO.md).
+- **A web app's own Appearance: Automatic, Light or Dark** (maintainer's approval, 2026-11-15). Each web app has
+  its own choice of the light or dark preference its pages are told (`prefers-color-scheme` through `matchMedia`,
+  and the dark background while a page loads): Automatic, the default, follows LordOS's mode as before; Light and
+  Dark keep that one whatever the desktop does, so a messaging app can stay dark on a light desktop. It is in
+  Settings → Web Apps, on the app's page (Appearance, three choices with a hint each), and in Lord Flow in the app
+  menu of the web app's window (Appearance ▸ Automatic, Light, Dark, the current one checked; Lord Classic flattens
+  submenus, so there it is in Settings only). It applies **at once to the app's open windows**, every profile: a
+  change writes the registry's new optional `colorScheme` key (`auto`, `light`, `dark`; written only when not `auto`,
+  anything else refused, `server/src/web/webreg.c`) and lord-server sends the app's running `lord-web` processes the
+  same closed `SetColorScheme("light" | "dark")` call it already sends for the desktop's mode
+  (`webask_app_scheme`). lord-server picks the word per app everywhere it tells one (`webscheme_for_app`: the app's
+  own for Light or Dark, else the desktop's): the environment at start, a desktop mode change and a lord-web's bus
+  name appearing. `lord-web` reads nothing new and the page gets no new API: only what it is told changes, never the
+  site. The same limit as before holds: sites whose dark mode is only CSS `@media` rules stay light. New:
+  `lord.webapps.setColorScheme(app, value)` (desktop only, not in the broker; a bad value is `sys.badArgument`),
+  `colorSchemeOf` and `COLOR_SCHEMES` in `sdk/webappsmodel.js`, `webAppearanceItem` in `sdk/appcontrol.js`, and the
+  `webapps.appearance.*` texts (8 keys) in all 32 languages (the 26 partial ones get their first `webapps.json`).
+  Tests: `build/webapp-test` (the key read and written back, the defaults not written, seven bad forms refused,
+  `webscheme_for_app` for every pair; 461 checks), `build/webreg-test` (an app set to Dark or Light starts with that
+  word whatever the desktop says, `webmgr_scheme_of`; 332 checks) and `tests/webapps_model_test.mjs`. No migration: a missing key is
+  Automatic. Not yet checked on screen on the development VM.
+- **A web app profile's Browser identity: five Linux browsers to choose from** (maintainer's request,
+  2026-11-15). Which browser a profile's pages are told it is, chosen from a closed list, never typed, per profile
+  (two accounts of one messaging app can differ), Linux identities only. Settings → Web Apps has a *Browser identity*
+  section on the app's page, one pop-up per profile with a hint for each choice and a footer that says LordOS still
+  uses its own engine (WebKit), that Chrome, Edge and Firefox are names of their owners, to choose LordOS (WebKit) if
+  a site misbehaves, and that a site that already linked the device keeps the name it saw until it is linked again;
+  in Lord Flow the web app window's app menu has *Browser identity ▸* the five, for that window's profile. The
+  strings (lord-web's `webpage_user_agent`, in C; JS and the page never pass one; `<version>` is always the installed
+  `LORD_VERSION`; quoted in full in docs/WEBAPPS.md), in the list's order:
+  - Chrome on Linux + LordOS (the default): desktop Chrome 157's reduced string (`X11; Linux x86_64` with its
+    `AppleWebKit/537.36` and `Chrome/157.0.0.0` tokens, also on ARM, as Chrome itself sends there) followed by
+    LordOS's own token, `LordOS/<version>`, as other browsers built on it add theirs;
+  - Edge on Linux: the same reduced string followed by `Edg/157.0.0.0`, what desktop Edge on Linux sends, for the
+    office, mail and team chat sites of its own maker;
+  - Firefox on Linux: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0` (`x86_64`,
+    `aarch64`);
+  - LordOS (WebKit): the string every app had until now, `X11; Linux <machine>` with WebKit's own frozen
+    `AppleWebKit/605.1.15` tokens and `LordOS/<version>`;
+  - LordOS (experimental): `Mozilla/5.0 (X11; Linux <machine>) LordOS/<version>`, LordOS alone; its hint warns that
+    many sites, messaging apps included, may refuse it or misbehave, and to switch back then.
+  The majors are constants (`WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR`, `WEBPAGE_FIREFOX_MAJOR` in
+  `server/src/web/webpage.h`) that docs/RELEASING.md now bumps each release. It applies **at once**: a change writes
+  the profile's new optional `userAgent` key in the registry (`chrome`, `edge`, `firefox`, `lordos`, `experimental`;
+  written only when not `chrome`, anything else refused, also at the app's level) and lord-server sends that
+  profile's running `lord-web` a new closed D-Bus call, `org.lordos.WebApp1.SetUserAgent(word)` with one of those
+  five words, which lord-web runs only when the bus says the caller is the lord-server that started it (as `Edit` and
+  `SetColorScheme`); lord-web sets WebKit's user agent and loads the app's page again, since a document keeps the
+  `navigator.userAgent` it started with (a sign-in on another site in the window is left alone and gets it with its
+  next load). lord-server sends it again when a lord-web's bus name appears, so a change made while it was starting
+  is not lost; the same word is ignored. WebKit's site-specific quirks keep today's rule (off on the app's own pages,
+  on for other sites). New: `lord.webapps.setUserAgent(app, profile, value)` (desktop only, not in the broker; a bad
+  value is `sys.badArgument`), `USER_AGENTS` and `userAgentOf` in `sdk/webappsmodel.js`, `webUserAgentItem` in
+  `sdk/appcontrol.js`, the `webapps.identity.*` texts (13 keys) in all 32 languages; they name no company or service
+  beyond the three browsers. Tests: `build/webapp-test` (the five strings, Chrome's and Edge's on every machine, the
+  LordOS token from the version given, Firefox's processor, experimental without other browsers' tokens, unknown
+  kinds refused, the key per profile read, written only when not `chrome`, ten bad forms refused; 518 checks),
+  `build/webreg-test` (`webmgr_user_agent_of`, a new profile is Chrome again; 345 checks) and
+  `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
 
 ### Changed
 
+- **Web apps tell sites they are Chrome on Linux, with LordOS's own token, by default** (maintainer's request,
+  2026-11-15), instead of LordOS's WebKit string, whose browser token made a messaging app's phone list the linked computer under another system's
+  browser. Every existing profile changes too (no stored key is the default; no migration). A profile set to *LordOS
+  (WebKit)* in Browser identity (above) gets the old string back. A device a site linked before keeps the name the
+  site saw then: unlink it on the phone and link it again to see the new one. Why it showed another system: WebKit's
+  site-specific quirks hand that messaging site another system's browser string whatever the setting, and lord-web
+  only turned them off on an app's own pages on 2026-11-11, after the first web apps were linked.
 - **Chinese by script.** `languageOfLocale` (`sdk/localename.js`) picks the interface language for a locale: its
   language part, or `zh-Hant` for `zh_TW`, `zh_HK` and `zh_MO` and `zh-Hans` for `zh_CN` and `zh_SG`; the first
   session and the login screen use it instead of cutting LANG to two letters. The installer keeps the full id
@@ -130,6 +196,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- docs/WEBAPPS.md: Browser identity (the registry's per-profile `userAgent`, the five strings, `SetUserAgent` and
+  the reload, why a linked device keeps the old name, where it is, the tests) under "The page", the registry's rules
+  and the More registry keys list. docs/RELEASING.md: a step to bump the Chrome, Edge and Firefox majors each release.
+  docs/PAPER-VALIDATION.md: the Browser identity claim in the 0.8.8.9 section.
+- docs/WEBAPPS.md: the registry's `colorScheme`, the start environment for an app set to Light or Dark, "Each app's
+  Appearance" under Light and dark (how lord-server picks the word, the live change, where it is, the tests), the app
+  menu item and the More registry keys list. docs/PAPER-VALIDATION.md: a 0.8.8.9 section (in development) with the
+  Appearance claim.
 - docs/LANGUAGES.md: the 26 partial languages (ids, names, regions, plural rules, direction, digits, script fonts),
   how they were chosen, the core set, the plural rules table, native digits, what a translator must keep
   (variables, plural forms, LordOS's own names, no other system's brands), and what is still pending for them (the
@@ -183,6 +257,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   reported RX 9060 XT) and links to the reports; "How do I share how LordOS runs on my computer?" no longer says the
   tested-hardware page has only the reference machines (it also has #42) and links to the comparison.
 
+- **LordOS Web Runtime page** (en, es, pt): each profile's Browser identity (Chrome on Linux + LordOS by default,
+  Edge on Linux, Firefox on Linux, LordOS (WebKit), LordOS (experimental)), marked in development, in a new paragraph and in Settings → Web Apps. The paper (en, es, pt)
+  says it in its web apps paragraph.
+- **LordOS Web Runtime page** (en, es, pt): each app's Appearance (Automatic, Light, Dark), marked in development
+  after 0.8.8.8, the latest release, under Light and dark and in Settings → Web Apps. The paper (en, es, pt, edition
+  0.8.8.9 Beta of 2026-11-15) says it in its web apps paragraph.
 - **Cookies and statistics: LordOS's update checks are counted from 2026-11-12.** Until 2026-11-11 the requests
   LordOS makes to `lordos.org/apt` were left out of every count. The policy (Cookies and statistics and the Privacy
   policy, in English, Spanish and Portuguese, both dated 2026-11-12) now says exactly what is counted from the same CDN

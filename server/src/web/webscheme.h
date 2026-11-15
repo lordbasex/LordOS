@@ -11,7 +11,11 @@
  *
  * lord-web then answers the page's matchMedia queries about prefers-color-scheme with the desktop's scheme (a script
  * in every frame, webscheme.js) and paints the view's background dark while a page loads in dark mode. Nothing goes
- * the other way: the page can't tell lord-server or lord-web anything through it. */
+ * the other way: the page can't tell lord-server or lord-web anything through it.
+ *
+ * Each app's "Appearance" (the registry's colorScheme, webreg.h: auto, light or dark; Settings → Web apps and the app
+ * menu) picks which of the two words lord-server sends that app: the desktop's for auto, else always its own. lord-web
+ * itself never reads that key for this: it only applies the word it gets, so a change reaches open windows at once. */
 #ifndef LORD_WEB_WEBSCHEME_H
 #define LORD_WEB_WEBSCHEME_H
 
@@ -30,6 +34,9 @@ enum { WEBSCHEME_LIGHT = 0, WEBSCHEME_DARK = 1 };
 int         webscheme_parse(const char *name);      /* WEBSCHEME_LIGHT or WEBSCHEME_DARK for exactly "light" or "dark", else -1 */
 const char *webscheme_name(int scheme);             /* "light" or "dark", NULL for anything else */
 int         webscheme_from_env(const char *value);  /* the environment's value: dark only for exactly "dark" */
+/* The scheme lord-server tells one app: pref is its WEBREG_SCHEME_* (auto, light, dark), desktop the desktop's
+ * WEBSCHEME_* or -1 when not known yet. auto (or anything else) gives desktop as it is, light and dark themselves. */
+int         webscheme_for_app(int pref, int desktop);
 /* the user script: js (webscheme.js, a function expression) called with the hook's name and the scheme. key must be
  * WEBSCHEME_KEY_LEN lowercase hex digits. Malloc'd, or NULL for a bad key or scheme. */
 char       *webscheme_script(const char *js, const char *key, int scheme);

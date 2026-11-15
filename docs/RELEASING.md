@@ -47,6 +47,12 @@ The releases page is the project's public changelog: every release is documented
    ```
 
    Also bump `package.json` (`version`, `lordos.channel`) and commit both.
+
+   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
+   in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
+   from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
+   changelog entry if they changed. A stale major is what makes sites treat a browser as outdated. `build/webapp-test`
+   checks only that the numbers are plausible, never the date, so this step is the only reminder.
 2. **Tag.** `git tag -a v<version> -m "LordOS <version>"` on that commit, and push the tag.
 3. **Sign the system code, then build** from the tag.
    - On the maintainer's machine (where the release key lives): `npm run build`, then

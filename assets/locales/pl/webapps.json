@@ -1,0 +1,23 @@
+{
+  "appearance.title": "Wygląd",
+  "appearance.auto": "Automatycznie",
+  "appearance.light": "Jasny",
+  "appearance.dark": "Ciemny",
+  "appearance.autoHint": "Podąża za jasnym lub ciemnym trybem LordOS.",
+  "appearance.lightHint": "Witryna zawsze otrzymuje tryb jasny, niezależnie od trybu LordOS.",
+  "appearance.darkHint": "Witryna zawsze otrzymuje tryb ciemny, niezależnie od trybu LordOS.",
+  "appearance.footer": "Zmienia się tylko preferencja jasnego lub ciemnego trybu, którą odczytuje witryna; LordOS nigdy nie modyfikuje samej witryny. Niektóre witryny i tak pozostają jasne, a witryna z własnym ustawieniem motywu stosuje się do niego.",
+  "identity.title": "Tożsamość przeglądarki",
+  "identity.label": "Przedstawiaj się jako",
+  "identity.chrome": "Chrome w systemie Linux + LordOS",
+  "identity.edge": "Edge w systemie Linux",
+  "identity.firefox": "Firefox w systemie Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (eksperymentalnie)",
+  "identity.chromeHint": "Witryny widzą najpopularniejszą przeglądarkę w systemie Linux oraz nazwę i wersję LordOS. Domyślnie.",
+  "identity.edgeHint": "Witryny widzą Edge w systemie Linux. Dla witryn biurowych, poczty i czatu zespołowego samego producenta Edge, które go oczekują.",
+  "identity.firefoxHint": "Witryny widzą Firefoksa w systemie Linux.",
+  "identity.lordosHint": "Witryny widzą własny silnik LordOS. Dla witryny, która źle działa z innymi.",
+  "identity.experimentalHint": "Witryny widzą tylko LordOS i jego wersję. Wiele witryn, także komunikatory, może go odrzucić lub działać źle; wtedy wybierz inną opcję.",
+  "identity.footer": "Przeglądarka, za którą każdy profil podaje się witrynom; otwarte okno wczytuje swoją stronę ponownie. LordOS nadal używa własnego silnika (WebKit); Chrome, Edge i Firefox to nazwy ich właścicieli. Jeśli witryna działa źle, wybierz LordOS (WebKit). Witryna, która już połączyła to urządzenie, np. komunikator, zachowuje widzianą nazwę do ponownego połączenia."
+}

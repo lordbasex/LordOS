@@ -67,6 +67,13 @@ LordOS's compositor, with WebKit's sandbox running. For one account it used abou
   notifications. `"auto"`: LordOS plays its sound unless the page plays its own (below); `"app"`: never LordOS's sound;
   `"system"`: always LordOS's sound; `"none"`: never LordOS's sound, and lord-web doesn't touch the page's audio
   either (a page that plays its own sound still does).
+- `colorScheme` (optional, `"auto"` when missing, written only when it isn't): the app's Appearance, the light or dark
+  preference its pages are told. `"auto"` follows the desktop's mode, `"light"` and `"dark"` always say that one
+  ("Light and dark", below).
+- A profile's `userAgent` (optional, `"chrome"` when missing, written only when it isn't): its Browser identity, the
+  browser its pages are told it is: `"chrome"`, `"edge"`, `"firefox"`, `"lordos"` or `"experimental"` ("Browser
+  identity", below). Anything else,
+  and the key at the app's level, is refused.
 - Unknown keys are refused. The file is at most 64 KB.
 
 Data, per app and profile, under `~/.local/share/lordos/web/<app>/<profile>/` (also in `fsops_protected`): `data/`,
@@ -82,7 +89,8 @@ Only lord-server starts `lord-web`:
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
   `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
   its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on). Once the
-  theme has told lord-server the desktop's mode, also `LORDOS_WEB_SCHEME=light` or `dark` ("Light and dark", below).
+  theme has told lord-server the desktop's mode, also `LORDOS_WEB_SCHEME=light` or `dark` ("Light and dark", below);
+  for an app whose Appearance is Light or Dark, always that word.
 
 `lord-web` reads its app's registry file itself, read-only, and refuses to start on any mismatch. A second launch of a
 running app and profile raises its window instead: lord-server knows its process, starts nothing, issues an
@@ -255,7 +263,9 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     Open Link in Browser goes to OpenURI (web, mail and phone links only); Copy Image reads the image with the page's
     origin in lord-web's isolated world (made a PNG unless it is a PNG or a JPEG, at most 32 MB) and offers it as an
     image.
-  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; Help starts with "<app> on the Web",
+  - **The app menu and Help:** Settings… opens Settings → Web Apps on that app; in Lord Flow, Appearance (Automatic,
+    Light, Dark) sets the app's `colorScheme` ("Light and dark", below) and Browser identity (Chrome on Linux +
+    LordOS, Edge on Linux, Firefox on Linux, LordOS (WebKit), LordOS (experimental)) the window's profile's `userAgent` ("Browser identity", below); Help starts with "<app> on the Web",
     the app's origin in the browser.
 - **Light and dark** (`webscheme.h`, `webscheme.c`, `webscheme.js`, `webdark.c`; since 0.8.8.8): a web app
   follows the desktop's light or dark mode as far as WPE WebKit 2.48 lets it.
@@ -284,6 +294,22 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     process) in the main frame, which passes it to same-origin frames; a frame of another origin gets it with its next
     load. The script has no privileges and no message handler: a page that calls the hook only changes what it sees
     itself, and nothing goes from the page to lord-web or lord-server.
+  - **Each app's Appearance** (`colorScheme` in the registry; in development after 0.8.8.8): Automatic (the default),
+    Light or Dark, per app (every profile of it). lord-server picks the word it sends each app
+    (`webscheme_for_app`: the app's own for Light or Dark, else the desktop's), in the environment at start, in
+    `SetColorScheme` when the desktop's mode changes and when a lord-web's bus name appears. lord-web reads nothing
+    new: it applies the word it gets exactly as before, so the script, the `change` events and the dark background
+    while loading all follow the app's choice, and the page's content is never changed. Changing it
+    (`lord.webapps.setColorScheme(app, value)`, desktop only, not in the broker) writes the registry and sends
+    `SetColorScheme` with the new word to each running profile of the app (`webask_app_scheme`), so **open windows
+    follow at once**; a page that only reads the scheme at load sees it on its next load. The same limit holds: Dark
+    reaches scripts that ask `matchMedia`, not CSS-only `@media` rules. Where: Settings → Web Apps, the app's page
+    (Appearance, a three-way choice with a hint for each), and in Lord Flow the app menu of the web app's window
+    (Appearance ▸ Automatic, Light, Dark, the current one checked). Lord Classic flattens submenus, so there it is only
+    in Settings. Tests: `build/webreg-test` (the start environment, `webmgr_scheme_of`), `build/webapp-test` (the key
+    read, written only when not `auto`, anything else refused;
+    `webscheme_for_app` for each pair), `tests/webapps_model_test.mjs` (`colorSchemeOf`). Not yet checked on screen
+    on the development VM.
   - **No white flash:** in dark mode the view's background is the desktop's dark window color (`#1f1f23`) from a
     load's start to its end, so nothing white shows before the page paints; then it is WebKit's white again, so a page
     without a background of its own reads as in a browser.
@@ -309,12 +335,68 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     and listed queries, `media`, listeners and `onchange`, no event when the answer stays, frames, an engine that
     already answers dark, `once` and `signal` listeners let go) and `tests/webreg_test.c` (`LORDOS_WEB_SCHEME` absent
     until the theme tells the mode, `dark` and `light` after it, absent again for any other value).
-- **User agent** (`webpage_user_agent`): `Mozilla/5.0 (X11; Linux <machine>) AppleWebKit/605.1.15 (KHTML, like Gecko)
-  Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own (frozen) AppleWebKit and Safari tokens, and
-  LordOS's version. WebKit's site-specific quirks are off on the app's own pages and on for any other site in the
-  window (a sign-in): one of those quirks hands some sites a Mac user agent whatever the setting, and a messaging web
-  app then offers its Mac download. Checked 2026-11-11: that app's sign-in page loads with this user agent and quirks
-  off, without the download offer.
+- **Browser identity** (`webpage_user_agent`; the registry's per-profile `userAgent`; in development after 0.8.8.8):
+  the browser a profile's pages are told it is, one of five, all Linux ones (the maintainer's choice: no other
+  system's identity), picked from a closed list in Settings (never typed), in this order. `<version>` is always
+  `LORD_VERSION`, the installed LordOS's, never written by hand.
+  - `chrome`, **Chrome on Linux + LordOS**, the default (a profile without the key):
+    `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36
+    LordOS/<version>`: desktop Chrome's string with LordOS's own token at the end, as Edge's `Edg/` and Opera's
+    `OPR/` are. Chrome's reduced user agent says `Linux x86_64` on every Linux, an ARM one too, so this string is the
+    same on `aarch64`.
+  - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
+    Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
+    office, mail and team chat sites of Edge's own maker, which expect it.
+  - `firefox`, **Firefox on Linux**: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0`.
+    Firefox names its processor (`x86_64`, `aarch64`); a machine name that isn't `[A-Za-z0-9_]` becomes `x86_64`.
+  - `lordos`, **LordOS (WebKit)**: the string every app had before, `Mozilla/5.0 (X11; Linux <machine>)
+    AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 LordOS/<version>`: Linux, WebKit's own
+    (frozen) AppleWebKit and Safari tokens, LordOS's version. For a site that misbehaves with the others.
+  - `experimental`, **LordOS (experimental)**: `Mozilla/5.0 (X11; Linux <machine>) LordOS/<version>`, LordOS alone,
+    no other browser's tokens. Many sites, messaging apps included, may refuse it or misbehave; the hint says to
+    switch back then.
+
+  A version that isn't `[A-Za-z0-9.+~-]` drops the LordOS token (experimental keeps a bare `LordOS`). The majors are
+  `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR` (`webpage.h`); docs/RELEASING.md bumps
+  them each release. JS and the page never pass a string: `lord.webapps.setUserAgent(app, profile, value)` (desktop
+  only, not in the broker) takes one of the five words, writes the registry and, when that profile runs, sends its lord-web
+  `org.lordos.WebApp1.SetUserAgent(word)` (`webask_user_agent`). lord-web accepts it only from the lord-server that
+  started it (the pid check of `Edit` and `SetColorScheme`), maps the word to the string itself, sets WebKit's
+  `user-agent` setting and loads the app's page again: a document keeps the `navigator.userAgent` it started with,
+  and requests after the change already carry the new one. When the window shows another site (a sign-in half done),
+  it is not reloaded and gets the new string with its next load. lord-server sends the profile's word again when a
+  lord-web's bus name appears, so a change made while it started is not lost; the same word is ignored. At start
+  lord-web reads the key from the registry like the rest; the probe ("Adding an app from an address") always asks as
+  Chrome on Linux. Where: Settings → Web Apps, the app's page, a *Browser
+  identity* section with one pop-up per profile (with one profile, "Identify as"), a hint for each choice and a
+  footer: LordOS still uses its own engine (WebKit), Chrome, Edge and Firefox are names of their owners, choose
+  LordOS (WebKit) if a site misbehaves, and a site that already linked this device keeps the name it saw. The texts
+  name no company or service (the brand check): Edge's hint says "Edge's own maker". In Lord Flow, the
+  app menu of the web app's window (Browser identity ▸ the five, for that window's profile; Lord Classic flattens
+  submenus, so there it is in Settings only).
+  - **Why Chrome by default, and why the old linked name stays** (2026-11-15): a messaging web app listed LordOS on
+    the phone's "Linked devices" as the other system's own browser. That site names a linked computer after the
+    browser and system it sees **when it is linked**, and keeps that name. WebKit 2.48's site-specific quirks
+    (`UserAgentQuirks`) hand that site's domain another system's browser string *whatever the user-agent setting*,
+    (the domain is in the `libWPEWebKit-2.0` 2.48 binary's list), and lord-web turned quirks off on an app's own
+    pages only on 2026-11-11, a day after its first build: a device linked with a build before that was linked with
+    the quirk's string, and the phone keeps showing it. With
+    quirks off, the old LordOS string still says "Safari" on Linux, a browser that doesn't exist there, which sites
+    read in their own ways. Chrome on Linux is what most sites expect from a Linux computer; LordOS's token at its
+    end (the maintainer's choice, 2026-11-15) lets a site count LordOS without treating it as an unknown browser. A
+    device linked before
+    the change keeps its old name until it is unlinked on the phone and linked again.
+  - **WebKit's site-specific quirks** stay as before: off on the app's own pages (a quirk would replace the string
+    the person chose) and on for any other site in the window (a sign-in), where WebKit's fixes for big sites help.
+  - **The limit:** a Chrome, Edge or Firefox string doesn't make WebKit one of them. A site that trusts the string may
+    send code only those engines run; such a site is what *LordOS (WebKit)* is for. Checked 2026-11-11 (the LordOS
+    string): the messaging app's sign-in page loads with quirks off, without another system's download offer. The
+    other strings are not yet checked on screen on the development VM.
+  - **Tests:** `build/webapp-test` (the five strings exactly, Chrome's and Edge's the same on every machine, the
+    LordOS token from the version given and dropped for a strange one, Firefox's processor and its fallback,
+    experimental with no other browser's tokens, unknown kinds refused, the words; the per-profile key read, written only when not
+    `chrome`, ten bad forms refused, refused at the app's level), `build/webreg-test` (`webmgr_user_agent_of`, a new
+    profile is Chrome again) and `tests/webapps_model_test.mjs` (`userAgentOf`, `USER_AGENTS`).
 - **Unread count:** a title that starts with `(N) ` (N 1..9999, `(99+)` is 99; `webpage_title_badge`) on the app's
   own pages is the app's unread count; lord-web sends it to lord-server with `SetBadge(app, profile, count)` on
   `org.lordos.WebApps1` (0: none) when it changes, without waiting for an answer. WPE 2.48 has no Badging API for an
@@ -600,7 +682,12 @@ silently.
   `"system"` always LordOS's, `"none"` no sound from LordOS. `lord.webapps.setNotifySound(app, value)`; Settings → Web
   apps → Notification sound, and the same choice in Settings → Notifications (one value for both pages). LordOS
   controls only its own sound: to silence the page's own sound, use the site's settings.
-- A profile is `{ id, name }` or `{ id, name, color }`, `color` one of LordOS's tag colors (Files' tags, Databases'
+- `colorScheme` (`"auto"` when missing, written only when it isn't): `"auto"`, `"light"` or `"dark"`, the app's
+  Appearance. `lord.webapps.setColorScheme(app, value)`; Settings → Web Apps → Appearance and the app menu.
+- A profile's `userAgent` (`"chrome"` when missing, written only when it isn't): `"chrome"`, `"edge"`,
+  `"firefox"`, `"lordos"` or `"experimental"`, its Browser identity. `lord.webapps.setUserAgent(app, profile, value)`; Settings → Web Apps → Browser
+  identity and the app menu.
+- A profile is `{ id, name }` plus optional `color` and `userAgent`, `color` one of LordOS's tag colors (Files' tags, Databases'
   favorites): `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, or `none`. A new profile gets one by
   itself (`webreg_profile_default_color`: the first none, then orange, purple, blue, green, red, yellow, gray, the
   first not taken); a profile without the key reads the same by its place. `lord.webapps.setProfileColor(app,

@@ -1,0 +1,23 @@
+{
+  "appearance.title": "모양",
+  "appearance.auto": "자동",
+  "appearance.light": "라이트",
+  "appearance.dark": "다크",
+  "appearance.autoHint": "LordOS의 라이트 또는 다크 모드를 따릅니다.",
+  "appearance.lightHint": "LordOS 모드와 관계없이 사이트에 항상 라이트라고 알립니다.",
+  "appearance.darkHint": "LordOS 모드와 관계없이 사이트에 항상 다크라고 알립니다.",
+  "appearance.footer": "사이트가 읽는 라이트 또는 다크 선호 설정만 바뀌며, LordOS는 사이트 자체를 절대 수정하지 않습니다. 그래도 라이트로 남는 사이트가 있으며, 자체 테마 설정이 있는 사이트는 그 설정을 따릅니다.",
+  "identity.title": "브라우저 식별",
+  "identity.label": "식별 이름",
+  "identity.chrome": "Linux의 Chrome + LordOS",
+  "identity.edge": "Linux의 Edge",
+  "identity.firefox": "Linux의 Firefox",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (실험적)",
+  "identity.chromeHint": "사이트에 Linux에서 가장 흔한 브라우저와 LordOS의 이름 및 버전이 함께 보입니다. 기본값입니다.",
+  "identity.edgeHint": "사이트에 Linux의 Edge로 보입니다. 이를 기대하는 Edge 제조사 자체의 오피스, 메일, 팀 채팅 사이트용입니다.",
+  "identity.firefoxHint": "사이트에 Linux의 Firefox로 보입니다.",
+  "identity.lordosHint": "사이트에 LordOS 자체 엔진으로 보입니다. 다른 선택에서 잘 작동하지 않는 사이트용입니다.",
+  "identity.experimentalHint": "사이트에 LordOS와 그 버전만 보입니다. 메시징 앱을 포함한 많은 사이트가 거부하거나 잘 작동하지 않을 수 있습니다. 그럴 때는 다른 선택을 하세요.",
+  "identity.footer": "각 프로필이 사이트에 밝히는 브라우저입니다. 열린 윈도우는 페이지를 다시 불러옵니다. LordOS는 계속 자체 엔진(WebKit)을 사용하며, Chrome, Edge와 Firefox는 각 소유자의 이름입니다. 사이트가 잘 작동하지 않으면 LordOS (WebKit)를 선택하세요. 메시징 앱처럼 이미 이 기기를 연결한 사이트는 다시 연결할 때까지 이전에 본 이름을 유지합니다."
+}

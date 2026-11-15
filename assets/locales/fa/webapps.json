@@ -1,0 +1,23 @@
+{
+  "appearance.title": "ظاهر",
+  "appearance.auto": "خودکار",
+  "appearance.light": "روشن",
+  "appearance.dark": "تیره",
+  "appearance.autoHint": "از حالت روشن یا تیرهٔ LordOS پیروی می‌کند.",
+  "appearance.lightHint": "حالت LordOS هرچه باشد، به سایت همیشه روشن گفته می‌شود.",
+  "appearance.darkHint": "حالت LordOS هرچه باشد، به سایت همیشه تیره گفته می‌شود.",
+  "appearance.footer": "فقط ترجیح روشن یا تیره‌ای که سایت می‌خواند تغییر می‌کند؛ LordOS هرگز خود سایت را تغییر نمی‌دهد. برخی سایت‌ها باز هم روشن می‌مانند، و سایتی که تنظیم پوستهٔ خودش را دارد از همان تنظیم پیروی می‌کند.",
+  "identity.title": "هویت مرورگر",
+  "identity.label": "معرفی به‌عنوان",
+  "identity.chrome": "Chrome روی Linux + LordOS",
+  "identity.edge": "Edge روی Linux",
+  "identity.firefox": "Firefox روی Linux",
+  "identity.lordos": "LordOS (WebKit)",
+  "identity.experimental": "LordOS (آزمایشی)",
+  "identity.chromeHint": "سایت‌ها رایج‌ترین مرورگر Linux را می‌بینند، به‌علاوهٔ نام و نسخهٔ LordOS. پیش‌فرض.",
+  "identity.edgeHint": "سایت‌ها Edge روی Linux را می‌بینند. برای سایت‌های اداری، ایمیل و گفت‌وگوی تیمی سازندهٔ خود Edge که آن را انتظار دارند.",
+  "identity.firefoxHint": "سایت‌ها Firefox روی Linux را می‌بینند.",
+  "identity.lordosHint": "سایت‌ها موتور خود LordOS را می‌بینند. برای سایتی که با گزینه‌های دیگر درست کار نمی‌کند.",
+  "identity.experimentalHint": "سایت‌ها فقط LordOS و نسخه‌اش را می‌بینند. بسیاری از سایت‌ها، از جمله برنامه‌های پیام‌رسان، ممکن است آن را نپذیرند یا درست کار نکنند؛ در این صورت گزینهٔ دیگری را انتخاب کنید.",
+  "identity.footer": "مرورگری که هر نمایه خود را به سایت‌ها با آن معرفی می‌کند؛ پنجرهٔ باز صفحه‌اش را دوباره بار می‌کند. LordOS همچنان از موتور خودش (WebKit) استفاده می‌کند؛ Chrome، Edge و Firefox نام‌هایی متعلق به صاحبانشان هستند. اگر سایتی درست کار نکرد، LordOS (WebKit) را انتخاب کنید. سایتی که این دستگاه را قبلاً پیوند داده است، مثل یک برنامهٔ پیام‌رسان، تا پیوند دوباره همان نامی را که دیده نگه می‌دارد."
+}

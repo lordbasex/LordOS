@@ -98,7 +98,7 @@ export function installWebApp(entry) {
 }
 
 // One of the registry's calls by name, then the list again. Throws the server's error.
-const CALLS = ['addProfile', 'renameProfile', 'removeProfile', 'setPermission', 'setBackground', 'uninstall', 'setTray', 'setNotifySound', 'setProfileColor'];
+const CALLS = ['addProfile', 'renameProfile', 'removeProfile', 'setPermission', 'setBackground', 'uninstall', 'setTray', 'setNotifySound', 'setProfileColor', 'setColorScheme', 'setUserAgent'];
 export function webAppCall(name, ...args) {
   if (!has() || !CALLS.includes(name)) throw new Error('unavailable');
   try { return lord.webapps[name](...args); } finally { refreshWebApps(); }
