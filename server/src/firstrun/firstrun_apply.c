@@ -407,8 +407,11 @@ static int apply_user(const FirstRun *fr) {
         const char *const b[] = { "/usr/sbin/usermod", "--password", fr->hash, fr->user, NULL };
         if (run(TEST ? t : b)) { say("could not set the password"); return 3; }
     }
-    static const char *const GROUPS[] = { "sudo", "audio", "video", "input", "render", "pipewire", "plugdev", "lpadmin", "bluetooth", "netdev" };
+    /* administrator: sudo, or wheel where there is no sudo group (Arch, Fedora; users_admin.c does the same) */
+    static const char *const GROUPS[] = { "audio", "video", "input", "render", "pipewire", "plugdev", "lpadmin", "bluetooth", "netdev" };
     char groups[160] = "";
+    if (group_exists("sudo")) strcat(groups, "sudo");
+    else if (group_exists("wheel")) strcat(groups, "wheel");
     for (size_t i = 0; i < sizeof GROUPS / sizeof *GROUPS; i++)
         if (group_exists(GROUPS[i])) { if (groups[0]) strcat(groups, ","); strcat(groups, GROUPS[i]); }
     if (groups[0]) {

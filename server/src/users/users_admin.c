@@ -5,7 +5,7 @@
  *   user-del       name \n keep the home folder (0|1)
  *   user-passwd    name \n new password \n current password
  *                  (your own: anyone, with the current one; someone else's: only an administrator)
- *   user-admin     name \n 0|1                         (sudo group)
+ *   user-admin     name \n 0|1                         (sudo group, or wheel without one)
  *   user-avatar    name \n color (#rrggbb or empty) \n image ("" unchanged, "-" remove, or a path
  *                  in the requester's home folder; PNG or JPEG up to 4 MB)
  *                  (your own: anyone; someone else's: only an administrator)
@@ -39,7 +39,10 @@
 
 #define USERS_DIR "/var/lib/lordos/users"
 #define SESSION_CONF "/etc/lordos/session.conf"
-#define ADMIN_GROUP "sudo"
+/* The group that makes someone an administrator: sudo (Debian, Ubuntu), or wheel where there is no
+ * sudo group (Arch, Fedora). admin.c's is_admin and admin_rescue.c already accept either. */
+static const char *admin_group(void) { return getgrnam("sudo") || !getgrnam("wheel") ? "sudo" : "wheel"; }
+#define ADMIN_GROUP admin_group()
 #define SUDO_BIN "/usr/bin/sudo"
 #define RUN_DIR "/run/lordos"
 #define RESCUE_LOCK RUN_DIR "/admin-rescue.lock"
