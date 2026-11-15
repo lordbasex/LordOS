@@ -326,6 +326,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   image, tested by the community), the build refusing missing helpers (and `libsystemd-dev`), nanosvg and the mirrored
   artcraft-launcher package, X11 apps run as root and web
   app logs, and four documents missing from the index (Cloud, Databases, Disk life, Voice).
+- **Hardware reports refreshed against every GitHub issue up to #159** (maintainer's request, 2026-11-15),
+  `docs/HARDWARE-REPORT.md`: besides the nine reports with a file, a new table of the twelve machines named in other
+  issues, open and closed (a 2012 laptop #2; a second 2015 laptop of #155's model #3/#8/#12/#14/#21/#23/#78;
+  HP ZBook 17 G2 with a FirePro W6150M on the `radeon` driver #40/#57/#94; a second Latitude 7480 #67; Latitude 5289 #54; an HP 4K laptop
+  #47; a ThinkPad with an external monitor #97/#98; ideapad 320-15IKB #106; a tablet PC #127; an ASUS with a Celeron
+  N4000 #153; Latitude 5590 #157; a Ryzen 7 7800X3D and RX 7800 XT desktop with two 120 Hz monitors #159), with what
+  was fixed, who confirmed it and what is open, and a table of four virtual machines (#9, #92, #76, #140). The report
+  rows gained their linked threads (#132 is the same K84L as #149, with no wireless card on the PCI bus; #135 and #137
+  are "reported as desktop", the reporter calls them tablets in #131). The comparison now counts 22 physical machines:
+  GPU by vendor and family (14 Intel from Ironlake to Whiskey Lake, Cherry Trail and Gemini Lake; 4 AMD from GCN 2 to
+  RDNA 4; 0 NVIDIA; 4 not given), CPU by vendor and generation (17 Intel, 2 AMD, 3 not given), kind (14 laptops, 3
+  desktops, a 2-in-1, a tablet, 2 reported as desktop, 1 not given), install and boot medium, and version, with what
+  works, the fixes confirmed by their reporters, the open problems and the untested combinations; thanks to 23 people,
+  one line each. The paper (en, es, pt; §3.5 and §10.2, mirrored in `docs/PAPER.md`) cites these counts and links the
+  document, `docs/PAPER-VALIDATION.md` has a row for them, `docs/DISPLAYS.md` names the external-monitor setups, the
+  own-desktop feature page and the FAQ's "Which graphics cards work?" and "How do I share how LordOS runs on my
+  computer?" (en, es, pt) count the new machines and the FirePro and RX 7800 XT.
 - **Hardware reports, `docs/HARDWARE-REPORT.md`** (maintainer's request, 2026-11-15): the maintainer's daily PC (Intel
   i9-10900, Radeon RX 580, three monitors with DisplayPort among them, LordOS on bare metal since 2026-11-07) and what
   was fixed on it, then a table of the nine community hardware reports on GitHub (#42, #105, #129, #135, #136, #137,
