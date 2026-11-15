@@ -1,0 +1,23 @@
+{
+  "search": "Поиск эмодзи",
+  "results": {
+    "one": "{count} результат",
+    "few": "{count} результата",
+    "many": "{count} результатов",
+    "other": "{count} результата"
+  },
+  "none": "Ничего не найдено",
+  "noRecent": "Здесь появятся эмодзи, которые вы используете",
+  "copied": "{text} скопировано: вставьте с помощью Ctrl+V",
+  "more": "Ещё…",
+  "group.recent": "Недавние",
+  "group.smileys": "Смайлики и эмоции",
+  "group.people": "Люди и тело",
+  "group.animals": "Животные и природа",
+  "group.food": "Еда и напитки",
+  "group.travel": "Путешествия и места",
+  "group.activities": "Занятия",
+  "group.objects": "Предметы",
+  "group.symbols": "Символы",
+  "group.flags": "Флаги"
+}
