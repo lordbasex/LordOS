@@ -1,0 +1,14 @@
+{
+  "folder": "相機",
+  "photoName": "照片 {date}",
+  "videoName": "影片 {date}",
+  "photo": "照片",
+  "video": "影片",
+  "mirror": "鏡像",
+  "none": "找不到相機",
+  "denied": "相機 App 未獲准使用相機。請在設定 → 隱私權中更改。",
+  "error": "無法使用相機：{error}",
+  "noneHint": "插入 USB 相機：它會自動出現在這裡，不需要重新啟動 App。",
+  "deniedTitle": "無法存取相機",
+  "errorTitle": "無法開啟相機"
+}

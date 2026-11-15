@@ -1,0 +1,66 @@
+{
+  "archiveName": "封存",
+  "archiveSummary": {
+    "other": "{count} 個檔案，{size}"
+  },
+  "compressOne": "壓縮「{name}」",
+  "compressMany": {
+    "other": "壓縮 {count} 個項目"
+  },
+  "compressing": "正在壓縮「{name}」…",
+  "compressProgress": "正在壓縮「{name}」：{files} 個檔案",
+  "compressed": {
+    "other": "「{name}」已完成（{count} 個檔案）"
+  },
+  "compressError": "無法壓縮「{name}」（{error}）",
+  "extractHere": "在此解壓縮",
+  "extractSelected": {
+    "other": "解壓縮 {count} 個項目"
+  },
+  "extracting": "正在解壓縮「{name}」…",
+  "extractProgress": "正在解壓縮「{name}」：{files} 個檔案（{pct}%）",
+  "extracted": {
+    "other": "已解壓縮到「{name}」（{count} 個檔案）"
+  },
+  "extractedSkipped": {
+    "other": "已解壓縮到「{name}」（{count} 個檔案）；為了安全略過了 {skipped} 個"
+  },
+  "extractError": "無法解壓縮「{name}」（{error}）",
+  "opening": "正在開啟「{name}」…",
+  "loading": "正在載入…",
+  "locked": "受密碼保護",
+  "pages": {
+    "other": "{count} 頁"
+  },
+  "more": {
+    "other": "還有 {count} 個"
+  },
+  "err.invalid": "不是封存檔，或已損毀",
+  "err.missing-volume": "分割封存檔缺少一部分：「{name}」",
+  "err.disk-full": "磁碟已滿",
+  "err.too-big": "檔案太大",
+  "err.too-many": "檔案數量太多",
+  "err.corrupt": "已損毀",
+  "err.write": "無法寫入",
+  "err.unavailable": "文件輔助程式無法使用",
+  "err.cancelled": "已取消",
+  "err.crash": "文件輔助程式意外停止",
+  "err.timeout": "花費的時間太長",
+  "err.protocol": "文件輔助程式傳回無效的回應",
+  "err.spawn": "無法啟動文件輔助程式",
+  "err.closed": "文件已關閉",
+  "err.bad-request": "請求無效",
+  "err.bad-field": "表單欄位無效",
+  "err.bad-page": "頁面無效",
+  "err.busy": "文件輔助程式忙碌中",
+  "err.memory": "記憶體不足",
+  "err.no-fonts": "沒有可用的字體",
+  "err.not-open": "文件未開啟",
+  "err.nothing": "沒有需要儲存的內容",
+  "err.read-only": "文件為唯讀",
+  "err.save": "無法儲存",
+  "err.unknown-op": "未知的操作",
+  "err.image": "影像無效",
+  "err.blob": "資料無效",
+  "err.password": "文件受密碼保護"
+}
