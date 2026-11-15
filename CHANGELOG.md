@@ -913,6 +913,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A web app with Appearance set to Light or Dark didn't open when only `lordos` was updated** (found testing
+  0.8.8.9 on the maintainer's PC, 2026-11-15): the web runtime is its own package, `lordos-web`, and a 0.8.8.8
+  `lord-web` refused the app's registry entry with the new `colorScheme` key ("unknown key colorScheme"), and kept
+  sending the old browser identity. `lordos-web` already depended on `lordos` of its exact version; now `lordos` also
+  `Breaks: lordos-web (<< <its version>)`, so dpkg and the Store update both together.
+
 - **The web apps model test covered only six languages** (`server/tests/webapps_model_test.mjs`): it expected exactly
   en, es, fr, it, lt and pt to have `webapps.json` and crashed on a language with no `store.json`. It now checks the
   catalog's texts and the Edit words in every complete language (no `"partial"` in `meta.json`), so a new language
