@@ -17,12 +17,17 @@
 //   webBadges (store) · webBadgeEvent(data)    the unread counts lord-web set (SetBadge): { [app]: { [profile]: n } }
 //   siteIcons (store) · wantSiteIcon(app) · refreshSiteIcon(app)   the site's own icon, fetched one at a time with the
 //                                  probe (lord.webapps.fetchIcon) and kept in ~/.cache/lordos/web/icons/
+//   webDeveloper (store) · setWebDeveloperMode(on)   Settings → Web Apps → Developer mode (off by default)
+//   webInspectItem(w)              the Window menu's Inspect (developer tools) for a web app's window while developer
+//                                  mode is on, else null; it asks first (webInspectAsk, <WebAppInspectPrompt />)
+//   webInspectAsk (store) · answerWebInspect(yes)   then lord.webapps.inspect starts that window again with WebKit's
+//                                  inspector on 127.0.0.1, which lord-web opens in the person's browser
 //
 // Only lord-server starts lord-web, with an app and a profile from the registry; nothing here names a URL to
 // open or a program to run.
 import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
-import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
+import { defaultProfile, parseWindowAppId, windowWebApp, askAnswer, upstreamVersion, badgeReducer, wantsSiteIcon, webEditItems, inspectItem, RUNTIME_PACKAGE, WEBKIT_PACKAGE } from './webappsmodel.js';
 import { t } from './i18n.js';
 
 const has = () => typeof lord !== 'undefined' && typeof lord.webapps === 'object' && lord.webapps !== null;
@@ -32,6 +37,8 @@ export const webAsks = createStore([]);
 export const webBadges = createStore({});
 export const webMenu = createStore(null);
 export const siteIcons = createStore({});
+export const webDeveloper = createStore(false);
+export const webInspectAsk = createStore(null);
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -207,6 +214,37 @@ export function webEditMenu(w) {
   return webEditItems((c) => t(`shell.edit.${c}`), (c) => { try { lord.webapps.edit(web.app, web.profile, c); } catch (e) { /* it ended */ } });
 }
 
+// ---- developer tools (docs/WEBAPPS.md, "Developer tools") ----
+
+function readDeveloperMode() {
+  let on = false;
+  try { on = has() && typeof lord.webapps.developerMode === 'function' && lord.webapps.developerMode() === true; } catch (e) { on = false; }
+  webDeveloper.set(on);
+}
+
+// Settings → Web Apps → Developer mode; off also closes every window that has developer tools on (lord-server).
+// Throws the server's error (with .code).
+export function setWebDeveloperMode(on) {
+  try { lord.webapps.setDeveloperMode(!!on); } finally { readDeveloperMode(); }
+}
+
+// The Window menu's Inspect (developer tools) for a window of a lord-web we started, only while developer mode is on;
+// checked while that window has them (they end when it closes).
+export function webInspectItem(w) {
+  const web = w?.args?.web;
+  if (!web || !webDeveloper.get() || !has() || typeof lord.webapps.inspect !== 'function') return null;
+  return inspectItem(web, true, webRunning(), t('webapps.inspect.menu'), (q) => webInspectAsk.set(q));
+}
+
+// The person's answer to "Turn on for this window?": only a yes reaches lord-server, which starts that window again
+// with the inspector (lord.webapps.inspect); lord-web opens it in the browser.
+export function answerWebInspect(yes) {
+  const q = webInspectAsk.get();
+  webInspectAsk.set(null);
+  if (!q || !yes) return;
+  try { lord.webapps.inspect(q.app, q.profile); } catch (e) { console.error('inspect:', e.code || e); }
+}
+
 // A page's right click: shown at the pointer by <WebAppMenu /> (hardware.jsx); one at a time.
 export function webMenuEvent(kind, data) {
   if (!data || typeof data.id !== 'number') return;
@@ -229,6 +267,7 @@ export function answerWebMenu(item, menu = webMenu.get()) {
 if (has()) {
   refreshWebApps();
   readIcons();
+  readDeveloperMode();
   try {
     const list = typeof lord.webapps.badges === 'function' ? lord.webapps.badges() : [];
     if (Array.isArray(list)) webBadges.set(list.reduce(badgeReducer, {}));

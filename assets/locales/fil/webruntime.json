@@ -8,5 +8,8 @@
   "chooser.openMany": "Pumili ng mga file",
   "offline.title": "Walang koneksyon",
   "offline.body": "Hindi maabot ng app na ito ang site nito. Kusa itong susubok muli sa sandaling bumalik ang network.",
-  "offline.hint": "Pindutin ang Ctrl+R para subukan ngayon."
+  "offline.hint": "Pindutin ang Ctrl+R para subukan ngayon.",
+  "inspect.title": "Naka-on ang mga tool ng developer",
+  "inspect.body": "Hanggang isara mo ang window na ito. Address:",
+  "inspect.failed": "Hindi masimulan ang mga tool ng developer"
 }

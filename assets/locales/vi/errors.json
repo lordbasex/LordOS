@@ -874,5 +874,6 @@
   "pkg.multiarchSplit": "{name} phải có cùng phiên bản cho 64 và 32 bit, và thay đổi này sẽ khiến chúng khác nhau",
   "pkg.multiarchConflict": "Không thể cài {name} cho cả 64 và 32 bit cùng lúc",
   "pkg.foreignArchUnsupported": "Chỉ có thể bật các gói 32 bit trên PC 64 bit (amd64); hệ thống này là {arch}",
-  "pkg.foreignArchFailed": "Không thể bật các gói 32 bit ({arch}) (dpkg kết thúc với mã {code})"
+  "pkg.foreignArchFailed": "Không thể bật các gói 32 bit ({arch}) (dpkg kết thúc với mã {code})",
+  "webapps.developerOff": "Chế độ nhà phát triển đang tắt trong Cài đặt → Ứng dụng web"
 }

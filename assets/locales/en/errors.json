@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} must have the same version for 64 and 32 bits, and this change would leave them different",
   "pkg.multiarchConflict": "{name} can't be installed for 64 and 32 bits at the same time",
   "pkg.foreignArchUnsupported": "32-bit packages can only be enabled on a 64-bit PC (amd64); this system is {arch}",
-  "pkg.foreignArchFailed": "32-bit ({arch}) packages could not be enabled (dpkg exited with code {code})"
+  "pkg.foreignArchFailed": "32-bit ({arch}) packages could not be enabled (dpkg exited with code {code})",
+  "webapps.developerOff": "Developer mode is off in Settings → Web Apps"
 }

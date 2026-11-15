@@ -211,5 +211,14 @@
   "identity.edgeHint": "网站看到的是 Linux 上的 Edge。适用于 Edge 开发商自己的办公、邮件和团队聊天网站，它们期望使用它。",
   "identity.firefoxHint": "网站看到的是 Linux 上的 Firefox。",
   "identity.lordosHint": "网站看到的是 LordOS 自己的引擎。适用于在其他选项下运行不正常的网站。",
-  "identity.footer": "每个配置文件向网站声称的浏览器；打开的窗口会重新载入其页面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名称。有些网站会检查浏览器，发现不一致就拒绝；如果网站拒绝或运行不正常，请选择其他身份，例如 LordOS (WebKit)。已经关联此设备的网站（例如即时通讯应用）在重新关联之前会保留它看到的名称。"
+  "identity.footer": "每个配置文件向网站声称的浏览器；打开的窗口会重新载入其页面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名称。有些网站会检查浏览器，发现不一致就拒绝；如果网站拒绝或运行不正常，请选择其他身份，例如 LordOS (WebKit)。已经关联此设备的网站（例如即时通讯应用）在重新关联之前会保留它看到的名称。",
+  "inspect.menu": "检查（开发者工具）",
+  "inspect.title": "{app} 的开发者工具",
+  "inspect.warning": "开发者工具可以看到此应用中的一切，包括消息和会话。要为此窗口打开吗？",
+  "inspect.detail": "窗口会在打开工具的状态下重新打开，工具会在你的浏览器中打开。在你关闭窗口之前，工具会一直开着。在此期间，这台电脑上的任何程序都可以连接到它们。",
+  "inspect.turnOn": "打开",
+  "settings.developerTitle": "开发者",
+  "settings.developer": "开发者模式",
+  "settings.developerHint": "在每个网页应用的“窗口”菜单中添加“检查（开发者工具）”",
+  "settings.developerFooter": "供网页开发者使用。开发者工具能看到所检查应用中的一切；只有在你于某个窗口中选择“检查”并确认后才会打开，而且只在这台电脑上。关闭此项会关闭所有打开了工具的窗口。"
 }

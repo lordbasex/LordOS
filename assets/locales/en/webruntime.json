@@ -8,5 +8,8 @@
   "chooser.openMany": "Choose files",
   "offline.title": "No connection",
   "offline.body": "This app couldn't reach its site. It will try again by itself as soon as the network is back.",
-  "offline.hint": "Press Ctrl+R to try now."
+  "offline.hint": "Press Ctrl+R to try now.",
+  "inspect.title": "Developer tools are on",
+  "inspect.body": "Until you close this window. Address:",
+  "inspect.failed": "Developer tools couldn't start"
 }

@@ -213,5 +213,14 @@
   "identity.edgeHint": "Saytlar Linux-da Edge görür. Edge-in öz istehsalçısının bunu gözləyən ofis, poçt və komanda söhbəti saytları üçün.",
   "identity.firefoxHint": "Saytlar Linux-da Firefox-u görür.",
   "identity.lordosHint": "Saytlar LordOS-un öz mühərrikini görür. Digərləri ilə düzgün işləməyən sayt üçün.",
-  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome, Edge və Firefox sahiblərinə məxsus adlardır. Bəzi saytlar brauzeri yoxlayır və uyğun gəlməyəni rədd edir; sayt rədd etsə və ya düzgün işləməsə, başqa kimlik seçin, məsələn, LordOS (WebKit). Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır."
+  "identity.footer": "Hər profilin saytlara özünü təqdim etdiyi brauzer; açıq pəncərə səhifəsini yenidən yükləyir. LordOS yenə də öz mühərrikindən (WebKit) istifadə edir; Chrome, Edge və Firefox sahiblərinə məxsus adlardır. Bəzi saytlar brauzeri yoxlayır və uyğun gəlməyəni rədd edir; sayt rədd etsə və ya düzgün işləməsə, başqa kimlik seçin, məsələn, LordOS (WebKit). Bu cihazı artıq əlaqələndirmiş sayt, məsələn, mesajlaşma tətbiqi, yenidən əlaqələndirənə qədər gördüyü adı saxlayır.",
+  "inspect.menu": "Yoxla (tərtibatçı alətləri)",
+  "inspect.title": "{app} üçün tərtibatçı alətləri",
+  "inspect.warning": "Tərtibatçı alətləri bu tətbiqdəki hər şeyi, o cümlədən mesajları və sessiyaları görə bilər. Bu pəncərə üçün aktiv edilsin?",
+  "inspect.detail": "Pəncərə onlar aktiv olaraq yenidən açılır və alətlər brauzerinizdə açılır. Pəncərəni bağlayana qədər aktiv qalırlar. Bu müddətdə bu kompüterdəki istənilən proqram onlara qoşula bilər.",
+  "inspect.turnOn": "Aktiv et",
+  "settings.developerTitle": "Tərtibatçı",
+  "settings.developer": "Tərtibatçı rejimi",
+  "settings.developerHint": "Hər veb tətbiqin Pəncərə menyusuna Yoxla (tərtibatçı alətləri) əlavə edir",
+  "settings.developerFooter": "Veb tərtibatçılar üçün. Tərtibatçı alətləri yoxladıqları tətbiqdəki hər şeyi görür; yalnız pəncərədə Yoxla seçib təsdiqlədikdən sonra və yalnız bu kompüterdə açılır. Bunu söndürmək onların aktiv olduğu hər pəncərəni bağlayır."
 }

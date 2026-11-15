@@ -8,6 +8,7 @@
  *
  *   make -C server build/webreg-test        (also in `make test`) */
 #include "../src/web/webreg.h"
+#include "../src/web/webinspect.h"
 #include "../src/web/webmgr.h"
 #include "../src/web/webscheme.h"
 #include "../src/sec/json.h"
@@ -681,6 +682,46 @@ static void test_manager(void) {
         CHECK(webmgr_remove_profile("chat", "agent", 1) == NULL, "profile agent removed");
         CHECK(!webmgr_add_profile("chat", "Agent", prof, sizeof prof) && webmgr_user_agent_of("chat", "agent") == WEBREG_UA_CHROME, "a new profile: chrome again");
         CHECK(webmgr_remove_profile("chat", "agent", 1) == NULL, "profile agent removed again");
+    }
+    /* developer tools (webinspect.h): only while developer mode is on, the window started again with --inspect; off
+     * ends it */
+    {
+        n = webmgr_running(r, WEB_MAX_RUNNING);
+        pid_t before = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(r[i].profile, "work")) before = r[i].pid;
+        CHECK(before > 0, "work runs");
+        int already = -1;
+        const char *e = webmgr_inspect("chat", "work", &already);
+        CHECK(!webmgr_developer() && e && !strcmp(e, "webapps.developerOff"), "developer mode off: %s", e ? e : "(started)");
+        snprintf(q, sizeof q, "%s/" WEBINSPECT_FILE, webmgr_config_dir());
+        write_text(q, "{\"developerMode\":\"yes\"}", 0600);
+        CHECK(!webmgr_developer() && webmgr_inspect("chat", "work", &already) != NULL, "a file that isn't valid is off");
+        CHECK(!webmgr_set_developer(1) && webmgr_developer(), "developer mode on");
+        CHECK(!stat(q, &st) && (st.st_mode & 0777) == 0600, "its file, 0600");
+        CHECK(webmgr_inspect("chat", "nope", &already) != NULL && webmgr_inspect("../x", "work", &already) != NULL && webmgr_inspect("chat", "../x", &already) != NULL,
+              "only an app and profile of the registry");
+        n = webmgr_running(r, WEB_MAX_RUNNING);
+        int same = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(r[i].profile, "work") && r[i].pid == before && !r[i].inspect) same = 1;
+        CHECK(same, "nothing ended for a refused call");
+        snprintf(p, sizeof p, "%s/args-chat-work", root);
+        unlink(p);
+        CHECK(!webmgr_inspect("chat", "work", &already) && already == 0, "started again with the inspector");
+        n = webmgr_running(r, WEB_MAX_RUNNING);
+        pid_t now = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(r[i].profile, "work") && r[i].inspect) now = r[i].pid;
+        CHECK(now > 0 && now != before && kill(before, 0) != 0, "a new process, the old one ended");
+        char *ia = NULL;
+        for (int i = 0; i < 200 && !(ia = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+        CHECK(ia && !strcmp(ia, "--app chat --profile work --inspect\n"), "argv: %s", ia ? ia : "(none)");
+        free(ia);
+        CHECK(!webmgr_inspect("chat", "work", &already) && already == 1, "a second Inspect only shows it");
+        CHECK(!webmgr_launch("chat", "work", &raised) && raised == 1, "a launch only raises it");
+        CHECK(!webmgr_set_developer(0) && !webmgr_developer(), "developer mode off again");
+        n = webmgr_running(r, WEB_MAX_RUNNING);
+        int left = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(r[i].profile, "work") || r[i].inspect) left = 1;
+        CHECK(!left && n == 1 && !strcmp(r[0].profile, "personal") && kill(now, 0) != 0, "turning it off ended the window with the inspector, not the others");
     }
     snprintf(p, sizeof p, "%s/.local/share/lordos/web/chat/work", root);
     CHECK(!stat(p, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0700, "its data folder, 0700");

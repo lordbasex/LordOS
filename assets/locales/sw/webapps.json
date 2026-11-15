@@ -213,5 +213,14 @@
   "identity.edgeHint": "Tovuti huona Edge kwenye Linux. Kwa tovuti za ofisi, barua na gumzo la timu za mtengenezaji wa Edge mwenyewe, zinazoitarajia.",
   "identity.firefoxHint": "Tovuti huona Firefox kwenye Linux.",
   "identity.lordosHint": "Tovuti huona injini ya LordOS yenyewe. Kwa tovuti inayokosea na nyingine.",
-  "identity.footer": "Kivinjari ambacho kila wasifu huziambia tovuti kuwa ndicho; dirisha lililo wazi hupakia ukurasa wake tena. LordOS bado hutumia injini yake yenyewe (WebKit); Chrome, Edge na Firefox ni majina ya wamiliki wake. Baadhi ya tovuti hukagua kivinjari na kukikataa kitu kisipolingana; tovuti ikikataa au ikikosea, chagua utambulisho mwingine, kama LordOS (WebKit). Tovuti ambayo tayari iliunganisha kifaa hiki, kama programu ya ujumbe, hubaki na jina iliyoliona hadi utakapokiunganisha tena."
+  "identity.footer": "Kivinjari ambacho kila wasifu huziambia tovuti kuwa ndicho; dirisha lililo wazi hupakia ukurasa wake tena. LordOS bado hutumia injini yake yenyewe (WebKit); Chrome, Edge na Firefox ni majina ya wamiliki wake. Baadhi ya tovuti hukagua kivinjari na kukikataa kitu kisipolingana; tovuti ikikataa au ikikosea, chagua utambulisho mwingine, kama LordOS (WebKit). Tovuti ambayo tayari iliunganisha kifaa hiki, kama programu ya ujumbe, hubaki na jina iliyoliona hadi utakapokiunganisha tena.",
+  "inspect.menu": "Kagua (zana za msanidi)",
+  "inspect.title": "Zana za msanidi za {app}",
+  "inspect.warning": "Zana za msanidi zinaweza kuona kila kitu katika programu hii, ikiwa ni pamoja na ujumbe na vipindi. Ziwashe kwa dirisha hili?",
+  "inspect.detail": "Dirisha linafunguka tena zana zikiwa zimewashwa, na zinafunguka katika kivinjari chako. Zinabaki zimewashwa hadi utakapofunga dirisha. Wakati huo, programu yoyote kwenye kompyuta hii inaweza kuunganishwa nazo.",
+  "inspect.turnOn": "Washa",
+  "settings.developerTitle": "Msanidi",
+  "settings.developer": "Hali ya msanidi",
+  "settings.developerHint": "Huongeza Kagua (zana za msanidi) kwenye menyu ya Dirisha ya kila programu ya wavuti",
+  "settings.developerFooter": "Kwa wasanidi wa wavuti. Zana za msanidi huona kila kitu katika programu wanayoikagua; zinafunguka tu baada ya kuchagua Kagua katika dirisha na kuthibitisha, na kwenye kompyuta hii pekee. Kuzima hiki hufunga dirisha lolote lenye zana hizo zimewashwa."
 }

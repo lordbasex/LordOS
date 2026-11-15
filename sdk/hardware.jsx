@@ -15,7 +15,8 @@
 //   portal keys   a Linux app asks for global shortcuts: the person gives each one a key or none
 //                 (<GlobalShortcutsPrompt />, globalshortcuts.jsx)
 //   web apps      a web app's page asks for the camera, the microphone, the screen, the location or notifications
-//                 and its registry entry says "ask" (org.lordos.WebApps1.Ask, <WebAppAskPrompt />, webapps.js)
+//                 and its registry entry says "ask" (org.lordos.WebApps1.Ask, <WebAppAskPrompt />, webapps.js); and
+//                 "Turn on developer tools for this window?" before Inspect (<WebAppInspectPrompt />)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -32,7 +33,7 @@ import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu } from './webapps.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
@@ -615,6 +616,50 @@ export function WebAppAskPrompt() {
   h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
     h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('cancel') } }, h(DialogButton, { label: t('webapps.ask.deny'), onClick: () => answerWebAsk(q, false, remember), th })),
     h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.ask.allow'), primary: true, th, onClick: () => answerWebAsk(q, true, remember) })))));
+}
+
+// ---- Inspect (developer tools) on a web app's window (docs/WEBAPPS.md, "Developer tools") ----
+//
+// Asked every time, Cancel first: the developer tools see everything in that app, and while they are on any program
+// on this computer can connect to them. Only "Turn On" reaches lord-server (lord.webapps.inspect).
+export function WebAppInspectPrompt() {
+  const q = useStore(webInspectAsk);
+  const th = useSystemTokens();
+  const [focus, setFocus] = useState('cancel');
+  const token = useRef({}).current;
+  const owner = useStore(dialogStack, (l) => keyOwner(l) === token);
+  const latest = useRef(null);
+  latest.current = { q, focus };
+  useEffect(() => {
+    if (!q) return undefined;
+    setFocus('cancel');
+    dialogStack.open(token, null, true);
+    return () => dialogStack.close(token);
+  }, [q]);
+  useEffect(() => addListener('keydown', (e) => {
+    const cur = latest.current;
+    if (!cur.q || dialogStack.owner() !== token) return;
+    const r = dialogKey(e, { destructive: true, focus: cur.focus });
+    if (r) dialogStack.take(e);
+    if (r?.focus) setFocus(r.focus);
+    else if (r?.press) answerWebInspect(r.press === 'ok');
+  }), []);
+  if (!q) return null;
+  const entry = webAppEntry(q.app);
+  const prof = profileOf(entry, q.profile);
+  const app = entry ? (entry.profiles.length > 1 && prof ? t('webapps.windowName', { app: entry.name, profile: prof.name }) : entry.name) : q.app;
+  const ring = (which) => (owner && focus === which ? { boxShadow: `0 0 0 2px ${th.accent}` } : null);
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
+  h(View, { style: { marginTop: 90, width: 400, borderRadius: 14, padding: 22, gap: 10, alignItems: 'center', backgroundColor: th.windowBg,
+    border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
+  h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t('webapps.inspect.title', { app })),
+  entry ? h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: th.textDim, textAlign: 'center', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' } }, entry.origin) : null,
+  h(Text, { style: { fontSize: 12, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t('webapps.inspect.warning')),
+  h(Text, { style: { fontSize: 11, color: th.textDim, textAlign: 'center', lineHeight: 1.4 } }, t('webapps.inspect.detail')),
+  h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('cancel') } }, h(DialogButton, { label: t('webapps.settings.cancel'), onClick: () => answerWebInspect(false), th })),
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.inspect.turnOn'), primary: true, th, onClick: () => answerWebInspect(true) })))));
 }
 
 // ---- A right click in a web app's page (org.lordos.WebApps1.Menu, server/src/ui/webask.c) ----

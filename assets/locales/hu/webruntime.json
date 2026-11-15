@@ -8,5 +8,8 @@
   "chooser.openMany": "Fájlok kiválasztása",
   "offline.title": "Nincs kapcsolat",
   "offline.body": "Ez az alkalmazás nem érte el a webhelyét. Amint a hálózat visszatér, magától újra megpróbálja.",
-  "offline.hint": "Nyomja meg a Ctrl+R billentyűket a mostani próbálkozáshoz."
+  "offline.hint": "Nyomja meg a Ctrl+R billentyűket a mostani próbálkozáshoz.",
+  "inspect.title": "A fejlesztői eszközök be vannak kapcsolva",
+  "inspect.body": "Amíg be nem zárja ezt az ablakot. Cím:",
+  "inspect.failed": "A fejlesztői eszközök nem indultak el"
 }

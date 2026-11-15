@@ -8,5 +8,8 @@
   "chooser.openMany": "Dateien auswählen",
   "offline.title": "Keine Verbindung",
   "offline.body": "Diese App konnte ihre Website nicht erreichen. Sie versucht es von selbst erneut, sobald das Netzwerk wieder da ist.",
-  "offline.hint": "Drücken Sie Strg+R, um es jetzt zu versuchen."
+  "offline.hint": "Drücken Sie Strg+R, um es jetzt zu versuchen.",
+  "inspect.title": "Entwicklertools sind an",
+  "inspect.body": "Bis du dieses Fenster schließt. Adresse:",
+  "inspect.failed": "Die Entwicklertools konnten nicht starten"
 }

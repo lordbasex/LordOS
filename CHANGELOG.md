@@ -448,6 +448,47 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   through the brightness keys (two laptops in `docs/HARDWARE-REPORT.md`, #12); the slider itself has not been tried
   on one.
 
+- **Developer tools for web apps: Inspect, per window, after asking** (maintainer's request, 2026-11-15: "seria bueno
+  agregar ... Inspecionar 'DevTools'", "a lo que es app webs"). Settings → Web Apps has a new *Developer* section with
+  one switch for every web app, *Developer mode*, off by default. With it on, each web app window's Window menu has
+  *Inspect (developer tools)*. Choosing it asks first, Cancel focused: "Developer tools can see everything in this app,
+  including messages and sessions. Turn on for this window?", with a line that says the window opens again with them on,
+  that they open in the browser, that they stay on until the window closes and that meanwhile any program on this
+  computer can connect to them. Only *Turn On* goes further.
+  - *How (WPE 2.48):* WPE WebKit has no inspector inside the window and turns its remote inspector on only as the
+    process starts, from `WEBKIT_INSPECTOR_HTTP_SERVER=<ip>:<port>` (read when the first web context is made; port 0
+    is refused, "invalid address"). So `lord.webapps.inspect(app, profile)` (desktop only, not in the broker) has
+    lord-server end that app and profile's `lord-web` and start it again as `lord-web --app <app> --profile <profile>
+    --inspect` (`webmgr_inspect`; `webargs.c` accepts `--inspect` only last, once, with an app). lord-web refuses
+    `--inspect` unless developer mode is on (it reads the file itself), has the kernel pick a free port on
+    `127.0.0.1`, hands WebKit `127.0.0.1:<port>`, turns the view's developer extras on, and checks that the port
+    listens from one of its own sockets (`/proc/self/net/tcp` against `/proc/self/fd`, `webinspect_listening`) before
+    it opens `http://127.0.0.1:<port>/` in the person's browser through OpenURI, with a notification that says the
+    tools are on and the address. The page lists that window's page; *Inspect* there opens WebKit's Web Inspector over
+    a WebSocket. Checked on the development machine against a headless lord-server: the off switch refuses
+    (`exit 2`), with it on lord-web listens only on 127.0.0.1 (the HTTP port and WebKit's own inspector server on
+    another random port), the target list names the page, `Main.html` loads, the WebSocket upgrade answers 101, and a
+    start without `--inspect` listens on nothing.
+  - *Limits:* WebKit's inspector server has no token or secret path, so while it is on any process on this computer
+    that can reach 127.0.0.1 can connect; that is why it is per window, asked every time, and ends with the window:
+    closing a window with developer tools on ends its lord-web even for an app that runs in the background, the next
+    start is a normal one, and turning developer mode off ends every window that has them. A second *Inspect* on that
+    window only brings it forward (the item is checked and unavailable while they are on). The page never gets a way
+    to turn them on: no D-Bus method was added, the menu item and the question are the shell's, and lord-server
+    checks the switch again.
+  - *Storage:* `~/.config/lordos/web/developer.json` (`{"developerMode": true}`, 0600), written only by
+    `lord.webapps.setDeveloperMode` (the folder is in `fsops_protected`); a missing or invalid file is off. New
+    `lord.webapps` calls: `developerMode()`, `setDeveloperMode(on)`, `inspect(app, profile)`; `running()` says which
+    windows have developer tools (`inspect`). New error code `webapps.developerOff`.
+  - *Texts:* `webapps.inspect.*`, `webapps.settings.developer*`, lord-web's own `inspect.title`, `inspect.body` and
+    `inspect.failed`, in all 35 languages.
+  - *Tests:* `tests/webapp_test.c` (argv with `--inspect`, the switch's file, the address, who listens on the port:
+    ours, nobody yet, another process's socket, ours on every address, another listener on the same port),
+    `tests/webreg_test.c` (refused while off or with an invalid file, the profile checked first, the old process
+    ended and a new one started with `--inspect`, a second Inspect only shows it, off ends it and not the other
+    profile) and `tests/webapps_model_test.mjs` (the Window menu item: only with developer mode on, checked while on,
+    a click only asks).
+
 ### Changed
 
 - **A tablet sleeps on a tap of the power button and shuts down on a 5-second hold** (issue

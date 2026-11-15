@@ -8,5 +8,8 @@
   "chooser.openMany": "Pasirinkite failus",
   "offline.title": "Nėra ryšio",
   "offline.body": "Ši programa nepasiekė savo svetainės. Ji bandys dar kartą pati, kai tik vėl atsiras tinklas.",
-  "offline.hint": "Paspauskite Ctrl+R, kad bandytumėte dabar."
+  "offline.hint": "Paspauskite Ctrl+R, kad bandytumėte dabar.",
+  "inspect.title": "Kūrėjo įrankiai įjungti",
+  "inspect.body": "Kol uždarysite šį langą. Adresas:",
+  "inspect.failed": "Nepavyko paleisti kūrėjo įrankių"
 }

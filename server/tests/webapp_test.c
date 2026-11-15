@@ -6,7 +6,8 @@
  * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
  * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
  * page (webscheme.c), and the catalog folder for its own words (weblangid.h), and an app that is offline (weboffline.h:
- * which load errors mean no network, the retry's delay, lord-web's own page; #144). The rest of the registry file (webreg.c,
+ * which load errors mean no network, the retry's delay, lord-web's own page; #144), and the developer tools (webinspect.c:
+ * the developer mode file, the inspector's address, who listens on its port). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
@@ -15,6 +16,7 @@
 #include "../src/web/webclip.h"
 #include "../src/web/webdrop.h"
 #include "../src/web/webedit.h"
+#include "../src/web/webinspect.h"
 #include "../src/web/webpage.h"
 #include "../src/web/webdl.h"
 #include "../src/web/weblangid.h"
@@ -24,6 +26,7 @@
 #include "../src/web/webscheme.h"
 #include "../src/web/weburl.h"
 
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
@@ -202,10 +205,64 @@ static void test_perm_context(void) {
     CHECK(weburl_perm_allowed("http://localhost:8000/x", "http://localhost:8000", "http://localhost:8000/", "http://localhost:8000"), "http on this computer");
 }
 
+/* developer tools: the switch's file, the inspector's address and the check that its port listens from lord-web itself */
+static void test_inspect(void) {
+    const char *on = "{\"developerMode\":true}";
+    CHECK(webinspect_parse(on, strlen(on)) == 1, "on");
+    const char *more = "{\"developerMode\":true,\"later\":1}";
+    CHECK(webinspect_parse(more, strlen(more)) == 1, "other keys ignored");
+    const char *off[] = { "{\"developerMode\":false}", "{\"developerMode\":1}", "{\"developerMode\":\"true\"}", "{}", "[true]", "true", "{\"developerMode\":true", "" };
+    for (size_t i = 0; i < sizeof off / sizeof off[0]; i++) CHECK(webinspect_parse(off[i], strlen(off[i])) == 0, "off: %s", off[i]);
+    CHECK(webinspect_parse(NULL, 0) == 0, "no file");
+    char big[WEBINSPECT_FILE_MAX + 40];
+    memset(big, ' ', sizeof big);
+    memcpy(big, on, strlen(on));
+    CHECK(webinspect_parse(big, sizeof big) == 0, "too big");
+    char f[64];
+    size_t n = webinspect_write(1, f, sizeof f);
+    CHECK(n && webinspect_parse(f, n) == 1, "write on: %s", f);
+    n = webinspect_write(0, f, sizeof f);
+    CHECK(n && webinspect_parse(f, n) == 0, "write off");
+    CHECK(webinspect_write(1, f, 8) == 0, "write: too small");
+
+    char s[64];
+    CHECK(!webinspect_address(41234, s, sizeof s) && !strcmp(s, "127.0.0.1:41234"), "address: %s", s);
+    CHECK(!webinspect_url(41234, s, sizeof s) && !strcmp(s, "http://127.0.0.1:41234/"), "url: %s", s);
+    CHECK(webinspect_address(0, s, sizeof s) && !s[0] && webinspect_address(80, s, sizeof s) && webinspect_url(65536, s, sizeof s) && !s[0], "ports below 1024, 0 and past 65535");
+    CHECK(webinspect_url(41234, s, 10) && !s[0], "url: buffer too small");
+
+    /* /proc/net/tcp: 127.0.0.1 is 0100007F on a little-endian machine; port 41234 is A112 */
+    const char *lo = htonl(1) != 1 ? "0100007F" : "7F000001";
+    char tcp[1024];
+    const char *head = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
+    unsigned long mine[] = { 555, 777 };
+    snprintf(tcp, sizeof tcp, "%s   0: %s:A112 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 777 1 0000000000000000 100 0 0 10 0\n"
+             "   1: %s:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 999 1 0000000000000000 100 0 0 10 0\n", head, lo, lo);
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41234, mine, 2) == 1, "ours listens");
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41235, mine, 2) == 0, "nobody yet");
+    CHECK(webinspect_listening(tcp, strlen(tcp), 80, mine, 2) == -1, "a port lord-web may not use");
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41234, mine, 1) == -1, "another process's socket");
+    snprintf(tcp, sizeof tcp, "%s   0: %s:A112 0100007F:9C40 01 00000000:00000000 00:00000000 00000000  1000        0 999 1 0000000000000000 100 0 0 10 0\n", head, lo);
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41234, mine, 2) == 0, "a connection from that port isn't a listener");
+    snprintf(tcp, sizeof tcp, "%s   0: 00000000:A112 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 777 1 0000000000000000 100 0 0 10 0\n", head);
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41234, mine, 2) == -1, "ours, but on every address");
+    snprintf(tcp, sizeof tcp, "%s   0: %s:A112 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 777 1 0000000000000000 100 0 0 10 0\n"
+             "   1: 00000000:A112 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1001        0 4242 1 0000000000000000 100 0 0 10 0", head, lo);
+    CHECK(webinspect_listening(tcp, strlen(tcp), 41234, mine, 2) == -1, "another listener on the same port, last line without a newline");
+    CHECK(webinspect_listening(head, strlen(head), 41234, mine, 2) == 0 && webinspect_listening(NULL, 0, 41234, mine, 2) == -1, "empty table, none");
+}
+
 static void test_args(void) {
     WebArgs a;
     char *ok[] = { "lord-web", "--app", "chat", "--profile", "work", NULL };
-    CHECK(webargs_parse(5, ok, &a) == WEBARGS_APP && !strcmp(a.app, "chat") && !strcmp(a.profile, "work"), "app");
+    CHECK(webargs_parse(5, ok, &a) == WEBARGS_APP && !strcmp(a.app, "chat") && !strcmp(a.profile, "work") && !a.inspect, "app");
+    char *insp[] = { "lord-web", "--app", "chat", "--profile", "work", "--inspect", NULL };
+    CHECK(webargs_parse(6, insp, &a) == WEBARGS_APP && !strcmp(a.app, "chat") && !strcmp(a.profile, "work") && a.inspect, "app with --inspect");
+    char *insp_first[] = { "lord-web", "--inspect", "--app", "chat", "--profile", "work", NULL };
+    char *insp_twice[] = { "lord-web", "--app", "chat", "--profile", "work", "--inspect", "--inspect", NULL };
+    char *probe_insp[] = { "lord-web", "--probe", "--inspect", NULL };
+    CHECK(webargs_parse(6, insp_first, &a) == WEBARGS_BAD && webargs_parse(7, insp_twice, &a) == WEBARGS_BAD && webargs_parse(3, probe_insp, &a) == WEBARGS_BAD,
+          "--inspect only last, once, with an app");
     char *probe[] = { "lord-web", "--probe", NULL };
     CHECK(webargs_parse(2, probe, &a) == WEBARGS_PROBE, "probe");
     char *icon[] = { "lord-web", "--probe-icon", NULL };
@@ -987,6 +1044,7 @@ int main(void) {
     test_perm_context();
     test_probe_hops();
     test_args();
+    test_inspect();
     test_manifest();
     test_downloads();
     test_lang_id();

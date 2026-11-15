@@ -4,8 +4,8 @@
  *     cookies in cookies.sqlite there, no credential storage of WebKit's own;
  *   - WebKit's sandbox (bubblewrap, seccomp, xdg-dbus-proxy) is always on in 2.48: webmain.c refuses to start when the
  *     variable that turns it off is set;
- *   - memory pressure settings so a web process gives memory back early, no developer extras, no windows opened
- *     without a click;
+ *   - memory pressure settings so a web process gives memory back early, no developer extras (only with --inspect,
+ *     webinspect.h), no windows opened without a click;
  *   - navigation: an address inside the app's scope stays in the window; a link clicked to an address outside it, and
  *     a new window outside it, open through the OpenURI portal in the person's browser. A redirect or a script that
  *     takes the page outside (a sign-in on another site) stays, and the title then starts with that site's host;
@@ -278,7 +278,8 @@ void web_show(Web *w, const char *token) {
 /* in the background (with or without its tray icon) the window only hides: the Dock and the launcher bring it back
  * through Show (webmain.c) */
 void web_close_requested(Web *w) {
-    if (w->app.background && w->win) { webwin_hide(w->win); return; }
+    /* with developer tools on, closing the window ends them: never kept running behind the tray */
+    if (w->app.background && w->win && !w->inspect_port) { webwin_hide(w->win); return; }
     web_quit(w, 0);
 }
 
@@ -638,6 +639,8 @@ int web_engine_start(Web *w) {
     w->user_agent = w->profile->user_agent;
     WebKitSettings *settings = web_settings_new(w->user_agent);
     webkit_settings_set_enable_site_specific_quirks(settings, FALSE);      /* the start address is the app's own */
+    /* only started with --inspect while developer mode is on (webmain.c): the remote inspector may attach to the page */
+    if (w->inspect_port) webkit_settings_set_enable_developer_extras(settings, TRUE);
     WebKitWebViewBackend *backend = webkit_web_view_backend_new(wpe_view_backend_exportable_fdo_get_view_backend(w->exportable), NULL, NULL);
     w->view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "backend", backend, "web-context", w->context, "network-session", w->session, "settings", settings, NULL);
     g_object_unref(settings);

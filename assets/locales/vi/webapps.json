@@ -211,5 +211,14 @@
   "identity.edgeHint": "Trang web thấy Edge trên Linux. Dành cho các trang văn phòng, thư và trò chuyện nhóm của chính nhà sản xuất Edge, vốn mong đợi nó.",
   "identity.firefoxHint": "Trang web thấy Firefox trên Linux.",
   "identity.lordosHint": "Trang web thấy công cụ riêng của LordOS. Dành cho trang web chạy không đúng với các lựa chọn khác.",
-  "identity.footer": "Trình duyệt mà mỗi hồ sơ xưng với trang web; cửa sổ đang mở sẽ tải lại trang. LordOS vẫn dùng công cụ riêng (WebKit); Chrome, Edge và Firefox là tên thuộc về chủ sở hữu của chúng. Một số trang web kiểm tra trình duyệt và từ chối nếu có gì không khớp; nếu trang web từ chối hoặc chạy không đúng, hãy chọn danh tính khác, chẳng hạn LordOS (WebKit). Trang web đã liên kết thiết bị này, như một ứng dụng nhắn tin, vẫn giữ tên đã thấy cho đến khi bạn liên kết lại."
+  "identity.footer": "Trình duyệt mà mỗi hồ sơ xưng với trang web; cửa sổ đang mở sẽ tải lại trang. LordOS vẫn dùng công cụ riêng (WebKit); Chrome, Edge và Firefox là tên thuộc về chủ sở hữu của chúng. Một số trang web kiểm tra trình duyệt và từ chối nếu có gì không khớp; nếu trang web từ chối hoặc chạy không đúng, hãy chọn danh tính khác, chẳng hạn LordOS (WebKit). Trang web đã liên kết thiết bị này, như một ứng dụng nhắn tin, vẫn giữ tên đã thấy cho đến khi bạn liên kết lại.",
+  "inspect.menu": "Kiểm tra (công cụ nhà phát triển)",
+  "inspect.title": "Công cụ nhà phát triển cho {app}",
+  "inspect.warning": "Công cụ nhà phát triển có thể xem mọi thứ trong ứng dụng này, kể cả tin nhắn và phiên. Bật cho cửa sổ này?",
+  "inspect.detail": "Cửa sổ mở lại với công cụ được bật, và công cụ mở trong trình duyệt của bạn. Công cụ vẫn bật cho đến khi bạn đóng cửa sổ. Trong lúc đó, bất kỳ chương trình nào trên máy tính này cũng có thể kết nối với công cụ.",
+  "inspect.turnOn": "Bật",
+  "settings.developerTitle": "Nhà phát triển",
+  "settings.developer": "Chế độ nhà phát triển",
+  "settings.developerHint": "Thêm Kiểm tra (công cụ nhà phát triển) vào menu Cửa sổ của mỗi ứng dụng web",
+  "settings.developerFooter": "Dành cho nhà phát triển web. Công cụ nhà phát triển thấy mọi thứ trong ứng dụng được kiểm tra; chỉ mở sau khi bạn chọn Kiểm tra trong một cửa sổ và xác nhận, và chỉ trên máy tính này. Tắt tùy chọn này sẽ đóng mọi cửa sổ đang bật công cụ."
 }

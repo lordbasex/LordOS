@@ -330,6 +330,23 @@ eq('and when one is added', M.sizesKey({ ...chat, profiles: [...chat.profiles, {
 
 // ---- editing: the Edit menu and a page's context menu ----
 const ran = [];
+{
+  // Inspect (developer tools): only with developer mode on, for a window of ours; checked while it has them
+  const asked = [];
+  const ask = (q) => asked.push(q);
+  const web = { app: 'chat', profile: 'work' };
+  eq('inspect: developer mode off', M.inspectItem(web, false, [], 'I', ask), null);
+  eq('inspect: not a web app window', M.inspectItem(null, true, [], 'I', ask), null);
+  eq('inspect: no profile', M.inspectItem({ app: 'chat' }, true, [], 'I', ask), null);
+  eq('inspect: only a real true', M.inspectItem(web, 'yes', [], 'I', ask), null);
+  const it = M.inspectItem(web, true, [{ app: 'chat', profile: 'work', pid: 9, inspect: false }, { app: 'chat', profile: 'personal', inspect: true }], 'I', ask);
+  eq('inspect: offered', [it.label, it.checked, it.disabled], ['I', false, false]);
+  it.onClick();
+  eq('inspect: it asks, nothing else', asked, [{ app: 'chat', profile: 'work' }]);
+  const on = M.inspectItem(web, true, [{ app: 'chat', profile: 'work', inspect: true }], 'I', ask);
+  eq('inspect: already on', [on.checked, on.disabled], [true, true]);
+  eq('inspect: running not a list', M.inspectItem(web, true, null, 'I', ask).checked, false);
+}
 const edit = M.webEditItems((c) => `L:${c}`, (c) => ran.push(c));
 eq('the Edit menu', edit.map((i) => (i === '-' ? '-' : `${i.label} ${i.hint}`)),
   ['L:undo Ctrl+Z', 'L:redo Ctrl+Shift+Z', '-', 'L:cut Ctrl+X', 'L:copy Ctrl+C', 'L:paste Ctrl+V', '-', 'L:selectAll Ctrl+A']);

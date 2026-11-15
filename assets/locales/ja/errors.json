@@ -874,5 +874,6 @@
   "pkg.multiarchSplit": "{name} は 64 ビットと 32 ビットで同じバージョンである必要があり、この変更ではバージョンが分かれてしまいます",
   "pkg.multiarchConflict": "{name} を 64 ビットと 32 ビットの両方で同時にインストールすることはできません",
   "pkg.foreignArchUnsupported": "32 ビットパッケージを有効にできるのは 64 ビット PC (amd64) だけです。このシステムは {arch} です",
-  "pkg.foreignArchFailed": "32 ビット ({arch}) パッケージを有効にできませんでした (dpkg の終了コード {code})"
+  "pkg.foreignArchFailed": "32 ビット ({arch}) パッケージを有効にできませんでした (dpkg の終了コード {code})",
+  "webapps.developerOff": "「設定」→「Web アプリ」でデベロッパモードがオフになっています"
 }

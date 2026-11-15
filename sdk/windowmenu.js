@@ -6,6 +6,7 @@
 //   Move to Desktop ›  the other desktops and a new one
 //   Overview
 //   Bring All to Front
+//   Inspect (developer tools)  a web app's window, while Settings → Web Apps → Developer mode is on (webapps.js)
 //   the open windows, the one in front checked
 //
 // Lord Flow shows it under Window in its menu bar; Lord Classic in each window's Window menu.
@@ -14,6 +15,7 @@ import { screen, displayFor } from '@lordos/runtime';
 import { t } from './i18n.js';
 import { moveToDesktopItems, desktopSuffix } from './desktops.js';
 import { openOverview } from './overview.jsx';
+import { webInspectItem } from './webapps.js';
 
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));   // not the theme's panels
 
@@ -66,6 +68,8 @@ export function windowMenuItems(id, { close = true } = {}) {
   items.push('-', { label: t('shell.desktops.moveTo'), disabled: !w, submenu: w ? moveToDesktopItems(id) : [] },
     { label: t('shell.desktops.overview'), onClick: () => openOverview() });
   items.push('-', { label: t('shell.window.bringAll'), onClick: () => { for (const x of stack()) wm.raise(x.id); if (id) wm.raise(id); } });
+  const inspect = w ? webInspectItem(w) : null;
+  if (inspect) items.push('-', inspect);
   if (close) items.push('-', { label: t('shell.window.close'), hint: 'Alt+F4', disabled: !w, onClick: () => wm.close(id) });
   const list = windows.get().filter(own);
   if (list.length) {

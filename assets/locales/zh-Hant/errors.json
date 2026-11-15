@@ -874,5 +874,6 @@
   "pkg.multiarchSplit": "{name} 的 64 位元與 32 位元必須是同一版本，而此變更會讓它們不一致",
   "pkg.multiarchConflict": "{name} 不能同時以 64 位元和 32 位元安裝",
   "pkg.foreignArchUnsupported": "只能在 64 位元電腦（amd64）上啟用 32 位元套件；本系統為 {arch}",
-  "pkg.foreignArchFailed": "無法啟用 32 位元（{arch}）套件（dpkg 以代碼 {code} 結束）"
+  "pkg.foreignArchFailed": "無法啟用 32 位元（{arch}）套件（dpkg 以代碼 {code} 結束）",
+  "webapps.developerOff": "「設定 → 網頁 App」中的開發者模式已關閉"
 }

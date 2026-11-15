@@ -213,5 +213,14 @@
   "identity.edgeHint": "Webbplatser ser Edge på Linux. För kontors-, e-post- och teamchattwebbplatser från Edges egen tillverkare, som förväntar sig den.",
   "identity.firefoxHint": "Webbplatser ser Firefox på Linux.",
   "identity.lordosHint": "Webbplatser ser LordOS egen motor. För en webbplats som inte fungerar med de andra.",
-  "identity.footer": "Webbläsaren som varje profil uppger sig vara för webbplatser; ett öppet fönster läser in sin sida igen. LordOS använder fortfarande sin egen motor (WebKit); Chrome, Edge och Firefox är namn som tillhör sina ägare. Vissa webbplatser kontrollerar webbläsaren och nekar den om något inte stämmer; om en webbplats nekar eller inte fungerar, välj en annan identitet, till exempel LordOS (WebKit). En webbplats som redan har länkat den här enheten, till exempel en meddelandeapp, behåller namnet den såg tills du länkar den igen."
+  "identity.footer": "Webbläsaren som varje profil uppger sig vara för webbplatser; ett öppet fönster läser in sin sida igen. LordOS använder fortfarande sin egen motor (WebKit); Chrome, Edge och Firefox är namn som tillhör sina ägare. Vissa webbplatser kontrollerar webbläsaren och nekar den om något inte stämmer; om en webbplats nekar eller inte fungerar, välj en annan identitet, till exempel LordOS (WebKit). En webbplats som redan har länkat den här enheten, till exempel en meddelandeapp, behåller namnet den såg tills du länkar den igen.",
+  "inspect.menu": "Inspektera (utvecklarverktyg)",
+  "inspect.title": "Utvecklarverktyg för {app}",
+  "inspect.warning": "Utvecklarverktyg kan se allt i den här appen, även meddelanden och sessioner. Slå på dem för det här fönstret?",
+  "inspect.detail": "Fönstret öppnas igen med verktygen på, och de öppnas i din webbläsare. De är på tills du stänger fönstret. Under tiden kan vilket program som helst på den här datorn ansluta till dem.",
+  "inspect.turnOn": "Slå på",
+  "settings.developerTitle": "Utvecklare",
+  "settings.developer": "Utvecklarläge",
+  "settings.developerHint": "Lägger till Inspektera (utvecklarverktyg) i menyn Fönster för varje webbapp",
+  "settings.developerFooter": "För webbutvecklare. Utvecklarverktyg ser allt i appen de inspekterar; de öppnas bara efter att du väljer Inspektera i ett fönster och bekräftar, och bara på den här datorn. Att stänga av det stänger alla fönster där de är på."
 }

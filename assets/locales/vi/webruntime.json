@@ -8,5 +8,8 @@
   "chooser.openMany": "Chọn các tệp",
   "offline.title": "Không có kết nối",
   "offline.body": "Ứng dụng này không thể truy cập trang của nó. Ứng dụng sẽ tự thử lại ngay khi mạng trở lại.",
-  "offline.hint": "Nhấn Ctrl+R để thử ngay."
+  "offline.hint": "Nhấn Ctrl+R để thử ngay.",
+  "inspect.title": "Công cụ nhà phát triển đang bật",
+  "inspect.body": "Cho đến khi bạn đóng cửa sổ này. Địa chỉ:",
+  "inspect.failed": "Không thể khởi động công cụ nhà phát triển"
 }

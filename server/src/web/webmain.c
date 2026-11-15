@@ -1,13 +1,17 @@
 /* webmain.c — lord-web's start (see web.h and docs/WEBAPPS.md, "Starting an app" and "Isolation").
  *
  * Only lord-server starts it, from the fixed path next to its own binary, with exactly
- * `--app <app> --profile <profile>`, `--probe` or `--probe-icon` (webargs.c). Before anything else lord-web:
+ * `--app <app> --profile <profile>` (with `--inspect` for the developer tools), `--probe` or `--probe-icon` (webargs.c).
+ * Before anything else lord-web:
  *   - refuses any other argv, and an environment that would turn WebKit's sandbox off; drops the variables that point
  *     WebKit or GStreamer at other code (an inspector server, injected bundles, other process binaries, plugin paths);
  *   - for an app: reads its own registry file read-only (webreg.c) and refuses to start on any mismatch: the file's
  *     id, the profile, any field;
  *   - takes the profile's lock (one process per app and profile: a second start asks the first to show its window
  *     over the session bus, org.lordos.WebApp1.Show, and exits);
+ *   - with --inspect: refuses to start unless developer mode is on (~/.config/lordos/web/developer.json, which only
+ *     lord.webapps writes), then hands WebKit its remote inspector's address, 127.0.0.1 and a free port, and opens it
+ *     in the person's browser once that port listens from this process (webinspect.h);
  *   - enters its own scope, app-lordos-lordos-web-<app>.scope (the firewall's and Monitor's row for the app; the probe's
  *     is lordos-webprobe), with memory and CPU limits that all the app's profiles and WebKit's processes share (webpage_scope_limits);
  *   - restricts itself with Landlock's scoping (no abstract unix socket and no signal outside its own processes) and
@@ -26,6 +30,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -46,7 +54,7 @@ const char *web_self_dir(void) {
 }
 
 static void usage(void) {
-    fprintf(stderr, "usage: lord-web --app <app> --profile <profile> | --probe | --probe-icon\n"
+    fprintf(stderr, "usage: lord-web --app <app> --profile <profile> [--inspect] | --probe | --probe-icon\n"
                     "lord-web is started by lord-server only (docs/WEBAPPS.md).\n");
 }
 
@@ -111,6 +119,90 @@ void web_registry_refresh(Web *w) {
     }
     w->app = a;
     w->profile = webreg_profile(&w->app, w->args.profile);
+}
+
+/* ---- developer tools (webinspect.h) ---- */
+
+/* --inspect: only while developer mode is on; a free port on 127.0.0.1 for WebKit's inspector, before WebKit reads it
+ * (the first web context, web_engine_start). 0, or -1: not started. */
+static int inspect_prepare(Web *w) {
+    char path[PATH_MAX + 32];
+    size_t len = 0;
+    snprintf(path, sizeof path, "%s/" WEBINSPECT_FILE, w->config_dir);
+    char *text = webreg_read_file(path, WEBINSPECT_FILE_MAX, &len);
+    int on = text && webinspect_parse(text, len);
+    free(text);
+    if (!on) { fprintf(stderr, "lord-web: --inspect needs developer mode (Settings, Web Apps): not started\n"); return -1; }
+    /* WebKit refuses port 0: the kernel picks a free one, which WebKit binds right after (webinspect_listening checks
+     * that the socket on it is ours before the browser opens it) */
+    int s = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
+    socklen_t al = sizeof a;
+    unsigned port = 0;
+    if (s >= 0 && !bind(s, (struct sockaddr *)&a, sizeof a) && !getsockname(s, (struct sockaddr *)&a, &al)) port = ntohs(a.sin_port);
+    if (s >= 0) close(s);
+    char addr[64];
+    if (webinspect_address(port, addr, sizeof addr) || setenv(WEBINSPECT_ENV, addr, 1)) {
+        fprintf(stderr, "lord-web: no free port on " WEBINSPECT_HOST " for the developer tools: not started\n");
+        return -1;
+    }
+    w->inspect_port = port;
+    fprintf(stderr, "lord-web: developer tools on %s for this window only\n", addr);
+    return 0;
+}
+
+#define INSPECT_TICK_MS 500
+#define INSPECT_TRIES   40                  /* 20 s */
+#define INSPECT_FDS     1024
+
+/* the inodes of this process's sockets */
+static int own_sockets(unsigned long *out, int max) {
+    DIR *d = opendir("/proc/self/fd");
+    if (!d) return 0;
+    int n = 0;
+    struct dirent *e;
+    while (n < max && (e = readdir(d))) {
+        char p[64], l[64];
+        if (e->d_name[0] == '.') continue;
+        snprintf(p, sizeof p, "/proc/self/fd/%.32s", e->d_name);
+        ssize_t k = readlink(p, l, sizeof l - 1);
+        if (k <= 0) continue;
+        l[k] = 0;
+        unsigned long ino = 0;
+        if (sscanf(l, "socket:[%lu]", &ino) == 1 && ino) out[n++] = ino;
+    }
+    closedir(d);
+    return n;
+}
+
+static gboolean inspect_tick(gpointer d) {
+    Web *w = d;
+    static unsigned long inodes[INSPECT_FDS];
+    int n = own_sockets(inodes, INSPECT_FDS);
+    gchar *tcp = NULL;
+    gsize len = 0;
+    int r = g_file_get_contents("/proc/self/net/tcp", &tcp, &len, NULL) ? webinspect_listening(tcp, len, w->inspect_port, inodes, n) : 0;
+    g_free(tcp);
+    if (r == 0 && ++w->inspect_tries < INSPECT_TRIES) return G_SOURCE_CONTINUE;
+    w->inspect_timer = 0;
+    char url[64];
+    if (r == 1 && !webinspect_url(w->inspect_port, url, sizeof url)) {
+        fprintf(stderr, "lord-web: developer tools listen on %s: opened in the browser\n", url);
+        webbus_open_uri(w, url);
+        char body[256];
+        snprintf(body, sizeof body, "%s %s", weblang("inspect.body"), url);
+        webbus_notify_text(w, weblang("inspect.title"), body);
+    } else {
+        fprintf(stderr, "lord-web: the developer tools' port %u %s: not opened\n", w->inspect_port, r < 0 ? "is someone else's" : "never listened");
+        webbus_notify_text(w, weblang("inspect.failed"), "");
+    }
+    return G_SOURCE_REMOVE;
+}
+
+void web_inspect_watch(Web *w) {
+    if (!w->inspect_port || w->inspect_timer) return;
+    w->inspect_tries = 0;
+    w->inspect_timer = g_timeout_add(INSPECT_TICK_MS, inspect_tick, w);
 }
 
 /* ---- one process per app and profile ---- */
@@ -242,6 +334,7 @@ static int run_app(Web *w) {
     int lock = lock_profile(w);
     if (lock == -1) { ask_running(w, tok); return 0; }
     if (lock < 0) return 1;
+    if (w->args.inspect && inspect_prepare(w)) return 2;
 
     char scope[WEBREG_ID_MAX + 16];
     snprintf(scope, sizeof scope, "lordos-web-%s", w->app.id);
@@ -257,6 +350,7 @@ static int run_app(Web *w) {
     if (w->app.background && w->app.tray) w->tray = webtray_new(w);
     serve_show(w);
     webwin_show(win, tok);
+    web_inspect_watch(w);
     g_main_loop_run(w->loop);
     webtray_free(w->tray);
     if (w->view) g_object_unref(w->view);

@@ -875,5 +875,6 @@
   "pkg.multiarchSplit": "{name} का 64 और 32 बिट के लिए एक ही संस्करण होना चाहिए, और यह बदलाव उन्हें अलग कर देगा",
   "pkg.multiarchConflict": "{name} को 64 और 32 बिट के लिए एक साथ इंस्टॉल नहीं किया जा सकता",
   "pkg.foreignArchUnsupported": "32-बिट पैकेज केवल 64-बिट पीसी (amd64) पर चालू किए जा सकते हैं; यह सिस्टम {arch} है",
-  "pkg.foreignArchFailed": "32-बिट ({arch}) पैकेज चालू नहीं किए जा सके (dpkg कोड {code} के साथ बंद हुआ)"
+  "pkg.foreignArchFailed": "32-बिट ({arch}) पैकेज चालू नहीं किए जा सके (dpkg कोड {code} के साथ बंद हुआ)",
+  "webapps.developerOff": "सेटिंग्स → वेब ऐप्स में डेवलपर मोड बंद है"
 }

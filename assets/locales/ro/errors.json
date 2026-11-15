@@ -876,5 +876,6 @@
   "pkg.multiarchSplit": "{name} trebuie să aibă aceeași versiune pe 64 și pe 32 de biți, iar această schimbare le-ar despărți",
   "pkg.multiarchConflict": "{name} nu poate fi instalat pe 64 și pe 32 de biți în același timp",
   "pkg.foreignArchUnsupported": "Pachetele pe 32 de biți pot fi activate doar pe un PC pe 64 de biți (amd64); acest sistem este {arch}",
-  "pkg.foreignArchFailed": "Pachetele pe 32 de biți ({arch}) nu au putut fi activate (dpkg s-a încheiat cu codul {code})"
+  "pkg.foreignArchFailed": "Pachetele pe 32 de biți ({arch}) nu au putut fi activate (dpkg s-a încheiat cu codul {code})",
+  "webapps.developerOff": "Modul dezvoltator este dezactivat în Setări → Aplicații web"
 }

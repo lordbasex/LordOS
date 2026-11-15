@@ -86,7 +86,8 @@ Nothing of one profile is readable by another.
 Only lord-server starts `lord-web`:
 
 - **Path:** fixed, next to the lord-server binary (`<lord-server dir>/lord-web`).
-- **argv:** exactly `lord-web --app <app> --profile <profile>`, both checked against the registry first.
+- **argv:** exactly `lord-web --app <app> --profile <profile>`, both checked against the registry first, or the same
+  followed by `--inspect` for a window with developer tools ("Developer tools", below).
 - **Environment:** only the session's (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `HOME`,
   `LANG`) plus `LORDOS_WEB=1`, and `LORDOS_SESSIOND=1` when lord-server runs under lord-sessiond: lord-web then gets
   its scope from lord-sessiond and refuses to start without it or without Landlock (development runs go on). Once the
@@ -642,7 +643,7 @@ silently.
     `LANDLOCK_ACCESS_FS_WRITE_FILE` handled, `bwrap` fails with "Failed to make / slave: Operation not permitted"). The
     files of the web content are kept by WebKit's sandbox instead; `lord-web` itself is LordOS's own code and only
     opens its registry file (read-only, no link followed), its profile folder and the Downloads folder;
-  - it refuses to start on any mismatch: argv other than the three forms, a registry file that is a link, over 64 KB,
+  - it refuses to start on any mismatch: argv other than its forms (`--inspect` only last, once, with an app), a registry file that is a link, over 64 KB,
     with an unknown key, a wrong type, a bad id or address, a scope that isn't a prefix of `startUrl` or not on
     `origin`, or an app or profile that isn't the one asked for (`webargs.c`, `webreg.c`, `weburl.c`, tested by
     `tests/webapp_test.c`); and when `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is set. It drops the variables that
@@ -782,6 +783,63 @@ Notification sound and, when LordOS's sound plays, which one.
 - **Each profile's data** in Settings → Web Apps is measured again when a profile is added or starts running and every
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
+
+## Developer tools (in development after 0.8.8.8, the latest release)
+
+Approved by the maintainer on 2026-11-15. For web developers: WebKit's Web Inspector for one web app window, in the
+person's browser.
+
+- **The switch:** Settings → Web Apps → Developer → *Developer mode*, one switch for every web app, off by default.
+  It is kept in `~/.config/lordos/web/developer.json` as `{"developerMode": true}` (0600), written only by
+  `lord.webapps.setDeveloperMode` (the folder is in `fsops_protected`); a missing file, or one that isn't exactly a
+  JSON object whose `developerMode` is `true`, is off (`webinspect_parse`). Turning it off ends every window that has
+  developer tools on.
+- **The menu:** with the switch on, each web app window's Window menu (the menu bar's in Lord Flow, the window's in Lord
+  Classic) has *Inspect (developer tools)* (`webInspectItem`, `inspectItem` in `webappsmodel.js`), checked and
+  unavailable while that window has them.
+- **The question:** every time, Cancel focused (`<WebAppInspectPrompt />`, `sdk/hardware.jsx`): "Developer tools can see
+  everything in this app, including messages and sessions. Turn on for this window?", the app's origin, and a line that
+  says the window opens again with them on, that they open in the browser, that they stay on until the window closes
+  and that meanwhile any program on this computer can connect to them. Only *Turn On* calls
+  `lord.webapps.inspect(app, profile)`.
+- **Why the window starts again:** WPE WebKit 2.48 has no inspector inside the view (no `WebKitWebInspector` in WPE)
+  and no API to turn remote inspection on for a view that runs. Its remote inspector starts only from the environment
+  as the process starts: `WEBKIT_INSPECTOR_SERVER=<ip>:<port>` (a socket protocol for another WebKit as the client) or
+  `WEBKIT_INSPECTOR_HTTP_SERVER=<ip>:<port>` (an HTTP server that serves the inspector's own pages, from
+  `/usr/share/wpe-webkit-2.0/inspector.gresource`, to any browser, with the page over a WebSocket), read when the first
+  web context is made. Port 0 is refused ("Failed to start remote inspector server on 127.0.0.1:0: invalid address").
+  LordOS uses the HTTP one.
+- **How:** `lord.webapps.inspect` (desktop only, not in the broker) → `webmgr_inspect`: refused with
+  `webapps.developerOff` while the switch is off; the app and profile must be in the registry; when that profile's
+  lord-web runs without developer tools it is ended (as when a profile is removed), then started again as
+  `lord-web --app <app> --profile <profile> --inspect`; one that already has them is only brought forward. lord-web:
+  - refuses `--inspect` unless the switch's file says on (it reads it itself, so a start by anything else gets
+    nothing more), after taking the profile's lock;
+  - binds a TCP socket on `127.0.0.1` port 0 to learn a free port from the kernel, closes it and sets
+    `WEBKIT_INSPECTOR_HTTP_SERVER=127.0.0.1:<port>` before the web context exists (it drops every `WEBKIT_*`
+    variable it was started with first, so nothing else can turn the inspector on); the view gets
+    `enable-developer-extras`;
+  - every half second for up to 20 s, checks `/proc/self/net/tcp` against its own sockets (`/proc/self/fd`):
+    `webinspect_listening` answers 1 only when the listening socket on that port is one of lord-web's and on
+    127.0.0.1, -1 when another process listens on that port (the port was taken between the check and WebKit's bind)
+    or ours listens on another address. Then it opens `http://127.0.0.1:<port>/` through OpenURI and sends a
+    notification ("Developer tools are on", "Until you close this window. Address:" and the address); on -1 or after
+    20 s only "Developer tools couldn't start".
+  - WebKit also starts its own inspector server (a D-Bus protocol over TCP) on another random port of 127.0.0.1 inside
+    lord-web; the web content process can't reach it from its sandbox and only logs that.
+- **Window lifetime:** closing that window ends its lord-web even for an app that runs in the background (no hiding
+  behind the tray), so the inspector goes with it; the next start is a normal one.
+- **What anyone on this computer can do while it is on:** WebKit's inspector server has no token, password or secret
+  path. Any process that can reach 127.0.0.1, of any user of this computer, can connect, read the page and its storage
+  and run script in it. Nothing outside the computer can (127.0.0.1 only). That is why it is off by default, asked
+  every time, per window, ends with the window and with the switch, and why the question says so.
+- **What the page can't do:** turn it on. No D-Bus method was added to lord-web; the menu item, the question and the
+  switch are the shell's, and lord-server and lord-web each check the switch.
+- **Checked** (2026-11-15, development machine, a headless lord-server and a local page): the switch off refuses
+  (`exit 2`); with it on, lord-web listens only on 127.0.0.1, the HTTP port's target list names the page with its
+  `socket/1/1/WebPage` link, `Main.html` loads, the WebSocket upgrade answers 101 and the check opens it; without
+  `--inspect` nothing listens. The menu, the question, Settings and the browser opening on a real session are still to
+  be checked on screen.
 
 ## No network (issue #144; in development after 0.8.8.8, the latest release)
 

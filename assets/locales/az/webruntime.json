@@ -8,5 +8,8 @@
   "chooser.openMany": "Fayllar seçin",
   "offline.title": "Bağlantı yoxdur",
   "offline.body": "Bu tətbiq öz saytına çata bilmədi. Şəbəkə qayıdan kimi özü yenidən cəhd edəcək.",
-  "offline.hint": "İndi cəhd etmək üçün Ctrl+R düymələrini basın."
+  "offline.hint": "İndi cəhd etmək üçün Ctrl+R düymələrini basın.",
+  "inspect.title": "Tərtibatçı alətləri aktivdir",
+  "inspect.body": "Bu pəncərəni bağlayana qədər. Ünvan:",
+  "inspect.failed": "Tərtibatçı alətləri başlamadı"
 }

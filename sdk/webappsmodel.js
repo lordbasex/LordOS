@@ -479,3 +479,14 @@ export function webMenuItems(names, label, pick) {
   }
   return out;
 }
+
+// ---- developer tools (docs/WEBAPPS.md, "Developer tools") ----
+
+// The Window menu's Inspect (developer tools) for a web app's window (web: { app, profile } of a lord-web we started),
+// only while developer mode is on; checked and unavailable while that window already has them (they end when it
+// closes). running: lord.webapps.running(); ask({ app, profile }) shows the question before anything starts.
+export function inspectItem(web, developer, running, label, ask) {
+  if (!web || !web.app || !web.profile || developer !== true) return null;
+  const on = (Array.isArray(running) ? running : []).some((r) => r && r.app === web.app && r.profile === web.profile && r.inspect === true);
+  return { label, checked: on, disabled: on, onClick: () => ask({ app: web.app, profile: web.profile }) };
+}

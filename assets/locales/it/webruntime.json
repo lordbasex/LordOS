@@ -8,5 +8,8 @@
   "chooser.openMany": "Scegli i file",
   "offline.title": "Nessuna connessione",
   "offline.body": "Questa app non è riuscita a raggiungere il suo sito. Riproverà da sola appena la rete tornerà disponibile.",
-  "offline.hint": "Premi Ctrl+R per riprovare ora."
+  "offline.hint": "Premi Ctrl+R per riprovare ora.",
+  "inspect.title": "Strumenti per sviluppatori attivi",
+  "inspect.body": "Finché non chiudi questa finestra. Indirizzo:",
+  "inspect.failed": "Impossibile avviare gli strumenti per sviluppatori"
 }

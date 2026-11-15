@@ -213,5 +213,14 @@
   "identity.edgeHint": "Les sites voient Edge sous Linux. Pour les sites de bureautique, de messagerie et de discussion d’équipe de l’éditeur d’Edge, qui l’attendent.",
   "identity.firefoxHint": "Les sites voient Firefox sous Linux.",
   "identity.lordosHint": "Les sites voient le moteur de LordOS. Pour un site qui fonctionne mal avec les autres.",
-  "identity.footer": "Le navigateur que chaque profil annonce aux sites ; une fenêtre ouverte recharge sa page. LordOS utilise toujours son propre moteur (WebKit) ; Chrome, Edge et Firefox sont des noms appartenant à leurs propriétaires. Certains sites vérifient le navigateur et le refusent si quelque chose ne correspond pas ; si un site le refuse ou fonctionne mal, choisissez une autre identité, comme LordOS (WebKit). Un site qui a déjà associé cet appareil, comme une messagerie, garde le nom qu’il a vu jusqu’à une nouvelle association."
+  "identity.footer": "Le navigateur que chaque profil annonce aux sites ; une fenêtre ouverte recharge sa page. LordOS utilise toujours son propre moteur (WebKit) ; Chrome, Edge et Firefox sont des noms appartenant à leurs propriétaires. Certains sites vérifient le navigateur et le refusent si quelque chose ne correspond pas ; si un site le refuse ou fonctionne mal, choisissez une autre identité, comme LordOS (WebKit). Un site qui a déjà associé cet appareil, comme une messagerie, garde le nom qu’il a vu jusqu’à une nouvelle association.",
+  "inspect.menu": "Inspecter (outils de développement)",
+  "inspect.title": "Outils de développement pour {app}",
+  "inspect.warning": "Les outils de développement peuvent tout voir dans cette app, y compris les messages et les sessions. Les activer pour cette fenêtre ?",
+  "inspect.detail": "La fenêtre se rouvre avec les outils activés, et ils s'ouvrent dans votre navigateur. Ils restent actifs jusqu'à ce que vous fermiez la fenêtre. Pendant ce temps, n'importe quel programme de cet ordinateur peut s'y connecter.",
+  "inspect.turnOn": "Activer",
+  "settings.developerTitle": "Développement",
+  "settings.developer": "Mode développeur",
+  "settings.developerHint": "Ajoute Inspecter (outils de développement) au menu Fenêtre de chaque app web",
+  "settings.developerFooter": "Pour les développeurs web. Les outils de développement voient tout dans l'app qu'ils inspectent ; ils ne s'ouvrent qu'après avoir choisi Inspecter dans une fenêtre et confirmé, et uniquement sur cet ordinateur. Désactiver ce mode ferme toute fenêtre où ils sont actifs."
 }

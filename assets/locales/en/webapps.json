@@ -213,5 +213,14 @@
   "identity.edgeHint": "Sites see Edge on Linux. For the office, mail and team chat sites of Edge’s own maker, which expect it.",
   "identity.firefoxHint": "Sites see Firefox on Linux.",
   "identity.lordosHint": "Sites see LordOS’s own engine. For a site that misbehaves with the others.",
-  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome, Edge and Firefox are names of their owners. Some sites check the browser and refuse it when something doesn’t match; if a site refuses or misbehaves, choose another identity, such as LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again."
+  "identity.footer": "The browser each profile tells sites it is; an open window loads its page again. LordOS still uses its own engine (WebKit); Chrome, Edge and Firefox are names of their owners. Some sites check the browser and refuse it when something doesn’t match; if a site refuses or misbehaves, choose another identity, such as LordOS (WebKit). A site that already linked this device, such as a messaging app, keeps the name it saw until you link it again.",
+  "inspect.menu": "Inspect (developer tools)",
+  "inspect.title": "Developer tools for {app}",
+  "inspect.warning": "Developer tools can see everything in this app, including messages and sessions. Turn on for this window?",
+  "inspect.detail": "The window opens again with them on, and they open in your browser. They stay on until you close the window. Meanwhile, any program on this computer can connect to them.",
+  "inspect.turnOn": "Turn On",
+  "settings.developerTitle": "Developer",
+  "settings.developer": "Developer mode",
+  "settings.developerHint": "Adds Inspect (developer tools) to each web app's Window menu",
+  "settings.developerFooter": "For web developers. Developer tools see everything in the app they inspect; they open only after you choose Inspect in a window and confirm, and only on this computer. Turning this off closes any window that has them on."
 }

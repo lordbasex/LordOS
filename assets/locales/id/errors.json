@@ -874,5 +874,6 @@
   "pkg.multiarchSplit": "{name} harus memiliki versi yang sama untuk 64 dan 32 bit, dan perubahan ini akan memisahkannya",
   "pkg.multiarchConflict": "{name} tidak dapat dipasang untuk 64 dan 32 bit sekaligus",
   "pkg.foreignArchUnsupported": "Paket 32-bit hanya dapat diaktifkan di PC 64-bit (amd64); sistem ini {arch}",
-  "pkg.foreignArchFailed": "Paket 32-bit ({arch}) tidak dapat diaktifkan (dpkg keluar dengan kode {code})"
+  "pkg.foreignArchFailed": "Paket 32-bit ({arch}) tidak dapat diaktifkan (dpkg keluar dengan kode {code})",
+  "webapps.developerOff": "Mode developer nonaktif di Pengaturan → Aplikasi Web"
 }

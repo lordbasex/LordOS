@@ -211,5 +211,14 @@
   "identity.edgeHint": "網站看到的是 Linux 上的 Edge。適用於 Edge 開發商自己的辦公、郵件和團隊聊天網站，它們期望使用它。",
   "identity.firefoxHint": "網站看到的是 Linux 上的 Firefox。",
   "identity.lordosHint": "網站看到的是 LordOS 自己的引擎。適用於在其他選項下運作不正常的網站。",
-  "identity.footer": "每個設定檔向網站聲稱的瀏覽器；開啟的視窗會重新載入其頁面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名稱。有些網站會檢查瀏覽器，發現不一致就拒絕；如果網站拒絕或運作不正常，請選擇其他身分，例如 LordOS (WebKit)。已經連結此裝置的網站（例如即時通訊 App）在重新連結之前會保留它看到的名稱。"
+  "identity.footer": "每個設定檔向網站聲稱的瀏覽器；開啟的視窗會重新載入其頁面。LordOS 仍使用自己的引擎（WebKit）；Chrome、Edge 和 Firefox 是其所有者的名稱。有些網站會檢查瀏覽器，發現不一致就拒絕；如果網站拒絕或運作不正常，請選擇其他身分，例如 LordOS (WebKit)。已經連結此裝置的網站（例如即時通訊 App）在重新連結之前會保留它看到的名稱。",
+  "inspect.menu": "檢查（開發者工具）",
+  "inspect.title": "{app} 的開發者工具",
+  "inspect.warning": "開發者工具可以看到這個 App 中的一切，包括訊息和工作階段。要為這個視窗開啟嗎？",
+  "inspect.detail": "視窗會在開啟工具的狀態下重新開啟，工具會在你的瀏覽器中開啟。在你關閉視窗之前，工具會一直開著。在這段期間，這台電腦上的任何程式都可以連線到它們。",
+  "inspect.turnOn": "開啟",
+  "settings.developerTitle": "開發者",
+  "settings.developer": "開發者模式",
+  "settings.developerHint": "在每個網頁 App 的「視窗」選單中加入「檢查（開發者工具）」",
+  "settings.developerFooter": "供網頁開發者使用。開發者工具能看到所檢查 App 中的一切；只有在你於某個視窗中選擇「檢查」並確認後才會開啟，而且只在這台電腦上。關閉此項會關閉所有開啟了工具的視窗。"
 }

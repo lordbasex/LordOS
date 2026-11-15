@@ -8,5 +8,8 @@
   "chooser.openMany": "選擇多個檔案",
   "offline.title": "沒有網路連線",
   "offline.body": "此應用程式無法連上其網站。網路恢復後會自動重試。",
-  "offline.hint": "按 Ctrl+R 立即重試。"
+  "offline.hint": "按 Ctrl+R 立即重試。",
+  "inspect.title": "開發者工具已開啟",
+  "inspect.body": "直到你關閉這個視窗。位址：",
+  "inspect.failed": "無法啟動開發者工具"
 }

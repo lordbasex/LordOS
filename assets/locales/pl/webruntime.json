@@ -8,5 +8,8 @@
   "chooser.openMany": "Wybierz pliki",
   "offline.title": "Brak połączenia",
   "offline.body": "Ta aplikacja nie mogła połączyć się ze swoją witryną. Spróbuje ponownie sama, gdy tylko sieć wróci.",
-  "offline.hint": "Naciśnij Ctrl+R, aby spróbować teraz."
+  "offline.hint": "Naciśnij Ctrl+R, aby spróbować teraz.",
+  "inspect.title": "Narzędzia deweloperskie są włączone",
+  "inspect.body": "Dopóki nie zamkniesz tego okna. Adres:",
+  "inspect.failed": "Nie udało się uruchomić narzędzi deweloperskich"
 }

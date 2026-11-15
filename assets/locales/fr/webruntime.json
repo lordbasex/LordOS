@@ -8,5 +8,8 @@
   "chooser.openMany": "Choisir des fichiers",
   "offline.title": "Pas de connexion",
   "offline.body": "Cette application n'a pas pu joindre son site. Elle réessaiera d'elle-même dès le retour du réseau.",
-  "offline.hint": "Appuyez sur Ctrl+R pour réessayer maintenant."
+  "offline.hint": "Appuyez sur Ctrl+R pour réessayer maintenant.",
+  "inspect.title": "Outils de développement activés",
+  "inspect.body": "Jusqu'à la fermeture de cette fenêtre. Adresse :",
+  "inspect.failed": "Les outils de développement n'ont pas pu démarrer"
 }

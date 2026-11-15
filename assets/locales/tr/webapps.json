@@ -213,5 +213,14 @@
   "identity.edgeHint": "Siteler Linux'ta Edge'i görür. Edge'in kendi üreticisinin bunu bekleyen ofis, e-posta ve ekip sohbeti siteleri için.",
   "identity.firefoxHint": "Siteler Linux'ta Firefox'u görür.",
   "identity.lordosHint": "Siteler LordOS'un kendi motorunu görür. Diğerleriyle düzgün çalışmayan bir site için.",
-  "identity.footer": "Her profilin sitelere kendini tanıttığı tarayıcı; açık bir pencere sayfasını yeniden yükler. LordOS kendi motorunu (WebKit) kullanmaya devam eder; Chrome, Edge ve Firefox sahiplerine ait adlardır. Bazı siteler tarayıcıyı denetler ve bir şey uyuşmazsa reddeder; bir site reddederse veya düzgün çalışmazsa LordOS (WebKit) gibi başka bir kimlik seçin. Bu cihazı zaten bağlamış bir site, örneğin bir mesajlaşma uygulaması, yeniden bağlayana kadar gördüğü adı korur."
+  "identity.footer": "Her profilin sitelere kendini tanıttığı tarayıcı; açık bir pencere sayfasını yeniden yükler. LordOS kendi motorunu (WebKit) kullanmaya devam eder; Chrome, Edge ve Firefox sahiplerine ait adlardır. Bazı siteler tarayıcıyı denetler ve bir şey uyuşmazsa reddeder; bir site reddederse veya düzgün çalışmazsa LordOS (WebKit) gibi başka bir kimlik seçin. Bu cihazı zaten bağlamış bir site, örneğin bir mesajlaşma uygulaması, yeniden bağlayana kadar gördüğü adı korur.",
+  "inspect.menu": "İncele (geliştirici araçları)",
+  "inspect.title": "{app} için geliştirici araçları",
+  "inspect.warning": "Geliştirici araçları, mesajlar ve oturumlar dahil bu uygulamadaki her şeyi görebilir. Bu pencere için açılsın mı?",
+  "inspect.detail": "Pencere araçlar açık olarak yeniden açılır ve araçlar tarayıcınızda açılır. Pencereyi kapatana kadar açık kalırlar. Bu sürede bu bilgisayardaki herhangi bir program onlara bağlanabilir.",
+  "inspect.turnOn": "Aç",
+  "settings.developerTitle": "Geliştirici",
+  "settings.developer": "Geliştirici modu",
+  "settings.developerHint": "Her web uygulamasının Pencere menüsüne İncele (geliştirici araçları) ekler",
+  "settings.developerFooter": "Web geliştiricileri için. Geliştirici araçları inceledikleri uygulamadaki her şeyi görür; yalnızca bir pencerede İncele'yi seçip onayladıktan sonra ve yalnızca bu bilgisayarda açılır. Kapatmak, araçların açık olduğu her pencereyi kapatır."
 }

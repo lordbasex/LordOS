@@ -213,5 +213,14 @@
   "identity.edgeHint": "Sivustot näkevät Edgen Linuxissa. Edgen oman valmistajan toimisto-, sähköposti- ja tiimikeskustelusivustoille, jotka odottavat sitä.",
   "identity.firefoxHint": "Sivustot näkevät Firefoxin Linuxissa.",
   "identity.lordosHint": "Sivustot näkevät LordOS:n oman moottorin. Sivustolle, joka ei toimi muilla oikein.",
-  "identity.footer": "Selain, joksi kukin profiili esittäytyy sivustoille; avoin ikkuna lataa sivunsa uudelleen. LordOS käyttää edelleen omaa moottoriaan (WebKit); Chrome, Edge ja Firefox ovat omistajiensa nimiä. Jotkin sivustot tarkistavat selaimen ja hylkäävät sen, jos jokin ei täsmää; jos sivusto hylkää sen tai ei toimi oikein, valitse toinen identiteetti, esimerkiksi LordOS (WebKit). Sivusto, joka on jo yhdistänyt tämän laitteen, kuten viestisovellus, pitää näkemänsä nimen, kunnes yhdistät sen uudelleen."
+  "identity.footer": "Selain, joksi kukin profiili esittäytyy sivustoille; avoin ikkuna lataa sivunsa uudelleen. LordOS käyttää edelleen omaa moottoriaan (WebKit); Chrome, Edge ja Firefox ovat omistajiensa nimiä. Jotkin sivustot tarkistavat selaimen ja hylkäävät sen, jos jokin ei täsmää; jos sivusto hylkää sen tai ei toimi oikein, valitse toinen identiteetti, esimerkiksi LordOS (WebKit). Sivusto, joka on jo yhdistänyt tämän laitteen, kuten viestisovellus, pitää näkemänsä nimen, kunnes yhdistät sen uudelleen.",
+  "inspect.menu": "Tarkasta (kehittäjätyökalut)",
+  "inspect.title": "Kehittäjätyökalut: {app}",
+  "inspect.warning": "Kehittäjätyökalut näkevät kaiken tässä sovelluksessa, myös viestit ja istunnot. Otetaanko ne käyttöön tälle ikkunalle?",
+  "inspect.detail": "Ikkuna avautuu uudelleen työkalut päällä, ja ne avautuvat selaimeesi. Ne pysyvät päällä, kunnes suljet ikkunan. Sillä välin mikä tahansa tämän tietokoneen ohjelma voi muodostaa niihin yhteyden.",
+  "inspect.turnOn": "Ota käyttöön",
+  "settings.developerTitle": "Kehittäjä",
+  "settings.developer": "Kehittäjätila",
+  "settings.developerHint": "Lisää Tarkasta (kehittäjätyökalut) jokaisen verkkosovelluksen Ikkuna-valikkoon",
+  "settings.developerFooter": "Verkkokehittäjille. Kehittäjätyökalut näkevät kaiken tarkastamassaan sovelluksessa; ne avautuvat vasta, kun valitset ikkunassa Tarkasta ja vahvistat, ja vain tällä tietokoneella. Tämän poistaminen käytöstä sulkee jokaisen ikkunan, jossa ne ovat päällä."
 }

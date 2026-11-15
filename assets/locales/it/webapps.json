@@ -213,5 +213,14 @@
   "identity.edgeHint": "I siti vedono Edge su Linux. Per i siti di ufficio, posta e chat di team del produttore di Edge, che se lo aspettano.",
   "identity.firefoxHint": "I siti vedono Firefox su Linux.",
   "identity.lordosHint": "I siti vedono il motore di LordOS. Per un sito che non funziona bene con gli altri.",
-  "identity.footer": "Il browser che ogni profilo dichiara ai siti; una finestra aperta ricarica la sua pagina. LordOS usa sempre il proprio motore (WebKit); Chrome, Edge e Firefox sono nomi dei rispettivi proprietari. Alcuni siti controllano il browser e lo rifiutano se qualcosa non corrisponde; se un sito lo rifiuta o non funziona bene, scegli un’altra identità, come LordOS (WebKit). Un sito che ha già collegato questo dispositivo, come un’app di messaggistica, mantiene il nome che ha visto finché non lo colleghi di nuovo."
+  "identity.footer": "Il browser che ogni profilo dichiara ai siti; una finestra aperta ricarica la sua pagina. LordOS usa sempre il proprio motore (WebKit); Chrome, Edge e Firefox sono nomi dei rispettivi proprietari. Alcuni siti controllano il browser e lo rifiutano se qualcosa non corrisponde; se un sito lo rifiuta o non funziona bene, scegli un’altra identità, come LordOS (WebKit). Un sito che ha già collegato questo dispositivo, come un’app di messaggistica, mantiene il nome che ha visto finché non lo colleghi di nuovo.",
+  "inspect.menu": "Ispeziona (strumenti per sviluppatori)",
+  "inspect.title": "Strumenti per sviluppatori di {app}",
+  "inspect.warning": "Gli strumenti per sviluppatori possono vedere tutto in questa app, compresi messaggi e sessioni. Attivarli per questa finestra?",
+  "inspect.detail": "La finestra si riapre con gli strumenti attivi, che si aprono nel tuo browser. Restano attivi finché non chiudi la finestra. Nel frattempo, qualsiasi programma su questo computer può collegarsi a loro.",
+  "inspect.turnOn": "Attiva",
+  "settings.developerTitle": "Sviluppo",
+  "settings.developer": "Modalità sviluppatore",
+  "settings.developerHint": "Aggiunge Ispeziona (strumenti per sviluppatori) al menu Finestra di ogni app web",
+  "settings.developerFooter": "Per gli sviluppatori web. Gli strumenti per sviluppatori vedono tutto nell'app che ispezionano; si aprono solo dopo che scegli Ispeziona in una finestra e confermi, e solo su questo computer. Disattivarla chiude ogni finestra in cui sono attivi."
 }

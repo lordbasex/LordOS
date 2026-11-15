@@ -8,5 +8,8 @@
   "chooser.openMany": "Pilih fail-fail",
   "offline.title": "Tiada sambungan",
   "offline.body": "Aplikasi ini tidak dapat mencapai lamannya. Ia akan mencuba lagi dengan sendiri sebaik sahaja rangkaian kembali.",
-  "offline.hint": "Tekan Ctrl+R untuk mencuba sekarang."
+  "offline.hint": "Tekan Ctrl+R untuk mencuba sekarang.",
+  "inspect.title": "Alat pembangun dihidupkan",
+  "inspect.body": "Sehingga anda menutup tetingkap ini. Alamat:",
+  "inspect.failed": "Alat pembangun tidak dapat dimulakan"
 }

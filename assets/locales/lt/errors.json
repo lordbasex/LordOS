@@ -876,5 +876,6 @@
   "pkg.multiarchSplit": "{name} 64 ir 32 bitų versijos turi sutapti, o šis pakeitimas jas išskirtų",
   "pkg.multiarchConflict": "{name} negalima įdiegti 64 ir 32 bitų vienu metu",
   "pkg.foreignArchUnsupported": "32 bitų paketus galima įjungti tik 64 bitų kompiuteryje (amd64); ši sistema yra {arch}",
-  "pkg.foreignArchFailed": "Nepavyko įjungti 32 bitų ({arch}) paketų (dpkg baigė darbą su kodu {code})"
+  "pkg.foreignArchFailed": "Nepavyko įjungti 32 bitų ({arch}) paketų (dpkg baigė darbą su kodu {code})",
+  "webapps.developerOff": "Kūrėjo režimas išjungtas skiltyje Nustatymai → Žiniatinklio programos"
 }
