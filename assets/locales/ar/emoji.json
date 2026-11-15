@@ -1,0 +1,25 @@
+{
+  "search": "البحث عن رمز تعبيري",
+  "results": {
+    "zero": "لا توجد نتائج",
+    "one": "نتيجة واحدة",
+    "two": "نتيجتان",
+    "few": "{count} نتائج",
+    "many": "{count} نتيجة",
+    "other": "{count} نتيجة"
+  },
+  "none": "لم يُعثر على شيء",
+  "noRecent": "ستظهر هنا الرموز التي تستخدمها",
+  "copied": "تم نسخ {text}: الصقه باستخدام Ctrl+V",
+  "more": "المزيد…",
+  "group.recent": "الأخيرة",
+  "group.smileys": "الوجوه والمشاعر",
+  "group.people": "الأشخاص والجسم",
+  "group.animals": "الحيوانات والطبيعة",
+  "group.food": "الطعام والشراب",
+  "group.travel": "السفر والأماكن",
+  "group.activities": "الأنشطة",
+  "group.objects": "الأشياء",
+  "group.symbols": "الرموز",
+  "group.flags": "الأعلام"
+}
