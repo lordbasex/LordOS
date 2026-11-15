@@ -232,7 +232,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `tests/webapps_model_test.mjs`. Not yet checked on screen on the development VM.
 - **Files and Disks mount a free partition of the system disk** ([#122](https://github.com/lordbasex/LordOS/issues/122),
   thanks to pct06, approved by the maintainer on 2026-11-15 as "only mount by hand"). In a dual boot on one disk the
-  other operating system's partition (its NTFS volume, say) never showed up, because Files skipped the whole system
+  other installed system's partition (its NTFS volume, say) never showed up, because Files skipped the whole system
   disk and the root side refused any partition on it. Now an administrator can mount and unmount it from Files' sidebar
   or from Disks, under `/media/<user>/<label>` with `nosuid,nodev`, like any internal disk. Root decides partition by
   partition, from the kernel and the udev database, never from what the app sends (`target()` in
