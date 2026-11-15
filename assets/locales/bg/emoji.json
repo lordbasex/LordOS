@@ -1,0 +1,21 @@
+{
+  "search": "Търсене на емоджи",
+  "results": {
+    "one": "{count} резултат",
+    "other": "{count} резултата"
+  },
+  "none": "Няма намерени",
+  "noRecent": "Емоджитата, които използвате, ще се появят тук",
+  "copied": "{text} е копирано: поставете го с Ctrl+V",
+  "more": "Още…",
+  "group.recent": "Скорошни",
+  "group.smileys": "Усмивки и емоции",
+  "group.people": "Хора и тяло",
+  "group.animals": "Животни и природа",
+  "group.food": "Храна и напитки",
+  "group.travel": "Пътуване и места",
+  "group.activities": "Дейности",
+  "group.objects": "Предмети",
+  "group.symbols": "Символи",
+  "group.flags": "Знамена"
+}

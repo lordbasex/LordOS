@@ -1,0 +1,74 @@
+{
+  "archiveName": "Архив",
+  "archiveSummary": {
+    "one": "{count} файл, {size}",
+    "other": "{count} файла, {size}"
+  },
+  "compressOne": "Компресирай „{name}“",
+  "compressMany": {
+    "one": "Компресирай {count} елемент",
+    "other": "Компресирай {count} елемента"
+  },
+  "compressing": "Компресиране на „{name}“…",
+  "compressProgress": "Компресиране на „{name}“: {files} файла",
+  "compressed": {
+    "one": "„{name}“ е готов ({count} файл)",
+    "other": "„{name}“ е готов ({count} файла)"
+  },
+  "compressError": "„{name}“ не можа да бъде компресиран ({error})",
+  "extractHere": "Разархивирай тук",
+  "extractSelected": {
+    "one": "Разархивирай {count} елемент",
+    "other": "Разархивирай {count} елемента"
+  },
+  "extracting": "Разархивиране на „{name}“…",
+  "extractProgress": "Разархивиране на „{name}“: {files} файла ({pct}%)",
+  "extracted": {
+    "one": "Разархивирано в „{name}“ ({count} файл)",
+    "other": "Разархивирано в „{name}“ ({count} файла)"
+  },
+  "extractedSkipped": {
+    "one": "Разархивирано в „{name}“ ({count} файл); {skipped} пропуснати от съображения за сигурност",
+    "other": "Разархивирано в „{name}“ ({count} файла); {skipped} пропуснати от съображения за сигурност"
+  },
+  "extractError": "„{name}“ не можа да бъде разархивиран ({error})",
+  "opening": "Отваряне на „{name}“…",
+  "loading": "Зареждане…",
+  "locked": "защитен с парола",
+  "pages": {
+    "one": "{count} страница",
+    "other": "{count} страници"
+  },
+  "more": {
+    "one": "и още {count}",
+    "other": "и още {count}"
+  },
+  "err.invalid": "не е архив или е повреден",
+  "err.missing-volume": "липсва част от разделения архив: „{name}“",
+  "err.disk-full": "дискът е пълен",
+  "err.too-big": "твърде голям е",
+  "err.too-many": "има твърде много файлове",
+  "err.corrupt": "повреден е",
+  "err.write": "неуспешен запис",
+  "err.unavailable": "помощникът за документи не е наличен",
+  "err.cancelled": "отказано",
+  "err.crash": "помощникът за документи спря неочаквано",
+  "err.timeout": "отне твърде дълго",
+  "err.protocol": "помощникът за документи изпрати невалиден отговор",
+  "err.spawn": "помощникът за документи не можа да бъде стартиран",
+  "err.closed": "документът беше затворен",
+  "err.bad-request": "невалидна заявка",
+  "err.bad-field": "невалидно поле на формуляр",
+  "err.bad-page": "невалидна страница",
+  "err.busy": "помощникът за документи е зает",
+  "err.memory": "недостатъчно памет",
+  "err.no-fonts": "няма налични шрифтове",
+  "err.not-open": "документът не е отворен",
+  "err.nothing": "няма нищо за записване",
+  "err.read-only": "документът е само за четене",
+  "err.save": "неуспешно записване",
+  "err.unknown-op": "неизвестна операция",
+  "err.image": "невалидно изображение",
+  "err.blob": "невалидни данни",
+  "err.password": "документът е защитен с парола"
+}
