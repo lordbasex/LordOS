@@ -5,5 +5,8 @@
   "download.done": "下载完成",
   "download.failed": "下载失败",
   "chooser.open": "选择文件",
-  "chooser.openMany": "选择文件"
+  "chooser.openMany": "选择文件",
+  "offline.title": "无网络连接",
+  "offline.body": "此应用无法访问其网站。网络恢复后它会自动重试。",
+  "offline.hint": "按 Ctrl+R 立即重试。"
 }

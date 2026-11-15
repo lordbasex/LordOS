@@ -10,11 +10,11 @@ WEB ?= $(shell pkg-config --exists $(WEB_PKGS) 2>/dev/null && echo 1 || echo 0)
 
 # the pure checks: argv, the registry, addresses and scope, the probe's answer, the icon check, download names, the wheel,
 # the unread count, the user agent, the notification sound, dropped files, pasted text and file lists, the Edit commands and context menu items, the color scheme,
-# the language of its own words
+# the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
                 src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/weblangid.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/weblangid.h src/web/weboffline.h src/sec/json.h
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)

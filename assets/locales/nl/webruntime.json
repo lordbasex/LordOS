@@ -5,5 +5,8 @@
   "download.done": "Download voltooid",
   "download.failed": "Download mislukt",
   "chooser.open": "Kies een bestand",
-  "chooser.openMany": "Kies bestanden"
+  "chooser.openMany": "Kies bestanden",
+  "offline.title": "Geen verbinding",
+  "offline.body": "Deze app kon zijn website niet bereiken. Hij probeert het vanzelf opnieuw zodra het netwerk terug is.",
+  "offline.hint": "Druk op Ctrl+R om het nu te proberen."
 }

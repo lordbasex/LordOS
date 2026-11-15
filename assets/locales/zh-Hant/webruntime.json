@@ -5,5 +5,8 @@
   "download.done": "下載完成",
   "download.failed": "下載失敗",
   "chooser.open": "選擇檔案",
-  "chooser.openMany": "選擇多個檔案"
+  "chooser.openMany": "選擇多個檔案",
+  "offline.title": "沒有網路連線",
+  "offline.body": "此應用程式無法連上其網站。網路恢復後會自動重試。",
+  "offline.hint": "按 Ctrl+R 立即重試。"
 }

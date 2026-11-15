@@ -5,5 +5,8 @@
   "download.done": "Unduhan selesai",
   "download.failed": "Unduhan gagal",
   "chooser.open": "Pilih berkas",
-  "chooser.openMany": "Pilih berkas-berkas"
+  "chooser.openMany": "Pilih berkas-berkas",
+  "offline.title": "Tidak ada koneksi",
+  "offline.body": "Aplikasi ini tidak dapat menjangkau situsnya. Aplikasi akan mencoba lagi sendiri begitu jaringan kembali.",
+  "offline.hint": "Tekan Ctrl+R untuk mencoba sekarang."
 }

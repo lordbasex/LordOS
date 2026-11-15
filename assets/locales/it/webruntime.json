@@ -5,5 +5,8 @@
   "download.done": "Download completato",
   "download.failed": "Download non riuscito",
   "chooser.open": "Scegli un file",
-  "chooser.openMany": "Scegli i file"
+  "chooser.openMany": "Scegli i file",
+  "offline.title": "Nessuna connessione",
+  "offline.body": "Questa app non è riuscita a raggiungere il suo sito. Riproverà da sola appena la rete tornerà disponibile.",
+  "offline.hint": "Premi Ctrl+R per riprovare ora."
 }

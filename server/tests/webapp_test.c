@@ -5,7 +5,8 @@
  * paste takes from the session's clipboard (webclip.c: the text type, its charset, the file list) and
  * the registry's optional tray and notifySound, and the Edit commands and context menu items lord-server and lord-web
  * pass each other (webedit.c), and the color scheme lord-server tells lord-web and the script that carries it to the
- * page (webscheme.c), and the catalog folder for its own words (weblangid.h). The rest of the registry file (webreg.c,
+ * page (webscheme.c), and the catalog folder for its own words (weblangid.h), and an app that is offline (weboffline.h:
+ * which load errors mean no network, the retry's delay, lord-web's own page; #144). The rest of the registry file (webreg.c,
  * shared with lord-server) is tests/webreg_test.c's.
  *
  *   make -C server build/webapp-test        (also in `make test`; needs no WPE) */
@@ -18,6 +19,7 @@
 #include "../src/web/webdl.h"
 #include "../src/web/weblangid.h"
 #include "../src/web/webmanifest.h"
+#include "../src/web/weboffline.h"
 #include "../src/web/webreg.h"
 #include "../src/web/webscheme.h"
 #include "../src/web/weburl.h"
@@ -909,7 +911,60 @@ static void test_scheme(void) {
     CHECK(!webscheme_script(NULL, key, 0) && !webscheme_script("x", NULL, 0) && !webscheme_script("x", key, 2) && !webscheme_call(key, -1), "script: nothing");
 }
 
+/* #144: a load that failed for lack of network is retried (and shown as lord-web's page), any other failure isn't */
+static void test_offline(void) {
+    static const struct { const char *domain; int code, net; } cases[] = {
+        { WEBOFFLINE_DOMAIN_RESOLVER, 0, 1 },               /* G_RESOLVER_ERROR_NOT_FOUND: "Name or service not known" */
+        { WEBOFFLINE_DOMAIN_RESOLVER, 1, 1 },               /* TEMPORARY_FAILURE */
+        { WEBOFFLINE_DOMAIN_RESOLVER, 2, 1 },               /* INTERNAL */
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_TIMED_OUT, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_HOST_NOT_FOUND, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_HOST_UNREACHABLE, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_NETWORK_UNREACHABLE, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_CONNECTION_REFUSED, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_PROXY_FAILED, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_CONNECTION_CLOSED, 1 },
+        { WEBOFFLINE_DOMAIN_IO, WEBOFFLINE_IO_NOT_CONNECTED, 1 },
+        { WEBOFFLINE_DOMAIN_IO, 19, 0 },                    /* G_IO_ERROR_CANCELLED: a newer load */
+        { WEBOFFLINE_DOMAIN_IO, 1, 0 },                     /* NOT_FOUND (a file) */
+        { WEBOFFLINE_DOMAIN_IO, 0, 0 },
+        { WEBOFFLINE_DOMAIN_WEBKIT, WEBOFFLINE_WEBKIT_TRANSPORT, 1 },
+        { WEBOFFLINE_DOMAIN_WEBKIT, 302, 0 },               /* WEBKIT_NETWORK_ERROR_CANCELLED */
+        { WEBOFFLINE_DOMAIN_WEBKIT, 399, 0 },               /* FAILED: not known to be the network */
+        { WEBOFFLINE_DOMAIN_WEBKIT, 301, 0 },               /* UNKNOWN_PROTOCOL */
+        { "WebKitPolicyError", 102, 0 },                    /* a download interrupts the load */
+        { "g-tls-error-quark", 0, 0 },
+        { "g-tls-error-quark", 24, 0 },
+        { "WebKitNetworkErrorX", 300, 0 },
+        { "g-resolver-error-quark-", 0, 0 },
+        { "", 0, 0 },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++)
+        CHECK(weboffline_is_network_error(cases[i].domain, cases[i].code) == cases[i].net, "network error %s %d", cases[i].domain, cases[i].code);
+    CHECK(!weboffline_is_network_error(NULL, 0), "no domain");
+
+    static const unsigned delays[] = { 2, 2, 4, 8, 16, 32, 60, 60, 60 };
+    for (unsigned f = 0; f < sizeof delays / sizeof *delays; f++) CHECK(weboffline_delay_s(f) == delays[f], "delay after %u = %u", f, weboffline_delay_s(f));
+    CHECK(weboffline_delay_s(33) == 60 && weboffline_delay_s(1000) == 60 && weboffline_delay_s(~0u) == 60, "the delay stays at 60 s");
+
+    char out[4096];
+    size_t n = weboffline_html("A<b>&\"'", "No connection", "It will try again.", "Press Ctrl+R.", "web.example.com", 0, out, sizeof out);
+    CHECK(n > 0 && n == strlen(out), "page length");
+    CHECK(strstr(out, "<title dir=\"auto\">A&lt;b&gt;&amp;&quot;&#39;</title>") != NULL, "title escaped: %s", out);
+    CHECK(!strstr(out, "<b>") && !strstr(out, "<script"), "no markup from the words, no script");
+    CHECK(strstr(out, "default-src 'none'") != NULL, "a policy without scripts");
+    CHECK(strstr(out, ">web.example.com<") && strstr(out, ">No connection<") && strstr(out, ">Press Ctrl+R.<"), "the words");
+    CHECK(strstr(out, "background:#ffffff") != NULL, "light");
+    n = weboffline_html("App", "\xd9\x84\xd8\xa7", "b", "c", "", 1, out, sizeof out);
+    CHECK(n > 0 && strstr(out, "background:#1f1f23") && !strstr(out, "dir=\"ltr\""), "dark, no host line");
+    CHECK(strstr(out, "<h1 dir=\"auto\">\xd9\x84\xd8\xa7</h1>") != NULL, "each line takes its own direction");
+    CHECK(weboffline_html("App", "a", "b", "c", "h", 0, out, 64) == 0 && out[0] == 0, "too small: nothing");
+    CHECK(weboffline_html("App", "a", "b", "c", NULL, 0, out, sizeof out) > 0, "no host");
+    CHECK(weboffline_html("App", "a", "b", "c", "h", 0, NULL, 0) == 0, "no buffer");
+}
+
 int main(void) {
+    test_offline();
     test_scheme();
     test_edit();
     test_axis();

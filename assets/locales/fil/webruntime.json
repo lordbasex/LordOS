@@ -5,5 +5,8 @@
   "download.done": "Tapos na ang download",
   "download.failed": "Nabigo ang download",
   "chooser.open": "Pumili ng file",
-  "chooser.openMany": "Pumili ng mga file"
+  "chooser.openMany": "Pumili ng mga file",
+  "offline.title": "Walang koneksyon",
+  "offline.body": "Hindi maabot ng app na ito ang site nito. Kusa itong susubok muli sa sandaling bumalik ang network.",
+  "offline.hint": "Pindutin ang Ctrl+R para subukan ngayon."
 }

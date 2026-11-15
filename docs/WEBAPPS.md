@@ -759,6 +759,27 @@ Notification sound and, when LordOS's sound plays, which one.
   30 s: before, a profile added during the visit showed "none yet" until Settings was opened again, because its folder
   only exists after its first start.
 
+## No network (since issue #144)
+
+When the app's own page (an address inside its `scope`) can't load for lack of network, `lord-web`
+(`webengine.c`, `weboffline.h`) shows its own page instead of WebKit's error page:
+
+- **Which failures:** a main frame load whose error is GResolver's (no DNS), one of GIO's connection errors (timed
+  out, host not found, host or network unreachable, connection refused, proxy failed, connection closed, not
+  connected) or WebKit's transport error (`weboffline_is_network_error`). A cancelled load, a download, a TLS error,
+  an HTTP answer and any address outside the scope (a sign-in on another site) keep WebKit's own handling.
+- **The page:** "No connection", that the app will try again by itself, the site's host and "Press Ctrl+R to try now",
+  in the person's language (`webruntime.json`: `offline.title`, `offline.body`, `offline.hint`) and the desktop's
+  light or dark colors (drawn again when the mode changes). It is `about:blank` HTML whose Content-Security-Policy
+  allows no script: it has no origin of the app's, and the window's permissions are denied while it is shown.
+- **Trying again:** the failed address loads again after 2, 4, 8, 16 and 32 s, then every 60 s; at once when GIO's
+  `GNetworkMonitor` says the network is available (the waits then start over at 2 s); at Ctrl+R or F5; after a crash
+  of the web process; and when the window is shown again (`Show` from the Dock or the launcher, the tray's Open). An
+  app in the background only hides when its window is closed, so before this opening it again showed the same error
+  until the session ended. Only an address inside the scope is ever loaded again, one load at a time.
+- **While hidden:** an app in the background keeps trying, so it is connected again (and its notifications come) by
+  the time the network is back.
+
 ## Not in the first version
 
 - Web push while the app is closed: WPE has no push service outside Apple's platforms, so the tray keeps the app

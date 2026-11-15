@@ -5,5 +5,8 @@
   "download.done": "Upakuaji umekamilika",
   "download.failed": "Upakuaji umeshindwa",
   "chooser.open": "Chagua faili",
-  "chooser.openMany": "Chagua faili"
+  "chooser.openMany": "Chagua faili",
+  "offline.title": "Hakuna muunganisho",
+  "offline.body": "Programu hii haikuweza kufikia tovuti yake. Itajaribu tena yenyewe mara mtandao utakaporudi.",
+  "offline.hint": "Bonyeza Ctrl+R ili kujaribu sasa."
 }

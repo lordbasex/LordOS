@@ -5,5 +5,8 @@
   "download.done": "Lataus valmis",
   "download.failed": "Lataus epäonnistui",
   "chooser.open": "Valitse tiedosto",
-  "chooser.openMany": "Valitse tiedostot"
+  "chooser.openMany": "Valitse tiedostot",
+  "offline.title": "Ei yhteyttä",
+  "offline.body": "Tämä sovellus ei tavoittanut sivustoaan. Se yrittää itse uudelleen heti, kun verkko palaa.",
+  "offline.hint": "Yritä nyt painamalla Ctrl+R."
 }

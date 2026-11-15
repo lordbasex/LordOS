@@ -19,11 +19,17 @@
  *     app then offers that system's download and names the linked device after it), and on for any other site in
  *     the window (a sign-in);
  *   - the unread count in the page's title goes to lord-server (SetBadge) when it changes;
- *   - when the page starts playing audio, for the notification sound (webbus.c, webpage_sound_suppress). */
+ *   - when the page starts playing audio, for the notification sound (webbus.c, webpage_sound_suppress);
+ *   - an app's own page that fails to load for lack of network (weboffline.h, #144): lord-web's "No connection" page
+ *     instead of WebKit's (which named GLib's resolver error and stayed there), and the failed address again after
+ *     2, 4, 8... up to 60 s, at once when GNetworkMonitor says the network is back, at Ctrl+R and when the window is
+ *     shown again (an app in the background only hides, so opening it again used to show the same error until the
+ *     session ended). Only an address inside the app's scope is loaded again. */
 #include "web.h"
 #include "webdl.h"
 #include "webwin.h"
 #include "weburl.h"
+#include "weboffline.h"
 #include "lord_version.h"           /* build/gen: LordOS's version, for the user agent */
 
 #include <sys/utsname.h>
@@ -46,6 +52,15 @@
 #define WEB_MEMORY_LIMIT_MAX_MB 3072
 #define WEB_MEMORY_POLL_S 30
 #define CRASH_WINDOW_US (30 * G_USEC_PER_SEC)
+
+/* weboffline.h mirrors these so its tests need no GLib */
+#define SAME(a, b) ((int)(a) == (int)(b))
+G_STATIC_ASSERT(SAME(WEBOFFLINE_IO_TIMED_OUT, G_IO_ERROR_TIMED_OUT) && SAME(WEBOFFLINE_IO_HOST_NOT_FOUND, G_IO_ERROR_HOST_NOT_FOUND)
+                && SAME(WEBOFFLINE_IO_HOST_UNREACHABLE, G_IO_ERROR_HOST_UNREACHABLE) && SAME(WEBOFFLINE_IO_NETWORK_UNREACHABLE, G_IO_ERROR_NETWORK_UNREACHABLE)
+                && SAME(WEBOFFLINE_IO_CONNECTION_REFUSED, G_IO_ERROR_CONNECTION_REFUSED) && SAME(WEBOFFLINE_IO_PROXY_FAILED, G_IO_ERROR_PROXY_FAILED)
+                && SAME(WEBOFFLINE_IO_CONNECTION_CLOSED, G_IO_ERROR_CONNECTION_CLOSED) && SAME(WEBOFFLINE_IO_NOT_CONNECTED, G_IO_ERROR_NOT_CONNECTED)
+                && SAME(WEBOFFLINE_WEBKIT_TRANSPORT, WEBKIT_NETWORK_ERROR_TRANSPORT) && SAME(G_RESOLVER_ERROR_NOT_FOUND, 0));
+#undef SAME
 
 WebKitWebContext *web_context_new(void) {
     WebKitMemoryPressureSettings *mp = webkit_memory_pressure_settings_new();
@@ -153,7 +168,7 @@ void web_set_user_agent(Web *w, int kind) {
     webkit_settings_set_user_agent(webkit_web_view_get_settings(w->view), ua);
     /* navigator.userAgent stays what the document started with: load the page again (only the app's own: another
      * site in the window, a sign-in half done, is left alone and gets the new one with its next load) */
-    if (!w->outside) webkit_web_view_reload(w->view);
+    if (!w->outside) web_reload(w);
 }
 
 void web_quit(Web *w, int code) {
@@ -163,8 +178,101 @@ void web_quit(Web *w, int code) {
     if (w->loop) g_main_loop_quit(w->loop);
 }
 
+/* ---- an app that is offline (weboffline.h) ---- */
+
+static void offline_clear(Web *w) {
+    g_clear_pointer(&w->offline_uri, g_free);
+    if (w->offline_timer) g_source_remove(w->offline_timer);
+    w->offline_timer = 0;
+    w->offline_failures = 0;
+    w->offline_retrying = 0;
+}
+
+/* the failed address again, now: only while it is the app's own, and one load at a time */
+static void offline_retry(Web *w) {
+    if (!w->offline_uri || w->offline_retrying || w->quitting || !w->view) return;
+    if (w->offline_timer) g_source_remove(w->offline_timer);
+    w->offline_timer = 0;
+    if (!weburl_in_scope(w->offline_uri, w->app.scope)) { offline_clear(w); return; }
+    w->offline_retrying = 1;
+    webkit_web_view_load_uri(w->view, w->offline_uri);
+}
+
+static gboolean offline_tick(gpointer d) {
+    Web *w = d;
+    w->offline_timer = 0;
+    offline_retry(w);
+    return G_SOURCE_REMOVE;
+}
+
+static void offline_schedule(Web *w) {
+    if (w->offline_uri && !w->offline_timer && !w->quitting)
+        w->offline_timer = g_timeout_add_seconds(weboffline_delay_s(w->offline_failures), offline_tick, w);
+}
+
+static void offline_show_page(Web *w, const char *uri) {
+    WebUrl u;
+    char html[4096];
+    size_t n = weboffline_html(w->app.name, weblang("offline.title"), weblang("offline.body"), weblang("offline.hint"),
+                               uri && !weburl_parse(uri, &u) ? u.host : "", w->scheme == WEBSCHEME_DARK, html, sizeof html);
+    if (!n) return;
+    w->offline_page = 1;
+    /* about:blank, not the failed address: the page has no origin of the app's and no script */
+    webkit_web_view_load_html(w->view, html, NULL);
+}
+
+/* the main frame's load failed: lack of network on the app's own address is lord-web's to handle, anything else
+ * (another site, a TLS error, a cancelled load, a download) stays WebKit's */
+static gboolean on_load_failed(WebKitWebView *v, WebKitLoadEvent ev, const char *uri, GError *e, gpointer d) {
+    (void)v; (void)ev;
+    Web *w = d;
+    int ours = w->offline_uri && uri && !strcmp(uri, w->offline_uri);
+    if (ours) w->offline_retrying = 0;
+    if (!e || !uri || !weboffline_is_network_error(g_quark_to_string(e->domain), e->code) || !weburl_in_scope(uri, w->app.scope)) {
+        /* a try that ended some other way (a newer load cancelled it): the next one still comes while the page is ours */
+        if (ours && w->offline_page) offline_schedule(w);
+        return FALSE;
+    }
+    if (!ours) {
+        offline_clear(w);
+        w->offline_uri = g_strdup(uri);
+    }
+    if (w->offline_failures < 1000) w->offline_failures++;
+    fprintf(stderr, "lord-web: no network (%s); trying again in %u s\n", e->message ? e->message : "", weboffline_delay_s(w->offline_failures));
+    if (!w->offline_page) offline_show_page(w, uri);
+    offline_schedule(w);
+    return TRUE;
+}
+
+/* a document other than lord-web's own page is in the window: the app is online again (or WebKit shows an error of its own) */
+static void offline_committed(Web *w) {
+    const char *uri = webkit_web_view_get_uri(w->view);
+    if (uri && !g_ascii_strncasecmp(uri, "about:", 6)) return;
+    w->offline_page = 0;
+    offline_clear(w);
+}
+
+static void on_network_changed(GNetworkMonitor *m, gboolean available, gpointer d) {
+    (void)m;
+    Web *w = d;
+    if (!available || !w->offline_uri) return;
+    w->offline_failures = 0;            /* the network came back: short waits again should the first try be too early */
+    offline_retry(w);
+}
+
+void web_offline_restyle(Web *w) {
+    if (w->offline_page && w->offline_uri && !w->offline_retrying && w->view) offline_show_page(w, w->offline_uri);
+}
+
+void web_reload(Web *w) {
+    if (!w->view) return;
+    if (w->offline_uri && w->offline_page) { w->offline_failures = 0; offline_retry(w); return; }
+    webkit_web_view_reload(w->view);
+}
+
 void web_show(Web *w, const char *token) {
     if (w->win) webwin_show(w->win, token);
+    if (w->offline_uri && w->offline_page) { w->offline_failures = 0; offline_retry(w); }
 }
 
 /* in the background (with or without its tray icon) the window only hides: the Dock and the launcher bring it back
@@ -433,7 +541,11 @@ static void on_target(WebKitWebView *v, WebKitHitTestResult *h, guint mods, gpoi
 
 static void on_close(WebKitWebView *v, gpointer d) { (void)v; web_close_requested(d); }
 
-static void on_load(WebKitWebView *v, WebKitLoadEvent ev, gpointer d) { (void)v; webdark_load(d, ev); }
+static void on_load(WebKitWebView *v, WebKitLoadEvent ev, gpointer d) {
+    (void)v;
+    if (ev == WEBKIT_LOAD_COMMITTED) offline_committed(d);
+    webdark_load(d, ev);
+}
 
 static void on_crash(WebKitWebView *v, WebKitWebProcessTerminationReason why, gpointer d) {
     Web *w = d;
@@ -442,7 +554,9 @@ static void on_crash(WebKitWebView *v, WebKitWebProcessTerminationReason why, gp
     fprintf(stderr, "lord-web: the web process ended (%s)\n", why == WEBKIT_WEB_PROCESS_CRASHED ? "crashed" : why == WEBKIT_WEB_PROCESS_EXCEEDED_MEMORY_LIMIT ? "memory limit" : "terminated");
     if (why == WEBKIT_WEB_PROCESS_TERMINATED_BY_API || (last && now - last < CRASH_WINDOW_US)) { web_quit(w, 1); return; }
     last = now;
-    webkit_web_view_reload(v);
+    (void)v;
+    w->offline_retrying = 0;            /* a try under way ended with the process */
+    web_reload(w);
 }
 
 /* ---- downloads ---- */
@@ -541,6 +655,10 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
     g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
     g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
+    g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);
+    /* netlink inside lord-web's own isolation; where no monitor works, the timer alone tries again */
+    GNetworkMonitor *mon = g_network_monitor_get_default();
+    if (mon) g_signal_connect(mon, "network-changed", G_CALLBACK(on_network_changed), w);
     webxfer_init(w);
     webselect_init(w);
     webdark_init(w);

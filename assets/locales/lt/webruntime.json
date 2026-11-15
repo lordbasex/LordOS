@@ -5,5 +5,8 @@
   "download.done": "Atsisiuntimas baigtas",
   "download.failed": "Nepavyko atsisiųsti",
   "chooser.open": "Pasirinkite failą",
-  "chooser.openMany": "Pasirinkite failus"
+  "chooser.openMany": "Pasirinkite failus",
+  "offline.title": "Nėra ryšio",
+  "offline.body": "Ši programa nepasiekė savo svetainės. Ji bandys dar kartą pati, kai tik vėl atsiras tinklas.",
+  "offline.hint": "Paspauskite Ctrl+R, kad bandytumėte dabar."
 }

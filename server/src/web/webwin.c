@@ -1294,7 +1294,7 @@ static int own_key(WebWin *win, uint32_t key) {
     xkb_keysym_t sym = xkb_state_key_get_one_sym(st, key + 8);
     int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
     WebKitWebView *v = win->w->view;
-    if (sym == XKB_KEY_F5 || (ctrl && !alt && (sym == XKB_KEY_r || sym == XKB_KEY_R))) { webkit_web_view_reload(v); return 1; }
+    if (sym == XKB_KEY_F5 || (ctrl && !alt && (sym == XKB_KEY_r || sym == XKB_KEY_R))) { web_reload(win->w); return 1; }
     if (alt && !ctrl && sym == XKB_KEY_Left) { webkit_web_view_go_back(v); return 1; }
     if (alt && !ctrl && sym == XKB_KEY_Right) { webkit_web_view_go_forward(v); return 1; }
     if (ctrl && !alt) {

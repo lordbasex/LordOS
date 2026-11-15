@@ -5,5 +5,8 @@
   "download.done": "ダウンロードが完了しました",
   "download.failed": "ダウンロードに失敗しました",
   "chooser.open": "ファイルを選択",
-  "chooser.openMany": "ファイルを選択"
+  "chooser.openMany": "ファイルを選択",
+  "offline.title": "接続されていません",
+  "offline.body": "このアプリはサイトに接続できませんでした。ネットワークが戻りしだい自動的に再試行します。",
+  "offline.hint": "今すぐ再試行するには Ctrl+R を押してください。"
 }

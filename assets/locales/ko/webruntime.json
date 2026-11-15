@@ -5,5 +5,8 @@
   "download.done": "다운로드 완료",
   "download.failed": "다운로드 실패",
   "chooser.open": "파일 선택",
-  "chooser.openMany": "파일 선택(여러 개)"
+  "chooser.openMany": "파일 선택(여러 개)",
+  "offline.title": "연결 없음",
+  "offline.body": "이 앱이 사이트에 연결하지 못했습니다. 네트워크가 돌아오면 자동으로 다시 시도합니다.",
+  "offline.hint": "지금 다시 시도하려면 Ctrl+R을 누르세요."
 }
