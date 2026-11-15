@@ -1,0 +1,22 @@
+{
+  "folder": "Înregistrări",
+  "name": "Înregistrare {date} {time}",
+  "all": "Toate înregistrările",
+  "empty": "Încă nu există înregistrări",
+  "hint": "Apăsați butonul roșu (sau R) pentru a înregistra cu microfonul",
+  "denied": "Reportofonul nu are permisiunea de a folosi microfonul",
+  "play": "Redă",
+  "pause": "Pauză",
+  "rename": "Redenumește",
+  "trim": "Decupează",
+  "cancelTrim": "Anulează decuparea",
+  "saveTrim": "Salvează copia decupată",
+  "trimmed": "decupată",
+  "export": "Exportă ca",
+  "exportBtn": "Exportă",
+  "working": "Se exportă…",
+  "exported": "S-a salvat „{name}”",
+  "exportError": "Nu s-a putut exporta",
+  "renameError": "Nu s-a putut redenumi (există deja acest nume?)",
+  "emptyTitle": "Alegeți sau faceți o înregistrare"
+}

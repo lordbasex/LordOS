@@ -1,0 +1,22 @@
+{
+  "search": "Caută emoji",
+  "results": {
+    "one": "{count} rezultat",
+    "few": "{count} rezultate",
+    "other": "{count} de rezultate"
+  },
+  "none": "Nu s-a găsit nimic",
+  "noRecent": "Cele pe care le folosești vor apărea aici",
+  "copied": "{text} copiat: lipește-l cu Ctrl+V",
+  "more": "Mai multe…",
+  "group.recent": "Recente",
+  "group.smileys": "Fețe zâmbitoare și emoții",
+  "group.people": "Oameni și corp",
+  "group.animals": "Animale și natură",
+  "group.food": "Mâncare și băutură",
+  "group.travel": "Călătorii și locuri",
+  "group.activities": "Activități",
+  "group.objects": "Obiecte",
+  "group.symbols": "Simboluri",
+  "group.flags": "Steaguri"
+}
