@@ -1,0 +1,14 @@
+{
+  "folder": "Máy ảnh",
+  "photoName": "Ảnh {date}",
+  "videoName": "Video {date}",
+  "photo": "Ảnh",
+  "video": "Video",
+  "mirror": "Lật gương",
+  "none": "Không tìm thấy máy ảnh nào",
+  "denied": "Ứng dụng Máy ảnh không được phép dùng máy ảnh. Hãy thay đổi trong Cài đặt → Quyền riêng tư.",
+  "error": "Không thể dùng máy ảnh: {error}",
+  "noneHint": "Cắm một máy ảnh USB: nó sẽ tự xuất hiện ở đây mà không cần khởi động lại ứng dụng.",
+  "deniedTitle": "Không có quyền truy cập máy ảnh",
+  "errorTitle": "Không thể mở máy ảnh"
+}

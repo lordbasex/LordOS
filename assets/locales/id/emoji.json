@@ -1,0 +1,20 @@
+{
+  "search": "Cari emoji",
+  "results": {
+    "other": "{count} hasil"
+  },
+  "none": "Tidak ditemukan apa pun",
+  "noRecent": "Emoji yang Anda gunakan akan muncul di sini",
+  "copied": "{text} disalin: tempel dengan Ctrl+V",
+  "more": "Lainnya…",
+  "group.recent": "Terbaru",
+  "group.smileys": "Wajah & emosi",
+  "group.people": "Orang & tubuh",
+  "group.animals": "Hewan & alam",
+  "group.food": "Makanan & minuman",
+  "group.travel": "Perjalanan & tempat",
+  "group.activities": "Aktivitas",
+  "group.objects": "Benda",
+  "group.symbols": "Simbol",
+  "group.flags": "Bendera"
+}

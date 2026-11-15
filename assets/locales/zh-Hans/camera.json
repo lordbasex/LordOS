@@ -1,0 +1,14 @@
+{
+  "folder": "相机",
+  "photoName": "照片 {date}",
+  "videoName": "视频 {date}",
+  "photo": "照片",
+  "video": "视频",
+  "mirror": "镜像",
+  "none": "未找到相机",
+  "denied": "“相机”未获准使用相机。请在“设置 → 隐私”中更改。",
+  "error": "无法使用相机：{error}",
+  "noneHint": "插入 USB 相机：它会自动出现在这里，无需重新启动应用。",
+  "deniedTitle": "无法访问相机",
+  "errorTitle": "无法打开相机"
+}

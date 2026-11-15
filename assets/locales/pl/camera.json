@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Zdjęcie {date}",
+  "videoName": "Wideo {date}",
+  "photo": "Zdjęcie",
+  "video": "Wideo",
+  "mirror": "Lustro",
+  "none": "Nie znaleziono kamery",
+  "denied": "Aplikacja Kamera nie ma uprawnień do korzystania z kamery. Zmień to w Ustawienia → Prywatność.",
+  "error": "Nie można użyć kamery: {error}",
+  "noneHint": "Podłącz kamerę USB: pojawi się tutaj sama, bez ponownego uruchamiania aplikacji.",
+  "deniedTitle": "Brak dostępu do kamery",
+  "errorTitle": "Nie można otworzyć kamery"
+}

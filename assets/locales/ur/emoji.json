@@ -1,0 +1,21 @@
+{
+  "search": "ایموجی تلاش کریں",
+  "results": {
+    "one": "{count} نتیجہ",
+    "other": "{count} نتائج"
+  },
+  "none": "کچھ نہیں ملا",
+  "noRecent": "جو آپ استعمال کریں گے وہ یہاں دکھائی دیں گے",
+  "copied": "{text} کاپی ہو گیا: Ctrl+V سے پیسٹ کریں",
+  "more": "مزید…",
+  "group.recent": "حالیہ",
+  "group.smileys": "مسکراہٹیں اور جذبات",
+  "group.people": "لوگ اور جسم",
+  "group.animals": "جانور اور فطرت",
+  "group.food": "کھانا اور مشروبات",
+  "group.travel": "سفر اور مقامات",
+  "group.activities": "سرگرمیاں",
+  "group.objects": "اشیاء",
+  "group.symbols": "علامات",
+  "group.flags": "پرچم"
+}

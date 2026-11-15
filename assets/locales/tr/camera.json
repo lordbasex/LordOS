@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Fotoğraf {date}",
+  "videoName": "Video {date}",
+  "photo": "Fotoğraf",
+  "video": "Video",
+  "mirror": "Ayna",
+  "none": "Kamera bulunamadı",
+  "denied": "Kamera uygulamasının kamerayı kullanma izni yok. Bunu Ayarlar → Gizlilik bölümünden değiştirin.",
+  "error": "Kamera kullanılamadı: {error}",
+  "noneHint": "Bir USB kamera takın: uygulamayı yeniden başlatmadan burada kendiliğinden görünür.",
+  "deniedTitle": "Kameraya erişim yok",
+  "errorTitle": "Kamera açılamadı"
+}

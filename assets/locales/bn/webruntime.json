@@ -1,0 +1,9 @@
+{
+  "tray.open": "খুলুন",
+  "tray.quit": "বন্ধ করুন",
+  "notify.open": "খুলুন",
+  "download.done": "ডাউনলোড সম্পন্ন",
+  "download.failed": "ডাউনলোড ব্যর্থ হয়েছে",
+  "chooser.open": "একটি ফাইল বেছে নিন",
+  "chooser.openMany": "ফাইল বেছে নিন"
+}

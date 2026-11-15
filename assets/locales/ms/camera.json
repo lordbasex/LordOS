@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Cermin",
+  "none": "Tiada kamera ditemui",
+  "denied": "Kamera tidak dibenarkan menggunakan kamera. Tukar dalam Tetapan → Privasi.",
+  "error": "Tidak dapat menggunakan kamera: {error}",
+  "noneHint": "Pasangkan kamera USB: ia akan muncul di sini dengan sendirinya, tanpa memulakan semula apl.",
+  "deniedTitle": "Tiada akses kepada kamera",
+  "errorTitle": "Kamera tidak dapat dibuka"
+}

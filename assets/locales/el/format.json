@@ -53,5 +53,7 @@
   },
   "decimal": ",",
   "group": ".",
-  "hour12": false
+  "hour12": false,
+  "am": "π.μ.",
+  "pm": "μ.μ."
 }

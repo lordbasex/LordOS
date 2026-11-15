@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Kuva {date}",
+  "videoName": "Video {date}",
+  "photo": "Kuva",
+  "video": "Video",
+  "mirror": "Peilaa",
+  "none": "Kameraa ei löytynyt",
+  "denied": "Kamera-sovelluksella ei ole lupaa käyttää kameraa. Muuta tätä kohdassa Asetukset → Yksityisyys.",
+  "error": "Kameraa ei voitu käyttää: {error}",
+  "noneHint": "Liitä USB-kamera: se näkyy täällä itsestään ilman sovelluksen uudelleenkäynnistystä.",
+  "deniedTitle": "Ei pääsyä kameraan",
+  "errorTitle": "Kameraa ei voitu avata"
+}

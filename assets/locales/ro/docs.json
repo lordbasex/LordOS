@@ -1,0 +1,82 @@
+{
+  "archiveName": "Arhivă",
+  "archiveSummary": {
+    "one": "{count} fișier, {size}",
+    "few": "{count} fișiere, {size}",
+    "other": "{count} de fișiere, {size}"
+  },
+  "compressOne": "Comprimă „{name}”",
+  "compressMany": {
+    "one": "Comprimă {count} element",
+    "few": "Comprimă {count} elemente",
+    "other": "Comprimă {count} de elemente"
+  },
+  "compressing": "Se comprimă „{name}”…",
+  "compressProgress": "Se comprimă „{name}”: {files} fișiere",
+  "compressed": {
+    "one": "„{name}” este gata ({count} fișier)",
+    "few": "„{name}” este gata ({count} fișiere)",
+    "other": "„{name}” este gata ({count} de fișiere)"
+  },
+  "compressError": "„{name}” nu a putut fi comprimat ({error})",
+  "extractHere": "Extrage aici",
+  "extractSelected": {
+    "one": "Extrage {count} element",
+    "few": "Extrage {count} elemente",
+    "other": "Extrage {count} de elemente"
+  },
+  "extracting": "Se extrage „{name}”…",
+  "extractProgress": "Se extrage „{name}”: {files} fișiere ({pct}%)",
+  "extracted": {
+    "one": "Extras în „{name}” ({count} fișier)",
+    "few": "Extras în „{name}” ({count} fișiere)",
+    "other": "Extras în „{name}” ({count} de fișiere)"
+  },
+  "extractedSkipped": {
+    "one": "Extras în „{name}” ({count} fișier); {skipped} omise din motive de siguranță",
+    "few": "Extras în „{name}” ({count} fișiere); {skipped} omise din motive de siguranță",
+    "other": "Extras în „{name}” ({count} de fișiere); {skipped} omise din motive de siguranță"
+  },
+  "extractError": "„{name}” nu a putut fi extras ({error})",
+  "opening": "Se deschide „{name}”…",
+  "loading": "Se încarcă…",
+  "locked": "protejat cu parolă",
+  "pages": {
+    "one": "{count} pagină",
+    "few": "{count} pagini",
+    "other": "{count} de pagini"
+  },
+  "more": {
+    "one": "și încă {count}",
+    "few": "și încă {count}",
+    "other": "și încă {count}"
+  },
+  "err.invalid": "nu este o arhivă sau este deteriorată",
+  "err.missing-volume": "lipsește o parte a arhivei împărțite: „{name}”",
+  "err.disk-full": "discul este plin",
+  "err.too-big": "este prea mare",
+  "err.too-many": "are prea multe fișiere",
+  "err.corrupt": "este deteriorată",
+  "err.write": "nu s-a putut scrie",
+  "err.unavailable": "asistentul pentru documente nu este disponibil",
+  "err.cancelled": "anulat",
+  "err.crash": "asistentul pentru documente s-a oprit neașteptat",
+  "err.timeout": "a durat prea mult",
+  "err.protocol": "asistentul pentru documente a trimis un răspuns nevalid",
+  "err.spawn": "asistentul pentru documente nu a putut fi pornit",
+  "err.closed": "documentul a fost închis",
+  "err.bad-request": "cerere nevalidă",
+  "err.bad-field": "câmp de formular nevalid",
+  "err.bad-page": "pagină nevalidă",
+  "err.busy": "asistentul pentru documente este ocupat",
+  "err.memory": "memorie insuficientă",
+  "err.no-fonts": "niciun font disponibil",
+  "err.not-open": "documentul nu este deschis",
+  "err.nothing": "nu este nimic de salvat",
+  "err.read-only": "documentul este doar în citire",
+  "err.save": "nu s-a putut salva",
+  "err.unknown-op": "operație necunoscută",
+  "err.image": "imagine nevalidă",
+  "err.blob": "date nevalide",
+  "err.password": "documentul este protejat cu parolă"
+}

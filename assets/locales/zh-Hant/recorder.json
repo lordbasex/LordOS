@@ -1,0 +1,22 @@
+{
+  "folder": "錄音",
+  "name": "錄音 {date} {time}",
+  "all": "所有錄音",
+  "empty": "還沒有錄音",
+  "hint": "按紅色按鈕（或 R）以使用麥克風錄音",
+  "denied": "錄音機未獲准使用麥克風",
+  "play": "播放",
+  "pause": "暫停",
+  "rename": "重新命名",
+  "trim": "修剪",
+  "cancelTrim": "取消修剪",
+  "saveTrim": "儲存修剪後的副本",
+  "trimmed": "已修剪",
+  "export": "匯出為",
+  "exportBtn": "匯出",
+  "working": "正在匯出…",
+  "exported": "已儲存「{name}」",
+  "exportError": "無法匯出",
+  "renameError": "無法重新命名（該名稱是否已存在？）",
+  "emptyTitle": "選擇或建立一段錄音"
+}

@@ -1,0 +1,21 @@
+{
+  "search": "Emoji zoeken",
+  "results": {
+    "one": "{count} resultaat",
+    "other": "{count} resultaten"
+  },
+  "none": "Niets gevonden",
+  "noRecent": "De emoji die je gebruikt verschijnen hier",
+  "copied": "{text} gekopieerd: plak met Ctrl+V",
+  "more": "Meer…",
+  "group.recent": "Recent",
+  "group.smileys": "Smileys en emotie",
+  "group.people": "Mensen en lichaam",
+  "group.animals": "Dieren en natuur",
+  "group.food": "Eten en drinken",
+  "group.travel": "Reizen en plaatsen",
+  "group.activities": "Activiteiten",
+  "group.objects": "Voorwerpen",
+  "group.symbols": "Symbolen",
+  "group.flags": "Vlaggen"
+}

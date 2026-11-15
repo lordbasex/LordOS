@@ -1,0 +1,20 @@
+{
+  "search": "ค้นหาอีโมจิ",
+  "results": {
+    "other": "{count} ผลลัพธ์"
+  },
+  "none": "ไม่พบสิ่งใด",
+  "noRecent": "อีโมจิที่คุณใช้จะแสดงที่นี่",
+  "copied": "คัดลอก {text} แล้ว: วางด้วย Ctrl+V",
+  "more": "เพิ่มเติม…",
+  "group.recent": "ล่าสุด",
+  "group.smileys": "หน้ายิ้มและอารมณ์",
+  "group.people": "ผู้คนและร่างกาย",
+  "group.animals": "สัตว์และธรรมชาติ",
+  "group.food": "อาหารและเครื่องดื่ม",
+  "group.travel": "การเดินทางและสถานที่",
+  "group.activities": "กิจกรรม",
+  "group.objects": "วัตถุ",
+  "group.symbols": "สัญลักษณ์",
+  "group.flags": "ธง"
+}

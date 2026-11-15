@@ -1,0 +1,21 @@
+{
+  "search": "Sök emoji",
+  "results": {
+    "one": "{count} resultat",
+    "other": "{count} resultat"
+  },
+  "none": "Inget hittades",
+  "noRecent": "De du använder visas här",
+  "copied": "{text} kopierad: klistra in med Ctrl+V",
+  "more": "Mer…",
+  "group.recent": "Senaste",
+  "group.smileys": "Smileys och känslor",
+  "group.people": "Människor och kropp",
+  "group.animals": "Djur och natur",
+  "group.food": "Mat och dryck",
+  "group.travel": "Resor och platser",
+  "group.activities": "Aktiviteter",
+  "group.objects": "Föremål",
+  "group.symbols": "Symboler",
+  "group.flags": "Flaggor"
+}

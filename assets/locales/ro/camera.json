@@ -1,0 +1,14 @@
+{
+  "folder": "Cameră",
+  "photoName": "Fotografie {date}",
+  "videoName": "Videoclip {date}",
+  "photo": "Fotografie",
+  "video": "Video",
+  "mirror": "Oglindire",
+  "none": "Nu s-a găsit nicio cameră",
+  "denied": "Aplicația Cameră nu are permisiunea de a folosi camera. Schimbați acest lucru în Setări → Confidențialitate.",
+  "error": "Camera nu a putut fi folosită: {error}",
+  "noneHint": "Conectați o cameră USB: apare aici singură, fără a reporni aplicația.",
+  "deniedTitle": "Fără acces la cameră",
+  "errorTitle": "Camera nu a putut fi deschisă"
+}

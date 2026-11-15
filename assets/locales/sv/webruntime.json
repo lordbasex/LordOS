@@ -1,0 +1,9 @@
+{
+  "tray.open": "Öppna",
+  "tray.quit": "Avsluta",
+  "notify.open": "Öppna",
+  "download.done": "Nedladdningen är klar",
+  "download.failed": "Nedladdningen misslyckades",
+  "chooser.open": "Välj en fil",
+  "chooser.openMany": "Välj filer"
+}

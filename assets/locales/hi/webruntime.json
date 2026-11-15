@@ -1,0 +1,9 @@
+{
+  "tray.open": "खोलें",
+  "tray.quit": "बंद करें",
+  "notify.open": "खोलें",
+  "download.done": "डाउनलोड पूरा हुआ",
+  "download.failed": "डाउनलोड विफल रहा",
+  "chooser.open": "एक फ़ाइल चुनें",
+  "chooser.openMany": "फ़ाइलें चुनें"
+}

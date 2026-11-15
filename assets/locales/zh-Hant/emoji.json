@@ -1,0 +1,20 @@
+{
+  "search": "搜尋表情符號",
+  "results": {
+    "other": "{count} 個結果"
+  },
+  "none": "找不到任何結果",
+  "noRecent": "你使用過的表情符號會顯示在這裡",
+  "copied": "已拷貝 {text}：按 Ctrl+V 貼上",
+  "more": "更多…",
+  "group.recent": "最近使用",
+  "group.smileys": "笑臉與情緒",
+  "group.people": "人物與身體",
+  "group.animals": "動物與自然",
+  "group.food": "食物與飲料",
+  "group.travel": "旅遊與地點",
+  "group.activities": "活動",
+  "group.objects": "物品",
+  "group.symbols": "符號",
+  "group.flags": "旗幟"
+}

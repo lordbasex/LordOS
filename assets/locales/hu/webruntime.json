@@ -1,0 +1,9 @@
+{
+  "tray.open": "Megnyitás",
+  "tray.quit": "Kilépés",
+  "notify.open": "Megnyitás",
+  "download.done": "A letöltés befejeződött",
+  "download.failed": "A letöltés sikertelen",
+  "chooser.open": "Fájl kiválasztása",
+  "chooser.openMany": "Fájlok kiválasztása"
+}

@@ -1,0 +1,9 @@
+{
+  "tray.open": "Aç",
+  "tray.quit": "Çık",
+  "notify.open": "Aç",
+  "download.done": "İndirme tamamlandı",
+  "download.failed": "İndirme başarısız oldu",
+  "chooser.open": "Bir dosya seçin",
+  "chooser.openMany": "Dosyaları seçin"
+}

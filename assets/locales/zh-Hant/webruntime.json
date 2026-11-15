@@ -1,0 +1,9 @@
+{
+  "tray.open": "開啟",
+  "tray.quit": "結束",
+  "notify.open": "開啟",
+  "download.done": "下載完成",
+  "download.failed": "下載失敗",
+  "chooser.open": "選擇檔案",
+  "chooser.openMany": "選擇多個檔案"
+}

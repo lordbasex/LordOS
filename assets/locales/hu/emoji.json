@@ -1,0 +1,21 @@
+{
+  "search": "Emodzsi keresése",
+  "results": {
+    "one": "{count} találat",
+    "other": "{count} találat"
+  },
+  "none": "Nincs találat",
+  "noRecent": "Itt jelennek meg azok, amelyeket használsz",
+  "copied": "{text} kimásolva: illeszd be a Ctrl+V billentyűkkel",
+  "more": "Továbbiak…",
+  "group.recent": "Legutóbbiak",
+  "group.smileys": "Hangulatjelek és érzelmek",
+  "group.people": "Emberek és testrészek",
+  "group.animals": "Állatok és természet",
+  "group.food": "Ételek és italok",
+  "group.travel": "Utazás és helyek",
+  "group.activities": "Tevékenységek",
+  "group.objects": "Tárgyak",
+  "group.symbols": "Szimbólumok",
+  "group.flags": "Zászlók"
+}

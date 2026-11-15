@@ -1,0 +1,82 @@
+{
+  "archiveName": "Архів",
+  "archiveSummary": {
+    "one": "{count} файл, {size}",
+    "few": "{count} файли, {size}",
+    "many": "{count} файлів, {size}"
+  },
+  "compressOne": "Стиснути «{name}»",
+  "compressMany": {
+    "one": "Стиснути {count} елемент",
+    "few": "Стиснути {count} елементи",
+    "many": "Стиснути {count} елементів"
+  },
+  "compressing": "Стиснення «{name}»…",
+  "compressProgress": "Стиснення «{name}»: файлів: {files}",
+  "compressed": {
+    "one": "«{name}» готово ({count} файл)",
+    "few": "«{name}» готово ({count} файли)",
+    "many": "«{name}» готово ({count} файлів)"
+  },
+  "compressError": "Не вдалося стиснути «{name}» ({error})",
+  "extractHere": "Розпакувати сюди",
+  "extractSelected": {
+    "one": "Розпакувати {count} елемент",
+    "few": "Розпакувати {count} елементи",
+    "many": "Розпакувати {count} елементів"
+  },
+  "extracting": "Розпакування «{name}»…",
+  "extractProgress": "Розпакування «{name}»: файлів: {files} ({pct}%)",
+  "extracted": {
+    "one": "Розпаковано в «{name}» ({count} файл)",
+    "few": "Розпаковано в «{name}» ({count} файли)",
+    "many": "Розпаковано в «{name}» ({count} файлів)"
+  },
+  "extractedSkipped": {
+    "one": "Розпаковано в «{name}» ({count} файл); пропущено з міркувань безпеки: {skipped}",
+    "few": "Розпаковано в «{name}» ({count} файли); пропущено з міркувань безпеки: {skipped}",
+    "many": "Розпаковано в «{name}» ({count} файлів); пропущено з міркувань безпеки: {skipped}"
+  },
+  "extractError": "Не вдалося розпакувати «{name}» ({error})",
+  "opening": "Відкриття «{name}»…",
+  "loading": "Завантаження…",
+  "locked": "захищено паролем",
+  "pages": {
+    "one": "{count} сторінка",
+    "few": "{count} сторінки",
+    "many": "{count} сторінок"
+  },
+  "more": {
+    "one": "і ще {count}",
+    "few": "і ще {count}",
+    "many": "і ще {count}"
+  },
+  "err.invalid": "це не архів, або його пошкоджено",
+  "err.missing-volume": "бракує частини розділеного архіву: «{name}»",
+  "err.disk-full": "диск заповнено",
+  "err.too-big": "завеликий розмір",
+  "err.too-many": "забагато файлів",
+  "err.corrupt": "пошкоджено",
+  "err.write": "не вдалося записати",
+  "err.unavailable": "помічник документів недоступний",
+  "err.cancelled": "скасовано",
+  "err.crash": "помічник документів неочікувано зупинився",
+  "err.timeout": "це забрало забагато часу",
+  "err.protocol": "помічник документів надіслав недійсну відповідь",
+  "err.spawn": "не вдалося запустити помічника документів",
+  "err.closed": "документ закрито",
+  "err.bad-request": "недійсний запит",
+  "err.bad-field": "недійсне поле форми",
+  "err.bad-page": "недійсна сторінка",
+  "err.busy": "помічник документів зайнятий",
+  "err.memory": "бракує пам’яті",
+  "err.no-fonts": "немає доступних шрифтів",
+  "err.not-open": "документ не відкрито",
+  "err.nothing": "немає чого зберігати",
+  "err.read-only": "документ лише для читання",
+  "err.save": "не вдалося зберегти",
+  "err.unknown-op": "невідома операція",
+  "err.image": "недійсне зображення",
+  "err.blob": "недійсні дані",
+  "err.password": "документ захищено паролем"
+}

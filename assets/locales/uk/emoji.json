@@ -1,0 +1,23 @@
+{
+  "search": "Пошук емодзі",
+  "results": {
+    "one": "{count} результат",
+    "few": "{count} результати",
+    "many": "{count} результатів",
+    "other": "{count} результату"
+  },
+  "none": "Нічого не знайдено",
+  "noRecent": "Тут зʼявлятимуться ті, якими ви користуєтеся",
+  "copied": "{text} скопійовано: вставте за допомогою Ctrl+V",
+  "more": "Більше…",
+  "group.recent": "Недавні",
+  "group.smileys": "Смайлики та емоції",
+  "group.people": "Люди й тіло",
+  "group.animals": "Тварини й природа",
+  "group.food": "Їжа та напої",
+  "group.travel": "Подорожі та місця",
+  "group.activities": "Дозвілля",
+  "group.objects": "Предмети",
+  "group.symbols": "Символи",
+  "group.flags": "Прапори"
+}

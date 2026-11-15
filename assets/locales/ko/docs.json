@@ -1,0 +1,66 @@
+{
+  "archiveName": "압축 파일",
+  "archiveSummary": {
+    "other": "파일 {count}개, {size}"
+  },
+  "compressOne": "“{name}” 압축",
+  "compressMany": {
+    "other": "항목 {count}개 압축"
+  },
+  "compressing": "“{name}” 압축 중…",
+  "compressProgress": "“{name}” 압축 중: 파일 {files}개",
+  "compressed": {
+    "other": "“{name}” 완료(파일 {count}개)"
+  },
+  "compressError": "“{name}”을(를) 압축할 수 없습니다({error})",
+  "extractHere": "여기에 풀기",
+  "extractSelected": {
+    "other": "항목 {count}개 풀기"
+  },
+  "extracting": "“{name}” 푸는 중…",
+  "extractProgress": "“{name}” 푸는 중: 파일 {files}개({pct}%)",
+  "extracted": {
+    "other": "“{name}”에 풀었습니다(파일 {count}개)"
+  },
+  "extractedSkipped": {
+    "other": "“{name}”에 풀었습니다(파일 {count}개). 안전을 위해 {skipped}개를 건너뛰었습니다"
+  },
+  "extractError": "“{name}”을(를) 풀 수 없습니다({error})",
+  "opening": "“{name}” 여는 중…",
+  "loading": "불러오는 중…",
+  "locked": "암호로 보호됨",
+  "pages": {
+    "other": "{count}쪽"
+  },
+  "more": {
+    "other": "외 {count}개"
+  },
+  "err.invalid": "압축 파일이 아니거나 손상되었습니다",
+  "err.missing-volume": "분할 압축 파일의 일부가 없습니다: “{name}”",
+  "err.disk-full": "디스크가 가득 찼습니다",
+  "err.too-big": "너무 큽니다",
+  "err.too-many": "파일이 너무 많습니다",
+  "err.corrupt": "손상되었습니다",
+  "err.write": "쓸 수 없습니다",
+  "err.unavailable": "문서 도우미를 사용할 수 없습니다",
+  "err.cancelled": "취소됨",
+  "err.crash": "문서 도우미가 예기치 않게 중지되었습니다",
+  "err.timeout": "시간이 너무 오래 걸렸습니다",
+  "err.protocol": "문서 도우미가 잘못된 응답을 보냈습니다",
+  "err.spawn": "문서 도우미를 시작할 수 없습니다",
+  "err.closed": "문서가 닫혔습니다",
+  "err.bad-request": "잘못된 요청",
+  "err.bad-field": "잘못된 양식 필드",
+  "err.bad-page": "잘못된 페이지",
+  "err.busy": "문서 도우미가 사용 중입니다",
+  "err.memory": "메모리가 부족합니다",
+  "err.no-fonts": "사용할 수 있는 글꼴이 없습니다",
+  "err.not-open": "문서가 열려 있지 않습니다",
+  "err.nothing": "저장할 내용이 없습니다",
+  "err.read-only": "문서가 읽기 전용입니다",
+  "err.save": "저장할 수 없습니다",
+  "err.unknown-op": "알 수 없는 작업",
+  "err.image": "잘못된 이미지",
+  "err.blob": "잘못된 데이터",
+  "err.password": "문서가 암호로 보호되어 있습니다"
+}

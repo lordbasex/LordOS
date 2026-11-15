@@ -1,0 +1,74 @@
+{
+  "archiveName": "آرکائیو",
+  "archiveSummary": {
+    "one": "{count} فائل، {size}",
+    "other": "{count} فائلیں، {size}"
+  },
+  "compressOne": "”{name}“ کمپریس کریں",
+  "compressMany": {
+    "one": "{count} آئٹم کمپریس کریں",
+    "other": "{count} آئٹمز کمپریس کریں"
+  },
+  "compressing": "”{name}“ کمپریس ہو رہا ہے…",
+  "compressProgress": "”{name}“ کمپریس ہو رہا ہے: {files} فائلیں",
+  "compressed": {
+    "one": "”{name}“ تیار ({count} فائل)",
+    "other": "”{name}“ تیار ({count} فائلیں)"
+  },
+  "compressError": "”{name}“ کمپریس نہیں ہو سکا ({error})",
+  "extractHere": "یہاں نکالیں",
+  "extractSelected": {
+    "one": "{count} آئٹم نکالیں",
+    "other": "{count} آئٹمز نکالیں"
+  },
+  "extracting": "”{name}“ نکالا جا رہا ہے…",
+  "extractProgress": "”{name}“ نکالا جا رہا ہے: {files} فائلیں ({pct}%)",
+  "extracted": {
+    "one": "”{name}“ میں نکالا گیا ({count} فائل)",
+    "other": "”{name}“ میں نکالا گیا ({count} فائلیں)"
+  },
+  "extractedSkipped": {
+    "one": "”{name}“ میں نکالا گیا ({count} فائل)؛ {skipped} حفاظت کے لیے چھوڑ دیے گئے",
+    "other": "”{name}“ میں نکالا گیا ({count} فائلیں)؛ {skipped} حفاظت کے لیے چھوڑ دیے گئے"
+  },
+  "extractError": "”{name}“ نکالا نہیں جا سکا ({error})",
+  "opening": "”{name}“ کھل رہا ہے…",
+  "loading": "لوڈ ہو رہا ہے…",
+  "locked": "پاس ورڈ سے محفوظ",
+  "pages": {
+    "one": "{count} صفحہ",
+    "other": "{count} صفحات"
+  },
+  "more": {
+    "one": "اور {count} مزید",
+    "other": "اور {count} مزید"
+  },
+  "err.invalid": "آرکائیو نہیں، یا یہ خراب ہے",
+  "err.missing-volume": "تقسیم شدہ آرکائیو کا ایک حصہ غائب ہے: ”{name}“",
+  "err.disk-full": "ڈسک بھری ہوئی ہے",
+  "err.too-big": "یہ بہت بڑا ہے",
+  "err.too-many": "اس میں بہت زیادہ فائلیں ہیں",
+  "err.corrupt": "یہ خراب ہے",
+  "err.write": "لکھا نہیں جا سکا",
+  "err.unavailable": "دستاویز مددگار دستیاب نہیں",
+  "err.cancelled": "منسوخ",
+  "err.crash": "دستاویز مددگار غیر متوقع طور پر رک گیا",
+  "err.timeout": "اس میں بہت دیر لگ گئی",
+  "err.protocol": "دستاویز مددگار نے غلط جواب بھیجا",
+  "err.spawn": "دستاویز مددگار شروع نہیں ہو سکا",
+  "err.closed": "دستاویز بند کر دی گئی",
+  "err.bad-request": "غلط درخواست",
+  "err.bad-field": "فارم کا غلط فیلڈ",
+  "err.bad-page": "غلط صفحہ",
+  "err.busy": "دستاویز مددگار مصروف ہے",
+  "err.memory": "میموری ختم ہو گئی",
+  "err.no-fonts": "کوئی فونٹ دستیاب نہیں",
+  "err.not-open": "دستاویز کھلی نہیں ہے",
+  "err.nothing": "محفوظ کرنے کے لیے کچھ نہیں",
+  "err.read-only": "دستاویز صرف پڑھنے کے لیے ہے",
+  "err.save": "محفوظ نہیں ہو سکا",
+  "err.unknown-op": "نامعلوم عمل",
+  "err.image": "غلط تصویر",
+  "err.blob": "غلط ڈیٹا",
+  "err.password": "دستاویز پاس ورڈ سے محفوظ ہے"
+}

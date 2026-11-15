@@ -1,0 +1,22 @@
+{
+  "folder": "Nagrania",
+  "name": "Nagranie {date} {time}",
+  "all": "Wszystkie nagrania",
+  "empty": "Brak nagrań",
+  "hint": "Naciśnij czerwony przycisk (lub R), aby nagrywać mikrofonem",
+  "denied": "Dyktafon nie ma uprawnień do korzystania z mikrofonu",
+  "play": "Odtwórz",
+  "pause": "Wstrzymaj",
+  "rename": "Zmień nazwę",
+  "trim": "Przytnij",
+  "cancelTrim": "Anuluj przycinanie",
+  "saveTrim": "Zapisz przyciętą kopię",
+  "trimmed": "przycięte",
+  "export": "Eksportuj jako",
+  "exportBtn": "Eksportuj",
+  "working": "Eksportowanie…",
+  "exported": "Zapisano „{name}”",
+  "exportError": "Nie można wyeksportować",
+  "renameError": "Nie można zmienić nazwy (czy ta nazwa już istnieje?)",
+  "emptyTitle": "Wybierz lub utwórz nagranie"
+}

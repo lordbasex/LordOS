@@ -1,0 +1,74 @@
+{
+  "archiveName": "Archiv",
+  "archiveSummary": {
+    "one": "{count} Datei, {size}",
+    "other": "{count} Dateien, {size}"
+  },
+  "compressOne": "„{name}“ komprimieren",
+  "compressMany": {
+    "one": "{count} Objekt komprimieren",
+    "other": "{count} Objekte komprimieren"
+  },
+  "compressing": "„{name}“ wird komprimiert …",
+  "compressProgress": "„{name}“ wird komprimiert: {files} Dateien",
+  "compressed": {
+    "one": "„{name}“ fertig ({count} Datei)",
+    "other": "„{name}“ fertig ({count} Dateien)"
+  },
+  "compressError": "„{name}“ konnte nicht komprimiert werden ({error})",
+  "extractHere": "Hier entpacken",
+  "extractSelected": {
+    "one": "{count} Objekt entpacken",
+    "other": "{count} Objekte entpacken"
+  },
+  "extracting": "„{name}“ wird entpackt …",
+  "extractProgress": "„{name}“ wird entpackt: {files} Dateien ({pct} %)",
+  "extracted": {
+    "one": "Entpackt nach „{name}“ ({count} Datei)",
+    "other": "Entpackt nach „{name}“ ({count} Dateien)"
+  },
+  "extractedSkipped": {
+    "one": "Entpackt nach „{name}“ ({count} Datei); {skipped} aus Sicherheitsgründen übersprungen",
+    "other": "Entpackt nach „{name}“ ({count} Dateien); {skipped} aus Sicherheitsgründen übersprungen"
+  },
+  "extractError": "„{name}“ konnte nicht entpackt werden ({error})",
+  "opening": "„{name}“ wird geöffnet …",
+  "loading": "Wird geladen …",
+  "locked": "passwortgeschützt",
+  "pages": {
+    "one": "{count} Seite",
+    "other": "{count} Seiten"
+  },
+  "more": {
+    "one": "und {count} weiteres",
+    "other": "und {count} weitere"
+  },
+  "err.invalid": "kein Archiv oder beschädigt",
+  "err.missing-volume": "ein Teil des geteilten Archivs fehlt: „{name}“",
+  "err.disk-full": "der Datenträger ist voll",
+  "err.too-big": "es ist zu groß",
+  "err.too-many": "es enthält zu viele Dateien",
+  "err.corrupt": "es ist beschädigt",
+  "err.write": "Schreiben nicht möglich",
+  "err.unavailable": "das Dokument-Hilfsprogramm ist nicht verfügbar",
+  "err.cancelled": "abgebrochen",
+  "err.crash": "das Dokument-Hilfsprogramm wurde unerwartet beendet",
+  "err.timeout": "es hat zu lange gedauert",
+  "err.protocol": "das Dokument-Hilfsprogramm hat eine ungültige Antwort gesendet",
+  "err.spawn": "das Dokument-Hilfsprogramm konnte nicht gestartet werden",
+  "err.closed": "das Dokument wurde geschlossen",
+  "err.bad-request": "ungültige Anfrage",
+  "err.bad-field": "ungültiges Formularfeld",
+  "err.bad-page": "ungültige Seite",
+  "err.busy": "das Dokument-Hilfsprogramm ist beschäftigt",
+  "err.memory": "kein Speicher mehr frei",
+  "err.no-fonts": "keine Schriften verfügbar",
+  "err.not-open": "das Dokument ist nicht geöffnet",
+  "err.nothing": "es gibt nichts zu sichern",
+  "err.read-only": "das Dokument ist schreibgeschützt",
+  "err.save": "Sichern nicht möglich",
+  "err.unknown-op": "unbekannter Vorgang",
+  "err.image": "ungültiges Bild",
+  "err.blob": "ungültige Daten",
+  "err.password": "das Dokument ist durch ein Passwort geschützt"
+}

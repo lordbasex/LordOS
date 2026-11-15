@@ -1,0 +1,22 @@
+{
+  "folder": "Rakaman",
+  "name": "Rakaman {date} {time}",
+  "all": "Semua rakaman",
+  "empty": "Belum ada rakaman",
+  "hint": "Tekan butang merah (atau R) untuk merakam dengan mikrofon",
+  "denied": "Perakam Suara tidak dibenarkan menggunakan mikrofon",
+  "play": "Main",
+  "pause": "Jeda",
+  "rename": "Namakan semula",
+  "trim": "Potong",
+  "cancelTrim": "Batalkan potongan",
+  "saveTrim": "Simpan salinan yang dipotong",
+  "trimmed": "dipotong",
+  "export": "Eksport sebagai",
+  "exportBtn": "Eksport",
+  "working": "Mengeksport…",
+  "exported": "“{name}” disimpan",
+  "exportError": "Tidak dapat mengeksport",
+  "renameError": "Tidak dapat menamakan semula (adakah nama itu sudah wujud?)",
+  "emptyTitle": "Pilih atau buat rakaman"
+}

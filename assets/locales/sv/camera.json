@@ -1,0 +1,14 @@
+{
+  "folder": "Kamera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Spegelvänd",
+  "none": "Ingen kamera hittades",
+  "denied": "Kamera får inte använda kameran. Ändra det i Inställningar → Integritet.",
+  "error": "Kunde inte använda kameran: {error}",
+  "noneHint": "Anslut en USB-kamera: den dyker upp här av sig själv, utan att appen startas om.",
+  "deniedTitle": "Ingen åtkomst till kameran",
+  "errorTitle": "Kameran kunde inte öppnas"
+}

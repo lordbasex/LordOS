@@ -1,0 +1,21 @@
+{
+  "search": "ইমোজি খুঁজুন",
+  "results": {
+    "one": "{count}টি ফলাফল",
+    "other": "{count}টি ফলাফল"
+  },
+  "none": "কিছু পাওয়া যায়নি",
+  "noRecent": "আপনি যেগুলো ব্যবহার করবেন সেগুলো এখানে দেখা যাবে",
+  "copied": "{text} কপি হয়েছে: Ctrl+V দিয়ে পেস্ট করুন",
+  "more": "আরও…",
+  "group.recent": "সাম্প্রতিক",
+  "group.smileys": "স্মাইলি ও আবেগ",
+  "group.people": "মানুষ ও শরীর",
+  "group.animals": "প্রাণী ও প্রকৃতি",
+  "group.food": "খাবার ও পানীয়",
+  "group.travel": "ভ্রমণ ও স্থান",
+  "group.activities": "কার্যকলাপ",
+  "group.objects": "বস্তু",
+  "group.symbols": "প্রতীক",
+  "group.flags": "পতাকা"
+}

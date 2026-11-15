@@ -1,0 +1,21 @@
+{
+  "search": "Emoji ara",
+  "results": {
+    "one": "{count} sonuç",
+    "other": "{count} sonuç"
+  },
+  "none": "Hiçbir şey bulunamadı",
+  "noRecent": "Kullandıklarınız burada görünecek",
+  "copied": "{text} kopyalandı: Ctrl+V ile yapıştırın",
+  "more": "Diğer…",
+  "group.recent": "Son kullanılanlar",
+  "group.smileys": "Gülen yüzler ve duygular",
+  "group.people": "İnsanlar ve vücut",
+  "group.animals": "Hayvanlar ve doğa",
+  "group.food": "Yiyecek ve içecek",
+  "group.travel": "Seyahat ve yerler",
+  "group.activities": "Etkinlikler",
+  "group.objects": "Nesneler",
+  "group.symbols": "Semboller",
+  "group.flags": "Bayraklar"
+}

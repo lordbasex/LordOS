@@ -1,0 +1,20 @@
+{
+  "search": "이모지 검색",
+  "results": {
+    "other": "결과 {count}개"
+  },
+  "none": "찾은 항목 없음",
+  "noRecent": "사용한 이모지가 여기에 표시됩니다",
+  "copied": "{text} 복사됨: Ctrl+V로 붙여 넣으세요",
+  "more": "더 보기…",
+  "group.recent": "최근 사용",
+  "group.smileys": "스마일리 및 감정",
+  "group.people": "사람 및 신체",
+  "group.animals": "동물 및 자연",
+  "group.food": "음식 및 음료",
+  "group.travel": "여행 및 장소",
+  "group.activities": "활동",
+  "group.objects": "사물",
+  "group.symbols": "기호",
+  "group.flags": "깃발"
+}

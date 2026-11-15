@@ -1,0 +1,9 @@
+{
+  "tray.open": "เปิด",
+  "tray.quit": "ออก",
+  "notify.open": "เปิด",
+  "download.done": "ดาวน์โหลดเสร็จแล้ว",
+  "download.failed": "ดาวน์โหลดล้มเหลว",
+  "chooser.open": "เลือกไฟล์",
+  "chooser.openMany": "เลือกไฟล์หลายไฟล์"
+}

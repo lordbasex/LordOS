@@ -1,0 +1,21 @@
+{
+  "search": "Emoji axtar",
+  "results": {
+    "one": "{count} nəticə",
+    "other": "{count} nəticə"
+  },
+  "none": "Heç nə tapılmadı",
+  "noRecent": "İstifadə etdikləriniz burada görünəcək",
+  "copied": "{text} kopyalandı: Ctrl+V ilə yapışdırın",
+  "more": "Daha çox…",
+  "group.recent": "Son istifadə olunanlar",
+  "group.smileys": "Smayliklər və emosiyalar",
+  "group.people": "İnsanlar və bədən",
+  "group.animals": "Heyvanlar və təbiət",
+  "group.food": "Yemək və içki",
+  "group.travel": "Səyahət və məkanlar",
+  "group.activities": "Fəaliyyətlər",
+  "group.objects": "Əşyalar",
+  "group.symbols": "Simvollar",
+  "group.flags": "Bayraqlar"
+}

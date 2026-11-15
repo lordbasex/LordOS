@@ -1,0 +1,9 @@
+{
+  "tray.open": "Άνοιγμα",
+  "tray.quit": "Έξοδος",
+  "notify.open": "Άνοιγμα",
+  "download.done": "Η λήψη ολοκληρώθηκε",
+  "download.failed": "Η λήψη απέτυχε",
+  "chooser.open": "Επιλέξτε ένα αρχείο",
+  "chooser.openMany": "Επιλέξτε αρχεία"
+}

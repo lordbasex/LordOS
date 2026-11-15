@@ -1,0 +1,22 @@
+{
+  "folder": "Kayıtlar",
+  "name": "Kayıt {date} {time}",
+  "all": "Tüm kayıtlar",
+  "empty": "Henüz kayıt yok",
+  "hint": "Mikrofonla kaydetmek için kırmızı düğmeye (veya R’ye) basın",
+  "denied": "Ses Kaydedici’nin mikrofonu kullanma izni yok",
+  "play": "Oynat",
+  "pause": "Duraklat",
+  "rename": "Yeniden Adlandır",
+  "trim": "Kırp",
+  "cancelTrim": "Kırpmayı iptal et",
+  "saveTrim": "Kırpılmış kopyayı kaydet",
+  "trimmed": "kırpılmış",
+  "export": "Farklı dışa aktar",
+  "exportBtn": "Dışa Aktar",
+  "working": "Dışa aktarılıyor…",
+  "exported": "“{name}” kaydedildi",
+  "exportError": "Dışa aktarılamadı",
+  "renameError": "Yeniden adlandırılamadı (bu ad zaten var mı?)",
+  "emptyTitle": "Bir kayıt seçin veya yeni kayıt yapın"
+}

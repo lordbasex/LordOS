@@ -175,7 +175,7 @@
   "net.devices": "Perangkat lain",
   "net.computer": "Komputer",
   "net.device": "Perangkat",
-  "net.workgroup": "Workgroup {name}",
+  "net.workgroup": "Grup kerja {name}",
   "net.signInToList": "Komputer ini menampilkan foldernya hanya setelah masuk",
   "net.noShares": "Tidak ada folder yang dibagikan",
   "net.nfsUnlisted": "Ekspornya tidak ditampilkan",

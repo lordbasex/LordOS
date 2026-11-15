@@ -1,0 +1,66 @@
+{
+  "archiveName": "ไฟล์บีบอัด",
+  "archiveSummary": {
+    "other": "{count} ไฟล์, {size}"
+  },
+  "compressOne": "บีบอัด “{name}”",
+  "compressMany": {
+    "other": "บีบอัด {count} รายการ"
+  },
+  "compressing": "กำลังบีบอัด “{name}”…",
+  "compressProgress": "กำลังบีบอัด “{name}”: {files} ไฟล์",
+  "compressed": {
+    "other": "“{name}” พร้อมแล้ว ({count} ไฟล์)"
+  },
+  "compressError": "บีบอัด “{name}” ไม่ได้ ({error})",
+  "extractHere": "แตกไฟล์ที่นี่",
+  "extractSelected": {
+    "other": "แตกไฟล์ {count} รายการ"
+  },
+  "extracting": "กำลังแตกไฟล์ “{name}”…",
+  "extractProgress": "กำลังแตกไฟล์ “{name}”: {files} ไฟล์ ({pct}%)",
+  "extracted": {
+    "other": "แตกไฟล์ไปที่ “{name}” แล้ว ({count} ไฟล์)"
+  },
+  "extractedSkipped": {
+    "other": "แตกไฟล์ไปที่ “{name}” แล้ว ({count} ไฟล์) ข้าม {skipped} รายการเพื่อความปลอดภัย"
+  },
+  "extractError": "แตกไฟล์ “{name}” ไม่ได้ ({error})",
+  "opening": "กำลังเปิด “{name}”…",
+  "loading": "กำลังโหลด…",
+  "locked": "มีรหัสผ่านป้องกัน",
+  "pages": {
+    "other": "{count} หน้า"
+  },
+  "more": {
+    "other": "และอีก {count} รายการ"
+  },
+  "err.invalid": "ไม่ใช่ไฟล์บีบอัด หรือไฟล์เสียหาย",
+  "err.missing-volume": "ไฟล์บีบอัดแบบแบ่งส่วนขาดไปหนึ่งส่วน: “{name}”",
+  "err.disk-full": "ดิสก์เต็ม",
+  "err.too-big": "ใหญ่เกินไป",
+  "err.too-many": "มีไฟล์มากเกินไป",
+  "err.corrupt": "ไฟล์เสียหาย",
+  "err.write": "เขียนไม่ได้",
+  "err.unavailable": "ตัวช่วยเอกสารใช้ไม่ได้",
+  "err.cancelled": "ยกเลิกแล้ว",
+  "err.crash": "ตัวช่วยเอกสารหยุดทำงานโดยไม่คาดคิด",
+  "err.timeout": "ใช้เวลานานเกินไป",
+  "err.protocol": "ตัวช่วยเอกสารส่งคำตอบที่ไม่ถูกต้อง",
+  "err.spawn": "เริ่มตัวช่วยเอกสารไม่ได้",
+  "err.closed": "เอกสารถูกปิดแล้ว",
+  "err.bad-request": "คำขอไม่ถูกต้อง",
+  "err.bad-field": "ฟิลด์แบบฟอร์มไม่ถูกต้อง",
+  "err.bad-page": "หน้าไม่ถูกต้อง",
+  "err.busy": "ตัวช่วยเอกสารไม่ว่าง",
+  "err.memory": "หน่วยความจำไม่พอ",
+  "err.no-fonts": "ไม่มีแบบอักษรที่ใช้ได้",
+  "err.not-open": "เอกสารไม่ได้เปิดอยู่",
+  "err.nothing": "ไม่มีอะไรให้บันทึก",
+  "err.read-only": "เอกสารเป็นแบบอ่านอย่างเดียว",
+  "err.save": "บันทึกไม่ได้",
+  "err.unknown-op": "การดำเนินการที่ไม่รู้จัก",
+  "err.image": "ภาพไม่ถูกต้อง",
+  "err.blob": "ข้อมูลไม่ถูกต้อง",
+  "err.password": "เอกสารมีรหัสผ่านป้องกัน"
+}

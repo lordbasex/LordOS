@@ -1,0 +1,9 @@
+{
+  "tray.open": "Deschide",
+  "tray.quit": "Ieși",
+  "notify.open": "Deschide",
+  "download.done": "Descărcare finalizată",
+  "download.failed": "Descărcarea a eșuat",
+  "chooser.open": "Alegeți un fișier",
+  "chooser.openMany": "Alegeți fișiere"
+}

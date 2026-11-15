@@ -1,0 +1,82 @@
+{
+  "archiveName": "Архив",
+  "archiveSummary": {
+    "one": "{count} файл, {size}",
+    "few": "{count} файла, {size}",
+    "many": "{count} файлов, {size}"
+  },
+  "compressOne": "Сжать «{name}»",
+  "compressMany": {
+    "one": "Сжать {count} объект",
+    "few": "Сжать {count} объекта",
+    "many": "Сжать {count} объектов"
+  },
+  "compressing": "Сжатие «{name}»…",
+  "compressProgress": "Сжатие «{name}»: файлов: {files}",
+  "compressed": {
+    "one": "«{name}» готов ({count} файл)",
+    "few": "«{name}» готов ({count} файла)",
+    "many": "«{name}» готов ({count} файлов)"
+  },
+  "compressError": "Не удалось сжать «{name}» ({error})",
+  "extractHere": "Распаковать сюда",
+  "extractSelected": {
+    "one": "Распаковать {count} объект",
+    "few": "Распаковать {count} объекта",
+    "many": "Распаковать {count} объектов"
+  },
+  "extracting": "Распаковка «{name}»…",
+  "extractProgress": "Распаковка «{name}»: файлов: {files} ({pct}%)",
+  "extracted": {
+    "one": "Распаковано в «{name}» ({count} файл)",
+    "few": "Распаковано в «{name}» ({count} файла)",
+    "many": "Распаковано в «{name}» ({count} файлов)"
+  },
+  "extractedSkipped": {
+    "one": "Распаковано в «{name}» ({count} файл); пропущено ради безопасности: {skipped}",
+    "few": "Распаковано в «{name}» ({count} файла); пропущено ради безопасности: {skipped}",
+    "many": "Распаковано в «{name}» ({count} файлов); пропущено ради безопасности: {skipped}"
+  },
+  "extractError": "Не удалось распаковать «{name}» ({error})",
+  "opening": "Открытие «{name}»…",
+  "loading": "Загрузка…",
+  "locked": "защищено паролем",
+  "pages": {
+    "one": "{count} страница",
+    "few": "{count} страницы",
+    "many": "{count} страниц"
+  },
+  "more": {
+    "one": "и еще {count}",
+    "few": "и еще {count}",
+    "many": "и еще {count}"
+  },
+  "err.invalid": "это не архив, или он поврежден",
+  "err.missing-volume": "не хватает части многотомного архива: «{name}»",
+  "err.disk-full": "диск заполнен",
+  "err.too-big": "он слишком большой",
+  "err.too-many": "в нем слишком много файлов",
+  "err.corrupt": "он поврежден",
+  "err.write": "не удалось записать",
+  "err.unavailable": "помощник документов недоступен",
+  "err.cancelled": "отменено",
+  "err.crash": "помощник документов неожиданно остановился",
+  "err.timeout": "это заняло слишком много времени",
+  "err.protocol": "помощник документов прислал неверный ответ",
+  "err.spawn": "не удалось запустить помощник документов",
+  "err.closed": "документ был закрыт",
+  "err.bad-request": "неверный запрос",
+  "err.bad-field": "неверное поле формы",
+  "err.bad-page": "неверная страница",
+  "err.busy": "помощник документов занят",
+  "err.memory": "недостаточно памяти",
+  "err.no-fonts": "нет доступных шрифтов",
+  "err.not-open": "документ не открыт",
+  "err.nothing": "нечего сохранять",
+  "err.read-only": "документ доступен только для чтения",
+  "err.save": "не удалось сохранить",
+  "err.unknown-op": "неизвестная операция",
+  "err.image": "неверное изображение",
+  "err.blob": "неверные данные",
+  "err.password": "документ защищен паролем"
+}

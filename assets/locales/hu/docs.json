@@ -1,0 +1,74 @@
+{
+  "archiveName": "Archívum",
+  "archiveSummary": {
+    "one": "{count} fájl, {size}",
+    "other": "{count} fájl, {size}"
+  },
+  "compressOne": "„{name}” tömörítése",
+  "compressMany": {
+    "one": "{count} elem tömörítése",
+    "other": "{count} elem tömörítése"
+  },
+  "compressing": "„{name}” tömörítése…",
+  "compressProgress": "„{name}” tömörítése: {files} fájl",
+  "compressed": {
+    "one": "„{name}” kész ({count} fájl)",
+    "other": "„{name}” kész ({count} fájl)"
+  },
+  "compressError": "Nem sikerült tömöríteni: „{name}” ({error})",
+  "extractHere": "Kibontás ide",
+  "extractSelected": {
+    "one": "{count} elem kibontása",
+    "other": "{count} elem kibontása"
+  },
+  "extracting": "„{name}” kibontása…",
+  "extractProgress": "„{name}” kibontása: {files} fájl ({pct}%)",
+  "extracted": {
+    "one": "Kibontva ide: „{name}” ({count} fájl)",
+    "other": "Kibontva ide: „{name}” ({count} fájl)"
+  },
+  "extractedSkipped": {
+    "one": "Kibontva ide: „{name}” ({count} fájl); {skipped} biztonsági okból kihagyva",
+    "other": "Kibontva ide: „{name}” ({count} fájl); {skipped} biztonsági okból kihagyva"
+  },
+  "extractError": "Nem sikerült kibontani: „{name}” ({error})",
+  "opening": "„{name}” megnyitása…",
+  "loading": "Betöltés…",
+  "locked": "jelszóval védett",
+  "pages": {
+    "one": "{count} oldal",
+    "other": "{count} oldal"
+  },
+  "more": {
+    "one": "és még {count}",
+    "other": "és még {count}"
+  },
+  "err.invalid": "nem archívum, vagy sérült",
+  "err.missing-volume": "a darabolt archívum egyik része hiányzik: „{name}”",
+  "err.disk-full": "a lemez megtelt",
+  "err.too-big": "túl nagy",
+  "err.too-many": "túl sok fájlt tartalmaz",
+  "err.corrupt": "sérült",
+  "err.write": "nem sikerült írni",
+  "err.unavailable": "a dokumentumkezelő segédprogram nem érhető el",
+  "err.cancelled": "megszakítva",
+  "err.crash": "a dokumentumkezelő segédprogram váratlanul leállt",
+  "err.timeout": "túl sokáig tartott",
+  "err.protocol": "a dokumentumkezelő segédprogram érvénytelen választ küldött",
+  "err.spawn": "nem sikerült elindítani a dokumentumkezelő segédprogramot",
+  "err.closed": "a dokumentum be lett zárva",
+  "err.bad-request": "érvénytelen kérés",
+  "err.bad-field": "érvénytelen űrlapmező",
+  "err.bad-page": "érvénytelen oldal",
+  "err.busy": "a dokumentumkezelő segédprogram foglalt",
+  "err.memory": "elfogyott a memória",
+  "err.no-fonts": "nincsenek elérhető betűtípusok",
+  "err.not-open": "a dokumentum nincs megnyitva",
+  "err.nothing": "nincs mit menteni",
+  "err.read-only": "a dokumentum csak olvasható",
+  "err.save": "nem sikerült menteni",
+  "err.unknown-op": "ismeretlen művelet",
+  "err.image": "érvénytelen kép",
+  "err.blob": "érvénytelen adatok",
+  "err.password": "a dokumentumot jelszó védi"
+}

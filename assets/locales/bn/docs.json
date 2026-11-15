@@ -1,0 +1,74 @@
+{
+  "archiveName": "আর্কাইভ",
+  "archiveSummary": {
+    "one": "{count}টি ফাইল, {size}",
+    "other": "{count}টি ফাইল, {size}"
+  },
+  "compressOne": "“{name}” কমপ্রেস করুন",
+  "compressMany": {
+    "one": "{count}টি আইটেম কমপ্রেস করুন",
+    "other": "{count}টি আইটেম কমপ্রেস করুন"
+  },
+  "compressing": "“{name}” কমপ্রেস হচ্ছে…",
+  "compressProgress": "“{name}” কমপ্রেস হচ্ছে: {files}টি ফাইল",
+  "compressed": {
+    "one": "“{name}” প্রস্তুত ({count}টি ফাইল)",
+    "other": "“{name}” প্রস্তুত ({count}টি ফাইল)"
+  },
+  "compressError": "“{name}” কমপ্রেস করা যায়নি ({error})",
+  "extractHere": "এখানে এক্সট্র্যাক্ট করুন",
+  "extractSelected": {
+    "one": "{count}টি আইটেম এক্সট্র্যাক্ট করুন",
+    "other": "{count}টি আইটেম এক্সট্র্যাক্ট করুন"
+  },
+  "extracting": "“{name}” এক্সট্র্যাক্ট হচ্ছে…",
+  "extractProgress": "“{name}” এক্সট্র্যাক্ট হচ্ছে: {files}টি ফাইল ({pct}%)",
+  "extracted": {
+    "one": "“{name}”-এ এক্সট্র্যাক্ট হয়েছে ({count}টি ফাইল)",
+    "other": "“{name}”-এ এক্সট্র্যাক্ট হয়েছে ({count}টি ফাইল)"
+  },
+  "extractedSkipped": {
+    "one": "“{name}”-এ এক্সট্র্যাক্ট হয়েছে ({count}টি ফাইল); নিরাপত্তার জন্য {skipped}টি বাদ দেওয়া হয়েছে",
+    "other": "“{name}”-এ এক্সট্র্যাক্ট হয়েছে ({count}টি ফাইল); নিরাপত্তার জন্য {skipped}টি বাদ দেওয়া হয়েছে"
+  },
+  "extractError": "“{name}” এক্সট্র্যাক্ট করা যায়নি ({error})",
+  "opening": "“{name}” খোলা হচ্ছে…",
+  "loading": "লোড হচ্ছে…",
+  "locked": "পাসওয়ার্ড দিয়ে সুরক্ষিত",
+  "pages": {
+    "one": "{count}টি পৃষ্ঠা",
+    "other": "{count}টি পৃষ্ঠা"
+  },
+  "more": {
+    "one": "এবং আরও {count}টি",
+    "other": "এবং আরও {count}টি"
+  },
+  "err.invalid": "আর্কাইভ নয়, বা এটি ক্ষতিগ্রস্ত",
+  "err.missing-volume": "বিভক্ত আর্কাইভের একটি অংশ নেই: “{name}”",
+  "err.disk-full": "ডিস্ক ভরে গেছে",
+  "err.too-big": "এটি খুব বড়",
+  "err.too-many": "এতে খুব বেশি ফাইল আছে",
+  "err.corrupt": "এটি ক্ষতিগ্রস্ত",
+  "err.write": "লেখা যায়নি",
+  "err.unavailable": "ডকুমেন্ট সহায়ক উপলব্ধ নয়",
+  "err.cancelled": "বাতিল হয়েছে",
+  "err.crash": "ডকুমেন্ট সহায়ক অপ্রত্যাশিতভাবে থেমে গেছে",
+  "err.timeout": "খুব বেশি সময় লেগেছে",
+  "err.protocol": "ডকুমেন্ট সহায়ক একটি অবৈধ উত্তর পাঠিয়েছে",
+  "err.spawn": "ডকুমেন্ট সহায়ক চালু করা যায়নি",
+  "err.closed": "ডকুমেন্টটি বন্ধ করা হয়েছে",
+  "err.bad-request": "অবৈধ অনুরোধ",
+  "err.bad-field": "অবৈধ ফর্ম ফিল্ড",
+  "err.bad-page": "অবৈধ পৃষ্ঠা",
+  "err.busy": "ডকুমেন্ট সহায়ক ব্যস্ত",
+  "err.memory": "মেমরি শেষ",
+  "err.no-fonts": "কোনো ফন্ট উপলব্ধ নেই",
+  "err.not-open": "ডকুমেন্টটি খোলা নেই",
+  "err.nothing": "সংরক্ষণ করার কিছু নেই",
+  "err.read-only": "ডকুমেন্টটি শুধু পড়ার জন্য",
+  "err.save": "সংরক্ষণ করা যায়নি",
+  "err.unknown-op": "অজানা কাজ",
+  "err.image": "অবৈধ ছবি",
+  "err.blob": "অবৈধ ডেটা",
+  "err.password": "ডকুমেন্টটি পাসওয়ার্ড দিয়ে সুরক্ষিত"
+}
