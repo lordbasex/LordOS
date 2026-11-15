@@ -3,56 +3,53 @@
  "since": "2026-11-11",
  "taken": "2026-11-15",
  "countries": 153,
+ "totalViews": 23826,
+ "totalVisitors": 11286,
  "rows": [
   {
    "cc": "ID",
-   "views": 7082,
-   "visitors": 3610
+   "views": 7142,
+   "visitors": 3625
   },
   {
    "cc": "BR",
-   "views": 4020,
-   "visitors": 1757
+   "views": 4061,
+   "visitors": 1781
   },
   {
    "cc": "US",
-   "views": 1789,
-   "visitors": 882
-  },
-  {
-   "cc": "IT",
-   "views": 1253,
-   "visitors": 157
+   "views": 1818,
+   "visitors": 890
   },
   {
    "cc": "IN",
-   "views": 877,
-   "visitors": 456
+   "views": 880,
+   "visitors": 459
   },
   {
    "cc": "JP",
-   "views": 646,
-   "visitors": 374
+   "views": 649,
+   "visitors": 376
   },
   {
    "cc": "ES",
-   "views": 595,
-   "visitors": 258
+   "views": 609,
+   "visitors": 263
   },
   {
    "cc": "DE",
-   "views": 452,
-   "visitors": 235
-  },
-  {
-   "cc": "FR",
-   "views": 383,
-   "visitors": 169
+   "views": 469,
+   "visitors": 243
   },
   {
    "cc": "MX",
-   "views": 351,
-   "visitors": 213
+   "views": 355,
+   "visitors": 216
+  },
+  {
+   "cc": "FR",
+   "views": 384,
+   "visitors": 169
   },
   {
    "cc": "PT",
@@ -60,19 +57,19 @@
    "visitors": 166
   },
   {
-   "cc": "GB",
-   "views": 287,
-   "visitors": 134
+   "cc": "IT",
+   "views": 1257,
+   "visitors": 159
   },
   {
    "cc": "CA",
-   "views": 270,
-   "visitors": 143
+   "views": 275,
+   "visitors": 148
   },
   {
-   "cc": "AR",
-   "views": 258,
-   "visitors": 113
+   "cc": "GB",
+   "views": 291,
+   "visitors": 137
   },
   {
    "cc": "MY",
@@ -80,24 +77,24 @@
    "visitors": 120
   },
   {
+   "cc": "AR",
+   "views": 273,
+   "visitors": 118
+  },
+  {
    "cc": "CO",
-   "views": 210,
-   "visitors": 109
+   "views": 214,
+   "visitors": 111
   },
   {
    "cc": "BD",
-   "views": 200,
-   "visitors": 102
-  },
-  {
-   "cc": "CL",
-   "views": 192,
-   "visitors": 76
+   "views": 202,
+   "visitors": 103
   },
   {
    "cc": "PL",
-   "views": 190,
-   "visitors": 98
+   "views": 195,
+   "visitors": 101
   },
   {
    "cc": "SG",
@@ -105,29 +102,39 @@
    "visitors": 96
   },
   {
+   "cc": "CL",
+   "views": 193,
+   "visitors": 77
+  },
+  {
+   "cc": "PE",
+   "views": 145,
+   "visitors": 74
+  },
+  {
    "cc": "VE",
    "views": 151,
    "visitors": 68
   },
   {
-   "cc": "NL",
-   "views": 149,
-   "visitors": 63
-  },
-  {
-   "cc": "PE",
-   "views": 144,
-   "visitors": 73
-  },
-  {
-   "cc": "CH",
-   "views": 133,
-   "visitors": 41
-  },
-  {
    "cc": "AU",
    "views": 117,
    "visitors": 67
+  },
+  {
+   "cc": "NL",
+   "views": 152,
+   "visitors": 64
+  },
+  {
+   "cc": "CN",
+   "views": 92,
+   "visitors": 58
+  },
+  {
+   "cc": "VN",
+   "views": 98,
+   "visitors": 57
   },
   {
    "cc": "DO",
@@ -136,23 +143,13 @@
   },
   {
    "cc": "DZ",
-   "views": 110,
-   "visitors": 54
-  },
-  {
-   "cc": "VN",
-   "views": 97,
-   "visitors": 56
-  },
-  {
-   "cc": "RO",
-   "views": 97,
-   "visitors": 42
+   "views": 120,
+   "visitors": 55
   },
   {
    "cc": "UA",
-   "views": 93,
-   "visitors": 46
+   "views": 95,
+   "visitors": 47
   },
   {
    "cc": "TR",
@@ -160,19 +157,9 @@
    "visitors": 44
   },
   {
-   "cc": "CN",
-   "views": 92,
-   "visitors": 58
-  },
-  {
-   "cc": "RU",
-   "views": 90,
+   "cc": "PH",
+   "views": 76,
    "visitors": 43
-  },
-  {
-   "cc": "HK",
-   "views": 86,
-   "visitors": 39
   },
   {
    "cc": "BE",
@@ -180,24 +167,19 @@
    "visitors": 43
   },
   {
-   "cc": "EC",
-   "views": 76,
-   "visitors": 39
+   "cc": "RU",
+   "views": 90,
+   "visitors": 43
   },
   {
-   "cc": "EG",
-   "views": 72,
-   "visitors": 29
+   "cc": "RO",
+   "views": 97,
+   "visitors": 42
   },
   {
-   "cc": "PH",
-   "views": 71,
+   "cc": "CH",
+   "views": 133,
    "visitors": 41
-  },
-  {
-   "cc": "ZA",
-   "views": 69,
-   "visitors": 37
   },
   {
    "cc": "PK",
@@ -205,9 +187,24 @@
    "visitors": 41
   },
   {
-   "cc": "SE",
+   "cc": "HK",
+   "views": 87,
+   "visitors": 40
+  },
+  {
+   "cc": "EC",
+   "views": 79,
+   "visitors": 40
+  },
+  {
+   "cc": "ZA",
    "views": 69,
-   "visitors": 33
+   "visitors": 37
+  },
+  {
+   "cc": "GR",
+   "views": 63,
+   "visitors": 37
   },
   {
    "cc": "AO",
@@ -215,29 +212,14 @@
    "visitors": 36
   },
   {
-   "cc": "MA",
-   "views": 65,
-   "visitors": 27
-  },
-  {
    "cc": "TH",
    "views": 65,
    "visitors": 35
   },
   {
-   "cc": "FI",
-   "views": 64,
-   "visitors": 23
-  },
-  {
-   "cc": "GR",
-   "views": 60,
-   "visitors": 36
-  },
-  {
-   "cc": "AT",
-   "views": 54,
-   "visitors": 22
+   "cc": "SE",
+   "views": 69,
+   "visitors": 33
   },
   {
    "cc": "KR",
@@ -245,19 +227,24 @@
    "visitors": 31
   },
   {
-   "cc": "NO",
-   "views": 45,
-   "visitors": 21
+   "cc": "EG",
+   "views": 73,
+   "visitors": 30
   },
   {
-   "cc": "GT",
-   "views": 45,
-   "visitors": 16
+   "cc": "MA",
+   "views": 69,
+   "visitors": 29
   },
   {
-   "cc": "HU",
+   "cc": "CU",
    "views": 44,
-   "visitors": 24
+   "visitors": 26
+  },
+  {
+   "cc": "FI",
+   "views": 70,
+   "visitors": 25
   },
   {
    "cc": "TW",
@@ -265,39 +252,9 @@
    "visitors": 24
   },
   {
-   "cc": "CU",
-   "views": 43,
-   "visitors": 25
-  },
-  {
-   "cc": "SV",
-   "views": 42,
-   "visitors": 18
-  },
-  {
-   "cc": "MZ",
-   "views": 38,
-   "visitors": 22
-  },
-  {
-   "cc": "CZ",
-   "views": 38,
-   "visitors": 18
-  },
-  {
-   "cc": "KE",
-   "views": 35,
-   "visitors": 16
-  },
-  {
-   "cc": "AE",
-   "views": 34,
-   "visitors": 15
-  },
-  {
-   "cc": "PR",
-   "views": 34,
-   "visitors": 20
+   "cc": "HU",
+   "views": 44,
+   "visitors": 24
   },
   {
    "cc": "IR",
@@ -305,19 +262,29 @@
    "visitors": 24
   },
   {
-   "cc": "LK",
-   "views": 31,
-   "visitors": 16
+   "cc": "AT",
+   "views": 55,
+   "visitors": 23
+  },
+  {
+   "cc": "MZ",
+   "views": 38,
+   "visitors": 22
   },
   {
    "cc": "BO",
-   "views": 31,
+   "views": 35,
+   "visitors": 22
+  },
+  {
+   "cc": "NO",
+   "views": 45,
    "visitors": 21
   },
   {
-   "cc": "RS",
-   "views": 29,
-   "visitors": 13
+   "cc": "PR",
+   "views": 34,
+   "visitors": 20
   },
   {
    "cc": "SA",
@@ -325,19 +292,49 @@
    "visitors": 19
   },
   {
-   "cc": "CR",
-   "views": 25,
-   "visitors": 16
+   "cc": "CZ",
+   "views": 38,
+   "visitors": 18
   },
   {
-   "cc": "SK",
-   "views": 25,
-   "visitors": 10
+   "cc": "SV",
+   "views": 42,
+   "visitors": 18
+  },
+  {
+   "cc": "KE",
+   "views": 36,
+   "visitors": 17
+  },
+  {
+   "cc": "CR",
+   "views": 26,
+   "visitors": 17
   },
   {
    "cc": "AZ",
    "views": 24,
    "visitors": 17
+  },
+  {
+   "cc": "LK",
+   "views": 31,
+   "visitors": 16
+  },
+  {
+   "cc": "GT",
+   "views": 45,
+   "visitors": 16
+  },
+  {
+   "cc": "IL",
+   "views": 22,
+   "visitors": 15
+  },
+  {
+   "cc": "AE",
+   "views": 34,
+   "visitors": 15
   },
   {
    "cc": "BG",
@@ -350,9 +347,29 @@
    "visitors": 14
   },
   {
-   "cc": "IL",
-   "views": 22,
-   "visitors": 15
+   "cc": "RS",
+   "views": 31,
+   "visitors": 13
+  },
+  {
+   "cc": "IE",
+   "views": 17,
+   "visitors": 12
+  },
+  {
+   "cc": "SY",
+   "views": 14,
+   "visitors": 11
+  },
+  {
+   "cc": "NG",
+   "views": 17,
+   "visitors": 11
+  },
+  {
+   "cc": "UY",
+   "views": 17,
+   "visitors": 10
   },
   {
    "cc": "PA",
@@ -360,18 +377,8 @@
    "visitors": 10
   },
   {
-   "cc": "NI",
-   "views": 20,
-   "visitors": 9
-  },
-  {
-   "cc": "PY",
-   "views": 18,
-   "visitors": 8
-  },
-  {
-   "cc": "UY",
-   "views": 17,
+   "cc": "SK",
+   "views": 25,
    "visitors": 10
   },
   {
@@ -380,19 +387,14 @@
    "visitors": 9
   },
   {
-   "cc": "TZ",
-   "views": 17,
-   "visitors": 7
+   "cc": "NP",
+   "views": 12,
+   "visitors": 9
   },
   {
-   "cc": "IE",
-   "views": 16,
-   "visitors": 11
-  },
-  {
-   "cc": "NG",
-   "views": 15,
-   "visitors": 10
+   "cc": "NI",
+   "views": 20,
+   "visitors": 9
   },
   {
    "cc": "MM",
@@ -400,49 +402,19 @@
    "visitors": 8
   },
   {
-   "cc": "SY",
-   "views": 14,
-   "visitors": 11
-  },
-  {
-   "cc": "SD",
-   "views": 14,
-   "visitors": 6
-  },
-  {
    "cc": "HR",
    "views": 13,
    "visitors": 8
   },
   {
-   "cc": "KZ",
-   "views": 13,
-   "visitors": 5
+   "cc": "IQ",
+   "views": 8,
+   "visitors": 8
   },
   {
-   "cc": "TN",
-   "views": 12,
-   "visitors": 6
-  },
-  {
-   "cc": "NP",
-   "views": 12,
-   "visitors": 9
-  },
-  {
-   "cc": "UZ",
-   "views": 12,
-   "visitors": 6
-  },
-  {
-   "cc": "AL",
-   "views": 11,
-   "visitors": 3
-  },
-  {
-   "cc": "KH",
-   "views": 11,
-   "visitors": 7
+   "cc": "PY",
+   "views": 18,
+   "visitors": 8
   },
   {
    "cc": "RW",
@@ -450,33 +422,48 @@
    "visitors": 8
   },
   {
-   "cc": "MD",
-   "views": 10,
-   "visitors": 4
+   "cc": "TZ",
+   "views": 17,
+   "visitors": 7
   },
   {
-   "cc": "GP",
-   "views": 10,
-   "visitors": 4
+   "cc": "KH",
+   "views": 11,
+   "visitors": 7
   },
   {
-   "cc": "CV",
-   "views": 10,
-   "visitors": 3
+   "cc": "SI",
+   "views": 7,
+   "visitors": 7
   },
   {
-   "cc": "DK",
-   "views": 10,
-   "visitors": 6
-  },
-  {
-   "cc": "CM",
-   "views": 10,
-   "visitors": 3
+   "cc": "HN",
+   "views": 9,
+   "visitors": 7
   },
   {
    "cc": "EE",
    "views": 9,
+   "visitors": 6
+  },
+  {
+   "cc": "TN",
+   "views": 12,
+   "visitors": 6
+  },
+  {
+   "cc": "UZ",
+   "views": 12,
+   "visitors": 6
+  },
+  {
+   "cc": "SD",
+   "views": 14,
+   "visitors": 6
+  },
+  {
+   "cc": "DK",
+   "views": 10,
    "visitors": 6
   },
   {
@@ -485,79 +472,9 @@
    "visitors": 5
   },
   {
-   "cc": "GH",
-   "views": 9,
+   "cc": "KZ",
+   "views": 13,
    "visitors": 5
-  },
-  {
-   "cc": "HN",
-   "views": 9,
-   "visitors": 7
-  },
-  {
-   "cc": "MG",
-   "views": 8,
-   "visitors": 3
-  },
-  {
-   "cc": "IQ",
-   "views": 8,
-   "visitors": 8
-  },
-  {
-   "cc": "LV",
-   "views": 8,
-   "visitors": 3
-  },
-  {
-   "cc": "CI",
-   "views": 7,
-   "visitors": 3
-  },
-  {
-   "cc": "HT",
-   "views": 7,
-   "visitors": 3
-  },
-  {
-   "cc": "LU",
-   "views": 7,
-   "visitors": 4
-  },
-  {
-   "cc": "SI",
-   "views": 7,
-   "visitors": 7
-  },
-  {
-   "cc": "MV",
-   "views": 7,
-   "visitors": 3
-  },
-  {
-   "cc": "BW",
-   "views": 7,
-   "visitors": 2
-  },
-  {
-   "cc": "MO",
-   "views": 7,
-   "visitors": 4
-  },
-  {
-   "cc": "BT",
-   "views": 7,
-   "visitors": 1
-  },
-  {
-   "cc": "QA",
-   "views": 7,
-   "visitors": 2
-  },
-  {
-   "cc": "OM",
-   "views": 7,
-   "visitors": 3
   },
   {
    "cc": "JO",
@@ -565,9 +482,34 @@
    "visitors": 5
   },
   {
-   "cc": "SZ",
-   "views": 6,
-   "visitors": 2
+   "cc": "GH",
+   "views": 9,
+   "visitors": 5
+  },
+  {
+   "cc": "MD",
+   "views": 10,
+   "visitors": 4
+  },
+  {
+   "cc": "LU",
+   "views": 7,
+   "visitors": 4
+  },
+  {
+   "cc": "MW",
+   "views": 4,
+   "visitors": 4
+  },
+  {
+   "cc": "GP",
+   "views": 10,
+   "visitors": 4
+  },
+  {
+   "cc": "MO",
+   "views": 7,
+   "visitors": 4
   },
   {
    "cc": "UG",
@@ -580,28 +522,18 @@
    "visitors": 3
   },
   {
-   "cc": "MK",
-   "views": 5,
-   "visitors": 2
-  },
-  {
-   "cc": "PS",
-   "views": 5,
+   "cc": "CI",
+   "views": 7,
    "visitors": 3
   },
   {
-   "cc": "BB",
-   "views": 4,
-   "visitors": 1
+   "cc": "MG",
+   "views": 8,
+   "visitors": 3
   },
   {
-   "cc": "MW",
-   "views": 4,
-   "visitors": 4
-  },
-  {
-   "cc": "VU",
-   "views": 4,
+   "cc": "HT",
+   "views": 7,
    "visitors": 3
   },
   {
@@ -610,24 +542,19 @@
    "visitors": 3
   },
   {
-   "cc": "LY",
-   "views": 3,
-   "visitors": 2
+   "cc": "AL",
+   "views": 11,
+   "visitors": 3
   },
   {
-   "cc": "MQ",
-   "views": 3,
-   "visitors": 1
+   "cc": "MK",
+   "views": 6,
+   "visitors": 3
   },
   {
-   "cc": "MU",
-   "views": 3,
-   "visitors": 2
-  },
-  {
-   "cc": "KG",
-   "views": 3,
-   "visitors": 2
+   "cc": "MV",
+   "views": 7,
+   "visitors": 3
   },
   {
    "cc": "IS",
@@ -635,9 +562,34 @@
    "visitors": 3
   },
   {
-   "cc": "TT",
-   "views": 3,
-   "visitors": 2
+   "cc": "VU",
+   "views": 4,
+   "visitors": 3
+  },
+  {
+   "cc": "PS",
+   "views": 5,
+   "visitors": 3
+  },
+  {
+   "cc": "CV",
+   "views": 10,
+   "visitors": 3
+  },
+  {
+   "cc": "LV",
+   "views": 8,
+   "visitors": 3
+  },
+  {
+   "cc": "CM",
+   "views": 10,
+   "visitors": 3
+  },
+  {
+   "cc": "OM",
+   "views": 7,
+   "visitors": 3
   },
   {
    "cc": "SC",
@@ -655,24 +607,39 @@
    "visitors": 2
   },
   {
-   "cc": "BA",
-   "views": 2,
-   "visitors": 1
-  },
-  {
    "cc": "TL",
    "views": 2,
    "visitors": 2
   },
   {
-   "cc": "CG",
-   "views": 2,
-   "visitors": 1
+   "cc": "LY",
+   "views": 3,
+   "visitors": 2
   },
   {
-   "cc": "ZM",
-   "views": 2,
-   "visitors": 1
+   "cc": "SZ",
+   "views": 6,
+   "visitors": 2
+  },
+  {
+   "cc": "BW",
+   "views": 7,
+   "visitors": 2
+  },
+  {
+   "cc": "MU",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "KG",
+   "views": 3,
+   "visitors": 2
+  },
+  {
+   "cc": "TT",
+   "views": 3,
+   "visitors": 2
   },
   {
    "cc": "JM",
@@ -680,19 +647,14 @@
    "visitors": 2
   },
   {
-   "cc": "BY",
-   "views": 2,
-   "visitors": 1
-  },
-  {
    "cc": "NA",
    "views": 2,
    "visitors": 2
   },
   {
-   "cc": "AF",
-   "views": 2,
-   "visitors": 1
+   "cc": "QA",
+   "views": 7,
+   "visitors": 2
   },
   {
    "cc": "ST",
@@ -702,6 +664,11 @@
   {
    "cc": "BZ",
    "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "BB",
+   "views": 4,
    "visitors": 1
   },
   {
@@ -715,8 +682,18 @@
    "visitors": 1
   },
   {
+   "cc": "BA",
+   "views": 2,
+   "visitors": 1
+  },
+  {
    "cc": "ZW",
    "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "CG",
+   "views": 2,
    "visitors": 1
   },
   {
@@ -735,8 +712,18 @@
    "visitors": 1
   },
   {
+   "cc": "ZM",
+   "views": 2,
+   "visitors": 1
+  },
+  {
    "cc": "AX",
    "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "MQ",
+   "views": 3,
    "visitors": 1
   },
   {
@@ -760,13 +747,28 @@
    "visitors": 1
   },
   {
+   "cc": "BT",
+   "views": 7,
+   "visitors": 1
+  },
+  {
    "cc": "GY",
    "views": 1,
    "visitors": 1
   },
   {
+   "cc": "BY",
+   "views": 2,
+   "visitors": 1
+  },
+  {
    "cc": "GE",
    "views": 1,
+   "visitors": 1
+  },
+  {
+   "cc": "AF",
+   "views": 2,
    "visitors": 1
   }
  ]
