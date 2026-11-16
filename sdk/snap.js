@@ -55,3 +55,12 @@ export function snapNext(at, dir) {
   const from = !at ? 'none' : /third/.test(at) ? 'third' : at;
   return (KEYS[from] && KEYS[from][dir]) || null;
 }
+
+// Snap thirds (configureWindows({ snapThirds }), Lord Workspaces): the pointer resting on a left or right edge for
+// SNAP_DWELL_MS turns that half into a third. dwell: { side, t } since the pointer reached that edge, or null.
+export const SNAP_DWELL_MS = 500;
+export function dwellZone(zone, dwell, now, ms = SNAP_DWELL_MS) {
+  if (zone !== 'left' && zone !== 'right') return { zone, dwell: null };
+  if (!dwell || dwell.side !== zone) return { zone, dwell: { side: zone, t: now } };
+  return { zone: now - dwell.t >= ms ? `${zone}-third` : zone, dwell };
+}

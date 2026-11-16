@@ -14,6 +14,7 @@ import {
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph } from '../glyphs.jsx';
+import { flyout, FLYOUT_DELAY } from './SnapTargets.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { setFloating, isFloating } from '../tiler.js';
 import { tween, EASE } from '../motion.js';
@@ -73,11 +74,12 @@ function AppMenuStrip({ t, win, focused }) {
   return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} /> : null;
 }
 
-function FrameButton({ t, focused, onClick, danger, children, label }) {
+function FrameButton({ t, focused, onClick, danger, children, label, onHover }) {
   const [hover, setHover] = useState(false);
+  const ref = useRef(null);
   return (
-    <View onMouseDown={(e) => e.stopPropagation()} onClick={onClick} title={label}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View ref={ref} onMouseDown={(e) => e.stopPropagation()} onClick={onClick} title={onHover ? undefined : label}
+      onMouseEnter={() => { setHover(true); onHover?.(true, ref.current); }} onMouseLeave={() => { setHover(false); onHover?.(false, ref.current); }}
       style={{ width: BTN, height: BTN, borderRadius: BTN / 2, alignItems: 'center', justifyContent: 'center', opacity: focused || hover ? 1 : 0.6,
         backgroundColor: hover ? (danger ? t.closeHover : t.hover) : 'transparent' }}>
       {children(hover && danger ? '#ffffff' : t.text)}
@@ -131,6 +133,17 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
     return () => { offMove(); offUp(); };
   }, [win.id, win.w, geo.y]);
 
+  // resting on the maximize button opens the layout flyout under it (SnapTargets.jsx), as in other systems' snap layouts
+  const flyTimer = useRef(0);
+  const maxHover = (on, node) => {
+    clearTimeout(flyTimer.current);
+    if (!on || locked) return;
+    flyTimer.current = setTimeout(() => {
+      if (!node) return;
+      try { const [x, y, w, h] = lord.getLayout(node.id); flyout.set({ id: win.id, x: x + w, y: y + h + 4 }); } catch (e) { /* gone */ }
+    }, FLYOUT_DELAY);
+  };
+  useEffect(() => () => clearTimeout(flyTimer.current), []);
   const shadow = focused ? t.shadow : t.shadowSoft;
   const items = (extra) => [
     floating
@@ -166,7 +179,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
     if (k === 'close') return <FrameButton key={k} t={t} focused={focused} danger label={tr('shell.classic.close')} onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} size={11} />}</FrameButton>;
     if (k === 'minimize') return <FrameButton key={k} t={t} focused={focused} label={tr('shell.classic.minimize')} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>;
     return (
-      <FrameButton key={k} t={t} focused={focused} label={tr(win.maximized ? 'shell.classic.restore' : 'shell.classic.maximize')} onClick={() => wm.toggleMaximize(win.id)}>
+      <FrameButton key={k} t={t} focused={focused} label={tr(win.maximized ? 'shell.classic.restore' : 'shell.classic.maximize')} onClick={() => { flyout.set(null); wm.toggleMaximize(win.id); }} onHover={maxHover}>
         {(c) => (win.maximized ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}
       </FrameButton>
     );

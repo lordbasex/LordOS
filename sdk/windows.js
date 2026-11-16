@@ -10,7 +10,7 @@ import { createStore, useStore } from './store.js';
 import { appName, t } from './i18n.js';
 import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
-import { SNAP_ZONES, snapRect, zoneAt, snapNext } from './snap.js';
+import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS } from './snap.js';
 import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
@@ -161,7 +161,9 @@ export const appMenus = createStore({});
 // below); the Classic theme does.
 // locked: (window) => true for a window the person has locked in place (Lord Workspaces' padlock): the person's own
 // ways to move, resize, maximize, minimize, snap or close it refuse (see "Locked windows" below).
-export function configureWindows({ apps, workArea, chrome: c, snap, locked }) {
+// snapThirds: true (Lord Workspaces) turns a left or right half into a third after the pointer rests on that edge for
+// SNAP_DWELL_MS while dragging; off, nothing changes for the other themes.
+export function configureWindows({ apps, workArea, chrome: c, snap, locked, snapThirds }) {
   themeApps = apps;
   rebuild();
   if (typeof workArea === 'function') areaFn = workArea;
@@ -169,6 +171,7 @@ export function configureWindows({ apps, workArea, chrome: c, snap, locked }) {
   if (c) chrome = c;
   if (snap != null) snapOn = !!snap;
   if (typeof locked === 'function') lockedFn = locked;
+  if (snapThirds != null) thirdsOn = !!snapThirds;
 }
 
 // ---- Locked windows ----
@@ -271,6 +274,11 @@ function frameRef(id, inset = 0) {
 // layouts with wm.snap(id, zone). While a window is moved in C, the SDK only reads the pointer a few
 // times per second (lord.wm.pointer), never per frame.
 let snapOn = false;
+let thirdsOn = false;
+export { SNAP_DWELL_MS };
+// { id, edges } while a window is moved (edges 0) or resized by the person in C, else null: a theme may follow the
+// pointer meanwhile (lord.wm.pointer), as Lord Workspaces does to show where a tiled window will land
+export const moveGrab = createStore(null);
 // { id, zone, rect: { x, y, w, h } } while a dragged window would snap, else null
 export const snapPreview = createStore(null);
 export const snapEnabled = () => snapOn;
@@ -304,9 +312,11 @@ function watchSnap(id) {
   clearInterval(previewTimer);
   previewTimer = 0;
   if (!snapOn || typeof lord === 'undefined' || !lord.wm || typeof lord.wm.pointer !== 'function') return;
+  let dwell = null;                 // { side, t }: the pointer on a left or right edge since t (snapThirds)
   previewTimer = setInterval(() => {
     const p = lord.wm.pointer();
-    const zone = p.active && p.edges === 0 ? snapZoneAt(p.x, p.y) : null;
+    let zone = p.active && p.edges === 0 ? snapZoneAt(p.x, p.y) : null;
+    if (thirdsOn) ({ zone, dwell } = dwellZone(zone, dwell, Date.now()));
     if (!p.active) { clearInterval(previewTimer); previewTimer = 0; }
     const cur = snapPreview.get();
     if ((cur ? cur.zone : null) === zone) return;
@@ -324,6 +334,7 @@ function beginGrab(id, edges) {
   const areas = grabAreas();
   if (!lord.wm.grab(f.node, edges, { inset: f.inset, minW, minH, minTop: areaOfWindow(w).y, areas })) return false;
   grab = { id, node: f.node, edges, f: { x: w.x, y: w.y, w: w.w, h: w.h } };
+  moveGrab.set({ id, edges });
   if (!edges) watchSnap(id);
   return true;
 }
@@ -331,14 +342,18 @@ globalThis.__lordWm = (type, d) => {
   if (type !== 'end' || !grab || grab.node !== d.node) return;
   const { id, f, edges } = grab;
   grab = null;
+  moveGrab.set(null);
   clearInterval(previewTimer);
   previewTimer = 0;
-  if (snapPreview.get()) snapPreview.set(null);
+  // a third chosen by resting on the edge (snapThirds) is the zone the preview showed
+  const shown = snapPreview.get();
+  if (shown) snapPreview.set(null);
   if (!d.dx && !d.dy && !d.dw && !d.dh) return;      // it was a click on the bar
   const nx = Math.round(f.x + d.dx), ny = Math.round(f.y + d.dy);
   if (snapOn && !edges && typeof lord !== 'undefined' && lord.wm && typeof lord.wm.pointer === 'function') {
     const p = lord.wm.pointer();
-    const zone = snapZoneAt(p.x, p.y);
+    const at = snapZoneAt(p.x, p.y);
+    const zone = thirdsOn && at && shown && shown.id === id && /third/.test(shown.zone) && at === shown.zone.replace('-third', '') ? shown.zone : at;
     const w = windows.get().find((x) => x.id === id);
     if (zone && w) {
       if (!w.snapped) patch(id, { x: nx, y: ny, w: f.w, h: f.h });   // the size to go back to: from before the first snap

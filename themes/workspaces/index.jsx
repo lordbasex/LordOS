@@ -31,6 +31,7 @@ import { activities, panel, deleting, startActivities, updateActivity, setUpActi
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
 import { startMagnet } from './magnet.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
+import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
@@ -49,7 +50,7 @@ const planFor = (d, s) => { const p = wsPrefs(s); return displayPlan(d, { spine:
 const areaFn = (d) => planFor(d, settings.get()).work;
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame; snapping on for windows that float
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true, locked: windowLocked });
+configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true, locked: windowLocked, snapThirds: true });
 
 // Search, the Control Center and the notifications open on the display under the pointer (or the main one).
 const togglePanel = (name, extra = {}) => panel.set((p) => (p && p.name === name && (!extra.mode || p.mode === extra.mode) ? null : { name, display: pointerDisplay().id, ...extra }));
@@ -109,13 +110,12 @@ function registerSources() {
   return () => { offA(); offW(); };
 }
 
-// Where a dragged floating window would snap.
+// Where a dragged window would snap (a free display; on a tiled one the drop target shows its slot instead), in glass.
 function SnapPreview({ t }) {
   const p = useStore(snapPreview);
-  if (!p) return null;
-  const r = p.rect;
-  return <View style={{ position: 'absolute', left: r.x + 6, top: r.y + 6, width: r.w - 12, height: r.h - 12, borderRadius: 14, pointerEvents: 'none',
-    backgroundColor: t.mode === 'dark' ? 'rgba(124,92,255,0.16)' : 'rgba(91,63,224,0.14)', border: `2px solid ${t.accent}` }} />;
+  const target = useStore(dropTarget);
+  if (!p || target) return null;
+  return <GlassTarget t={t} rect={p.rect} />;
 }
 
 // The minimize effect: the window shrinks into its display's tray of minimized windows (the frame header,
@@ -152,6 +152,7 @@ function App() {
   startActivities();
   startTiler();
   startMagnet();
+  useDropTarget();
   const [s] = useSettings();
   const prefs = wsPrefs(s);
   const surface = effectiveSurface(prefs, s);
@@ -199,7 +200,6 @@ function App() {
   const isOnChrome = (x, y) => onChrome(plans.map((p) => p.plan), x, y);
   const panelDisplay = (open && displays.find((d) => d.id === open.display)) || mainDisplay();
   const panelPlan = plans.find((p) => p.d.id === panelDisplay.id) || main;
-  const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
   const deskMeta = meta[desktop] || activityOf(desktop);
   const onDesk = all.filter((w) => w.desktop === desktop && !w.pip).length;
@@ -247,12 +247,13 @@ function App() {
         <OverviewBackdrop />
         {mounted.map((w) => (
           <Fragment key={w.id}>
-            {preview && w === top ? <SnapPreview t={t} /> : null}
+            {w === top ? <><SnapPreview t={t} /><DropTarget t={t} /></> : null}
             <Window win={w} t={t} focused={!inOverview && w.id === focused} app={getApp(w.id)} tight={tight.has(w.id)} leaving={leaving.includes(w.id)} locked={windowLocked(w)} />
           </Fragment>
         ))}
         {leavingWins.map((w) => <Window key={w.id} win={w} t={t} focused={false} app={getApp(w.id)} leaving />)}
         <SnapAssist t={t} />
+        <SnapFlyout t={t} />
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (

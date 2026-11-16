@@ -28,6 +28,8 @@ const applied = new Map();           // window id → { tile, got, t }: the rect
 const moved = new Map();             // window id → when the tiler moved it in the last second (underBudget)
 const home = new Map();              // window id → display key
 const order = new Map();             // `${desk}|${dkey}` → the tiles' slots in order: [[window ids]], the shown one last
+const hints = new Map();             // window id → { dk, x, y, t }: where the person dropped it, as the target preview showed
+const slotAsks = new Map();          // window id → { dk, at }: put it in slot `at` of display dk (the layout flyout)
 const lastMin = new Map();           // window id → minimized at the last pass (a window brought back takes its slot again)
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
 export const tiled = createStore({ rev: 0, tight: [], counts: {}, holes: {} });
@@ -86,6 +88,31 @@ export function setLocked(desk, dkey, on) {
 }
 // whether window w is on a locked display of its activity (the display its frame is on)
 export const windowLocked = (w) => !!w && !w.pip && isLocked(w.desktop, keyOfDisplay(displayFor(wFrame(w))));
+
+// The slot a window being dragged would land in on display d (Lord Workspaces' target preview): its rect, or null
+// where windows are free or locked. The same rules as a drop (dropInto, slotAt).
+export function slotPreview(desk, d, id, x, y) {
+  const dk = keyOfDisplay(d);
+  const { layout, ratio } = layoutOf(desk, dk);
+  if (layout === 'free' || isLocked(desk, dk)) return null;
+  const live = new Set(windows.get().filter((w) => w.desktop === desk).map((w) => w.id));
+  const stacks = (order.get(`${desk}|${dk}`) || []).map((st) => st.filter((x) => live.has(x))).filter((st) => st.length);
+  const n = stacks.length + (stacks.some((st) => st.includes(id)) ? 0 : 1);
+  const rects = tileRects(layout, workAreaOf(d), n, ratio) || [];
+  const i = slotAt(rects, x, y);
+  return i < 0 ? null : { dk, rect: rects[i] };
+}
+// the drop the preview showed: the tiler uses that point (the pointer), not the window's center
+export function dropHint(id, dk, x, y) { hints.set(id, { dk, x, y, t: Date.now() }); schedule(); }
+// The layout flyout on a tiled display: window id into slot `at` of layout `layout` there.
+export function placeInSlot(desk, dk, id, layout, at) {
+  if (layoutOf(desk, dk).layout !== layout) setLayout(desk, dk, layout);
+  floating.delete(id);
+  applied.delete(id);
+  home.set(id, dk);
+  slotAsks.set(id, { dk, at });
+  schedule();
+}
 
 export function setFloating(id, on) {
   if (on) floating.add(id); else { floating.delete(id); applied.delete(id); }
@@ -164,10 +191,13 @@ export function retile() {
       // moved (its size kept, or snapped to an edge) onto a display with tiles: it takes the slot under the drop, on
       // that display (drag to rearrange); resized by hand, or dropped where windows are free: it floats
       const f = wFrame(w), g = was.got || was.tile;
-      const dkTo = keyOfDisplay(displayFor(f));
-      const moved = !!w.snapped || (g && f.w === g.w && f.h === g.h);
+      const hint = hints.get(w.id);
+      hints.delete(w.id);
+      const fresh = hint && now - hint.t < 3000 && hint.t <= now ? hint : null;
+      const dkTo = fresh ? fresh.dk : keyOfDisplay(displayFor(f));
+      const moved = !!fresh || !!w.snapped || (g && f.w === g.w && f.h === g.h);
       if (moved && keys.includes(dkTo) && layoutOf(desk, dkTo).layout !== 'free') {
-        drops.set(w.id, { dk: dkTo, x: f.x + f.w / 2, y: f.y + f.h / 2 });
+        drops.set(w.id, fresh ? { dk: dkTo, x: fresh.x, y: fresh.y } : { dk: dkTo, x: f.x + f.w / 2, y: f.y + f.h / 2 });
         applied.delete(w.id);
         home.set(w.id, dkTo);
         for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== `${desk}|${dkTo}`) order.set(ok, st.map((x) => x.filter((id) => id !== w.id)).filter((x) => x.length));
@@ -204,6 +234,13 @@ export function retile() {
       if (dr.dk !== dk) continue;
       const n = prevStacks.length + (prevStacks.some((st) => st.includes(id)) ? 0 : 1);
       prevStacks = dropInto(prevStacks, id, slotAt(tileRects(layout, area, n, ratio) || [], dr.x, dr.y));
+    }
+    // asked from the layout flyout: into that slot (from wherever it was)
+    for (const [id, ask] of slotAsks) {
+      if (ask.dk !== dk) continue;
+      slotAsks.delete(id);
+      for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== k) order.set(ok, st.map((x) => x.filter((y) => y !== id)).filter((x) => x.length));
+      prevStacks = dropInto(prevStacks, id, ask.at);
     }
     // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep their slots
     const live = orderFor(ids, keyOf, prevStacks.length ? null : saved[dk]?.apps);

@@ -76,6 +76,18 @@ displays do. Nothing runs per frame, nothing polls.
 - **Drag to rearrange** (`dropInto`, `slotAt`). A tiled window dragged with its size kept (or snapped to an edge) onto
   a display with tiles takes the slot under the drop: on its own display it swaps with the window there; on another
   display it gets a slot of its own there and leaves its old one. Dropped on a display in Free, it floats there.
+- **Where a window will land** (`components/SnapTargets.jsx`, Lord Workspaces only). While a window is dragged over a
+  tiled display, a glass rectangle shows the slot it will take (`slotPreview`, read from the SDK's `moveGrab` a few
+  times a second, one render per change of slot); the drop takes that slot whatever the window's centre (`dropHint`).
+  Over a free display the SDK's snap preview shows in the same glass. The glass is the Crystal material's blur over
+  LordOS's own surfaces, a tint over Linux apps (the renderer doesn't blur their pixels on the GPU yet), a 1 px inner
+  light and the accent edge; it grows from the pointer in 150 ms, still under Reduce motion.
+- **Snap thirds**: resting on the left or right edge for 0.5 s turns the half into a third (`configureWindows({
+  snapThirds: true })`, `sdk/snap.js` `dwellZone`; off in Lord Flow and Lord Classic).
+- **The layout flyout**: resting 0.45 s on a window's maximize button opens halves, thirds, main and side, and quarters
+  under it. A click puts the window in that zone: on a free display the SDK's snap zone (a half also wakes the magnet),
+  on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
+  and not on Linux apps that draw their own buttons (Chrome).
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title
   bar's menu, or until a layout is chosen again for the display it is on now (a floating window belongs to the display
   it is on, wherever it was tiled before). Dialogs, notices and the theme's own panels never tile.

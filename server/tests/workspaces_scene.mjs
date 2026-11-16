@@ -293,6 +293,48 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
+// the layout flyout and the drop target (Lord Workspaces only)
+{
+  const snapT = await import('../../themes/workspaces/components/SnapTargets.jsx');
+  await new Promise((res) => setTimeout(res, 1100));
+  const g = (k) => ({ halves: { layout: 'halves', zones: ['left', 'right'] }, thirds: { layout: 'three', zones: ['left-third', 'center-third', 'right-third'] } }[k]);
+  const q1 = sdk.wm.open('extra53', { frame: { x: L.x + 200, y: 200, w: 600, h: 400 } });
+  await flush();
+  snapT.applyZone(q1, g('thirds'), 2);
+  await flush();
+  check('flyout, free display: the snap zone (right third)', [frameOf(q1), sdk.wm.get(q1).snapped], [sdk.snapRect('right-third', sdk.workAreaOf(L)), 'right-third']);
+  const q2 = sdk.wm.open('extra54', { frame: { x: L.x + 300, y: 300, w: 500, h: 400 } });
+  await flush();
+  snapT.applyZone(q2, g('thirds'), 0);
+  for (let i = 0; i < 3; i++) await flush();
+  // the display was free: q2 snaps to the left third
+  check('flyout, free display: left third', sdk.wm.get(q2).snapped, 'left-third');
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  for (let i = 0; i < 3; i++) await flush();
+  const halves = tileRects('halves', plan(L).work, 2, 0.5);
+  snapT.applyZone(q2, g('thirds'), 2);
+  for (let i = 0; i < 4; i++) await flush();
+  const thirds = tileRects('three', plan(L).work, 2, 1 / 3);
+  check('flyout, tiled display: the layout set there, the window in that slot', [tiler.layoutOf(desk, 'DP-1').layout, tiler.tiled.get().counts['DP-1']], ['three', 2]);
+  check('flyout, tiled display: slot 2 of two is the last one', frameOf(q2), thirds[1]);
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  for (let i = 0; i < 3; i++) await flush();
+  const now2 = [frameOf(q1), frameOf(q2)];
+  const prev = tiler.slotPreview(desk, L, q1, halves[0].x + 50, 400);
+  check('drop target: the slot under the pointer', prev && prev.rect, halves[0]);
+  const mine = halves.findIndex((r) => r.x === frameOf(q1).x);
+  const other = 1 - mine;
+  check('drop target: q1 is in a half', mine >= 0, true);
+  tiler.dropHint(q1, 'DP-1', halves[other].x + 50, 400);
+  sdk.wm.move(q1, frameOf(q1).x + 30, frameOf(q1).y + 30);   // its centre stays on its own half; the pointer was on the other
+  for (let i = 0; i < 3; i++) await flush();
+  check('drop target: the window lands where the preview showed (they swap)', [frameOf(q1), frameOf(q2)], [halves[other], halves[mine]]);
+  void now2;
+  for (const id of [q1, q2]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 3; i++) await flush();
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');
