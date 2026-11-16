@@ -1605,8 +1605,8 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
     if (ord == ORD_PATH && !in_layer)
         for (int i = 1; i < ord_n; i++) if (ord_anc[i] == n) { p = ord_anc[i - 1]; break; }
     int seen = 0;
-    /* a terminal, an app window or a video inside a kept blur: its own changes (outside damage) are the node's */
-    if (vis && (n->type == NODE_TERM || n->type == NODE_SURFACE || n->type == NODE_MEDIA))
+    /* a terminal, an app window, a video or a sound wave inside a kept blur: its own changes (outside damage) are the node's */
+    if (vis && (n->type == NODE_TERM || n->type == NODE_SURFACE || n->type == NODE_MEDIA || n->type == NODE_WAVE))
         for (int a = 0; a < dw_nanc && a < DW_ANC; a++)
             for (int i = 0; i < BC_MAX; i++) {
                 BlurCache *e = &bcache[i];
