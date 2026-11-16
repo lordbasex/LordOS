@@ -7,6 +7,7 @@ import {
   View, Text, ScrollView, Segmented, Toggle, Button, TextInput, useTheme, useBackup, backup, fs, wm, t as tr, errorText,
   formatBytes, formatDate, formatTime, formatNumber, direction,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SidebarItem, SectionTitle, EmptyState, GroupBox, FormRow, Hairline, spacing, typeScale,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -98,7 +99,7 @@ function Confirm({ title, body, ok, onOk, onCancel, danger }) {
   const th = useTheme();
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 420, padding: spacing.xl, gap: spacing.m, borderRadius: 12, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}>
+      <View style={{ width: 420, maxWidth: '94%', padding: spacing.xl, gap: spacing.m, borderRadius: 12, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}>
         <Label size={typeScale.headline} weight={600}>{title}</Label>
         <Label dim style={{ lineHeight: 1.4 }}>{body}</Label>
         <Row style={{ justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.xs }}>
@@ -341,35 +342,41 @@ function Browser({ st }) {
   const box = useRef(null);
   const width = useWidth(box, 760);
   const narrow = width < 700;
+  // a small window: the list of backups hides behind a toolbar button and opens over the files
+  const side = useSidebar(640, 'backup');
   if (!list.length) {
     return <EmptyState icon={<Icon size={56} />} title={tr('backup.emptyTitle')} hint={st?.dest ? tr('backup.emptyBody') : tr('backup.emptyNoDest')} />;
   }
   const whenSel = () => when(snaps.find((s) => s.id === sel)?.time);
   const caption = { fontSize: typeScale.caption, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap' };
   const restoreLabel = pick ? tr('backup.restoreItem', { name: pick }) : rel ? tr('backup.restoreFolder') : tr('backup.restorePick');
+  const sidebar = (
+    <View style={{ width: 220, ...(side.narrow ? { flex: 1 } : null), backgroundColor: th.sidebarBg }}>
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m, gap: 2 }}>
+          {groups.map((g) => (
+            <View key={g.key} style={{ gap: 2 }}>
+              <SectionTitle>{formatDate(g.date, 'dayMonth')}</SectionTitle>
+              {g.items.map((s) => (
+                <SidebarItem key={s.id} label={formatTime(new Date(s.time * 1000))} selected={sel === s.id} onClick={() => { setSel(s.id); setRel(''); if (side.narrow) side.close(); }} />
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+      <View style={{ height: 30, justifyContent: 'center', paddingHorizontal: spacing.l }}>
+        <Hairline edge="top" />
+        <Label dim size={typeScale.caption}>{tr('backup.count', { count: list.length })}</Label>
+      </View>
+      <Hairline edge="end" />
+    </View>
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 220, backgroundColor: th.sidebarBg }}>
-        <ScrollView style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m, gap: 2 }}>
-            {groups.map((g) => (
-              <View key={g.key} style={{ gap: 2 }}>
-                <SectionTitle>{formatDate(g.date, 'dayMonth')}</SectionTitle>
-                {g.items.map((s) => (
-                  <SidebarItem key={s.id} label={formatTime(new Date(s.time * 1000))} selected={sel === s.id} onClick={() => { setSel(s.id); setRel(''); }} />
-                ))}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-        <View style={{ height: 30, justifyContent: 'center', paddingHorizontal: spacing.l }}>
-          <Hairline edge="top" />
-          <Label dim size={typeScale.caption}>{tr('backup.count', { count: list.length })}</Label>
-        </View>
-        <Hairline edge="end" />
-      </View>
+      {side.narrow ? null : sidebar}
       <View ref={box} style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
+          {side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, overflow: 'hidden' }}>
             <View onClick={() => setRel('')}><Text style={{ fontSize: typeScale.body, fontWeight: 600, color: rel ? th.accent : th.text, whiteSpace: 'nowrap' }}>{tr('backup.home')}</Text></View>
             {crumbs.map((c, i) => (
@@ -446,6 +453,7 @@ function Browser({ st }) {
         <Confirm danger title={tr('backup.deleteTitle')} ok={tr('backup.delete')} body={tr('backup.deleteBody', { when: whenSel() })}
           onCancel={() => setAsk(null)} onOk={() => { setAsk(null); try { backup.remove(sel); } catch (e) { setErr(String(e.message || e)); } }} />
       ) : null}
+      {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>
   );
 }

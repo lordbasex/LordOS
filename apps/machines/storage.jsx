@@ -6,7 +6,7 @@
 // (the mock's "Downloads" in the bar; 3.9, "The Linux download cards"), shared by every account: each with its size and
 // the machines of this account whose CD drive has it; Remove (vm-image-remove, an administrator's action) asks first and
 // is refused while a running machine has it in its drive.
-import { View, Text, ScrollView, ConfirmDialog, useAppWindow, wm, fs, admin, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, ConfirmDialog, useAppWindow, wm, fs, admin, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { storageRows, storageBar, stateView } from './model.js';
 import { usePal, has, bytes, Btn, Sheet, OsMark } from './ui.jsx';
@@ -37,6 +37,7 @@ export function Storage() {
   const [imgs, setImgs] = useState([]);
   const [rm, setRm] = useState(null);           // the image whose removal is being confirmed
   const [removing, setRemoving] = useState(false);
+  const narrow = useNarrow();       // a small window: the details under the list
   const load = () => {
     if (!has()) return;
     const s = lord.vm.storage();
@@ -105,7 +106,7 @@ export function Storage() {
         <View style={{ flexDirection: 'row', height: 16, borderRadius: 4, overflow: 'hidden', backgroundColor: p.track }}>
           {bar.map((b) => <View key={b.key} style={{ width: `${Math.round(b.frac * 1000) / 10}%`, height: 16, backgroundColor: colors[b.key] }} />)}
         </View>
-        <View style={{ flexDirection: 'row', gap: 18 }}>
+        <View style={{ flexDirection: 'row', gap: 18, flexWrap: 'wrap' }}>
           {bar.map((b) => (
             <View key={b.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors[b.key] }} />
@@ -114,8 +115,8 @@ export function Storage() {
           ))}
         </View>
       </View>
-      <View style={{ flex: 1, minHeight: 0, flexDirection: 'row' }}>
-        <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 20, paddingVertical: 12 }}>
+      <View style={{ flex: 1, minHeight: 0, flexDirection: narrow ? 'column' : 'row' }}>
+        <View style={{ flex: 1, minWidth: 0, minHeight: 0, paddingHorizontal: narrow ? 12 : 20, paddingVertical: 12 }}>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
             <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.machine')}</Text>
             <Text style={{ width: 90, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'end' }}>{tr('machines.storage.size')}</Text>
@@ -153,7 +154,7 @@ export function Storage() {
             </> : null}
           </ScrollView>
         </View>
-        <View style={{ width: 300, padding: 16, gap: 10, backgroundColor: p.raised }}>
+        <View style={{ width: narrow ? undefined : 300, padding: 16, gap: 10, backgroundColor: p.raised }}>
           {cur && m ? <>
             <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{m.name}</Text>
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>

@@ -4,7 +4,7 @@
   "name": "Scanner",
   "description": "Driverless network scanners (eSCL): preview, area, resolution and save as PDF, PNG or JPEG",
   "size": [860, 620],
-  "minSize": [640, 460],
+  "minSize": [480, 360],
   "dock": false,
   "category": "Graphics",
   "permissions": ["network:lan", "fs:home:write"]

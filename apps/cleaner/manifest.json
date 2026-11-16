@@ -4,7 +4,7 @@
   "name": "Cleaner",
   "description": "Finds regenerable files, shows what they use and moves what you choose to the Trash",
   "size": [1100, 700],
-  "minSize": [880, 600],
+  "minSize": [480, 360],
   "ownFrame": true,
   "dock": false,
   "permissions": ["fs:home"],

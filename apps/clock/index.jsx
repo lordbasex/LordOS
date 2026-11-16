@@ -97,7 +97,7 @@ function ZonePicker({ onPick, onClose }) {
   const shown = (needle ? zones.filter((z) => z.toLowerCase().replace(/_/g, ' ').includes(needle)) : zones).slice(0, 200);
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 380, height: 400, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)', padding: spacing.xl, gap: spacing.m }}>
+      <View style={{ width: 380, maxWidth: '92%', height: 400, maxHeight: '92%', borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)', padding: spacing.xl, gap: spacing.m }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('clock.world.add')}</Text>
         <TextInput value={q} onChange={setQ} autoFocus placeholder={tr('clock.world.search')} onCancel={onClose} onSubmit={() => shown[0] && onPick(shown[0])} />
         <View style={{ flex: 1, borderRadius: 8, border: `1px solid ${t.separator}` }}>
@@ -193,7 +193,7 @@ function AlarmEditor({ alarm, onClose }) {
   const d = new Date(); d.setHours(h, m, 0, 0);
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 380, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)', padding: spacing.xl, gap: spacing.l }}>
+      <View style={{ width: 380, maxWidth: '92%', borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 12px 40px rgba(0,0,0,0.45)', padding: spacing.xl, gap: spacing.l }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{alarm ? tr('clock.alarm.edit') : tr('clock.alarm.new')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, direction: 'ltr' }}>
           <Stepper value={h} onChange={setH} min={0} max={23} format={pad} />

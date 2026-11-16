@@ -7,7 +7,7 @@ import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
-  wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText,
+  wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -182,6 +182,9 @@ export default function Files() {
   // the sidebar's width, dragged from its edge and kept
   const [dragW, setDragW] = useState(null);
   const sideW = clampSide(dragW ?? prefs.sideWidth);
+  // a narrow window (a Workspaces tile): the sidebar hides behind a toolbar button and lays over the files when shown
+  const sb = useSidebar(640);
+  const sideInW = sb.narrow ? 0 : sideW;
   const startSide = (e) => {
     const x0 = e.x, w0 = sideW;
     const off = [addListener('pointermove', (m) => setDragW(clampSide(w0 + (m.x - x0)))),
@@ -227,6 +230,8 @@ export default function Files() {
 
   const dirs = useMemo(() => userDirs(), []);
   const baseLoc = tab.loc;
+  // a place picked in a narrow window's sidebar closes it
+  useEffect(() => { if (sb.narrow && sb.shown) sb.close(); }, [JSON.stringify(baseLoc)]);
   const loc = debounced ? { type: 'search', root: scope === 'home' || baseLoc.type !== 'dir' ? fs.home() : baseLoc.path, query: debounced } : baseLoc;
   const [netState, searchLan] = useLan(baseLoc.type === 'network', (m) => setMsg(m));
   // a search inside a cloud account goes to cloud.search, off the interface's thread (docs/CLOUD.md 17.2 item 31)
@@ -847,7 +852,7 @@ export default function Files() {
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
-  const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideW : 600, zoom);
+  const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideInW : 600, zoom);
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -973,7 +978,7 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
   };
-  const content = (rootWidthRef.current || 960) - sideW;
+  const content = (rootWidthRef.current || 960) - sideInW;
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   // a cloud account waiting for a new sign-in is not tried again by itself: its folder says so instead of "empty", with
@@ -1048,7 +1053,7 @@ export default function Files() {
   const width = useWidth(root, 960);
   rootWidthRef.current = width;
   const narrow = content < 600;
-  const tight = content < 470;
+  const tight = content < 520;
   const viewBtn = useRef(null), sortBtn = useRef(null), tagBtn = useRef(null), moreBtn = useRef(null);
   const side = (id) => !prefs.hiddenSide.includes(id);
   const sideScroll = (
@@ -1106,15 +1111,16 @@ export default function Files() {
   return (
     <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       {/* sidebar (source list) */}
-      <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
+      {sb.narrow ? null : <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
         {sideScroll}
         <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, ...(direction() === 'rtl' ? { left: 0 } : { right: 0 }), width: 6, cursor: 'ew-resize' }} />
-      </View>
+      </View>}
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         {/* toolbar */}
         <Toolbar>
+          {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
           <ToolbarGroup>
             <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
             <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
@@ -1222,6 +1228,7 @@ export default function Files() {
         </View>
       </View>
 
+      {sb.narrow && sb.shown ? <SidebarOverlay width={sideW} onClose={sb.close}>{sideScroll}</SidebarOverlay> : null}
       {/* what is being dragged: in the desktop's drag layer, above every window, so it follows the pointer into another
           app (a window that takes files shows a +); in its own window only when there are no desktop layers */}
       {drag && (shellLayers() || dragLocal) && (() => {

@@ -4,7 +4,7 @@ import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
   Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry,
-  suggestions, unseenSuggestions, refreshSuggestions,
+  suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
@@ -336,6 +336,8 @@ function InstalledPage({ query, filter: initial }) {
 // Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'webapps', 'lordos' or 'cat:<Category>')
 // and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id).
 // Back returns to the page.
+// a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
+const SIDE_AT = 720;
 const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
@@ -349,6 +351,7 @@ export default function Store() {
   const deb = useDebian();
   const launcher = useLauncherApps();
   const go = (p) => { setApp(null); setPage(p); };
+  const side = useSidebar(SIDE_AT);
   // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
   const scroll = useRef(null);
   const listAt = useRef(null);
@@ -424,11 +427,10 @@ export default function Store() {
   else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
   else body = <debian.Updates />;
   const item = (id, label, detail, glyph) => (
-    <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => go(id)} />
+    <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
   );
-  return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 210, backgroundColor: t.sidebarBg }}>
+  const sidebar = (
+      <View style={{ width: 210, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
         <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
           <SectionTitle>{tr('store.section.store')}</SectionTitle>
@@ -449,20 +451,26 @@ export default function Store() {
         </ScrollView>
         <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 6 }}><debian.Status /></View>
       </View>
+  );
+  return (
+    <View style={{ flex: 1, flexDirection: 'row' }}>
+      {side.narrow ? null : sidebar}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
+          {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
           {app ? <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('store.back')} onClick={() => setApp(null)} /> : null}
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{app ? appTitle : pageTitle}</Text>
           </View>
-          {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={200} /> : null}
+          {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
-        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
+        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
+      {side.narrow && side.shown ? <SidebarOverlay width={210} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>
   );
 }

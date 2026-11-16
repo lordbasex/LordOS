@@ -4,7 +4,7 @@
   "name": "Install LordOS",
   "description": "Installs LordOS to the disk from the live system",
   "size": [760, 560],
-  "minSize": [640, 480],
+  "minSize": [480, 360],
   "dock": false,
   "live": true,
   "category": "System",

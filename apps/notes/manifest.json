@@ -4,7 +4,7 @@
   "name": "Notes",
   "description": "Notes and sticky notes on the desktop, with markdown, images and attachments",
   "size": [860, 560],
-  "minSize": [560, 360],
+  "minSize": [480, 360],
   "dock": true,
   "category": "Office",
   "permissions": ["fs:home"]

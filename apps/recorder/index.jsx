@@ -5,7 +5,7 @@
 // waveform, play, rename, trim and export to Opus, MP3 or WAV (lord-media, with FFmpeg).
 import {
   View, Text, Image, ScrollView, Button, TextInput, Segmented, Hairline, EmptyState, useTheme, useKeyboard, typeScale,
-  t as tr, media, usePlayer, userDirs, fs, mediaFormatTime, formatDate, formatTime, addListener, useSound, microphones, defaultSource,
+  t as tr, media, usePlayer, userDirs, fs, mediaFormatTime, formatDate, formatTime, addListener, useSound, microphones, defaultSource, useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -174,13 +174,17 @@ export default function Recorder() {
 
   const cur = list.find((x) => x.path === sel);
   const detail = useRef(null);
-  const W = Math.max(200, Math.min(760, useBoxWidth(detail, 560) - 40));   // the box width minus its padding
-  const WAVE_H = 120;
+  // a narrow window (a Workspaces tile): the list keeps its record button, so it narrows instead of hiding, and the
+  // detail tightens its padding and waveform
+  const narrow = useNarrow(640);
+  const PAD = narrow ? 14 : 20;
+  const W = Math.max(160, Math.min(760, useBoxWidth(detail, 560) - 2 * PAD));   // the box width minus its padding
+  const WAVE_H = narrow ? 84 : 120;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 240, backgroundColor: th.sidebarBg }}>
+      <View style={{ width: narrow ? 184 : 240, backgroundColor: th.sidebarBg }}>
         <Hairline edge="end" />
-        <View style={{ height: 44, justifyContent: 'center', paddingHorizontal: 20 }}>
+        <View style={{ height: 44, justifyContent: 'center', paddingHorizontal: narrow ? 14 : 20 }}>
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: th.text }}>{tr('recorder.all')}</Text>
         </View>
         <ScrollView style={{ flex: 1, paddingHorizontal: 10 }}>
@@ -222,18 +226,18 @@ export default function Recorder() {
           </View>
           {mics.length > 1 && !rec && (
             <Segmented small value={source || defaultSource(snd)?.name || ''} onChange={setSource}
-              options={mics.slice(0, 3).map((m) => [m.name, m.description.length > 14 ? `${m.description.slice(0, 13)}…` : m.description])} />
+              options={mics.slice(0, narrow ? 2 : 3).map((m) => [m.name, m.description.length > (narrow ? 9 : 14) ? `${m.description.slice(0, narrow ? 8 : 13)}…` : m.description])} />
           )}
         </View>
       </View>
-      <View ref={detail} style={{ flex: 1, minWidth: 0, padding: 20, gap: 12 }}>
+      <View ref={detail} style={{ flex: 1, minWidth: 0, padding: PAD, gap: narrow ? 8 : 12 }}>
         {cur ? (
           <>
             <View style={{ gap: 4 }}>
               {renaming !== null ? (
                 <TextInput value={renaming} autoFocus selectAll onChange={setRenaming} onSubmit={doRename} onCancel={() => setRenaming(null)} size={17} />
               ) : (
-                <Text onDoubleClick={() => setRenaming(stem(cur.path))} style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{stem(cur.path)}</Text>
+                <Text onDoubleClick={() => setRenaming(stem(cur.path))} style={{ fontSize: narrow ? typeScale.title : typeScale.largeTitle, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{stem(cur.path)}</Text>
               )}
               <Text style={{ fontSize: typeScale.callout, color: th.textDim }}>{`${formatDate(new Date(cur.mtime), 'long')} · ${wave ? mediaFormatTime(wave.duration) : '…'}`}</Text>
             </View>

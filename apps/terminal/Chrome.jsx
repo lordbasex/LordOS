@@ -334,7 +334,7 @@ export function Toolbelt({ t, wid, w, sid }) {
   const sessions = w.tabs.flatMap((tab) => leaves(tab.root));
   const quote = (s) => `'${s.replace(/'/g, "'\\''")}'`;
   return (
-    <View style={{ width: 240, paddingHorizontal: 10, paddingVertical: 12, backgroundColor: t.sidebarBg, overflow: 'hidden' }}>
+    <View style={{ width: 240, maxWidth: '50%', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: t.sidebarBg, overflow: 'hidden' }}>
       <Hairline edge="start" />
       <Section t={t} title={tr('terminal.belt.jobs')}>
         {sessions.map((s) => {

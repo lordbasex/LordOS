@@ -4,7 +4,7 @@
   "name": "Fonts",
   "description": "Font viewer and manager: samples, character map, install and remove user fonts",
   "size": [960, 620],
-  "minSize": [640, 420],
+  "minSize": [480, 360],
   "dock": false,
   "category": "Utility",
   "permissions": ["fs:home:read", "fs:home:write"]

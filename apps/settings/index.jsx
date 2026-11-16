@@ -7,6 +7,7 @@ import {
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -941,6 +942,8 @@ function UserCard({ onClick, selected }) {
 
 // The open section survives the interface being remounted when the language changes.
 let lastSection = 'general';
+// a small window (a Lord Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
+const SIDE_AT = 700;
 
 // Other apps open a section: wm.open('settings', { args: { section: 'network', page: 'vpn' } }).
 export default function Settings() {
@@ -949,7 +952,8 @@ export default function Settings() {
   const { args } = useAppWindow();
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
-  const setSection = (s) => { lastSection = s; setSectionState(s); };
+  const side = useSidebar(SIDE_AT);
+  const setSection = (s) => { lastSection = s; setSectionState(s); if (side.narrow) side.close(); };
   // 'themes' (the old Themes page, links from older help) now opens Appearance
   useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
@@ -960,9 +964,9 @@ export default function Settings() {
   const [pi5] = useState(isPi5);
   const visible = (id) => sectionShown(id, hasPad, pi5) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
-  return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 220, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
+  const pad = side.narrow ? spacing.l : spacing.xxl;
+  const sidebar = (
+      <View style={{ width: 220, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
         <Hairline edge="end" />
         <View style={{ paddingHorizontal: 10, gap: spacing.s }}>
           <SearchField value={query} onChange={setQuery} placeholder={tr('settings.search')}
@@ -983,15 +987,20 @@ export default function Settings() {
           </View>
         </ScrollView>
       </View>
+  );
+  return (
+    <View style={{ flex: 1, flexDirection: 'row' }}>
+      {side.narrow ? null : sidebar}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.xxl }}>
+        <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: pad }}>
           <Hairline edge="bottom" />
+          {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.title, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
             {tr(`settings.section.${section}`)}</Text>
           {section === 'cloud' ? <CloudHeaderAction /> : null}
         </View>
         <ScrollView resetKey={section} style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: spacing.xxl, paddingTop: spacing.xl, alignItems: 'center' }}>
+          <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
             <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
@@ -999,6 +1008,7 @@ export default function Settings() {
           </View>
         </ScrollView>
       </View>
+      {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
       {section === 'cloud' ? <CloudSheets /> : null}
     </View>

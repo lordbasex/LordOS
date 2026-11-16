@@ -9,11 +9,16 @@
 // anywhere; Save writes the JSON to Documents.
 import {
   View, Text, ScrollView, Button, useTheme, useLocale, GroupBox, FormRow, Segmented, formatNumber, spacing, typeScale, fs, userDirs, wm, admin, session,
+  useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { CATEGORIES, DESKTOP_CATEGORIES, ratio, categoryRatios, comparableReferences, stability, compatibilityVerdict, desktopVerdict, conditionDiffs, changes, sustainedSeries, fileName, piFirmware } from './perf.js';
 import { startScene } from './scene.jsx';
 import { compatibility } from './model.js';
+
+// A small window (a tile of Lord Workspaces): narrower label columns, the comparison under a measurement's name. index.jsx
+// uses the same width for its rows, its tabs (a drop-down) and Hardware's list (behind a button).
+export const NARROW_AT = 700;
 
 const VERDICT_COLOR = { pass: '#30d158', warn: '#ff9f0a', fail: '#ff453a', unknown: '#8e8e93' };
 const key = (id) => id.replace(/\./g, '_');
@@ -69,11 +74,12 @@ function Bar({ value }) {
 function Verdict({ label, state, detail, states = 'verdictState' }) {
   const t = useTheme();
   const { t: tr } = useLocale();
+  const narrow = useNarrow(NARROW_AT);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.m, minHeight: 40, paddingVertical: 8 }}>
       <View style={{ width: 10, height: 10, marginTop: 5, borderRadius: 5, backgroundColor: VERDICT_COLOR[state] || '#8e8e93' }} />
-      <Text style={{ width: 150, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text>
-      <Text style={{ width: 110, fontSize: typeScale.callout, fontWeight: 600, color: VERDICT_COLOR[state], textAlign: 'start' }}>{tr(`sysinfo.perf.${states}.${state}`)}</Text>
+      <Text style={{ width: narrow ? 100 : 150, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text>
+      <Text style={{ width: narrow ? 80 : 110, fontSize: typeScale.callout, fontWeight: 600, color: VERDICT_COLOR[state], textAlign: 'start' }}>{tr(`sysinfo.perf.${states}.${state}`)}</Text>
       <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{detail}</Text>
     </View>
   );
@@ -100,6 +106,23 @@ function Measurement({ id, res, refs, change }) {
   }).filter(Boolean).join(' · ');
   const ch = change != null && Math.abs(change) >= 0.005
     ? tr(change > 0 ? 'sysinfo.perf.better' : 'sysinfo.perf.worse', { pct: formatNumber(Math.abs(change) * 100, 0) }) : '';
+  const narrow = useNarrow(NARROW_AT);
+  const note = m ? vs : skipped ? tr(`sysinfo.perf.skip.${skipped}`) : '';
+  if (narrow) {
+    // a small window: the comparison goes under the name
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 32, paddingVertical: 4 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.perf.m.${key(id)}`)}</Text>
+          {note ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{note}</Text> : null}
+        </View>
+        <View style={{ width: 110, gap: 2 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: m ? t.text : t.textDim, textAlign: 'end' }}>{m ? `${fmt(m.value)} ${m.unit}` : '—'}</Text>
+          {ch ? <Text style={{ fontSize: typeScale.caption, color: change > 0 ? '#30d158' : '#ff9f0a', textAlign: 'end' }}>{ch}</Text> : null}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 32, paddingVertical: 4 }}>
       <Text style={{ width: 230, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.perf.m.${key(id)}`)}</Text>
@@ -113,8 +136,9 @@ function Measurement({ id, res, refs, change }) {
 
 function Row({ label, value }) {
   const t = useTheme();
+  const narrow = useNarrow(NARROW_AT);
   return (
-    <FormRow label={label} labelWidth={190} minHeight={28}>
+    <FormRow label={label} labelWidth={narrow ? 130 : 190} minHeight={28}>
       <Text style={{ fontSize: typeScale.body, color: value ? t.text : t.textDim, textAlign: 'start' }}>{value || '—'}</Text>
     </FormRow>
   );
@@ -292,20 +316,22 @@ export default function Performance({ r }) {
   // the desktop run's scene, while lord-server records frames (comp.* and desk.* steps)
   const scene = running && st.mode === 'desktop' && /^(comp|desk)\./.test(st.step || '');
   useEffect(() => (scene ? startScene() : undefined), [scene]);
+  const narrow = useNarrow(NARROW_AT);
+  const buttons = running ? <Button label={tr('sysinfo.perf.cancel')} onClick={cancel} /> : [
+    <Button key="d" label={tr('sysinfo.perf.desktop')} onClick={() => start('desktop')} />,
+    <Button key="f" label={tr('sysinfo.perf.full')} onClick={() => start('full')} />,
+    <Button key="q" primary label={tr('sysinfo.perf.quick')} onClick={() => start('quick')} />,
+  ];
   if (st.state === 'unavailable') return <View style={{ padding: spacing.xl }}><Text style={{ color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.perf.unavailable')}</Text></View>;
   return (
     <ScrollView style={{ flex: 1 }}>
       <View style={{ padding: spacing.xl, gap: spacing.l }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
-          <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: narrow ? 'column' : 'row', alignItems: narrow ? 'stretch' : 'center', gap: spacing.m }}>
+          <View style={{ flex: narrow ? undefined : 1, gap: 2 }}>
             <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>LordBench</Text>
             <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('sysinfo.perf.intro')}</Text>
           </View>
-          {running ? <Button label={tr('sysinfo.perf.cancel')} onClick={cancel} /> : [
-            <Button key="d" label={tr('sysinfo.perf.desktop')} onClick={() => start('desktop')} />,
-            <Button key="f" label={tr('sysinfo.perf.full')} onClick={() => start('full')} />,
-            <Button key="q" primary label={tr('sysinfo.perf.quick')} onClick={() => start('quick')} />,
-          ]}
+          {narrow ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s }}>{buttons}</View> : buttons}
         </View>
         {!running ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('sysinfo.perf.fullNote', { min: SUSTAINED_S / 60 })}</Text> : null}
         {st.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{tr('sysinfo.perf.startFailed')}</Text> : null}

@@ -185,15 +185,15 @@ export function Content({ s, db, table, view, status }) {
     <View ref={root} style={{ flex: 1, minHeight: 0 }}>
       {/* filter bar */}
       {rules.map((r, i) => (
-        <View key={i} style={{ height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: p.bar }}>
+        <View key={i} style={{ height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, overflow: 'hidden', backgroundColor: p.bar }}>
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: p.line }} />
           <Text style={{ width: 52, fontSize: 12.5, color: p.dim, textAlign: 'start' }}>{i === 0 ? tr('databases.content.search') : tr('databases.content.and')}</Text>
           <Popup small value={r.column} options={cols} placeholder={tr('databases.content.column')} onChange={(v) => setRules((l) => l.map((x, k) => (k === i ? { ...x, column: v } : x)))} />
           <Popup small value={r.op} options={opOptions()} onChange={(v) => setRules((l) => l.map((x, k) => (k === i ? { ...x, op: v } : x)))} />
           {opNeedsValue(r.op) ? <TextInput value={r.value} onChange={(v) => setRules((l) => l.map((x, k) => (k === i ? { ...x, value: v } : x)))} onSubmit={applyFilter}
-            placeholder={r.op === 'in' ? tr('databases.content.listHint') : tr('databases.content.value')} style={{ width: 200, height: 26 }} size={12.5} /> : null}
+            placeholder={r.op === 'in' ? tr('databases.content.listHint') : tr('databases.content.value')} style={{ width: 200, flexShrink: 1, minWidth: 60, height: 26 }} size={12.5} /> : null}
           {r.op === 'between' ? <Text style={{ fontSize: 12.5, color: p.dim }}>{tr('databases.content.betweenAnd')}</Text> : null}
-          {r.op === 'between' ? <TextInput value={r.value2} onChange={(v) => setRules((l) => l.map((x, k) => (k === i ? { ...x, value2: v } : x)))} onSubmit={applyFilter} style={{ width: 120, height: 26 }} size={12.5} /> : null}
+          {r.op === 'between' ? <TextInput value={r.value2} onChange={(v) => setRules((l) => l.map((x, k) => (k === i ? { ...x, value2: v } : x)))} onSubmit={applyFilter} style={{ width: 120, flexShrink: 1, minWidth: 50, height: 26 }} size={12.5} /> : null}
           {i === 0 ? <Btn small primary label={tr('databases.content.filter')} onClick={applyFilter} style={{ height: 26 }} /> : null}
           {i === rules.length - 1 ? <IconBtn glyph="+" size={16} title={tr('databases.content.addRule')} onClick={() => setRules((l) => [...l, { column: '', op: '=', value: '', value2: '' }])} /> : null}
           {i > 0 ? <IconBtn glyph="−" size={16} title={tr('databases.content.removeRule')} onClick={() => setRules((l) => l.filter((_, k) => k !== i))} /> : null}

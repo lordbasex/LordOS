@@ -12,7 +12,7 @@ import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Button, Slider, useTheme, useAppWindow, useKeyboard, useWindowState, wm,
   t as tr, errorText, media, useThumb, userDirs, fs, addListener, direction, print, ThemeProvider, ToolbarButton, ToolbarGroup, EmptyState, useStore, windows,
   Segmented, TextInput, Toggle, openMarkup, imageEdit as M, useCloud, useFilesDrop, FilesDropHint, dropCount,
-  ContextMenu, ConfirmDialog, cloud, cloudModel,
+  ContextMenu, ConfirmDialog, cloud, cloudModel, useNarrow, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { keptPlaces, inPlaces } from './places.js';
@@ -97,6 +97,8 @@ function ToolBtn({ glyph, label, onClick, active, dark }) {
 
 function Viewer({ list, index, setIndex, onClose, winId, mode, onTrash }) {
   const th = useTheme();
+  // a narrow window (a Workspaces tile): icon-only buttons and an edit bar that wraps
+  const slim = useNarrow(640);
   const path = list[index]?.path;
   const [id, setId] = useState(0);
   const [info, setInfo] = useState(null);
@@ -269,24 +271,24 @@ function Viewer({ list, index, setIndex, onClose, winId, mode, onTrash }) {
     <View style={{ flex: 1, backgroundColor: full ? '#000' : '#141416' }}>
       {!full && (
         <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8, backgroundColor: '#1d1d20' }}>
-          <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={18} label={tr('photos.library')} onClick={onClose} />
-          <View style={{ flex: 1, alignItems: 'center', overflow: 'hidden' }}>
+          <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={18} label={slim ? undefined : tr('photos.library')} title={slim ? tr('photos.library') : undefined} onClick={onClose} />
+          <View style={{ flex: 1, minWidth: 0, alignItems: 'center', overflow: 'hidden' }}>
             <Text style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', whiteSpace: 'nowrap' }}>{baseName(path)}</Text>
             <Text style={{ fontSize: 11, color: 'rgba(235,235,245,0.55)', whiteSpace: 'nowrap' }}>{info?.sourceWidth ? `${info.sourceWidth} × ${info.sourceHeight}` : ''}{list.length > 1 ? `  ·  ${index + 1} / ${list.length}` : ''}</Text>
           </View>
           <ToolbarGroup>
             <ToolbarButton icon="−" small title={tr('photos.zoomOut')} onClick={() => zoomBy(0.8)} />
-            <View onClick={() => setZoomAt(zoom ? 0 : 1)} style={{ minWidth: 56, alignItems: 'center' }}>
+            <View onClick={() => setZoomAt(zoom ? 0 : 1)} style={{ minWidth: slim ? 44 : 56, alignItems: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: 500, color: '#f5f5f7', whiteSpace: 'nowrap' }}>{zoom ? `${Math.round(zoom * 100)} %` : tr('photos.fit')}</Text>
             </View>
             <ToolbarButton icon="+" small title={tr('photos.zoomIn')} onClick={() => zoomBy(1.25)} />
           </ToolbarGroup>
           <ToolbarButton icon="⟲" title={tr('photos.rotateLeft')} onClick={() => setRot((r) => r - 90)} />
           <ToolbarButton icon="⟳" title={tr('photos.rotateRight')} onClick={() => setRot((r) => r + 90)} />
-          <ToolbarButton icon="▶" iconSize={13} title={tr('photos.slideshow')} onClick={() => setSlide(true)} />
-          <ToolbarButton icon="⛶" title={tr('photos.fullscreen')} onClick={() => wm.setFullscreen(winId, true)} />
-          {M.canMarkup(path) && !info?.animated && !error ? <ToolbarButton icon="✐" label={tr('photos.markup')} title={tr('photos.markupHint')} onClick={() => openMarkup(path)} /> : null}
-          <ToolbarButton icon="✎" label={tr('photos.edit')} active={!!edit} onClick={() => (edit ? setEdit(null) : startEdit())} />
+          {slim ? null : <ToolbarButton icon="▶" iconSize={13} title={tr('photos.slideshow')} onClick={() => setSlide(true)} />}
+          {slim ? null : <ToolbarButton icon="⛶" title={tr('photos.fullscreen')} onClick={() => wm.setFullscreen(winId, true)} />}
+          {M.canMarkup(path) && !info?.animated && !error ? <ToolbarButton icon="✐" label={slim ? undefined : tr('photos.markup')} title={tr('photos.markupHint')} onClick={() => openMarkup(path)} /> : null}
+          <ToolbarButton icon="✎" label={slim ? undefined : tr('photos.edit')} title={slim ? tr('photos.edit') : undefined} active={!!edit} onClick={() => (edit ? setEdit(null) : startEdit())} />
           <ToolbarButton icon={<TrashGlyph color="#f5f5f7" />} title={tr('photos.menu.trash')} onClick={() => onTrash([path])} />
         </View>
       )}
@@ -345,14 +347,16 @@ function Viewer({ list, index, setIndex, onClose, winId, mode, onTrash }) {
       </View>
       {edit && !full && (() => {
         const cp = cropPixels(), z = outSize();
+        // a narrow window: the rows wrap instead of running out of the window
+        const wrapRow = slim ? { height: undefined, minHeight: 30, flexWrap: 'wrap' } : null;
         return (
           <View style={{ paddingVertical: 8, paddingHorizontal: 16, gap: 8, backgroundColor: '#1d1d20' }}>
-            <View style={{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={[{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 10 }, wrapRow]}>
               <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.crop')}</Text>
               <Segmented small value={edit.preset} onChange={setPreset}
                 options={M.CROP_PRESETS.map((p) => [p, p === 'free' || p === 'original' || p === 'square' ? tr(`photos.crop.${p}`) : p])} />
               <Text style={{ fontSize: 11, color: '#999', direction: 'ltr' }}>{`${cp.w} × ${cp.h}`}</Text>
-              <View style={{ flex: 1 }} />
+              {slim ? null : <View style={{ flex: 1 }} />}
               <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.size')}</Text>
               <View style={{ width: 70 }}><TextInput value={z.wText} onChange={(t) => typeSide('width', t)} selectAll /></View>
               <Text style={{ fontSize: 12, color: '#999' }}>×</Text>
@@ -360,12 +364,12 @@ function Viewer({ list, index, setIndex, onClose, winId, mode, onTrash }) {
               <Toggle small on={z.keep} onChange={(k) => setEdit((ed) => ({ ...ed, size: { ...outSize(), keep: k, touched: true } }))} />
               <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.keepRatio')}</Text>
             </View>
-            <View style={{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={[{ height: 30, flexDirection: 'row', alignItems: 'center', gap: 12 }, wrapRow]}>
               <Text style={{ fontSize: 12, color: '#ccc' }}>{tr('photos.brightness')}</Text>
-              <Slider value={edit.bright} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, bright: Math.round(v) })} />
+              <Slider value={edit.bright} min={-100} max={100} width={slim ? 100 : 130} onChange={(v) => setEdit({ ...edit, bright: Math.round(v) })} />
               <Text style={{ fontSize: 12, color: '#ccc', marginLeft: 8 }}>{tr('photos.contrast')}</Text>
-              <Slider value={edit.contrast} min={-100} max={100} width={130} onChange={(v) => setEdit({ ...edit, contrast: Math.round(v) })} />
-              <Text style={{ fontSize: 11, color: '#999', flex: 1 }}>{edit.crop ? tr('photos.cropReady') : tr('photos.cropHint')}</Text>
+              <Slider value={edit.contrast} min={-100} max={100} width={slim ? 100 : 130} onChange={(v) => setEdit({ ...edit, contrast: Math.round(v) })} />
+              <Text style={{ fontSize: 11, color: '#999', flex: 1, minWidth: slim ? 160 : undefined }}>{edit.crop ? tr('photos.cropReady') : tr('photos.cropHint')}</Text>
               <Button label={tr('photos.reset')} onClick={() => { setEdit({ bright: 0, contrast: 0, crop: null, preset: 'free', size: null }); setRot(0); }} />
               <Button primary label={tr('photos.saveCopy')} onClick={saveCopy} />
             </View>
@@ -414,6 +418,7 @@ export default function Photos() {
   const [size, setSize] = useState(132);
   const [rev, setRev] = useState(0);
   const winW = useStore(windows, (ws) => ws.find((w) => w.id === win.id)?.w || 980);
+  const sb = useSidebar(640);
 
   const cloudSt = useCloud();
   const places = keptPlaces(cloudSt.accounts);
@@ -567,6 +572,24 @@ export default function Photos() {
 
   // narrow window (close to minSize): a smaller title so it is not clipped
   const narrow = winW < 700;
+  // a narrower one (a Workspaces tile): the sidebar hides behind a button and lays over the photos when shown
+  const pickPlace = (f, a) => { setFolder(f); setAll(a); if (sb.narrow) sb.close(); };
+  const sidebar = (
+    <>
+      <SectionTitle>{tr('photos.library')}</SectionTitle>
+      <SidebarItem label={tr('photos.allPhotos')} icon="▦" selected={all && folder === dirs.pictures} onClick={() => pickPlace(dirs.pictures, true)} />
+      <View style={{ height: 8 }} />
+      <SectionTitle>{tr('photos.folders')}</SectionTitle>
+      {subfolders(dirs.pictures).map((f) => (
+        <SidebarItem key={f} label={baseName(f)} icon={<FolderGlyph on={!all && folder === f} />} selected={!all && folder === f} onClick={() => pickPlace(f, false)} />
+      ))}
+      {places.length > 0 && <View style={{ height: 8 }} />}
+      {places.length > 0 && <SectionTitle>{tr('photos.cloud')}</SectionTitle>}
+      {places.map((k) => (
+        <SidebarItem key={k.path} label={k.label} icon={<FolderGlyph on={folder === k.path} />} selected={folder === k.path} onClick={() => pickPlace(k.path, true)} />
+      ))}
+    </>
+  );
   // grouped by month, like a photo library
   const groups = [];
   for (const e of items) {
@@ -577,24 +600,14 @@ export default function Photos() {
   }
   return (
     <View {...drop.props} ref={root} style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
+      {sb.narrow ? null : <View style={{ width: 210, backgroundColor: th.sidebarBg, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
-        <SectionTitle>{tr('photos.library')}</SectionTitle>
-        <SidebarItem label={tr('photos.allPhotos')} icon="▦" selected={all && folder === dirs.pictures} onClick={() => { setFolder(dirs.pictures); setAll(true); }} />
-        <View style={{ height: 8 }} />
-        <SectionTitle>{tr('photos.folders')}</SectionTitle>
-        {subfolders(dirs.pictures).map((f) => (
-          <SidebarItem key={f} label={baseName(f)} icon={<FolderGlyph on={!all && folder === f} />} selected={!all && folder === f} onClick={() => { setFolder(f); setAll(false); }} />
-        ))}
-        {places.length > 0 && <View style={{ height: 8 }} />}
-        {places.length > 0 && <SectionTitle>{tr('photos.cloud')}</SectionTitle>}
-        {places.map((k) => (
-          <SidebarItem key={k.path} label={k.label} icon={<FolderGlyph on={folder === k.path} />} selected={folder === k.path} onClick={() => { setFolder(k.path); setAll(true); }} />
-        ))}
-      </View>
-      <View style={{ flex: 1 }}>
-        <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 12 }}>
-          <View style={{ flex: 1, overflow: 'hidden' }}>
+        {sidebar}
+      </View>}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: sb.narrow ? 12 : 20, gap: sb.narrow ? 8 : 12 }}>
+          {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
+          <View style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <Text style={{ fontSize: narrow ? 17 : 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' }}>{places.find((k) => k.path === folder)?.label || (all ? tr('photos.allPhotos') : baseName(folder))}</Text>
             <Text style={{ fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' }}>{selected.length > 1 ? tr('photos.selectedOf', { count: selected.length, total: items.length }) : tr('photos.count', { count: items.length })}</Text>
           </View>
@@ -605,7 +618,7 @@ export default function Photos() {
           </View>
           <ToolbarButton icon="↻" title={tr('photos.refresh')} onClick={() => setRev((r) => r + 1)} />
         </View>
-        <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
+        <ScrollView style={{ flex: 1, paddingHorizontal: sb.narrow ? 12 : 20 }}>
           {!items.length && (
             <EmptyState icon="▦" title={tr('photos.emptyTitle')} hint={tr('photos.empty')} style={{ paddingTop: 80 }} />
           )}
@@ -624,6 +637,11 @@ export default function Photos() {
           ))}
         </ScrollView>
       </View>
+      {sb.narrow && sb.shown ? (
+        <SidebarOverlay width={210} onClose={sb.close}>
+          <View style={{ flex: 1, paddingTop: 8, paddingHorizontal: 10, gap: 2 }}>{sidebar}</View>
+        </SidebarOverlay>
+      ) : null}
       {toast}
       {/* over everything else, so it is not drawn under the grid */}
       {dropHint}

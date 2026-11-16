@@ -7,6 +7,7 @@
 import {
   View, Text, Image, MediaView, ScrollView, SidebarItem, SectionTitle, Hairline, EmptyState, ToolbarButton, useTheme, useAppWindow, useKeyboard,
   useStore, useWindowState, wm, typeScale, t as tr, errorText, media, usePlayer, nowPlaying, mediaFormatTime, useThumb, fs, addListener, direction, useFilesDrop, FilesDropHint, dropCount,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { library, scan, albumsOf, artistsOf, parseSrt, mediaIn, AUDIO, VIDEO } from './library.js';
@@ -199,6 +200,8 @@ export default function Player() {
   const [openFor, setOpenFor] = useWindowState('openFor', null);   // path of the open player
   const root = useRef(null);
   const width = useBoxWidth(root, 960);
+  // a narrow window (a Workspaces tile): the library's sidebar hides behind a button and lays over the list when shown
+  const sb = useSidebar(640);
   const p = usePlayer(id);
   const current = queue[index] || null;
   const video = !!current && isVideo(current) && p.info && p.info.video >= 0;
@@ -422,7 +425,7 @@ export default function Player() {
 
   // ---- library ----
   const albums = albumsOf(tracks), artists = artistsOf(tracks);
-  const contentW = width - 200;
+  const contentW = width - (sb.narrow ? 0 : 200);
   const showArtist = contentW >= 380, showAlbum = contentW >= 560;
   const narrow = width < 720;
   const col = (flex, extra) => ({ flex, minWidth: 0, fontSize: 12, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...extra });
@@ -504,25 +507,32 @@ export default function Player() {
     content = songList(tracks.slice().sort((a, b) => compareNames(a.title, b.title)), (x, i, list) => row(x, i, list));
   }
   const titles = { songs: tr('player.songsTitle'), artists: sel || tr('player.artists'), albums: tr('player.albums'), videos: tr('player.videos'), queue: tr('player.queue') };
+  const pickView = (fn) => { fn(); if (sb.narrow) sb.close(); };
+  const sidebar = (
+    <>
+      <SectionTitle>{tr('player.library')}</SectionTitle>
+      {[['songs', '♪'], ['artists', '☺'], ['albums', '◫'], ['videos', '▶']].map(([k, g]) => (
+        <SidebarItem key={k} label={tr(`player.nav.${k}`)} icon={g} selected={view === k} onClick={() => pickView(() => { setView(k); setSel(null); })} />
+      ))}
+      <SectionTitle>{tr('player.playing')}</SectionTitle>
+      <SidebarItem label={tr('player.nav.queue')} icon="≡" selected={view === 'queue'} onClick={() => pickView(() => setView('queue'))} />
+      {current && isVideo(current) && <SidebarItem label={tr('player.nav.video')} icon="▣" selected={false} onClick={() => pickView(() => setShowVideo(true))} />}
+      <View style={{ flex: 1 }} />
+      {lib.scanning && <Text style={{ fontSize: typeScale.caption, color: th.textDim, paddingHorizontal: 10, paddingBottom: 10 }}>{tr('player.scanning', { done: lib.done, total: lib.total })}</Text>}
+    </>
+  );
   const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue');
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1 }} onMouseDown={() => setMenu(null)}>
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        <View style={{ width: 200, backgroundColor: th.sidebarBg, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>
+        {sb.narrow ? null : <View style={{ width: 200, backgroundColor: th.sidebarBg, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>
           <Hairline edge="end" />
-          <SectionTitle>{tr('player.library')}</SectionTitle>
-          {[['songs', '♪'], ['artists', '☺'], ['albums', '◫'], ['videos', '▶']].map(([k, g]) => (
-            <SidebarItem key={k} label={tr(`player.nav.${k}`)} icon={g} selected={view === k} onClick={() => { setView(k); setSel(null); }} />
-          ))}
-          <SectionTitle>{tr('player.playing')}</SectionTitle>
-          <SidebarItem label={tr('player.nav.queue')} icon="≡" selected={view === 'queue'} onClick={() => setView('queue')} />
-          {current && isVideo(current) && <SidebarItem label={tr('player.nav.video')} icon="▣" selected={false} onClick={() => setShowVideo(true)} />}
-          <View style={{ flex: 1 }} />
-          {lib.scanning && <Text style={{ fontSize: typeScale.caption, color: th.textDim, paddingHorizontal: 10, paddingBottom: 10 }}>{tr('player.scanning', { done: lib.done, total: lib.total })}</Text>}
-        </View>
+          {sidebar}
+        </View>}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 6 }}>
+          <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: sb.narrow ? 12 : 20, gap: 6 }}>
+            {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
             {sel && <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} title={tr('player.back')} onClick={() => setSel(null)} style={{ marginHorizontal: -6 }} />}
             <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{titles[view]}</Text>
           </View>
@@ -556,6 +566,11 @@ export default function Player() {
           {!narrow && <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>{volumeCtl(false, th.text)}</View>}
         </View>
       )}
+      {sb.narrow && sb.shown ? (
+        <SidebarOverlay width={200} onClose={sb.close}>
+          <View style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4, gap: 2 }}>{sidebar}</View>
+        </SidebarOverlay>
+      ) : null}
       {/* over everything else, so it is not drawn under the list */}
       {dropHint}
     </View>

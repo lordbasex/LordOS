@@ -1,7 +1,7 @@
 // Table Info (the approved mock): the table's engine, row format, encoding, collation, dates and next auto-increment
 // value; its size (rows, average row, data, indexes, free space, with a bar); its comment; its CREATE syntax, in color,
 // with Copy.
-import { View, Text, ScrollView, clipboard, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, clipboard, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Btn, Note, CodeBlock, MONO } from './ui.jsx';
 import { run1 } from './conn.js';
@@ -17,11 +17,13 @@ export function TableInfo({ s, db, table, view, status }) {
     run1(s.key, createSql(db, table, view)).then((r) => setCreate(parseCreate(r))).catch((e) => setError(errText(e)));
   }, [db, table]);
   const st = status || {};
+  const narrow = useNarrow(760);          // a small window: the two cards one over the other
+
   const total = (st.data || 0) + (st.index || 0) + (st.free || 0);
   const frac = (x) => (total ? Math.max(0, Math.min(1, (x || 0) / total)) : 0);
   const kv = (rows) => rows.map(([k, val, mono]) => (
     <View key={k} style={{ flexDirection: 'row', gap: 12 }}>
-      <Text style={{ width: 150, fontSize: 12.5, color: p.dim, textAlign: 'end' }}>{k}</Text>
+      <Text style={{ width: narrow ? 110 : 150, fontSize: 12.5, color: p.dim, textAlign: 'end' }}>{k}</Text>
       <Text style={{ flex: 1, fontSize: mono ? 12 : 12.5, fontFamily: mono ? MONO : undefined, color: p.text, textAlign: 'start' }}>{val === null || val === undefined || val === '' ? '—' : String(val)}</Text>
     </View>
   ));
@@ -29,15 +31,15 @@ export function TableInfo({ s, db, table, view, status }) {
     <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: 18, paddingVertical: 16, gap: 14 }}>
       {error ? <Note kind="bad">{error}</Note> : null}
       {!view ? (
-        <View style={{ flexDirection: 'row', gap: 14 }}>
-          <Card title={tr('databases.info.table')}>
+        <View style={{ flexDirection: narrow ? 'column' : 'row', gap: 14 }}>
+          <Card stack={narrow} title={tr('databases.info.table')}>
             {kv([
               [tr('databases.info.engine'), st.engine], [tr('databases.info.rowFormat'), st.rowFormat], [tr('databases.info.encoding'), st.charset],
               [tr('databases.info.collation'), st.collation, true], [tr('databases.info.created'), st.created], [tr('databases.info.updated'), st.updated],
               [tr('databases.info.autoIncrement'), st.autoIncrement === null || st.autoIncrement === undefined ? null : n(st.autoIncrement), true],
             ])}
           </Card>
-          <Card title={tr('databases.info.size')}>
+          <Card stack={narrow} title={tr('databases.info.size')}>
             {kv([
               [tr('databases.info.rows'), st.rows === null || st.rows === undefined ? null : tr('databases.info.estimate', { count: n(st.rows) })],
               [tr('databases.info.avgRow'), st.avgRow === null || st.avgRow === undefined ? null : tr('databases.info.bytes', { count: n(st.avgRow) })],
@@ -69,10 +71,10 @@ export function TableInfo({ s, db, table, view, status }) {
   );
 }
 
-function Card({ title, children, right }) {
+function Card({ title, children, right, stack }) {
   const p = usePal();
   return (
-    <View style={{ flex: 1, minWidth: 0, backgroundColor: p.box, border: `1px solid ${p.line}`, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 14, gap: 7 }}>
+    <View style={{ flex: stack ? undefined : 1, minWidth: 0, backgroundColor: p.box, border: `1px solid ${p.line}`, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 14, gap: 7 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
         <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: p.dim, letterSpacing: 0.5, textAlign: 'start' }}>{title}</Text>
         {right || null}

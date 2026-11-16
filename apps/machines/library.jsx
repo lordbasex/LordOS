@@ -5,7 +5,7 @@
 // the other screens of this window.
 import {
   View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState,
+  Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState, useNarrow,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -58,10 +58,11 @@ export function openLogs(m) {
 // the status line under the library (5.1): machines running, the memory they use, free space (a click opens Storage)
 function Summary({ label, value, frac, color, onClick }) {
   const p = usePal();
+  const narrow = useNarrow();       // a small window: no bars, the numbers only
   return (
     <View onClick={onClick} title={onClick ? tr('machines.storage.menu') : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Text style={{ fontSize: 12, color: p.dim }}>{label}</Text>
-      <View style={{ width: 70 }}><Bar frac={frac} color={color} height={5} /></View>
+      <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{label}</Text>
+      {narrow ? null : <View style={{ width: 70 }}><Bar frac={frac} color={color} height={5} /></View>}
       <Text style={{ fontSize: 12, fontWeight: 600, color: p.text }}>{value}</Text>
     </View>
   );
@@ -138,6 +139,7 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
   const on = v.active;
   const go = () => (a.open || a.start ? openMachine(m) : null);
   const cell = (text, w, strong) => <Text style={{ width: w, fontSize: 12, fontWeight: strong ? 600 : 400, color: strong ? p.text : p.dim, textAlign: 'end', whiteSpace: 'nowrap' }}>{text}</Text>;
+  const narrow = useNarrow();       // a small window: no CPU and memory columns
   return (
     <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
@@ -150,12 +152,12 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
         <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
         <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{[sys.name || tr('machines.card.system'), m.arch, m.accel === 'tcg' ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ')}</Text>
       </View>
-      <View style={{ width: 130, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: narrow ? 100 : 130, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
         <StateDot tone={v.tone} />
         <Text style={{ fontSize: 12, color: v.why ? '#ff9a9a' : p.text, whiteSpace: 'nowrap' }}>{tr(`machines.doing.${doingOf(m, windowed)}`)}</Text>
       </View>
-      {cell(on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—', 56)}
-      {cell(on && u?.memBytes ? `${gib(u.memBytes)} GB` : gb(m.memoryMb), 70)}
+      {narrow ? null : cell(on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—', 56)}
+      {narrow ? null : cell(on && u?.memBytes ? `${gib(u.memBytes)} GB` : gb(m.memoryMb), 70)}
       {cell(m.diskBytes != null ? bytes(m.diskBytes) : '—', 70, true)}
       <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={a.open ? tr('machines.open') : tr('machines.start')}
         style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', opacity: hover || sel ? 1 : 0, backgroundColor: p.btn }}>
@@ -177,9 +179,10 @@ function FirstRun({ host, onNew, onImport, onCheck }) {
     setBusy(false); onCheck();
   };
   const side = host.kvmDevice && !host.kvm ? 'allow' : !host.kvmDevice ? 'off' : null;
+  const narrow = useNarrow();       // a small window: the two panes one above the other
   return (
-    <View style={{ flex: 1, flexDirection: 'row', gap: 16, padding: 16 }}>
-      <View style={{ flex: 1, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+    <View style={{ flex: 1, flexDirection: narrow ? 'column' : 'row', gap: 16, padding: 16 }}>
+      <View style={{ flex: 1, padding: narrow ? 16 : 28, alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
         <AppMark size={96} />
         <Text style={{ marginTop: 8, fontSize: 20, fontWeight: 700, color: p.text }}>{tr('machines.empty')}</Text>
         <Text style={{ maxWidth: 420, fontSize: 13, lineHeight: 1.5, color: p.dim, textAlign: 'center' }}>{tr('machines.first.addHint')}</Text>
@@ -189,7 +192,7 @@ function FirstRun({ host, onNew, onImport, onCheck }) {
         </View>
       </View>
       {side ? (
-        <View style={{ flex: 1, padding: 28, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
+        <View style={{ flex: 1, padding: narrow ? 16 : 28, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
           {side === 'allow' ? <>
             <Text style={{ fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.first.stepTitle')}</Text>
             <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.first.stepText')}</Text>
@@ -295,9 +298,10 @@ function PiView({ host, list, onBack }) {
     ['native', 'arm64', '#8ce8b0'], ['slow', 'amd64', '#ffc56e'], ['limited', 'gpu', '#ffc56e'], ['no', 'passthrough', '#ff9a9a'], ['no', 'nested', '#ff9a9a'],
   ];
   const emu = list.filter((m) => m.accel === 'tcg');
-  return (
-    <View style={{ flex: 1, flexDirection: 'row', gap: 16 }}>
-      <View style={{ flex: 1, padding: 24, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
+  const narrow = useNarrow();       // a small window: the notes under the table, in one scrolling column
+  const page = (
+    <View style={{ flex: narrow ? undefined : 1, flexDirection: narrow ? 'column' : 'row', gap: 16 }}>
+      <View style={{ flex: narrow ? undefined : 1, padding: 24, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
         <Text style={{ fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.pi.title', { board: host.board || tr('machines.pi.thisComputer'), ram: gb(host.ramMb) })}</Text>
         <Text style={{ fontSize: 14, color: p.dim, textAlign: 'start' }}>{tr('machines.pi.native', { cpus: host.cpus, mem: gb(host.memMaxMb) })}</Text>
         {rows.map(([st, k, c]) => (
@@ -309,10 +313,10 @@ function PiView({ host, list, onBack }) {
             </View>
           </View>
         ))}
-        <View style={{ flex: 1 }} />
+        {narrow ? null : <View style={{ flex: 1 }} />}
         <Btn label={tr('machines.back')} onClick={onBack} style={{ alignSelf: 'flex-start' }} />
       </View>
-      <View style={{ width: 380, gap: 12 }}>
+      <View style={{ width: narrow ? undefined : 380, gap: 12 }}>
         {emu.length ? (
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: p.warnBg }}>
             <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.pi.emuTitle')}</Text>
@@ -328,6 +332,7 @@ function PiView({ host, list, onBack }) {
       </View>
     </View>
   );
+  return narrow ? <ScrollView style={{ flex: 1 }}>{page}</ScrollView> : page;
 }
 
 export function Library() {
@@ -346,6 +351,7 @@ export function Library() {
   const [copying, setCopying] = useState(null);
   const [query, setQuery] = useState('');
   const [s0] = useSettings();
+  const narrow = useNarrow();
   const lv = libView(s0.machinesView);
   const putView = (patch) => settings.set({ machinesView: { ...libView(settings.get().machinesView), ...patch } });
   const wins = useStore(windows, (ws) => ws.map((w) => w.id).join(' '));
@@ -487,14 +493,14 @@ export function Library() {
             </ToolbarGroup>
             <MenuButton icon="⇅" title={tr('machines.lib.sort')} items={sortItems} />
             <MenuButton icon={lv.show === 'all' ? '▽' : '▼'} title={tr('machines.lib.show')} items={showItems} />
-            <SearchField value={query} onChange={setQuery} placeholder={tr('machines.lib.search')} width={180} />
+            <SearchField value={query} onChange={setQuery} placeholder={tr('machines.lib.search')} width={narrow ? 120 : 180} />
           </> : null}
         </Toolbar>
       ) : null}
       {error ? <Text style={{ marginHorizontal: 20, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
       {full ? <View style={{ flex: 1, padding: 16 }}>{body}</View> : body}
       {!full && list.length ? (
-        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 20, borderTopWidth: 1, borderColor: p.line }}>
+        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: narrow ? 14 : 22, paddingHorizontal: narrow ? 12 : 20, borderTopWidth: 1, borderColor: p.line, overflow: 'hidden' }}>
           <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} frac={sum.running.frac} color={p.ok} />
           {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} frac={sum.memory.frac} color={p.mem} /> : null}
           {sum.free ? <Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} onClick={openStorage} /> : null}

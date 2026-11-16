@@ -76,7 +76,7 @@ function Main() {
   };
 
   const tabs = (
-    <View style={{ height: 32, flexDirection: 'row', alignItems: 'stretch', backgroundColor: p.tabs }}>
+    <View style={{ height: 32, flexDirection: 'row', alignItems: 'stretch', overflow: 'hidden', backgroundColor: p.tabs }}>
       <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: p.line }} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: p.line }} />
       {!active ? <Tab on label={tr('databases.newConnection')} icon={<Text style={{ fontSize: 14, color: p.text }}>+</Text>} /> : null}
@@ -111,7 +111,7 @@ function Tab({ on, label, icon, onClick, onClose, closed, busy }) {
   const [hover, setHover] = useState(false);
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, maxWidth: 220, backgroundColor: on ? p.bg : 'transparent' }}>
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, maxWidth: 220, flexShrink: 1, minWidth: 0, backgroundColor: on ? p.bg : 'transparent' }}>
       <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: p.line }} />
       {icon}
       <Text style={{ fontSize: 12, color: on ? p.text : p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textDecoration: closed ? 'line-through' : 'none' }}>{label}</Text>

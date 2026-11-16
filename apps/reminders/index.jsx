@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useKeyboard, useWindowState, usePim, reminders, calendars,
   Button, Toggle, Segmented, TextInput, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarSpacer, EmptyState, addListener,
-  formatDate, formatTime, direction, t,
+  formatDate, formatTime, direction, t, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -93,12 +93,19 @@ export default function RemindersApp() {
   const unavailable = listsQ.error && !listsQ.data;
   const title = curList ? curList.name : t(`reminders.smart.${sel}`);
   const color = curList ? curList.color || '#007aff' : SMART[sel] || th.text;
+  // a narrow window (a Workspaces tile): the sidebar hides behind a toolbar button and lays over the list when shown
+  const sb = useSidebar(640);
+  const sidebar = (
+    <Sidebar sel={sel} onSel={(v) => { setSel(v); if (sb.narrow) sb.close(); }} lists={lists} counts={counts} now={now}
+      onAdd={() => setSheet({ newList: true })} onEdit={(l) => setSheet({ list: l })} />
+  );
 
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      <Sidebar sel={sel} onSel={setSel} lists={lists} counts={counts} now={now} onAdd={() => setSheet({ newList: true })} onEdit={(l) => setSheet({ list: l })} />
-      <View style={{ flex: 1 }}>
+      {sb.narrow ? null : sidebar}
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Toolbar separator={false}>
+          {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
           <ToolbarSpacer />
           {sel !== 'completed' ? (
             <ToolbarButton label={showDone ? t('reminders.hideCompleted') : t('reminders.showCompleted')} small onClick={() => setShowDone(!showDone)} active={showDone} />
@@ -112,6 +119,7 @@ export default function RemindersApp() {
             newRowRef={newRow} loading={!itemsQ.data} />
         )}
       </View>
+      {sb.narrow && sb.shown ? <SidebarOverlay width={236} onClose={sb.close}>{sidebar}</SidebarOverlay> : null}
       {sheet ? <ListSheet list={sheet.list} onClose={() => setSheet(null)} onCreated={(id) => setSel(`list:${id}`)} /> : null}
     </View>
   );

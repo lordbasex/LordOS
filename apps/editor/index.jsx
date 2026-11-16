@@ -4,6 +4,7 @@
 // See docs/EDITOR.md.
 import {
   View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print, speechItems, registerSelection, ContextMenu, settings, useSettings,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Doc, cursorAt, hasSel, selStart, selEnd } from './buffer.js';
@@ -117,7 +118,7 @@ function FileDialog({ t, tr, mode, start, initialName, onPick, onCancel }) {
   const pickDir = mode === 'folder';
   return (
     <View onClick={onCancel} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center' }}>
-      <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 40, width: 480, height: 400, padding: 20, gap: 12, borderRadius: 12,
+      <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 40, width: 480, maxWidth: '92%', height: 400, maxHeight: '86%', padding: 20, gap: 12, borderRadius: 12,
         backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -160,7 +161,7 @@ function Picker({ t, title, placeholder, items, onPick, onCancel, render = (x) =
   }, [q, items]);
   return (
     <View onClick={onCancel} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center' }}>
-      <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 480, padding: 12, gap: 8, borderRadius: 12,
+      <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 480, maxWidth: '92%', padding: 12, gap: 8, borderRadius: 12,
         backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
         {title && <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, marginLeft: 4 }}>{title}</Text>}
         <TextInput key={focused ? 'on' : 'off'} value={q} onChange={(v) => { setQ(v); setSel(0); }} placeholder={placeholder} autoFocus onCancel={onCancel}
@@ -247,6 +248,10 @@ export default function Editor() {
   const [find, setFind] = useState({ open: false, query: '', replace: '', regex: false, caseSensitive: false });
   const [msg, setMsg] = useState(null);
   const [lineQuery, setLineQuery] = useState('');
+  // a small window: the project goes behind a button in the tab bar and opens over the text
+  const sb = useSidebar(640, 'project');
+  const sbRef = useRef(sb);
+  sbRef.current = sb;
   const [prefs] = useSettings();
   const recentList = prefs.editor?.recent;
   const api = useRef(null);
@@ -384,7 +389,12 @@ export default function Editor() {
       case 'language': setOverlay('lang'); break;
       // print with the system dialog (M9): the text is laid out as a PDF in lord-doc
       case 'print': print.open({ title: tab.path ? baseName(tab.path) : tr('editor.untitled'), text: doc.text(), mono: true }); break;
-      case 'toggleProject': setRoot((r) => (r === null ? '' : null)); break;
+      case 'toggleProject': {
+        const b = sbRef.current;
+        if (!b.narrow) setRoot((r) => (r === null ? '' : null));
+        else { setRoot((r) => (r === null ? '' : r)); b.toggle(); }
+        break;
+      }
       case 'nextTab': { const i = tabs.findIndex((x) => x.id === tab.id); setActiveId(tabs[(i + 1) % tabs.length].id); break; }
       case 'prevTab': { const i = tabs.findIndex((x) => x.id === tab.id); setActiveId(tabs[(i - 1 + tabs.length) % tabs.length].id); break; }
       default: if (a && a[name]) a[name]();
@@ -474,34 +484,42 @@ export default function Editor() {
       if (st && st.dir) { setRoot(relOf(pth)); setExpanded(new Set()); } else openPath(pth);
     }
   };
+  const project = root === null ? null : (
+    <>
+      <View style={{ height: 34, flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 8, gap: 6 }}>
+        <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          {root ? baseName(root) : tr('editor.home')}</Text>
+        <ToolbarButton icon="⋯" small title={tr('editor.cmd.openFolder')} onClick={() => setOverlay('folder')} />
+      </View>
+      <ScrollView style={{ flex: 1, paddingHorizontal: 8 }}>
+        <Tree t={t} root={root} open={(p) => { openPath(p, { fromTree: true }); if (sb.narrow) sb.close(); }} active={tab.path} expanded={expanded}
+          onToggle={(p) => setExpanded((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n; })} />
+      </ScrollView>
+    </>
+  );
   return (
     <View onFilesDrop={dropFiles} onFilesOver={(paths) => setDropOver(paths ? paths.length : null)}
       style={{ flex: 1, flexDirection: 'row', backgroundColor: t.editorBg }}>
-      {root !== null && (
+      {root !== null && !sb.narrow && (
         <View style={{ width: 220, backgroundColor: t.sidebarBg }}>
           <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: t.separator }} />
-          <View style={{ height: 34, flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 8, gap: 6 }}>
-            <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {root ? baseName(root) : tr('editor.home')}</Text>
-            <ToolbarButton icon="⋯" small title={tr('editor.cmd.openFolder')} onClick={() => setOverlay('folder')} />
-          </View>
-          <ScrollView style={{ flex: 1, paddingHorizontal: 8 }}>
-            <Tree t={t} root={root} open={(p) => openPath(p, { fromTree: true })} active={tab.path} expanded={expanded}
-              onToggle={(p) => setExpanded((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n; })} />
-          </ScrollView>
+          {project}
         </View>
       )}
       <View ref={column} style={{ flex: 1 }}>
         {/* tabs */}
-        <View style={{ height: 34, flexDirection: 'row', backgroundColor: t.sidebarBg, direction: 'ltr' }}>
+        <View style={{ height: 34, flexDirection: 'row', backgroundColor: t.sidebarBg, direction: 'ltr', overflow: 'hidden' }}>
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: t.separator }} />
+          {sb.narrow && root !== null && (
+            <View style={{ justifyContent: 'center', paddingHorizontal: 6 }}><SidebarToggle small shown={sb.shown} onClick={sb.toggle} /></View>
+          )}
           {tabs.map((x) => {
             const on = x.id === tab.id;
             return (
-              <View key={x.id} onClick={() => setActiveId(x.id)} style={{ maxWidth: 200, paddingLeft: 14, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
+              <View key={x.id} onClick={() => setActiveId(x.id)} style={{ maxWidth: 200, minWidth: 0, flexShrink: 1, paddingLeft: 14, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
                 backgroundColor: on ? t.editorBg : 'transparent' }}>
                 <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: t.separator }} />
-                <Text style={{ fontSize: 12, color: on ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{x.path ? baseName(x.path) : tr('editor.untitled')}</Text>
+                <Text style={{ flexShrink: 1, minWidth: 0, fontSize: 12, color: on ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.path ? baseName(x.path) : tr('editor.untitled')}</Text>
                 <View onClick={(e) => { e.stopPropagation(); closeTab(x); }} style={{ width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: x.doc.dirty ? 10 : 12, color: x.doc.dirty ? t.text : t.textDim }}>{x.doc.dirty ? '●' : '×'}</Text>
                 </View>
@@ -517,13 +535,13 @@ export default function Editor() {
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)}
           bounds={column.current ? { w: lord.getLayout(column.current.id)[2], h: lord.getLayout(column.current.id)[3] } : undefined} />}
         {/* status bar */}
-        <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 14, backgroundColor: t.sidebarBg,
+        <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: sb.narrow ? 10 : 16, paddingHorizontal: sb.narrow ? 10 : 14, backgroundColor: t.sidebarBg,
           direction: 'ltr' }}>
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: t.separator }} />
           <Text style={{ fontSize: 11, color: t.textDim }}>{tr('editor.status.position', { line: k.l + 1, col })}</Text>
           {doc.cursors.length > 1 && <Text style={{ fontSize: 11, color: t.accent }}>{tr('editor.status.cursors', { count: doc.cursors.length })}</Text>}
           {nsel > 0 && <Text style={{ fontSize: 11, color: t.textDim }}>{tr('editor.status.selected', { count: nsel })}</Text>}
-          {msg && <Text style={{ fontSize: 11, color: msg.ok ? '#30d158' : '#ff453a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{msg.text}</Text>}
+          {msg && <Text style={{ flexShrink: 1, minWidth: 0, fontSize: 11, color: msg.ok ? '#30d158' : '#ff453a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{msg.text}</Text>}
           <View style={{ flex: 1 }} />
           <View onClick={() => setOverlay('lang')}><Text style={{ fontSize: 11, color: t.text }}>{lang.id === 'plain' ? tr('editor.plain') : lang.name}</Text></View>
           <View onClick={() => { tab.useTabs = !tab.useTabs; bump(); }}>
@@ -532,13 +550,14 @@ export default function Editor() {
           <View onClick={() => { tab.tabSize = tab.tabSize === 2 ? 4 : tab.tabSize === 4 ? 8 : 2; bump(); }}>
             <Text style={{ fontSize: 11, color: t.textDim }}>{`⇥ ${tab.tabSize}`}</Text>
           </View>
-          <Text style={{ fontSize: 11, color: t.textDim }}>UTF-8</Text>
+          {!sb.narrow && <Text style={{ fontSize: 11, color: t.textDim }}>UTF-8</Text>}
           <View onClick={() => { doc.eol = doc.eol === '\n' ? '\r\n' : '\n'; doc.touch(); bump(); }}>
             <Text style={{ fontSize: 11, color: t.text }}>{doc.eol === '\n' ? 'LF' : 'CRLF'}</Text>
           </View>
         </View>
       </View>
 
+      {sb.narrow && sb.shown && project && <SidebarOverlay width={240} onClose={sb.close}>{project}</SidebarOverlay>}
       {(overlay === 'open' || overlay === 'saveAs' || overlay === 'folder') && (
         <FileDialog t={t} tr={tr} mode={overlay === 'saveAs' ? 'save' : overlay === 'folder' ? 'folder' : 'open'}
           start={tab.path ? dirOf(relOf(tab.path)) : root || ''} initialName={tab.path ? baseName(tab.path) : ''}
@@ -567,7 +586,7 @@ export default function Editor() {
       )}
       {overlay === 'gotoLine' && (
         <View onClick={() => setOverlay(null)} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center' }}>
-          <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 320, padding: 12, gap: 8, borderRadius: 12, backgroundColor: t.windowBg,
+          <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 320, maxWidth: '92%', padding: 12, gap: 8, borderRadius: 12, backgroundColor: t.windowBg,
             border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
             <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, marginLeft: 4 }}>{tr('editor.gotoLine.title', { count: doc.lineCount })}</Text>
             <TextInput value={lineQuery} onChange={(v) => setLineQuery(v.replace(/[^\d:]/g, ''))} placeholder={tr('editor.gotoLine.placeholder')} autoFocus
@@ -582,7 +601,7 @@ export default function Editor() {
       )}
       {confirmTab && (
         <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center' }}>
-          <View style={{ marginTop: 60, width: 400, padding: 20, gap: 8, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`,
+          <View style={{ marginTop: 60, width: 400, maxWidth: '92%', padding: 20, gap: 8, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`,
             boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{tr('editor.confirm.title', { name: confirmTab.path ? baseName(confirmTab.path) : tr('editor.untitled') })}</Text>
             <Text style={{ fontSize: 13, color: t.textDim, lineHeight: 1.4 }}>{tr('editor.confirm.body')}</Text>

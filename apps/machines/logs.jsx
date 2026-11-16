@@ -3,7 +3,7 @@
 // state, sandbox, limits, network, engine, storage, recoveries, problems) with Copy report. A filter as you type, Level
 // (all, warnings, errors), Pause with a count of new lines, Clear view, Copy, Save. Read again every second; at most
 // the last 256 KB of a log and 50 000 lines are kept, and guest text has its escape sequences removed (lord.vm.log).
-import { View, Text, TextInput, ScrollView, Segmented, useAppWindow, wm, fs, clipboard, revealPath, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, ScrollView, Segmented, useAppWindow, wm, fs, clipboard, revealPath, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { usePal, Btn, has } from './ui.jsx';
 import { readLog, reportText } from './diag.js';
@@ -93,16 +93,17 @@ export function Logs({ dir, name }) {
     const out = `${fs.home()}/Documents/${name} ${which === 'vm' ? 'machine' : which === 'serial' ? 'console' : 'journal'} log.txt`;
     try { fs.write(out, `${lines.join('\n')}\n`); setSaved(out); } catch (e) { setSaved(''); }
   };
+  const narrow = useNarrow();       // a small window: the controls wrap onto a second line
   const sources = [['overview', tr('machines.logs.overview')], ['vm', tr('machines.logs.machine')], ['serial', tr('machines.logs.console')]];
   if (m?.agent) sources.push(['journal', tr('machines.logs.journal')]);
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: p.line }}>
+      <View style={{ minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: narrow ? 8 : 0, borderBottomWidth: 1, borderColor: p.line }}>
         <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('machines.logs.title', { name })}</Text>
         <Segmented small value={which} onChange={(x) => { setWhich(x); setPaused(false); }} options={sources} />
         {which !== 'overview' ? <>
           <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.logs.filter')}</Text>
-          <View style={{ width: 160 }}><TextInput value={filter} onChange={setFilter} /></View>
+          <View style={{ width: narrow ? 110 : 160 }}><TextInput value={filter} onChange={setFilter} /></View>
           <Btn label={tr(`machines.logs.level.${level}`)} onClick={() => setLevel(LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length])} style={{ height: 28 }} />
           <Btn label={paused ? tr('machines.logs.follow') : tr('machines.logs.pause')} onClick={() => setPaused(!paused)} style={{ height: 28 }} />
           <Btn label={tr('machines.logs.copy')} onClick={() => clipboard.set(lines.join('\n'))} style={{ height: 28 }} />

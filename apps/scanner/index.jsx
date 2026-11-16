@@ -3,7 +3,7 @@
 // the scanner sends is decoded and converted in the sandboxed lord-doc helper.
 import {
   View, Text, Button, Segmented, Hairline, EmptyState, ScrollView, useTheme, useAppWindow, wm, fs, print, DocImage, releaseImage, decodeImage, convertImage,
-  formatDate, formatTime, typeScale, t as tr,
+  formatDate, formatTime, typeScale, useNarrow, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -46,6 +46,20 @@ export default function Scanner() {
   const [msg, setMsg] = useState(null);
   const box = useRef(null);
   const drag = useRef(null);
+  // a small window (a tile of Lord Workspaces): a narrower settings panel, and the preview scaled down to the room it has
+  const narrow = useNarrow();
+  const pad = narrow ? 12 : 20;
+  const pane = useRef(null);
+  const [room, setRoom] = useState(null);           // [w, h] of the preview's area
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!pane.current) return;
+      const l = lord.getLayout(pane.current.id);
+      const w = Math.round(l[2]), h = Math.round(l[3]);
+      if (w > 0 && h > 0 && (!room || Math.abs(w - room[0]) > 2 || Math.abs(h - room[1]) > 2)) setRoom([w, h]);
+    }, 20);
+    return () => clearTimeout(id);
+  });
 
   useEffect(() => { if (args?.scanner && args?.nonce) setScanner(args.scanner); }, [args?.nonce]);
   useEffect(() => {
@@ -146,23 +160,25 @@ export default function Scanner() {
     );
   }
   const sel = area;
+  const k = preview && room ? Math.max(0.1, Math.min(1, (room[0] - 2 * pad) / preview.w, (room[1] - 2 * pad) / preview.h)) : 1;
+  const pw = preview ? Math.round(preview.w * k) : 0, ph = preview ? Math.round(preview.h * k) : 0;
   const caption = (text) => <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: th.textDim, marginTop: 6 }}>{text}</Text>;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }} onMouseMove={onMove} onMouseUp={onUp}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: th.mode === 'dark' ? '#2a2a2e' : '#e3e3e8' }}>
+      <View ref={pane} style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', padding: pad, backgroundColor: th.mode === 'dark' ? '#2a2a2e' : '#e3e3e8' }}>
         {preview ? (
-          <View ref={box} onMouseDown={onDown} style={{ width: preview.w, height: preview.h, backgroundColor: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.35)', direction: 'ltr' }}>
-            <DocImage image={preview.image} style={{ width: preview.w, height: preview.h }} />
+          <View ref={box} onMouseDown={onDown} style={{ width: pw, height: ph, backgroundColor: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.35)', direction: 'ltr' }}>
+            <DocImage image={preview.image} style={{ width: pw, height: ph }} />
             {sel && sel[2] > 0 && (
-              <View style={{ position: 'absolute', left: sel[0] * preview.w, top: sel[1] * preview.h, width: sel[2] * preview.w, height: sel[3] * preview.h,
+              <View style={{ position: 'absolute', left: sel[0] * pw, top: sel[1] * ph, width: sel[2] * pw, height: sel[3] * ph,
                 border: `2px solid ${th.accent}`, backgroundColor: `${th.accent}22` }} />
             )}
           </View>
         ) : <EmptyState title={busy === 'preview' ? tr('scanner.previewing') : null} hint={busy === 'preview' ? null : tr('scanner.previewHint')} />}
       </View>
-      <View style={{ width: 280, backgroundColor: th.sidebarBg }}>
+      <View style={{ width: narrow ? 220 : 280, backgroundColor: th.sidebarBg }}>
         <Hairline edge="start" />
-        <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16 }}>
+        <ScrollView style={{ flex: 1, paddingHorizontal: narrow ? 12 : 16, paddingTop: narrow ? 12 : 16 }}>
           <View style={{ gap: 8, paddingBottom: 12 }}>
             <View style={{ gap: 2 }}>
               <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: th.text }}>{scanner.name}</Text>
@@ -191,7 +207,7 @@ export default function Scanner() {
           </View>
         </ScrollView>
         {/* the actions sit in a fixed footer of the panel, above the Dock */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10 }}>
+        <View style={{ paddingHorizontal: narrow ? 12 : 16, paddingTop: 12, paddingBottom: narrow ? 12 : 16, gap: 10 }}>
           <Hairline edge="top" />
           <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             {lastSaved.current && format !== 'pdf' ? <Button label={tr('scanner.print')} onClick={() => print.open({ title: fs.basename(lastSaved.current), image: lastSaved.current })} /> : null}

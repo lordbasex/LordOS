@@ -5,6 +5,7 @@
 import {
   View, Text, TextInput, Slider, Button, Segmented, useTheme, useAppWindow, useKeyboard, wm, fs, clipboard, DocImage, releaseImage,
   fontInfo, fontSample, fontGrid, formatBytes, t as tr, SidebarItem, SectionTitle, SearchField, GroupBox, FormRow, EmptyState,
+  Dropdown, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLOCKS } from './blocks.js';
@@ -59,7 +60,9 @@ function Sample({ font, text, size, width, th, extra }) {
   return <DocImage image={img.image} style={{ width: img.w, height: img.h }} />;
 }
 
-function CharMap({ font, ranges, th }) {
+// width: the pane's width; narrow: the block list becomes a drop-down above the grid. The grid keeps up to 16 columns,
+// fewer when they would not fit beside the list.
+function CharMap({ font, ranges, th, width, narrow }) {
   const blocks = useMemo(() => BLOCKS.filter(([, a, b]) => ranges.some(([x, y]) => x <= b && y >= a)), [ranges]);
   const [block, setBlock] = useState(0);
   const [img, setImg] = useState(null);
@@ -67,7 +70,8 @@ function CharMap({ font, ranges, th }) {
   const [chunk, setChunk] = useState(0);
   const gridRef = useRef(null);
   const cur = blocks[Math.min(block, blocks.length - 1)];
-  const CELL = 40, COLS = 16;
+  const CELL = 40;
+  const COLS = Math.max(4, Math.min(16, Math.floor((width - (narrow ? 0 : 216) - 2) / CELL)));
   const cps = useMemo(() => {
     if (!cur) return [];
     const out = [];
@@ -81,13 +85,13 @@ function CharMap({ font, ranges, th }) {
     fontGrid(font.path, { cps, cell: CELL, cols: COLS, fg: th.mode === 'dark' ? '#f2f2f7' : '#1c1c1e', index: font.index || 0 })
       .then((r) => { if (alive) { got = r.image; setImg(r); } else releaseImage(r.image); }).catch(() => {});
     return () => { alive = false; if (got) releaseImage(got); };
-  }, [font?.path, cps.join(','), th.mode]);
+  }, [font?.path, cps.join(','), th.mode, COLS]);
   if (!blocks.length) return <Text style={{ margin: 16, fontSize: 12, color: th.textDim }}>{tr('fonts.noChars')}</Text>;
   const size = cur ? cur[2] - cur[1] + 1 : 0;
   const pages = Math.ceil(size / 256);
   return (
     <View style={{ flex: 1, flexDirection: 'row', gap: 16 }}>
-      <View style={{ width: 200 }}>
+      {narrow ? null : <View style={{ width: 200 }}>
         <View style={{ flex: 1, overflow: 'hidden' }}>
           {blocks.slice(0, 40).map((b, i) => (
             <View key={b[0]} onClick={() => setBlock(i)} style={{ height: 26, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6, backgroundColor: i === block ? th.accent : 'transparent' }}>
@@ -95,10 +99,12 @@ function CharMap({ font, ranges, th }) {
             </View>
           ))}
         </View>
-      </View>
-      <View style={{ flex: 1, gap: 8 }}>
+      </View>}
+      <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ flex: 1, fontSize: 11, color: th.textDim }}>{cur ? `U+${cur[1].toString(16).toUpperCase().padStart(4, '0')}–U+${cur[2].toString(16).toUpperCase().padStart(4, '0')}` : ''}</Text>
+          {narrow ? <Dropdown small value={Math.min(block, blocks.length - 1)} onChange={setBlock} width={Math.max(140, Math.min(220, width - 200))}
+            options={blocks.slice(0, 40).map((b, i) => [i, tr(`fonts.block.${b[0]}`)])} /> : null}
+          <Text style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', fontSize: 11, color: th.textDim }}>{cur ? `U+${cur[1].toString(16).toUpperCase().padStart(4, '0')}–U+${cur[2].toString(16).toUpperCase().padStart(4, '0')}` : ''}</Text>
           {pages > 1 && <Text style={{ fontSize: 11, color: th.textDim }}>{`${chunk + 1}/${pages}`}</Text>}
           {pages > 1 && <Button label="‹" onClick={() => setChunk((c) => Math.max(0, c - 1))} />}
           {pages > 1 && <Button label="›" onClick={() => setChunk((c) => Math.min(pages - 1, c + 1))} />}
@@ -140,10 +146,12 @@ export default function Fonts() {
   const [msg, setMsg] = useState(null);
   const [width, setWidth] = useState(600);
   const pane = useRef(null);
+  const sb = useSidebar(640);
   const [file, setFile] = useState(() => (args?.path && FONT_EXT.test(args.path) ? args.path : null));
   useEffect(() => { if (args?.path && args?.nonce && FONT_EXT.test(args.path)) setFile(args.path); }, [args?.nonce]);
   useEffect(() => { if (!msg) return undefined; const id = setTimeout(() => setMsg(null), 4000); return () => clearTimeout(id); }, [msg]);
-  useEffect(() => { const id = setInterval(() => { if (pane.current) { const w = lord.getLayout(pane.current.id)[2] - 48; if (Math.abs(w - width) > 8) setWidth(w); } }, 300); return () => clearInterval(id); }, [width]);
+  const padH = sb.narrow ? 16 : 24;
+  useEffect(() => { const id = setInterval(() => { if (pane.current) { const w = lord.getLayout(pane.current.id)[2] - padH * 2; if (Math.abs(w - width) > 8) setWidth(w); } }, 300); return () => clearInterval(id); }, [width, padH]);
 
   const visible = fams.filter((f) => (coll === 'all' || (coll === 'user' && f.user) || (coll === 'mono' && f.mono) || (coll === 'color' && f.color))
     && (!q || f.family.toLowerCase().includes(q.toLowerCase())));
@@ -200,25 +208,34 @@ export default function Fonts() {
   });
 
   const colls = [['all', tr('fonts.coll.all')], ['user', tr('fonts.coll.user')], ['mono', tr('fonts.coll.mono')], ['color', tr('fonts.coll.color')]];
+  // a narrow window: the sidebar hides behind a button at the start of the header; picking a family closes it
+  const toggle = sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null;
+  const sidebar = (
+    <>
+      <SearchField value={q} onChange={setQ} placeholder={tr('fonts.search')} style={{ marginBottom: 6 }} />
+      <SectionTitle>{tr('fonts.collections')}</SectionTitle>
+      {colls.map(([k, l]) => (
+        <SidebarItem key={k} label={l} selected={coll === k} onClick={() => { setColl(k); setSel(null); }} />
+      ))}
+      <View style={{ height: 6 }} />
+      <SectionTitle>{tr('fonts.families', { count: visible.length })}</SectionTitle>
+      <FamilyList list={visible} fileFont={fileFont} current={fam} onPick={(f) => { setSel(f.file ? 'file' : f.family); if (sb.narrow) sb.close(); }} th={th} />
+    </>
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 230, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 2 }}>
+      {sb.narrow ? null : <View style={{ width: 230, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 2 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
-        <SearchField value={q} onChange={setQ} placeholder={tr('fonts.search')} style={{ marginBottom: 6 }} />
-        <SectionTitle>{tr('fonts.collections')}</SectionTitle>
-        {colls.map(([k, l]) => (
-          <SidebarItem key={k} label={l} selected={coll === k} onClick={() => { setColl(k); setSel(null); }} />
-        ))}
-        <View style={{ height: 6 }} />
-        <SectionTitle>{tr('fonts.families', { count: visible.length })}</SectionTitle>
-        <FamilyList list={visible} fileFont={fileFont} current={fam} onPick={(f) => setSel(f.file ? 'file' : f.family)} th={th} />
-      </View>
-      <View ref={pane} style={{ flex: 1, paddingVertical: 20, paddingHorizontal: 24, gap: 14 }}>
+        {sidebar}
+      </View>}
+      <View ref={pane} style={{ flex: 1, minWidth: 0, paddingVertical: sb.narrow ? 12 : 20, paddingHorizontal: padH, gap: sb.narrow ? 10 : 14 }}>
+        {!fam && sb.narrow ? <View style={{ flexDirection: 'row' }}>{toggle}</View> : null}
         {!fam ? <EmptyState icon="A" title={tr('fonts.none')} /> : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1, gap: 2, overflow: 'hidden' }}>
-                <Text style={{ fontSize: 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap' }}>{fam.family}</Text>
+              {toggle}
+              <View style={{ flex: 1, minWidth: 0, gap: 2, overflow: 'hidden' }}>
+                <Text style={{ fontSize: sb.narrow ? 18 : 22, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fam.family}</Text>
                 <Text style={{ fontSize: 12, color: th.textDim }}>{fam.file ? tr('fonts.notInstalled') : tr('fonts.styles', { count: fam.styles.length })}</Text>
               </View>
               {fam.file && !already ? <Button primary label={tr('fonts.install')} onClick={install} /> : null}
@@ -239,10 +256,10 @@ export default function Fonts() {
             {tab === 'sample' && (
               <View style={{ flex: 1, gap: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <TextInput value={text} onChange={setText} placeholder={tr('fonts.typeHere')} style={{ flex: 1 }} />
+                  <TextInput value={text} onChange={setText} placeholder={tr('fonts.typeHere')} style={{ flex: 1, minWidth: 0 }} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
                     <Text style={{ fontSize: 11, color: th.textDim }}>A</Text>
-                    <Slider value={size} min={8} max={120} onChange={(v) => setSize(Math.round(v))} width={120} />
+                    <Slider value={size} min={8} max={120} onChange={(v) => setSize(Math.round(v))} width={sb.narrow ? 90 : 120} />
                     <Text style={{ fontSize: 17, color: th.textDim }}>A</Text>
                   </View>
                   <Text style={{ width: 48, fontSize: 12, color: th.textDim, textAlign: 'end' }}>{`${size} px`}</Text>
@@ -254,7 +271,7 @@ export default function Fonts() {
                 </View>
               </View>
             )}
-            {tab === 'chars' && info && !info.error && <CharMap font={font} ranges={info.ranges || []} th={th} />}
+            {tab === 'chars' && info && !info.error && <CharMap font={font} ranges={info.ranges || []} th={th} width={width} narrow={sb.narrow} />}
             {tab === 'info' && (
               <View style={{ gap: 4 }}>
                 {info?.error ? <Text style={{ fontSize: 12, color: '#ff453a' }}>{tr('fonts.invalid')}</Text> : info && <GroupBox>{[
@@ -262,13 +279,18 @@ export default function Fonts() {
                   [tr('fonts.info.glyphs'), String(info.glyphs)], [tr('fonts.info.chars'), String(info.chars)],
                   [tr('fonts.info.kind'), [info.mono ? tr('fonts.coll.mono') : null, info.color ? tr('fonts.coll.color') : null, info.scalable ? tr('fonts.scalable') : tr('fonts.bitmap')].filter(Boolean).join(' · ')],
                   [tr('fonts.info.file'), font.path], [tr('fonts.info.size'), (() => { try { return formatBytes(fs.stat(font.path).size); } catch (e) { return '—'; } })()],
-                ].map(([k, v]) => <FormRow key={k} label={k} labelWidth={150} minHeight={32}>{v}</FormRow>)}</GroupBox>}
+                ].map(([k, v]) => <FormRow key={k} label={k} labelWidth={sb.narrow ? 110 : 150} minHeight={32}>{v}</FormRow>)}</GroupBox>}
               </View>
             )}
           </>
         )}
         {msg ? <Text style={{ fontSize: 12, color: th.accent }}>{msg}</Text> : null}
       </View>
+      {sb.narrow && sb.shown ? (
+        <SidebarOverlay width={240} onClose={sb.close}>
+          <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: 10, gap: 2 }}>{sidebar}</View>
+        </SidebarOverlay>
+      ) : null}
     </View>
   );
 }

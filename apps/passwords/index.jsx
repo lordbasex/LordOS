@@ -7,7 +7,7 @@
 // the detail pane; under 960 px the columns get narrower so nothing is clipped.
 import {
   View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, ScrollView, SearchField, SectionTitle, ToolbarButton, EmptyState,
-  hasTextFocus, direction, wm, t, vaultAvailable, ContextMenu,
+  hasTextFocus, direction, wm, t, vaultAvailable, ContextMenu, useSidebar, useNarrow, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { app, req, refreshStatus, wireEvents, reloadLogin, keepCopy, toast, errorText } from './api.js';
@@ -147,6 +147,10 @@ function ListRow({ e, cat, selected, onClick, onContextMenu }) {
 }
 
 // The width of a box after layout (measured again on every render).
+// a small window (a Lord Workspaces tile): below SIDE_AT the source list hides behind a button, below ONE_AT the item
+// list and the detail take turns (the detail with a back button)
+const SIDE_AT = 820, ONE_AT = 640;
+
 function useWidth(ref, initial) {
   const [w, setW] = useState(initial);
   useEffect(() => {
@@ -177,6 +181,8 @@ export default function Passwords() {
   const [ctx, setCtx] = useState(null);         // the list's right-click menu: { x, y, items }
   const rootRef = useRef(null);
   const winW = useWidth(rootRef, 1040);
+  const side = useSidebar(SIDE_AT);
+  const single = useNarrow(ONE_AT);
 
   // protected: black in screenshots, recordings, the remote desktop and thumbnails
   useEffect(() => { if (win?.id) wm.setProtected(win.id, true); }, [win?.id]);
@@ -296,13 +302,14 @@ export default function Passwords() {
   }
 
   const canAdd = sel !== 'login' && sel !== 'trash';
-  return (
-    <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      <View style={{ width: sideW, backgroundColor: th.sidebarBg, borderInlineEndWidth: 1, borderInlineEndColor: th.separator }}>
+  const detail1 = single && !fullPane && !!(cur || editing);   // one pane at a time, showing the item
+  const toggle = side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null;
+  const sidebar = (
+      <View style={{ width: sideW, flex: side.narrow ? 1 : undefined, backgroundColor: th.sidebarBg, borderInlineEndWidth: side.narrow ? 0 : 1, borderInlineEndColor: th.separator }}>
         <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 6 }}>
           <SearchField value={q} onChange={setQ} placeholder={t('passwords.search')} />
         </View>
-        <Sidebar sel={sel} onSel={(s) => { setSel(s); setCur(null); setEditing(null); }} issues={issues}
+        <Sidebar sel={sel} onSel={(s) => { setSel(s); setCur(null); setEditing(null); if (side.narrow) side.close(); }} issues={issues}
           onNewCat={() => openSheet('cat')} onEditCat={(c) => openSheet('cat', c)} onEditTag={(tg) => openSheet('tag', tg)} />
         <View style={{ height: 41, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: th.separator }}>
           <ToolbarButton icon="⚄" iconSize={16} title={t('passwords.menu.generator')} onClick={() => openSheet('gen')} />
@@ -311,14 +318,19 @@ export default function Passwords() {
           <ToolbarButton icon={<Glyph kind="lock" size={14} color={th.text} />} label={t('passwords.lock')} title={t('passwords.menu.lock')} onClick={lock} />
         </View>
       </View>
+  );
+  return (
+    <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
+      {side.narrow ? null : sidebar}
       {fullPane ? (
-        <View style={{ flex: 1, minWidth: 0 }}>{sel === 'security'
+        <View style={{ flex: 1, minWidth: 0 }}>{toggle ? <View style={{ height: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>{toggle}</View> : null}{sel === 'security'
           ? <SecurityView onOpen={(id) => { setSel('all'); setCur(id); }} />
           : <CodesView onOpen={(id) => { setSel('all'); setCur(id); }} />}</View>
       ) : (
         <>
-          <View style={{ width: listW, borderInlineEndWidth: 1, borderInlineEndColor: th.separator }}>
-            <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingInlineStart: 16, paddingInlineEnd: 10, gap: 4 }}>
+          {detail1 ? null : <View style={single ? { flex: 1, minWidth: 0 } : { width: listW, borderInlineEndWidth: 1, borderInlineEndColor: th.separator }}>
+            <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingInlineStart: toggle ? 8 : 16, paddingInlineEnd: 10, gap: 4 }}>
+              {toggle}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: 17, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{title}</Text>
                 <Text style={{ fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{q.trim() && searchMs != null && sel !== 'login'
@@ -344,10 +356,18 @@ export default function Passwords() {
                 title={q ? t('passwords.list.noResults') : t('passwords.list.empty')} hint={q ? null : canAdd ? t('passwords.list.emptyHint') : null}
                 style={{ justifyContent: 'flex-start', paddingTop: 72 }} />
             )}
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>{detail}</View>
+          </View>}
+          {single && !detail1 ? null : <View style={{ flex: 1, minWidth: 0 }}>
+            {detail1 && !editing ? (
+              <View style={{ height: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: th.separator }}>
+                <ToolbarButton small icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} title={t('files.menu.back')} onClick={() => setCur(null)} />
+              </View>
+            ) : null}
+            {detail}
+          </View>}
         </>
       )}
+      {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {sheet === 'gen' && <GeneratorSheet onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <SettingsSheet onClose={() => setSheet(null)} />}
       {sheet === 'import' && <ImportSheet onClose={() => setSheet(null)} />}

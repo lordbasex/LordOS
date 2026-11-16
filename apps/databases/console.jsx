@@ -1,7 +1,7 @@
 // Console (the approved mock): every query a connection sent, with its time, who sent it (you, or the app reading the
 // structure, the tables, a page), how long it took and its error. It lives in memory with the connection and is gone
 // when it closes; passwords never show (model.redactSql). A window of its own: wm.open('databases', { args: { console } }).
-import { View, Text, SearchField, FilePicker, useStore, useAppWindow, wm, fs, formatTime, t as tr } from '@lordos/sdk';
+import { View, Text, SearchField, FilePicker, useStore, useAppWindow, useNarrow, wm, fs, formatTime, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { usePal, Btn, Check, Note, MONO, useSize } from './ui.jsx';
 import { Grid } from './grid.jsx';
@@ -14,6 +14,7 @@ const stamp = (at) => { const d = new Date(at); return `${pad(d.getHours())}:${p
 export function ConsoleWindow({ sessionKey }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
+  const narrow = useNarrow(760);          // a small window: the bar wraps onto a second line
   useStore(store);
   const s = store.get().sessions.find((x) => x.key === sessionKey);
   const [query, setQuery] = useState('');
@@ -54,9 +55,9 @@ export function ConsoleWindow({ sessionKey }) {
   };
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, backgroundColor: p.bar }}>
+      <View style={{ ...(narrow ? { minHeight: 42, flexWrap: 'wrap', paddingVertical: 8 } : { height: 42 }), flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, backgroundColor: p.bar }}>
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: p.line }} />
-        <SearchField value={query} onChange={setQuery} placeholder={tr('databases.console.filter')} width={240} />
+        <SearchField value={query} onChange={setQuery} placeholder={tr('databases.console.filter')} width={narrow ? 160 : 240} />
         <Check on={showApp} onChange={setShowApp} label={tr('databases.console.showApp')} />
         <Check on={errorsOnly} onChange={setErrorsOnly} label={tr('databases.console.errorsOnly')} />
         <View style={{ flex: 1 }} />

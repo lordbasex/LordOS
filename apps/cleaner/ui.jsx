@@ -75,6 +75,12 @@ export function useFrame(pick) {
   return useStore(windows, (ws) => { const w = ws.find((x) => x.id === id); return w ? pick(wm.frame(w)) : null; });
 }
 
+// A small window (a tile of Lord Workspaces): below this width the sidebar is a rail of icons and the margins shrink.
+export const RAIL_BELOW = 760;
+export const useRail = () => !!useFrame((g) => g.w < RAIL_BELOW);
+export const PAD = (rail) => (rail ? 18 : 38);              // the content's side margin
+export const ASIDE = (rail) => (rail ? 76 : 236) + 2 * PAD(rail);   // the sidebar plus both margins
+
 export function useLive() {
   const w = useAppWindow() || {};
   const hidden = useWindowHidden(w.id);
@@ -239,6 +245,7 @@ export function Hero({ art, title, line, features = [], children }) {
   const whole = useRef(99);
   const [ix, iy] = onOrbit(ORBIT_B, INNER_START);
   const small = !!useFrame((g) => g.w < 1040 || g.h < 660);   // a small window: everything still has to fit above the button
+  const bare = !!useFrame((g) => g.w < 560 || g.h < 540);    // too small for the picture: only the text
   // the two dots and the object move in frames of their own; the rings don't turn, only their dots do
   useLoop((t) => {
     if (outer.current) { const [x, y] = onOrbit(ORBIT_A, t * 40); set(outer.current.id, 'translateX', x); set(outer.current.id, 'translateY', y + ORBIT_A); }
@@ -257,7 +264,7 @@ export function Hero({ art, title, line, features = [], children }) {
   }, true, SLOT.b);
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxl, paddingBottom: ORB_SPACE, minHeight: 0 }}>
-      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr', ...(small ? { transform: 'scale(0.62)', marginHorizontal: -64 } : null) }}>
+      {bare ? null : <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr', ...(small ? { transform: 'scale(0.62)', marginHorizontal: -64 } : null) }}>
         {p.orbit ? <Image src={`asset:cleaner/orbit-outer-${p.orbit}.png`} style={{ position: 'absolute', left: 0, top: 0, width: 340, height: 340 }} /> : null}
         {p.orbit ? <Image src={`asset:cleaner/orbit-inner-${p.orbit}.png`} style={{ position: 'absolute', left: 42, top: 42, width: 256, height: 256 }} /> : null}
         {p.pane ? <View style={{ position: 'absolute', left: 40, top: 40, right: 40, bottom: 40, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 30px 60px rgba(90,60,170,0.25)', transform: 'rotate(-6deg)', overflow: 'hidden' }}>
@@ -270,7 +277,7 @@ export function Hero({ art, title, line, features = [], children }) {
         {p.orbit ? <View ref={inner} style={{ position: 'absolute', left: 165 + ix, top: 165 + iy, width: 10, height: 10, borderRadius: 5, backgroundColor: '#ffd36b' }} /> : null}
         <Image ref={sparkA} src="asset:cleaner/spark.png" style={{ position: 'absolute', left: 58, top: 62, width: 20, height: 20 }} />
         <Image ref={sparkB} src="asset:cleaner/spark.png" style={{ position: 'absolute', left: 262, top: 176, width: 14, height: 14 }} />
-      </View>
+      </View>}
       <Enter style={{ flex: 1, minWidth: 0, gap: spacing.s }} y={14} x={0} ms={500}>
         <Label size={small ? 26 : 40} weight={300}>{title}</Label>
         <Label size={small ? typeScale.callout : 15} dim>{line}</Label>
@@ -361,9 +368,10 @@ export function SelectAll({ count, label, onAll, onNone }) {
 export function SectionScan({ art, verb, path, counter, found }) {
   const img = useRef(null);
   useLoop((t) => { if (img.current) { const s = 1 + Math.sin(t * 2.4) * 0.03; set(img.current.id, 'scaleX', s); set(img.current.id, 'scaleY', s); } });
+  const low = !!useFrame((g) => g.h < 560);
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingBottom: ORB_SPACE }}>
-      <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={{ width: 300, height: 286 }} />
+      <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={low ? { width: 120, height: 114 } : { width: 300, height: 286 }} />
       <Label size={28} weight={300}>{verb}</Label>
       <Label size={typeScale.callout} mono dim lines={1}>{midTrim(path)}</Label>
       <Label size={typeScale.callout} dim>{counter}</Label>

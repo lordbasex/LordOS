@@ -14,6 +14,7 @@ import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -177,6 +178,10 @@ export default function Registros() {
   const query = useRef({ seq: 0 });
   const box = useRef(null);
   const [width, height] = useSize(box, [820, 600]);
+  // a small window (a tile of Lord Workspaces): the sources hide behind a toolbar button and open over the list
+  const bar = useSidebar(640, 'logs');
+  const tight = width < 560;           // narrower fields and process column, the filters may wrap
+  const colProc = tight ? 100 : COL_PROC;
   const newest = useRef(0);
 
   const isJournal = src.kind !== 'lordos';
@@ -290,7 +295,7 @@ export default function Registros() {
         backgroundColor: on ? t.accent : i % 2 ? (t.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)') : 'transparent' }}>
         <View style={{ width: 10, alignItems: 'center' }}><Dot p={e.p} /></View>
         <Text style={{ width: COL_TIME, fontSize: typeScale.caption, color: on ? '#fff' : t.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'start' }}>{e.t ? clock(e.t / 1000) : `#${e.line}`}</Text>
-        <Text style={{ width: COL_PROC, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
+        <Text style={{ width: colProc, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
         <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.m.replace(/\n/g, ' ⏎ ')}</Text>
       </View>
     );
@@ -298,45 +303,50 @@ export default function Registros() {
 
   const side = (kind, label, icon, extra) => (
     <SidebarItem key={kind + (extra?.file || '')} label={label} icon={icon} selected={src.kind === kind && (!extra || src.file === extra.file)}
-      onClick={() => setSrc({ kind, ...(extra || {}) })} />
+      onClick={() => { setSrc({ kind, ...(extra || {}) }); if (bar.narrow) bar.close(); }} />
   );
   const narrow = width < 640;
   const caption = { fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', textAlign: 'start' };
 
+  const sourceList = (
+    <View style={{ width: 210, ...(bar.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: spacing.xs, gap: 2 }}>
+      <SectionTitle>{tr('logs.section.journal')}</SectionTitle>
+      {side('user', tr('logs.src.user'), '☺')}
+      {side('system', tr('logs.src.system'), '▣')}
+      {side('kernel', tr('logs.src.kernel'), '◐')}
+      <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
+      {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
+      {['session', 'apps', 'web', 'old'].map((g) => {
+        const list = files.filter((f) => fileGroup(f.name) === g);
+        if (!list.length) return null;
+        return [
+          g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
+          ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
+            : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
+        ];
+      })}
+      <View style={{ flex: 1 }} />
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
+        {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
+      </Text>
+      <Hairline edge="end" />
+    </View>
+  );
+
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 210, backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: spacing.xs, gap: 2 }}>
-        <SectionTitle>{tr('logs.section.journal')}</SectionTitle>
-        {side('user', tr('logs.src.user'), '☺')}
-        {side('system', tr('logs.src.system'), '▣')}
-        {side('kernel', tr('logs.src.kernel'), '◐')}
-        <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
-        {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
-        {['session', 'apps', 'web', 'old'].map((g) => {
-          const list = files.filter((f) => fileGroup(f.name) === g);
-          if (!list.length) return null;
-          return [
-            g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
-            ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
-              : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
-          ];
-        })}
-        <View style={{ flex: 1 }} />
-        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
-          {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
-        </Text>
-        <Hairline edge="end" />
-      </View>
+      {bar.narrow ? null : sourceList}
       <View ref={box} style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
+          {bar.narrow ? <SidebarToggle shown={bar.shown} onClick={bar.toggle} /> : null}
           <ToolbarButton icon="●" iconSize={9} label={tr('logs.live')} active={live} color={t.textDim} onClick={() => setLive(!live)} />
           <ToolbarButton label={tr('logs.export')} onClick={exportView} />
           <ToolbarSpacer />
           <TextInput value={proc} onChange={setProc} placeholder={tr('logs.process')}
-            style={{ width: narrow ? 130 : 150, ...(procValid ? {} : { border: '1px solid #ff453a' }) }} />
-          <SearchField value={search} onChange={setSearch} placeholder={tr('logs.search')} width={narrow ? 190 : 220} />
+            style={{ width: tight ? 96 : narrow ? 130 : 150, ...(procValid ? {} : { border: '1px solid #ff453a' }) }} />
+          <SearchField value={search} onChange={setSearch} placeholder={tr('logs.search')} width={tight ? 130 : narrow ? 190 : 220} />
         </Toolbar>
-        <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
+        <View style={{ ...(tight ? { minHeight: 40, flexWrap: 'wrap', paddingVertical: 6 } : { height: 40 }), flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <Segmented small appearance="neutral" value={level} onChange={setLevel}
             options={[['all', tr('logs.lv.all')], ['info', tr('logs.lv.info')], ['warning', tr('logs.lv.warning')], ['error', tr('logs.lv.error')]]} />
           <Segmented small appearance="neutral" value={range} onChange={setRange}
@@ -346,7 +356,7 @@ export default function Registros() {
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m }}>
           <View style={{ width: 10 }} />
           <Text style={[caption, { width: COL_TIME }]}>{tr('logs.field.time')}</Text>
-          <Text style={[caption, { width: COL_PROC }]}>{tr('logs.field.process')}</Text>
+          <Text style={[caption, { width: colProc }]}>{tr('logs.field.process')}</Text>
           <Text style={[caption, { flex: 1 }]}>{tr('logs.field.message')}</Text>
           <Hairline edge="bottom" />
         </View>
@@ -375,6 +385,7 @@ export default function Registros() {
           ) : null}
         </View>
       </View>
+      {bar.narrow && bar.shown ? <SidebarOverlay width={210} onClose={bar.close}>{sourceList}</SidebarOverlay> : null}
     </View>
   );
 }

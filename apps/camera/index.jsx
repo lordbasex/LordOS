@@ -168,23 +168,23 @@ export default function Camera() {
       </View>
       <View style={{ height: 88, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, backgroundColor: '#161618' }}>
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-        <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', gap: 6, overflow: 'hidden' }}>
           {shots.slice(0, 3).map((x) => <Shot key={x} path={x} onOpen={() => wm.open(/\.mp4$/.test(x) ? 'player' : 'photos', { new: true, args: { path: x } })} />)}
         </View>
         <View onClick={shoot} style={{ width: 60, height: 60, borderRadius: 30, border: '3px solid #ffffff', alignItems: 'center', justifyContent: 'center', opacity: id ? 1 : 0.5 }}>
           <View style={{ width: recording ? 22 : 46, height: recording ? 22 : 46, borderRadius: recording ? 5 : 23,
             backgroundColor: mode === 'video' ? '#ff3b30' : '#ffffff' }} />
         </View>
-        <View style={{ flex: 1, alignItems: 'flex-end', gap: 8 }}>
+        <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 8 }}>
           <ModeSwitch value={mode} onChange={(v) => !recStart && setMode(v)} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 12, color: 'rgba(235,235,245,0.7)' }}>{tr('camera.mirror')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
+            <Text style={{ flexShrink: 1, minWidth: 0, fontSize: 12, color: 'rgba(235,235,245,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tr('camera.mirror')}</Text>
             <Toggle on={mirror} onChange={(v) => update({ camera: { ...(s.camera || {}), mirror: v } })} />
           </View>
         </View>
       </View>
       {cams.length > 1 && (
-        <View style={{ position: 'absolute', right: 12, top: 12, flexDirection: 'row', gap: 4, padding: 3, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.55)' }}>
+        <View style={{ position: 'absolute', right: 12, top: 12, maxWidth: '80%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4, padding: 3, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.55)' }}>
           {cams.map((c) => (
             <View key={c.device} onClick={() => { setDev(c.device); update({ camera: { ...(s.camera || {}), device: c.device } }); }}
               style={{ paddingHorizontal: 10, height: 24, borderRadius: 6, justifyContent: 'center', backgroundColor: c.device === dev ? th.accent : 'transparent' }}>
@@ -194,8 +194,8 @@ export default function Camera() {
         </View>
       )}
       {cam && cams.length === 1 && (
-        <View style={{ position: 'absolute', left: 12, top: 12, paddingHorizontal: 10, height: 24, justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <Text style={{ fontSize: 11, color: '#e5e5ea' }}>{cam.name}{p.info ? ` · ${p.info.width}×${p.info.height}` : ''}</Text>
+        <View style={{ position: 'absolute', left: 12, top: 12, maxWidth: '80%', paddingHorizontal: 10, height: 24, justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <Text style={{ fontSize: 11, color: '#e5e5ea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cam.name}{p.info ? ` · ${p.info.width}×${p.info.height}` : ''}</Text>
         </View>
       )}
     </View>

@@ -9,7 +9,7 @@ import { userDirs } from './locations.js';
 function Sheet({ t, width = 460, children }) {
   return (
     <View onMouseDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width, maxHeight: '92%', padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
+      <View style={{ width, maxWidth: '94%', maxHeight: '92%', padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         {children}
       </View>
     </View>

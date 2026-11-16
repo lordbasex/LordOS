@@ -3,7 +3,7 @@
 // cursor, or the selection) and Run All (Ctrl+Shift+Enter), Explain, the history of this favorite, results in tabs with
 // a Messages tab, rows and milliseconds, Copy as CSV, JSON or INSERT. Safe mode asks before an UPDATE or DELETE without
 // WHERE; a locked connection runs only what reads.
-import { View, Text, MenuButton, ConfirmDialog, addListener, useAppWindow, hasTextFocus, ime, clipboard, t as tr } from '@lordos/sdk';
+import { View, Text, MenuButton, ConfirmDialog, addListener, useAppWindow, hasTextFocus, ime, clipboard, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { EditorView } from '../editor/EditorView.jsx';
 import { Doc, head, hasSel, selStart, selEnd } from '../editor/buffer.js';
@@ -23,6 +23,7 @@ const MAX_ROWS = 5000;
 
 export function Query({ s, db, tables }) {
   const p = usePal();
+  const narrow = useNarrow(760);          // a small window: the run bar without the shortcut hint
   const { focused } = useAppWindow();
   const v = viewOf(s.key);
   if (!v.query) v.query = { doc: new Doc(''), results: [], active: 0, messages: [], summary: null };
@@ -231,11 +232,11 @@ export function Query({ s, db, tables }) {
           </View>
         ) : null}
       </View>
-      <View onMouseDown={(e) => { drag.current = { y: e.y, h: edH }; }} style={{ height: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: p.bar }}>
+      <View onMouseDown={(e) => { drag.current = { y: e.y, h: edH }; }} style={{ height: 38, flexDirection: 'row', alignItems: 'center', gap: narrow ? 6 : 8, paddingHorizontal: 10, overflow: 'hidden', backgroundColor: p.bar }}>
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: p.line }} />
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: p.line }} />
         <Btn small primary label={tr('databases.q.runCurrent')} disabled={running} onClick={runCurrent} title="Ctrl+Enter" style={{ height: 26 }} />
-        <Text style={{ fontSize: 11, color: p.dim }}>Ctrl+Enter</Text>
+        {narrow ? null : <Text style={{ fontSize: 11, color: p.dim }}>Ctrl+Enter</Text>}
         <Btn small label={tr('databases.q.runAll')} disabled={running} onClick={runAll} title="Ctrl+Shift+Enter" style={{ height: 26 }} />
         <Btn small label={tr('databases.q.explain')} disabled={running} onClick={explain} style={{ height: 26 }} />
         <View style={{ width: 1, height: 20, backgroundColor: p.line, marginHorizontal: 2 }} />

@@ -14,7 +14,7 @@
 import {
   View, Text, ScrollView, useTheme, useLocale, useStore, monitor, monitorConnections, useMonitor,
   formatBytes, formatNumber, tOptional, useSystemInfo, wm, direction, firewall, firewallState, useLauncherApps, Lumo, Button, useAppWindow, useSettings,
-  netModel, ConfirmDialog, Disclosure, DisclosureGlyph,
+  netModel, ConfirmDialog, Disclosure, DisclosureGlyph, ToolbarButton, useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { C, fmt, AppGlyph, useCardStyle } from './index.jsx';
@@ -844,6 +844,10 @@ export function NetworkTab({ last, prefs }) {
   const [range, setRange] = useState('live');           // the traffic chart's zoom: 'live' or a history window
   const [end, setEnd] = useState(null);                 // the history window's end (Unix s), null = now
   const sysHist = useHistory(range === 'live' ? null : range, end, null);
+  // a small window (a Lord Workspaces tile): below 900 px the map takes the list's place behind a globe button, below
+  // 640 px the details too (with a back button)
+  const narrow = useNarrow(900), tight = useNarrow(640);
+  const [pane, setPane] = useState('list');             // narrow: 'list' or 'map'
   const restrictedOf = useMemo(() => firewall.state().restricted || {}, [fw.rev]);
   const mode = useMemo(() => firewall.state().mode || 'silent', [fw.rev]);
   const names = useMemo(() => namesOf(fw.events), [fw.events]);
@@ -909,19 +913,26 @@ export function NetworkTab({ last, prefs }) {
     },
   };
   const column = { borderRadius: 12, backgroundColor: card.bg, border: `1px solid ${t.separator}`, padding: 10 };
+  const rtl = direction() === 'rtl';
+  const backBtn = (onClick) => <ToolbarButton small icon={rtl ? '›' : '‹'} iconSize={18} title={tr('files.menu.back')} onClick={onClick} />;
+  const showMap = !narrow || pane === 'map';
+  const detailOne = tight && pane === 'list' && !!(sel || selPlace);      // tight: the details instead of the list
+  const showList = !narrow || (pane === 'list' && !detailOne);
+  const showDetail = !tight || detailOne;
   const roots = live ? tree : histRoots;
   const extra = [
     { label: tr('monitor.net.view.menuItem'), checked: mprefs.menuItem === true, onClick: () => setPrefs({ menuItem: mprefs.menuItem !== true }) },
     { label: tr('monitor.net.view.blocklists'), onClick: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) },
   ];
   return (
-    <View style={{ flex: 1, flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingVertical: 16 }}>
+    <View style={{ flex: 1, flexDirection: 'row', gap: narrow ? 8 : 12, paddingHorizontal: narrow ? 12 : 20, paddingVertical: narrow ? 12 : 16 }}>
       {/* left */}
-      <View style={{ ...column, width: 336, gap: 8 }}>
+      {showList ? <View style={{ ...column, ...(narrow ? { flex: 1, minWidth: 0 } : { width: 336 }), gap: 8 }}>
         <ShareHolderLine tr={tr} />
         <TokenSearch chips={chips} setChips={setChips} text={text} setText={setText} tr={tr} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ViewButton view={view} setView={setView} extra={extra} tr={tr} />
+          {narrow ? <ToolbarButton small icon={<Glyph name="globe" color={t.text} />} title={tr('monitor.net.map')} onClick={() => setPane('map')} /> : null}
           <Text style={{ flex: 1, fontSize: 10, color: t.textDim, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden' }}>
             {live ? tr(`monitor.net.count.${view.group}`, { count: roots.length }) : tr('monitor.net.count.app', { count: roots.length })}
           </Text>
@@ -958,10 +969,11 @@ export function NetworkTab({ last, prefs }) {
         </ScrollView>
         <View style={{ height: 1, backgroundColor: t.separator }} />
         <SystemTraffic tr={tr} range={range} setRange={setRange} end={end} setEnd={setEnd} sysHist={sysHist} />
-      </View>
+      </View> : null}
       {/* centro: el mapa ocupa toda la altura */}
-      <View style={{ ...column, flex: 1, minWidth: 0, gap: 8 }}>
+      {showMap ? <View style={{ ...column, flex: 1, minWidth: 0, gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 2 }}>
+          {narrow ? backBtn(() => setPane('list')) : null}
           <Glyph name="globe" color={t.accent} />
           <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
             {(sel ? tr('monitor.net.mapOf', { app: labelOf(tr, sel) }) : tr('monitor.net.map')) + ' · ' +
@@ -969,14 +981,15 @@ export function NetworkTab({ last, prefs }) {
           </Text>
           {(sel || selPlace) && <View onClick={() => { setSelected(null); setPlace(null); }}><Text style={{ fontSize: 11, color: t.accent }}>{tr('monitor.net.showAll')}</Text></View>}
         </View>
-        <MapView places={places} home={info?.home} selected={place} onSelect={setPlace} fitKey={selected || ''} geoOn={prefs.geo !== false && info?.geo} />
+        <MapView places={places} home={info?.home} selected={place} onSelect={(cc) => { setPlace(cc); if (tight && cc) setPane('list'); }} fitKey={selected || ''} geoOn={prefs.geo !== false && info?.geo} />
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2 }}>
           <Text style={{ flex: 1, fontSize: 9, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('monitor.net.privacyShort')}</Text>
           <View onClick={() => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } })}><Text style={{ fontSize: 9, color: t.accent, whiteSpace: 'nowrap' }}>{tr('monitor.net.privacyLink')}</Text></View>
         </View>
-      </View>
+      </View> : null}
       {/* derecha */}
-      <View style={{ ...column, width: 270, padding: 12 }}>
+      {showDetail ? <View style={{ ...column, ...(detailOne ? { flex: 1, minWidth: 0 } : { width: narrow ? 240 : 270 }), padding: 12 }}>
+        {detailOne ? <View style={{ flexDirection: 'row', marginTop: -4, marginBottom: 4 }}>{backBtn(() => { setSelected(null); setPlace(null); setHost(null); })}</View> : null}
         <ScrollView style={{ flex: 1, marginHorizontal: -12 }} contentStyle={{ paddingHorizontal: 12 }}>
           <View style={{ gap: 16 }}>
             {selPlace ? <PlaceDetail p={selPlace} tr={tr} /> : sel?.key === REMOTE_KEY ? <RemoteDetail rd={rd} Section={Section} KV={KV} tr={tr} /> : sel ? (
@@ -984,7 +997,7 @@ export function NetworkTab({ last, prefs }) {
             ) : <Summary groups={apps} conns={conns} last={last} tr={tr} fw={fw} names={names} range={range} sysHist={sysHist} launcher={launcher} lists={lists} />}
           </View>
         </ScrollView>
-      </View>
+      </View> : null}
       {sheet ? (
         <RuleSheet overlay app={sheet.app} appLabel={sheet.label} initial={{ dst: sheet.dst, action: sheet.action }} suggestions={sheet.suggestions} note={sheet.note}
           onDone={() => setSheet(null)} />

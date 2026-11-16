@@ -5,6 +5,7 @@ import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
@@ -351,42 +352,53 @@ export default function Notes() {
     const id = setInterval(() => { if (root.current) { const w = lord.getLayout(root.current.id)[2]; if (Math.abs(w - winW) > 2) setWinW(w); } }, 300);
     return () => clearInterval(id);
   }, [winW]);
-  const sideW = winW < 720 ? 200 : 240;
+  // a small window: the list goes behind a button in the toolbar and opens over the note (kept beside the empty state)
+  const sb = useSidebar(640, 'list');
+  const sideInline = !sb.narrow || !note;
+  const sideW = !sideInline ? 0 : winW < 720 ? 200 : 240;
   const compact = winW - sideW < 470;
   const colorItems = note ? COLORS.map((c) => ({ label: tr(`notes.color.${c}`), checked: c === note.color, onClick: () => updateNote(note.slug, { color: c }, { touch: false }) })) : [];
-  return (
-    <View ref={root} {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: sideW, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>
-        <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <SearchField value={q} onChange={setQ} placeholder={tr('notes.search')} style={{ flex: 1 }} />
-          <ToolbarButton icon="✎" title={tr('notes.new')} onClick={newNote} />
-        </View>
-        <ScrollView style={{ flex: 1 }}>
-          {shown.map((n) => {
-            const on = note && n.slug === note.slug;
-            const pv = previewOf(n.body);
-            return (
-              <View key={n.slug} onClick={() => { setSel(n.slug); setMode('read'); }} style={{ flexDirection: 'row', gap: 10, paddingVertical: 9, paddingHorizontal: 10,
-                borderRadius: 8, marginBottom: 2, backgroundColor: on ? th.accent : 'transparent' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 5, backgroundColor: PAPER[n.color][1], border: '1px solid rgba(0,0,0,0.12)' }} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ fontSize: 13, fontWeight: 600, color: on ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{n.title || tr('notes.untitled')}</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, overflow: 'hidden' }}>
-                    <Text style={{ fontSize: 11, color: on ? 'rgba(255,255,255,0.85)' : th.text, whiteSpace: 'nowrap' }}>{fmtDate(n.updated, formatDate)}</Text>
-                    <Text style={{ flex: 1, fontSize: 11, color: on ? 'rgba(255,255,255,0.75)' : th.textDim, whiteSpace: 'nowrap', overflow: 'hidden',
-                      direction: n.desktop ? 'inherit' : textDirection(pv) }}>{n.desktop ? tr('notes.onDesktop') : pv}</Text>
-                  </View>
+  const side = (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <SearchField value={q} onChange={setQ} placeholder={tr('notes.search')} style={{ flex: 1 }} />
+        <ToolbarButton icon="✎" title={tr('notes.new')} onClick={() => { newNote(); if (sb.narrow) sb.close(); }} />
+      </View>
+      <ScrollView style={{ flex: 1 }}>
+        {shown.map((n) => {
+          const on = note && n.slug === note.slug;
+          const pv = previewOf(n.body);
+          return (
+            <View key={n.slug} onClick={() => { setSel(n.slug); setMode('read'); if (sb.narrow) sb.close(); }} style={{ flexDirection: 'row', gap: 10, paddingVertical: 9, paddingHorizontal: 10,
+              borderRadius: 8, marginBottom: 2, backgroundColor: on ? th.accent : 'transparent' }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 5, backgroundColor: PAPER[n.color][1], border: '1px solid rgba(0,0,0,0.12)' }} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: 13, fontWeight: 600, color: on ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{n.title || tr('notes.untitled')}</Text>
+                <View style={{ flexDirection: 'row', gap: 6, overflow: 'hidden' }}>
+                  <Text style={{ fontSize: 11, color: on ? 'rgba(255,255,255,0.85)' : th.text, whiteSpace: 'nowrap' }}>{fmtDate(n.updated, formatDate)}</Text>
+                  <Text style={{ flex: 1, fontSize: 11, color: on ? 'rgba(255,255,255,0.75)' : th.textDim, whiteSpace: 'nowrap', overflow: 'hidden',
+                    direction: n.desktop ? 'inherit' : textDirection(pv) }}>{n.desktop ? tr('notes.onDesktop') : pv}</Text>
                 </View>
               </View>
-            );
-          })}
-          {!shown.length && <Text style={{ fontSize: 12, color: th.textDim, margin: 10 }}>{loaded ? tr('notes.none') : '…'}</Text>}
-        </ScrollView>
+            </View>
+          );
+        })}
+        {!shown.length && <Text style={{ fontSize: 12, color: th.textDim, margin: 10 }}>{loaded ? tr('notes.none') : '…'}</Text>}
+      </ScrollView>
+    </>
+  );
+  return (
+    <View ref={root} {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
+      {sideInline && (
+      <View style={{ width: sideW, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>
+        <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
+        {side}
       </View>
+      )}
       {note ? (
         <View style={{ flex: 1 }}>
           <Toolbar>
+            {sb.narrow && <SidebarToggle shown={sb.shown} onClick={sb.toggle} />}
             <Segmented appearance="neutral" value={mode} onChange={setMode} options={[['read', tr('notes.read')], ['edit', tr('notes.edit')]]} />
             {!compact && <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginLeft: 8 }}>
               {COLORS.map((c) => <Dot key={c} color={c} size={14} selected={c === note.color} onClick={() => updateNote(note.slug, { color: c }, { touch: false })} />)}
@@ -431,6 +443,11 @@ export default function Notes() {
       ) : (
         <EmptyState icon={<Icon size={56} />} title={tr('notes.none')} hint={tr('notes.noneHint')}
           action={<Button primary label={tr('notes.new')} onClick={newNote} />} />
+      )}
+      {!sideInline && sb.shown && (
+        <SidebarOverlay width={240} onClose={sb.close}>
+          <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>{side}</View>
+        </SidebarOverlay>
       )}
       {/* over everything else, so it is not drawn under the note */}
       <FilesDropHint over={drop.over} title={drop.over && (drop.over.files.length ? tr(note ? 'notes.drop.add' : 'notes.drop.addNew', { count: drop.over.files.length }) : tr('notes.drop.none'))}

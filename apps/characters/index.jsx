@@ -3,7 +3,7 @@
 // click picks one; "Copy" puts it on the clipboard.
 import {
   View, Text, Button, Segmented, ScrollView, SidebarItem, Toolbar, ToolbarSpacer, Hairline, SearchField, EmptyState, useTheme, clipboard, emoji,
-  EmojiGrid, EmojiToneBar, typeScale, t as tr,
+  EmojiGrid, EmojiToneBar, typeScale, t as tr, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useMemo, useState } from 'react';
 
@@ -32,8 +32,28 @@ const SYMBOL_BLOCKS = [
 // Inspector of the picked character (an empty state until there is one), with a hairline on its
 // leading edge.
 const PREVIEW_W = 200;
-function Preview({ ch, th }) {
+function Preview({ ch, th, narrow }) {
   const edge = <Hairline edge="start" />;
+  // a narrow window: the picked character in a strip under the grid (nothing until there is one)
+  if (narrow) {
+    if (!ch) return null;
+    const cps = [...ch].map((c) => `U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`).join(' ');
+    const name = emoji.name(ch);
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: th.sidebarBg }}>
+        <Hairline edge="top" />
+        <View style={{ width: 52, height: 52, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: th.mode === 'dark' ? 'rgba(255,255,255,0.06)' : '#ffffff', border: `1px solid ${th.separator}` }}>
+          <Text style={{ fontSize: 30, color: th.text, lineHeight: 44 }}>{ch}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          {name ? <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</Text> : null}
+          <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start', direction: 'ltr' }}>{cps}</Text>
+        </View>
+        <Button primary label={tr('characters.copy')} onClick={() => clipboard.set(ch)} />
+      </View>
+    );
+  }
   if (!ch) {
     return (
       <View style={{ width: PREVIEW_W, backgroundColor: th.sidebarBg }}>
@@ -66,6 +86,7 @@ export default function Characters() {
   const [block, setBlock] = useState(0);
   const [tone, setTone] = useState(emoji.tone());
   const [pick, setPick] = useState(null);
+  const sb = useSidebar(640);
   const groups = emoji.groups();
   const list = useMemo(() => (q.trim() ? emoji.search(q, 400) : group === 'recent' ? emoji.recents() : groups.find((g) => g.id === group)?.list || []), [q, group]);
   const chars = useMemo(() => {
@@ -78,47 +99,54 @@ export default function Characters() {
   const side = tab === 'emoji'
     ? [['recent', tr('emoji.group.recent')], ...groups.map((g) => [g.id, tr(`emoji.group.${g.id}`)])]
     : SYMBOL_BLOCKS.map((b, i) => [i, tr(`characters.block.${b[0]}`)]);
+  // picking a category in a narrow window closes the sidebar over the grid
+  const sidebar = (
+    <ScrollView resetKey={tab} style={{ flex: 1, paddingHorizontal: 10, paddingTop: 10 }}>
+      {side.map(([id, label]) => {
+        const on = tab === 'emoji' ? (!q.trim() && group === id) : block === id;
+        return <SidebarItem key={id} label={label} selected={on} onClick={() => { if (tab === 'emoji') { setQ(''); setGroup(id); } else setBlock(id); if (sb.narrow) sb.close(); }} />;
+      })}
+      <View style={{ height: 10 }} />
+    </ScrollView>
+  );
   return (
     <View style={{ flex: 1 }}>
       <Toolbar>
+        <SidebarToggle shown={sb.shown} onClick={sb.toggle} />
         <Segmented appearance="neutral" value={tab} onChange={(v) => { setTab(v); setPick(null); }}
           options={[['emoji', tr('characters.tab.emoji')], ['symbols', tr('characters.tab.symbols')]]} />
         <ToolbarSpacer />
-        {tab === 'emoji' && <EmojiToneBar tone={tone} onTone={(n) => { setTone(n); emoji.setTone(n); }} th={th} />}
-        {tab === 'emoji' && <SearchField value={q} onChange={setQ} placeholder={tr('emoji.search')} width={180} />}
+        {tab === 'emoji' && <EmojiToneBar tone={tone} onTone={(n) => { setTone(n); emoji.setTone(n); }} th={th} size={sb.narrow ? 18 : 22} />}
+        {tab === 'emoji' && <SearchField value={q} onChange={setQ} placeholder={tr('emoji.search')}
+          width={sb.narrow ? undefined : 180} style={sb.narrow ? { flex: 1, minWidth: 80, maxWidth: 180 } : null} />}
       </Toolbar>
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        <View style={{ width: 180, backgroundColor: th.sidebarBg }}>
-          <ScrollView resetKey={tab} style={{ flex: 1, paddingHorizontal: 10, paddingTop: 10 }}>
-            {side.map(([id, label]) => {
-              const on = tab === 'emoji' ? (!q.trim() && group === id) : block === id;
-              return <SidebarItem key={id} label={label} selected={on} onClick={() => { if (tab === 'emoji') { setQ(''); setGroup(id); } else setBlock(id); }} />;
-            })}
-            <View style={{ height: 10 }} />
-          </ScrollView>
-          <Hairline edge="end" />
-        </View>
-        <View style={{ flex: 1, minWidth: 0, direction: 'ltr' }}>
-          {tab === 'emoji' ? (
-            list.length ? (
-              <ScrollView resetKey={`${group}|${q}`} style={{ flex: 1, padding: 12 }}>
-                <EmojiGrid list={list} sel={-1} picked={pick} onPick={choose} tone={tone} size={44} th={th} wrap />
+        {sb.shown && !sb.narrow ? <View style={{ width: 180, backgroundColor: th.sidebarBg }}>{sidebar}<Hairline edge="end" /></View> : null}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flex: 1, minWidth: 0, direction: 'ltr' }}>
+            {tab === 'emoji' ? (
+              list.length ? (
+                <ScrollView resetKey={`${group}|${q}`} style={{ flex: 1, padding: 12 }}>
+                  <EmojiGrid list={list} sel={-1} picked={pick} onPick={choose} tone={tone} size={44} th={th} wrap />
+                </ScrollView>
+              ) : <EmptyState title={group === 'recent' && !q.trim() ? tr('emoji.noRecent') : tr('emoji.none')} />
+            ) : (
+              <ScrollView resetKey={block} style={{ flex: 1, padding: 12 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {chars.map((ch) => (
+                    <View key={ch} onClick={() => choose(ch)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8,
+                      backgroundColor: pick === ch ? th.accent : 'transparent' }}>
+                      <Text style={{ fontSize: 20, color: pick === ch ? '#fff' : th.text }}>{ch}</Text>
+                    </View>
+                  ))}
+                </View>
               </ScrollView>
-            ) : <EmptyState title={group === 'recent' && !q.trim() ? tr('emoji.noRecent') : tr('emoji.none')} />
-          ) : (
-            <ScrollView resetKey={block} style={{ flex: 1, padding: 12 }}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {chars.map((ch) => (
-                  <View key={ch} onClick={() => choose(ch)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8,
-                    backgroundColor: pick === ch ? th.accent : 'transparent' }}>
-                    <Text style={{ fontSize: 20, color: pick === ch ? '#fff' : th.text }}>{ch}</Text>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-          )}
+            )}
+          </View>
+          {sb.narrow ? <Preview ch={pick} th={th} narrow /> : null}
         </View>
-        <Preview ch={pick} th={th} />
+        {sb.narrow ? null : <Preview ch={pick} th={th} />}
+        {sb.shown && sb.narrow ? <SidebarOverlay width={200} onClose={sb.close}>{sidebar}</SidebarOverlay> : null}
       </View>
     </View>
   );

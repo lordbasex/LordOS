@@ -374,7 +374,7 @@ export function FilesMode({ t, wid, sid, startLocal }) {
         {btn(tr('terminal.files.hidden'), () => setHidden((h) => !h), { on: hidden })}
         <Text style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{msg || tr('terminal.files.autoRefresh')}</Text>
         {btn(tr('terminal.files.asRoot'), toggleRoot, { on: root, danger: true })}
-        <TextInput value={filter} onChange={setFilter} placeholder={tr('terminal.files.filter')} style={{ width: 130 }} />
+        <TextInput value={filter} onChange={setFilter} placeholder={tr('terminal.files.filter')} style={{ width: 130, flexShrink: 1, minWidth: 70 }} />
       </View>
       <View style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
         {pane('local')}
@@ -518,7 +518,7 @@ function Sheet({ t, sheet, setSheet, onApply, onSha }) {
   const plain = s.kind === 'info';
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', paddingTop: 70 }}>
-      <View style={{ width: 460, padding: 16, gap: 12, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 18px 44px rgba(0,0,0,0.5)' }}>
+      <View style={{ width: 460, maxWidth: '92%', padding: 16, gap: 12, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 18px 44px rgba(0,0,0,0.5)' }}>
         <Text style={{ fontSize: 13.5, fontWeight: 600, color: t.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</Text>
         {s.path && !plain && <Text style={{ fontFamily: MONO, fontSize: 11.5, color: t.textDim, textAlign: 'start', direction: 'ltr' }}>{s.path}</Text>}
         {plain && <Text style={{ fontFamily: MONO, fontSize: 11.5, color: t.textDim, textAlign: 'start', direction: 'ltr' }}>{s.path}</Text>}

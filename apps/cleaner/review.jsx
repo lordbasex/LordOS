@@ -2,7 +2,7 @@
 // number and the real things behind it. A card appears only for what the scan really found.
 import { View, Image, cleaner, useThumb, t as tr, formatBytes, formatNumber, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
-import { Label, Glass, GlassButton, Enter, CountUp, Tile, Bar, useFrame, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Enter, CountUp, Tile, Bar, useFrame, useRail, ASIDE, usePal } from './ui.jsx';
 import { folderKinds, folderKind } from './storage.jsx';
 
 const TYPE_ICON = { image: 'pictures', video: 'videos', audio: 'music', document: 'documents', code: 'code' };
@@ -106,7 +106,8 @@ export function ReviewBoard({ rules, tree, dups, go }) {
   const home = useMemo(() => (tree ? cleaner.tree(tree.id, 0, ROWS) : null), [tree && tree.id]);
   const kinds = useMemo(folderKinds, []);
   const small = !!useFrame((g) => g.h < 660);
-  const cardWidth = (useFrame((g) => g.w) || 1100) / 2 - 162 - spacing.l * 2;   // half of what the sidebar and margins leave
+  const rail = useRail();
+  const cardWidth = ((useFrame((g) => g.w) || 1100) - ASIDE(rail) - 12) / 2 - spacing.l * 2;   // half of what the sidebar and margins leave
   const shown = small ? 2 : ROWS;
   const cats = rules ? rules.rules.filter((r) => r.files > 0 && r.action !== 'none' && !r.explicit).sort((a, b) => b.allocated - a.allocated) : [];
   const cleanup = rules ? rules.estimated : 0, reclaim = dups ? dups.reclaim : 0, total = cleanup + reclaim;

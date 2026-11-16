@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useKeyboard, useWindowState, usePim, addressBooks, contacts, contactName,
   Button, TextInput, SearchField, Hairline, EmptyState, ToolbarButton, FilePicker, addListener, direction, formatNumber, t,
-  isolatedPim, pickFileFd, closeFileFd, openDavSetup, openMailAccounts,
+  isolatedPim, pickFileFd, closeFileFd, openDavSetup, openMailAccounts, useSidebar, useNarrow, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RED, Sheet, Popover, MenuList, Layers, useLoad } from './ui.jsx';
@@ -33,6 +33,9 @@ export function Icon({ size: s }) {
 }
 
 const ROW = 30, HEAD = 24;
+// a small window (a Lord Workspaces tile): below SIDE_AT the books and groups hide behind a toolbar button, below
+// ONE_AT the list and the card take turns (the card with a back button)
+const SIDE_AT = 800, ONE_AT = 640;
 
 const sortKey = (c) => {
   const n = c.n || {};
@@ -64,6 +67,9 @@ export default function ContactsApp() {
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState(null);                // the contact being edited (edit mode)
   const [sheet, setSheet] = useState(null);                // { group } | { newGroup } | { pick: 'vcf' } | { confirm: contact } | { notice }
+  const side = useSidebar(SIDE_AT);
+  const single = useNarrow(ONE_AT);
+  const [opened, setOpened] = useState(false);              // one pane at a time: the card instead of the list
 
   const people = useMemo(() => all.filter((c) => c.kind !== 'group'), [all]);
   const groups = useMemo(() => all.filter((c) => c.kind === 'group').sort((a, b) => compareNames(contactName(a), contactName(b))), [all]);
@@ -93,7 +99,7 @@ export default function ContactsApp() {
     const r = await addressBooks.create({ name: t('contacts.defaultBook') });
     return r.uid;
   };
-  const startNew = () => setDraft({ ...blankContact(), _new: true });
+  const startNew = () => { setDraft({ ...blankContact(), _new: true }); setOpened(true); };
   const saveDraft = async (c, photo) => {
     const isNew = !!c._new;
     const book = isNew ? await targetBook() : c.book;
@@ -132,18 +138,23 @@ export default function ContactsApp() {
     if (f) importVcf(f);
   };
 
+  const sources = (
+    <Sources books={books} groups={groups} src={src} counts={people} onSrc={(s) => { setSrc(s); setDraft(null); setOpened(false); if (side.narrow) side.close(); }}
+      onNewGroup={() => setSheet({ newGroup: true })} onImport={startImport}
+      onRenameGroup={(g) => setSheet({ group: g })} onDeleteGroup={(g) => { contacts.remove(g.book, g.uid).catch(() => {}); if (src === `group:${keyOf(g)}`) setSrc('all'); }} />
+  );
+
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      <Sources books={books} groups={groups} src={src} counts={people} onSrc={(s) => { setSrc(s); setDraft(null); }}
-        onNewGroup={() => setSheet({ newGroup: true })} onImport={startImport}
-        onRenameGroup={(g) => setSheet({ group: g })} onDeleteGroup={(g) => { contacts.remove(g.book, g.uid).catch(() => {}); if (src === `group:${keyOf(g)}`) setSrc('all'); }} />
-      <View style={{ width: 270 }}>
+      {side.shown && !side.narrow ? sources : null}
+      {single && (opened || draft) ? null : <View style={single ? { flex: 1, minWidth: 0 } : { width: 270 }}>
         <Hairline edge="end" />
         <View style={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
           <SearchField value={query} onChange={setQuery} placeholder={t('contacts.search')} style={{ flex: 1 }} />
         </View>
         {unavailable ? null : list.length ? (
-          <ContactList list={list} cur={cur} onPick={(c) => { setDraft(null); setCur(keyOf(c)); }} />
+          <ContactList list={list} cur={cur} onPick={(c) => { setDraft(null); setCur(keyOf(c)); setOpened(true); }} />
         ) : (
           <EmptyState title={query ? t('contacts.noResults') : t('contacts.noContacts')} />
         )}
@@ -153,8 +164,14 @@ export default function ContactsApp() {
           <Text style={{ flex: 1, fontSize: 11, color: th.textDim, textAlign: 'center', whiteSpace: 'nowrap' }}>{t('contacts.count', { count: list.length, n: formatNumber(list.length, 0) })}</Text>
           <View style={{ width: 22 }} />
         </View>
-      </View>
-      <View style={{ flex: 1 }}>
+      </View>}
+      {single && !(opened || draft) ? null : <View style={{ flex: 1, minWidth: 0 }}>
+        {single && !draft ? (
+          <View style={{ height: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
+            <Hairline edge="bottom" />
+            <ToolbarButton small icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} title={t('files.menu.back')} onClick={() => setOpened(false)} />
+          </View>
+        ) : null}
         {unavailable ? (
           <EmptyState mascot="confused" title={t('contacts.unavailable')} hint={t('contacts.unavailableHint')} />
         ) : draft ? (
@@ -165,7 +182,8 @@ export default function ContactsApp() {
         ) : (
           <EmptyState icon={<PersonGlyph size={44} color={th.textDim} />} title={t('contacts.noSelection')} />
         )}
-      </View>
+      </View>}
+      {side.shown && side.narrow ? <SidebarOverlay width={212} onClose={side.close}>{sources}</SidebarOverlay> : null}
       {sheet && (sheet.newGroup || sheet.group) ? (
         <GroupSheet group={sheet.group} onClose={() => setSheet(null)} onSave={async (name) => {
           if (sheet.group) await contacts.save(sheet.group.book, { ...sheet.group, fn: name }, {});

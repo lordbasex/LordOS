@@ -45,7 +45,7 @@ function Sheet({ width = 460, top, onClose, children, label }) {
   return (
     <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center', justifyContent: top == null ? 'center' : 'flex-start', paddingTop: top || 0 }}>
-      <View aria-label={label} style={{ width, maxHeight: '96%', borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg,
+      <View aria-label={label} style={{ width, maxWidth: '96%', maxHeight: '96%', borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg,
         border: `1px solid ${t.separator}`, boxShadow: '0 30px 80px rgba(0,0,0,0.55)', overflow: 'hidden' }}>
         {children}
       </View>

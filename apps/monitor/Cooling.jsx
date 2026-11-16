@@ -7,7 +7,7 @@ import {
   FanCurveChart, formatTemp, formatNumber, typeScale, wm, FAN_HISTORY,
 } from '@lordos/sdk';
 import { useMemo, useState } from 'react';
-import { Card, Big, Stat, useCardStyle } from './index.jsx';
+import { Card, Big, Stat, StatRow, useCardStyle } from './index.jsx';
 import { Chart } from './Chart.jsx';
 
 const C = { temp: '#ff9f0a', fan: '#32ade6' };
@@ -63,7 +63,7 @@ export function CoolingTab() {
           </Card>
         </View>
       )}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <StatRow>
         <Stat icon="temp" label={tr('monitor.cpuTemp')} value={s?.temp != null ? formatNumber(Math.round(s.temp), 0) : '—'} unit={s?.temp != null ? '°C' : null} />
         <Stat label={tr('cooling.profile')} value={profile} />
         <Stat label={tr('cooling.step')} value={step} />
@@ -73,7 +73,7 @@ export function CoolingTab() {
         {(s?.firmwareFans || []).map((f, i) => (
           <Stat key={`r${i}`} icon="fan" label={tr('cooling.firmwareFan', { n: i + 1 })} value={f.rpm >= 0 ? formatNumber(f.rpm, 0) : '—'} unit={tr('monitor.rpm')} />
         ))}
-      </View>
+      </StatRow>
     </>
   );
 }

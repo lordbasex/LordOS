@@ -116,7 +116,12 @@ function Globe({ color }) {
   );
 }
 
-function Sidebar({ s }) {
+// A small window hides the steps behind a button in the footer; the desktop app's platform has no such hook.
+const SIDE_BELOW = 700;
+const WIDE = { narrow: false, shown: true, toggle() {}, close() {} };
+const useSide = platform.useSidebar ? () => platform.useSidebar(SIDE_BELOW, 'imager') : () => WIDE;
+
+function Sidebar({ s, onPick, fill }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const dev = deviceById(s.device);
@@ -129,7 +134,7 @@ function Sidebar({ s }) {
   if (s.step === 'customise' && s.customise) tip = `tab.${s.tab}`;
   const pose = HELP[tip] || HELP[s.step] || 'wave';
   return (
-    <View style={{ width: 236, backgroundColor: t.sidebarBg, borderEndWidth: 1, borderEndColor: t.separator, paddingHorizontal: 12, paddingTop: 18, paddingBottom: 14 }}>
+    <View style={{ width: 236, ...(fill ? { flex: 1 } : null), backgroundColor: t.sidebarBg, borderEndWidth: 1, borderEndColor: t.separator, paddingHorizontal: 12, paddingTop: 18, paddingBottom: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginBottom: 20 }}>
         <ImagerIcon size={34} />
         <View style={{ flex: 1 }}>
@@ -143,7 +148,7 @@ function Sidebar({ s }) {
           const reachable = !writing && s.step !== 'done' && i <= cur;
           return (
             <Press key={id} id={`step-${id}`} label={tr(`imager.step.${id}`)} role="tab" selected={here} disabled={!reachable && !here}
-              onClick={reachable ? () => set({ step: id }) : undefined}
+              onClick={reachable ? () => { set({ step: id }); onPick?.(); } : undefined}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 8,
                 backgroundColor: here ? (t.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : 'transparent', opacity: 1 }}>
               <View style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
@@ -172,7 +177,7 @@ function Sidebar({ s }) {
   );
 }
 
-function Footer({ s }) {
+function Footer({ s, side }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   if (s.step === 'done' || (s.step === 'write' && s.job)) return null;
@@ -180,6 +185,7 @@ function Footer({ s }) {
   const isWrite = s.step === 'write';
   return (
     <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: t.separator }}>
+      {side ? <platform.SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
       <View style={{ flex: 1 }} />
       {!first ? <Button label={tr('imager.back')} onClick={back} /> : null}
       {isWrite ? <Button primary label={tr('imager.write.start')} style={{ backgroundColor: '#e5484d' }} onClick={() => set({ dialog: 'confirm' })} />
@@ -192,6 +198,7 @@ export default function Imager() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const s = useStore(app);
+  const side = useSide();
   useFocusKeys({ onEscape: back });
   useEffect(() => { loadReleases(); }, []);
   if (!platform.available()) {
@@ -207,15 +214,16 @@ export default function Imager() {
   const Layer = platform.Layer;
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.windowBg }}>
-      <Sidebar s={s} />
+      {side.narrow ? null : <Sidebar s={s} />}
       <View style={{ flex: 1, minWidth: 0 }}>
         {s.step === 'customise' || s.step === 'done' ? <Step s={s} /> : (
           <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: 28, paddingTop: 24, paddingBottom: 24 }}>
             <Step s={s} />
           </ScrollView>
         )}
-        <Footer s={s} />
+        <Footer s={s} side={side.narrow ? side : null} />
       </View>
+      {side.narrow && side.shown ? <platform.SidebarOverlay width={236} onClose={side.close}><Sidebar s={s} onPick={side.close} fill /></platform.SidebarOverlay> : null}
       {s.dialog === 'options' ? <OptionsDialog s={s} /> : null}
       <WriteDialogs s={s} />
       {Layer ? <Layer /> : null}

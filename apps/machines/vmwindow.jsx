@@ -5,7 +5,7 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
-  inhibitShortcuts, t as tr,
+  inhibitShortcuts, useNarrow, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
@@ -86,7 +86,7 @@ function AgentPop({ ctl, onClose }) {
 
 // The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
 // shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
-function Tools({ ctl, floating }) {
+function Tools({ ctl, floating, compact }) {
   const { st, a, follow, cfg } = ctl;
   // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
@@ -122,15 +122,15 @@ function Tools({ ctl, floating }) {
         <AgentButton ctl={ctl} />
         <IconMenuBtn icon={icons.clipboard} label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
         <IconMenuBtn icon={icons.folder} label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
-        <IconBtn icon={icons.apps} label={tr('machines.tb.appsLater')} disabled />
+        {compact ? null : <IconBtn icon={icons.apps} label={tr('machines.tb.appsLater')} disabled />}
       </BarGroup>
-      <BarSep />
+      {compact ? null : <BarSep />}
     </> : null}
     <BarGroup>
       <IconMenuBtn glyph="⛶" size={15} label={resLabel} items={res} disabled={!a.keys} on={!follow} />
       <IconMenuBtn glyph="⏏" label={tr('machines.tb.devices')} items={ctl.devices} />
     </BarGroup>
-    <BarSep />
+    {compact ? null : <BarSep />}
     <BarGroup>
       {!floating ? <IconBtn glyph=">_" size={12} label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
       <IconBtn glyph="≡" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
@@ -139,13 +139,13 @@ function Tools({ ctl, floating }) {
         : <IconBtn icon={icons.record} color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
     </BarGroup>
     {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
-    <BarSep />
+    {compact ? null : <BarSep />}
     <BarGroup>
       {a.start ? <IconBtn glyph="▶" color="#30d158" label={st?.suspended || stateView(st?.state, st?.reason).key === 'suspended' ? tr('machines.cmd.resume') : tr('machines.start')} onClick={ctl.begin} />
         : <IconBtn glyph={a.resume ? '▶' : null} icon={a.resume ? null : icons.pause} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />}
       <IconMenuBtn icon={icons.power} label={tr('machines.cmd.power')} items={ctl.power} disabled={a.start} />
     </BarGroup>
-    <BarSep />
+    {compact ? null : <BarSep />}
     <BarGroup>
       {!floating ? <IconBtn glyph="⚙" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
       {floating ? <IconBtn glyph="⤡" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
@@ -157,13 +157,16 @@ function Tools({ ctl, floating }) {
 function Header({ ctl, name }) {
   const p = usePal();
   const v = stateView(ctl.st?.state, ctl.st?.reason);
+  // a small window: the name and state are in the window's title already; the tools lose their separators and the
+  // placeholder for apps, so they still fit on the bar
+  const compact = useNarrow();
   return (
-    <View style={{ height: BAR, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, backgroundColor: p.raised }}>
+    <View style={{ height: BAR, flexDirection: 'row', alignItems: 'center', gap: compact ? 4 : 6, paddingHorizontal: compact ? 8 : 12, backgroundColor: p.raised }}>
       <StateDot tone={v.tone} size={9} />
-      <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 260 }}>{name}</Text>
-      <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{tr(`machines.state.${v.key}`)}</Text>
+      {compact ? null : <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 260 }}>{name}</Text>}
+      {compact ? null : <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{tr(`machines.state.${v.key}`)}</Text>}
       <View style={{ flex: 1 }} />
-      <Tools ctl={ctl} />
+      <Tools ctl={ctl} compact={compact} />
     </View>
   );
 }

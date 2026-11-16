@@ -7,7 +7,7 @@
 // disk-unmount, disk-eject and disk-cancel (the Disks app's). The first-run file goes onto the
 // card's boot partition through lord.fs, mounted for the user like any USB stick.
 import { createElement as h } from 'react';
-import { admin, disks, fs, settings, keyboard, sound, notify, t, FilePicker, createStore, useStore } from '@lordos/sdk';
+import { admin, disks, fs, settings, keyboard, sound, notify, t, FilePicker, createStore, useStore, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import zonesData from './data/zones.json';
 import layoutsData from './data/layouts.json';
 
@@ -152,6 +152,10 @@ export const platform = {
   // the language and theme follow LordOS; updates come with LordOS itself
   followsSystem: true,
   appUpdates: null,
+
+  // a small window (a tile of Lord Workspaces): the steps hide behind a button and open over the step (sdk/narrow.jsx).
+  // The desktop app leaves these out and keeps its sidebar.
+  useSidebar, SidebarToggle, SidebarOverlay,
 
   done({ title, body, sound: withSound }) {
     if (withSound) sound.play('notify');

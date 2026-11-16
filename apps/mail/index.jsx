@@ -6,7 +6,7 @@ import {
   View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, TextInput, ScrollView, t, wm, fs, monthName, formatDate, formatTime,
   Toolbar, ToolbarButton, ToolbarSpacer, ToolbarDivider, SearchField, Hairline, direction, textDirection, Disclosure as SdkDisclosure,
   mailRequest, onMailEvent, mailStatus, mailConfig, mailAccounts, mailAvailable, addListener, clipboard, registerDockActions,
-  trackMailStatus, isolatedPim, saveFile,
+  trackMailStatus, isolatedPim, saveFile, useSidebar, useNarrow, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { HtmlView, TextView } from './HtmlView.jsx';
@@ -16,6 +16,10 @@ import { folderTree, toggleCollapsed, accountUnread } from './foldertree.js';
 import { CATEGORY_COLORS, categoryName, listDate, fullDate, folderName, addrShort, formatSize, openPath, revealPath } from './util.js';
 import { quote } from './md.js';
 import { safeName } from './util.js';
+
+// a small window (a Lord Workspaces tile): below SIDE_AT the accounts and folders hide behind a toolbar button, below
+// ONE_AT the list and the message take turns (the message with a back button)
+const SIDE_AT = 820, ONE_AT = 640;
 
 const ROW = 86;                 // sender, subject and two lines of preview, with room to breathe
 
@@ -479,8 +483,17 @@ function MailMain() {
   const compact = rootW > 100 && rootW < 1000;      // narrower panes in small windows
   const sideW = compact ? 200 : 220, listW = compact ? 290 : 330;
   const accounts = cfg.accounts.filter((a) => a.kind === 'mail');
+  const side = useSidebar(SIDE_AT);
+  const single = useNarrow(ONE_AT);
+  const [opened, setOpened] = useState(false);          // one pane at a time: the message instead of the list
 
   useEffect(() => { setLoadErr(''); }, [JSON.stringify(src)]);
+  // another mailbox: a small window's sidebar closes and the list comes back (not for a message opened from elsewhere)
+  const keepOpen = useRef(false);
+  useEffect(() => {
+    if (side.narrow && side.shown) side.close();
+    if (keepOpen.current) keepOpen.current = false; else setOpened(false);
+  }, [JSON.stringify(src)]);
   const loadFolders = () => mailRequest('folders').then((r) => setFolders(r.accounts || [])).catch(() => {});
   useEffect(() => {
     loadFolders();
@@ -500,7 +513,9 @@ function MailMain() {
     if (args?.setup === 'dav') setSheet({ setup: 'dav', preset: typeof args.preset === 'string' ? args.preset : 'other' });
     if (typeof args?.accounts === 'string') setSheet({ accounts: args.accounts, confirm: !!args.remove });
     if (args?.acct && args?.folder) {
-      setSrc({ kind: 'folder', acct: args.acct, folder: args.folder });
+      const to = { kind: 'folder', acct: args.acct, folder: args.folder };
+      if (args.uid) { keepOpen.current = JSON.stringify(to) !== JSON.stringify(src); setOpened(true); }
+      setSrc(to);
       if (args.uid) openItem({ acct: args.acct, folder: args.folder, uid: args.uid });
     }
   }, [args?.nonce]);
@@ -655,7 +670,7 @@ function MailMain() {
 
   // ---- sidebar ----
   const sidebar = (
-    <View style={{ width: sideW, backgroundColor: th.sidebarBg }}>
+    <View style={{ width: sideW, flex: side.narrow ? 1 : undefined, backgroundColor: th.sidebarBg }}>
       <Hairline edge="end" />
       <ScrollView style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10, gap: 1 }}>
@@ -726,8 +741,11 @@ function MailMain() {
 
   // toolbar: icon-only items with tooltips, as in Mail; the ones that need a message are dimmed
   const glyphColor = () => th.text;            // ToolbarButton dims disabled items itself
+  const reading1 = single && opened && !!sel;   // one pane at a time, showing the message
   const toolbar = (
-    <Toolbar>
+    <Toolbar style={side.narrow ? { gap: 4, paddingHorizontal: 8 } : null}>
+      {side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
+      {reading1 ? <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} title={t('files.menu.back')} onClick={() => setOpened(false)} /> : null}
       <ToolbarButton icon="✎" title={t('mail.new')} onClick={() => compose()} />
       <ToolbarDivider />
       <ToolbarButton icon="↩" title={t('mail.reply')} disabled={!msg} onClick={act.reply} />
@@ -755,11 +773,11 @@ function MailMain() {
   const noAccounts = !accounts.length;
   return (
     <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      {sidebar}
-      <View style={{ flex: 1 }}>
+      {side.narrow ? null : sidebar}
+      <View style={{ flex: 1, minWidth: 0 }}>
         {toolbar}
         <View style={{ flex: 1, flexDirection: 'row' }}>
-          <View style={{ width: listW }}>
+          {reading1 ? null : <View style={single ? { flex: 1, minWidth: 0 } : { width: listW }}>
             <Hairline edge="end" />
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, height: 40 }}>
               <Text style={{ flex: 1, fontSize: 15, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{listTitle}</Text>
@@ -772,9 +790,9 @@ function MailMain() {
                   <Text style={{ fontSize: 13, color: th.textDim }}>{t('mail.noAccounts')}</Text>
                   <Button primary label={t('mail.addAccount')} onClick={() => setSheet('setup')} />
                 </View>
-              ) : <MessageList src={src} rev={listRev} selected={selKey} onSelect={openItem} onMenu={() => setSheet({ menu: 'labels' })} cfg={cfg} />}
-          </View>
-          <View ref={readingRef} style={{ flex: 1 }}>
+              ) : <MessageList src={src} rev={listRev} selected={selKey} onSelect={(it) => { setOpened(true); return openItem(it); }} onMenu={() => setSheet({ menu: 'labels' })} cfg={cfg} />}
+          </View>}
+          {single && !reading1 ? null : <View ref={readingRef} style={{ flex: 1, minWidth: 0 }}>
             {msg ? (
               <ScrollView key={`${msg.acct}|${msg.folder}|${msg.uid}`} style={{ flex: 1 }}>
                 <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, gap: 12 }}>
@@ -797,9 +815,10 @@ function MailMain() {
                 <Text style={{ fontSize: 13, color: th.textDim, textAlign: 'center' }}>{loadErr || t('mail.noSelection')}</Text>
               </View>
             )}
-          </View>
+          </View>}
         </View>
       </View>
+      {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {sheet === 'setup' && <AccountSetup onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
       {sheet && sheet.setup === 'dav' && <AccountSetup kind="dav" preset={sheet.preset} onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
       {(sheet === 'accounts' || (sheet && typeof sheet.accounts === 'string')) && (

@@ -6,6 +6,7 @@
 import {
   View, Text, TextInput, Button, useTheme, useAppWindow, useKeyboard, addListener, wm, fs, clipboard, pdf, print, DocImage, releaseImage,
   formatNumber, direction, t as tr, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, SearchField, EmptyState, useFilesDrop, FilesDropHint,
+  useSidebar, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageCache } from './cache.js';
@@ -101,6 +102,14 @@ export default function PdfViewer() {
   const [mode, setMode] = useState(saved?.mode || 'continuous');   // 'continuous' | 'single'
   const [invert, setInvert] = useState(() => th.mode === 'dark' && !!saved?.invert);
   const [side, setSide] = useState(saved?.side ?? 'thumbs');         // null | 'thumbs' | 'outline'
+  const sb = useSidebar(640);                                         // a narrow window's sidebar (over the pages)
+  // the View menu's Thumbnails and Outline: in a narrow window they show or hide the sidebar over the pages
+  const sideOn = (k) => side === k && (!sb.narrow || sb.shown);
+  const pickSide = (k) => {
+    if (!sb.narrow) { setSide((s) => (s === k ? null : k)); return; }
+    if (sb.shown && side === k) sb.close();
+    else { setSide(k); if (!sb.shown) sb.toggle(); }
+  };
   const [offset, setOffset] = useState(0);
   const [offsetX, setOffsetX] = useState(0);
   const [page, setPage] = useState(0);
@@ -175,7 +184,7 @@ export default function PdfViewer() {
     measure();
     const id = setInterval(measure, 250);
     return () => clearInterval(id);
-  }, [view.w, view.h, side]);
+  }, [view.w, view.h, side, sb.narrow]);
   const ref0 = shown(sizes[page] || [595, 842], rot);
   const scale = zoom === 'width' ? Math.max(0.1, (view.w - 2 * GAP - 12) / ref0[0])
     : zoom === 'page' ? Math.max(0.1, Math.min((view.w - 2 * GAP) / ref0[0], (view.h - 2 * GAP) / ref0[1]))
@@ -482,8 +491,8 @@ export default function PdfViewer() {
       { label: tr('pdf.menu.view'), items: [
         { label: tr('pdf.view.continuous'), checked: mode === 'continuous', onClick: () => setMode('continuous') },
         { label: tr('pdf.view.single'), checked: mode === 'single', onClick: () => setMode('single') }, '-',
-        { label: tr('pdf.side.thumbs'), checked: side === 'thumbs', onClick: () => setSide((s) => (s === 'thumbs' ? null : 'thumbs')) },
-        { label: tr('pdf.side.outline'), checked: side === 'outline', onClick: () => setSide((s) => (s === 'outline' ? null : 'outline')) }, '-',
+        { label: tr('pdf.side.thumbs'), checked: sideOn('thumbs'), onClick: () => pickSide('thumbs') },
+        { label: tr('pdf.side.outline'), checked: sideOn('outline'), onClick: () => pickSide('outline') }, '-',
         { label: tr('pdf.zoom.in'), hint: '❖+', onClick: () => zoomStep(1) },
         { label: tr('pdf.zoom.out'), hint: '❖−', onClick: () => zoomStep(-1) },
         { label: tr('pdf.zoom.actual'), hint: '❖0', onClick: () => setZoomTo(1) },
@@ -499,7 +508,7 @@ export default function PdfViewer() {
         { label: tr('pdf.go.last'), hint: 'Fin', onClick: () => goPage(n - 1) },
       ] },
     ]);
-  }, [doc, mode, side, zoom, invert, annotated.length, selection?.text, path, page, n]);
+  }, [doc, mode, side, zoom, invert, annotated.length, selection?.text, path, page, n, sb.narrow, sb.shown]);
 
   // ---- drawing ----
   const dark = th.mode === 'dark';
@@ -580,13 +589,18 @@ export default function PdfViewer() {
   }
 
   const barBg = dark ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.03)';
-  const winW = view.w + (side && doc ? 184 : 0);
+  // a narrow window (a Workspaces tile): the sidebar lays over the pages, shown on demand, and picking a page closes it
+  const narrowWin = sb.narrow;
+  const winW = view.w + (side && doc && !narrowWin ? 184 : 0);
+  const inkColors = tool === 'highlight' || tool === 'ink';
+  const findW = winW < 600 ? (inkColors ? 0 : 110) : winW < 760 ? 130 : 180;
   const pageLabel = n ? tr('pdf.pageOf', { page: page + 1, count: n }) : '';
   return (
     <View {...drop.props} style={{ flex: 1 }}>
       {/* toolbar: icon-only items with tooltips, as in Preview; the narrow window drops what is also in the menus */}
       <Toolbar style={{ gap: 6 }}>
-        <ToolbarButton icon="◫" title={tr('pdf.tool.sidebar')} active={!!side} onClick={() => setSide((s) => (s ? null : 'thumbs'))} />
+        <ToolbarButton icon="◫" title={tr('pdf.tool.sidebar')} active={narrowWin ? sb.shown : !!side}
+          onClick={() => (narrowWin ? sb.toggle() : setSide((s) => (s ? null : 'thumbs')))} />
         {goto != null ? (
           <TextInput autoFocus value={goto} onChange={setGoto} placeholder={tr('pdf.goPlaceholder')} onCancel={() => setGoto(null)}
             onSubmit={() => { const v = Number(goto); setGoto(null); if (v >= 1) goPage(v - 1); }} style={{ width: 96 }} />
@@ -610,17 +624,17 @@ export default function PdfViewer() {
           <ToolbarButton icon="✎" small title={tr('pdf.tool.ink')} active={tool === 'ink'} onClick={() => setTool((x) => (x === 'ink' ? 'select' : 'ink'))} disabled={!doc} />
           <ToolbarButton icon="▤" small title={tr('pdf.tool.note')} active={tool === 'note'} onClick={() => setTool('note')} disabled={!doc} />
         </ToolbarGroup>
-        {(tool === 'highlight' || tool === 'ink') && (
+        {inkColors && (
           <View style={{ flexDirection: 'row', gap: 4 }}>
             {TOOL_COLORS.map((c) => <View key={c} onClick={() => setColor(c)} style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c, border: `2px solid ${color === c ? th.text : 'transparent'}` }} />)}
           </View>
         )}
         {winW >= 760 && <ToolbarButton icon="◐" title={tr('pdf.invert')} active={invert} onClick={() => setInvert((v) => !v)} disabled={!doc} />}
         {winW >= 760 && <ToolbarButton icon="⎙" title={tr('pdf.menu.print')} onClick={doPrint} disabled={!doc} />}
-        <FindField th={th} query={query} setQuery={setQuery} hits={hits} onFind={runFind} onNext={nextHit} focusReq={findRef} disabled={!doc} width={winW < 760 ? 130 : 180} />
+        {findW ? <FindField th={th} query={query} setQuery={setQuery} hits={hits} onFind={runFind} onNext={nextHit} focusReq={findRef} disabled={!doc} width={findW} /> : null}
       </Toolbar>
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        {side && doc && (
+        {side && doc && !narrowWin && (
           <Sidebar side={side} setSide={setSide} doc={doc} sizes={sizes} page={page} onPage={goPage} cache={thumbs.current} rot={rot} invert={invert} rev={rev} th={th} />
         )}
         <View ref={area} onWheel={onWheel} onMouseDown={onDown} onContextMenu={() => {}}
@@ -649,6 +663,12 @@ export default function PdfViewer() {
               height: Math.max(30, view.h * view.h / lay.height), backgroundColor: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} />
           )}
         </View>
+        {narrowWin && sb.shown && doc ? (
+          <SidebarOverlay width={184} onClose={sb.close}>
+            <Sidebar side={side || 'thumbs'} setSide={setSide} doc={doc} sizes={sizes} page={page} onPage={(p) => { goPage(p); sb.close(); }}
+              cache={thumbs.current} rot={rot} invert={invert} rev={rev} th={th} />
+          </SidebarOverlay>
+        ) : null}
       </View>
       {/* status bar */}
       <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, backgroundColor: barBg }}>

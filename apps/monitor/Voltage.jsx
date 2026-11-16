@@ -5,7 +5,7 @@
 // and its window is not minimized.
 import { View, Text, admin, monitor, useAppWindow, useLocale, useStore, useTheme, useWindowHidden, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { Card, Big, Stat, useCardStyle } from './index.jsx';
+import { Card, Big, Stat, StatRow, useCardStyle } from './index.jsx';
 import { Chart } from './Chart.jsx';
 import { VoltageArt } from './VoltageArt.jsx';
 import { LOW_5V, parsePmic, boardWatts, powerState, voltSources, primaryRail, traceRange, afterBoot } from './voltmodel.js';
@@ -146,7 +146,7 @@ export function VoltageTab() {
         </Card>
       )}
       {(watts != null || state) && (
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <StatRow>
           {watts != null && (
             <Stat icon="activity" label={tr('monitor.volt.power')} value={formatNumber(watts, 2)} unit={tr('monitor.volt.wattsUnit')}>
               <Hint>{tr('monitor.volt.powerNote')}</Hint>
@@ -157,7 +157,7 @@ export function VoltageTab() {
               <Hint>{when ? tr('monitor.volt.lastAt', when) : tr('monitor.volt.sinceBootNote')}</Hint>
             </Stat>
           )}
-        </View>
+        </StatRow>
       )}
       {sources.map((s) => (
         <Card key={s.id} icon={s.kind === 'board' ? 'cpu' : 'activity'}

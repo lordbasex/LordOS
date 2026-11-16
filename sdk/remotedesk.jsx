@@ -431,7 +431,11 @@ function ListWindow({ winId, args }) {
   const view = r.view === 'list' ? 'list' : 'grid';
   const sort = r.sort === 'last' ? 'last' : 'name';
   const kind = ['rdp', 'vnc'].includes(r.kind) ? r.kind : 'all';
-  const side = r.sidebar !== false;
+  // a narrow window (a Workspaces tile) hides the sidebar until asked, without changing the wide choice
+  const narrow = frameW < 640;
+  const [narrowSide, setNarrowSide] = useState(false);
+  const side = narrow ? narrowSide : r.sidebar !== false;
+  const toggleSide = () => (narrow ? setNarrowSide(!narrowSide) : putDesks({ sidebar: !side }));
   const grouped = r.sections !== false;
   const section = r.section === 'favorites' ? 'favorites' : 'devices';
   const collapsed = r.collapsed || {};
@@ -486,7 +490,7 @@ function ListWindow({ winId, args }) {
       { label: tr('remotedesk.menuView'), items: [
         { label: tr('remotedesk.viewGrid'), checked: view === 'grid', onClick: () => putDesks({ view: 'grid' }) },
         { label: tr('remotedesk.viewList'), checked: view === 'list', onClick: () => putDesks({ view: 'list' }) }, '-',
-        { label: tr('remotedesk.showSidebar'), checked: side, onClick: () => putDesks({ sidebar: !side }) },
+        { label: tr('remotedesk.showSidebar'), checked: side, onClick: toggleSide },
         { label: tr('remotedesk.showGroups'), checked: grouped, onClick: () => putDesks({ sections: !grouped }) }, '-',
         { label: tr('remotedesk.sortName'), checked: sort === 'name', onClick: () => putDesks({ sort: 'name' }) },
         { label: tr('remotedesk.sortLast'), checked: sort === 'last', onClick: () => putDesks({ sort: 'last' }) },
@@ -539,7 +543,7 @@ function ListWindow({ winId, args }) {
         selected: section === 'devices', detail: r.devices.length || null, onClick: () => putDesks({ section: 'devices' }) })) : null,
     h(View, { style: { flex: 1, minWidth: 0 } },
       h(Toolbar, null,
-        h(ToolbarButton, { icon: '▤', title: tr('remotedesk.toggleSidebar'), active: side, onClick: () => putDesks({ sidebar: !side }) }),
+        h(ToolbarButton, { icon: '▤', title: tr('remotedesk.toggleSidebar'), active: side, onClick: toggleSide }),
         h(ToolbarSpacer),
         h(MenuButton, { icon: '+', title: tr('remotedesk.add'), items: addItems, minWidth: 300 }),
         h(ToolbarGroup, null,
@@ -554,7 +558,7 @@ function ListWindow({ winId, args }) {
           { label: tr('remotedesk.filterRdp'), checked: kind === 'rdp', onClick: () => putDesks({ kind: 'rdp' }) },
           { label: tr('remotedesk.filterVnc'), checked: kind === 'vnc', onClick: () => putDesks({ kind: 'vnc' }) }, '-',
           { label: tr('remotedesk.favorites'), checked: section === 'favorites', onClick: () => putDesks({ section: section === 'favorites' ? 'devices' : 'favorites' }) }] }),
-        h(SearchField, { value: query, onChange: setQuery, placeholder: tr('remotedesk.search'), width: 180 })),
+        h(SearchField, { value: query, onChange: setQuery, placeholder: tr('remotedesk.search'), width: narrow ? 120 : 180 })),
       empty || h(ScrollView, { style: { flex: 1 }, resetKey: section, contentStyle: { padding: 20, gap: 22 } },
         ...sections.map(([g, list]) => {
           const key = g || '-';
