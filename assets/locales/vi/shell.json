@@ -1,5 +1,8 @@
 {
   "app.about": "Giới thiệu {app}",
+  "app.crashed": "{app} gặp sự cố",
+  "app.crashedBody": "Phần còn lại của màn hình vẫn hoạt động. Hãy đóng cửa sổ này và mở lại ứng dụng.",
+  "app.crashedClose": "Đóng cửa sổ",
   "app.hide": "Ẩn {app}",
   "app.hideOthers": "Ẩn các ứng dụng khác",
   "app.quit": "Thoát {app}",

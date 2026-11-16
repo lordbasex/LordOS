@@ -1,5 +1,8 @@
 {
   "app.about": "Om {app}",
+  "app.crashed": "{app} stötte på ett problem",
+  "app.crashedBody": "Resten av skrivbordet fortsätter att fungera. Stäng det här fönstret och öppna appen igen.",
+  "app.crashedClose": "Stäng fönstret",
   "app.hide": "Göm {app}",
   "app.hideOthers": "Göm övriga",
   "app.quit": "Avsluta {app}",

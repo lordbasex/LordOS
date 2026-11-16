@@ -1,5 +1,8 @@
 {
   "app.about": "{app} کے بارے میں",
+  "app.crashed": "{app} کو ایک مسئلہ پیش آیا",
+  "app.crashedBody": "ڈیسک ٹاپ کا باقی حصہ کام کرتا رہے گا۔ یہ ونڈو بند کریں اور ایپ دوبارہ کھولیں۔",
+  "app.crashedClose": "ونڈو بند کریں",
   "app.hide": "{app} چھپائیں",
   "app.hideOthers": "دیگر چھپائیں",
   "app.quit": "{app} بند کریں",

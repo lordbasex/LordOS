@@ -1,5 +1,8 @@
 {
   "app.about": "Perihal {app}",
+  "app.crashed": "{app} menghadapi masalah",
+  "app.crashedBody": "Bahagian lain desktop terus berfungsi. Tutup tetingkap ini dan buka aplikasi semula.",
+  "app.crashedClose": "Tutup tetingkap",
   "app.hide": "Sembunyikan {app}",
   "app.hideOthers": "Sembunyikan yang Lain",
   "app.quit": "Keluar dari {app}",

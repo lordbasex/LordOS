@@ -1,5 +1,8 @@
 {
   "app.about": "Tungkol sa {app}",
+  "app.crashed": "Nagkaproblema ang {app}",
+  "app.crashedBody": "Gumagana pa rin ang natitirang bahagi ng desktop. Isara ang window na ito at buksan muli ang app.",
+  "app.crashedClose": "Isara ang window",
   "app.hide": "Itago ang {app}",
   "app.hideOthers": "Itago ang Iba",
   "app.quit": "Isara ang {app}",

@@ -122,6 +122,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     controls sits on its own pill that shows under the pointer, with thin lines between groups and glyphs in the
     spine's colour (`components/BarButton.jsx`, tokens `iconFg`, `itemHover`, `barSeparator`). Activity icons keep the
     colour chosen for them.
+  - *A failing app no longer takes the desktop down:* each app window has its own error boundary (sdk/components.jsx
+    AppHost): an app that throws while rendering or in an effect shows "<app> ran into a problem" with Close window in
+    its own window, and the error goes to the log. Before, React unmounted the whole shell: a black screen with only
+    the pointer (Photos restored with a picture that no longer existed). lord.media calls that C refuses (a path
+    outside the home or gone) now return null in the SDK, as with no helper. A free slot's "Free space" and Add window
+    stay out on a display with widgets (the frame header's + adds a window).
   - *Claude Code widget, small:* the context ring is larger (it names itself inside: Context) and the state and limit
     bars sit along the bottom, as the weather's text does.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching

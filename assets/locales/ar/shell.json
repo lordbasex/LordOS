@@ -1,5 +1,8 @@
 {
   "app.about": "حول {app}",
+  "app.crashed": "واجه {app} مشكلة",
+  "app.crashedBody": "يواصل باقي سطح المكتب العمل. أغلق هذه النافذة وافتح التطبيق مرة أخرى.",
+  "app.crashedClose": "إغلاق النافذة",
   "app.hide": "إخفاء {app}",
   "app.hideOthers": "إخفاء الآخرين",
   "app.quit": "إنهاء {app}",

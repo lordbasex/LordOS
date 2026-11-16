@@ -1,5 +1,8 @@
 {
   "app.about": "{app} について",
+  "app.crashed": "{app} で問題が発生しました",
+  "app.crashedBody": "デスクトップのほかの部分はそのまま動作します。このウインドウを閉じて、アプリを開き直してください。",
+  "app.crashedClose": "ウインドウを閉じる",
   "app.hide": "{app} を隠す",
   "app.hideOthers": "ほかを隠す",
   "app.quit": "{app} を終了",

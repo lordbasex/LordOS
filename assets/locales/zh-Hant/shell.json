@@ -1,5 +1,8 @@
 {
   "app.about": "關於 {app}",
+  "app.crashed": "{app} 發生問題",
+  "app.crashedBody": "桌面的其他部分仍正常運作。請關閉這個視窗，再重新開啟應用程式。",
+  "app.crashedClose": "關閉視窗",
   "app.hide": "隱藏 {app}",
   "app.hideOthers": "隱藏其他",
   "app.quit": "結束 {app}",

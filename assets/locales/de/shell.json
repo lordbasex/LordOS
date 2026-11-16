@@ -1,5 +1,8 @@
 {
   "app.about": "Über {app}",
+  "app.crashed": "{app} hatte ein Problem",
+  "app.crashedBody": "Der Rest des Desktops läuft weiter. Schließen Sie dieses Fenster und öffnen Sie die App erneut.",
+  "app.crashedClose": "Fenster schließen",
   "app.hide": "{app} ausblenden",
   "app.hideOthers": "Andere ausblenden",
   "app.quit": "{app} beenden",

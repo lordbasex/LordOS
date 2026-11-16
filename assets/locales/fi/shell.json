@@ -1,5 +1,8 @@
 {
   "app.about": "Tietoja: {app}",
+  "app.crashed": "{app} kohtasi ongelman",
+  "app.crashedBody": "Muu työpöytä toimii edelleen. Sulje tämä ikkuna ja avaa sovellus uudelleen.",
+  "app.crashedClose": "Sulje ikkuna",
   "app.hide": "Kätke {app}",
   "app.hideOthers": "Kätke muut",
   "app.quit": "Lopeta {app}",

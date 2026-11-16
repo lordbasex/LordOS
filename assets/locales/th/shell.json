@@ -1,5 +1,8 @@
 {
   "app.about": "เกี่ยวกับ {app}",
+  "app.crashed": "{app} พบปัญหา",
+  "app.crashedBody": "ส่วนอื่นของเดสก์ท็อปยังทำงานต่อได้ ปิดหน้าต่างนี้แล้วเปิดแอปอีกครั้ง",
+  "app.crashedClose": "ปิดหน้าต่าง",
   "app.hide": "ซ่อน {app}",
   "app.hideOthers": "ซ่อนแอปอื่น",
   "app.quit": "ออกจาก {app}",

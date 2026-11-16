@@ -1,5 +1,8 @@
 {
   "app.about": "Kuhusu {app}",
+  "app.crashed": "{app} imekumbwa na tatizo",
+  "app.crashedBody": "Sehemu nyingine ya eneo-kazi inaendelea kufanya kazi. Funga dirisha hili kisha ufungue programu tena.",
+  "app.crashedClose": "Funga dirisha",
   "app.hide": "Ficha {app}",
   "app.hideOthers": "Ficha Zingine",
   "app.quit": "Ondoka {app}",

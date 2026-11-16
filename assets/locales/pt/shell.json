@@ -1,5 +1,8 @@
 {
   "app.about": "Sobre o {app}",
+  "app.crashed": "{app} teve um problema",
+  "app.crashedBody": "O resto da área de trabalho continua funcionando. Feche esta janela e abra o app de novo.",
+  "app.crashedClose": "Fechar janela",
   "app.hide": "Ocultar {app}",
   "app.hideOthers": "Ocultar outros",
   "app.quit": "Sair do {app}",

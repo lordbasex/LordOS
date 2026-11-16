@@ -136,6 +136,9 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const bare = count === 0 && !minimized.length;
   // the empty state's card only on a display with nothing at all: no window, none minimized, no widget
   const empty = bare && !widgetsHere;
+  // a free slot's "Free space" and its Add window button stay out on a display with widgets too (they would sit over
+  // them): the slot keeps its outline, and the frame header's + adds a window
+  const quiet = bare || widgetsHere;
   // the free slots of this display's tiles (a window minimized there keeps its place): a dashed outline to fill
   const holesJson = useStore(tiled, (s) => JSON.stringify(s.holes?.[dkey] || []));
   const holes = JSON.parse(holesJson);
@@ -206,8 +209,8 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         <View key={`hole${i}`} style={{ position: 'absolute', left: r.x + 4, top: r.y + 4, width: r.w - 8, height: r.h - 8, borderRadius: 12,
           border: `2px dashed ${alpha(meta.color, 0.55)}`, alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'box-none' }}>
           {/* with nothing open the empty state's card says it once, over the outlines */}
-          {bare ? null : <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', paddingHorizontal: 16 }}>{tr('shell.ws.slot.free')}</Text>}
-          {bare ? null : (   /* locked too: the slot a minimized window left can take another app */
+          {quiet ? null : <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', paddingHorizontal: 16 }}>{tr('shell.ws.slot.free')}</Text>}
+          {quiet ? null : (   /* locked too: the slot a minimized window left can take another app */
             <View onClick={(e) => onAddWindow(d, e)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent }}>
               <PlusGlyph color={t.onAccent} size={11} />
               <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>

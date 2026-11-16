@@ -1,5 +1,8 @@
 {
   "app.about": "Apie {app}",
+  "app.crashed": "{app} susidūrė su problema",
+  "app.crashedBody": "Likusi darbalaukio dalis veikia toliau. Uždarykite šį langą ir vėl atidarykite programą.",
+  "app.crashedClose": "Uždaryti langą",
   "app.hide": "Slėpti {app}",
   "app.hideOthers": "Slėpti kitas",
   "app.quit": "Išeiti iš {app}",

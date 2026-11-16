@@ -1,5 +1,8 @@
 {
   "app.about": "Tentang {app}",
+  "app.crashed": "{app} mengalami masalah",
+  "app.crashedBody": "Bagian lain desktop tetap berjalan. Tutup jendela ini lalu buka aplikasinya lagi.",
+  "app.crashedClose": "Tutup jendela",
   "app.hide": "Sembunyikan {app}",
   "app.hideOthers": "Sembunyikan yang Lain",
   "app.quit": "Keluar dari {app}",

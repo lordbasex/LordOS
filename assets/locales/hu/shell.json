@@ -1,5 +1,8 @@
 {
   "app.about": "{app} névjegye",
+  "app.crashed": "A(z) {app} hibába ütközött",
+  "app.crashedBody": "Az asztal többi része tovább működik. Zárja be ezt az ablakot, és nyissa meg újra az alkalmazást.",
+  "app.crashedClose": "Ablak bezárása",
   "app.hide": "{app} elrejtése",
   "app.hideOthers": "Többi elrejtése",
   "app.quit": "Kilépés: {app}",

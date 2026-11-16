@@ -1,5 +1,8 @@
 {
   "app.about": "{app} haqqında",
+  "app.crashed": "{app} problemlə üzləşdi",
+  "app.crashedBody": "Masaüstünün qalan hissəsi işləməyə davam edir. Bu pəncərəni bağlayın və tətbiqi yenidən açın.",
+  "app.crashedClose": "Pəncərəni bağla",
   "app.hide": "{app} tətbiqini gizlət",
   "app.hideOthers": "Digərlərini gizlət",
   "app.quit": "{app} tətbiqindən çıx",

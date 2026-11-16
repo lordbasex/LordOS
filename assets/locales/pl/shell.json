@@ -1,5 +1,8 @@
 {
   "app.about": "{app} — informacje",
+  "app.crashed": "{app} napotkała problem",
+  "app.crashedBody": "Reszta pulpitu działa dalej. Zamknij to okno i otwórz aplikację ponownie.",
+  "app.crashedClose": "Zamknij okno",
   "app.hide": "Ukryj {app}",
   "app.hideOthers": "Ukryj pozostałe",
   "app.quit": "Zakończ {app}",

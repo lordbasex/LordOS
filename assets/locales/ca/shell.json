@@ -1,5 +1,8 @@
 {
   "app.about": "Quant a {app}",
+  "app.crashed": "{app} ha tingut un problema",
+  "app.crashedBody": "La resta de l'escriptori continua funcionant. Tanca aquesta finestra i torna a obrir l'app.",
+  "app.crashedClose": "Tanca la finestra",
   "app.hide": "Amaga {app}",
   "app.hideOthers": "Amaga les altres",
   "app.quit": "Surt de {app}",

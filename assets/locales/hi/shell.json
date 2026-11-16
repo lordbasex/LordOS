@@ -1,5 +1,8 @@
 {
   "app.about": "{app} के बारे में",
+  "app.crashed": "{app} में कोई समस्या आई",
+  "app.crashedBody": "डेस्कटॉप का बाकी हिस्सा चलता रहेगा। यह विंडो बंद करें और ऐप फिर से खोलें।",
+  "app.crashedClose": "विंडो बंद करें",
   "app.hide": "{app} छिपाएँ",
   "app.hideOthers": "अन्य छिपाएँ",
   "app.quit": "{app} बंद करें",

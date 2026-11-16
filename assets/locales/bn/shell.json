@@ -1,5 +1,8 @@
 {
   "app.about": "{app} সম্পর্কে",
+  "app.crashed": "{app} একটি সমস্যায় পড়েছে",
+  "app.crashedBody": "ডেস্কটপের বাকি অংশ কাজ করছে। এই উইন্ডোটি বন্ধ করে অ্যাপটি আবার খুলুন।",
+  "app.crashedClose": "উইন্ডো বন্ধ করুন",
   "app.hide": "{app} লুকান",
   "app.hideOthers": "অন্যগুলো লুকান",
   "app.quit": "{app} বন্ধ করুন",
