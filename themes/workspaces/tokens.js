@@ -4,7 +4,7 @@
 //
 //   opaque       solid panels, no blur: the cheapest to paint
 //   translucent  the classic look: a tinted panel that blurs what is behind it
-//   crystal      the translucent panel plus light: a bright 1 px top edge, a soft two-stop sheen from the top, a darker
+//   crystal      the translucent panel plus light: a soft two-stop sheen from the top, a darker
 //                inner bottom edge (the light bending at the glass's lower rim) and a depth shadow. Tuned per mode.
 //
 // Settings → Appearance → Transparency off (settings.effects === false) is always opaque. Colours are the brand's
@@ -58,6 +58,7 @@ export function material(surface, dark) {
     blur: SPINE_BLUR,
     // the sheen: brighter at the top, almost nothing at the bottom (two stops: what the renderer draws)
     sheen: dark ? 'linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.01))' : 'linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.12))',
+    // only the group frame's accent line reads it (surfaces draw no bright top edge)
     edge: dark ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.98)',
     rim: dark ? 'rgba(0,0,0,0.30)' : 'rgba(40,30,110,0.12)',
     shadow: dark ? '0 18px 40px rgba(6,3,26,0.50)' : '0 18px 38px rgba(52,38,140,0.20)',

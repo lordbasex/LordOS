@@ -110,7 +110,7 @@ A new theme setting, **Effects style** (`themeOptions.workspaces.surface`), in t
 |---|---|
 | **Opaque** | Solid panels, no blur. The cheapest to paint. |
 | **Translucent** | The classic look: a tinted panel that blurs what is behind it. |
-| **Crystal** | The maintainer's own name for this look: the translucent panel plus light — a bright 1 px top edge, a soft two-stop sheen from the top, a darker inner lower rim (the light bending at the glass's lower edge) and a depth shadow, tuned per light and dark. The default. |
+| **Crystal** | The maintainer's own name for this look: the translucent panel plus light — a soft two-stop sheen from the top, a darker inner lower rim (the light bending at the glass's lower edge) and a depth shadow, tuned per light and dark. The default. |
 
 Settings → Appearance → Transparency off (`settings.effects === false`) is always Opaque. Rules that keep it cheap:
 

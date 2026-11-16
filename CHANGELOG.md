@@ -45,7 +45,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - *Control Center:* a live drawn preview, dark mode, Reduce motion, the effects style, the accent, Do Not Disturb,
     Night Light, Wi-Fi, Bluetooth, volume, brightness, the power mode and the wallpaper.
   - *Effects styles* (a theme setting): **Opaque** (solid panels), **Translucent** (tinted panels that blur) and
-    **Crystal** (the translucent glass with a bright top edge, a two-stop sheen, a darker lower rim and a depth shadow,
+    **Crystal** (the translucent glass with a two-stop sheen, a darker lower rim and a depth shadow,
     per light and dark; the default). Transparency off in Appearance is always Opaque. One live blur at rest (the
     spine); the group frame is a border, never a full-screen blur or scrim.
   - *Motion:* activity switches with the windows' slide and the pills' glide, spring feedback on the spine, Search that
