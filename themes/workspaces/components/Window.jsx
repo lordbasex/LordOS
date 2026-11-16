@@ -98,7 +98,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   const geo = wm.frame(win);
   const [menu, setMenu] = useState(null);
   const { atStart, order: buttonOrder } = useWindowButtons(false);
-  // on a locked display (the frame's padlock): no buttons, no move, resize or window menu (the SDK refuses them too)
+  // on a locked display (the frame's padlock): only minimize, no move, resize or window menu (the SDK refuses them too)
   const order = locked ? [] : buttonOrder;
   const floating = isFloating(win.id);
   // zoom in from where it was launched (the spine, the search panel), on its cached raster; not the windows a session
@@ -189,7 +189,13 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
 
   const Icon = windowIcon(win);
   const buttons = locked
-    ? <View title={tr('shell.ws.lock.window')} style={{ width: BTN, height: BTN, alignItems: 'center', justifyContent: 'center', opacity: 0.55 }}><LockGlyph color={t.textDim} size={12} /></View>
+    ? (
+      // locked: minimize stays (another app can take the slot), then the padlock where maximize and close were
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        {button('minimize')}
+        <View style={{ width: BTN, height: BTN, alignItems: 'center', justifyContent: 'center', opacity: 0.55 }}><LockGlyph color={t.textDim} size={12} /></View>
+      </View>
+    )
     : <View style={{ flexDirection: 'row', gap: 4 }}>{order.map(button)}</View>;
   // a maximized window fills the group frame's work area, inside its margins: it keeps its rounded corners
   const flat = !!win.fullscreen;

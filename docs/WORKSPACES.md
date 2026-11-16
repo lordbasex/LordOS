@@ -61,9 +61,11 @@ displays do. Nothing runs per frame, nothing polls.
   that follows, and a pair formed in one change is judged from the next.
 - **The padlock** at the end of each frame header locks that display of the activity (`layouts[connector].locked`,
   kept by Save layout). Locked, the header shows only the padlock, the divider can't be dragged, and the display's
-  windows lose their minimize, maximize and close buttons, their window menu, title-bar drag and resize edges (a small
-  padlock takes the buttons' place). The SDK refuses the person's other ways too (`configureWindows({ locked })`,
-  `isWindowLocked`): `wm.beginMove`/`beginResize`, `move`, `resize`, `minimize`, `toggleMaximize`, `snap`, `snapKey`,
+  windows lose their maximize and close buttons, their window menu, title-bar drag and resize edges (a small padlock
+  takes those buttons' place). Minimize stays: a window minimized on a locked display leaves its slot, and the app
+  brought back or opened there takes it, so the layout holds while the apps in it change. The SDK refuses the person's
+  other ways too (`configureWindows({ locked })`, `isWindowLocked`): `wm.beginMove`/`beginResize`, `move`, `resize`,
+  `toggleMaximize`, `snap`, `snapKey`,
   `center`, `arrange`, a Linux app's move or resize request, and `close` unless forced. What a program does still
   applies: the tiler, a forced close, an app closing its own window (a Linux app's own close button included). New
   windows may open on a locked display and take their tile.

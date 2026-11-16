@@ -129,7 +129,7 @@ struct Surf {
     struct wl_resource *dlg;
     int modal;
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
-    int fixed;                      /* locked by the theme (wl_set_fixed): no maximize or minimize offered or done */
+    int fixed;                      /* locked by the theme (wl_set_fixed): no maximize offered or done (minimize stays) */
     struct wl_resource *kde;
     /* popup menu */
     Surf *parent;
@@ -2474,7 +2474,7 @@ static void top_unfullscreen(struct wl_client *c, struct wl_resource *r) {
 }
 static void top_minimize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped && !s->fixed) emit(s, "minimize", "{}");
+    if (s && s->mapped) emit(s, "minimize", "{}");   /* locked too: minimizing frees the slot for another app */
 }
 static const struct xdg_toplevel_interface toplevel_impl = {
     .destroy = top_destroy, .set_parent = top_parent, .set_title = top_title, .set_app_id = top_app_id,
@@ -2530,7 +2530,7 @@ static void send_caps(Surf *s) {
     wl_array_init(&caps);
     uint32_t *p;
     if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
-    if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
+    if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;   /* offered even locked */
     xdg_toplevel_send_wm_capabilities(s->top, &caps);
     wl_array_release(&caps);
 }

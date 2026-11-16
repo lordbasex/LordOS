@@ -197,7 +197,10 @@ function restore(list, active = 0) {
     const p = parseDockId(e.id);
     restoredIds.add(e.id);
     try {
-      const a = p.kind === 'desktop' ? null : getApp(p.key);
+      // a Linux app (desktop:) or a web app (web:) isn't a LordOS app: it is launched as a Dock click, and its window
+      // takes its saved place, activity and state when it arrives (setLinuxPlacement above)
+      const outside = p.kind === 'desktop' || p.kind === 'web';
+      const a = outside ? null : getApp(p.key);
       if (a && !a.package && isAppOff(p.key)) {
         // deactivated in Store → Installed (appsoffactions.js): it stays closed, without a notice
       } else if (a && !a.isolated && !a.package) {
@@ -207,7 +210,7 @@ function restore(list, active = 0) {
           const id = wm.open(p.key, { ...(first ? null : { new: true }), ...(e.args ? { args: e.args } : null), frame: fit(e.f), desktop: desktopAt(e.desk || 0) });
           if (id) afterOpen(id, e);
         }
-      } else if (a || p.kind === 'desktop') {
+      } else if (a || outside) {
         claims.push({ id: e.id, entry: e, at: Date.now() });
         if (launch) launchDockItem(e.id);
       }

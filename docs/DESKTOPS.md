@@ -135,6 +135,9 @@ alone, `lord-server` used 0 CPU ticks in 10 s with three desktops and windows op
 - Session restore ([SESSIONS.md](SESSIONS.md)): each entry has `desk`, its position in the list, left out for the
   first, and `sessionSaved.active` is the desktop in view. A window that comes back opens directly on its desktop,
   so it takes neither the front nor the keyboard of the desktop in view. Only a sane position is read back.
+  LordOS apps reopen directly; Linux apps (`desktop:`) and web apps (`web:`, since 0.8.8.10: before, they were saved
+  but never relaunched) are launched as a Dock click, and their window takes its saved frame, desktop and state as it
+  arrives (`setLinuxPlacement`).
 - A theme switch keeps the desktops, the desktop in view and each window's place, Linux windows included.
 
 ## Checked

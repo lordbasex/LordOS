@@ -184,15 +184,18 @@ function buildFileIndex() {
   const out = [];
   const queue = [['', 0]];
   const done = () => { fileIndex = { at: Date.now(), list: out, building: false }; resultsVersion.set((x) => x + 1); };
+  let home = '';
+  try { home = fs.home(); } catch (e) { home = ''; }
+  if (!home) { done(); return; }
   const step = () => {
     if (!queue.length || out.length >= MAX_FILES) { done(); return; }
     const [dir, depth] = queue.shift();
-    fs.listAsync(dir ? `${fs.home()}/${dir}` : fs.home()).then((entries) => {
+    Promise.resolve().then(() => fs.listAsync(dir ? `${home}/${dir}` : home)).then((entries) => {
       let n = 0;
-      for (const e of entries) {
+      for (const e of Array.isArray(entries) ? entries : []) {
         if (!e || !e.name || e.name[0] === '.' || n++ >= PER_DIR || out.length >= MAX_FILES) continue;
         const rel = dir ? `${dir}/${e.name}` : e.name;
-        out.push({ path: `${fs.home()}/${rel}`, name: e.name, key: fold(e.name), dir: e.dir, size: e.size, mtime: e.mtime });
+        out.push({ path: `${home}/${rel}`, name: e.name, key: fold(e.name), dir: e.dir, size: e.size, mtime: e.mtime });
         if (e.dir && depth < 4 && !SKIP_DIRS.has(e.name)) queue.push([rel, depth + 1]);
       }
     }, () => {}).then(() => setTimeout(step, 0));

@@ -440,7 +440,9 @@ export const wm = {
   moveToDesktop(id, desktop) {
     if (desktopList.get().includes(desktop)) patch(id, { desktop });
   },
-  minimize: (id) => { if (!isWindowLocked(id)) patch(id, { minimized: true }); },
+  // allowed on a locked display (the padlock keeps the layout, not the app in a slot): minimizing leaves the slot to
+  // the window brought back or opened there
+  minimize: (id) => patch(id, { minimized: true }),
   toggleMaximize: (id) => isWindowLocked(id) || windows.set((ws) => ws.map((w) => (w.id !== id ? w : w.snapped && w.restore
     ? { ...w, ...w.restore, snapped: null, restore: null, maximized: true }
     : { ...w, maximized: !w.maximized }))),

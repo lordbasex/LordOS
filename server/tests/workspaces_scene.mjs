@@ -168,7 +168,7 @@ await flush();
   await flush();
 }
 
-// the padlock of one display: its windows can't be moved, resized, minimized, maximized, snapped or closed by the person,
+// the padlock of one display: its windows can't be moved, resized, maximized, snapped or closed by the person (minimize stays),
 // and the frame's header keeps only the padlock; the other displays are untouched
 {
   const T = (k) => sdk.t(`shell.ws.layout.${k}`);
@@ -182,9 +182,17 @@ await flush();
   await flush();
   check('lock: only that display', [tiler.isLocked(desk, 'DP-1'), tiler.isLocked(desk, 'DP-2'), tiler.isLocked(desk, 'HDMI-A-1')], [true, false, false]);
   check('lock: the window is locked, the one on the main display is not', [sdk.isWindowLocked(k1), sdk.isWindowLocked(k2)], [true, false]);
-  sdk.wm.move(k1, L.x + 600, 500); sdk.wm.resize(k1, 300, 200); sdk.wm.minimize(k1); sdk.wm.toggleMaximize(k1); sdk.wm.snap(k1, 'left'); sdk.wm.snapKey(k1, 'right'); sdk.wm.center(k1);
+  sdk.wm.move(k1, L.x + 600, 500); sdk.wm.resize(k1, 300, 200); sdk.wm.toggleMaximize(k1); sdk.wm.snap(k1, 'left'); sdk.wm.snapKey(k1, 'right'); sdk.wm.center(k1);
   await flush();
-  check('lock: move, resize, minimize, maximize, snap and center refused', [frameOf(k1), !!sdk.wm.get(k1).minimized, !!sdk.wm.get(k1).maximized], [f0, false, false]);
+  check('lock: move, resize, maximize, snap and center refused', [frameOf(k1), !!sdk.wm.get(k1).maximized], [f0, false]);
+  // minimize stays: another app can take the slot while the layout holds
+  sdk.wm.minimize(k1);
+  await flush();
+  check('lock: minimize still works', !!sdk.wm.get(k1).minimized, true);
+  sdk.wm.focus(k1);
+  sdk.wm.patch?.(k1, { minimized: false });
+  if (sdk.wm.get(k1).minimized) sdk.windows.set((ws) => ws.map((w) => (w.id === k1 ? { ...w, minimized: false } : w)));
+  await flush();
   check('lock: close refused (unless forced)', [sdk.wm.close(k1), !!sdk.wm.get(k1)], [false, true]);
   check('lock: the header keeps only the padlock', shown(T('free')), freeBefore - 1);
   sdk.wm.minimize(k2);

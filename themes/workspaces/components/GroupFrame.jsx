@@ -207,7 +207,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
           border: `2px dashed ${alpha(meta.color, 0.55)}`, alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'box-none' }}>
           {/* with nothing open the empty state's card says it once, over the outlines */}
           {bare ? null : <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', paddingHorizontal: 16 }}>{tr('shell.ws.slot.free')}</Text>}
-          {locked || bare ? null : (
+          {bare ? null : (   /* locked too: the slot a minimized window left can take another app */
             <View onClick={(e) => onAddWindow(d, e)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent }}>
               <PlusGlyph color={t.onAccent} size={11} />
               <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>

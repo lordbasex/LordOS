@@ -92,7 +92,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     huge folder (a node_modules) stopped the desktop for seconds (12.8 s on the maintainer's machine, caught by the
     watchdog inside the sort). It now reads one folder at a time with fs.listAsync (lord-server's file thread),
     unsorted, skips hidden entries and folders such as node_modules, keeps at most 2000 entries a folder, and folds
-    each name once instead of on every keystroke. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    each name once instead of on every keystroke.
+    **Web apps come back with the session**: they were saved (`web:<id>`) but the restore only launched LordOS apps and
+    Linux apps with a .desktop, so a web app (WhatsApp, Discord… on an activity of their own) never reopened. They are
+    now launched like a Dock click and take their saved place, activity and state. **The padlock keeps minimize**:
+    a locked display's windows show minimize beside the padlock (a Linux app is offered it too), so another app can
+    take the slot while the layout holds, and the free slot keeps its Add window button. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

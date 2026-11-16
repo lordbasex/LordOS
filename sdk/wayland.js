@@ -238,7 +238,7 @@ function sync() {
     if (!s) continue;
     const st = surfaceState(w, active);
     const cov = covered.has(w.id);
-    // locked (the theme's padlock, isWindowLocked): the app is told it can't maximize or minimize, and its own buttons go
+    // locked (the theme's padlock, isWindowLocked): the app is told it can't maximize (minimize stays), and its own buttons go
     const fixed = isWindowLocked(w.id);
     const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0);
     if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed); }
