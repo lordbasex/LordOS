@@ -37,5 +37,15 @@
   "col.time": "Време",
   "back": "Назад",
   "emptyMusicTitle": "Няма музика",
-  "emptyVideosTitle": "Няма видеоклипове"
+  "emptyVideosTitle": "Няма видеоклипове",
+  "nav.network": "Мрежа",
+  "nav.streams": "Потоци",
+  "streams.open": "Отваряне на адрес…",
+  "streams.list": "Отваряне на M3U списък…",
+  "streams.save": "Запазване",
+  "streams.remove": "Премахване",
+  "streams.close": "Затваряне",
+  "streams.saved": "Запазени",
+  "streams.channels": "Канали ({n})",
+  "streams.empty": "Отворете камера, поток или ТВ канал по адрес или каналите от M3U списък."
 }

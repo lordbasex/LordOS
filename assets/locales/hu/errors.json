@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "A(z) {name} nem telepíthető egyszerre 64 és 32 bitesként",
   "pkg.foreignArchUnsupported": "32 bites csomagokat csak 64 bites PC-n (amd64) lehet engedélyezni; ez a rendszer: {arch}",
   "pkg.foreignArchFailed": "Nem sikerült engedélyezni a 32 bites ({arch}) csomagokat (a dpkg {code} kóddal lépett ki)",
-  "webapps.developerOff": "A fejlesztői mód ki van kapcsolva a Beállítások → Webalkalmazások részben"
+  "webapps.developerOff": "A fejlesztői mód ki van kapcsolva a Beállítások → Webalkalmazások részben",
+  "media.streamAddress": "Ez az adáscím nem engedélyezett",
+  "media.streamCannotOpen": "Az adást nem sikerült megnyitni",
+  "media.streamTimeout": "Az adás nem válaszolt időben",
+  "media.streamAuth": "Az adás felhasználót és jelszót kért, vagy hibásak voltak",
+  "media.streamLost": "Megszakadt az adás",
+  "media.streamNoChannels": "A listán nincsenek csatornák",
+  "media.noStreamHelper": "Az adássegéd (lord-stream) nem érhető el"
 }

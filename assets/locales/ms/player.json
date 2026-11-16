@@ -36,5 +36,15 @@
   "col.time": "Masa",
   "back": "Kembali",
   "emptyMusicTitle": "Tiada muzik",
-  "emptyVideosTitle": "Tiada video"
+  "emptyVideosTitle": "Tiada video",
+  "nav.network": "Rangkaian",
+  "nav.streams": "Strim",
+  "streams.open": "Buka alamat…",
+  "streams.list": "Buka senarai M3U…",
+  "streams.save": "Simpan",
+  "streams.remove": "Buang",
+  "streams.close": "Tutup",
+  "streams.saved": "Disimpan",
+  "streams.channels": "Saluran ({n})",
+  "streams.empty": "Buka kamera, strim atau saluran TV melalui alamatnya, atau saluran senarai M3U."
 }

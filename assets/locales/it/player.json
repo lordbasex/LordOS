@@ -37,5 +37,15 @@
   "col.time": "Durata",
   "back": "Indietro",
   "emptyMusicTitle": "Nessuna musica",
-  "emptyVideosTitle": "Nessun video"
+  "emptyVideosTitle": "Nessun video",
+  "nav.network": "Rete",
+  "nav.streams": "Stream",
+  "streams.open": "Apri indirizzo…",
+  "streams.list": "Apri lista M3U…",
+  "streams.save": "Salva",
+  "streams.remove": "Rimuovi",
+  "streams.close": "Chiudi",
+  "streams.saved": "Salvati",
+  "streams.channels": "Canali ({n})",
+  "streams.empty": "Apri una telecamera, uno stream o un canale TV dal suo indirizzo, o i canali di una lista M3U."
 }

@@ -38,5 +38,15 @@
   "col.time": "Время",
   "back": "Назад",
   "emptyMusicTitle": "Нет музыки",
-  "emptyVideosTitle": "Нет видео"
+  "emptyVideosTitle": "Нет видео",
+  "nav.network": "Сеть",
+  "nav.streams": "Трансляции",
+  "streams.open": "Открыть адрес…",
+  "streams.list": "Открыть список M3U…",
+  "streams.save": "Сохранить",
+  "streams.remove": "Убрать",
+  "streams.close": "Закрыть",
+  "streams.saved": "Сохранённые",
+  "streams.channels": "Каналы ({n})",
+  "streams.empty": "Откройте камеру, трансляцию или телеканал по адресу либо каналы из списка M3U."
 }

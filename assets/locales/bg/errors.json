@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} не може да се инсталира едновременно за 64 и 32 бита",
   "pkg.foreignArchUnsupported": "32-битови пакети могат да се включат само на 64-битов компютър (amd64); тази система е {arch}",
   "pkg.foreignArchFailed": "32-битовите пакети ({arch}) не можаха да се включат (dpkg завърши с код {code})",
-  "webapps.developerOff": "Режимът за разработчици е изключен в Настройки → Уеб приложения"
+  "webapps.developerOff": "Режимът за разработчици е изключен в Настройки → Уеб приложения",
+  "media.streamAddress": "Този адрес на поток не е разрешен",
+  "media.streamCannotOpen": "Потокът не можа да се отвори",
+  "media.streamTimeout": "Потокът не отговори навреме",
+  "media.streamAuth": "Потокът поиска потребител и парола или те бяха грешни",
+  "media.streamLost": "Потокът прекъсна",
+  "media.streamNoChannels": "Списъкът няма канали",
+  "media.noStreamHelper": "Помощникът за потоци (lord-stream) не е наличен"
 }

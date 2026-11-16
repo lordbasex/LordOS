@@ -576,5 +576,7 @@
   "comp.sql": "Bases de données",
   "comp.sqlHint": "Bases de données : connexions aux serveurs MySQL et MariaDB de vos favoris.",
   "comp.weather": "Météo",
-  "comp.weatherHint": "Les prévisions du widget Météo, d'Open-Meteo, une fois activées."
+  "comp.weatherHint": "Les prévisions du widget Météo, d'Open-Meteo, une fois activées.",
+  "comp.streams": "Caméras et TV",
+  "comp.streamsHint": "Le widget vidéo et les adresses du Lecteur : caméras, flux et chaînes TV (lord-stream)."
 }

@@ -97,7 +97,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Linux apps with a .desktop, so a web app (WhatsApp, Discord… on an activity of their own) never reopened. They are
     now launched like a Dock click and take their saved place, activity and state. **The padlock keeps minimize**:
     a locked display's windows show minimize beside the padlock (a Linux app is offered it too), so another app can
-    take the slot while the layout holds, and the free slot keeps its Add window button. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    take the slot while the layout holds, and the free slot keeps its Add window button.
+    **Cameras, streams and TV (`lord-stream`)**: a Video widget (m, s, l, xl) and the Player's new Streams section
+    play RTSP, RTMP, SRT, RTP, UDP (multicast included), HLS, MPEG-DASH, HTTP MPEG-TS and MJPEG addresses and the
+    channels of M3U lists (by address or file), with pause, mute and Reconnecting. They run in `lord-stream`
+    (maintainer's approval 2026-11-16): lord-media's player built as a second binary with internet sockets only
+    (`sandbox_apply_helper` gains `network`: AF_INET/AF_INET6, connect, bind; never unix, netlink or exec), in its own
+    firewall scope `lordos:streams`, every wait bounded so a dead camera never holds the desktop. lord-media itself
+    still has no network. A password in an address goes to the keyring, never settings.json. The sandbox's Landlock
+    rules now work for single files too (a file got directory rights and the kernel refused the rule: files such as
+    /etc/ld.so.cache in the helpers' lists were never readable). Tests: `streamurl-test` (39), `stream_model_test`,
+    `sandbox-test helper-net`, and `lordstream-e2e` against local FFmpeg servers for each protocol. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

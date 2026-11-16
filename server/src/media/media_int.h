@@ -15,7 +15,7 @@
 
 typedef struct MAudio MAudio;
 
-enum { SK_NONE = 0, SK_PLAYER, SK_CAMERA, SK_IMAGE, SK_CAPTURE, SK_SCREENREC, SK_AUDIOREC, SK_STREAM };
+enum { SK_NONE = 0, SK_PLAYER, SK_CAMERA, SK_IMAGE, SK_CAPTURE, SK_SCREENREC, SK_AUDIOREC, SK_STREAM, SK_M3U };   /* SK_M3U: lord-stream's channel list */
 
 /* How a source is shown in its node. */
 typedef struct {
@@ -92,6 +92,8 @@ MediaSrc *media_src_at(int i);          /* iterate: 0..MEDIA_MAX_SRC-1 (NULL if 
 void media_src_close(MediaSrc *s);
 void media_src_damage(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
+/* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
+int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 int  media_pulse_fd(void);              /* socket connected to PipeWire (the user's) or -1 */
 int  media_render_fd(void);             /* render node for VA-API or -1 */
 const char *media_hwaccel(void);        /* "vaapi" | "v4l2request" | "none" (LORD_MEDIA_HWACCEL) */

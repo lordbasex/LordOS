@@ -38,5 +38,15 @@
   "col.time": "Тривалість",
   "back": "Назад",
   "emptyMusicTitle": "Немає музики",
-  "emptyVideosTitle": "Немає відео"
+  "emptyVideosTitle": "Немає відео",
+  "nav.network": "Мережа",
+  "nav.streams": "Трансляції",
+  "streams.open": "Відкрити адресу…",
+  "streams.list": "Відкрити список M3U…",
+  "streams.save": "Зберегти",
+  "streams.remove": "Прибрати",
+  "streams.close": "Закрити",
+  "streams.saved": "Збережені",
+  "streams.channels": "Канали ({n})",
+  "streams.empty": "Відкрийте камеру, трансляцію чи телеканал за адресою або канали зі списку M3U."
 }

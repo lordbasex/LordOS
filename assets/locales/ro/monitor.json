@@ -591,5 +591,7 @@
   "comp.sql": "Baze de date",
   "comp.sqlHint": "Baze de date: conexiuni la serverele MySQL și MariaDB din favorite.",
   "comp.weather": "Vremea",
-  "comp.weatherHint": "Prognozele widgetului Vremea de la Open-Meteo, după ce le activezi."
+  "comp.weatherHint": "Prognozele widgetului Vremea de la Open-Meteo, după ce le activezi.",
+  "comp.streams": "Camere și TV",
+  "comp.streamsHint": "Widgetul video și adresele Playerului: camere, fluxuri și canale TV (lord-stream)."
 }

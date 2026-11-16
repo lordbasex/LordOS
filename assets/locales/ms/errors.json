@@ -875,5 +875,12 @@
   "pkg.multiarchConflict": "{name} tidak boleh dipasang untuk 64 dan 32 bit pada masa yang sama",
   "pkg.foreignArchUnsupported": "Pakej 32-bit hanya boleh didayakan pada PC 64-bit (amd64); sistem ini ialah {arch}",
   "pkg.foreignArchFailed": "Pakej 32-bit ({arch}) tidak dapat didayakan (dpkg keluar dengan kod {code})",
-  "webapps.developerOff": "Mod pembangun dimatikan dalam Tetapan → Apl Web"
+  "webapps.developerOff": "Mod pembangun dimatikan dalam Tetapan → Apl Web",
+  "media.streamAddress": "Alamat strim ini tidak dibenarkan",
+  "media.streamCannotOpen": "Strim tidak dapat dibuka",
+  "media.streamTimeout": "Strim tidak menjawab tepat pada masanya",
+  "media.streamAuth": "Strim meminta pengguna dan kata laluan, atau ia salah",
+  "media.streamLost": "Strim terputus",
+  "media.streamNoChannels": "Senarai tiada saluran",
+  "media.noStreamHelper": "Pembantu strim (lord-stream) tiada"
 }

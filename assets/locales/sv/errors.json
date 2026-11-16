@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} kan inte installeras för 64 och 32 bitar samtidigt",
   "pkg.foreignArchUnsupported": "32-bitarspaket kan bara aktiveras på en 64-bitars dator (amd64); det här systemet är {arch}",
   "pkg.foreignArchFailed": "32-bitarspaket ({arch}) kunde inte aktiveras (dpkg avslutades med kod {code})",
-  "webapps.developerOff": "Utvecklarläget är avstängt i Inställningar → Webbappar"
+  "webapps.developerOff": "Utvecklarläget är avstängt i Inställningar → Webbappar",
+  "media.streamAddress": "Den här strömadressen är inte tillåten",
+  "media.streamCannotOpen": "Strömmen kunde inte öppnas",
+  "media.streamTimeout": "Strömmen svarade inte i tid",
+  "media.streamAuth": "Strömmen bad om användare och lösenord, eller så var de fel",
+  "media.streamLost": "Strömmen bröts",
+  "media.streamNoChannels": "Listan har inga kanaler",
+  "media.noStreamHelper": "Strömhjälpen (lord-stream) är inte tillgänglig"
 }

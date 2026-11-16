@@ -101,6 +101,39 @@ The same windows are black when a Linux app shares a screen or a window through 
  lord-media    media/helper/*  (FFmpeg + libva; sandbox; no network or files)
 ```
 
+### Network streams: `lord-stream` (0.8.8.10)
+
+Cameras, streams and TV channels for the desktop's **Video** widget and the Player's **Streams** (maintainer's approval
+2026-11-16). `lord-media` keeps no network at all; a second binary does this one job.
+
+- **What it is:** lord-media's own player (`helper/lm_play.c`) built with `LM_NET` as `lord-stream`, plus the M3U
+  reader (`media/stream/ls_m3u.c`). It refuses every other job. lord-server launches it like lord-media
+  (`media_spawn_stream`: fixed path next to lord-server, no arguments, `LANG` only, the socket on fd 3).
+- **Addresses** (`media/streamurl.c`, `tests/streamurl_test.c`, checked in lord-server and again in the helper):
+  `rtsp`, `rtsps`, `rtmp`, `rtmps`, `rtmpt`, `srt`, `rtp`, `udp`, `http`, `https` (HLS, DASH, MPEG-TS, MJPEG), printable
+  ASCII without spaces, quotes, `|` or backslashes, at most 2048 bytes. FFmpeg's `protocol_whitelist` is the
+  network-only list (`STREAM_FF_PROTOCOLS`): never `file:`, `pipe:`, `concat:` or `data:`.
+- **Sandbox:** the helpers' one (`sandbox_apply_helper`) with `network = 1`: socket(2) only for AF_INET/AF_INET6,
+  plus connect, bind (UDP: RTP ports, multicast) and sendmmsg/recvmmsg (glibc's resolver); never AF_UNIX, netlink or
+  socketpair; no exec or fork; read-only the system's libraries and what name resolution and TLS read
+  (`/etc/resolv.conf`, `/etc/hosts`, `/etc/nsswitch.conf`, `/etc/ssl`…). It runs in `lordos-net-streams.scope`, the
+  firewall app **`lordos:streams`** ("Cameras & TV" in Monitor → Network). `build/sandbox-test helper-net`.
+- **Never stuck:** every open and read is bounded (20 s to open, 6 s without data on a live stream; an
+  `interrupt_callback` also ends a read when lord-server stops it). A live stream that ends was lost: the helper says
+  `media.streamLost` and exits; the desktop shows Reconnecting and starts a new one after 1, 2, 4… 30 s
+  (`sdk/streams.jsx` `useStream`, `sdk/streammodel.js`). A wrong address or password stays failed. A live stream
+  without sound follows its frames' timing (bursts of segments are not dropped as late); an address with a duration
+  (a film over HLS) seeks and ends like a file.
+- **Passwords:** an address may carry `user:password@`; the desktop keeps the address without it and the password in
+  the keyring (Passwords, owner `player`, service `stream:<scheme>://<host:port>`), and puts it back only inside the
+  job's parameters. Nothing writes it to settings.json, a file or a command line.
+- **M3U lists:** an http(s) list is read by lord-stream (at most 4 MB and 5000 channels, parsed in the sandbox) and its
+  channels reach JS rebuilt by lord-server (`m3u_result`: each address checked again); a list file in the home folder
+  is parsed in JS by the same rules (`parseM3U`).
+- **Checked** with `build/lordstream-e2e` against local servers made with FFmpeg (HLS, DASH, SRT, UDP, RTP,
+  HTTP MPEG-TS, MJPEG, RTMP), an http M3U list, and a public HTTPS HLS stream (DNS and TLS in the sandbox). Not yet:
+  RTSP against a real camera (the one tried wasn't reachable), ONVIF discovery, NDI (closed SDK: not possible).
+
 ### The `lord-media` helper
 
 - **How it's launched:** lord-server launches it on demand (`media_spawn`), with a fixed path:

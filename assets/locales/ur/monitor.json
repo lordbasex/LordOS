@@ -576,5 +576,7 @@
   "comp.sql": "ڈیٹا بیسز",
   "comp.sqlHint": "ڈیٹا بیسز: آپ کے پسندیدہ MySQL اور MariaDB سرورز سے کنکشنز۔",
   "comp.weather": "موسم",
-  "comp.weatherHint": "آن کرنے کے بعد موسم ویجیٹ کی Open-Meteo سے پیش گوئیاں۔"
+  "comp.weatherHint": "آن کرنے کے بعد موسم ویجیٹ کی Open-Meteo سے پیش گوئیاں۔",
+  "comp.streams": "کیمرے اور ٹی وی",
+  "comp.streamsHint": "ویڈیو ویجیٹ اور پلیئر کے پتے: کیمرے، اسٹریمز اور ٹی وی چینلز (lord-stream)۔"
 }

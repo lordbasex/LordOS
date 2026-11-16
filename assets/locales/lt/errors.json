@@ -877,5 +877,12 @@
   "pkg.multiarchConflict": "{name} negalima įdiegti 64 ir 32 bitų vienu metu",
   "pkg.foreignArchUnsupported": "32 bitų paketus galima įjungti tik 64 bitų kompiuteryje (amd64); ši sistema yra {arch}",
   "pkg.foreignArchFailed": "Nepavyko įjungti 32 bitų ({arch}) paketų (dpkg baigė darbą su kodu {code})",
-  "webapps.developerOff": "Kūrėjo režimas išjungtas skiltyje Nustatymai → Žiniatinklio programos"
+  "webapps.developerOff": "Kūrėjo režimas išjungtas skiltyje Nustatymai → Žiniatinklio programos",
+  "media.streamAddress": "Šis transliacijos adresas neleidžiamas",
+  "media.streamCannotOpen": "Transliacijos atidaryti nepavyko",
+  "media.streamTimeout": "Transliacija laiku neatsakė",
+  "media.streamAuth": "Transliacija paprašė naudotojo ir slaptažodžio arba jie neteisingi",
+  "media.streamLost": "Transliacija nutrūko",
+  "media.streamNoChannels": "Sąraše nėra kanalų",
+  "media.noStreamHelper": "Transliacijų pagalbininkas (lord-stream) nepasiekiamas"
 }

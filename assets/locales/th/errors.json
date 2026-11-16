@@ -875,5 +875,12 @@
   "pkg.multiarchConflict": "ไม่สามารถติดตั้ง {name} สำหรับ 64 และ 32 บิตพร้อมกันได้",
   "pkg.foreignArchUnsupported": "เปิดใช้แพ็กเกจ 32 บิตได้เฉพาะบนพีซี 64 บิต (amd64) เท่านั้น ระบบนี้คือ {arch}",
   "pkg.foreignArchFailed": "ไม่สามารถเปิดใช้แพ็กเกจ 32 บิต ({arch}) ได้ (dpkg จบด้วยรหัส {code})",
-  "webapps.developerOff": "โหมดนักพัฒนาปิดอยู่ใน การตั้งค่า → เว็บแอป"
+  "webapps.developerOff": "โหมดนักพัฒนาปิดอยู่ใน การตั้งค่า → เว็บแอป",
+  "media.streamAddress": "ไม่อนุญาตที่อยู่สตรีมนี้",
+  "media.streamCannotOpen": "เปิดสตรีมไม่ได้",
+  "media.streamTimeout": "สตรีมไม่ตอบกลับทันเวลา",
+  "media.streamAuth": "สตรีมขอผู้ใช้และรหัสผ่าน หรือข้อมูลไม่ถูกต้อง",
+  "media.streamLost": "สตรีมขาดหาย",
+  "media.streamNoChannels": "รายการไม่มีช่อง",
+  "media.noStreamHelper": "ตัวช่วยสตรีม (lord-stream) ไม่พร้อมใช้งาน"
 }

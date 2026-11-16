@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} can't be installed for 64 and 32 bits at the same time",
   "pkg.foreignArchUnsupported": "32-bit packages can only be enabled on a 64-bit PC (amd64); this system is {arch}",
   "pkg.foreignArchFailed": "32-bit ({arch}) packages could not be enabled (dpkg exited with code {code})",
-  "webapps.developerOff": "Developer mode is off in Settings → Web Apps"
+  "webapps.developerOff": "Developer mode is off in Settings → Web Apps",
+  "media.streamAddress": "This stream address isn't allowed",
+  "media.streamCannotOpen": "The stream couldn't be opened",
+  "media.streamTimeout": "The stream didn't answer in time",
+  "media.streamAuth": "The stream asked for a user and password, or they were wrong",
+  "media.streamLost": "The stream was lost",
+  "media.streamNoChannels": "The list has no channels",
+  "media.noStreamHelper": "The stream helper (lord-stream) is not available"
 }

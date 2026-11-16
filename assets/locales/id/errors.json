@@ -875,5 +875,12 @@
   "pkg.multiarchConflict": "{name} tidak dapat dipasang untuk 64 dan 32 bit sekaligus",
   "pkg.foreignArchUnsupported": "Paket 32-bit hanya dapat diaktifkan di PC 64-bit (amd64); sistem ini {arch}",
   "pkg.foreignArchFailed": "Paket 32-bit ({arch}) tidak dapat diaktifkan (dpkg keluar dengan kode {code})",
-  "webapps.developerOff": "Mode developer nonaktif di Pengaturan → Aplikasi Web"
+  "webapps.developerOff": "Mode developer nonaktif di Pengaturan → Aplikasi Web",
+  "media.streamAddress": "Alamat siaran ini tidak diizinkan",
+  "media.streamCannotOpen": "Siaran tidak bisa dibuka",
+  "media.streamTimeout": "Siaran tidak menjawab tepat waktu",
+  "media.streamAuth": "Siaran meminta pengguna dan kata sandi, atau keduanya salah",
+  "media.streamLost": "Siaran terputus",
+  "media.streamNoChannels": "Daftar tidak berisi saluran",
+  "media.noStreamHelper": "Pembantu siaran (lord-stream) tidak tersedia"
 }

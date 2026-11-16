@@ -576,5 +576,7 @@
   "comp.sql": "Adatbázisok",
   "comp.sqlHint": "Adatbázisok: kapcsolatok a kedvencei közé felvett MySQL- és MariaDB-kiszolgálókhoz.",
   "comp.weather": "Időjárás",
-  "comp.weatherHint": "Az időjárás-widget előrejelzései az Open-Meteótól, ha bekapcsolod."
+  "comp.weatherHint": "Az időjárás-widget előrejelzései az Open-Meteótól, ha bekapcsolod.",
+  "comp.streams": "Kamerák és tévé",
+  "comp.streamsHint": "A videó-widget és a Lejátszó címei: kamerák, adások és tévécsatornák (lord-stream)."
 }

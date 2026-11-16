@@ -385,7 +385,7 @@ await flush();
   wp.widgetPicker.set({ display: R });
   await flush();
   check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
-  check('widgets: its kinds', ['timer', 'recent', 'updates', 'launcher', 'vpn', 'weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  check('widgets: its kinds', ['video', 'timer', 'recent', 'updates', 'launcher', 'vpn', 'weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
   wp.widgetPicker.set(null);
   const g = grid.gridOf(sdk.workAreaOf(R));
   const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };
@@ -514,6 +514,16 @@ await flush();
   const id = sdk.addDeskWidget('vpn', 'm', L);
   for (let i = 0; i < 2; i++) await flush();
   check('vpn: the only VPN, its switch off', [shownV('office') >= 1, shownV(sdk.t('shell.widgets.vpn.off')) >= 1, shownV(sdk.t('shell.widgets.vpn.disconnected')) >= 1], [true, true, true]);
+  sdk.removeDeskWidget(id);
+  for (let i = 0; i < 2; i++) await flush();
+}
+
+// video: with no source yet it offers to set one; nothing is opened (no lord-stream) until there is an address
+{
+  const shownV = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  const id = sdk.addDeskWidget('video', 'm', L);
+  for (let i = 0; i < 2; i++) await flush();
+  check('video: no source, it offers one', [shownV(sdk.t('shell.widgets.video.empty')), shownV(sdk.t('shell.widgets.video.setup'))], [1, 1]);
   sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();
 }

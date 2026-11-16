@@ -36,5 +36,15 @@
   "col.time": "時間",
   "back": "戻る",
   "emptyMusicTitle": "音楽なし",
-  "emptyVideosTitle": "ビデオなし"
+  "emptyVideosTitle": "ビデオなし",
+  "nav.network": "ネットワーク",
+  "nav.streams": "配信",
+  "streams.open": "アドレスを開く…",
+  "streams.list": "M3U リストを開く…",
+  "streams.save": "保存",
+  "streams.remove": "削除",
+  "streams.close": "閉じる",
+  "streams.saved": "保存済み",
+  "streams.channels": "チャンネル（{n}）",
+  "streams.empty": "アドレスでカメラ、配信、テレビチャンネルを開くか、M3U リストのチャンネルを開きます。"
 }

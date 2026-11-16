@@ -561,5 +561,7 @@
   "comp.sql": "データベース",
   "comp.sqlHint": "データベース：お気に入りにある MySQL および MariaDB サーバーへの接続。",
   "comp.weather": "天気",
-  "comp.weatherHint": "オンにすると、天気ウィジェットが Open-Meteo から予報を取得します。"
+  "comp.weatherHint": "オンにすると、天気ウィジェットが Open-Meteo から予報を取得します。",
+  "comp.streams": "カメラとテレビ",
+  "comp.streamsHint": "ビデオウィジェットとプレーヤーのアドレス：カメラ、配信、テレビチャンネル（lord-stream）。"
 }

@@ -576,5 +576,7 @@
   "comp.sql": "Mga Database",
   "comp.sqlHint": "Mga Database: mga koneksyon sa mga MySQL at MariaDB server sa mga paborito mo.",
   "comp.weather": "Panahon",
-  "comp.weatherHint": "Ang mga taya ng widget ng panahon mula sa Open-Meteo, kapag in-on mo."
+  "comp.weatherHint": "Ang mga taya ng widget ng panahon mula sa Open-Meteo, kapag in-on mo.",
+  "comp.streams": "Mga camera at TV",
+  "comp.streamsHint": "Ang video widget at mga address ng Player: camera, stream at TV channel (lord-stream)."
 }

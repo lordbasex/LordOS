@@ -576,5 +576,7 @@
   "comp.sql": "Hifadhidata",
   "comp.sqlHint": "Hifadhidata: miunganisho kwa seva za MySQL na MariaDB kwenye vipendwa vyako.",
   "comp.weather": "Hali ya hewa",
-  "comp.weatherHint": "Utabiri wa wijeti ya hali ya hewa kutoka Open-Meteo, ukiuwasha."
+  "comp.weatherHint": "Utabiri wa wijeti ya hali ya hewa kutoka Open-Meteo, ukiuwasha.",
+  "comp.streams": "Kamera na TV",
+  "comp.streamsHint": "Wijeti ya video na anwani za Kicheza: kamera, mitiririko na chaneli za TV (lord-stream)."
 }

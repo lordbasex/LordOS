@@ -37,5 +37,15 @@
   "col.time": "Dauer",
   "back": "Zurück",
   "emptyMusicTitle": "Keine Musik",
-  "emptyVideosTitle": "Keine Videos"
+  "emptyVideosTitle": "Keine Videos",
+  "nav.network": "Netzwerk",
+  "nav.streams": "Streams",
+  "streams.open": "Adresse öffnen …",
+  "streams.list": "M3U-Liste öffnen …",
+  "streams.save": "Sichern",
+  "streams.remove": "Entfernen",
+  "streams.close": "Schließen",
+  "streams.saved": "Gesichert",
+  "streams.channels": "Sender ({n})",
+  "streams.empty": "Öffne eine Kamera, einen Stream oder einen TV-Sender über die Adresse oder die Sender einer M3U-Liste."
 }

@@ -561,5 +561,7 @@
   "comp.sql": "Pangkalan Data",
   "comp.sqlHint": "Pangkalan Data: sambungan ke pelayan MySQL dan MariaDB dalam kegemaran anda.",
   "comp.weather": "Cuaca",
-  "comp.weatherHint": "Ramalan widget cuaca daripada Open-Meteo, selepas anda menghidupkannya."
+  "comp.weatherHint": "Ramalan widget cuaca daripada Open-Meteo, selepas anda menghidupkannya.",
+  "comp.streams": "Kamera dan TV",
+  "comp.streamsHint": "Widget video dan alamat Pemain: kamera, strim dan saluran TV (lord-stream)."
 }

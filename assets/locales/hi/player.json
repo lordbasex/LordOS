@@ -37,5 +37,15 @@
   "col.time": "समय",
   "back": "पीछे",
   "emptyMusicTitle": "कोई संगीत नहीं",
-  "emptyVideosTitle": "कोई वीडियो नहीं"
+  "emptyVideosTitle": "कोई वीडियो नहीं",
+  "nav.network": "नेटवर्क",
+  "nav.streams": "स्ट्रीम",
+  "streams.open": "पता खोलें…",
+  "streams.list": "M3U सूची खोलें…",
+  "streams.save": "सहेजें",
+  "streams.remove": "हटाएँ",
+  "streams.close": "बंद करें",
+  "streams.saved": "सहेजे गए",
+  "streams.channels": "चैनल ({n})",
+  "streams.empty": "कैमरा, स्ट्रीम या टीवी चैनल उसके पते से, या M3U सूची के चैनल खोलें।"
 }

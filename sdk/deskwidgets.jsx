@@ -47,6 +47,7 @@ import { openFileWithApps } from './sysopen.js';
 import { lordosUpdate, restartNeeded } from './updates.js';
 import { storeUpdates } from './appcontrol.js';
 import { useLauncherApps, launchApp } from './apps.js';
+import { VideoBody, videoSetup } from './videowidget.jsx';
 import { dock, dockIdOf } from './dock.js';
 import { locale } from './i18n.js';
 import { regionCountry } from './localename.js';
@@ -1238,13 +1239,21 @@ function LauncherBody({ w, L }) {
   );
 }
 
+// ---- video: cameras, streams and TV channels (sdk/videowidget.jsx, lord-stream) ----
+const VideoKind = ({ w }) => <VideoBody w={w} setOpts={(p) => setDeskWidget(w.id, { opts: p })} />;
+
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
-const BODIES = { timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
+const BODIES = { video: VideoKind, timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
-const KIND_SIZES = { timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
+const KIND_SIZES = { video: ['m', 's', 'l', 'xl'], timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
+  video: (w) => [
+    { label: t('shell.widgets.video.setup'), onClick: () => videoSetup.set({ widget: w, set: (p) => setDeskWidget(w.id, { opts: p }) }) },
+    { label: t(w.opts?.muted === false ? 'shell.widgets.video.mute' : 'shell.widgets.video.unmute'), onClick: () => setDeskWidget(w.id, { opts: { muted: w.opts?.muted !== false ? false : true } }) },
+    { label: t(w.opts?.paused ? 'shell.widgets.video.play' : 'shell.widgets.video.pause'), onClick: () => setDeskWidget(w.id, { opts: { paused: !w.opts?.paused } }) },
+  ],
   timer: () => [{ label: t('shell.widgets.timer.openClock'), onClick: () => wm.open('clock') }],
   recent: () => [{ label: t('apps.files'), onClick: () => wm.open('files') }],
   // which apps: a check per app (the Dock's pins until chosen), at most 8

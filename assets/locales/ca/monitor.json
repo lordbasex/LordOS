@@ -576,5 +576,7 @@
   "comp.sql": "Bases de dades",
   "comp.sqlHint": "Bases de dades: connexions als servidors MySQL i MariaDB dels teus preferits.",
   "comp.weather": "Temps",
-  "comp.weatherHint": "Les previsions del giny del temps, d'Open-Meteo, quan les actives."
+  "comp.weatherHint": "Les previsions del giny del temps, d'Open-Meteo, quan les actives.",
+  "comp.streams": "Càmeres i TV",
+  "comp.streamsHint": "El giny de vídeo i les adreces del Reproductor: càmeres, emissions i canals de TV (lord-stream)."
 }

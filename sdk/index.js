@@ -370,3 +370,7 @@ export { windowMenuItems, moveResizeItems } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
 export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, NARROW, MIN_W, MIN_H } from './narrow.jsx';
+// Network streams: cameras, IPTV and the Player's addresses through lord-stream (sdk/streams.jsx, sdk/streammodel.js)
+export { useStream, saveStreamPassword, STREAM_KEYRING_APP } from './streams.jsx';
+export { streamUrlOk, splitCredentials, withCredentials, protocolOf, lowQuality, parseM3U, hostKey } from './streammodel.js';
+export { VideoSetup, videoSetup } from './videowidget.jsx';

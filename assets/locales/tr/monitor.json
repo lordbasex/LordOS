@@ -576,5 +576,7 @@
   "comp.sql": "Veritabanları",
   "comp.sqlHint": "Veritabanları: sık kullanılanlarınızdaki MySQL ve MariaDB sunucularına bağlantılar.",
   "comp.weather": "Hava Durumu",
-  "comp.weatherHint": "Açtığında, hava durumu widget'ının Open-Meteo tahminleri."
+  "comp.weatherHint": "Açtığında, hava durumu widget'ının Open-Meteo tahminleri.",
+  "comp.streams": "Kameralar ve TV",
+  "comp.streamsHint": "Video widget'ı ve Oynatıcı'nın adresleri: kameralar, yayınlar ve TV kanalları (lord-stream)."
 }

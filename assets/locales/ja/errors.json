@@ -875,5 +875,12 @@
   "pkg.multiarchConflict": "{name} を 64 ビットと 32 ビットの両方で同時にインストールすることはできません",
   "pkg.foreignArchUnsupported": "32 ビットパッケージを有効にできるのは 64 ビット PC (amd64) だけです。このシステムは {arch} です",
   "pkg.foreignArchFailed": "32 ビット ({arch}) パッケージを有効にできませんでした (dpkg の終了コード {code})",
-  "webapps.developerOff": "「設定」→「Web アプリ」でデベロッパモードがオフになっています"
+  "webapps.developerOff": "「設定」→「Web アプリ」でデベロッパモードがオフになっています",
+  "media.streamAddress": "この配信アドレスは許可されていません",
+  "media.streamCannotOpen": "配信を開けませんでした",
+  "media.streamTimeout": "配信が時間内に応答しませんでした",
+  "media.streamAuth": "配信がユーザー名とパスワードを求めたか、それが違っていました",
+  "media.streamLost": "配信が途切れました",
+  "media.streamNoChannels": "リストにチャンネルがありません",
+  "media.noStreamHelper": "配信ヘルパー（lord-stream）を利用できません"
 }

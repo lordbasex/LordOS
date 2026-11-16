@@ -9,6 +9,7 @@ import {
   useStore, useWindowState, wm, typeScale, t as tr, errorText, media, usePlayer, nowPlaying, mediaFormatTime, useThumb, fs, addListener, direction, useFilesDrop, FilesDropHint, dropCount,
   useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
+import { StreamsView } from './streams.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { library, scan, albumsOf, artistsOf, parseSrt, mediaIn, AUDIO, VIDEO } from './library.js';
 import { compareNames } from '../../sdk/collate.js';
@@ -501,12 +502,14 @@ export default function Player() {
         {lib.videos.map((v, i) => <VideoCard key={v.path} v={v} onOpen={() => playList(lib.videos.map((x) => x.path), i)} />)}
       </View>
     );
+  } else if (view === 'streams') {
+    content = <StreamsView onStart={() => { if (idRef.current) media.control(idRef.current, 'pause'); }} />;
   } else if (view === 'queue') {
     content = songList(queue, (q, i) => row(tracks.find((x) => x.path === q) || { path: q, title: baseName(q), artist: '', album: '' }, i, queue.map((x) => ({ path: x }))));
   } else {
     content = songList(tracks.slice().sort((a, b) => compareNames(a.title, b.title)), (x, i, list) => row(x, i, list));
   }
-  const titles = { songs: tr('player.songsTitle'), artists: sel || tr('player.artists'), albums: tr('player.albums'), videos: tr('player.videos'), queue: tr('player.queue') };
+  const titles = { songs: tr('player.songsTitle'), artists: sel || tr('player.artists'), albums: tr('player.albums'), videos: tr('player.videos'), queue: tr('player.queue'), streams: tr('player.nav.streams') };
   const pickView = (fn) => { fn(); if (sb.narrow) sb.close(); };
   const sidebar = (
     <>
@@ -517,11 +520,13 @@ export default function Player() {
       <SectionTitle>{tr('player.playing')}</SectionTitle>
       <SidebarItem label={tr('player.nav.queue')} icon="≡" selected={view === 'queue'} onClick={() => pickView(() => setView('queue'))} />
       {current && isVideo(current) && <SidebarItem label={tr('player.nav.video')} icon="▣" selected={false} onClick={() => pickView(() => setShowVideo(true))} />}
+      <SectionTitle>{tr('player.nav.network')}</SectionTitle>
+      <SidebarItem label={tr('player.nav.streams')} icon="◉" selected={view === 'streams'} onClick={() => pickView(() => { setView('streams'); setSel(null); })} />
       <View style={{ flex: 1 }} />
       {lib.scanning && <Text style={{ fontSize: typeScale.caption, color: th.textDim, paddingHorizontal: 10, paddingBottom: 10 }}>{tr('player.scanning', { done: lib.done, total: lib.total })}</Text>}
     </>
   );
-  const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue');
+  const empty = !((view === 'videos' ? lib.videos.length : tracks.length) || view === 'queue' || view === 'streams');
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1 }} onMouseDown={() => setMenu(null)}>

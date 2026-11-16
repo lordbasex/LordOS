@@ -30,6 +30,7 @@ export const COMPONENTS = {
   'lordos:sql': { label: 'monitor.comp.sql', glyph: 'database', hint: 'monitor.comp.sqlHint' },
   'lordos:lists': { label: 'monitor.comp.lists', glyph: 'shield', hint: 'monitor.comp.listsHint' },
   'lordos:weather': { label: 'monitor.comp.weather', glyph: 'network', hint: 'monitor.comp.weatherHint' },
+  'lordos:streams': { label: 'monitor.comp.streams', glyph: 'network', hint: 'monitor.comp.streamsHint' },
   'lordos:machines': { label: 'monitor.comp.machines', icon: 'machines', hint: 'monitor.comp.machinesHint' },
   'lordos:vpn': { label: 'monitor.comp.vpn', glyph: 'tunnel', hint: 'monitor.comp.vpnHint', system: true },
   'system:dns': { label: 'monitor.comp.dns', glyph: 'dns', hint: 'monitor.comp.dnsHint', system: true },

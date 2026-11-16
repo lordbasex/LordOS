@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "Pakettia {name} ei voi asentaa 64- ja 32-bittisenä samaan aikaan",
   "pkg.foreignArchUnsupported": "32-bittiset paketit voi ottaa käyttöön vain 64-bittisessä PC:ssä (amd64); tämä järjestelmä on {arch}",
   "pkg.foreignArchFailed": "32-bittisiä ({arch}) paketteja ei voitu ottaa käyttöön (dpkg päättyi koodilla {code})",
-  "webapps.developerOff": "Kehittäjätila on pois päältä kohdassa Asetukset → Verkkosovellukset"
+  "webapps.developerOff": "Kehittäjätila on pois päältä kohdassa Asetukset → Verkkosovellukset",
+  "media.streamAddress": "Tätä lähetysosoitetta ei sallita",
+  "media.streamCannotOpen": "Lähetystä ei voitu avata",
+  "media.streamTimeout": "Lähetys ei vastannut ajoissa",
+  "media.streamAuth": "Lähetys pyysi käyttäjää ja salasanaa, tai ne olivat väärät",
+  "media.streamLost": "Lähetys katkesi",
+  "media.streamNoChannels": "Listalla ei ole kanavia",
+  "media.noStreamHelper": "Lähetysapuri (lord-stream) ei ole käytettävissä"
 }

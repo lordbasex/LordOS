@@ -139,6 +139,11 @@ displays do. Nothing runs per frame, nothing polls.
   app; Updates reads the signed lists' last check (`lordosUpdate`, `storeUpdates`, `restartNeeded`: nothing is
   fetched) every 10 minutes and opens the Store's Updates page; Apps launches 4 or 8 apps, the Dock's pins until
   chosen from its menu (`opts.apps`).
+- **Video** (m, s, l, xl): a camera, a stream or a TV channel played by `lord-stream` (docs/MEDIA.md, "Network streams"):
+  an address (RTSP, RTMP, SRT, RTP, UDP, HLS, DASH, MJPEG, HTTP) or a channel of an M3U list, set from its menu or
+  its card. Muted by default; pause closes a live stream (no bandwidth, nothing decoding); Reconnecting while a lost
+  stream comes back. Small and medium ask a camera for its sub stream where the address says how. The password of an
+  address goes to the keyring (`opts` keeps `{ url, user, name }`).
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

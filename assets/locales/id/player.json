@@ -36,5 +36,15 @@
   "col.time": "Durasi",
   "back": "Kembali",
   "emptyMusicTitle": "Tidak ada musik",
-  "emptyVideosTitle": "Tidak ada video"
+  "emptyVideosTitle": "Tidak ada video",
+  "nav.network": "Jaringan",
+  "nav.streams": "Siaran",
+  "streams.open": "Buka alamat…",
+  "streams.list": "Buka daftar M3U…",
+  "streams.save": "Simpan",
+  "streams.remove": "Hapus",
+  "streams.close": "Tutup",
+  "streams.saved": "Tersimpan",
+  "streams.channels": "Saluran ({n})",
+  "streams.empty": "Buka kamera, siaran, atau saluran TV lewat alamatnya, atau saluran dari daftar M3U."
 }

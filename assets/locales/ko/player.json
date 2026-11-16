@@ -36,5 +36,15 @@
   "col.time": "시간",
   "back": "뒤로",
   "emptyMusicTitle": "음악 없음",
-  "emptyVideosTitle": "비디오 없음"
+  "emptyVideosTitle": "비디오 없음",
+  "nav.network": "네트워크",
+  "nav.streams": "스트림",
+  "streams.open": "주소 열기…",
+  "streams.list": "M3U 목록 열기…",
+  "streams.save": "저장",
+  "streams.remove": "제거",
+  "streams.close": "닫기",
+  "streams.saved": "저장됨",
+  "streams.channels": "채널({n})",
+  "streams.empty": "주소로 카메라, 스트림, TV 채널을 열거나 M3U 목록의 채널을 엽니다."
 }

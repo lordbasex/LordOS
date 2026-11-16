@@ -38,5 +38,15 @@
   "col.time": "Durată",
   "back": "Înapoi",
   "emptyMusicTitle": "Nicio melodie",
-  "emptyVideosTitle": "Niciun videoclip"
+  "emptyVideosTitle": "Niciun videoclip",
+  "nav.network": "Rețea",
+  "nav.streams": "Fluxuri",
+  "streams.open": "Deschide adresă…",
+  "streams.list": "Deschide listă M3U…",
+  "streams.save": "Salvează",
+  "streams.remove": "Elimină",
+  "streams.close": "Închide",
+  "streams.saved": "Salvate",
+  "streams.channels": "Canale ({n})",
+  "streams.empty": "Deschide o cameră, un flux sau un canal TV după adresă, sau canalele unei liste M3U."
 }

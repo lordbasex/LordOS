@@ -20,6 +20,7 @@ import {
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
+  VideoSetup,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -261,6 +262,7 @@ function App() {
         <SnapAssist t={t} />
         <SnapFlyout t={t} />
         <WidgetPicker t={t} />
+        <VideoSetup />
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (

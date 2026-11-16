@@ -35,6 +35,9 @@
 #include <libswscale/swscale.h>
 
 #include "lm_hwfall.h"
+#ifdef LM_NET
+#include "../streamurl.h"
+#endif
 
 #define VQ_MAX   6                   /* decoded frames waiting */
 #define AQ_MS    1000                /* decoded PCM waiting */
@@ -96,6 +99,7 @@ typedef struct {
     int64_t seek_ms;
     int track_req_a, track_req_s;   /* requested track change (-2 = none) */
     int eof;
+    int live;                       /* lord-stream: a network stream (no seeking; its end is a lost connection) */
     PktQ vq_pkt, aq_pkt, sq_pkt;
     VFrame vq[VQ_MAX];
     int vq_n;
@@ -434,7 +438,13 @@ static void *decode_thread(void *arg) {
         size_t qbytes = P.vq_pkt.bytes + P.aq_pkt.bytes + P.sq_pkt.bytes;
         if (!P.eof && (need_v || need_a || qbytes < (1u << 20)) && qbytes < PKTQ_MAX) {
             pthread_mutex_unlock(&P.mu);
+#ifdef LM_NET
+            if (P.live) lm_net_deadline(6000);         /* a stream that sends nothing for 6 s is lost */
+#endif
             int r = av_read_frame(P.fmt, pkt);
+#ifdef LM_NET
+            if (P.live) lm_net_deadline(0);
+#endif
             pthread_mutex_lock(&P.mu);
             if (P.seek_req) { av_packet_unref(pkt); continue; }
             if (r < 0) {
@@ -590,7 +600,18 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     }
     close(pulse);
 
+#ifdef LM_NET
+    /* lord-stream: an address, never a file */
+    static char url[STREAM_URL_MAX + 1];
+    (void)fd;
+    if (mp_param(params, "url", url, sizeof url) || !url[0]) { lm_error("media.streamAddress"); return; }
+    P.live = 1;
+    loop = 0;
+    P.fmt = lm_open_url(url, params, err, sizeof err);
+    memset(url, 0, sizeof url);                     /* it may hold a camera's password */
+#else
     P.fmt = lm_open_input(fd, err, sizeof err);
+#endif
     if (!P.fmt) { lm_error("%s", err); return; }
     P.start_ms = P.fmt->start_time != AV_NOPTS_VALUE ? P.fmt->start_time / 1000 : 0;
     P.dur_ms = P.fmt->duration > 0 ? P.fmt->duration / 1000 : 0;
@@ -661,8 +682,8 @@ void lm_player(const char *params, int fd, int pulse, int render) {
                     set_playing(1);
                     break;
                 case MM_PAUSE: set_playing(0); break;
-                case MM_SEEK: ended = 0; seek_to(m.v[0]); seek_wait = 1; break;
-                case MM_LOOP: loop = m.v[0] != 0; break;
+                case MM_SEEK: if (!P.live || P.dur_ms > 0) { ended = 0; seek_to(m.v[0]); seek_wait = 1; } break;
+                case MM_LOOP: loop = (!P.live || P.dur_ms > 0) && m.v[0] != 0; break;
                 case MM_TRACK:
                     pthread_mutex_lock(&P.mu);
                     if (m.v[0] == 's' && (m.v[1] < 0 || ((unsigned)m.v[1] < P.fmt->nb_streams && P.fmt->streams[m.v[1]]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE)))
@@ -712,6 +733,13 @@ void lm_player(const char *params, int fd, int pulse, int render) {
                 memmove(P.vq, P.vq + 1, sizeof P.vq[0] * (size_t)--P.vq_n);
                 pthread_mutex_unlock(&P.mu);
                 continue;
+            }
+            /* a live stream without sound: its frames come in bursts (segments, network jitter), so the clock follows
+             * them instead of dropping them as late; a jump forward (a discontinuity) re-anchors it too */
+            if (P.live && P.dur_ms <= 0 && !C.audio && C.playing && (vf.pts < now - 150 || vf.pts > now + 1000)) {
+                C.base_pts = vf.pts;
+                C.base_ms = lm_now_ms();
+                now = vf.pts;
             }
             /* after a seek, the first frame is shown even while paused */
             int show_paused = seek_wait && !C.playing;
@@ -763,7 +791,10 @@ void lm_player(const char *params, int fd, int pulse, int render) {
         }
         P.sub_n = 0;
         int drained = P.eof && !P.vq_n && !P.aq_n && !P.vq_pkt.n && !P.aq_pkt.n;
+        int lost = P.live && P.dur_ms <= 0 && P.eof;     /* an address with a duration (a film over HLS) just ends */
         pthread_mutex_unlock(&P.mu);
+        /* a live stream ends only when the connection does: lord-server is told, and the desktop reconnects */
+        if (lost) { lm_error("media.streamLost"); break; }
         /* end: nothing left and the audio has already played */
         if (drained && C.playing && !ended && (!C.audio || clock_ms() >= C.audio_end - 30 || !ar_avail(AR))) {
             if (loop) seek_to(0);
@@ -792,5 +823,8 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     P.quit = 1;
     pthread_cond_broadcast(&P.cv);
     pthread_mutex_unlock(&P.mu);
+#ifdef LM_NET
+    lm_net_abort = 1;                               /* a read waiting on the network returns now */
+#endif
     pthread_join(P.th, NULL);
 }

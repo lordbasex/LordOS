@@ -105,12 +105,63 @@ AVFormatContext *lm_open_input(int fd, char *err, size_t errlen) {
 
 void lm_close_input(AVFormatContext **fmt) {
     if (!*fmt) return;
+    if (!((*fmt)->flags & AVFMT_FLAG_CUSTOM_IO)) { avformat_close_input(fmt); return; }   /* lord-stream: FFmpeg's own I/O */
     AVIOContext *io = (*fmt)->pb;
     void *op = io ? io->opaque : NULL;
     avformat_close_input(fmt);
     if (io) { av_freep(&io->buffer); avio_context_free(&io); }
     av_free(op);
 }
+
+#ifdef LM_NET
+/* ---- lord-stream: an address instead of a file (0.8.8.10; streamurl.h) ----
+ * Only lord-stream is built with LM_NET, and only it may open sockets (its sandbox: internet sockets in the firewall
+ * scope lordos-net-streams). The address was checked by lord-server and is checked again here; FFmpeg may use only
+ * the network protocols of STREAM_FF_PROTOCOLS, never file: or pipe:. Every wait is bounded: a dead camera or a
+ * stalled server fails within seconds (the desktop then shows Reconnecting and starts a new lord-stream). */
+#include "../streamurl.h"
+volatile int lm_net_abort;
+static double net_deadline;                 /* ms: an open or a read past this gives up */
+static int net_interrupt(void *op) { (void)op; return lm_net_abort || (net_deadline && lm_now_ms() > net_deadline); }
+void lm_net_deadline(double ms_from_now) { net_deadline = ms_from_now > 0 ? lm_now_ms() + ms_from_now : 0; }
+
+AVFormatContext *lm_open_url(const char *url, const char *params, char *err, size_t errlen) {
+    if (!stream_url_ok(url)) { lerr_set(err, errlen, "media.streamAddress", NULL); return NULL; }
+    AVFormatContext *fmt = avformat_alloc_context();
+    if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
+    fmt->interrupt_callback.callback = net_interrupt;
+    fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
+    fmt->flags |= AVFMT_FLAG_NOBUFFER;
+    AVDictionary *o = NULL;
+    /* RTSP over TCP by default (cameras behind NAT, no lost packets); transport=udp asks for UDP */
+    char tr[8] = "tcp";
+    if (mp_param_int(params, "udp", 0)) snprintf(tr, sizeof tr, "udp");
+    if (!strncmp(url, "rtsp", 4)) { av_dict_set(&o, "rtsp_transport", tr, 0); av_dict_set(&o, "timeout", "8000000", 0); }
+    av_dict_set(&o, "rw_timeout", "8000000", 0);                 /* tcp, http, rtmp: 8 s without data */
+    av_dict_set(&o, "reconnect", "0", 0);                        /* the desktop reconnects (a new helper) */
+    av_dict_set(&o, "probesize", "2000000", 0);
+    av_dict_set(&o, "analyzeduration", "3000000", 0);
+    av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
+    lm_net_deadline(20000);                                      /* the whole open, DNS and handshake included */
+    int r = avformat_open_input(&fmt, url, NULL, &o);
+    av_dict_free(&o);
+    if (r < 0) {
+        char why[128];
+        av_strerror(r, why, sizeof why);
+        LM_LOG("could not open the stream: %s", why);
+        lerr_set(err, errlen, r == AVERROR_EXIT || r == AVERROR(ETIMEDOUT) ? "media.streamTimeout" : r == AVERROR_HTTP_UNAUTHORIZED ||
+                 r == AVERROR_HTTP_FORBIDDEN ? "media.streamAuth" : "media.streamCannotOpen", NULL);
+        lm_net_deadline(0);
+        return NULL;
+    }
+    fmt->max_analyze_duration = 3 * AV_TIME_BASE;
+    lm_net_deadline(15000);
+    r = avformat_find_stream_info(fmt, NULL);
+    lm_net_deadline(0);
+    if (r < 0) LM_DBG("find_stream_info: %d", r);
+    return fmt;
+}
+#endif
 
 /* ---- output ---- */
 

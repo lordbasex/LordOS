@@ -14,6 +14,13 @@ const abs = (s) => ({ position: 'absolute', ...s });
 // a small drawing of each kind (no emoji, no images)
 function KindGlyph({ type, t }) {
   const a = t.accent, dim = t.textDim;
+  if (type === 'video') return (
+    <View style={{ width: 34, height: 34, justifyContent: 'center', direction: 'ltr' }}>
+      <View style={{ width: 34, height: 24, borderRadius: 6, backgroundColor: '#1d1d22', border: `2px solid ${dim}`, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 0, height: 0, marginLeft: 3, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#E5484D' }} />
+      </View>
+    </View>
+  );
   if (type === 'timer') return (
     <View style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: 28, height: 28, borderRadius: 14, border: `3px solid ${a}` }} />

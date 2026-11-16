@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} را نمی‌توان هم‌زمان برای ۶۴ و ۳۲ بیت نصب کرد",
   "pkg.foreignArchUnsupported": "بسته‌های ۳۲ بیتی فقط روی رایانهٔ ۶۴ بیتی (amd64) فعال می‌شوند؛ این سیستم {arch} است",
   "pkg.foreignArchFailed": "بسته‌های ۳۲ بیتی ({arch}) فعال نشدند (dpkg با کد {code} پایان یافت)",
-  "webapps.developerOff": "حالت توسعه‌دهنده در تنظیمات ← برنامه‌های وب خاموش است"
+  "webapps.developerOff": "حالت توسعه‌دهنده در تنظیمات ← برنامه‌های وب خاموش است",
+  "media.streamAddress": "این نشانی پخش مجاز نیست",
+  "media.streamCannotOpen": "پخش باز نشد",
+  "media.streamTimeout": "پخش به‌موقع پاسخ نداد",
+  "media.streamAuth": "پخش کاربر و گذرواژه خواست یا نادرست بودند",
+  "media.streamLost": "پخش قطع شد",
+  "media.streamNoChannels": "فهرست کانالی ندارد",
+  "media.noStreamHelper": "دستیار پخش (lord-stream) در دسترس نیست"
 }

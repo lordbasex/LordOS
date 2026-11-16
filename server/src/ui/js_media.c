@@ -12,6 +12,7 @@
  *     permission: refused with fw.restricted.<perm>, and restricting while a camera, microphone
  *     or screen recording runs stops it at once (media_restricted below);
  *   - the decoder (lord-media) never receives a path: lord-server opens the file and passes the fd. */
+#include "../media/streamurl.h"
 #include "js_media.h"
 #include "../media/media_int.h"
 #include "ui.h"
@@ -163,6 +164,74 @@ static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 out:
     if (app) JS_FreeCString(c, app);
     if (path) JS_FreeCString(c, path);
+    return ret;
+}
+
+/* ---- network streams (lord-stream, 0.8.8.10; streamurl.h, docs/MEDIA.md "Network streams") ----
+ * The desktop's own context only (never an isolated app: the broker has no such message). The address is checked
+ * here (stream_url_ok) and again in lord-stream; it travels only inside the job's parameters (a camera's password
+ * included, read from the keyring by the desktop), never a file or the command line. */
+static int url_arg(JSContext *c, JSValueConst v, char *out, size_t n) {
+    const char *u = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+    int ok = u && strlen(u) < n && stream_url_ok(u) && !strchr(u, '\n');
+    if (ok) snprintf(out, n, "%s", u);
+    if (u) JS_FreeCString(c, u);
+    return ok;
+}
+
+/* stream(app, url, { audio, hw, autoplay, udp, volume, appName, name }) → id: a player like play()'s */
+static JSValue f_stream(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2) return JS_EXCEPTION;
+    const char *app = arg_app(c, argv[0]);
+    JSValueConst o = argc > 2 ? argv[2] : JS_UNDEFINED;
+    static char url[STREAM_URL_MAX + 1];
+    JSValue ret = JS_NULL;
+    if (!app || !url_arg(c, argv[1], url, sizeof url)) { ret = js_throw_code(c, "media.streamAddress", NULL); goto out; }
+    MediaSrc *s = media_src_new(SK_PLAYER, app);
+    if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
+    int ring = -1, render = -1;
+    char appname[64], title[96];
+    opt_str(c, o, "appName", appname, sizeof appname);
+    opt_str(c, o, "name", title, sizeof title);
+    if (opt_int(c, o, "audio", 1, 0, 1)) s->audio = maudio_open(0, appname[0] ? appname : app, title[0] ? title : "stream", "video", &ring);
+    if (s->audio) maudio_volume(s->audio, opt_num(c, o, "volume", 1));
+    int hw = opt_int(c, o, "hw", 1, 0, 1);
+    if (hw) render = media_render_fd();
+    static char params[STREAM_URL_MAX + 256];
+    snprintf(params, sizeof params, "url=%s\nnative=0\nloop=0\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=0\nrate=100\nhwaccel=%s\nudp=%d\n", url,
+             opt_int(c, o, "autoplay", 1, 0, 1), s->audio && ring >= 0 ? 1 : 0, hw && render >= 0, media_hwaccel(), opt_int(c, o, "udp", 0, 0, 1));
+    int fds[2], nfds = 0;
+    if (s->audio && ring >= 0) fds[nfds++] = ring;
+    if (hw && render >= 0) fds[nfds++] = render;
+    s->sock = media_spawn_stream(MK_PLAY, params, fds, nfds, &s->pid);
+    memset(params, 0, sizeof params);
+    if (render >= 0) close(render);
+    if (s->sock < 0) { media_src_close(s); ret = js_throw_code(c, "media.noStreamHelper", NULL); goto out; }
+    ret = JS_NewInt32(c, s->id);
+out:
+    memset(url, 0, sizeof url);
+    if (app) JS_FreeCString(c, app);
+    return ret;
+}
+
+/* m3u(app, url) → id: the channels arrive as 'm3u' events { ok, more, items: [{ name, group, logo, url }] | code } */
+static JSValue f_m3u(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2) return JS_EXCEPTION;
+    const char *app = arg_app(c, argv[0]);
+    char url[STREAM_URL_MAX + 1];
+    JSValue ret = JS_NULL;
+    if (!app || !url_arg(c, argv[1], url, sizeof url) || !stream_m3u_url_ok(url)) { ret = js_throw_code(c, "media.streamAddress", NULL); goto out; }
+    MediaSrc *s = media_src_new(SK_M3U, app);
+    if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
+    char params[STREAM_URL_MAX + 16];
+    snprintf(params, sizeof params, "url=%s\n", url);
+    s->sock = media_spawn_stream(MK_M3U, params, NULL, 0, &s->pid);
+    if (s->sock < 0) { media_src_close(s); ret = js_throw_code(c, "media.noStreamHelper", NULL); goto out; }
+    ret = JS_NewInt32(c, s->id);
+out:
+    if (app) JS_FreeCString(c, app);
     return ret;
 }
 
@@ -834,6 +903,8 @@ static JSValue f_hwdecode(JSContext *c, JSValueConst t, int argc, JSValueConst *
 
 static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("play", 3, f_play),
+    JS_CFUNC_DEF("stream", 3, f_stream),
+    JS_CFUNC_DEF("m3u", 2, f_m3u),
     JS_CFUNC_DEF("control", 3, f_control),
     JS_CFUNC_DEF("close", 1, f_close),
     JS_CFUNC_DEF("view", 2, f_view),

@@ -36,5 +36,15 @@
   "col.time": "Thời lượng",
   "back": "Quay lại",
   "emptyMusicTitle": "Không có nhạc",
-  "emptyVideosTitle": "Không có video"
+  "emptyVideosTitle": "Không có video",
+  "nav.network": "Mạng",
+  "nav.streams": "Luồng phát",
+  "streams.open": "Mở địa chỉ…",
+  "streams.list": "Mở danh sách M3U…",
+  "streams.save": "Lưu",
+  "streams.remove": "Gỡ",
+  "streams.close": "Đóng",
+  "streams.saved": "Đã lưu",
+  "streams.channels": "Kênh ({n})",
+  "streams.empty": "Mở camera, luồng phát hoặc kênh TV theo địa chỉ, hoặc các kênh của danh sách M3U."
 }

@@ -576,5 +576,7 @@
   "comp.sql": "Databases",
   "comp.sqlHint": "Databases: connections to MySQL and MariaDB servers in your favorites.",
   "comp.weather": "Weather",
-  "comp.weatherHint": "The weather widget's forecasts from Open-Meteo, once you turn them on."
+  "comp.weatherHint": "The weather widget's forecasts from Open-Meteo, once you turn them on.",
+  "comp.streams": "Cameras & TV",
+  "comp.streamsHint": "The video widget and the Player's addresses: cameras, streams and TV channels (lord-stream)."
 }

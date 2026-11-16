@@ -576,5 +576,7 @@
   "comp.sql": "Databaser",
   "comp.sqlHint": "Databaser: anslutningar till MySQL- och MariaDB-servrar i dina favoriter.",
   "comp.weather": "Väder",
-  "comp.weatherHint": "Väderwidgetens prognoser från Open-Meteo, när du slår på dem."
+  "comp.weatherHint": "Väderwidgetens prognoser från Open-Meteo, när du slår på dem.",
+  "comp.streams": "Kameror och tv",
+  "comp.streamsHint": "Videowidgeten och Spelarens adresser: kameror, strömmar och tv-kanaler (lord-stream)."
 }

@@ -37,5 +37,15 @@
   "col.time": "Tijd",
   "back": "Terug",
   "emptyMusicTitle": "Geen muziek",
-  "emptyVideosTitle": "Geen video's"
+  "emptyVideosTitle": "Geen video's",
+  "nav.network": "Netwerk",
+  "nav.streams": "Streams",
+  "streams.open": "Adres openen…",
+  "streams.list": "M3U-lijst openen…",
+  "streams.save": "Bewaar",
+  "streams.remove": "Verwijder",
+  "streams.close": "Sluit",
+  "streams.saved": "Bewaard",
+  "streams.channels": "Zenders ({n})",
+  "streams.empty": "Open een camera, stream of tv-zender via het adres, of de zenders van een M3U-lijst."
 }

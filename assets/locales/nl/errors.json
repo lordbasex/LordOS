@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} kan niet tegelijk voor 64 en 32 bits worden geïnstalleerd",
   "pkg.foreignArchUnsupported": "32-bits pakketten kunnen alleen worden ingeschakeld op een 64-bits pc (amd64); dit systeem is {arch}",
   "pkg.foreignArchFailed": "32-bits pakketten ({arch}) konden niet worden ingeschakeld (dpkg stopte met code {code})",
-  "webapps.developerOff": "De ontwikkelaarsmodus staat uit in Instellingen → Webapps"
+  "webapps.developerOff": "De ontwikkelaarsmodus staat uit in Instellingen → Webapps",
+  "media.streamAddress": "Dit streamadres is niet toegestaan",
+  "media.streamCannotOpen": "De stream kon niet worden geopend",
+  "media.streamTimeout": "De stream antwoordde niet op tijd",
+  "media.streamAuth": "De stream vroeg om gebruiker en wachtwoord, of ze waren fout",
+  "media.streamLost": "De stream is weggevallen",
+  "media.streamNoChannels": "De lijst heeft geen zenders",
+  "media.noStreamHelper": "De streamhelper (lord-stream) is niet beschikbaar"
 }

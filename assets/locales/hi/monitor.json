@@ -576,5 +576,7 @@
   "comp.sql": "डेटाबेस",
   "comp.sqlHint": "डेटाबेस: आपके पसंदीदा में MySQL और MariaDB सर्वरों से कनेक्शन।",
   "comp.weather": "मौसम",
-  "comp.weatherHint": "चालू करने पर मौसम विजेट के Open-Meteo से पूर्वानुमान।"
+  "comp.weatherHint": "चालू करने पर मौसम विजेट के Open-Meteo से पूर्वानुमान।",
+  "comp.streams": "कैमरे और टीवी",
+  "comp.streamsHint": "वीडियो विजेट और प्लेयर के पते: कैमरे, स्ट्रीम और टीवी चैनल (lord-stream)।"
 }

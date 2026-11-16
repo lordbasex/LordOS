@@ -37,5 +37,15 @@
   "col.time": "সময়",
   "back": "ফিরে যান",
   "emptyMusicTitle": "কোনো গান নেই",
-  "emptyVideosTitle": "কোনো ভিডিও নেই"
+  "emptyVideosTitle": "কোনো ভিডিও নেই",
+  "nav.network": "নেটওয়ার্ক",
+  "nav.streams": "স্ট্রিম",
+  "streams.open": "ঠিকানা খুলুন…",
+  "streams.list": "M3U তালিকা খুলুন…",
+  "streams.save": "সংরক্ষণ",
+  "streams.remove": "সরান",
+  "streams.close": "বন্ধ",
+  "streams.saved": "সংরক্ষিত",
+  "streams.channels": "চ্যানেল ({n})",
+  "streams.empty": "ক্যামেরা, স্ট্রিম বা টিভি চ্যানেল তার ঠিকানা দিয়ে, বা M3U তালিকার চ্যানেল খুলুন।"
 }

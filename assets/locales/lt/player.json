@@ -38,5 +38,15 @@
   "col.time": "Trukmė",
   "back": "Atgal",
   "emptyMusicTitle": "Muzikos nėra",
-  "emptyVideosTitle": "Vaizdo įrašų nėra"
+  "emptyVideosTitle": "Vaizdo įrašų nėra",
+  "nav.network": "Tinklas",
+  "nav.streams": "Transliacijos",
+  "streams.open": "Atidaryti adresą…",
+  "streams.list": "Atidaryti M3U sąrašą…",
+  "streams.save": "Įrašyti",
+  "streams.remove": "Pašalinti",
+  "streams.close": "Užverti",
+  "streams.saved": "Įrašytos",
+  "streams.channels": "Kanalai ({n})",
+  "streams.empty": "Atidarykite kamerą, transliaciją ar TV kanalą pagal adresą arba M3U sąrašo kanalus."
 }

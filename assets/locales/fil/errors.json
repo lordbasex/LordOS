@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "Hindi maaaring i-install ang {name} para sa 64 at 32 bit nang sabay",
   "pkg.foreignArchUnsupported": "Maaari lang i-enable ang mga 32-bit na package sa 64-bit na PC (amd64); ang system na ito ay {arch}",
   "pkg.foreignArchFailed": "Hindi na-enable ang mga 32-bit ({arch}) na package (lumabas ang dpkg na may code {code})",
-  "webapps.developerOff": "Naka-off ang developer mode sa Mga Setting → Mga Web App"
+  "webapps.developerOff": "Naka-off ang developer mode sa Mga Setting → Mga Web App",
+  "media.streamAddress": "Hindi pinapayagan ang stream address na ito",
+  "media.streamCannotOpen": "Hindi mabuksan ang stream",
+  "media.streamTimeout": "Hindi sumagot sa oras ang stream",
+  "media.streamAuth": "Humingi ng user at password ang stream, o mali ang mga ito",
+  "media.streamLost": "Naputol ang stream",
+  "media.streamNoChannels": "Walang channel ang list",
+  "media.noStreamHelper": "Hindi available ang stream helper (lord-stream)"
 }

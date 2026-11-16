@@ -576,5 +576,7 @@
   "comp.sql": "Tietokannat",
   "comp.sqlHint": "Tietokannat: yhteydet suosikeissasi oleviin MySQL- ja MariaDB-palvelimiin.",
   "comp.weather": "Sää",
-  "comp.weatherHint": "Sääwidgetin ennusteet Open-Meteolta, kun otat ne käyttöön."
+  "comp.weatherHint": "Sääwidgetin ennusteet Open-Meteolta, kun otat ne käyttöön.",
+  "comp.streams": "Kamerat ja tv",
+  "comp.streamsHint": "Videowidget ja Soittimen osoitteet: kamerat, lähetykset ja tv-kanavat (lord-stream)."
 }

@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} को 64 और 32 बिट के लिए एक साथ इंस्टॉल नहीं किया जा सकता",
   "pkg.foreignArchUnsupported": "32-बिट पैकेज केवल 64-बिट पीसी (amd64) पर चालू किए जा सकते हैं; यह सिस्टम {arch} है",
   "pkg.foreignArchFailed": "32-बिट ({arch}) पैकेज चालू नहीं किए जा सके (dpkg कोड {code} के साथ बंद हुआ)",
-  "webapps.developerOff": "सेटिंग्स → वेब ऐप्स में डेवलपर मोड बंद है"
+  "webapps.developerOff": "सेटिंग्स → वेब ऐप्स में डेवलपर मोड बंद है",
+  "media.streamAddress": "इस स्ट्रीम पते की अनुमति नहीं है",
+  "media.streamCannotOpen": "स्ट्रीम नहीं खुल सकी",
+  "media.streamTimeout": "स्ट्रीम ने समय पर जवाब नहीं दिया",
+  "media.streamAuth": "स्ट्रीम ने उपयोगकर्ता और पासवर्ड माँगा, या वे गलत थे",
+  "media.streamLost": "स्ट्रीम टूट गई",
+  "media.streamNoChannels": "सूची में कोई चैनल नहीं है",
+  "media.noStreamHelper": "स्ट्रीम सहायक (lord-stream) उपलब्ध नहीं है"
 }

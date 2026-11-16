@@ -37,5 +37,15 @@
   "col.time": "Müddət",
   "back": "Geri",
   "emptyMusicTitle": "Musiqi yoxdur",
-  "emptyVideosTitle": "Video yoxdur"
+  "emptyVideosTitle": "Video yoxdur",
+  "nav.network": "Şəbəkə",
+  "nav.streams": "Yayımlar",
+  "streams.open": "Ünvan aç…",
+  "streams.list": "M3U siyahısı aç…",
+  "streams.save": "Saxla",
+  "streams.remove": "Sil",
+  "streams.close": "Bağla",
+  "streams.saved": "Saxlanılanlar",
+  "streams.channels": "Kanallar ({n})",
+  "streams.empty": "Kameranı, yayımı və ya TV kanalını ünvanı ilə, ya da M3U siyahısının kanallarını aç."
 }

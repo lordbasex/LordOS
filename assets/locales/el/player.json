@@ -37,5 +37,15 @@
   "col.time": "Διάρκεια",
   "back": "Πίσω",
   "emptyMusicTitle": "Δεν υπάρχει μουσική",
-  "emptyVideosTitle": "Δεν υπάρχουν βίντεο"
+  "emptyVideosTitle": "Δεν υπάρχουν βίντεο",
+  "nav.network": "Δίκτυο",
+  "nav.streams": "Ροές",
+  "streams.open": "Άνοιγμα διεύθυνσης…",
+  "streams.list": "Άνοιγμα λίστας M3U…",
+  "streams.save": "Αποθήκευση",
+  "streams.remove": "Αφαίρεση",
+  "streams.close": "Κλείσιμο",
+  "streams.saved": "Αποθηκευμένες",
+  "streams.channels": "Κανάλια ({n})",
+  "streams.empty": "Ανοίξτε κάμερα, ροή ή κανάλι από τη διεύθυνση ή τα κανάλια μιας λίστας M3U."
 }

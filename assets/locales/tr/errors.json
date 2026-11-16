@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} aynı anda hem 64 hem 32 bit için kurulamaz",
   "pkg.foreignArchUnsupported": "32 bit paketler yalnızca 64 bit bir PC'de (amd64) etkinleştirilebilir; bu sistem {arch}",
   "pkg.foreignArchFailed": "32 bit ({arch}) paketler etkinleştirilemedi (dpkg {code} koduyla çıktı)",
-  "webapps.developerOff": "Geliştirici modu Ayarlar → Web Uygulamaları’nda kapalı"
+  "webapps.developerOff": "Geliştirici modu Ayarlar → Web Uygulamaları’nda kapalı",
+  "media.streamAddress": "Bu yayın adresine izin verilmiyor",
+  "media.streamCannotOpen": "Yayın açılamadı",
+  "media.streamTimeout": "Yayın zamanında yanıt vermedi",
+  "media.streamAuth": "Yayın kullanıcı ve parola istedi ya da yanlıştı",
+  "media.streamLost": "Yayın kesildi",
+  "media.streamNoChannels": "Listede kanal yok",
+  "media.noStreamHelper": "Yayın yardımcısı (lord-stream) kullanılamıyor"
 }

@@ -561,5 +561,7 @@
   "comp.sql": "数据库",
   "comp.sqlHint": "数据库：连接到你收藏中的 MySQL 和 MariaDB 服务器。",
   "comp.weather": "天气",
-  "comp.weatherHint": "开启后，天气小组件从 Open-Meteo 获取的预报。"
+  "comp.weatherHint": "开启后，天气小组件从 Open-Meteo 获取的预报。",
+  "comp.streams": "摄像头和电视",
+  "comp.streamsHint": "视频小组件和播放器的地址：摄像头、直播流和电视频道（lord-stream）。"
 }

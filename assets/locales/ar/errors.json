@@ -880,5 +880,12 @@
   "pkg.multiarchConflict": "لا يمكن تثبيت {name} لـ 64 و32 بت في الوقت نفسه",
   "pkg.foreignArchUnsupported": "لا يمكن تفعيل حزم 32 بت إلا على حاسوب 64 بت (amd64)؛ هذا النظام {arch}",
   "pkg.foreignArchFailed": "تعذّر تفعيل حزم 32 بت ({arch}) (انتهى dpkg بالرمز {code})",
-  "webapps.developerOff": "وضع المطور متوقف في الإعدادات ← تطبيقات الويب"
+  "webapps.developerOff": "وضع المطور متوقف في الإعدادات ← تطبيقات الويب",
+  "media.streamAddress": "عنوان البث هذا غير مسموح",
+  "media.streamCannotOpen": "تعذّر فتح البث",
+  "media.streamTimeout": "لم يستجب البث في الوقت المناسب",
+  "media.streamAuth": "طلب البث اسم مستخدم وكلمة مرور، أو كانا خاطئين",
+  "media.streamLost": "انقطع البث",
+  "media.streamNoChannels": "لا توجد قنوات في القائمة",
+  "media.noStreamHelper": "مساعد البث (lord-stream) غير متاح"
 }

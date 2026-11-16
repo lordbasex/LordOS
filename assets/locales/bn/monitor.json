@@ -576,5 +576,7 @@
   "comp.sql": "ডেটাবেস",
   "comp.sqlHint": "ডেটাবেস: আপনার পছন্দের তালিকায় থাকা MySQL ও MariaDB সার্ভারের সংযোগ।",
   "comp.weather": "আবহাওয়া",
-  "comp.weatherHint": "চালু করার পর আবহাওয়া উইজেটের Open-Meteo পূর্বাভাস।"
+  "comp.weatherHint": "চালু করার পর আবহাওয়া উইজেটের Open-Meteo পূর্বাভাস।",
+  "comp.streams": "ক্যামেরা ও টিভি",
+  "comp.streamsHint": "ভিডিও উইজেট ও প্লেয়ারের ঠিকানা: ক্যামেরা, স্ট্রিম ও টিভি চ্যানেল (lord-stream)।"
 }

@@ -37,5 +37,15 @@
   "col.time": "وقت",
   "back": "واپس",
   "emptyMusicTitle": "کوئی موسیقی نہیں",
-  "emptyVideosTitle": "کوئی ویڈیو نہیں"
+  "emptyVideosTitle": "کوئی ویڈیو نہیں",
+  "nav.network": "نیٹ ورک",
+  "nav.streams": "اسٹریمز",
+  "streams.open": "پتہ کھولیں…",
+  "streams.list": "M3U فہرست کھولیں…",
+  "streams.save": "محفوظ کریں",
+  "streams.remove": "ہٹائیں",
+  "streams.close": "بند کریں",
+  "streams.saved": "محفوظ شدہ",
+  "streams.channels": "چینلز ({n})",
+  "streams.empty": "کیمرا، اسٹریم یا ٹی وی چینل اس کے پتے سے، یا M3U فہرست کے چینلز کھولیں۔"
 }

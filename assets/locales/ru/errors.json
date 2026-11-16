@@ -877,5 +877,12 @@
   "pkg.multiarchConflict": "{name} нельзя установить одновременно для 64 и 32 бит",
   "pkg.foreignArchUnsupported": "32-битные пакеты можно включить только на 64-битном ПК (amd64); эта система — {arch}",
   "pkg.foreignArchFailed": "Не удалось включить 32-битные пакеты ({arch}) (dpkg завершился с кодом {code})",
-  "webapps.developerOff": "Режим разработчика выключен в Настройки → Веб-приложения"
+  "webapps.developerOff": "Режим разработчика выключен в Настройки → Веб-приложения",
+  "media.streamAddress": "Этот адрес трансляции не разрешён",
+  "media.streamCannotOpen": "Не удалось открыть трансляцию",
+  "media.streamTimeout": "Трансляция не ответила вовремя",
+  "media.streamAuth": "Трансляция запросила пользователя и пароль, или они неверны",
+  "media.streamLost": "Трансляция прервалась",
+  "media.streamNoChannels": "В списке нет каналов",
+  "media.noStreamHelper": "Помощник трансляций (lord-stream) недоступен"
 }

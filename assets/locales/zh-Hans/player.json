@@ -36,5 +36,15 @@
   "col.time": "时长",
   "back": "返回",
   "emptyMusicTitle": "没有音乐",
-  "emptyVideosTitle": "没有视频"
+  "emptyVideosTitle": "没有视频",
+  "nav.network": "网络",
+  "nav.streams": "直播流",
+  "streams.open": "打开地址…",
+  "streams.list": "打开 M3U 列表…",
+  "streams.save": "保存",
+  "streams.remove": "移除",
+  "streams.close": "关闭",
+  "streams.saved": "已保存",
+  "streams.channels": "频道（{n}）",
+  "streams.empty": "通过地址打开摄像头、直播流或电视频道，或打开 M3U 列表中的频道。"
 }

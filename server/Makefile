@@ -73,7 +73,7 @@ DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/prin
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
-FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/fetch/weather.c src/fetch/wxsvc.c src/ui/js_weather.c
+FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/ui/js_weather.c
 SRC += $(FW_SRC)
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
@@ -164,7 +164,7 @@ endif
 # lord-server never does. If FFmpeg's -dev packages are missing, everything else is built without it.
 MEDIA ?= $(shell pkg-config --exists libavcodec libavformat libavutil libswscale libswresample 2>/dev/null && echo 1 || echo 0)
 ifeq ($(MEDIA),1)
-ALL += build/lord-media
+ALL += build/lord-media build/lord-stream
 endif
 # lord-doc: the document helper (docs/DOCUMENTS.md). It's the only one that links Poppler and
 # libarchive (and cairo, FreeType and fontconfig, which come with Poppler); lord-server never does.
@@ -823,6 +823,24 @@ build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h s
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# lord-stream (0.8.8.10; cameras and IPTV, docs/MEDIA.md "Network streams"): lord-media's player built with LM_NET, the
+# only helper with internet sockets (sandbox network=1, firewall scope lordos-net-streams). Network players and M3U
+# lists only; lord-media itself keeps no network at all.
+LS_SRC := $(LM_SRC) src/media/stream/ls_m3u.c src/media/streamurl.c
+build/lord-stream: $(LS_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/media/streamurl.h src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_NET $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LS_SRC) \
+	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# lord-stream end to end against a test server (a tool, never installed): build/lordstream-e2e build/lord-stream play URL
+build/lordstream-e2e: tests/lordstream_e2e.c src/media/proto.c src/media/proto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lordstream_e2e.c src/media/proto.c
+# the addresses lord-stream may open and the M3U lists it reads (src/media/streamurl.c)
+test: build/streamurl-test
+build/streamurl-test: tests/streamurl_test.c src/media/streamurl.c src/media/streamurl.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/streamurl_test.c src/media/streamurl.c
+	./$@ || { rm -f $@; exit 1; }
 # lord-media with a decoder that fails after 30 frames (HWFALL=2: frames that can't be read back), to run the way
 # out of it where there is no hardware (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
 HWFALL ?= 1

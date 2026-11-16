@@ -25,7 +25,7 @@ static void av_log_cb(void *avcl, int level, const char *fmt, va_list vl) {
     if (++count > 200) return;                  /* a broken file doesn't flood the log */
     char line[512];
     vsnprintf(line, sizeof line, fmt, vl);
-    fprintf(stderr, "lord-media[%d]: ffmpeg: %s", (int)getpid(), line);
+    fprintf(stderr, LM_WHO "[%d]: ffmpeg: %s", (int)getpid(), line);
 }
 
 int main(int argc, char **argv) {
@@ -34,7 +34,11 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     prctl(PR_SET_PDEATHSIG, SIGKILL);           /* if lord-server goes away, so does this one */
     if (getppid() == 1) return 1;
+    #ifdef LM_NET
+    prctl(PR_SET_NAME, "lord-stream");
+#else
     prctl(PR_SET_NAME, "lord-media");
+#endif
     lm_debug = getenv("LORD_MEDIA_DEBUG") != NULL;
     /* only the socket: any other inherited descriptor is closed */
 #ifdef SYS_close_range
@@ -53,6 +57,18 @@ int main(int argc, char **argv) {
         return 1;
     }
     /* mp_send skips missing descriptors: a silent video has no audio ring, and its render node comes in the ring's place */
+#ifdef LM_NET
+    /* lord-stream: a network player or a channel list, nothing else; its fds are the audio ring and the render node (no
+     * file): shifted into the player's places (mp_send skips the missing ones) */
+    if (m.v[0] != MK_PLAY && m.v[0] != MK_M3U) { LM_LOG("lord-stream: not a stream job"); return 1; }
+    if (m.v[0] == MK_PLAY) {
+        int ring = mp_param_int(payload, "audio", 0) ? fds[0] : -1;
+        int render = mp_param_int(payload, "hw", 0) ? fds[ring >= 0 ? 1 : 0] : -1;
+        fds[0] = -1; fds[1] = ring; fds[2] = render;
+    }
+#else
+    if (m.v[0] == MK_M3U) { LM_LOG("lord-media: no network jobs"); return 1; }
+#endif
     if (m.v[0] == MK_PLAY && mp_param_int(payload, "hw", 0) && fds[2] < 0 && fds[1] >= 0) { fds[2] = fds[1]; fds[1] = -1; }
     /* The shared sandbox (sec/sandbox.c, the same as lord-doc's), before reading a byte
      * of the file and before initializing VA-API: no network, nothing opened outside the system's libraries and
@@ -90,8 +106,19 @@ int main(int argc, char **argv) {
         devs[0] = dev_video;
         devs[1] = dev_media;
     }
+#ifdef LM_NET
+    /* lord-stream: the same sandbox plus internet sockets (never unix or netlink), in the firewall scope
+     * lordos-net-streams (firewall app lordos:streams), and what name resolution and TLS read */
+    static const char *const ro_net[] = { "/usr/lib", "/usr/lib64", "/lib", "/lib64", "/usr/share", "/etc/ld.so.cache",
+                                          "/sys/dev/char", "/sys/devices", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf",
+                                          "/etc/host.conf", "/etc/gai.conf", "/etc/ssl", "/etc/gnutls", "/run/systemd/resolve", NULL };
+    SandboxHelperCfg cfg = { .name = "lordos-net-streams", .ro_paths = ro_net, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
+                             .mem_max_mb = 768, .network = 1 };
+    (void)ro_pi; (void)pi_hevc; (void)ro; (void)devs;
+#else
     SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = pi_hevc ? ro_pi : ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
                              .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536, .dev_files = pi_hevc ? devs : NULL };
+#endif
     if (m.v[0] == MK_WORKER) {                 /* thumbnails and probes: in the background (before the sandbox) */
         setpriority(PRIO_PROCESS, 0, 10);
         syscall(SYS_ioprio_set, 1, 0, (2 << 13) | 7);   /* IOPRIO_WHO_PROCESS, this process, best effort, lowest */
@@ -109,6 +136,9 @@ int main(int argc, char **argv) {
     case MK_STREAM: lm_stream(payload, st_ring, st_render); break;
     case MK_VBENCH: lm_vbench(payload); break;
     case MK_LIVE: lm_live(payload, fds[0], fds[1]); break;
+#ifdef LM_NET
+    case MK_M3U: ls_m3u(payload); break;
+#endif
     default: LM_LOG("unknown kind %lld", (long long)m.v[0]); return 1;
     }
     return 0;

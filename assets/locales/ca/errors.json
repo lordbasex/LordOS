@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} no es pot instal·lar per a 64 i 32 bits alhora",
   "pkg.foreignArchUnsupported": "Els paquets de 32 bits només es poden habilitar en un PC de 64 bits (amd64); aquest sistema és {arch}",
   "pkg.foreignArchFailed": "No s’han pogut habilitar els paquets de 32 bits ({arch}) (dpkg ha acabat amb el codi {code})",
-  "webapps.developerOff": "El mode de desenvolupador està desactivat a Configuració → Apps web"
+  "webapps.developerOff": "El mode de desenvolupador està desactivat a Configuració → Apps web",
+  "media.streamAddress": "Aquesta adreça d'emissió no està permesa",
+  "media.streamCannotOpen": "No s'ha pogut obrir l'emissió",
+  "media.streamTimeout": "L'emissió no ha respost a temps",
+  "media.streamAuth": "L'emissió ha demanat usuari i contrasenya, o eren incorrectes",
+  "media.streamLost": "S'ha perdut l'emissió",
+  "media.streamNoChannels": "La llista no té canals",
+  "media.noStreamHelper": "L'ajudant d'emissions (lord-stream) no està disponible"
 }

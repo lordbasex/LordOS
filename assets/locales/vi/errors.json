@@ -875,5 +875,12 @@
   "pkg.multiarchConflict": "Không thể cài {name} cho cả 64 và 32 bit cùng lúc",
   "pkg.foreignArchUnsupported": "Chỉ có thể bật các gói 32 bit trên PC 64 bit (amd64); hệ thống này là {arch}",
   "pkg.foreignArchFailed": "Không thể bật các gói 32 bit ({arch}) (dpkg kết thúc với mã {code})",
-  "webapps.developerOff": "Chế độ nhà phát triển đang tắt trong Cài đặt → Ứng dụng web"
+  "webapps.developerOff": "Chế độ nhà phát triển đang tắt trong Cài đặt → Ứng dụng web",
+  "media.streamAddress": "Địa chỉ luồng này không được phép",
+  "media.streamCannotOpen": "Không mở được luồng",
+  "media.streamTimeout": "Luồng không phản hồi kịp",
+  "media.streamAuth": "Luồng yêu cầu người dùng và mật khẩu, hoặc chúng sai",
+  "media.streamLost": "Luồng đã mất",
+  "media.streamNoChannels": "Danh sách không có kênh",
+  "media.noStreamHelper": "Trình trợ giúp luồng (lord-stream) không có sẵn"
 }

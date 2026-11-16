@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} ne peut pas être installé en 64 et en 32 bits en même temps",
   "pkg.foreignArchUnsupported": "Les paquets 32 bits ne peuvent être activés que sur un PC 64 bits (amd64) ; ce système est {arch}",
   "pkg.foreignArchFailed": "Impossible d’activer les paquets 32 bits ({arch}) (dpkg s’est terminé avec le code {code})",
-  "webapps.developerOff": "Le mode développeur est désactivé dans Réglages → Apps web"
+  "webapps.developerOff": "Le mode développeur est désactivé dans Réglages → Apps web",
+  "media.streamAddress": "Cette adresse de flux n'est pas autorisée",
+  "media.streamCannotOpen": "Impossible d'ouvrir le flux",
+  "media.streamTimeout": "Le flux n'a pas répondu à temps",
+  "media.streamAuth": "Le flux a demandé un utilisateur et un mot de passe, ou ils étaient faux",
+  "media.streamLost": "Le flux a été perdu",
+  "media.streamNoChannels": "La liste ne contient aucune chaîne",
+  "media.noStreamHelper": "L'assistant de flux (lord-stream) n'est pas disponible"
 }

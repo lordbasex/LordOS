@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} کو بیک وقت 64 اور 32 بٹ کے لیے انسٹال نہیں کیا جا سکتا",
   "pkg.foreignArchUnsupported": "32 بٹ پیکیجز صرف 64 بٹ پی سی (amd64) پر فعال کیے جا سکتے ہیں؛ یہ سسٹم {arch} ہے",
   "pkg.foreignArchFailed": "32 بٹ ({arch}) پیکیجز فعال نہیں کیے جا سکے (dpkg کوڈ {code} کے ساتھ بند ہوا)",
-  "webapps.developerOff": "ترتیبات → ویب ایپس میں ڈویلپر موڈ بند ہے"
+  "webapps.developerOff": "ترتیبات → ویب ایپس میں ڈویلپر موڈ بند ہے",
+  "media.streamAddress": "اس اسٹریم پتے کی اجازت نہیں",
+  "media.streamCannotOpen": "اسٹریم نہیں کھل سکا",
+  "media.streamTimeout": "اسٹریم نے وقت پر جواب نہیں دیا",
+  "media.streamAuth": "اسٹریم نے صارف اور پاس ورڈ مانگا، یا وہ غلط تھے",
+  "media.streamLost": "اسٹریم ٹوٹ گیا",
+  "media.streamNoChannels": "فہرست میں کوئی چینل نہیں",
+  "media.noStreamHelper": "اسٹریم مددگار (lord-stream) دستیاب نہیں"
 }

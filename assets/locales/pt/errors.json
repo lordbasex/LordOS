@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} não pode ser instalado para 64 e 32 bits ao mesmo tempo",
   "pkg.foreignArchUnsupported": "Os pacotes de 32 bits só podem ser habilitados num PC de 64 bits (amd64); este sistema é {arch}",
   "pkg.foreignArchFailed": "Não foi possível habilitar os pacotes de 32 bits ({arch}) (o dpkg terminou com o código {code})",
-  "webapps.developerOff": "O modo desenvolvedor está desativado em Ajustes → Apps web"
+  "webapps.developerOff": "O modo desenvolvedor está desativado em Ajustes → Apps web",
+  "media.streamAddress": "Este endereço de transmissão não é permitido",
+  "media.streamCannotOpen": "Não foi possível abrir a transmissão",
+  "media.streamTimeout": "A transmissão não respondeu a tempo",
+  "media.streamAuth": "A transmissão pediu usuário e senha, ou estavam errados",
+  "media.streamLost": "A transmissão caiu",
+  "media.streamNoChannels": "A lista não tem canais",
+  "media.noStreamHelper": "O auxiliar de transmissões (lord-stream) não está disponível"
 }

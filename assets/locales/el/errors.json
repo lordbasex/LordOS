@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "Το {name} δεν μπορεί να εγκατασταθεί για 64 και 32 bit ταυτόχρονα",
   "pkg.foreignArchUnsupported": "Τα πακέτα 32 bit ενεργοποιούνται μόνο σε υπολογιστή 64 bit (amd64)· αυτό το σύστημα είναι {arch}",
   "pkg.foreignArchFailed": "Δεν ήταν δυνατή η ενεργοποίηση των πακέτων 32 bit ({arch}) (το dpkg τερμάτισε με κωδικό {code})",
-  "webapps.developerOff": "Η λειτουργία προγραμματιστή είναι ανενεργή στις Ρυθμίσεις → Εφαρμογές web"
+  "webapps.developerOff": "Η λειτουργία προγραμματιστή είναι ανενεργή στις Ρυθμίσεις → Εφαρμογές web",
+  "media.streamAddress": "Αυτή η διεύθυνση ροής δεν επιτρέπεται",
+  "media.streamCannotOpen": "Η ροή δεν άνοιξε",
+  "media.streamTimeout": "Η ροή δεν απάντησε εγκαίρως",
+  "media.streamAuth": "Η ροή ζήτησε χρήστη και κωδικό ή ήταν λάθος",
+  "media.streamLost": "Η ροή χάθηκε",
+  "media.streamNoChannels": "Η λίστα δεν έχει κανάλια",
+  "media.noStreamHelper": "Ο βοηθός ροών (lord-stream) δεν είναι διαθέσιμος"
 }

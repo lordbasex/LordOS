@@ -38,5 +38,15 @@
   "col.time": "Czas",
   "back": "Wstecz",
   "emptyMusicTitle": "Brak muzyki",
-  "emptyVideosTitle": "Brak wideo"
+  "emptyVideosTitle": "Brak wideo",
+  "nav.network": "Sieć",
+  "nav.streams": "Transmisje",
+  "streams.open": "Otwórz adres…",
+  "streams.list": "Otwórz listę M3U…",
+  "streams.save": "Zapisz",
+  "streams.remove": "Usuń",
+  "streams.close": "Zamknij",
+  "streams.saved": "Zapisane",
+  "streams.channels": "Kanały ({n})",
+  "streams.empty": "Otwórz kamerę, transmisję lub kanał TV po adresie albo kanały z listy M3U."
 }

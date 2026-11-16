@@ -170,10 +170,40 @@ static int helper_mode(void) {
     return 0;
 }
 
+/* lord-stream's profile (network = 1): internet sockets, connect and bind; still no unix sockets, no socketpair, no
+ * netlink, no files outside its read-only folders, no exec or fork */
+static int helper_net_mode(void) {
+    const char *ro[] = { "/usr/share/fonts", "/etc/resolv.conf", NULL };
+    int extra[] = { -1 };
+    SandboxHelperCfg cfg = { .name = "lordos-helper-net-test", .ro_paths = ro, .extra_syscalls = extra, .mem_max_mb = 256, .network = 1 };
+    printf("mask=0x%x\n", sandbox_apply_helper(&cfg));
+    int s4 = socket(AF_INET, SOCK_STREAM, 0), s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+    OK(s4 >= 0 && s6 >= 0, "internet sockets work (%s)", s4 < 0 || s6 < 0 ? strerror(errno) : "ok");
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = 0, .sin_addr = { htonl(INADDR_LOOPBACK) } };
+    OK(s4 >= 0 && bind(s4, (struct sockaddr *)&a, sizeof a) == 0, "bind of an internet socket works (%s)", strerror(errno));
+    int lc = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in to = { .sin_family = AF_INET, .sin_port = htons(9), .sin_addr = { htonl(INADDR_LOOPBACK) } };
+    int cr = lc >= 0 ? connect(lc, (struct sockaddr *)&to, sizeof to) : -1;
+    OK(cr == 0 || errno == ECONNREFUSED, "connect is allowed (refused by the port, not the filter: %s)", cr ? strerror(errno) : "ok");
+    OK(socket(AF_UNIX, SOCK_STREAM, 0) < 0, "a unix socket still fails (%s)", strerror(errno));
+    OK(socket(AF_NETLINK, SOCK_RAW, 0) < 0, "a netlink socket fails (%s)", strerror(errno));
+    int sv[2];
+    OK(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0, "socketpair fails (%s)", strerror(errno));
+    OK(open("/etc/passwd", O_RDONLY) < 0, "reading /etc/passwd fails (%s)", strerror(errno));
+    OK(open("/etc/resolv.conf", O_RDONLY) >= 0, "its read-only files (resolv.conf) are readable");
+    char *const av[] = { "/bin/true", NULL };
+    OK(execve("/bin/true", av, NULL) < 0, "execve fails (%s)", strerror(errno));
+    pid_t p = fork();
+    if (p == 0) _exit(0);
+    OK(p < 0, "fork fails (%s)", strerror(errno));
+    return 0;
+}
+
 int main(int argc, char **argv) {
     home = getenv("HOME");
     const char *mode = argc > 1 ? argv[1] : "";
     if (!strcmp(mode, "helper")) helper_mode();
+    else if (!strcmp(mode, "helper-net")) helper_net_mode();
     else app_mode(!strcmp(mode, "net"));
     printf("sandbox-test %s: %d/%d passed\n", mode[0] ? mode : "app", checks - fails, checks);
     return fails ? 1 : 0;

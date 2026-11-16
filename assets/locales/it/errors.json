@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} non può essere installato a 64 e a 32 bit contemporaneamente",
   "pkg.foreignArchUnsupported": "I pacchetti a 32 bit si possono abilitare solo su un PC a 64 bit (amd64); questo sistema è {arch}",
   "pkg.foreignArchFailed": "Impossibile abilitare i pacchetti a 32 bit ({arch}) (dpkg è terminato con il codice {code})",
-  "webapps.developerOff": "La modalità sviluppatore è disattivata in Impostazioni → App web"
+  "webapps.developerOff": "La modalità sviluppatore è disattivata in Impostazioni → App web",
+  "media.streamAddress": "Questo indirizzo di stream non è consentito",
+  "media.streamCannotOpen": "Impossibile aprire lo stream",
+  "media.streamTimeout": "Lo stream non ha risposto in tempo",
+  "media.streamAuth": "Lo stream ha chiesto utente e password, o erano errati",
+  "media.streamLost": "Lo stream si è interrotto",
+  "media.streamNoChannels": "La lista non ha canali",
+  "media.noStreamHelper": "L'assistente degli stream (lord-stream) non è disponibile"
 }

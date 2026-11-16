@@ -576,5 +576,7 @@
   "comp.sql": "Databases",
   "comp.sqlHint": "Databases: verbindingen met MySQL- en MariaDB-servers in je favorieten.",
   "comp.weather": "Weer",
-  "comp.weatherHint": "De verwachtingen van de weerwidget van Open-Meteo, zodra je ze inschakelt."
+  "comp.weatherHint": "De verwachtingen van de weerwidget van Open-Meteo, zodra je ze inschakelt.",
+  "comp.streams": "Camera's en tv",
+  "comp.streamsHint": "De videowidget en de adressen van de Speler: camera's, streams en tv-zenders (lord-stream)."
 }

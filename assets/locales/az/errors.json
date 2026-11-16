@@ -876,5 +876,12 @@
   "pkg.multiarchConflict": "{name} eyni anda 64 və 32 bit üçün quraşdırıla bilməz",
   "pkg.foreignArchUnsupported": "32 bitlik paketlər yalnız 64 bitlik kompüterdə (amd64) aktivləşdirilə bilər; bu sistem {arch}-dir",
   "pkg.foreignArchFailed": "32 bitlik ({arch}) paketlər aktivləşdirilə bilmədi (dpkg {code} kodu ilə başa çatdı)",
-  "webapps.developerOff": "Tərtibatçı rejimi Parametrlər → Veb tətbiqlər bölməsində söndürülüb"
+  "webapps.developerOff": "Tərtibatçı rejimi Parametrlər → Veb tətbiqlər bölməsində söndürülüb",
+  "media.streamAddress": "Bu yayım ünvanına icazə verilmir",
+  "media.streamCannotOpen": "Yayımı açmaq olmadı",
+  "media.streamTimeout": "Yayım vaxtında cavab vermədi",
+  "media.streamAuth": "Yayım istifadəçi və parol istədi və ya səhv idi",
+  "media.streamLost": "Yayım kəsildi",
+  "media.streamNoChannels": "Siyahıda kanal yoxdur",
+  "media.noStreamHelper": "Yayım köməkçisi (lord-stream) əlçatan deyil"
 }

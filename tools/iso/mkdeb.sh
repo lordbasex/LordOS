@@ -69,6 +69,7 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 # nothing), so each one is required here. ALLOW_MISSING="lord-tts …" leaves out the ones named, on purpose.
 missing=""
 for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
+         lord-stream:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" \
@@ -148,6 +149,9 @@ fi
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
 [ -x "$L/bin/lord-media" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-media" 2>/dev/null || true; }
+# lord-stream (0.8.8.10): lord-media's player with internet sockets only, for cameras and IPTV (docs/MEDIA.md "Network streams")
+[ -x server/build/lord-stream ] && install -m 755 server/build/lord-stream "$L/bin/lord-stream"
+[ -x "$L/bin/lord-stream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-stream" 2>/dev/null || true; }
 # lord-vault: Passwords and the system keyring (docs/PASSWORDS.md); lord-server only launches the one in its own folder
 [ -x server/build/lord-vault ] && install -m 755 server/build/lord-vault "$L/bin/lord-vault"
 [ -x "$L/bin/lord-vault" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-vault" 2>/dev/null || true; }
