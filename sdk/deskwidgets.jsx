@@ -804,12 +804,14 @@ function AlertGlow({ level }) {
   return <View style={{ position: 'absolute', left: -15, top: -13, right: -15, bottom: -14, borderRadius: 22, border: `2px solid ${c}`,
     boxShadow: on ? `0 0 22px ${c}` : `0 0 6px ${c}`, opacity: on ? 1 : 0.55, pointerEvents: 'none' }} />;
 }
-function Gauge({ L, size, pct, label, sub }) {
+// inner: a caption under the figure, inside the ring (the small Claude Code widget's "Context")
+function Gauge({ L, size, pct, label, sub, inner }) {
   const v = (pct ?? 0) / 100;
   return (
     <View style={{ alignItems: 'center', gap: 2, minWidth: 0 }}>
       <TickRing L={L} size={size} value={v} color={toneOf(L, v)} ticks={size >= 90 ? 48 : 36}>
         <Text style={{ fontSize: size >= 90 ? 19 : size >= 70 ? 15 : 13, fontWeight: 650, color: L.text }}>{pct != null ? `${pct}%` : '–'}</Text>
+        {inner ? <Text style={{ fontSize: 9.5, fontWeight: 600, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: size * 0.62, textAlign: 'center' }}>{inner}</Text> : null}
       </TickRing>
       {label ? <Text style={{ fontSize: 11, fontWeight: 600, color: L.text, whiteSpace: 'nowrap' }}>{label}</Text> : null}
       {sub ? <Text style={{ fontSize: 10, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: size + 30 }}>{sub}</Text> : null}
@@ -842,10 +844,13 @@ function ClaudeBody({ w, L }) {
         <Text style={{ width: 30, fontSize: 10.5, fontWeight: 650, color: L.text, textAlign: 'end' }}>{l?.pct != null ? `${l.pct}%` : '–'}</Text>
       </View>
     );
+    // the context ring as large as the card allows, the text along the bottom (as the weather's)
     return (
-      <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+      <View style={{ flex: 1, gap: 3 }}>
         <AlertGlow level={alert} />
-        <Gauge L={L} size={66} pct={c.ctx} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Gauge L={L} size={90} pct={c.ctx} inner={t('shell.widgets.claude.ctx')} />
+        </View>
         {stateRow}
         {mini(t('shell.widgets.claude.fiveShort'), five)}
         {mini(t('shell.widgets.claude.weekShort'), week)}

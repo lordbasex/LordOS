@@ -122,6 +122,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     controls sits on its own pill that shows under the pointer, with thin lines between groups and glyphs in the
     spine's colour (`components/BarButton.jsx`, tokens `iconFg`, `itemHover`, `barSeparator`). Activity icons keep the
     colour chosen for them.
+  - *Claude Code widget, small:* the context ring is larger (it names itself inside: Context) and the state and limit
+    bars sit along the bottom, as the weather's text does.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
     activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and
     windows of those apps go back there; with fewer monitors a missing display's apps join the main display's tiles; a
