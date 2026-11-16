@@ -38,20 +38,22 @@ export const BRAND_GRADIENT = 'linear-gradient(135deg, #B46CFF, #4F46E5)';
 export function material(surface, dark) {
   if (surface === 'opaque') {
     return {
-      bg: dark ? '#221F38' : '#F7F5FD', border: dark ? 'rgba(255,255,255,0.09)' : 'rgba(20,16,60,0.11)', blur: 0,
+      bg: dark ? '#221F38' : '#F7F5FD', bgStill: dark ? '#221F38' : '#F7F5FD', border: dark ? 'rgba(255,255,255,0.09)' : 'rgba(20,16,60,0.11)', blur: 0,
       sheen: null, edge: null, rim: null,
       shadow: dark ? '0 10px 26px rgba(5,3,20,0.45)' : '0 10px 26px rgba(40,30,110,0.14)',
     };
   }
   if (surface === 'translucent') {
     return {
-      bg: dark ? 'rgba(26,22,50,0.74)' : 'rgba(255,255,255,0.78)', border: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,60,0.10)', blur: SPINE_BLUR,
+      bg: dark ? 'rgba(26,22,50,0.74)' : 'rgba(255,255,255,0.78)', bgStill: dark ? 'rgba(26,22,50,0.86)' : 'rgba(255,255,255,0.88)', border: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,60,0.10)', blur: SPINE_BLUR,
       sheen: null, edge: null, rim: null,
       shadow: dark ? '0 12px 30px rgba(5,3,20,0.42)' : '0 12px 30px rgba(40,30,110,0.16)',
     };
   }
   return {
     bg: dark ? 'rgba(32,27,64,0.50)' : 'rgba(255,255,255,0.52)',
+    // the same glass where it doesn't blur (the top band, docs/WORKSPACES.md): thicker, so text stays readable
+    bgStill: dark ? 'rgba(32,27,64,0.80)' : 'rgba(255,255,255,0.80)',
     border: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.70)',
     blur: SPINE_BLUR,
     // the sheen: brighter at the top, almost nothing at the bottom (two stops: what the renderer draws)
@@ -109,11 +111,19 @@ export function makeTheme({ mode, accent, effects, surface }, wallpapers = []) {
     titleBg: dark ? '#221F37' : '#F4F2FB',
     titleBgBlur: dark ? '#1D1B30' : '#EEEBF8',
     closeHover: '#E5484D',
-    // the group frame: a dimmed scrim over the wallpaper (never a live blur: it covers the whole work area)
+    // the group frame is only its border (a fill over the whole work area is the costly part of an activity switch on
+    // the CPU path, docs/WORKSPACES.md); its header's name and actions sit on small tinted chips, never blurred
+    chipBg: dark ? (s === 'opaque' ? '#221F38' : 'rgba(22,18,44,0.78)') : (s === 'opaque' ? '#F7F5FD' : 'rgba(255,255,255,0.84)'),
+    // the Control Center's preview of the frame
     frameBg: dark ? (s === 'opaque' ? 'rgba(16,13,34,0.62)' : 'rgba(16,13,34,0.30)') : (s === 'opaque' ? 'rgba(246,244,253,0.70)' : 'rgba(255,255,255,0.26)'),
     frameText: dark ? '#F1EFFC' : '#191733',
-    shadow: dark ? '0 16px 36px rgba(6,3,24,0.50)' : '0 16px 36px rgba(40,30,110,0.20)',
-    shadowSoft: dark ? '0 8px 20px rgba(6,3,24,0.36)' : '0 8px 20px rgba(40,30,110,0.12)',
+    // windows: short shadows (they reach WINDOW_SHADOW px; model/geometry.js keeps that clear of the spine's margin,
+    // and a short shadow is cheaper to paint on every frame a window moves)
+    shadow: dark ? '0 8px 16px rgba(6,3,24,0.55)' : '0 8px 16px rgba(40,30,110,0.22)',
+    // the spine's shadow stays short: whatever its blur and shadow reach repaints the whole spine when it changes, and
+    // the top band's glide sits just past that (model/geometry.js)
+    spineShadow: 'none',
+    shadowSoft: dark ? '0 4px 12px rgba(6,3,24,0.40)' : '0 4px 12px rgba(40,30,110,0.14)',
     onAccent: '#FFFFFF',
     brandGradient: BRAND_GRADIENT,
   };
@@ -121,10 +131,12 @@ export function makeTheme({ mode, accent, effects, surface }, wallpapers = []) {
 
 // The style of a surface's own box (the caller adds position and size). Crystal's sheen, edge and rim are children
 // (<Crystal />) so this stays one node with no gradient of its own.
-export function surfaceStyle(t, radius = 16) {
+// still: no live blur (a surface next to another blurred one, or that changes often), the thicker glass instead.
+export function surfaceStyle(t, radius = 16, still = false) {
   const m = t.mat;
+  const blur = !still && m.blur;
   return {
-    borderRadius: radius, backgroundColor: m.bg, border: `1px solid ${m.border}`, boxShadow: m.shadow, overflow: 'hidden',
-    ...(m.blur ? { backdropFilter: `blur(${m.blur}px)` } : null),
+    borderRadius: radius, backgroundColor: blur ? m.bg : m.bgStill, border: `1px solid ${m.border}`, boxShadow: m.shadow, overflow: 'hidden',
+    ...(blur ? { backdropFilter: `blur(${m.blur}px)` } : null),
   };
 }

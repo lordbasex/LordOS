@@ -10,6 +10,62 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Lord Workspaces, a third desktop theme (in development;** approved by the maintainer on 2026-11-15;
+  `docs/WORKSPACES.md`). It organizes the desktop by activities and leaves Lord Flow and Lord Classic as they were.
+  - *Activities:* each activity is one of the SDK's desktops (up to 9) with a name (the desktop's own), an icon, a
+    colour, pinned apps and a layout per display, kept by position in a new settings key, `workspaces` (version 1; no
+    migration). A strip of pills switches them (the accent glides to the new one), **+ New** adds one, a double click
+    renames in place, the right-click menu edits the icon, colour and apps or deletes the activity after asking in the
+    page; its windows go to the activity beside it. A first run shows a two-step onboarding (name, icon and colour;
+    apps and layout) on the only activity while nothing is open.
+  - *Context Spine:* a rail with the LordOS crown (the system menu), Activities (the Overview), Apps, Files and the
+    Control Center; it collapses to icons on its own below 1440 px, from its button or with ❖⌥D, and can show on every
+    display. A status cluster holds the privacy indicators, the status items, the volume, notifications and the clock,
+    which wakes once a minute.
+  - *Tiling:* a group frame per display with Change layout (Free, One at a time, Main and side, Three columns, Grid),
+    Add window, Save layout and Move to another activity. The divider of a split layout shows a line while dragged and
+    applies on release; a window moved by hand floats until "Tile this window"; one whose minimum size is bigger than
+    its tile keeps its minimum inside the work area and says so. The tiler writes the window store once per change and
+    never runs per frame.
+  - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
+    activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and
+    windows of those apps go back there; with fewer monitors a missing display's apps join the main display's tiles; a
+    monitor unplugged moves its windows into the main display's tiles and plugged back returns them. Search, the
+    Control Center and Add window open on the display under the pointer. A different activity per monitor and the
+    Overview per display need SDK and compositor work (not built).
+  - *Search:* ❖Space, Ctrl+Space or ❖ alone open a panel on LordOS's own search plus two new sections, Activities and
+    Open windows (`registerSpotlightSource`); typing starts at the first character, Enter opens, Esc closes.
+  - *Control Center:* a live drawn preview, dark mode, Reduce motion, the effects style, the accent, Do Not Disturb,
+    Night Light, Wi-Fi, Bluetooth, volume, brightness, the power mode and the wallpaper.
+  - *Effects styles* (a theme setting): **Opaque** (solid panels), **Translucent** (tinted panels that blur) and
+    **Crystal** (the translucent glass with a bright top edge, a two-stop sheen, a darker lower rim and a depth shadow,
+    per light and dark; the default). Transparency off in Appearance is always Opaque. One live blur at rest (the
+    spine); the group frame is a border, never a full-screen blur or scrim.
+  - *Motion:* activity switches with the windows' slide and the pills' glide, spring feedback on the spine, Search that
+    drops in and settles, a Control Center that unfolds from its button, windows that zoom from where they were launched
+    and minimize into the spine; all from one frame loop on cached transforms (no React render per frame), 120–260 ms,
+    and none with Reduce motion.
+  - *Window frames:* a 36 px title bar with real button targets, the app's menus in a strip under it (F10 or ⌥ alone), Linux
+    apps with their own bar unframed with the theme's window menu.
+  - *Keys:* Lord Flow's fixed lists over Linux apps (`flow-desktops`, no new compositor table) and its Desktops keys.
+  - *Performance,* measured headless at 1920×1080 on the CPU path against Lord Flow and Lord Classic in the same
+    scenario: focus changes repaint about a third of the screen they do, activity switches cost about the same as their
+    desktop switches, no timer runs every second at rest, and an idle desktop paints nothing (`docs/WORKSPACES.md`,
+    "Performance"). Several first drafts were measured slower and changed: no scale of the display-sized frame, no
+    scrim, nothing that moves inside the spine's blur margin, short window shadows.
+  - *Settings:* a theme's `theme.json` may now declare `sketch` (its picture in Appearance → Desktop style), `options`
+    (its own choices, shown under Desktop style and on Desktop & Dock, kept in the new `themeOptions` settings key) and
+    `desktopArrows` (`sdk/thememeta.js`, checked strictly); Desktop & Dock shows such a theme its desktops, its options
+    and the title bars' buttons, without a Dock section. Lord Flow and Lord Classic declare none of them and are
+    unchanged. The SDK also exports `switchDesktop` and `removeDesktopById`.
+  - *Languages:* 72 new strings (`shell.ws.*`, the two search sections and the theme's name) in all 35 languages.
+  - *Tests:* `server/tests/workspaces_model_test.mjs` (geometry, layouts, saved layouts across monitors, the settings
+    key, theme.json, the three styles and the palette's contrast) and `workspaces_test.mjs` with
+    `workspaces_scene.mjs` (the whole theme on three displays), both in `make test`; `theme_cost_scene.mjs` measures
+    any theme. Not yet checked on a real session, with real monitors, Linux apps, right to left or the GPU path.
+
 ## [0.8.8.9-beta] - 2026-11-15
 
 ### Added

@@ -113,6 +113,8 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
   const surface = effectiveSurface(prefs, s);
   const bt = useBluetooth();
   const bl = useBacklight();
+  const st = useSound();
+  const soundOn = !!(st.connected && defaultSink(st));
   const dnd = dndActive();
   const night = nightActive();
   let radios = [];
@@ -171,8 +173,8 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
               onToggle={() => setBluetoothPower(!bt.adapter.powered)} onMore={() => openSettings(onClose, 'bluetooth')} /> : null}
           </View>
         ) : null}
-        <Tile t={t} style={{ gap: 10 }}>
-          <View onClick={() => openSettings(onClose, 'sound')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.sound')}</Text></View>
+        {soundOn || bl ? <Tile t={t} style={{ gap: 10 }}>
+          {soundOn ? <View onClick={() => openSettings(onClose, 'sound')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.sound')}</Text></View> : null}
           <SoundRow t={t} />
           {bl ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
@@ -181,7 +183,7 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
               <Text style={{ fontSize: 11, color: t.textDim, width: 38, textAlign: 'end' }}>{`${Math.round(bl.fraction * 100)} %`}</Text>
             </View>
           ) : null}
-        </Tile>
+        </Tile> : null}
         <PowerRow t={t} onClose={onClose} />
         <Tile t={t} style={{ gap: 8 }}>
           <View onClick={() => openSettings(onClose, 'wallpaper')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.wallpaper')}</Text></View>

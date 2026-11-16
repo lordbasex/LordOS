@@ -1,7 +1,7 @@
 // Lord Workspaces as plain data (themes/workspaces/model/*.js, tokens.js) and the theme.json fields Settings reads
 // (sdk/thememeta.js): where things go on each display, the tiles, the activities' settings key, the three effects
 // styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
-import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W } from '../../themes/workspaces/model/geometry.js';
+import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
 import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
 import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity, defaultActivity, freshActivity, togglePin, needsOnboarding, wsPatch, optPatch,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
@@ -19,11 +19,15 @@ const p = displayPlan(D, { spine: 'auto' });
 eq('wide display: expanded spine', p.mode, 'expanded');
 eq('spine rect', p.spine, { x: MARGIN, y: MARGIN, w: SPINE_W.expanded, h: 1080 - 2 * MARGIN });
 yes('top band on the main display', p.top && p.top.y === MARGIN);
+yes('the top band clear of the spine blur margin', p.top.x - (p.spine.x + p.spine.w) > 2 * SPINE_BLUR + 1 + SPINE_SHADOW_REACH);
+yes('no spine shadow (its reach is part of the repaint margin)', makeTheme({ mode: 'dark' }).spineShadow === 'none');
 yes('frame starts after the spine', p.frame.x === MARGIN + SPINE_W.expanded + SPINE_GAP);
 yes('work inside the frame', p.work.x > p.frame.x && p.work.y > p.frame.y && p.work.x + p.work.w < p.frame.x + p.frame.w && p.work.y + p.work.h < p.frame.y + p.frame.h);
 // the blur of the spine reads 2 × its radius around it: no window may sit in that margin
-yes('windows clear of the spine blur margin', p.work.x - (p.spine.x + p.spine.w) >= 2 * SPINE_BLUR);
-eq('blur gap constant', SPINE_GAP + FRAME_PAD >= 2 * SPINE_BLUR, true);
+// a window's frame node reaches 6 px past its edge (sdk/windowshell.jsx WINDOW_EDGE, the resize grips)
+yes('windows and their shadows clear of the spine blur margin', p.work.x - Math.max(6, WINDOW_SHADOW) - (p.spine.x + p.spine.w) > 2 * SPINE_BLUR + 1 + SPINE_SHADOW_REACH);
+yes('window shadows within their reach', ['dark', 'light'].every((mode) => / 16px rgba/.test(makeTheme({ mode }).shadow) && / 12px rgba/.test(makeTheme({ mode }).shadowSoft)));
+eq('blur gap constant', SPINE_GAP + FRAME_PAD - 6 > 2 * SPINE_BLUR + 1 + SPINE_SHADOW_REACH, true);
 eq('narrow display collapses', spineMode('auto', SMALL_W - 1), 'collapsed');
 eq('explicit expanded wins', spineMode('expanded', 1024), 'expanded');
 eq('explicit collapsed wins', spineMode('collapsed', 3840), 'collapsed');

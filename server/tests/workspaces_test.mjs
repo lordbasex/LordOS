@@ -34,18 +34,18 @@ for (const d of ['sdk', 'runtime', ...themeDirs]) {
 // scene fills (the bars' rectangles), far off screen otherwise; settings saved in memory; the network polls counted.
 const MOCK = `globalThis.__lordTest = (() => {
   const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), layouts = new Map();
-  const counts = { netPolls: 0 };
+  const counts = { netPolls: 0, ops: 0 };
   let nextId = 1, saved = '{}';
   const base = {
     screen: { width: 1920, height: 1080, displays: [], mirror: false },
     version: 'test', now: () => Date.now(), stats: () => ({}),
     getLayout: (id) => layouts.get(id) || [-10000, -10000, 1, 1],
-    createNode: () => { const id = nextId++; styles.set(id, {}); return id; },
-    setStyle: (id, k, v) => { const s = styles.get(id); if (!s) return; if (v === undefined) delete s[k]; else s[k] = v; },
-    setText: (id, s) => { texts.set(id, s); },
-    appendChild: (p, c) => { parents.set(c, p); removed.delete(c); },
-    insertBefore: (p, c) => { parents.set(c, p); removed.delete(c); },
-    removeChild: (p, c) => { removed.add(c); },
+    createNode: () => { counts.ops++; const id = nextId++; styles.set(id, {}); return id; },
+    setStyle: (id, k, v) => { counts.ops++; const s = styles.get(id); if (!s) return; if (v === undefined) delete s[k]; else s[k] = v; },
+    setText: (id, s) => { counts.ops++; texts.set(id, s); },
+    appendChild: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
+    insertBefore: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
+    removeChild: (p, c) => { counts.ops++; removed.add(c); },
     locale: { languages: () => ['en'], get: () => 'en', catalog: () => null },
     destroy: (id) => { styles.delete(id); texts.delete(id); parents.delete(id); removed.add(id); },
     settings: { load: () => saved, save: (s) => { saved = s; return true; } },

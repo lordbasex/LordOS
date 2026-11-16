@@ -1,0 +1,243 @@
+# Lord Workspaces
+
+**In development** after 0.8.8.9 Beta (approved by the maintainer on 2026-11-15). Lord Workspaces (`themes/workspaces`)
+is LordOS's third desktop theme, next to Lord Flow (`themes/default`) and Lord Classic (`themes/classic`), and it
+changes neither of them. It organizes the desktop by **activities**: each activity is a desktop with a name, an icon,
+a colour, the apps pinned to it and a tiling layout for every display, and its windows sit in a group frame. It came
+from a proposal called "Origin Flow"; this document says what was built, what changed from the proposal, how it
+performs against the other two themes and what is left for the compositor.
+
+## What it looks like
+
+| Piece | What it is | Where |
+|---|---|---|
+| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
+| **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch), **+ New**, and "Activity 2 of 4 · up to 9". Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
+| **Status cluster** | Privacy indicators, the status items (network, Cleaner, Cloud, keyboard…), the volume, notifications with an unread dot, and the date and time (the clock wakes once a minute). | `components/TopBar.jsx` |
+| **Group frame** | Per display, a frame in the accent around the work area; its header holds the activity's name (and the display's, with several), its pinned apps and the actions **Change layout**, **Add window**, **Save layout** and **Move to another activity**. With no window on a display, a short empty state offers Add window and Open pinned apps. | `components/GroupFrame.jsx` |
+| **Windows** | A 36 px title bar (icon and title at the start, minimize, maximize and close as real 28 px targets with a glyph, at the end or first with Settings → Desktop & Dock → Title bars → Left). An app's own menus in a strip under it with Window and Help (there is no global menu bar; F10 or the left ⌥ alone opens the first one). Linux apps that draw their own bar (`args.csd`) get no frame and the theme's window menu where they ask for one. Right click on a title: Tile or Float this window, Move to another activity, Minimize, Maximize, Close. | `components/Window.jsx` |
+| **Search** | ❖Space, Ctrl+Space (not in the Terminal) or ❖ alone, on the display under the pointer, in the overlay layer (a Linux app doesn't keep the keyboard). LordOS's own search (`searchEverything`: apps, files, Settings, notes, the calculator, Help, the Store) plus two sections this theme registers, **Activities** and **Open windows**. Typing starts at the first character; ↑ ↓ choose, Enter opens, Esc closes. With nothing typed it lists the activities and every app. | `components/Search.jsx`, `index.jsx` |
+| **Control Center** | A live drawn preview of the desktop with the current choices; dark mode, Reduce motion, the **effects style**, the accent, Do Not Disturb, Night Light, Wi-Fi (its state; a click opens Settings → Network → Wi-Fi), Bluetooth, the volume and the screen's brightness, the power mode and the wallpaper. It unfolds from its button. | `components/ControlCenter.jsx` |
+| **Onboarding** | On the only activity, while nothing was set up and nothing is open: 1. its name, icon and colour; 2. its apps and the layout. "Start activity" opens the apps, which the layout places. It can be skipped; the same two steps edit an activity later. | `components/ActivityEditor.jsx` |
+
+The menus and the notification panel are Lord Classic's own components (`themes/classic/components/Menu.jsx`,
+`NotificationCenter.jsx`), restyled by this theme's tokens; the window glyphs are Classic's too. The Overview, the app
+switcher, the power dialog, the level HUD and the SDK's own surfaces (notifications, prompts, the file chooser…) are the
+SDK's, as in every theme.
+
+## Activities
+
+An activity **is** one of the SDK's desktops (`sdk/desktops.js`, at most 9), so the Overview, Settings → Desktop & Dock,
+session restore, a theme switch and the rule that a window on a hidden desktop never has the keyboard all work as in
+the other themes. Its name is the desktop's own (`settings.desktopNames`, `renameDesktop`). What a desktop doesn't have
+is kept in a new settings key, versioned, by position like the names (desktops are numbered again at every start):
+
+```
+settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup } | null, … ] }
+settings.themeOptions.workspaces = { surface, spine, spineEvery }
+```
+
+`layouts` is per display (by connector name): `{ layout, ratio, apps }`. A new key, so no migration
+(`sdk/settings.js` lists both with "new key, no migration"). The model is `model/activities.js`.
+
+## Tiling
+
+Layouts (`model/layouts.js`): **Free** (windows stay where they are; the default), **One at a time**, **Main and side**
+(a main tile and a column of up to three), **Three columns** and **Grid**. The tiler (`tiler.js`) writes the SDK's
+window store once for every window that moves (the same fields `wm.setFrame` writes) when something changes: a window
+opens, closes, is minimized or comes back, the layout or its divider changes, the activity in view changes, the
+displays do. Nothing runs per frame, nothing polls.
+
+- **The divider** of Main and side and Three columns sits in the gap between the tiles. Dragging it shows a line in the
+  drag layer, moved with `lord.setStyle` (no React render per pointer move); the tiles change once, on release.
+- **A window moved or resized by hand** (or maximized, or snapped) leaves its tile and floats until **Tile this
+  window** from its title bar's menu. Dialogs, notices and the theme's own panels never tile.
+- **A window whose minimum size is bigger than its tile** keeps its minimum at the tile's corner, inside the work area
+  (it overlaps its neighbour instead of being cut), and its title bar shows an amber dot ("needs more room than its
+  tile").
+
+## Several displays
+
+The maintainer's main case is one activity spanning all his monitors (three 1080p displays daily), and that is the
+default:
+
+- **One activity spans every display.** The SDK's desktops are global: switching activity switches all the displays
+  together. Each display has its own group frame, header, layout and divider, computed in its own work area; a window
+  belongs to one display and never straddles two in a tiled layout.
+- **Save layout remembers each monitor.** For every display, by its connector name (`DP-1`, `HDMI-A-1`…), the layout,
+  the divider and the app of each tile in order. When those apps open again (a new session, session restore, the
+  pinned apps) their windows go back to that display and that tile.
+- **Fewer monitors.** A saved display that isn't connected has its apps joined to the main display's tiles
+  (`foldMissing`). **A monitor unplugged:** the SDK moves its windows to the main display (`keepWindowsInWorkAreas`),
+  where they join the tiles; **plugged back:** windows with a saved place on it go back there. Nothing is closed or
+  lost. `server/tests/workspaces_scene.mjs` checks this with three displays.
+- **The spine** is on the main display, or on every display (Settings → Desktop & Dock, or Appearance). The strip and
+  the status cluster are on the main display. **Search, the Control Center and Add window open on the display under
+  the pointer** (or the one whose button was used).
+- **Mirrored displays** show one picture, laid out for the main display.
+
+What needs SDK or compositor work, not the theme:
+
+- **A different activity per monitor** (secondary in the request): the SDK has one active desktop for every display
+  (`activeDesktop`, `visibleOn`, `keyboardSurface`, the compositor's `parked` state), so per-display desktops need a new
+  desktop model in the SDK and in `wl.c`'s parking, with the keyboard rule kept. Not built.
+- **The Overview per display:** the SDK's Overview lays out the windows in the main display's work area; per-display
+  grids are an SDK change (`sdk/overview.jsx`). Today the Overview is the SDK's, on the main display.
+
+## Effects styles
+
+A new theme setting, **Effects style** (`themeOptions.workspaces.surface`), in the Control Center and in Settings:
+
+| Style | What it is |
+|---|---|
+| **Opaque** | Solid panels, no blur. The cheapest to paint. |
+| **Translucent** | The classic look: a tinted panel that blurs what is behind it. |
+| **Crystal** | The maintainer's own name for this look: the translucent panel plus light — a bright 1 px top edge, a soft two-stop sheen from the top, a darker inner lower rim (the light bending at the glass's lower edge) and a depth shadow, tuned per light and dark. The default. |
+
+Settings → Appearance → Transparency off (`settings.effects === false`) is always Opaque. Rules that keep it cheap:
+
+- **One live blur at rest: the spine.** The strip, the status cluster, the header chips and the empty state use the
+  same glass without a live blur (a thicker tint: `bgStill`); Search and the Control Center blur while they are open.
+- **No full-screen blur, no full-screen scrim.** The group frame is only a border: a fill over the whole work area was
+  the costly part of an activity switch on the CPU path.
+- **Clearances.** The engine repaints a blurred node and twice its blur radius around it whenever a change touches that
+  margin, and with one damage box per frame (the default) everything else that changed joins it. The geometry
+  (`model/geometry.js`) keeps every window, its resize grips, its shadow and the top band out of the spine's margin
+  (checked in `workspaces_model_test.mjs`): measured before the fix, each frame of the strip's glide repainted the
+  spine's whole height.
+
+Gradients have two stops (what the renderer draws). The colours are the brand's violets (`#7C5CFF`, `#5B3FE0`; the
+gradient `#B46CFF → #4F46E5` on the onboarding's primary button) with violet-biased neutrals, and the shared accent
+names (azul, violeta, rosa, naranja, verde, grafito) so the person's accent survives a theme switch; in light mode each
+accent is one step deeper. Contrast is checked in the model test: text on windows, panels and title bars ≥ 7:1, dim
+text ≥ 4.5:1, white on every accent ≥ 3:1 (large text and controls) in both modes. The crown is the brand's
+full-colour render, never recoloured, with no glow.
+
+## Motion
+
+Every transition changes a node's native transform or opacity with `lord.setStyle` from one shared frame loop
+(`motion.js`): lord-server paints the subtree once into a cached raster and composites it, and React doesn't render per
+frame. Durations are 120–260 ms; with **Reduce motion** (Settings → Appearance, and the Control Center) every one
+jumps to its end, and the SDK's own desktop slide is off too.
+
+- **Activity switch:** the SDK slides and fades the arriving windows (as in the other themes), then the accent under
+  the strip's pills glides to the new activity with a small overshoot (a translate and a horizontal scale from its left
+  edge). It starts after the windows' slide: in the same frames the two would be repainted as one box spanning both.
+- **Spine:** each item answers the pointer with a spring (scale on its icon: up on hover, down on press).
+- **Search** drops in from a little above and settles; **the Control Center** unfolds from its button.
+- **Windows** open with a zoom from where they were launched (the spine, the search panel), and minimize into the spine.
+
+## Keys
+
+The theme's table (`index.jsx`) on top of the SDK's base: ❖Space and Ctrl+Space open Search (the theme's entries win
+over the base's), ❖ alone opens it with every app; ❖⌥D collapses or expands the spine; the app switcher (❖Tab by
+default), ❖\` the app's next window, ❖M minimize, ❖H hide, ❖⌥H hide others, ❖, the app's settings, and Lord Flow's
+Desktops keys (⌃↑ the Overview, ⌃← ⌃→ and ❖⌃← ❖⌃→ switch activities, ⌃↓ the app's windows). Over a Linux app the
+compositor keeps Lord Flow's fixed lists (`flow-desktops`, or `flow` with Settings → Keyboard's ⌃ arrows off,
+`server/src/wl/keygrab.c`): no new C table, so the keys it keeps are exactly those.
+
+## Settings
+
+Settings knows the two bundled themes by id; for any other theme it now reads three optional fields of its
+`theme.json`, checked by `sdk/thememeta.js` (labels must be `shell.*` locale keys, values short plain strings,
+anything else dropped):
+
+- `sketch` (`rail`, `pills`, `frame`, `menubar`, `dock`, `taskbar`): the drawn picture in Appearance → Desktop style.
+- `options`: the theme's own choices, under Desktop style and on Desktop & Dock while it is the current theme, stored in
+  `settings.themeOptions[<theme id>]` (one key for every theme, so a theme's id can't reach another setting). Lord
+  Workspaces declares Effects style, Context Spine (Automatic, With labels, Icons only) and Show the spine on every
+  display.
+- `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Lord Flow.
+
+On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no
+Dock or taskbar section. Lord Flow and Lord Classic declare none of the three and see exactly what they did.
+
+## Performance
+
+Measured on the development machine (Intel Core i9-10900, AMD Radeon RX 580; CPU path, `LORD_GPU=0`), a headless
+1920×1080 `lord-server --profile` with a private home and runtime folder, the same scenario in each theme: three
+windows (Text Editor, Files, Terminal), then 20 focus changes, 20 title changes and 10 activity (desktop) switches
+between one with the windows and an empty one, then 10 s idle. A headless session paints only while someone watches,
+so a screen recording (10 fps) was kept running during the scenario; paint times are `--profile`'s own. Lord
+Workspaces in its default layout (Free), dark mode.
+
+Medians of three runs each (2026-11-15); "paint" is the sum of `--profile`'s paint times over the phase, "screen" the
+average share of the screen repainted per frame:
+
+| Phase | Lord Flow | Lord Classic | Workspaces, Crystal | Workspaces, Opaque |
+|---|---|---|---|---|
+| First full frame after the recording starts | 63 ms | 61 ms | 63 ms | 59 ms |
+| 20 focus changes: paint (frames), screen | 84.6 ms (23), 71 % | 94.5 ms (23), 77 % | **57.3 ms** (23), **28 %** | **56.7 ms** (21), **31 %** |
+| 20 title changes: paint, screen | 39.5 ms, 24 % | 34.5 ms, 23 % | 37.7 ms, 22 % | 37.5 ms, 23 % |
+| 10 desktop / activity switches: paint (frames), screen | 330 ms (47), 46 % | 344 ms (49), 44 % | 349 ms (104), 24 % | 364 ms (109), 25 % |
+| 3 s idle with the recording on: frames | 4 | 4 | 4 | 4 |
+| 10 s idle without a viewer: CPU ticks of `lord-server` | 16 | 16 | 16 | 14 |
+
+The switches spread widely from run to run (Lord Flow 262–352 ms, Workspaces Crystal 217–397 ms): within that spread
+the three themes cost the same. Workspaces draws more frames there (the windows' slide, then the pills' glide), each of
+them smaller.
+
+What a change costs in native calls (`server/tests/theme_cost_scene.mjs`, the stub `lord`, one display, three
+windows; numbers, not checks):
+
+| Change | Lord Flow | Lord Classic | Lord Workspaces |
+|---|---|---|---|
+| A window's title, ×10 | 10 | 10 | 10 |
+| The window in front, ×10 | 160 | 290 | 210 |
+| A window opened and closed | 206 | 247 | 233 |
+| Desktop / activity switches, ×4 | 44 | 68 | 352 |
+| Intervals alive at rest | 250 ms, 1 s (the clock), 2 s | 250 ms, 1 s (the clock), 2 s, 5 s (the network glyph) | 250 ms (the SDK's) |
+| Timer wake-ups per minute at rest | 330 | 342 | 240 (+1 for the clock) |
+
+(First render: 494, 385 and 1,736 calls; Workspaces' includes the first-run onboarding.)
+
+What these say:
+
+- **Focus changes** are the cheapest of the three: Workspaces repaints about a third of what Flow and Classic do,
+  because nothing else on screen depends on the window in front (Flow's menu bar and Classic's taskbar change with it).
+- **Idle:** no timer every second (the clock wakes at each minute's turn), and the only interval left is the SDK's own.
+  At rest nothing is painted.
+- **Activity switches** cost about the same as a desktop switch in Lord Flow and Lord Classic (within their run-to-run
+  spread), with the glide added after the windows' slide; they don't beat them yet. Earlier drafts were several times as costly (scaling the display-sized group frame, a scrim
+  over the work area, changes inside the spine's blur margin); each of those was measured and removed.
+- **In native calls** a switch costs more than in Flow and Classic: the header shows the activity's name, icon, pins
+  and layout, which change with it.
+
+## Changed from the proposal
+
+- **No weather widget:** the shell asks nothing from the internet.
+- **"Seek" is Search and "Control Atlas" is the Control Center**, LordOS's own names.
+- **The group doesn't move as a whole and the divider applies on release:** no `setFrame` loop per pointer move.
+- **The group frame is a border, not a frosted panel,** and Crystal's live blur stays on the spine and on the open
+  panels: a full-screen blur on the CPU path would repaint the whole screen with every change.
+- **Live miniatures of hidden activities** are not possible yet (below); the Overview shows them as frames with the
+  app's icon.
+
+## Tests
+
+- `server/tests/workspaces_model_test.mjs` (in `make test`): the geometry on one display and several, right to left,
+  mirrored displays and the blur clearances; the five layouts, the divider, the minimum-size fit, the saved order and
+  homes, a missing monitor folded into the main one; the settings key, pins, onboarding; theme.json's fields and
+  `sdk/thememeta.js`'s checks; the three styles and the palette's contrast.
+- `server/tests/workspaces_test.mjs` with `workspaces_scene.mjs` (in `make test`): the whole theme over a stub `lord`
+  with three monitors — a frame per display, the spine on the main one, the work areas, no timer every second, split
+  on one display and single on another, a window moved by hand floating and tiling again, Save layout, a monitor
+  unplugged and plugged back, a new activity, Search on the display it opens for, Crystal and Opaque.
+- `theme_cost_scene.mjs` (a measurement, not in `make test`): `node tests/workspaces_test.mjs theme_cost_scene.mjs
+  <default|classic|workspaces>`.
+- On screen: headless sessions on the development machine, screenshots in light and dark × Opaque, Translucent and
+  Crystal, Search, the Control Center, the empty state, the onboarding and the layouts. **Not yet checked** on a real
+  session with real monitors, with a Linux app's own bar, in a right-to-left language, or on the GPU path.
+
+## Deferred: compositor and SDK work
+
+- **Live miniatures of hidden activities** in the Overview and the strip: hidden desktops' windows aren't painted (a
+  Linux window there is parked), so the compositor would need to keep and scale their last buffers.
+- **Real frosted glass over Linux apps on the GPU path:** the theme's UI is painted on the CPU and the GPU only
+  composites; over a Linux app's window a blur only tints. A GPU blur pass is compositor work.
+- **Alt+Space** (and other keys over Linux apps): the compositor's key lists are fixed C tables
+  (`server/src/wl/keygrab.c`); Workspaces reuses Lord Flow's. A table of its own is a reviewed change.
+- **Weather** in the status cluster: not planned (no network from the shell).
+- **A different activity per monitor** and **the Overview per display** (above): SDK and compositor changes.
+- **Damage in several rectangles** (`LORD_DAMAGE=multi`, off by default): with it, a small change far from the spine
+  would never join a large one; the theme already keeps its moving parts out of the spine's margin.

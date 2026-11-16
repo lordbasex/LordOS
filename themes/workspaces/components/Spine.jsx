@@ -34,7 +34,7 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
 export const Spine = memo(function Spine({ t, rect, mode, rtl, active, onCrown, onActivities, onApps, onFiles, onControl, onToggle, controlRef }) {
   const expanded = mode === 'expanded';
   return (
-    <Surface t={t} radius={18} style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h, paddingVertical: 12, alignItems: 'center', gap: 4 }}>
+    <Surface t={t} radius={18} style={{ boxShadow: t.spineShadow, position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h, paddingVertical: 12, alignItems: 'center', gap: 4 }}>
       <View onClick={onCrown} title={tr('shell.ws.spine.system')} style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6,
         backgroundColor: active.menu ? t.hover : 'transparent' }}>
         <Image src="asset:icons/lordos-crown.png" style={{ width: 28, height: 28 }} />

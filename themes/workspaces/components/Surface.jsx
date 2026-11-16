@@ -19,9 +19,9 @@ export const Crystal = memo(function Crystal({ t, radius }) {
   );
 });
 
-export const Surface = memo(forwardRef(function Surface({ t, radius = 16, style, children, ...rest }, ref) {
+export const Surface = memo(forwardRef(function Surface({ t, radius = 16, still = false, style, children, ...rest }, ref) {
   return (
-    <View ref={ref} {...rest} style={{ ...surfaceStyle(t, radius), ...style }}>
+    <View ref={ref} {...rest} style={{ ...surfaceStyle(t, radius, still), ...style }}>
       <Crystal t={t} radius={radius} />
       {children}
     </View>

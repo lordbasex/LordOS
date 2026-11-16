@@ -77,6 +77,8 @@ Estos números salen de máquinas virtuales y de una sola placa. Los reportes de
 
 En la 0.8.7: varios escritorios en Lord Flow y Lord Classic, con una vista general de las ventanas en vivo, una tira de escritorios y arrastre de una ventana de uno a otro. Cada ventana vuelve a su escritorio después de reiniciar, y una ventana de un escritorio oculto nunca tiene el teclado, ni siquiera si pide pantalla completa desde ahí. Probado en una sesión aislada en una máquina virtual, con apps X11 en una sesión completa en otra, y la vista general en el monitor de una Raspberry Pi 5; falta comprobar un idioma de derecha a izquierda en pantalla y gestos reales de trackpad.
 
+En desarrollo después de la 0.8.8.9: un tercer estilo de escritorio, **Lord Workspaces**. Cada actividad es un escritorio con su nombre, ícono, color, apps fijadas y una disposición por monitor; una columna de contexto al costado abre Actividades, Apps, Archivos y el Centro de control; las ventanas se acomodan en mosaico por pantalla, y Guardar disposición recuerda qué app va en qué lugar de qué monitor. Sus superficies toman uno de tres estilos de efectos, Opaco, Translúcido o Cristal. Lord Flow y Lord Classic no cambian. Por ahora comprobado en sesiones de prueba sin monitor, todavía no en monitores reales.
+
 ## Archivos, servidores y otros discos
 
 Todo en la 0.8.7.

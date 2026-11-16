@@ -507,6 +507,19 @@
           }
         },
         {
+          "id": "themes",
+          "q": {
+            "en": "Which desktop styles does LordOS have?",
+            "es": "¿Qué estilos de escritorio tiene LordOS?",
+            "pt": "Quais estilos de desktop o LordOS tem?"
+          },
+          "a": {
+            "en": "Two today, chosen live in Settings → Appearance → Desktop style: Lord Flow (a menu bar, a magnifying Dock, an app launcher and a Control Center) and Lord Classic (a taskbar, a start menu with search and quick settings). A third, **Lord Workspaces**, is in development after 0.8.8.9 Beta: it organizes the desktop by activities, each one a desktop with its own name, icon, colour, apps and layout per monitor, with a Context Spine on the side, windows tiled per display, a Search panel and three effects styles (Opaque, Translucent and Crystal). One activity spans all your monitors, and Save layout remembers which app goes where on each one. It is not in a release yet.",
+            "es": "Hoy dos, que se eligen en vivo en Ajustes → Apariencia → Estilo de escritorio: Lord Flow (barra de menú, un Dock con lupa, un lanzador de apps y un Centro de control) y Lord Classic (barra de tareas, menú de inicio con búsqueda y ajustes rápidos). Un tercero, **Lord Workspaces**, está en desarrollo después de la 0.8.8.9 Beta: organiza el escritorio por actividades, cada una un escritorio con su nombre, ícono, color, apps y disposición por monitor, con una columna de contexto al costado, ventanas en mosaico por pantalla, un panel de Búsqueda y tres estilos de efectos (Opaco, Translúcido y Cristal). Una actividad abarca todos tus monitores, y Guardar disposición recuerda qué app va dónde en cada uno. Todavía no está en ninguna versión publicada.",
+            "pt": "Hoje dois, escolhidos ao vivo em Configurações → Aparência → Estilo do desktop: o Lord Flow (barra de menus, um Dock com lupa, um lançador de apps e uma Central de controle) e o Lord Classic (barra de tarefas, menu iniciar com busca e ajustes rápidos). Um terceiro, o **Lord Workspaces**, está em desenvolvimento depois da 0.8.8.9 Beta: organiza o desktop por atividades, cada uma uma área de trabalho com nome, ícone, cor, apps e layout por monitor, com uma coluna de contexto ao lado, janelas lado a lado por tela, um painel de Busca e três estilos de efeitos (Opaco, Translúcido e Cristal). Uma atividade abrange todos os seus monitores, e Salvar layout lembra qual app vai onde em cada um. Ainda não está em nenhuma versão publicada."
+          }
+        },
+        {
           "id": "linux-apps",
           "q": {
             "en": "Can I run regular Linux apps?",

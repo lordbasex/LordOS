@@ -13,7 +13,7 @@
 // apps join the main display's tiles (model/layouts.js foldMissing). A display unplugged: the SDK moves its windows to
 // the main display (keepWindowsInWorkAreas) and they join its tiles; plugged back, they return to their saved display.
 import { windows, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
-import { tileRects, fitTile, cleanLayout, cleanRatio, orderFor, homeFor, displayKey, savedDisplay, foldMissing } from './model/layouts.js';
+import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKey, savedDisplay, foldMissing } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
@@ -51,7 +51,9 @@ export function setLayout(desk, dkey, layout, ratio) {
   updateActivity(desk, (m) => {
     const cur = m.layouts[dkey] || {};
     const l = cleanLayout(layout ?? cur.layout);
-    return { ...m, layouts: { ...m.layouts, [dkey]: { ...cur, layout: l, ratio: cleanRatio(l, ratio ?? cur.ratio) } } };
+    // another layout starts from its own divider (2/3 for main and side, 1/3 for three columns)
+    const r = ratio ?? (l === cur.layout ? cur.ratio : defaultRatio(l));
+    return { ...m, layouts: { ...m.layouts, [dkey]: { ...cur, layout: l, ratio: cleanRatio(l, r) } } };
   });
   // a new layout takes every window of that display back into the tiles
   if (layout != null) for (const w of windows.get()) if (w.desktop === desk && home.get(w.id) === dkey) floating.delete(w.id);

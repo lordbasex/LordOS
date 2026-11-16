@@ -77,6 +77,8 @@ These numbers come from virtual machines and one board. Reports from 22 real mac
 
 In 0.8.7: several desktops in both Lord Flow and Lord Classic, with an Overview of live windows, a strip of desktops and dragging a window from one to another. Each window comes back on its desktop after a restart, and a window on a hidden desktop never has the keyboard, not even one that asks for fullscreen from there. Checked in an isolated session on a virtual machine, with X11 apps in a full session on another, and the Overview on a Raspberry Pi 5's monitor; a right-to-left language on screen and real trackpad swipes are still to check.
 
+In development after 0.8.8.9: a third desktop style, **Lord Workspaces**. Each activity is a desktop with its own name, icon, colour, pinned apps and a layout per monitor; a Context Spine on the side opens Activities, Apps, Files and the Control Center; windows tile per display, and Save layout remembers which app goes in which place of which monitor. Its surfaces take one of three effects styles, Opaque, Translucent or Crystal. Lord Flow and Lord Classic don't change. Checked in test sessions without a monitor so far, not yet on real monitors.
+
 ## Files, servers and other disks
 
 All in 0.8.7.

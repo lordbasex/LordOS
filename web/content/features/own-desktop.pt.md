@@ -77,6 +77,8 @@ Esses números vêm de máquinas virtuais e de uma placa. Os relatórios de 22 m
 
 Na 0.8.7: várias áreas de trabalho no Lord Flow e no Lord Classic, com uma visão geral das janelas ao vivo, uma faixa de áreas de trabalho e arrastar uma janela de uma para outra. Cada janela volta à sua área de trabalho depois de reiniciar, e uma janela de uma área de trabalho oculta nunca tem o teclado, nem se pedir tela cheia de lá. Testado em uma sessão isolada em uma máquina virtual, com apps X11 numa sessão completa em outra, e a visão geral no monitor de um Raspberry Pi 5; falta conferir um idioma da direita para a esquerda na tela e gestos reais de trackpad.
 
+Em desenvolvimento depois da 0.8.8.9: um terceiro estilo de desktop, o **Lord Workspaces**. Cada atividade é uma área de trabalho com nome, ícone, cor, apps fixados e um layout por monitor; uma coluna de contexto ao lado abre Atividades, Apps, Arquivos e a Central de controle; as janelas ficam lado a lado por tela, e Salvar layout lembra qual app vai em qual lugar de qual monitor. As superfícies usam um de três estilos de efeitos, Opaco, Translúcido ou Cristal. O Lord Flow e o Lord Classic não mudam. Por enquanto verificado em sessões de teste sem monitor, ainda não em monitores reais.
+
 ## Arquivos, servidores e outros discos
 
 Tudo na 0.8.7.

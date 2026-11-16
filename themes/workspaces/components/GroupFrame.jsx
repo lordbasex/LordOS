@@ -83,10 +83,21 @@ function Splitter({ t, desk, dkey, layout, ratio, area, count }) {
   );
 }
 
+// The frame itself: only a border in the accent (Crystal adds a brighter top edge), the same for every activity, so a
+// switch never repaints this display-sized box; the activity's own colour is on its header chip and its pill. No fill:
+// a scrim over the whole work area was the costly part of a switch on the CPU path (docs/WORKSPACES.md, "Performance").
+const FrameBox = memo(function FrameBox({ t, f }) {
+  return (
+    <View style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h, borderRadius: 18, border: `1.5px solid ${alpha(t.accent, 0.45)}`, pointerEvents: 'none' }}>
+      {t.mat.edge ? <View style={{ position: 'absolute', left: 24, right: 24, top: 0, height: 1, backgroundColor: alpha(t.accent, 0.85) }} /> : null}
+    </View>
+  );
+});
+
 // how many windows of this activity show on this display (a narrow selector: other windows' changes don't re-render)
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
-export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, meta, multi, front, frameRef, onAddWindow, onEdit, showEmpty }) {
+export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, meta, multi, canMove, onAddWindow, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
   const [picker, setPicker] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null);
@@ -102,25 +113,22 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, met
     const [x, y, w, h] = n ? lord.getLayout(n.id) : [hd.x + hd.w - 300, hd.y + 30, 0, 0];
     setPicker({ x: Math.max(d.x + 8, Math.min(x + w - 300, d.x + d.w - 308)), y: y + h + 6 });
   };
-  const frontWin = front ? wm.get(front) : null;
-  const canMove = !!frontWin && frontWin.desktop === desk && desktopList.get().length > 1;
   return (
     <>
-      <View ref={frameRef} style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h, borderRadius: 18,
-        backgroundColor: t.frameBg, border: `1.5px solid ${alpha(meta.color, 0.55)}` }}>
-        {t.mat.edge ? <View style={{ position: 'absolute', left: 24, right: 24, top: 0, height: 1, backgroundColor: alpha(meta.color, 0.9), pointerEvents: 'none' }} /> : null}
-      </View>
-      <View style={{ position: 'absolute', left: hd.x, top: hd.y, width: hd.w, height: hd.h, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
-        <View style={{ width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(meta.color, 0.18) }}>
-          <ActivityIcon icon={meta.icon} color={meta.color} bg={t.solidBg} size={14} />
-        </View>
-        <View onDoubleClick={() => onEdit(desk)} style={{ flexShrink: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 14, fontWeight: 700, color: t.frameText, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>
-            {multi ? tr('shell.ws.frame.onDisplay', { activity: desktopName(desk), display: d.name || String(d.id) }) : desktopName(desk)}
-          </Text>
+      <FrameBox t={t} f={f} />
+      <View style={{ position: 'absolute', left: hd.x, top: hd.y, width: hd.w, height: hd.h, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, pointerEvents: 'box-none' }}>
+        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 8, paddingStart: 4, paddingEnd: 12, borderRadius: 12, backgroundColor: t.chipBg, flexShrink: 1, minWidth: 0 }}>
+          <View style={{ width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(meta.color, 0.22) }}>
+            <ActivityIcon icon={meta.icon} color={meta.color} bg={t.solidBg} size={14} />
+          </View>
+          <View onDoubleClick={() => onEdit(desk)} style={{ flexShrink: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 14, fontWeight: 700, color: t.frameText, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>
+              {multi ? tr('shell.ws.frame.onDisplay', { activity: desktopName(desk), display: d.name || String(d.id) }) : desktopName(desk)}
+            </Text>
+          </View>
         </View>
         {pins.length ? (
-          <View style={{ flexDirection: 'row', gap: 2, marginStart: 4 }}>
+          <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
             {pins.map((a) => (
               <View key={a.id} title={a.name} onClick={(e) => { noteLaunch(e.x, e.y); launchApp(a.id); }}
                 style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}>
@@ -130,20 +138,24 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, met
           </View>
         ) : null}
         <View style={{ flex: 1 }} />
-        {saved ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('shell.ws.layout.saved')}</Text> : null}
-        <HeaderButton t={t} wide anchor={layoutBtn} active={!!picker} label={tr(`shell.ws.layout.${layout}`)} onClick={openPicker}>
-          <LayoutMini cells={LAYOUT_CELLS[layout]} w={20} h={14} color={t.frameText} fill={t.frameText} active />
-        </HeaderButton>
-        <HeaderButton t={t} label={tr('shell.ws.layout.add')} onClick={(e) => onAddWindow(d, e)}><PlusGlyph color={t.frameText} size={12} /></HeaderButton>
-        <HeaderButton t={t} label={tr('shell.ws.layout.save')} onClick={() => { saveLayout(desk); setSaved(true); }}><SaveGlyph color={t.frameText} bg={t.solidBg} size={14} /></HeaderButton>
-        {canMove ? (
-          <HeaderButton t={t} label={tr('shell.ws.layout.move')} onClick={(e) => setMoveMenu({ x: e.x, y: e.y + 12, id: front })}><MoveGlyph color={t.frameText} size={14} /></HeaderButton>
-        ) : null}
+        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
+          {saved ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 6 }}>{tr('shell.ws.layout.saved')}</Text> : null}
+          <HeaderButton t={t} wide anchor={layoutBtn} active={!!picker} label={tr(`shell.ws.layout.${layout}`)} onClick={openPicker}>
+            <LayoutMini cells={LAYOUT_CELLS[layout]} w={20} h={14} color={t.frameText} fill={t.frameText} active />
+          </HeaderButton>
+          <HeaderButton t={t} label={tr('shell.ws.layout.add')} onClick={(e) => onAddWindow(d, e)}><PlusGlyph color={t.frameText} size={12} /></HeaderButton>
+          <HeaderButton t={t} label={tr('shell.ws.layout.save')} onClick={() => { saveLayout(desk); setSaved(true); }}><SaveGlyph color={t.frameText} bg={t.solidBg} size={14} /></HeaderButton>
+          {canMove ? (
+            <HeaderButton t={t} label={tr('shell.ws.layout.move')} onClick={(e) => { const id = wm.focused(); if (id) setMoveMenu({ x: e.x, y: e.y + 12, id }); }}><MoveGlyph color={t.frameText} size={14} /></HeaderButton>
+          ) : null}
+        </View>
       </View>
       {count >= 2 ? <Splitter t={t} desk={desk} dkey={dkey} layout={layout} ratio={ratio} area={area} count={count} /> : null}
-      {count === 0 && showEmpty ? (
-        <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none' }}>
-          <View style={{ alignItems: 'center', gap: 10, maxWidth: 420 }}>
+      {/* kept mounted and only shown or hidden: an activity switch then changes one style here, not a whole card */}
+      {showEmpty ? (
+        <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',
+          display: count === 0 ? 'flex' : 'none' }}>
+          <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, maxWidth: 440, paddingHorizontal: 24, paddingVertical: 20 }}>
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.frameText, textAlign: 'center' }}>{tr('shell.ws.empty.title')}</Text>
             <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.empty.body')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
@@ -158,7 +170,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, met
                 </View>
               ) : null}
             </View>
-          </View>
+          </Surface>
         </View>
       ) : null}
       {picker && <LayoutPicker t={t} at={picker} current={layout} onPick={(l) => setLayout(desk, dkey, l)} onClose={() => setPicker(null)} />}

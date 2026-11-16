@@ -821,6 +821,19 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9 (planned)
 
+- [ ] **Lord Workspaces** (approved by the maintainer on 2026-11-15; in development on `lordos-workspaces`,
+  `WORKSPACES.md`): a third theme with activities, a Context Spine, tiling per display and three effects styles
+  (Opaque, Translucent, Crystal). Built and checked in headless sessions and scene tests; still to check on a real
+  session with real monitors, Linux apps with their own bar, right to left and the GPU path, then the screenshots for
+  the site. Compositor and SDK work it leaves for later:
+  - live miniatures of hidden activities (keeping and scaling a hidden desktop's last buffers);
+  - real frosted glass over Linux apps on the GPU path (today the blur only tints there);
+  - a key table of its own over Linux apps (Alt+Space and others; `keygrab.c` is a fixed, reviewed list), reusing Lord
+    Flow's until then;
+  - a different activity per monitor (per-display desktops in the SDK and the compositor's parking) and the Overview
+    per display;
+  - no weather widget: the shell asks nothing from the internet.
+
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
   - Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)): 75 % and 80 % first, never 50 %;
     the UI engine, pointer, captures, Wayland `int_scale`/fractional scale below 1 and Xwayland's DPI.

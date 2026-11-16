@@ -41,12 +41,6 @@ import { Menu } from '../classic/components/Menu.jsx';
 import { NotificationCenter } from '../classic/components/NotificationCenter.jsx';
 
 const rtlNow = () => direction() === 'rtl';
-// one stable ref callback per display key: the group frame's node, for the switch transition
-const refCallbacks = new Map();
-function frameRefFor(map, key) {
-  if (!refCallbacks.has(key)) refCallbacks.set(key, (n) => { if (n) map.set(key, n); else map.delete(key); });
-  return refCallbacks.get(key);
-}
 const planFor = (d, s) => { const p = wsPrefs(s); return displayPlan(d, { spine: p.spine, every: p.spineEvery, rtl: rtlNow(), primary: !!d.main }); };
 // the work area of each display: the group frame's inside (model/geometry.js)
 const areaFn = (d) => planFor(d, settings.get()).work;
@@ -168,7 +162,6 @@ function App() {
   const desk = useStore(deskMenu);
   const seen = useRef(0);
   const controlRef = useRef(null);
-  const frameRefs = useRef(new Map());
   const rtl = rtlNow();
   const displays = screenDisplays();
   const shown = shownDisplays(displays, screen.mirror);
@@ -188,31 +181,6 @@ function App() {
     left: desktopSwipe('left'), right: desktopSwipe('right'),
   }), []);
 
-  // switching activity: the group frames slide in from the side it comes from and settle from a little depth, then
-  // its windows settle one after the other (the SDK slides and fades the windows themselves; sdk/desktops.js)
-  useEffect(() => {
-    let prev = activeDesktop.get();
-    return activeDesktop.subscribe(() => {
-      const cur = activeDesktop.get();
-      if (cur === prev) return;
-      const l = desktopList.get();
-      const dir = (l.indexOf(cur) >= l.indexOf(prev) ? 1 : -1) * (rtlNow() ? -1 : 1);
-      prev = cur;
-      if (reduceMotion() || overview.get()) return;
-      for (const r of frameRefs.current.values()) {
-        const n = r?.id;
-        if (n) tween(n, { translateX: [dir * 36, 0], scaleX: [0.965, 1], scaleY: [0.965, 1], opacity: [0.4, 1] }, { ms: 260, ease: EASE.out });
-      }
-      setTimeout(() => {
-        const ws = windowsStore.get().filter((w) => w.desktop === cur && !w.minimized && !w.fullscreen && !w.pip).sort((a, b) => dir * (a.x - b.x));
-        ws.slice(0, 10).forEach((w, i) => {
-          const n = wm.frameNode(w.id);
-          if (n) tween(n, { scaleX: [0.955, 1], scaleY: [0.955, 1] }, { ms: 220, delay: 40 + 35 * i, ease: EASE.back });
-        });
-      }, 0);
-    });
-  }, []);
-
   const leaving = useLeaving(all, main?.plan.spine);
   const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', menu: !!crown }),
     [inOverview, open, crown]);
@@ -227,6 +195,8 @@ function App() {
   const top = mounted[mounted.length - 1];
   const deskMeta = meta[desktop] || activityOf(desktop);
   const onDesk = all.filter((w) => w.desktop === desktop && !w.pip).length;
+  // the header's Move button: a window of this activity in front and another activity to send it to
+  const canMove = !!focused && list.length > 1;
   const onboarding = needsOnboarding(deskMeta, list.length, onDesk) && !inOverview;
   const controlAnchor = () => {
     const n = controlRef.current;
@@ -256,8 +226,8 @@ function App() {
         {displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
         {plans.map(({ d, key, plan }) => (
-          <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} desk={desktop} meta={deskMeta} multi={plans.length > 1} front={focused}
-            frameRef={frameRefFor(frameRefs.current, key)} onAddWindow={H.addWindow} onEdit={H.edit} showEmpty={!onboarding} />
+          <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
+            onAddWindow={H.addWindow} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
         {onboarding && main ? (
           <View style={{ position: 'absolute', left: main.plan.work.x, top: main.plan.work.y, width: main.plan.work.w, height: main.plan.work.h, alignItems: 'center', justifyContent: 'center' }}>

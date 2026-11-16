@@ -6,9 +6,10 @@
 // delete (asked first, in the page). The clock re-renders only its own text, once a minute (sharedTicker).
 import {
   View, Text, TextInput, useStore, desktopList, desktopNames, desktopName, activeDesktop, renameDesktop, switchDesktop, formatTime, formatDate,
-  StatusItems, PrivacyIndicators, useSound, defaultSink, t as tr,
+  StatusItems, PrivacyIndicators, clockPrefs, weekdayName, useSound, defaultSink, t as tr,
 } from '@lordos/sdk';
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { tween, EASE } from '../motion.js';
 import { Surface } from './Surface.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SpeakerGlyph, BellGlyph } from '../glyphs.jsx';
@@ -16,12 +17,16 @@ import { activities, renaming, deleting, newActivity, noteLaunch } from '../stat
 import { MAX_ACTIVITIES } from '../model/activities.js';
 
 const H = 44;
-// One timer for the clock, woken at each minute's turn (not every second): the time and the day re-render then, and
-// nothing else does. Runs only while the clock is on screen.
-function minuteTicker(read) {
+// One timer for the clock, woken at each minute's turn (each second's only with Settings → Date & Time → Show seconds):
+// the time and the day re-render then, and nothing else does. Runs only while the clock is on screen. The format is
+// the menu bar clock's (24-hour, the date or the weekday, seconds; sdk/hardware.jsx clockPrefs).
+function clockTicker(read) {
   let value = null, timer = 0;
   const subs = new Set();
-  const arm = () => { const n = new Date(); timer = setTimeout(tick, 60000 - (n.getSeconds() * 1000 + n.getMilliseconds()) + 20); };
+  const arm = () => {
+    const n = new Date(), ms = n.getSeconds() * 1000 + n.getMilliseconds();
+    timer = setTimeout(tick, clockPrefs().seconds ? 1000 - n.getMilliseconds() + 5 : 60000 - ms + 20);
+  };
   const tick = () => { const v = read(new Date()); if (v !== value) { value = v; for (const fn of [...subs]) fn(); } arm(); };
   return {
     get: () => (value == null ? (value = read(new Date())) : value),
@@ -32,19 +37,20 @@ function minuteTicker(read) {
     },
   };
 }
-export const clock = minuteTicker((d) => `${formatDate(d, 'short')}\u0000${formatTime(d)}`);
+const dayOf = (d) => { const c = clockPrefs(); return c.date === 'none' ? '' : c.date === 'weekday' ? weekdayName(d.getDay()) : formatDate(d, 'short'); };
+export const clock = clockTicker((d) => `${dayOf(d)}\u0000${formatTime(d, { seconds: !!clockPrefs().seconds })}`);
 
 const Clock = memo(function Clock({ t }) {
   const [day, time] = useStore(clock).split('\u0000');
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap' }}>{day}</Text>
+      {day ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap' }}>{day}</Text> : null}
       <Text style={{ fontSize: 14, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{time}</Text>
     </View>
   );
 });
 
-const Pill = memo(function Pill({ t, id, active, name, meta, onMenu }) {
+const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pillRef }) {
   const [hover, setHover] = useState(false);
   const editing = useStore(renaming) === id;
   const [value, setValue] = useState(name);
@@ -58,28 +64,68 @@ const Pill = memo(function Pill({ t, id, active, name, meta, onMenu }) {
     );
   }
   return (
-    <View onClick={() => switchDesktop(id)} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => onMenu(id, e)}
+    <View ref={pillRef} onClick={() => switchDesktop(id)} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => onMenu(id, e)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={name}
       style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 16, maxWidth: 190,
-        backgroundColor: active ? t.accent : hover ? t.hover : 'transparent' }}>
+        backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.hover : 'transparent' }}>
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
       <Text style={{ fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
     </View>
   );
 });
 
+// after the next frame's layout (a timer where there are no frames: the tests)
+const nextFrame = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 16));
+const cancelFrame = (id) => (typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame(id) : clearTimeout(id));
+
+// one stable ref callback per pill
+const refFns = new Map();
+function pillRefFor(map, id) {
+  if (!refFns.has(id)) refFns.set(id, (n) => { if (n) map.set(id, n); else map.delete(id); });
+  return refFns.get(id);
+}
+
 export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   const list = useStore(desktopList);
   const active = useStore(activeDesktop);
-  useStore(desktopNames);
   const meta = useStore(activities);
+  const names = useStore(desktopNames);
   const [menu, setMenu] = useState(null);
+  // the accent under the pill in view: it glides to the next one on a switch (motion.js, left and width only, inside
+  // this small surface), the pill's own fill until it has been measured once
+  const strip = useRef(null);
+  const glider = useRef(null);
+  const pills = useRef(new Map());
+  const [pos, setPos] = useState(null);
+  const last = useRef(null);
+  useEffect(() => {
+    const raf = nextFrame(() => {
+      const p = pills.current.get(active), sn = strip.current, g = glider.current;
+      if (!p || !sn) return;
+      let box, sbox;
+      try { box = lord.getLayout(p.id); sbox = lord.getLayout(sn.id); } catch (e) { return; }
+      if (!box || !sbox || box[2] <= 0) return;
+      const next = { x: box[0] - sbox[0], w: box[2] };
+      const was = last.current;
+      last.current = next;
+      setPos(next);
+      // drawn at its new place at once, then moved there from the old one: a translate and a horizontal scale from the
+      // left edge (a cached raster, the cheap path), never left/width (those lay the strip out again on every frame)
+      if (was && g && (was.x !== next.x || was.w !== next.w)) {
+        // after the windows' slide (sdk/desktops.js, 170 ms): in the same frames the two changes would be repainted as one
+        // box spanning both (the engine's single damage box), several times the pixels of each alone
+        tween(g.id, { translateX: [was.x - next.x, 0], scaleX: [was.w / next.w, 1] }, { ms: 180, delay: 150, ease: EASE.back });
+      }
+    });
+    return () => cancelFrame(raf);
+  }, [active, list.length, names]);
   const at = list.indexOf(active) + 1;
   const full = list.length >= MAX_ACTIVITIES;
   return (
-    <Surface t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
-      {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
-        onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
+    <Surface ref={strip} t={t} radius={H / 2} still style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
+      {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - 32) / 2 - 1, width: pos.w, height: 32, borderRadius: 16, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
+      {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
+        pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
       <View onClick={(e) => { if (!full) { noteLaunch(e.x, e.y); newActivity(); } }} title={tr('shell.ws.activity.new')}
         style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 16, opacity: full ? 0.45 : 1 }}>
         <PlusGlyph color={t.text} size={11} />
@@ -111,7 +157,7 @@ function Volume({ t, onClick }) {
 // rect: the top band; screenW: the whole screen's width (the cluster is placed by its end edge, its width is its content)
 export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, notifRef }) {
   return (
-    <Surface t={t} radius={H / 2} style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
+    <Surface t={t} radius={H / 2} still style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
       flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 }}>
       <PrivacyIndicators />
       <StatusItems color={t.text} height={28} />
