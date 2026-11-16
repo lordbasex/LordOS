@@ -60,3 +60,6 @@ export const findWallpaper = (list, id) => (list || []).find((w) => w.id === id)
 
 // The small image for a picker (falls back to the full one for theme wallpapers without a thumb).
 export const wallpaperThumb = (w) => (w && (w.thumb || w.src)) || null;
+
+// One wallpaper per display (every theme): the rules are in wallpapermodel.js, tested with node.
+export { displayWallpaperKey, wallpaperIdFor, wallpaperPatch, displayLabel } from './wallpapermodel.js';

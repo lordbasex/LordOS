@@ -14,7 +14,7 @@
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
-  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
+  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
@@ -176,7 +176,6 @@ function App() {
     left: desktopSwipe('left'), right: desktopSwipe('right'),
   }), []);
 
-  const wallpaper = findWallpaper(t.wallpapers, s.wallpaper);
   const isOnBar = (x, y) => onBar(pos, x, y, bars);
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
@@ -190,7 +189,7 @@ function App() {
     <ThemeProvider tokens={t}>
       <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#101216' : '#c9d3e0' }}>
         {all.map((d) => (
-          <Image key={d.id + ':' + d.x} src={wallpaperSrc(wallpaper, d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
+          <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d)), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => setDesk({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}

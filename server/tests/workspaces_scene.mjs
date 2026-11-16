@@ -20,7 +20,7 @@ const { tileRects } = await import('../../themes/workspaces/model/layouts.js');
 const tiler = await import('../../themes/workspaces/tiler.js');
 const state = await import('../../themes/workspaces/state.js');
 
-const { texts, styles, parents, removed } = globalThis.__lordTest;
+const { texts, styles, parents, removed, props } = globalThis.__lordTest;
 const h = React.createElement;
 const flush = async () => { for (let i = 0; i < 30; i++) await new Promise((res) => setImmediate(res)); await new Promise((res) => setTimeout(res, 5)); for (let i = 0; i < 10; i++) await new Promise((res) => setImmediate(res)); };
 const check = (name, got, want) => {
@@ -236,6 +236,21 @@ await flush();
   check('magnet: the chooser closed', magnet.assist.get(), null);
   for (const id of [m1, m2, m3]) sdk.wm.close(id);
   await flush();
+}
+
+// one wallpaper per display (every theme, sdk/wallpapermodel.js): the right display gets its own picture
+{
+  const wallOf = (d) => [...props].filter(([id, p]) => typeof p.src === 'string' && attached(id) && styles.get(id)?.left === d.x && styles.get(id)?.width === d.w).map(([, p]) => p.src)[0] || '';
+  const before = [L, M, R].map(wallOf);
+  check('wallpaper: one picture for every display at first', new Set(before).size, 1);
+  const other = sdk.lordosWallpapers.find((w) => w.id !== sdk.settings.get().wallpaper);
+  sdk.settings.set(sdk.wallpaperPatch(sdk.settings.get(), other.id, R));
+  await flush();
+  const after = [L, M, R].map(wallOf);
+  check('wallpaper: only the right display changed', [after[0] === before[0], after[1] === before[1], after[2] !== before[2]], [true, true, true]);
+  sdk.settings.set(sdk.wallpaperPatch(sdk.settings.get(), sdk.settings.get().wallpaper, null));
+  await flush();
+  check('wallpaper: all displays again', [L, M, R].map(wallOf), before);
 }
 
 // the effects styles: Crystal draws its sheen, Opaque no blur at all

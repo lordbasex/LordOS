@@ -12,6 +12,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **One wallpaper per display, in every theme.** Settings → Wallpaper gains a display selector (all displays or one,
+  named by model plus connector when monitors share a model); a display's own picture is kept in a new settings key,
+  `wallpapers` (`{ [connector]: id }`, no migration: an absent key is the old behaviour). Lord Flow, Lord Classic and
+  Lord Workspaces draw each display's picture, and the Control Center's quick pictures change the display it opened
+  on. A picture for one display turns that display's moving wallpaper off (a `null` entry in `motion` now wins over
+  the one for all displays). The motion selector names displays the same way. `sdk/wallpapermodel.js`, tests in
+  `server/tests/wallpaper_model_test.mjs` and the Workspaces scene (`docs/WALLPAPERS.md`).
 - **Lord Workspaces, a third desktop theme (in development;** approved by the maintainer on 2026-11-15;
   `docs/WORKSPACES.md`). It organizes the desktop by activities and leaves Lord Flow and Lord Classic as they were.
   - *Activities:* each activity is one of the SDK's desktops (up to 9) with a name (the desktop's own), an icon, a

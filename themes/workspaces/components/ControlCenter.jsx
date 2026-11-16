@@ -6,7 +6,7 @@
 // state is read once when it opens, nothing polls.
 import {
   View, Text, Image, Slider, Segmented, ScrollView, useSettings, settings, wm, addListener, useSound, defaultSink, sound, useBluetooth, setBluetoothPower,
-  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, usePowerProfiles, admin, t as tr,
+  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, screenDisplays, usePowerProfiles, admin, t as tr,
   MoonGlyph, SunGlyph, ContrastGlyph, BluetoothGlyph, SignalGlyph,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
@@ -131,7 +131,10 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
   const height = Math.min(area.h - 24, 720);
   const left = rtl ? anchor.x - CC_W - 10 : anchor.x + anchor.w + 10;
   const top = Math.max(area.y + 12, Math.min(anchor.y + anchor.h - height, area.y + area.h - 12 - height));
-  const quick = [findWallpaper(t.wallpapers, s.wallpaper), ...QUICK.map((id) => t.wallpapers.find((w) => w.id === id))].filter((w, i, a) => w && a.indexOf(w) === i).slice(0, 4);
+  // several displays: the quick wallpapers are the picture of the display it opened on (sdk/wallpapers.js)
+  const wd = screenDisplays().length > 1 ? screenDisplays().find((d) => d.id === area.id) || null : null;
+  const curWall = wallpaperIdFor(s, wd);
+  const quick = [findWallpaper(t.wallpapers, curWall), ...QUICK.map((id) => t.wallpapers.find((w) => w.id === id))].filter((w, i, a) => w && a.indexOf(w) === i).slice(0, 4);
   return (
     <Surface ref={ref} t={t} radius={20} style={{ position: 'absolute', left, top, width: CC_W, height, transformOrigin: rtl ? 'right bottom' : 'left bottom',
       backgroundColor: t.panelBg, ...(t.panelBlur ? { backdropFilter: `blur(${t.panelBlur}px)` } : null) }}>
@@ -189,8 +192,8 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
           <View onClick={() => openSettings(onClose, 'wallpaper')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.wallpaper')}</Text></View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {quick.map((w) => (
-              <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden',
-                border: s.wallpaper === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
+              <View key={w.id} onClick={() => set(wd ? wallpaperPatch(s, w.id, wd) : { wallpaper: w.id })} style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden',
+                border: curWall === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
                 <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </View>
             ))}

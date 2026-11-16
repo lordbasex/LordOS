@@ -18,6 +18,22 @@ rule and otherwise shows its still image. The decisions are in `sdk/motionmodel.
 A virtual machine's GPU never qualifies (`hwDecode().virtualGpu`). On a V4L2 decoder HEVC counts only if the FFmpeg in use
 can drive it (`drmprime` from `lm_hwprobe.c`): Debian's FFmpeg can't, Raspberry Pi's can.
 
+## One wallpaper per display
+
+Every theme (0.8.8.10). `settings.wallpaper` is the picture of every display; `settings.wallpapers`
+(`{ [connector]: id }`) gives a display its own. The key is the connector (DP-2, HDMI-A-1…), never the model's
+name, which three monitors of one model share. The rules are in `sdk/wallpapermodel.js` (`wallpaperIdFor`,
+`wallpaperPatch`, `displayLabel`; tests in `server/tests/wallpaper_model_test.mjs`):
+
+- **Settings → Wallpaper** shows a display selector with several displays: *All displays* or one of them (its model,
+  plus its connector when two share the model). A picture for one display also turns that display's moving wallpaper
+  off (`settings.motion[displayId] = null`, which wins over the one for all displays); a picture for all clears the
+  per-display pictures and the moving wallpapers, as before.
+- **The Control Center's quick pictures** (Lord Flow, Lord Workspaces) change the display the Control Center opened
+  on when there are several.
+- Removing one of your own pictures sends a display that showed it back to the picture of every display.
+- The login screen keeps one picture.
+
 ## Format
 
 HEVC first: it is what a Raspberry Pi 5 decodes in hardware. Each item has `1080.hevc`, `2160.hevc` when the source is 4K,

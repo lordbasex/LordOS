@@ -33,7 +33,7 @@ for (const d of ['sdk', 'runtime', ...themeDirs]) {
 // A stub lord: nodes, their styles and texts (and which ones left the tree); lord.getLayout answers from a map the
 // scene fills (the bars' rectangles), far off screen otherwise; settings saved in memory; the network polls counted.
 const MOCK = `globalThis.__lordTest = (() => {
-  const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), layouts = new Map();
+  const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), layouts = new Map(), props = new Map();
   const counts = { netPolls: 0, ops: 0 };
   let nextId = 1, saved = '{}';
   const base = {
@@ -43,6 +43,7 @@ const MOCK = `globalThis.__lordTest = (() => {
     createNode: () => { counts.ops++; const id = nextId++; styles.set(id, {}); return id; },
     setStyle: (id, k, v) => { counts.ops++; const s = styles.get(id); if (!s) return; if (v === undefined) delete s[k]; else s[k] = v; },
     setText: (id, s) => { counts.ops++; texts.set(id, s); },
+    setProp: (id, k, v) => { counts.ops++; if (!props.has(id)) props.set(id, {}); props.get(id)[k] = v; },
     appendChild: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
     insertBefore: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
     removeChild: (p, c) => { counts.ops++; removed.add(c); },
@@ -58,7 +59,7 @@ const MOCK = `globalThis.__lordTest = (() => {
   for (const ns of ${JSON.stringify([...NS])}) if (!(ns in base)) base[ns] = undefined;
   const noop = () => undefined;
   globalThis.lord = new Proxy(base, { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? noop : undefined) });
-  return { styles, texts, parents, removed, layouts, counts };
+  return { styles, texts, parents, removed, layouts, counts, props };
 })();`;
 
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-workspaces-'));

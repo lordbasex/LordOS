@@ -15,7 +15,7 @@
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
-  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
+  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
@@ -196,7 +196,6 @@ function App() {
   const isOnChrome = (x, y) => onChrome(plans.map((p) => p.plan), x, y);
   const panelDisplay = (open && displays.find((d) => d.id === open.display)) || mainDisplay();
   const panelPlan = plans.find((p) => p.d.id === panelDisplay.id) || main;
-  const wallpaper = findWallpaper(t.wallpapers, s.wallpaper);
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
   const deskMeta = meta[desktop] || activityOf(desktop);
@@ -225,7 +224,7 @@ function App() {
     <ThemeProvider tokens={t}>
       <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#0F0D1C' : '#DCD6F2' }}>
         {displays.map((d) => (
-          <Image key={d.id + ':' + d.x} src={wallpaperSrc(wallpaper, d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
+          <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d)), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}

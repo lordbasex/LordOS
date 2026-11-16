@@ -22,7 +22,7 @@ import { windows, wm, getApp, workAreaOf, windowTitle, activeDesktop, desktopLis
 import { MAX_DESKTOPS, onDesktop, gridLayout, stripLayout, stripSlot, moveDesktopTo, hitRect, overviewPlaceholder, OVERVIEW_LABEL } from './desktopmodel.js';
 import { launcherIdOf } from './dock.js';
 import { windowIcon } from './apps.js';
-import { findWallpaper, wallpaperThumb } from './wallpapers.js';
+import { findWallpaper, wallpaperThumb, wallpaperIdFor } from './wallpapers.js';
 import { clearTextFocus, TextInput } from './components.jsx';
 
 const DRAG_START = 6;
@@ -230,7 +230,7 @@ function Strip({ o, th }) {
   const active = useStore(activeDesktop);
   useStore(desktopNames);
   const s = settings.get();
-  const wall = wallpaperThumb(findWallpaper(th.wallpapers, s.wallpaper));
+  const wall = wallpaperThumb(findWallpaper(th.wallpapers, wallpaperIdFor(s, mainDisplay())));
   const { strip } = o;
   // while a desktop is dragged the others make room where it would go, and it follows the pointer
   let cards = strip.cards;

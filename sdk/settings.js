@@ -15,6 +15,7 @@ const DEFAULTS = {
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
   wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
+  wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
   keyboard: null,        // before M5; now keyboards (see keyboard.js). It was 'latam' until 0.8.8.6 (#55)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,

@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -292,7 +292,7 @@ function MotionWallpapers({ login }) {
         {msg ? <Note tone="warn">{msg}</Note> : null}
         {can && displays.length > 1 ? (
           <SettingRow label={tr('settings.motion.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, d.name || String(d.id)])]} />
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
           </SettingRow>
         ) : null}
         {can ? (
@@ -365,7 +365,9 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
   const cur = ids.includes(curId) ? curId : null;
   const remove = () => {
     removeWallpaperImage(cur).then(() => {
-      set({ wallpaperImages: ids.filter((x) => x !== cur), ...(s.wallpaper === cur ? { wallpaper: DEFAULT_WALLPAPER } : {}) });
+      // a display that showed it goes back to the picture of every display
+      const own = Object.fromEntries(Object.entries(s.wallpapers || {}).filter(([, v]) => v !== cur));
+      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: DEFAULT_WALLPAPER } : {}) });
     }, (e) => setNote(errorText(e)));
   };
   return (
@@ -413,10 +415,17 @@ function Wallpapers() {
   const [target, setTarget] = useState('desktop');
   const login = target === 'login';
   const [note, setNote] = useState('');
-  const shown = login ? s.loginWallpaper : s.wallpaper;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
+  // several displays: the picture of every display ('*') or of one (its own, settings.wallpapers; sdk/wallpapers.js)
+  const displays = screenDisplays() || [];
+  const [scope, setScope] = useState('*');
+  const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
+  const desk = wallpaperIdFor(s, scopeDisplay);
+  const shown = login ? s.loginWallpaper : desk;
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk);
+  const chooseDesk = (id) => set(wallpaperPatch(s, id, scopeDisplay));
+  const ownCount = Object.keys(s.wallpapers || {}).filter((k) => displays.some((d) => displayWallpaperKey(d) === k)).length;
   const stillPick = (id) => {
-    if (!login) { set({ wallpaper: id, motion: {} }); return; }
+    if (!login) { chooseDesk(id); return; }
     setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }, (e) => setNote(errorText(e)));
   };
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
@@ -429,6 +438,13 @@ function Wallpapers() {
     <Stack>
       <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
       {note ? <Note>{note}</Note> : null}
+      {!login && displays.length > 1 ? (
+        <Section footer={scope === '*' && ownCount ? tr('settings.wallpaperFor.allResets') : tr('settings.wallpaperFor.displayHint')}>
+          <SettingRow label={tr('settings.wallpaperFor.display')}>
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
+          </SettingRow>
+        </Section>
+      ) : null}
       <Section>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
           <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
@@ -448,7 +464,7 @@ function Wallpapers() {
         </SettingRow>
       </Section>
       <UserImages login={login} curId={shown} setNote={setNote}
-        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : set({ wallpaper: id, motion: {} }))}
+        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : chooseDesk(id))}
         onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
       <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
