@@ -61,7 +61,7 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pill
   const fg = active ? t.onAccent : t.text;
   if (editing) {
     return (
-      <View style={{ width: 160, height: 32, justifyContent: 'center' }}>
+      <View style={{ width: 160, height: BAR_ITEM, justifyContent: 'center' }}>
         <TextInput value={value} autoFocus selectAll onChange={setValue} size={12.5}
           onSubmit={() => { renameDesktop(id, value.trim()); renaming.set(null); }} onCancel={() => renaming.set(null)} style={{ height: 30 }} />
       </View>
@@ -70,7 +70,7 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pill
   return (
     <View ref={pillRef} onClick={() => switchDesktop(id)} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => onMenu(id, e)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={name}
-      style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 16, maxWidth: 190,
+      style={{ height: BAR_ITEM, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: BAR_ITEM / 2, maxWidth: 190,
         backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.itemHover : 'transparent' }}>
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
       <Text style={{ fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
@@ -126,8 +126,8 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   const at = list.indexOf(active) + 1;
   const full = list.length >= MAX_ACTIVITIES;
   return (
-    <Surface ref={strip} t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
-      {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - 32) / 2 - 1, width: pos.w, height: 32, borderRadius: 16, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
+    <Surface ref={strip} t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
+      {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - BAR_ITEM) / 2 - 1, width: pos.w, height: BAR_ITEM, borderRadius: BAR_ITEM / 2, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
       {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
         pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
       <BarSeparator t={t} />
@@ -162,7 +162,7 @@ function Volume({ t, onClick }) {
 export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, notifRef }) {
   return (
     <Surface t={t} radius={H / 2} style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
-      flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
+      flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
       <PrivacyIndicators />
       <View style={{ paddingHorizontal: 4 }}><StatusItems color={t.iconFg} height={BAR_ITEM} /></View>
       <BarSeparator t={t} />

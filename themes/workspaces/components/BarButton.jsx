@@ -5,7 +5,8 @@
 import { View } from '@lordos/sdk';
 import { forwardRef, memo, useState } from 'react';
 
-export const BAR_ITEM = 32;
+// a video player's proportions (a 48 px pill, 40 px buttons, 4 px inside it) at the bars' 44 px
+export const BAR_ITEM = 36;
 
 export const BarButton = memo(forwardRef(function BarButton({ t, glyph, title, onClick, active, disabled, style, children }, ref) {
   const [hover, setHover] = useState(false);
@@ -14,7 +15,7 @@ export const BarButton = memo(forwardRef(function BarButton({ t, glyph, title, o
     <View ref={ref} title={title} onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: BAR_ITEM, minWidth: BAR_ITEM, borderRadius: BAR_ITEM / 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 6, paddingHorizontal: children ? 10 : 0, opacity: disabled ? 0.45 : 1,
+        gap: 6, paddingHorizontal: children ? 12 : 0, opacity: disabled ? 0.45 : 1,
         backgroundColor: active ? t.accent : hover && !disabled ? t.itemHover : 'transparent', ...style }}>
       {glyph ? glyph(fg) : null}
       {typeof children === 'function' ? children(fg) : children}
