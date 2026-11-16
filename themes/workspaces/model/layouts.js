@@ -224,3 +224,27 @@ export function slotStacks(prev, live, isMin, back = new Set()) {
 }
 // the window a slot shows (its last one, if not minimized), or null for a free slot
 export const shownIn = (stack, isMin) => (stack.length && !isMin(stack[stack.length - 1]) ? stack[stack.length - 1] : null);
+
+// A window dropped by hand on a tiled display (0.8.8.10, drag to rearrange): stacks are that display's slots, at the
+// slot under the drop. A window already in them swaps slots with the one there; one from elsewhere gets a slot of its
+// own at that place (the others shift). at: the index of the slot under the drop (slotAt).
+export function dropInto(stacks, id, at) {
+  const out = (stacks || []).map((s) => [...s]);
+  const src = out.findIndex((s) => s.includes(id));
+  if (src >= 0) {
+    if (at === src || at < 0 || at >= out.length) return out;
+    [out[src], out[at]] = [out[at], out[src]];
+    return out;
+  }
+  out.splice(Math.max(0, Math.min(at, out.length)), 0, [id]);
+  return out;
+}
+// the index of the rect under (x, y), else the nearest one by its center; -1 with none
+export function slotAt(rects, x, y) {
+  if (!rects || !rects.length) return -1;
+  const i = rects.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  if (i >= 0) return i;
+  let best = 0, bd = Infinity;
+  rects.forEach((r, j) => { const d = (r.x + r.w / 2 - x) ** 2 + (r.y + r.h / 2 - y) ** 2; if (d < bd) { bd = d; best = j; } });
+  return best;
+}

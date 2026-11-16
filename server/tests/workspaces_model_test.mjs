@@ -7,7 +7,7 @@ import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
 import { cleanThemeMeta, themeOptionValue, themeOptionPatch } from '../../sdk/thememeta.js';
-import { slotStacks, shownIn } from '../../themes/workspaces/model/layouts.js';
+import { slotStacks, shownIn, dropInto, slotAt } from '../../themes/workspaces/model/layouts.js';
 import { assistFor, follow, other } from '../../themes/workspaces/model/magnet.js';
 import { readFileSync } from 'node:fs';
 
@@ -265,6 +265,19 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
   eq('slots: term closed, its slot goes', r.stacks, [['chrome']]);
   eq('slots: a minimized window never placed gets no slot', slotStacks([], ['a', 'b'], min(['a'])).stacks, [['b']]);
   eq('slots: two new windows, one free slot', slotStacks([['x']], ['x', 'p', 'q'], min(['x'])).stacks, [['x', 'p'], ['q']]);
+}
+
+// ---- drag to rearrange ----
+{
+  eq('drop: on another slot swaps', dropInto([['a'], ['b'], ['c']], 'a', 2), [['c'], ['b'], ['a']]);
+  eq('drop: on its own slot, nothing', dropInto([['a'], ['b']], 'a', 0), [['a'], ['b']]);
+  eq('drop: a slot travels with its minimized windows', dropInto([['m', 'a'], ['b']], 'a', 1), [['b'], ['m', 'a']]);
+  eq('drop: from another display, a slot of its own there', dropInto([['a'], ['b']], 'x', 1), [['a'], ['x'], ['b']]);
+  eq('drop: past the end, last', dropInto([['a']], 'x', 5), [['a'], ['x']]);
+  const R2 = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 110, y: 0, w: 100, h: 100 }];
+  eq('slotAt: under the point', [slotAt(R2, 150, 50), slotAt(R2, 10, 10)], [1, 0]);
+  eq('slotAt: in the gap, the nearest', slotAt(R2, 107, 50), 1);
+  eq('slotAt: none', slotAt([], 1, 1), -1);
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

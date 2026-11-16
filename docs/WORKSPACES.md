@@ -73,8 +73,12 @@ displays do. Nothing runs per frame, nothing polls.
   the first free slot of its display; a window brought back from minimized takes its slot again, and the window shown
   there meanwhile is minimized (they swap). Closing a window gives its slot up. A window minimized before the tiler
   placed it gets no slot.
-- **A window moved or resized by hand** (or maximized, or snapped) leaves its tile and floats until **Tile this
-  window** from its title bar's menu. Dialogs, notices and the theme's own panels never tile.
+- **Drag to rearrange** (`dropInto`, `slotAt`). A tiled window dragged with its size kept (or snapped to an edge) onto
+  a display with tiles takes the slot under the drop: on its own display it swaps with the window there; on another
+  display it gets a slot of its own there and leaves its old one. Dropped on a display in Free, it floats there.
+- **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title
+  bar's menu, or until a layout is chosen again for the display it is on now (a floating window belongs to the display
+  it is on, wherever it was tiled before). Dialogs, notices and the theme's own panels never tile.
 - **A window whose minimum size is bigger than its tile** keeps its minimum at the tile's corner, inside the work area
   (it overlaps its neighbour instead of being cut), and its title bar shows an amber dot ("needs more room than its
   tile").

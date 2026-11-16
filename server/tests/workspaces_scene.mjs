@@ -76,10 +76,10 @@ check('split on the main display', [a, b, c].map(frameOf), want);
 check('single on the right display', frameOf(s), plan(R).work);
 check('the left display untouched (free)', tiler.layoutOf(desk, 'DP-1').layout, 'free');
 
-// moved by hand: out of its tile, floating; the others take the room
-sdk.wm.move(c, M.x + 50, 200);
+// resized by hand: out of its tile, floating; the others take the room
+sdk.wm.setFrame(c, { ...frameOf(c), x: frameOf(c).x + 20, w: frameOf(c).w - 80 });
 await flush();
-check('moved by hand: it floats', tiler.isFloating(c), true);
+check('resized by hand: it floats', tiler.isFloating(c), true);
 check('the others re-tile as two', [a, b].map(frameOf), tileRects('split', plan(M).work, 2, 2 / 3));
 tiler.setFloating(c, false);
 await flush();
@@ -250,6 +250,47 @@ await flush();
   for (const id of [fa, ch, tm]) sdk.wm.close(id, true);
   tiler.setLayout(desk, 'DP-1', 'free');
   for (let i = 0; i < 2; i++) await flush();
+}
+
+// re-picking Two halves with two floating windows (moved by hand, or placed by session restore): both tile, side by side
+{
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const a1 = sdk.wm.open('extra55', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  const a2 = sdk.wm.open('extra56', { frame: { x: L.x + 700, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  sdk.wm.setFrame(a1, { x: L.x + 40, y: 60, w: 900, h: 900 });
+  sdk.wm.setFrame(a2, { x: L.x + 960, y: 60, w: 940, h: 900 });
+  for (let i = 0; i < 3; i++) await flush();
+  check('repick: moved by hand, both float', [tiler.isFloating(a1), tiler.isFloating(a2)], [true, true]);
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  for (let i = 0; i < 3; i++) await flush();
+  const halves = tileRects('halves', plan(L).work, 2, 0.5);
+  check('repick: two halves, one each', [frameOf(a1), frameOf(a2)], halves);
+  for (const id of [a1, a2]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 2; i++) await flush();
+}
+
+// drag to rearrange: a tile dragged onto another swaps with it; dragged to another display, it joins that display's tiles
+{
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  await new Promise((res) => setTimeout(res, 1100));   // the tiler's pass budget (MAX_PASSES a second) after the blocks above
+  const p1 = sdk.wm.open('extra57', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  const p2 = sdk.wm.open('extra58', { frame: { x: L.x + 700, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  const halves = tileRects('halves', plan(L).work, 2, 0.5);
+  check('rearrange: two halves', [frameOf(p1), frameOf(p2)], halves);
+  const f1 = frameOf(p1);
+  sdk.wm.move(p1, halves[1].x + 40, f1.y);           // dragged onto the right half, its size kept
+  for (let i = 0; i < 3; i++) await flush();
+  check('rearrange: dropped on the other half, they swap', [frameOf(p1), frameOf(p2), tiler.isFloating(p1)], [halves[1], halves[0], false]);
+  sdk.wm.move(p2, M.x + 300, 300);                   // dragged to the main display (split, three tiles)
+  for (let i = 0; i < 3; i++) await flush();
+  check('rearrange: dragged to another display, it joins its tiles', [tiler.isFloating(p2), tiler.tiled.get().counts['DP-2'], tiler.tiled.get().counts['DP-1']], [false, 4, 1]);
+  check('rearrange: the one left fills the display', frameOf(p1), tileRects('halves', plan(L).work, 1, 0.5)[0]);
+  for (const id of [p1, p2]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 3; i++) await flush();
 }
 
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows

@@ -43,7 +43,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     corners. Minimized windows stay on their display: its frame header shows them as icons ("Minimized"),
     the minimize effect shrinks the window there, and a click brings it back where it was. In a tiled layout a minimized window keeps its place: the others don't
     grow into it, the free space shows with Add window, a new app takes it, and bringing the first back swaps the two.
-    A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    Dragging a tiled window onto another tile swaps them, and dragging it to another monitor adds it to that monitor's
+    tiles; choosing a layout again takes back every floating window of that display, including one dragged there from
+    another monitor (before, it stayed loose and the others filled the screen). A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
     still closes it. The tiler writes the window store once per change and
