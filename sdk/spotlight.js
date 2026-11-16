@@ -172,26 +172,30 @@ export function convert(input) {
 // ---- file index (if the server doesn't provide lord.fs.search) ----
 
 let fileIndex = { at: 0, list: [], building: false };
+// Folders nobody searches by name and that can hold tens of thousands of entries (a stall of 12 s on 2026-11-16 was the
+// old builder listing and sorting one of these on the main loop).
+const SKIP_DIRS = new Set(['node_modules', '__pycache__', 'venv', 'site-packages', 'target', 'vendor', 'third_party', 'out']);
+const PER_DIR = 2000, MAX_FILES = 5000;
+// Built a folder at a time with fs.listAsync (read on lord-server's file thread, not on the main loop, and not sorted:
+// the index needs no order), hidden entries left out; each name is kept folded once so typing only compares.
 function buildFileIndex() {
   if (fileIndex.building || Date.now() - fileIndex.at < 120000) return;
   fileIndex.building = true;
   const out = [];
   const queue = [['', 0]];
+  const done = () => { fileIndex = { at: Date.now(), list: out, building: false }; resultsVersion.set((x) => x + 1); };
   const step = () => {
-    let budget = 40;
-    while (queue.length && budget-- > 0 && out.length < 5000) {
-      const [dir, depth] = queue.shift();
-      let entries = [];
-      try { entries = fs.list(dir || '.'); } catch (e) { continue; }
+    if (!queue.length || out.length >= MAX_FILES) { done(); return; }
+    const [dir, depth] = queue.shift();
+    fs.listAsync(dir ? `${fs.home()}/${dir}` : fs.home()).then((entries) => {
+      let n = 0;
       for (const e of entries) {
+        if (!e || !e.name || e.name[0] === '.' || n++ >= PER_DIR || out.length >= MAX_FILES) continue;
         const rel = dir ? `${dir}/${e.name}` : e.name;
-        out.push({ path: `${fs.home()}/${rel}`, name: e.name, dir: e.dir, size: e.size, mtime: e.mtime });
-        if (e.dir && depth < 4) queue.push([rel, depth + 1]);
+        out.push({ path: `${fs.home()}/${rel}`, name: e.name, key: fold(e.name), dir: e.dir, size: e.size, mtime: e.mtime });
+        if (e.dir && depth < 4 && !SKIP_DIRS.has(e.name)) queue.push([rel, depth + 1]);
       }
-    }
-    if (queue.length && out.length < 5000) { setTimeout(step, 0); return; }
-    fileIndex = { at: Date.now(), list: out, building: false };
-    resultsVersion.set((x) => x + 1);
+    }, () => {}).then(() => setTimeout(step, 0));
   };
   step();
 }
@@ -203,7 +207,7 @@ function searchFiles(q) {
     try { return lord.fs.search(fs.home(), q, { limit: 60, depth: 6 }); } catch (e) { /* fall back to the index */ }
   }
   buildFileIndex();
-  return fileIndex.list.filter((f) => fold(f.name).includes(q)).slice(0, 60);
+  return fileIndex.list.filter((f) => (f.key ?? fold(f.name)).includes(q)).slice(0, 60);
 }
 
 const IMG = /\.(png|jpe?g|gif|webp|bmp)$/i;

@@ -86,7 +86,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the files opened lately; whether LordOS and the apps are up to date (the last check of the signed lists, nothing
     fetched); and 4 or 8 apps to launch (the Dock's pins until chosen). Cleaner in a small window: its icon rail was
     kept wide by the sidebar's opening animation when the window was tiled at once; the animation no longer runs on
-    opening, and the rail's icons have their section's name as a tooltip. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    opening, and the rail's icons have their section's name as a tooltip.
+    **Search no longer freezes the desktop while typing**: its file index (used where lord.fs.search isn't there)
+    listed up to 40 home folders per turn of the main loop, each read on the main thread and sorted by name, so one
+    huge folder (a node_modules) stopped the desktop for seconds (12.8 s on the maintainer's machine, caught by the
+    watchdog inside the sort). It now reads one folder at a time with fs.listAsync (lord-server's file thread),
+    unsorted, skips hidden entries and folders such as node_modules, keeps at most 2000 entries a folder, and folds
+    each name once instead of on every keystroke. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
