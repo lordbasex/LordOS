@@ -658,5 +658,15 @@
   "widgets.video.load": "载入",
   "widgets.video.loading": "正在载入…",
   "widgets.video.noChannels": "该列表中没有频道",
-  "widgets.video.save": "保存"
+  "widgets.video.save": "保存",
+  "widgets.claude.ctx": "上下文",
+  "widgets.claude.five": "5 小时",
+  "widgets.claude.week": "本周",
+  "widgets.claude.fiveShort": "5时",
+  "widgets.claude.weekShort": "周",
+  "widgets.claude.resets": "{t}后重置",
+  "widgets.claude.d": "{d} 天 {h} 小时",
+  "widgets.claude.h": "{h} 小时 {m} 分",
+  "widgets.claude.m": "{m} 分",
+  "widgets.claude.near": "接近上限"
 }

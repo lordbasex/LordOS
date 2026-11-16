@@ -658,5 +658,15 @@
   "widgets.video.load": "Tải",
   "widgets.video.loading": "Đang tải…",
   "widgets.video.noChannels": "Không có kênh trong danh sách",
-  "widgets.video.save": "Lưu"
+  "widgets.video.save": "Lưu",
+  "widgets.claude.ctx": "Ngữ cảnh",
+  "widgets.claude.five": "5 giờ",
+  "widgets.claude.week": "Tuần",
+  "widgets.claude.fiveShort": "5g",
+  "widgets.claude.weekShort": "Tuần",
+  "widgets.claude.resets": "gia hạn sau {t}",
+  "widgets.claude.d": "{d} ng {h} g",
+  "widgets.claude.h": "{h} g {m} ph",
+  "widgets.claude.m": "{m} ph",
+  "widgets.claude.near": "Gần giới hạn"
 }

@@ -665,5 +665,15 @@
   "widgets.video.load": "Yüklə",
   "widgets.video.loading": "Yüklənir…",
   "widgets.video.noChannels": "Siyahıda kanal yoxdur",
-  "widgets.video.save": "Saxla"
+  "widgets.video.save": "Saxla",
+  "widgets.claude.ctx": "Kontekst",
+  "widgets.claude.five": "5 saat",
+  "widgets.claude.week": "Həftə",
+  "widgets.claude.fiveShort": "5s",
+  "widgets.claude.weekShort": "Həf",
+  "widgets.claude.resets": "{t} sonra yenilənir",
+  "widgets.claude.d": "{d} g {h} s",
+  "widgets.claude.h": "{h} s {m} dəq",
+  "widgets.claude.m": "{m} dəq",
+  "widgets.claude.near": "Limitə yaxın"
 }

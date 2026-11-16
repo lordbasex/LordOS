@@ -665,5 +665,15 @@
   "widgets.video.load": "Laden",
   "widgets.video.loading": "Laden…",
   "widgets.video.noChannels": "Geen zenders in die lijst",
-  "widgets.video.save": "Bewaar"
+  "widgets.video.save": "Bewaar",
+  "widgets.claude.ctx": "Context",
+  "widgets.claude.five": "5 uur",
+  "widgets.claude.week": "Week",
+  "widgets.claude.fiveShort": "5u",
+  "widgets.claude.weekShort": "Wk",
+  "widgets.claude.resets": "vernieuwt over {t}",
+  "widgets.claude.d": "{d} d {h} u",
+  "widgets.claude.h": "{h} u {m} min",
+  "widgets.claude.m": "{m} min",
+  "widgets.claude.near": "Dicht bij een limiet"
 }

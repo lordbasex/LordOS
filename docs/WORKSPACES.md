@@ -144,6 +144,12 @@ displays do. Nothing runs per frame, nothing polls.
   its card. Muted by default; pause closes a live stream (no bandwidth, nothing decoding); Reconnecting while a lost
   stream comes back. Small and medium ask a camera for its sub stream where the address says how. The password of an
   address goes to the keyring (`opts` keeps `{ url, user, name }`).
+- **Claude Code** (s, m, l; `sdk/claudewidgetmodel.js`): every session of every account — `~/.claude` and any
+  `~/.claude-*` folder (another account through `CLAUDE_CONFIG_DIR`), the account named from that folder's
+  `.claude.json` (name and plan only). Rings for the context, the plan's 5 hours and the week, with when each renews
+  (small: the context ring and two bars). At 70 % of any of them the card glows amber, at 85 % red, pulsing slowly
+  (a timer only while it glows, no sound). Claude Code reports no daily figure: the 5-hour window is the closest.
+  An account whose status line isn't connected to the Terminal shows its sessions' state only.
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

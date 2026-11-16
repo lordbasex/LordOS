@@ -658,5 +658,15 @@
   "widgets.video.load": "불러오기",
   "widgets.video.loading": "불러오는 중…",
   "widgets.video.noChannels": "이 목록에 채널이 없습니다",
-  "widgets.video.save": "저장"
+  "widgets.video.save": "저장",
+  "widgets.claude.ctx": "컨텍스트",
+  "widgets.claude.five": "5시간",
+  "widgets.claude.week": "주",
+  "widgets.claude.fiveShort": "5시간",
+  "widgets.claude.weekShort": "주",
+  "widgets.claude.resets": "{t} 후 갱신",
+  "widgets.claude.d": "{d}일 {h}시간",
+  "widgets.claude.h": "{h}시간 {m}분",
+  "widgets.claude.m": "{m}분",
+  "widgets.claude.near": "한도에 가까움"
 }

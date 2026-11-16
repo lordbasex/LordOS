@@ -658,5 +658,15 @@
   "widgets.video.load": "Muat",
   "widgets.video.loading": "Memuat…",
   "widgets.video.noChannels": "Tidak ada saluran di daftar itu",
-  "widgets.video.save": "Simpan"
+  "widgets.video.save": "Simpan",
+  "widgets.claude.ctx": "Konteks",
+  "widgets.claude.five": "5 jam",
+  "widgets.claude.week": "Minggu",
+  "widgets.claude.fiveShort": "5j",
+  "widgets.claude.weekShort": "Mgg",
+  "widgets.claude.resets": "diperbarui dalam {t}",
+  "widgets.claude.d": "{d} h {h} j",
+  "widgets.claude.h": "{h} j {m} mnt",
+  "widgets.claude.m": "{m} mnt",
+  "widgets.claude.near": "Dekat batas"
 }

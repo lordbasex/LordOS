@@ -665,5 +665,15 @@
   "widgets.video.load": "Betöltés",
   "widgets.video.loading": "Betöltés…",
   "widgets.video.noChannels": "Nincs csatorna a listán",
-  "widgets.video.save": "Mentés"
+  "widgets.video.save": "Mentés",
+  "widgets.claude.ctx": "Kontextus",
+  "widgets.claude.five": "5 óra",
+  "widgets.claude.week": "Hét",
+  "widgets.claude.fiveShort": "5ó",
+  "widgets.claude.weekShort": "Hét",
+  "widgets.claude.resets": "megújul: {t}",
+  "widgets.claude.d": "{d} n {h} ó",
+  "widgets.claude.h": "{h} ó {m} perc",
+  "widgets.claude.m": "{m} perc",
+  "widgets.claude.near": "Közel egy korláthoz"
 }

@@ -665,5 +665,15 @@
   "widgets.video.load": "Charger",
   "widgets.video.loading": "Chargement…",
   "widgets.video.noChannels": "Aucune chaîne dans cette liste",
-  "widgets.video.save": "Enregistrer"
+  "widgets.video.save": "Enregistrer",
+  "widgets.claude.ctx": "Contexte",
+  "widgets.claude.five": "5 heures",
+  "widgets.claude.week": "Semaine",
+  "widgets.claude.fiveShort": "5h",
+  "widgets.claude.weekShort": "Sem",
+  "widgets.claude.resets": "renouvelé dans {t}",
+  "widgets.claude.d": "{d} j {h} h",
+  "widgets.claude.h": "{h} h {m} min",
+  "widgets.claude.m": "{m} min",
+  "widgets.claude.near": "Proche d'une limite"
 }

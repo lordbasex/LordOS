@@ -665,5 +665,15 @@
   "widgets.video.load": "Yükle",
   "widgets.video.loading": "Yükleniyor…",
   "widgets.video.noChannels": "Listede kanal yok",
-  "widgets.video.save": "Kaydet"
+  "widgets.video.save": "Kaydet",
+  "widgets.claude.ctx": "Bağlam",
+  "widgets.claude.five": "5 saat",
+  "widgets.claude.week": "Hafta",
+  "widgets.claude.fiveShort": "5s",
+  "widgets.claude.weekShort": "Hf",
+  "widgets.claude.resets": "{t} sonra yenilenir",
+  "widgets.claude.d": "{d} g {h} s",
+  "widgets.claude.h": "{h} s {m} dk",
+  "widgets.claude.m": "{m} dk",
+  "widgets.claude.near": "Bir sınıra yakın"
 }

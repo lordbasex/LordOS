@@ -658,5 +658,15 @@
   "widgets.video.load": "読み込む",
   "widgets.video.loading": "読み込み中…",
   "widgets.video.noChannels": "このリストにチャンネルはありません",
-  "widgets.video.save": "保存"
+  "widgets.video.save": "保存",
+  "widgets.claude.ctx": "コンテキスト",
+  "widgets.claude.five": "5 時間",
+  "widgets.claude.week": "週",
+  "widgets.claude.fiveShort": "5時間",
+  "widgets.claude.weekShort": "週",
+  "widgets.claude.resets": "{t}後に更新",
+  "widgets.claude.d": "{d}日 {h}時間",
+  "widgets.claude.h": "{h}時間 {m}分",
+  "widgets.claude.m": "{m}分",
+  "widgets.claude.near": "上限に近づいています"
 }

@@ -665,5 +665,15 @@
   "widgets.video.load": "लोड करें",
   "widgets.video.loading": "लोड हो रहा है…",
   "widgets.video.noChannels": "इस सूची में कोई चैनल नहीं",
-  "widgets.video.save": "सहेजें"
+  "widgets.video.save": "सहेजें",
+  "widgets.claude.ctx": "संदर्भ",
+  "widgets.claude.five": "5 घंटे",
+  "widgets.claude.week": "सप्ताह",
+  "widgets.claude.fiveShort": "5घं",
+  "widgets.claude.weekShort": "सप्ता",
+  "widgets.claude.resets": "{t} में नवीनीकरण",
+  "widgets.claude.d": "{d} दि {h} घं",
+  "widgets.claude.h": "{h} घं {m} मि",
+  "widgets.claude.m": "{m} मि",
+  "widgets.claude.near": "सीमा के पास"
 }

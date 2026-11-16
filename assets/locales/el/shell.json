@@ -665,5 +665,15 @@
   "widgets.video.load": "Φόρτωση",
   "widgets.video.loading": "Φόρτωση…",
   "widgets.video.noChannels": "Δεν υπάρχουν κανάλια στη λίστα",
-  "widgets.video.save": "Αποθήκευση"
+  "widgets.video.save": "Αποθήκευση",
+  "widgets.claude.ctx": "Πλαίσιο",
+  "widgets.claude.five": "5 ώρες",
+  "widgets.claude.week": "Εβδομάδα",
+  "widgets.claude.fiveShort": "5ώ",
+  "widgets.claude.weekShort": "Εβδ",
+  "widgets.claude.resets": "ανανεώνεται σε {t}",
+  "widgets.claude.d": "{d} ημ {h} ώ",
+  "widgets.claude.h": "{h} ώ {m} λ",
+  "widgets.claude.m": "{m} λ",
+  "widgets.claude.near": "Κοντά σε όριο"
 }

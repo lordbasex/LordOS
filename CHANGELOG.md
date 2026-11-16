@@ -107,7 +107,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     still has no network. A password in an address goes to the keyring, never settings.json. The sandbox's Landlock
     rules now work for single files too (a file got directory rights and the kernel refused the rule: files such as
     /etc/ld.so.cache in the helpers' lists were never readable). Tests: `streamurl-test` (39), `stream_model_test`,
-    `sandbox-test helper-net`, and `lordstream-e2e` against local FFmpeg servers for each protocol. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    `sandbox-test helper-net`, and `lordstream-e2e` against local FFmpeg servers for each protocol.
+    **Claude Code widget**: rings for the context, the 5-hour window and the week, with the time until each renews, the
+    model, the state and the account (each `~/.claude*` folder is an account: name and plan from its .claude.json); a
+    slow amber or red glow near a limit (70 % / 85 %), without sound. The large one lists the sessions and each
+    account's limits. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

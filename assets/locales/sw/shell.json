@@ -665,5 +665,15 @@
   "widgets.video.load": "Pakia",
   "widgets.video.loading": "Inapakia…",
   "widgets.video.noChannels": "Hakuna chaneli kwenye orodha hiyo",
-  "widgets.video.save": "Hifadhi"
+  "widgets.video.save": "Hifadhi",
+  "widgets.claude.ctx": "Muktadha",
+  "widgets.claude.five": "Saa 5",
+  "widgets.claude.week": "Wiki",
+  "widgets.claude.fiveShort": "5s",
+  "widgets.claude.weekShort": "Wiki",
+  "widgets.claude.resets": "inaanza upya baada ya {t}",
+  "widgets.claude.d": "{d} s {h} s",
+  "widgets.claude.h": "{h} s {m} dk",
+  "widgets.claude.m": "{m} dk",
+  "widgets.claude.near": "Karibu na kikomo"
 }

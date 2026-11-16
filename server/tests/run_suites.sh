@@ -271,6 +271,7 @@ EOF
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
+    if have node; then run "claude-widget-model-test (sdk/claudewidgetmodel.js)" node tests/claude_widget_model_test.mjs; else skip "claude-widget-model-test" node; fi
     if have node; then run "stream-model-test (sdk/streammodel.js)" node tests/stream_model_test.mjs; else skip "stream-model-test" node; fi
     # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
     if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi

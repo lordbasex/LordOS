@@ -665,5 +665,15 @@
   "widgets.video.load": "لوڈ کریں",
   "widgets.video.loading": "لوڈ ہو رہا ہے…",
   "widgets.video.noChannels": "اس فہرست میں چینل نہیں",
-  "widgets.video.save": "محفوظ کریں"
+  "widgets.video.save": "محفوظ کریں",
+  "widgets.claude.ctx": "سیاق",
+  "widgets.claude.five": "5 گھنٹے",
+  "widgets.claude.week": "ہفتہ",
+  "widgets.claude.fiveShort": "5گ",
+  "widgets.claude.weekShort": "ہفتہ",
+  "widgets.claude.resets": "{t} میں تجدید",
+  "widgets.claude.d": "{d} د {h} گ",
+  "widgets.claude.h": "{h} گ {m} منٹ",
+  "widgets.claude.m": "{m} منٹ",
+  "widgets.claude.near": "حد کے قریب"
 }

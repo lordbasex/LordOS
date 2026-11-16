@@ -665,5 +665,15 @@
   "widgets.video.load": "লোড",
   "widgets.video.loading": "লোড হচ্ছে…",
   "widgets.video.noChannels": "এই তালিকায় কোনো চ্যানেল নেই",
-  "widgets.video.save": "সংরক্ষণ"
+  "widgets.video.save": "সংরক্ষণ",
+  "widgets.claude.ctx": "প্রসঙ্গ",
+  "widgets.claude.five": "৫ ঘণ্টা",
+  "widgets.claude.week": "সপ্তাহ",
+  "widgets.claude.fiveShort": "৫ঘ",
+  "widgets.claude.weekShort": "সপ্তা",
+  "widgets.claude.resets": "{t} পরে নবায়ন",
+  "widgets.claude.d": "{d} দি {h} ঘ",
+  "widgets.claude.h": "{h} ঘ {m} মি",
+  "widgets.claude.m": "{m} মি",
+  "widgets.claude.near": "সীমার কাছে"
 }

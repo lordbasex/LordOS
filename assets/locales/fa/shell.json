@@ -665,5 +665,15 @@
   "widgets.video.load": "بارگذاری",
   "widgets.video.loading": "در حال بارگذاری…",
   "widgets.video.noChannels": "کانالی در این فهرست نیست",
-  "widgets.video.save": "ذخیره"
+  "widgets.video.save": "ذخیره",
+  "widgets.claude.ctx": "زمینه",
+  "widgets.claude.five": "۵ ساعت",
+  "widgets.claude.week": "هفته",
+  "widgets.claude.fiveShort": "۵س",
+  "widgets.claude.weekShort": "هفته",
+  "widgets.claude.resets": "تمدید در {t}",
+  "widgets.claude.d": "{d} ر {h} س",
+  "widgets.claude.h": "{h} س {m} د",
+  "widgets.claude.m": "{m} د",
+  "widgets.claude.near": "نزدیک به سقف"
 }

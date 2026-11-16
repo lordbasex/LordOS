@@ -40,6 +40,7 @@ import { wifiBars } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER } from './widgetgrid.js';
 import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
 import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
+import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewidgetmodel.js';
 import { admin } from './admin.js';
 import { clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swReset, swElapsed } from './alarms.js';
 import { recent as fsRecent, basename } from './fs.js';
@@ -748,51 +749,142 @@ function ClipboardBody({ w, L }) {
   );
 }
 
-// ---- Claude Code ----
+// ---- Claude Code: every session of every account (~/.claude and ~/.claude-* folders), its context and the plan's limits ----
 const readJson = (path) => { try { const v = JSON.parse(lord.fs.read(path)); return v && typeof v === 'object' ? v : null; } catch (e) { return null; } };
-function claudeSessions() {
-  const home = lord.fs.home();
-  let names = [];
-  try { names = lord.fs.list(`${home}/.claude/sessions`).map((e) => e.name).filter((n) => /^\d{1,9}\.json$/.test(n)).slice(0, 16); } catch (e) { return []; }
-  return names.map((n) => {
-    const d = readJson(`${home}/.claude/sessions/${n}`);
-    const id = d && /^[A-Za-z0-9-]{1,64}$/.test(String(d.sessionId || '')) ? d.sessionId : null;
-    if (!id) return null;
-    const st = readJson(`${home}/.cache/lordos/claude/${id}.json`);
-    const ctx = st && st.session_id === id ? Math.round(+st.context_window?.used_percentage) : NaN;
-    const dir = st && typeof st.workspace?.current_dir === 'string' ? st.workspace.current_dir : typeof d.cwd === 'string' ? d.cwd : '';
-    return { id, state: d.status === 'busy' ? 'working' : d.status === 'idle' ? 'waiting' : '', ctx: Number.isFinite(ctx) ? ctx : null,
-      model: typeof st?.model?.display_name === 'string' ? st.model.display_name.slice(0, 24) : '', dir: dir.split('/').filter(Boolean).pop() || '' };
-  }).filter(Boolean);
+const pctOf = (v) => (v == null || v === '' || !Number.isFinite(+v) ? null : Math.max(0, Math.min(100, Math.round(+v))));
+function limitOf(x, now) {
+  const p = pctOf(x?.used_percentage);
+  if (p == null) return null;
+  const at = Number.isFinite(+x.resets_at) && +x.resets_at > 0 ? +x.resets_at * 1000 : null;
+  return at != null && at <= now ? null : { pct: p, resetsAt: at };
+}
+// the accounts' names and plans: their .claude.json, read once a minute
+let claudeAccounts = { at: 0, map: {} };
+function accountsFor(home, dirs) {
+  if (Date.now() - claudeAccounts.at < 60000) return claudeAccounts.map;
+  const map = {};
+  for (const d of dirs) {
+    let text = null;
+    try { text = lord.fs.read(d === '.claude' ? `${home}/.claude.json` : `${home}/${d}/.claude.json`); } catch (e) { text = null; }
+    const a = text ? accountOf(text) : null;
+    if (a) map[d] = a;
+  }
+  claudeAccounts = { at: Date.now(), map };
+  return map;
+}
+function claudeData() {
+  const home = lord.fs.home(), now = Date.now();
+  let dirs = ['.claude'];
+  try { dirs = configDirs(lord.fs.list(home).filter((e) => e.dir).map((e) => e.name)); } catch (e) { /* the default only */ }
+  const out = [];
+  for (const dir of dirs) {
+    let names = [];
+    try { names = lord.fs.list(`${home}/${dir}/sessions`).map((e) => e.name).filter((n) => /^\d{1,9}\.json$/.test(n)).slice(0, 16); } catch (e) { continue; }
+    for (const n of names) {
+      const d = readJson(`${home}/${dir}/sessions/${n}`);
+      const id = d && /^[A-Za-z0-9-]{1,64}$/.test(String(d.sessionId || '')) ? d.sessionId : null;
+      if (!id) continue;
+      const st = readJson(`${home}/.cache/lordos/claude/${id}.json`);
+      const mine = st && st.session_id === id;
+      const cwd = mine && typeof st.workspace?.current_dir === 'string' ? st.workspace.current_dir : typeof d.cwd === 'string' ? d.cwd : '';
+      out.push({ id, dir, state: d.status === 'busy' ? 'working' : d.status === 'idle' ? 'waiting' : '', ctx: mine ? pctOf(st.context_window?.used_percentage) : null,
+        model: mine && typeof st.model?.display_name === 'string' ? st.model.display_name.slice(0, 24) : '', cwd: cwd.split('/').filter(Boolean).pop() || '',
+        five: mine ? limitOf(st.rate_limits?.five_hour, now) : null, week: mine ? limitOf(st.rate_limits?.seven_day, now) : null,
+        at: +d.statusUpdatedAt || +d.updatedAt || 0 });
+    }
+  }
+  return summarize(out, accountsFor(home, dirs));
+}
+// a slow glow while a limit is near: a timer only then (900 ms), none otherwise
+function AlertGlow({ level }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => { if (!level) return undefined; const id = setInterval(() => setOn((x) => !x), 900); return () => clearInterval(id); }, [level]);
+  if (!level) return null;
+  const c = level === 'high' ? '#ff453a' : '#ffb020';
+  return <View style={{ position: 'absolute', left: -15, top: -13, right: -15, bottom: -14, borderRadius: 22, border: `2px solid ${c}`,
+    boxShadow: on ? `0 0 22px ${c}` : `0 0 6px ${c}`, opacity: on ? 1 : 0.55, pointerEvents: 'none' }} />;
+}
+function Gauge({ L, size, pct, label, sub }) {
+  const v = (pct ?? 0) / 100;
+  return (
+    <View style={{ alignItems: 'center', gap: 2, minWidth: 0 }}>
+      <TickRing L={L} size={size} value={v} color={toneOf(L, v)} ticks={size >= 90 ? 48 : 36}>
+        <Text style={{ fontSize: size >= 90 ? 19 : size >= 70 ? 15 : 13, fontWeight: 650, color: L.text }}>{pct != null ? `${pct}%` : '–'}</Text>
+      </TickRing>
+      {label ? <Text style={{ fontSize: 11, fontWeight: 600, color: L.text, whiteSpace: 'nowrap' }}>{label}</Text> : null}
+      {sub ? <Text style={{ fontSize: 10, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: size + 30 }}>{sub}</Text> : null}
+    </View>
+  );
 }
 function ClaudeBody({ w, L }) {
-  const list = useEvery(claudeSessions, 3000) || [];
+  const data = useEvery(claudeData, 3000) || { sessions: [], accounts: [] };
+  const list = data.sessions;
   const dot = (s) => (s === 'working' ? L.warn : s === 'waiting' ? L.ok : L.faint);
   const stateText = (s) => t(s === 'working' ? 'shell.widgets.claude.working' : s === 'waiting' ? 'shell.widgets.claude.waiting' : 'shell.widgets.claude.idle');
   if (!list.length) return <View style={{ flex: 1 }}><Head L={L} title="Claude Code" /><Quiet L={L} text={t('shell.widgets.claude.none')} /></View>;
+  const c = list[0];
+  const acc = data.accounts.find((a) => a.dir === c.dir) || {};
+  const five = acc.five || c.five, week = acc.week || c.week, now = Date.now();
+  const alert = alertOf({ ctx: c.ctx, five, week });
+  const left = (l) => (l?.resetsAt ? t('shell.widgets.claude.resets', { t: leftText(l.resetsAt - now, t) }) : '');
+  const who = acc.account ? `${acc.account.name}${acc.account.plan ? ` · ${acc.account.plan}` : ''}` : c.dir === '.claude' ? '' : c.dir.replace(/^\.claude-/, '');
+  const stateRow = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dot(c.state) }} />
+      <Text style={{ fontSize: 11, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{[stateText(c.state), c.model].filter(Boolean).join(' · ')}</Text>
+    </View>
+  );
   if (w.size === 's') {
-    const c = list[0];
+    const mini = (lab, l) => (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'stretch' }}>
+        <Text style={{ width: 28, fontSize: 10, fontWeight: 600, color: L.dim, textAlign: 'start' }}>{lab}</Text>
+        <View style={{ flex: 1 }}><Bar L={L} value={(l?.pct ?? 0) / 100} color={toneOf(L, (l?.pct ?? 0) / 100)} /></View>
+        <Text style={{ width: 30, fontSize: 10.5, fontWeight: 650, color: L.text, textAlign: 'end' }}>{l?.pct != null ? `${l.pct}%` : '–'}</Text>
+      </View>
+    );
     return (
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Head L={L} title="Claude Code" right={list.length > 1 ? `+${list.length - 1}` : ''} />
-        <TickRing L={L} size={80} value={(c.ctx || 0) / 100} color={toneOf(L, (c.ctx || 0) / 100)}><Text style={{ fontSize: 16, fontWeight: 650, color: L.text }}>{c.ctx != null ? `${c.ctx}%` : '–'}</Text></TickRing>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}><View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dot(c.state) }} /><Sub L={L}>{stateText(c.state)}</Sub></View>
+      <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+        <AlertGlow level={alert} />
+        <Gauge L={L} size={66} pct={c.ctx} />
+        {stateRow}
+        {mini(t('shell.widgets.claude.fiveShort'), five)}
+        {mini(t('shell.widgets.claude.weekShort'), week)}
       </View>
     );
   }
+  const big = w.size === 'l' ? 88 : 66;
+  const gauges = (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-start' }}>
+      <Gauge L={L} size={big} pct={c.ctx} label={t('shell.widgets.claude.ctx')} sub={c.cwd} />
+      <Gauge L={L} size={big} pct={five?.pct ?? null} label={t('shell.widgets.claude.five')} sub={left(five)} />
+      <Gauge L={L} size={big} pct={week?.pct ?? null} label={t('shell.widgets.claude.week')} sub={left(week)} />
+    </View>
+  );
   return (
     <View style={{ flex: 1, gap: 6 }}>
-      <Head L={L} title="Claude Code" />
-      {list.slice(0, w.size === 'l' ? 5 : 2).map((c) => (
-        <View key={c.id} style={{ gap: 3 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot(c.state) }} />
-            <Text style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.dir || c.model || 'Claude'}</Text>
-            <Text style={{ fontSize: 11.5, color: L.dim }}>{stateText(c.state)}</Text>
-          </View>
-          {c.ctx != null ? <Bar L={L} value={c.ctx / 100} color={toneOf(L, c.ctx / 100)} /> : null}
+      <AlertGlow level={alert} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ fontSize: 12, fontWeight: 650, color: L.dim }}>Claude Code</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>{stateRow}</View>
+        {who ? <Text style={{ fontSize: 11, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 130 }}>{who}</Text> : null}
+      </View>
+      {alert ? <Text style={{ fontSize: 11, fontWeight: 650, color: alert === 'high' ? L.crit : L.warn, textAlign: 'start' }}>{t('shell.widgets.claude.near')}</Text> : null}
+      {gauges}
+      {w.size === 'l' ? (
+        <View style={{ gap: 4, marginTop: 4 }}>
+          {list.slice(0, 4).map((x) => (
+            <View key={x.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dot(x.state) }} />
+              <Text style={{ flex: 1, fontSize: 11.5, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{x.cwd || x.model || 'Claude'}</Text>
+              {data.accounts.length > 1 ? <Text style={{ fontSize: 10.5, color: L.dim }}>{(data.accounts.find((a) => a.dir === x.dir)?.account?.name) || x.dir.replace(/^\.claude-?/, '') || '·'}</Text> : null}
+              <Text style={{ width: 36, fontSize: 11, fontWeight: 650, color: x.ctx != null ? toneOf(L, x.ctx / 100) : L.dim, textAlign: 'end' }}>{x.ctx != null ? `${x.ctx}%` : '–'}</Text>
+            </View>
+          ))}
+          {data.accounts.length > 1 ? data.accounts.map((a) => (
+            <Text key={a.dir} style={{ fontSize: 10.5, color: L.dim, textAlign: 'start' }}>{`${a.account?.name || a.dir} · ${t('shell.widgets.claude.weekShort')} ${a.week?.pct != null ? `${a.week.pct}%` : '–'} · ${t('shell.widgets.claude.fiveShort')} ${a.five?.pct != null ? `${a.five.pct}%` : '–'}`}</Text>
+          )) : null}
         </View>
-      ))}
+      ) : null}
     </View>
   );
 }

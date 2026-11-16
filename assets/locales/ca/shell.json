@@ -665,5 +665,15 @@
   "widgets.video.load": "Carrega",
   "widgets.video.loading": "S'està carregant…",
   "widgets.video.noChannels": "No hi ha canals en aquesta llista",
-  "widgets.video.save": "Desa"
+  "widgets.video.save": "Desa",
+  "widgets.claude.ctx": "Context",
+  "widgets.claude.five": "5 hores",
+  "widgets.claude.week": "Setmana",
+  "widgets.claude.fiveShort": "5h",
+  "widgets.claude.weekShort": "Set",
+  "widgets.claude.resets": "es renova d'aquí a {t}",
+  "widgets.claude.d": "{d} d {h} h",
+  "widgets.claude.h": "{h} h {m} min",
+  "widgets.claude.m": "{m} min",
+  "widgets.claude.near": "A prop d'un límit"
 }

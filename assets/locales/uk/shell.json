@@ -672,5 +672,15 @@
   "widgets.video.load": "Завантажити",
   "widgets.video.loading": "Завантаження…",
   "widgets.video.noChannels": "У цьому списку немає каналів",
-  "widgets.video.save": "Зберегти"
+  "widgets.video.save": "Зберегти",
+  "widgets.claude.ctx": "Контекст",
+  "widgets.claude.five": "5 годин",
+  "widgets.claude.week": "Тиждень",
+  "widgets.claude.fiveShort": "5г",
+  "widgets.claude.weekShort": "Тиж",
+  "widgets.claude.resets": "оновиться через {t}",
+  "widgets.claude.d": "{d} д {h} г",
+  "widgets.claude.h": "{h} г {m} хв",
+  "widgets.claude.m": "{m} хв",
+  "widgets.claude.near": "Близько до ліміту"
 }

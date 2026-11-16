@@ -665,5 +665,15 @@
   "widgets.video.load": "Зареждане",
   "widgets.video.loading": "Зарежда се…",
   "widgets.video.noChannels": "Няма канали в този списък",
-  "widgets.video.save": "Запазване"
+  "widgets.video.save": "Запазване",
+  "widgets.claude.ctx": "Контекст",
+  "widgets.claude.five": "5 часа",
+  "widgets.claude.week": "Седмица",
+  "widgets.claude.fiveShort": "5ч",
+  "widgets.claude.weekShort": "Седм",
+  "widgets.claude.resets": "подновява се след {t}",
+  "widgets.claude.d": "{d} д {h} ч",
+  "widgets.claude.h": "{h} ч {m} мин",
+  "widgets.claude.m": "{m} мин",
+  "widgets.claude.near": "Близо до лимит"
 }

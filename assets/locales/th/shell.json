@@ -658,5 +658,15 @@
   "widgets.video.load": "โหลด",
   "widgets.video.loading": "กำลังโหลด…",
   "widgets.video.noChannels": "ไม่มีช่องในรายการนี้",
-  "widgets.video.save": "บันทึก"
+  "widgets.video.save": "บันทึก",
+  "widgets.claude.ctx": "บริบท",
+  "widgets.claude.five": "5 ชั่วโมง",
+  "widgets.claude.week": "สัปดาห์",
+  "widgets.claude.fiveShort": "5 ชม.",
+  "widgets.claude.weekShort": "สัปดาห์",
+  "widgets.claude.resets": "ต่ออายุใน {t}",
+  "widgets.claude.d": "{d} วัน {h} ชม.",
+  "widgets.claude.h": "{h} ชม. {m} นาที",
+  "widgets.claude.m": "{m} นาที",
+  "widgets.claude.near": "ใกล้ถึงขีดจำกัด"
 }

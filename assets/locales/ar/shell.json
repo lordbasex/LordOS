@@ -693,5 +693,15 @@
   "widgets.video.load": "تحميل",
   "widgets.video.loading": "جارٍ التحميل…",
   "widgets.video.noChannels": "لا قنوات في هذه القائمة",
-  "widgets.video.save": "حفظ"
+  "widgets.video.save": "حفظ",
+  "widgets.claude.ctx": "السياق",
+  "widgets.claude.five": "5 ساعات",
+  "widgets.claude.week": "الأسبوع",
+  "widgets.claude.fiveShort": "5س",
+  "widgets.claude.weekShort": "أسب",
+  "widgets.claude.resets": "يتجدد خلال {t}",
+  "widgets.claude.d": "{d} ي {h} س",
+  "widgets.claude.h": "{h} س {m} د",
+  "widgets.claude.m": "{m} د",
+  "widgets.claude.near": "قريب من حدّ"
 }

@@ -665,5 +665,15 @@
   "widgets.video.load": "I-load",
   "widgets.video.loading": "Naglo-load…",
   "widgets.video.noChannels": "Walang channel sa list na iyon",
-  "widgets.video.save": "I-save"
+  "widgets.video.save": "I-save",
+  "widgets.claude.ctx": "Konteksto",
+  "widgets.claude.five": "5 oras",
+  "widgets.claude.week": "Linggo",
+  "widgets.claude.fiveShort": "5o",
+  "widgets.claude.weekShort": "Lgo",
+  "widgets.claude.resets": "magre-renew sa {t}",
+  "widgets.claude.d": "{d} a {h} o",
+  "widgets.claude.h": "{h} o {m} min",
+  "widgets.claude.m": "{m} min",
+  "widgets.claude.near": "Malapit sa limit"
 }

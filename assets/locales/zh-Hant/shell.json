@@ -658,5 +658,15 @@
   "widgets.video.load": "載入",
   "widgets.video.loading": "正在載入…",
   "widgets.video.noChannels": "此清單中沒有頻道",
-  "widgets.video.save": "儲存"
+  "widgets.video.save": "儲存",
+  "widgets.claude.ctx": "上下文",
+  "widgets.claude.five": "5 小時",
+  "widgets.claude.week": "本週",
+  "widgets.claude.fiveShort": "5時",
+  "widgets.claude.weekShort": "週",
+  "widgets.claude.resets": "{t}後重設",
+  "widgets.claude.d": "{d} 天 {h} 小時",
+  "widgets.claude.h": "{h} 小時 {m} 分",
+  "widgets.claude.m": "{m} 分",
+  "widgets.claude.near": "接近上限"
 }

@@ -672,5 +672,15 @@
   "widgets.video.load": "Încarcă",
   "widgets.video.loading": "Se încarcă…",
   "widgets.video.noChannels": "Niciun canal în lista aceea",
-  "widgets.video.save": "Salvează"
+  "widgets.video.save": "Salvează",
+  "widgets.claude.ctx": "Context",
+  "widgets.claude.five": "5 ore",
+  "widgets.claude.week": "Săptămână",
+  "widgets.claude.fiveShort": "5h",
+  "widgets.claude.weekShort": "Săpt",
+  "widgets.claude.resets": "se reînnoiește în {t}",
+  "widgets.claude.d": "{d} z {h} h",
+  "widgets.claude.h": "{h} h {m} min",
+  "widgets.claude.m": "{m} min",
+  "widgets.claude.near": "Aproape de o limită"
 }
