@@ -201,14 +201,28 @@ export function foldMissing(saved, connected, mainKey) {
 // swap). prev: the stacks of the last pass ([[ids]], the shown one last); live: the display's windows in their order
 // (shown and minimized); isMin(id); back: ids just brought back from minimized. A minimized window the tiler never
 // placed gets no slot. Returns { stacks, swapOut } (swapOut: windows to minimize).
-export function slotStacks(prev, live, isMin, back = new Set()) {
+// min: the layout's slots, kept even empty (Two halves always shows two: an empty one is a free space); max: at most that
+// many (One at a time: one slot, the others minimized behind the window shown).
+export const SLOTS = { single: [1, 1], halves: [2, Infinity], three: [3, Infinity], split: [2, Infinity], grid: [0, Infinity] };
+export const slotLimits = (layout) => SLOTS[layout] || [0, Infinity];
+// empty slots beyond `min` go, from the end (a slot left by a window that moved away)
+export function trimSlots(stacks, min) {
+  const out = [...stacks];
+  for (let i = out.length - 1; i >= 0 && out.length > min; i--) if (!out[i].length) out.splice(i, 1);
+  return out;
+}
+export function slotStacks(prev, live, isMin, back = new Set(), { min = 0, max = Infinity } = {}) {
   const here = new Set(live);
-  const stacks = (prev || []).map((s) => s.filter((id) => here.has(id))).filter((s) => s.length);
+  let stacks = (prev || []).map((s) => s.filter((id) => here.has(id)));
+  // empty slots beyond the layout's own count go (from the end), and slots beyond its maximum join the last one
+  stacks = trimSlots(stacks, min);
+  while (stacks.length > Math.max(1, max)) { const extra = stacks.pop(); stacks[stacks.length - 1].unshift(...extra); }
+  while (stacks.length < min) stacks.push([]);
   const placed = new Set(stacks.flat());
   for (const id of live) {
     if (placed.has(id) || isMin(id)) continue;
     const free = stacks.find((s) => s.every(isMin));
-    if (free) free.push(id); else stacks.push([id]);
+    if (free) free.push(id); else if (stacks.length >= max) stacks[stacks.length - 1].push(id); else stacks.push([id]);
     placed.add(id);
   }
   const swapOut = [];
@@ -220,7 +234,8 @@ export function slotStacks(prev, live, isMin, back = new Set()) {
     s.splice(s.indexOf(keep), 1);
     s.push(keep);
   }
-  return { stacks: stacks.filter((s) => s.length), swapOut };
+  stacks = stacks.filter((st, i) => st.length || i < min);
+  return { stacks, swapOut };
 }
 // the window a slot shows (its last one, if not minimized), or null for a free slot
 export const shownIn = (stack, isMin) => (stack.length && !isMin(stack[stack.length - 1]) ? stack[stack.length - 1] : null);
@@ -237,7 +252,7 @@ export function dropInto(stacks, id, at, isMin = () => false) {
   if (free) {
     if (src >= 0) out[src] = out[src].filter((x) => x !== id);
     out[at].push(id);
-    return out.filter((s) => s.length);
+    return out;
   }
   if (src >= 0) {
     if (at === src || at < 0 || at >= out.length) return out;

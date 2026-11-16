@@ -206,6 +206,8 @@ await flush();
 {
   const label = sdk.t('shell.ws.minimized.label');
   const trays = () => [...texts].filter(([id, v]) => v === label && attached(id) && ![parents.get(id), parents.get(parents.get(id))].some((p) => styles.get(p)?.display === 'none')).map(([id]) => id);
+  tiler.setLayout(desk, 'HDMI-A-1', 'free');   // One at a time would minimize the store window behind it
+  for (let i = 0; i < 2; i++) await flush();
   const m1 = sdk.wm.open('extra40', { frame: { x: R.x + 300, y: 300, w: 500, h: 400 } });
   await flush();
   const f1 = frameOf(m1);
@@ -222,6 +224,7 @@ await flush();
   check('tray: a click brings it back, where it was', [!!sdk.wm.get(m1).minimized, frameOf(m1)], [false, f1]);
   check('tray: empty again', trays().length, 0);
   sdk.wm.close(m1, true);
+  tiler.setLayout(desk, 'HDMI-A-1', 'single');
   await flush();
 }
 
@@ -286,8 +289,8 @@ await flush();
   check('rearrange: dropped on the other half, they swap', [frameOf(p1), frameOf(p2), tiler.isFloating(p1)], [halves[1], halves[0], false]);
   sdk.wm.move(p2, M.x + 300, 300);                   // dragged to the main display (split, three tiles)
   for (let i = 0; i < 3; i++) await flush();
-  check('rearrange: dragged to another display, it joins its tiles', [tiler.isFloating(p2), tiler.tiled.get().counts['DP-2'], tiler.tiled.get().counts['DP-1']], [false, 4, 1]);
-  check('rearrange: the one left fills the display', frameOf(p1), tileRects('halves', plan(L).work, 1, 0.5)[0]);
+  check('rearrange: dragged to another display, it joins its tiles; Two halves keeps its two', [tiler.isFloating(p2), tiler.tiled.get().counts['DP-2'], tiler.tiled.get().counts['DP-1']], [false, 4, 2]);
+  check('rearrange: the one left keeps its half, the other half free', [frameOf(p1), (tiler.tiled.get().holes['DP-1'] || []).length], [halves[1], 1]);
   for (const id of [p1, p2]) sdk.wm.close(id, true);
   tiler.setLayout(desk, 'DP-1', 'free');
   for (let i = 0; i < 3; i++) await flush();
@@ -314,9 +317,9 @@ await flush();
   const halves = tileRects('halves', plan(L).work, 2, 0.5);
   snapT.applyZone(q2, g('thirds'), 2);
   for (let i = 0; i < 4; i++) await flush();
-  const thirds = tileRects('three', plan(L).work, 2, 1 / 3);
-  check('flyout, tiled display: the layout set there, the window in that slot', [tiler.layoutOf(desk, 'DP-1').layout, tiler.tiled.get().counts['DP-1']], ['three', 2]);
-  check('flyout, tiled display: slot 2 of two is the last one', frameOf(q2), thirds[1]);
+  void tileRects;
+  check('flyout, tiled display: the layout set there, its three slots', [tiler.layoutOf(desk, 'DP-1').layout, tiler.tiled.get().counts['DP-1']], ['three', 3]);
+  check('flyout, tiled display: the window in the right third', frameOf(q2), tileRects('three', plan(L).work, 3, 1 / 3)[2]);
   tiler.setLayout(desk, 'DP-1', 'halves');
   for (let i = 0; i < 3; i++) await flush();
   const now2 = [frameOf(q1), frameOf(q2)];
@@ -396,6 +399,30 @@ await flush();
   for (const id of ids) sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();
   check('widgets: all removed', (sdk.settings.get().deskWidgets || []).length, 0);
+}
+
+// Two halves with one window: it takes a half and the other shows free; maximizing goes to One at a time, the others
+// minimized behind it
+{
+  await new Promise((res) => setTimeout(res, 1100));
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const h1 = sdk.wm.open('extra41', { frame: { x: L.x + 300, y: 300, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  const hv = tileRects('halves', plan(L).work, 2, 0.5);
+  check('halves: one window takes a half, the other half free', [frameOf(h1), (tiler.tiled.get().holes['DP-1'] || []).length], [hv[0], 1]);
+  const h2 = sdk.wm.open('extra42', { frame: { x: L.x + 400, y: 300, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('halves: a second window fills the free half', [frameOf(h2), (tiler.tiled.get().holes['DP-1'] || []).length], [hv[1], 0]);
+  sdk.wm.toggleMaximize(h2);
+  for (let i = 0; i < 4; i++) await flush();
+  check('maximize on a tiled display: One at a time, the window shown, the other minimized',
+    [tiler.layoutOf(desk, 'DP-1').layout, frameOf(h2), !!sdk.wm.get(h2).maximized, !!sdk.wm.get(h1).minimized], ['single', plan(L).work, false, true]);
+  sdk.wm.focus(h1);
+  for (let i = 0; i < 3; i++) await flush();
+  check('One at a time: bringing the other back swaps them', [!!sdk.wm.get(h1).minimized, !!sdk.wm.get(h2).minimized, frameOf(h1)], [false, true, plan(L).work]);
+  for (const id of [h1, h2]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 3; i++) await flush();
 }
 
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows

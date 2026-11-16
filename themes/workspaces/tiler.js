@@ -19,7 +19,7 @@
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
 import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
-import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot } from './model/layouts.js';
+import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
@@ -30,7 +30,8 @@ const home = new Map();              // window id → display key
 const order = new Map();             // `${desk}|${dkey}` → the tiles' slots in order: [[window ids]], the shown one last
 const hints = new Map();             // window id → { dk, x, y, t }: where the person dropped it, as the target preview showed
 const slotAsks = new Map();          // window id → { dk, at }: put it in slot `at` of display dk (the layout flyout)
-const lastMin = new Map();           // window id → minimized at the last pass (a window brought back takes its slot again)
+const lastMin = new Map();
+const prefer = new Set();            // windows to show in their slot at the next pass (maximized into One at a time)           // window id → minimized at the last pass (a window brought back takes its slot again)
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
 export const tiled = createStore({ rev: 0, tight: [], counts: {}, holes: {} });
 
@@ -96,13 +97,15 @@ export function slotPreview(desk, d, id, x, y) {
   const { layout, ratio } = layoutOf(desk, dk);
   if (layout === 'free' || isLocked(desk, dk)) return null;
   const live = new Set(windows.get().filter((w) => w.desktop === desk).map((w) => w.id));
-  const stacks = (order.get(`${desk}|${dk}`) || []).map((st) => st.filter((x) => live.has(x))).filter((st) => st.length);
+  const [min] = slotLimits(layout);
+  const stacks = (order.get(`${desk}|${dk}`) || []).map((st) => st.filter((x) => live.has(x))).filter((st, i) => st.length || i < min);
+  while (stacks.length < min) stacks.push([]);
   const isMin = (wid) => !!windows.get().find((w) => w.id === wid)?.minimized;
   const rectsFor = (n) => tileRects(layout, workAreaOf(d), n, ratio) || [];
   const { at } = dropSlot(stacks, id, x, y, rectsFor, isMin);
   if (at < 0) return null;
   // the slots as they will be after the drop (a free slot taken, its own slot gone): the rect it will really get
-  const after = dropInto(stacks, id, at, isMin);
+  const after = trimSlots(dropInto(stacks, id, at, isMin), min);
   const i = after.findIndex((st) => st.includes(id));
   const rects = rectsFor(after.length);
   return i < 0 || !rects[i] ? null : { dk, rect: rects[i] };
@@ -178,8 +181,21 @@ export function retile() {
   for (const id of [...applied.keys()]) if (!live.has(id)) { applied.delete(id); home.delete(id); floating.delete(id); moved.delete(id); }
   for (const id of [...lastMin.keys()]) if (!live.has(id)) lastMin.delete(id);
 
+  // a window maximized on a tiled display: that display goes to One at a time with this window shown, the others
+  // minimized behind it (in its tray), instead of a window over the tiles
+  const toSingle = all.filter((w) => w.desktop === desk && w.maximized && !w.fullscreen && !w.minimized && !w.pip && tileable({ ...w, maximized: false }))
+    .map((w) => ({ w, dk: home.get(w.id) || keyOfDisplay(displayFor(wFrame(w))) }))
+    .filter(({ dk }) => keys.includes(dk) && !['free', 'single'].includes(layoutOf(desk, dk).layout) && !isLocked(desk, dk));
+  if (toSingle.length) {
+    for (const { w, dk } of toSingle) { prefer.add(w.id); floating.delete(w.id); home.set(w.id, dk); setLayout(desk, dk, 'single'); }
+    applying = true;
+    try { windows.set((ws) => ws.map((x) => (toSingle.some((y) => y.w.id === x.id) ? { ...x, maximized: false } : x))); } finally { applying = false; }
+    schedule();
+    return;
+  }
   const groups = new Map(keys.map((k) => [k, []]));
-  const back = new Set();
+  const back = new Set(prefer);
+  prefer.clear();
   const drops = new Map();             // window id → { dk, x, y }: dropped by hand on a tiled display (drag to rearrange)
   for (const w of all) {
     if (w.desktop !== desk) continue;
@@ -205,7 +221,7 @@ export function retile() {
         drops.set(w.id, fresh ? { dk: dkTo, x: fresh.x, y: fresh.y } : { dk: dkTo, x: f.x + f.w / 2, y: f.y + f.h / 2 });
         applied.delete(w.id);
         home.set(w.id, dkTo);
-        for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== `${desk}|${dkTo}`) order.set(ok, st.map((x) => x.filter((id) => id !== w.id)).filter((x) => x.length));
+        for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== `${desk}|${dkTo}`) order.set(ok, st.map((x) => x.filter((id) => id !== w.id)));
       } else { floating.add(w.id); applied.delete(w.id); }
     } else if (how === 'answer') applied.set(w.id, { ...was, got: wFrame(w) });
     // a floating window belongs to the display it is on now (a new layout there takes it back)
@@ -234,6 +250,9 @@ export function retile() {
     const keyOf = (id) => { const w = all.find((x) => x.id === id); return w ? launcherIdOf(w) : ''; };
     const { layout, ratio } = layoutOf(desk, dk);
     const area = workAreaOf(d);
+    const [min, max] = slotLimits(cleanLayout(layout));
+    // the layout's own slots first (a drop or the flyout may aim at one still empty)
+    if (cleanLayout(layout) !== 'free') { prevStacks = [...prevStacks]; while (prevStacks.length < min) prevStacks.push([]); }
     // windows dropped here: into the slot under the drop (a swap within the display, a new slot from another)
     for (const [id, dr] of drops) {
       if (dr.dk !== dk) continue;
@@ -244,13 +263,13 @@ export function retile() {
     for (const [id, ask] of slotAsks) {
       if (ask.dk !== dk) continue;
       slotAsks.delete(id);
-      for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== k) order.set(ok, st.map((x) => x.filter((y) => y !== id)).filter((x) => x.length));
+      for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== k) order.set(ok, st.map((x) => x.filter((y) => y !== id)));
       prevStacks = dropInto(prevStacks, id, ask.at, isMin);
     }
     // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep their slots
     const live = orderFor(ids, keyOf, prevStacks.length ? null : saved[dk]?.apps);
     const freeLayout = cleanLayout(layout) === 'free';
-    const { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back);
+    const { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back, { min, max });
     for (const id of swapOut) toMin.add(id);
     const shownOf = (st) => (st.some((id) => toMin.has(id)) ? st.filter((id) => !toMin.has(id) && !isMin(id)).pop() || null : shownIn(st, isMin));
     order.set(k, stacks);

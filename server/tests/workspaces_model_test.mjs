@@ -283,7 +283,7 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
 // ---- a drop takes a free slot ----
 {
   const isMin = (id) => id === 'm';
-  eq('free slot: a window of the display takes it, its own slot goes', dropInto([['m'], ['mon'], ['ch']], 'ch', 0, isMin), [['m', 'ch'], ['mon']]);
+  eq('free slot: a window of the display takes it, its own slot left empty (trimmed by the layout)', dropInto([['m'], ['mon'], ['ch']], 'ch', 0, isMin), [['m', 'ch'], ['mon'], []]);
   eq('free slot: one from elsewhere takes it too (no new slot)', dropInto([['m'], ['mon']], 'x', 0, isMin), [['m', 'x'], ['mon']]);
   eq('free slot: a shown slot still swaps', dropInto([['m'], ['mon'], ['ch']], 'ch', 1, isMin), [['m'], ['ch'], ['mon']]);
   const A = { x: 0, y: 0, w: 1000, h: 600 };

@@ -213,10 +213,10 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
       {showEmpty ? (
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',
           display: count === 0 && !minimized.length ? 'flex' : 'none' }}>
-          <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, maxWidth: 440, paddingHorizontal: 24, paddingVertical: 20 }}>
+          <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, width: Math.min(560, area.w - 48), paddingHorizontal: 24, paddingVertical: 20 }}>
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.frameText, textAlign: 'center' }}>{tr('shell.ws.empty.title')}</Text>
             <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.empty.body')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 4, alignSelf: 'stretch' }}>
               <View onClick={(e) => onAddWindow(d, e)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent }}>
                 <PlusGlyph color={t.onAccent} size={11} />
                 <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>
