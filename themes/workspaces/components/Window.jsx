@@ -150,6 +150,8 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
       ? { label: tr('shell.ws.window.tile'), onClick: () => setFloating(win.id, false) }
       : { label: tr('shell.ws.window.float'), onClick: () => setFloating(win.id, true) },
     { label: tr('shell.ws.layout.move'), submenu: moveItems(win) },
+    // the layout flyout from the window menu too: for Linux apps that draw their own maximize button (Chrome)
+    ...(locked ? [] : [{ label: tr('shell.ws.snapfly.open'), onClick: () => { const m = menu || win.windowMenu; flyout.set({ id: win.id, x: m ? m.x : win.x + 40, y: m ? m.y : win.y + 40, at: 'point' }); } }]),
     '-',
     ...(extra || []),
     { label: tr('shell.classic.minimize'), onClick: () => wm.minimize(win.id) },

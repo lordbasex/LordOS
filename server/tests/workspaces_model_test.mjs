@@ -7,7 +7,7 @@ import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
 import { cleanThemeMeta, themeOptionValue, themeOptionPatch } from '../../sdk/thememeta.js';
-import { slotStacks, shownIn, dropInto, slotAt } from '../../themes/workspaces/model/layouts.js';
+import { slotStacks, shownIn, dropInto, slotAt, dropSlot } from '../../themes/workspaces/model/layouts.js';
 import { assistFor, follow, other } from '../../themes/workspaces/model/magnet.js';
 import { readFileSync } from 'node:fs';
 
@@ -278,6 +278,19 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
   eq('slotAt: under the point', [slotAt(R2, 150, 50), slotAt(R2, 10, 10)], [1, 0]);
   eq('slotAt: in the gap, the nearest', slotAt(R2, 107, 50), 1);
   eq('slotAt: none', slotAt([], 1, 1), -1);
+}
+
+// ---- a drop takes a free slot ----
+{
+  const isMin = (id) => id === 'm';
+  eq('free slot: a window of the display takes it, its own slot goes', dropInto([['m'], ['mon'], ['ch']], 'ch', 0, isMin), [['m', 'ch'], ['mon']]);
+  eq('free slot: one from elsewhere takes it too (no new slot)', dropInto([['m'], ['mon']], 'x', 0, isMin), [['m', 'x'], ['mon']]);
+  eq('free slot: a shown slot still swaps', dropInto([['m'], ['mon'], ['ch']], 'ch', 1, isMin), [['m'], ['ch'], ['mon']]);
+  const A = { x: 0, y: 0, w: 1000, h: 600 };
+  const rf = (n) => tileRects('halves', A, n, 0.5);
+  eq('dropSlot: over the free slot, that one', dropSlot([['m'], ['mon'], ['ch']], 'ch', 100, 100, rf, isMin), { at: 0, n: 3 });
+  eq('dropSlot: a newcomer over a shown window, a new slot', dropSlot([['a'], ['b']], 'x', 900, 300, rf, isMin).n, 3);
+  eq('dropSlot: a newcomer over the free slot, no new slot', dropSlot([['m'], ['b']], 'x', 100, 300, rf, isMin), { at: 0, n: 2 });
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

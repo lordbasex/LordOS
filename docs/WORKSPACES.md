@@ -75,7 +75,9 @@ displays do. Nothing runs per frame, nothing polls.
   placed it gets no slot.
 - **Drag to rearrange** (`dropInto`, `slotAt`). A tiled window dragged with its size kept (or snapped to an edge) onto
   a display with tiles takes the slot under the drop: on its own display it swaps with the window there; on another
-  display it gets a slot of its own there and leaves its old one. Dropped on a display in Free, it floats there.
+  display it gets a slot of its own there and leaves its old one. Dropped on a free slot (a minimized window's place)
+  it takes that slot and its own goes, so a half stays one half (`dropSlot`); the minimized window waits behind it and
+  comes back by swapping. Dropped on a display in Free, it floats there.
 - **Where a window will land** (`components/SnapTargets.jsx`, Lord Workspaces only). While a window is dragged over a
   tiled display, a glass rectangle shows the slot it will take (`slotPreview`, read from the SDK's `moveGrab` a few
   times a second, one render per change of slot); the drop takes that slot whatever the window's centre (`dropHint`).
@@ -87,7 +89,8 @@ displays do. Nothing runs per frame, nothing polls.
 - **The layout flyout**: resting 0.45 s on a window's maximize button opens halves, thirds, main and side, and quarters
   under it. A click puts the window in that zone: on a free display the SDK's snap zone (a half also wakes the magnet),
   on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
-  and not on Linux apps that draw their own buttons (Chrome).
+  and not on the buttons Linux apps draw themselves (Chrome): for those, **Snap window…** in the window menu (a right
+  click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title
   bar's menu, or until a layout is chosen again for the display it is on now (a floating window belongs to the display
   it is on, wherever it was tiled before). Dialogs, notices and the theme's own panels never tile.

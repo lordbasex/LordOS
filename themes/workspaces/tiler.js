@@ -19,7 +19,7 @@
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
 import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
-import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt } from './model/layouts.js';
+import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
@@ -97,10 +97,15 @@ export function slotPreview(desk, d, id, x, y) {
   if (layout === 'free' || isLocked(desk, dk)) return null;
   const live = new Set(windows.get().filter((w) => w.desktop === desk).map((w) => w.id));
   const stacks = (order.get(`${desk}|${dk}`) || []).map((st) => st.filter((x) => live.has(x))).filter((st) => st.length);
-  const n = stacks.length + (stacks.some((st) => st.includes(id)) ? 0 : 1);
-  const rects = tileRects(layout, workAreaOf(d), n, ratio) || [];
-  const i = slotAt(rects, x, y);
-  return i < 0 ? null : { dk, rect: rects[i] };
+  const isMin = (wid) => !!windows.get().find((w) => w.id === wid)?.minimized;
+  const rectsFor = (n) => tileRects(layout, workAreaOf(d), n, ratio) || [];
+  const { at } = dropSlot(stacks, id, x, y, rectsFor, isMin);
+  if (at < 0) return null;
+  // the slots as they will be after the drop (a free slot taken, its own slot gone): the rect it will really get
+  const after = dropInto(stacks, id, at, isMin);
+  const i = after.findIndex((st) => st.includes(id));
+  const rects = rectsFor(after.length);
+  return i < 0 || !rects[i] ? null : { dk, rect: rects[i] };
 }
 // the drop the preview showed: the tiler uses that point (the pointer), not the window's center
 export function dropHint(id, dk, x, y) { hints.set(id, { dk, x, y, t: Date.now() }); schedule(); }
@@ -232,15 +237,15 @@ export function retile() {
     // windows dropped here: into the slot under the drop (a swap within the display, a new slot from another)
     for (const [id, dr] of drops) {
       if (dr.dk !== dk) continue;
-      const n = prevStacks.length + (prevStacks.some((st) => st.includes(id)) ? 0 : 1);
-      prevStacks = dropInto(prevStacks, id, slotAt(tileRects(layout, area, n, ratio) || [], dr.x, dr.y));
+      const { at } = dropSlot(prevStacks, id, dr.x, dr.y, (n) => tileRects(layout, area, n, ratio) || [], isMin);
+      prevStacks = dropInto(prevStacks, id, at, isMin);
     }
     // asked from the layout flyout: into that slot (from wherever it was)
     for (const [id, ask] of slotAsks) {
       if (ask.dk !== dk) continue;
       slotAsks.delete(id);
       for (const [ok, st] of order) if (ok.startsWith(`${desk}|`) && ok !== k) order.set(ok, st.map((x) => x.filter((y) => y !== id)).filter((x) => x.length));
-      prevStacks = dropInto(prevStacks, id, ask.at);
+      prevStacks = dropInto(prevStacks, id, ask.at, isMin);
     }
     // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep their slots
     const live = orderFor(ids, keyOf, prevStacks.length ? null : saved[dk]?.apps);

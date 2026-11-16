@@ -228,9 +228,17 @@ export const shownIn = (stack, isMin) => (stack.length && !isMin(stack[stack.len
 // A window dropped by hand on a tiled display (0.8.8.10, drag to rearrange): stacks are that display's slots, at the
 // slot under the drop. A window already in them swaps slots with the one there; one from elsewhere gets a slot of its
 // own at that place (the others shift). at: the index of the slot under the drop (slotAt).
-export function dropInto(stacks, id, at) {
+// A free slot (its windows all minimized) under the drop is taken: the window joins that slot (in front of the minimized
+// ones, which come back by swapping) and its own slot goes, so a half stays one half. isMin(id): minimized.
+export function dropInto(stacks, id, at, isMin = () => false) {
   const out = (stacks || []).map((s) => [...s]);
   const src = out.findIndex((s) => s.includes(id));
+  const free = at >= 0 && at < out.length && at !== src && out[at].every(isMin);
+  if (free) {
+    if (src >= 0) out[src] = out[src].filter((x) => x !== id);
+    out[at].push(id);
+    return out.filter((s) => s.length);
+  }
   if (src >= 0) {
     if (at === src || at < 0 || at >= out.length) return out;
     [out[src], out[at]] = [out[at], out[src]];
@@ -238,6 +246,19 @@ export function dropInto(stacks, id, at) {
   }
   out.splice(Math.max(0, Math.min(at, out.length)), 0, [id]);
   return out;
+}
+// The slot a drop at (x, y) takes among `stacks` on a display with that layout and area: a slot already there (a free one
+// to take, or one to swap with), or a new one for a window from elsewhere dropped on a shown window. Returns { at, n }:
+// the index for dropInto and the count of slots to lay out for the preview.
+export function dropSlot(stacks, id, x, y, rectsFor, isMin = () => false) {
+  const n0 = (stacks || []).length;
+  const inHere = (stacks || []).some((s) => s.includes(id));
+  if (n0) {
+    const i = slotAt(rectsFor(n0), x, y);
+    if (i >= 0 && (inHere || stacks[i].every(isMin))) return { at: i, n: n0 };
+  }
+  const n = n0 + (inHere ? 0 : 1);
+  return { at: slotAt(rectsFor(n), x, y), n };
 }
 // the index of the rect under (x, y), else the nearest one by its center; -1 with none
 export function slotAt(rects, x, y) {

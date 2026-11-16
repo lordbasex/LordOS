@@ -490,6 +490,7 @@
   "ws.snapfly.thirds": "Thirds",
   "ws.snapfly.split": "Main and side",
   "ws.snapfly.quarters": "Quarters",
+  "ws.snapfly.open": "Snap window…",
   "ws.window.tile": "Tile this window",
   "ws.window.float": "Float this window",
   "ws.notif.title": "Notifications",

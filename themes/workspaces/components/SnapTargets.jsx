@@ -4,7 +4,8 @@
 //                   it grows from the pointer in 150 ms, with no motion under Reduce motion
 //   DropTarget      while a window is dragged over a tiled display: the slot it will land in (tiler.js slotPreview); the
 //                   drop then takes that slot (dropHint), whatever the window's centre
-//   SnapFlyout      the layouts under a window's maximize button after a short hover: halves, thirds, main and side,
+//   SnapFlyout      the layouts under a window's maximize button after a short hover (or at the pointer, from the
+//                   window menu: Linux apps such as Chrome draw their own maximize button): halves, thirds, main and side,
 //                   quarters; a click puts the window in that zone (Free: the SDK's snap zones, the magnet fills the other
 //                   half) or in that slot of that layout (a tiled display: the layout is set there)
 import { View, Text, Layer, addListener, useStore, createStore, moveGrab, displayAt, activeDesktop, wm, t as tr } from '@lordos/sdk';
@@ -121,7 +122,7 @@ export function SnapFlyout({ t }) {
   return (
     <Layer name="popover">
       <View ref={ref} onMouseLeave={() => flyout.set(null)}
-        style={{ position: 'absolute', left: Math.max(4, f.x - width + 40), top: f.y, width, padding: pad, gap: 8, borderRadius: 14,
+        style={{ position: 'absolute', left: Math.max(4, f.at === 'point' ? f.x : f.x - width + 40), top: f.y, width, padding: pad, gap: 8, borderRadius: 14,
           backgroundColor: t.mat.blur ? t.mat.bg : t.mat.bgStill, border: `1px solid ${t.mat.border}`, boxShadow: t.mat.shadow,
           ...(t.mat.blur ? { backdropFilter: `blur(${t.mat.blur}px)` } : null) }}>
         <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{tr('shell.ws.snapfly.title')}</Text>

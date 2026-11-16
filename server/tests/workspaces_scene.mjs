@@ -335,6 +335,36 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
+// the maintainer's case: Two halves with three windows (the left half in two rows), the top one minimized; Chrome
+// dragged onto that free space takes it, its own row goes, and it gets the whole left half
+{
+  await new Promise((res) => setTimeout(res, 1100));
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const fz = sdk.wm.open('extra45', { frame: { x: L.x + 100, y: 100, w: 500, h: 300 } });
+  const mo = sdk.wm.open('extra46', { frame: { x: L.x + 1000, y: 100, w: 500, h: 300 } });
+  const cr = sdk.wm.open('extra47', { frame: { x: L.x + 100, y: 600, w: 500, h: 300 } });
+  for (let i = 0; i < 3; i++) await flush();
+  const three = tileRects('halves', plan(L).work, 3, 0.5);
+  check('case: three windows, the left half in two rows', [frameOf(fz), frameOf(mo), frameOf(cr)], three);
+  sdk.wm.minimize(fz);
+  for (let i = 0; i < 3; i++) await flush();
+  check('case: the top row free, chrome still in the bottom row', [(tiler.tiled.get().holes['DP-1'] || []).length, frameOf(cr)], [1, three[2]]);
+  const pv = tiler.slotPreview(desk, L, cr, three[0].x + 100, three[0].y + 100);
+  const two = tileRects('halves', plan(L).work, 2, 0.5);
+  check('case: the preview shows the whole left half', pv && pv.rect, two[0]);
+  tiler.dropHint(cr, 'DP-1', three[0].x + 100, three[0].y + 100);
+  sdk.wm.move(cr, frameOf(cr).x + 20, frameOf(cr).y - 200);
+  for (let i = 0; i < 3; i++) await flush();
+  check('case: chrome takes the whole left half, no free space left', [frameOf(cr), frameOf(mo), (tiler.tiled.get().holes['DP-1'] || []).length, tiler.tiled.get().counts['DP-1']],
+    [two[0], two[1], 0, 2]);
+  sdk.wm.focus(fz);
+  for (let i = 0; i < 3; i++) await flush();
+  check('case: the minimized one brought back swaps with chrome', [frameOf(fz), !!sdk.wm.get(cr).minimized], [two[0], true]);
+  for (const id of [fz, mo, cr]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 3; i++) await flush();
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');

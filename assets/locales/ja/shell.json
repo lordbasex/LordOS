@@ -483,6 +483,7 @@
   "ws.snapfly.thirds": "3分割",
   "ws.snapfly.split": "メインとサイド",
   "ws.snapfly.quarters": "4分割",
+  "ws.snapfly.open": "ウィンドウを配置…",
   "ws.window.tile": "このウインドウをタイルに配置",
   "ws.window.float": "このウインドウを自由にする",
   "ws.notif.title": "通知",

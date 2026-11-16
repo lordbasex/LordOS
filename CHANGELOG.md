@@ -48,7 +48,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     another monitor (before, it stayed loose and the others filled the screen). While a window is dragged over a tiled monitor,
     a glass rectangle shows the slot it will take, and the drop takes it; resting on a side edge half a second turns a
     half into a third; resting on the maximize button opens a flyout of halves, thirds, main and side, and quarters (on
-    a tiled monitor it sets that layout and slot). Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
+    a tiled monitor it sets that layout and slot; for Chrome, which draws its own buttons, "Snap window…" in the
+    window menu opens it). A window dropped on a free space (a minimized window's place) takes it and gives its own up,
+    so it gets the whole half instead of a third. Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
     off for them and its new `moveGrab` store is read only by Workspaces. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
