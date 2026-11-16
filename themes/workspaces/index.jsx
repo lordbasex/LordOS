@@ -1,6 +1,6 @@
 // "Lord Workspaces" theme (id workspaces) — a desktop organized by activities. Each activity is one of the SDK's
 // desktops (at most 9) with a name, an icon, a colour, pinned apps and a tiling layout per display; its windows sit in a
-// group frame in the activity's colour. The Context Spine on the side opens Activities (the Overview), Apps, Files and
+// group frame per display. The Context Spine on the side opens Activities (the Overview), Apps, Files and
 // the Control Center; Search opens with ❖Space, Ctrl+Space or ❖ alone. Every surface takes one of three effects styles:
 // Opaque, Translucent or Crystal. See docs/WORKSPACES.md.
 //
