@@ -1595,7 +1595,7 @@ static void blur_walk(Node *n, int *grew) {
  * not proven. The 0.8.2 scene was tried again on VM 116 (docs/MONITOR.md) with both modes and no
  * stale area appeared, before or after these fixes: the report is still not reproduced, so the
  * switch stays off. */
-int paint_multi_damage = 0;
+int paint_multi_damage = 1;
 static Box drects[DAMAGE_MAX];
 static int ndrects;
 
@@ -1673,7 +1673,7 @@ void paint_damage_settle(DamageList *l) {
 
 /* The list for this frame, or 0 if it has to be one box. */
 static int multi_rects(Node *root) {
-    if (!paint_multi_damage || layer.want || gpu_active() || !root) return 0;
+    if (!paint_multi_damage || layer.want || !root) return 0;
     Box *d = &ui.damage;
     if (d->x0 != ui.dlast.x0 || d->y0 != ui.dlast.y0 || d->x1 != ui.dlast.x1 || d->y1 != ui.dlast.y1) return 0;   /* set directly */
     if (ui.dlist.n < 2) return 0;
