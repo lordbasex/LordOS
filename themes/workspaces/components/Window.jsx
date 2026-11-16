@@ -146,7 +146,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
-      <WindowShell win={win} leaving={leaving} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
+      <WindowShell win={win} leaving={leaving} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: BTN, flexDirection: 'row', gap: 4, paddingHorizontal: 6, pointerEvents: 'box-none' }}>
@@ -172,7 +172,8 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
 
   const Icon = windowIcon(win);
   const buttons = <View style={{ flexDirection: 'row', gap: 4 }}>{order.map(button)}</View>;
-  const flat = win.maximized;
+  // a maximized window fills the group frame's work area, inside its margins: it keeps its rounded corners
+  const flat = !!win.fullscreen;
   const border = focused ? t.windowBorder : t.separator;
   return (
     <WindowShell win={win} leaving={leaving} onMouseDown={() => wm.focus(win.id)} style={{
