@@ -82,6 +82,7 @@ export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } fr
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
 export { Lumo, lumoSource } from './mascot.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';
+export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, moveDeskWidget, startDeskWidgets, deskWidgetSize } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
   dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,

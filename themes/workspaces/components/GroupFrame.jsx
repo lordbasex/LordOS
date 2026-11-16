@@ -127,7 +127,7 @@ function MinimizedTray({ t, d, ids }) {
 
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
-export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onEdit, showEmpty }) {
+export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
   const minIds = useStore(windows, minimizedOn(desk, d));
   const minimized = minIds ? minIds.split('\n') : [];
@@ -221,6 +221,13 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
                 <PlusGlyph color={t.onAccent} size={11} />
                 <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>
               </View>
+              {onAddWidget ? (
+                <View onClick={() => onAddWidget(d)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6,
+                  backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
+                  <PlusGlyph color={t.frameText} size={11} />
+                  <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.frameText }}>{tr('shell.widgets.add')}</Text>
+                </View>
+              ) : null}
               {pins.length ? (
                 <View onClick={(e) => { noteLaunch(e.x, e.y); for (const a of pins) launchApp(a.id); }}
                   style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>

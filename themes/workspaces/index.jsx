@@ -15,7 +15,7 @@
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
-  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
+  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
@@ -31,6 +31,7 @@ import { activities, panel, deleting, startActivities, updateActivity, setUpActi
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
 import { startMagnet } from './magnet.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
+import { WidgetPicker, widgetPicker } from './components/WidgetPicker.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
@@ -77,6 +78,7 @@ const H = {
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   addWindow: (d, e) => { if (e) noteLaunch(e.x, e.y); panel.set({ name: 'search', mode: 'apps', display: d.id }); },
+  addWidget: (d) => widgetPicker.set({ display: d }),
   edit: (id) => editing.set(id),
   closePanel: () => panel.set(null),
 };
@@ -152,6 +154,7 @@ function App() {
   startActivities();
   startTiler();
   startMagnet();
+  startDeskWidgets();
   useDropTarget();
   const [s] = useSettings();
   const prefs = wsPrefs(s);
@@ -235,7 +238,7 @@ function App() {
         <DesktopWidgets layer="below" />
         {plans.map(({ d, key, label: dname, plan }) => (
           <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
-            onAddWindow={H.addWindow} onEdit={H.edit} showEmpty={!onboarding} />
+            onAddWindow={H.addWindow} onAddWidget={H.addWidget} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
         {onboarding && main ? (
           <View style={{ position: 'absolute', left: main.plan.work.x, top: main.plan.work.y, width: main.plan.work.w, height: main.plan.work.h, alignItems: 'center', justifyContent: 'center' }}>
@@ -254,6 +257,7 @@ function App() {
         {leavingWins.map((w) => <Window key={w.id} win={w} t={t} focused={false} app={getApp(w.id)} leaving />)}
         <SnapAssist t={t} />
         <SnapFlyout t={t} />
+        <WidgetPicker t={t} />
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
@@ -282,6 +286,8 @@ function App() {
         {crown && <Menu t={t} x={crown.x} y={crown.y} onClose={() => crownMenu.set(null)} items={crownItems} />}
         {desk && (
           <Menu t={t} x={desk.x} y={desk.y} onClose={() => deskMenu.set(null)} items={[
+            { label: tr('shell.widgets.add'), onClick: () => widgetPicker.set({ display: displayAt(desk.x, desk.y) || mainDisplay(), x: desk.x, y: desk.y }) },
+            '-',
             { label: tr('shell.ws.activity.new'), disabled: list.length >= 9, onClick: () => newActivity() },
             { label: tr('shell.desktops.overview'), onClick: () => openOverview() },
             '-',

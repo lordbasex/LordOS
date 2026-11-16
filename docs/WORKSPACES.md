@@ -91,6 +91,16 @@ displays do. Nothing runs per frame, nothing polls.
   on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
   and not on the buttons Linux apps draw themselves (Chrome): for those, **Snap window…** in the window menu (a right
   click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
+- **Widgets** (`sdk/deskwidgets.jsx`, `components/WidgetPicker.jsx`; Lord Workspaces only). **Add widget** in the
+  empty state of a display, or a right click on the wallpaper, opens the catalog over that display: Clock (the minute,
+  no timer per second), System (CPU and memory, read only while shown), Calendar (this month, days with events
+  marked), Now playing, Read aloud (the clipboard, with lord-say) and the Notes app's sticky note
+  (`registerWidgetKind`). A widget is placed at the right-click point or near the top of the display, kept in
+  `settings.deskWidgets` (`[{ id, type, x, y }]`, no migration), moved by its top bar (one write when released) and
+  removed with its ×. The other themes never publish these widgets (`startDeskWidgets` is called by Workspaces only);
+  the sticky notes stay everywhere, as before.
+- **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
+  only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title
   bar's menu, or until a layout is chosen again for the display it is on now (a floating window belongs to the display
   it is on, wherever it was tiled before). Dialogs, notices and the theme's own panels never tile.

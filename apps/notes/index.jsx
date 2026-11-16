@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
-  Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint,
+  Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
@@ -247,6 +247,9 @@ function NoteCard({ widget }) {
   );
 }
 setupWidgets(NoteCard);
+// the sticky note in the desktop's widget catalog (Lord Workspaces' Add widget): a new note shown on the desktop there
+registerWidgetKind({ type: 'note', nameKey: 'shell.widgets.note.name', descKey: 'shell.widgets.note.desc',
+  add: (x, y) => { try { if (!notesStore.get().loaded) loadNotes(); } catch (e) { /* the folder comes later */ } return createNote({ desktop: true, x, y }); } });
 
 // notes are read when the session starts (and the desktop ones appear by themselves)
 queueMicrotask(() => { try { loadNotes(); } catch (e) { console.log(`notes: ${e.message}`); } });

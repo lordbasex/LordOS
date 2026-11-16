@@ -365,6 +365,25 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
+// Add widget: the catalog opens over a display, a widget lands on the desktop, is kept in the settings, and is removed
+{
+  const wp = await import('../../themes/workspaces/components/WidgetPicker.jsx');
+  const shownT = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  wp.widgetPicker.set({ display: R });
+  await flush();
+  check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
+  check('widgets: its built-in kinds', ['clock', 'system', 'calendar', 'nowplaying', 'readaloud'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  wp.widgetPicker.set(null);
+  const wid = sdk.addDeskWidget('clock', R.x + 200, 300);
+  for (let i = 0; i < 2; i++) await flush();
+  check('widgets: kept in the settings', (sdk.settings.get().deskWidgets || []).map((w) => [w.type, w.x, w.y]), [['clock', R.x + 200, 300]]);
+  check('widgets: the clock is on the desktop', [...styles].some(([id, st]) => st.left === R.x + 200 && st.top === 300 && st.width === sdk.deskWidgetSize('clock')[0] && attached(id)), true);
+  check('widgets: no timer every second with a clock', intervals(1000), 0);
+  sdk.removeDeskWidget(wid);
+  for (let i = 0; i < 2; i++) await flush();
+  check('widgets: removed', [(sdk.settings.get().deskWidgets || []).length, [...styles].some(([id, st]) => st.left === R.x + 200 && st.top === 300 && attached(id))], [0, false]);
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');
