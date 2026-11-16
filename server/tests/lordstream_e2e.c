@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     close(sv[1]);
     char params[4200];
     if (m3u) snprintf(params, sizeof params, "url=%s\n", argv[3]);
-    else snprintf(params, sizeof params, "url=%s\nautoplay=1\naudio=0\nhw=0\nhwaccel=none\n", argv[3]);
+    else snprintf(params, sizeof params, "url=%s\nautoplay=1\naudio=0\nhw=0\nhwaccel=none\nudp=%d\n", argv[3], getenv("UDP") ? 1 : 0);
     int64_t v[6] = { m3u ? MK_M3U : MK_PLAY, 0, 0, 0, 0, 0 };
     mp_send(sv[0], MM_JOB, 0, v, params, strlen(params), NULL, 0);
     if (!m3u) mp_sendv(sv[0], MM_SIZE, 0, 320, 180, 0, 0);

@@ -131,8 +131,10 @@ Cameras, streams and TV channels for the desktop's **Video** widget and the Play
   channels reach JS rebuilt by lord-server (`m3u_result`: each address checked again); a list file in the home folder
   is parsed in JS by the same rules (`parseM3U`).
 - **Checked** with `build/lordstream-e2e` against local servers made with FFmpeg (HLS, DASH, SRT, UDP, RTP,
-  HTTP MPEG-TS, MJPEG, RTMP), an http M3U list, and a public HTTPS HLS stream (DNS and TLS in the sandbox). Not yet:
-  RTSP against a real camera (the one tried wasn't reachable), ONVIF discovery, NDI (closed SDK: not possible).
+  HTTP MPEG-TS, MJPEG, RTMP), an http M3U list, a public HTTPS HLS stream (DNS and TLS in the sandbox), and RTSP from
+  a webcam served by VLC on 127.0.0.1 (VLC refuses RTSP over TCP, so lord-stream falls back to UDP by itself; a camera
+  starts with a 1 s analysis, the first frame in about 4 s there; stopping VLC was noticed within a second). Not yet:
+  ONVIF discovery; NDI (closed SDK: not possible).
 
 ### The `lord-media` helper
 

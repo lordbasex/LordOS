@@ -137,14 +137,33 @@ AVFormatContext *lm_open_url(const char *url, const char *params, char *err, siz
     char tr[8] = "tcp";
     if (mp_param_int(params, "udp", 0)) snprintf(tr, sizeof tr, "udp");
     if (!strncmp(url, "rtsp", 4)) { av_dict_set(&o, "rtsp_transport", tr, 0); av_dict_set(&o, "timeout", "8000000", 0); }
+    int cam = !strncmp(url, "rtsp", 4);                          /* a camera: one known stream, start sooner */
     av_dict_set(&o, "rw_timeout", "8000000", 0);                 /* tcp, http, rtmp: 8 s without data */
     av_dict_set(&o, "reconnect", "0", 0);                        /* the desktop reconnects (a new helper) */
-    av_dict_set(&o, "probesize", "2000000", 0);
-    av_dict_set(&o, "analyzeduration", "3000000", 0);
+    av_dict_set(&o, "probesize", cam ? "500000" : "2000000", 0);
+    av_dict_set(&o, "analyzeduration", cam ? "1000000" : "3000000", 0);
     av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
     lm_net_deadline(20000);                                      /* the whole open, DNS and handshake included */
     int r = avformat_open_input(&fmt, url, NULL, &o);
     av_dict_free(&o);
+    /* a server that refuses RTSP over TCP (461 Unsupported transport: VLC, some cameras): the same over UDP, once */
+    if (r < 0 && !strncmp(url, "rtsp", 4) && !strcmp(tr, "tcp") && r != AVERROR_EXIT && r != AVERROR(ETIMEDOUT) &&
+        r != AVERROR_HTTP_UNAUTHORIZED && r != AVERROR_HTTP_FORBIDDEN && !lm_net_abort) {
+        LM_LOG("RTSP over TCP refused; trying UDP");
+        fmt = avformat_alloc_context();
+        if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
+        fmt->interrupt_callback.callback = net_interrupt;
+        fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
+        fmt->flags |= AVFMT_FLAG_NOBUFFER;
+        av_dict_set(&o, "rtsp_transport", "udp", 0);
+        av_dict_set(&o, "timeout", "8000000", 0);
+        av_dict_set(&o, "probesize", "500000", 0);
+        av_dict_set(&o, "analyzeduration", "1000000", 0);
+        av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
+        lm_net_deadline(20000);
+        r = avformat_open_input(&fmt, url, NULL, &o);
+        av_dict_free(&o);
+    }
     if (r < 0) {
         char why[128];
         av_strerror(r, why, sizeof why);
@@ -154,7 +173,7 @@ AVFormatContext *lm_open_url(const char *url, const char *params, char *err, siz
         lm_net_deadline(0);
         return NULL;
     }
-    fmt->max_analyze_duration = 3 * AV_TIME_BASE;
+    fmt->max_analyze_duration = (cam ? 1 : 3) * AV_TIME_BASE;
     lm_net_deadline(15000);
     r = avformat_find_stream_info(fmt, NULL);
     lm_net_deadline(0);
