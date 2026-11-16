@@ -27,6 +27,7 @@
 #include "ui/js_cloud.h"
 #include "fsasync.h"
 #include "sound/snd.h"
+#include "ui/wave.h"
 #include "keyboard.h"
 #include "ui/js_sys.h"
 #include "canvas.h"
@@ -2566,6 +2567,7 @@ int main(int argc, char **argv) {
     /* Cloud: rclone rcd on a Unix socket, started when there is an account (cloud/cloud.c, docs/CLOUD.md) */
     if (ok && !s.greeter && getenv("HOME") && session_user && js_cloud_start(getenv("HOME"))) fprintf(stderr, "lord-server: no Cloud\n");
     if (ok && snd_start()) fprintf(stderr, "lord-server: no PipeWire for now (sound); it retries on its own\n");
+    wave_source(snd_spectrum_now());            /* <SoundWave> nodes draw the sound client's spectrum */
     if (ok && !s.greeter) portal_start();   /* dark mode, accent and buttons for GTK/GNOME/Qt (ui/portal.c) */
     if (ok && !s.greeter) sni_start();      /* the tray icons of Linux apps (ui/sni.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
@@ -2926,6 +2928,7 @@ int main(int argc, char **argv) {
         brokersrv_events(js_broker_event);        /* avisos de permiso e indicadores → tema */
         brokersrv_tick();                         /* teclado y reintentos hacia las apps aisladas */
         snd_events(js_sound_event);
+        wave_tick();                              /* <SoundWave>: only its box, only when the bands moved */
         wl_events(js_wl_event);
         js_clipboard_poll();
         term_events(js_term_event);

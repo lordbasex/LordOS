@@ -1,5 +1,6 @@
 /* node.c — tree of native nodes that React creates and modifies. */
 #include "ui.h"
+#include "wave.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -223,6 +224,7 @@ void node_destroy(Node *n) {
     if (node_gone_hook) node_gone_hook(n->id, n->serial);
     ui.nodes[n->id] = NULL;
     image_release(n->img);
+    wave_conf_free(n->wave);
     free(n->text);
     free(n->tf);
     free(n->s.ext);

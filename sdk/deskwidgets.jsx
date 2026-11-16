@@ -13,13 +13,15 @@
 // A widget belongs to one activity (desktop) and one display (its connector): it shows only there, on a block of cells
 // of that display's grid that no other widget may take. Kept in settings.deskWidgets as
 // [{ id, type, size, desk, dk, col, row, opts }]. Moved by dragging it anywhere (a glass block shows where it will land:
-// the nearest free block); resized, set up and removed from its right-click menu.
+// the nearest free block); resized, set up and removed from its right-click menu. Any widget can be pinned instead
+// (opts.pin, widgetgrid.js PINS): 'bottom-center' keeps it centred along the bottom of its display, off the grid;
+// dragging it puts it back on the grid. opts.frame 'none' draws it without its card (the sound wave).
 //
 // The look follows TangoOS's widgets (the maintainer's own design): 22 px corners, the Crystal blur, 12 px headings,
 // large figures. Nothing on them runs per second: clocks move once a minute; System, Network, Temperatures and Claude
 // Code read only while shown.
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
+import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { registerWidgetType, setWidgets } from './widgets.js';
@@ -37,7 +39,9 @@ import { useFan } from './cooling.jsx';
 import { battery } from './hardware.jsx';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars } from './menubarmodel.js';
-import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER } from './widgetgrid.js';
+import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
+import { useSound, useSpectrumSource } from './sound.js';
+import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
 import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
 import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
 import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewidgetmodel.js';
@@ -77,12 +81,19 @@ const sizeOf = (w) => {
   return ok.includes(RENAMED[w.size]) ? RENAMED[w.size] : ok[0] || 's';
 };
 const deskOf = (w) => (w.desk == null ? activeDesktop.get() : w.desk);
+const pinOf = (w) => (PINS.includes(w?.opts?.pin) ? w.opts.pin : null);
+// the pinned widgets of one activity on one display (its own, or the main display's when its display is gone)
+function pinnedOn(desk, d, list = all()) {
+  const dk = dkOf(d), main = mainDisplay();
+  return list.filter((w) => deskOf(w) === desk && pinOf(w) && (w.dk === dk || (!shown().some((x) => dkOf(x) === w.dk) && d.id === main?.id)))
+    .map((w) => ({ ...w, size: sizeOf(w) }));
+}
 
 // The blocks of one activity on one display: kept ones where they fit, the others (no block yet, a display gone, a
 // smaller screen) on the nearest free block. Pure but for the reads of the settings and the displays.
 function placed(desk, d, list = all()) {
   const g = gridFor(d), dk = dkOf(d), main = mainDisplay();
-  const here = list.filter((w) => deskOf(w) === desk && (w.dk === dk || (!shown().some((x) => dkOf(x) === w.dk) && d.id === main?.id)));
+  const here = list.filter((w) => deskOf(w) === desk && !pinOf(w) && (w.dk === dk || (!shown().some((x) => dkOf(x) === w.dk) && d.id === main?.id)));
   const out = [];
   for (const w of here) {
     const size = sizeOf(w);
@@ -98,10 +109,12 @@ export function addDeskWidget(type, size, display) {
   const d = display || mainDisplay();
   const desk = activeDesktop.get();
   const sz = KIND_SIZES[type].includes(size) ? size : KIND_SIZES[type][0];
-  const spot = firstFree(gridFor(d), placed(desk, d), sz);
+  const opts = { ...(NEW_OPTS[type] || {}) };
+  // a pinned one needs no free block; it still gets one to go back to when it is dragged
+  const spot = firstFree(gridFor(d), placed(desk, d), sz) || (opts.pin ? { col: 0, row: 0 } : null);
   if (!spot) return null;
   const id = `${type}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
-  settings.set({ deskWidgets: [...all(), { id, type, size: sz, desk, dk: dkOf(d), ...spot, opts: {} }].slice(-MAX_WIDGETS) });
+  settings.set({ deskWidgets: [...all(), { id, type, size: sz, desk, dk: dkOf(d), ...spot, opts }].slice(-MAX_WIDGETS) });
   return id;
 }
 export const removeDeskWidget = (id) => settings.set({ deskWidgets: all().filter((w) => w.id !== id) });
@@ -111,6 +124,7 @@ export function resizeDeskWidget(id, size) {
   const w = all().find((x) => x.id === id);
   const d = shown().find((x) => dkOf(x) === w?.dk) || mainDisplay();
   if (!w || !d) return false;
+  if (pinOf(w)) { setDeskWidget(id, { size }); return true; }
   const g = gridFor(d), others = placed(deskOf(w), d).filter((x) => x.id !== id);
   const spot = fits(g, occupancy(others), w.col, w.row, size) ? { col: w.col, row: w.row } : nearestFree(g, others, size, w.col, w.row);
   if (!spot) return false;
@@ -141,6 +155,10 @@ export function startDeskWidgets() {
       for (const w of placed(desk, d)) {
         const r = rectOf(g, w.col, w.row, w.size);
         (byType[w.type] ||= []).push({ id: w.id, x: r.x, y: r.y, w: r.w, h: r.h, size: w.size, kind: w.type, opts: w.opts || {}, dk: dkOf(d) });
+      }
+      for (const w of pinnedOn(desk, d)) {
+        const r = pinnedRect(workAreaOf(d), w.size, pinOf(w));
+        if (r) (byType[w.type] ||= []).push({ id: w.id, x: r.x, y: r.y, w: r.w, h: r.h, size: w.size, kind: w.type, opts: w.opts || {}, dk: dkOf(d) });
       }
     }
     for (const type of Object.keys(BODIES)) setWidgets(`ws-${type}`, byType[type] || []);
@@ -205,16 +223,19 @@ function WidgetCard({ widget }) {
       if (!dr) return;
       widgetDrag.set(null);
       setLive(null);
-      if (dr.moving && dr.target) setDeskWidget(widget.id, { dk: dr.target.dk, col: dr.target.col, row: dr.target.row });
+      if (dr.moving && dr.target) setDeskWidget(widget.id, { dk: dr.target.dk, col: dr.target.col, row: dr.target.row, opts: { pin: null } });
     });
     return () => { offMove(); offUp(); };
   }, [widget.id, widget.size, widget.dk]);
   const g = live ? { ...widget, ...live } : widget;
   const Body = BODIES[widget.kind];
+  const bare = widget.opts?.frame === 'none' && FRAMELESS.has(widget.kind);
   const sizes = KIND_SIZES[widget.kind] || ['s'];
   const items = [
     ...(sizes.length > 1 ? [{ label: t('shell.widgets.size'), submenu: sizes.map((sz) => ({ label: t(`shell.widgets.size.${sz}`), checked: sz === widget.size, onClick: () => resizeDeskWidget(widget.id, sz) })) }] : []),
     ...(KIND_MENU[widget.kind] ? KIND_MENU[widget.kind](widget) : []),
+    { label: t('shell.widgets.pin.bottomCenter'), checked: widget.opts?.pin === 'bottom-center',
+      onClick: () => setDeskWidget(widget.id, { opts: { pin: widget.opts?.pin === 'bottom-center' ? null : 'bottom-center' } }) },
     '-',
     { label: t('shell.widgets.remove'), danger: true, onClick: () => removeDeskWidget(widget.id) },
   ];
@@ -225,11 +246,14 @@ function WidgetCard({ widget }) {
           const d = shown().find((x) => e.x >= x.x && e.x < x.x + x.w && e.y >= x.y && e.y < x.y + x.h) || shown().find((x) => dkOf(x) === widget.dk) || { x: 0, y: 0, w: 4000, h: 4000 };
           setMenu({ x: e.x, y: e.y, d: { x: d.x, y: d.y, w: d.w, h: d.h } });
         }}
-        style={{ position: 'absolute', left: g.x, top: g.y, width: widget.w, height: widget.h, borderRadius: 22, overflow: 'hidden',
+        style={bare ? { position: 'absolute', left: g.x, top: g.y, width: widget.w, height: widget.h, borderRadius: 22, overflow: 'hidden',
+          // no card: only while it is dragged a faint outline shows what is being moved
+          ...(live ? { border: `1px dashed ${L.dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)'}` } : null) }
+        : { position: 'absolute', left: g.x, top: g.y, width: widget.w, height: widget.h, borderRadius: 22, overflow: 'hidden',
           backgroundColor: L.blur ? L.bg : L.solid, ...(L.blur ? { backdropFilter: `blur(${L.blur}px)` } : null),
           border: `0.5px solid ${L.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
           boxShadow: live ? '0 24px 60px rgba(0,0,0,0.32)' : '0 8px 28px rgba(0,0,0,0.16)', transform: live ? 'scale(1.03)' : undefined }}>
-        <View style={{ flex: 1, paddingTop: 13, paddingHorizontal: 15, paddingBottom: 14 }}>
+        <View style={bare ? { flex: 1 } : { flex: 1, paddingTop: 13, paddingHorizontal: 15, paddingBottom: 14 }}>
           {Body ? <Body w={widget} L={L} /> : null}
         </View>
       </View>
@@ -1332,15 +1356,57 @@ function LauncherBody({ w, L }) {
 }
 
 // ---- video: cameras, streams and TV channels (sdk/videowidget.jsx, lord-stream) ----
+// ---- the sound wave: lines that follow the desktop's sound, one app's or the microphone's (drawn in C) ----
+const FRAMELESS = new Set(['soundwave']);
+// a new sound wave starts centred along the bottom of its display, without a card
+const NEW_OPTS = { soundwave: { pin: 'bottom-center' } };
+const waveFrame = (w) => (w.opts?.frame === 'card' ? 'card' : 'none');   // no card by default: part of the wallpaper
+function SoundWaveBody({ w, L }) {
+  const th = useTheme() || {};
+  const src = sourceOf(w.opts);
+  useSpectrumSource(src);
+  const look = { lines: w.opts?.lines === 'few' ? 8 : w.opts?.lines === 'many' ? 22 : 16,
+    colors: colorsOf(w.opts?.palette || 'neon', th.accent), gain: gainOf(w.opts?.sensitivity) };
+  const wave = <SoundWave wave={look} style={{ flex: 1 }} />;
+  if (waveFrame(w) === 'none') return wave;
+  const name = src.kind === 'mic' ? t('shell.widgets.soundwave.mic') : src.kind === 'app' ? src.label : t('shell.widgets.soundwave.desktop');
+  return <View style={{ flex: 1 }}><Head L={L} title={t('shell.widgets.soundwave.name')} right={name} />{wave}</View>;
+}
+function soundWaveMenu(w) {
+  const set = (p) => setDeskWidget(w.id, { opts: p });
+  const src = sourceOf(w.opts);
+  const apps = appsPlaying(lord.sound?.state ? lord.sound.state() : null);
+  if (src.kind === 'app' && !apps.some((a) => a.key === src.app)) apps.unshift({ key: src.app, label: src.label });
+  const pick = (v, cur, key) => ({ checked: v === cur, onClick: () => set({ [key]: v }) });
+  return [
+    { label: t('shell.widgets.soundwave.source'), submenu: [
+      { label: t('shell.widgets.soundwave.desktop'), checked: src.kind === 'desktop', onClick: () => set({ source: { kind: 'desktop' } }) },
+      { label: t('shell.widgets.soundwave.mic'), checked: src.kind === 'mic', onClick: () => set({ source: { kind: 'mic' } }) },
+      ...(apps.length ? ['-', ...apps.map((a) => ({ label: a.label, checked: src.kind === 'app' && src.app === a.key,
+        onClick: () => set({ source: { kind: 'app', app: a.key, label: a.label } }) }))] : [{ label: t('shell.widgets.soundwave.noApps'), disabled: true }]),
+    ] },
+    { label: t('shell.widgets.soundwave.style'), submenu: [
+      { label: t('shell.widgets.soundwave.frameNone'), ...pick('none', waveFrame(w), 'frame') },
+      { label: t('shell.widgets.soundwave.frameCard'), ...pick('card', waveFrame(w), 'frame') },
+    ] },
+    { label: t('shell.widgets.soundwave.colors'), submenu: PALETTE_ORDER.map((p) => ({ label: t(`shell.widgets.soundwave.palette.${p}`), ...pick(p, w.opts?.palette || 'neon', 'palette') })) },
+    { label: t('shell.widgets.soundwave.lines'), submenu: ['few', 'normal', 'many'].map((v) => ({ label: t(`shell.widgets.soundwave.lines.${v}`), ...pick(v, w.opts?.lines || 'normal', 'lines') })) },
+    { label: t('shell.widgets.soundwave.sensitivity'), submenu: ['low', 'normal', 'high'].map((v) => ({ label: t(`shell.widgets.soundwave.sensitivity.${v}`), ...pick(v, w.opts?.sensitivity || 'normal', 'sensitivity') })) },
+  ];
+}
+
 const VideoKind = ({ w }) => <VideoBody w={w} setOpts={(p) => setDeskWidget(w.id, { opts: p })} />;
 
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
 const BODIES = { video: VideoKind, timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
-  battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
+  battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody,
+  soundwave: SoundWaveBody };
 const KIND_SIZES = { video: ['m', 's', 'l', 'xl'], timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
-  temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
+  temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'],
+  soundwave: ['w', 'm', 'l', 'xl'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
+  soundwave: soundWaveMenu,
   video: (w) => [
     { label: t('shell.widgets.video.setup'), onClick: () => videoSetup.set({ widget: w, set: (p) => setDeskWidget(w.id, { opts: p }) }) },
     { label: t(w.opts?.muted === false ? 'shell.widgets.video.mute' : 'shell.widgets.video.unmute'), onClick: () => setDeskWidget(w.id, { opts: { muted: w.opts?.muted !== false ? false : true } }) },

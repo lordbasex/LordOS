@@ -150,6 +150,14 @@ displays do. Nothing runs per frame, nothing polls.
   (small: the context ring and two bars). At 70 % of any of them the card glows amber, at 85 % red, pulsing slowly
   (a timer only while it glows, no sound). Claude Code reports no daily figure: the 5-hour window is the closest.
   An account whose status line isn't connected to the Terminal shows its sessions' state only.
+- **Sound wave** (w, m, l, xl; `sdk/soundwavemodel.js`, drawn in C by `<SoundWave>`, docs/SOUND.md): glowing lines that
+  move with the sound of the desktop, one app (by name) or the microphone, one source at a time. Transparent by default
+  (`opts.frame` `'none'`, no card: part of the wallpaper; only while dragged a dashed outline shows) or on a card that
+  names the source. Colours, lines and sensitivity from its right-click menu. Repaints only its box, only while there
+  is sound.
+- **Pinned widgets** (`opts.pin`, `widgetgrid.js` `PINS` and `pinnedRect`): any widget's right-click menu has **Center
+  at the bottom**, which keeps it centred along the bottom of its display's work area, off the grid (it holds no cells
+  and may sit over another widget). Dragging it puts it back on the grid. A new sound wave starts pinned there.
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

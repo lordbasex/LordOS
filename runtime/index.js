@@ -17,6 +17,9 @@ export const Terminal = 'terminal';
 export const Surface = 'surface';
 // <MediaView media={id} />: video, photo, capture or camera from lord.media (docs/MEDIA.md); drawn by C.
 export const MediaView = 'media';
+// <SoundWave wave={{ lines, colors: [0xRRGGBB × 3], gain }} />: the sound wave widget's lines, drawn by C from the
+// spectrum lord.sound.spectrum listens to (server/src/ui/wave.c); JS sends only its look.
+export const SoundWave = 'wave';
 export const screen = { width: lord.screen.width, height: lord.screen.height, displays: [], mirror: false };
 // Displays (docs/DISPLAYS.md): the desktop is one logical space (screen.width × height) and every
 // display shows a rectangle of it: { id, name, x, y, w, h, scale, main }. The menu bar and the Dock
@@ -110,6 +113,7 @@ function applyProps(inst, prev, next) {
   if (prev.session !== next.session) lord.setProp(inst.id, 'session', next.session ?? 0);
   if (prev.surface !== next.surface) lord.setProp(inst.id, 'surface', next.surface ?? 0);
   if (prev.media !== next.media) lord.setProp(inst.id, 'media', next.media ?? 0);
+  if (next.wave && JSON.stringify(prev.wave) !== JSON.stringify(next.wave)) lord.setProp(inst.id, 'wave', next.wave);
   // protected: the node (and what's inside) comes out black in screenshots, recordings and remote desktop
   if (!!prev.protected !== !!next.protected) lord.setProp(inst.id, 'protected', !!next.protected);
   // <Image pixels={{ width, height, data }} />: RGBA canvas (a new object for each frame)

@@ -3,6 +3,7 @@
 #include "../term/term.h"
 #include "../wl/wl.h"
 #include "../media/media.h"
+#include "wave.h"
 #include "grab.h"
 #include "../gpu/gpu.h"
 
@@ -181,6 +182,7 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_TERM) term_paint(c, n->term, ix, iy, iw, ih, op);
     if (n->type == NODE_SURFACE) wl_paint(c, n->term, n->id, lix, liy, liw, lih, op);
     if (n->type == NODE_MEDIA) media_paint(c, n->term, n->id, ix, iy, iw, ih, (s->radius - bw) * k, op);
+    if (n->type == NODE_WAVE) wave_paint(c, n, ix, iy, iw, ih, k, op);
     /* text is clipped to its box: a label outside the clip (a list row scrolled away) isn't laid out */
     if (n->type == NODE_TEXT && (s->color >> 24) && x < c->clip.x1 && x + w > c->clip.x0 && y < c->clip.y1 && y + h > c->clip.y0) {
         node_gather_text(n, text_buf, sizeof text_buf);
@@ -309,7 +311,7 @@ static void tf_bounds(const Node *n, Affine rel, Box *b, int *ok, int *live) {
     if (n->s.backdrop_blur >= 1) *live = 1;
     if (n->type == NODE_MEDIA) *ok = 0;
     if (n->type == NODE_SURFACE) *live = 1;     /* GPU path: its quad goes at the scaled place (wl_tf_begin) */
-    if (n->type == NODE_TERM) *live = 1;
+    if (n->type == NODE_TERM || n->type == NODE_WAVE) *live = 1;
     Affine r = n->own_tf ? affine_mul(rel, n->tf->own) : rel;
     Box v = affine_box(r, visual_box(n));
     b->x0 = fminf(b->x0, v.x0); b->y0 = fminf(b->y0, v.y0);
@@ -1412,7 +1414,7 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         sig_node(walk_sig, n, 0);
         if (n->paint_dirty) walk_sig->dirty = 1;
         /* as tf_bounds */
-        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || n->type == NODE_SURFACE) walk_sig->live |= 1;
+        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || n->type == NODE_SURFACE || n->type == NODE_WAVE) walk_sig->live |= 1;
         if (n->type == NODE_MEDIA) walk_sig->live |= 2;
         walk_sig->area = box_or(walk_sig->area, cur);
     }

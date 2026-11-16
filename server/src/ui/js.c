@@ -12,6 +12,7 @@
 #include "js_pkg.h"
 #include "../apps.h"
 #include "js_sound.h"
+#include "wave.h"
 #include "js_monitor.h"
 #include "js_sec.h"
 #include "js_doc.h"
@@ -108,9 +109,11 @@ static JSValue f_create_node(JSContext *c, JSValueConst this_val, int argc, JSVa
     if (!t) return JS_EXCEPTION;
     int type = !strcmp(t, "text") ? NODE_TEXT : !strcmp(t, "image") ? NODE_IMAGE
              : !strcmp(t, "raw") ? NODE_RAW : !strcmp(t, "terminal") ? NODE_TERM
-             : !strcmp(t, "surface") ? NODE_SURFACE : !strcmp(t, "media") ? NODE_MEDIA : NODE_VIEW;
+             : !strcmp(t, "surface") ? NODE_SURFACE : !strcmp(t, "media") ? NODE_MEDIA
+             : !strcmp(t, "wave") ? NODE_WAVE : NODE_VIEW;
     JS_FreeCString(c, t);
     Node *n = node_new(type);
+    if (n && type == NODE_WAVE && !(n->wave = wave_conf_new())) { node_destroy(n); n = NULL; }
     return n ? JS_NewInt32(c, n->id) : JS_ThrowOutOfMemory(c);
 }
 
@@ -252,6 +255,25 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         int32_t id = 0;                     /* lord.media source (video, photo, screenshot, camera) */
         if (JS_IsNumber(argv[2])) JS_ToInt32(c, &id, argv[2]);
         js_media_node(n, id);
+        node_invalidate(n);
+    } else if (n && key && !strcmp(key, "wave") && n->type == NODE_WAVE && n->wave && JS_IsObject(argv[2])) {
+        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain } (sdk/soundwave.js) */
+        WaveConf *w = n->wave;
+        double d;
+        JSValue v = JS_GetPropertyStr(c, argv[2], "lines");
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 2 && d <= 24) w->lines = (int)d;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "gain");
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0.25 && d <= 3) w->gain = (float)d;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "colors");
+        for (uint32_t i = 0; i < 3 && JS_IsArray(c, v); i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i);
+            if (JS_IsNumber(e) && !JS_ToFloat64(c, &d, e) && d >= 0 && d <= 0xffffff) w->col[i] = (uint32_t)d;
+            JS_FreeValue(c, e);
+        }
+        JS_FreeValue(c, v);
+        wave_conf_changed(w);
         node_invalidate(n);
     } else if (n && key && !strcmp(key, "protected")) {
         n->protect = JS_ToBool(c, argv[2]) ? 1 : 0;     /* protected window (wm.setProtected) */

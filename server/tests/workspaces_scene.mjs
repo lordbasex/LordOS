@@ -538,7 +538,8 @@ await flush();
     ids.push(id);
     await flush();
     const w = (sdk.settings.get().deskWidgets || []).find((x) => x.id === id);
-    const r = grid.rectOf(grid.gridOf(sdk.workAreaOf(L)), w.col, w.row, size);
+    // a pinned one (the sound wave starts at the bottom centre) is off the grid
+    const r = w.opts?.pin ? grid.pinnedRect(sdk.workAreaOf(L), size, w.opts.pin) : grid.rectOf(grid.gridOf(sdk.workAreaOf(L)), w.col, w.row, size);
     const ok = [...styles].some(([nid, st]) => st.left === r.x && st.top === r.y && st.width === r.w && attached(nid));
     if (!ok) check(`widgets: ${k.type} ${size} on the desktop`, ok, true);
   }

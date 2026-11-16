@@ -204,6 +204,8 @@ EOF
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    run "spectrum-test" build/spectrum-test
+    if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi

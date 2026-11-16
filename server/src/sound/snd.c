@@ -10,11 +10,13 @@
  * its high-fidelity profile, and snd_set_profile switches it (issue #78, docs/SOUND.md).
  *
  * Extras: level meter for an input (a normal 48 kHz recording stream; the level is the largest
- * sample of each block, see snd_meter) and system sounds synthesized here (uploaded once to the
- * server's sample cache and then played with PLAY_SAMPLE). */
+ * sample of each block, see snd_meter), the sound wave widget's spectrum (snd_spectrum: one more
+ * recording stream, of the desktop, one app or a microphone; only band levels leave here) and system
+ * sounds synthesized here (uploaded once to the server's sample cache and then played with PLAY_SAMPLE). */
 #include "snd.h"
 #include "pulse.h"
 #include "sndcard.h"
+#include "spectrum.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -61,7 +63,7 @@ typedef struct { Stream s[MAX_STREAMS]; int n; } StreamList;
 typedef struct { SndCard c[MAX_CARDS]; int n; } CardList;
 
 enum {
-    R_NONE, R_AUTH, R_NAME, R_SERVER, R_LIST, R_ONE, R_ACK, R_RECORD, R_UPLOAD, R_PLAY,
+    R_NONE, R_AUTH, R_NAME, R_SERVER, R_LIST, R_ONE, R_ACK, R_RECORD, R_UPLOAD, R_PLAY, R_SPEC,
 };
 
 typedef struct { uint32_t tag; int kind, what; uint32_t arg; } Pending;
@@ -84,15 +86,25 @@ static struct {
     int meter_pending;
     double peak;
     int peak_ready;
+    /* the spectrum: what was asked (kind -1 = off; index PA_INVALID_INDEX = the default device) and the
+     * stream that serves it now (source and, for one app, its sink input) */
+    int spec_kind;
+    uint32_t spec_index, spec_source, spec_direct, spec_channel;
+    int spec_pending, spec_again;
+    Spectrum spec;
     int debug;                          /* LORD_SND_DEBUG=1: every packet to stderr */
     int samples_uploaded, uploading, play_after;   /* bits: pop, notify, error, chime, ping, drop */
     char last_error[128];
-} S = { .fd = -1, .timer = -1, .meter_source = PA_INVALID_INDEX, .meter_channel = PA_INVALID_INDEX };
+} S = { .fd = -1, .timer = -1, .meter_source = PA_INVALID_INDEX, .meter_channel = PA_INVALID_INDEX,
+        .spec_kind = -1, .spec_index = PA_INVALID_INDEX, .spec_source = PA_INVALID_INDEX,
+        .spec_direct = PA_INVALID_INDEX, .spec_channel = PA_INVALID_INDEX };
 
 static void disconnect(const char *why);
 #define SAMPLES 6                           /* the system sounds: pop, notify, error, chime, ping, drop */
 static void upload_data(int which, uint32_t channel);
 static int play_sample(int which);
+static void spec_refresh(void);
+static void spec_close(void);
 
 /* ---- E/S ---- */
 
@@ -418,6 +430,8 @@ static int try_connect(void) {
     S.samples_uploaded = S.uploading = S.play_after = 0;
     S.meter_channel = PA_INVALID_INDEX;
     S.meter_pending = 0;
+    S.spec_channel = S.spec_source = S.spec_direct = PA_INVALID_INDEX;
+    S.spec_pending = S.spec_again = 0;
 
     /* cookie: PulseAudio's if it exists (pipewire-pulse doesn't require it) */
     uint8_t cookie[256] = { 0 };
@@ -510,6 +524,22 @@ static void on_reply(Pending p, TsIn *t) {
         S.meter_channel = ch;
         break;
     }
+    case R_SPEC: {
+        uint32_t ch = ts_get_u32(t);
+        S.spec_pending = 0;
+        if (t->err) break;
+        if (S.spec_source != p.arg) {               /* asked for something else in the meantime */
+            TsOut o;
+            uint32_t tag = cmd_begin(&o, PA_CMD_DELETE_RECORD_STREAM);
+            ts_u32(&o, ch);
+            cmd_send(&o, tag, R_ACK, PA_CMD_DELETE_RECORD_STREAM, 0);
+            spec_refresh();
+            break;
+        }
+        S.spec_channel = ch;
+        if (S.spec_again) { S.spec_again = 0; spec_refresh(); }
+        break;
+    }
     case R_UPLOAD: {
         uint32_t ch = ts_get_u32(t), len = ts_get_u32(t);
         (void)len;
@@ -524,6 +554,7 @@ static void on_reply(Pending p, TsIn *t) {
 static void on_error(Pending p, uint32_t code) {
     if (p.kind == R_ONE) return;                    /* it disappeared between the notice and the request */
     if (p.kind == R_RECORD) S.meter_pending = 0;
+    if (p.kind == R_SPEC) { S.spec_pending = S.spec_again = 0; S.spec_source = S.spec_direct = PA_INVALID_INDEX; S.dirty = 1; }
     snprintf(S.last_error, sizeof S.last_error, "comando %d: error %u", p.what, code);
     fprintf(stderr, "sonido: %s\n", S.last_error);
     if (p.kind == R_AUTH || p.kind == R_NAME) disconnect("connection refused");
@@ -536,6 +567,15 @@ static void on_packet(uint32_t channel, const uint8_t *d, size_t n) {
             for (size_t i = 0; i + 4 <= n; i += 4) { memcpy(&v, d + i, 4); v = fabsf(v); if (v > m) m = v; }
             S.peak = m > 1 ? 1 : m;
             S.peak_ready = 1;
+        } else if (channel == S.spec_channel && n >= 4) {
+            float buf[1024];
+            for (size_t off = 0; off + 4 <= n;) {
+                size_t k = (n - off) / 4;
+                if (k > 1024) k = 1024;
+                memcpy(buf, d + off, k * 4);
+                spectrum_feed(&S.spec, buf, (int)k);
+                off += k * 4;
+            }
         }
         return;
     }
@@ -563,6 +603,10 @@ static void on_packet(uint32_t channel, const uint8_t *d, size_t n) {
     if (cmd == PA_CMD_RECORD_STREAM_KILLED) {       /* the meter's source disappeared */
         uint32_t ch = ts_get_u32(&t);
         if (ch == S.meter_channel) { S.meter_channel = PA_INVALID_INDEX; S.meter_source = PA_INVALID_INDEX; }
+        if (ch == S.spec_channel) {                 /* the app stopped or the device went: wait for the next state */
+            S.spec_channel = S.spec_source = S.spec_direct = PA_INVALID_INDEX;
+            S.dirty = 1;
+        }
     }
     /* REQUEST, STARTED, OVERFLOW...: we don't play our own streams (samples go to the cache) */
 }
@@ -609,6 +653,7 @@ void snd_events(SndEventFn fn) {
     if (S.fd >= 0 && S.out_len && flush_out()) disconnect("write error");
     if (S.dirty && S.info_pending <= 0) {
         S.dirty = 0;
+        spec_refresh();                             /* the default device changed, the app moved or ended */
         char *j = snd_state_json();
         if (j) fn("state", j);
         free(j);
@@ -770,6 +815,12 @@ char *snd_state_json(void) {
     bput(&b, ",\"defaultSource\":");
     bstr(&b, S.default_source);
     bidx(&b, "meter", S.meter_source);
+    if (S.spec_kind < 0) bput(&b, ",\"spectrum\":null");
+    else {
+        bput(&b, ",\"spectrum\":{\"kind\":\"%s\"", S.spec_kind == SND_SINK ? "sink" : S.spec_kind == SND_SOURCE ? "source" : "input");
+        bidx(&b, "index", S.spec_index);
+        bput(&b, ",\"live\":%s}", S.spec_source != PA_INVALID_INDEX ? "true" : "false");
+    }
     bput(&b, ",\"sinks\":[");
     bdevs(&b, &S.sinks, 0);
     bput(&b, "],\"sources\":[");
@@ -947,6 +998,117 @@ int snd_meter(uint32_t source) {
     ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0);   /* volume_set, muted_set, relative, passthrough */
     S.meter_pending = 1;
     return cmd_send(&t, tag, R_RECORD, PA_CMD_CREATE_RECORD_STREAM, source);
+}
+
+/* ---- the sound wave's spectrum ----
+ *
+ * One recording stream at a time, like the meter (mono float at 48 kHz, blocks of 1600 samples: 30 a
+ * second): the desktop is the monitor of an output, one app is that same monitor limited to the app's
+ * stream (direct_on_input, what pavucontrol's per-app meters use), a microphone is the input itself.
+ * Nothing but band levels leaves (spectrum.c); the samples are dropped as they arrive. Listening to a
+ * microphone shows as recording (its own application id, not hidden in the state), so the theme's
+ * microphone indicator lights; the desktop and an app don't (no microphone is opened). */
+
+static const Dev *dev_by(const DevList *l, uint32_t index, const char *name) {
+    for (int i = 0; i < l->n; i++)
+        if (index != PA_INVALID_INDEX ? l->d[i].index == index : !strcmp(l->d[i].name, name)) return &l->d[i];
+    return NULL;
+}
+
+/* What the request needs now: the source and the app's stream (or PA_INVALID_INDEX). 0 if it can't be. */
+static int spec_want(uint32_t *source, uint32_t *direct) {
+    *source = *direct = PA_INVALID_INDEX;
+    if (S.spec_kind == SND_SINK) {
+        const Dev *d = dev_by(&S.sinks, S.spec_index, S.default_sink);
+        if (!d || d->monitor == PA_INVALID_INDEX) return 0;
+        *source = d->monitor;
+    } else if (S.spec_kind == SND_SOURCE) {
+        const Dev *d = dev_by(&S.sources, S.spec_index, S.default_source);
+        if (!d) return 0;
+        *source = d->index;
+    } else if (S.spec_kind == SND_INPUT) {
+        const Stream *st = NULL;
+        for (int i = 0; i < S.inputs.n; i++) if (S.inputs.s[i].index == S.spec_index) st = &S.inputs.s[i];
+        if (!st || !strcmp(st->appid, "org.lordos.Server")) return 0;
+        const Dev *d = dev_by(&S.sinks, st->dev, "");
+        if (!d || d->monitor == PA_INVALID_INDEX) return 0;
+        *source = d->monitor;
+        *direct = st->index;
+    } else return 0;
+    return 1;
+}
+
+static void spec_close(void) {
+    if (S.spec_channel != PA_INVALID_INDEX && S.fd >= 0) {
+        TsOut t;
+        uint32_t tag = cmd_begin(&t, PA_CMD_DELETE_RECORD_STREAM);
+        ts_u32(&t, S.spec_channel);
+        cmd_send(&t, tag, R_ACK, PA_CMD_DELETE_RECORD_STREAM, 0);
+    }
+    S.spec_channel = S.spec_source = S.spec_direct = PA_INVALID_INDEX;
+}
+
+static void spec_refresh(void) {
+    if (!S.connected) return;
+    uint32_t src, direct;
+    int ok = spec_want(&src, &direct);
+    if (ok && src == S.spec_source && direct == S.spec_direct) return;   /* already that one (or on its way) */
+    if (!ok && S.spec_source == PA_INVALID_INDEX) return;
+    if (S.spec_pending) { S.spec_again = 1; return; }   /* once it is open, compared again (R_SPEC) */
+    spec_close();
+    spectrum_init(&S.spec, 48000);
+    S.dirty = 1;
+    if (!ok) return;
+    int mic = S.spec_kind == SND_SOURCE;
+    TsOut t;
+    uint32_t tag = cmd_begin(&t, PA_CMD_CREATE_RECORD_STREAM);
+    uint8_t mono = 0;                               /* PA_CHANNEL_POSITION_MONO */
+    ts_ss(&t, PA_SAMPLE_FLOAT32LE, 1, 48000);
+    ts_cmap(&t, 1, &mono);
+    ts_u32(&t, src);
+    ts_str(&t, NULL);
+    ts_u32(&t, 0xffffffffu);                        /* maxlength: the server's */
+    ts_bool(&t, 0);                                 /* corked */
+    ts_u32(&t, 1600 * 4);                           /* fragsize: 1600 samples, 30 blocks a second */
+    ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0);   /* no_remap … fix_channels */
+    ts_bool(&t, 1);                                 /* no_move */
+    ts_bool(&t, 0);                                 /* variable_rate */
+    ts_bool(&t, 0);                                 /* peak_detect */
+    ts_bool(&t, 1);                                 /* adjust_latency */
+    const char *hidden[] = { "media.name", "LordOS: sound wave", "application.id", "org.lordos.Server" };
+    const char *shown[] = { "media.name", "Sound wave", "application.name", "LordOS", "application.id", "org.lordos.SoundWave" };
+    if (mic) ts_proplist(&t, shown, 3); else ts_proplist(&t, hidden, 2);
+    ts_u32(&t, direct);                             /* direct_on_input: only that app's stream */
+    ts_bool(&t, 0);                                 /* early_requests */
+    ts_bool(&t, 1);                                 /* dont_inhibit_auto_suspend */
+    ts_bool(&t, 0);                                 /* fail_on_suspend */
+    ts_u8(&t, 1);                                   /* one format: PCM */
+    ts_format_pcm(&t);
+    uint32_t vol = PA_VOLUME_NORM;
+    ts_cvol(&t, 1, &vol);
+    ts_bool(&t, 0);                                 /* muted */
+    ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0);   /* volume_set, muted_set, relative, passthrough */
+    S.spec_source = src;
+    S.spec_direct = direct;
+    if (cmd_send(&t, tag, R_SPEC, PA_CMD_CREATE_RECORD_STREAM, src)) { S.spec_source = S.spec_direct = PA_INVALID_INDEX; return; }
+    S.spec_pending = 1;
+}
+
+int snd_spectrum(int kind, uint32_t index) {
+    if (kind != -1 && kind != SND_SINK && kind != SND_SOURCE && kind != SND_INPUT) return -1;
+    if (kind == SND_INPUT && index == PA_INVALID_INDEX) return -1;
+    if (kind == S.spec_kind && index == S.spec_index) return 0;
+    S.spec_kind = kind;
+    S.spec_index = kind < 0 ? PA_INVALID_INDEX : index;
+    S.dirty = 1;
+    if (kind < 0) { spec_close(); spectrum_init(&S.spec, 48000); return 0; }
+    spec_refresh();
+    return 0;
+}
+
+const Spectrum *snd_spectrum_now(void) {
+    if (S.spec.rate == 0) spectrum_init(&S.spec, 48000);
+    return &S.spec;
 }
 
 /* ---- system sounds ---- */

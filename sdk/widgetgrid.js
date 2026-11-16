@@ -11,6 +11,8 @@
 //   firstFree(g, list, size) the first free block, from the top right (rows down, columns leftwards)
 //   nearestFree(g, list, size, col, row, except)   the free block nearest to (col, row)
 //   cellAt(g, x, y)          the cell whose top left is nearest to a point (where a dragged widget's corner is)
+//   PINS / pinnedRect(area, size, pin)   a widget pinned to a place of its display instead of the grid: 'bottom-center'
+//                          (centred, along the bottom of the work area). It holds no cells: it may sit over others
 export const CELL = 170;
 export const GAP = 16;
 export const MARGIN = 24;
@@ -68,4 +70,12 @@ export function nearestFree(g, list, size, col, row, except) {
 export function cellAt(g, x, y) {
   const step = g.cell + g.gap;
   return { col: Math.max(0, Math.min(g.cols - 1, Math.round((x - g.x) / step))), row: Math.max(0, Math.min(g.rows - 1, Math.round((y - g.y) / step))) };
+}
+
+export const PINS = ['bottom-center'];
+export function pinnedRect(area, size, pin, margin = MARGIN) {
+  if (!PINS.includes(pin)) return null;
+  const [c, r] = spanOf(size);
+  const w = c * CELL + (c - 1) * GAP, h = r * CELL + (r - 1) * GAP;
+  return { x: Math.round(area.x + (area.w - w) / 2), y: Math.round(area.y + area.h - margin - h), w, h };
 }

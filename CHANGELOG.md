@@ -111,7 +111,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     **Claude Code widget**: rings for the context, the 5-hour window and the week, with the time until each renews, the
     model, the state and the account (each `~/.claude*` folder is an account: name and plan from its .claude.json); a
     slow amber or red glow near a limit (70 % / 85 %), without sound. The large one lists the sessions and each
-    account's limits. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    account's limits. **Sound wave widget** (w, m, l, xl): glowing lines that move with the sound of the desktop (the
+    default output), one app (chosen by name from those playing; its stream is found again each time it starts) or the
+    default microphone, one source at a time. lord-server listens with one more recording stream from our own PipeWire
+    client (`lord.sound.spectrum`; one app is that output's monitor limited to its stream, `direct_on_input`), turns
+    each block into 48 log-spaced band levels (`server/src/sound/spectrum.c`, a 2048-point FFT, 30 blocks a second)
+    and draws the lines itself in a new node, `<SoundWave>` (`server/src/ui/wave.c`): JS never receives the sound or
+    the levels, only sets the look. The node damages only its own box, only when the bands moved; in silence the
+    spectrum goes quiet and nothing repaints. Drawing the lines takes ~1.6 ms per block for the wide size (~5 % of one
+    core while sound plays: only the band of rows the lines and glow reach, the glow at half size, tables for the
+    rest). Listening to the microphone shows as recording (the microphone
+    indicator lights); the desktop and an app don't open a microphone. Transparent by default (no card: it reads as
+    part of the wallpaper) or on a card; colours (Neon, the theme's accent, Aurora, Fire, Ice), number of lines and
+    sensitivity from its right-click menu. **Pin to the bottom centre** for every widget (`opts.pin`,
+    `widgetgrid.js pinnedRect`): centred along the bottom of its display, off the grid; dragging puts it back on the
+    grid. A new sound wave starts pinned there. Tests: `spectrum-test` (bands, silence, the lines' shape and bounds),
+    `soundwave-model-test` and the Workspaces scene. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

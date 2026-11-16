@@ -6,7 +6,9 @@
 //   const out = defaultSink(s);    // the default output (or null)
 //   sound.setVolume('sink', out.index, 0.5); sound.setMute('sink', out.index, true)
 import { createStore, useStore } from './store.js';
+import { useEffect } from 'react';
 import { planDefault, planMic, pendingTarget, arrivals, micChoices } from './btaudiomodel.js';
+import { resolve as resolveWave } from './soundwavemodel.js';
 
 const has = () => typeof lord.sound !== 'undefined';
 const EMPTY = { connected: false, sinks: [], sources: [], inputs: [], outputs: [] };
@@ -66,3 +68,32 @@ export const microphones = (s) => s.sources.filter((x) => x.monitorOf === -1);
 export const defaultSource = (s) => microphones(s).find((x) => x.default) || microphones(s)[0] || null;
 // Headset microphones that appear only once the headset is switched to headset mode: { card, name, label }.
 export const headsetMics = (s) => micChoices(s);
+
+// The sound wave widget's source (sdk/soundwavemodel.js): each shown widget asks for its own; lord.sound.spectrum
+// listens to one, the most recently shown widget's, and nothing once none is shown. An app's stream is found again
+// in each new state (its index changes when it starts playing again); while it isn't playing, nothing is listened to.
+const waveWants = [];
+let waveKey = 'off';
+function applyWave() {
+  const top = waveWants[waveWants.length - 1];
+  const r = top ? resolveWave(soundState.get(), top.src) : null;
+  const key = r ? r.join(':') : 'off';
+  if (key === waveKey) return;
+  waveKey = key;
+  if (r) call('spectrum', r[0], r[1]); else call('spectrum', null);
+}
+soundState.subscribe(applyWave);
+export function useSpectrumSource(src, on = true) {
+  const k = JSON.stringify(src || null);
+  useEffect(() => {
+    if (!on) return undefined;
+    const want = { src };
+    waveWants.push(want);
+    applyWave();
+    return () => {
+      const i = waveWants.indexOf(want);
+      if (i >= 0) waveWants.splice(i, 1);
+      applyWave();
+    };
+  }, [k, on]);
+}

@@ -10,7 +10,7 @@
 enum { UNIT_AUTO = 0, UNIT_PX, UNIT_PCT };
 typedef struct { float v; uint8_t unit; } Dim;
 
-enum { NODE_VIEW, NODE_TEXT, NODE_IMAGE, NODE_RAW, NODE_TERM, NODE_SURFACE, NODE_MEDIA };
+enum { NODE_VIEW, NODE_TEXT, NODE_IMAGE, NODE_RAW, NODE_TERM, NODE_SURFACE, NODE_MEDIA, NODE_WAVE };
 enum { JUSTIFY_START, JUSTIFY_CENTER, JUSTIFY_END, JUSTIFY_BETWEEN, JUSTIFY_AROUND, JUSTIFY_EVENLY };
 enum { ALIGN_AUTO, ALIGN_STRETCH, ALIGN_START, ALIGN_CENTER, ALIGN_END };
 enum { TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT, TEXT_START, TEXT_END };   /* start/end according to direction */
@@ -101,6 +101,7 @@ typedef struct Node {
     Style s;
     char *text;                 /* NODE_RAW */
     Image *img;                 /* NODE_IMAGE */
+    struct WaveConf *wave;      /* NODE_WAVE: its look and its last raster (wave.h) */
     int term;                   /* NODE_TERM: session id; NODE_SURFACE: Wayland surface id; NODE_MEDIA: source (media/) */
     uint8_t protect;            /* protected window: black in screenshots, recordings and remote desktop (media/capture.c) */
     uint8_t rtl;                /* effective direction (computed in layout) */
