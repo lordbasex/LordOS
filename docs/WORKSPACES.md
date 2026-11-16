@@ -91,16 +91,21 @@ displays do. Nothing runs per frame, nothing polls.
   on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
   and not on the buttons Linux apps draw themselves (Chrome): for those, **Snap window…** in the window menu (a right
   click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
-- **Widgets** (`sdk/deskwidgets.jsx`, `components/WidgetPicker.jsx`; Lord Workspaces only). **Add widget** in the
-  empty state of a display, or a right click on the wallpaper, opens the catalog over that display: Clock (the minute,
-  no timer per second), System (CPU and memory, read only while shown), Calendar (this month, days with events
-  marked), Now playing, Read aloud (the clipboard, with lord-say), Network (rate, address, Wi‑Fi signal), Disks,
-  Temperatures and fans (lord-fand), Battery (offered only with one), Reminders (tick to complete), Clipboard (click to
-  copy again), Claude Code (its sessions, working or waiting, and context) and the Notes app's sticky note
-  (`registerWidgetKind`). Every timer runs only while its widget is shown. A widget is placed at the right-click point or near the top of the display, kept in
-  `settings.deskWidgets` (`[{ id, type, x, y }]`, no migration), moved by its top bar (one write when released) and
-  removed with its ×. The other themes never publish these widgets (`startDeskWidgets` is called by Workspaces only);
-  the sticky notes stay everywhere, as before.
+- **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `components/WidgetPicker.jsx`; Lord Workspaces only). Each
+  display's work area holds a grid of 170 px cells with 16 px gaps, anchored to its top right (TangoOS's grid). A widget
+  takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, extra large 4×2; no other widget can be placed
+  or dropped over it. Widgets belong to an activity and a display (its connector): another activity shows its own, or
+  none. **Add widget** (the empty state, or a right click on the wallpaper) opens the catalog over that display, with a
+  button per size; the widget goes on the first free block from the top right ("no room" says so). Dragged anywhere, a
+  dashed block shows where it will land, the nearest free one; its right-click menu changes its size (where it fits),
+  its options (the clock: analog or digital, cities from the Clock app) and removes it. Kinds and sizes: Clock (s
+  analog face or digital, m with world cities, l, xl four cities), Calendar (s today and the next event, m the next
+  three, l the month), System (CPU and memory as tick rings), Network (rates; m with the last minute's columns),
+  Disks, Temperatures and fans, Battery (only with one), Reminders, Clipboard, Claude Code, Now playing and Read aloud;
+  the Notes app's sticky note stays a free note of its own. The look is TangoOS's: 22 px corners, the Crystal blur
+  (none in Opaque), 12 px headings, large figures. Clocks move once a minute (no seconds hand: no timer every
+  second), and every reading runs only while its widget is shown. Kept in `settings.deskWidgets`
+  (`[{ id, type, size, desk, dk, col, row, opts }]`).
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

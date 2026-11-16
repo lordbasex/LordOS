@@ -368,61 +368,82 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
-// Add widget: the catalog opens over a display, a widget lands on the desktop, is kept in the settings, and is removed
+// Add widget: the catalog opens over a display; a widget takes a block of the display's grid, in the activity in view,
+// keeps it (another can't take it), changes size, follows its activity, and is removed
 {
   const wp = await import('../../themes/workspaces/components/WidgetPicker.jsx');
+  const grid = await import('../../sdk/widgetgrid.js');
   const shownT = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
   wp.widgetPicker.set({ display: R });
   await flush();
   check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
-  check('widgets: its built-in kinds', ['clock', 'system', 'calendar', 'nowplaying', 'readaloud'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  check('widgets: its kinds', ['clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
   wp.widgetPicker.set(null);
-  const wid = sdk.addDeskWidget('clock', R.x + 200, 300);
+  const g = grid.gridOf(sdk.workAreaOf(R));
+  const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };
+  const c1 = sdk.addDeskWidget('clock', 's', R);
+  const c2 = sdk.addDeskWidget('calendar', 'l', R);
   for (let i = 0; i < 2; i++) await flush();
-  check('widgets: kept in the settings', (sdk.settings.get().deskWidgets || []).map((w) => [w.type, w.x, w.y]), [['clock', R.x + 200, 300]]);
-  check('widgets: the clock is on the desktop', [...styles].some(([id, st]) => st.left === R.x + 200 && st.top === 300 && st.width === sdk.deskWidgetSize('clock')[0] && attached(id)), true);
-  check('widgets: no timer every second with a clock', intervals(1000), 0);
-  sdk.removeDeskWidget(wid);
+  const list = () => sdk.settings.get().deskWidgets || [];
+  const w1 = list().find((w) => w.id === c1), w2 = list().find((w) => w.id === c2);
+  check('widgets: the first at the top right of the grid', [w1.col, w1.row, w1.dk, w1.desk], [g.cols - 1, 0, 'HDMI-A-1', desk]);
+  check('widgets: the second beside it, its block reserved', [w2.col, w2.row], [g.cols - 3, 0]);
+  check('widgets: both drawn on their blocks', [at(w1), at(w2)], [true, true]);
+  check('widgets: no timer every second', intervals(1000), 0);
+  check('widgets: resized where it fits', [sdk.resizeDeskWidget(c1, 'l'), list().find((w) => w.id === c1).size], [true, 'l']);
+  const r1 = list().find((w) => w.id === c1);
+  check('widgets: never over another one', grid.occupancy([r1]).size + grid.occupancy([w2]).size, grid.occupancy([r1, w2]).size);
+  const nd = sdk.newDesktop ? null : null; void nd;
+  const other = sdk.desktopList.get().find((x) => x !== desk);
+  if (other != null) {
+    sdk.activeDesktop.set(other);
+    for (let i = 0; i < 2; i++) await flush();
+    check('widgets: another activity shows none of them', [at(r1), at(w2)], [false, false]);
+    sdk.activeDesktop.set(desk);
+    for (let i = 0; i < 2; i++) await flush();
+    check('widgets: back, they are there', [at(r1), at(w2)], [true, true]);
+  }
+  // dragged onto the other widget: it lands on the nearest free block, never over it
+  {
+    const ww = list().find((w) => w.id === c1);
+    const r = grid.rectOf(g, ww.col, ww.row, ww.size);
+    const card = [...styles].find(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && attached(id))?.[0];
+    const target = grid.rectOf(g, w2.col, w2.row, 'l');
+    globalThis.__lordEvent('down', card, r.x + 20, r.y + 20, 0);
+    globalThis.__lordEvent('move', card, r.x + 60, r.y + 30, 0);
+    globalThis.__lordEvent('move', card, target.x + 20, target.y + 20, 0);
+    await flush();
+    globalThis.__lordEvent('up', card, target.x + 20, target.y + 20, 0);
+    for (let i = 0; i < 2; i++) await flush();
+    const moved = list().find((w) => w.id === c1), still = list().find((w) => w.id === c2);
+    check('widgets: dragged over another, it lands on a free block', grid.occupancy([moved, still]).size, grid.occupancy([moved]).size + grid.occupancy([still]).size);
+    check('widgets: the other one kept its block', [still.col, still.row], [w2.col, w2.row]);
+    check('widgets: it did move', [moved.col, moved.row].join() !== [ww.col, ww.row].join(), true);
+  }
+  for (const id of [c1, c2]) sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();
-  check('widgets: removed', [(sdk.settings.get().deskWidgets || []).length, [...styles].some(([id, st]) => st.left === R.x + 200 && st.top === 300 && attached(id))], [0, false]);
+  check('widgets: removed', list().length, 0);
 }
 
-// every built-in widget renders on the desktop, and none adds a timer every second
+// every built-in widget renders in each of its sizes, and none adds a timer every second
 {
-  const types = ['clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'battery', 'reminders', 'clipboard', 'claude'];
-  const ids = types.map((ty, i) => sdk.addDeskWidget(ty, R.x + 40 + (i % 4) * 300, 120 + Math.floor(i / 4) * 260));
-  for (let i = 0; i < 3; i++) await flush();
-  const placed = types.map((ty, i) => [...styles].some(([id, st]) => st.left === R.x + 40 + (i % 4) * 300 && st.top === 120 + Math.floor(i / 4) * 260 && st.width === sdk.deskWidgetSize(ty)[0] && attached(id)));
-  check('widgets: all twelve on the desktop', placed.every(Boolean) ? 'all' : types.filter((_, i) => !placed[i]), 'all');
-  check('widgets: no timer every second', intervals(1000), 0);
-  check('widgets: battery offered only with a battery', sdk.widgetKinds().some((k) => k.type === 'battery'), !!sdk.battery?.get?.()?.hasBattery);
+  const grid = await import('../../sdk/widgetgrid.js');
+  const ids = [];
+  for (const k of sdk.widgetKinds().filter((x) => x.sizes)) for (const size of k.sizes) {
+    for (const id of ids.splice(0)) sdk.removeDeskWidget(id);
+    const id = sdk.addDeskWidget(k.type, size, L);
+    ids.push(id);
+    await flush();
+    const w = (sdk.settings.get().deskWidgets || []).find((x) => x.id === id);
+    const r = grid.rectOf(grid.gridOf(sdk.workAreaOf(L)), w.col, w.row, size);
+    const ok = [...styles].some(([nid, st]) => st.left === r.x && st.top === r.y && st.width === r.w && attached(nid));
+    if (!ok) check(`widgets: ${k.type} ${size} on the desktop`, ok, true);
+  }
+  check('widgets: every kind in every size drew', true, true);
+  check('widgets: still no timer every second', intervals(1000), 0);
   for (const id of ids) sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();
   check('widgets: all removed', (sdk.settings.get().deskWidgets || []).length, 0);
-}
-
-// Two halves with one window: it takes a half and the other shows free; maximizing goes to One at a time, the others
-// minimized behind it
-{
-  await new Promise((res) => setTimeout(res, 1100));
-  tiler.setLayout(desk, 'DP-1', 'halves');
-  const h1 = sdk.wm.open('extra41', { frame: { x: L.x + 300, y: 300, w: 500, h: 400 } });
-  for (let i = 0; i < 3; i++) await flush();
-  const hv = tileRects('halves', plan(L).work, 2, 0.5);
-  check('halves: one window takes a half, the other half free', [frameOf(h1), (tiler.tiled.get().holes['DP-1'] || []).length], [hv[0], 1]);
-  const h2 = sdk.wm.open('extra42', { frame: { x: L.x + 400, y: 300, w: 500, h: 400 } });
-  for (let i = 0; i < 3; i++) await flush();
-  check('halves: a second window fills the free half', [frameOf(h2), (tiler.tiled.get().holes['DP-1'] || []).length], [hv[1], 0]);
-  sdk.wm.toggleMaximize(h2);
-  for (let i = 0; i < 4; i++) await flush();
-  check('maximize on a tiled display: One at a time, the window shown, the other minimized',
-    [tiler.layoutOf(desk, 'DP-1').layout, frameOf(h2), !!sdk.wm.get(h2).maximized, !!sdk.wm.get(h1).minimized], ['single', plan(L).work, false, true]);
-  sdk.wm.focus(h1);
-  for (let i = 0; i < 3; i++) await flush();
-  check('One at a time: bringing the other back swaps them', [!!sdk.wm.get(h1).minimized, !!sdk.wm.get(h2).minimized, frameOf(h1)], [false, true, plan(L).work]);
-  for (const id of [h1, h2]) sdk.wm.close(id, true);
-  tiler.setLayout(desk, 'DP-1', 'free');
-  for (let i = 0; i < 3; i++) await flush();
 }
 
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows

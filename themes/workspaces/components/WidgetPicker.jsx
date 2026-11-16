@@ -1,7 +1,8 @@
 // Add widget: the desktop widget catalog (sdk/deskwidgets.jsx) as cards over a display, opened from the empty state's
-// "Add widget", a free slot, or the wallpaper's right-click menu. A click puts the widget where it was asked for (the
-// right-click point), else near the top of that display's work area; Escape or a click outside closes it.
-import { View, Text, Layer, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, t as tr } from '@lordos/sdk';
+// "Add widget" or the wallpaper's right-click menu. Each card has a button per size (small 1×1, medium 2×1, large 2×2,
+// extra large 4×2, drawn as its block of cells); a click puts the widget on the first free block of that display's grid,
+// in the activity in view. Escape or a click outside closes it.
+import { View, Text, Layer, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, addDeskWidget, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 
@@ -84,15 +85,30 @@ function KindGlyph({ type, t }) {
   return <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: dim }} />;
 }
 
+const SPANS = { s: [1, 1], m: [2, 1], l: [2, 2], xl: [4, 2] };
+function SizeChip({ t, size, onPick }) {
+  const [hover, setHover] = useState(false);
+  const [c, r] = SPANS[size];
+  return (
+    <View onClick={onPick} title={tr(`shell.widgets.size.${size}`)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ height: 30, paddingHorizontal: 7, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? t.accent : t.hover }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: c * 7 + (c - 1) * 2, gap: 2, direction: 'ltr' }}>
+        {Array.from({ length: c * r }, (_, i) => <View key={i} style={{ width: 7, height: 7, borderRadius: 2, backgroundColor: hover ? t.onAccent : t.textDim }} />)}
+      </View>
+    </View>
+  );
+}
 function Card({ t, kind, onPick }) {
   const [hover, setHover] = useState(false);
+  const sizes = kind.sizes || null;
   return (
-    <View onClick={onPick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 176, height: 118, padding: 12, gap: 8, borderRadius: 14, backgroundColor: hover ? t.hover : t.chipBg,
+    <View onClick={sizes ? undefined : () => onPick(null)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ width: 176, minHeight: 132, padding: 12, gap: 6, borderRadius: 16, backgroundColor: hover ? t.hover : t.chipBg,
         border: `1px solid ${hover ? t.accent : t.separator}` }}>
       <KindGlyph type={kind.type} t={t} />
       <Text style={{ fontSize: 13, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(kind.nameKey)}</Text>
       <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr(kind.descKey)}</Text>
+      {sizes ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 'auto' }}>{sizes.map((sz) => <SizeChip key={sz} t={t} size={sz} onPick={() => onPick(sz)} />)}</View> : null}
     </View>
   );
 }
@@ -101,6 +117,8 @@ export function WidgetPicker({ t }) {
   const p = useStore(widgetPicker);
   useStore(widgetCatalog);
   const ref = useRef(null);
+  const [full, setFull] = useState(false);
+  useEffect(() => { setFull(false); }, [p]);
   useEffect(() => {
     if (!p) return undefined;
     const offDown = addListener('pointerdown', (e) => { for (let n = e.target; n; n = n.parent) if (n === ref.current) return; widgetPicker.set(null); });
@@ -112,12 +130,15 @@ export function WidgetPicker({ t }) {
   const kinds = widgetKinds();
   const cols = Math.min(4, kinds.length);
   const W = cols * 176 + (cols - 1) * 10 + 36;
-  const pick = (k) => {
-    widgetPicker.set(null);
-    const x = p.x ?? area.x + area.w - 340 - (cascade % 5) * 24;
-    const y = p.y ?? area.y + 40 + (cascade % 5) * 24;
-    cascade++;
-    k.add(x, y);
+  const pick = (k, size) => {
+    if (!k.sizes) {
+      widgetPicker.set(null);
+      k.add?.(p.x ?? area.x + area.w - 340 - (cascade % 5) * 24, p.y ?? area.y + 40 + (cascade % 5) * 24);
+      cascade++;
+      return;
+    }
+    if (addDeskWidget(k.type, size, p.display)) widgetPicker.set(null);
+    else setFull(true);
   };
   return (
     <Layer name="overlay">
@@ -125,10 +146,10 @@ export function WidgetPicker({ t }) {
         width: W, padding: 18, gap: 12 }}>
         <View style={{ gap: 2 }}>
           <Text style={{ fontSize: 16, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.widgets.title')}</Text>
-          <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'start' }}>{tr('shell.widgets.subtitle')}</Text>
+          <Text style={{ fontSize: 12, color: full ? '#E5484D' : t.textDim, textAlign: 'start' }}>{tr(full ? 'shell.widgets.noRoom' : 'shell.widgets.subtitle')}</Text>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {kinds.map((k) => <Card key={k.type} t={t} kind={k} onPick={() => pick(k)} />)}
+          {kinds.map((k) => <Card key={k.type} t={t} kind={k} onPick={(size) => pick(k, size)} />)}
         </View>
       </Surface>
     </Layer>

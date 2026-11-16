@@ -15,7 +15,7 @@
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
-  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
+  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, WidgetDropTarget, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
@@ -236,6 +236,7 @@ function App() {
         ))}
         {displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
+        <WidgetDropTarget />
         {plans.map(({ d, key, label: dname, plan }) => (
           <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
             onAddWindow={H.addWindow} onAddWidget={H.addWidget} onEdit={H.edit} showEmpty={!onboarding} />

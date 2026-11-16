@@ -52,11 +52,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     window menu opens it). A window dropped on a free space (a minimized window's place) takes it and gives its own up,
     so it gets the whole half instead of a third. Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
     off for them and its new `moveGrab` store is read only by Workspaces. "Add widget" in a display's empty state, or a right click on
-    the wallpaper, opens a catalog of desktop widgets: Clock, System (CPU and memory), Calendar (this month, days with
-    events marked), Now playing, Read aloud (the clipboard, with lord-say), Network, Disks, Temperatures and fans,
-    Battery, Reminders, Clipboard, Claude Code and the Notes app's sticky note; they are
-    kept in `settings.deskWidgets`, moved by their top bar and removed with ×, and appear only in Lord Workspaces
-    (`sdk/deskwidgets.jsx`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    the wallpaper, opens the widget catalog: each widget takes a block of the display's grid (small 1×1, medium 2×1,
+    large 2×2, extra large 4×2, TangoOS's 170 px cells) that no other can take, belongs to the activity in view, is
+    dragged to the nearest free block and resized or set up from its right-click menu (the clock: analog or digital,
+    world cities). Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
     still closes it. The tiler writes the window store once per change and
