@@ -491,6 +491,7 @@
   "ws.lock.window": "Užrakinta: atrakinkite rėmelio spynele",
   "ws.minimized.label": "Sumažinti",
   "ws.minimized.title": "Šiame ekrane sumažinti langai: spustelėkite, kad grąžintumėte",
+  "ws.slot.free": "Laisva vieta: atidarykite programą arba grąžinkite sumažintą",
   "ws.window.tile": "Išdėstyti šį langą",
   "ws.window.float": "Palikti šį langą laisvą",
   "ws.notif.title": "Pranešimai",

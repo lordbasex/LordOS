@@ -19,7 +19,7 @@
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
 import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
-import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget } from './model/layouts.js';
+import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
@@ -27,9 +27,10 @@ const floating = new Set();          // window ids out of the tiles
 const applied = new Map();           // window id → { tile, got, t }: the rect asked for, the frame taken as the answer, when
 const moved = new Map();             // window id → when the tiler moved it in the last second (underBudget)
 const home = new Map();              // window id → display key
-const order = new Map();             // `${desk}|${dkey}` → [window ids] in tile order
+const order = new Map();             // `${desk}|${dkey}` → the tiles' slots in order: [[window ids]], the shown one last
+const lastMin = new Map();           // window id → minimized at the last pass (a window brought back takes its slot again)
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
-export const tiled = createStore({ rev: 0, tight: [], counts: {} });
+export const tiled = createStore({ rev: 0, tight: [], counts: {}, holes: {} });
 
 let applying = false;
 let pending = 0;
@@ -100,7 +101,7 @@ export function saveLayout(desk) {
   for (const d of displaysHere()) {
     const dk = keyOfDisplay(d);
     const { layout, ratio } = layoutOf(desk, dk);
-    const ids = (order.get(`${desk}|${dk}`) || []).filter((id) => windows.get().some((w) => w.id === id && w.desktop === desk));
+    const ids = (order.get(`${desk}|${dk}`) || []).map((st) => st[st.length - 1]).filter((id) => windows.get().some((w) => w.id === id && w.desktop === desk));
     const keys = ids.map((id) => { const w = windows.get().find((x) => x.id === id); return w ? launcherIdOf(w) : null; });
     out[dk] = { ...savedDisplay(layout, ratio, keys), ...(activityOf(desk).layouts[dk]?.locked ? { locked: true } : null) };
   }
@@ -142,10 +143,18 @@ export function retile() {
   const saved = foldMissing(meta.layouts, keys, mk);
   const live = new Set(all.map((w) => w.id));
   for (const id of [...applied.keys()]) if (!live.has(id)) { applied.delete(id); home.delete(id); floating.delete(id); moved.delete(id); }
+  for (const id of [...lastMin.keys()]) if (!live.has(id)) lastMin.delete(id);
 
   const groups = new Map(keys.map((k) => [k, []]));
+  const back = new Set();
   for (const w of all) {
-    if (w.desktop !== desk || !tileable(w)) continue;
+    if (w.desktop !== desk) continue;
+    if (lastMin.get(w.id) && !w.minimized) back.add(w.id);
+    lastMin.set(w.id, !!w.minimized);
+    // minimized while in a tile: it keeps its slot (a free space the others don't take)
+    if (w.minimized && !w.fullscreen && !w.pip && !floating.has(w.id) && home.has(w.id) && keys.includes(home.get(w.id))
+      && tileable({ ...w, minimized: false, maximized: false })) { groups.get(home.get(w.id)).push(w.id); continue; }
+    if (!tileable(w)) continue;
     const was = applied.get(w.id);
     // moved or resized by hand since the tiler placed it: it floats; the app's own answer to the size: kept
     const how = was ? judgeFrame(was, wFrame(w), now) : 'same';
@@ -162,25 +171,33 @@ export function retile() {
   }
 
   const moves = new Map();
+  const toMin = new Set();
   let later = false;
   const tight = [];
   const counts = {};
+  const holes = {};
+  const isMin = (id) => !!all.find((x) => x.id === id)?.minimized;
   disp.forEach((d, i) => {
     const dk = keys[i];
     const ids = groups.get(dk);
     const k = `${desk}|${dk}`;
-    const prev = (order.get(k) || []).filter((id) => ids.includes(id));
-    const fresh = ids.filter((id) => !prev.includes(id));
+    const prevStacks = order.get(k) || [];
     const keyOf = (id) => { const w = all.find((x) => x.id === id); return w ? launcherIdOf(w) : ''; };
-    // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep theirs
-    const list = orderFor([...prev, ...fresh], keyOf, prev.length ? null : saved[dk]?.apps);
-    order.set(k, list);
-    counts[dk] = list.length;
+    // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep their slots
+    const live = orderFor(ids, keyOf, prevStacks.length ? null : saved[dk]?.apps);
     const { layout, ratio } = layoutOf(desk, dk);
     const area = workAreaOf(d);
-    const rects = tileRects(layout, area, list.length, ratio);
-    if (!rects) { for (const id of list) applied.delete(id); return; }
-    list.forEach((id, j) => {
+    const freeLayout = cleanLayout(layout) === 'free';
+    const { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back);
+    for (const id of swapOut) toMin.add(id);
+    const shownOf = (st) => (st.some((id) => toMin.has(id)) ? st.filter((id) => !toMin.has(id) && !isMin(id)).pop() || null : shownIn(st, isMin));
+    order.set(k, stacks);
+    counts[dk] = stacks.length;
+    const rects = tileRects(layout, area, stacks.length, ratio);
+    if (!rects) { for (const id of ids) applied.delete(id); return; }
+    stacks.forEach((st, j) => {
+      const id = shownOf(st);
+      if (!id) { (holes[dk] ||= []).push(rects[j]); return; }
       const w = all.find((x) => x.id === id);
       const r = fitTile(rects[j], getApp(id)?.minSize, area);
       if (r.tight) tight.push(id);
@@ -198,12 +215,16 @@ export function retile() {
   });
 
   const t = tiled.get();
-  if (JSON.stringify(t.tight) !== JSON.stringify(tight) || JSON.stringify(t.counts) !== JSON.stringify(counts)) tiled.set({ rev: t.rev + 1, tight, counts });
+  if (JSON.stringify(t.tight) !== JSON.stringify(tight) || JSON.stringify(t.counts) !== JSON.stringify(counts) || JSON.stringify(t.holes) !== JSON.stringify(holes)) {
+    tiled.set({ rev: t.rev + 1, tight, counts, holes });
+  }
   if (later) schedule(1000);
-  if (!moves.size) return;
+  if (!moves.size && !toMin.size) return;
+  for (const id of toMin) lastMin.set(id, true);
   applying = true;
   try {
-    windows.set((ws) => ws.map((w) => (moves.has(w.id) ? { ...w, ...moves.get(w.id), maximized: false, snapped: null, restore: null, oskFrame: null } : w)));
+    windows.set((ws) => ws.map((w) => (toMin.has(w.id) ? { ...w, minimized: true }
+      : moves.has(w.id) ? { ...w, ...moves.get(w.id), maximized: false, snapped: null, restore: null, oskFrame: null } : w)));
   } finally { applying = false; }
 }
 

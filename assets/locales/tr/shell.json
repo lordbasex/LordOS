@@ -484,6 +484,7 @@
   "ws.lock.window": "Kilitli: çerçevedeki asma kilitle açın",
   "ws.minimized.label": "Simge durumunda",
   "ws.minimized.title": "Bu ekranda simge durumundaki pencereler: geri getirmek için tıklayın",
+  "ws.slot.free": "Boş alan: bir uygulama açın veya simge durumundakini geri getirin",
   "ws.window.tile": "Bu pencereyi döşe",
   "ws.window.float": "Bu pencereyi serbest bırak",
   "ws.notif.title": "Bildirimler",

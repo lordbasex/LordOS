@@ -484,6 +484,7 @@
   "ws.lock.window": "Vergrendeld: ontgrendel met het slotje in het kader",
   "ws.minimized.label": "Geminimaliseerd",
   "ws.minimized.title": "Geminimaliseerde vensters op dit scherm: klik er een aan om hem terug te halen",
+  "ws.slot.free": "Vrije ruimte: open een app of haal een geminimaliseerd venster terug",
   "ws.window.tile": "Dit venster tegelen",
   "ws.window.float": "Dit venster vrijlaten",
   "ws.notif.title": "Meldingen",

@@ -491,6 +491,7 @@
   "ws.lock.window": "Blocată: deblocați din lacătul cadrului",
   "ws.minimized.label": "Minimizate",
   "ws.minimized.title": "Ferestre minimizate pe acest ecran: faceți clic pe una pentru a o readuce",
+  "ws.slot.free": "Spațiu liber: deschideți o aplicație sau readuceți una minimizată",
   "ws.window.tile": "Așază fereastra",
   "ws.window.float": "Lasă fereastra liberă",
   "ws.notif.title": "Notificări",

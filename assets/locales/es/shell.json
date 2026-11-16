@@ -484,6 +484,7 @@
   "ws.lock.window": "Bloqueada: se desbloquea con el candado del marco",
   "ws.minimized.label": "Minimizadas",
   "ws.minimized.title": "Ventanas minimizadas en este monitor: hacé clic en una para traerla de vuelta",
+  "ws.slot.free": "Espacio libre: abrí una app o traé una minimizada",
   "ws.window.tile": "Acomodar esta ventana",
   "ws.window.float": "Dejar esta ventana libre",
   "ws.notif.title": "Notificaciones",

@@ -477,6 +477,7 @@
   "ws.lock.window": "Terkunci: buka dari gembok di bingkai",
   "ws.minimized.label": "Diminimalkan",
   "ws.minimized.title": "Jendela yang diminimalkan di layar ini: klik salah satu untuk mengembalikannya",
+  "ws.slot.free": "Ruang kosong: buka aplikasi atau kembalikan yang diminimalkan",
   "ws.window.tile": "Petakkan jendela ini",
   "ws.window.float": "Bebaskan jendela ini",
   "ws.notif.title": "Notifikasi",

@@ -477,6 +477,7 @@
   "ws.lock.window": "Đã khóa: mở khóa bằng ổ khóa trên khung",
   "ws.minimized.label": "Đã thu nhỏ",
   "ws.minimized.title": "Cửa sổ đã thu nhỏ trên màn hình này: nhấp để mở lại",
+  "ws.slot.free": "Chỗ trống: mở một ứng dụng hoặc đưa cửa sổ đã thu nhỏ trở lại",
   "ws.window.tile": "Xếp cửa sổ này",
   "ws.window.float": "Thả tự do cửa sổ này",
   "ws.notif.title": "Thông báo",

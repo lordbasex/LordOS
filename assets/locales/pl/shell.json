@@ -491,6 +491,7 @@
   "ws.lock.window": "Zablokowane: odblokuj kłódką w ramce",
   "ws.minimized.label": "Zminimalizowane",
   "ws.minimized.title": "Zminimalizowane okna na tym ekranie: kliknij, aby przywrócić",
+  "ws.slot.free": "Wolne miejsce: otwórz aplikację lub przywróć zminimalizowaną",
   "ws.window.tile": "Ułóż to okno",
   "ws.window.float": "Uwolnij to okno",
   "ws.notif.title": "Powiadomienia",

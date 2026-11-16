@@ -194,3 +194,33 @@ export function foldMissing(saved, connected, mainKey) {
   }
   return out;
 }
+
+// Tiles as slots (0.8.8.10): each tile is a stack of windows with at most one shown. A window minimized while tiled
+// keeps its slot, so the others stay where they are and the slot shows as a free space; a window that opens takes the
+// first free slot; a window brought back takes its slot again, and the one shown there meanwhile is minimized (they
+// swap). prev: the stacks of the last pass ([[ids]], the shown one last); live: the display's windows in their order
+// (shown and minimized); isMin(id); back: ids just brought back from minimized. A minimized window the tiler never
+// placed gets no slot. Returns { stacks, swapOut } (swapOut: windows to minimize).
+export function slotStacks(prev, live, isMin, back = new Set()) {
+  const here = new Set(live);
+  const stacks = (prev || []).map((s) => s.filter((id) => here.has(id))).filter((s) => s.length);
+  const placed = new Set(stacks.flat());
+  for (const id of live) {
+    if (placed.has(id) || isMin(id)) continue;
+    const free = stacks.find((s) => s.every(isMin));
+    if (free) free.push(id); else stacks.push([id]);
+    placed.add(id);
+  }
+  const swapOut = [];
+  for (const s of stacks) {
+    const shown = s.filter((id) => !isMin(id));
+    if (!shown.length) continue;
+    const keep = shown.find((id) => back.has(id)) || shown[shown.length - 1];
+    for (const id of shown) if (id !== keep) swapOut.push(id);
+    s.splice(s.indexOf(keep), 1);
+    s.push(keep);
+  }
+  return { stacks: stacks.filter((s) => s.length), swapOut };
+}
+// the window a slot shows (its last one, if not minimized), or null for a free slot
+export const shownIn = (stack, isMin) => (stack.length && !isMin(stack[stack.length - 1]) ? stack[stack.length - 1] : null);

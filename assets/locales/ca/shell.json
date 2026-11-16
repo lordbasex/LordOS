@@ -484,6 +484,7 @@
   "ws.lock.window": "Blocada: desbloca-la amb el cadenat del marc",
   "ws.minimized.label": "Minimitzades",
   "ws.minimized.title": "Finestres minimitzades en aquesta pantalla: feu-hi clic per recuperar-ne una",
+  "ws.slot.free": "Espai lliure: obriu una app o recupereu-ne una de minimitzada",
   "ws.window.tile": "Encaixa aquesta finestra",
   "ws.window.float": "Deixa lliure aquesta finestra",
   "ws.notif.title": "Notificacions",

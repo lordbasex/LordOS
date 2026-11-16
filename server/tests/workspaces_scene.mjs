@@ -225,6 +225,33 @@ await flush();
   await flush();
 }
 
+// slots: in Two halves, a minimized window keeps its half; a new app takes it; bringing the first back swaps them
+{
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const fa = sdk.wm.open('extra50', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  const ch = sdk.wm.open('extra51', { frame: { x: L.x + 700, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  const halves = tileRects('halves', plan(L).work, 2, 0.5);
+  check('slots: files and chrome in the two halves', [frameOf(fa), frameOf(ch)], halves);
+  sdk.wm.minimize(fa);
+  for (let i = 0; i < 3; i++) await flush();
+  check('slots: files minimized, chrome stays in its half', frameOf(ch), halves[1]);
+  check('slots: the free half is shown', (tiler.tiled.get().holes['DP-1'] || []).length, 1);
+  const tm = sdk.wm.open('extra52', { frame: { x: L.x + 300, y: 300, w: 400, h: 300 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('slots: a new app takes the free half', [frameOf(tm), frameOf(ch), (tiler.tiled.get().holes['DP-1'] || []).length], [halves[0], halves[1], 0]);
+  sdk.wm.focus(fa);
+  for (let i = 0; i < 3; i++) await flush();
+  check('slots: files back in its half, the other app minimized, chrome untouched',
+    [frameOf(fa), !!sdk.wm.get(tm).minimized, frameOf(ch)], [halves[0], true, halves[1]]);
+  sdk.wm.focus(tm);
+  for (let i = 0; i < 3; i++) await flush();
+  check('slots: and back again', [!!sdk.wm.get(fa).minimized, frameOf(tm)], [true, halves[0]]);
+  for (const id of [fa, ch, tm]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 2; i++) await flush();
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');

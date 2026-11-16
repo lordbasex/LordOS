@@ -484,6 +484,7 @@
   "ws.lock.window": "Gesperrt: mit dem Schloss im Rahmen entsperren",
   "ws.minimized.label": "Minimiert",
   "ws.minimized.title": "Minimierte Fenster auf diesem Bildschirm: zum Zurückholen anklicken",
+  "ws.slot.free": "Freier Platz: eine App öffnen oder eine minimierte zurückholen",
   "ws.window.tile": "Fenster einpassen",
   "ws.window.float": "Fenster frei lassen",
   "ws.notif.title": "Mitteilungen",

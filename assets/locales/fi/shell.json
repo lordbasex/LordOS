@@ -484,6 +484,7 @@
   "ws.lock.window": "Lukittu: avaa kehyksen lukosta",
   "ws.minimized.label": "Pienennetyt",
   "ws.minimized.title": "Tämän näytön pienennetyt ikkunat: palauta napsauttamalla",
+  "ws.slot.free": "Vapaa tila: avaa sovellus tai palauta pienennetty",
   "ws.window.tile": "Aseta ikkuna ruutuun",
   "ws.window.float": "Vapauta ikkuna",
   "ws.notif.title": "Ilmoitukset",

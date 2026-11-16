@@ -7,6 +7,7 @@ import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
 import { cleanThemeMeta, themeOptionValue, themeOptionPatch } from '../../sdk/thememeta.js';
+import { slotStacks, shownIn } from '../../themes/workspaces/model/layouts.js';
 import { assistFor, follow, other } from '../../themes/workspaces/model/magnet.js';
 import { readFileSync } from 'node:fs';
 
@@ -242,6 +243,28 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
 {
   const c = cleanActivity({ icon: 'code', color: '#7C5CFF', pins: [], setup: true, layouts: { 'DP-1': { layout: 'free', locked: true }, 'DP-2': { layout: 'grid', locked: 'yes' } } }, 0);
   eq('padlock kept', [c.layouts['DP-1'].locked, 'locked' in c.layouts['DP-2']], [true, false]);
+}
+
+// ---- slots: a minimized window keeps its place ----
+{
+  const min = (ids) => (id) => ids.includes(id);
+  let r = slotStacks([], ['files', 'chrome'], min([]));
+  eq('slots: two windows, two slots', [r.stacks, r.swapOut], [[['files'], ['chrome']], []]);
+  r = slotStacks(r.stacks, ['files', 'chrome'], min(['files']));
+  eq('slots: files minimized keeps its slot', r.stacks, [['files'], ['chrome']]);
+  eq('slots: its slot is free, chrome still shown', [shownIn(r.stacks[0], min(['files'])), shownIn(r.stacks[1], min(['files']))], [null, 'chrome']);
+  r = slotStacks(r.stacks, ['files', 'chrome', 'term'], min(['files']));
+  eq('slots: a new window takes the free slot', [r.stacks, r.swapOut], [[['files', 'term'], ['chrome']], []]);
+  r = slotStacks(r.stacks, ['files', 'chrome', 'term'], min([]), new Set(['files']));
+  eq('slots: files brought back swaps with term', [r.stacks, r.swapOut], [[['term', 'files'], ['chrome']], ['term']]);
+  r = slotStacks(r.stacks, ['files', 'chrome', 'term'], min(['term']));
+  eq('slots: after the swap, nothing more to do', r.swapOut, []);
+  r = slotStacks(r.stacks, ['chrome', 'term'], min(['term']));
+  eq('slots: files closed, term keeps the slot (free)', r.stacks, [['term'], ['chrome']]);
+  r = slotStacks(r.stacks, ['chrome'], min([]));
+  eq('slots: term closed, its slot goes', r.stacks, [['chrome']]);
+  eq('slots: a minimized window never placed gets no slot', slotStacks([], ['a', 'b'], min(['a'])).stacks, [['b']]);
+  eq('slots: two new windows, one free slot', slotStacks([['x']], ['x', 'p', 'q'], min(['x'])).stacks, [['x', 'p'], ['q']]);
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

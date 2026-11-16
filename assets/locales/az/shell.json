@@ -484,6 +484,7 @@
   "ws.lock.window": "Kilidlidir: çərçivədəki kilidlə açın",
   "ws.minimized.label": "Kiçildilmiş",
   "ws.minimized.title": "Bu ekranda kiçildilmiş pəncərələr: qaytarmaq üçün birinə klikləyin",
+  "ws.slot.free": "Boş yer: tətbiq açın və ya kiçildilmiş birini qaytarın",
   "ws.window.tile": "Bu pəncərəni düz",
   "ws.window.float": "Bu pəncərəni sərbəst burax",
   "ws.notif.title": "Bildirişlər",

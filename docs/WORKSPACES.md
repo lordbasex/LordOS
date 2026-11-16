@@ -68,6 +68,11 @@ displays do. Nothing runs per frame, nothing polls.
   windows may open on a locked display and take their tile.
 - **The frame header** names the display by its model, plus its connector when two displays share the model
   ("S27F350 · DP-2").
+- **Tiles are slots** (`model/layouts.js` `slotStacks`). A window minimized while in a tile keeps its slot: the other
+  windows stay where they are and the slot shows as a dashed free space with Add window. A window that opens takes
+  the first free slot of its display; a window brought back from minimized takes its slot again, and the window shown
+  there meanwhile is minimized (they swap). Closing a window gives its slot up. A window minimized before the tiler
+  placed it gets no slot.
 - **A window moved or resized by hand** (or maximized, or snapped) leaves its tile and floats until **Tile this
   window** from its title bar's menu. Dialogs, notices and the theme's own panels never tile.
 - **A window whose minimum size is bigger than its tile** keeps its minimum at the tile's corner, inside the work area

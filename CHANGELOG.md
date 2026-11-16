@@ -41,7 +41,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). ❖V pastes in LordOS apps, as in Lord Flow
     (❖⇧V opens the clipboard). A maximized window fills the frame's work area and keeps its rounded
     corners. Minimized windows stay on their display: its frame header shows them as icons ("Minimized"),
-    the minimize effect shrinks the window there, and a click brings it back where it was. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    the minimize effect shrinks the window there, and a click brings it back where it was. In a tiled layout a minimized window keeps its place: the others don't
+    grow into it, the free space shows with Add window, a new app takes it, and bringing the first back swaps the two.
+    A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
     still closes it. The tiler writes the window store once per change and

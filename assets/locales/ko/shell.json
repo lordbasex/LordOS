@@ -477,6 +477,7 @@
   "ws.lock.window": "잠김: 프레임의 자물쇠로 해제하세요",
   "ws.minimized.label": "최소화됨",
   "ws.minimized.title": "이 디스플레이에서 최소화한 창: 클릭하면 다시 나타납니다",
+  "ws.slot.free": "빈 공간: 앱을 열거나 최소화한 창을 다시 불러오세요",
   "ws.window.tile": "이 창을 타일에 배치",
   "ws.window.float": "이 창을 자유롭게 두기",
   "ws.notif.title": "알림",

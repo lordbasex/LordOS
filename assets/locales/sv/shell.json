@@ -484,6 +484,7 @@
   "ws.lock.window": "Låst: lås upp med hänglåset i ramen",
   "ws.minimized.label": "Minimerade",
   "ws.minimized.title": "Minimerade fönster på den här skärmen: klicka för att ta tillbaka",
+  "ws.slot.free": "Ledigt utrymme: öppna en app eller ta tillbaka en minimerad",
   "ws.window.tile": "Placera fönstret",
   "ws.window.float": "Låt fönstret vara fritt",
   "ws.notif.title": "Notiser",

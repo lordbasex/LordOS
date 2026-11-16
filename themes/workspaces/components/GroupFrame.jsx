@@ -11,7 +11,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled } from '../tiler.js';
 import { Surface } from './Surface.jsx';
 import { noteLaunch } from '../state.js';
 
@@ -131,6 +131,12 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const count = useStore(windows, countOn(desk, d));
   const minIds = useStore(windows, minimizedOn(desk, d));
   const minimized = minIds ? minIds.split('\n') : [];
+  // the free slots of this display's tiles (a window minimized there keeps its place): a dashed outline to fill
+  const holesJson = useStore(tiled, (s) => JSON.stringify(s.holes?.[dkey] || []));
+  const holes = JSON.parse(holesJson);
+  // the divider splits the slots (a free one included), not only the windows shown
+  const slotCount = useStore(tiled, (s) => s.counts?.[dkey] || 0);
+  const slots = Math.max(count, slotCount);
   const [picker, setPicker] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -190,7 +196,19 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
           </HeaderButton>
         </View>
       </View>
-      {count >= 2 && !locked ? <Splitter t={t} desk={desk} dkey={dkey} layout={layout} ratio={ratio} area={area} count={count} /> : null}
+      {holes.map((r, i) => (
+        <View key={`hole${i}`} style={{ position: 'absolute', left: r.x + 4, top: r.y + 4, width: r.w - 8, height: r.h - 8, borderRadius: 12,
+          border: `2px dashed ${alpha(meta.color, 0.55)}`, alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'box-none' }}>
+          <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.slot.free')}</Text>
+          {locked ? null : (
+            <View onClick={(e) => onAddWindow(d, e)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent }}>
+              <PlusGlyph color={t.onAccent} size={11} />
+              <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>
+            </View>
+          )}
+        </View>
+      ))}
+      {slots >= 2 && !locked ? <Splitter t={t} desk={desk} dkey={dkey} layout={layout} ratio={ratio} area={area} count={slots} /> : null}
       {/* kept mounted and only shown or hidden: an activity switch then changes one style here, not a whole card */}
       {showEmpty ? (
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',

@@ -477,6 +477,7 @@
   "ws.lock.window": "已鎖定：用框架上的鎖解鎖",
   "ws.minimized.label": "已最小化",
   "ws.minimized.title": "此顯示器上已最小化的視窗：點一下即可還原",
+  "ws.slot.free": "空位：開啟一個應用程式，或還原已最小化的視窗",
   "ws.window.tile": "並排此視窗",
   "ws.window.float": "讓此視窗浮動",
   "ws.notif.title": "通知",
