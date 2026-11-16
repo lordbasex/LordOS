@@ -203,6 +203,19 @@ function FilesSwitch({ t, wid, info }) {
   );
 }
 
+// one component for every status item, defined once: a component made inside StatusBar's render was a new type each
+// second, so React made every item's nodes again (and the compositor repainted them) with nothing changed
+function Item({ t, label, color, onClick }) {
+  return <Text onClick={onClick} style={small(t, { color: color || t.textDim })}>{label}</Text>;
+}
+
+// term.info every second: the same values keep the same object (no render)
+function sameInfo(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+}
+
 export function StatusBar({ t, sid, wid }) {
   const [info, setInfo] = useState(() => term.info(sid));
   const clock = useClock((d) => formatTime(d), 1000);
@@ -214,32 +227,31 @@ export function StatusBar({ t, sid, wid }) {
   const upPct = up.length ? Math.round(100 * up.reduce((a, j) => a + (j.done || 0), 0) / Math.max(1, up.reduce((a, j) => a + (j.total || 0), 0))) : 0;
   useEffect(() => {
     setInfo(term.info(sid));
-    const id = setInterval(() => setInfo(term.info(sid)), 1000);
+    const id = setInterval(() => { const n = term.info(sid); setInfo((o) => (sameInfo(o, n) ? o : n)); }, 1000);
     return () => clearInterval(id);
   }, [sid]);
   if (!info) return null;
   const home = lord.fs.home();
   const cwd = (m.cwd || info.cwd || '').replace(home, '~');
-  const Item = ({ label, color, onClick }) => <Text onClick={onClick} style={small(t, { color: color || t.textDim })}>{label}</Text>;
   return (
     <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 16, backgroundColor: t.sidebarBg }}>
       <Hairline edge="top" />
-      <Item label={cwd || '~'} />
+      <Item t={t} label={cwd || '~'} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Item label={info.busy ? (claude?.via ? `✳ ${programLabel('claude')} · ${programLabel(info.process)}` : `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}`) : `${info.shell || 'shell'}`}
+        <Item t={t} label={info.busy ? (claude?.via ? `✳ ${programLabel('claude')} · ${programLabel(info.process)}` : `${isClaude(info.process) ? '✳' : '▶'} ${programLabel(info.process)}`) : `${info.shell || 'shell'}`}
           color={info.busy ? (isClaude(info.process) || claude?.via ? '#d97757' : t.accent) : undefined}
           onClick={claude && !claude.via ? () => patchMeta(sid, { claudeConnect: true }) : undefined} />
         {claude && <ClaudeSegments t={t} wid={wid} sid={sid} c={claude} cols={info.cols} />}
       </View>
-      {m.lastExit > 0 && <Item label={tr('terminal.status.lastExit', { code: m.lastExit })} color="#ff453a" />}
+      {m.lastExit > 0 && <Item t={t} label={tr('terminal.status.lastExit', { code: m.lastExit })} color="#ff453a" />}
       <View style={{ flex: 1 }} />
-      {info.view > 0 && <Item label={tr('terminal.status.history', { n: info.view })} />}
-      {info.altScreen && <Item label={tr('terminal.status.altScreen')} />}
-      {up.length > 0 && <Item label={`↑ ${up.length} · ${upPct} %`} color="#ff9f0a" onClick={() => drops.set((d) => (d[sid] ? { ...d, [sid]: { ...d[sid], hidden: false } } : d))} />}
-      {fwd > 0 && <Item label={`⇄ ${fwd}`} onClick={(e) => { const w = getWin(wid); if (w) patchWin(wid, () => ({ fwdPanel: { tabId: w.active, x: e.x } })); }} />}
+      {info.view > 0 && <Item t={t} label={tr('terminal.status.history', { n: info.view })} />}
+      {info.altScreen && <Item t={t} label={tr('terminal.status.altScreen')} />}
+      {up.length > 0 && <Item t={t} label={`↑ ${up.length} · ${upPct} %`} color="#ff9f0a" onClick={() => drops.set((d) => (d[sid] ? { ...d, [sid]: { ...d[sid], hidden: false } } : d))} />}
+      {fwd > 0 && <Item t={t} label={`⇄ ${fwd}`} onClick={(e) => { const w = getWin(wid); if (w) patchWin(wid, () => ({ fwdPanel: { tabId: w.active, x: e.x } })); }} />}
       <FilesSwitch t={t} wid={wid} info={info} />
-      <Item label={`${info.cols}×${info.rows}`} />
-      <Item label={clock} />
+      <Item t={t} label={`${info.cols}×${info.rows}`} />
+      <Item t={t} label={clock} />
     </View>
   );
 }

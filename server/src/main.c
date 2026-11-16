@@ -339,6 +339,17 @@ static void view_of(const Out *o, int index) {
     paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, index };
 }
 static void view_reset(void) { paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 }; }
+/* The displays the UI is painted on, for the blurred backdrop cache (paint.c): a blurred node is left out of the
+ * blur rule only when every display showing it keeps its blurred pixels */
+static void paint_views_set(const Server *s) {
+    paint_nviews = 0;
+    for (int i = 0; i <= OUT_MAX && paint_nviews < PAINT_VIEWS_MAX; i++) {
+        const Out *o = i < OUT_MAX ? &s->out[i] : &s->cap;
+        if (!o->on) continue;
+        paint_views[paint_nviews++] = (PaintViewBox){ { (float)o->v.x, (float)o->v.y, (float)(o->v.x + o->v.w), (float)(o->v.y + o->v.h) },
+                                                      (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, i };
+    }
+}
 
 /* "text" for JSON (display names come from EDID: printable ASCII, but escaped anyway). */
 static void jquote(char *out, size_t n, const char *s) {
@@ -918,6 +929,7 @@ static void plan_drop(DisplayPlan *p, int j) {
 /* Between frames (no flip pending): open, move, modeset and close heads so the displays match
  * the plan. out[0] keeps the card's fd: if its display went away it takes another one. */
 static void outputs_apply(Server *s) {
+    paint_blur_cache_reset();            /* kept blurred pixels belong to the old displays */
     Kms *k0 = K0(s);
     if (s->headless || k0->fd < 0) return;
     KmsOutput ko[KMS_MAX_OUTPUTS];
@@ -1436,7 +1448,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
      * own; r, what is presented, is the box around them (the scene keeps the pixels in between) */
     Box lb = o->pl.n ? o->pl.r[0] : (Box){ 0, 0, 0, 0 };
     for (int k = 1; k < o->pl.n; k++) lb = box_join(lb, o->pl.r[k]);
-    int multi = !whole && o->pl.n > 1 && !gpu_active() && lb.x0 == b.x0 && lb.y0 == b.y0 && lb.x1 == b.x1 && lb.y1 == b.y1;
+    int multi = !whole && o->pl.n > 1 && lb.x0 == b.x0 && lb.y0 == b.y0 && lb.x1 == b.x1 && lb.y1 == b.y1;
     DamageList l = { .n = 0 };
     if (multi) l = o->pl;
     else if (!whole) dlist_add(&l, b);
@@ -1447,7 +1459,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         b = l.r[0];
         for (int k = 1; k < l.n; k++) b = box_join(b, l.r[k]);
     }
-    multi = !whole && !gpu_active() && l.n > 1;
+    multi = !whole && l.n > 1;
     int nparts = multi ? l.n : 1;
     /* GPU drag (paint_root_gdrag): one box on a GPU display while a window is dragged */
     int gdrag = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
@@ -1465,6 +1477,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     o->pframes = 0;
     double t0 = now_ms(), px = 0;
     view_of(o, index);
+    paint_blur_cache_on = 1;                /* a display's scene: its blurred backdrops may be kept and reused */
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = whole ? (Rect){ 0, 0, o->scene.w, o->scene.h } : out_phys_rect(&o->v, q.x0, q.y0, q.x1, q.y1);
@@ -1488,6 +1501,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->scene, (Rect){ 0, 0, o->scene.w, o->scene.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     view_reset();
@@ -1953,14 +1967,20 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
          * composed while the remote desktop reads it back) */
         /* GPU drag: the strips around the window, and the window from its textures (gpu_frame_ex); a frame
          * with nothing painted while the last one had it draws it again (its rectangle is stale) */
-        Rect up[4] = { r };
+        /* what paint_out painted: each damaged rectangle on its own (paint.c, "Several damaged rectangles") */
+        Rect up[DAMAGE_MAX] = { r };
         int nup = 1, gdragdrawn = 0;
+        if (!o->gdragtaken && o->npainted > 1 && r.x1 > r.x0) {
+            nup = 0;
+            for (int k = 0; k < o->npainted && nup < DAMAGE_MAX; k++)
+                up[nup++] = (Rect){ (int)o->painted[k].x0, (int)o->painted[k].y0, (int)o->painted[k].x1, (int)o->painted[k].y1 };
+        }
         GpuDrag again;
         const GpuDrag *gdrag = NULL;
         if (o->gdragtaken) {
             gdrag = &o->gdrag;
             nup = o->gdrag.nstrip;
-            memcpy(up, o->gdrag.strip, sizeof up);
+            memcpy(up, o->gdrag.strip, sizeof o->gdrag.strip);
         } else if (o->gdrag_on && r.x1 <= r.x0) {
             again = o->gdrag;
             again.lpx = again.bpx = NULL;
@@ -2142,6 +2162,7 @@ static int render_frame(Server *s) {
             if (fpipe_hold_callbacks(o->prep, o->prep_js)) ui_js_hold = 1;
             o->prep_js = 0;
         }
+    paint_views_set(s);
     paint_ui(s);
     s->last_render = now_ms();
     cursor_mark(s);
@@ -2359,6 +2380,7 @@ static int check_code(int argc, char **argv) {
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
  * back: the caller keeps `current` then, so a second failed switch never falls back to a refused theme */
 static int switch_theme(const char *current) {
+    paint_blur_cache_reset();            /* the new theme's nodes may reuse the old ids */
     char path[sizeof ui.theme_request];
     snprintf(path, sizeof path, "%s", ui.theme_request);
     ui.theme_request[0] = 0;
@@ -2572,7 +2594,7 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter) sni_start();      /* the tray icons of Linux apps (ui/sni.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
-    if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "multi")) paint_multi_damage = 1;   /* several damaged rectangles (paint.c; off by default) */
+    if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
     tp_route_init(&tp_host);
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,

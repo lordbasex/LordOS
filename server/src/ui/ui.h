@@ -318,6 +318,15 @@ void   image_draw(Canvas *c, Image *img, float x, float y, float w, float h, flo
  * index tells displays apart (the window-drag layer belongs to one of them). Default: 1:1. */
 typedef struct { float x, y, k, dx, dy; int index; } PaintView;
 extern PaintView paint_view;
+/* The blurred backdrop cache (paint.c): main.c says which displays are painted (logical box, scale, view) and
+ * turns it on around a display's paint; a display change resets it */
+#define PAINT_VIEWS_MAX 9
+typedef struct { Box b; float x, y, k, dx, dy; int index; } PaintViewBox;
+extern PaintViewBox paint_views[PAINT_VIEWS_MAX];
+extern int paint_nviews;
+extern int paint_blur_cache_on;
+extern void (*damage_hook)(Box b);      /* node.c damage_add: set by paint.c during its damage walk */
+void paint_blur_cache_reset(void);
 void  paint_layer_view(int index);  /* the display with most of the window being moved */
 int   paint_layer_node(void);       /* that window's node (0: no drag layer) */
 int   paint_damage(Node *root);     /* computes ui.damage; 0 if there is nothing to repaint */
