@@ -8,7 +8,7 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
 import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
@@ -238,8 +238,10 @@ function sync() {
     if (!s) continue;
     const st = surfaceState(w, active);
     const cov = covered.has(w.id);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov); }
+    // locked (the theme's padlock, isWindowLocked): the app is told it can't maximize or minimize, and its own buttons go
+    const fixed = isWindowLocked(w.id);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed); }
   }
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
@@ -249,6 +251,7 @@ function sync() {
   if (top?.attention) setTimeout(() => wm.setAttention(top.id, false), 0);
 }
 windows.subscribe(sync);
+windowLocks.subscribe(sync);
 activeDesktop.subscribe(sync);
 overviewShowing.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());

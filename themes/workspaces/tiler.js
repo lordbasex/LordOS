@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
@@ -80,6 +80,7 @@ export function setLocked(desk, dkey, on) {
     if (on) next.locked = true; else delete next.locked;
     return { ...m, layouts: { ...m.layouts, [dkey]: next } };
   });
+  locksChanged();
 }
 // whether window w is on a locked display of its activity (the display its frame is on)
 export const windowLocked = (w) => !!w && !w.pip && isLocked(w.desktop, keyOfDisplay(displayFor(wFrame(w))));
@@ -216,4 +217,6 @@ export function startTiler() {
   windows.subscribe(schedule);
   activeDesktop.subscribe(schedule);
   activities.subscribe(schedule);
+  // a padlock read from the settings (the session's start, another activity's) reaches the Linux apps too
+  activities.subscribe(locksChanged);
 }

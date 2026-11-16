@@ -129,6 +129,7 @@ struct Surf {
     struct wl_resource *dlg;
     int modal;
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
+    int fixed;                      /* locked by the theme (wl_set_fixed): no maximize or minimize offered or done */
     struct wl_resource *kde;
     /* popup menu */
     Surf *parent;
@@ -228,6 +229,19 @@ static void fs_rect(float *x, float *y, float *w, float *h) {
     if (fs_slot >= 0 && fs_slot < OUT_MAX && oslots_used(fs_slot)) { oslot_rect(fs_slot, x, y, w, h); return; }
     *x = 0; *y = 0; *w = ui.width; *h = ui.height;
 }
+/* Where the pointer was last (wl_pointer), for the keyboard's fullscreen rule. */
+static float ptr_last_x = -1, ptr_last_y = -1;
+/* A fullscreen window owns its own display only: the pointer on another display goes to what is there (the desktop
+ * and its windows), and the keys follow the pointer's display (several monitors: a video full screen on one, work on
+ * the others). With one display that is the whole screen, as before. */
+static int on_fs(float x, float y) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    return x >= fx && x < fx + fw && y >= fy && y < fy + fh;
+}
+/* the keyboard's side: before the pointer ever moved, a fullscreen window has the keys wherever it is */
+static int ptr_on_fs(void) { return ptr_last_x < 0 ? fs_surf && fs_surf->content : on_fs(ptr_last_x, ptr_last_y); }
 
 /* cursor of the app with the pointer: 0 LordOS arrow, 1 app image, 2 hidden */
 static Surf *cursor_surf;
@@ -2387,12 +2401,17 @@ static void top_min_size(struct wl_client *c, struct wl_resource *r, int32_t w, 
     Surf *s = wl_resource_get_user_data(r);
     if (s) { s->min_w = w; s->min_h = h; }
 }
+/* A refused request still gets its answer: a configure with the state as it is (xdg-shell asks for one after
+ * set_maximized and unset_maximized; an app that waits for it, Google Chrome, stops responding without it). */
+static void refuse_state(Surf *s) { if (s && s->xdg && s->sent_configure) send_toplevel_configure(s); }
 static void top_maximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
+    if (s && s->fixed) { refuse_state(s); return; }
     if (s && s->mapped) emit(s, "maximize", "{}");
 }
 static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
+    if (s && s->fixed) { refuse_state(s); return; }
     if (s && s->mapped) emit(s, "unmaximize", "{}");
 }
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
@@ -2455,7 +2474,7 @@ static void top_unfullscreen(struct wl_client *c, struct wl_resource *r) {
 }
 static void top_minimize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) emit(s, "minimize", "{}");
+    if (s && s->mapped && !s->fixed) emit(s, "minimize", "{}");
 }
 static const struct xdg_toplevel_interface toplevel_impl = {
     .destroy = top_destroy, .set_parent = top_parent, .set_title = top_title, .set_app_id = top_app_id,
@@ -2504,6 +2523,17 @@ static void pop_gone(struct wl_resource *r) {
 /* ---- xdg_surface / xdg_wm_base ---- */
 
 static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* What the window manager offers this toplevel (xdg-shell 5): maximize and minimize, none while it is locked. */
+static void send_caps(Surf *s) {
+    if (!s || !s->top || wl_resource_get_version(s->top) < 5) return;
+    struct wl_array caps;
+    wl_array_init(&caps);
+    uint32_t *p;
+    if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+    if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
+    xdg_toplevel_send_wm_capabilities(s->top, &caps);
+    wl_array_release(&caps);
+}
 static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
@@ -2515,15 +2545,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
     s->role = R_TOPLEVEL;
     s->csd = !s->kde_ssd;                   /* until it asks for server decoration */
     if (!s->app_id[0]) set_app_id(s, c, "");
-    if (wl_resource_get_version(t) >= 5) {
-        struct wl_array caps;
-        wl_array_init(&caps);
-        uint32_t *p;
-        if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
-        if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
-        xdg_toplevel_send_wm_capabilities(t, &caps);
-        wl_array_release(&caps);
-    }
+    send_caps(s);
 }
 static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) {
     Surf *s = wl_resource_get_user_data(r);
@@ -3296,7 +3318,7 @@ static Surf *surface_under_ex(float x, float y, Node *hit, float *lx, float *ly,
         if (skip_xicon && popups[i]->xw && xwm_is_dnd_icon(popups[i]->xw)) continue;   /* an X app's drag icon */
         if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
     }
-    if (!target && fs_surf && fs_surf->content) {
+    if (!target && on_fs(x, y)) {
         float ox, oy;
         if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, lx, ly);
     } else if (!target && hit && hit->type == NODE_SURFACE) {
@@ -3931,6 +3953,7 @@ int wl_drag_files_taken(void) {
 }
 
 int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel) {
+    ptr_last_x = x; ptr_last_y = y;
     if (!dpy) return 0;
     for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
     if (seat_held < 0) seat_held = 0;
@@ -3956,7 +3979,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
             if (!t || t->role != R_POPUP) dismiss_popups();
         }
     pointer_enter(target, lx, ly);
-    if (!target) return fs_surf && fs_surf->content ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
+    if (!target) return on_fs(x, y) ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
     /* a window under a modal dialog gets no presses and no wheel (releases still go: a drag ends);
      * the theme still sees the click and brings the dialog forward (sdk/dialogmodel.js) */
     Surf *owner = target;
@@ -3990,7 +4013,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     if (xheld && !buttons_held) xdrag_release();
     Surf *top = target;
     while (top && top->role == R_SUB) top = top->parent;
-    if (fs_surf && fs_surf->content) return 2;  /* fullscreen: the UI does not see the pointer */
+    if (on_fs(x, y)) return 2;                  /* over a fullscreen window: the UI does not see the pointer */
     return top && top->role == R_POPUP ? 2 : 1;
 }
 
@@ -4372,7 +4395,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
         else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
         return 0;
     }
-    if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
+    if (ptr_on_fs() && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     /* An app holding the shortcuts gets every key but the few kbi_route keeps; ❖Esc turns that off, and with it
      * a locked pointer and fullscreen, so everything is LordOS's again; pressed again it holds again. */
     KbInhib *ki = value == 1 && was_to_app ? focus_inhibitor() : NULL;
@@ -4955,7 +4978,7 @@ void wl_set_focus(int id) {
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
-    if (fs_surf && fs_surf->content) s = fs_surf;      /* in fullscreen the keyboard is its own */
+    if (ptr_on_fs()) s = fs_surf;    /* the pointer on a fullscreen window's display: the keyboard is its own */
     if (s == key_focus) return;
     struct wl_resource *kb;
     if (key_focus) {
@@ -5043,6 +5066,18 @@ const char *wl_kill(int id) {
     if (kill(pid, SIGKILL)) return "app.forceQuitFailed";
     fprintf(stderr, "wayland: force quit pid %d (window %d)\n", (int)pid, id);
     return NULL;
+}
+
+/* Locked by the theme (Lord Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
+ * wm_capabilities, which Chromium and GTK 4 read to hide those buttons; a new list takes effect with the next
+ * configure), and its requests to do so are answered with the state as it is. Its own close button stays: closing is
+ * the app's. */
+void wl_set_fixed(int id, int fixed) {
+    Surf *s = find(id);
+    if (!s || !s->top || s->fixed == !!fixed) return;
+    s->fixed = !!fixed;
+    send_caps(s);
+    if (s->xdg && s->sent_configure) send_toplevel_configure(s);
 }
 
 void wl_set_state(int id, int maximized, int fullscreen) {
@@ -5249,7 +5284,7 @@ struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly) {
         float ox, oy;
         if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
     }
-    if (!target && fs_surf && fs_surf->content) {
+    if (!target && on_fs(x, y)) {
         float ox, oy;
         if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, lx, ly);
     } else if (!target) {

@@ -504,6 +504,13 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
   ❖Esc, the lock (❖L, ❖⌃Q), Ctrl+Alt+F1…F12, the media, sound and light keys and Print Screen (`keygrab_system_key`),
   and the ones `on_input` in `main.c` handles before any of this (⌃⌥⌫, ⌃⌥⇧Esc). A key's release and repeats go
   where its press went.
+- **Fullscreen and several displays.** A fullscreen window is presented on its own display and owns only that one:
+  the pointer on another display reaches the desktop and its windows, and the keys go to the fullscreen window while
+  the pointer is on its display (`on_fs`, `ptr_on_fs` in `wl.c`).
+- **Locked windows** (`wl_set_fixed`, from `lord.wayland.state`'s seventh argument; Lord Workspaces' padlock): the app
+  gets an empty `wm_capabilities` (no maximize, no minimize) and a configure, its set_maximized/unset_maximized are
+  answered with a configure of the state as it is, and set_minimized is ignored. Any refused maximize request is
+  answered that way: an app such as Chrome waits for the configure.
 - **❖Esc** turns it off for that window (`inactive`) and with it a locked pointer and fullscreen, so everything is
   LordOS's again; pressed again in front of the same window it holds again (`active`). ❖Esc's own press and release
   reach nobody.

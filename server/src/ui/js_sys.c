@@ -1637,6 +1637,7 @@ static JSValue f_wl_state(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (argc > 3) wl_set_minimized(id, JS_ToBool(c, argv[3]));
     if (argc > 4) wl_set_parked(id, JS_ToBool(c, argv[4]));
     if (argc > 5) wl_set_covered(id, JS_ToBool(c, argv[5]));
+    if (argc > 6) wl_set_fixed(id, JS_ToBool(c, argv[6]));
     return JS_UNDEFINED;
 }
 
@@ -1791,7 +1792,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
-    JS_CFUNC_DEF("state", 6, f_wl_state),
+    JS_CFUNC_DEF("state", 7, f_wl_state),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };

@@ -176,6 +176,10 @@ export function configureWindows({ apps, workArea, chrome: c, snap, locked }) {
 // minimize, toggleMaximize, snap, snapKey, center, arrange and close (unless forced) leave a locked window as it is;
 // what a program does to it (setFrame, the tiler, a forced close, the app closing its own window) still applies.
 let lockedFn = null;
+// bumped by the theme when what is locked changes without a window changing (a padlock turned): the Wayland side
+// tells the apps again (sdk/wayland.js)
+export const windowLocks = createStore(0);
+export const locksChanged = () => windowLocks.set(windowLocks.get() + 1);
 export const isWindowLocked = (id) => {
   if (!lockedFn) return false;
   const w = windows.get().find((x) => x.id === id);

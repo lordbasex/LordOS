@@ -62,6 +62,7 @@ void wl_close(int id);                  /* asks the app to close the window */
 void wl_close_all(int ms);              /* every app asked to close, then waits for them: at most ms */
 const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);
+void wl_set_fixed(int id, int fixed);     /* locked by the theme: no maximize or minimize offered or done */
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
 void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */

@@ -92,6 +92,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A fullscreen window took the mouse and the keyboard of every monitor (all themes).** With a YouTube video full
+  screen on one display, the pointer did nothing on the others and every key went to the video until it left
+  fullscreen. Now a fullscreen window owns its own display only (`server/src/wl/wl.c` `on_fs`): the pointer on another
+  display reaches the desktop and its windows there, and the keys go to the fullscreen window while the pointer is on
+  its display (or before the pointer has moved), else to the window focused elsewhere. One display: as before.
+- **A Linux app's maximize or unmaximize request that LordOS refused got no answer** (xdg-shell asks for a configure
+  after each), and Google Chrome stopped responding while it waited. Refused requests are answered with the state as it
+  is. Lord Workspaces' padlock also tells the app it can't maximize or minimize (xdg-shell 5 `wm_capabilities`,
+  `wl_set_fixed`, the seventh argument of `lord.wayland.state`), so Chromium hides those buttons; its own close
+  button stays, as closing is the app's.
 - **Lord Workspaces froze a desktop with three monitors (in development; found on the maintainer's computer with the
   0.8.8.10~ws1 test build).** What froze it is not reproduced yet (headless, CPU path: no stall in a stress of layouts,
   the Apps panel, Google Chrome and a terminal); the watchdog above now names it if it happens again. Fixed meanwhile:
