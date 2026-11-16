@@ -1115,6 +1115,9 @@ static void sim_free(SimOut *o) { free(o->scene); free(o->buf[0]); free(o->buf[1
 
 /* main.c paint_ui: layout, damage, and the damage goes to the display's pending list */
 static void sim_paint_ui(SimOut *o, Node *root) {
+    (void)o;
+    paint_nviews = 1;                       /* main.c paint_views_set: one display */
+    paint_views[0] = (PaintViewBox){ { 0, 0, SW, SH }, 0, 0, 1, 0, 0, 0 };
     layout_root(root, SW, SH);
     Box d = { 0, 0, 0, 0 };
     if (paint_damage(root)) d = ui.damage;
@@ -1157,6 +1160,7 @@ static Rect sim_paint_out(SimOut *o, Node *root, int *nparts_out) {
     else parts[0] = b;
     o->pl.n = 0;
     o->pframes = 0;
+    paint_blur_cache_on = !getenv("SIM_NO_BLUR_CACHE");    /* main.c paint_out: the blurred backdrop cache */
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = { (int)floorf(fmaxf(q.x0, 0)), (int)floorf(fmaxf(q.y0, 0)), (int)ceilf(fminf(q.x1, SW)), (int)ceilf(fminf(q.y1, SH)) };
@@ -1170,6 +1174,7 @@ static Rect sim_paint_out(SimOut *o, Node *root, int *nparts_out) {
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
     }
     *nparts_out = nparts;
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->sc, (Rect){ 0, 0, SW, SH });
     ui.damage = (Box){ 0, 0, 0, 0 };
     return r;
@@ -1673,6 +1678,65 @@ static void test_gcontend(void) {
     CHECK(l && strstr(js, "\"load\":\"read\"") && strstr(js, "\"busMBs\":null") && strstr(js, "\"gpuP50\":14.000"), "json");
     CHECK(gc_json(&mem[4], js, 8) == 0, "json that doesn't fit");
 #undef GR
+}
+
+/* The blurred backdrop cache (paint.c, 0.8.8.10): four frosted cards 16 px apart over a striped wallpaper, like
+ * Lord Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
+ * a stripe changing under a card, a card moving and a card's own blur changing blur again; every frame is the
+ * same as a full repaint. */
+static void test_blur_cache(void) {
+    enum { W = 900, H = 360 };
+    paint_multi_damage = 1;
+    ui_reset();
+    paint_blur_cache_reset();
+    paint_nviews = 1;
+    paint_views[0] = (PaintViewBox){ { 0, 0, W, H }, 0, 0, 1, 0, 0, 0 };
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff102030);
+    Node *stripes[18];
+    for (int i = 0; i < 18; i++) stripes[i] = box_in(root, (float)(i * 50), 0, 22, H, i % 2 ? 0xffc04060 : 0xff40a0c0);
+    Node *card[4], *hand[4];
+    for (int i = 0; i < 4; i++) {
+        card[i] = box_in(root, 30 + i * (186 + 16), 60, 186, 186, 0x60ffffff);
+        sn(card[i], "backdropBlur", 24);
+        sn(card[i], "borderRadius", 18);
+        ss(card[i], "overflow", "hidden");
+        hand[i] = box_in(card[i], 90, 40, 4, 50, 0xffffffff);
+    }
+    paint_blur_cache_on = 1;
+    render(root, W, H);
+    int bad = 0, small = 0, big = 0, ticks = 0;
+    float card_area = 186.0f * 186.0f;
+    for (int f = 0; f < 40; f++) {
+        int tick = f % 5 != 4 && f != 21 && f != 27 && f != 33;
+        if (tick) { sn(hand[f % 4], "left", 60 + (float)((f * 7) % 60)); ticks++; }
+        if (f == 9) sn(stripes[5], "backgroundColor", 0xff30ff30);     /* under the second card: blurred again */
+        if (f == 21) sn(card[2], "left", 30 + 2 * (186 + 16) + 6);     /* a card moves */
+        if (f == 27) sn(card[1], "backdropBlur", 12);                  /* a card's own blur */
+        if (f == 33) node_destroy(stripes[12]);                        /* a stripe goes away under the third card */
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        paint_blur_cache_on = 1;
+        int r = paint_partial(root, W, H, &n, &area);
+        paint_blur_cache_on = 0;
+        if (r < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) {
+            if (bad < 3) printf("  blur cache frame %d: differs from a full repaint by %d at %d,%d\n", f, worst, where % W, where / W);
+            bad++;
+        }
+        if (tick && f != 9 && f != 10 && area > 0 && area < card_area * 0.25f) small++;
+        if (!tick || f == 9) big += area >= card_area;
+    }
+    CHECK(!bad, "blur cache: %d frames differ from a full repaint", bad);
+    CHECK(small >= ticks - 2, "blur cache: a hand inside a frosted card repaints the hand alone (%d of %d frames)", small, ticks);
+    CHECK(big >= 4, "blur cache: a change below or of a card blurs it again (%d frames)", big);
+    printf("blur cache: %d of %d hand frames repainted under a quarter of a card\n", small, ticks);
+    paint_blur_cache_on = 0;
+    paint_nviews = 0;
+    paint_blur_cache_reset();
 }
 
 static void test_damage_fuzz(void) {
@@ -2224,8 +2288,10 @@ static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
     ui.damage = (Box){ lx0, ly0, lx1, ly1 };
     canvas_set_clip(&o->c, pr);
     int taken = 0;
+    paint_blur_cache_on = 1;
     if (test_gdrag) taken = paint_root_gdrag(&o->c, root, &o->g);
     else paint_root_clear(&o->c, root, 0x000000);
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
@@ -2249,6 +2315,10 @@ static void drag_present(DOut *const *os, int n) {
 static void drag_paint_n(Node *root, DOut *const *os, int n) {
     if (!ui.dirty) return;
     ui.dirty = 0;
+    paint_nviews = 0;                       /* main.c paint_views_set */
+    for (int i = 0; i < n && i < PAINT_VIEWS_MAX; i++)
+        paint_views[paint_nviews++] = (PaintViewBox){ { (float)os[i]->v.x, (float)os[i]->v.y, (float)(os[i]->v.x + os[i]->v.w), (float)(os[i]->v.y + os[i]->v.h) },
+                                                      (float)os[i]->v.x, (float)os[i]->v.y, (float)os[i]->v.k, (float)os[i]->v.dx, (float)os[i]->v.dy, i };
     layout_root(root, DW, DH);
     Box d = { 0, 0, 0, 0 };
     if (paint_damage(root)) d = ui.damage;
@@ -3435,6 +3505,7 @@ int main(int argc, char **argv) {
     test_gcontend();
     memset(&gc_all, 0, sizeof gc_all);
     test_damage_pipeline();
+    test_blur_cache();
     test_damage_fuzz();
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);

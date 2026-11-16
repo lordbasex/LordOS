@@ -338,6 +338,17 @@ static void view_of(const Out *o, int index) {
     paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, index };
 }
 static void view_reset(void) { paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 }; }
+/* The displays the UI is painted on, for the blurred backdrop cache (paint.c): a blurred node is left out of the
+ * blur rule only when every display showing it keeps its blurred pixels */
+static void paint_views_set(const Server *s) {
+    paint_nviews = 0;
+    for (int i = 0; i <= OUT_MAX && paint_nviews < PAINT_VIEWS_MAX; i++) {
+        const Out *o = i < OUT_MAX ? &s->out[i] : &s->cap;
+        if (!o->on) continue;
+        paint_views[paint_nviews++] = (PaintViewBox){ { (float)o->v.x, (float)o->v.y, (float)(o->v.x + o->v.w), (float)(o->v.y + o->v.h) },
+                                                      (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, i };
+    }
+}
 
 /* "text" for JSON (display names come from EDID: printable ASCII, but escaped anyway). */
 static void jquote(char *out, size_t n, const char *s) {
@@ -917,6 +928,7 @@ static void plan_drop(DisplayPlan *p, int j) {
 /* Between frames (no flip pending): open, move, modeset and close heads so the displays match
  * the plan. out[0] keeps the card's fd: if its display went away it takes another one. */
 static void outputs_apply(Server *s) {
+    paint_blur_cache_reset();            /* kept blurred pixels belong to the old displays */
     Kms *k0 = K0(s);
     if (s->headless || k0->fd < 0) return;
     KmsOutput ko[KMS_MAX_OUTPUTS];
@@ -1464,6 +1476,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     o->pframes = 0;
     double t0 = now_ms(), px = 0;
     view_of(o, index);
+    paint_blur_cache_on = 1;                /* a display's scene: its blurred backdrops may be kept and reused */
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = whole ? (Rect){ 0, 0, o->scene.w, o->scene.h } : out_phys_rect(&o->v, q.x0, q.y0, q.x1, q.y1);
@@ -1487,6 +1500,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->scene, (Rect){ 0, 0, o->scene.w, o->scene.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     view_reset();
@@ -2147,6 +2161,7 @@ static int render_frame(Server *s) {
             if (fpipe_hold_callbacks(o->prep, o->prep_js)) ui_js_hold = 1;
             o->prep_js = 0;
         }
+    paint_views_set(s);
     paint_ui(s);
     s->last_render = now_ms();
     cursor_mark(s);
@@ -2364,6 +2379,7 @@ static int check_code(int argc, char **argv) {
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
  * back: the caller keeps `current` then, so a second failed switch never falls back to a refused theme */
 static int switch_theme(const char *current) {
+    paint_blur_cache_reset();            /* the new theme's nodes may reuse the old ids */
     char path[sizeof ui.theme_request];
     snprintf(path, sizeof path, "%s", ui.theme_request);
     ui.theme_request[0] = 0;
