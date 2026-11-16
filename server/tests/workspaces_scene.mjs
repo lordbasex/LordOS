@@ -151,6 +151,59 @@ offNotes();
 sdk.wm.close(stubborn, true);
 await flush();
 
+// the layout picker, clicked: the choice changes only the display whose header it was opened from
+{
+  const T = (k) => sdk.t(`shell.ws.layout.${k}`);
+  const textNode = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).map(([id]) => id);
+  const click = async (id) => { const p = parents.get(id) ?? id; globalThis.__lordEvent('down', p, 0, 0, 0); globalThis.__lordEvent('up', p, 0, 0, 0); await flush(); };
+  const before = ['DP-1', 'DP-2', 'HDMI-A-1'].map((k) => tiler.layoutOf(desk, k).layout);
+  const btn = textNode(T(before[0]));
+  check('picker: one header button on the left display', btn.length, 1);
+  await click(btn[0]);
+  const opt = textNode(T('halves'));
+  check('picker: open, with Two halves', opt.length, 1);
+  if (opt.length) await click(opt[0]);
+  check('picker: only the left display changed', ['DP-1', 'DP-2', 'HDMI-A-1'].map((k) => tiler.layoutOf(desk, k).layout), ['halves', before[1], before[2]]);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  await flush();
+}
+
+// the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
+{
+  const magnet = await import('../../themes/workspaces/magnet.js');
+  const work = plan(L).work;
+  const half = (zone) => sdk.snapRect(zone, sdk.workAreaOf(L));
+  const m1 = sdk.wm.open('extra20', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  const m2 = sdk.wm.open('extra21', { frame: { x: L.x + 300, y: 260, w: 500, h: 400 } });
+  await flush();
+  sdk.wm.snap(m1, 'left');
+  await flush();
+  check('magnet: the snapped window takes the left half', frameOf(m1), half('left'));
+  check('magnet: the only other window fills the right half', [frameOf(m2).x, frameOf(m2).y, frameOf(m2).w], [half('right').x, half('right').y, half('right').w]);
+  const l = frameOf(m1);
+  sdk.wm.setFrame(m1, { ...l, w: l.w + 120 });
+  await flush();
+  check('magnet: the right window follows the shared edge', [frameOf(m2).x, frameOf(m2).x + frameOf(m2).w], [l.x + l.w + 120, work.x + work.w]);
+  sdk.wm.move(m2, L.x + 200, 300);
+  await flush();
+  const after = frameOf(m2);
+  sdk.wm.setFrame(m1, { ...frameOf(m1), w: l.w });
+  await flush();
+  check('magnet: moved by hand, the pair ends', frameOf(m2), after);
+  const m3 = sdk.wm.open('extra22', { frame: { x: L.x + 500, y: 300, w: 400, h: 300 } });
+  await flush();
+  sdk.wm.snap(m3, 'right');
+  await flush();
+  const offer = magnet.assist.get();
+  check('magnet: several windows, a choice for the left half', offer && [offer.side, offer.ids.slice(0, 2).sort()], ['left', [m1, m2].sort()]);
+  magnet.choose(m2);
+  await flush();
+  check('magnet: the chosen window takes the left half', [frameOf(m2).x, frameOf(m2).w], [half('left').x, half('left').w]);
+  check('magnet: the chooser closed', magnet.assist.get(), null);
+  for (const id of [m1, m2, m3]) sdk.wm.close(id);
+  await flush();
+}
+
 // the effects styles: Crystal draws its sheen, Opaque no blur at all
 const blurred = () => [...styles].filter(([id, st]) => st.backdropBlur > 0 && attached(id)).length;
 const sheens = () => [...styles].filter(([id, st]) => st.gradient && st.pointerEvents === 'none' && attached(id)).length;

@@ -24,10 +24,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Control Center; it collapses to icons on its own below 1440 px, from its button or with ❖⌥D, and can show on every
     display. A status cluster holds the privacy indicators, the status items, the volume, notifications and the clock,
     which wakes once a minute.
-  - *Tiling:* a group frame per display with Change layout (Free, One at a time, Main and side, Three columns, Grid),
+  - *Tiling:* a group frame per display with Change layout, chosen per display (Free, One at a time, Two halves, Main
+    and side, Three columns, Grid),
     Add window, Save layout and Move to another activity. The divider of a split layout shows a line while dragged and
     applies on release; a window moved by hand floats until "Tile this window"; one whose minimum size is bigger than
-    its tile keeps its minimum inside the work area and says so. The tiler writes the window store once per change and
+    its tile keeps its minimum inside the work area and says so. In Free, the magnet: a window dragged to the left or
+    right edge takes that half and the only other window of the display fills the other one (with several, a chooser
+    over the empty half); resizing one of the pair by the shared edge moves the other's on release. With several
+    monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). The tiler writes the window store once per change and
     never runs per frame.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
     activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and

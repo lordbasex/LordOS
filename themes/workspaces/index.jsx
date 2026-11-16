@@ -6,11 +6,12 @@
 //
 //   tokens.js                   colours, the three materials and the shape tokens of the shared controls
 //   model/                      plain functions, tested with node: geometry (where things go on each display),
-//                               layouts (the tiles), activities (the settings key)
+//                               layouts (the tiles), magnet (the free layout's halves), activities (the settings key)
 //   state.js, tiler.js          the activities' data and the tiling at runtime
+//   magnet.js                   the free layout's magnet: the other half filled or chosen, the shared edge
 //   motion.js                   the transitions: cached transforms from one frame loop, none with Reduce motion
 //   components/                 Spine, TopBar (activity strip, status cluster), GroupFrame, Window, Search,
-//                               ControlCenter, ActivityEditor (onboarding and edit), Surface
+//                               ControlCenter, ActivityEditor (onboarding and edit), SnapAssist, Surface
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
@@ -28,6 +29,8 @@ import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/ac
 import { minimizeStarts } from '../default/minimize.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled } from './tiler.js';
+import { startMagnet } from './magnet.js';
+import { SnapAssist } from './components/SnapAssist.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
@@ -145,6 +148,7 @@ function useLeaving(list, spine) {
 function App() {
   startActivities();
   startTiler();
+  startMagnet();
   const [s] = useSettings();
   const prefs = wsPrefs(s);
   const surface = effectiveSurface(prefs, s);
@@ -165,8 +169,10 @@ function App() {
   const rtl = rtlNow();
   const displays = screenDisplays();
   const shown = shownDisplays(displays, screen.mirror);
-  const sig = shown.map((d) => `${d.id}:${d.x},${d.y},${d.w}x${d.h}:${d.main ? 1 : 0}`).join('|');
-  const plans = useMemo(() => shown.map((d) => ({ d, key: keyOfDisplay(d), plan: planFor(d, s) })), [sig, prefs.spine, prefs.spineEvery, rtl]);
+  const sig = shown.map((d) => `${d.id}:${d.connector || ''}:${d.x},${d.y},${d.w}x${d.h}:${d.main ? 1 : 0}`).join('|');
+  // a display's name in its frame header: its model, or its connector too when two displays share the model
+  const label = (d) => (d.connector && shown.filter((x) => x.name === d.name).length > 1 ? `${d.name || ''} · ${d.connector}`.replace(/^ · /, '') : d.name || String(d.id));
+  const plans = useMemo(() => shown.map((d) => ({ d, key: keyOfDisplay(d), label: label(d), plan: planFor(d, s) })), [sig, prefs.spine, prefs.spineEvery, rtl]);
   const main = plans.find((p) => p.d.main) || plans[0];
 
   // the work areas follow the spine and the displays live; the tiles are laid out again
@@ -225,8 +231,8 @@ function App() {
         ))}
         {displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
-        {plans.map(({ d, key, plan }) => (
-          <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
+        {plans.map(({ d, key, label: dname, plan }) => (
+          <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
             onAddWindow={H.addWindow} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
         {onboarding && main ? (
@@ -244,6 +250,7 @@ function App() {
           </Fragment>
         ))}
         {leavingWins.map((w) => <Window key={w.id} win={w} t={t} focused={false} app={getApp(w.id)} leaving />)}
+        <SnapAssist t={t} />
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (

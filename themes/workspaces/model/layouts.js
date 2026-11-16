@@ -1,12 +1,12 @@
 // layouts.js — Lord Workspaces' static tiling, as plain data (tested by server/tests/workspaces_model_test.mjs). The
 // runtime part is ../tiler.js, which moves windows with the SDK's own window store; nothing here moves anything.
 //
-//   LAYOUTS                          'free' (windows where the person puts them), 'single', 'split' (a main tile and a
-//                                    column), 'three' (three columns) and 'grid'
+//   LAYOUTS                          'free' (windows where the person puts them), 'single', 'halves' (two columns),
+//                                    'split' (a main tile and a column), 'three' (three columns) and 'grid'
 //   tileRects(layout, area, n, ratio)    n rectangles inside the work area (null for 'free')
 //   fitTile(r, min, area)            a tile too small for a window's minimum size: the window keeps its minimum, at the
 //                                    tile's corner, inside the area (it overlaps its neighbour instead of being cut)
-//   splitterAt / ratioFrom           the draggable divider of 'split' and 'three' and the ratio a drop gives
+//   splitterAt / ratioFrom           the draggable divider of 'halves', 'split' and 'three' and the ratio a drop gives
 //   orderFor(ids, keyOf, saved)      the tile order: a saved layout's apps first, in their saved order
 //   homeFor(key, saved, connected)   the display a saved layout put an app's window on, if that display is here
 //   displayKey(d, i)                 a display's stable name (its connector), for saved layouts
@@ -14,7 +14,7 @@
 //   judgeFrame(entry, frame, now)    what a window's change since the tiler placed it means: the same, the app's
 //                                    answer to the size it was given, or a move by hand
 //   underBudget(times, now)          whether one more move of a window fits its budget (MOVES_PER_SEC)
-export const LAYOUTS = ['free', 'single', 'split', 'three', 'grid'];
+export const LAYOUTS = ['free', 'single', 'halves', 'split', 'three', 'grid'];
 export const TILE_GAP = 10;
 export const RATIO_MIN = 0.25;
 export const RATIO_MAX = 0.75;
@@ -22,9 +22,10 @@ export const RATIO_MAX = 0.75;
 export const SIDE_ROWS = 3;
 
 export const cleanLayout = (l) => (LAYOUTS.includes(l) ? l : 'free');
-export const defaultRatio = (layout) => (layout === 'three' ? 1 / 3 : 2 / 3);
+export const defaultRatio = (layout) => (layout === 'three' ? 1 / 3 : layout === 'halves' ? 1 / 2 : 2 / 3);
+const DIVIDED = ['halves', 'split', 'three'];
 export function cleanRatio(layout, r) {
-  const v = Number(r);
+  const v = r == null || r === '' ? NaN : Number(r);
   if (!Number.isFinite(v)) return defaultRatio(layout);
   return Math.min(RATIO_MAX, Math.max(RATIO_MIN, v));
 }
@@ -52,6 +53,16 @@ export function tileRects(layout, area, n, ratio, gap = TILE_GAP) {
   if (l === 'free') return null;
   const a = R(area.x, area.y, area.w, area.h);
   if (l === 'single' || n === 1) return fill([a], n);
+  if (l === 'halves') {
+    // two columns; more windows stack in rows, the left column taking the odd one
+    const r = cleanRatio('halves', ratio);
+    const lw = (a.w - gap) * r;
+    const [left, right] = cols(a, [lw, a.w - gap - lw], gap);
+    const nl = Math.min(Math.ceil(n / 2), SIDE_ROWS), nr = Math.min(n - Math.ceil(n / 2), SIDE_ROWS);
+    const L = rows(left, nl, gap), Rr = rows(right, nr, gap);
+    // tile order alternates sides: 1 left, 2 right, 3 left…; past SIDE_ROWS a side's windows share its last row
+    return Array.from({ length: n }, (_, i) => (i % 2 === 0 ? L[Math.min(i / 2, nl - 1)] : Rr[Math.min((i - 1) / 2, nr - 1)]));
+  }
   if (l === 'split') {
     const r = cleanRatio('split', ratio);
     const mw = (a.w - gap) * r;
@@ -90,7 +101,7 @@ export function fitTile(r, min, area) {
 
 // The divider's x, or null where there is none (one window, 'single', 'grid', 'free').
 export function splitterAt(layout, area, ratio, n, gap = TILE_GAP) {
-  if (!area || n < 2 || (layout !== 'split' && layout !== 'three')) return null;
+  if (!area || n < 2 || !DIVIDED.includes(layout)) return null;
   const r = cleanRatio(layout, ratio);
   const inner = layout === 'three' && n > 2 ? area.w - 2 * gap : area.w - gap;
   return Math.round(area.x + inner * r + gap / 2);

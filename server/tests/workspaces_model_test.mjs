@@ -7,6 +7,7 @@ import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
 import { cleanThemeMeta, themeOptionValue, themeOptionPatch } from '../../sdk/thememeta.js';
+import { assistFor, follow, other } from '../../themes/workspaces/model/magnet.js';
 import { readFileSync } from 'node:fs';
 
 let ok = 0;
@@ -48,7 +49,7 @@ eq('off chrome: the work area', onChrome([p], 900, 600), false);
 
 // ---- layouts ----
 const A = { x: 0, y: 0, w: 1000, h: 600 };
-eq('layouts', LAYOUTS, ['free', 'single', 'split', 'three', 'grid']);
+eq('layouts', LAYOUTS, ['free', 'single', 'halves', 'split', 'three', 'grid']);
 eq('free has no tiles', tileRects('free', A, 3), null);
 eq('unknown layout is free', cleanLayout('spiral'), 'free');
 eq('single: monocle', tileRects('single', A, 2), [A, A]);
@@ -193,5 +194,48 @@ eq('deep accents for every name', Object.keys(deep), Object.keys(accents));
 eq('brand violets', [accents.violeta, deep.violeta], ['#7C5CFF', '#5B3FE0']);
 eq('an unknown accent is the brand violet', makeTheme({ mode: 'dark', accent: 'x' }).accent, '#7C5CFF');
 eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true))).blur, SPINE_BLUR);
+
+// ---- two halves ----
+{
+  const A = { x: 0, y: 0, w: 1010, h: 600 };
+  const h2 = tileRects('halves', A, 2, null);
+  eq('halves: two equal columns', h2, [{ x: 0, y: 0, w: 500, h: 600 }, { x: 510, y: 0, w: 500, h: 600 }]);
+  eq('halves: one window takes it all', tileRects('halves', A, 1, null), [{ x: 0, y: 0, w: 1010, h: 600 }]);
+  const h3 = tileRects('halves', A, 3, null);
+  eq('halves: three windows, the left column holds two rows', [h3[0].x, h3[2].x, h3[1].x, h3[0].h, h3[1].h], [0, 0, 510, 295, 600]);
+  const h9 = tileRects('halves', A, 9, null);
+  yes('halves: every window inside the area', h9.every((r) => r.x >= 0 && r.y >= 0 && r.x + r.w <= 1010 && r.y + r.h <= 600));
+  eq('halves: the divider in the middle', splitterAt('halves', A, null, 2), 505);
+  eq('halves: dragging the divider', ratioFrom('halves', A, 705, 2), cleanRatio('halves', 700 / 1000));
+  yes('halves is a layout', LAYOUTS.includes('halves') && cleanLayout('halves') === 'halves');
+}
+
+// ---- the free layout's magnet ----
+{
+  const area = { x: 0, y: 0, w: 1000, h: 600 };
+  const far = { x: 1000, y: 0, w: 1000, h: 600 };
+  const win = (id, x, w, snapped) => ({ id, x, y: 0, w, h: 600, snapped });
+  eq('other side', [other('left'), other('right'), other('max')], ['right', 'left', null]);
+  eq('magnet: the only other window fills the half', assistFor([win('a', 0, 500, 'left'), win('b', 200, 400)], 'a', area), { fill: 'b' });
+  eq('magnet: a window already in the other half pairs', assistFor([win('a', 0, 500, 'left'), win('b', 500, 500, 'right'), win('c', 100, 300)], 'a', area), { pair: 'b' });
+  eq('magnet: several windows: a choice, this display first',
+    assistFor([win('x', 1200, 300), win('a', 500, 500, 'right'), win('b', 100, 300), win('c', 50, 200)], 'a', area), { choose: ['b', 'c', 'x'] });
+  eq('magnet: a window on another display alone is offered, never moved', assistFor([win('a', 0, 500, 'left'), win('x', 1200, 300)], 'a', area), { choose: ['x'] });
+  eq('magnet: alone', assistFor([win('a', 0, 500, 'left')], 'a', area), null);
+  eq('magnet: not a half', assistFor([win('a', 0, 500, 'max'), win('b', 100, 300)], 'a', area), null);
+  void far;
+  const pair = { left: 'a', right: 'b' };
+  const f = (x, w, more) => ({ x, y: 0, w, h: 600, minimized: false, maximized: false, ...more });
+  const before = { a: f(0, 500), b: f(500, 500) };
+  eq('magnet: the left one wider, the right one follows', follow(pair, before, { a: f(0, 620), b: f(500, 500) }, area), { patch: { id: 'b', x: 620, w: 380 } });
+  eq('magnet: the right one wider, the left one follows', follow(pair, before, { a: f(0, 500), b: f(300, 700) }, area), { patch: { id: 'a', x: 0, w: 300 } });
+  eq('magnet: never under the minimum width', follow(pair, before, { a: f(0, 950), b: f(500, 500) }, area, () => 200), { patch: { id: 'b', x: 800, w: 200 } });
+  eq('magnet: nothing changed', follow(pair, before, before, area), null);
+  eq('magnet: the follower already there (its own write coming back)', follow(pair, { a: f(0, 500), b: f(500, 500) }, { a: f(0, 620), b: f(620, 380) }, area), { break: true });
+  eq('magnet: moved by hand breaks', follow(pair, before, { a: f(40, 500), b: f(500, 500) }, area), { break: true });
+  eq('magnet: minimized breaks', follow(pair, before, { a: f(0, 500, { minimized: true }), b: f(500, 500) }, area), { break: true });
+  eq('magnet: closed breaks', follow(pair, before, { a: f(0, 500) }, area), { break: true });
+  eq('magnet: the outer edge of the right one breaks', follow(pair, before, { a: f(0, 500), b: f(500, 400) }, area), { break: true });
+}
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

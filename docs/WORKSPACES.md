@@ -42,14 +42,24 @@ settings.themeOptions.workspaces = { surface, spine, spineEvery }
 
 ## Tiling
 
-Layouts (`model/layouts.js`): **Free** (windows stay where they are; the default), **One at a time**, **Main and side**
-(a main tile and a column of up to three), **Three columns** and **Grid**. The tiler (`tiler.js`) writes the SDK's
+Layouts (`model/layouts.js`), chosen per display: **Free** (windows stay where they are; the default), **One at a
+time**, **Two halves** (two columns; more windows stack in rows, alternating sides), **Main and side** (a main tile and
+a column of up to three), **Three columns** and **Grid**. The tiler (`tiler.js`) writes the SDK's
 window store once for every window that moves (the same fields `wm.setFrame` writes) when something changes: a window
 opens, closes, is minimized or comes back, the layout or its divider changes, the activity in view changes, the
 displays do. Nothing runs per frame, nothing polls.
 
-- **The divider** of Main and side and Three columns sits in the gap between the tiles. Dragging it shows a line in the
+- **The divider** of Two halves, Main and side and Three columns sits in the gap between the tiles. Dragging it shows a line in the
   drag layer, moved with `lord.setStyle` (no React render per pointer move); the tiles change once, on release.
+- **The magnet (Free layout, `magnet.js`, `model/magnet.js`):** a window dragged to the left or right edge of a display
+  takes that half (the SDK's snapping, `configureWindows({ snap: true })`). If one other window of that activity is on
+  the display, it takes the other half by itself; with several, a chooser over the empty half lists them (this
+  display's first; a click snaps it there; Escape or a click outside closes it). The two windows are then a pair:
+  resizing one by the shared edge moves the other's edge to it on release, never below its minimum width. Moving
+  either one, minimizing, maximizing or closing it ends the pair. The magnet writes the window store only for the window
+  that follows, and a pair formed in one change is judged from the next.
+- **The frame header** names the display by its model, plus its connector when two displays share the model
+  ("S27F350 · DP-2").
 - **A window moved or resized by hand** (or maximized, or snapped) leaves its tile and floats until **Tile this
   window** from its title bar's menu. Dialogs, notices and the theme's own panels never tile.
 - **A window whose minimum size is bigger than its tile** keeps its minimum at the tile's corner, inside the work area

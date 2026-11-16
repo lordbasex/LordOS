@@ -97,7 +97,7 @@ const FrameBox = memo(function FrameBox({ t, f }) {
 // how many windows of this activity show on this display (a narrow selector: other windows' changes don't re-render)
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
-export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, meta, multi, canMove, onAddWindow, onEdit, showEmpty }) {
+export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
   const [picker, setPicker] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null);
@@ -123,7 +123,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, desk, met
           </View>
           <View onDoubleClick={() => onEdit(desk)} style={{ flexShrink: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 14, fontWeight: 700, color: t.frameText, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>
-              {multi ? tr('shell.ws.frame.onDisplay', { activity: desktopName(desk), display: d.name || String(d.id) }) : desktopName(desk)}
+              {multi ? tr('shell.ws.frame.onDisplay', { activity: desktopName(desk), display: dname || d.name || String(d.id) }) : desktopName(desk)}
             </Text>
           </View>
         </View>
