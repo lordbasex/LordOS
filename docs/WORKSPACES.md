@@ -123,6 +123,14 @@ displays do. Nothing runs per frame, nothing polls.
   The card shows a sky gradient by condition and time of day, the city, the temperature, a drawn icon, high
   and low; m adds the next five days, l the week with range bars and three cities. Tests: `tests/weather_test.c`
   (path and parsing), `tests/weather_model_test.mjs`, and the scene checks that nothing is asked while it's off.
+- **VPN** (s, m, l). The VPNs set up in Settings → Network → VPN (`lord.net.vpnList()`), turned on and off with the
+  same closed actions Settings uses (`net-vpn-up` / `net-vpn-down`, open to the session's user): no new privilege. A
+  widget drives one VPN (`opts.vpn`, chosen from its right-click menu; with a single VPN it is that one), so several
+  VPN widgets can sit side by side, one per VPN. Small: the name, a switch with relief (a sunken track, a raised knob,
+  ON/OFF) and the state or the address; medium adds the address and the traffic of that VPN's own interface; large
+  lists every VPN with a switch each. State, address and traffic come from the interface in `lord.net.interfaces()`
+  every 3 s while shown (`sdk/vpnmodel.js`, `tests/vpn_model_test.mjs`). When the VPN asks for a password, a single
+  sign-on or a certificate, or fails, the widget offers **Open in Settings**, where those questions are answered.
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

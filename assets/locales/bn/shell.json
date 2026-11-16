@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "বৃষ্টি",
   "widgets.weather.kind.snow": "তুষার",
   "widgets.weather.kind.showers": "ঝরো বৃষ্টি",
-  "widgets.weather.kind.storm": "বজ্রঝড়"
+  "widgets.weather.kind.storm": "বজ্রঝড়",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN চালু বা বন্ধ করুন, ঠিকানা ও ট্রাফিকসহ",
+  "widgets.vpn.on": "চালু",
+  "widgets.vpn.off": "বন্ধ",
+  "widgets.vpn.connected": "সংযুক্ত",
+  "widgets.vpn.disconnected": "বিচ্ছিন্ন",
+  "widgets.vpn.connecting": "সংযোগ হচ্ছে…",
+  "widgets.vpn.disconnecting": "বিচ্ছিন্ন হচ্ছে…",
+  "widgets.vpn.failed": "সংযোগ করা যায়নি",
+  "widgets.vpn.none": "এখনো কোনো VPN সেট করা নেই।",
+  "widgets.vpn.add": "VPN সেট করুন",
+  "widgets.vpn.choose": "VPN বেছে নিন",
+  "widgets.vpn.settings": "সেটিংসে খুলুন"
 }

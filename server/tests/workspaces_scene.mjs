@@ -500,6 +500,16 @@ await flush();
   for (let i = 0; i < 2; i++) await flush();
 }
 
+// VPN: with one VPN set up, the widget drives it directly: its name and the switch (OFF while its interface is down)
+{
+  const shownV = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  const id = sdk.addDeskWidget('vpn', 'm', L);
+  for (let i = 0; i < 2; i++) await flush();
+  check('vpn: the only VPN, its switch off', [shownV('office') >= 1, shownV(sdk.t('shell.widgets.vpn.off')) >= 1, shownV(sdk.t('shell.widgets.vpn.disconnected')) >= 1], [true, true, true]);
+  sdk.removeDeskWidget(id);
+  for (let i = 0; i < 2; i++) await flush();
+}
+
 // every built-in widget renders in each of its sizes, and none adds a timer every second
 {
   const grid = await import('../../sdk/widgetgrid.js');

@@ -616,5 +616,18 @@
   "widgets.weather.kind.rain": "Deszcz",
   "widgets.weather.kind.snow": "Śnieg",
   "widgets.weather.kind.showers": "Przelotne opady",
-  "widgets.weather.kind.storm": "Burza"
+  "widgets.weather.kind.storm": "Burza",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Włącz lub wyłącz VPN, z adresem i ruchem",
+  "widgets.vpn.on": "WŁ.",
+  "widgets.vpn.off": "WYŁ.",
+  "widgets.vpn.connected": "Połączono",
+  "widgets.vpn.disconnected": "Rozłączono",
+  "widgets.vpn.connecting": "Łączenie…",
+  "widgets.vpn.disconnecting": "Rozłączanie…",
+  "widgets.vpn.failed": "Nie udało się połączyć",
+  "widgets.vpn.none": "Nie skonfigurowano jeszcze VPN.",
+  "widgets.vpn.add": "Skonfiguruj VPN",
+  "widgets.vpn.choose": "Wybierz VPN",
+  "widgets.vpn.settings": "Otwórz w Ustawieniach"
 }

@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "雨",
   "widgets.weather.kind.snow": "雪",
   "widgets.weather.kind.showers": "陣雨",
-  "widgets.weather.kind.storm": "雷雨"
+  "widgets.weather.kind.storm": "雷雨",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "開啟或關閉 VPN，並顯示其位址和流量",
+  "widgets.vpn.on": "開",
+  "widgets.vpn.off": "關",
+  "widgets.vpn.connected": "已連線",
+  "widgets.vpn.disconnected": "未連線",
+  "widgets.vpn.connecting": "正在連線…",
+  "widgets.vpn.disconnecting": "正在中斷…",
+  "widgets.vpn.failed": "無法連線",
+  "widgets.vpn.none": "尚未設定 VPN。",
+  "widgets.vpn.add": "設定 VPN",
+  "widgets.vpn.choose": "選擇 VPN",
+  "widgets.vpn.settings": "在設定中開啟"
 }

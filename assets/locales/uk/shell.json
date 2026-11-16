@@ -616,5 +616,18 @@
   "widgets.weather.kind.rain": "Дощ",
   "widgets.weather.kind.snow": "Сніг",
   "widgets.weather.kind.showers": "Зливи",
-  "widgets.weather.kind.storm": "Гроза"
+  "widgets.weather.kind.storm": "Гроза",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Увімкнення й вимкнення VPN, його адреса й трафік",
+  "widgets.vpn.on": "УВІМК",
+  "widgets.vpn.off": "ВИМК",
+  "widgets.vpn.connected": "Підключено",
+  "widgets.vpn.disconnected": "Відключено",
+  "widgets.vpn.connecting": "Підключення…",
+  "widgets.vpn.disconnecting": "Відключення…",
+  "widgets.vpn.failed": "Не вдалося підключитися",
+  "widgets.vpn.none": "VPN ще не налаштовано.",
+  "widgets.vpn.add": "Налаштувати VPN",
+  "widgets.vpn.choose": "Вибрати VPN",
+  "widgets.vpn.settings": "Відкрити в Налаштуваннях"
 }

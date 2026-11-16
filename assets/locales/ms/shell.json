@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "Hujan",
   "widgets.weather.kind.snow": "Salji",
   "widgets.weather.kind.showers": "Hujan lebat sekejap",
-  "widgets.weather.kind.storm": "Ribut petir"
+  "widgets.weather.kind.storm": "Ribut petir",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Hidupkan atau matikan VPN, dengan alamat dan trafiknya",
+  "widgets.vpn.on": "HIDUP",
+  "widgets.vpn.off": "MATI",
+  "widgets.vpn.connected": "Disambungkan",
+  "widgets.vpn.disconnected": "Diputuskan",
+  "widgets.vpn.connecting": "Menyambung…",
+  "widgets.vpn.disconnecting": "Memutuskan…",
+  "widgets.vpn.failed": "Tidak dapat menyambung",
+  "widgets.vpn.none": "Belum ada VPN disediakan.",
+  "widgets.vpn.add": "Sediakan VPN",
+  "widgets.vpn.choose": "Pilih VPN",
+  "widgets.vpn.settings": "Buka dalam Tetapan"
 }

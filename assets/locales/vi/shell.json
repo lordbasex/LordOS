@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "Mưa",
   "widgets.weather.kind.snow": "Tuyết",
   "widgets.weather.kind.showers": "Mưa rào",
-  "widgets.weather.kind.storm": "Dông"
+  "widgets.weather.kind.storm": "Dông",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Bật hoặc tắt VPN, kèm địa chỉ và lưu lượng",
+  "widgets.vpn.on": "BẬT",
+  "widgets.vpn.off": "TẮT",
+  "widgets.vpn.connected": "Đã kết nối",
+  "widgets.vpn.disconnected": "Đã ngắt",
+  "widgets.vpn.connecting": "Đang kết nối…",
+  "widgets.vpn.disconnecting": "Đang ngắt…",
+  "widgets.vpn.failed": "Không kết nối được",
+  "widgets.vpn.none": "Chưa thiết lập VPN nào.",
+  "widgets.vpn.add": "Thiết lập VPN",
+  "widgets.vpn.choose": "Chọn VPN",
+  "widgets.vpn.settings": "Mở trong Cài đặt"
 }

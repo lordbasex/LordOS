@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "بارش",
   "widgets.weather.kind.snow": "برف",
   "widgets.weather.kind.showers": "بوچھاڑ",
-  "widgets.weather.kind.storm": "گرج چمک کا طوفان"
+  "widgets.weather.kind.storm": "گرج چمک کا طوفان",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN آن یا آف کریں، اس کے پتے اور ٹریفک کے ساتھ",
+  "widgets.vpn.on": "آن",
+  "widgets.vpn.off": "آف",
+  "widgets.vpn.connected": "منسلک",
+  "widgets.vpn.disconnected": "منقطع",
+  "widgets.vpn.connecting": "منسلک ہو رہا ہے…",
+  "widgets.vpn.disconnecting": "منقطع ہو رہا ہے…",
+  "widgets.vpn.failed": "منسلک نہیں ہو سکا",
+  "widgets.vpn.none": "ابھی کوئی VPN سیٹ نہیں۔",
+  "widgets.vpn.add": "VPN سیٹ کریں",
+  "widgets.vpn.choose": "VPN چنیں",
+  "widgets.vpn.settings": "ترتیبات میں کھولیں"
 }

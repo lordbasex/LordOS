@@ -616,5 +616,18 @@
   "widgets.weather.kind.rain": "Lietus",
   "widgets.weather.kind.snow": "Sniegas",
   "widgets.weather.kind.showers": "Liūtys",
-  "widgets.weather.kind.storm": "Perkūnija"
+  "widgets.weather.kind.storm": "Perkūnija",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Įjunkite arba išjunkite VPN, su adresu ir srautu",
+  "widgets.vpn.on": "ĮJ.",
+  "widgets.vpn.off": "IŠJ.",
+  "widgets.vpn.connected": "Prisijungta",
+  "widgets.vpn.disconnected": "Atsijungta",
+  "widgets.vpn.connecting": "Jungiamasi…",
+  "widgets.vpn.disconnecting": "Atsijungiama…",
+  "widgets.vpn.failed": "Nepavyko prisijungti",
+  "widgets.vpn.none": "Dar nėra nustatyto VPN.",
+  "widgets.vpn.add": "Nustatyti VPN",
+  "widgets.vpn.choose": "Pasirinkti VPN",
+  "widgets.vpn.settings": "Atidaryti nustatymuose"
 }

@@ -637,5 +637,18 @@
   "widgets.weather.kind.rain": "مطر",
   "widgets.weather.kind.snow": "ثلج",
   "widgets.weather.kind.showers": "زخات",
-  "widgets.weather.kind.storm": "عاصفة رعدية"
+  "widgets.weather.kind.storm": "عاصفة رعدية",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "تشغيل VPN أو إيقافه، مع عنوانه وحركة بياناته",
+  "widgets.vpn.on": "تشغيل",
+  "widgets.vpn.off": "إيقاف",
+  "widgets.vpn.connected": "متصل",
+  "widgets.vpn.disconnected": "غير متصل",
+  "widgets.vpn.connecting": "جارٍ الاتصال…",
+  "widgets.vpn.disconnecting": "جارٍ قطع الاتصال…",
+  "widgets.vpn.failed": "تعذّر الاتصال",
+  "widgets.vpn.none": "لم يُعدّ أي VPN بعد.",
+  "widgets.vpn.add": "إعداد VPN",
+  "widgets.vpn.choose": "اختيار VPN",
+  "widgets.vpn.settings": "الفتح في الإعدادات"
 }

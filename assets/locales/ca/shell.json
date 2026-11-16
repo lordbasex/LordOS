@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Pluja",
   "widgets.weather.kind.snow": "Neu",
   "widgets.weather.kind.showers": "Ruixats",
-  "widgets.weather.kind.storm": "Tempesta"
+  "widgets.weather.kind.storm": "Tempesta",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Activa o desactiva una VPN, amb la seva IP i trànsit",
+  "widgets.vpn.on": "ON",
+  "widgets.vpn.off": "OFF",
+  "widgets.vpn.connected": "Connectada",
+  "widgets.vpn.disconnected": "Desconnectada",
+  "widgets.vpn.connecting": "S'està connectant…",
+  "widgets.vpn.disconnecting": "S'està desconnectant…",
+  "widgets.vpn.failed": "No s'ha pogut connectar",
+  "widgets.vpn.none": "Encara no hi ha cap VPN configurada.",
+  "widgets.vpn.add": "Configura una VPN",
+  "widgets.vpn.choose": "Tria la VPN",
+  "widgets.vpn.settings": "Obre a Configuració"
 }

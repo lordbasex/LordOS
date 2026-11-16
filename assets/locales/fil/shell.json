@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Ulan",
   "widgets.weather.kind.snow": "Niyebe",
   "widgets.weather.kind.showers": "Pag-ambon",
-  "widgets.weather.kind.storm": "Bagyo na may kulog"
+  "widgets.weather.kind.storm": "Bagyo na may kulog",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "I-on o i-off ang VPN, kasama ang address at trapiko",
+  "widgets.vpn.on": "ON",
+  "widgets.vpn.off": "OFF",
+  "widgets.vpn.connected": "Nakakonekta",
+  "widgets.vpn.disconnected": "Hindi nakakonekta",
+  "widgets.vpn.connecting": "Kumokonekta…",
+  "widgets.vpn.disconnecting": "Dinidiskonekta…",
+  "widgets.vpn.failed": "Hindi makakonekta",
+  "widgets.vpn.none": "Wala pang naka-set up na VPN.",
+  "widgets.vpn.add": "Mag-set up ng VPN",
+  "widgets.vpn.choose": "Pumili ng VPN",
+  "widgets.vpn.settings": "Buksan sa Settings"
 }

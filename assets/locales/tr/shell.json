@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Yağmur",
   "widgets.weather.kind.snow": "Kar",
   "widgets.weather.kind.showers": "Sağanak",
-  "widgets.weather.kind.storm": "Gök gürültülü fırtına"
+  "widgets.weather.kind.storm": "Gök gürültülü fırtına",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Bir VPN'i aç veya kapat, adresi ve trafiğiyle",
+  "widgets.vpn.on": "AÇIK",
+  "widgets.vpn.off": "KAPALI",
+  "widgets.vpn.connected": "Bağlı",
+  "widgets.vpn.disconnected": "Bağlı değil",
+  "widgets.vpn.connecting": "Bağlanıyor…",
+  "widgets.vpn.disconnecting": "Bağlantı kesiliyor…",
+  "widgets.vpn.failed": "Bağlanılamadı",
+  "widgets.vpn.none": "Henüz VPN ayarlanmadı.",
+  "widgets.vpn.add": "VPN ayarla",
+  "widgets.vpn.choose": "VPN seç",
+  "widgets.vpn.settings": "Ayarlar'da aç"
 }

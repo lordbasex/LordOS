@@ -616,5 +616,18 @@
   "widgets.weather.kind.rain": "Ploaie",
   "widgets.weather.kind.snow": "Ninsoare",
   "widgets.weather.kind.showers": "Averse",
-  "widgets.weather.kind.storm": "Furtună"
+  "widgets.weather.kind.storm": "Furtună",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Pornește sau oprește un VPN, cu adresa și traficul",
+  "widgets.vpn.on": "ON",
+  "widgets.vpn.off": "OFF",
+  "widgets.vpn.connected": "Conectat",
+  "widgets.vpn.disconnected": "Deconectat",
+  "widgets.vpn.connecting": "Se conectează…",
+  "widgets.vpn.disconnecting": "Se deconectează…",
+  "widgets.vpn.failed": "Nu s-a putut conecta",
+  "widgets.vpn.none": "Niciun VPN configurat încă.",
+  "widgets.vpn.add": "Configurează un VPN",
+  "widgets.vpn.choose": "Alege VPN",
+  "widgets.vpn.settings": "Deschide în Setări"
 }

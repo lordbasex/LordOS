@@ -53,7 +53,7 @@ const MOCK = `globalThis.__lordTest = (() => {
     system: { info: () => ({ user: 'test', memTotalKB: 8000000, memAvailableKB: 4000000, cores: 4 }), cpuTimes: () => [100, 50] },
     weather: { request: () => { counts.wx++; return true; }, get: () => null },
     time: { zone: () => 'America/Argentina/Buenos_Aires', zoneOffset: () => null },
-    net: { interfaces: () => { counts.netPolls++; return [
+    net: { vpnList: () => [{ name: 'office', type: 'wireguard' }], interfaces: () => { counts.netPolls++; return [
       { name: 'lo', type: 'loopback', up: true, addresses: [] },
       { name: 'eth0', type: 'ether', up: true, addresses: [{ family: 4, scope: 'global', address: '192.168.1.5' }] },
     ]; } },

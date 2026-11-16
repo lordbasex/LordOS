@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "비",
   "widgets.weather.kind.snow": "눈",
   "widgets.weather.kind.showers": "소나기",
-  "widgets.weather.kind.storm": "뇌우"
+  "widgets.weather.kind.storm": "뇌우",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN 켜기/끄기, 주소와 트래픽",
+  "widgets.vpn.on": "켬",
+  "widgets.vpn.off": "끔",
+  "widgets.vpn.connected": "연결됨",
+  "widgets.vpn.disconnected": "연결 안 됨",
+  "widgets.vpn.connecting": "연결 중…",
+  "widgets.vpn.disconnecting": "연결 끊는 중…",
+  "widgets.vpn.failed": "연결할 수 없음",
+  "widgets.vpn.none": "아직 설정된 VPN이 없습니다.",
+  "widgets.vpn.add": "VPN 설정",
+  "widgets.vpn.choose": "VPN 선택",
+  "widgets.vpn.settings": "설정에서 열기"
 }

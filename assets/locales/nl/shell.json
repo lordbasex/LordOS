@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Regen",
   "widgets.weather.kind.snow": "Sneeuw",
   "widgets.weather.kind.showers": "Buien",
-  "widgets.weather.kind.storm": "Onweer"
+  "widgets.weather.kind.storm": "Onweer",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Een VPN aan- of uitzetten, met adres en verkeer",
+  "widgets.vpn.on": "AAN",
+  "widgets.vpn.off": "UIT",
+  "widgets.vpn.connected": "Verbonden",
+  "widgets.vpn.disconnected": "Niet verbonden",
+  "widgets.vpn.connecting": "Verbinden…",
+  "widgets.vpn.disconnecting": "Verbinding verbreken…",
+  "widgets.vpn.failed": "Verbinden mislukt",
+  "widgets.vpn.none": "Nog geen VPN ingesteld.",
+  "widgets.vpn.add": "VPN instellen",
+  "widgets.vpn.choose": "VPN kiezen",
+  "widgets.vpn.settings": "Openen in Instellingen"
 }

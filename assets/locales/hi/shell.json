@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "बारिश",
   "widgets.weather.kind.snow": "बर्फ़",
   "widgets.weather.kind.showers": "बौछारें",
-  "widgets.weather.kind.storm": "आँधी-तूफ़ान"
+  "widgets.weather.kind.storm": "आँधी-तूफ़ान",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN चालू या बंद करें, उसके पते और ट्रैफ़िक के साथ",
+  "widgets.vpn.on": "चालू",
+  "widgets.vpn.off": "बंद",
+  "widgets.vpn.connected": "कनेक्टेड",
+  "widgets.vpn.disconnected": "डिस्कनेक्टेड",
+  "widgets.vpn.connecting": "कनेक्ट हो रहा है…",
+  "widgets.vpn.disconnecting": "डिस्कनेक्ट हो रहा है…",
+  "widgets.vpn.failed": "कनेक्ट नहीं हो सका",
+  "widgets.vpn.none": "अभी कोई VPN सेट नहीं है।",
+  "widgets.vpn.add": "VPN सेट करें",
+  "widgets.vpn.choose": "VPN चुनें",
+  "widgets.vpn.settings": "सेटिंग्स में खोलें"
 }

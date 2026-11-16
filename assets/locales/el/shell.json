@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Βροχή",
   "widgets.weather.kind.snow": "Χιόνι",
   "widgets.weather.kind.showers": "Μπόρες",
-  "widgets.weather.kind.storm": "Καταιγίδα"
+  "widgets.weather.kind.storm": "Καταιγίδα",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Ενεργοποίηση ή απενεργοποίηση VPN, με διεύθυνση και κίνηση",
+  "widgets.vpn.on": "ON",
+  "widgets.vpn.off": "OFF",
+  "widgets.vpn.connected": "Συνδεδεμένο",
+  "widgets.vpn.disconnected": "Αποσυνδεδεμένο",
+  "widgets.vpn.connecting": "Σύνδεση…",
+  "widgets.vpn.disconnecting": "Αποσύνδεση…",
+  "widgets.vpn.failed": "Η σύνδεση απέτυχε",
+  "widgets.vpn.none": "Δεν έχει ρυθμιστεί ακόμη VPN.",
+  "widgets.vpn.add": "Ρύθμιση VPN",
+  "widgets.vpn.choose": "Επιλογή VPN",
+  "widgets.vpn.settings": "Άνοιγμα στις Ρυθμίσεις"
 }

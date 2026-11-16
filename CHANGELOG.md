@@ -77,7 +77,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `useWindowWidth`, `useNarrow`, `useSidebar`, `SidebarToggle`, `SidebarOverlay`; the window store's width, no
     polling). Wide windows look as before. In a short window Calendar's and Reminders' sheets scroll their fields
     between the title and the buttons (`useWindowHeight`), Machines' snapshot timeline gives way to the selected
-    snapshot's panel, Monitor's Overview stacks its paired cards below 640 px, and Databases' ⋯ menu has its tooltip. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    snapshot's panel, Monitor's Overview stacks its paired cards below 640 px, and Databases' ⋯ menu has its tooltip.
+    **VPN widget**: a switch with relief (sunken track, raised knob, ON/OFF) that turns a VPN from Settings → Network →
+    VPN on or off with the same actions Settings uses; medium shows its address and traffic, large lists every VPN
+    with a switch each. One widget per VPN (chosen from its menu; the only one by default), so several can be on the
+    desktop at once. A password, sign-on or certificate question sends the person to Settings. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Yağış",
   "widgets.weather.kind.snow": "Qar",
   "widgets.weather.kind.showers": "Leysan",
-  "widgets.weather.kind.storm": "İldırımlı fırtına"
+  "widgets.weather.kind.storm": "İldırımlı fırtına",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN-i aç və ya bağla, ünvanı və trafiki ilə",
+  "widgets.vpn.on": "AÇIQ",
+  "widgets.vpn.off": "BAĞLI",
+  "widgets.vpn.connected": "Qoşulub",
+  "widgets.vpn.disconnected": "Qoşulmayıb",
+  "widgets.vpn.connecting": "Qoşulur…",
+  "widgets.vpn.disconnecting": "Ayrılır…",
+  "widgets.vpn.failed": "Qoşulmaq olmadı",
+  "widgets.vpn.none": "Hələ VPN qurulmayıb.",
+  "widgets.vpn.add": "VPN qur",
+  "widgets.vpn.choose": "VPN seç",
+  "widgets.vpn.settings": "Ayarlarda aç"
 }

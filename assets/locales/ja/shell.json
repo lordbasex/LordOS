@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "雨",
   "widgets.weather.kind.snow": "雪",
   "widgets.weather.kind.showers": "にわか雨",
-  "widgets.weather.kind.storm": "雷雨"
+  "widgets.weather.kind.storm": "雷雨",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN のオン/オフ、アドレスと通信量",
+  "widgets.vpn.on": "オン",
+  "widgets.vpn.off": "オフ",
+  "widgets.vpn.connected": "接続済み",
+  "widgets.vpn.disconnected": "未接続",
+  "widgets.vpn.connecting": "接続中…",
+  "widgets.vpn.disconnecting": "切断中…",
+  "widgets.vpn.failed": "接続できませんでした",
+  "widgets.vpn.none": "VPN はまだ設定されていません。",
+  "widgets.vpn.add": "VPN を設定",
+  "widgets.vpn.choose": "VPN を選択",
+  "widgets.vpn.settings": "設定で開く"
 }

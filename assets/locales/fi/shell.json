@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Sadetta",
   "widgets.weather.kind.snow": "Lunta",
   "widgets.weather.kind.showers": "Sadekuuroja",
-  "widgets.weather.kind.storm": "Ukkosta"
+  "widgets.weather.kind.storm": "Ukkosta",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Kytke VPN päälle tai pois, osoite ja liikenne",
+  "widgets.vpn.on": "PÄÄLLÄ",
+  "widgets.vpn.off": "POIS",
+  "widgets.vpn.connected": "Yhdistetty",
+  "widgets.vpn.disconnected": "Ei yhdistetty",
+  "widgets.vpn.connecting": "Yhdistetään…",
+  "widgets.vpn.disconnecting": "Katkaistaan…",
+  "widgets.vpn.failed": "Yhdistäminen epäonnistui",
+  "widgets.vpn.none": "VPN:ää ei ole vielä määritetty.",
+  "widgets.vpn.add": "Määritä VPN",
+  "widgets.vpn.choose": "Valitse VPN",
+  "widgets.vpn.settings": "Avaa asetuksissa"
 }

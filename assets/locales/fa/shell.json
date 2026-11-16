@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "باران",
   "widgets.weather.kind.snow": "برف",
   "widgets.weather.kind.showers": "رگبار",
-  "widgets.weather.kind.storm": "توفان تندری"
+  "widgets.weather.kind.storm": "توفان تندری",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "روشن یا خاموش کردن VPN، با نشانی و ترافیک آن",
+  "widgets.vpn.on": "روشن",
+  "widgets.vpn.off": "خاموش",
+  "widgets.vpn.connected": "متصل",
+  "widgets.vpn.disconnected": "قطع",
+  "widgets.vpn.connecting": "در حال اتصال…",
+  "widgets.vpn.disconnecting": "در حال قطع اتصال…",
+  "widgets.vpn.failed": "اتصال برقرار نشد",
+  "widgets.vpn.none": "هنوز هیچ VPN تنظیم نشده است.",
+  "widgets.vpn.add": "تنظیم VPN",
+  "widgets.vpn.choose": "انتخاب VPN",
+  "widgets.vpn.settings": "باز کردن در تنظیمات"
 }

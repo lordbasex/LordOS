@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Дъжд",
   "widgets.weather.kind.snow": "Сняг",
   "widgets.weather.kind.showers": "Превалявания",
-  "widgets.weather.kind.storm": "Гръмотевична буря"
+  "widgets.weather.kind.storm": "Гръмотевична буря",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Включване и изключване на VPN, с адрес и трафик",
+  "widgets.vpn.on": "ВКЛ",
+  "widgets.vpn.off": "ИЗКЛ",
+  "widgets.vpn.connected": "Свързано",
+  "widgets.vpn.disconnected": "Несвързано",
+  "widgets.vpn.connecting": "Свързване…",
+  "widgets.vpn.disconnecting": "Прекъсване…",
+  "widgets.vpn.failed": "Неуспешно свързване",
+  "widgets.vpn.none": "Още няма настроена VPN.",
+  "widgets.vpn.add": "Настройване на VPN",
+  "widgets.vpn.choose": "Избор на VPN",
+  "widgets.vpn.settings": "Отваряне в Настройки"
 }

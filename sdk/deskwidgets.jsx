@@ -39,6 +39,8 @@ import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER } from './widgetgrid.js';
 import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
+import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
+import { admin } from './admin.js';
 import { locale } from './i18n.js';
 import { regionCountry } from './localename.js';
 
@@ -951,13 +953,175 @@ function WeatherBody({ w }) {
   );
 }
 
+// ---- VPN: the ones set up in Settings → Network → VPN, connected with the same closed actions Settings uses ----
+const vpnList = () => { try { return lord.net?.vpnList ? lord.net.vpnList() || [] : []; } catch (e) { return []; } };
+const vpnSettings = () => wm.open('settings', { args: { section: 'network', page: 'vpn' } });
+// what each VPN is doing while this desktop asked: name → { what: 'up'|'down'|'settings'|'error', at, text }
+const vpnBusy = createStore({});
+let vpnEventsOn = false;
+function vpnEvents() {
+  if (vpnEventsOn) return;
+  vpnEventsOn = true;
+  admin.onEvent((text) => {
+    const e = eventOf(text);
+    if (!e) return;
+    const cur = vpnBusy.get()[e.name];
+    if (e.what === 'connected' || e.what === 'disconnected') vpnBusy.set((b) => { const n = { ...b }; delete n[e.name]; return n; });
+    else if (cur && (e.what === 'need-auth' || e.what === 'sso' || e.what === 'untrusted-cert')) vpnBusy.set((b) => ({ ...b, [e.name]: { what: 'settings', at: Date.now() } }));
+    else if (cur && (e.what === 'auth-failed' || e.what === 'error')) vpnBusy.set((b) => ({ ...b, [e.name]: { what: 'error', at: Date.now() } }));
+  });
+}
+function vpnToggle(name, on) {
+  vpnEvents();
+  vpnBusy.set((b) => ({ ...b, [name]: { what: on ? 'up' : 'down', at: Date.now() } }));
+  admin.run(on ? 'net-vpn-up' : 'net-vpn-down', name, undefined, { quiet: true }).then(
+    () => { if (!on) vpnBusy.set((b) => { const n = { ...b }; delete n[name]; return n; }); },
+    () => vpnBusy.set((b) => ({ ...b, [name]: { what: 'error', at: Date.now() } })));
+}
+// the VPNs, their interfaces (every 3 s while shown, no root) and this VPN's rates
+function useVpn(target) {
+  const list = useEvery(vpnList, 10000) || [];
+  const busy = useStore(vpnBusy);
+  const prev = useRef(null);
+  const sample = useEvery(() => {
+    const ifs = lord.net?.interfaces ? lord.net.interfaces() : [];
+    const v = list.find((x) => x.name === target);
+    const st = vpnState(v, ifs), now = Date.now(), p = prev.current;
+    prev.current = { ...st, t: now };
+    return { ifs, st, rate: p && st.up ? vpnRates(p, st, (now - p.t) / 1000) : null };
+  }, 3000, [target, list.length]) || { ifs: [], st: vpnState(null), rate: null };
+  useEffect(() => { vpnEvents(); }, []);
+  // a request that got no answer in 40 s gives way to Settings (it may be asking for a password there)
+  const b = busy[target];
+  const stuck = b && (b.what === 'up' || b.what === 'down') && Date.now() - b.at > 40000;
+  const upNow = !!(b && b.what === 'up' && sample.st.up);
+  useEffect(() => { if (upNow) vpnBusy.set((x) => { const n = { ...x }; delete n[target]; return n; }); }, [upNow, target]);
+  return { list, ifs: sample.ifs, st: sample.st, rate: sample.rate, busy: stuck ? { what: 'settings' } : b };
+}
+// an on/off switch with relief, like a real one: a sunken track, a raised knob with a dimple, ON/OFF on the free side
+function ReliefSwitch({ on, busy, onClick, w = 120, h = 52 }) {
+  const pad = Math.round(h * 0.09), track = h - 2 * pad, knob = track - 2 * Math.round(h * 0.06);
+  const inner = track - knob;
+  const left = on ? w - 2 * pad - knob - inner / 2 : inner / 2;
+  return (
+    <View onClick={busy ? undefined : onClick} style={{ width: w, height: h, borderRadius: h / 2, padding: pad, direction: 'ltr', opacity: busy ? 0.75 : 1,
+      background: 'linear-gradient(180deg, rgba(0,0,0,0.22), rgba(255,255,255,0.55))', boxShadow: '0 1px 2px rgba(255,255,255,0.4)' }}>
+      <View style={{ flex: 1, borderRadius: track / 2, overflow: 'hidden',
+        background: on ? 'linear-gradient(180deg, #23874b, #3fbf6e)' : 'linear-gradient(180deg, #6f7787, #959dac)' }}>
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: Math.round(track * 0.35), background: 'linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0))' }} />
+        <Text style={{ position: 'absolute', top: 0, bottom: 0, ...(on ? { left: Math.round(track * 0.38) } : { right: Math.round(track * 0.34) }), lineHeight: track,
+          fontSize: Math.round(track * 0.42), fontWeight: 500, color: 'rgba(255,255,255,0.88)' }}>{t(on ? 'shell.widgets.vpn.on' : 'shell.widgets.vpn.off')}</Text>
+        <View style={{ position: 'absolute', left, top: inner / 2, width: knob, height: knob, borderRadius: knob / 2, alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(160deg, #f3f6fb, #c3cad6)', boxShadow: '0 4px 10px rgba(0,0,0,0.35)' }}>
+          <View style={{ width: knob * 0.62, height: knob * 0.62, borderRadius: knob * 0.31, border: '1px solid rgba(255,255,255,0.7)',
+            background: busy ? 'linear-gradient(160deg, #c3cad6, #f3f6fb)' : 'linear-gradient(340deg, #f3f6fb, #cfd5df)' }} />
+        </View>
+      </View>
+    </View>
+  );
+}
+function VpnStatus({ L, st, busy, center }) {
+  const key = busy?.what === 'up' ? 'connecting' : busy?.what === 'down' ? 'disconnecting' : busy?.what === 'error' ? 'failed' : st.up ? 'connected' : 'disconnected';
+  const color = key === 'connected' ? L.ok : key === 'failed' ? L.crit : L.dim;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: center ? 'center' : 'flex-start' }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ fontSize: 11.5, color: key === 'connected' ? L.text : L.dim }}>{t(`shell.widgets.vpn.${key}`)}</Text>
+    </View>
+  );
+}
+function VpnSettingsLink({ L, busy }) {
+  if (busy?.what !== 'settings' && busy?.what !== 'error') return null;
+  return (
+    <View onClick={vpnSettings} style={{ alignSelf: 'flex-start', height: 22, paddingHorizontal: 9, borderRadius: 11, justifyContent: 'center', backgroundColor: L.track }}>
+      <Text style={{ fontSize: 11, fontWeight: 600, color: L.text }}>{t('shell.widgets.vpn.settings')}</Text>
+    </View>
+  );
+}
+function VpnBody({ w, L }) {
+  const list0 = useEvery(vpnList, 10000) || [];
+  const target = targetOf(w.opts, list0);
+  const { list, st, rate: r, busy } = useVpn(target);
+  const v = list.find((x) => x.name === target);
+  if (!list.length) {
+    return (
+      <View style={{ flex: 1, gap: 6 }}>
+        <Head L={L} title="VPN" />
+        <Quiet L={L} text={t('shell.widgets.vpn.none')} />
+        <View onClick={vpnSettings} style={{ alignSelf: 'flex-start', height: 24, paddingHorizontal: 10, borderRadius: 12, justifyContent: 'center', backgroundColor: L.accent, marginTop: 'auto' }}>
+          <Text style={{ fontSize: 11.5, fontWeight: 600, color: '#fff' }}>{t('shell.widgets.vpn.add')}</Text>
+        </View>
+      </View>
+    );
+  }
+  // several VPNs and none chosen for this widget (or a large one): a row per VPN, each with its own switch
+  const row = (x) => <VpnRow key={x.name} L={L} vpn={x} />;
+  if (w.size === 'l' || !v) {
+    return (
+      <View style={{ flex: 1, gap: 8 }}>
+        <Head L={L} title="VPN" right={!v && w.size !== 'l' ? t('shell.widgets.vpn.choose') : ''} />
+        <View style={{ gap: 6 }}>{list.slice(0, w.size === 'l' ? 6 : 2).map(row)}</View>
+      </View>
+    );
+  }
+  const on = busy?.what === 'up' ? true : busy?.what === 'down' ? false : st.up;
+  const sw = (sz) => <ReliefSwitch on={on} busy={busy?.what === 'up' || busy?.what === 'down'} onClick={() => vpnToggle(v.name, !st.up)} {...sz} />;
+  if (w.size === 's') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', gap: 7 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: 650, color: L.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 140 }}>{v.name}</Text>
+        {sw({ w: 112, h: 48 })}
+        <VpnStatus L={L} st={st} busy={busy} center />
+        <Sub L={L} center>{st.up ? st.ip : String(v.type || '').toUpperCase()}</Sub>
+      </View>
+    );
+  }
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', gap: 14 }}>
+      <View style={{ flex: 1, gap: 5, minWidth: 0 }}>
+        <Text style={{ fontSize: 13, fontWeight: 650, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{v.name}</Text>
+        <VpnStatus L={L} st={st} busy={busy} />
+        {st.up ? <Line L={L} label="IP" value={st.ip || '…'} /> : <Sub L={L}>{String(v.type || '').toUpperCase()}</Sub>}
+        {st.up ? (
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View><Sub L={L}>↓ {t('shell.widgets.network.down')}</Sub><Text style={{ fontSize: 14, fontWeight: 600, color: L.accent }}>{r ? rate(r.rx) : '…'}</Text></View>
+            <View><Sub L={L}>↑ {t('shell.widgets.network.up')}</Sub><Text style={{ fontSize: 14, fontWeight: 600, color: L.ok }}>{r ? rate(r.tx) : '…'}</Text></View>
+          </View>
+        ) : <VpnSettingsLink L={L} busy={busy} />}
+      </View>
+      <View style={{ justifyContent: 'center' }}>{sw({ w: 120, h: 52 })}</View>
+    </View>
+  );
+}
+function VpnRow({ L, vpn }) {
+  const { st, busy } = useVpn(vpn.name);
+  const on = busy?.what === 'up' ? true : busy?.what === 'down' ? false : st.up;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: 650, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{vpn.name}</Text>
+        <Text style={{ fontSize: 11, color: st.up ? L.ok : L.dim, textAlign: 'start' }}>{st.up ? st.ip || t('shell.widgets.vpn.connected') : t(busy?.what === 'up' ? 'shell.widgets.vpn.connecting' : busy?.what === 'error' ? 'shell.widgets.vpn.failed' : 'shell.widgets.vpn.disconnected')}</Text>
+      </View>
+      <ReliefSwitch on={on} busy={busy?.what === 'up' || busy?.what === 'down'} onClick={() => vpnToggle(vpn.name, !st.up)} w={78} h={34} />
+    </View>
+  );
+}
+
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
-const BODIES = { weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
+const BODIES = { vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
-const KIND_SIZES = { weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
+const KIND_SIZES = { vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
+  // which VPN this widget drives: one widget per VPN, as many as wanted
+  vpn: (w) => {
+    const list = vpnList(), cur = targetOf(w.opts, list);
+    return [
+      ...(list.length > 1 ? [{ label: t('shell.widgets.vpn.choose'), submenu: list.map((v) => ({ label: v.name, checked: v.name === cur, onClick: () => setDeskWidget(w.id, { opts: { vpn: v.name } }) })) }] : []),
+      { label: t('shell.widgets.vpn.settings'), onClick: vpnSettings },
+    ];
+  },
   weather: () => [
     { label: '°C', checked: wxUnit() === 'c', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'c' } }) },
     { label: '°F', checked: wxUnit() === 'f', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'f' } }) },

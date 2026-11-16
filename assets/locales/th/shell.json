@@ -602,5 +602,18 @@
   "widgets.weather.kind.rain": "ฝน",
   "widgets.weather.kind.snow": "หิมะ",
   "widgets.weather.kind.showers": "ฝนซู่",
-  "widgets.weather.kind.storm": "พายุฝนฟ้าคะนอง"
+  "widgets.weather.kind.storm": "พายุฝนฟ้าคะนอง",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "เปิดหรือปิด VPN พร้อมที่อยู่และปริมาณข้อมูล",
+  "widgets.vpn.on": "เปิด",
+  "widgets.vpn.off": "ปิด",
+  "widgets.vpn.connected": "เชื่อมต่อแล้ว",
+  "widgets.vpn.disconnected": "ไม่ได้เชื่อมต่อ",
+  "widgets.vpn.connecting": "กำลังเชื่อมต่อ…",
+  "widgets.vpn.disconnecting": "กำลังตัดการเชื่อมต่อ…",
+  "widgets.vpn.failed": "เชื่อมต่อไม่ได้",
+  "widgets.vpn.none": "ยังไม่ได้ตั้งค่า VPN",
+  "widgets.vpn.add": "ตั้งค่า VPN",
+  "widgets.vpn.choose": "เลือก VPN",
+  "widgets.vpn.settings": "เปิดในการตั้งค่า"
 }

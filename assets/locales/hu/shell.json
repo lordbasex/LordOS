@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Eső",
   "widgets.weather.kind.snow": "Hó",
   "widgets.weather.kind.showers": "Zápor",
-  "widgets.weather.kind.storm": "Zivatar"
+  "widgets.weather.kind.storm": "Zivatar",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "VPN be- és kikapcsolása, címmel és forgalommal",
+  "widgets.vpn.on": "BE",
+  "widgets.vpn.off": "KI",
+  "widgets.vpn.connected": "Csatlakozva",
+  "widgets.vpn.disconnected": "Nincs csatlakozva",
+  "widgets.vpn.connecting": "Csatlakozás…",
+  "widgets.vpn.disconnecting": "Bontás…",
+  "widgets.vpn.failed": "Nem sikerült csatlakozni",
+  "widgets.vpn.none": "Még nincs beállított VPN.",
+  "widgets.vpn.add": "VPN beállítása",
+  "widgets.vpn.choose": "VPN kiválasztása",
+  "widgets.vpn.settings": "Megnyitás a Beállításokban"
 }

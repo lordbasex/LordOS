@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Mvua",
   "widgets.weather.kind.snow": "Theluji",
   "widgets.weather.kind.showers": "Mvua za rasharasha",
-  "widgets.weather.kind.storm": "Radi"
+  "widgets.weather.kind.storm": "Radi",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Washa au zima VPN, pamoja na anwani na trafiki",
+  "widgets.vpn.on": "WASHA",
+  "widgets.vpn.off": "ZIMA",
+  "widgets.vpn.connected": "Imeunganishwa",
+  "widgets.vpn.disconnected": "Haijaunganishwa",
+  "widgets.vpn.connecting": "Inaunganisha…",
+  "widgets.vpn.disconnecting": "Inakata muunganisho…",
+  "widgets.vpn.failed": "Imeshindwa kuunganisha",
+  "widgets.vpn.none": "Bado hakuna VPN iliyowekwa.",
+  "widgets.vpn.add": "Weka VPN",
+  "widgets.vpn.choose": "Chagua VPN",
+  "widgets.vpn.settings": "Fungua katika Mipangilio"
 }

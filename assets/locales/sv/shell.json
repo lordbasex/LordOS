@@ -609,5 +609,18 @@
   "widgets.weather.kind.rain": "Regn",
   "widgets.weather.kind.snow": "Snö",
   "widgets.weather.kind.showers": "Skurar",
-  "widgets.weather.kind.storm": "Åska"
+  "widgets.weather.kind.storm": "Åska",
+  "widgets.vpn.name": "VPN",
+  "widgets.vpn.desc": "Slå på eller av ett VPN, med adress och trafik",
+  "widgets.vpn.on": "PÅ",
+  "widgets.vpn.off": "AV",
+  "widgets.vpn.connected": "Ansluten",
+  "widgets.vpn.disconnected": "Frånkopplad",
+  "widgets.vpn.connecting": "Ansluter…",
+  "widgets.vpn.disconnecting": "Kopplar från…",
+  "widgets.vpn.failed": "Kunde inte ansluta",
+  "widgets.vpn.none": "Inget VPN har konfigurerats än.",
+  "widgets.vpn.add": "Konfigurera ett VPN",
+  "widgets.vpn.choose": "Välj VPN",
+  "widgets.vpn.settings": "Öppna i Inställningar"
 }
