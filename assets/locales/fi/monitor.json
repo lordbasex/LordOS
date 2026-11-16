@@ -574,5 +574,7 @@
   "gpu.machines": "Koneet",
   "gpu.vms": "Käynnissä · suoritin {cpu} % · muisti {mem}",
   "comp.sql": "Tietokannat",
-  "comp.sqlHint": "Tietokannat: yhteydet suosikeissasi oleviin MySQL- ja MariaDB-palvelimiin."
+  "comp.sqlHint": "Tietokannat: yhteydet suosikeissasi oleviin MySQL- ja MariaDB-palvelimiin.",
+  "comp.weather": "Sää",
+  "comp.weatherHint": "Sääwidgetin ennusteet Open-Meteolta, kun otat ne käyttöön."
 }

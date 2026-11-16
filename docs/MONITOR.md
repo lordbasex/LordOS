@@ -154,6 +154,7 @@ backed by its own process and cgroup scope, so its rules are enforced by the ker
 | Printers and scanners | `lordos:print` | IPP and eSCL to network printers and scanners, and their mDNS discovery |
 | Terminal | `lordos:terminal` | the shell of every terminal and every program it starts; the detail lists the programs by name |
 | Blocklist updates | `lordos:lists` | the daily blocklist downloads (`lord-fetch`) |
+| Weather | `lordos:weather` | the weather widget's forecasts from Open-Meteo, once turned on (`lord-fetch`) |
 | VPN | `lordos:vpn` | the counters of LordOS's own VPN interfaces (Settings → Network); not blockable |
 | Name resolution (DNS) | `system:dns` | systemd-resolved; shown, never blockable |
 | Time synchronization | `system:time` | systemd-timesyncd; shown, never blockable |

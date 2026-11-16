@@ -574,5 +574,7 @@
   "gpu.machines": "ورچوئل مشینیں",
   "gpu.vms": "چل رہی ہیں · پروسیسر {cpu} % · میموری {mem}",
   "comp.sql": "ڈیٹا بیسز",
-  "comp.sqlHint": "ڈیٹا بیسز: آپ کے پسندیدہ MySQL اور MariaDB سرورز سے کنکشنز۔"
+  "comp.sqlHint": "ڈیٹا بیسز: آپ کے پسندیدہ MySQL اور MariaDB سرورز سے کنکشنز۔",
+  "comp.weather": "موسم",
+  "comp.weatherHint": "آن کرنے کے بعد موسم ویجیٹ کی Open-Meteo سے پیش گوئیاں۔"
 }

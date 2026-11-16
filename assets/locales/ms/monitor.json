@@ -559,5 +559,7 @@
   "gpu.machines": "Mesin Maya",
   "gpu.vms": "Berjalan · pemproses {cpu} % · memori {mem}",
   "comp.sql": "Pangkalan Data",
-  "comp.sqlHint": "Pangkalan Data: sambungan ke pelayan MySQL dan MariaDB dalam kegemaran anda."
+  "comp.sqlHint": "Pangkalan Data: sambungan ke pelayan MySQL dan MariaDB dalam kegemaran anda.",
+  "comp.weather": "Cuaca",
+  "comp.weatherHint": "Ramalan widget cuaca daripada Open-Meteo, selepas anda menghidupkannya."
 }

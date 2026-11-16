@@ -574,5 +574,7 @@
   "gpu.machines": "Машини",
   "gpu.vms": "Работят · процесор {cpu} % · памет {mem}",
   "comp.sql": "Бази данни",
-  "comp.sqlHint": "Бази данни: връзки към сървъри MySQL и MariaDB от любимите ви."
+  "comp.sqlHint": "Бази данни: връзки към сървъри MySQL и MariaDB от любимите ви.",
+  "comp.weather": "Времето",
+  "comp.weatherHint": "Прогнозите на джаджата за времето от Open-Meteo, след като ги включите."
 }

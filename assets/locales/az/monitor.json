@@ -574,5 +574,7 @@
   "gpu.machines": "Virtual maşınlar",
   "gpu.vms": "İşləyir · prosessor {cpu} % · yaddaş {mem}",
   "comp.sql": "Verilənlər bazaları",
-  "comp.sqlHint": "Verilənlər bazaları: seçilmişlərinizdəki MySQL və MariaDB serverlərinə bağlantılar."
+  "comp.sqlHint": "Verilənlər bazaları: seçilmişlərinizdəki MySQL və MariaDB serverlərinə bağlantılar.",
+  "comp.weather": "Hava",
+  "comp.weatherHint": "Açdıqda hava vidcetinin Open-Meteo proqnozları."
 }

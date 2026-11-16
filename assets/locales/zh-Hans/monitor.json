@@ -559,5 +559,7 @@
   "gpu.machines": "虚拟机",
   "gpu.vms": "运行中 · 处理器 {cpu} % · 内存 {mem}",
   "comp.sql": "数据库",
-  "comp.sqlHint": "数据库：连接到你收藏中的 MySQL 和 MariaDB 服务器。"
+  "comp.sqlHint": "数据库：连接到你收藏中的 MySQL 和 MariaDB 服务器。",
+  "comp.weather": "天气",
+  "comp.weatherHint": "开启后，天气小组件从 Open-Meteo 获取的预报。"
 }

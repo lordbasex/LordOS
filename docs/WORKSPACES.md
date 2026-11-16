@@ -110,6 +110,19 @@ displays do. Nothing runs per frame, nothing polls.
   (none in Opaque), 12 px headings, large figures. Clocks move once a minute (no seconds hand: no timer every
   second), and every reading runs only while its widget is shown. Kept in `settings.deskWidgets`
   (`[{ id, type, size, desk, dk, col, row, opts }]`).
+- **Weather** (approved by the maintainer on 2026-11-16; s, m, l). The only widget that uses the internet, and only once
+  the person presses **Turn on** on it (`settings.weather.on`, off by default; its right-click menu turns it off and
+  picks °C or °F, by default the region's). The desktop names a time zone (its own and, at l, three of the Clock app's
+  cities); lord-server takes that zone's coordinates from tzdata's `zone1970.tab` (no GPS, no address, nothing typed)
+  and, through its own connector (`lordos:weather`: its own scope, firewall row and rules), opens a socket to
+  `api.open-meteo.com:443` only. The sandboxed `lord-fetch` speaks TLS on it, sends one fixed GET built from the two
+  numbers, and parses the answer strictly into numbers (`server/src/fetch/weather.c`: temperature, feeling, WMO code,
+  day or night, six days of code, high and low; anything missing or out of range refuses the whole answer). lord-server
+  checks those numbers again and keeps each zone's forecast 30 minutes (a failure waits 10; at most 8 zones). JS sees
+  only `lord.weather.request(zone)` and `lord.weather.get(zone)`, in the desktop's own context (never an isolated app).
+  The card shows a sky gradient by condition and time of day, the city, the temperature, a drawn icon, high
+  and low; m adds the next five days, l the week with range bars and three cities. Tests: `tests/weather_test.c`
+  (path and parsing), `tests/weather_model_test.mjs`, and the scene checks that nothing is asked while it's off.
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

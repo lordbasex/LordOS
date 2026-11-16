@@ -18,7 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists", "lan", "sql" };
+static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists", "lan", "sql", "weather" };
 
 const char *netconn_name(NcComponent c) { return (unsigned)c < NC_COUNT ? NAMES[c] : NULL; }
 

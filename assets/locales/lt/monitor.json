@@ -589,5 +589,7 @@
   "gpu.machines": "Virtualios mašinos",
   "gpu.vms": "Veikia · procesorius {cpu} % · atmintis {mem}",
   "comp.sql": "Duomenų bazės",
-  "comp.sqlHint": "Duomenų bazės: ryšiai su MySQL ir MariaDB serveriais iš jūsų mėgstamų."
+  "comp.sqlHint": "Duomenų bazės: ryšiai su MySQL ir MariaDB serveriais iš jūsų mėgstamų.",
+  "comp.weather": "Orai",
+  "comp.weatherHint": "Orų valdiklio prognozės iš Open-Meteo, kai jas įjungiate."
 }

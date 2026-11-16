@@ -559,5 +559,7 @@
   "gpu.machines": "仮想マシン",
   "gpu.vms": "実行中 · プロセッサ {cpu} % · メモリ {mem}",
   "comp.sql": "データベース",
-  "comp.sqlHint": "データベース：お気に入りにある MySQL および MariaDB サーバーへの接続。"
+  "comp.sqlHint": "データベース：お気に入りにある MySQL および MariaDB サーバーへの接続。",
+  "comp.weather": "天気",
+  "comp.weatherHint": "オンにすると、天気ウィジェットが Open-Meteo から予報を取得します。"
 }

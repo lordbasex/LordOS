@@ -559,5 +559,7 @@
   "gpu.machines": "가상 머신",
   "gpu.vms": "실행 중 · 프로세서 {cpu}% · 메모리 {mem}",
   "comp.sql": "데이터베이스",
-  "comp.sqlHint": "데이터베이스: 즐겨찾기에 있는 MySQL 및 MariaDB 서버로의 연결."
+  "comp.sqlHint": "데이터베이스: 즐겨찾기에 있는 MySQL 및 MariaDB 서버로의 연결.",
+  "comp.weather": "날씨",
+  "comp.weatherHint": "켜면 날씨 위젯이 Open-Meteo에서 예보를 가져옵니다."
 }

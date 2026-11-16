@@ -589,5 +589,7 @@
   "gpu.machines": "Машини",
   "gpu.vms": "Працює · процесор {cpu} % · пам’ять {mem}",
   "comp.sql": "Бази даних",
-  "comp.sqlHint": "Бази даних: з’єднання із серверами MySQL і MariaDB у вашому обраному."
+  "comp.sqlHint": "Бази даних: з’єднання із серверами MySQL і MariaDB у вашому обраному.",
+  "comp.weather": "Погода",
+  "comp.weatherHint": "Прогнози віджета погоди від Open-Meteo, коли ви їх увімкнете."
 }

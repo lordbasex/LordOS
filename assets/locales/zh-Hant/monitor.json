@@ -559,5 +559,7 @@
   "gpu.machines": "虛擬機器",
   "gpu.vms": "執行中 · 處理器 {cpu} % · 記憶體 {mem}",
   "comp.sql": "資料庫",
-  "comp.sqlHint": "資料庫：與你最愛中的 MySQL 與 MariaDB 伺服器的連線。"
+  "comp.sqlHint": "資料庫：與你最愛中的 MySQL 與 MariaDB 伺服器的連線。",
+  "comp.weather": "天氣",
+  "comp.weatherHint": "開啟後，天氣小工具從 Open-Meteo 取得的預報。"
 }

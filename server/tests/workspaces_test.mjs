@@ -34,7 +34,7 @@ for (const d of ['sdk', 'runtime', ...themeDirs]) {
 // scene fills (the bars' rectangles), far off screen otherwise; settings saved in memory; the network polls counted.
 const MOCK = `globalThis.__lordTest = (() => {
   const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), layouts = new Map(), props = new Map();
-  const counts = { netPolls: 0, ops: 0 };
+  const counts = { netPolls: 0, ops: 0, wx: 0 };
   let nextId = 1, saved = '{}';
   const base = {
     screen: { width: 1920, height: 1080, displays: [], mirror: false },
@@ -51,6 +51,8 @@ const MOCK = `globalThis.__lordTest = (() => {
     destroy: (id) => { styles.delete(id); texts.delete(id); parents.delete(id); removed.add(id); },
     settings: { load: () => saved, save: (s) => { saved = s; return true; } },
     system: { info: () => ({ user: 'test', memTotalKB: 8000000, memAvailableKB: 4000000, cores: 4 }), cpuTimes: () => [100, 50] },
+    weather: { request: () => { counts.wx++; return true; }, get: () => null },
+    time: { zone: () => 'America/Argentina/Buenos_Aires', zoneOffset: () => null },
     net: { interfaces: () => { counts.netPolls++; return [
       { name: 'lo', type: 'loopback', up: true, addresses: [] },
       { name: 'eth0', type: 'ether', up: true, addresses: [{ family: 4, scope: 'global', address: '192.168.1.5' }] },

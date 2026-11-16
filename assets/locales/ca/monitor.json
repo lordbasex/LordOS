@@ -574,5 +574,7 @@
   "gpu.machines": "Màquines",
   "gpu.vms": "En execució · processador {cpu} % · memòria {mem}",
   "comp.sql": "Bases de dades",
-  "comp.sqlHint": "Bases de dades: connexions als servidors MySQL i MariaDB dels teus preferits."
+  "comp.sqlHint": "Bases de dades: connexions als servidors MySQL i MariaDB dels teus preferits.",
+  "comp.weather": "Temps",
+  "comp.weatherHint": "Les previsions del giny del temps, d'Open-Meteo, quan les actives."
 }

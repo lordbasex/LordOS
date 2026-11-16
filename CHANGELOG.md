@@ -62,7 +62,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     shows only on a display with nothing at all (no window, none minimized, no widget); widgets alone hide it. The "+"
     in each frame header is now a menu: Add window, Add widget, Add web app (the Store's Web apps page), and the
     wallpaper's right-click menu starts with the same three. The widget catalog shows four columns (it wrapped to
-    three: the cards' borders were left out of its width), fewer on a narrow display. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    three: the cards' borders were left out of its width), fewer on a narrow display.
+    **Weather widget** (maintainer's approval 2026-11-16): small, medium and large, in a card with a sky by
+    condition and time of day, a drawn icon, high and low, the next days, three of Clock's cities). It is the only
+    widget that uses the internet and asks nothing until the person presses Turn on (`settings.weather.on`). The
+    coordinates are the time zone's own, from tzdata (no location); lord-server connects through a connector of its
+    own, `lordos:weather` (its own scope, firewall row and Monitor row), to `api.open-meteo.com:443` only, and the
+    sandboxed `lord-fetch` does one fixed GET and parses the answer strictly into numbers (`fetch/weather.c`, checked
+    again in lord-server, kept 30 minutes). `lord.weather` exists only in the desktop's own context. Tests:
+    `weather-test` (25), `weather_model_test.mjs`, and the scene checks that nothing is asked while it is off.
+    **Every app fits a small window**: a Workspaces side tile is about 600×470, and apps with a larger minimum
+    (Cleaner 880×600, Disks 760×480, …) ran over the next window. Every native app's minimum is now at most 480×360,
+    and below 640 px their sidebars hide behind a toolbar button and open over the content (`sdk/narrow.jsx`:
+    `useWindowWidth`, `useNarrow`, `useSidebar`, `SidebarToggle`, `SidebarOverlay`; the window store's width, no
+    polling). Wide windows look as before. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

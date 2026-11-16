@@ -14,6 +14,13 @@ const abs = (s) => ({ position: 'absolute', ...s });
 // a small drawing of each kind (no emoji, no images)
 function KindGlyph({ type, t }) {
   const a = t.accent, dim = t.textDim;
+  if (type === 'weather') return (
+    <View style={{ width: 34, height: 34, direction: 'ltr' }}>
+      <View style={abs({ left: 14, top: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFC531' })} />
+      <View style={abs({ left: 2, top: 18, width: 28, height: 12, borderRadius: 6, backgroundColor: t.text })} />
+      <View style={abs({ left: 8, top: 11, width: 14, height: 14, borderRadius: 7, backgroundColor: t.text })} />
+    </View>
+  );
   if (type === 'clock') return (
     <View style={{ width: 34, height: 34, borderRadius: 17, border: `2.5px solid ${a}` }}>
       <View style={abs({ left: 15, top: 6, width: 2.5, height: 12, backgroundColor: t.text, borderRadius: 2 })} />

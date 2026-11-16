@@ -38,6 +38,9 @@ import { battery } from './hardware.jsx';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER } from './widgetgrid.js';
+import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
+import { locale } from './i18n.js';
+import { regionCountry } from './localename.js';
 
 // ---- the catalog ----
 const kinds = [];
@@ -784,13 +787,183 @@ function ClaudeBody({ w, L }) {
   );
 }
 
+// ---- weather (Open-Meteo through lord-fetch, by the time zone's coordinates: server/src/fetch/wxsvc.h) ----
+// Off until the person turns it on from the widget (settings.weather.on): nothing is asked of the internet before.
+const wxOn = () => !!settings.get().weather?.on;
+const wxUnit = () => settings.get().weather?.unit || unitFor(regionCountry(locale.get().region));
+function useWeather(zones, on) {
+  const now = useMinute();
+  const key = zones.join('|');
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!on) return undefined;
+    for (const z of zones) { try { lord.weather?.request(z); } catch (e) { /* no lord.weather (tests, older server) */ } }
+    // the first answer takes a few seconds: look again shortly, then once a minute (useMinute)
+    const id = setTimeout(() => setTick((x) => x + 1), 4000);
+    return () => clearTimeout(id);
+  }, [key, on, Math.floor(now / 600000)]);
+  void tick;
+  const out = {};
+  for (const z of zones) { try { out[z] = on ? lord.weather?.get(z) || null : null; } catch (e) { out[z] = null; } }
+  return out;
+}
+// drawn, no emoji: a sun (or moon), a cloud, and what falls from it
+function WxGlyph({ code, day = 1, size = 40 }) {
+  const k = kindOf(code), s = size / 40;
+  const sun = (x, y, r) => (
+    <View style={{ position: 'absolute', left: x - r, top: y - r, width: 2 * r, height: 2 * r }}>
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2, d = r * 0.98;
+        return <View key={i} style={{ position: 'absolute', left: r + Math.sin(a) * d - 1.2 * s, top: r - Math.cos(a) * d - 3 * s, width: 2.4 * s, height: 6 * s, borderRadius: 1.2 * s, backgroundColor: '#FFC531', transform: `rotate(${i * 45}deg)` }} />;
+      })}
+      <View style={{ position: 'absolute', left: r * 0.42, top: r * 0.42, width: r * 1.16, height: r * 1.16, borderRadius: r * 0.58, backgroundColor: '#FFC531' }} />
+    </View>
+  );
+  const moon = (x, y, r) => (
+    <View style={{ position: 'absolute', left: x - r, top: y - r, width: 2 * r, height: 2 * r, borderRadius: r, backgroundColor: '#F2F0E6', overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', left: r * 0.7, top: -r * 0.35, width: 2 * r, height: 2 * r, borderRadius: r, backgroundColor: 'rgba(16,24,48,0.92)' }} />
+    </View>
+  );
+  const cloud = (x, y, w, color = '#F4F6FA') => (
+    <View style={{ position: 'absolute', left: x, top: y, width: w, height: w * 0.62 }}>
+      <View style={{ position: 'absolute', left: w * 0.06, top: w * 0.26, width: w * 0.88, height: w * 0.36, borderRadius: w * 0.18, backgroundColor: color }} />
+      <View style={{ position: 'absolute', left: w * 0.14, top: w * 0.14, width: w * 0.36, height: w * 0.36, borderRadius: w * 0.18, backgroundColor: color }} />
+      <View style={{ position: 'absolute', left: w * 0.36, top: 0, width: w * 0.46, height: w * 0.46, borderRadius: w * 0.23, backgroundColor: color }} />
+    </View>
+  );
+  const drops = (n, color, len, round) => Array.from({ length: n }, (_, i) => (
+    <View key={i} style={{ position: 'absolute', left: (10 + i * (22 / Math.max(1, n - 1))) * s, top: 29 * s, width: (round ? 4 : 2.4) * s, height: (round ? 4 : len) * s, borderRadius: 2 * s, backgroundColor: color, transform: round ? undefined : 'rotate(18deg)' }} />
+  ));
+  const parts = [];
+  if (k === 'clear') parts.push(<View key="c" style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}>{day ? sun(20 * s, 20 * s, 15 * s) : moon(20 * s, 20 * s, 13 * s)}</View>);
+  else {
+    if (k === 'partly') parts.push(<View key="p" style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}>{day ? sun(25 * s, 14 * s, 11 * s) : moon(26 * s, 13 * s, 9 * s)}</View>);
+    parts.push(<View key="cl" style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}>{cloud(2 * s, (k === 'partly' ? 12 : 6) * s, 36 * s, k === 'storm' || k === 'rain' ? '#C9D1DC' : '#F4F6FA')}</View>);
+    if (k === 'rain' || k === 'showers') parts.push(...drops(4, '#5AB0FF', 8, false));
+    if (k === 'drizzle') parts.push(...drops(3, '#7CC0FF', 5, false));
+    if (k === 'snow') parts.push(...drops(4, '#FFFFFF', 4, true));
+    if (k === 'fog') parts.push(...[0, 1].map((i) => <View key={`f${i}`} style={{ position: 'absolute', left: (5 + i * 6) * s, top: (31 + i * 5) * s, width: 26 * s, height: 2.6 * s, borderRadius: 1.3 * s, backgroundColor: '#E6EAF0' }} />));
+    if (k === 'storm') parts.push(<View key="b" style={{ position: 'absolute', left: 18 * s, top: 27 * s, width: 4 * s, height: 12 * s, backgroundColor: '#FFC531', borderRadius: 1 * s, transform: 'rotate(20deg)' }} />);
+  }
+  return <View style={{ width: size, height: size, direction: 'ltr' }}>{parts}</View>;
+}
+const WX_TEXT = '#ffffff', WX_DIM = 'rgba(255,255,255,0.78)';
+function WeatherBody({ w }) {
+  const on = wxOn();
+  useStore(settings, (s) => `${!!s.weather?.on}|${s.weather?.unit || ''}|${JSON.stringify(s.clock?.cities || [])}`);
+  const here = localZone();
+  const zones = [here, ...(w.size === 'l' ? cities(3) : [])].filter(Boolean);
+  const data = useWeather(zones, on);
+  const cur = data[here], unit = wxUnit();
+  const deg = (c) => `${tempIn(c, unit)}°`;
+  const sky = skyOf(cur?.c != null ? kindOf(cur.c) : 'partly', cur ? cur.d : 1);
+  const bleed = { position: 'absolute', left: -15, top: -13, right: -15, bottom: -14, background: `linear-gradient(170deg, ${sky[0]}, ${sky[1]})` };
+  const city = cityName(here) || t('shell.widgets.weather.name');
+  if (!on) {
+    return (
+      <View style={{ flex: 1, gap: 6, justifyContent: 'center' }}>
+        <View style={bleed} />
+        <WxGlyph code={2} size={w.size === 's' ? 34 : 40} />
+        <Text style={{ fontSize: 13, fontWeight: 650, color: WX_TEXT, textAlign: 'start' }}>{t('shell.widgets.weather.name')}</Text>
+        {w.size !== 's' ? <Text style={{ fontSize: 11, color: WX_DIM, textAlign: 'start' }}>{t('shell.widgets.weather.consent')}</Text> : null}
+        <View onClick={() => settings.set({ weather: { ...(settings.get().weather || {}), on: true } })}
+          style={{ alignSelf: 'flex-start', height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' }}>
+          <Text style={{ fontSize: 12, fontWeight: 600, color: WX_TEXT }}>{t('shell.widgets.weather.turnOn')}</Text>
+        </View>
+      </View>
+    );
+  }
+  if (!cur || cur.t == null) {
+    return (
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={bleed} />
+        <Text style={{ fontSize: 13, fontWeight: 650, color: WX_TEXT, textAlign: 'start' }}>{city}</Text>
+        <Text style={{ fontSize: 11.5, color: WX_DIM, textAlign: 'start' }}>{t(cur?.error ? 'shell.widgets.weather.offline' : 'shell.widgets.weather.loading')}</Text>
+      </View>
+    );
+  }
+  const today = cur.days?.[0];
+  const head = (
+    <View style={{ gap: 1 }}>
+      <Text style={{ fontSize: 13, fontWeight: 650, color: WX_TEXT, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{city}</Text>
+      <Text style={{ fontSize: w.size === 's' ? 40 : 46, fontWeight: 300, color: WX_TEXT, textAlign: 'start' }}>{deg(cur.t)}</Text>
+    </View>
+  );
+  const foot = (
+    <View style={{ gap: 1 }}>
+      <WxGlyph code={cur.c} day={cur.d} size={20} />
+      <Text style={{ fontSize: 11.5, fontWeight: 600, color: WX_TEXT, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t(`shell.widgets.weather.kind.${kindOf(cur.c)}`)}</Text>
+      {today ? <Text style={{ fontSize: 11.5, color: WX_DIM, textAlign: 'start' }}>{t('shell.widgets.weather.hilo', { hi: deg(today[1]), lo: deg(today[2]) })}</Text> : null}
+    </View>
+  );
+  if (w.size === 's') return <View style={{ flex: 1, justifyContent: 'space-between' }}><View style={bleed} />{head}{foot}</View>;
+  const dayName = (i) => (i === 0 ? t('shell.widgets.weather.today') : weekdayName(new Date(Date.now() + i * 86400000).getDay(), true));
+  if (w.size === 'm') {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
+        <View style={bleed} />
+        <View style={{ width: 120, justifyContent: 'space-between' }}>{head}{foot}</View>
+        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {(cur.days || []).slice(1, 6).map((d, i) => (
+            <View key={i} style={{ alignItems: 'center', gap: 5 }}>
+              <Text style={{ fontSize: 11, fontWeight: 600, color: WX_DIM }}>{dayName(i + 1)}</Text>
+              <WxGlyph code={d[0]} size={24} />
+              <Text style={{ fontSize: 12, fontWeight: 600, color: WX_TEXT }}>{deg(d[1])}</Text>
+              <Text style={{ fontSize: 11, color: WX_DIM }}>{deg(d[2])}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+  // l: today, the week as rows with a range bar, and three other cities
+  const all = (cur.days || []).flatMap((d) => [d[1], d[2]]);
+  const lo = Math.min(...all), hi = Math.max(...all), span = Math.max(1, hi - lo);
+  return (
+    <View style={{ flex: 1, gap: 8 }}>
+      <View style={bleed} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>{head}<View style={{ alignItems: 'flex-end' }}>{foot}</View></View>
+      <View style={{ gap: 3 }}>
+        {(cur.days || []).slice(0, 5).map((d, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 20, direction: 'ltr' }}>
+            <Text style={{ width: 52, fontSize: 12, fontWeight: 600, color: WX_TEXT, textAlign: 'start' }}>{dayName(i)}</Text>
+            <WxGlyph code={d[0]} size={18} />
+            <Text style={{ width: 32, fontSize: 12, color: WX_DIM, textAlign: 'end' }}>{deg(d[2])}</Text>
+            <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)' }}>
+              <View style={{ position: 'absolute', left: `${((d[2] - lo) / span) * 100}%`, width: `${Math.max(6, ((d[1] - d[2]) / span) * 100)}%`, height: 4, borderRadius: 2, background: 'linear-gradient(90deg, #7ED1FF, #FFC531)' }} />
+            </View>
+            <Text style={{ width: 32, fontSize: 12, fontWeight: 600, color: WX_TEXT, textAlign: 'end' }}>{deg(d[1])}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 'auto' }}>
+        {zones.slice(1).map((z) => {
+          const o = data[z];
+          return (
+            <View key={z} style={{ alignItems: 'center', gap: 2, minWidth: 0, flex: 1 }}>
+              <Text style={{ fontSize: 11, color: WX_DIM, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{cityName(z)}</Text>
+              {o?.t != null ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><WxGlyph code={o.c} day={o.d} size={16} /><Text style={{ fontSize: 12.5, fontWeight: 600, color: WX_TEXT }}>{deg(o.t)}</Text></View> : <Text style={{ fontSize: 12, color: WX_DIM }}>…</Text>}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
-const BODIES = { clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
+const BODIES = { weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
-const KIND_SIZES = { clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
+const KIND_SIZES = { weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
+  weather: () => [
+    { label: '°C', checked: wxUnit() === 'c', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'c' } }) },
+    { label: '°F', checked: wxUnit() === 'f', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'f' } }) },
+    { label: t('shell.widgets.clock.cities'), onClick: () => wm.open('clock') },
+    ...(wxOn() ? [{ label: t('shell.widgets.weather.turnOff'), onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), on: false } }) }] : []),
+  ],
   clock: (w) => [
     { label: t('shell.widgets.clock.analog'), checked: w.opts?.style !== 'digital', onClick: () => setDeskWidget(w.id, { opts: { style: 'analog' } }) },
     { label: t('shell.widgets.clock.digital'), checked: w.opts?.style === 'digital', onClick: () => setDeskWidget(w.id, { opts: { style: 'digital' } }) },

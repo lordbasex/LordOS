@@ -574,5 +574,7 @@
   "gpu.machines": "মেশিন",
   "gpu.vms": "চলছে · প্রসেসর {cpu} % · মেমরি {mem}",
   "comp.sql": "ডেটাবেস",
-  "comp.sqlHint": "ডেটাবেস: আপনার পছন্দের তালিকায় থাকা MySQL ও MariaDB সার্ভারের সংযোগ।"
+  "comp.sqlHint": "ডেটাবেস: আপনার পছন্দের তালিকায় থাকা MySQL ও MariaDB সার্ভারের সংযোগ।",
+  "comp.weather": "আবহাওয়া",
+  "comp.weatherHint": "চালু করার পর আবহাওয়া উইজেটের Open-Meteo পূর্বাভাস।"
 }

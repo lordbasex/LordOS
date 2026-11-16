@@ -574,5 +574,7 @@
   "gpu.machines": "Maschinen",
   "gpu.vms": "Laufen · Prozessor {cpu} % · Arbeitsspeicher {mem}",
   "comp.sql": "Datenbanken",
-  "comp.sqlHint": "Datenbanken: Verbindungen zu MySQL- und MariaDB-Servern in deinen Favoriten."
+  "comp.sqlHint": "Datenbanken: Verbindungen zu MySQL- und MariaDB-Servern in deinen Favoriten.",
+  "comp.weather": "Wetter",
+  "comp.weatherHint": "Die Vorhersagen des Wetter-Widgets von Open-Meteo, sobald du sie einschaltest."
 }

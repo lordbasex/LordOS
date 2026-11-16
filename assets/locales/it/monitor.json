@@ -574,5 +574,7 @@
   "gpu.machines": "Macchine",
   "gpu.vms": "In esecuzione · processore {cpu} % · memoria {mem}",
   "comp.sql": "Database",
-  "comp.sqlHint": "Database: connessioni ai server MySQL e MariaDB dei tuoi preferiti."
+  "comp.sqlHint": "Database: connessioni ai server MySQL e MariaDB dei tuoi preferiti.",
+  "comp.weather": "Meteo",
+  "comp.weatherHint": "Le previsioni del widget Meteo da Open-Meteo, una volta attivate."
 }

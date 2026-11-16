@@ -377,7 +377,7 @@ await flush();
   wp.widgetPicker.set({ display: R });
   await flush();
   check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
-  check('widgets: its kinds', ['clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  check('widgets: its kinds', ['weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
   wp.widgetPicker.set(null);
   const g = grid.gridOf(sdk.workAreaOf(R));
   const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };
@@ -483,6 +483,21 @@ await flush();
     globalThis.__lordEvent('down', null, L.x + 5, L.y + 600, 0); globalThis.__lordEvent('up', null, L.x + 5, L.y + 600, 0);
     for (let i = 0; i < 2; i++) await flush();
   }
+}
+
+// weather: off until the person turns it on from the widget; nothing is asked of the internet before
+{
+  const { counts } = globalThis.__lordTest;
+  const shownW = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  const id = sdk.addDeskWidget('weather', 'm', L);
+  for (let i = 0; i < 2; i++) await flush();
+  check('weather: off, it offers to turn on and asks nothing', [shownW(sdk.t('shell.widgets.weather.turnOn')), counts.wx], [1, 0]);
+  sdk.settings.set({ weather: { on: true } });
+  for (let i = 0; i < 2; i++) await flush();
+  check('weather: on, it asks for the time zone\'s forecast', [counts.wx > 0, shownW(sdk.t('shell.widgets.weather.loading'))], [true, 1]);
+  sdk.settings.set({ weather: { on: false } });
+  sdk.removeDeskWidget(id);
+  for (let i = 0; i < 2; i++) await flush();
 }
 
 // every built-in widget renders in each of its sizes, and none adds a timer every second

@@ -559,5 +559,7 @@
   "gpu.machines": "Mesin Virtual",
   "gpu.vms": "Berjalan · prosesor {cpu} % · memori {mem}",
   "comp.sql": "Basis Data",
-  "comp.sqlHint": "Basis Data: koneksi ke server MySQL dan MariaDB di favorit Anda."
+  "comp.sqlHint": "Basis Data: koneksi ke server MySQL dan MariaDB di favorit Anda.",
+  "comp.weather": "Cuaca",
+  "comp.weatherHint": "Prakiraan widget cuaca dari Open-Meteo, setelah kamu aktifkan."
 }

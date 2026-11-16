@@ -574,5 +574,7 @@
   "gpu.machines": "वर्चुअल मशीनें",
   "gpu.vms": "चल रहा है · प्रोसेसर {cpu} % · मेमोरी {mem}",
   "comp.sql": "डेटाबेस",
-  "comp.sqlHint": "डेटाबेस: आपके पसंदीदा में MySQL और MariaDB सर्वरों से कनेक्शन।"
+  "comp.sqlHint": "डेटाबेस: आपके पसंदीदा में MySQL और MariaDB सर्वरों से कनेक्शन।",
+  "comp.weather": "मौसम",
+  "comp.weatherHint": "चालू करने पर मौसम विजेट के Open-Meteo से पूर्वानुमान।"
 }

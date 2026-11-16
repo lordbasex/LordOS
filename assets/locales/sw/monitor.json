@@ -574,5 +574,7 @@
   "gpu.machines": "Mashine",
   "gpu.vms": "Inaendeshwa · kichakataji {cpu} % · kumbukumbu {mem}",
   "comp.sql": "Hifadhidata",
-  "comp.sqlHint": "Hifadhidata: miunganisho kwa seva za MySQL na MariaDB kwenye vipendwa vyako."
+  "comp.sqlHint": "Hifadhidata: miunganisho kwa seva za MySQL na MariaDB kwenye vipendwa vyako.",
+  "comp.weather": "Hali ya hewa",
+  "comp.weatherHint": "Utabiri wa wijeti ya hali ya hewa kutoka Open-Meteo, ukiuwasha."
 }

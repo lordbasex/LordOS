@@ -559,5 +559,7 @@
   "gpu.machines": "Máy ảo",
   "gpu.vms": "Đang chạy · bộ xử lý {cpu} % · bộ nhớ {mem}",
   "comp.sql": "Cơ sở dữ liệu",
-  "comp.sqlHint": "Cơ sở dữ liệu: kết nối đến các máy chủ MySQL và MariaDB trong mục ưa thích của bạn."
+  "comp.sqlHint": "Cơ sở dữ liệu: kết nối đến các máy chủ MySQL và MariaDB trong mục ưa thích của bạn.",
+  "comp.weather": "Thời tiết",
+  "comp.weatherHint": "Dự báo của tiện ích thời tiết từ Open-Meteo, khi bạn bật."
 }

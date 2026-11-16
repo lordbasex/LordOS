@@ -589,5 +589,7 @@
   "gpu.machines": "Mașini",
   "gpu.vms": "Pornite · procesor {cpu} % · memorie {mem}",
   "comp.sql": "Baze de date",
-  "comp.sqlHint": "Baze de date: conexiuni la serverele MySQL și MariaDB din favorite."
+  "comp.sqlHint": "Baze de date: conexiuni la serverele MySQL și MariaDB din favorite.",
+  "comp.weather": "Vremea",
+  "comp.weatherHint": "Prognozele widgetului Vremea de la Open-Meteo, după ce le activezi."
 }

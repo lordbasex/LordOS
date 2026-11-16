@@ -574,5 +574,7 @@
   "gpu.machines": "Gépek",
   "gpu.vms": "Fut · processzor {cpu} % · memória {mem}",
   "comp.sql": "Adatbázisok",
-  "comp.sqlHint": "Adatbázisok: kapcsolatok a kedvencei közé felvett MySQL- és MariaDB-kiszolgálókhoz."
+  "comp.sqlHint": "Adatbázisok: kapcsolatok a kedvencei közé felvett MySQL- és MariaDB-kiszolgálókhoz.",
+  "comp.weather": "Időjárás",
+  "comp.weatherHint": "Az időjárás-widget előrejelzései az Open-Meteótól, ha bekapcsolod."
 }
