@@ -29,9 +29,10 @@ const check = (name, got, want) => {
 };
 const attached = (id) => { for (let n = id; n; n = parents.get(n)) if (removed.has(n)) return false; return parents.has(id); };
 
-const L = { id: 41, name: 'DP-1', x: 0, y: 0, w: 1920, h: 1080, scale: 100, main: false };
-const M = { id: 42, name: 'DP-2', x: 1920, y: 0, w: 1920, h: 1080, scale: 100, main: true };
-const R = { id: 43, name: 'HDMI-A-1', x: 3840, y: 0, w: 1920, h: 1080, scale: 100, main: false };
+// three monitors of one model, as lord-server describes them: the model in name, the port in connector
+const L = { id: 41, name: 'S27F350', connector: 'DP-1', x: 0, y: 0, w: 1920, h: 1080, scale: 100, main: false };
+const M = { id: 42, name: 'S27F350', connector: 'DP-2', x: 1920, y: 0, w: 1920, h: 1080, scale: 100, main: true };
+const R = { id: 43, name: 'S27F350', connector: 'HDMI-A-1', x: 3840, y: 0, w: 1920, h: 1080, scale: 100, main: false };
 const plug = async (list, mirror = false) => {
   lord.screen.displays = list;
   lord.screen.mirror = mirror;
@@ -118,6 +119,36 @@ state.panel.set({ name: 'search', mode: 'apps', display: L.id });
 await flush();
 check('search: on the left display', [...styles].filter(([id, st]) => st.width === 680 && st.left === L.x + Math.round((L.w - 680) / 2) && attached(id)).length, 1);
 state.panel.set(null);
+await flush();
+
+// bounded whatever the apps do (0.8.9): a pass with nothing new moves nothing; an app that answers every size it is
+// given with another one (a minimum size, a character grid) stays in its tile and is asked once, never in a loop
+let notes = 0;
+const offNotes = sdk.windows.subscribe(() => { notes++; });
+for (let i = 0; i < 5; i++) tiler.retile();
+await flush();
+check('idempotent: passes with nothing new change nothing', notes, 0);
+const stubborn = sdk.wm.open('extra1', { frame: { x: M.x + 600, y: 300, w: 500, h: 400 } });
+let answers = 0;
+const offAnswer = sdk.windows.subscribe(() => {
+  const w = sdk.wm.get(stubborn);
+  if (!w || answers > 500) return;
+  // every size the tiler gives (even widths here) is answered with another one (odd), as a geometry event does
+  if (w.w % 2 === 0) { answers++; setTimeout(() => sdk.wm.resize(stubborn, w.w - 3 - 2 * (answers % 3), w.h - 5), 0); }
+});
+notes = 0;
+for (let i = 0; i < 20; i++) await flush();
+offAnswer();
+check('a stubborn app: still in its tile', tiler.isFloating(stubborn), false);
+check('a stubborn app: a bounded number of changes', notes < 12 && answers < 6, true);
+check('a stubborn app: counted on the main display', tiler.tiled.get().counts['DP-2'], 4);
+check('a stubborn app: it did answer, once', answers, 1);
+notes = 0;
+for (let i = 0; i < 5; i++) tiler.retile();
+await flush();
+check('and then idle', notes, 0);
+offNotes();
+sdk.wm.close(stubborn, true);
 await flush();
 
 // the effects styles: Crystal draws its sheen, Opaque no blur at all

@@ -60,19 +60,34 @@ static void *worker(void *arg) {
     return NULL;
 }
 
-/* SIGXCPU: a thread ran PAR_RT_TIME_US on real time without blocking (a bug, or a very long theme
- * load). Every thread goes back to the normal policy for the rest of the session; nothing is killed. */
-static void rt_demote(int sig) {
-    (void)sig;
+/* Every thread back to the normal policy for the rest of the session (RLIMIT_RTPRIO is 0 since par_init:
+ * the kernel never lets them take real time again); nothing is killed. Async-signal-safe. 1 if they were
+ * at real time until now. */
+static int demote_all(const char *m, size_t n) {
     struct sched_param p = { 0 };
     for (int i = 0; i < PAR_MAX; i++) {
         int t = atomic_load(&rt_tids[i]);
-        if (t) sched_setscheduler(t, SCHED_OTHER, &p);
+        /* with SCHED_RESET_ON_FORK kept: without CAP_SYS_NICE the kernel refuses to clear that flag (EPERM),
+         * and the main thread, which has it, would stay at real time (it did until 0.8.9) */
+        if (t) sched_setscheduler(t, SCHED_OTHER | SCHED_RESET_ON_FORK, &p);
     }
-    if (atomic_exchange(&rt_on, 0)) {
-        static const char m[] = "lord-server: back to the normal priority (a thread ran too long on real time, or it could not be set)\n";
-        if (write(2, m, sizeof m - 1) < 0) {}
-    }
+    if (!atomic_exchange(&rt_on, 0)) return 0;
+    if (write(2, m, n) < 0) {}
+    return 1;
+}
+
+/* SIGXCPU: a thread ran PAR_RT_TIME_US on real time without blocking (a bug, or a very long theme
+ * load). */
+static void rt_demote(int sig) {
+    (void)sig;
+    static const char m[] = "lord-server: back to the normal priority (a thread ran too long on real time, or it could not be set)\n";
+    demote_all(m, sizeof m - 1);
+}
+
+/* The watchdog (wdog.h): the main loop stalled, whether or not its thread blocks now and then. */
+int par_demote(void) {
+    static const char m[] = "lord-server: back to the normal priority for the rest of the session (the main loop stalled)\n";
+    return demote_all(m, sizeof m - 1);
 }
 
 static int rt_set(int flags) {

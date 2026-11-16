@@ -12,13 +12,20 @@
 // those apps go back to that display and tile when they open again. With fewer displays connected, a gone display's
 // apps join the main display's tiles (model/layouts.js foldMissing). A display unplugged: the SDK moves its windows to
 // the main display (keepWindowsInWorkAreas) and they join its tiles; plugged back, they return to their saved display.
+//
+// Bounded by construction (server/tests/workspaces_model_test.mjs, workspaces_scene.mjs): a pass that changes nothing
+// moves nothing, so a second pass right after the first is a no-op; a window is asked for a tile's size once per tile,
+// and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
+// (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
+// changes the windows meanwhile: past that the pass waits a second.
 import { windows, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
-import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKey, savedDisplay, foldMissing } from './model/layouts.js';
+import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
 
 const floating = new Set();          // window ids out of the tiles
-const applied = new Map();           // window id → the rect the tiler gave it last
+const applied = new Map();           // window id → { tile, got, t }: the rect asked for, the frame taken as the answer, when
+const moved = new Map();             // window id → when the tiler moved it in the last second (underBudget)
 const home = new Map();              // window id → display key
 const order = new Map();             // `${desk}|${dkey}` → [window ids] in tile order
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
@@ -26,6 +33,9 @@ export const tiled = createStore({ rev: 0, tight: [], counts: {} });
 
 let applying = false;
 let pending = 0;
+let passes = [];                     // when the last passes ran (at most MAX_PASSES a second)
+let warned = false;
+const MAX_PASSES = 60;
 const sameRect = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 // Theme panels (the SDK's built-in windows) and dialogs never tile.
@@ -39,7 +49,7 @@ export function tileable(w) {
 }
 
 export const displaysHere = () => shownDisplays(screenDisplays(), screen.mirror);
-export const keyOfDisplay = (d) => { const list = displaysHere(); return displayKey(d, Math.max(0, list.findIndex((x) => x.id === d.id))); };
+export const keyOfDisplay = (d) => { const list = displaysHere(); const i = list.findIndex((x) => x.id === d.id); return displayKeys(list)[i] ?? `#${Math.max(0, i)}`; };
 const mainKey = () => { const list = displaysHere(); const m = list.find((d) => d.main) || list[0]; return m ? keyOfDisplay(m) : '#0'; };
 
 // the layout of one display of an activity (an unset display takes 'free': windows stay where they are)
@@ -93,13 +103,20 @@ export function areasChanged() {
   schedule();
 }
 
-export function schedule() {
+// Every change of the windows, the activities or the desktop in view asks for one pass; the changes of one moment
+// share it.
+export function schedule(ms = 0) {
   if (pending) return;
-  pending = setTimeout(() => { pending = 0; retile(); }, 0);
+  pending = setTimeout(() => { pending = 0; retile(); }, ms);
 }
+const warnOnce = (what) => { if (!warned) { warned = true; console.warn(`workspaces: tiler: ${what}`); } };
 
 export function retile() {
   if (applying) return;
+  const now = Date.now();
+  passes = passes.filter((t) => now - t < 1000 && t <= now);
+  if (passes.length >= MAX_PASSES) { warnOnce(`more than ${MAX_PASSES} passes in a second; waiting`); schedule(1000); return; }
+  passes.push(now);
   const desk = activeDesktop.get();
   const all = windows.get();
   const disp = displaysHere();
@@ -109,14 +126,16 @@ export function retile() {
   const meta = activityOf(desk);
   const saved = foldMissing(meta.layouts, keys, mk);
   const live = new Set(all.map((w) => w.id));
-  for (const id of [...applied.keys()]) if (!live.has(id)) { applied.delete(id); home.delete(id); floating.delete(id); }
+  for (const id of [...applied.keys()]) if (!live.has(id)) { applied.delete(id); home.delete(id); floating.delete(id); moved.delete(id); }
 
   const groups = new Map(keys.map((k) => [k, []]));
   for (const w of all) {
     if (w.desktop !== desk || !tileable(w)) continue;
     const was = applied.get(w.id);
-    // moved or resized by hand since the tiler placed it: it floats
-    if (was && !sameRect(was, wFrame(w))) { floating.add(w.id); applied.delete(w.id); }
+    // moved or resized by hand since the tiler placed it: it floats; the app's own answer to the size: kept
+    const how = was ? judgeFrame(was, wFrame(w), now) : 'same';
+    if (how === 'hand') { floating.add(w.id); applied.delete(w.id); }
+    else if (how === 'answer') applied.set(w.id, { ...was, got: wFrame(w) });
     if (floating.has(w.id)) continue;
     let dk = home.get(w.id);
     if (!dk || !keys.includes(dk)) {
@@ -128,6 +147,7 @@ export function retile() {
   }
 
   const moves = new Map();
+  let later = false;
   const tight = [];
   const counts = {};
   disp.forEach((d, i) => {
@@ -150,13 +170,21 @@ export function retile() {
       const r = fitTile(rects[j], getApp(id)?.minSize, area);
       if (r.tight) tight.push(id);
       const want = { x: r.x, y: r.y, w: r.w, h: r.h };
-      applied.set(id, want);
-      if (!sameRect(want, wFrame(w))) moves.set(id, want);
+      const was = applied.get(id);
+      // the same tile as before: nothing to ask (the window took it, or answered with a size of its own)
+      if (was && sameRect(was.tile, want)) return;
+      if (sameRect(want, wFrame(w))) { applied.set(id, { tile: want, got: want, t: now }); return; }
+      const budget = underBudget(moved.get(id), now);
+      if (!budget) { later = true; warnOnce(`window ${id} asked to move too often; waiting`); return; }
+      moved.set(id, budget);
+      applied.set(id, { tile: want, got: want, t: now });
+      moves.set(id, want);
     });
   });
 
   const t = tiled.get();
   if (JSON.stringify(t.tight) !== JSON.stringify(tight) || JSON.stringify(t.counts) !== JSON.stringify(counts)) tiled.set({ rev: t.rev + 1, tight, counts });
+  if (later) schedule(1000);
   if (!moves.size) return;
   applying = true;
   try {

@@ -61,7 +61,9 @@ export function Search({ t, display, onClose, isOnChrome }) {
   const list = useStore(desktopList);
   const active = useStore(activeDesktop);
   const meta = useStore(activities);
-  useEffect(() => { searchEverything.prepare(); }, []);
+  // the file index (sdk/spotlight.js) only once something is typed: the Apps view never needs it
+  const typed = query.trim() !== '';
+  useEffect(() => { if (typed) searchEverything.prepare(); }, [typed]);
   useEffect(() => {
     const n = box.current?.id;
     if (n) { tween(n, { translateY: [-18, 0] }, { ms: 240, ease: EASE.back }); tween(n, { opacity: [0, 1] }, { ms: 140 }); }

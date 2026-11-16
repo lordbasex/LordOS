@@ -2,7 +2,7 @@
 // (sdk/thememeta.js): where things go on each display, the tiles, the activities' settings key, the three effects
 // styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
-import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
+import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, displayKeys, judgeFrame, underBudget, ANSWER_MS, MOVES_PER_SEC, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
 import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity, defaultActivity, freshActivity, togglePin, needsOnboarding, wsPatch, optPatch,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
@@ -84,8 +84,41 @@ const folded = foldMissing(saved, ['DP-1', 'DP-2'], 'DP-1');
 eq('fewer monitors: a gone display joins the main one', folded['DP-1'].apps, ['editor', 'web:docs']);
 eq('fewer monitors: the others stay', folded['DP-2'].apps, ['terminal', 'files']);
 eq('home after folding', homeFor('web:docs', folded, ['DP-1', 'DP-2']), 'DP-1');
-eq('display key: connector', displayKey({ name: 'DP-3' }, 2), 'DP-3');
+eq('display key: connector', displayKey({ name: 'S27F350', connector: 'DP-3' }, 2), 'DP-3');
+eq('display key: never the model name', displayKey({ name: 'S27F350' }, 2), '#2');
 eq('display key: by place', displayKey({}, 2), '#2');
+// three monitors of one model (the maintainer's desk, 0.8.9): three keys
+const same = [{ name: 'S27F350', connector: 'DP-2' }, { name: 'S27F350', connector: 'HDMI-A-1' }, { name: 'S27F350', connector: 'DP-3' }];
+eq('display keys: three of one model', displayKeys(same), ['DP-2', 'HDMI-A-1', 'DP-3']);
+eq('display keys: never two alike', displayKeys([{ connector: 'X' }, { connector: 'X' }, {}]), ['X', '#1', '#2']);
+
+// ---- the tiler's decisions: bounded whatever the app does ----
+const T = { x: 100, y: 50, w: 800, h: 600 };
+const entry = { tile: T, got: T, t: 1000 };
+eq('judge: where the tiler left it', judgeFrame(entry, { ...T }, 1100), 'same');
+eq('judge: the app answered another size at the corner', judgeFrame(entry, { ...T, w: 812, h: 590 }, 1200), 'answer');
+eq('judge: the answer is kept afterwards', judgeFrame({ ...entry, got: { ...T, w: 812, h: 590 } }, { ...T, w: 812, h: 590 }, 9000), 'same');
+eq('judge: a late change is a hand', judgeFrame(entry, { ...T, w: 700 }, 1000 + ANSWER_MS + 1), 'hand');
+eq('judge: moved is a hand', judgeFrame(entry, { ...T, x: 140 }, 1100), 'hand');
+eq('judge: nothing known', judgeFrame(null, T, 0), 'hand');
+let times = [];
+for (let i = 0; i < MOVES_PER_SEC; i++) times = underBudget(times, 5000 + i);
+eq('budget: ten moves in a second', times.length, MOVES_PER_SEC);
+eq('budget: one more waits', underBudget(times, 5100), null);
+eq('budget: a second later it fits', underBudget(times, 6010)?.length, 1);
+// An app that never takes its size: the tiler (as tiler.js uses these) asks it once per tile, whatever it answers.
+{
+  const asked = [];
+  let e = null, frame = { x: 0, y: 0, w: 10, h: 10 }, t = 0;
+  for (let pass = 0; pass < 200; pass++, t += 7) {
+    const how = e ? judgeFrame(e, frame, t) : 'same';
+    if (how === 'hand') break;
+    if (how === 'answer') e = { ...e, got: { ...frame } };
+    if (!(e && e.tile.x === T.x && e.tile.y === T.y && e.tile.w === T.w && e.tile.h === T.h)) { e = { tile: T, got: T, t }; asked.push(t); frame = { ...T }; }
+    frame = { ...frame, w: T.w - 3 - (pass % 5), h: T.h - 7 };     // the app answers something else every time
+  }
+  eq('a stubborn app: asked once for its tile', asked.length, 1);
+}
 eq('saved display', savedDisplay('three', 0.5, ['files', null, 'terminal']), { layout: 'three', ratio: 0.5, apps: ['files', 'terminal'] });
 
 // ---- activities ----

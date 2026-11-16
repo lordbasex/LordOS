@@ -585,7 +585,24 @@ own), as KWin does for its compositor and Mutter for the thread that sends frame
   drops to `nobody`).
 - A thread that runs 5 s of CPU on real time without blocking (a bug) gets `SIGXCPU`, and every thread goes back to
   the normal policy for the rest of the session; nothing is killed. The session log says which happened
-  (`compositor at real-time priority 2 (SCHED_RR, N threads)`).
+  (`compositor at real-time priority 2 (SCHED_RR, N threads)`). Until 0.8.9 the main thread itself stayed at real
+  time there: without `CAP_SYS_NICE` the kernel refuses to clear `SCHED_RESET_ON_FORK` (`EPERM`), and the demotion
+  asked for `SCHED_OTHER` alone; it now keeps the flag (`par.c` `demote_all`, checked by `build/wdog-test`).
+- **The watchdog (0.8.9, approved by the maintainer on 2026-11-16; `wdog.c`, `wdog.h`).** `SIGXCPU` only comes when a
+  thread never blocks; a main loop that blocks now and then (a lock, a disk read, the paint threads' condition
+  variable) and never gets back to its `poll()` escaped it, and a frozen compositor is a frozen desktop. The loop now
+  stores, with two relaxed atomic stores per iteration and no system call, when it left `poll()` (and 0 just before
+  it waits). A thread of its own, at the normal policy (explicitly, never real time), started after `par_init` right
+  before the loop, looks every 200 ms. Away from `poll()` for more than 2 s: every thread goes back to the normal
+  policy for the rest of the session (`par_demote`; `RLIMIT_RTPRIO` is 0, so the kernel never gives real time back:
+  the limit drop stays), and the log says what the main thread is doing (`/proc`: running or waiting, the share of a
+  CPU it uses, where it waits), its C stack (a real-time signal to that thread, `backtrace()` there; resolve the
+  `+0x…` offsets with `addr2line -e lord-server`) and, if JavaScript runs, the JS stack (QuickJS's interrupt
+  handler, which only reads an atomic while nothing is wrong). Past 10 s it stops the JavaScript task that runs (an
+  uncatchable `interrupted` error, logged with its stack by `js.c`) once that task has run 0.5 s by itself, and the
+  loop goes on; when the loop is back the log says after how long. A theme load is long by design and never counts.
+  A display whose page flip hasn't completed in 2 s is logged too (from fields the loop already keeps). Every line
+  starts with `lord-server: watchdog:`.
 - Without lord-sessiond, or on a kernel that refuses it (`CONFIG_RT_GROUP_SCHED`), nothing changes.
 
 Checked on VM 116 with the new lord-sessiond: the main thread is `SCHED_RR|SCHED_RESET_ON_FORK`, the 7 paint threads

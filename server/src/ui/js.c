@@ -47,6 +47,7 @@
 #include "../wl/keygrab.h"
 #include "../media/media.h"
 #include "../sec/codesig.h"
+#include "../wdog.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
@@ -413,11 +414,36 @@ static char *load_code(const char *path, size_t *len, int *refused) {
     return src;
 }
 
+/* QuickJS asks every 10000 bytecode steps whether to go on (wdog.h): only while the compositor's main loop
+ * has stalled does the watchdog answer anything else. 1: the JS stack is logged (an error made here and
+ * dropped, an exception in flight left alone) and the task goes on; 2: the task is stopped with an
+ * uncatchable "interrupted" error, which the caller logs with its stack. */
+static int on_interrupt(JSRuntime *r, void *opaque) {
+    (void)r;
+    (void)opaque;
+    int w = wdog_js_poll();
+    if (w == 1 && ctx && !JS_HasException(ctx)) {
+        /* inside the interpreter QuickJS adds an error's stack only while it unwinds: an Error made by a
+         * line of JS called from here has every frame below it */
+        static const char probe[] = "new Error().stack";
+        JSValue st = JS_Eval(ctx, probe, sizeof probe - 1, "<watchdog>", JS_EVAL_TYPE_GLOBAL);
+        const char *s = JS_IsString(st) ? JS_ToCString(ctx, st) : NULL;
+        fprintf(stderr, "lord-server: watchdog: the JavaScript stack:\n%s\n", s ? s : "(none)");
+        if (s) JS_FreeCString(ctx, s);
+        if (JS_IsException(st)) JS_FreeValue(ctx, JS_GetException(ctx));
+        else JS_FreeValue(ctx, st);
+        return 0;
+    }
+    if (w == 2) fprintf(stderr, "lord-server: watchdog: the JavaScript task stopped (its stack follows)\n");
+    return w == 2;
+}
+
 /* A new context with the whole `lord` object of a session (or of the login screen). */
 static void session_context(void) {
     rt = JS_NewRuntime();
     JS_SetMemoryLimit(rt, 256u << 20);
     JS_SetMaxStackSize(rt, 4u << 20);
+    JS_SetInterruptHandler(rt, on_interrupt, NULL);
     ctx = JS_NewContext(rt);
 
     JSValue g = JS_GetGlobalObject(ctx);

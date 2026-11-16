@@ -55,6 +55,14 @@ displays do. Nothing runs per frame, nothing polls.
 - **A window whose minimum size is bigger than its tile** keeps its minimum at the tile's corner, inside the work area
   (it overlaps its neighbour instead of being cut), and its title bar shows an amber dot ("needs more room than its
   tile").
+- **An app that answers with another size** (Google Chrome's minimum size, a terminal's character grid) at the tile's
+  corner within 1.5 s keeps that size and stays in its tile; it is asked again only when its tile changes
+  (`model/layouts.js` `judgeFrame`). A resize by hand later than that floats the window as above.
+- **Bounded:** a pass with nothing new moves nothing (a second pass is a no-op); at most 10 moves of one window and 60
+  passes a second, past which the pass waits a second (`underBudget`, `MAX_PASSES` in `tiler.js`). A display is keyed
+  by its connector, never its model's name (three monitors of one model share it), and two keys are never alike
+  (`displayKeys`). Tests: `workspaces_model_test.mjs` and `workspaces_scene.mjs` (idempotent passes, an app that
+  answers every size with another one).
 
 ## Several displays
 

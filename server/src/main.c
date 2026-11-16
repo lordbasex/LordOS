@@ -31,6 +31,7 @@
 #include "ui/js_sys.h"
 #include "canvas.h"
 #include "par.h"
+#include "wdog.h"
 #include "input.h"
 #include "inputkind.h"
 #include "kms.h"
@@ -2615,11 +2616,16 @@ int main(int argc, char **argv) {
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
 
     double start = now_ms();
+    /* the watchdog (wdog.h): a stall of this loop never leaves the desktop frozen at real time */
+    wdog_start();
+    wdog_busy(mono_ns());
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
             char next[sizeof current];
             snprintf(next, sizeof next, "%s", ui.theme_request);
+            wdog_expect(1);                 /* a theme loads for a second or more by design */
             if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
+            wdog_expect(0);
         }
         /* El movimiento del puntero juntado: una vez por cuadro, cuando terminó el page flip. Así un
          * mouse de 1000 Hz no llama a JS (ni a las apps Linux) mil veces por segundo. */
@@ -2821,8 +2827,10 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
+        wdog_idle();
         if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
         loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */
+        wdog_busy(loop_wake);
         loop_wake_flip = 0;
         if (pfd[0].revents & POLLIN) {
             Kms *heads[OUT_MAX], *mk = &main_out(&s)->kms;
@@ -2851,6 +2859,20 @@ int main(int argc, char **argv) {
             }
         }
         if (pfd[1].revents & POLLIN) break;
+        /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
+         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps */
+        if (!s.headless) {
+            static uint64_t flip_told[OUT_MAX];
+            for (int i = 0; i < OUT_MAX; i++) {
+                const Kms *k = &s.out[i].kms;
+                if (!s.out[i].on || !k->flip_pending) { flip_told[i] = 0; continue; }
+                if (flip_told[i] != k->flip_submit_ns && k->flip_submit_ns && loop_wake > k->flip_submit_ns + 2000000000ull) {
+                    flip_told[i] = k->flip_submit_ns;
+                    fprintf(stderr, "lord-server: watchdog: %s: its page flip has not completed for %.1f s\n",
+                            s.out[i].d.connector, (loop_wake - k->flip_submit_ns) / 1e9);
+                }
+            }
+        }
         int lost[INPUT_MAX_DEVICES], nlost = 0;
         for (int i = 0; i < s.input.count; i++) {
             if (pfd[2 + i].revents & POLLIN) input_dispatch(&s.input, i, on_input, &s);
@@ -2912,6 +2934,7 @@ int main(int argc, char **argv) {
     /* a logout on the monitor: lord-sessiond takes it back now (a black frame on every display, the login screen up),
      * so closing the apps and unmounting the cloud folders below happens off the screen instead of behind a frozen
      * desktop for seconds */
+    wdog_stop();                          /* closing the apps below may take seconds by design */
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */

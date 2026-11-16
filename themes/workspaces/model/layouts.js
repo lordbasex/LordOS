@@ -10,6 +10,10 @@
 //   orderFor(ids, keyOf, saved)      the tile order: a saved layout's apps first, in their saved order
 //   homeFor(key, saved, connected)   the display a saved layout put an app's window on, if that display is here
 //   displayKey(d, i)                 a display's stable name (its connector), for saved layouts
+//   displayKeys(list)                every display's key, never two alike
+//   judgeFrame(entry, frame, now)    what a window's change since the tiler placed it means: the same, the app's
+//                                    answer to the size it was given, or a move by hand
+//   underBudget(times, now)          whether one more move of a window fits its budget (MOVES_PER_SEC)
 export const LAYOUTS = ['free', 'single', 'split', 'three', 'grid'];
 export const TILE_GAP = 10;
 export const RATIO_MIN = 0.25;
@@ -120,8 +124,44 @@ export function homeFor(key, saved, connected) {
   return null;
 }
 
-// A display's stable name for saved layouts: its connector (DP-1, HDMI-A-1…), or its place when it has none.
-export const displayKey = (d, i = 0) => (d && typeof d.name === 'string' && d.name ? d.name : `#${i}`);
+// A display's stable name for saved layouts: its connector (DP-1, HDMI-A-1…), never its model (three monitors of
+// the same model share it), or its place when it has none.
+export const displayKey = (d, i = 0) => (d && typeof d.connector === 'string' && d.connector ? d.connector : `#${i}`);
+// The keys of a list of displays, each one different (a repeated one takes its place: '#2').
+export function displayKeys(list) {
+  const seen = new Set();
+  return (list || []).map((d, i) => {
+    let k = displayKey(d, i);
+    if (seen.has(k)) k = `#${i}`;
+    seen.add(k);
+    return k;
+  });
+}
+
+// A window the tiler placed, compared with where it is now. entry: { tile, got, t } (the rect the tiler asked for,
+// the frame it took as the answer, when it asked). 'same': as it was left. 'answer': the app gave itself another size
+// at the tile's corner shortly after it was asked (a minimum size, a terminal's character grid): kept as the answer,
+// the window stays in its tile and is never asked again for that tile. 'hand': moved or resized by the person, or
+// changed later: the window floats. A window is asked again only when its tile changes, so an app that never takes
+// the size it is given can't make the tiler loop.
+export const ANSWER_MS = 1500;
+export function judgeFrame(entry, frame, now, answerMs = ANSWER_MS) {
+  if (!entry || !frame) return 'hand';
+  const g = entry.got || entry.tile;
+  if (g && g.x === frame.x && g.y === frame.y && g.w === frame.w && g.h === frame.h) return 'same';
+  const t = entry.tile;
+  if (t && frame.x === t.x && frame.y === t.y && now - entry.t >= 0 && now - entry.t < answerMs) return 'answer';
+  return 'hand';
+}
+
+// At most MOVES_PER_SEC moves of one window per second by the tiler, whatever asks for them. times: when it was moved
+// (ms); returns the list with this move added, or null if it doesn't fit (the move waits).
+export const MOVES_PER_SEC = 10;
+export function underBudget(times, now, max = MOVES_PER_SEC, per = 1000) {
+  const recent = (times || []).filter((t) => now - t < per && now >= t);
+  if (recent.length >= max) return null;
+  return [...recent, now];
+}
 
 // What "Save layout" keeps for one display: the layout, its ratio and the app of each tile, in tile order.
 export function savedDisplay(layout, ratio, keys) {

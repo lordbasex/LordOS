@@ -65,6 +65,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     key, theme.json, the three styles and the palette's contrast) and `workspaces_test.mjs` with
     `workspaces_scene.mjs` (the whole theme on three displays), both in `make test`; `theme_cost_scene.mjs` measures
     any theme. Not yet checked on a real session, with real monitors, Linux apps, right to left or the GPU path.
+- **The compositor's watchdog** (approved by the maintainer on 2026-11-16; `server/src/wdog.c`, `docs/BENCHMARK.md`,
+  "Real-time priority"). No bug in a theme or in lord-server may leave the desktop frozen for good. The main loop marks
+  when it leaves its `poll()` (two atomic stores per iteration, no system call); a thread of its own at the normal
+  policy looks every 200 ms. Away for more than 2 s: the compositor's threads go back to the normal policy for the rest
+  of the session, and the session log gets the main thread's state, its C stack and, when JavaScript runs, the JS
+  stack. Past 10 s the JavaScript task that runs is stopped (an uncatchable error, logged with its stack) and the
+  desktop goes on. A theme load never counts. A display whose page flip doesn't complete in 2 s is logged too. Test:
+  `build/wdog-test` in `make test` (a stall seen once, quick iterations and a theme load not, the priority drop where
+  real time can be had, an endless JS loop with a `try/catch` stopped, the next task running normally).
+
+### Fixed
+
+- **Lord Workspaces froze a desktop with three monitors (in development; found on the maintainer's computer with the
+  0.8.8.10~ws1 test build).** What froze it is not reproduced yet (headless, CPU path: no stall in a stress of layouts,
+  the Apps panel, Google Chrome and a terminal); the watchdog above now names it if it happens again. Fixed meanwhile:
+  - *Display keys:* the tiler and Save layout keyed a display by its model name, so three monitors of one model were
+    one display: each window was placed on all three in turn, ended on the wrong one and floated. They are keyed by
+    their connector now (`DP-2`, `HDMI-A-1`…), never two alike (`displayKeys`). A layout saved by the test build under
+    the model's name is not read back.
+  - *Bounded tiling:* a pass with nothing new moves nothing; a window is asked for a tile's size once per tile, and an
+    app that answers with another size at the tile's corner within 1.5 s (Chrome's minimum size, a terminal's character
+    grid) keeps it and stays in its tile instead of floating (`judgeFrame`); at most 10 moves per window and 60 passes
+    per second, past that the pass waits a second (`underBudget`). Checked in `workspaces_model_test.mjs` (an app that
+    answers every size with another one is asked once) and `workspaces_scene.mjs` (idempotent passes, a stubborn app
+    stays tiled with a bounded number of changes).
+  - *Search:* the Apps view no longer builds the home folder's file index; it starts with the first typed character.
+- **The real-time priority's demotion left the main thread at real time.** On `SIGXCPU` lord-server asked the kernel
+  for `SCHED_OTHER` alone, which it refuses for a thread with `SCHED_RESET_ON_FORK` (the main one) without
+  `CAP_SYS_NICE`: only the paint threads went back. It keeps the flag now (`par.c`).
 
 ## [0.8.8.9-beta] - 2026-11-15
 
