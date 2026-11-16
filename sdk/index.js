@@ -4,10 +4,12 @@ import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { locale, tOptional } from './i18n.js';
+import { cleanThemeMeta } from './thememeta.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
+export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
 export { settings, useSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
@@ -100,7 +102,7 @@ export {
   keepWindowsInWorkAreas, pointerDisplay,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
-export { desktopName, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
+export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, removeDesktopById, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
 import { startDesktops, desktopsForThemeSwitch, desktopAt, indexOfDesktop } from './desktops.js';
 // the brief level indicator of the volume, brightness and keyboard-light keys (docs/SHORTCUTS.md)
 export { LevelHud, showLevel } from './levelhud.js';
@@ -221,10 +223,13 @@ export const themes = {
     let meta = {};
     try { meta = t.meta ? JSON.parse(t.meta) : {}; } catch (e) { /* invalid theme.json */ }
     // translated name and description (shell.theme.<id>.*) or those from theme.json
+    // (0.8.9) sketch, options and desktopArrows: what Settings shows for a theme it doesn't know by id (sdk/thememeta.js)
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
-      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '' };
+      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta) };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
+  // the current theme's entry (null on the login screen or without lord.themes)
+  info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },
   // Switches theme live: the server discards this JS context and loads the new one. The LordOS
   // app windows that are open come back in the new theme (themeReopen, read once by startShell);
   // Linux app windows stay connected and simply get the new theme's frame.

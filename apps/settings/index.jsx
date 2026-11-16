@@ -20,6 +20,7 @@ import { PrivacySettings } from './Privacy.jsx';
 import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
+import { SketchThumb, ThemeOptions, knownTheme } from './ThemeExtras.jsx';
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -99,7 +100,8 @@ function ModeThumb({ mode, accent }) {
 
 // A small picture of a desktop style: a menu bar and a Dock ('default') or a centered taskbar
 // ('classic'). Drawn with views: our own sketch, no screenshots.
-function StyleThumb({ id, accent, dark }) {
+function StyleThumb({ id, accent, dark, sketch }) {
+  if (sketch && !knownTheme(id)) return <SketchThumb sketch={sketch} accent={accent} dark={dark} />;
   const glass = dark ? 'rgba(30,30,36,0.85)' : 'rgba(255,255,255,0.82)';
   const win = dark ? '#2c2c30' : '#ffffff';
   const classic = id === 'classic';
@@ -151,7 +153,7 @@ function StylePicker() {
           return (
             <View key={id} onClick={() => { if (!th.current) pick(id); }} style={{ alignItems: 'center', gap: 6 }}>
               <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${th.current ? t.accent : 'transparent'}` }}>
-                <StyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} />
+                <StyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} sketch={th.sketch} />
               </View>
               <Text style={{ fontSize: typeScale.callout, fontWeight: th.current ? 600 : 400, color: t.text }}>{th.name}</Text>
             </View>
@@ -169,6 +171,7 @@ function Appearance() {
   return (
     <Stack>
       <StylePicker />
+      <ThemeOptions theme={themes.info()} />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
           {[['dark', tr('settings.dark')], ['light', tr('settings.light')]].map(([id, label]) => (

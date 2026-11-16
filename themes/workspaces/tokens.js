@@ -1,0 +1,130 @@
+// Tokens of the "Lord Workspaces" theme. The base keys (text, accent, windowBg…) are the contract with the apps
+// (sdk/theme.js); the shape keys restyle the SDK's shared controls; the rest is this theme's own, above all the three
+// effects styles of its surfaces (the Context Spine, the activity strip, the status cluster, panels and menus):
+//
+//   opaque       solid panels, no blur: the cheapest to paint
+//   translucent  the classic look: a tinted panel that blurs what is behind it
+//   crystal      the translucent panel plus light: a bright 1 px top edge, a soft two-stop sheen from the top, a darker
+//                inner bottom edge (the light bending at the glass's lower rim) and a depth shadow. Tuned per mode.
+//
+// Settings → Appearance → Transparency off (settings.effects === false) is always opaque. Colours are the brand's
+// violets (#7C5CFF, #5B3FE0; the gradient #B46CFF → #4F46E5) and neutrals with a violet bias; contrast is checked in
+// server/tests/workspaces_model_test.mjs. Built from useSettings() (memoized in index.jsx), with the SDK's wallpapers passed
+// in, so this file is plain data that node can test.
+import { SPINE_BLUR } from './model/geometry.js';
+
+// The shared accent names, so the person's accent survives a theme switch. 'violeta' is the brand's own violet.
+export const accents = {
+  azul: '#3D7BFD',
+  violeta: '#7C5CFF',
+  rosa: '#E5487F',
+  naranja: '#E2711A',
+  verde: '#22A565',
+  grafito: '#7A7891',
+};
+// The same hues one step deeper: text and white-on-accent fills in light mode keep 4.5:1 or close to it.
+export const deep = {
+  azul: '#2563EB',
+  violeta: '#5B3FE0',
+  rosa: '#C8306A',
+  naranja: '#C2570C',
+  verde: '#15803D',
+  grafito: '#5D5B78',
+};
+
+export const BRAND_GRADIENT = 'linear-gradient(135deg, #B46CFF, #4F46E5)';
+
+// One material for every surface of the theme, per effects style and mode.
+export function material(surface, dark) {
+  if (surface === 'opaque') {
+    return {
+      bg: dark ? '#221F38' : '#F7F5FD', border: dark ? 'rgba(255,255,255,0.09)' : 'rgba(20,16,60,0.11)', blur: 0,
+      sheen: null, edge: null, rim: null,
+      shadow: dark ? '0 10px 26px rgba(5,3,20,0.45)' : '0 10px 26px rgba(40,30,110,0.14)',
+    };
+  }
+  if (surface === 'translucent') {
+    return {
+      bg: dark ? 'rgba(26,22,50,0.74)' : 'rgba(255,255,255,0.78)', border: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,60,0.10)', blur: SPINE_BLUR,
+      sheen: null, edge: null, rim: null,
+      shadow: dark ? '0 12px 30px rgba(5,3,20,0.42)' : '0 12px 30px rgba(40,30,110,0.16)',
+    };
+  }
+  return {
+    bg: dark ? 'rgba(32,27,64,0.50)' : 'rgba(255,255,255,0.52)',
+    border: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.70)',
+    blur: SPINE_BLUR,
+    // the sheen: brighter at the top, almost nothing at the bottom (two stops: what the renderer draws)
+    sheen: dark ? 'linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.01))' : 'linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.12))',
+    edge: dark ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.98)',
+    rim: dark ? 'rgba(0,0,0,0.30)' : 'rgba(40,30,110,0.12)',
+    shadow: dark ? '0 18px 40px rgba(6,3,26,0.50)' : '0 18px 38px rgba(52,38,140,0.20)',
+  };
+}
+
+export function makeTheme({ mode, accent, effects, surface }, wallpapers = []) {
+  const dark = mode === 'dark';
+  const s = effects === false ? 'opaque' : surface || 'crystal';
+  const m = material(s, dark);
+  const name = accents[accent] ? accent : 'violeta';
+  const acc = dark ? accents[name] : deep[name];
+  return {
+    mode,
+    accent: acc,
+    accents,
+    wallpapers,
+    effects: s !== 'opaque',
+    surface: s,
+    text: dark ? '#F1EFFC' : '#191733',
+    textDim: dark ? 'rgba(241,239,252,0.64)' : 'rgba(25,23,51,0.66)',
+    windowBg: dark ? '#1C1A2E' : '#FFFFFF',
+    sidebarBg: dark ? '#191729' : '#F4F2FB',
+    separator: dark ? 'rgba(255,255,255,0.09)' : 'rgba(20,16,60,0.10)',
+    hover: dark ? 'rgba(255,255,255,0.075)' : 'rgba(20,16,60,0.06)',
+    control: dark ? '#2D2A45' : '#ECE9F7',
+    inputBg: dark ? '#232039' : '#FFFFFF',
+    radius: 10,
+    // shared controls (sdk/theme.js): soft radii, accent menu highlight, filled selection, a focus ring
+    controlRadius: 8,
+    controlRadiusSmall: 6,
+    groupRadius: 12,
+    menuRadius: 12,
+    menuItemRadius: 7,
+    menuHighlight: 'accent',
+    selection: 'fill',
+    inputFocus: 'ring',
+    buttonBorder: false,
+    popupBg: dark ? '#252239' : '#FBFAFF',
+    gtkButtons: ':minimize,maximize,close',
+    scrollThumb: dark ? 'rgba(255,255,255,0.30)' : 'rgba(20,16,60,0.28)',
+    scrollThumbHover: dark ? 'rgba(255,255,255,0.48)' : 'rgba(20,16,60,0.44)',
+    // This theme's own:
+    mat: m,
+    // an opaque colour close to the surfaces, for glyphs that cut a hole
+    solidBg: dark ? '#221F38' : '#F7F5FD',
+    blur: s === 'opaque' ? 0 : 20,
+    panelBg: s === 'opaque' ? m.bg : dark ? 'rgba(30,26,56,0.86)' : 'rgba(251,250,255,0.88)',
+    panelBlur: s === 'opaque' ? 0 : 20,
+    windowBorder: dark ? 'rgba(255,255,255,0.12)' : 'rgba(20,16,60,0.14)',
+    titleBg: dark ? '#221F37' : '#F4F2FB',
+    titleBgBlur: dark ? '#1D1B30' : '#EEEBF8',
+    closeHover: '#E5484D',
+    // the group frame: a dimmed scrim over the wallpaper (never a live blur: it covers the whole work area)
+    frameBg: dark ? (s === 'opaque' ? 'rgba(16,13,34,0.62)' : 'rgba(16,13,34,0.30)') : (s === 'opaque' ? 'rgba(246,244,253,0.70)' : 'rgba(255,255,255,0.26)'),
+    frameText: dark ? '#F1EFFC' : '#191733',
+    shadow: dark ? '0 16px 36px rgba(6,3,24,0.50)' : '0 16px 36px rgba(40,30,110,0.20)',
+    shadowSoft: dark ? '0 8px 20px rgba(6,3,24,0.36)' : '0 8px 20px rgba(40,30,110,0.12)',
+    onAccent: '#FFFFFF',
+    brandGradient: BRAND_GRADIENT,
+  };
+}
+
+// The style of a surface's own box (the caller adds position and size). Crystal's sheen, edge and rim are children
+// (<Crystal />) so this stays one node with no gradient of its own.
+export function surfaceStyle(t, radius = 16) {
+  const m = t.mat;
+  return {
+    borderRadius: radius, backgroundColor: m.bg, border: `1px solid ${m.border}`, boxShadow: m.shadow, overflow: 'hidden',
+    ...(m.blur ? { backdropFilter: `blur(${m.blur}px)` } : null),
+  };
+}
