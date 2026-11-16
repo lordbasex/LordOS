@@ -19,4 +19,10 @@ size_t say_next(const char *s, size_t len, size_t max, size_t *skip);
  * of the three; English otherwise). */
 const char *say_language(const char *s, size_t len, const char *fallback);
 
+/* Spanish and Portuguese only (lang "es" or "pt"; any other language comes back as it is): numbers, decimals,
+ * percentages, ordinals, times, dates, money, degrees and the symbols # @ & + = written out as words, since their
+ * Pocket TTS models never learned to read digits (docs/VOICE.md, "Text normalization"). Portuguese is Brazilian's.
+ * A new NUL-terminated string, *outlen its length; NULL when out of memory. */
+char *say_normalize(const char *s, size_t len, const char *lang, size_t *outlen);
+
 #endif

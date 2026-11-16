@@ -10,6 +10,46 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Spanish and Portuguese voices read numbers and symbols.** Measured on the maintainer's computer with all 135 voice
+  packages installed and each recording transcribed by whisper.cpp: the Spanish and Portuguese Pocket TTS models never
+  learned digits, so "Tengo 88 años y nací en 1987. Compré 3 libros por 25 euros. #LordOS es genial." came out as
+  "Tengo bronce proteaños y nací en Crombiquit…" with every HD voice, and the standard models got only some numbers.
+  The same sentences written in words were read perfectly; English reads digits because its model learned them, and
+  audio.cpp normalizes no numbers in any language. `say` (and so every Speech menu, ❖Esc, Live Speech and Save as
+  Audio…) now writes them out as words for Spanish and Portuguese before splitting the text, with its own tables and
+  no new dependency (`say_normalize()` in `server/src/tts/saytext.c`); English text is left exactly as it was.
+  - *Covered, in both languages:* cardinals from 0 to 999 999 999 999 (cien/cem, ciento uno/cento e um, millones and
+    "mil millones"/milhões and bilhões, Portuguese "e" between groups as written: "dois mil e vinte e seis") and
+    negative numbers; a Spanish count before a noun shortened ("21 años" veintiún años, "1 libro" un libro, not before
+    "de"); thousands as written in Spanish and Portuguese ("1.000.000", "1 000", no-break and thin spaces) and comma
+    decimals ("3,5" tres coma cinco/três vírgula cinco), a point decimal read as "punto"/"ponto", versions and
+    addresses group by group ("0.8.8.10"); percentages; ordinals 1–100 masculine and feminine ("1.º", "1.ª", "1º",
+    Spanish "1.er" primer and "3.er" tercer); times ("14:30" catorce y treinta/catorze e trinta, "14:00" catorce horas,
+    "14h30", "1:02:03", "48 hs"); dates day first ("15/11/2026", "2026-11-15"); money before or after the amount (€,
+    $, US$, U$S, R$, £; "25,50 €" veinticinco euros con cincuenta, "1.000.000 €" un millón de euros; libras feminine);
+    degrees ("21 °C" veintiún grados Celsius); "#LordOS" LordOS, "#5" número cinco, "nº 5", "@" arroba, "&" y/e, "+"
+    and "=" before a number más/mais and igual a; rising ranges ("10-20" diez a veinte).
+  - *Read digit by digit:* numbers that start with 0 ("0800"), more than 9 digits without separators (phone numbers),
+    more than 12 with them; "612 345 678" is read in its three groups, not as 612 million. Digits inside words are
+    split off ("MP3" MP tres, "4K" cuatro K, "H264" H doscientos sesenta y cuatro, longer runs digit by digit); "C#"
+    and "C++" stay. Web addresses and e-mails keep their letters and name their punctuation ("info@lordos.org" info
+    arroba lordos punto org).
+  - *Not covered yet:* units ("5 km"), fractions ("1/2" is read "uno barra dos"), Roman numerals, the feminine of a
+    count before a feminine noun ("1 casa"), and European Portuguese forms (Brazilian ones are used: dezesseis,
+    bilhão).
+  - *Tests:* `server/tests/saytext_test.c` grows from 25 to 237 checks (126 Spanish and 82 Portuguese cases, and
+    English and other languages left untouched), all in `make test`; 300,000 random inputs under ASan and UBSan found
+    nothing.
+  - *Measured* (the same i9-10900 and RX 580, every installed Spanish and Portuguese voice, 23 HD and 22 standard
+    each, transcribed with whisper.cpp's `small` model; an item counts when the transcript has the number, in digits
+    or words). Sentence 1, above (88, 1987, 3, 25): Spanish HD 0 → 100 % of the items, standard 57 → 95 %;
+    Portuguese HD 1 → 94 %, standard 79 → 96 %. Sentence 2, "La inflación fue del 3,5% y el libro cuesta 25,50 €. La
+    reunión es a las 14:30 y quedé en 2.º lugar. El 15/11/2026 hacía 21 °C." and its Portuguese (with R$), 8 items:
+    Spanish HD 0 → 100 %, standard 41 → 96 %; Portuguese HD 5 → 93 %, standard 27 → 100 %. Most of what is left is
+    whisper writing the spoken words its own way ("80 e 8" for oitenta e oito).
+
 ## [0.8.8.9-beta] - 2026-11-15
 
 ### Added

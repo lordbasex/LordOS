@@ -500,6 +500,17 @@ int main(int argc, char **argv) {
         lang = say_language(text, len, fallback);
     }
     if (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt")) lang = "en";    /* the languages LordOS has voices for */
+    /* Spanish and Portuguese models don't read digits or symbols: numbers, times, money… written out as words
+     * (saytext.c), before the text is split so the pieces are measured on what is spoken. English stays as it is. */
+    if (strcmp(lang, "en")) {
+        size_t nlen;
+        char *spoken = say_normalize(text, len, lang, &nlen);
+        if (!spoken) die("out of memory", NULL);
+        free(text);
+        text = spoken;
+        len = nlen;
+        if (!len) return 0;
+    }
     if (!quality) quality = conf_quality[0] ? conf_quality : "auto";
     if (strcmp(quality, "auto") && strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is auto, standard or hd", quality);
     const char *roots[2] = { user_root, ROOTS_SYS };
