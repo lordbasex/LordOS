@@ -7,6 +7,7 @@
 // names (desktops are numbered again at every start), and the theme's own choices.
 //
 //   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup } | null ] }
+//   (layouts: { [display connector]: { layout, ratio, apps?, locked? } }; locked: the padlock is closed)
 //   settings.themeOptions.workspaces = { surface, spine, spineEvery }   (theme.json "options": Settings shows them,
 //                                    sdk/thememeta.js)
 //
@@ -43,6 +44,7 @@ function cleanLayouts(l) {
     const layout = cleanLayout(v.layout);
     const e = { layout, ratio: cleanRatio(layout, v.ratio) };
     if (Array.isArray(v.apps)) e.apps = v.apps.filter(isKey).slice(0, 12);
+    if (v.locked === true) e.locked = true;
     out[dk] = e;
   }
   return out;

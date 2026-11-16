@@ -8,7 +8,7 @@
 // nothing runs per frame or polls. Its own write is ignored when it comes back, so it can't loop.
 import { windows, activeDesktop, displayFor, workAreaOf, getApp, snapRect, createStore } from '@lordos/sdk';
 import { assistFor, follow, other, SIDES } from './model/magnet.js';
-import { tileable, layoutOf, keyOfDisplay } from './tiler.js';
+import { tileable, layoutOf, keyOfDisplay, windowLocked } from './tiler.js';
 
 // { id, side, rect, ids } while the chooser offers windows for the other half of window `id`, else null
 export const assist = createStore(null);
@@ -67,7 +67,7 @@ function changed(ws) {
   }
   // a window just snapped to a half, by hand, in a free layout: fill or offer the other half
   for (const w of ws) {
-    if (!SIDES.includes(w.snapped) || w.desktop !== desk || !prev[w.id]) continue;
+    if (!SIDES.includes(w.snapped) || w.desktop !== desk || !prev[w.id] || windowLocked(w)) continue;
     const p = prev[w.id];
     if (p.x === w.x && p.y === w.y && p.w === w.w && p.h === w.h) continue;
     if (pairs.some((q) => q.left === w.id || q.right === w.id)) continue;
@@ -89,6 +89,8 @@ function changed(ws) {
     if (q.desk !== desk || made.has(q)) { keep.push(q); continue; }
     const lw = windows.get().find((x) => x.id === q.left), rw = windows.get().find((x) => x.id === q.right);
     if (!lw || !rw || lw.desktop !== desk || rw.desktop !== desk) continue;
+    // a locked display: the pair stays, nothing follows
+    if (windowLocked(lw) || windowLocked(rw)) { keep.push(q); continue; }
     const r = follow(q, prev, after, workAreaOf(displayFor(lw)), minW);
     if (r?.break) continue;
     keep.push(q);

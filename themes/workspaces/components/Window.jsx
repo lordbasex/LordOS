@@ -13,7 +13,7 @@ import {
   solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
-import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph } from '../glyphs.jsx';
+import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph } from '../glyphs.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { setFloating, isFloating } from '../tiler.js';
 import { tween, EASE } from '../motion.js';
@@ -91,11 +91,13 @@ function moveItems(win) {
   return list.filter((d) => d !== win.desktop).map((d) => ({ label: desktopName(d), onClick: () => wm.moveToDesktop(win.id, d) }));
 }
 
-export const Window = memo(function Window({ win, t, focused, app, tight, leaving = false }) {
+export const Window = memo(function Window({ win, t, focused, app, tight, leaving = false, locked = false }) {
   const drag = useRef(null);
   const geo = wm.frame(win);
   const [menu, setMenu] = useState(null);
-  const { atStart, order } = useWindowButtons(false);
+  const { atStart, order: buttonOrder } = useWindowButtons(false);
+  // on a locked display (the frame's padlock): no buttons, no move, resize or window menu (the SDK refuses them too)
+  const order = locked ? [] : buttonOrder;
   const floating = isFloating(win.id);
   // zoom in from where it was launched (the spine, the search panel), on its cached raster; not the windows a session
   // or a theme switch brings back, and never with Reduce motion (motion.js)
@@ -146,7 +148,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
-      <WindowShell win={win} leaving={leaving} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
+      <WindowShell win={win} leaving={leaving} resizable={!locked} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: BTN, flexDirection: 'row', gap: 4, paddingHorizontal: 6, pointerEvents: 'box-none' }}>
@@ -155,7 +157,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
             {atStart ? <View style={{ flex: 1, pointerEvents: 'none' }} /> : null}
           </View>
         ) : null}
-        {wmenu && <Menu t={t} x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={items()} />}
+        {wmenu && !locked && <Menu t={t} x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={items()} />}
       </WindowShell>
     );
   }
@@ -171,20 +173,22 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   }
 
   const Icon = windowIcon(win);
-  const buttons = <View style={{ flexDirection: 'row', gap: 4 }}>{order.map(button)}</View>;
+  const buttons = locked
+    ? <View title={tr('shell.ws.lock.window')} style={{ width: BTN, height: BTN, alignItems: 'center', justifyContent: 'center', opacity: 0.55 }}><LockGlyph color={t.textDim} size={12} /></View>
+    : <View style={{ flexDirection: 'row', gap: 4 }}>{order.map(button)}</View>;
   // a maximized window fills the group frame's work area, inside its margins: it keeps its rounded corners
   const flat = !!win.fullscreen;
   const border = focused ? t.windowBorder : t.separator;
   return (
-    <WindowShell win={win} leaving={leaving} onMouseDown={() => wm.focus(win.id)} style={{
+    <WindowShell win={win} leaving={leaving} resizable={!locked} onMouseDown={() => wm.focus(win.id)} style={{
       borderRadius: flat ? 0 : 12, backgroundColor: app.transparent ? 'transparent' : t.windowBg, overflow: 'hidden',
       border: `1px solid ${app.transparent ? solidOver(border, t.titleBg) : border}`, boxShadow: shadow,
     }}>
       <View onMouseDown={(e) => {
-        if (e.button) return;
+        if (e.button || locked) return;
         if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false };
       }}
-        onDoubleClick={() => wm.toggleMaximize(win.id)} onContextMenu={(e) => setMenu({ x: e.x, y: e.y })}
+        onDoubleClick={() => { if (!locked) wm.toggleMaximize(win.id); }} onContextMenu={(e) => { if (!locked) setMenu({ x: e.x, y: e.y }); }}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {atStart ? buttons : <View style={{ width: 4 }} />}
         {Icon ? <Icon size={16} /> : null}

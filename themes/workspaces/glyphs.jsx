@@ -64,6 +64,18 @@ export function SaveGlyph({ color, bg, size = 14 }) {
   );
 }
 
+// A padlock (the display's lock): shackle and body; open, the shackle lifts and turns to the side.
+export function LockGlyph({ color, size = 14, open = false }) {
+  const k = size / 14;
+  return (
+    <View style={{ width: size, height: size, direction: 'ltr' }}>
+      <View style={abs({ left: (open ? 5.6 : 3.6) * k, top: (open ? -0.6 : 0.6) * k, width: 6.8 * k, height: 7 * k, borderTopLeftRadius: 3.4 * k, borderTopRightRadius: 3.4 * k,
+        border: `${1.5 * k}px solid ${color}`, borderBottomWidth: 0 })} />
+      <View style={abs({ left: 2 * k, top: 6 * k, width: 10 * k, height: 7.6 * k, borderRadius: 1.8 * k, backgroundColor: color })} />
+    </View>
+  );
+}
+
 // An arrow into a stack (Move to another activity).
 export function MoveGlyph({ color, size = 14 }) {
   const k = size / 14;

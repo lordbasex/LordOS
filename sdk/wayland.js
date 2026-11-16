@@ -8,7 +8,7 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
 import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
@@ -49,7 +49,7 @@ let drag = null;
 addListener('pointermove', (e) => {
   if (!drag) return;
   const w = wm.get(drag.id);
-  if (!w) { drag = null; return; }
+  if (!w || isWindowLocked(drag.id)) { drag = null; return; }
   if (!drag.start || drag.start.x == null) { drag.start = { x: e.x, y: e.y, f: wm.frame(w) }; return; }
   const dx = e.x - drag.start.x, dy = e.y - drag.start.y, f = drag.start.f;
   if (drag.edges == null && w.maximized) {

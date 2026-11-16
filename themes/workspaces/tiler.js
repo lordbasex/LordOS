@@ -70,6 +70,20 @@ export function setLayout(desk, dkey, layout, ratio) {
   schedule();
 }
 
+// The padlock of one display of an activity: closed, the windows there can't be moved, resized, minimized, maximized,
+// snapped or closed by the person (the SDK refuses, configureWindows({ locked })), and the frame hides its actions.
+export const isLocked = (desk, dkey) => !!activityOf(desk).layouts[dkey]?.locked;
+export function setLocked(desk, dkey, on) {
+  updateActivity(desk, (m) => {
+    const cur = m.layouts[dkey] || { layout: 'free', ratio: cleanRatio('split') };
+    const next = { ...cur };
+    if (on) next.locked = true; else delete next.locked;
+    return { ...m, layouts: { ...m.layouts, [dkey]: next } };
+  });
+}
+// whether window w is on a locked display of its activity (the display its frame is on)
+export const windowLocked = (w) => !!w && !w.pip && isLocked(w.desktop, keyOfDisplay(displayFor(wFrame(w))));
+
 export function setFloating(id, on) {
   if (on) floating.add(id); else { floating.delete(id); applied.delete(id); }
   if (!on) { const w = windows.get().find((x) => x.id === id); if (w) home.set(id, keyOfDisplay(displayFor(wFrame(w)))); }
@@ -87,7 +101,7 @@ export function saveLayout(desk) {
     const { layout, ratio } = layoutOf(desk, dk);
     const ids = (order.get(`${desk}|${dk}`) || []).filter((id) => windows.get().some((w) => w.id === id && w.desktop === desk));
     const keys = ids.map((id) => { const w = windows.get().find((x) => x.id === id); return w ? launcherIdOf(w) : null; });
-    out[dk] = savedDisplay(layout, ratio, keys);
+    out[dk] = { ...savedDisplay(layout, ratio, keys), ...(activityOf(desk).layouts[dk]?.locked ? { locked: true } : null) };
   }
   updateActivity(desk, (m) => ({ ...m, layouts: { ...m.layouts, ...out } }));
   return out;

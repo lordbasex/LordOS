@@ -159,14 +159,28 @@ export const appMenus = createStore({});
 // used to open Linux app windows at the size they requested.
 // snap: true turns on window snapping (dragging a window to an edge of the screen, see "Snapping"
 // below); the Classic theme does.
-export function configureWindows({ apps, workArea, chrome: c, snap }) {
+// locked: (window) => true for a window the person has locked in place (Lord Workspaces' padlock): the person's own
+// ways to move, resize, maximize, minimize, snap or close it refuse (see "Locked windows" below).
+export function configureWindows({ apps, workArea, chrome: c, snap, locked }) {
   themeApps = apps;
   rebuild();
   if (typeof workArea === 'function') areaFn = workArea;
   else if (workArea) { area = workArea; areaFn = null; }
   if (c) chrome = c;
   if (snap != null) snapOn = !!snap;
+  if (typeof locked === 'function') lockedFn = locked;
 }
+
+// ---- Locked windows ----
+// The theme decides which windows are locked (configureWindows({ locked })). wm.beginMove/beginResize, move, resize,
+// minimize, toggleMaximize, snap, snapKey, center, arrange and close (unless forced) leave a locked window as it is;
+// what a program does to it (setFrame, the tiler, a forced close, the app closing its own window) still applies.
+let lockedFn = null;
+export const isWindowLocked = (id) => {
+  if (!lockedFn) return false;
+  const w = windows.get().find((x) => x.id === id);
+  try { return !!(w && lockedFn(w)); } catch (e) { return false; }
+};
 
 // SDK internal apps (they don't appear in the app launcher): 'linux' = Wayland windows.
 export function registerBuiltinApp(app) {
@@ -301,7 +315,7 @@ const grabAreas = () => screen.displays.map((d) => workAreaOf(d)).map((a, i) => 
 function beginGrab(id, edges) {
   const w = windows.get().find((x) => x.id === id);
   const f = frameNodes.get(id);
-  if (!w || !f || w.maximized || w.fullscreen || typeof lord === 'undefined' || !lord.wm) return false;
+  if (!w || !f || w.maximized || w.fullscreen || isWindowLocked(id) || typeof lord === 'undefined' || !lord.wm) return false;
   const [minW, minH] = registry.get(w.app)?.minSize || [160, 100];
   const areas = grabAreas();
   if (!lord.wm.grab(f.node, edges, { inset: f.inset, minW, minH, minTop: areaOfWindow(w).y, areas })) return false;
@@ -382,6 +396,7 @@ export const wm = {
   },
   // Closes the window; if the app set a guard and it returns false, it doesn't close.
   close(id, force = false) {
+    if (!force && isWindowLocked(id)) return false;
     const guard = guards.get(id);
     if (!force && guard && guard() === false) {
       // it stays, and it may be asking something (unsaved changes): on another desktop that must be seen.
@@ -406,17 +421,17 @@ export const wm = {
   moveToDesktop(id, desktop) {
     if (desktopList.get().includes(desktop)) patch(id, { desktop });
   },
-  minimize: (id) => patch(id, { minimized: true }),
-  toggleMaximize: (id) => windows.set((ws) => ws.map((w) => (w.id !== id ? w : w.snapped && w.restore
+  minimize: (id) => { if (!isWindowLocked(id)) patch(id, { minimized: true }); },
+  toggleMaximize: (id) => isWindowLocked(id) || windows.set((ws) => ws.map((w) => (w.id !== id ? w : w.snapped && w.restore
     ? { ...w, ...w.restore, snapped: null, restore: null, maximized: true }
     : { ...w, maximized: !w.maximized }))),
   // Snapping (see "Snapping" above): zone is one of SNAP_ZONES; 'restore' goes back to the size
   // and place from before the first snap (or un-maximizes).
-  snap: (id, zone) => { if (zone === 'restore') unsnap(id); else if (SNAP_ZONES.includes(zone)) snapTo(id, zone); },
+  snap: (id, zone) => { if (isWindowLocked(id)) return; if (zone === 'restore') unsnap(id); else if (SNAP_ZONES.includes(zone)) snapTo(id, zone); },
   // The Window menu (sdk/windowmenu.js, 0.8.5): centered in its display's work area at its own size.
   center(id) {
     const w = windows.get().find((x) => x.id === id);
-    if (!w) return;
+    if (!w || isWindowLocked(id)) return;
     const a = workAreaOf(displayFor(w)), r = w.snapped && w.restore ? w.restore : w;
     const ww = Math.min(r.w, a.w), hh = Math.min(r.h, a.h);
     patch(id, { x: Math.round(a.x + (a.w - ww) / 2), y: Math.round(a.y + (a.h - hh) / 2), w: ww, h: hh, maximized: false, snapped: null, restore: null });
@@ -442,20 +457,20 @@ export const wm = {
     const first = windows.get().find((x) => x.id === ids[0]);
     if (!zones || !first) return;
     const d = displayFor(first);
-    ids.slice(0, zones.length).forEach((id, i) => { snapTo(id, zones[i], d); });
+    ids.slice(0, zones.length).forEach((id, i) => { if (!isWindowLocked(id)) snapTo(id, zones[i], d); });
     for (const id of [...ids.slice(0, zones.length)].reverse()) wm.focus(id);
   },
   // Super+arrow (dir: 'left' | 'right' | 'up' | 'down'): snap.js snapNext.
   snapKey(id, dir) {
     const w = windows.get().find((x) => x.id === id);
-    if (!w || w.fullscreen || w.pip) return;
+    if (!w || w.fullscreen || w.pip || isWindowLocked(id)) return;
     const to = snapNext(w.maximized ? 'max' : w.snapped, dir);
     if (!to) return;
     if (to === 'minimize') wm.minimize(id);
     else wm.snap(id, to);
   },
-  move: (id, x, y) => patch(id, { x: Math.round(x), y: Math.round(Math.max(workAreaOf(displayAt(x, y)).y, y)), maximized: false, snapped: null, restore: null, oskFrame: null }),
-  resize: (id, w, h) => patch(id, { w: Math.round(w), h: Math.round(h) }),
+  move: (id, x, y) => isWindowLocked(id) || patch(id, { x: Math.round(x), y: Math.round(Math.max(workAreaOf(displayAt(x, y)).y, y)), maximized: false, snapped: null, restore: null, oskFrame: null }),
+  resize: (id, w, h) => isWindowLocked(id) || patch(id, { w: Math.round(w), h: Math.round(h) }),
   setFrame: (id, f) => patch(id, { ...f, maximized: false, snapped: null, restore: null, oskFrame: null }),
   // The on-screen keyboard moves the window with the field out of its way, and puts it back as it was
   // (sdk/osk.js). A window the person moves meanwhile stays where they left it.

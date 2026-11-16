@@ -238,4 +238,10 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
   eq('magnet: the outer edge of the right one breaks', follow(pair, before, { a: f(0, 500), b: f(500, 400) }, area), { break: true });
 }
 
+// the padlock is kept in the settings key, and only as true
+{
+  const c = cleanActivity({ icon: 'code', color: '#7C5CFF', pins: [], setup: true, layouts: { 'DP-1': { layout: 'free', locked: true }, 'DP-2': { layout: 'grid', locked: 'yes' } } }, 0);
+  eq('padlock kept', [c.layouts['DP-1'].locked, 'locked' in c.layouts['DP-2']], [true, false]);
+}
+
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

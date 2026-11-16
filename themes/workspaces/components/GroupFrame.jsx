@@ -9,9 +9,9 @@ import {
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
-import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
+import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked } from '../tiler.js';
 import { Surface } from './Surface.jsx';
 import { noteLaunch } from '../state.js';
 
@@ -105,6 +105,8 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const layoutBtn = useRef(null);
   const apps = useLauncherApps();
   const { layout, ratio } = layoutOf(desk, dkey);
+  // the padlock closed: only the padlock stays in the header, and the divider can't be dragged
+  const locked = isLocked(desk, dkey);
   const f = plan.frame, hd = plan.header, area = plan.work;
   useEffect(() => { if (!saved) return undefined; const id = setTimeout(() => setSaved(false), 1600); return () => clearTimeout(id); }, [saved]);
   const pins = meta.pins.map((k) => apps.find((a) => a.id === k)).filter(Boolean);
@@ -139,7 +141,8 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         ) : null}
         <View style={{ flex: 1 }} />
         <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
-          {saved ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 6 }}>{tr('shell.ws.layout.saved')}</Text> : null}
+          {saved && !locked ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 6 }}>{tr('shell.ws.layout.saved')}</Text> : null}
+          {locked ? null : (<>
           <HeaderButton t={t} wide anchor={layoutBtn} active={!!picker} label={tr(`shell.ws.layout.${layout}`)} onClick={openPicker}>
             <LayoutMini cells={LAYOUT_CELLS[layout]} w={20} h={14} color={t.frameText} fill={t.frameText} active />
           </HeaderButton>
@@ -148,9 +151,13 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
           {canMove ? (
             <HeaderButton t={t} label={tr('shell.ws.layout.move')} onClick={(e) => { const id = wm.focused(); if (id) setMoveMenu({ x: e.x, y: e.y + 12, id }); }}><MoveGlyph color={t.frameText} size={14} /></HeaderButton>
           ) : null}
+          </>)}
+          <HeaderButton t={t} active={locked} label={tr(locked ? 'shell.ws.lock.off' : 'shell.ws.lock.on')} onClick={() => { setPicker(null); setMoveMenu(null); setLocked(desk, dkey, !locked); }}>
+            <LockGlyph color={locked ? t.accent : t.frameText} size={14} open={!locked} />
+          </HeaderButton>
         </View>
       </View>
-      {count >= 2 ? <Splitter t={t} desk={desk} dkey={dkey} layout={layout} ratio={ratio} area={area} count={count} /> : null}
+      {count >= 2 && !locked ? <Splitter t={t} desk={desk} dkey={dkey} layout={layout} ratio={ratio} area={area} count={count} /> : null}
       {/* kept mounted and only shown or hidden: an activity switch then changes one style here, not a whole card */}
       {showEmpty ? (
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',

@@ -168,6 +168,40 @@ await flush();
   await flush();
 }
 
+// the padlock of one display: its windows can't be moved, resized, minimized, maximized, snapped or closed by the person,
+// and the frame's header keeps only the padlock; the other displays are untouched
+{
+  const T = (k) => sdk.t(`shell.ws.layout.${k}`);
+  const shown = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  const k1 = sdk.wm.open('extra30', { frame: { x: L.x + 200, y: 200, w: 600, h: 400 } });
+  const k2 = sdk.wm.open('extra31', { frame: { x: M.x + 200, y: 200, w: 600, h: 400 } });
+  await flush();
+  const f0 = frameOf(k1);
+  const freeBefore = shown(T('free'));
+  tiler.setLocked(desk, 'DP-1', true);
+  await flush();
+  check('lock: only that display', [tiler.isLocked(desk, 'DP-1'), tiler.isLocked(desk, 'DP-2'), tiler.isLocked(desk, 'HDMI-A-1')], [true, false, false]);
+  check('lock: the window is locked, the one on the main display is not', [sdk.isWindowLocked(k1), sdk.isWindowLocked(k2)], [true, false]);
+  sdk.wm.move(k1, L.x + 600, 500); sdk.wm.resize(k1, 300, 200); sdk.wm.minimize(k1); sdk.wm.toggleMaximize(k1); sdk.wm.snap(k1, 'left'); sdk.wm.snapKey(k1, 'right'); sdk.wm.center(k1);
+  await flush();
+  check('lock: move, resize, minimize, maximize, snap and center refused', [frameOf(k1), !!sdk.wm.get(k1).minimized, !!sdk.wm.get(k1).maximized], [f0, false, false]);
+  check('lock: close refused (unless forced)', [sdk.wm.close(k1), !!sdk.wm.get(k1)], [false, true]);
+  check('lock: the header keeps only the padlock', shown(T('free')), freeBefore - 1);
+  sdk.wm.minimize(k2);
+  await flush();
+  check('lock: the main display still minimizes', !!sdk.wm.get(k2).minimized, true);
+  const saved = tiler.saveLayout(desk);
+  check('lock: Save layout keeps the padlock', saved['DP-1'].locked, true);
+  tiler.setLocked(desk, 'DP-1', false);
+  await flush();
+  sdk.wm.move(k1, L.x + 300, 300);
+  await flush();
+  check('unlock: it moves again', [frameOf(k1).x, frameOf(k1).y], [L.x + 300, 300]);
+  check('unlock: the header back', shown(T('free')), freeBefore);
+  for (const id of [k1, k2]) sdk.wm.close(id, true);
+  await flush();
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');

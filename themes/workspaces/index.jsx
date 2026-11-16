@@ -28,7 +28,7 @@ import { displayPlan, shownDisplays, onChrome } from './model/geometry.js';
 import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/activities.js';
 import { minimizeStarts } from '../default/minimize.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
-import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled } from './tiler.js';
+import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
 import { startMagnet } from './magnet.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
@@ -49,7 +49,7 @@ const planFor = (d, s) => { const p = wsPrefs(s); return displayPlan(d, { spine:
 const areaFn = (d) => planFor(d, settings.get()).work;
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame; snapping on for windows that float
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true });
+configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true, locked: windowLocked });
 
 // Search, the Control Center and the notifications open on the display under the pointer (or the main one).
 const togglePanel = (name, extra = {}) => panel.set((p) => (p && p.name === name && (!extra.mode || p.mode === extra.mode) ? null : { name, display: pointerDisplay().id, ...extra }));
@@ -246,7 +246,7 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview t={t} /> : null}
-            <Window win={w} t={t} focused={!inOverview && w.id === focused} app={getApp(w.id)} tight={tight.has(w.id)} leaving={leaving.includes(w.id)} />
+            <Window win={w} t={t} focused={!inOverview && w.id === focused} app={getApp(w.id)} tight={tight.has(w.id)} leaving={leaving.includes(w.id)} locked={windowLocked(w)} />
           </Fragment>
         ))}
         {leavingWins.map((w) => <Window key={w.id} win={w} t={t} focused={false} app={getApp(w.id)} leaving />)}

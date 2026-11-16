@@ -33,7 +33,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     over the empty half); resizing one of the pair by the shared edge moves the other's on release. With several
     monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). ❖V pastes in LordOS apps, as in Lord Flow
     (❖⇧V opens the clipboard). A maximized window fills the frame's work area and keeps its rounded
-    corners. The tiler writes the window store once per change and
+    corners. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
+    small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
+    still closes it. The tiler writes the window store once per change and
     never runs per frame.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
     activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and
