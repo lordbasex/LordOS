@@ -84,6 +84,12 @@ export function makeTheme({ mode, accent, effects, surface }, wallpapers = []) {
     sidebarBg: dark ? '#191729' : '#F4F2FB',
     separator: dark ? 'rgba(255,255,255,0.09)' : 'rgba(20,16,60,0.10)',
     hover: dark ? 'rgba(255,255,255,0.075)' : 'rgba(20,16,60,0.06)',
+    // the bars' controls (Context Spine, activity strip, status cluster; components/BarButton.jsx): the glyphs' colour
+    // at rest and under the pointer, the pill that shows under the pointer, the line between groups
+    iconFg: dark ? 'rgba(241,239,252,0.64)' : 'rgba(25,23,51,0.66)',
+    iconFgHover: dark ? '#F1EFFC' : '#191733',
+    itemHover: dark ? 'rgba(255,255,255,0.14)' : 'rgba(20,16,60,0.09)',
+    barSeparator: dark ? 'rgba(255,255,255,0.14)' : 'rgba(20,16,60,0.12)',
     control: dark ? '#2D2A45' : '#ECE9F7',
     inputBg: dark ? '#232039' : '#FFFFFF',
     radius: 10,

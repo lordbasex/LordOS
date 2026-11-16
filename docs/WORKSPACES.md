@@ -215,8 +215,14 @@ A new theme setting, **Effects style** (`themeOptions.workspaces.surface`), in t
 
 Settings → Appearance → Transparency off (`settings.effects === false`) is always Opaque. Rules that keep it cheap:
 
-- **One live blur at rest: the spine.** The strip, the status cluster, the header chips and the empty state use the
-  same glass without a live blur (a thicker tint: `bgStill`); Search and the Control Center blur while they are open.
+- **Live blur at rest: the spine, the activity strip and the status cluster** (the last two since 0.8.8.10, when the
+  engine began keeping a blurred backdrop while nothing behind it changes and repainting each damaged rectangle on its
+  own). The header chips and the empty state use the same glass without a live blur (a thicker tint: `bgStill`);
+  Search and the Control Center blur while they are open.
+- **The bars' controls** (`components/BarButton.jsx`): like a video player's, each control of the spine, the strip and
+  the cluster sits on its own pill that shows under the pointer (`itemHover`), glyphs in the spine's colour (`iconFg`,
+  `iconFgHover`), thin lines between groups (`barSeparator`). An activity's icon keeps the colour chosen in Edit
+  activity; status items in colour (an app's own icon) keep theirs.
 - **No full-screen blur, no full-screen scrim.** The group frame is only a border: a fill over the whole work area was
   the costly part of an activity switch on the CPU path.
 - **Clearances.** The engine repaints a blurred node and twice its blur radius around it whenever a change touches that

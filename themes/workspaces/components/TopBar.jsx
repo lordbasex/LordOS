@@ -1,7 +1,10 @@
 // The top band of the main display: the activity strip at the start (a pill per activity, its icon in its colour, the
 // one in view filled with the accent; "+ New activity"; where you are: "Activity 2 of 4 · up to 9") and the status
 // cluster at the end (privacy indicators, the status items such as the network, the volume, notifications and the
-// clock). Each is one small surface, so at most two blurred boxes here.
+// clock). Each is one small surface of the theme's material, blurred like the Context Spine (the engine keeps a
+// blurred backdrop while nothing behind it changes). Their controls look like a video player's: a pill per control
+// that shows under the pointer, glyphs in the spine's colour, thin lines between groups (components/BarButton.jsx).
+// An activity's icon keeps its own colour (Edit activity).
 // A pill: click switches; double click renames in place (Enter keeps, Esc drops); right click: rename, icon and colour,
 // delete (asked first, in the page). The clock re-renders only its own text, once a minute (sharedTicker).
 import {
@@ -11,6 +14,7 @@ import {
 import { memo, useEffect, useRef, useState } from 'react';
 import { tween, EASE } from '../motion.js';
 import { Surface } from './Surface.jsx';
+import { BarButton, BarSeparator, BAR_ITEM } from './BarButton.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SpeakerGlyph, BellGlyph } from '../glyphs.jsx';
 import { activities, renaming, deleting, newActivity, noteLaunch } from '../state.js';
@@ -67,7 +71,7 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pill
     <View ref={pillRef} onClick={() => switchDesktop(id)} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => onMenu(id, e)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={name}
       style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 16, maxWidth: 190,
-        backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.hover : 'transparent' }}>
+        backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.itemHover : 'transparent' }}>
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
       <Text style={{ fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
     </View>
@@ -122,15 +126,16 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   const at = list.indexOf(active) + 1;
   const full = list.length >= MAX_ACTIVITIES;
   return (
-    <Surface ref={strip} t={t} radius={H / 2} still style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
+    <Surface ref={strip} t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
       {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - 32) / 2 - 1, width: pos.w, height: 32, borderRadius: 16, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
       {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
         pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
-      <View onClick={(e) => { if (!full) { noteLaunch(e.x, e.y); newActivity(); } }} title={tr('shell.ws.activity.new')}
-        style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 16, opacity: full ? 0.45 : 1 }}>
-        <PlusGlyph color={t.text} size={11} />
-        <Text style={{ fontSize: 12.5, fontWeight: 500, color: t.text, whiteSpace: 'nowrap' }}>{tr('shell.ws.activity.newShort')}</Text>
-      </View>
+      <BarSeparator t={t} />
+      <BarButton t={t} disabled={full} title={tr('shell.ws.activity.new')} onClick={(e) => { noteLaunch(e.x, e.y); newActivity(); }}
+        glyph={(c) => <PlusGlyph color={c} size={11} />}>
+        {(c) => <Text style={{ fontSize: 12.5, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{tr('shell.ws.activity.newShort')}</Text>}
+      </BarButton>
+      <BarSeparator t={t} />
       <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 8 }}>{tr('shell.ws.activity.position', { n: at, total: list.length, max: MAX_ACTIVITIES })}</Text>
       {menu && <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
         { label: tr('shell.ws.activity.rename'), onClick: () => renaming.set(menu.id) },
@@ -148,24 +153,24 @@ function Volume({ t, onClick }) {
   if (!st.connected || !out) return null;
   const pct = Math.round(out.level * 100);
   return (
-    <View onClick={onClick} title={tr('shell.cc.sound')} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-      <SpeakerGlyph color={t.text} size={15} level={pct === 0 ? 0 : pct < 50 ? 1 : 2} muted={out.mute} />
-    </View>
+    <BarButton t={t} onClick={onClick} title={tr('shell.cc.sound')}
+      glyph={(c) => <SpeakerGlyph color={c} size={15} level={pct === 0 ? 0 : pct < 50 ? 1 : 2} muted={out.mute} />} />
   );
 }
 
 // rect: the top band; screenW: the whole screen's width (the cluster is placed by its end edge, its width is its content)
 export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, notifRef }) {
   return (
-    <Surface t={t} radius={H / 2} still style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
-      flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 }}>
+    <Surface t={t} radius={H / 2} style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
+      flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 }}>
       <PrivacyIndicators />
-      <StatusItems color={t.text} height={28} />
+      <View style={{ paddingHorizontal: 4 }}><StatusItems color={t.iconFg} height={BAR_ITEM} /></View>
+      <BarSeparator t={t} />
       <Volume t={t} onClick={onControl} />
-      <View ref={notifRef} onClick={onNotif} title={tr('shell.ws.notif.title')} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-        <BellGlyph color={t.text} size={15} dot={unread ? t.accent : null} />
-      </View>
-      <View onClick={onNotif} style={{ paddingStart: 4 }}><Clock t={t} /></View>
+      <BarButton ref={notifRef} t={t} onClick={onNotif} title={tr('shell.ws.notif.title')}
+        glyph={(c) => <BellGlyph color={c} size={15} dot={unread ? t.accent : null} />} />
+      <BarSeparator t={t} />
+      <BarButton t={t} onClick={onNotif}><Clock t={t} /></BarButton>
     </Surface>
   );
 });
