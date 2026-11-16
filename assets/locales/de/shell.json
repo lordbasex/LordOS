@@ -482,6 +482,8 @@
   "ws.lock.on": "Fenster dieses Bildschirms sperren",
   "ws.lock.off": "Fenster dieses Bildschirms entsperren",
   "ws.lock.window": "Gesperrt: mit dem Schloss im Rahmen entsperren",
+  "ws.minimized.label": "Minimiert",
+  "ws.minimized.title": "Minimierte Fenster auf diesem Bildschirm: zum Zurückholen anklicken",
   "ws.window.tile": "Fenster einpassen",
   "ws.window.float": "Fenster frei lassen",
   "ws.notif.title": "Mitteilungen",

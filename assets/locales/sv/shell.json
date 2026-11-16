@@ -482,6 +482,8 @@
   "ws.lock.on": "Lås den här skärmens fönster",
   "ws.lock.off": "Lås upp den här skärmens fönster",
   "ws.lock.window": "Låst: lås upp med hänglåset i ramen",
+  "ws.minimized.label": "Minimerade",
+  "ws.minimized.title": "Minimerade fönster på den här skärmen: klicka för att ta tillbaka",
   "ws.window.tile": "Placera fönstret",
   "ws.window.float": "Låt fönstret vara fritt",
   "ws.notif.title": "Notiser",

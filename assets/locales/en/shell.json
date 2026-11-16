@@ -482,6 +482,8 @@
   "ws.lock.on": "Lock this display's windows",
   "ws.lock.off": "Unlock this display's windows",
   "ws.lock.window": "Locked: unlock it from the padlock in the frame",
+  "ws.minimized.label": "Minimized",
+  "ws.minimized.title": "Minimized windows on this display: click one to bring it back",
   "ws.window.tile": "Tile this window",
   "ws.window.float": "Float this window",
   "ws.notif.title": "Notifications",

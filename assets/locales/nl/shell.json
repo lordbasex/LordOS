@@ -482,6 +482,8 @@
   "ws.lock.on": "Vensters van dit scherm vergrendelen",
   "ws.lock.off": "Vensters van dit scherm ontgrendelen",
   "ws.lock.window": "Vergrendeld: ontgrendel met het slotje in het kader",
+  "ws.minimized.label": "Geminimaliseerd",
+  "ws.minimized.title": "Geminimaliseerde vensters op dit scherm: klik er een aan om hem terug te halen",
   "ws.window.tile": "Dit venster tegelen",
   "ws.window.float": "Dit venster vrijlaten",
   "ws.notif.title": "Meldingen",

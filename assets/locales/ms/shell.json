@@ -475,6 +475,8 @@
   "ws.lock.on": "Kunci tetingkap paparan ini",
   "ws.lock.off": "Buka kunci tetingkap paparan ini",
   "ws.lock.window": "Dikunci: buka dengan mangga pada bingkai",
+  "ws.minimized.label": "Diminimumkan",
+  "ws.minimized.title": "Tetingkap yang diminimumkan pada paparan ini: klik satu untuk memulihkannya",
   "ws.window.tile": "Petakkan tetingkap ini",
   "ws.window.float": "Bebaskan tetingkap ini",
   "ws.notif.title": "Pemberitahuan",

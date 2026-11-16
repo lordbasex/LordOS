@@ -475,6 +475,8 @@
   "ws.lock.on": "このディスプレイのウィンドウをロック",
   "ws.lock.off": "このディスプレイのウィンドウのロックを解除",
   "ws.lock.window": "ロック中：フレームの錠前で解除します",
+  "ws.minimized.label": "最小化",
+  "ws.minimized.title": "このディスプレイで最小化したウィンドウ：クリックすると元に戻ります",
   "ws.window.tile": "このウインドウをタイルに配置",
   "ws.window.float": "このウインドウを自由にする",
   "ws.notif.title": "通知",

@@ -5,7 +5,7 @@
 // between the tiles: dragging it shows a line (moved with lord.setStyle, no React render per pointer move) and the
 // tiles change once, on release. With no window on the display, a short empty state offers the same two ways in.
 import {
-  View, Text, Layer, addListener, useStore, windows, wm, desktopList, desktopName, displayFor, launchApp, useLauncherApps, t as tr,
+  View, Text, Layer, addListener, useStore, windows, wm, windowTitle, windowIcon, desktopList, desktopName, displayFor, launchApp, useLauncherApps, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
@@ -95,10 +95,42 @@ const FrameBox = memo(function FrameBox({ t, f }) {
 });
 
 // how many windows of this activity show on this display (a narrow selector: other windows' changes don't re-render)
+// The windows of this activity minimized on this display, as a string of ids (a narrow selector, like countOn). A
+// minimized window keeps its frame, so it stays on the display it was on and comes back there.
+const minimizedOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && w.minimized && !w.pip && tileable({ ...w, minimized: false, maximized: false })
+  && displayFor(w)?.id === d.id).map((w) => w.id).join('\n');
+// where each display's tray is, for the minimize effect (index.jsx): display id → the tray's node
+export const trayNodes = new Map();
+
+// The minimized windows of a display, in its frame header: one icon each; a click brings the window back where it was.
+function MinimizedTray({ t, d, ids }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) trayNodes.set(d.id, ref.current.id); return () => { if (trayNodes.get(d.id) === ref.current?.id) trayNodes.delete(d.id); }; });
+  const list = ids.map((id) => wm.get(id)).filter(Boolean);
+  return (
+    <View ref={ref} title={tr('shell.ws.minimized.title')} style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4, borderRadius: 12,
+      backgroundColor: t.chipBg, display: list.length ? 'flex' : 'none' }}>
+      {list.length ? <Text style={{ fontSize: 11, color: t.textDim, paddingHorizontal: 4, whiteSpace: 'nowrap' }}>{tr('shell.ws.minimized.label')}</Text> : null}
+      {list.slice(0, 8).map((w) => {
+        const Icon = windowIcon(w);
+        return (
+          <View key={w.id} title={windowTitle(w)} onClick={() => wm.focus(w.id)}
+            style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}>
+            {Icon ? <Icon size={18} /> : <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.textDim }} />}
+          </View>
+        );
+      })}
+      {list.length > 8 ? <Text style={{ fontSize: 11, color: t.textDim, paddingHorizontal: 4 }}>{`+${list.length - 8}`}</Text> : null}
+    </View>
+  );
+}
+
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
 export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
+  const minIds = useStore(windows, minimizedOn(desk, d));
+  const minimized = minIds ? minIds.split('\n') : [];
   const [picker, setPicker] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -139,6 +171,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
             ))}
           </View>
         ) : null}
+        <MinimizedTray t={t} d={d} ids={minimized} />
         <View style={{ flex: 1 }} />
         <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
           {saved && !locked ? <Text style={{ fontSize: 11.5, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 6 }}>{tr('shell.ws.layout.saved')}</Text> : null}
@@ -161,7 +194,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
       {/* kept mounted and only shown or hidden: an activity switch then changes one style here, not a whole card */}
       {showEmpty ? (
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',
-          display: count === 0 ? 'flex' : 'none' }}>
+          display: count === 0 && !minimized.length ? 'flex' : 'none' }}>
           <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, maxWidth: 440, paddingHorizontal: 24, paddingVertical: 20 }}>
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.frameText, textAlign: 'center' }}>{tr('shell.ws.empty.title')}</Text>
             <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.empty.body')}</Text>

@@ -202,6 +202,29 @@ await flush();
   await flush();
 }
 
+// minimized windows stay on their display: its frame header shows them, and a click brings each back where it was
+{
+  const label = sdk.t('shell.ws.minimized.label');
+  const trays = () => [...texts].filter(([id, v]) => v === label && attached(id) && ![parents.get(id), parents.get(parents.get(id))].some((p) => styles.get(p)?.display === 'none')).map(([id]) => id);
+  const m1 = sdk.wm.open('extra40', { frame: { x: R.x + 300, y: 300, w: 500, h: 400 } });
+  await flush();
+  const f1 = frameOf(m1);
+  check('tray: none with nothing minimized', trays().length, 0);
+  sdk.wm.minimize(m1);
+  for (let i = 0; i < 3; i++) await flush();
+  const tr = trays();
+  check('tray: one, on the display the window was on', tr.length, 1);
+  const up = (id) => [parents.get(id), parents.get(parents.get(id))];
+  const icon = tr.length ? [...parents].filter(([c, p]) => up(tr[0]).includes(p) && styles.get(c)?.width === 26 && attached(c)).map(([c]) => c) : [];
+  check('tray: the window\'s icon', icon.length, 1);
+  if (icon.length) { globalThis.__lordEvent('down', icon[0], 0, 0, 0); globalThis.__lordEvent('up', icon[0], 0, 0, 0); }
+  for (let i = 0; i < 3; i++) await flush();
+  check('tray: a click brings it back, where it was', [!!sdk.wm.get(m1).minimized, frameOf(m1)], [false, f1]);
+  check('tray: empty again', trays().length, 0);
+  sdk.wm.close(m1, true);
+  await flush();
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');

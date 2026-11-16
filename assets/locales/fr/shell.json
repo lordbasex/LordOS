@@ -482,6 +482,8 @@
   "ws.lock.on": "Verrouiller les fenêtres de cet écran",
   "ws.lock.off": "Déverrouiller les fenêtres de cet écran",
   "ws.lock.window": "Verrouillée : déverrouillez-la avec le cadenas du cadre",
+  "ws.minimized.label": "Réduites",
+  "ws.minimized.title": "Fenêtres réduites sur cet écran : cliquez sur l'une pour la ramener",
   "ws.window.tile": "Placer cette fenêtre",
   "ws.window.float": "Libérer cette fenêtre",
   "ws.notif.title": "Notifications",

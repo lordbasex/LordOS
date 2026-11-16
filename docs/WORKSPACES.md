@@ -151,7 +151,10 @@ jumps to its end, and the SDK's own desktop slide is off too.
   edge). It starts after the windows' slide: in the same frames the two would be repainted as one box spanning both.
 - **Spine:** each item answers the pointer with a spring (scale on its icon: up on hover, down on press).
 - **Search** drops in from a little above and settles; **the Control Center** unfolds from its button.
-- **Windows** open with a zoom from where they were launched (the spine, the search panel), and minimize into the spine.
+- **Windows** open with a zoom from where they were launched (the spine, the search panel), and minimize into their
+  display's tray of minimized windows (the frame header shows one icon per minimized window of the activity on that
+  display; a click brings the window back where it was, its frame unchanged). A maximized window fills its display's
+  work area inside the group frame, never the whole canvas of several monitors.
 
 ## Keys
 

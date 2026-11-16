@@ -482,6 +482,8 @@
   "ws.lock.on": "A kijelző ablakainak zárolása",
   "ws.lock.off": "A kijelző ablakainak feloldása",
   "ws.lock.window": "Zárolva: a keret lakatjával oldható fel",
+  "ws.minimized.label": "Kis méretű",
+  "ws.minimized.title": "A kijelző kis méretre állított ablakai: kattintson egyre a visszahozásához",
   "ws.window.tile": "Ablak csempézése",
   "ws.window.float": "Ablak szabadon hagyása",
   "ws.notif.title": "Értesítések",

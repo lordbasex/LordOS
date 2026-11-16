@@ -482,6 +482,8 @@
   "ws.lock.on": "Bloquear as janelas deste monitor",
   "ws.lock.off": "Desbloquear as janelas deste monitor",
   "ws.lock.window": "Bloqueada: desbloqueie no cadeado da moldura",
+  "ws.minimized.label": "Minimizadas",
+  "ws.minimized.title": "Janelas minimizadas neste monitor: clique em uma para trazê-la de volta",
   "ws.window.tile": "Encaixar esta janela",
   "ws.window.float": "Deixar esta janela livre",
   "ws.notif.title": "Notificações",

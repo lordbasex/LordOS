@@ -15,7 +15,7 @@
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
-  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
+  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
@@ -35,7 +35,7 @@ import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
 import { ActivityStrip, StatusCluster, STATUS_W } from './components/TopBar.jsx';
-import { GroupFrame } from './components/GroupFrame.jsx';
+import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { Search } from './components/Search.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
 import { ActivityEditor } from './components/ActivityEditor.jsx';
@@ -118,7 +118,8 @@ function SnapPreview({ t }) {
     backgroundColor: t.mode === 'dark' ? 'rgba(124,92,255,0.16)' : 'rgba(91,63,224,0.14)', border: `2px solid ${t.accent}` }} />;
 }
 
-// The minimize effect: the window shrinks into the spine on its cached raster (one render to start, one to end).
+// The minimize effect: the window shrinks into its display's tray of minimized windows (the frame header,
+// GroupFrame.jsx), or the spine before the tray has a place, on its cached raster (one render to start, one to end).
 const MIN_MS = 220;
 function useLeaving(list, spine) {
   const prev = useRef(new Map());
@@ -132,7 +133,9 @@ function useLeaving(list, spine) {
         const n = wm.frameNode(id), w = wm.get(id);
         if (!n || !w) return;
         const f = wm.frame(w);
-        const to = spine ? { x: spine.x + spine.w / 2, y: spine.y + 110 } : { x: f.x, y: f.y };
+        let to = spine ? { x: spine.x + spine.w / 2, y: spine.y + 110 } : { x: f.x, y: f.y };
+        const tray = trayNodes.get(displayFor(f)?.id);
+        if (tray) try { const [tx, ty, tw, th] = lord.getLayout(tray); if (tw > 0 && tx > -10000) to = { x: tx + tw / 2, y: ty + th / 2 }; } catch (e) { /* gone */ }
         try { lord.setStyle(n, 'transformOriginX', to.x - f.x); lord.setStyle(n, 'transformOriginY', to.y - f.y); } catch (e) { /* gone */ }
         tween(n, { scaleX: [1, 0.12], scaleY: [1, 0.12], opacity: [1, 0] }, { ms: MIN_MS, ease: EASE.inOut,
           done: () => {

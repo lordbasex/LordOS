@@ -482,6 +482,8 @@
   "ws.lock.on": "Blocca le finestre di questo schermo",
   "ws.lock.off": "Sblocca le finestre di questo schermo",
   "ws.lock.window": "Bloccata: sbloccala dal lucchetto della cornice",
+  "ws.minimized.label": "Ridotte",
+  "ws.minimized.title": "Finestre ridotte a icona su questo schermo: fai clic su una per riaprirla",
   "ws.window.tile": "Affianca questa finestra",
   "ws.window.float": "Lascia libera questa finestra",
   "ws.notif.title": "Notifiche",
