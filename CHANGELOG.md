@@ -31,7 +31,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its tile keeps its minimum inside the work area and says so. In Free, the magnet: a window dragged to the left or
     right edge takes that half and the only other window of the display fills the other one (with several, a chooser
     over the empty half); resizing one of the pair by the shared edge moves the other's on release. With several
-    monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). The tiler writes the window store once per change and
+    monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). ❖V pastes in LordOS apps, as in Lord Flow
+    (❖⇧V opens the clipboard). The tiler writes the window store once per change and
     never runs per frame.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
     activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and

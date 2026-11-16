@@ -178,7 +178,7 @@ function App() {
   // the work areas follow the spine and the displays live; the tiles are laid out again
   useEffect(() => { configureWindows({ apps, workArea: areaFn }); areasChanged(); }, [sig, prefs.spine, prefs.spineEvery, rtl, screen.width, screen.height]);
   useEffect(registerSources, []);
-  useShortcuts({ grabs: switcherGrabs(flowGrabs()), table, onSuperTap: () => openSearch('apps') });
+  useShortcuts({ grabs: switcherGrabs(flowGrabs()), table, onSuperTap: () => openSearch('apps'), appsPaste: true });
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { panel.set(null); crownMenu.set(null); deskMenu.set(null); } }), []);
   useEffect(() => { if (inOverview) panel.set(null); }, [inOverview]);
   useEffect(() => registerGestureActions({
